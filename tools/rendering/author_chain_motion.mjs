@@ -66,7 +66,8 @@ function viewBoxOf(entry) {
 for (const spec of CHAIN_SPECS) {
   const row = catalogue.movements.find((entry) => entry.id === spec.id);
   if (!row) throw Error(`Movement ${spec.id} is not in the catalogue`);
-  if (row.motion.source_hold_reason) throw Error(`Movement ${spec.id} is on a source hold`);
+  // A movement whose catalogue text is on a source hold can only be authored from a text that says where it came from.
+  if (row.motion.source_hold_reason && !(spec.text && spec.text.basis)) throw Error(`Movement ${spec.id} is on a source hold`);
   if (row.source.asset_key !== `movement/${spec.slug}/demo/v1`) throw Error(`Movement ${spec.id} asset key ${row.source.asset_key} does not match slug ${spec.slug}`);
   const movement = layout.CHAIN_MOVEMENTS[spec.slug];
   if (!movement) throw Error(`Movement ${spec.id} has no chain movement for ${spec.slug}`);
@@ -97,9 +98,9 @@ for (const spec of CHAIN_SPECS) {
     techniqueCitations: [],
     viewBox: [0, 0, 100, 100],
     equipment: spec.equipment,
-    instructions: row.source.instructions,
-    cues: row.source.cues,
-    coachingIntent: row.source.coaching_intent,
+    instructions: spec.text?.instructions ?? row.source.instructions,
+    cues: spec.text?.cues ?? row.source.cues,
+    coachingIntent: spec.text?.coachingIntent ?? row.source.coaching_intent,
     reason: spec.reason,
     summary: spec.summary,
     frames: spec.phases.map((ph, i) => ({ id: `p${i + 1}`, caption: spec.captions[i], joints: pose(spec.slug, ph, spec.turns?.[i]) })),

@@ -64,6 +64,9 @@ const primsFor = (frame, options = {}) => layoutCanonicalFigure(frame.joints, {
   ...options,
 });
 const primSignature = (frame, options = {}) => JSON.stringify(primsFor(frame, options));
+/** The parts of a drawn across-the-body dumbbell: its handle, and the plate at each end of it. */
+const bellHandles = (prims) => prims.filter((p) => p.kind === 'bone' && p.w === 1.8);
+const isBellPart = (p) => p.kind === 'bone' && (p.w === 1.8 || (p.w === 2.6 && p.stroke === 'ink1'));
 
 describe('the live 186 variant resolves through the contract', () => {
   test('it is recognised as a variant and its base is the live Hammer Curl', () => {
@@ -180,8 +183,8 @@ describe('resolution refuses a malformed variant', () => {
       variantWith({ captionOverrides: { ...VARIANT.captionOverrides, 'not-a-frame-6': 'Extra.' } }),
       BASE,
     )).toThrow(/not a frame of base 62/);
-    const { 'full-stretch-5': dropped, ...rest } = VARIANT.captionOverrides;
-    expect(() => deriveVariantEntry(variantWith({ captionOverrides: rest }), BASE)).toThrow(/no caption supplied for base frame full-stretch-5/);
+    const { 'p5': dropped, ...rest } = VARIANT.captionOverrides;
+    expect(() => deriveVariantEntry(variantWith({ captionOverrides: rest }), BASE)).toThrow(/no caption supplied for base frame p5/);
   });
 
   test('caption wording is NOT gated by this module (owner direction, Entry 0160 A1)', () => {
@@ -190,7 +193,7 @@ describe('resolution refuses a malformed variant', () => {
     // pulldown or a hinge. Wording is judged by review, on the rendered card.
     expect(() => deriveVariantEntry(
       variantWith({
-        captionOverrides: { ...VARIANT.captionOverrides, 'lower-past-m-4': 'Hold the top position briefly.' },
+        captionOverrides: { ...VARIANT.captionOverrides, 'p4': 'Hold the top position briefly.' },
       }),
       BASE,
     )).not.toThrow();
@@ -198,19 +201,19 @@ describe('resolution refuses a malformed variant', () => {
 
   test('the step assignment is checked structurally: unknown, out of order, repeated', () => {
     expect(() => deriveVariantEntry(
-      variantWith({ frameRoles: { ...VARIANT.frameRoles, 'lower-past-m-4': 'sideways' } }),
+      variantWith({ frameRoles: { ...VARIANT.frameRoles, 'p4': 'sideways' } }),
       BASE,
-    )).toThrow(/lower-past-m-4: "sideways" is not a step of the curl family/);
+    )).toThrow(/p4: "sideways" is not a step of the curl family/);
     // Swapped steps: the second frame's step no longer comes after the first's.
     expect(() => deriveVariantEntry(
-      variantWith({ frameRoles: { ...VARIANT.frameRoles, 'elbows-quiet-2': 'peak' } }),
+      variantWith({ frameRoles: { ...VARIANT.frameRoles, 'p2': 'peak' } }),
       BASE,
-    )).toThrow(/curl-to-ches-3: step "peak" does not come after the previous frame's step "peak"/);
+    )).toThrow(/p3: step "peak" does not come after the previous frame's step "peak"/);
     // A repeated step is the same failure: two frames cannot share one step.
     expect(() => deriveVariantEntry(
-      variantWith({ frameRoles: { ...VARIANT.frameRoles, 'elbows-quiet-2': 'rise', 'curl-to-ches-3': 'rise' } }),
+      variantWith({ frameRoles: { ...VARIANT.frameRoles, 'p2': 'rise', 'p3': 'rise' } }),
       BASE,
-    )).toThrow(/curl-to-ches-3: step "rise" does not come after the previous frame's step/);
+    )).toThrow(/p3: step "rise" does not come after the previous frame's step/);
   });
 
   test('a base whose family has no step list is refused, not guessed', () => {
@@ -234,11 +237,11 @@ describe('resolution refuses a malformed variant', () => {
     const edited = structuredClone(resolved);
     edited.frames[2].joints = { ...edited.frames[2].joints, wr: [39.8, 30] };
     expect(() => verifyResolvedVariant(edited, BASE))
-      .toThrow(/curl-to-ches-3 joints do not match the base's/);
+      .toThrow(/p3 joints do not match the base's/);
 
     // Reordered steps: refused by the same rule resolution applies.
     const reordered = structuredClone(resolved);
-    reordered.frameRoles['elbows-quiet-2'] = 'peak';
+    reordered.frameRoles['p2'] = 'peak';
     expect(() => verifyResolvedVariant(reordered, BASE))
       .toThrow(/does not come after the previous frame's step/);
 
@@ -248,10 +251,10 @@ describe('resolution refuses a malformed variant', () => {
   });
 
   test('a frame role that is missing, unknown, or keyed to a frame that does not exist', () => {
-    const { 'neutral-grip-1': dropped, ...rest } = VARIANT.frameRoles;
-    expect(() => deriveVariantEntry(variantWith({ frameRoles: rest }), BASE)).toThrow(/no frame role for base frame neutral-grip-1/);
+    const { 'p1': dropped, ...rest } = VARIANT.frameRoles;
+    expect(() => deriveVariantEntry(variantWith({ frameRoles: rest }), BASE)).toThrow(/no frame role for base frame p1/);
     expect(() => deriveVariantEntry(
-      variantWith({ frameRoles: { ...VARIANT.frameRoles, 'lower-past-m-4': 'sideways' } }),
+      variantWith({ frameRoles: { ...VARIANT.frameRoles, 'p4': 'sideways' } }),
       BASE,
     )).toThrow(/is not a step of the curl family/);
     expect(() => deriveVariantEntry(
@@ -326,7 +329,7 @@ describe('resolution refuses a malformed variant', () => {
     // Two peaks can no longer be expressed at all: a repeated step fails the
     // forward rule before any count is taken.
     expect(() => deriveVariantEntry(
-      variantWith({ frameRoles: { ...VARIANT.frameRoles, 'elbows-quiet-2': PEAK_STEP } }),
+      variantWith({ frameRoles: { ...VARIANT.frameRoles, 'p2': PEAK_STEP } }),
       BASE,
     )).toThrow(/does not come after the previous frame's step/);
   });
@@ -362,11 +365,12 @@ describe('the implement tilt belongs to the peak frame only', () => {
         role: covered.frameRoles[frame.id],
         implementOrientation: covered.implementOrientation,
       });
-      const bells = variant.filter(p => p.kind === 'bone' && p.w === 4.6);
-      expect(bells).toHaveLength(2);
-      if (bells.some(p => Math.abs(p.y2 - p.y1) > 1e-9)) differing.push(frame.id);
-      expect(variant.filter(p => !(p.kind === 'bone' && p.w === 4.6)))
-        .toEqual(flat.filter(p => !(p.kind === 'rect' && p.w === 13 && p.h === 4.6)));
+      // Since the 9 October 2026 redraw both curls are turned pose-table
+      // drawings: a bell is a handle (w 1.8) with a plate (w 2.6) at each end.
+      expect(bellHandles(variant)).toHaveLength(2);
+      if (bellHandles(variant).some(p => Math.abs(p.y2 - p.y1) > 1e-9)) differing.push(frame.id);
+      // Everything that is not a bell is exactly what the flat drawing has.
+      expect(variant.filter(p => !isBellPart(p))).toEqual(flat.filter(p => !isBellPart(p)));
     });
     expect(differing).toEqual([PEAK_FRAME_ID]);
   });
@@ -374,18 +378,23 @@ describe('the implement tilt belongs to the peak frame only', () => {
   test('the peak frame draws the tilted bell at the expected rise; the flat frames do not', () => {
     const covered = resolvedCoveredVariant();
     const peakIndex = covered.frames.findIndex((frame) => frame.id === PEAK_FRAME_ID);
-    const expectedRise = 2 * 6.5 * Math.tan((15 * Math.PI) / 180);
-    const bellBones = (prims) => prims.filter(
-      (prim) => prim.kind === 'bone' && prim.w === 4.6 && Math.abs(Math.abs(prim.y2 - prim.y1) - expectedRise) < 1e-9,
-    );
-    const tilted = primsFor(BASE.frames[peakIndex], {
+    // A handle tilted by 15 degrees rises by its own level length times tan 15,
+    // one end up and the other down by half of that each.
+    const level = bellHandles(primsFor(BASE.frames[peakIndex]));
+    expect(level).toHaveLength(2);
+    const tilted = bellHandles(primsFor(BASE.frames[peakIndex], {
       role: covered.frameRoles[PEAK_FRAME_ID],
       implementOrientation: covered.implementOrientation,
-    });
+    }));
     // Two tilted bells: the near one at full opacity, the far one dimmed.
-    expect(bellBones(tilted)).toHaveLength(2);
+    expect(tilted).toHaveLength(2);
+    tilted.forEach((handle, i) => {
+      const expectedRise = Math.abs(level[i].x2 - level[i].x1) * Math.tan((15 * Math.PI) / 180);
+      expect(expectedRise).toBeGreaterThan(1);
+      expect(Math.abs(handle.y2 - handle.y1)).toBeCloseTo(expectedRise, 9);
+    });
     for (const index of covered.frames.map((_, i) => i).filter((i) => i !== peakIndex)) {
-      expect(bellBones(primsFor(BASE.frames[index]))).toHaveLength(0);
+      for (const handle of bellHandles(primsFor(BASE.frames[index]))) expect(handle.y1).toBe(handle.y2);
     }
   });
 
@@ -394,17 +403,17 @@ describe('the implement tilt belongs to the peak frame only', () => {
     const peakIndex = covered.frames.findIndex((frame) => frame.id === PEAK_FRAME_ID);
     expect(primSignature(BASE.frames[peakIndex], { role: 'peak' })).toBe(primSignature(BASE.frames[peakIndex]));
     for (const role of [undefined, 'lower']) {
-      const bells = primsFor(BASE.frames[peakIndex], { role, implementOrientation: 'supinated' })
-        .filter(p => p.kind === 'bone' && p.w === 4.6);
+      const bells = bellHandles(primsFor(BASE.frames[peakIndex], { role, implementOrientation: 'supinated' }));
       expect(bells).toHaveLength(2);
       expect(bells.every(p => p.y1 === p.y2)).toBe(true);
     }
   });
 
   test('the base Hammer Curl drawing is untouched by the contract', () => {
-    // 62 is drawn by its own slug branch (vertical bells), and 186 by the
-    // generic dumbbells branch. Drawing the BASE at the BASE's own assetKey
-    // must not move a single primitive, contract present or not.
+    // 62 is drawn by its own pose table (each dumbbell held like a hammer,
+    // square to its forearm), and 186 by its own (dumbbells across the body).
+    // Drawing the BASE at the BASE's own assetKey must not move a single
+    // primitive, contract present or not.
     const atBaseSlug = (frame, opts = {}) => JSON.stringify(layoutCanonicalFigure(frame.joints, {
       view: BASE.view, body: DUAL_BODY_PARAMETERS.neutral, assetKey: BASE.assetKey, ...opts,
     }));
@@ -416,8 +425,10 @@ describe('the implement tilt belongs to the peak frame only', () => {
       body: DUAL_BODY_PARAMETERS.neutral,
       assetKey: BASE.assetKey,
     });
-    // Hammer Curl draws its bells as axis-aligned rects, never as tilted bones.
-    expect(baseSlugPrims.filter((prim) => prim.kind === 'rect').length).toBeGreaterThan(0);
+    // Hammer Curl draws a hammer-held dumbbell at each hand (a w 2.2 handle),
+    // never the across-the-body bell the variant tilts.
+    expect(baseSlugPrims.filter((prim) => prim.kind === 'bone' && prim.w === 2.2)).toHaveLength(2);
+    expect(bellHandles(baseSlugPrims)).toHaveLength(0);
   });
 });
 

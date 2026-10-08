@@ -173,7 +173,10 @@ const frontBaseline = JSON.parse(fs.readFileSync(path.join(__dirname, '../fixtur
 //contact, fixed upper arms and continuous radius have dedicated regression
 //coverage in MovementPreview.supportedGeometry.test.js. Retain this frozen
 //front-drawing digest for every unchanged front projection.
-test.each(frontBaseline.cases.filter(c => ![92, 158, 253].includes(c.movementId)).map((c) => [c.movementId, c.body, c]))('unchanged front drawing stays byte-identical: movement %i / %s', (id, body, baseline) => {
+//62 Hammer Curl was redrawn turned on 9 October 2026 at the owner's request
+//(from the front its curl came toward the viewer); it is tested in
+//MovementPreview.hammerCurl.test.js.
+test.each(frontBaseline.cases.filter(c => ![92, 158, 253, 62].includes(c.movementId)).map((c) => [c.movementId, c.body, c]))('unchanged front drawing stays byte-identical: movement %i / %s', (id, body, baseline) => {
   const e = canonicals.find((v) => v.movementId === id);
   expect(e.view).toBe('front');
   const poses = e.frames.flatMap((f, i) => i === e.frames.length - 1 ? [f.joints]

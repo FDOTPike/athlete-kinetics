@@ -1119,4 +1119,50 @@ export const CHAIN_SPECS = [
     reason: 'Redrawn on 9 October 2026 at the owner\'s request, because the earlier drawing was against this text: the turn onto one hand and the reach to the ceiling barely showed. Source-bound side-view draft on a body that can roll about its own length: a push-up on the toes with the body in one straight line, then, pressing up, the body rolls onto its far hand and far foot until the hips and shoulders are stacked, and the near arm sweeps out and up until it points straight at the ceiling; a hold, and the hand returns to the floor. The planted hand and foot do not move. One side is shown; the last caption carries the turn to the other side. Not drawn: the hands just outside shoulder width, which a side view cannot show.',
     summary: 'From a push-up on the toes, press up and turn onto one hand with the body in one straight line, reaching the other arm to the ceiling, then return the hand to the floor and turn to the other side next time.',
   },
+  {
+    id: 62,
+    slug: 'hammer-curl',
+    previewId: 'hammer_curl',
+    equipment: 'dumbbells',
+    phases: [0, 1, 1, 0, 0],
+    // "Curl to shoulder height with quiet upper arms, then lower slower than you lifted."
+    segments: [1100, 300, 1800, 500],
+    captions: [
+      'Hold the dumbbells at the sides with the palms facing each other and keep that neutral grip for the whole rep.',
+      'Curl to shoulder height with quiet upper arms.',
+      'Keep the thumbs up through the rep.',
+      'Lower slower than you lifted, back to the natural long-arm position.',
+      'Hold the elbows quietly beside the ribs.',
+    ],
+    reason: 'Redrawn on 9 October 2026 at the owner\'s request: seen from the front the curl came toward the viewer, so the hands hardly seemed to rise. Source-bound draft, drawn from a 3D model turned 50 degrees: standing tall with a dumbbell hanging at each side, palms facing each other; both forearms curl straight up to shoulder height while the upper arms hang still, and lower more slowly to long arms. Each dumbbell stays square to its forearm, as a hammer is held. Dumbbell Bicep Curl is drawn from these frames and turns with it.',
+    summary: 'Standing with the palms facing each other, curl both dumbbells to shoulder height with the upper arms still, then lower more slowly than you lifted to long arms.',
+  },
+  {
+    id: 200,
+    slug: 'finger-curls',
+    equipment: 'barbell',
+    // The catalogue's own text for this movement is a placeholder on a source hold. This is the description that
+    // was written from the public-domain reference entry and checked by a separate auditor.
+    text: {
+      basis: 'Written from the public-domain free-exercise-db entry for Finger Curls and its two photographs, then checked by a separate auditor on 9 October 2026; this is the auditor\'s corrected wording. The catalogue\'s own text for this movement is a placeholder on a source hold.',
+      instructions: 'Sit on the end of a bench with the feet flat a little wider than the shoulders and lean forward to rest the forearms on the thighs, hands just past the knees, holding a light barbell with the palms up at shoulder width. Slowly uncurl the fingers and let the bar roll down the hands until it is caught in the last joints of the fingers. Close the hands to roll the bar back up into the palms as high as you can, and hold for a moment.',
+      cues: 'Forearms on the thighs, wrists still. Let the bar roll to the last finger joints. Close the hands and hold.',
+      coachingIntent: 'Train the forearms and grip by curling the bar with the fingers alone.',
+    },
+    // The three poses are one body; they carry the scene. 0: the athlete alone. 1: the close-up of the hand open,
+    // the bar held in the closed hand. 2: the fingers open, the bar rolled to the fingertips.
+    phases: [0, 1, 2, 1, 1, 0, 0],
+    segments: [900, 1500, 1200, 800, 900, 500],
+    captions: [
+      'Sit on the end of a bench with the feet flat a little wider than the shoulders and lean forward to rest the forearms on the thighs, hands just past the knees, holding a light barbell with the palms up at shoulder width.',
+      'A closer look at one hand: the bar starts in the closed hand, in the palm.',
+      'Slowly uncurl the fingers and let the bar roll down the hands until it is caught in the last joints of the fingers.',
+      'Close the hands to roll the bar back up into the palms as high as you can.',
+      'Hold for a moment. Forearms on the thighs, wrists still.',
+      'Only the fingers move; the wrists and forearms stay still.',
+      'Let the bar roll to the last finger joints. Close the hands and hold.',
+    ],
+    reason: 'New draft of 9 October 2026, drawn at the owner\'s request as a scene: the seated athlete holding the barbell, then a close-up of one hand. Side view. The athlete sits leaning forward with the forearms level along the thighs and the palms up, the bar in the hands just past the knees, and does not move. A round panel then opens out of the hand and shows it seven and a half times larger: the wrist stays still while the fingers uncurl and the bar rolls from the palm down to the last joint of the fingers, where it is caught, then the hand closes and rolls it back up, and holds. The catalogue\'s own text for this movement is a placeholder on a source hold; the text here was written from the public-domain reference entry and its photographs and checked by a separate auditor. Not settled by any source: whether the thumb wraps the bar at the top (it is drawn alongside the fingers, clear of the bar) and the exact angle of the wrist (it is drawn in line with the forearm).',
+    summary: 'Seated with the forearms on the thighs and the palms up, slowly uncurl the fingers to let the bar roll to the last finger joints, then close the hands to roll it back up and hold. A close-up shows the hand.',
+  },
 ];

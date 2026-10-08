@@ -91,7 +91,10 @@ function identity(e,p) {
 // the original drawing at the commit it names, so the pin steps over that one
 // row and holds the other eleven. Its redraw is tested against its text in
 // MovementPreview.redrawnFromText.test.js.
-const REDRAWN_SINCE_BASELINE = [39];
+// Hammer Curl (62) was redrawn turned on 9 October 2026, also at the owner's
+// request: from the front its curl came toward the viewer. Its redraw is
+// tested in MovementPreview.hammerCurl.test.js.
+const REDRAWN_SINCE_BASELINE = [39, 62];
 test('the original canonical neutral drawings stay byte-identical at 20ms intervals (all but the one redrawn since)', () => {
   expect(baselineNeutral.rows).toHaveLength(12);
   expect(baselineNeutral.rows.filter((row) => REDRAWN_SINCE_BASELINE.includes(row.id))).toHaveLength(REDRAWN_SINCE_BASELINE.length);

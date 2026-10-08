@@ -1312,6 +1312,15 @@ export interface ChainMovement {
   farArmOver?: boolean;
   /** Paint the near arm over the head (an arm held beside the head). */
   nearArmOverHead?: boolean;
+  /**
+   * A magnified view of the near hand in a round panel, for a movement that
+   * happens in the fingers. The poses then carry the scene as well as the
+   * body: from pose 0 to pose 1 the panel grows out of the hand, and from
+   * pose 1 to pose 2 the fingers open and the bar rolls from the palm to the
+   * fingertips. `at` is the panel's centre, `r` its radius and `scale` how
+   * many times larger than the figure the hand is drawn.
+   */
+  closeUp?: { at: ChainPoint; r: number; scale: number };
 }
 
 const CHAIN_TRUNK = 24;
@@ -1791,6 +1800,8 @@ export const V_BAR = { bar: [50, 104] as const, grip: [50, 98] as const, half: 3
 /** The hammer curls: an arm hanging at the side, and the forearm at the top of each curl. */
 const HAMMER_HANG = { upperArm: [-90, 4], forearm: [-90, 2] } as const;
 const HAMMER_STANCE = { at: [0, CHAIN_STANDING_HIP], trunk: 90, thigh: -90, shin: -90 } as const;
+/** A forearm curled straight up to shoulder height from an upper arm hanging at the side. */
+const HAMMER_CURLED = [60, 2] as const;
 /** Dumbbell Sumo Squat: how far each foot is from the midline, and the height of the hips standing and at the bottom. */
 export const SUMO_SQUAT = { footOut: 16, tall: 45.9, low: 27 } as const;
 /** One sumo-squat pose: feet planted wide, both hands on one dumbbell hanging at the midline on long arms. */
@@ -1841,6 +1852,11 @@ function sidePlankPose(deg: number, roll: number, legIn: number, hand: ChainPoin
     upperArm: -90, forearm: -90, wrist: hand, farWrist: SIDE_PLANK_HANDS,
   };
 }
+
+/** Finger Curls: where the close-up of the hand sits, how big it is, and how many times it magnifies the hand. */
+export const FINGER_CURL_PANEL = { at: [88, 64] as const, r: 24, scale: 7.5 } as const;
+/** The seated athlete of the Finger Curls: the wrist curls' seat and level forearms, the hand in line with the forearm. */
+const FINGER_CURL_BODY = { ...WRIST_CURL_BODY, hand: 0 } as const;
 
 /** The chain movements, by slug. */
 export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
@@ -2864,9 +2880,9 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     implement: 'hammer',
     farArmOver: true,
     poses: [
-      { ...HAMMER_STANCE, ...HAMMER_HANG, forearm: [60, 2], farForearm: HAMMER_HANG.forearm },
+      { ...HAMMER_STANCE, ...HAMMER_HANG, forearm: HAMMER_CURLED, farForearm: HAMMER_HANG.forearm },
       { ...HAMMER_STANCE, ...HAMMER_HANG },
-      { ...HAMMER_STANCE, ...HAMMER_HANG, farForearm: [60, 2] },
+      { ...HAMMER_STANCE, ...HAMMER_HANG, farForearm: HAMMER_CURLED },
     ],
   },
   // Cross Body Hammer Curl: the same stance, but each forearm curls across the
@@ -2912,6 +2928,48 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       sidePlankPose((PUSH_UP_TOP_DEG + SIDE_PLANK_DEG) / 2, -45, SIDE_PLANK_LEG_IN / 2, [76.8, 46.8, 27.6], 3),
       sidePlankPose(SIDE_PLANK_DEG, -90, SIDE_PLANK_LEG_IN, [SIDE_PLANK_TOP_SHOULDER[0], SIDE_PLANK_TOP_SHOULDER[1] + CHAIN_LONG_ARM, 0], 0),
     ],
+  },
+  // Hammer Curl: standing, seen turned, palms facing each other. Both
+  // forearms curl straight up to shoulder height together; the upper arms hang
+  // still and each dumbbell stays square to its forearm.
+  'hammer-curl': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 50,
+    implement: 'hammer',
+    farArmOver: true,
+    poses: [
+      { ...HAMMER_STANCE, ...HAMMER_HANG },
+      { ...HAMMER_STANCE, ...HAMMER_HANG, forearm: HAMMER_CURLED },
+    ],
+  },
+  // Dumbbell Bicep Curl: drawn from the Hammer Curl's frames (a variant, see
+  // derivation.ts), so its poses are the same. Only the grip differs: palms
+  // forward, so each dumbbell lies across the body, and the variant's
+  // supinated orientation tilts it at the top.
+  'dumbbell-bicep-curl': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 50,
+    implement: 'bells',
+    farArmOver: true,
+    poses: [
+      { ...HAMMER_STANCE, ...HAMMER_HANG },
+      { ...HAMMER_STANCE, ...HAMMER_HANG, forearm: HAMMER_CURLED },
+    ],
+  },
+  // Finger Curls: sitting with the forearms level along the thighs, palms up,
+  // a barbell in the hands beyond the knees. The body does not move; the three
+  // poses carry the scene. From the first to the second a close-up of the hand
+  // opens, and from the second to the third the fingers open and the bar rolls
+  // from the palm down to the last joints of the fingers.
+  'finger-curls': {
+    root: 'hip',
+    implement: 'bar',
+    palm: 'up',
+    equipment: WRIST_CURL_BENCH,
+    closeUp: FINGER_CURL_PANEL,
+    poses: [FINGER_CURL_BODY, FINGER_CURL_BODY, FINGER_CURL_BODY],
   },
   // chain movements are added above this line
 };
@@ -3131,7 +3189,7 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters, tu
     kn: project(nearLeg.mid), an: project(nearLeg.end), kf: projectFar(farLeg.mid), af: projectFar(farLeg.end),
   };
   return {
-    movement, view, joints, project, projectFar,
+    movement, view, joints, project, projectFar, ph,
     /** The trunk's drawn centreline, neck first. Straight unless the spine is curled. */
     spine, curled: Math.abs(curl) > 1e-9 || Math.abs(sideCurl) > 1e-9,
     /** Whether the shoulders are drawn as a girdle out from the neck (any view that shows their width). */
@@ -3170,7 +3228,11 @@ export function trunkCentreline(pose: CanonicalPose, opts: FigureOptions): Canon
 /** A chain movement's equipment, lines and held implement, grouped by where they are painted. */
 function layoutChainExtras(
   figure: ReturnType<typeof chainGeometry>, body: BodyParameters, farColor: ColorRole, farOpacity: number,
+  contractTilt: number | null = null,
 ) {
+  // How far each held bell is tilted: the movement's own peak tilt, unless a
+  // variant's declared orientation supplies it (the `derivesFrom` contract).
+  const bellTilt = contractTilt ?? figure.peakTilt;
   const { movement, joints: j, project } = figure;
   const groups: Record<ChainLayer, FigurePrim[]> = { behind: [], mid: [], front: [] };
   const far: FigurePrim[] = [];
@@ -3242,10 +3304,10 @@ function layoutChainExtras(
       return;
     }
     let a = p, b = q;
-    if (figure.peakTilt > 0) {
+    if (bellTilt > 0) {
       // The inner end is the one nearer the neck, so two arms would mirror
       // about the midline. It rises and the outer end drops by the same amount.
-      const rise = (length / 2) * Math.tan(chainRad(figure.peakTilt));
+      const rise = (length / 2) * Math.tan(chainRad(bellTilt));
       const inner = Math.abs(p[0] - j.nk[0]) <= Math.abs(q[0] - j.nk[0]) ? 'p' : 'q';
       a = [p[0], p[1] + (inner === 'p' ? -rise : rise)];
       b = [q[0], q[1] + (inner === 'q' ? -rise : rise)];
@@ -3310,7 +3372,119 @@ function layoutChainExtras(
     if (kind !== 'handle') far.push({ kind: 'circle', cx: figure.grip.far[0], cy: figure.grip.far[1], r, fill: farColor, opacity: farOpacity });
     near.push({ kind: 'circle', cx: figure.grip.near[0], cy: figure.grip.near[1], r, fill: 'textHi', opacity: 1 });
   }
+  const panel = handCloseUp(figure);
+  if (panel !== null) {
+    // Back to front: the line from the real hand, the panel that hides whatever
+    // is behind it, the wrist and palm, the fingers, and the bar they hold.
+    groups.front.push(line(figure.grip.near, panel.centre, 0.8, 'textLow', 0.75));
+    groups.front.push({ kind: 'circle', cx: panel.centre[0], cy: panel.centre[1], r: panel.r, fill: 'ink1', stroke: 'textLow', strokeWidth: 1.2, opacity: 1 });
+    groups.front.push(line(panel.stub, panel.wrist, CLOSE_UP_HAND.wristHalf * 2 * panel.scale, 'textHi', 1));
+    groups.front.push(line(panel.wrist, panel.knuckle, CLOSE_UP_HAND.palmHalf * 2 * panel.scale, 'textHi', 1));
+    groups.front.push(line(panel.thumb[0], panel.thumb[1], CLOSE_UP_HAND.fingerHalf * 2 * panel.scale, 'textHi', 1));
+    for (let i = 0; i < 3; i++) {
+      groups.front.push(line(panel.finger[i], panel.finger[i + 1], CLOSE_UP_HAND.fingerHalf * 2 * panel.scale, 'textHi', 1));
+    }
+    groups.front.push({ kind: 'circle', cx: panel.bar[0], cy: panel.bar[1], r: CLOSE_UP_HAND.bar * panel.scale, fill: 'textMid', stroke: 'ink1', strokeWidth: 0.8, opacity: 1 });
+  }
   return { ...groups, far, lines, near };
+}
+
+/**
+ * The hand of the close-up, in hand units (one is a figure unit, about four
+ * centimetres), with real proportions: a palm, a finger of three bones and a
+ * bar of barbell thickness. Each finger bone's direction is measured from the
+ * line of the hand, turning toward the palm: `closed` wraps the bar against
+ * the end of the palm, `open` lets the fingers hang with only the last joint
+ * hooked.
+ */
+const CLOSE_UP_PALM_HALF = 0.375, CLOSE_UP_FINGER_HALF = 0.21, CLOSE_UP_BAR = 0.36;
+const CLOSE_UP_MIDDLE_BONE = 0.65;
+/** How far the bar's centre is from the line of a finger bone it rests against. */
+const CLOSE_UP_TOUCH = CLOSE_UP_BAR + CLOSE_UP_FINGER_HALF;
+/**
+ * The closed hand wraps the bar: the finger turns by the same angle at each
+ * joint, the one that makes all three bones touch the bar at once. The first
+ * bone is the length that then also rests the bar against the end of the palm.
+ */
+const CLOSE_UP_WRAP = 2 * Math.atan(CLOSE_UP_MIDDLE_BONE / (2 * CLOSE_UP_TOUCH)) * 180 / Math.PI;
+const CLOSE_UP_FIRST_BONE = CLOSE_UP_MIDDLE_BONE / 2 + Math.sqrt((CLOSE_UP_PALM_HALF + CLOSE_UP_BAR) ** 2 - CLOSE_UP_TOUCH ** 2);
+export const CLOSE_UP_HAND = {
+  palm: 2.5, palmHalf: CLOSE_UP_PALM_HALF, wristHalf: 0.5, stub: 0.2,
+  finger: [CLOSE_UP_FIRST_BONE, CLOSE_UP_MIDDLE_BONE, 0.6], fingerHalf: CLOSE_UP_FINGER_HALF, bar: CLOSE_UP_BAR,
+  closed: [40, 40 + CLOSE_UP_WRAP, 40 + 2 * CLOSE_UP_WRAP], open: [-30, -5, 50],
+} as const;
+/** Where the knuckle sits in the panel, so that the whole hand is centred in it. */
+const CLOSE_UP_KNUCKLE: readonly [number, number] = [0.25, -0.3];
+
+/** The finger's four points for a given opening, from the knuckle at the origin: along the hand, and toward the palm. */
+function closeUpFinger(open: number): [number, number][] {
+  const points: [number, number][] = [[0, 0]];
+  for (let i = 0; i < 3; i++) {
+    const a = chainRad(CLOSE_UP_HAND.closed[i] + (CLOSE_UP_HAND.open[i] - CLOSE_UP_HAND.closed[i]) * open);
+    points.push([points[i][0] + CLOSE_UP_HAND.finger[i] * Math.cos(a), points[i][1] + CLOSE_UP_HAND.finger[i] * Math.sin(a)]);
+  }
+  return points;
+}
+/**
+ * Where a bar rests in the crook of the finger at joint `k`: touching the
+ * bone before the joint and the bone after it, on the palm's side.
+ */
+function closeUpCrook(open: number, k: 1 | 2): [number, number] {
+  const angle = (i: number): number => CLOSE_UP_HAND.closed[i] + (CLOSE_UP_HAND.open[i] - CLOSE_UP_HAND.closed[i]) * open;
+  const turn = angle(k) - angle(k - 1);
+  const reach = (CLOSE_UP_HAND.bar + CLOSE_UP_HAND.fingerHalf) / Math.cos(chainRad(turn / 2));
+  const toward = chainRad(angle(k - 1) + 180 - (180 - turn) / 2);
+  const joint = closeUpFinger(open)[k];
+  return [joint[0] + reach * Math.cos(toward), joint[1] + reach * Math.sin(toward)];
+}
+/**
+ * Where the bar is for a given opening. Closed, all three finger bones touch
+ * it and it rests against the end of the palm; open, it is hooked in the last
+ * joint. In between it rolls along the middle bone from one crook to the
+ * other, touching that bone the whole way, so it is never loose and never
+ * drawn through a finger.
+ */
+function closeUpBar(open: number): [number, number] {
+  const first = closeUpCrook(open, 1), last = closeUpCrook(open, 2);
+  return [first[0] + (last[0] - first[0]) * open, first[1] + (last[1] - first[1]) * open];
+}
+
+/**
+ * The close-up of the near hand at this moment, or null when the movement has
+ * none or the panel has not yet opened. Everything is in drawing coordinates.
+ */
+export function handCloseUp(figure: ReturnType<typeof chainGeometry>) {
+  const closeUp = figure.movement.closeUp;
+  if (closeUp === undefined) return null;
+  const zoom = Math.max(0, Math.min(1, figure.ph));
+  const open = Math.max(0, Math.min(1, figure.ph - 1));
+  if (zoom < 1e-6) return null;
+  const hand = figure.grip.near;
+  const target = figure.project(chainWorld(closeUp.at));
+  const centre: CanonicalPoint = [hand[0] + (target[0] - hand[0]) * zoom, hand[1] + (target[1] - hand[1]) * zoom];
+  const scale = closeUp.scale * zoom;
+  // The hand is drawn the way the figure's own forearm points, with the palm on the side a palms-up grip puts it.
+  const j = figure.joints;
+  const length = Math.hypot(j.wr[0] - j.el[0], j.wr[1] - j.el[1]) || 1;
+  const along: CanonicalPoint = [(j.wr[0] - j.el[0]) / length, (j.wr[1] - j.el[1]) / length];
+  const palmSide: CanonicalPoint = [along[1], -along[0]];
+  const place = (q: readonly [number, number]): CanonicalPoint => [
+    centre[0] + (along[0] * (q[0] + CLOSE_UP_KNUCKLE[0]) + palmSide[0] * (q[1] + CLOSE_UP_KNUCKLE[1])) * scale,
+    centre[1] + (along[1] * (q[0] + CLOSE_UP_KNUCKLE[0]) + palmSide[1] * (q[1] + CLOSE_UP_KNUCKLE[1])) * scale,
+  ];
+  const finger = closeUpFinger(open);
+  const bar = closeUpBar(open);
+  return {
+    zoom, open, centre, r: closeUp.r * zoom, scale,
+    /** The hand model before it is placed: the finger's points and the bar, from the knuckle. */
+    model: { finger, bar },
+    stub: place([-CLOSE_UP_HAND.palm - CLOSE_UP_HAND.stub, 0]),
+    wrist: place([-CLOSE_UP_HAND.palm, 0]),
+    knuckle: place([0, 0]),
+    thumb: [place([-CLOSE_UP_HAND.palm + 0.7, 0.25]), place([-CLOSE_UP_HAND.palm + 1.5, 0.7])] as const,
+    finger: finger.map(place),
+    bar: place(bar),
+  };
 }
 
 /** Small hip arc with fixed soft knee; an actual cuff, not a hand cable. */
@@ -3869,7 +4043,10 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
   const bone = (
     p1: CanonicalPoint, p2: CanonicalPoint, w: number, color: ColorRole, opacity: number,
   ): BonePrim => ({ kind: 'bone', x1: p1[0], y1: p1[1], x2: p2[0], y2: p2[1], w, color, opacity });
-  const chainDraw = chain ? layoutChainExtras(chain, body, farColor, farOpacity) : null;
+  // A variant's supinated orientation tilts the bells at its peak step only, by the weight the contract gives.
+  const contractTilt = opts.implementOrientation === 'supinated'
+    ? BELL_TILT_DEG * (opts.implementTiltWeight ?? (opts.role === 'peak' ? 1 : 0)) : null;
+  const chainDraw = chain ? layoutChainExtras(chain, body, farColor, farOpacity, contractTilt) : null;
 
   const prims: FigurePrim[] = [];
 

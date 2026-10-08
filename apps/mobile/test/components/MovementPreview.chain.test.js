@@ -10,6 +10,7 @@ import {
   poseAtTime,
   resolveFigureJoints,
 } from '../../src/components/movementPreview/canonicalFigure';
+import { deriveVariantEntry } from '../../src/components/movementPreview/derivation';
 import { previewManifest } from './previewManifest';
 
 const BODY = CANONICAL_BODY_PARAMETERS;
@@ -17,7 +18,12 @@ const FLOOR = 96.9;
 /** Straight-line distance between two points of any dimension. */
 const distance = (a, b) => Math.hypot(...a.map((v, i) => v - b[i]));
 const slugOf = (entry) => entry.assetKey.split('/')[1];
-const entries = previewManifest.entries.filter((e) => CHAIN_MOVEMENTS[slugOf(e)] !== undefined);
+// A variant (`derivesFrom`) carries no frames of its own: it is checked as the
+// contract resolves it, with its base's frames and its own text and timings.
+const entries = previewManifest.entries
+  .filter((e) => CHAIN_MOVEMENTS[slugOf(e)] !== undefined)
+  .map((e) => (e.derivesFrom === undefined ? e
+    : deriveVariantEntry(e, previewManifest.entries.find((base) => base.movementId === e.derivesFrom))));
 
 test('every chain movement is authored, and nothing is authored twice', () => {
   expect(entries.map(slugOf).sort()).toEqual(Object.keys(CHAIN_MOVEMENTS).sort());
