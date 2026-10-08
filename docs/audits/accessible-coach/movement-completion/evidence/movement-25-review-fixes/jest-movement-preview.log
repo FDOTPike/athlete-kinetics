@@ -1,0 +1,60 @@
+source commit: 63521c145e1f35a8dbe03da2a7423fae71514bfd
+command: npx jest --config apps/mobile/jest.config.js --runInBand --no-cache --testPathPattern MovementPreview
+
+PASS apps/mobile/test/components/MovementPreview.test.js
+PASS apps/mobile/test/components/MovementPreview.thirdRedraw.test.js
+PASS apps/mobile/test/components/MovementPreview.gripDelta.test.js
+PASS apps/mobile/test/components/MovementPreview.secondRedraw.test.js
+PASS apps/mobile/test/components/MovementPreview.redrawnFromText.test.js
+PASS apps/mobile/test/components/MovementPreview.adversarial.test.js
+PASS apps/mobile/test/components/MovementPreview.lifecycle_stress.test.js
+PASS apps/mobile/test/components/MovementPreview.derivation.test.js
+PASS apps/mobile/test/components/MovementPreview.lyingTrunkFlexion.test.js
+PASS apps/mobile/test/components/MovementPreview.cableCrunchesAndTwists.test.js
+PASS apps/mobile/test/components/MovementPreview.supportedAndWristCurls.test.js
+PASS apps/mobile/test/components/MovementPreview.challenger_m7_1.test.js
+PASS apps/mobile/test/components/MovementPreview.challenger_m6_4.test.js
+PASS apps/mobile/test/components/MovementPreview.bodyweight.test.js
+PASS apps/mobile/test/components/MovementPreview.lyingTricepsExtension.test.js
+PASS apps/mobile/test/components/MovementPreview.inclineBenchArms.test.js
+PASS apps/mobile/test/components/MovementPreview.approval.test.js
+PASS apps/mobile/test/components/MovementPreview.sideRaisesAndFlyes.test.js
+PASS apps/mobile/test/components/MovementPreview.jointOffsets.test.js
+PASS apps/mobile/test/components/MovementPreview.proneInclineRaise.test.js
+PASS apps/mobile/test/components/MovementPreview.torso.test.js (29.671 s)
+PASS apps/mobile/test/components/MovementPreview.canonicalFrameFit.test.js (32.799 s)
+PASS apps/mobile/test/components/MovementPreview.frontStanding.test.js
+PASS apps/mobile/test/components/MovementPreview.batch3Perspective.test.js
+PASS apps/mobile/test/components/MovementPreview.fixedBarBodyMotion.test.js
+PASS apps/mobile/test/components/MovementPreview.cableLow.test.js
+PASS apps/mobile/test/components/MovementPreview.canonical.test.js
+PASS apps/mobile/test/components/MovementPreview.supportedGeometry.test.js
+PASS apps/mobile/test/components/MovementPreview.fingerCurls.test.js
+PASS apps/mobile/test/components/MovementPreview.frontRaise.test.js
+PASS apps/mobile/test/components/MovementPreview.lateralRaise.test.js
+PASS apps/mobile/test/components/MovementPreview.seatedLateralRaise.test.js
+PASS apps/mobile/test/components/MovementPreview.hammerCurl.test.js
+PASS apps/mobile/test/components/MovementPreview.chain.test.js (38.325 s)
+PASS apps/mobile/test/components/MovementPreview.captionIntegrity.test.js
+PASS apps/mobile/test/components/MovementPreview.layout.test.js
+PASS apps/mobile/test/components/MovementPreview.flye.test.js (7.516 s)
+PASS apps/mobile/test/components/MovementPreview.reverseLunge.test.js
+PASS apps/mobile/test/components/MovementPreview.pushdown.test.js (8.405 s)
+PASS apps/mobile/test/components/MovementPreview.runtimeRegression.test.js
+PASS apps/mobile/test/components/MovementPreview.canonicalNavigation.test.js
+PASS apps/mobile/test/components/MovementPreview.lungeReducedMotion.test.js
+PASS apps/mobile/test/components/MovementPreview.manifestSplit.test.js
+PASS apps/mobile/test/components/MovementPreview.lazyFamilyLoad.test.js
+PASS apps/mobile/test/components/MovementPreview.straightArmPulldown.test.js
+PASS apps/mobile/test/components/MovementPreview.kickback.test.js
+PASS apps/mobile/test/components/MovementPreview.reverseLungeNativeContact.test.js
+PASS apps/mobile/test/components/MovementPreview.headSupport.test.js
+PASS apps/mobile/test/components/MovementPreview.unbrokenMotion.test.js
+PASS apps/mobile/test/components/MovementPreview.walkingLunge.test.js
+PASS apps/mobile/test/components/MovementPreview.ropeTension.test.js
+PASS apps/mobile/test/components/MovementPreview.lungeContactMutation.test.js
+PASS apps/mobile/test/components/MovementPreview.lungeContact.test.js
+Test Suites: 53 passed, 53 total
+Tests:       1775 passed, 1775 total
+Snapshots:   0 total
+exit code: 0

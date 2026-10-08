@@ -1,0 +1,11 @@
+source commit: 63521c145e1f35a8dbe03da2a7423fae71514bfd
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with identity-mov24.json
+
+movements measured: 174 (baseline 174)
+added: none
+removed: none
+changed, expected: 155 Cable Incline Triceps Extension
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  155 Cable Incline Triceps Extension: drawn ccd205feeda15ecedc57ecaf2e0e76871109b9909a479befbe71c2f19c6b41b5 captions dba060a2d1c09a1b59809efc24a94cd014c5b65e27584567aceb447c151ba82b stage 221.33x240.00 cycle 4200 ms
+exit code: 0 (probe run exit 0)
