@@ -1,0 +1,11 @@
+source commit: 502dc184c1d87fcba4f14fe613edcea009d5513e
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with identity-mov16.json
+
+movements measured: 173 (baseline 173)
+added: none
+removed: none
+changed, expected: 171 Concentration Curls
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  171 Concentration Curls: drawn ac1e76266bcae72a35f3662c5a1a8a861df5ecc2164057889db74a4a4851f643 captions eacffa968f7d0a4bcb9ea88ca5b951fb25eab926f444f42e54999156a1dd607f stage 193.55x240.00 cycle 4200 ms
+exit code: 0 (probe run exit 0)
