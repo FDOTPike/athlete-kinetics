@@ -85,9 +85,23 @@ function identity(e,p) {
   if(e.movementId===2 && Math.abs(p.b[0]-56)>.02) throw Error('deadlift path');
   if(e.movementId===5 && (dist(p.nk,e.frames[0].joints.nk)>.02 || dist(p.hp,e.frames[0].joints.hp)>.02)) throw Error('row hinge');
 }
-test('all 12 existing canonical neutral drawings stay byte-identical at 20ms intervals', () => {
+// Cable Crunch (39) was redrawn on 8 October 2026 at the owner's request: its
+// original drawing was a stiff trunk hinging at the hips, where its text says
+// the upper spine rounds with the hips frozen. The baseline file still records
+// the original drawing at the commit it names, so the pin steps over that one
+// row and holds the other eleven. Its redraw is tested against its text in
+// MovementPreview.redrawnFromText.test.js.
+const REDRAWN_SINCE_BASELINE = [39];
+test('the original canonical neutral drawings stay byte-identical at 20ms intervals (all but the one redrawn since)', () => {
+  expect(baselineNeutral.rows).toHaveLength(12);
+  expect(baselineNeutral.rows.filter((row) => REDRAWN_SINCE_BASELINE.includes(row.id))).toHaveLength(REDRAWN_SINCE_BASELINE.length);
   for (const row of baselineNeutral.rows) {
     const e = production.entries.find((e) => e.movementId === row.id);
+    if (REDRAWN_SINCE_BASELINE.includes(row.id)) {
+      // Redrawn: it must really be a different drawing now, driven by the pose kit.
+      expect(typeof e.frames[0].joints.ph).toBe('number');
+      continue;
+    }
     const draws = [];
     const ds = rig.segmentDurations(e.frames.length, e.segmentDurationsMs);
     const total = ds.reduce((a, b) => a + b, 0);
