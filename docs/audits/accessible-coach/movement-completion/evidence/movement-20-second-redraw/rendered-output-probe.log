@@ -1,0 +1,20 @@
+source commit: 8dd61d819fc3a6b3b379b4ad685ab293778a93a3
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with identity-mov19.json
+
+movements measured: 173 (baseline 173)
+added: none
+removed: none
+changed, expected: 287 Stiff Leg Barbell Good Morning; 22 Cable Row; 238 Low Pulley Row To Neck; 142 Bent Over Barbell Row; 144 Bent Over One-Arm Long Bar Row; 118 Calf Raises - With Bands; 59 Face Pull; 266 Seated Cable Rows; 174 Crunch - Hands Overhead; 110 Barbell Rear Delt Row
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  287 Stiff Leg Barbell Good Morning: drawn 94fd01fe556917a0dc8e01eaf729b51ccee309e02041f5aadb31531fa3c0c633 captions f285c846da0acbfeab51dd9f6b0091172ad8537768b2fecfa0a9af0ce6422d1e stage 135.65x240.00 cycle 4300 ms
+  22 Cable Row: drawn 4bbd83e2836e9c96003e4258119ece97f293996e961927ad2be3aa3bd87bdcf4 captions bda4ad61d84f43cfc4f1d34dc82f12a112aade8bf4edd9cdbd841d64e275c294 stage 240.00x169.09 cycle 3900 ms
+  238 Low Pulley Row To Neck: drawn a4eb5820f7dc7e5045113e42bb9bb88d07f5b239d40d0524c8f23e0c56b50bcf captions ad01629db1e0ee0e9cf2303851b9f3ec2fd3bfc2086d9b5c8413067937484e56 stage 216.77x240.00 cycle 4200 ms
+  142 Bent Over Barbell Row: drawn d79e65c4b0af59379512bdf0ac53a5e8d55538030ab9f5347a1dede1bc399c82 captions 2c824fd195be25568c81ffdfd1515808f86d5654a4381a6a2bb44709aba91bcf stage 180.00x240.00 cycle 4100 ms
+  144 Bent Over One-Arm Long Bar Row: drawn 9f2651b5917c1baec954dc34e8bb13742bed304c1815c8e6647d74c2db0668a6 captions e2c628e8f33d4473c9bf96484157b8fe1d8f325fe775251e3df25f9c3a5efec9 stage 240.00x224.21 cycle 4100 ms
+  118 Calf Raises - With Bands: drawn be8efcf803a1119d06816c62acb2e1ec471482d3cf4cb421d00a8a7056c51a26 captions a015327d24586f7221270995c10d72e7bbcc53527929a939696fa74981e6ca85 stage 60.00x240.00 cycle 4000 ms
+  59 Face Pull: drawn 724a3bad50d998aa84ec0b3bbd5f62fba4043cfe1d085645b07ca9c8d9e55030 captions d0c550238214cd851753faf65f0148d8af51205e2d38d21e0fcd2c15c9b4555a stage 117.60x240.00 cycle 4100 ms
+  266 Seated Cable Rows: drawn aa863990f3f070d72a3a297b905ff0623937cf9c5a1ee298301af452d07354ba captions 52c744cdd5c22c66e1efe690d9b6125adcaadfb6d2e7a3a00e6cf486b1579259 stage 240.00x215.65 cycle 4100 ms
+  174 Crunch - Hands Overhead: drawn b6b0bff9040f41d55822b8b672075f2a1d7002006c3a970687af07cd5660e61b captions 613da570f821b903d5c24c640b130658454d42949635d2b05d283db94341458d stage 240.00x81.65 cycle 4200 ms
+  110 Barbell Rear Delt Row: drawn 5c49d6a5dc9b08f6e563d47ebdaae5cb4c645a6f81d75cf1886511220977fd66 captions d88e2f31f073587220187e8aabf3beb46c975edde16133048071813ec49b827a stage 165.41x240.00 cycle 4100 ms
+exit code: 0 (probe run exit 0)
