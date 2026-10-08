@@ -59,10 +59,13 @@ describe.each(entries.map((e) => [e.name, e]))('%s', (_name, entry) => {
     }
     for (const frame of entry.frames) expect(typeof frame.joints.ph).toBe('number');
     // Where the entry's own account says how far the model is turned, it is the angle the drawing uses.
-    const turned = /turned (d+) degrees/.exec(entry.reason);
+    const turned = /turned (\d+) degrees/.exec(entry.reason);
+    // Every turned drawing says how far, so this cannot pass by never matching.
+    if (view === 'oblique') expect(turned).not.toBeNull();
     if (turned) {
       expect(view).toBe('oblique');
-      expect(Number(turned[1])).toBe(movement.yawDeg ?? 35);
+      // The text gives the size of the turn; which way it goes is the table's business.
+      expect(Number(turned[1])).toBe(Math.abs(movement.yawDeg ?? 35));
     }
   });
 
