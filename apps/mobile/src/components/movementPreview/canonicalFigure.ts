@@ -1269,6 +1269,13 @@ export interface ChainMovement {
   implement?: 'none' | 'bells' | 'bell' | 'hammer' | 'bar' | 'ez' | 'cableBar' | 'handle' | 'handles' | 'rope';
   /** Which way the palm of a bent hand faces: what it holds sits on that side of the knuckles. */
   palm?: 'up' | 'down';
+  /**
+   * A palms-up dumbbell curl whose wrist keeps turning at the top: over the
+   * upper half of the lift each bell tilts so its inner, little-finger end
+   * rises toward the same-side ear ("pinky toward the ear"). The same tilt the
+   * supinated standing curl is drawn with.
+   */
+  supinatedPeak?: boolean;
   /** The direction a held dumbbell's handle points. Across the body when omitted. */
   bellAxis?: readonly [number, number, number];
   lines?: readonly ChainLine[];
@@ -1748,9 +1755,11 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     ],
   },
   // Concentration Curls: seated with the feet wide, the back of the working
-  // upper arm against the inner thigh, the free hand on the other knee.
+  // upper arm against the inner thigh, the free hand on the other knee. At the
+  // top the wrist keeps turning: little finger toward the same-side ear.
   'concentration-curls': {
     root: 'hip',
+    supinatedPeak: true,
     view: 'oblique',
     yawDeg: 72,
     originX: 44,
@@ -2371,6 +2380,8 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters, tu
     hold: { near: project(nearHold), far: projectFar(farHold) },
     toe: { near: nearToe ? project(nearToe) : null, far: farToe ? projectFar(farToe) : null },
     footWidth: feet === 'flat' ? body.lw * 0.9 : body.lw * 0.82,
+    /** How far each held bell is tilted, inner end up, in degrees: none below half-way, all of it at the top. */
+    peakTilt: movement.supinatedPeak === true ? BELL_TILT_DEG * Math.max(0, Math.min(1, (ph - 0.5) * 2)) : 0,
     angles: { trunk: given, curl, sideCurl, twist, thigh, shin, upperArm, forearm, farThigh, farShin, farUpperArm, farForearm, hand, foot },
   };
 }
@@ -2456,9 +2467,19 @@ function layoutChainExtras(
       out.push({ kind: 'rect', x: c[0] - 2.8, y: c[1] - 2.8, w: 5.6, h: 5.6, rx: 1.6, fill: color, opacity, stroke: 'ink1', strokeWidth: 1.4 });
       return;
     }
-    const nx = -(q[1] - p[1]) / length * 2.2, ny = (q[0] - p[0]) / length * 2.2;
-    out.push(line(p, q, 1.8, color, opacity));
-    for (const end of [p, q]) {
+    let a = p, b = q;
+    if (figure.peakTilt > 0) {
+      // The inner end is the one nearer the neck, so two arms would mirror
+      // about the midline. It rises and the outer end drops by the same amount.
+      const rise = (length / 2) * Math.tan(chainRad(figure.peakTilt));
+      const inner = Math.abs(p[0] - j.nk[0]) <= Math.abs(q[0] - j.nk[0]) ? 'p' : 'q';
+      a = [p[0], p[1] + (inner === 'p' ? -rise : rise)];
+      b = [q[0], q[1] + (inner === 'q' ? -rise : rise)];
+    }
+    const drawn = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const nx = -(b[1] - a[1]) / drawn * 2.2, ny = (b[0] - a[0]) / drawn * 2.2;
+    out.push(line(a, b, 1.8, color, opacity));
+    for (const end of [a, b]) {
       out.push({ ...line([end[0] - nx, end[1] - ny], [end[0] + nx, end[1] + ny], 2.6, color, opacity), stroke: 'ink1', strokeWidth: 0.6 });
     }
   };

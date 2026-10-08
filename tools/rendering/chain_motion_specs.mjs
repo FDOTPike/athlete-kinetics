@@ -172,7 +172,7 @@ export const CHAIN_SPECS = [
       'Lower slowly until the arm is straight.',
       'Complete the repetitions, then change arms.',
     ],
-    reason: 'Source-bound draft, drawn from a 3D model seen nearly from the front, turned 72 degrees, so the wide feet and the inner thigh both show. Seated on a flat bench, leaning forward, the back of the working upper arm rests against the inner thigh and stays there while the forearm curls the dumbbell from a straight arm up toward the shoulder, holds, and lowers slowly. The free hand rests on the other knee; the source does not say where it goes. One side is shown; the last caption carries the change of arms.',
+    reason: 'Source-bound draft, drawn from a 3D model seen nearly from the front, turned 72 degrees, so the wide feet and the inner thigh both show. Seated on a flat bench, leaning forward, the back of the working upper arm rests against the inner thigh and stays there while the forearm curls the dumbbell from a straight arm up toward the shoulder, holds, and lowers slowly. Over the upper half of the curl the wrist keeps turning, so the dumbbell tilts with its little-finger end rising toward the same-side ear; that cue came from the owner on 8 October 2026 and is not in the catalogue text, so no caption states it. The free hand rests on the other knee; the source does not say where it goes. One side is shown; the last caption carries the change of arms.',
     summary: 'Seated with the feet wide and the back of the upper arm against the inner thigh, curl one dumbbell up toward the shoulder, squeeze, lower slowly to a straight arm, then change arms.',
   },
   {
