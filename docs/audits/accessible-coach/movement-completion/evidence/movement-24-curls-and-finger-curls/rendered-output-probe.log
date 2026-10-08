@@ -1,0 +1,13 @@
+source commit: 9c963d9721b81dc2ec26efec2bb9f75ac5a259a8
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with identity-mov23.json
+
+movements measured: 174 (baseline 173)
+added: 200 Finger Curls
+removed: none
+changed, expected: 62 Hammer Curl; 186 Dumbbell Bicep Curl
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  62 Hammer Curl: drawn c21849e2108dd8c13a607daced959f19aab3334dc53cb11d6fbb509b9e94361f captions d25ac84b1987eb6d50d4d664657f06ca38146b9f1dd6d8fd05abfa2ea43f6abb stage 117.39x240.00 cycle 3700 ms
+  186 Dumbbell Bicep Curl: drawn 7ba029fe92b6eb9607db31eb82c303662348b49664fa6e1cdc8d6cb31ad3faed captions 68195bb0304e8573fd9e2472eb36beafe859a931ae5529538a48cca6e1c4ae87 stage 117.39x240.00 cycle 4100 ms
+  200 Finger Curls: drawn ee2792ad4b00e00bf99f80c91d55aaacc157b63af0c5315f90228b1521f5f59e captions 4003f5ad3c0adf8a06a847a6c8e0535943b07056a887e922e196b9d3a6049b95 stage 240.00x223.69 cycle 5800 ms
+exit code: 0 (probe run exit 0)
