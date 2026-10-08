@@ -786,7 +786,7 @@ export const CHAIN_SPECS = [
       'Return slowly until the arms are straight.',
       'Torso stays upright and still.',
     ],
-    reason: 'Redrawn on 8 October 2026 at the owner\'s request, because the earlier drawing contradicted this text: it showed the athlete standing. Source-bound draft, drawn from a 3D model turned 35 degrees so the wide elbows show: sitting at a low row station with the back upright, the feet on the plate and the knees slightly bent, arms straight toward the low pulley; the elbows lift high and wide and the rope comes to the neck until the hands are beside the ears and the upper arms are level, a pause, and a slower return to straight arms. The trunk and legs do not move. Not drawn: the palms-down grip.',
+    reason: 'Redrawn on 8 October 2026 at the owner\'s request, because the earlier drawing contradicted this text: it showed the athlete standing. Source-bound draft, drawn from a 3D model turned 55 degrees so the wide elbows show: sitting at a low row station with the back upright, the feet on the plate and the knees slightly bent, arms straight toward the low pulley; the elbows lift high and wide and the rope comes to the neck until the hands are beside the ears and the upper arms are level, a pause, and a slower return to straight arms. The trunk and legs do not move. Not drawn: the palms-down grip.',
     summary: 'Seated at a low cable row with the back upright, lift the elbows high and wide to pull the rope to the neck, hands beside the ears, pause, then return slowly to straight arms.',
   },
   {
@@ -912,7 +912,7 @@ export const CHAIN_SPECS = [
       'This never becomes a heavy movement.',
       'Thumbs to the ears, elbows high. The weight stays humble.',
     ],
-    reason: 'Redrawn on 9 October 2026 at the owner\'s request, because the earlier drawing was against this text: the rope was anchored below upper-chest height. Source-bound draft, drawn from a 3D model turned 35 degrees so the hands splitting apart show: standing facing a pulley set at upper-chest height with the arms long toward it; the elbows go high and wide and the two rope ends split to finish beside the ears with the forearms turned up and back, a one-second squeeze, and a return to long arms. The trunk and legs do not move. Not drawn: the thumbs-back grip.',
+    reason: 'Redrawn on 9 October 2026 at the owner\'s request, because the earlier drawing was against this text: the rope was anchored below upper-chest height. Source-bound draft, drawn from a 3D model turned 58 degrees so the hands splitting apart show: standing facing a pulley set at upper-chest height with the arms long toward it; the elbows go high and wide and the two rope ends split to finish beside the ears with the forearms turned up and back, a one-second squeeze, and a return to long arms. The trunk and legs do not move. Not drawn: the thumbs-back grip.',
     summary: 'Facing a rope set at upper-chest height, pull it to the bridge of the nose while the hands split past the ears with the elbows high, squeeze for a beat, then return to long arms.',
   },
   {
