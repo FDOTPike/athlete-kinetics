@@ -120,7 +120,9 @@ keeps the only thing embeddings are actually good at — meaning-matching free
 text — and leaves every consequence to deterministic, reviewable TypeScript.
 The coaching cue is mechanical-rationale only; the app gives no medical advice.
 
-**What is being evaluated (owner ruling, 2026-10-09).** The lesson of the
+**What is being evaluated (conditions proposed, pending owner
+confirmation).** On 2026-10-09 the owner ruled that a small model may be part
+of the decision process. The lesson of the
 removed model was that a small model cannot be the decision-maker. It did not
 show that a small model cannot help. The embedding router matches wording
 without understanding it: it cannot tell "no pain today" from "pain today",
@@ -129,4 +131,5 @@ talking about. A hybrid design is now under study, in which a small on-device
 model reads the note and reports facts about it, and deterministic TypeScript
 still decides every consequence. Any such model must run fully offline and
 inside the app's memory ceiling, and nothing ships until it has been measured
-against the current router on sealed test phrases.
+against the current router on sealed test phrases and the owner has signed
+off on that measured evidence.

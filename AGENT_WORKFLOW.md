@@ -33,8 +33,10 @@ migration.
    embedded web views. Video links are inert text opened via the OS handler.
 2. **Determinism**: prescriptions, blocks, progression, substitution = pure
    TS functions. No RNG, no clock reads inside engines.
-   **Language models** (owner ruling 2026-10-09; replaces the former "no LLMs
-   at runtime"): a small on-device model MAY be used to interpret the
+   **Language models** (replaces the former "no LLMs at runtime"; the owner
+   ruled on 2026-10-09 that a small model may be part of the decision
+   process, and the conditions below are PROPOSED, pending his confirmation):
+   a small on-device model MAY be used to interpret the
    athlete's free-text report, as one input to the deterministic guardrails.
    It must run fully offline (rule 1) and inside the memory ceiling (rule 3).
    It never writes a prescription, a block or a cue; those stay pure TS. No
