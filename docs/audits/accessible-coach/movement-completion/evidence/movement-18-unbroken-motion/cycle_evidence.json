@@ -1,7 +1,7 @@
 {
-  "sourceCommit": "376926aca6cfee8a94d4c606c6e532045be52b1a",
+  "sourceCommit": "d55409a7a01cda57f49c317b44161612e6196aa6",
   "sourcesCommittedAtRender": true,
-  "previewDataSha256": "a854a69bd5f8c7492bd2a61b733e490b44b495765d6e00619eb99a6ba1454c1e",
+  "previewDataSha256": "3c9c47ff4ec1e5273fd08c00228b6edadc558814880524da3cff517720e6f977",
   "rendering": "Headless production primitives; no native FPS or technique approval.",
   "sourceHashes": {
     "apps/mobile/src/components/movementPreview/previewIndex.json": "c5c2c58b8bc7a46d9bd9828a603fea32bf78a1e8f94b800179396f77f29d1b29",
@@ -11,7 +11,7 @@
     "apps/mobile/src/components/movementPreview/families/carry__standing.json": "84e2d2d0e2dbc74b20b7a4e45e7b6cf73cfa1b11f06de8352bc852280f0d91b1",
     "apps/mobile/src/components/movementPreview/families/dead-bug__supine.json": "7238a4f476b84225365f570d07099ef37e52435c86d392145f3ea2f75ac7bdc4",
     "apps/mobile/src/components/movementPreview/families/dip__seated-supported.json": "4dd1b3b503010776defb9599f544e338de150bc718b51d69beb3cb87829bb9e4",
-    "apps/mobile/src/components/movementPreview/families/elbow-extension__bodyweight-supported.json": "43d3ebd07d34d19a07d7c14dd512099842c8033fa96eaf493a187072096a0297",
+    "apps/mobile/src/components/movementPreview/families/elbow-extension__bodyweight-supported.json": "e4c2882f2a5bc43cbdbf44c3e66088e1d243597299eda283dff547dfed50c40b",
     "apps/mobile/src/components/movementPreview/families/elbow-extension__decline.json": "abcc731d94cb374c440d2645dcaa90b0650d4489d3d4952380271bce4e8221f3",
     "apps/mobile/src/components/movementPreview/families/elbow-extension__incline.json": "fc17be85a24dab44118a5c9498ab9880fa021e5b7e8dc76b699ebe106adb9b8b",
     "apps/mobile/src/components/movementPreview/families/elbow-extension__standing-overhead.json": "fdc05d92b4a9f9b3f97057d1401ca3571ed91aaf9a9f574755c698bb45fe39dc",
@@ -120,11 +120,11 @@
       "records": [
         {
           "body": "neutral",
-          "tickCount": 117,
-          "totalMs": 3800,
-          "sheetSha256": "74342ed66063b27d6a48df6ce46efc182d830efcaadc51f0113b3017f333568a",
-          "htmlSha256": "37951d7cc794d4a16c82370902cde3372f58e00c4c69115d599a65421af80bbf",
-          "primitiveFramesSha256": "a0e064282d72b0b7f162a3469d0b2262f07a0a4e4fb586b433f6832338c8b78e"
+          "tickCount": 126,
+          "totalMs": 4100,
+          "sheetSha256": "5d0c10cf18f526936b3b88db20d1fb9d89ba0368c5d80d15afa27b430e61a261",
+          "htmlSha256": "e6f35980300811e8bd79789c11aca547e0820cd7294a1298c54924745411b3dd",
+          "primitiveFramesSha256": "606bc29110abccacaad6b8bed726b115edd15e7850fdae8198df73fc60949b77"
         }
       ]
     },

@@ -1,7 +1,7 @@
-source commit: 376926aca6cfee8a94d4c606c6e532045be52b1a
+source commit: d55409a7a01cda57f49c317b44161612e6196aa6
 command: node tools/rendering/test_verify_movement_evidence.mjs
 
-probe corpus: movement 14 rendered to C:\Users\fpike\AppData\Local\Temp\wo09-evidence-probe-JdfiH6\clean
+probe corpus: movement 14 rendered to C:\Users\fpike\AppData\Local\Temp\wo09-evidence-probe-FaQQiw\clean
   11-position contract 33 cards / 3 sheets / 72 SVG+PNG files
   clean render      pass
   clean source-bound draft pass

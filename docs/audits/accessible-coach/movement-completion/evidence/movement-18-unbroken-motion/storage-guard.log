@@ -1,4 +1,4 @@
-source commit: 376926aca6cfee8a94d4c606c6e532045be52b1a
+source commit: d55409a7a01cda57f49c317b44161612e6196aa6
 command: node --expose-gc tools/rendering/verify_preview_storage.mjs
 
 {
@@ -15,22 +15,22 @@ command: node --expose-gc tools/rendering/verify_preview_storage.mjs
   "singleFamily": {
     "samples": [
       90576,
-      93912,
-      94104,
-      94104,
-      94336
+      93944,
+      94072,
+      94072,
+      94304
     ],
-    "medianBytes": 94104
+    "medianBytes": 94072
   },
   "allFamilies": {
     "samples": [
-      1363968,
-      1363168,
+      1363936,
+      1363088,
       1363040,
-      1363168,
+      1363040,
       1363040
     ],
-    "medianBytes": 1363168
+    "medianBytes": 1363040
   },
   "budgets": {
     "rawBytes": 1048576,
