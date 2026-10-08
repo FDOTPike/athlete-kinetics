@@ -58,6 +58,12 @@ describe.each(entries.map((e) => [e.name, e]))('%s', (_name, entry) => {
       expect(entry.frames[0].joints).toEqual(entry.frames.at(-1).joints);
     }
     for (const frame of entry.frames) expect(typeof frame.joints.ph).toBe('number');
+    // Where the entry's own account says how far the model is turned, it is the angle the drawing uses.
+    const turned = /turned (d+) degrees/.exec(entry.reason);
+    if (turned) {
+      expect(view).toBe('oblique');
+      expect(Number(turned[1])).toBe(movement.yawDeg ?? 35);
+    }
   });
 
   test('every bone keeps its real length on every tick', () => {
