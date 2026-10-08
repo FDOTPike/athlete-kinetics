@@ -1186,6 +1186,12 @@ export interface ChainPose {
   sideCurl?: number;
   /** How far the shoulders are turned about the spine, in degrees; positive brings the near shoulder forward. */
   twist?: number;
+  /**
+   * How far the whole body is rolled about its own length, in degrees: hips
+   * and shoulders together. Positive brings the near side toward the front of
+   * the body, as `twist` does for the shoulders alone.
+   */
+  roll?: number;
   /** Neck to head; continues the spine when omitted. */
   head?: ChainDir;
   thigh: ChainDir;
@@ -1229,7 +1235,8 @@ export type ChainShape =
 /** A cable or band from a fixed point, or from under a foot, to a hand or an ankle. */
 export interface ChainLine {
   from: ChainPoint | 'nearFoot' | 'farFoot';
-  to: 'nearGrip' | 'farGrip' | 'nearAnkle' | 'farAnkle';
+  /** 'midGrip' is half-way between the two hands: the middle of a bar they both hold. */
+  to: 'nearGrip' | 'farGrip' | 'midGrip' | 'nearAnkle' | 'farAnkle';
   /** 'far' paints the line behind the trunk and the near limbs (a cable that runs between the legs). */
   depth?: 'far';
 }
@@ -1239,9 +1246,10 @@ export interface ChainMovement {
   /**
    * The joint a pose places directly. 'ankle' is the near ankle: the body is
    * built up from a planted foot. 'toe' is the near forefoot: the body is built
-   * up from the ball of a foot whose heel is free to rise.
+   * up from the ball of a foot whose heel is free to rise. 'farAnkle' is the
+   * far ankle, for a body that turns onto its far side.
    */
-  root: 'hip' | 'neck' | 'ankle' | 'toe';
+  root: 'hip' | 'neck' | 'ankle' | 'toe' | 'farAnkle';
   /**
    * The poses form a loop: after the last comes the first again, and the phase
    * may run on past it. Between whole phases the figure moves at an even pace,
@@ -1337,6 +1345,11 @@ function chainNormal(v: ChainVec): ChainVec {
   return [v[0] / n, v[1] / n, v[2] / n];
 }
 const chainWorld = (p: ChainPoint): ChainVec => [p[0], p[1], p[2] ?? 0];
+/** The direction across the body, square to a spine direction: toward the viewer for a spine in the side plane. */
+function chainAcross(axis: ChainVec): ChainVec {
+  const k = axis[2];
+  return chainNormal([-axis[0] * k, -axis[1] * k, 1 - axis[2] * k]);
+}
 
 /** The hip of a figure sitting with level thighs and feet flat on the floor. */
 const CHAIN_SEATED_HIP = CHAIN_ANKLE_HEIGHT + CHAIN_SHIN;
@@ -1750,6 +1763,84 @@ export const FACE_PULL_PULLEY: readonly [number, number] = [44, CHAIN_STANDING_S
 export const CHAIN_FOREFOOT_HEIGHT = CHAIN_ANKLE_HEIGHT;
 /** Calf Raises - With Bands: how far the foot tilts at the top of the rise, in degrees. */
 export const BAND_CALF_RAISE_TILT = 42;
+
+/**
+ * Standing in a front view with the feet shoulder width apart: how far each
+ * straight leg leans out from its hip to put the foot under the shoulder, and
+ * the height that leaves the hips at.
+ */
+const FRONT_STANCE_OUT = Math.asin((CANONICAL_BODY_PARAMETERS.sw * 0.92 - CANONICAL_BODY_PARAMETERS.hw * 0.8) / (CHAIN_THIGH + CHAIN_SHIN)) * 180 / Math.PI;
+const FRONT_STANCE_HIP = CHAIN_FRONT_ANKLE + (CHAIN_THIGH + CHAIN_SHIN) * Math.cos(chainRad(FRONT_STANCE_OUT));
+/**
+ * The overhead presses, in the plane across the shoulders. An upper arm given
+ * as [90, out] points `out` degrees away from straight up: 90 is level out to
+ * the side, more than 90 is below level. The forearm stays upright.
+ */
+export const PRESS_START_OUT = { 'standing-dumbbell-press': 100, 'seated-dumbbell-press': 140, 'seated-cable-shoulder-press': 105 } as const;
+/** Seated Dumbbell Press: the direction of the trunk sitting back against the bench's back support. */
+export const SEATED_PRESS_BACK = 100;
+/** Seated Cable Shoulder Press: a low pulley out to each side of the bench. */
+export const CABLE_PRESS_PULLEYS: readonly [ChainPoint, ChainPoint] = [[0, 4, 40], [0, 4, -40]];
+/** Underhand Cable Pulldowns: the pulley overhead, half the narrow grip, the slight lean back, and where the bar meets the chest. */
+export const PULLDOWN = { pulley: [1.5, 92] as const, gripHalf: 5, back: 100, touch: 20 } as const;
+const PULLDOWN_HIP: readonly [number, number] = [0, CHAIN_SEATED_HIP];
+const PULLDOWN_REACH: readonly [number, number] = [0.5, 71.66];
+const PULLDOWN_CHEST = chainOnFront(PULLDOWN_HIP, PULLDOWN.back, PULLDOWN.touch, 7.4);
+/** V-Bar Pullup: the bar seen end-on, the handle hung over its middle, and half the distance between the hands on it. */
+export const V_BAR = { bar: [50, 104] as const, grip: [50, 98] as const, half: 3 } as const;
+/** The hammer curls: an arm hanging at the side, and the forearm at the top of each curl. */
+const HAMMER_HANG = { upperArm: [-90, 4], forearm: [-90, 2] } as const;
+const HAMMER_STANCE = { at: [0, CHAIN_STANDING_HIP], trunk: 90, thigh: -90, shin: -90 } as const;
+/** Dumbbell Sumo Squat: how far each foot is from the midline, and the height of the hips standing and at the bottom. */
+export const SUMO_SQUAT = { footOut: 16, tall: 45.9, low: 27 } as const;
+/** One sumo-squat pose: feet planted wide, both hands on one dumbbell hanging at the midline on long arms. */
+function sumoSquatPose(hipHeight: number): ChainPose {
+  const hands = hipHeight + CHAIN_TRUNK - 22.7;
+  return {
+    at: [0, hipHeight], trunk: 90, thigh: -90, shin: -90,
+    ankle: [0, CHAIN_FRONT_ANKLE, SUMO_SQUAT.footOut], farAnkle: [0, CHAIN_FRONT_ANKLE, -SUMO_SQUAT.footOut],
+    upperArm: -90, forearm: -90, wrist: [3, hands, 1], farWrist: [3, hands, -1],
+  };
+}
+
+/**
+ * Push Up to Side Plank. The far hand and the far foot stay planted for the
+ * whole movement, and the body is one line from the feet. Three angles of
+ * that line to the floor: at the bottom of the push-up, at the top with the
+ * shoulders over straight arms, and in the side plank, where the hips and
+ * shoulders are stacked and the lower shoulder is over the planted hand.
+ */
+const SIDE_PLANK_ANKLE: readonly [number, number] = [14, CANONICAL_BODY_PARAMETERS.lw * 0.82 / 2 + CHAIN_FOOT * Math.sin(chainRad(70))];
+const SIDE_PLANK_BODY = CHAIN_THIGH + CHAIN_SHIN + CHAIN_TRUNK;
+const SIDE_PLANK_HAND_HEIGHT = 2.2;
+const SIDE_PLANK_SHOULDER_OUT = CANONICAL_BODY_PARAMETERS.sw * 0.92;
+const SIDE_PLANK_HIP_OUT = CANONICAL_BODY_PARAMETERS.hw * 0.8;
+const sidePlankDeg = (rad: number): number => rad * 180 / Math.PI;
+export const PUSH_UP_BOTTOM_DEG = sidePlankDeg(Math.asin((10 - SIDE_PLANK_ANKLE[1]) / SIDE_PLANK_BODY));
+export const PUSH_UP_TOP_DEG = sidePlankDeg(Math.asin((SIDE_PLANK_HAND_HEIGHT + CHAIN_LONG_ARM - SIDE_PLANK_ANKLE[1]) / SIDE_PLANK_BODY));
+export const SIDE_PLANK_DEG = sidePlankDeg(
+  Math.asin((SIDE_PLANK_HAND_HEIGHT + CHAIN_LONG_ARM - SIDE_PLANK_ANKLE[1]) / Math.hypot(SIDE_PLANK_BODY, SIDE_PLANK_SHOULDER_OUT - SIDE_PLANK_HIP_OUT))
+  + Math.atan((SIDE_PLANK_SHOULDER_OUT - SIDE_PLANK_HIP_OUT) / SIDE_PLANK_BODY),
+);
+/** Where both hands are planted for the push-up: under the shoulders at the top. */
+const SIDE_PLANK_HANDS: readonly [number, number] = [
+  SIDE_PLANK_ANKLE[0] + SIDE_PLANK_BODY * Math.cos(chainRad(PUSH_UP_TOP_DEG)), SIDE_PLANK_HAND_HEIGHT,
+];
+/** How far the upper leg angles down in the side plank, so its foot rests on the lower one. */
+const SIDE_PLANK_LEG_IN = sidePlankDeg(Math.asin((2 * SIDE_PLANK_HIP_OUT - (CANONICAL_BODY_PARAMETERS.lw * 0.82 + 0.4)) / (CHAIN_THIGH + CHAIN_SHIN)));
+/** The upper shoulder in the side plank, and the hand reached straight up from it. */
+const SIDE_PLANK_TOP_SHOULDER: readonly [number, number] = [
+  SIDE_PLANK_ANKLE[0] + SIDE_PLANK_BODY * Math.cos(chainRad(SIDE_PLANK_DEG)) - (SIDE_PLANK_HIP_OUT + SIDE_PLANK_SHOULDER_OUT) * Math.sin(chainRad(SIDE_PLANK_DEG)),
+  SIDE_PLANK_ANKLE[1] + SIDE_PLANK_BODY * Math.sin(chainRad(SIDE_PLANK_DEG)) + (SIDE_PLANK_HIP_OUT + SIDE_PLANK_SHOULDER_OUT) * Math.cos(chainRad(SIDE_PLANK_DEG)),
+];
+/** One pose of it: the body line's angle, how far the body is rolled onto its far side, how far the upper leg angles in, and the near hand. */
+function sidePlankPose(deg: number, roll: number, legIn: number, hand: ChainPoint, headUp: number): ChainPose {
+  return {
+    at: SIDE_PLANK_ANKLE, trunk: deg, head: deg + headUp, roll,
+    thigh: deg + 180 + legIn, shin: deg + 180 + legIn, farThigh: deg + 180, farShin: deg + 180, foot: -70,
+    upperArm: -90, forearm: -90, wrist: hand, farWrist: SIDE_PLANK_HANDS,
+  };
+}
 
 /** The chain movements, by slug. */
 export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
@@ -2651,6 +2742,177 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       { at: FLOOR_CRUNCH_HIP, trunk: 180, curl: 38, thigh: 50, shin: -50, ankle: FLOOR_CRUNCH_FOOT, upperArm: 96, forearm: 96 },
     ],
   },
+  // Standing Dumbbell Press: seen from the front, feet under the shoulders.
+  // The dumbbells start at head height with the elbows out and the forearms
+  // upright, and are pressed straight overhead; nothing below the arms moves.
+  'standing-dumbbell-press': {
+    root: 'hip',
+    view: 'front',
+    feet: 'front',
+    implement: 'bells',
+    poses: [
+      {
+        at: [0, FRONT_STANCE_HIP], trunk: 90, thigh: [-90, FRONT_STANCE_OUT], shin: [-90, FRONT_STANCE_OUT],
+        upperArm: [90, PRESS_START_OUT['standing-dumbbell-press']], forearm: [90, 0],
+      },
+      {
+        at: [0, FRONT_STANCE_HIP], trunk: 90, thigh: [-90, FRONT_STANCE_OUT], shin: [-90, FRONT_STANCE_OUT],
+        upperArm: [90, 5], forearm: [90, 0],
+      },
+    ],
+  },
+  // Seated Dumbbell Press: sitting back against a bench with a back support,
+  // seen turned. The dumbbells go from the shoulders to meet overhead, the
+  // forearms upright the whole way.
+  'seated-dumbbell-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 60,
+    originX: 46,
+    implement: 'bells',
+    equipment: chainInclineBench([0, CHAIN_SEATED_HIP], SEATED_PRESS_BACK),
+    poses: [
+      {
+        at: [0, CHAIN_SEATED_HIP], trunk: SEATED_PRESS_BACK, thigh: [0, 8], shin: -90,
+        upperArm: [90, PRESS_START_OUT['seated-dumbbell-press']], forearm: [90, 0],
+      },
+      { at: [0, CHAIN_SEATED_HIP], trunk: SEATED_PRESS_BACK, thigh: [0, 8], shin: -90, upperArm: [90, -8], forearm: [90, -14] },
+    ],
+  },
+  // Seated Cable Shoulder Press: sitting tall on a flat bench between two low
+  // pulleys, a handle in each hand. The handles go up and together overhead.
+  'seated-cable-shoulder-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 65,
+    originX: 46,
+    implement: 'handles',
+    lines: [{ from: CABLE_PRESS_PULLEYS[0], to: 'nearGrip' }, { from: CABLE_PRESS_PULLEYS[1], to: 'farGrip' }],
+    equipment: [
+      { kind: 'pulley', at: CABLE_PRESS_PULLEYS[0] },
+      { kind: 'pulley', at: CABLE_PRESS_PULLEYS[1] },
+      { kind: 'post', at: [-24, CHAIN_SEATED_HIP - CHAIN_THIGH_HALF - 4] },
+      { kind: 'post', at: [0, CHAIN_SEATED_HIP - CHAIN_THIGH_HALF - 4] },
+      { kind: 'slab', a: [-29, CHAIN_SEATED_HIP - CHAIN_THIGH_HALF - 2], b: [5, CHAIN_SEATED_HIP - CHAIN_THIGH_HALF - 2] },
+    ],
+    poses: [
+      {
+        at: [0, CHAIN_SEATED_HIP], trunk: 90, thigh: [0, 10], shin: -90,
+        upperArm: [90, PRESS_START_OUT['seated-cable-shoulder-press']], forearm: [90, 0],
+      },
+      { at: [0, CHAIN_SEATED_HIP], trunk: 90, thigh: [0, 10], shin: -90, upperArm: [90, -10], forearm: [90, -18] },
+    ],
+  },
+  // Underhand Cable Pulldowns: seated under a high pulley with the thighs
+  // under the knee pad, leaning back a little, seen turned. The hands are
+  // close together on the bar; it comes to the upper chest as the elbows
+  // travel down and back beside the ribs.
+  'underhand-cable-pulldowns': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 40,
+    originX: 40,
+    implement: 'cableBar',
+    elbowPole: [-125, 10],
+    lines: [{ from: PULLDOWN.pulley, to: 'midGrip' }],
+    equipment: [
+      { kind: 'pulley', at: PULLDOWN.pulley },
+      { kind: 'post', at: [16, CHAIN_SEATED_HIP + CHAIN_THIGH_HALF + 4] },
+      { kind: 'roller', at: [14, CHAIN_SEATED_HIP + CHAIN_THIGH_HALF + 2.8] },
+      ...chainFlatBench(-12, 8, CHAIN_SEATED_HIP - CHAIN_THIGH_HALF),
+    ],
+    poses: [
+      {
+        at: PULLDOWN_HIP, trunk: PULLDOWN.back, thigh: 0, shin: -90, upperArm: 80, forearm: 80,
+        wrist: [PULLDOWN_REACH[0], PULLDOWN_REACH[1], PULLDOWN.gripHalf], farWrist: [PULLDOWN_REACH[0], PULLDOWN_REACH[1], -PULLDOWN.gripHalf],
+      },
+      {
+        at: PULLDOWN_HIP, trunk: PULLDOWN.back, thigh: 0, shin: -90, upperArm: 80, forearm: 80,
+        wrist: [PULLDOWN_CHEST[0], PULLDOWN_CHEST[1], PULLDOWN.gripHalf], farWrist: [PULLDOWN_CHEST[0], PULLDOWN_CHEST[1], -PULLDOWN.gripHalf],
+      },
+    ],
+  },
+  // V-Bar Pullup: both hands on one V-handle hung over the middle of the bar,
+  // which is seen end-on. The body hangs leaning back a little and is pulled
+  // up until the chest is close to the handle, the head passing behind the bar.
+  'v-bar-pullup': {
+    root: 'hip',
+    feet: 'free',
+    elbowPole: -80,
+    equipment: [
+      { kind: 'frame', a: V_BAR.bar, b: V_BAR.grip },
+      { kind: 'roller', at: V_BAR.bar, layer: 'behind' },
+    ],
+    poses: [
+      {
+        at: [52.19, 51.07], trunk: 102, head: 100, thigh: -85, shin: -165, foot: -160, upperArm: 85, forearm: 85,
+        wrist: [V_BAR.grip[0], V_BAR.grip[1], V_BAR.half], farWrist: [V_BAR.grip[0], V_BAR.grip[1], -V_BAR.half],
+      },
+      {
+        at: [49.16, 76.08], trunk: 112, head: 122, thigh: -66, shin: -156, foot: -160, upperArm: 85, forearm: 85,
+        wrist: [V_BAR.grip[0], V_BAR.grip[1], V_BAR.half], farWrist: [V_BAR.grip[0], V_BAR.grip[1], -V_BAR.half],
+      },
+    ],
+  },
+  // Alternate Hammer Curl: standing, seen turned, palms facing in. The middle
+  // pose is both arms long; either side of it one forearm curls straight up
+  // to shoulder height while the other arm hangs still.
+  'alternate-hammer-curl': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 50,
+    implement: 'hammer',
+    farArmOver: true,
+    poses: [
+      { ...HAMMER_STANCE, ...HAMMER_HANG, forearm: [60, 2], farForearm: HAMMER_HANG.forearm },
+      { ...HAMMER_STANCE, ...HAMMER_HANG },
+      { ...HAMMER_STANCE, ...HAMMER_HANG, farForearm: [60, 2] },
+    ],
+  },
+  // Cross Body Hammer Curl: the same stance, but each forearm curls across the
+  // front of the body toward the opposite shoulder, the upper arm coming
+  // forward only a little.
+  'cross-body-hammer-curl': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 50,
+    implement: 'hammer',
+    farArmOver: true,
+    poses: [
+      { ...HAMMER_STANCE, upperArm: [-78, 4], forearm: [45, -48], farUpperArm: HAMMER_HANG.upperArm, farForearm: HAMMER_HANG.forearm },
+      { ...HAMMER_STANCE, ...HAMMER_HANG },
+      { ...HAMMER_STANCE, ...HAMMER_HANG, farUpperArm: [-78, 4], farForearm: [45, -48] },
+    ],
+  },
+  // Dumbbell Sumo Squat: seen from the front, feet planted wide, one dumbbell
+  // hanging between the legs on long arms. The hips go straight down between
+  // the knees, which travel out over the feet.
+  'dumbbell-sumo-squat': {
+    root: 'hip',
+    view: 'front',
+    feet: 'front',
+    implement: 'bell',
+    bellAxis: [0, 1, 0],
+    farArmOver: true,
+    kneePole: [0, 35],
+    poses: [sumoSquatPose(SUMO_SQUAT.tall), sumoSquatPose(SUMO_SQUAT.low)],
+  },
+  // Push Up to Side Plank: a push-up on the toes, then the body rolls onto its
+  // far hand and foot as it presses up, and the near arm sweeps out and up to
+  // the ceiling. Poses: the bottom of the push-up, the top, half-way through
+  // the turn, and the side plank.
+  'push-up-to-side-plank': {
+    root: 'farAnkle',
+    feet: 'free',
+    elbowPole: 150,
+    poses: [
+      sidePlankPose(PUSH_UP_BOTTOM_DEG, 0, 0, [SIDE_PLANK_HANDS[0], SIDE_PLANK_HANDS[1], SIDE_PLANK_SHOULDER_OUT], 6),
+      sidePlankPose(PUSH_UP_TOP_DEG, 0, 0, [SIDE_PLANK_HANDS[0], SIDE_PLANK_HANDS[1], SIDE_PLANK_SHOULDER_OUT], 6),
+      // Half-way through the turn the near arm is out to the side, toward the viewer.
+      sidePlankPose((PUSH_UP_TOP_DEG + SIDE_PLANK_DEG) / 2, -45, SIDE_PLANK_LEG_IN / 2, [76.8, 46.8, 27.6], 3),
+      sidePlankPose(SIDE_PLANK_DEG, -90, SIDE_PLANK_LEG_IN, [SIDE_PLANK_TOP_SHOULDER[0], SIDE_PLANK_TOP_SHOULDER[1] + CHAIN_LONG_ARM, 0], 0),
+    ],
+  },
   // chain movements are added above this line
 };
 
@@ -2701,7 +2963,8 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters, tu
   const at = point(a.at, b.at, 'at') as ChainPoint;
   const curl = num(a.curl, b.curl);
   const sideCurl = num(a.sideCurl, b.sideCurl);
-  const twist = num(a.twist, b.twist) + turn * (movement.turnWithPhase === true ? Math.max(0, Math.min(1, ph)) : 1);
+  const roll = num(a.roll, b.roll);
+  const twist = num(a.twist, b.twist) + roll + turn * (movement.turnWithPhase === true ? Math.max(0, Math.min(1, ph)) : 1);
   const given = dir(a.trunk, b.trunk);
   const thigh = dir(a.thigh, b.thigh);
   const shin = dir(a.shin, b.shin);
@@ -2742,28 +3005,41 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters, tu
   const top = spineWorld[CHAIN_SPINE_STEPS];
   // From a planted ankle the hip is back up the near leg: shin, then thigh.
   const shinUp = chainUnit(shin, 1), thighUp = chainUnit(thigh, 1);
+  // The hips sit square across the body, and turn about its length with a roll.
+  const hipTangent = tangent(0);
+  const hipLine = chainAcross(hipTangent);
+  const hipFront = chainCross(hipTangent, hipLine);
+  const hipAxis: ChainVec = roll === 0 ? hipLine : [
+    hipLine[0] * Math.cos(chainRad(roll)) + hipFront[0] * Math.sin(chainRad(roll)),
+    hipLine[1] * Math.cos(chainRad(roll)) + hipFront[1] * Math.sin(chainRad(roll)),
+    hipLine[2] * Math.cos(chainRad(roll)) + hipFront[2] * Math.sin(chainRad(roll)),
+  ];
+  // From a planted far ankle the hip is back up the far leg, then across from the far hip joint.
+  const farShinUp = chainUnit(farShin, -1), farThighUp = chainUnit(farThigh, -1);
+  const farHipOut = body.hw * 0.8;
   // From a planted forefoot the ankle is back along the foot first.
   const footBack = movement.root === 'toe' && foot !== undefined ? chainUnit(foot, 1) : null;
   const heel: readonly [number, number] = footBack === null ? [0, 0] : [footBack[0] * CHAIN_FOOT, footBack[1] * CHAIN_FOOT];
   const shift: ChainVec = movement.root === 'neck' ? [at[0] - top[0], at[1] - top[1], 0]
     : movement.root === 'ankle' || movement.root === 'toe'
       ? [at[0] - heel[0] - (shinUp[0] * CHAIN_SHIN + thighUp[0] * CHAIN_THIGH), at[1] - heel[1] - (shinUp[1] * CHAIN_SHIN + thighUp[1] * CHAIN_THIGH), 0]
-      : [at[0], at[1], at[2] ?? 0];
+      : movement.root === 'farAnkle'
+        ? [
+          at[0] + hipAxis[0] * farHipOut - (farShinUp[0] * CHAIN_SHIN + farThighUp[0] * CHAIN_THIGH),
+          at[1] + hipAxis[1] * farHipOut - (farShinUp[1] * CHAIN_SHIN + farThighUp[1] * CHAIN_THIGH),
+          0,
+        ]
+        : [at[0], at[1], at[2] ?? 0];
   for (let i = 0; i <= CHAIN_SPINE_STEPS; i++) spineWorld[i] = chainAdd(spineWorld[i], shift, 1);
   const hip = spineWorld[0];
   const neck = spineWorld[CHAIN_SPINE_STEPS];
   const neckTangent = tangent(1);
-  const hipTangent = tangent(0);
   const headDir = optDir(a.head, b.head);
   const head = chainAdd(neck, headDir === undefined ? neckTangent : chainUnit(headDir, 1), CHAIN_NECK);
 
   // Shoulders and hips sit either side of the spine, square across the body,
   // and the shoulders turn about the spine with a twist.
-  const across = (axis: ChainVec): ChainVec => {
-    const k = axis[2];
-    return chainNormal([-axis[0] * k, -axis[1] * k, 1 - axis[2] * k]);
-  };
-  const shoulderLine = across(neckTangent);
+  const shoulderLine = chainAcross(neckTangent);
   const forward = chainCross(neckTangent, shoulderLine);
   const tw = chainRad(twist);
   const shoulderAxis: ChainVec = [
@@ -2771,7 +3047,6 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters, tu
     shoulderLine[1] * Math.cos(tw) + forward[1] * Math.sin(tw),
     shoulderLine[2] * Math.cos(tw) + forward[2] * Math.sin(tw),
   ];
-  const hipAxis = across(hipTangent);
   const shoulderHalf = body.sw * 0.92;
   const hipHalf = body.hw * 0.8;
   const upperLength = front ? RAISE_UPPER_ARM : SAGITTAL_UPPER_ARM;
@@ -2873,7 +3148,7 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters, tu
     footWidth: feet === 'flat' ? body.lw * 0.9 : body.lw * 0.82,
     /** How far each held bell is tilted, inner end up, in degrees: none below half-way, all of it at the top. */
     peakTilt: movement.supinatedPeak === true ? BELL_TILT_DEG * Math.max(0, Math.min(1, (ph - 0.5) * 2)) : 0,
-    angles: { trunk: given, curl, sideCurl, twist, thigh, shin, upperArm, forearm, farThigh, farShin, farUpperArm, farForearm, hand, foot },
+    angles: { trunk: given, curl, sideCurl, twist, roll, thigh, shin, upperArm, forearm, farThigh, farShin, farUpperArm, farForearm, hand, foot },
   };
 }
 
@@ -2939,8 +3214,9 @@ function layoutChainExtras(
     const start: CanonicalPoint = cable.from === 'nearFoot' ? [j.an[0] + underFoot, trapped]
       : cable.from === 'farFoot' ? [j.af[0] + underFoot, trapped]
         : project(chainWorld(cable.from));
-    const end = cable.to === 'nearGrip' ? figure.hold.near : cable.to === 'farGrip' ? figure.hold.far
-      : cable.to === 'nearAnkle' ? j.an : j.af;
+    const end: CanonicalPoint = cable.to === 'nearGrip' ? figure.hold.near : cable.to === 'farGrip' ? figure.hold.far
+      : cable.to === 'midGrip' ? [(figure.hold.near[0] + figure.hold.far[0]) / 2, (figure.hold.near[1] + figure.hold.far[1]) / 2]
+        : cable.to === 'nearAnkle' ? j.an : j.af;
     (cable.depth === 'far' ? far : lines).push(line(start, end, 1.4, 'textMid', 1));
   }
 
