@@ -32,7 +32,15 @@ migration.
 1. **Zero-Cloud**: 100% offline runtime. No API calls, no telemetry, no
    embedded web views. Video links are inert text opened via the OS handler.
 2. **Determinism**: prescriptions, blocks, progression, substitution = pure
-   TS functions. No RNG, no clock reads inside engines, no LLMs at runtime.
+   TS functions. No RNG, no clock reads inside engines.
+   **Language models** (owner ruling 2026-10-09; replaces the former "no LLMs
+   at runtime"): a small on-device model MAY be used to interpret the
+   athlete's free-text report, as one input to the deterministic guardrails.
+   It must run fully offline (rule 1) and inside the memory ceiling (rule 3).
+   It never writes a prescription, a block or a cue; those stay pure TS. No
+   model is added to, or swapped in, the runtime without the owner's sign-off
+   on measured evidence. Today the only model shipped is the sentence
+   embedder.
 3. **Memory**: hard ceiling 536,870,912 B (512 MiB), preferred operating target
    450,000,000 B — ratified 2026-08-24, one ceiling for every supported Android
    and iOS device. Between target and ceiling requires physical-device evidence
