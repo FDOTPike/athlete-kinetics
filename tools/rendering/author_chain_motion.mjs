@@ -89,7 +89,8 @@ for (const spec of CHAIN_SPECS) {
     movementId: spec.id,
     name: row.name,
     assetKey: row.source.asset_key,
-    previewId: `${spec.slug.replaceAll('-', '_')}_${spec.id}_draft`,
+    // A redraw of an older draft keeps that draft's id, so nothing that refers to it has to change.
+    previewId: spec.previewId ?? `${spec.slug.replaceAll('-', '_')}_${spec.id}_draft`,
     pattern: row.source.pattern,
     status: 'pending',
     view: movement.view ?? 'side',
@@ -106,6 +107,8 @@ for (const spec of CHAIN_SPECS) {
   };
   entry.viewBox = viewBoxOf(entry);
   const at = manifest.entries.findIndex((existing) => existing.movementId === spec.id);
+  // A redraw of an older draft keeps the technique citations that draft carried.
+  if (at >= 0 && spec.previewId !== undefined) entry.techniqueCitations = manifest.entries[at].techniqueCitations ?? [];
   if (at >= 0 && manifest.entries[at].previewId !== entry.previewId) throw Error(`Movement ${spec.id} is already owned by another author`);
   if (at < 0) manifest.entries.push(entry); else manifest.entries[at] = entry;
   console.log(`Authored ${spec.id} ${row.name}: view ${entry.view}, box ${JSON.stringify(entry.viewBox)}`);

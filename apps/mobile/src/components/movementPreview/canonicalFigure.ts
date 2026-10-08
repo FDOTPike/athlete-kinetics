@@ -1223,12 +1223,15 @@ export type ChainShape =
   | { kind: 'post'; at: ChainPoint; layer?: ChainLayer }
   | { kind: 'pulley'; at: ChainPoint; layer?: ChainLayer }
   | { kind: 'ball'; at: ChainPoint; r: number; layer?: ChainLayer }
-  | { kind: 'roller'; at: ChainPoint; layer?: ChainLayer };
+  | { kind: 'roller'; at: ChainPoint; layer?: ChainLayer }
+  | { kind: 'box'; a: ChainPoint; b: ChainPoint; layer?: ChainLayer };
 
 /** A cable or band from a fixed point, or from under a foot, to a hand or an ankle. */
 export interface ChainLine {
   from: ChainPoint | 'nearFoot' | 'farFoot';
   to: 'nearGrip' | 'farGrip' | 'nearAnkle' | 'farAnkle';
+  /** 'far' paints the line behind the trunk and the near limbs (a cable that runs between the legs). */
+  depth?: 'far';
 }
 
 /** A chain movement: its poses, how it is seen, what it holds and the equipment around it. */
@@ -1626,6 +1629,47 @@ function reverseFlyeBench(): ChainShape[] {
 }
 /** The Back Flyes With Bands: where the band is looped round the rack upright, at shoulder height in front. */
 export const BACK_FLYE_ANCHOR: readonly [number, number] = [46, CHAIN_STANDING_HIP + CHAIN_TRUNK];
+
+/** The height of the shoulders of a figure standing tall on flat feet. */
+const CHAIN_STANDING_SHOULDER = CHAIN_STANDING_HIP + CHAIN_TRUNK;
+/** Cable Seated Crunch: the hips on the bench, and the high pulley behind. */
+const SEATED_CRUNCH_HIP: readonly [number, number] = [44, CHAIN_SEATED_HIP];
+export const SEATED_CRUNCH_PULLEY: readonly [number, number] = [8, 84];
+/** Cable Crunch: kneeling with the hips a little behind the knees, facing a high pulley a short way in front. */
+const CABLE_CRUNCH_THIGH = -70;
+const CABLE_CRUNCH_HIP: readonly [number, number] = [46, CHAIN_KNEELING_KNEE + CHAIN_THIGH * Math.sin(chainRad(70))];
+export const CABLE_CRUNCH_PULLEY: readonly [number, number] = [72, 96];
+/** The two floor crunches: where the hips lie, and feet flat on the floor with the knees bent. */
+const FLOOR_CRUNCH_HIP: readonly [number, number] = [50, CHAIN_LYING_HEIGHT];
+const FLOOR_CRUNCH_FOOT: readonly [number, number] = [77, CHAIN_ANKLE_HEIGHT];
+/** Janda Sit-Up: the foot placed so the planted leg's knee is bent to a right angle. */
+const JANDA_HIP: readonly [number, number] = [44, CHAIN_LYING_HEIGHT];
+const JANDA_FOOT: readonly [number, number] = [
+  JANDA_HIP[0] + Math.sqrt(2 * CHAIN_THIGH * CHAIN_THIGH - (CHAIN_LYING_HEIGHT - CHAIN_ANKLE_HEIGHT) ** 2), CHAIN_ANKLE_HEIGHT,
+];
+/** The Pallof presses: the anchor out to the athlete's side, and the arm directions for hands at the chest and pressed out. */
+export const PALLOF_BAND_ANCHOR: readonly [number, number, number] = [0, CHAIN_STANDING_SHOULDER - 7, 40];
+export const PALLOF_PULLEY: readonly [number, number, number] = [0, CHAIN_STANDING_SHOULDER, 34];
+const PALLOF_STANCE = { at: [0, CHAIN_STANDING_HIP], trunk: 90, thigh: -90, shin: -90 } as const;
+const PALLOF_AT_CHEST = { upperArm: [-70, 25], forearm: [54, -72] } as const;
+const PALLOF_PRESSED = { upperArm: [-5, -18.8], forearm: [-5, -18.8] } as const;
+/** Cable Pull-Through: the low pulley behind the athlete, and where the feet stand. */
+export const PULL_THROUGH_PULLEY: readonly [number, number] = [6, 5];
+const PULL_THROUGH_FEET: readonly [number, number] = [52, CHAIN_ANKLE_HEIGHT];
+/** Step-up with Knee Raise: the box, and a foot standing on it. */
+export const STEP_BOX = { front: 50, back: 68, top: 14 } as const;
+const STEP_ON_BOX: readonly [number, number] = [57, STEP_BOX.top + CHAIN_ANKLE_HEIGHT];
+const STEP_ON_FLOOR: readonly [number, number] = [40, CHAIN_ANKLE_HEIGHT];
+const STEP_ARMS = { upperArm: -88, forearm: -80 } as const;
+/** The internal rotations: the anchor out to the working side at elbow height, in a front view. */
+export const INTERNAL_ROTATION_ANCHOR: readonly [number, number, number] = [0, CHAIN_FRONT_SHOULDER - RAISE_UPPER_ARM, 40];
+const INTERNAL_ROTATION_BODY = {
+  at: [0, CHAIN_FRONT_HIP], trunk: 90, thigh: -90, shin: -90, upperArm: [-90, 0], farUpperArm: [-90, 4], farForearm: [-90, 2],
+} as const;
+/** Low Pulley Row To Neck: the seat, the foot plate and the low pulley of a row station. */
+const NECK_ROW_SEAT_TOP = 12;
+const NECK_ROW_FEET: readonly [number, number] = [43, 13];
+export const NECK_ROW_PULLEY: readonly [number, number] = [58, 14];
 
 /** The chain movements, by slug. */
 export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
@@ -2163,6 +2207,199 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       { at: [0, CHAIN_STANDING_HIP], trunk: 90, thigh: -90, shin: -90, upperArm: [0, 90], forearm: [0, 90] },
     ],
   },
+  // Cable Seated Crunch: sitting on a flat bench with the back to a high
+  // pulley, rope ends over the shoulders at the upper chest; the hips stay put
+  // and the spine curls the trunk forward.
+  'cable-seated-crunch': {
+    root: 'hip',
+    implement: 'rope',
+    armsFollowTrunk: true,
+    lines: [{ from: SEATED_CRUNCH_PULLEY, to: 'nearGrip' }],
+    equipment: [
+      { kind: 'frame', a: [SEATED_CRUNCH_PULLEY[0], 0.5], b: [SEATED_CRUNCH_PULLEY[0], 90] },
+      { kind: 'pulley', at: SEATED_CRUNCH_PULLEY },
+      ...chainFlatBench(SEATED_CRUNCH_HIP[0] - 17, SEATED_CRUNCH_HIP[0] + 7, CHAIN_SEATED_HIP - CHAIN_THIGH_HALF),
+    ],
+    poses: [
+      { at: SEATED_CRUNCH_HIP, trunk: 90, curl: 0, thigh: 0, shin: -90, upperArm: -80, forearm: 78 },
+      // The arms are given relative to the chest. Curled, the elbows hang down toward the lap.
+      { at: SEATED_CRUNCH_HIP, trunk: 90, curl: 65, thigh: 0, shin: -90, upperArm: -40, forearm: 133 },
+    ],
+  },
+  // Cable Crunch: kneeling facing a high pulley, rope at the collarbones. The
+  // hips are frozen and only the upper spine rounds, taking the elbows toward
+  // the thighs.
+  'cable-crunch': {
+    root: 'hip',
+    spine: 'upper',
+    feet: 'free',
+    implement: 'rope',
+    armsFollowTrunk: true,
+    lines: [{ from: CABLE_CRUNCH_PULLEY, to: 'nearGrip' }],
+    equipment: [
+      { kind: 'frame', a: [CABLE_CRUNCH_PULLEY[0], 0.5], b: [CABLE_CRUNCH_PULLEY[0], 99] },
+      { kind: 'pulley', at: CABLE_CRUNCH_PULLEY },
+    ],
+    poses: [
+      { at: CABLE_CRUNCH_HIP, trunk: 68, curl: 0, thigh: CABLE_CRUNCH_THIGH, shin: 180, foot: 180, upperArm: -75, forearm: 95 },
+      // The arms are given relative to the chest. Rounded over, the elbows point down at the thighs.
+      { at: CABLE_CRUNCH_HIP, trunk: 68, curl: 85, thigh: CABLE_CRUNCH_THIGH, shin: 180, foot: 180, upperArm: -13, forearm: 177 },
+    ],
+  },
+  // Cross-Body Crunch: knees bent, feet flat, hands by the head. The middle
+  // pose is lying down; either side of it the upper spine curls and turns so
+  // one shoulder leads across while the opposite knee comes in to meet it.
+  'cross-body-crunch': {
+    root: 'hip',
+    spine: 'upper',
+    feet: 'free',
+    kneePole: 90,
+    armsFollowTrunk: true,
+    poses: [
+      { at: FLOOR_CRUNCH_HIP, trunk: 180, curl: 48, twist: 30, thigh: 50, shin: -50, ankle: FLOOR_CRUNCH_FOOT, farAnkle: [64, 20], foot: 0, farFoot: -30, ...HANDS_BY_EARS },
+      { at: FLOOR_CRUNCH_HIP, trunk: 180, curl: 0, twist: 0, thigh: 50, shin: -50, ankle: FLOOR_CRUNCH_FOOT, farAnkle: FLOOR_CRUNCH_FOOT, foot: 0, farFoot: 0, ...HANDS_BY_EARS },
+      { at: FLOOR_CRUNCH_HIP, trunk: 180, curl: 48, twist: -30, thigh: 50, shin: -50, ankle: [64, 20], farAnkle: FLOOR_CRUNCH_FOOT, foot: -30, farFoot: 0, ...HANDS_BY_EARS },
+    ],
+  },
+  // Janda Sit-Up: knees bent to a right angle, feet flat, arms resting at the
+  // sides. The spine peels off the floor and the curled trunk comes up, slowly,
+  // and goes down the same way in the same time.
+  'janda-sit-up': {
+    root: 'hip',
+    kneePole: 90,
+    poses: [
+      { at: JANDA_HIP, trunk: 180, curl: 0, thigh: 45, shin: -45, ankle: JANDA_FOOT, upperArm: -8, forearm: -12 },
+      { at: JANDA_HIP, trunk: 180, curl: 58, thigh: 45, shin: -45, ankle: JANDA_FOOT, upperArm: -14, forearm: -10 },
+      { at: JANDA_HIP, trunk: 102, curl: 58, thigh: 45, shin: -45, ankle: JANDA_FOOT, upperArm: -55, forearm: -25 },
+    ],
+  },
+  // Pallof Press: standing side-on to an anchored band, drawn turned so the
+  // anchor is seen out to the athlete's side. The hands press straight out
+  // from the chest; nothing else moves.
+  'pallof-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 60,
+    originX: 62,
+    lines: [{ from: PALLOF_BAND_ANCHOR, to: 'nearGrip' }],
+    equipment: [
+      { kind: 'frame', a: [0, 0.5, PALLOF_BAND_ANCHOR[2]], b: [0, CHAIN_STANDING_SHOULDER + 8, PALLOF_BAND_ANCHOR[2]] },
+    ],
+    poses: [
+      { ...PALLOF_STANCE, ...PALLOF_AT_CHEST },
+      { ...PALLOF_STANCE, ...PALLOF_PRESSED },
+    ],
+  },
+  // Pallof Press With Rotation: the same stance beside a shoulder-height
+  // pulley. Press out, then the shoulders turn a quarter turn away from the
+  // pulley with the arms straight and the hips still.
+  'pallof-press-with-rotation': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 60,
+    originX: 58,
+    implement: 'handle',
+    lines: [{ from: PALLOF_PULLEY, to: 'nearGrip' }],
+    equipment: [
+      { kind: 'frame', a: [0, 0.5, PALLOF_PULLEY[2]], b: [0, CHAIN_STANDING_SHOULDER + 8, PALLOF_PULLEY[2]] },
+      { kind: 'pulley', at: PALLOF_PULLEY },
+    ],
+    poses: [
+      { ...PALLOF_STANCE, twist: 0, ...PALLOF_AT_CHEST },
+      { ...PALLOF_STANCE, twist: 0, ...PALLOF_PRESSED },
+      {
+        ...PALLOF_STANCE, twist: 90,
+        upperArm: [-5, -108.8], forearm: [-5, -108.8], farUpperArm: [-5, 71.2], farForearm: [-5, 71.2],
+      },
+    ],
+  },
+  // Cable Pull-Through: facing away from a low pulley, the rope held at the
+  // hips with the cable running back between the legs. The hips go back and the
+  // flat back hinges forward; the feet stay planted.
+  'cable-pull-through': {
+    root: 'hip',
+    implement: 'rope',
+    kneePole: 0,
+    lines: [{ from: PULL_THROUGH_PULLEY, to: 'nearGrip', depth: 'far' }],
+    equipment: [
+      { kind: 'frame', a: [PULL_THROUGH_PULLEY[0], 0.5], b: [PULL_THROUGH_PULLEY[0], 16] },
+      { kind: 'pulley', at: PULL_THROUGH_PULLEY },
+    ],
+    poses: [
+      { at: [52, 46.3], trunk: 90, head: 90, thigh: -90, shin: -90, ankle: PULL_THROUGH_FEET, upperArm: -85, forearm: -88 },
+      { at: [44, 43.5], trunk: 25, head: 42, thigh: -90, shin: -90, ankle: PULL_THROUGH_FEET, upperArm: -125, forearm: -125 },
+    ],
+  },
+  // Step-up with Knee Raise: feet together on the floor, the lead foot lifted
+  // onto the box, then standing tall on it as the other knee drives up.
+  'step-up-with-knee-raise': {
+    root: 'hip',
+    feet: 'free',
+    kneePole: 0,
+    equipment: [{ kind: 'box', a: [STEP_BOX.front, 0], b: [STEP_BOX.back, STEP_BOX.top] }],
+    poses: [
+      { at: [40, 46.3], trunk: 90, thigh: -90, shin: -90, ankle: STEP_ON_FLOOR, farAnkle: STEP_ON_FLOOR, foot: 0, farFoot: 0, ...STEP_ARMS },
+      { at: [42, 46.3], trunk: 88, thigh: -90, shin: -90, ankle: [48, 20], farAnkle: STEP_ON_FLOOR, foot: -8, farFoot: 0, ...STEP_ARMS },
+      { at: [46, 46], trunk: 82, thigh: -90, shin: -90, ankle: STEP_ON_BOX, farAnkle: STEP_ON_FLOOR, foot: 0, farFoot: 0, ...STEP_ARMS },
+      { at: [57, STEP_BOX.top + 46.3], trunk: 90, thigh: -90, shin: -90, ankle: STEP_ON_BOX, farAnkle: [80.4, STEP_BOX.top + 29.9], foot: 0, farFoot: -20, ...STEP_ARMS },
+    ],
+  },
+  // Cable Internal Rotation: seen from the front, the cable out to the working
+  // side at elbow height. The upper arm hangs still at the side; the level
+  // forearm turns from pointing at the cable to the centreline.
+  'cable-internal-rotation': {
+    root: 'hip',
+    view: 'front',
+    feet: 'front',
+    implement: 'handle',
+    lines: [{ from: INTERNAL_ROTATION_ANCHOR, to: 'nearGrip' }],
+    equipment: [
+      { kind: 'frame', a: [0, 0.5, INTERNAL_ROTATION_ANCHOR[2]], b: [0, 84, INTERNAL_ROTATION_ANCHOR[2]] },
+      { kind: 'pulley', at: INTERNAL_ROTATION_ANCHOR },
+    ],
+    poses: [
+      { ...INTERNAL_ROTATION_BODY, forearm: [0, 90] },
+      { ...INTERNAL_ROTATION_BODY, forearm: [0, -57] },
+    ],
+  },
+  // Internal Rotation with Band: the same movement against a band fixed at
+  // elbow height, turned further across the body.
+  'internal-rotation-with-band': {
+    root: 'hip',
+    view: 'front',
+    feet: 'front',
+    lines: [{ from: INTERNAL_ROTATION_ANCHOR, to: 'nearGrip' }],
+    equipment: [
+      { kind: 'frame', a: [0, 0.5, INTERNAL_ROTATION_ANCHOR[2]], b: [0, INTERNAL_ROTATION_ANCHOR[1] + 6, INTERNAL_ROTATION_ANCHOR[2]] },
+    ],
+    poses: [
+      { ...INTERNAL_ROTATION_BODY, forearm: [0, 90] },
+      { ...INTERNAL_ROTATION_BODY, forearm: [0, -78] },
+    ],
+  },
+  // Low Pulley Row To Neck: sitting at a low row station, back upright, feet
+  // on the plate. The elbows lift high and wide and the rope comes to the neck,
+  // hands beside the ears. Drawn turned so the wide elbows show.
+  'low-pulley-row-to-neck': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 35,
+    originX: 24,
+    feet: 'free',
+    kneePole: 90,
+    implement: 'rope',
+    lines: [{ from: NECK_ROW_PULLEY, to: 'nearGrip' }, { from: NECK_ROW_PULLEY, to: 'farGrip' }],
+    equipment: [
+      { kind: 'frame', a: [NECK_ROW_PULLEY[0], 0.5], b: [NECK_ROW_PULLEY[0], 22] },
+      { kind: 'pulley', at: NECK_ROW_PULLEY },
+      { kind: 'frame', a: [NECK_ROW_FEET[0] + 4.4, 4], b: [NECK_ROW_FEET[0] + 4.4, 22] },
+      ...chainFlatBench(-13, 6, NECK_ROW_SEAT_TOP),
+    ],
+    poses: [
+      { at: [0, NECK_ROW_SEAT_TOP + CHAIN_THIGH_HALF], trunk: 90, thigh: 10, shin: -10, ankle: NECK_ROW_FEET, foot: 80, upperArm: [-25, 0], forearm: [-25, 0] },
+      { at: [0, NECK_ROW_SEAT_TOP + CHAIN_THIGH_HALF], trunk: 90, thigh: 10, shin: -10, ankle: NECK_ROW_FEET, foot: 80, upperArm: [0, 50], forearm: [123.7, -52] },
+    ],
+  },
   // chain movements are added above this line
 };
 
@@ -2427,6 +2664,13 @@ function layoutChainExtras(
     } else if (shape.kind === 'ball') {
       const p = project(chainWorld(shape.at));
       groups[shape.layer ?? 'mid'].push({ kind: 'circle', cx: p[0], cy: p[1], r: shape.r, fill: 'line', stroke: 'textLow', strokeWidth: 1.2, opacity: 1 });
+    } else if (shape.kind === 'box') {
+      // A solid block between two opposite corners, as a box to step on.
+      const p = project(chainWorld(shape.a)), q = project(chainWorld(shape.b));
+      groups[shape.layer ?? 'behind'].push({
+        kind: 'rect', x: Math.min(p[0], q[0]), y: Math.min(p[1], q[1]), w: Math.abs(q[0] - p[0]), h: Math.abs(q[1] - p[1]),
+        rx: 1, fill: 'line', stroke: 'textLow', strokeWidth: 1.2, opacity: 1,
+      });
     } else {
       const p = project(chainWorld(shape.at));
       groups[shape.layer ?? 'front'].push({ kind: 'circle', cx: p[0], cy: p[1], r: 2.6, fill: 'textMid', opacity: 1 });
@@ -2443,7 +2687,7 @@ function layoutChainExtras(
         : project(chainWorld(cable.from));
     const end = cable.to === 'nearGrip' ? figure.hold.near : cable.to === 'farGrip' ? figure.hold.far
       : cable.to === 'nearAnkle' ? j.an : j.af;
-    lines.push(line(start, end, 1.4, 'textMid', 1));
+    (cable.depth === 'far' ? far : lines).push(line(start, end, 1.4, 'textMid', 1));
   }
 
   const handDot = (p: CanonicalPoint, color: ColorRole, opacity: number): FigurePrim =>
@@ -3631,7 +3875,7 @@ export const EQUIPMENT_BY_SLUG: Record<string, string> = {
   'single-leg-glute-bridge': 'none',
   // Family 35: the split-stance family.
   'dumbbell-lunge': 'dumbbells',
-  'step-up-with-knee-raise': 'none',
+  'step-up-with-knee-raise': 'bench',
   // Family 36: the bent-over rear delts.
   'barbell-rear-delt-row': 'barbell',
   'bent-over-dumbbell-rear-delt-raise-with-head-on-bench': 'dumbbells',
