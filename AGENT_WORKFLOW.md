@@ -35,7 +35,7 @@ migration.
    TS functions. No RNG, no clock reads inside engines.
    **Language models** (replaces the former "no LLMs at runtime"; the owner
    ruled on 2026-10-09 that a small model may be part of the decision
-   process, and the conditions below are PROPOSED, pending his confirmation):
+   process, and confirmed the conditions below the same day):
    a small on-device model MAY be used to interpret the
    athlete's free-text report, as one input to the deterministic guardrails.
    It must run fully offline (rule 1) and inside the memory ceiling (rule 3).
