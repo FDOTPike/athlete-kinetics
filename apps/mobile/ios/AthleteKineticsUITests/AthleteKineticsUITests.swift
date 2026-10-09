@@ -272,9 +272,11 @@ final class AthleteKineticsUITests: XCTestCase {
       wait(element(marker), "the \(screen) screen marker (\(marker))")
       // Today and Plan share a screen marker, so the marker alone does not
       // prove the switch has rendered; the selected state must follow.
+      // One lookup on the 300-movement Library took 9.5 s on a loaded runner
+      // (CI evidence 31e8bc4), so a 10 s bound allowed a single reading.
       let selected = XCTWaiter.wait(for: [XCTNSPredicateExpectation(
-        predicate: NSPredicate(format: "isSelected == true"), object: element(key))], timeout: 10)
-      XCTAssertEqual(selected, .completed, "\(screen) control is not marked selected within 10 s of tapping it")
+        predicate: NSPredicate(format: "isSelected == true"), object: element(key))], timeout: 30)
+      XCTAssertEqual(selected, .completed, "\(screen) control is not marked selected within 30 s of tapping it")
       log("visited \(screen)")
       guard #available(iOS 17.0, *) else {
         XCTFail("the accessibility audit needs iOS 17+; this runtime is older")
@@ -424,18 +426,23 @@ final class AthleteKineticsUITests: XCTestCase {
     // appeared, the same steps passed. The stuck system authorization view is
     // recorded and cleared by relaunching the app (data persists on disk). The
     // same sequence on a physical device is an owner check.
+    // CI evidence (31e8bc4, iOS 27): the app was still hittable here, and the
+    // sheet for this one request (the app's trace shows a single "request
+    // start") came up 12.5 minutes later, over the athlete switcher. An
+    // unanswered request is therefore always ended by the relaunch, and
+    // tools/ios_ui_tests.sh requires the trace to show one request only.
     if !answered {
       let header = element("header-athlete")
       if header.exists && !header.isHittable {
         log("HEALTH-VIEW-STUCK the app was not hittable after the unanswered Health request; relaunching")
-        app.terminate()
-        launch(["-AKUITestTrace", "1"])
-        // The relaunch opens on Today; the steps below start from Profile.
-        openProfile()
-        log("after relaunch: Profile hittable=\(element("athlete-screen-shown").exists && element("header-athlete").isHittable)")
       } else {
-        log("app hittable after the Health request: \(header.exists ? "yes" : "header absent")")
+        log("app hittable after the Health request: \(header.exists ? "yes" : "header absent"); relaunching to end the unanswered request")
       }
+      app.terminate()
+      launch(["-AKUITestTrace", "1"])
+      // The relaunch opens on Today; the steps below start from Profile.
+      openProfile()
+      log("after relaunch: Profile hittable=\(element("athlete-screen-shown").exists && element("header-athlete").isHittable)")
     }
 
     let before = expandCoachMode()
