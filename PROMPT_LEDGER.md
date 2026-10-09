@@ -12382,11 +12382,11 @@ master from origin. I'll decide later how to renumber and carry those entries.
 
 ---
 
-## Entry 0196 — 2026-10-08 · Owner decisions on merging pull request 43, the held pull requests and the remaining hand-over items (Claude Code Desktop)
+## Entry 0197 — 2026-10-08 · Owner decisions on merging pull request 43, the held pull requests and the remaining hand-over items (Claude Code Desktop)
 
 2026-10-08 (local date; 2026-10-07 UTC). Executor: Claude Code Desktop. Worktree `.claude/worktrees/master-takeover-2026-10-07`, branch `claude/master-followup-2026-10-08`, cut from the pull request 43 head `02e775f` so that this entry does not move that head while its CI is running.
 
-> **Ledger numbering note.** Entries 0193 and 0194 are on the pull request 43 branch. The primary checkout's `PROMPT_LEDGER.md` holds two further uncommitted entries written by other sessions after its `master` was updated: one numbered 0193 (movement order), which clashes with the 0193 above, and one numbered 0195 (Triage Lab). This entry takes 0196 to stay clear of both. Those uncommitted entries were not touched.
+> **Ledger numbering note.** Entries 0193 and 0194 are on the pull request 43 branch. The primary checkout's `PROMPT_LEDGER.md` holds uncommitted entries written by other sessions after its `master` was updated, numbered 0193 (movement order, which clashes with the 0193 above), 0195 and 0196 (Triage Lab). This entry was first written as 0196 and renumbered to 0197 on 2026-10-09, before any push, when the other 0196 appeared. Those uncommitted entries were not touched.
 
 ### Input
 
@@ -12434,3 +12434,119 @@ Report at the end:
 - what you left, and why;
 - anything new you found.
 ```
+
+### Output
+
+- **Merged.** Pull request 43, with a merge commit: `637ecd6` (2026-10-09T01:45Z). CI on its head `02e775f` was green on the second attempt of run 37603984164: verification suite, Android and iOS jobs all passed, and all five UI tests passed, `test4_backupToFilesAndRestore` among them. No `FOCUS-RETRY` line was printed in either attempt.
+- **First attempt.** The iOS job failed on `test1_onboardingNavigationAndAccessibility`: Apple's accessibility audit on the Ready screen returned "Audit failed to complete in time" (code -56). `test1` types no text, so it does not run the changed code; the message is in none of the 14 earlier runs checked. Only the failed job was re-run, on the same head. The pull request carries a comment recording both attempts. The audit timeout was not addressed.
+- **Master run for the merge commit.** Run 37871312204 on `637ecd6` was in progress when this entry was written; its result is not known here.
+- **Left unmerged, nothing changed.** Movement drafts 29, 34-37 and 40-42, and the later movement pull requests. Pull request 28: its base `claude/release-integration` is at `a3483a2` (master without the #39 merge commit); its head is 3 commits ahead of and 21 behind that base; its last iOS job is red. Pull request 21: conflicts in `PROMPT_LEDGER.md` and `apps/mobile/src/screens/SessionScreen.tsx`, against its base and against master; 9 commits, 22 files. Pull request 7: a trial merge into master has no conflicts; 23 commits, 10 new files under `docs/research/biometric-rpe/`, no source changes; its last CI run predates the iOS job.
+- **Issue #38.** No new report from the tester (forgeaura). Nothing posted.
+- **Local checkout.** Done under Entry 0194: branch `local-ledger-0023-0028` (`52221e7`, not pushed) and local `master` fast-forwarded. Since then other sessions have added uncommitted ledger entries to the primary checkout (see the numbering note); they were left as found.
+- **Owner-gated items.** No action on TestFlight, the physical-device checks or the owner decisions list.
+
+---
+
+## Entry 0198 — 2026-10-09 · Assess an outside architectural review against the code; effort for its recommendations; use of CodeRabbit (Claude Code Desktop)
+
+2026-10-09. Executor: Claude Code Desktop. Same worktree and branch as Entry 0197.
+
+### Input
+
+Two messages, received verbatim. The first:
+
+```text
+Could you please see deep minds review
+Please assess the code base and provide a report on how truthful its statements are, how much work it would take too do, can we utilize code rabbit? im signing up to code rabbits advance tier ,  utilize it
+```
+
+The second, sent after the review could not be found on disk, was "sorry here it is" followed by the pasted review:
+
+```text
+Although you pasted the raw binary content of a ZIP or TAR archive encoded as plain text (which scrambles the actual code), the file paths and directory structure have been preserved perfectly.
+
+By analyzing the file names, module organization, and document titles, I can deduce the system design and provide a comprehensive Architectural Review of the Athlete Kinetics application.
+
+Here is an analysis of your system's architecture, its strengths, and potential areas for improvement.
+
+1. High-Level System Architecture
+The application utilizes a Monorepo structure (likely Yarn workspaces or npm workspaces), cleanly separating the React Native presentation layer from the core business, data, and machine learning logic.
+
+* `apps/mobile/`: The React Native frontend application.
+
+* `packages/core-db/`: The local database schema, migrations, and persistence layer.
+
+* `packages/inference/`: The on-device Machine Learning (ML) and algorithmic rules engine.
+
+* `packages/biometrics/`: The hardware/OS integration layer for health data.
+
+Key Architectural Paradigm: The application is strictly Local-First and Offline-Capable. By placing the database and ML inference directly on the device, the app ensures rapid UI responses, functions without an internet connection, and guarantees absolute data privacy for sensitive health metrics.
+
+2. Module Breakdown & Review
+A. The "Brain": On-Device Inference (`packages/inference`)
+This is the most sophisticated and impressive component of the architecture. Instead of relying on a cloud backend to generate workouts, the app computes everything on the edge.
+
+* Kinematic Autopilot: Files like `kinematicAutopilot.ts`, `progressionEngine.ts`, `loadSelection.ts`, and `routineComposer.ts` represent a complex expert system. It dynamically auto-regulates athlete training, manages periodization, and calculates metrics like e1RM (Estimated 1-Rep Max).
+
+* On-Device NLP & ML: The `src/semantic/` directory contains `onnxEmbedder.ts`, `wordpiece.ts`, and `cosine.ts`, and relies on the `minilm` tokenizer. This proves you are running an ONNX model (likely a quantized MiniLM sentence transformer) directly on the phone. This is used for semantic search (e.g., finding alternative exercises based on intent, or processing natural language coaching cues) entirely offline.
+
+B. Persistence Layer (`packages/core-db`)
+This is a heavily relational local database (SQLite).
+
+* Schema Design: You have 69 sequential SQL migration files (`001_mechanical_input.sql` to `069_resting_heart_rate.sql`). The schema tracks highly specific domain concepts like `telemetry`, `niggle_tracking` (injuries), `suspension_episode`, and `periodization`.
+
+* Secure Backups: Because the app has no cloud backend, device loss means data loss. The presence of `backupCrypto.ts`, `backupStore.ts`, and `canonicalJson.ts` shows a well-architected, encrypted backup and restore mechanism allowing users to securely port their data.
+
+C. Biometrics Integration (`packages/biometrics`)
+
+* You have abstracted OS-level health layers (`appleHealth.ts` and `healthConnect.ts`) behind a unified `platformBridge.ts`. This decoupling ensures your inference engine doesn't need to care whether the user is on iOS or Android; it just consumes standardized physiological data.
+
+D. Frontend & State Management (`apps/mobile`)
+
+* Component Architecture: You use a component-driven design with a robust library of UI primitives in `src/components/ui/` (`Sheet`, `Chip`, `Stepper`, `PrimaryButton`), separated from complex domain views (`FocusGoalsPanel`, `RoutineTemplateBuilder`).
+
+* State Management: The `src/state/` directory is partitioned by domain (`sportStore.ts`, `focusGoalStore.ts`, `todayState.ts`). The naming convention (`useStore.ts`) strongly suggests you are using a lightweight, hook-based state manager like Zustand.
+
+3. Multi-Agent Development Workflow
+The repository contains a massive amount of AI-driven documentation: `HANDOVER_*.md`, `WO_*.md`, `AUDIT_*.md`, and `PROMPT_LEDGER.md`.
+
+* Observation: You are using a highly structured, multi-agent AI framework (referencing LLMs like Opus, Claude, Gemini, DeepSeek, and an orchestrator named "Sol") to architect, audit, and write code.
+
+* Tooling: You have built custom tools to support these agents, such as `tools/autopilot-sim/` (to mathematically simulate and verify the AI coach's training progressions) and `tools/memory-audit/` (to ensure the agents aren't writing code that causes memory leaks).
+
+4. Actionable Recommendations & Risks
+While the architecture is exceptional, there are a few technical debts and risks you should address before a production release:
+
+1. Migration Squashing (`core-db`)
+With 69 SQL migrations, app startup time for new users will be delayed as the SQLite engine sequentially executes every script. Furthermore, files like `037_movement_library_v2_batch.sql` through `048` indicate that you are mixing data seeding/patching with structural migrations.
+
+   * Recommendation: Squash these migrations. Consolidating the 69 files into a single `schema_v1_baseline.sql` will drastically reduce the app's initialization overhead on fresh installs.
+
+2. ONNX Memory & Threading (`inference`)
+Running MiniLM and complex progression math on-device is incredibly CPU/RAM intensive.
+
+   * Recommendation: Ensure you are utilizing hardware acceleration (CoreML on iOS / NNAPI on Android) via your ONNX runtime. Furthermore, ensure these ML tasks and SQLite queries are executed using JSI (JavaScript Interface) bindings or pushed to background native threads. If executed in the standard React Native JS thread, the UI will stutter and freeze during workout generation.
+
+3. Repository Bloat (Agent Logs)
+Storing thousands of conversational logs, work orders, and handovers (`docs/audits/`, `.agents/`) in the main application repository will eventually cause massive Git history bloat and slow down IDE search indexing.
+
+   * Recommendation: Move the `.agents/` folder and all `HANDOVER/AUDIT/WO` markdown files into a separate `athlete-kinetics-docs` repository, or add them to `.gitignore` to keep the main codebase lightweight for CI/CD pipelines.
+```
+
+### Output
+
+No source, schema, gate or configuration file was changed. Every figure below was read or measured on `origin/master` at `637ecd6` on 2026-10-09.
+
+- **What the review could see.** By its own first sentence it read file paths only, not file contents. Its statements about names and layout are mostly right; its statements about behaviour, cost and risk are inferences and several are wrong.
+- **Right.** npm workspaces with `apps/mobile` and `packages/{core-db,inference,biometrics}`; every file it names exists; SQLite through op-sqlite; Zustand; the int8 MiniLM ONNX model run on the device; encrypted backup and restore; offline operation.
+- **Wrong or overstated.**
+  - "69 sequential migrations": 69 `.sql` files, 68 migrations. `004` is the daily upsert the data layer runs, not a migration; the chain's order is the array in `migrations.ts`, and `user_version` reaches 68.
+  - The embedder is not used to find alternative exercises or to process coaching cues. Its one runtime call embeds the athlete's free-text report so it can be matched to the phrase codebase (`apps/mobile/src/state/useStore.ts`). The autopilot, progression, load selection and routine composer do not call it.
+  - `telemetry`, `niggle_tracking` and `periodization` are schema file names, not tables.
+  - "Sol" is the builder in `AGENT_WORKFLOW.md`, not an orchestrator.
+  - `tools/memory-audit` is a RAM budget gate against a ratified ceiling, not a leak detector.
+  - "Thousands of conversational logs": master tracks 854 files, 229 of them Markdown (195 under `docs/`, 102 under `docs/audits/`, 26 root hand-overs). `.agents/` holds one rules file.
+- **Recommendation 1, squash migrations.** A fresh chain (68 entries, 925 KB of SQL, 119 tables, 300 movements) took a median 86 ms over seven runs on this workstation with `node:sqlite`, one transaction per migration as the runner does. Not measured on a phone. Squashing would break the append-only rule, the frozen shipped bytes and the array ordinals, and the full chain would have to stay for installed builds and for self-heal. Assessed as not worth doing; a device timing in the native smoke check would settle the startup question.
+- **Recommendation 2, hardware acceleration and threading.** The session is created with default options, so inference runs on the CPU provider; no CoreML or NNAPI is configured. op-sqlite and onnxruntime-react-native are already JSI modules, and `session.run` is asynchronous. Workout generation does not use the model. Embedding latency on a device was not found in the repository and was not measured here. A different execution provider would need the workstation-parity gate re-proved.
+- **Recommendation 3, move or ignore the documents.** The tracked tree is 29.3 MB, of which `docs/` is 3.6 MB and `PROMPT_LEDGER.md` 0.8 MB. Blobs reachable from master total about 11 MB compressed (`docs/` 1.6 MB); the other remote branches add about 13.5 MB, of which 8.2 MB is PNG evidence. Ignoring the files would take hash-pinned evidence out of version control. Assessed as not worth doing. The real cost seen in this session is the single ledger file: it conflicts between branches and its entry numbers clash between sessions.
+- **CodeRabbit.** No CodeRabbit configuration file is tracked; the pull-request reviews run from the repository settings. It reviews pull-request differences, not a whole repository. The command-line tool is not installed here. Plan names, prices and file limits were taken from third-party pages that disagree with one another and were not confirmed on the vendor's own pricing page.
