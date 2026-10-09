@@ -12570,3 +12570,18 @@ yes try it on the ledger branch
 - `coderabbit review --committed --base origin/master --agent` (CLI 0.9.0), run in this worktree on `claude/master-followup-2026-10-08`: exit 0, review completed, 1 file reviewed (`PROMPT_LEDGER.md`), 0 findings.
 - The run reported that promotional review credits were added to the account; no paid continuation was requested (`--use-credits` was not passed).
 - No file other than this entry changed. Not pushed.
+
+---
+
+## Entry 0200 — 2026-10-09 · Write a CodeRabbit configuration file for the review procedure (Claude Code Desktop)
+
+2026-10-09. Executor: Claude Code Desktop. Ledger entry on `claude/master-followup-2026-10-08`; the configuration file itself is on its own branch, `claude/coderabbit-config-2026-10-09`, cut from `origin/master` at `637ecd6`, so that the one-file change can be reviewed apart from the ledger.
+
+### Input
+
+Received verbatim:
+
+```text
+are you able to have a read through https://docs.coderabbit.ai/getting-started/yaml-configuration
+And github repo, please write code rabbit config file for review procedure
+```
