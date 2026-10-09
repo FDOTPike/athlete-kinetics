@@ -2023,6 +2023,32 @@ export const BENCH_ROW_FINISH: readonly [number, number] = [5, 5];
 /** The far shin lies along the bench behind its knee. */
 const BENCH_ROW_FAR_ANKLE: readonly [number, number] = [BENCH_ROW_HIP[0] - CHAIN_SHIN, BENCH_ROW_TOP + CHAIN_THIGH_HALF];
 
+/**
+ * Cable Incline Pushdown: lying back on an incline bench with the head toward
+ * a high pulley behind it. The arms stay straight and swing at the shoulder,
+ * from the bar just above the thighs to the bar back over the head.
+ */
+export const INCLINE_PUSHDOWN_BENCH_DEG = 45;
+const INCLINE_PUSHDOWN_HIP: readonly [number, number] = [60, CHAIN_SEATED_HIP];
+export const INCLINE_PUSHDOWN_PULLEY: readonly [number, number] = [8, 96];
+export const INCLINE_PUSHDOWN_LOW = -30;
+export const INCLINE_PUSHDOWN_HIGH = 118;
+/** The elbows are fixed a little short of straight: the forearm is turned this far from the upper arm throughout. */
+export const INCLINE_PUSHDOWN_ELBOW_SOFT = 8;
+/**
+ * Standing Cable Chest Press: standing in a staggered stance facing away from
+ * two pulleys at chest height, one behind each shoulder. The hands start
+ * beside the chest with the elbows out, and finish together in front of it.
+ */
+const STANDING_PRESS_HIP: readonly [number, number] = [0, 45];
+export const STANDING_PRESS_PULLEYS: readonly [ChainPoint, ChainPoint] = [[-26, 62, 24], [-26, 62, -24]];
+function cablePressHands(pressed: boolean): { wrist: ChainPoint; farWrist: ChainPoint } {
+  const y = STANDING_PRESS_HIP[1] + CHAIN_TRUNK;
+  // Forward of the shoulder, below it, and out from it (in from it, once pressed).
+  const [x, drop, out] = pressed ? [23, 4, -7.1] : [10.75, 3.1, 12];
+  return { wrist: [x, y - drop, CHAIN_SHOULDER_HALF + out], farWrist: [x, y - drop, -CHAIN_SHOULDER_HALF - out] };
+}
+
 /** The chain movements, by slug. */
 export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
   // Incline Dumbbell Curl: sitting back on an incline bench, the upper arms
@@ -3515,6 +3541,47 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
         wrist: [BENCH_ROW_SHOULDER[0] - BENCH_ROW_FINISH[0], BENCH_ROW_SHOULDER[1] - BENCH_ROW_FINISH[1]],
         farWrist: [BENCH_ROW_SHOULDER[0] + 5, BENCH_ROW_TOP + CHAIN_HAND_REST],
       },
+    ],
+  },
+  // Cable Incline Pushdown: lying back on an incline bench, a bar on a cable
+  // from a high pulley behind the head. Straight arms take the bar from just
+  // above the thighs back over the head in a semicircle, and pull it down again.
+  'cable-incline-pushdown': {
+    root: 'hip',
+    implement: 'cableBar',
+    nearArmOverHead: true,
+    lines: [{ from: INCLINE_PUSHDOWN_PULLEY, to: 'nearGrip' }],
+    equipment: [
+      { kind: 'frame', a: [INCLINE_PUSHDOWN_PULLEY[0], 0.5], b: [INCLINE_PUSHDOWN_PULLEY[0], INCLINE_PUSHDOWN_PULLEY[1] + 3] },
+      { kind: 'pulley', at: INCLINE_PUSHDOWN_PULLEY },
+      ...chainInclineBench(INCLINE_PUSHDOWN_HIP, 180 - INCLINE_PUSHDOWN_BENCH_DEG),
+    ],
+    poses: [
+      { at: INCLINE_PUSHDOWN_HIP, trunk: 180 - INCLINE_PUSHDOWN_BENCH_DEG, thigh: 0, shin: -90, upperArm: INCLINE_PUSHDOWN_LOW, forearm: INCLINE_PUSHDOWN_LOW + INCLINE_PUSHDOWN_ELBOW_SOFT },
+      { at: INCLINE_PUSHDOWN_HIP, trunk: 180 - INCLINE_PUSHDOWN_BENCH_DEG, thigh: 0, shin: -90, upperArm: INCLINE_PUSHDOWN_HIGH, forearm: INCLINE_PUSHDOWN_HIGH + INCLINE_PUSHDOWN_ELBOW_SOFT },
+    ],
+  },
+  // Standing Cable Chest Press: standing with one foot ahead, facing away
+  // from two chest-high pulleys, seen turned. The handles go from beside the
+  // chest, elbows out and bent, forward and together until the arms are straight.
+  'standing-cable-chest-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 55,
+    pitchDeg: 15,
+    originX: 50,
+    implement: 'handles',
+    elbowPole: [-90, 70],
+    lines: [{ from: STANDING_PRESS_PULLEYS[0], to: 'nearGrip' }, { from: STANDING_PRESS_PULLEYS[1], to: 'farGrip', depth: 'far' }],
+    equipment: [
+      { kind: 'frame', a: [STANDING_PRESS_PULLEYS[0][0], 0.5, 24], b: [STANDING_PRESS_PULLEYS[0][0], STANDING_PRESS_PULLEYS[0][1] + 6, 24] },
+      { kind: 'frame', a: [STANDING_PRESS_PULLEYS[1][0], 0.5, -24], b: [STANDING_PRESS_PULLEYS[1][0], STANDING_PRESS_PULLEYS[1][1] + 6, -24] },
+      { kind: 'pulley', at: STANDING_PRESS_PULLEYS[0] },
+      { kind: 'pulley', at: STANDING_PRESS_PULLEYS[1] },
+    ],
+    poses: [
+      { at: STANDING_PRESS_HIP, trunk: 90, thigh: -90, shin: -90, ankle: [-10, CHAIN_ANKLE_HEIGHT], farAnkle: [10, CHAIN_ANKLE_HEIGHT], upperArm: 0, forearm: 0, ...cablePressHands(false) },
+      { at: STANDING_PRESS_HIP, trunk: 90, thigh: -90, shin: -90, ankle: [-10, CHAIN_ANKLE_HEIGHT], farAnkle: [10, CHAIN_ANKLE_HEIGHT], upperArm: 0, forearm: 0, ...cablePressHands(true) },
     ],
   },
   // chain movements are added above this line

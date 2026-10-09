@@ -44,7 +44,9 @@ test('every canonical movement, both bodies, every keyframe: no duplicate primit
   // family 37 adds the kneeling rows, and family 38 adds the incline raises.
   // Finger Curls, drawn with a close-up of the hand, came next, and One-Arm
   // Dumbbell Row, once a variant of Single-Arm Dumbbell Row, now has its own frames.
-  expect(CANONICAL.length).toBe(172);
+  // Cable Incline Pushdown and Standing Cable Chest Press, the last two beginner
+  // movements without a drawing, make 174.
+  expect(CANONICAL.length).toBe(174);
   for (const entry of CANONICAL) {
     for (const bodyName of ['neutral']) {
       for (const frame of entry.frames) {

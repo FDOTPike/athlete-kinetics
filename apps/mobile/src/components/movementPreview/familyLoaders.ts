@@ -42,6 +42,7 @@ export const FAMILY_LOADERS: Readonly<Record<string, () => PreviewFamilyFile>> =
   'hip-extension__supine': () => require('./families/hip-extension__supine.json') as PreviewFamilyFile,
   'hip-hinge__standing': () => require('./families/hip-hinge__standing.json') as PreviewFamilyFile,
   'horizontal-press__incline': () => require('./families/horizontal-press__incline.json') as PreviewFamilyFile,
+  'horizontal-press__standing': () => require('./families/horizontal-press__standing.json') as PreviewFamilyFile,
   'horizontal-press__supine': () => require('./families/horizontal-press__supine.json') as PreviewFamilyFile,
   'horizontal-pull__bent-over': () => require('./families/horizontal-pull__bent-over.json') as PreviewFamilyFile,
   'horizontal-pull__kneeling': () => require('./families/horizontal-pull__kneeling.json') as PreviewFamilyFile,

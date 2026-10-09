@@ -1623,4 +1623,50 @@ export const CHAIN_SPECS = [
     reason: 'Redrawn on 9 October 2026 at the owner\'s request, from the description accepted that day: the earlier drawing was borrowed from Single-Arm Dumbbell Row, which finishes with the elbow toward the hip, where this text finishes beside the chest. Source-bound side-view draft with its own drawing: one knee and the same-side hand on a flat bench, the other foot flat on the floor and the trunk level; the dumbbell hangs on a straight arm under the shoulder and is pulled up beside the chest with the elbow rising past the back, a short squeeze, and a slower lowering to a long arm. The trunk and legs do not move. The dumbbell is held end-on to the viewer\'s line, as a palm facing in holds it. One side is shown; the last caption carries the change of sides.',
     summary: 'With one knee and the same-side hand on a bench and the torso level, pull the dumbbell from a long arm up to the side of the chest, squeeze, lower it straight down, then change sides.',
   },
+  {
+    id: 154,
+    slug: 'cable-incline-pushdown',
+    equipment: 'bench, cable_machine',
+    text: {
+      basis: 'The catalogue\'s text for this movement is on a source hold because one sentence contradicts the rest: "Keeping the upper arms stationary" cannot hold while the bar travels overhead and the lats do the work. This is the catalogue text with that sentence and its cue corrected as a separate auditor (audit F) proposed on 9 October 2026, after checking the public-domain free-exercise-db entry and other descriptions of the movement: the elbows stay fixed and the arms move at the shoulders. The owner has not yet seen or accepted the correction, and the catalogue text is not changed here.',
+      instructions: 'Lie back on an incline bench set in front of a high pulley, facing away from the machine, with a straight bar overhead. Take an overhand shoulder-width grip and bring the arms down so the bar sits just above the thighs. Keeping the elbows fixed and nearly straight, let the bar travel back overhead in a semicircle, moving only at the shoulders. Pull it back down to the thighs with the lats and hold the contraction.',
+      cues: 'Keep the elbows fixed and nearly straight. Move the bar in one smooth semicircle. Finish the pull with the lats.',
+      coachingIntent: 'Train the lats through shoulder extension while lying on an incline bench facing away from the stack.',
+    },
+    phases: [0, 1, 1, 0, 0],
+    // Pose 0 is the bar just above the thighs. "let the bar travel back overhead in a semicircle. Pull it back down to the thighs with the lats and hold the contraction."
+    segments: [1500, 300, 1100, 900],
+    captions: [
+      'Lie back on an incline bench set in front of a high pulley, facing away from the machine, and take the straight bar with an overhand shoulder-width grip, arms down so the bar sits just above the thighs.',
+      'Keeping the elbows fixed and nearly straight, let the bar travel back overhead.',
+      'Move the bar in one smooth semicircle.',
+      'Pull it back down to the thighs with the lats.',
+      'Hold the contraction. Finish the pull with the lats.',
+    ],
+    reason: 'First drawing of this movement, made on 9 October 2026 from its catalogue text with one sentence corrected; the owner has not yet accepted that correction. Source-bound side-view draft: lying back on a bench inclined 45 degrees with the head toward a high pulley and the feet on the floor, a straight bar on the cable; with the elbows fixed a little short of straight, the arms take the bar from just above the thighs back over the head in one arc at the shoulder, stopping short of the line of the body, and pull it down to the thighs again for a hold. The body and legs do not move. The cable only lengthens on the pull down. What was corrected: the catalogue says "Keeping the upper arms stationary", which cannot hold while the bar travels overhead and the lats do the work; the public-domain reference photographs and a separate audit both show straight arms moving at the shoulder.',
+    summary: 'Lying back on an incline bench with a high cable behind your head, take the bar from just above the thighs back overhead in one smooth arc, then pull it down to the thighs with the lats and hold.',
+  },
+  {
+    id: 279,
+    slug: 'standing-cable-chest-press',
+    equipment: 'cable_machine',
+    text: {
+      basis: 'Written on 9 October 2026 from the public-domain free-exercise-db entry for this movement and its photographs; this is the wording as corrected by a separate auditor (audit F). The owner has not yet seen or accepted it. The catalogue\'s own text for this movement is a placeholder on a source hold.',
+      instructions: 'Set both pulleys to chest height. Take a handle in each hand and stand a short step in front of the machine, facing away from it, far enough that the cables are taut. Put one foot ahead of the other for balance. Draw the shoulder blades together and bring the elbows out to the sides just below shoulder height, bent to about ninety degrees, with the forearms pointing forward along the cables and the handles beside the chest. Holding that posture, press the handles forward and towards each other until the arms are straight but not snapped locked, hands close together in front of the chest. Pause, then return under control until the handles are beside the chest again.',
+      cues: 'Shoulder blades together at the start. Hold your posture; do not rock or twist to help. Finish with the hands close together in front of the chest.',
+      coachingIntent: 'Train the chest, shoulders and triceps with a standing press against two cables.',
+    },
+    phases: [0, 1, 1, 0, 0],
+    // "Pause, then return under control until the handles are beside the chest again."
+    segments: [1000, 500, 1700, 500],
+    captions: [
+      'Stand a short step in front of two chest-high pulleys, facing away, one foot ahead of the other, with the elbows out just below shoulder height and bent to about ninety degrees, forearms pointing forward and the handles beside the chest.',
+      'Holding that posture, press the handles forward and towards each other until the arms are straight but not snapped locked.',
+      'Pause. Hands close together in front of the chest.',
+      'Return under control until the handles are beside the chest again.',
+      'Shoulder blades together. Do not rock or twist to help.',
+    ],
+    reason: 'First drawing of this movement, made on 9 October 2026 from a description written that day from the public-domain reference and corrected by a separate auditor; the owner has not yet accepted that description. Source-bound draft, drawn from a 3D model turned 55 degrees and seen from a little above, so the elbows out to the sides and the handles coming together show: standing with one foot ahead of the other, facing away from two chest-high pulleys, a handle in each hand; the handles start beside the chest with the elbows out just below shoulder height and bent to about a right angle, forearms pointing forward, and are pressed forward and toward each other until the arms are nearly straight and the hands close together, a pause, and a slower return to beside the chest. The body and legs do not move. Each cable only lengthens on the press.',
+    summary: 'Standing with one foot ahead, facing away from two chest-high cables, press the handles forward and towards each other until the arms are straight, pause, then return under control until they are beside the chest.',
+  },
 ];
