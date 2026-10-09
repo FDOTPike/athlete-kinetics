@@ -110,6 +110,17 @@ console.log('[N3] Info.plist privacy and presentation');
   check('display name is the product name, not the scaffold', plist.get('CFBundleDisplayName') === 'pikeMethods');
   const fonts = String(plist.get('UIAppFonts') ?? '');
   check('UIAppFonts registers the Archivo variable font', fonts.includes('Archivo-VariableFont_wdth,wght.ttf'));
+  // The iOS 27 SDK stops an app at launch unless it uses the UIScene life
+  // cycle: the manifest names the scene delegate, and the window is made for
+  // the scene there, not for the screen in the app delegate.
+  const appDelegate = read('apps/mobile/ios/AthleteKinetics/AppDelegate.swift');
+  const sceneBody = appDelegate.match(/^class SceneDelegate: UIResponder, UIWindowSceneDelegate \{\n([\s\S]*?)\n^\}$/m)?.[1] ?? '';
+  check('the app adopts the UIScene life cycle: one scene, its delegate named in Info.plist',
+    /<key>UIApplicationSceneManifest<\/key>\s*<dict>\s*<key>UIApplicationSupportsMultipleScenes<\/key>\s*<false\/>/.test(plistXml)
+      && /<key>UIWindowSceneSessionRoleApplication<\/key>\s*<array>\s*<dict>\s*<key>UISceneConfigurationName<\/key>\s*<string>[^<]+<\/string>\s*<key>UISceneDelegateClassName<\/key>\s*<string>\$\(PRODUCT_MODULE_NAME\)\.SceneDelegate<\/string>\s*<\/dict>\s*<\/array>/.test(plistXml));
+  check('React Native starts in a window made for the scene, and no window is made for the screen',
+    sceneBody.includes('UIWindow(windowScene: windowScene)') && /factory\.startReactNative\(\s*withModuleName:/.test(sceneBody)
+      && sceneBody.includes('appDelegate.window = window') && !appDelegate.includes('UIWindow(frame:'));
   const launch = read('apps/mobile/ios/AthleteKinetics/LaunchScreen.storyboard');
   check('launch screen carries no scaffold text', !/AthleteKinetics|Powered by React Native/.test(launch));
 }
