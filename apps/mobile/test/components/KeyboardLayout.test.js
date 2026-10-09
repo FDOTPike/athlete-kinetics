@@ -31,7 +31,8 @@ describe('KeyboardAwareScrollView contract', () => {
     // +1: the preparation panel's "exercise you did instead" field (work order 1).
     // +9: the SMART goal editor (7) and the measurement entry (2) (work order 2).
     // +4: the sport editor (3) and the goal exercise search (1) (work order 3).
-    expect(inputTags).toHaveLength(39 + 2 + 4);
+    // +1: the optional note on the session-feel panel (070).
+    expect(inputTags).toHaveLength(39 + 2 + 4 + 1);
     expect(backupInputs).toHaveLength(2);
     expect(backupInputs.map(({ tag }) => tag)).toEqual(expect.arrayContaining([
       expect.stringContaining('accessibilityLabel="Backup password, at least 12 characters"'),

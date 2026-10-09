@@ -17,8 +17,10 @@ import {
   Chip,
   Stepper,
   RestTimerCard,
+  QuietAction,
 } from '../components/ui';
 import { PreparationPanel } from '../components/PreparationPanel';
+import { SessionFeelPanel, describeSessionFeel } from '../components/SessionFeelPanel';
 
 
 type SessionMode = 'guided' | 'self_directed';
@@ -332,9 +334,15 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
   const [bandLevel, setBandLevel] = useState<number | null>(null);
   const advancedRest = useRef<string | null>(null);
 
-  const hasSubView = detailsOpen || safetyOpen || niggleRegion !== null || substitution !== null;
+  // Session feel (070): the sub-view that records how the ended session went.
+  const [feelOpen, setFeelOpen] = useState(false);
+  const [feelRevision, setFeelRevision] = useState(0);
+  useEffect(() => { setFeelOpen(false); }, [lastEndedSessionId]);
+
+  const hasSubView = feelOpen || detailsOpen || safetyOpen || niggleRegion !== null || substitution !== null;
   useSubViewBack(hasSubView, () => {
-    if (detailsOpen) setDetailsOpen(false);
+    if (feelOpen) setFeelOpen(false);
+    else if (detailsOpen) setDetailsOpen(false);
     else if (safetyOpen) setSafetyOpen(false);
     else if (niggleRegion !== null) setNiggleRegion(null);
     else if (substitution !== null) closeSubstitution();
@@ -376,6 +384,20 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
       return null;
     }
   }, [lastEndedSessionId, loadSessionSummaryFacts, summaryBlockSessions, summaryToday]);
+
+  // Session feel (070): whether to ask how the ended session went, and what is
+  // already saved. Component tests drive this screen with partial store states,
+  // so an absent loader reads as "nothing to ask". Re-read after each save.
+  const loadSessionFeel = state.loadSessionFeel;
+  const sessionFeel = useMemo(() => {
+    if (lastEndedSessionId == null || typeof loadSessionFeel !== 'function') return null;
+    try {
+      return loadSessionFeel(lastEndedSessionId);
+    } catch {
+      // Like the summary, this must never block the completion screen.
+      return null;
+    }
+  }, [lastEndedSessionId, loadSessionFeel, feelRevision]);
 
   // What was recorded for the just-ended session's preparation. null means
   // nothing was recorded (a session from before preparation existed); the
@@ -542,6 +564,23 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
     // their existing honest copy.
     const displayMsg = outcomeCopy[outcome.kind] ?? 'Outcome unavailable';
 
+    if (feelOpen && sessionFeel !== null) {
+      return (
+        <SessionFeelPanel
+          saved={sessionFeel.saved}
+          note={sessionFeel.note}
+          onSave={(draft, noteText) => {
+            // A record only: this writes session_feel and session_note, and
+            // nothing that a prescription, block or progression reads.
+            const result = state.saveSessionFeel(draft, noteText);
+            if (result === null) setFeelRevision((revision) => revision + 1);
+            return result;
+          }}
+          onClose={() => setFeelOpen(false)}
+        />
+      );
+    }
+
     return (
       <View style={styles.outcomeContainer}>
         {/* Wordmark top-left */}
@@ -598,6 +637,32 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
         </View>
 
         <View style={styles.outcomeFooter}>
+          {sessionFeel !== null && (
+            <View style={styles.feelBlock} testID="session-feel-summary">
+              {sessionFeel.saved !== null ? (
+                <>
+                  <Text style={styles.summaryLine} testID="session-feel-saved">
+                    {`How it went: ${describeSessionFeel(sessionFeel.saved)}`}
+                  </Text>
+                  {sessionFeel.note !== null && <Text style={styles.summaryComparison}>Your note is saved with this session.</Text>}
+                  <QuietAction label="Change" onPress={() => setFeelOpen(true)} accessibilityLabel="Change how this session went" testID="session-feel-change" />
+                </>
+              ) : sessionFeel.ask ? (
+                <>
+                  <Text style={styles.summaryLine} testID="session-feel-ask">This session went differently from the plan.</Text>
+                  <SecondaryButton
+                    label="Record how it went"
+                    onPress={() => setFeelOpen(true)}
+                    accessibilityLabel="Record how this session went"
+                    testID="session-feel-open"
+                    style={{ alignSelf: 'stretch' }}
+                  />
+                </>
+              ) : (
+                <QuietAction label="Add a note about this session" onPress={() => setFeelOpen(true)} accessibilityLabel="Add a note about this session" testID="session-feel-note-open" />
+              )}
+            </View>
+          )}
           <SecondaryButton
             label="Back to Today"
             onPress={() => {
@@ -2019,6 +2084,10 @@ const styles = StyleSheet.create({
   },
   outcomeFooter: {
     paddingBottom: theme.space[4],
+  },
+  feelBlock: {
+    gap: theme.space[2],
+    marginBottom: theme.space[4],
   },
   teachingOnlyOption: {
     ...theme.font.label,
