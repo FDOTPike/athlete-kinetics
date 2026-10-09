@@ -201,11 +201,16 @@ console.log('[N9] Xcode 26 / fmt consteval compatibility');
       && podfile.includes("config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = min_ios_version_supported"));
   // Xcode 27 builds with explicit modules; the pinned Apple Health binding
   // (16.0.0) needs its core's private module on the dependents' include path.
+  // Read from the helper's own body, in order: the version guard returns
+  // before the dependents are selected and before any include path is set.
+  const exposeBody = podfile.match(/^def expose_healthkit_core_private_module!\(installer\)\n([\s\S]*?)\n^end$/m)?.[1] ?? '';
+  const exposeGuard = exposeBody.search(/unless version == '16\.0\.0'\n[^\n]*\n\s+return\n\s+end\n/);
+  const exposeSelect = exposeBody.indexOf("dependency.pod_name == 'ReactNativeHealthkitCore'");
+  const exposeSet = exposeBody.indexOf("config.build_settings['SWIFT_INCLUDE_PATHS'] = \"#{current} #{include_path}\"");
   check('the Podfile post_install makes the Apple Health core\'s private module resolvable for its dependents (16.0.0 only)',
     /^\s+expose_healthkit_core_private_module!\(installer\)$/m.test(podfile)
-      && podfile.includes("unless version == '16.0.0'")
-      && podfile.includes("dependency.pod_name == 'ReactNativeHealthkitCore'")
-      && /config\.build_settings\['SWIFT_INCLUDE_PATHS'\] = "#\{current\} #\{include_path\}"/.test(podfile));
+      && exposeGuard !== -1 && exposeGuard < exposeSelect && exposeSelect < exposeSet,
+    `guard@${exposeGuard} select@${exposeSelect} set@${exposeSet}`);
   if (fmtVersion !== undefined) {
     check('the installed React Native still pins the fmt version the patch is written for', fmtVersion === '11.0.2', fmtVersion);
   }
