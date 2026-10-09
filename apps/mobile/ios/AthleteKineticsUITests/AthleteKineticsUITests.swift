@@ -347,7 +347,13 @@ final class AthleteKineticsUITests: XCTestCase {
     completeOnboarding("athlete A")
     openProfile()
     let idle = element(labelBeginsWith: "Apple Health is available.")
-    wait(idle, "the Apple Health 'available' wording before any request")
+    // CI evidence c3e7de5 (Xcode 27 row, iOS 27.0 simulator): 30 s after the
+    // Profile opened the app still read "Checking Apple Health…"; the same
+    // test had the wording in time on the run before. The wording must still
+    // appear; the time it took is recorded and the bound is 2 minutes.
+    let idleStart = Date()
+    wait(idle, "the Apple Health 'available' wording before any request", timeout: 120)
+    log("health availability shown after \(Int(Date().timeIntervalSince(idleStart))) s")
     // CI evidence (5bdc452): the simulator's HealthKit sheet service can start
     // slower than HealthKit's own 10 s authorization session; HealthKit then
     // fails the request ("Authorization session timed out") and the app shows
@@ -667,9 +673,10 @@ final class AthleteKineticsUITests: XCTestCase {
 
   private func saveInFiles() {
     // Encrypting the snapshot (scrypt) precedes the sheet: wait for the sheet
-    // or a final status, up to 3 minutes, recording the status as it goes.
+    // or a final status, up to 5 minutes (150 s was measured on CI, c3e7de5),
+    // recording the status as it goes.
     let status = element("backup-status-message")
-    let deadline = Date().addingTimeInterval(180)
+    let deadline = Date().addingTimeInterval(300)
     var lastStatus = ""
     while Date() < deadline {
       if filesControl(["Save", "Move", "Done", "Open", "Cancel"]).exists { break }
@@ -703,6 +710,12 @@ final class AthleteKineticsUITests: XCTestCase {
     file.tap()
     let open = filesControl(["Open"])
     if open.waitForExistence(timeout: 5) && open.isEnabled { open.tap() }
-    wait(element("restore-preview"), "the restore preview", timeout: 120)
+    // Reading the backup derives its key (scrypt in JavaScript on Hermes), the
+    // same work as creating it. CI evidence c3e7de5 (Xcode 26 row): creating
+    // took 150 s and the preview, bounded at 120 s, arrived after the bound.
+    // The time taken is recorded; the bound is 5 minutes.
+    let previewStart = Date()
+    wait(element("restore-preview"), "the restore preview", timeout: 300)
+    log("restore preview shown after \(Int(Date().timeIntervalSince(previewStart))) s")
   }
 }
