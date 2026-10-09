@@ -75,12 +75,17 @@ export interface SessionFeelPanelProps {
   onClose: () => void;
 }
 
+/**
+ * The sub-view that asks how a finished session went. Starts from the saved
+ * answer when there is one, so it doubles as the way to correct it.
+ */
 export function SessionFeelPanel({ saved, note, onSave, onClose }: SessionFeelPanelProps): React.JSX.Element {
   const [feel, setFeel] = useState<SessionFeelKind | null>(saved?.feel ?? null);
   const [reasons, setReasons] = useState<readonly SessionFeelReason[]>(saved?.reasons ?? []);
   const [noteText, setNoteText] = useState(note ?? '');
   const [problem, setProblem] = useState<Exclude<SessionFeelSaveResult, null> | null>(null);
 
+  /** Tap a reason on or off. Any earlier "could not save" message is cleared. */
   const toggleReason = (reason: SessionFeelReason): void => {
     setProblem(null);
     setReasons((current) => (current.includes(reason)
@@ -88,6 +93,7 @@ export function SessionFeelPanel({ saved, note, onSave, onClose }: SessionFeelPa
       : [...current, reason]));
   };
 
+  /** Ask the store to save. Close on success; otherwise stay open and say why. */
   const save = (): void => {
     const result = onSave({ feel, reasons }, noteText);
     if (result === null) onClose();

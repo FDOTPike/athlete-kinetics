@@ -5784,6 +5784,9 @@ export const useStore = create<KineticsStore>()((set, get) => {
     );
   },
 
+  /** Save how the last ended session went (070) and, when one was typed, its
+   *  note, in one transaction. A record only: writes session_feel and
+   *  session_note and nothing a prescription, block or progression reads. */
   saveSessionFeel: (draft, note) => {
     const sessionId = get().lastEndedSessionId;
     if (sessionId === null) return 'not_saved';
@@ -5828,6 +5831,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
     }
   },
 
+  /** Read-only: whether to ask how this session went (it did not go to plan)
+   *  and the answer and note already saved for it. Never throws. */
   loadSessionFeel: (sessionId) => {
     const nothing: SessionFeelView = { ask: false, saved: null, note: null };
     try {

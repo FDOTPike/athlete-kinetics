@@ -281,6 +281,11 @@ export interface SessionScreenProps {
   onReturnToToday?: () => void;
 }
 
+/**
+ * The workout surface: the idle start view, the live session, and the
+ * completion screen shown after a session ends (its saved outcome, the
+ * summary of what was done, and the optional record of how it went).
+ */
 export default function SessionScreen({ onReturnToToday }: SessionScreenProps = {}): React.JSX.Element {
   const state = useStore((s) => s);
   const {

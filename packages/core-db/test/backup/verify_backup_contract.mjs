@@ -577,7 +577,7 @@ try {
   const inventory = readFileSync(join(import.meta.dirname, '..', '..', '..', '..', 'docs', 'audits', 'accessible-coach', 'WO03_DURABLE_DATA_INVENTORY.md'), 'utf8');
   for (const tableName of tableNames) assert.ok(inventory.includes(`\`${tableName}\``), `inventory must list ${tableName}`);
   assert.match(inventory, /Final live durable tables: 119/);
-  console.log('verify:backup PASS — AES-GCM+scrypt all-athlete physical round trip, 119 tables including activity/support/preparation/focus/goals/sport/resting HR/session feel, v63-v68 forward-restore contracts, wrong-password/tamper/truncation/KDF cap/nonce/duplicate/compatibility/journal rollback');
+  console.log('verify:backup PASS — AES-GCM+scrypt all-athlete physical round trip, 119 tables including activity/support/preparation/focus/goals/sport/resting HR/session feel, current schema v69, v63-v68 forward-restore contracts, wrong-password/tamper/truncation/KDF cap/nonce/duplicate/compatibility/journal rollback');
 } finally {
   rmSync(work, { recursive: true, force: true });
 }
