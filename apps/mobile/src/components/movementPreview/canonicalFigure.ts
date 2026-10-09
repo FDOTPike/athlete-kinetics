@@ -1186,6 +1186,8 @@ export interface ChainPose {
   sideCurl?: number;
   /** How far the shoulders are turned about the spine, in degrees; positive brings the near shoulder forward. */
   twist?: number;
+  /** How far the shoulders are lifted toward the ears, along the spine (a shrug). */
+  shrug?: number;
   /**
    * How far the whole body is rolled about its own length, in degrees: hips
    * and shoulders together. Positive brings the near side toward the front of
@@ -1857,6 +1859,85 @@ function sidePlankPose(deg: number, roll: number, legIn: number, hand: ChainPoin
 export const FINGER_CURL_PANEL = { at: [88, 64] as const, r: 24, scale: 7.5 } as const;
 /** The seated athlete of the Finger Curls: the wrist curls' seat and level forearms, the hand in line with the forearm. */
 const FINGER_CURL_BODY = { ...WRIST_CURL_BODY, hand: 0 } as const;
+
+/** 3/4 Sit-Up: knees bent with the feet held down, and the bar that holds them. */
+const THREE_QUARTER_HIP: readonly [number, number] = [50, CHAIN_LYING_HEIGHT];
+const THREE_QUARTER_FEET: readonly [number, number] = [77, CHAIN_ANKLE_HEIGHT];
+export const THREE_QUARTER_ANCHOR: readonly [number, number] = [THREE_QUARTER_FEET[0] + 2.7, CHAIN_ANKLE_HEIGHT * 2 + 2.6];
+/** Crunches: lying with the lower legs resting on a bench, hips and knees at right angles. */
+const BENCH_CRUNCH_HIP: readonly [number, number] = [36, CHAIN_LYING_HEIGHT];
+/** The top of that bench: the underside of a level shin whose knee is a thigh's length above the hip. */
+export const BENCH_CRUNCH_BENCH_TOP = CHAIN_LYING_HEIGHT + CHAIN_THIGH - CHAIN_ANKLE_HEIGHT;
+/**
+ * Rope Crunch: kneeling tall facing a high pulley a short way in front. The
+ * pulley hangs from an overhead beam, with the machine's upright further off,
+ * because the hands travel forward under the pulley as the spine curls.
+ */
+export const ROPE_CRUNCH_UPRIGHT = 88;
+const ROPE_CRUNCH_HIP: readonly [number, number] = [44, CHAIN_KNEELING_KNEE + CHAIN_THIGH];
+export const ROPE_CRUNCH_PULLEY: readonly [number, number] = [59, 112];
+/** A rope end held in each hand beside the head, a little in front of the ears, given as if the trunk were upright. */
+const ROPE_BY_HEAD = { upperArm: 30, forearm: 150 } as const;
+/** Band Good Morning (Pull Through): the feet, the post in front, and where the band is looped round its base. */
+const BAND_GOOD_MORNING_FEET: readonly [number, number] = [36, CHAIN_ANKLE_HEIGHT];
+export const BAND_GOOD_MORNING_ANCHOR: readonly [number, number] = [84, 3];
+export const BAND_GOOD_MORNING_LEAN = 12;
+const bandGoodMorningLeg = (lean: number) =>
+  ({ at: BAND_GOOD_MORNING_FEET, thigh: -90 + GOOD_MORNING_KNEE_SOFT + lean, shin: -90 - GOOD_MORNING_KNEE_SOFT + lean }) as const;
+/** Hands holding something at the base of the neck, given as if the trunk were upright. */
+const HANDS_AT_COLLAR = { upperArm: -80, forearm: 78 } as const;
+/** Hip Extension with Bands: the post held for balance, where the band is fixed low on it, and how far the leg goes back. */
+export const BAND_KICKBACK_POST = 60;
+export const BAND_KICKBACK_ANCHOR: readonly [number, number] = [BAND_KICKBACK_POST, 5];
+export const BAND_KICKBACK_DEG = 24;
+/** The two shrugs: how far the shoulders lift, in figure units. The same lift the other two shrugs are drawn with. */
+export const SHRUG_LIFT = 4.5;
+/** Cable Shrugs: the low pulley close in front. */
+export const CABLE_SHRUG_PULLEY: readonly [number, number] = [62, 5];
+
+/** Cable One Arm Tricep Extension: the high pulley in front, and the forearm's direction at the start (elbow bent tighter than a right angle). */
+export const ONE_ARM_PUSHDOWN_PULLEY: readonly [number, number] = [62, 96];
+export const ONE_ARM_PUSHDOWN_START = 25;
+/**
+ * Preacher Hammer Dumbbell Curl: seated behind a sloping pad. The upper arms
+ * lie down the pad's face; the pad is the slab just under them, starting
+ * clear of the chest and running on past the elbows.
+ */
+const PREACHER_HIP: readonly [number, number] = [30, CHAIN_SEATED_HIP];
+export const PREACHER_TRUNK = 80;
+export const PREACHER_UPPER_ARM = -50;
+const PREACHER_SHOULDER = chainNeckOf(PREACHER_HIP, PREACHER_TRUNK);
+/** A point down the pad: `along` the upper arm from the shoulder, on the pad's centre line under the arm. */
+function preacherPad(along: number): readonly [number, number] {
+  const a = chainRad(PREACHER_UPPER_ARM), under = CANONICAL_BODY_PARAMETERS.lw * 0.88 / 2 + 2;
+  return [
+    PREACHER_SHOULDER[0] + Math.cos(a) * along + Math.sin(a) * under,
+    PREACHER_SHOULDER[1] + Math.sin(a) * along - Math.cos(a) * under,
+  ];
+}
+/** External Rotation with Cable: the cable at elbow height on the far side, so the near hand is the one farther from it. */
+export const EXTERNAL_ROTATION_ANCHOR: readonly [number, number, number] = [0, CHAIN_FRONT_SHOULDER - RAISE_UPPER_ARM, -40];
+/** Shotgun Row: a wide split stance leaning forward, the far leg in front, and the low pulley beyond it. */
+const SHOTGUN_HIP: readonly [number, number] = [40, 38];
+export const SHOTGUN_TRUNK = 45;
+const SHOTGUN_SHOULDER = chainNeckOf(SHOTGUN_HIP, SHOTGUN_TRUNK);
+export const SHOTGUN_PULLEY: readonly [number, number] = [92, 12];
+const SHOTGUN_FRONT_FOOT: readonly [number, number] = [62, CHAIN_ANKLE_HEIGHT];
+const SHOTGUN_BACK_FOOT: readonly [number, number] = [16, CHAIN_ANKLE_HEIGHT];
+/** The straight arm reaching down the line to the pulley, and the hand at the side of the lower ribs. */
+const SHOTGUN_REACH: readonly [number, number] = (() => {
+  const dx = SHOTGUN_PULLEY[0] - SHOTGUN_SHOULDER[0], dy = SHOTGUN_PULLEY[1] - SHOTGUN_SHOULDER[1], d = Math.hypot(dx, dy);
+  return [SHOTGUN_SHOULDER[0] + dx / d * CHAIN_LONG_ARM, SHOTGUN_SHOULDER[1] + dy / d * CHAIN_LONG_ARM];
+})();
+export const SHOTGUN_RIBS = 13;
+const SHOTGUN_FINISH = chainOnFront(SHOTGUN_HIP, SHOTGUN_TRUNK, SHOTGUN_RIBS, 2);
+/** Kneeling High Pulley Row: kneeling tall facing a pulley well overhead, about half a metre in front. */
+const KNEELING_ROW_HIP: readonly [number, number] = [0, CHAIN_KNEELING_KNEE + CHAIN_THIGH];
+export const KNEELING_ROW_PULLEY: readonly [number, number] = [25, 98];
+/** Incline Cable Chest Press: how far the bench is raised from level, and a low pulley either side, just behind the shoulders. */
+export const INCLINE_PRESS_BENCH_DEG = 40;
+const INCLINE_PRESS_HIP: readonly [number, number] = [10, CHAIN_SEATED_HIP];
+export const INCLINE_PRESS_PULLEYS: readonly [ChainPoint, ChainPoint] = [[-14, 4, 32], [-14, 4, -32]];
 
 /** The chain movements, by slug. */
 export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
@@ -2971,6 +3052,269 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     closeUp: FINGER_CURL_PANEL,
     poses: [FINGER_CURL_BODY, FINGER_CURL_BODY, FINGER_CURL_BODY],
   },
+  // 3/4 Sit-Up: knees bent, feet held down, hands by the head. The poses are
+  // lying, three quarters of the way down, and upright; sitting up from the
+  // floor passes through the middle one, and each rep after that lowers only
+  // as far as it.
+  '3-4-sit-up': {
+    root: 'hip',
+    kneePole: 90,
+    armsFollowTrunk: true,
+    nearArmOverHead: true,
+    equipment: [
+      { kind: 'post', at: [THREE_QUARTER_ANCHOR[0], THREE_QUARTER_ANCHOR[1]] },
+      { kind: 'roller', at: THREE_QUARTER_ANCHOR },
+    ],
+    poses: [
+      { at: THREE_QUARTER_HIP, trunk: 180, curl: 0, thigh: 50, shin: -50, ankle: THREE_QUARTER_FEET, ...HANDS_BY_EARS },
+      { at: THREE_QUARTER_HIP, trunk: 180, curl: 45, thigh: 50, shin: -50, ankle: THREE_QUARTER_FEET, ...HANDS_BY_EARS },
+      { at: THREE_QUARTER_HIP, trunk: 95, curl: 20, thigh: 50, shin: -50, ankle: THREE_QUARTER_FEET, ...HANDS_BY_EARS },
+    ],
+  },
+  // Crunches: lying with the lower legs resting on a bench, hands by the head.
+  // The lower back stays on the floor and only the upper spine curls, lifting
+  // the shoulders about ten centimetres.
+  'crunches': {
+    root: 'hip',
+    spine: 'upper',
+    feet: 'free',
+    armsFollowTrunk: true,
+    nearArmOverHead: true,
+    equipment: chainFlatBench(BENCH_CRUNCH_HIP[0] + 4, BENCH_CRUNCH_HIP[0] + CHAIN_SHIN + 8, BENCH_CRUNCH_BENCH_TOP),
+    poses: [
+      { at: BENCH_CRUNCH_HIP, trunk: 180, curl: 0, thigh: 90, shin: 0, foot: 75, ...HANDS_BY_EARS },
+      { at: BENCH_CRUNCH_HIP, trunk: 180, curl: 34, thigh: 90, shin: 0, foot: 75, ...HANDS_BY_EARS },
+    ],
+  },
+  // Rope Crunch: kneeling tall facing a high pulley a short way in front, a
+  // rope end in each hand beside the head. The hips stay still and the whole
+  // spine curls the rib cage toward the thighs.
+  'rope-crunch': {
+    root: 'hip',
+    feet: 'free',
+    implement: 'rope',
+    armsFollowTrunk: true,
+    lines: [{ from: ROPE_CRUNCH_PULLEY, to: 'nearGrip' }],
+    equipment: [
+      { kind: 'frame', a: [ROPE_CRUNCH_UPRIGHT, 0.5], b: [ROPE_CRUNCH_UPRIGHT, ROPE_CRUNCH_PULLEY[1] + 3] },
+      { kind: 'frame', a: [ROPE_CRUNCH_PULLEY[0] - 5, ROPE_CRUNCH_PULLEY[1] + 3], b: [ROPE_CRUNCH_UPRIGHT, ROPE_CRUNCH_PULLEY[1] + 3] },
+      { kind: 'pulley', at: ROPE_CRUNCH_PULLEY },
+    ],
+    poses: [
+      { at: ROPE_CRUNCH_HIP, trunk: 90, curl: 0, thigh: -90, shin: 180, foot: 180, ...ROPE_BY_HEAD },
+      { at: ROPE_CRUNCH_HIP, trunk: 90, curl: 78, thigh: -90, shin: 180, foot: 180, ...ROPE_BY_HEAD },
+    ],
+  },
+  // Band Good Morning (Pull Through): facing a post with a band looped round
+  // its base and over the back of the neck, held at the collar. The hips go
+  // back and the flat trunk folds to near level against the band; the knees
+  // keep one soft bend, the leg turning about the ankle as one piece.
+  'band-good-morning-pull-through': {
+    root: 'ankle',
+    armsFollowTrunk: true,
+    lines: [{ from: BAND_GOOD_MORNING_ANCHOR, to: 'nearGrip' }],
+    equipment: [
+      { kind: 'frame', a: [BAND_GOOD_MORNING_ANCHOR[0], 0.5], b: [BAND_GOOD_MORNING_ANCHOR[0], 70] },
+    ],
+    poses: [
+      { ...bandGoodMorningLeg(0), trunk: 90, head: 90, ...HANDS_AT_COLLAR },
+      { ...bandGoodMorningLeg(BAND_GOOD_MORNING_LEAN), trunk: 12, head: 35, ...HANDS_AT_COLLAR },
+    ],
+  },
+  // Hip Extension with Bands: standing tall facing a post and holding it, a
+  // band from low on the post to the near ankle. That leg goes straight back
+  // with the knee straight; the trunk and the standing leg do not move.
+  'hip-extension-with-bands': {
+    root: 'hip',
+    feet: 'free',
+    lines: [{ from: BAND_KICKBACK_ANCHOR, to: 'nearAnkle' }],
+    equipment: [
+      { kind: 'frame', a: [BAND_KICKBACK_POST, 0.5], b: [BAND_KICKBACK_POST, 82] },
+    ],
+    poses: [
+      {
+        at: [40, CHAIN_STANDING_HIP], trunk: 90, thigh: -90, shin: -90, foot: 0, farThigh: -90, farShin: -90, farFoot: 0,
+        upperArm: -40, forearm: 10, wrist: [BAND_KICKBACK_POST, 58], farWrist: [BAND_KICKBACK_POST, 58],
+      },
+      {
+        // The foot tilts less than the leg, so the toe never dips under the floor as the leg starts back.
+        at: [40, CHAIN_STANDING_HIP], trunk: 90, thigh: -90 - BAND_KICKBACK_DEG, shin: -90 - BAND_KICKBACK_DEG, foot: -0.6 * BAND_KICKBACK_DEG,
+        farThigh: -90, farShin: -90, farFoot: 0,
+        upperArm: -40, forearm: 10, wrist: [BAND_KICKBACK_POST, 58], farWrist: [BAND_KICKBACK_POST, 58],
+      },
+    ],
+  },
+  // Barbell Shrug Behind The Back: standing tall, the bar hanging at arm's
+  // length behind the body. The arms stay straight and only the shoulders
+  // lift, straight up, and lower.
+  'barbell-shrug-behind-the-back': {
+    root: 'hip',
+    implement: 'bar',
+    poses: [
+      { at: [50, CHAIN_STANDING_HIP], trunk: 90, thigh: -90, shin: -90, upperArm: -100, forearm: -100, shrug: 0 },
+      { at: [50, CHAIN_STANDING_HIP], trunk: 90, thigh: -90, shin: -90, upperArm: -100, forearm: -100, shrug: SHRUG_LIFT },
+    ],
+  },
+  // Cable Shrugs: standing tall close to a low pulley, the bar hanging in
+  // front on straight arms. Only the shoulders lift and lower.
+  'cable-shrugs': {
+    root: 'hip',
+    implement: 'cableBar',
+    lines: [{ from: CABLE_SHRUG_PULLEY, to: 'nearGrip' }],
+    equipment: [
+      { kind: 'frame', a: [CABLE_SHRUG_PULLEY[0], 0.5], b: [CABLE_SHRUG_PULLEY[0], 16] },
+      { kind: 'pulley', at: CABLE_SHRUG_PULLEY },
+    ],
+    poses: [
+      { at: [50, CHAIN_STANDING_HIP], trunk: 90, thigh: -90, shin: -90, upperArm: -84, forearm: -84, shrug: 0 },
+      { at: [50, CHAIN_STANDING_HIP], trunk: 90, thigh: -90, shin: -90, upperArm: -84, forearm: -84, shrug: SHRUG_LIFT },
+    ],
+  },
+  // Cable One Arm Tricep Extension: standing facing a high pulley, one handle
+  // in the near hand. The upper arm stays locked to the side while the forearm
+  // straightens down beside the body; the free arm hangs.
+  'cable-one-arm-tricep-extension': {
+    root: 'hip',
+    implement: 'handle',
+    lines: [{ from: ONE_ARM_PUSHDOWN_PULLEY, to: 'nearGrip' }],
+    equipment: [
+      { kind: 'frame', a: [ONE_ARM_PUSHDOWN_PULLEY[0], 0.5], b: [ONE_ARM_PUSHDOWN_PULLEY[0], 99] },
+      { kind: 'pulley', at: ONE_ARM_PUSHDOWN_PULLEY },
+    ],
+    poses: [
+      {
+        at: [40, CHAIN_STANDING_HIP], trunk: 90, thigh: -90, shin: -90,
+        upperArm: -90, forearm: ONE_ARM_PUSHDOWN_START, farUpperArm: -88, farForearm: -80,
+      },
+      {
+        at: [40, CHAIN_STANDING_HIP], trunk: 90, thigh: -90, shin: -90,
+        upperArm: -90, forearm: -88, farUpperArm: -88, farForearm: -80,
+      },
+    ],
+  },
+  // Dumbbell Tricep Extension - Pronated Grip: lying on a flat bench, the
+  // upper arms upright. The elbows bend to lower the dumbbells beside the ears
+  // and straighten again; the palms face the feet, so each dumbbell is end-on.
+  'dumbbell-tricep-extension-pronated-grip': {
+    root: 'hip',
+    implement: 'bells',
+    nearArmOverHead: true,
+    equipment: chainFlatBench(20, 66, CABLE_LYING_BENCH_TOP),
+    poses: [
+      { at: [62, CABLE_LYING_BENCH_TOP + CHAIN_BACK_HALF], trunk: 180, thigh: 0, shin: -90, ankle: [84, CHAIN_ANKLE_HEIGHT], upperArm: 90, forearm: 90 },
+      { at: [62, CABLE_LYING_BENCH_TOP + CHAIN_BACK_HALF], trunk: 180, thigh: 0, shin: -90, ankle: [84, CHAIN_ANKLE_HEIGHT], upperArm: 90, forearm: 230 },
+    ],
+  },
+  // Preacher Hammer Dumbbell Curl: seated, the backs of the upper arms on a
+  // sloping pad. The forearms go from almost straight to shoulder height; the
+  // upper arms do not leave the pad and each dumbbell is held like a hammer.
+  'preacher-hammer-dumbbell-curl': {
+    root: 'hip',
+    implement: 'hammer',
+    equipment: [
+      { kind: 'post', at: [preacherPad(15)[0], preacherPad(15)[1]] },
+      // In front: the pad's near edge is what the viewer sees under the arm.
+      { kind: 'slab', a: preacherPad(8), b: preacherPad(20), layer: 'front' },
+      ...chainFlatBench(PREACHER_HIP[0] - 12, PREACHER_HIP[0] + 6, CHAIN_SEATED_HIP - CHAIN_THIGH_HALF),
+    ],
+    poses: [
+      // The top first: the text lowers, then curls back up and squeezes.
+      { at: PREACHER_HIP, trunk: PREACHER_TRUNK, thigh: 0, shin: -90, upperArm: PREACHER_UPPER_ARM, forearm: 65 },
+      { at: PREACHER_HIP, trunk: PREACHER_TRUNK, thigh: 0, shin: -90, upperArm: PREACHER_UPPER_ARM, forearm: PREACHER_UPPER_ARM + 15 },
+    ],
+  },
+  // External Rotation with Cable: seen from the front, side-on to a cable at
+  // elbow height on the far side. The near elbow stays at the side at a right
+  // angle while its level forearm turns from across the body, outward.
+  'external-rotation-with-cable': {
+    root: 'hip',
+    view: 'front',
+    feet: 'front',
+    implement: 'handle',
+    lines: [{ from: EXTERNAL_ROTATION_ANCHOR, to: 'nearGrip' }],
+    equipment: [
+      { kind: 'frame', a: [0, 0.5, EXTERNAL_ROTATION_ANCHOR[2]], b: [0, 84, EXTERNAL_ROTATION_ANCHOR[2]] },
+      { kind: 'pulley', at: EXTERNAL_ROTATION_ANCHOR },
+    ],
+    poses: [
+      { ...INTERNAL_ROTATION_BODY, forearm: [0, -70] },
+      { ...INTERNAL_ROTATION_BODY, forearm: [0, 50] },
+    ],
+  },
+  // Shotgun Row: a wide split stance leaning forward with a flat back, the far
+  // leg in front and the far hand on its thigh. The near arm reaches down the
+  // cable's line to a low pulley, then rows the handle to the lower ribs.
+  'shotgun-row': {
+    root: 'hip',
+    implement: 'handle',
+    kneePole: 0,
+    elbowPole: 135,
+    lines: [{ from: SHOTGUN_PULLEY, to: 'nearGrip' }],
+    equipment: [
+      { kind: 'frame', a: [SHOTGUN_PULLEY[0], 0.5], b: [SHOTGUN_PULLEY[0], 24] },
+      { kind: 'pulley', at: SHOTGUN_PULLEY },
+    ],
+    poses: [
+      {
+        at: SHOTGUN_HIP, trunk: SHOTGUN_TRUNK, head: 30, thigh: -90, shin: -90, ankle: SHOTGUN_BACK_FOOT, farAnkle: SHOTGUN_FRONT_FOOT,
+        upperArm: -50, forearm: -50, wrist: SHOTGUN_REACH, farWrist: [52.5, 33.5],
+      },
+      {
+        at: SHOTGUN_HIP, trunk: SHOTGUN_TRUNK, head: 30, thigh: -90, shin: -90, ankle: SHOTGUN_BACK_FOOT, farAnkle: SHOTGUN_FRONT_FOOT,
+        upperArm: -50, forearm: -50, wrist: SHOTGUN_FINISH, farWrist: [52.5, 33.5],
+      },
+    ],
+  },
+  // Kneeling High Pulley Row: kneeling tall on both knees facing a pulley well
+  // overhead, seen turned, a rope end in each hand. The arms start straight up
+  // toward the pulley; the elbows go out to the sides and the rope ends come
+  // to either side of the upper chest.
+  'kneeling-high-pulley-row': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 50,
+    originX: 40,
+    feet: 'free',
+    implement: 'rope',
+    elbowPole: [-60, 70],
+    lines: [{ from: KNEELING_ROW_PULLEY, to: 'nearGrip' }, { from: KNEELING_ROW_PULLEY, to: 'farGrip' }],
+    equipment: [
+      { kind: 'frame', a: [KNEELING_ROW_PULLEY[0], 0.5], b: [KNEELING_ROW_PULLEY[0], KNEELING_ROW_PULLEY[1] + 3] },
+      { kind: 'pulley', at: KNEELING_ROW_PULLEY },
+    ],
+    poses: [
+      {
+        at: KNEELING_ROW_HIP, trunk: 90, thigh: -90, shin: 180, foot: 180, upperArm: 62, forearm: 62,
+        wrist: [11.05, KNEELING_ROW_HIP[1] + CHAIN_TRUNK + 20.88, 3], farWrist: [11.05, KNEELING_ROW_HIP[1] + CHAIN_TRUNK + 20.88, -3],
+      },
+      {
+        at: KNEELING_ROW_HIP, trunk: 90, thigh: -90, shin: 180, foot: 180, upperArm: 62, forearm: 62,
+        wrist: [3, KNEELING_ROW_HIP[1] + CHAIN_TRUNK - 2.6, 11], farWrist: [3, KNEELING_ROW_HIP[1] + CHAIN_TRUNK - 2.6, -11],
+      },
+    ],
+  },
+  // Incline Cable Chest Press: lying back on an incline bench between two low
+  // pulleys, seen turned. The handles start out from the chest with the
+  // elbows at right angles and are pressed up and together until the arms are
+  // straight. The arm directions are given as if the trunk were upright.
+  'incline-cable-chest-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 46,
+    implement: 'handles',
+    armsFollowTrunk: true,
+    lines: [{ from: INCLINE_PRESS_PULLEYS[0], to: 'nearGrip' }, { from: INCLINE_PRESS_PULLEYS[1], to: 'farGrip' }],
+    equipment: [
+      { kind: 'pulley', at: INCLINE_PRESS_PULLEYS[0] },
+      { kind: 'pulley', at: INCLINE_PRESS_PULLEYS[1] },
+      ...chainInclineBench(INCLINE_PRESS_HIP, 180 - INCLINE_PRESS_BENCH_DEG),
+    ],
+    poses: [
+      { at: INCLINE_PRESS_HIP, trunk: 180 - INCLINE_PRESS_BENCH_DEG, thigh: [0, 8], shin: -90, upperArm: [-90, 45], forearm: [0, 0] },
+      { at: INCLINE_PRESS_HIP, trunk: 180 - INCLINE_PRESS_BENCH_DEG, thigh: [0, 8], shin: -90, upperArm: [0, -12], forearm: [0, -20] },
+    ],
+  },
   // chain movements are added above this line
 };
 
@@ -3022,6 +3366,7 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters, tu
   const curl = num(a.curl, b.curl);
   const sideCurl = num(a.sideCurl, b.sideCurl);
   const roll = num(a.roll, b.roll);
+  const shrug = num(a.shrug, b.shrug);
   const twist = num(a.twist, b.twist) + roll + turn * (movement.turnWithPhase === true ? Math.max(0, Math.min(1, ph)) : 1);
   const given = dir(a.trunk, b.trunk);
   const thigh = dir(a.thigh, b.thigh);
@@ -3132,9 +3477,11 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters, tu
     const mid = chainAdd(root, chainUnit(first, side), firstLength);
     return { root, mid, end: chainAdd(mid, chainUnit(second, side), secondLength) };
   };
-  const nearArm = limb(chainAdd(neck, shoulderAxis, shoulderHalf), 1, upperArm, forearm, upperLength, foreLength,
+  // A shrug lifts both shoulders along the spine; the neck and head stay where they are.
+  const girdleCentre = shrug === 0 ? neck : chainAdd(neck, neckTangent, shrug);
+  const nearArm = limb(chainAdd(girdleCentre, shoulderAxis, shoulderHalf), 1, upperArm, forearm, upperLength, foreLength,
     wristTarget, movement.elbowPole ?? -135);
-  const farArm = limb(chainAdd(neck, shoulderAxis, -shoulderHalf), -1, farUpperArm, farForearm, upperLength, foreLength,
+  const farArm = limb(chainAdd(girdleCentre, shoulderAxis, -shoulderHalf), -1, farUpperArm, farForearm, upperLength, foreLength,
     farWristTarget, movement.elbowPole ?? -135);
   const nearLeg = limb(chainAdd(hip, hipAxis, hipHalf), 1, thigh, shin, CHAIN_THIGH, CHAIN_SHIN,
     ankleTarget, movement.kneePole ?? 45);
@@ -3206,7 +3553,7 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters, tu
     footWidth: feet === 'flat' ? body.lw * 0.9 : body.lw * 0.82,
     /** How far each held bell is tilted, inner end up, in degrees: none below half-way, all of it at the top. */
     peakTilt: movement.supinatedPeak === true ? BELL_TILT_DEG * Math.max(0, Math.min(1, (ph - 0.5) * 2)) : 0,
-    angles: { trunk: given, curl, sideCurl, twist, roll, thigh, shin, upperArm, forearm, farThigh, farShin, farUpperArm, farForearm, hand, foot },
+    angles: { trunk: given, curl, sideCurl, twist, roll, shrug, thigh, shin, upperArm, forearm, farThigh, farShin, farUpperArm, farForearm, hand, foot },
   };
 }
 
@@ -4090,7 +4437,7 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
     ? layoutLowCable(j, body, farColor, farOpacity) : null;
   // Family 15: the incline cable press rides the same depth groups to its own
   // low pulley at the head end of the bench.
-  const inclineCable = slug === 'incline-cable-chest-press' && !front
+  const inclineCable = !chain && slug === 'incline-cable-chest-press' && !front
     ? layoutInclineCable(j, body, farColor, farOpacity) : null;
   const cableDraw = lowCable ?? inclineCable;
   if (cableDraw) prims.push(...cableDraw.farCable);
@@ -4227,7 +4574,8 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
   // ---- Layer 4: near limbs ----
   // The preacher pad is in front of the chest; keep its support surface
   // visible while the working upper arm occludes it on the near side.
-  if (PREACHER_SLUGS.has(slug)) prims.push(...apparatus(slug, front, body));
+  // A pose-table movement brings its own pad (layoutChainExtras).
+  if (!chain && PREACHER_SLUGS.has(slug)) prims.push(...apparatus(slug, front, body));
   prims.push(bone(nLeg, j.kn, body.lw * 1.18, 'textHi', 1));
   prims.push(bone(j.kn, j.an, body.lw * 0.9, 'textHi', 1));
   if (reverseLunge) prims.push(bone(reverseLunge.frontFoot[0], reverseLunge.frontFoot[1], reverseLunge.footWidth, 'textHi', 1));
@@ -4250,6 +4598,8 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
   if (SHRUG_SLUGS.has(slug) && pose.se !== undefined && pose.se > 0) {
     prims.push(bone(j.nk, nArm, body.lw * 0.8, 'textHi', 1));
   }
+  // A pose-table shrug shows the same way: the lifted shoulder joined to the neck.
+  if (chain && chain.angles.shrug > 0) prims.push(bone(j.nk, nArm, body.lw * 0.8, 'textHi', 1));
   // Cable/rope attachment LINES (textMid) are drawn BEFORE the head so the
   // head ring occludes them: a cable painted across the face (round-3
   // reviewer finding, cable crunch and lat pulldown) reads as the rope

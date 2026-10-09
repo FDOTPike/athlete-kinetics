@@ -11,7 +11,10 @@ function times(entry) {
   return [...Array.from({ length: Math.ceil(total / 33) }, (_, i) => i * 33), total];
 }
 
-test.each([53, 82, 138, 163])('shrug%i has stationary head/trunk/legs, extended arms and a one-second peak', id => {
+// 138 Barbell Shrug Behind The Back and 163 Cable Shrugs were redrawn as pose
+// tables on 9 October 2026 from their accepted descriptions; the same things
+// are held for them in MovementPreview.acceptedText.test.js.
+test.each([53, 82])('shrug%i has stationary head/trunk/legs, extended arms and a one-second peak', id => {
   const entry = source(id);
   expect(entry.status).toBe('pending');
   expect(entry.segmentDurationsMs[2]).toBeGreaterThanOrEqual(1000);
@@ -32,11 +35,12 @@ test.each([53, 82, 138, 163])('shrug%i has stationary head/trunk/legs, extended 
     expect(initial.nArm[1] - top.nArm[1]).toBeCloseTo(4.5, 8);
     expect(initial.wr[1] - top.wr[1]).toBeCloseTo(4.5, 8);
     if (id === 82) expect(top.wr[0]).toBeGreaterThan(top.hp[0]);
-    if (id === 138) expect(top.wr[0]).toBeLessThan(top.hp[0]);
   }
 });
 
-test.each([92, 158, 253])('preacher%i keeps supported elbows and forearm radius, with full slow return', id => {
+// 253 Preacher Hammer Dumbbell Curl was redrawn as a pose table on 9 October
+// 2026 from its accepted description; it is held in MovementPreview.acceptedText.test.js.
+test.each([92, 158])('preacher%i keeps supported elbows and forearm radius, with full slow return', id => {
   const entry = source(id);
   expect(entry.view).toBe('side');
   expect(entry.frames.at(-1).joints).toEqual(entry.frames[0].joints);
@@ -70,7 +74,7 @@ test.each([92, 158, 253])('preacher%i keeps supported elbows and forearm radius,
   }
 });
 
-test.each([82, 138, 92, 158, 163])('bar%i spans both actual hands and cable variants attach once to its center', id => {
+test.each([82, 92, 158])('bar%i spans both actual hands and cable variants attach once to its center', id => {
   const entry = source(id);
   for (const body of [DUAL_BODY_PARAMETERS.neutral]) for (const t of times(entry)) {
     const pose = poseAtTime(entry.frames.map(f => f.joints), t, entry.segmentDurationsMs);
@@ -81,16 +85,16 @@ test.each([82, 138, 92, 158, 163])('bar%i spans both actual hands and cable vari
     expect(distance([shafts[0].x1, shafts[0].y1], [shafts[0].x2, shafts[0].y2])).toBeCloseTo(distance(f.wr, f.wf) + 7, 8);
     const centre = [(f.wr[0] + f.wf[0]) / 2, (f.wr[1] + f.wf[1]) / 2];
     expect([(shafts[0].x1 + shafts[0].x2) / 2, (shafts[0].y1 + shafts[0].y2) / 2]).toEqual(centre);
-    if ([158, 163].includes(id)) {
+    if (id === 158) {
       const cables = prims.filter(p => p.kind === 'bone' && p.w === 1.4 && p.color === 'textMid');
       expect(cables).toHaveLength(1);
       expect([cables[0].x2, cables[0].y2]).toEqual(centre);
-      expect([cables[0].x1, cables[0].y1]).toEqual(id === 158 ? [72, 92] : [84, 88]);
+      expect([cables[0].x1, cables[0].y1]).toEqual([72, 92]);
     }
   }
 });
 
-test.each([53, 143, 253])('dumbbell%i emits its one load depiction per hand without the generic horizontal rectangle', id => {
+test.each([53, 143])('dumbbell%i emits its one load depiction per hand without the generic horizontal rectangle', id => {
   const entry = source(id);
   for (const body of [DUAL_BODY_PARAMETERS.neutral]) for (const frame of entry.frames) {
     const prims = layoutCanonicalFigure(frame.joints, options(entry, body));
