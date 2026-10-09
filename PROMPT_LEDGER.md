@@ -12379,3 +12379,23 @@ master from origin. I'll decide later how to renumber and carry those entries.
 - **Local edits preserved.** In the primary checkout, the uncommitted additions to `AGENT_WORKFLOW.md` (section 0.2) and `PROMPT_LEDGER.md` (entries 0023-0028 in the pre-merge master numbering) were committed unchanged to the new local branch `local-ledger-0023-0028` (`52221e7e`, parent `3358be6`; 2 files, 359 insertions). Not pushed. Renumbering and carrying them forward remains the owner's decision.
 - **Local master updated.** `git merge --ff-only origin/master` first stopped on one untracked file, `docs/WORK_ORDERS_2026-09-12_ACCESSIBLE_COACH.md`, which `origin/master` tracks. Its content was identical to the tracked version (blob `30fec443` both ways), so the untracked copy was moved aside, not deleted, and the fast-forward then completed: local `master` is `96ce954`, level with `origin/master`. The file at that path hashes the same before and after. The other untracked files in the primary checkout were not touched.
 - **Push and pull request (item 1).** The branch is pushed and opened as a pull request against `master` after this commit; its number is not known at commit time. It is to be merged with a merge commit only when CI is fully green on its head, including the iOS UI tests. If `test4` fails again, the `FOCUS-RETRY` lines and the error are reported and the test is left as strict as it is.
+
+---
+
+## Entry 0201 — 2026-10-09 · Issue #38: act on the tester's Xcode 27 report, reply on the issue, watch for the next report (Claude Code Desktop)
+
+2026-10-09. Executor: Claude Code Desktop. Worktree `.claude/worktrees/xcode27-pods`, branch `claude/xcode27-pod-deployment-targets-2026-10-09`, cut from `origin/master` at `637ecd6`.
+
+> **Ledger numbering note.** `origin/master` ends at Entry 0194. Entries 0195-0200 are held on other branches (`origin/claude/master-followup-2026-10-08` carries up to 0200), so this entry takes 0201.
+
+### Input
+
+Two messages, received verbatim, the second while the first was being worked on:
+
+```text
+can you please continue to reply to Opus on my friend Mac, please setup a watcher to see for a new reply, run until completion and tell the other opus to stop as well when completed
+```
+
+```text
+please  use Opus reports and make it work
+```

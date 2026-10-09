@@ -33,6 +33,27 @@ target 'AthleteKinetics' do
     )
     patch_fmt_consteval_for_apple_clang!(installer)
     make_glog_namespace_headers_textual!(installer)
+    raise_pod_deployment_targets!(installer)
+  end
+end
+
+# A pod target keeps the deployment target its own podspec declares.
+# react-native-blob-util 0.24.9 declares iOS 11.0, and its privacy-manifest
+# resource bundle is generated with that value. Xcode 26 builds it; Xcode 27
+# supports 15.0 and later only and stops the build at that target (issue #38:
+# "The iOS Simulator deployment target 'IPHONEOS_DEPLOYMENT_TARGET' is set to
+# 11.0, but the range of supported deployment target versions is 15.0 to
+# 27.0.x"). The app itself already requires React Native's minimum, so every
+# pod target below that minimum is raised to it; none is lowered.
+def raise_pod_deployment_targets!(installer)
+  minimum = Gem::Version.new(min_ios_version_supported)
+  installer.pods_project.targets.each do |target|
+    target.build_configurations.each do |config|
+      current = config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'].to_s
+      next unless current.match?(/\A\d+(\.\d+)*\z/) && Gem::Version.new(current) < minimum
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = min_ios_version_supported
+      Pod::UI.puts "#{target.name} (#{config.name}): iOS deployment target #{current} raised to #{min_ios_version_supported}".green
+    end
   end
 end
 

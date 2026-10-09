@@ -194,6 +194,11 @@ console.log('[N9] Xcode 26 / fmt consteval compatibility');
   check('the Podfile post_install makes glog\'s namespace-included headers textual (Swift/C++ interop)',
     /make_glog_namespace_headers_textual!\(installer\)/.test(podfile)
       && /textual = %w\[log_severity\.h vlog_is_on\.h\]/.test(podfile));
+  // Xcode 27 refuses a pod target below iOS 15.0 (issue #38).
+  check('the Podfile post_install raises pod deployment targets below the app minimum, and lowers none',
+    /^\s+raise_pod_deployment_targets!\(installer\)$/m.test(podfile)
+      && /Gem::Version\.new\(current\) < minimum/.test(podfile)
+      && podfile.includes("config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = min_ios_version_supported"));
   if (fmtVersion !== undefined) {
     check('the installed React Native still pins the fmt version the patch is written for', fmtVersion === '11.0.2', fmtVersion);
   }
