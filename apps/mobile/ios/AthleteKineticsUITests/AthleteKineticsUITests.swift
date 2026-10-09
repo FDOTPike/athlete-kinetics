@@ -99,12 +99,40 @@ final class AthleteKineticsUITests: XCTestCase {
     el.tap()
   }
 
+  /// Whether the field, or an element inside it, holds keyboard focus: the
+  /// condition XCTest requires before it types. XCTest offers the attribute
+  /// to key-value coding only.
+  private func holdsKeyboardFocus(_ el: XCUIElement) -> Bool {
+    if (el.value(forKey: "hasKeyboardFocus") as? Bool) == true { return true }
+    return el.descendants(matching: .any).matching(NSPredicate(format: "hasKeyboardFocus == true")).firstMatch.exists
+  }
+
+  /// Taps the field until it holds keyboard focus, as a person does when a
+  /// tap is not taken; typing into an unfocused field fails the test (CI
+  /// evidence b99d0cb: the backup password field, just scrolled into view,
+  /// had no keyboard focus when typing began). Every further tap is recorded.
+  private func focus(_ el: XCUIElement, _ what: String, file: StaticString = #filePath, line: UInt = #line) {
+    for attempt in 1...3 {
+      if attempt > 1 {
+        log("FOCUS-RETRY \(what): no keyboard focus 5 s after tap \(attempt - 1); tapping again")
+        reveal(el, what, file: file, line: line)
+      }
+      el.tap()
+      let deadline = Date().addingTimeInterval(5)
+      while Date() < deadline {
+        if holdsKeyboardFocus(el) { return }
+        usleep(250_000)
+      }
+    }
+    XCTFail("\(what) did not take keyboard focus after 3 taps", file: file, line: line)
+  }
+
   /// Replaces the field's text, then submits (single-line fields blur on
   /// return, so the keyboard never covers the next control).
   private func enterText(into key: String, _ text: String, submit: Bool = true) {
     let el = element(key)
     reveal(el, key)
-    el.tap()
+    focus(el, key)
     let existing = (el.value as? String) ?? ""
     if !existing.isEmpty {
       el.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: existing.count))
