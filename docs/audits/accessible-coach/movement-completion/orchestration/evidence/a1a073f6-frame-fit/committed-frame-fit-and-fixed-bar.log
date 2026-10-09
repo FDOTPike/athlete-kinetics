@@ -1,0 +1,8 @@
+PASS apps/mobile/test/components/MovementPreview.canonicalFrameFit.test.js (25.076 s)
+
+Test Suites: 1 skipped, 1 passed, 1 of 2 total
+Tests:       7 skipped, 7 passed, 14 total
+Snapshots:   0 total
+Time:        25.928 s
+Ran all test suites matching /MovementPreview.canonicalFrameFit|MovementPreview.fixedBarBodyMotion/i.
+jest exit=0

@@ -1,0 +1,85 @@
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+FAIL apps/mobile/test/components/MovementPreview.canonicalFrameFit.test.js
+  Finding A: Canonical Frame-Fit Enclosure and Stage Integrity
+    × Movement 52: figureFrame encloses stage, floor full height fits, all painted Views enclosed (neutral) (569 ms)
+    × Movement 52: figureFrame encloses stage, floor full height fits, all painted Views enclosed (male) (8 ms)
+    × Movement 52: figureFrame encloses stage, floor full height fits, all painted Views enclosed (female) (7 ms)
+    √ Negative Control: original 171.43 dp frame height demonstrably fails enclosure guard for 52 (5 ms)
+    √ Negative Control: 24 dp shorter frame mutation demonstrably fails enclosure guard for 52 (4 ms)
+    × Coverage of all renderable canonical and derived entries across the full cycle (7 ms)
+    √ Parent layout presentation: compact mode (SessionScreen) and card mode (LibraryScreenV2) (7 ms)
+
+  ● Finding A: Canonical Frame-Fit Enclosure and Stage Integrity › Movement 52: figureFrame encloses stage, floor full height fits, all painted Views enclosed (neutral)
+
+    Frame height 216 does not enclose stage height 240
+
+      73 |   }
+      74 |   if (frameH < stageH - EPS) {
+    > 75 |     throw new Error(`Frame height ${frameH} does not enclose stage height ${stageH}`);
+         |           ^
+      76 |   }
+      77 |
+      78 |   // Visible window in stage coordinates
+
+      at assertEnclosure (test/components/MovementPreview.canonicalFrameFit.test.js:75:11)
+      at assertEnclosure (test/components/MovementPreview.canonicalFrameFit.test.js:143:9)
+      at asyncGeneratorStep (../../node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● Finding A: Canonical Frame-Fit Enclosure and Stage Integrity › Movement 52: figureFrame encloses stage, floor full height fits, all painted Views enclosed (male)
+
+    Frame height 216 does not enclose stage height 240
+
+      73 |   }
+      74 |   if (frameH < stageH - EPS) {
+    > 75 |     throw new Error(`Frame height ${frameH} does not enclose stage height ${stageH}`);
+         |           ^
+      76 |   }
+      77 |
+      78 |   // Visible window in stage coordinates
+
+      at assertEnclosure (test/components/MovementPreview.canonicalFrameFit.test.js:75:11)
+      at assertEnclosure (test/components/MovementPreview.canonicalFrameFit.test.js:143:9)
+      at asyncGeneratorStep (../../node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● Finding A: Canonical Frame-Fit Enclosure and Stage Integrity › Movement 52: figureFrame encloses stage, floor full height fits, all painted Views enclosed (female)
+
+    Frame height 216 does not enclose stage height 240
+
+      73 |   }
+      74 |   if (frameH < stageH - EPS) {
+    > 75 |     throw new Error(`Frame height ${frameH} does not enclose stage height ${stageH}`);
+         |           ^
+      76 |   }
+      77 |
+      78 |   // Visible window in stage coordinates
+
+      at assertEnclosure (test/components/MovementPreview.canonicalFrameFit.test.js:75:11)
+      at assertEnclosure (test/components/MovementPreview.canonicalFrameFit.test.js:143:9)
+      at asyncGeneratorStep (../../node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● Finding A: Canonical Frame-Fit Enclosure and Stage Integrity › Coverage of all renderable canonical and derived entries across the full cycle
+
+    Frame height 216 does not enclose stage height 240
+
+      73 |   }
+      74 |   if (frameH < stageH - EPS) {
+    > 75 |     throw new Error(`Frame height ${frameH} does not enclose stage height ${stageH}`);
+         |           ^
+      76 |   }
+      77 |
+      78 |   // Visible window in stage coordinates
+
+      at assertEnclosure (test/components/MovementPreview.canonicalFrameFit.test.js:75:11)
+      at Object.assertEnclosure (test/components/MovementPreview.canonicalFrameFit.test.js:210:9)
+      at asyncGeneratorStep (../../node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+Test Suites: 1 failed, 1 total
+Tests:       4 failed, 3 passed, 7 total
+Snapshots:   0 total
+Time:        3.068 s
+Ran all test suites matching /MovementPreview.canonicalFrameFit/i.
+control B exit=1

@@ -1,0 +1,6236 @@
+{
+ "tickMs": 33,
+ "body": "neutral (component default)",
+ "results": [
+  {
+   "movementId": 14,
+   "name": "Goblet Squat",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    20,
+    6,
+    48,
+    94
+   ],
+   "totalMs": 1900,
+   "ticks": 60,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 122.55319148936171,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 48,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 55,
+   "name": "Dumbbell Squat",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    20,
+    6,
+    48,
+    94
+   ],
+   "totalMs": 2800,
+   "ticks": 87,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 122.55319148936171,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 47,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 9,
+   "name": "Romanian Deadlift",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    22,
+    6,
+    46,
+    94
+   ],
+   "totalMs": 2600,
+   "ticks": 81,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 117.4468085106383,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 50,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 113,
+   "name": "Cable Deadlifts",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    22,
+    6,
+    46,
+    94
+   ],
+   "totalMs": 2760,
+   "ticks": 86,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 117.4468085106383,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 58,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 287,
+   "name": "Stiff Leg Barbell Good Morning",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    21,
+    6,
+    49,
+    94
+   ],
+   "totalMs": 3040,
+   "ticks": 95,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 125.10638297872342,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 152,
+   "stageOverflowDp": {
+    "left": 1.3129168686715431,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": 1485,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 1.3129168686715431,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": 1485,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 86,
+   "name": "Dumbbell Floor Press",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    18,
+    64,
+    64,
+    36
+   ],
+   "totalMs": 2980,
+   "ticks": 93,
+   "dims": {
+    "frameW": 240,
+    "frameH": 135,
+    "stageW": 240,
+    "stageH": 135
+   },
+   "floorSeen": true,
+   "maxChildren": 47,
+   "stageOverflowDp": {
+    "left": 8.447890734021748,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": 0,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 8.447890734021748,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": 0,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 100,
+   "name": "Close-Grip Dumbbell Press",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    14,
+    24,
+    68,
+    78
+   ],
+   "totalMs": 2980,
+   "ticks": 93,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 209.23076923076925,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 51,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 128,
+   "name": "Alternating Floor Press",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    18,
+    64,
+    64,
+    36
+   ],
+   "totalMs": 3540,
+   "ticks": 110,
+   "dims": {
+    "frameW": 240,
+    "frameH": 135,
+    "stageW": 240,
+    "stageH": 135
+   },
+   "floorSeen": true,
+   "maxChildren": 50,
+   "stageOverflowDp": {
+    "left": 8.447906950367148,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": 0,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 8.447906950367148,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": 0,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 133,
+   "name": "Barbell Bench Press - Medium Grip",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    10,
+    20,
+    76,
+    82
+   ],
+   "totalMs": 3100,
+   "ticks": 96,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 222.4390243902439,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 53,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 141,
+   "name": "Bench Press - With Bands",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    10,
+    20,
+    76,
+    82
+   ],
+   "totalMs": 3100,
+   "ticks": 96,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 222.4390243902439,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 51,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 168,
+   "name": "Close-Grip EZ-Bar Press",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    10,
+    20,
+    76,
+    82
+   ],
+   "totalMs": 3100,
+   "ticks": 96,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 222.4390243902439,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 55,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 185,
+   "name": "Dumbbell Bench Press with Neutral Grip",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    14,
+    24,
+    68,
+    78
+   ],
+   "totalMs": 3100,
+   "ticks": 96,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 209.23076923076925,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 51,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 196,
+   "name": "Extended Range One-Arm Kettlebell Floor Press",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    18,
+    64,
+    64,
+    36
+   ],
+   "totalMs": 2680,
+   "ticks": 84,
+   "dims": {
+    "frameW": 240,
+    "frameH": 135,
+    "stageW": 240,
+    "stageH": 135
+   },
+   "floorSeen": true,
+   "maxChildren": 50,
+   "stageOverflowDp": {
+    "left": 8.447890734021748,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": 0,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 8.447890734021748,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": 0,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 246,
+   "name": "One Arm Dumbbell Bench Press",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    14,
+    24,
+    68,
+    78
+   ],
+   "totalMs": 3100,
+   "ticks": 96,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 209.23076923076925,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 50,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 227,
+   "name": "JM Press",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    10,
+    20,
+    76,
+    82
+   ],
+   "totalMs": 3100,
+   "ticks": 96,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 222.4390243902439,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 53,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 22,
+   "name": "Cable Row",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    25,
+    16,
+    74,
+    84
+   ],
+   "totalMs": 2680,
+   "ticks": 84,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 211.42857142857144,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 53,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 30,
+   "name": "Band Row",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    30,
+    10,
+    64,
+    92
+   ],
+   "totalMs": 2680,
+   "ticks": 84,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 166.95652173913044,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 50,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 117,
+   "name": "Cable Rope Rear-Delt Rows",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    25,
+    16,
+    74,
+    84
+   ],
+   "totalMs": 3020,
+   "ticks": 94,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 211.42857142857144,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 55,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 238,
+   "name": "Low Pulley Row To Neck",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    30,
+    6,
+    64,
+    96
+   ],
+   "totalMs": 2680,
+   "ticks": 84,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 160,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 50,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 273,
+   "name": "Shotgun Row",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    30,
+    10,
+    64,
+    92
+   ],
+   "totalMs": 2680,
+   "ticks": 84,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 166.95652173913044,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 50,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 142,
+   "name": "Bent Over Barbell Row",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    12.78,
+    20.09,
+    61.72,
+    83.91
+   ],
+   "totalMs": 2680,
+   "ticks": 84,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 176.53199856989633,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 152,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 144,
+   "name": "Bent Over One-Arm Long Bar Row",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    19.08,
+    19.17,
+    61.82,
+    84.83
+   ],
+   "totalMs": 2680,
+   "ticks": 84,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240.00000000000003,
+    "stageW": 174.9003890133208,
+    "stageH": 240.00000000000003
+   },
+   "floorSeen": true,
+   "maxChildren": 48,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 146,
+   "name": "Bent Over Two-Dumbbell Row",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    19.08,
+    19.16,
+    61.82,
+    84.84
+   ],
+   "totalMs": 2680,
+   "ticks": 84,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 174.8797736916549,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 47,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 147,
+   "name": "Bent Over Two-Dumbbell Row With Palms In",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    19.08,
+    19.16,
+    61.82,
+    84.84
+   ],
+   "totalMs": 2680,
+   "ticks": 84,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 174.8797736916549,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 48,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 32,
+   "name": "Band External Rotation",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "front",
+   "viewBox": [
+    26.47,
+    10,
+    70,
+    90
+   ],
+   "totalMs": 4080,
+   "ticks": 126,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 186.66666666666666,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 49,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 115,
+   "name": "Cable Internal Rotation",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "front",
+   "viewBox": [
+    20.02,
+    10,
+    76.58,
+    90
+   ],
+   "totalMs": 4080,
+   "ticks": 126,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 204.2133333333333,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 50,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 197,
+   "name": "External Rotation",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "front",
+   "viewBox": [
+    13,
+    10,
+    70,
+    90
+   ],
+   "totalMs": 4080,
+   "ticks": 126,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 186.66666666666666,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 48,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 198,
+   "name": "External Rotation with Cable",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "front",
+   "viewBox": [
+    27.62,
+    10,
+    70,
+    90
+   ],
+   "totalMs": 4080,
+   "ticks": 126,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 186.66666666666666,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 50,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 224,
+   "name": "Internal Rotation with Band",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "front",
+   "viewBox": [
+    22.62,
+    10,
+    71.68,
+    90
+   ],
+   "totalMs": 4080,
+   "ticks": 126,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 191.14666666666668,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 49,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 127,
+   "name": "Alternating Cable Shoulder Press",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    29.4,
+    0,
+    74,
+    100
+   ],
+   "totalMs": 3700,
+   "ticks": 115,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 177.6,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 50,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 274,
+   "name": "Shoulder Press - With Bands",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    13.5,
+    0,
+    74,
+    100
+   ],
+   "totalMs": 3700,
+   "ticks": 115,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 177.6,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 48,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 280,
+   "name": "Standing Dumbbell Press",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    17.2,
+    0,
+    74,
+    100
+   ],
+   "totalMs": 3700,
+   "ticks": 115,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 177.6,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 47,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 284,
+   "name": "Standing Palm-In One-Arm Dumbbell Press",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    9.1,
+    -2.5,
+    76,
+    103.01
+   ],
+   "totalMs": 3700,
+   "ticks": 115,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 177.07018736045043,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 50,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 76,
+   "name": "Standing Dumbbell Calf Raise",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    33,
+    0,
+    44,
+    102
+   ],
+   "totalMs": 3440,
+   "ticks": 107,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 103.52941176470588,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 48,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 118,
+   "name": "Calf Raises - With Bands",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    33,
+    0,
+    44,
+    102
+   ],
+   "totalMs": 3440,
+   "ticks": 107,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 103.52941176470588,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 48,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 15,
+   "name": "Kettlebell Swing",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    22,
+    6,
+    62,
+    94
+   ],
+   "totalMs": 1400,
+   "ticks": 45,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 158.29787234042553,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 50,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 10,
+   "name": "Dumbbell Bench Press",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    20,
+    24,
+    60,
+    78
+   ],
+   "totalMs": 2100,
+   "ticks": 66,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 184.6153846153846,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 50,
+   "stageOverflowDp": {
+    "left": 6.255878254107158,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": 0,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 6.255878254107158,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": 0,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 11,
+   "name": "Dumbbell Shoulder Press",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    28,
+    14,
+    42,
+    86
+   ],
+   "totalMs": 3160,
+   "ticks": 98,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 117.2093023255814,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 50,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 12,
+   "name": "Single-Arm Dumbbell Row",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    14,
+    38,
+    60,
+    62
+   ],
+   "totalMs": 2100,
+   "ticks": 66,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 232.25806451612902,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 51,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 247,
+   "name": "One-Arm Dumbbell Row",
+   "derived": true,
+   "derivesFrom": 12,
+   "view": "side",
+   "viewBox": [
+    14,
+    38,
+    60,
+    62
+   ],
+   "totalMs": 2100,
+   "ticks": 66,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 232.25806451612902,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 51,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 21,
+   "name": "Lat Pulldown",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    20,
+    4,
+    62,
+    94
+   ],
+   "totalMs": 5240,
+   "ticks": 161,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 158.29787234042553,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 56,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 74,
+   "name": "Scapular Pull-Up",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "front",
+   "viewBox": [
+    24,
+    0,
+    52,
+    118
+   ],
+   "totalMs": 2800,
+   "ticks": 87,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 105.76271186440678,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 51,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 103,
+   "name": "One Arm Lat Pulldown",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "front",
+   "viewBox": [
+    18,
+    2,
+    64,
+    96
+   ],
+   "totalMs": 3920,
+   "ticks": 121,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 160,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 55,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 169,
+   "name": "Close-Grip Front Lat Pulldown",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "front",
+   "viewBox": [
+    18,
+    2,
+    64,
+    96
+   ],
+   "totalMs": 3920,
+   "ticks": 121,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 160,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 56,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 294,
+   "name": "Underhand Cable Pulldowns",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "front",
+   "viewBox": [
+    18,
+    2,
+    64,
+    96
+   ],
+   "totalMs": 3540,
+   "ticks": 110,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 160,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 60,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 298,
+   "name": "V-Bar Pullup",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "front",
+   "viewBox": [
+    20.03,
+    -1,
+    59.94,
+    121
+   ],
+   "totalMs": 3320,
+   "ticks": 103,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 118.88925619834711,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 53,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 300,
+   "name": "Wide-Grip Lat Pulldown",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "front",
+   "viewBox": [
+    18,
+    2,
+    64,
+    96
+   ],
+   "totalMs": 3920,
+   "ticks": 121,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 160,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 56,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 97,
+   "name": "Band Good Morning",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    22,
+    6,
+    46,
+    94
+   ],
+   "totalMs": 2600,
+   "ticks": 81,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 117.4468085106383,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 50,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 54,
+   "name": "Dumbbell Split Squat",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    16,
+    6,
+    52,
+    94
+   ],
+   "totalMs": 2300,
+   "ticks": 72,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 132.76595744680853,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 47,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 17,
+   "name": "Walking Lunge",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    0,
+    7,
+    86,
+    93
+   ],
+   "totalMs": 8400,
+   "ticks": 257,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 221.93548387096774,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 48,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 19,
+   "name": "Farmer Carry",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "front",
+   "viewBox": [
+    26,
+    6,
+    48,
+    94
+   ],
+   "totalMs": 3840,
+   "ticks": 119,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 122.55319148936171,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 48,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 20,
+   "name": "Suitcase Carry",
+   "derived": true,
+   "derivesFrom": 19,
+   "view": "front",
+   "viewBox": [
+    26,
+    6,
+    48,
+    94
+   ],
+   "totalMs": 3840,
+   "ticks": 119,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 122.55319148936171,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 47,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 39,
+   "name": "Cable Crunch",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    16,
+    2,
+    66,
+    98
+   ],
+   "totalMs": 3100,
+   "ticks": 96,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 161.6326530612245,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 49,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 62,
+   "name": "Hammer Curl",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "front",
+   "viewBox": [
+    26,
+    8,
+    48,
+    90
+   ],
+   "totalMs": 2100,
+   "ticks": 66,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 128,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 48,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 186,
+   "name": "Dumbbell Bicep Curl",
+   "derived": true,
+   "derivesFrom": 62,
+   "view": "front",
+   "viewBox": [
+    26,
+    8,
+    48,
+    90
+   ],
+   "totalMs": 2100,
+   "ticks": 66,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 128,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 48,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 267,
+   "name": "Seated Cable Shoulder Press",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    34,
+    8,
+    50,
+    98
+   ],
+   "totalMs": 3640,
+   "ticks": 113,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 122.44897959183673,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 51,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 270,
+   "name": "Seated Dumbbell Press",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    34,
+    3.5,
+    50,
+    102.5
+   ],
+   "totalMs": 3640,
+   "ticks": 113,
+   "dims": {
+    "frameW": 240,
+    "frameH": 239.99999999999997,
+    "stageW": 117.07317073170731,
+    "stageH": 239.99999999999997
+   },
+   "floorSeen": true,
+   "maxChildren": 52,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 34,
+   "name": "Barbell Curl",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "front",
+   "viewBox": [
+    0,
+    -7.66,
+    100,
+    122
+   ],
+   "totalMs": 3000,
+   "ticks": 93,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 196.72131147540983,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 52,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 106,
+   "name": "Reverse Barbell Curl",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "front",
+   "viewBox": [
+    0,
+    -7.66,
+    100,
+    122
+   ],
+   "totalMs": 3000,
+   "ticks": 93,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 196.72131147540983,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 52,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 167,
+   "name": "Close-Grip EZ Bar Curl",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "front",
+   "viewBox": [
+    0,
+    -7.66,
+    100,
+    122
+   ],
+   "totalMs": 3000,
+   "ticks": 93,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 196.72131147540983,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 52,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 199,
+   "name": "EZ-Bar Curl",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "front",
+   "viewBox": [
+    0,
+    -7.66,
+    100,
+    122
+   ],
+   "totalMs": 3000,
+   "ticks": 93,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 196.72131147540983,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 52,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 114,
+   "name": "Cable Hammer Curls - Rope Attachment",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "front",
+   "viewBox": [
+    0.76,
+    -7.52,
+    100,
+    122
+   ],
+   "totalMs": 3000,
+   "ticks": 93,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 196.72131147540983,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 58,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 260,
+   "name": "Reverse Cable Curl",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "front",
+   "viewBox": [
+    0,
+    -7.52,
+    100,
+    122
+   ],
+   "totalMs": 3000,
+   "ticks": 93,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 196.72131147540983,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 60,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 278,
+   "name": "Standing Biceps Cable Curl",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "front",
+   "viewBox": [
+    0,
+    -7.52,
+    100,
+    122
+   ],
+   "totalMs": 3000,
+   "ticks": 93,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 196.72131147540983,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 58,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 126,
+   "name": "Alternate Hammer Curl",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "front",
+   "viewBox": [
+    0,
+    -7.66,
+    100,
+    122
+   ],
+   "totalMs": 4000,
+   "ticks": 124,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 196.72131147540983,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 48,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 172,
+   "name": "Cross Body Hammer Curl",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "front",
+   "viewBox": [
+    0,
+    -7.66,
+    100,
+    122
+   ],
+   "totalMs": 3500,
+   "ticks": 109,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 196.72131147540983,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 48,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 134,
+   "name": "Barbell Incline Bench Press - Medium Grip",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    7,
+    16,
+    77,
+    86
+   ],
+   "totalMs": 3940,
+   "ticks": 122,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 214.88372093023256,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 54,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 212,
+   "name": "Hammer Grip Incline DB Bench Press",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    7,
+    16,
+    77,
+    86
+   ],
+   "totalMs": 3940,
+   "ticks": 122,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 214.88372093023256,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 52,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 216,
+   "name": "Incline Cable Chest Press",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    7,
+    16,
+    77,
+    86
+   ],
+   "totalMs": 3940,
+   "ticks": 122,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 214.88372093023256,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 62,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 218,
+   "name": "Incline Dumbbell Bench With Palms Facing In",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    7,
+    16,
+    77,
+    86
+   ],
+   "totalMs": 3660,
+   "ticks": 113,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 214.88372093023256,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 52,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 24,
+   "name": "Band Pull-Apart",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "front",
+   "viewBox": [
+    8,
+    8,
+    84,
+    92
+   ],
+   "totalMs": 2400,
+   "ticks": 75,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 219.1304347826087,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 47,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 159,
+   "name": "Cable Rear Delt Fly",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "front",
+   "viewBox": [
+    8,
+    4.69,
+    84,
+    95.31
+   ],
+   "totalMs": 4580,
+   "ticks": 141,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 211.52030217186024,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 52,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 25,
+   "name": "Pallof Press",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    14,
+    8,
+    68,
+    92
+   ],
+   "totalMs": 2260,
+   "ticks": 71,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 177.3913043478261,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 48,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 251,
+   "name": "Pallof Press With Rotation",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    14,
+    8,
+    68,
+    92
+   ],
+   "totalMs": 2560,
+   "ticks": 80,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 177.3913043478261,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 50,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 111,
+   "name": "Barbell Seated Calf Raise",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    22,
+    10,
+    70,
+    90
+   ],
+   "totalMs": 2980,
+   "ticks": 93,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 186.66666666666666,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 54,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 191,
+   "name": "Dumbbell Seated One-Leg Calf Raise",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    22,
+    10,
+    70,
+    90
+   ],
+   "totalMs": 2980,
+   "ticks": 93,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 186.66666666666666,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 53,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 26,
+   "name": "Plank",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    8,
+    60,
+    86,
+    42
+   ],
+   "totalMs": 2320,
+   "ticks": 73,
+   "dims": {
+    "frameW": 240,
+    "frameH": 117.2093023255814,
+    "stageW": 240,
+    "stageH": 117.2093023255814
+   },
+   "floorSeen": true,
+   "maxChildren": 48,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 42,
+   "name": "Chest-Supported Dumbbell Row",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    12,
+    32,
+    62,
+    70
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 212.57142857142856,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 53,
+   "stageOverflowDp": {
+    "left": 0.4642552733242802,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": 0,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0.4642552733242802,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": 0,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 44,
+   "name": "Dead Bug",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    2,
+    40,
+    94,
+    60
+   ],
+   "totalMs": 3280,
+   "ticks": 102,
+   "dims": {
+    "frameW": 240,
+    "frameH": 153.19148936170214,
+    "stageW": 240,
+    "stageH": 153.19148936170214
+   },
+   "floorSeen": true,
+   "maxChildren": 48,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 57,
+   "name": "Dumbbell Sumo Squat",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    14,
+    6,
+    62,
+    94
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 158.29787234042553,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 48,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 59,
+   "name": "Face Pull",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    14,
+    6,
+    78,
+    94
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 199.14893617021278,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 52,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 266,
+   "name": "Seated Cable Rows",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    14,
+    8,
+    78,
+    90
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 208,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 51,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 60,
+   "name": "Feet-Elevated Push-Up",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    6,
+    50,
+    98,
+    52
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 127.34693877551021,
+    "stageW": 240,
+    "stageH": 127.34693877551021
+   },
+   "floorSeen": true,
+   "maxChildren": 47,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 254,
+   "name": "Push Up to Side Plank",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    6,
+    50,
+    98,
+    52
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 127.34693877551021,
+    "stageW": 240,
+    "stageH": 127.34693877551021
+   },
+   "floorSeen": true,
+   "maxChildren": 48,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 255,
+   "name": "Push-Up Wide",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    6,
+    50,
+    98,
+    52
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 127.34693877551021,
+    "stageW": 240,
+    "stageH": 127.34693877551021
+   },
+   "floorSeen": true,
+   "maxChildren": 48,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 174,
+   "name": "Crunch - Hands Overhead",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    2,
+    40,
+    94,
+    60
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 153.19148936170214,
+    "stageW": 240,
+    "stageH": 153.19148936170214
+   },
+   "floorSeen": true,
+   "maxChildren": 48,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 175,
+   "name": "Crunches",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    2,
+    40,
+    94,
+    60
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 153.19148936170214,
+    "stageW": 240,
+    "stageH": 153.19148936170214
+   },
+   "floorSeen": true,
+   "maxChildren": 47,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 263,
+   "name": "Rope Crunch",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    2,
+    40,
+    94,
+    60
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 153.19148936170214,
+    "stageW": 240,
+    "stageH": 153.19148936170214
+   },
+   "floorSeen": true,
+   "maxChildren": 51,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 116,
+   "name": "Cable Rope Overhead Triceps Extension",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    10,
+    2,
+    80,
+    96
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 200,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 51,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0.45915458467803205,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": 0
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0.45915458467803205,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": 0
+    }
+   }
+  },
+  {
+   "movementId": 157,
+   "name": "Cable One Arm Tricep Extension",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    10,
+    2,
+    80,
+    96
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 200,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 49,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0.45915458467803205,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": 0
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0.45915458467803205,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": 0
+    }
+   }
+  },
+  {
+   "movementId": 193,
+   "name": "Dumbbell Tricep Extension -Pronated Grip",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    10,
+    2,
+    80,
+    96
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 200,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 51,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0.45915458467803205,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": 0
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0.45915458467803205,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": 0
+    }
+   }
+  },
+  {
+   "movementId": 282,
+   "name": "Standing Dumbbell Triceps Extension",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    10,
+    -3.81,
+    80,
+    104.28
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 184.11967779056386,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 51,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 283,
+   "name": "Standing Overhead Barbell Triceps Extension",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    10,
+    2,
+    80,
+    96
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 200,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 52,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0.45915458467803205,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": 0
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0.45915458467803205,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": 0
+    }
+   }
+  },
+  {
+   "movementId": 53,
+   "name": "Dumbbell Shrug",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    10,
+    6,
+    80,
+    94.47
+   ],
+   "totalMs": 3100,
+   "ticks": 96,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 203.23912353127977,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 53,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 82,
+   "name": "Barbell Shrug",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    10,
+    6,
+    80,
+    94.47
+   ],
+   "totalMs": 3100,
+   "ticks": 96,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 203.23912353127977,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 56,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 138,
+   "name": "Barbell Shrug Behind The Back",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    10,
+    6,
+    80,
+    94.47
+   ],
+   "totalMs": 3100,
+   "ticks": 96,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 203.23912353127977,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 56,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 163,
+   "name": "Cable Shrugs",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    9.69,
+    6,
+    80.61,
+    94.47
+   ],
+   "totalMs": 3100,
+   "ticks": 96,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 204.78882184820577,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 55,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 125,
+   "name": "3/4 Sit-Up",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    2,
+    40,
+    94,
+    60
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 153.19148936170214,
+    "stageW": 240,
+    "stageH": 153.19148936170214
+   },
+   "floorSeen": true,
+   "maxChildren": 48,
+   "stageOverflowDp": {
+    "left": 3.0282637373918844,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": 0,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 3.0282637373918844,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": 0,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 161,
+   "name": "Cable Seated Crunch",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    2,
+    40,
+    94,
+    60
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 153.19148936170214,
+    "stageW": 240,
+    "stageH": 153.19148936170214
+   },
+   "floorSeen": true,
+   "maxChildren": 51,
+   "stageOverflowDp": {
+    "left": 3.0282637373918844,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": 0,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 3.0282637373918844,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": 0,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 225,
+   "name": "Jackknife Sit-Up",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    -2.12,
+    40,
+    98.12,
+    66.09
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 161.65511618426416,
+    "stageW": 240,
+    "stageH": 161.65511618426416
+   },
+   "floorSeen": true,
+   "maxChildren": 48,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 226,
+   "name": "Janda Sit-Up",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    2,
+    40,
+    94,
+    60
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 153.19148936170214,
+    "stageW": 240,
+    "stageH": 153.19148936170214
+   },
+   "floorSeen": true,
+   "maxChildren": 48,
+   "stageOverflowDp": {
+    "left": 3.0282637373918844,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": 0,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 3.0282637373918844,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": 0,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 40,
+   "name": "Cable Pull-Through",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    8,
+    10,
+    80,
+    92
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 208.69565217391306,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 51,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 132,
+   "name": "Band Good Morning (Pull Through)",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    8,
+    10,
+    80,
+    92
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 208.69565217391306,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 49,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 214,
+   "name": "Hip Extension with Bands",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    8,
+    10,
+    80,
+    92
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 208.69565217391306,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 48,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 90,
+   "name": "Incline Push-Up",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    6,
+    21.45,
+    98,
+    80.55
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 197.26530612244898,
+    "stageW": 240,
+    "stageH": 197.26530612244898
+   },
+   "floorSeen": true,
+   "maxChildren": 51,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 222,
+   "name": "Incline Push-Up Close-Grip",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    6,
+    19.54,
+    98,
+    82.46
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 201.94285714285712,
+    "stageW": 240,
+    "stageH": 201.94285714285712
+   },
+   "floorSeen": true,
+   "maxChildren": 51,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 223,
+   "name": "Incline Push-Up Wide",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    6,
+    23.45,
+    98,
+    78.55
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 192.3673469387755,
+    "stageW": 240,
+    "stageH": 192.3673469387755
+   },
+   "floorSeen": true,
+   "maxChildren": 51,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 92,
+   "name": "Preacher Curl",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    10,
+    8,
+    72,
+    94
+   ],
+   "totalMs": 5300,
+   "ticks": 163,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 183.82978723404256,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 60,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 158,
+   "name": "Cable Preacher Curl",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    10,
+    8,
+    72,
+    94
+   ],
+   "totalMs": 5300,
+   "ticks": 163,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 183.82978723404256,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 58,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 253,
+   "name": "Preacher Hammer Dumbbell Curl",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    10,
+    8,
+    72,
+    94
+   ],
+   "totalMs": 5300,
+   "ticks": 163,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 183.82978723404256,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 57,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 73,
+   "name": "Russian Twist",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    2,
+    40,
+    94,
+    60
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 153.19148936170214,
+    "stageW": 240,
+    "stageH": 153.19148936170214
+   },
+   "floorSeen": true,
+   "maxChildren": 48,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 173,
+   "name": "Cross-Body Crunch",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    2,
+    40,
+    94,
+    60
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 153.19148936170214,
+    "stageW": 240,
+    "stageH": 153.19148936170214
+   },
+   "floorSeen": true,
+   "maxChildren": 48,
+   "stageOverflowDp": {
+    "left": 3.0282637373918844,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": 0,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 3.0282637373918844,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": 0,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 245,
+   "name": "Oblique Crunches",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    2,
+    40,
+    94,
+    60
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 153.19148936170214,
+    "stageW": 240,
+    "stageH": 153.19148936170214
+   },
+   "floorSeen": true,
+   "maxChildren": 48,
+   "stageOverflowDp": {
+    "left": 3.0282637373918844,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": 0,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 3.0282637373918844,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": 0,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 29,
+   "name": "Glute Bridge",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    2,
+    40,
+    94,
+    60
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 153.19148936170214,
+    "stageW": 240,
+    "stageH": 153.19148936170214
+   },
+   "floorSeen": true,
+   "maxChildren": 48,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 75,
+   "name": "Single-Leg Glute Bridge",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    2,
+    40,
+    94,
+    60
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 153.19148936170214,
+    "stageW": 240,
+    "stageH": 153.19148936170214
+   },
+   "floorSeen": true,
+   "maxChildren": 48,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 51,
+   "name": "Dumbbell Lunge",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    6,
+    12,
+    82,
+    90
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 218.66666666666666,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 49,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 286,
+   "name": "Step-up with Knee Raise",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    3.98,
+    7.35,
+    84.02,
+    95.25
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 211.703937007874,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 50,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 110,
+   "name": "Barbell Rear Delt Row",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    8,
+    10,
+    84,
+    92
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 219.1304347826087,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 52,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 143,
+   "name": "Bent Over Dumbbell Rear Delt Raise With Head On Bench",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "oblique",
+   "viewBox": [
+    8,
+    12,
+    96,
+    90
+   ],
+   "totalMs": 5200,
+   "ticks": 160,
+   "dims": {
+    "frameW": 240,
+    "frameH": 225,
+    "stageW": 240,
+    "stageH": 225
+   },
+   "floorSeen": true,
+   "maxChildren": 55,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 122,
+   "name": "Kneeling Single-Arm High Pulley Row",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    10,
+    14,
+    82,
+    88
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 239.99999999999997,
+    "stageW": 223.63636363636363,
+    "stageH": 239.99999999999997
+   },
+   "floorSeen": true,
+   "maxChildren": 50,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 234,
+   "name": "Kneeling High Pulley Row",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    10,
+    14,
+    82,
+    88
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 239.99999999999997,
+    "stageW": 223.63636363636363,
+    "stageH": 239.99999999999997
+   },
+   "floorSeen": true,
+   "maxChildren": 50,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 135,
+   "name": "Barbell Incline Shoulder Raise",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    0,
+    14,
+    90,
+    88
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 234.66666666666666,
+    "stageW": 240,
+    "stageH": 234.66666666666666
+   },
+   "floorSeen": true,
+   "maxChildren": 56,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 187,
+   "name": "Dumbbell Incline Shoulder Raise",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    0,
+    14,
+    90,
+    88
+   ],
+   "totalMs": 2140,
+   "ticks": 67,
+   "dims": {
+    "frameW": 240,
+    "frameH": 234.66666666666666,
+    "stageW": 240,
+    "stageH": 234.66666666666666
+   },
+   "floorSeen": true,
+   "maxChildren": 52,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 80,
+   "name": "Triceps Pushdown",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "oblique",
+   "viewBox": [
+    10,
+    4,
+    82,
+    98
+   ],
+   "totalMs": 4500,
+   "ticks": 139,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 200.81632653061226,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 57,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 262,
+   "name": "Reverse Grip Triceps Pushdown",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "oblique",
+   "viewBox": [
+    10,
+    4,
+    82,
+    98
+   ],
+   "totalMs": 4500,
+   "ticks": 139,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 200.81632653061226,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 57,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 292,
+   "name": "Triceps Pushdown - Rope Attachment",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "oblique",
+   "viewBox": [
+    10,
+    4,
+    82,
+    98
+   ],
+   "totalMs": 4500,
+   "ticks": 139,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 200.81632653061226,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 58,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 264,
+   "name": "Rope Straight-Arm Pulldown",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "oblique",
+   "viewBox": [
+    6,
+    -5,
+    94,
+    107
+   ],
+   "totalMs": 4800,
+   "ticks": 148,
+   "dims": {
+    "frameW": 240,
+    "frameH": 239.99999999999997,
+    "stageW": 210.8411214953271,
+    "stageH": 239.99999999999997
+   },
+   "floorSeen": true,
+   "maxChildren": 58,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 49,
+   "name": "Dumbbell Flye",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "oblique",
+   "viewBox": [
+    0,
+    15,
+    104,
+    88
+   ],
+   "totalMs": 4100,
+   "ticks": 127,
+   "dims": {
+    "frameW": 240,
+    "frameH": 203.07692307692307,
+    "stageW": 239.99999999999997,
+    "stageH": 203.07692307692307
+   },
+   "floorSeen": true,
+   "maxChildren": 56,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 178,
+   "name": "Decline Dumbbell Flyes",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "oblique",
+   "viewBox": [
+    0,
+    15,
+    104,
+    88
+   ],
+   "totalMs": 4100,
+   "ticks": 127,
+   "dims": {
+    "frameW": 240,
+    "frameH": 203.07692307692307,
+    "stageW": 239.99999999999997,
+    "stageH": 203.07692307692307
+   },
+   "floorSeen": true,
+   "maxChildren": 58,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 220,
+   "name": "Incline Dumbbell Flyes",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "oblique",
+   "viewBox": [
+    0,
+    15,
+    104,
+    88
+   ],
+   "totalMs": 4100,
+   "ticks": 127,
+   "dims": {
+    "frameW": 240,
+    "frameH": 203.07692307692307,
+    "stageW": 239.99999999999997,
+    "stageH": 203.07692307692307
+   },
+   "floorSeen": true,
+   "maxChildren": 56,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 84,
+   "name": "Cable Glute Kickback",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    6,
+    8,
+    88,
+    96
+   ],
+   "totalMs": 4400,
+   "ticks": 136,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 220,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 53,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  },
+  {
+   "movementId": 52,
+   "name": "Dumbbell Reverse Lunge",
+   "derived": false,
+   "derivesFrom": null,
+   "view": "side",
+   "viewBox": [
+    -6,
+    6,
+    80,
+    96
+   ],
+   "totalMs": 4400,
+   "ticks": 136,
+   "dims": {
+    "frameW": 240,
+    "frameH": 240,
+    "stageW": 200,
+    "stageH": 240
+   },
+   "floorSeen": true,
+   "maxChildren": 52,
+   "stageOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   },
+   "frameOverflowDp": {
+    "left": 0,
+    "right": 0,
+    "top": 0,
+    "bottom": 0,
+    "atMs": {
+     "left": null,
+     "right": null,
+     "top": null,
+     "bottom": null
+    }
+   }
+  }
+ ],
+ "skipped": [
+  {
+   "movementId": 28,
+   "why": "rig legacy"
+  },
+  {
+   "movementId": 16,
+   "why": "rig legacy"
+  },
+  {
+   "movementId": 88,
+   "why": "rig legacy"
+  },
+  {
+   "movementId": 70,
+   "why": "intentionally_unsuitable"
+  },
+  {
+   "movementId": 68,
+   "why": "intentionally_unsuitable"
+  },
+  {
+   "movementId": 7,
+   "why": "intentionally_unsuitable"
+  }
+ ]
+}
