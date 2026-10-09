@@ -500,8 +500,9 @@ final class AthleteKineticsUITests: XCTestCase {
     // Restore. First the person backs out of the Files sheet: nothing changes.
     enterText(into: "Backup password, at least 12 characters", password)
     tap("choose-restore-button", "RESTORE ENCRYPTED BACKUP")
-    let cancel = app.buttons["Cancel"]
-    wait(cancel, "the Files sheet's Cancel", timeout: 30)
+    let cancel = filesControl(["Cancel", "Close"])
+    if !cancel.waitForExistence(timeout: 30) { log("files sheet without Cancel: \(filesSheetInventory())") }
+    wait(cancel, "the Files sheet's Cancel", timeout: 1)
     cancel.tap()
     settledLabel(element("backup-status-message"), beginsWith: "Restore cancelled. Your data is unchanged.",
                  "status after cancelling the Files sheet", timeout: 30)
@@ -629,6 +630,27 @@ final class AthleteKineticsUITests: XCTestCase {
 
   // MARK: - Files
 
+  /// A control of the Files sheet by its visible name. Up to iOS 26 these are
+  /// buttons; on iOS 27 "Save" was on screen with no Button of that name (CI
+  /// evidence 3f126c3), so a button is preferred and any element carrying the
+  /// name is accepted.
+  private func filesControl(_ names: [String]) -> XCUIElement {
+    let named = NSPredicate(format: "label IN %@ OR identifier IN %@", names, names)
+    let button = app.buttons.matching(named).firstMatch
+    return button.exists ? button : app.descendants(matching: .any).matching(named).firstMatch
+  }
+
+  /// What the Files sheet exposes: the elements of its bar by type, label and
+  /// identifier, and the last buttons in the tree (the sheet's follow the app's).
+  private func filesSheetInventory() -> String {
+    let bar = app.navigationBars.matching(NSPredicate(format: "identifier CONTAINS 'DocumentManager'")).firstMatch
+    let inBar = !bar.exists ? "absent" : bar.descendants(matching: .any).allElementsBoundByIndex.prefix(30)
+      .map { "\($0.elementType.rawValue):\($0.label.prefix(30))|\($0.identifier.prefix(30))" }.joined(separator: "; ")
+    let lastButtons = app.buttons.allElementsBoundByIndex.suffix(20)
+      .map { String(($0.label.isEmpty ? $0.identifier : $0.label).prefix(30)) }.joined(separator: "; ")
+    return "bar[\(inBar)] last buttons[\(lastButtons)]"
+  }
+
   private func onMyIPhone() {
     let browse = app.buttons.matching(identifier: "Browse").firstMatch
     if browse.waitForExistence(timeout: 10) && !browse.isSelected { browse.tap() }
@@ -650,7 +672,7 @@ final class AthleteKineticsUITests: XCTestCase {
     let deadline = Date().addingTimeInterval(180)
     var lastStatus = ""
     while Date() < deadline {
-      if ["Save", "Move", "Done", "Open", "Cancel"].contains(where: { app.buttons[$0].exists }) { break }
+      if filesControl(["Save", "Move", "Done", "Open", "Cancel"]).exists { break }
       if status.exists && status.label != lastStatus {
         lastStatus = status.label
         log("backup status while waiting for the Files sheet: \(lastStatus.prefix(160))")
@@ -661,14 +683,14 @@ final class AthleteKineticsUITests: XCTestCase {
     // UIDocumentPickerViewController (export, as a copy) into On My iPhone.
     onMyIPhone()
     for name in ["Save", "Move", "Done", "Open"] {
-      let b = app.buttons[name]
+      let b = filesControl([name])
       if b.waitForExistence(timeout: 5) && b.isEnabled {
         b.tap()
         log("files export: \(name)")
         return
       }
     }
-    log("files export: no enabled action; status=\(element("backup-status-message").exists ? element("backup-status-message").label : "-"); app{\(visibleLabels(app))}")
+    log("files sheet without an enabled Save/Move action: \(filesSheetInventory()); status=\(element("backup-status-message").exists ? element("backup-status-message").label : "-")")
     XCTFail("the Files export sheet had no enabled Save/Move action")
   }
 
@@ -679,7 +701,7 @@ final class AthleteKineticsUITests: XCTestCase {
     wait(file, "the saved backup file in Files", timeout: 30)
     log("files import: picking \(file.label)")
     file.tap()
-    let open = app.buttons["Open"]
+    let open = filesControl(["Open"])
     if open.waitForExistence(timeout: 5) && open.isEnabled { open.tap() }
     wait(element("restore-preview"), "the restore preview", timeout: 120)
   }
