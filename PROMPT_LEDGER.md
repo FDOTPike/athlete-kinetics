@@ -12550,3 +12550,23 @@ No source, schema, gate or configuration file was changed. Every figure below wa
 - **Recommendation 2, hardware acceleration and threading.** The session is created with default options, so inference runs on the CPU provider; no CoreML or NNAPI is configured. op-sqlite and onnxruntime-react-native are already JSI modules, and `session.run` is asynchronous. Workout generation does not use the model. Embedding latency on a device was not found in the repository and was not measured here. A different execution provider would need the workstation-parity gate re-proved.
 - **Recommendation 3, move or ignore the documents.** The tracked tree is 29.3 MB, of which `docs/` is 3.6 MB and `PROMPT_LEDGER.md` 0.8 MB. Blobs reachable from master total about 11 MB compressed (`docs/` 1.6 MB); the other remote branches add about 13.5 MB, of which 8.2 MB is PNG evidence. Ignoring the files would take hash-pinned evidence out of version control. Assessed as not worth doing. The real cost seen in this session is the single ledger file: it conflicts between branches and its entry numbers clash between sessions.
 - **CodeRabbit.** No CodeRabbit configuration file is tracked; the pull-request reviews run from the repository settings. It reviews pull-request differences, not a whole repository. The command-line tool is not installed here. Plan names, prices and file limits were taken from third-party pages that disagree with one another and were not confirmed on the vendor's own pricing page.
+
+---
+
+## Entry 0199 — 2026-10-09 · First CodeRabbit command-line review, on the ledger branch (Claude Code Desktop)
+
+2026-10-09. Executor: Claude Code Desktop. Same worktree and branch as Entry 0197.
+
+### Input
+
+Received verbatim, in reply to an offer to try the newly installed CodeRabbit command-line tool on this branch:
+
+```text
+yes try it on the ledger branch
+```
+
+### Output
+
+- `coderabbit review --committed --base origin/master --agent` (CLI 0.9.0), run in this worktree on `claude/master-followup-2026-10-08`: exit 0, review completed, 1 file reviewed (`PROMPT_LEDGER.md`), 0 findings.
+- The run reported that promotional review credits were added to the account; no paid continuation was requested (`--use-credits` was not passed).
+- No file other than this entry changed. Not pushed.
