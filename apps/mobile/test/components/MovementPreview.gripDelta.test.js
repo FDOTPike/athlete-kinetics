@@ -471,7 +471,33 @@ describe('the contract refuses a gripDelta it cannot honour', () => {
     expect(() => deriveVariantEntry(variantWith({ view: 'side' }), BASE))
       .toThrow(/gripDelta is a front-view override; this movement is drawn "side"/);
     const rowBase = rawEntryFor(12);
-    const row = rawEntryFor(247);
+    // The library no longer holds a side-view variant: One-Arm Dumbbell Row
+    // (247) was given its own drawing on 9 October 2026. The refusal is still
+    // checked against the real side-view base, with the variant 247 used to be.
+    const row = {
+      movementId: 247,
+      derivesFrom: 12,
+      name: 'Hypothetical Side-View Row Variant Fixture',
+      assetKey: 'movement/one-arm-dumbbell-row/demo/v1',
+      status: 'pending',
+      previewId: 'hypothetical_side_view_row_variant',
+      summary: 'Five drawn positions of a one-arm dumbbell row on a bench, seen from the side.',
+      instructions: 'Brace on the bench, let the working arm hang long, then drive the elbow back toward the hip and lower under control.',
+      cues: 'Set the torso before the pull. Lead with the elbow.',
+      coachingIntent: 'A fixture: the same bench-supported pull as its base.',
+      reason: 'A fixture derived from the Single-Arm Dumbbell Row authored joint path (derivesFrom 12).',
+      techniqueCitationsInherited: true,
+      captionOverrides: {
+        'reach-long-a-1': 'Brace on the bench and let the working arm hang long.',
+        'elbow-drives-2': 'Pull by driving the elbow back toward the hip.',
+        'elbow-to-the-3': 'Finish with the elbow at the hip and the upper back doing the work.',
+        'lower-to-ful-4': 'Lower the bell under control to the full reach.',
+        'full-stretch-5': 'If the torso turns or the shoulder shrugs, reset the rep.',
+      },
+      frameRoles: {
+        'reach-long-a-1': 'reach', 'elbow-drives-2': 'drive', 'elbow-to-the-3': 'peak', 'lower-to-ful-4': 'lower', 'full-stretch-5': 'return',
+      },
+    };
     expect(rowBase.view).toBe('side');
     expect(() => deriveVariantEntry({ ...row, gripDelta: 4 }, rowBase))
       .toThrow(/gripDelta is a front-view override/);

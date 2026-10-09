@@ -1283,7 +1283,7 @@ export interface ChainMovement {
    */
   feet?: 'flat' | 'free' | 'front' | 'none';
   /** What the hands hold. */
-  implement?: 'none' | 'bells' | 'bell' | 'hammer' | 'bar' | 'ez' | 'cableBar' | 'handle' | 'handles' | 'rope' | 'longBar';
+  implement?: 'none' | 'bells' | 'bell' | 'hammer' | 'bar' | 'ez' | 'cableBar' | 'handle' | 'handles' | 'rope' | 'longBar' | 'kettlebell';
   /** For 'longBar': the point on the floor the bar's far end is braced at, and the bar's whole length from there. */
   barAnchor?: ChainPoint;
   barLength?: number;
@@ -1938,6 +1938,90 @@ export const KNEELING_ROW_PULLEY: readonly [number, number] = [25, 98];
 export const INCLINE_PRESS_BENCH_DEG = 40;
 const INCLINE_PRESS_HIP: readonly [number, number] = [10, CHAIN_SEATED_HIP];
 export const INCLINE_PRESS_PULLEYS: readonly [ChainPoint, ChainPoint] = [[-14, 4, 32], [-14, 4, -32]];
+
+/** Half the width of the shoulders and of the hips, as the 3D model places them. */
+const CHAIN_SHOULDER_HALF = CANONICAL_BODY_PARAMETERS.sw * 0.92;
+const CHAIN_HIP_HALF = CANONICAL_BODY_PARAMETERS.hw * 0.8;
+/** The height of a hand resting on a surface: half a hand's thickness above it. */
+const CHAIN_HAND_REST = CANONICAL_BODY_PARAMETERS.lw * 0.44 + 0.1;
+/** Oblique Crunches: how far the shoulders turn toward the far knee, and the far hand's place out on the floor. */
+export const OBLIQUE_CRUNCH_TWIST = 30;
+export const OBLIQUE_CRUNCH_FAR_HAND: readonly [number, number, number] = [BENCH_CRUNCH_HIP[0] - 33, CHAIN_HAND_REST, -29];
+/**
+ * Bench Press - With Bands: lying on a flat bench, the band trapped under the
+ * bench's head-end leg and a handle in each hand. At the bottom the upper
+ * arms are level, this many degrees out from the sides, and the forearms upright.
+ */
+const BAND_PRESS_BENCH: readonly [number, number] = [16, 66];
+const BAND_PRESS_HIP: readonly [number, number] = [62, CABLE_LYING_BENCH_TOP + CHAIN_BACK_HALF];
+const BAND_PRESS_SHOULDER: readonly [number, number] = [BAND_PRESS_HIP[0] - CHAIN_TRUNK, BAND_PRESS_HIP[1]];
+export const BAND_PRESS_ELBOW_OUT = 45;
+/** Where the band comes out from under the head-end leg, either side of it. */
+export const BAND_PRESS_ANCHORS: readonly [ChainPoint, ChainPoint] = [[BAND_PRESS_BENCH[0] + 5, 0.7, 4], [BAND_PRESS_BENCH[0] + 5, 0.7, -4]];
+function bandPressHands(lowered: boolean): { wrist: ChainPoint; farWrist: ChainPoint } {
+  const [x, y] = BAND_PRESS_SHOULDER;
+  if (!lowered) return { wrist: [x, y + CHAIN_LONG_ARM, CHAIN_SHOULDER_HALF], farWrist: [x, y + CHAIN_LONG_ARM, -CHAIN_SHOULDER_HALF] };
+  const out = SAGITTAL_UPPER_ARM * Math.sin(chainRad(BAND_PRESS_ELBOW_OUT)), down = SAGITTAL_UPPER_ARM * Math.cos(chainRad(BAND_PRESS_ELBOW_OUT));
+  return {
+    wrist: [x + down, y + SAGITTAL_FOREARM, CHAIN_SHOULDER_HALF + out],
+    farWrist: [x + down, y + SAGITTAL_FOREARM, -CHAIN_SHOULDER_HALF - out],
+  };
+}
+/**
+ * Extended Range One-Arm Kettlebell Floor Press: lying on the floor, rolled
+ * this far away from the pressing (near) side, so the near shoulder is off
+ * the floor and its elbow can sink below the line of the chest.
+ */
+export const KB_PRESS_ROLL = 35;
+const KB_PRESS_HIP: readonly [number, number] = [52, CHAIN_LYING_HEIGHT + 1.5];
+/** The pressing shoulder, lifted by the roll. */
+export const KB_PRESS_SHOULDER: readonly [number, number, number] = [
+  KB_PRESS_HIP[0] - CHAIN_TRUNK,
+  KB_PRESS_HIP[1] + CHAIN_SHOULDER_HALF * Math.sin(chainRad(KB_PRESS_ROLL)),
+  CHAIN_SHOULDER_HALF * Math.cos(chainRad(KB_PRESS_ROLL)),
+];
+/** At the bottom the upper arm points out to the side and down past the chest, the forearm upright. */
+const KB_PRESS_LOW_UPPER_ARM: readonly [number, number] = [-40, 50];
+const KB_PRESS_LOW: ChainPoint = (() => {
+  const a = chainRad(KB_PRESS_LOW_UPPER_ARM[0]), o = chainRad(KB_PRESS_LOW_UPPER_ARM[1]);
+  return [
+    KB_PRESS_SHOULDER[0] + SAGITTAL_UPPER_ARM * Math.cos(a) * Math.cos(o),
+    KB_PRESS_SHOULDER[1] + SAGITTAL_UPPER_ARM * Math.sin(a) * Math.cos(o) + SAGITTAL_FOREARM,
+    KB_PRESS_SHOULDER[2] + SAGITTAL_UPPER_ARM * Math.sin(o),
+  ];
+})();
+const KB_PRESS_HIGH: ChainPoint = [KB_PRESS_SHOULDER[0], KB_PRESS_SHOULDER[1] + CHAIN_LONG_ARM, KB_PRESS_SHOULDER[2]];
+/** The free hand out on the floor on the far side, and the near foot planted across the body. */
+const KB_PRESS_FREE_HAND: ChainPoint = [KB_PRESS_HIP[0] - CHAIN_TRUNK + 4, CHAIN_HAND_REST, -31.8];
+const KB_PRESS_FOOT: ChainPoint = [KB_PRESS_HIP[0] + 18, CHAIN_ANKLE_HEIGHT, -14];
+/** The far leg lies straight along the floor from its own hip joint. */
+const KB_PRESS_FAR_FOOT: ChainPoint = [
+  KB_PRESS_HIP[0] + CHAIN_THIGH + CHAIN_SHIN - 0.02,
+  KB_PRESS_HIP[1] - CHAIN_HIP_HALF * Math.sin(chainRad(KB_PRESS_ROLL)),
+  -CHAIN_HIP_HALF * Math.cos(chainRad(KB_PRESS_ROLL)),
+];
+/** A kettlebell's round bell: where its centre sits from the grip, and its radius. */
+export const KETTLEBELL_REST: readonly [number, number, number] = [-2.8, -3.6, 1.5];
+export const KETTLEBELL_RADIUS = 4.6;
+/**
+ * External Rotation: lying on the far side on a flat bench, facing the
+ * viewer, so the working (near) arm is the top one. The forearm turns from
+ * level, pointing straight ahead, up to this many degrees short of upright.
+ */
+export const SIDE_LYING_BENCH_TOP = CABLE_LYING_BENCH_TOP;
+const SIDE_LYING_HIP: readonly [number, number] = [40, SIDE_LYING_BENCH_TOP + CHAIN_SHOULDER_HALF + CANONICAL_BODY_PARAMETERS.lw * 0.44];
+export const SIDE_LYING_SHORT_OF_UPRIGHT = 20;
+/**
+ * One-Arm Dumbbell Row: the far knee and far hand on a bench, the near foot on
+ * the floor beside it and the trunk level. The hand hangs under the shoulder
+ * and finishes beside the chest, this far back from the shoulder and below the spine.
+ */
+export const BENCH_ROW_TOP = 19;
+const BENCH_ROW_HIP: readonly [number, number] = [34, BENCH_ROW_TOP + CHAIN_THIGH_HALF + CHAIN_THIGH];
+const BENCH_ROW_SHOULDER: readonly [number, number] = [BENCH_ROW_HIP[0] + CHAIN_TRUNK, BENCH_ROW_HIP[1]];
+export const BENCH_ROW_FINISH: readonly [number, number] = [5, 5];
+/** The far shin lies along the bench behind its knee. */
+const BENCH_ROW_FAR_ANKLE: readonly [number, number] = [BENCH_ROW_HIP[0] - CHAIN_SHIN, BENCH_ROW_TOP + CHAIN_THIGH_HALF];
 
 /** The chain movements, by slug. */
 export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
@@ -3315,6 +3399,124 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       { at: INCLINE_PRESS_HIP, trunk: 180 - INCLINE_PRESS_BENCH_DEG, thigh: [0, 8], shin: -90, upperArm: [0, -12], forearm: [0, -20] },
     ],
   },
+  // Oblique Crunches: Crunches' set-up seen turned, one hand beside the head
+  // and the other arm out on the floor. The upper spine curls and the
+  // shoulders turn, taking the near elbow toward the far knee.
+  'oblique-crunches': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 12,
+    pitchDeg: 30,
+    originX: 16,
+    spine: 'upper',
+    feet: 'free',
+    armsFollowTrunk: true,
+    nearArmOverHead: true,
+    // The arm on the floor bends, if at all, along the floor toward the head.
+    elbowPole: 180,
+    equipment: chainFlatBench(BENCH_CRUNCH_HIP[0] + 4, BENCH_CRUNCH_HIP[0] + CHAIN_SHIN + 8, BENCH_CRUNCH_BENCH_TOP),
+    poses: [
+      { at: BENCH_CRUNCH_HIP, trunk: 180, curl: 0, twist: 0, thigh: 90, shin: 0, foot: 75, ...HANDS_BY_EARS, farWrist: OBLIQUE_CRUNCH_FAR_HAND },
+      // The raised elbow swings in across the body; the hand stays beside the head.
+      { at: BENCH_CRUNCH_HIP, trunk: 180, curl: 34, twist: OBLIQUE_CRUNCH_TWIST, thigh: 90, shin: 0, foot: 75, upperArm: [HANDS_BY_EARS.upperArm, -25], forearm: [HANDS_BY_EARS.forearm, 20], farWrist: OBLIQUE_CRUNCH_FAR_HAND },
+    ],
+  },
+  // Bench Press - With Bands: lying on a flat bench seen turned, a band from
+  // under the bench's head-end leg to a handle in each hand. The arms start
+  // straight above the chest and lower until the elbows are at right angles.
+  'bench-press-with-bands': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 30,
+    originX: 22,
+    implement: 'handles',
+    elbowPole: [0, BAND_PRESS_ELBOW_OUT],
+    lines: [{ from: BAND_PRESS_ANCHORS[0], to: 'nearGrip' }, { from: BAND_PRESS_ANCHORS[1], to: 'farGrip', depth: 'far' }],
+    equipment: chainFlatBench(BAND_PRESS_BENCH[0], BAND_PRESS_BENCH[1], CABLE_LYING_BENCH_TOP),
+    poses: [
+      { at: BAND_PRESS_HIP, trunk: 180, thigh: [0, 12], shin: -90, ankle: [84, CHAIN_ANKLE_HEIGHT], farAnkle: [84, CHAIN_ANKLE_HEIGHT], upperArm: 90, forearm: 90, ...bandPressHands(false) },
+      { at: BAND_PRESS_HIP, trunk: 180, thigh: [0, 12], shin: -90, ankle: [84, CHAIN_ANKLE_HEIGHT], farAnkle: [84, CHAIN_ANKLE_HEIGHT], upperArm: 90, forearm: 90, ...bandPressHands(true) },
+    ],
+  },
+  // Extended Range One-Arm Kettlebell Floor Press: lying on the floor seen
+  // turned, the near knee taken across so the body rolls away from the
+  // pressing arm. The kettlebell goes from beside the shoulder, elbow sunk
+  // below the chest, to a straight upright arm; the free hand is out on the floor.
+  'extended-range-one-arm-kettlebell-floor-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 12,
+    pitchDeg: 30,
+    originX: 10,
+    feet: 'free',
+    implement: 'kettlebell',
+    elbowPole: KB_PRESS_LOW_UPPER_ARM,
+    kneePole: [90, -30],
+    poses: [
+      {
+        at: KB_PRESS_HIP, trunk: 180, roll: KB_PRESS_ROLL, thigh: 45, shin: -70, foot: 0, farThigh: 0, farShin: 0, farFoot: 80,
+        upperArm: 90, forearm: 90, wrist: KB_PRESS_LOW, farWrist: KB_PRESS_FREE_HAND, ankle: KB_PRESS_FOOT, farAnkle: KB_PRESS_FAR_FOOT,
+      },
+      {
+        at: KB_PRESS_HIP, trunk: 180, roll: KB_PRESS_ROLL, thigh: 45, shin: -70, foot: 0, farThigh: 0, farShin: 0, farFoot: 80,
+        upperArm: 90, forearm: 90, wrist: KB_PRESS_HIGH, farWrist: KB_PRESS_FREE_HAND, ankle: KB_PRESS_FOOT, farAnkle: KB_PRESS_FAR_FOOT,
+      },
+    ],
+  },
+  // External Rotation: lying on the far side on a flat bench, facing the
+  // viewer, head on the bottom arm. The top upper arm lies along the side;
+  // its forearm turns from level, pointing ahead, up toward the ceiling.
+  'external-rotation': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 6,
+    pitchDeg: 30,
+    originX: 12,
+    feet: 'free',
+    implement: 'bell',
+    bellAxis: [1, 0, 0],
+    equipment: chainFlatBench(-6, 88, SIDE_LYING_BENCH_TOP),
+    poses: [
+      {
+        at: SIDE_LYING_HIP, trunk: 0, roll: -90, head: -25,
+        thigh: [192, 25], shin: [188, -25], farThigh: [180, -25], farShin: [180, 25], foot: [0, 80], farFoot: [0, -80],
+        upperArm: 180, forearm: [90, 90], farUpperArm: [0, -40], farForearm: [0, 60],
+      },
+      {
+        at: SIDE_LYING_HIP, trunk: 0, roll: -90, head: -25,
+        thigh: [192, 25], shin: [188, -25], farThigh: [180, -25], farShin: [180, 25], foot: [0, 80], farFoot: [0, -80],
+        upperArm: 180, forearm: [90, SIDE_LYING_SHORT_OF_UPRIGHT], farUpperArm: [0, -40], farForearm: [0, 60],
+      },
+    ],
+  },
+  // One-Arm Dumbbell Row: the far knee and hand on a bench, the near foot on
+  // the floor, the trunk level. The dumbbell hangs under the near shoulder
+  // and is pulled up beside the chest, the elbow rising past the back.
+  'one-arm-dumbbell-row': {
+    root: 'hip',
+    feet: 'free',
+    implement: 'bell',
+    bellAxis: [1, 0, 0],
+    elbowPole: 135,
+    kneePole: 0,
+    equipment: chainFlatBench(4, 72, BENCH_ROW_TOP),
+    poses: [
+      {
+        at: BENCH_ROW_HIP, trunk: 0, thigh: -90, shin: -90, foot: 0, farThigh: -90, farShin: 180, farFoot: 180,
+        ankle: [BENCH_ROW_HIP[0] - 12, CHAIN_ANKLE_HEIGHT], farAnkle: BENCH_ROW_FAR_ANKLE,
+        upperArm: -90, forearm: -90,
+        wrist: [BENCH_ROW_SHOULDER[0], BENCH_ROW_SHOULDER[1] - CHAIN_LONG_ARM],
+        farWrist: [BENCH_ROW_SHOULDER[0] + 5, BENCH_ROW_TOP + CHAIN_HAND_REST],
+      },
+      {
+        at: BENCH_ROW_HIP, trunk: 0, thigh: -90, shin: -90, foot: 0, farThigh: -90, farShin: 180, farFoot: 180,
+        ankle: [BENCH_ROW_HIP[0] - 12, CHAIN_ANKLE_HEIGHT], farAnkle: BENCH_ROW_FAR_ANKLE,
+        upperArm: -90, forearm: -90,
+        wrist: [BENCH_ROW_SHOULDER[0] - BENCH_ROW_FINISH[0], BENCH_ROW_SHOULDER[1] - BENCH_ROW_FINISH[1]],
+        farWrist: [BENCH_ROW_SHOULDER[0] + 5, BENCH_ROW_TOP + CHAIN_HAND_REST],
+      },
+    ],
+  },
   // chain movements are added above this line
 };
 
@@ -3714,6 +3916,13 @@ function layoutChainExtras(
       const c: CanonicalPoint = [end[0] - ux * back, end[1] - uy * back];
       near.push({ ...line([c[0] + uy * 6, c[1] - ux * 6], [c[0] - uy * 6, c[1] + ux * 6], 2.4, 'textHi', 1), stroke: 'ink1', strokeWidth: 0.6 });
     }
+  } else if (kind === 'kettlebell') {
+    // One kettlebell in the near hand: the handle across the palm, and the
+    // round bell resting on the back of the wrist, below and behind the grip.
+    const a = project(chainAdd(w.near.hold, [0, 0, 1], -2.6)), b = project(chainAdd(w.near.hold, [0, 0, 1], 2.6));
+    const c = project(chainAdd(w.near.hold, KETTLEBELL_REST, 1));
+    near.push({ kind: 'circle', cx: c[0], cy: c[1], r: KETTLEBELL_RADIUS, fill: 'textHi', stroke: 'ink1', strokeWidth: 1, opacity: 1 });
+    near.push(line(a, b, 2.2, 'textHi', 1));
   } else if (kind === 'handle' || kind === 'handles' || kind === 'rope') {
     const r = kind === 'rope' ? 2.2 : 2.6;
     if (kind !== 'handle') far.push({ kind: 'circle', cx: figure.grip.far[0], cy: figure.grip.far[1], r, fill: farColor, opacity: farOpacity });
@@ -4489,8 +4698,9 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
   // The row's bench sits BETWEEN the far leg and the torso: the kneeling
   // athlete's standing leg passes behind the bench, so the pad occludes it.
   // Drawing the pad with Layer 1 apparatus (behind the far limbs) put the far
-  // shin in front of the bench slab (B1-247-R2).
-  if (ROW_SLUGS.has(slug)) {
+  // shin in front of the bench slab (B1-247-R2). A row with a pose table
+  // brings its own bench.
+  if (!chain && ROW_SLUGS.has(slug)) {
     prims.push({ kind: 'rect', x: ROW_BENCH.x, y: ROW_BENCH.top, w: ROW_BENCH.w,
       h: ROW_BENCH.h, rx: 1, fill: 'line', stroke: 'textLow', strokeWidth: 1.2, opacity: 1 });
     prims.push(bone([ROW_BENCH.x + 3, ROW_BENCH.top + ROW_BENCH.h], [ROW_BENCH.x + 3, GROUND_LINE],

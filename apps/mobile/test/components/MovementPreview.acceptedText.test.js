@@ -10,6 +10,10 @@ import {
   BAND_KICKBACK_ANCHOR,
   BAND_KICKBACK_DEG,
   BAND_KICKBACK_POST,
+  BAND_PRESS_ANCHORS,
+  BAND_PRESS_ELBOW_OUT,
+  BENCH_ROW_FINISH,
+  BENCH_ROW_TOP,
   BENCH_CRUNCH_BENCH_TOP,
   CABLE_SHRUG_PULLEY,
   CANONICAL_BODY_PARAMETERS,
@@ -19,7 +23,12 @@ import {
   GOOD_MORNING_KNEE_SOFT,
   INCLINE_PRESS_BENCH_DEG,
   INCLINE_PRESS_PULLEYS,
+  KB_PRESS_ROLL,
+  KB_PRESS_SHOULDER,
+  KETTLEBELL_RADIUS,
   KNEELING_ROW_PULLEY,
+  OBLIQUE_CRUNCH_FAR_HAND,
+  OBLIQUE_CRUNCH_TWIST,
   ONE_ARM_PUSHDOWN_PULLEY,
   PREACHER_TRUNK,
   PREACHER_UPPER_ARM,
@@ -29,6 +38,8 @@ import {
   SHOTGUN_RIBS,
   SHOTGUN_TRUNK,
   SHRUG_LIFT,
+  SIDE_LYING_BENCH_TOP,
+  SIDE_LYING_SHORT_OF_UPRIGHT,
   THREE_QUARTER_ANCHOR,
   chainGeometry,
   layoutCanonicalFigure,
@@ -110,14 +121,14 @@ function expectStill(entry, keys) {
 const LEGS = ['kn', 'an', 'kf', 'af'];
 const BODY_STILL = ['hd', 'nk', 'hp', ...LEGS];
 
-const IDS = [125, 175, 263, 132, 214, 138, 163, 157, 193, 253, 198, 273, 234, 216];
+const IDS = [125, 175, 263, 132, 214, 138, 163, 157, 193, 253, 198, 273, 234, 216, 245, 141, 196, 197, 247];
 
 test.each(IDS.map((id) => [entryOf(id).name, entryOf(id)]))('%s is a pending redraw from the accepted description, and keeps its older draft id', (_name, entry) => {
   expect(entry.status).toBe('pending');
   expect(CHAIN_MOVEMENTS[slugOf(entry)]).toBeDefined();
   expect(entry.previewId).toBe(slugOf(entry).replaceAll('-', '_'));
   expect(entry.reason).toContain('Redrawn on 9 October 2026');
-  expect(entry.reason).toContain('from the description he accepted that day');
+  expect(entry.reason).toContain('from the description accepted that day');
   // The placeholder that kept it on hold is gone from the entry.
   expect(entry.instructions).not.toMatch(/choose a load or range you can/);
   expect(entry.cues).not.toMatch(/Own the return without momentum|Own the pause before lowering/);
@@ -793,5 +804,347 @@ describe('Incline Cable Chest Press (216)', () => {
     expect(distance(start.near.hold, start.far.hold) - distance(top.near.hold, top.far.hold)).toBeGreaterThanOrEqual(20);
     expect(pause).toBeGreaterThanOrEqual(400);
     expect(lower).toBeGreaterThanOrEqual(1.5 * press);
+  });
+});
+
+describe('Oblique Crunches (245)', () => {
+  const entry = entryOf(245);
+  const [up, pause, down] = entry.segmentDurationsMs;
+  const HAND = BODY.lw * 0.44;
+
+  test('lifted a stiff trunk with no bench and no turn: "lift the shoulder on the same side as the hand at your head and curl up and across, bringing that elbow toward the opposite knee"', () => {
+    const start = figureAt(entry, 0).world, top = figureAt(entry, up).world;
+    expect(curlOf(start)).toBeCloseTo(0, 6);
+    expect(curlOf(top)).toBeGreaterThanOrEqual(25); // the spine curls; the trunk is not lifted stiff
+    // The shoulder on the side of the raised hand is the one that lifts; the other stays down.
+    expect(top.near.shoulder[1] - start.near.shoulder[1]).toBeGreaterThanOrEqual(6);
+    expect(Math.abs(top.far.shoulder[1] - start.far.shoulder[1])).toBeLessThanOrEqual(1);
+    expect(OBLIQUE_CRUNCH_TWIST).toBeGreaterThanOrEqual(20);
+    // Across: the raised elbow travels toward the far side of the body and toward the far knee.
+    expect(start.near.elbow[2] - top.near.elbow[2]).toBeGreaterThanOrEqual(5);
+    expect(distance(start.near.elbow, start.far.knee) - distance(top.near.elbow, top.far.knee)).toBeGreaterThanOrEqual(10);
+    // "touching it only if the lower back stays down": drawn short of touching.
+    expect(distance(top.near.elbow, top.far.knee)).toBeGreaterThan(8);
+    expect(entry.view).toBe('oblique');
+  });
+
+  test('"the lower legs resting on a bench so the hips and knees are bent to about ninety degrees ... Keeping the legs still"', () => {
+    const { world } = figureAt(entry, 0);
+    for (const [name] of SIDES) {
+      const side = world[name];
+      expect(kneeOf(side)).toBeCloseTo(90, 6);
+      expect(direction(side.hipJoint, side.knee)).toBeCloseTo(90, 6); // the thigh upright: the hip at a right angle to a level trunk
+      expect(side.ankle[1] - CHAIN_ANKLE_HEIGHT).toBeCloseTo(BENCH_CRUNCH_BENCH_TOP, 6); // the calf rests on the bench
+    }
+    expect(world.neck[1]).toBeCloseTo(world.hip[1], 9); // lying flat
+    expectStill(entry, ['hp', ...LEGS]);
+    // "the lower back pressed down": the hip end of the spine stays level on the floor while the upper part curls.
+    const top = figureAt(entry, up).world;
+    expect(top.spine[1][1]).toBeCloseTo(top.spine[0][1], 6);
+  });
+
+  test('"one hand beside your head and the other arm on the floor out to the side"', () => {
+    for (const t of ticksOf(entry)) {
+      const { world } = figureAt(entry, t);
+      expect(distance(world.near.wrist, world.head)).toBeLessThanOrEqual(BODY.hr + 4); // beside the head, on every tick
+      expect(distance(world.far.wrist, OBLIQUE_CRUNCH_FAR_HAND)).toBeLessThan(1e-6); // the other hand does not leave its place,
+      expect(world.far.wrist[1]).toBeLessThanOrEqual(HAND + 0.2); // which is on the floor,
+      expect(world.far.elbow[1]).toBeGreaterThanOrEqual(HAND - 0.5); // with the elbow not sunk into it,
+    }
+    // and out to the side: far beyond the shoulder's own width.
+    expect(Math.abs(OBLIQUE_CRUNCH_FAR_HAND[2])).toBeGreaterThanOrEqual(BODY.sw * 0.92 + 15);
+  });
+
+  test('"Lower under control to the start ... then swap arms and do the same on the other side"', () => {
+    expect(pause).toBeGreaterThan(0);
+    expect(down).toBeGreaterThanOrEqual(1.3 * up);
+    expect(entry.frames.at(-1).caption).toContain('swap arms');
+  });
+});
+
+describe('Bench Press - With Bands (141)', () => {
+  const entry = entryOf(141);
+  const [lower, turn, press, squeeze] = entry.segmentDurationsMs;
+  const movement = CHAIN_MOVEMENTS['bench-press-with-bands'];
+
+  test('showed a barbell, where the text has none: "Trap the middle of a band with handles under the head-end leg of a flat bench ... take a handle in each hand"', () => {
+    const start = figureAt(entry, 0);
+    expect(movement.implement).toBe('handles');
+    // No bar or plates: nothing drawn at barbell or plate width.
+    expect(start.prims.filter((p) => p.kind === 'bone' && (p.w === 1.6 || p.w === 2.4) && p.color === 'textHi')).toHaveLength(0);
+    const posts = movement.equipment.filter((shape) => shape.kind === 'post').map((shape) => shape.at[0]);
+    const headEnd = Math.min(...posts), footEnd = Math.max(...posts);
+    expect(Math.abs(headEnd - start.world.head[0])).toBeLessThan(Math.abs(footEnd - start.world.head[0])); // the head-end leg
+    for (const anchor of BAND_PRESS_ANCHORS) {
+      expect(anchor[0]).toBeCloseTo(headEnd, 6); // under that leg,
+      expect(anchor[1]).toBeLessThanOrEqual(1); // on the floor
+    }
+    expect(linesOf(start).length + start.prims.filter((p) => p.kind === 'bone' && p.color === 'textMid' && p.w === 1.4).length).toBeGreaterThanOrEqual(2);
+    expect(entry.view).toBe('oblique');
+  });
+
+  test('"lie back with the arms straight above the chest, hands shoulder-width apart"', () => {
+    const { world } = figureAt(entry, 0);
+    expect(world.neck[1]).toBeCloseTo(world.hip[1], 9); // lying on the bench
+    const slab = movement.equipment.find((shape) => shape.kind === 'slab');
+    expect(slab.a[1] + 2).toBeCloseTo(world.hip[1] - BODY.sw * 0.58, 6);
+    for (const [name] of SIDES) {
+      const side = world[name];
+      expect(elbowOf(side)).toBeGreaterThanOrEqual(170);
+      expect(side.wrist[0]).toBeCloseTo(side.shoulder[0], 6); // straight above,
+      expect(side.wrist[2]).toBeCloseTo(side.shoulder[2], 6); // each hand over its own shoulder: shoulder-width
+      expect(side.ankle[1]).toBeCloseTo(CHAIN_ANKLE_HEIGHT, 6);
+    }
+  });
+
+  test('"Lower the handles slowly until the elbows are bent to ninety degrees"', () => {
+    const low = figureAt(entry, lower).world;
+    const toFeet = [1, 0, 0];
+    for (const [name] of SIDES) {
+      const side = low[name];
+      expect(elbowOf(side)).toBeCloseTo(90, 4);
+      expect(side.elbow[1]).toBeCloseTo(side.shoulder[1], 4); // the upper arm level with the chest: no lower than the bench allows
+      // The upper arm's angle out from the side of the body.
+      const upper = minus(side.elbow, side.shoulder);
+      const fromSide = deg(Math.acos(upper.reduce((sum, v, i) => sum + v * toFeet[i], 0) / Math.hypot(...upper)));
+      expect(fromSide).toBeCloseTo(BAND_PRESS_ELBOW_OUT, 4);
+      expect(direction(side.elbow, side.wrist)).toBeCloseTo(90, 4); // forearm upright under the handle
+    }
+    for (const t of ticksOf(entry)) expect(elbowOf(figureAt(entry, t).world.near)).toBeGreaterThanOrEqual(90 - 0.1); // never deeper
+    expectStill(entry, BODY_STILL);
+  });
+
+  test('"Press back up to straight arms, squeeze the chest for a second, and take at least twice as long to lower as to press"', () => {
+    expect(lower).toBeGreaterThanOrEqual(2 * press);
+    expect(squeeze).toBeGreaterThanOrEqual(1000);
+    expect(turn).toBeGreaterThan(0);
+    // The band only stretches on the press, and is never shorter than at the bottom.
+    for (const [name, anchor] of [['near', BAND_PRESS_ANCHORS[0]], ['far', BAND_PRESS_ANCHORS[1]]]) {
+      const length = (t) => distance(anchor, figureAt(entry, t).world[name].hold);
+      expectOnlyGrows(ticksOf(entry).filter((t) => t >= lower + turn && t <= lower + turn + press).map(length), 4);
+      for (const t of ticksOf(entry)) expect(length(t)).toBeGreaterThanOrEqual(length(lower) - SLACK);
+    }
+  });
+});
+
+describe('Extended Range One-Arm Kettlebell Floor Press (196)', () => {
+  const entry = entryOf(196);
+  const [press, pause, lower] = entry.segmentDurationsMs;
+  const ARM_HALF = (BODY.lw * 0.88) / 2;
+  // The way the rolled chest faces, and how far round from it the upper arm is: 90 is level with the chest, more is behind it.
+  const chestFront = [0, Math.cos((KB_PRESS_ROLL * Math.PI) / 180), -Math.sin((KB_PRESS_ROLL * Math.PI) / 180)];
+  const fromChest = (side) => {
+    const upper = minus(side.elbow, side.shoulder);
+    return deg(Math.acos(upper.reduce((sum, v, i) => sum + v * chestFront[i], 0) / Math.hypot(...upper)));
+  };
+
+  test('showed a flat floor press: "take the knee across your body so the hips and trunk roll toward the other side and the pressing shoulder lifts off the floor"', () => {
+    for (const t of ticksOf(entry)) {
+      const figure = figureAt(entry, t);
+      const { world } = figure;
+      expect(figure.angles.roll).toBe(KB_PRESS_ROLL);
+      // The pressing (near) shoulder and hip are lifted; the other shoulder is down by the floor.
+      expect(world.near.shoulder[1] - world.far.shoulder[1]).toBeGreaterThanOrEqual(8);
+      expect(world.near.hipJoint[1] - world.far.hipJoint[1]).toBeGreaterThanOrEqual(5);
+      expect(world.far.shoulder[1]).toBeLessThanOrEqual(ARM_HALF + 1);
+      expect(world.far.shoulder[1]).toBeGreaterThanOrEqual(ARM_HALF); // on the floor, not in it
+      // The knee is across: beyond the far hip, on the far side of the body's midline.
+      expect(world.near.knee[2]).toBeLessThan(world.far.hipJoint[2]);
+      expect(kneeOf(world.near)).toBeLessThanOrEqual(110); // bent,
+      expect(world.near.ankle[1]).toBeCloseTo(CHAIN_ANKLE_HEIGHT, 6); // its foot on the floor
+      expect(kneeOf(world.far)).toBeGreaterThanOrEqual(175); // the other leg long
+    }
+    expect(KB_PRESS_ROLL).toBeGreaterThanOrEqual(25);
+    expect(KB_PRESS_ROLL).toBeLessThanOrEqual(45);
+    expect(figureAt(entry, 0).world.near.shoulder.map((v) => Math.round(v * 1e6))).toEqual(KB_PRESS_SHOULDER.map((v) => Math.round(v * 1e6)));
+  });
+
+  test('"Lie on your back holding a kettlebell by the handle at one shoulder ... with the free arm out on the floor for support"', () => {
+    const start = figureAt(entry, 0);
+    const { world } = start;
+    expect(world.neck[1]).toBeCloseTo(world.hip[1], 9); // lying
+    expect(CHAIN_MOVEMENTS['extended-range-one-arm-kettlebell-floor-press'].implement).toBe('kettlebell');
+    const bells = start.prims.filter((p) => p.kind === 'circle' && p.r === KETTLEBELL_RADIUS);
+    expect(bells).toHaveLength(1); // one kettlebell, in the pressing hand
+    expect(distance([bells[0].cx, bells[0].cy], start.hold.near)).toBeLessThanOrEqual(KETTLEBELL_RADIUS + 1.5);
+    // At the shoulder: the hand is beside it, no higher than a forearm above it.
+    expect(distance(world.near.wrist, world.near.shoulder)).toBeLessThanOrEqual(14);
+    for (const t of ticksOf(entry)) {
+      const now = figureAt(entry, t).world;
+      expect(now.far.wrist).toEqual(world.far.wrist); // the free hand stays put,
+      expect(now.far.wrist[1]).toBeLessThanOrEqual(BODY.lw * 0.44 + 0.2); // on the floor,
+      expect(now.far.elbow[1]).toBeGreaterThanOrEqual(1.5);
+      expect(Math.abs(now.far.wrist[2] - now.far.shoulder[2])).toBeGreaterThanOrEqual(20); // out to its side
+    }
+  });
+
+  test('"Press the kettlebell up until the arm is straight and vertical, drawing the upper arm in toward the chest as it rises"', () => {
+    const start = figureAt(entry, 0).world.near, top = figureAt(entry, press).world.near;
+    expect(elbowOf(top)).toBeGreaterThanOrEqual(170);
+    expect(distance([top.wrist[0], top.wrist[2]], [top.shoulder[0], top.shoulder[2]])).toBeLessThan(1e-6); // vertical: straight above the shoulder
+    expect(top.wrist[1]).toBeGreaterThan(top.shoulder[1] + 23);
+    // In toward the chest: the elbow starts well out to the side and finishes in line with the shoulder.
+    expect(start.elbow[2] - start.shoulder[2]).toBeGreaterThanOrEqual(7);
+    expect(Math.abs(top.elbow[2] - top.shoulder[2])).toBeLessThanOrEqual(1);
+    // Measured against the chest itself: the upper arm only ever closes toward the chest's front as the kettlebell rises.
+    const round = ticksOf(entry).filter((t) => t <= press).map((t) => fromChest(figureAt(entry, t).world.near));
+    for (let i = 1; i < round.length; i++) expect(round[i]).toBeLessThanOrEqual(round[i - 1] + 1e-6);
+    expect(round[0] - round.at(-1)).toBeGreaterThanOrEqual(80);
+  });
+
+  test('"Lower under control, letting the elbow sink behind the line of the chest only as far as the shoulder is comfortable"', () => {
+    const low = figureAt(entry, press + pause + lower).world.near;
+    // Behind the line of the chest: the elbow ends below its own, lifted, shoulder. That is the extended range.
+    expect(low.shoulder[1] - low.elbow[1]).toBeGreaterThanOrEqual(3);
+    expect(low.shoulder[1] - low.elbow[1]).toBeLessThanOrEqual(8); // and no further
+    // Against the rolled chest the upper arm is well past level: a press lying flat stops at ninety.
+    expect(fromChest(low)).toBeGreaterThanOrEqual(120);
+    expect(fromChest(low)).toBeLessThanOrEqual(150);
+    expect(low.elbow[1]).toBeGreaterThanOrEqual(ARM_HALF); // it does not go into the floor
+    expect(direction(low.elbow, low.wrist)).toBeCloseTo(90, 4); // the forearm upright under the kettlebell
+    expect(pause).toBeGreaterThan(0);
+    expect(lower).toBeGreaterThanOrEqual(1.5 * press);
+    expectStill(entry, BODY_STILL);
+    expect(entry.frames.at(-1).caption).toContain('change sides');
+  });
+});
+
+describe('External Rotation (197)', () => {
+  const entry = entryOf(197);
+  const [up, hold, down] = entry.segmentDurationsMs;
+  const movement = CHAIN_MOVEMENTS['external-rotation'];
+
+  test('showed a standing athlete: "Lie on your side on a flat bench with your head resting on the bottom arm"', () => {
+    const start = figureAt(entry, 0);
+    const { world } = start;
+    expect(world.neck[1]).toBeCloseTo(world.hip[1], 9); // lying,
+    // on one side: one shoulder straight above the other, and one hip above the other.
+    expect(world.near.shoulder[1] - world.far.shoulder[1]).toBeCloseTo(2 * BODY.sw * 0.92, 6);
+    expect(world.near.shoulder[2]).toBeCloseTo(world.far.shoulder[2], 6);
+    expect(world.near.hipJoint[1]).toBeGreaterThan(world.far.hipJoint[1] + 10);
+    // On the bench: the bottom shoulder rests on its top.
+    const slab = movement.equipment.find((shape) => shape.kind === 'slab');
+    expect(slab.a[1] + 2).toBeCloseTo(SIDE_LYING_BENCH_TOP, 6);
+    expect(world.far.shoulder[1] - BODY.lw * 0.44).toBeCloseTo(SIDE_LYING_BENCH_TOP, 6);
+    expect(slab.a[1]).toBeCloseTo(slab.b[1], 9); // a flat bench
+    // The head rests on the bottom arm: it is lowered toward the bench, and the bottom forearm passes under it.
+    expect(world.head[1]).toBeLessThan(world.neck[1] - 2);
+    const lowArm = [world.far.elbow, world.far.wrist];
+    const under = Math.min(...[0, 0.25, 0.5, 0.75, 1].map((k) => Math.hypot(
+      lowArm[0][0] + (lowArm[1][0] - lowArm[0][0]) * k - world.head[0], lowArm[0][2] + (lowArm[1][2] - lowArm[0][2]) * k - world.head[2])));
+    expect(under).toBeLessThanOrEqual(BODY.hr);
+    expect(world.head[1] - BODY.hr - (world.far.wrist[1] + BODY.lw * 0.44)).toBeLessThanOrEqual(1.5);
+    expect(entry.view).toBe('oblique');
+  });
+
+  test('"a light dumbbell in the top hand with that elbow tucked against your side and bent to ninety degrees, so the forearm points straight ahead, level with the floor"', () => {
+    const start = figureAt(entry, 0);
+    const top = start.world.near;
+    expect(movement.implement).toBe('bell'); // one dumbbell, in the top (near) hand
+    // Tucked against the side: the upper arm lies along the top side of the trunk, toward the hips.
+    expect(top.elbow[1]).toBeCloseTo(top.shoulder[1], 6);
+    expect(top.elbow[2]).toBeCloseTo(top.shoulder[2], 6);
+    expect(top.elbow[0]).toBeLessThan(top.shoulder[0] - 12);
+    for (const t of ticksOf(entry)) {
+      const now = figureAt(entry, t).world.near;
+      expect(elbowOf(now)).toBeCloseTo(90, 6); // "Elbow stays at ninety degrees"
+      expect(now.elbow).toEqual(top.elbow); // "Elbow stays tucked to your side"
+    }
+    // Straight ahead and level: the forearm points out of the front of the body, which faces the viewer.
+    expect(top.wrist[1]).toBeCloseTo(top.elbow[1], 6);
+    expect(top.wrist[0]).toBeCloseTo(top.elbow[0], 6);
+    expect(top.wrist[2] - top.elbow[2]).toBeGreaterThan(11);
+    // The knees are bent forward the same way, so "ahead" is the way the body faces.
+    expect(start.world.near.knee[2]).toBeGreaterThan(start.world.near.hipJoint[2] + 5);
+  });
+
+  test('"turn the forearm up toward the ceiling as far as it goes comfortably, no further than upright, and hold for a second"', () => {
+    const start = figureAt(entry, 0).world.near, end = figureAt(entry, up).world.near;
+    expect(end.wrist[1] - end.elbow[1]).toBeGreaterThanOrEqual(10); // up toward the ceiling
+    const tilt = (side) => deg(Math.atan2(side.wrist[2] - side.elbow[2], side.wrist[1] - side.elbow[1])); // 0 is upright, 90 level ahead
+    expect(tilt(start)).toBeCloseTo(90, 6);
+    expect(tilt(end)).toBeCloseTo(SIDE_LYING_SHORT_OF_UPRIGHT, 6);
+    expect(SIDE_LYING_SHORT_OF_UPRIGHT).toBeGreaterThanOrEqual(0); // no further than upright
+    for (const t of ticksOf(entry)) {
+      const now = figureAt(entry, t).world.near;
+      expect(tilt(now)).toBeGreaterThanOrEqual(SIDE_LYING_SHORT_OF_UPRIGHT - 1e-6);
+      expect(tilt(now)).toBeLessThanOrEqual(90 + 1e-6);
+      expect(now.wrist[0]).toBeCloseTo(now.elbow[0], 6); // it turns about the upper arm, and goes nowhere else
+    }
+    expect(hold).toBeGreaterThanOrEqual(1000);
+  });
+
+  test('"Lower slowly to the start without letting your body roll back, complete the repetitions, then change sides"', () => {
+    expect(down).toBeGreaterThanOrEqual(1.5 * up);
+    expectStill(entry, [...BODY_STILL, 'ef', 'wf']); // nothing but the top forearm moves
+    for (const t of ticksOf(entry)) expect(figureAt(entry, t).angles.roll).toBe(-90);
+    expect(entry.frames.at(-1).caption).toContain('change sides');
+  });
+});
+
+describe('One-Arm Dumbbell Row (247)', () => {
+  const entry = entryOf(247);
+  const [pull, squeeze, lower] = entry.segmentDurationsMs;
+  const movement = CHAIN_MOVEMENTS['one-arm-dumbbell-row'];
+
+  test('borrowed a row that finishes at the hip: "pull the dumbbell straight up to the side of the chest"', () => {
+    expect(entry.derivesFrom).toBeUndefined(); // its own drawing now
+    expect(entry.frames).toHaveLength(5);
+    const start = figureAt(entry, 0).world, top = figureAt(entry, pull).world;
+    const hand = onTrunk(top, top.near.hold);
+    // Beside the chest: in the chest half of the trunk, nearer the shoulder than the hip, and within the trunk's own depth.
+    expect(hand.along).toBeGreaterThanOrEqual(TRUNK * 0.7);
+    expect(hand.along).toBeLessThanOrEqual(TRUNK);
+    expect(Math.abs(hand.front)).toBeLessThanOrEqual(BODY.sw * 0.58);
+    expect(TRUNK - hand.along).toBeCloseTo(BENCH_ROW_FINISH[0], 6);
+    // Straight up: the hand rises far more than it drifts.
+    const rise = top.near.hold[1] - start.near.hold[1], drift = Math.abs(top.near.hold[0] - start.near.hold[0]);
+    expect(rise).toBeGreaterThanOrEqual(15);
+    expect(drift).toBeLessThanOrEqual(rise / 3);
+    // The elbow leads up past the back.
+    expect(top.near.elbow[1]).toBeGreaterThan(top.neck[1] + 3);
+  });
+
+  test('"Place one knee and the same-side hand on a flat bench with the other foot flat on the floor"', () => {
+    const { world } = figureAt(entry, 0);
+    const slab = movement.equipment.find((shape) => shape.kind === 'slab');
+    expect(slab.a[1] + 2).toBeCloseTo(BENCH_ROW_TOP, 6);
+    expect(slab.a[1]).toBeCloseTo(slab.b[1], 9);
+    // The far knee and the far hand rest on the bench top; they are the same side.
+    expect(world.far.knee[1] - THIGH_HALF).toBeCloseTo(BENCH_ROW_TOP, 6);
+    expect(world.far.wrist[1] - BODY.lw * 0.44).toBeCloseTo(BENCH_ROW_TOP + 0.1, 6);
+    expect(world.far.ankle[1]).toBeCloseTo(world.far.knee[1], 6); // the shin lies along the bench
+    for (const point of [world.far.knee, world.far.wrist, world.far.ankle]) {
+      expect(point[0]).toBeGreaterThanOrEqual(Math.min(slab.a[0], slab.b[0]));
+      expect(point[0]).toBeLessThanOrEqual(Math.max(slab.a[0], slab.b[0]));
+    }
+    // The other (near) foot is flat on the floor.
+    expect(world.near.ankle[1]).toBeCloseTo(CHAIN_ANKLE_HEIGHT, 6);
+    expect(world.near.toe[1]).toBeCloseTo(world.near.ankle[1], 6);
+    expect(kneeOf(world.near)).toBeGreaterThanOrEqual(150); // a standing leg, a little soft
+  });
+
+  test('"bend forward until your torso is level with the floor and your back is flat ... the arm hanging straight ... Keeping the torso still and the upper arm close to your side"', () => {
+    const start = figureAt(entry, 0);
+    expect(start.world.neck[1]).toBeCloseTo(start.world.hip[1], 9); // level
+    expect(start.curled).toBe(false); // flat
+    expect(elbowOf(start.world.near)).toBeGreaterThanOrEqual(170);
+    expect(start.world.near.wrist[0]).toBeCloseTo(start.world.near.shoulder[0], 6); // hanging straight down under the shoulder
+    expect(movement.implement).toBe('bell'); // a dumbbell in the free hand only
+    expect(movement.bellAxis).toEqual([1, 0, 0]); // "the palm facing in": the handle runs the way the body does
+    for (const t of ticksOf(entry)) {
+      const { near } = figureAt(entry, t).world;
+      expect(near.elbow[2]).toBeCloseTo(near.shoulder[2], 6); // close to the side
+      expect(near.wrist[2]).toBeCloseTo(near.shoulder[2], 6);
+    }
+    expectStill(entry, [...BODY_STILL, 'ef', 'wf']);
+  });
+
+  test('"squeeze the back. Lower it straight down to a long arm, complete the repetitions, then change sides"', () => {
+    expect(squeeze).toBeGreaterThanOrEqual(500);
+    expect(lower).toBeGreaterThanOrEqual(1.5 * pull);
+    const end = figureAt(entry, pull + squeeze + lower).world.near;
+    expect(elbowOf(end)).toBeGreaterThanOrEqual(170);
+    expect(entry.frames.at(-1).caption).toContain('change sides');
   });
 });
