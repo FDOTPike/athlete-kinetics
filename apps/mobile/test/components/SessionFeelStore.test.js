@@ -155,6 +155,16 @@ describe('the pure rule decides what is saved', () => {
   });
 });
 
+describe('a note on its own', () => {
+  test('the note writer saves a note with no answer, and the loader reads it back', () => {
+    const sessionId = finishOneSession();
+    state().saveSessionNote('  new shoes felt good  ');
+    expect(feelRow(sessionId)).toBeUndefined();
+    expect(noteRow(sessionId).note).toBe('new shoes felt good');
+    expect(state().loadSessionFeel(sessionId)).toEqual({ ask: true, saved: null, note: 'new shoes felt good' });
+  });
+});
+
 describe('a record, not a decision', () => {
   test('saving changes no prescription, plan, set, outcome, report or niggle', () => {
     const sessionId = finishOneSession();

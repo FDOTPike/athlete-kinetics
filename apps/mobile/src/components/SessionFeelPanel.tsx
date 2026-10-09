@@ -55,13 +55,15 @@ export function describeSessionFeel(record: SessionFeelRecord): string {
   return `${answer}: ${record.reasons.map((reason) => SESSION_FEEL_REASON_LABEL[reason].toLowerCase()).join(', ')}.`;
 }
 
-export type SessionFeelSaveResult = SessionFeelProblem | 'not_saved' | null;
+/** 'nothing_to_save': the answer was optional and neither an answer nor a note was given. */
+export type SessionFeelSaveResult = SessionFeelProblem | 'not_saved' | 'nothing_to_save' | null;
 
 const PROBLEM_TEXT: Record<Exclude<SessionFeelSaveResult, null>, string> = {
   feel_required: 'Choose how the session went.',
   reason_required: 'Choose at least one reason.',
   unknown_value: 'This could not be saved. Your session is still recorded.',
   not_saved: 'This could not be saved. Your session is still recorded.',
+  nothing_to_save: 'Type a note, or choose how the session went.',
 };
 
 export interface SessionFeelPanelProps {
@@ -69,6 +71,10 @@ export interface SessionFeelPanelProps {
   saved: SessionFeelRecord | null;
   /** The note already saved for this session, or null. */
   note: string | null;
+  /** True when the session went to plan, so nothing is being asked and a note
+   *  may be saved on its own. Only changes the wording; the caller decides
+   *  what a save with no answer does. */
+  answerOptional?: boolean;
   /** Asks the store to save. Returns null when saved, otherwise why not. */
   onSave: (draft: SessionFeelDraft, note: string) => SessionFeelSaveResult;
   /** Leave without saving, or after a save. */
@@ -79,7 +85,7 @@ export interface SessionFeelPanelProps {
  * The sub-view that asks how a finished session went. Starts from the saved
  * answer when there is one, so it doubles as the way to correct it.
  */
-export function SessionFeelPanel({ saved, note, onSave, onClose }: SessionFeelPanelProps): React.JSX.Element {
+export function SessionFeelPanel({ saved, note, answerOptional = false, onSave, onClose }: SessionFeelPanelProps): React.JSX.Element {
   const [feel, setFeel] = useState<SessionFeelKind | null>(saved?.feel ?? null);
   const [reasons, setReasons] = useState<readonly SessionFeelReason[]>(saved?.reasons ?? []);
   const [noteText, setNoteText] = useState(note ?? '');
@@ -107,6 +113,11 @@ export function SessionFeelPanel({ saved, note, onSave, onClose }: SessionFeelPa
       testID="session-feel-panel"
     >
       <Text style={styles.title} accessibilityRole="header">How did this session go?</Text>
+      {answerOptional && (
+        <Text style={styles.caption} testID="session-feel-optional">
+          This session went to plan, so an answer is optional. You can save a note on its own.
+        </Text>
+      )}
       <View style={styles.chipRow}>
         {SESSION_FEEL_KINDS.map((kind) => (
           <Chip

@@ -570,11 +570,27 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
     const displayMsg = outcomeCopy[outcome.kind] ?? 'Outcome unavailable';
 
     if (feelOpen && sessionFeel !== null) {
+      // A session that went to plan is not asked anything, so its note may be
+      // saved on its own. Once an answer exists, or the question was asked,
+      // a save carries an answer.
+      const answerOptional = !sessionFeel.ask && sessionFeel.saved === null;
       return (
         <SessionFeelPanel
           saved={sessionFeel.saved}
           note={sessionFeel.note}
+          answerOptional={answerOptional}
           onSave={(draft, noteText) => {
+            if (answerOptional && draft.feel === null) {
+              if (noteText.trim().length === 0) return 'nothing_to_save';
+              try {
+                // The note alone: session_note, stored as typed, never interpreted.
+                state.saveSessionNote(noteText);
+              } catch {
+                return 'not_saved';
+              }
+              setFeelRevision((revision) => revision + 1);
+              return null;
+            }
             // A record only: this writes session_feel and session_note, and
             // nothing that a prescription, block or progression reads.
             const result = state.saveSessionFeel(draft, noteText);
@@ -662,6 +678,11 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                     testID="session-feel-open"
                     style={{ alignSelf: 'stretch' }}
                   />
+                </>
+              ) : sessionFeel.note !== null ? (
+                <>
+                  <Text style={styles.summaryComparison} testID="session-feel-note-saved">Your note is saved with this session.</Text>
+                  <QuietAction label="Edit note" onPress={() => setFeelOpen(true)} accessibilityLabel="Edit the note about this session" testID="session-feel-note-open" />
                 </>
               ) : (
                 <QuietAction label="Add a note about this session" onPress={() => setFeelOpen(true)} accessibilityLabel="Add a note about this session" testID="session-feel-note-open" />

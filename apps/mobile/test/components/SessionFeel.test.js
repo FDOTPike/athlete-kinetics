@@ -219,6 +219,7 @@ const baseState = (overrides = {}) => ({
   getMovementAvailabilityVerdicts: () => [],
   loadSessionFeel: jest.fn(() => ({ ask: true, saved: null, note: null })),
   saveSessionFeel: jest.fn(() => null),
+  saveSessionNote: jest.fn(),
   ...overrides,
 });
 
@@ -302,6 +303,73 @@ describe('completion screen: asked only when the session did not go to plan', ()
     fireEvent.press(screen.getByTestId('session-feel-cancel'));
     expect(screen.getByLabelText('Back to Today')).toBeOnTheScreen();
     expect(mockState.saveSessionFeel).not.toHaveBeenCalled();
+  });
+
+  test('a session that went to plan can save a note on its own, with no answer', () => {
+    const loadSessionFeel = jest.fn()
+      .mockReturnValueOnce({ ask: false, saved: null, note: null })
+      .mockReturnValue({ ask: false, saved: null, note: 'new shoes felt good' });
+    mockState = baseState({ loadSessionFeel });
+    render(<SessionScreen />);
+    fireEvent.press(screen.getByTestId('session-feel-note-open'));
+    expect(screen.getByTestId('session-feel-optional')).toBeOnTheScreen();
+    fireEvent.changeText(screen.getByTestId('session-feel-note'), '  new shoes felt good  ');
+    fireEvent.press(screen.getByTestId('session-feel-save'));
+
+    expect(mockState.saveSessionNote).toHaveBeenCalledTimes(1);
+    expect(mockState.saveSessionNote).toHaveBeenCalledWith('  new shoes felt good  ');
+    expect(mockState.saveSessionFeel).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('session-feel-panel')).toBeNull();
+    expect(screen.getByTestId('session-feel-note-saved')).toHaveTextContent('Your note is saved with this session.');
+    expect(screen.getByLabelText('Edit the note about this session')).toBeOnTheScreen();
+    expectNoTrainingAction();
+  });
+
+  test('when the answer is optional, saving nothing at all says so and writes nothing', () => {
+    mockState = baseState({ loadSessionFeel: jest.fn(() => ({ ask: false, saved: null, note: null })) });
+    render(<SessionScreen />);
+    fireEvent.press(screen.getByTestId('session-feel-note-open'));
+    fireEvent.changeText(screen.getByTestId('session-feel-note'), '   ');
+    fireEvent.press(screen.getByTestId('session-feel-save'));
+    expect(screen.getByTestId('session-feel-problem')).toHaveTextContent('Type a note, or choose how the session went.');
+    expect(mockState.saveSessionNote).not.toHaveBeenCalled();
+    expect(mockState.saveSessionFeel).not.toHaveBeenCalled();
+  });
+
+  test('when the answer is optional, choosing one still saves it as an answer', () => {
+    mockState = baseState({ loadSessionFeel: jest.fn(() => ({ ask: false, saved: null, note: null })) });
+    render(<SessionScreen />);
+    fireEvent.press(screen.getByTestId('session-feel-note-open'));
+    fireEvent.press(screen.getByTestId('session-feel-as_planned'));
+    fireEvent.changeText(screen.getByTestId('session-feel-note'), 'steady');
+    fireEvent.press(screen.getByTestId('session-feel-save'));
+    expect(mockState.saveSessionFeel).toHaveBeenCalledWith({ feel: 'as_planned', reasons: [] }, 'steady');
+    expect(mockState.saveSessionNote).not.toHaveBeenCalled();
+  });
+
+  test('a session that did not go to plan cannot be saved with a note alone', () => {
+    mockState = baseState({ saveSessionFeel: jest.fn(() => 'feel_required') });
+    render(<SessionScreen />);
+    fireEvent.press(screen.getByTestId('session-feel-open'));
+    expect(screen.queryByTestId('session-feel-optional')).toBeNull();
+    fireEvent.changeText(screen.getByTestId('session-feel-note'), 'felt rough');
+    fireEvent.press(screen.getByTestId('session-feel-save'));
+    expect(mockState.saveSessionFeel).toHaveBeenCalledWith({ feel: null, reasons: [] }, 'felt rough');
+    expect(mockState.saveSessionNote).not.toHaveBeenCalled();
+    expect(screen.getByTestId('session-feel-problem')).toHaveTextContent('Choose how the session went.');
+  });
+
+  test('a note-only save that fails keeps the panel open', () => {
+    mockState = baseState({
+      loadSessionFeel: jest.fn(() => ({ ask: false, saved: null, note: null })),
+      saveSessionNote: jest.fn(() => { throw new Error('database closed'); }),
+    });
+    render(<SessionScreen />);
+    fireEvent.press(screen.getByTestId('session-feel-note-open'));
+    fireEvent.changeText(screen.getByTestId('session-feel-note'), 'a note');
+    fireEvent.press(screen.getByTestId('session-feel-save'));
+    expect(screen.getByTestId('session-feel-panel')).toBeOnTheScreen();
+    expect(screen.getByTestId('session-feel-problem')).toHaveTextContent('This could not be saved. Your session is still recorded.');
   });
 
   test('"Back to Today" still dismisses exactly once and never saves an answer', () => {
