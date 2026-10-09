@@ -34,6 +34,47 @@ target 'AthleteKinetics' do
     patch_fmt_consteval_for_apple_clang!(installer)
     make_glog_namespace_headers_textual!(installer)
     raise_pod_deployment_targets!(installer)
+    expose_healthkit_core_private_module!(installer)
+  end
+end
+
+# ReactNativeHealthkitCore 16.0.0 imports its Objective-C exception helpers
+# through a private Clang module (ios/module.modulemap,
+# ReactNativeHealthkitCore_Private) and puts that directory on
+# SWIFT_INCLUDE_PATHS for its own target only. With explicit module builds,
+# which Xcode 27 uses, a pod that depends on the core must resolve that module
+# too and cannot (issue #38: "Unable to resolve module dependency:
+# 'ReactNativeHealthkitCore_Private' (in target 'ReactNativeHealthkit')").
+# Upstream fixed it in 16.1.0 by adding the core's ios/ directory to the
+# dependents' SWIFT_INCLUDE_PATHS (kingstinct/react-native-healthkit#395); this
+# does the same for the pinned 16.0.0. Scoped to exactly 16.0.0 and fails
+# closed if the module map is not where it is expected. Remove when the Apple
+# Health binding is moved to 16.1.0 or later.
+def expose_healthkit_core_private_module!(installer)
+  core = installer.pod_targets.find { |target| target.pod_name == 'ReactNativeHealthkitCore' }
+  return if core.nil?
+  version = core.root_spec.version.to_s
+  unless version == '16.0.0'
+    Pod::UI.puts "ReactNativeHealthkitCore #{version}: private-module include path not added (written for 16.0.0 only)".yellow
+    return
+  end
+  core_ios = File.join(File.expand_path(installer.sandbox.pod_dir('ReactNativeHealthkitCore').to_s), 'ios')
+  unless File.exist?(File.join(core_ios, 'module.modulemap'))
+    raise "ReactNativeHealthkitCore 16.0.0: module.modulemap not found in #{core_ios}; refusing to continue"
+  end
+  relative = Pathname.new(core_ios).relative_path_from(Pathname.new(File.expand_path(installer.sandbox.root.to_s)))
+  include_path = "\"${PODS_ROOT}/#{relative}\""
+  dependents = installer.pod_targets
+    .select { |target| target.dependent_targets.any? { |dependency| dependency.pod_name == 'ReactNativeHealthkitCore' } }
+    .map(&:name)
+  installer.pods_project.targets.each do |target|
+    next unless dependents.include?(target.name)
+    target.build_configurations.each do |config|
+      current = Array(config.build_settings['SWIFT_INCLUDE_PATHS'] || '$(inherited)').join(' ')
+      next if current.include?(include_path)
+      config.build_settings['SWIFT_INCLUDE_PATHS'] = "#{current} #{include_path}"
+      Pod::UI.puts "#{target.name} (#{config.name}): ReactNativeHealthkitCore_Private made resolvable (#{include_path})".green
+    end
   end
 end
 

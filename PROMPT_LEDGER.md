@@ -12399,3 +12399,15 @@ can you please continue to reply to Opus on my friend Mac, please setup a watche
 ```text
 please  use Opus reports and make it work
 ```
+
+### Output
+
+- **First report (2026-10-09T03:35Z, Xcode 27.0).** `build-for-testing` stopped after 12 s: the `react-native-blob-util-ReactNativeBlobUtilPrivacyInfo` target had deployment target 11.0 and Xcode 27 supports 15.0 and later. Checked against the repository before acting: `master` pins `react-native-blob-util` 0.24.9, its podspec declares iOS 11.0 with a resource bundle, and the Podfile raised nothing.
+- **Fix 1** (`fadb59d`): `raise_pod_deployment_targets!` in the Podfile `post_install`, the new Podfile checksum in `Podfile.lock`, and a `verify:native-config` check (watched failing with the call removed). Pull request #64 against `master`.
+- **Reply on #38** (comment 6073830494): the commit to test and the re-run steps, and the agreed stop line `DONE - STOP`. A background check polled the issue once a minute for the next comment.
+- **Pause.** The owner then asked for the tester's agent to be given a break to save usage. Comment 6073910546 says so, starting with the stop line and stating that the work is paused, not finished.
+- **Second report (03:54Z; the run had already finished).** Fix 1 confirmed on Xcode 27: `pod install --deployment` exit 0 and both configurations printed "iOS deployment target 11.0 raised to 15.1"; the deployment-target error did not return. The build then failed (exit 65) at `SwiftDriver ReactNativeHealthkit` for arm64 and x86_64: "Unable to resolve module dependency: 'ReactNativeHealthkitCore_Private'". The UI tests did not run. Checked against the installed 16.0.0 package: the core podspec puts `ios/` on `SWIFT_INCLUDE_PATHS` for its own target only. Upstream names this error and fixes it in 16.1.0 (kingstinct/react-native-healthkit#395, released 2026-10-07).
+- **Fix 2** (this commit): `expose_healthkit_core_private_module!` in the Podfile `post_install` adds the core's `ios/` directory to `SWIFT_INCLUDE_PATHS` of the pods that depend on the core, as upstream does; scoped to exactly 16.0.0 and failing closed if the module map is missing. New Podfile checksum in `Podfile.lock`; a second `verify:native-config` check, watched failing with the call removed. The binding's version is unchanged.
+- **Gates.** After each fix: `npm run typecheck` exit 0 and `npm run verify:native-config` exit 0. `pod install` and the Xcode builds cannot run on this machine.
+- **Not verified.** Fix 2 has not been run on any Mac. Xcode 26 is covered by the pull request's CI; Xcode 27 needs another run on the tester's Mac, which has not been requested because of the pause. The five UI tests have not yet run on Xcode 27, and further Xcode 27 errors may follow this one.
+- **Not done.** Pull request #64 is not merged. No comment was posted after the pause.

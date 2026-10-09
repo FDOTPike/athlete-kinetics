@@ -199,6 +199,13 @@ console.log('[N9] Xcode 26 / fmt consteval compatibility');
     /^\s+raise_pod_deployment_targets!\(installer\)$/m.test(podfile)
       && /Gem::Version\.new\(current\) < minimum/.test(podfile)
       && podfile.includes("config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = min_ios_version_supported"));
+  // Xcode 27 builds with explicit modules; the pinned Apple Health binding
+  // (16.0.0) needs its core's private module on the dependents' include path.
+  check('the Podfile post_install makes the Apple Health core\'s private module resolvable for its dependents (16.0.0 only)',
+    /^\s+expose_healthkit_core_private_module!\(installer\)$/m.test(podfile)
+      && podfile.includes("unless version == '16.0.0'")
+      && podfile.includes("dependency.pod_name == 'ReactNativeHealthkitCore'")
+      && /config\.build_settings\['SWIFT_INCLUDE_PATHS'\] = "#\{current\} #\{include_path\}"/.test(podfile));
   if (fmtVersion !== undefined) {
     check('the installed React Native still pins the fmt version the patch is written for', fmtVersion === '11.0.2', fmtVersion);
   }
