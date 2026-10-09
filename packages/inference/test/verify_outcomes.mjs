@@ -9,6 +9,7 @@ const {
   SESSION_OUTCOME_ENGINE_VERSION,
   SessionOutcomeValidationError,
 } = require('./.build/sessionOutcome.js');
+const feel = require('./.build/sessionFeel.js');
 
 const reps = (value) => ({ kind: 'reps', reps: value });
 const time = (value) => ({ kind: 'time', seconds: value });
@@ -219,6 +220,72 @@ check('decision output is recognition-only and exposes no prescription controls'
 check('engine source has no clock or random reads', () => {
   const source = readFileSync(new URL('../src/sessionOutcome.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /Date\.now\s*\(|new\s+Date\s*\(|Math\.random\s*\(|performance\.now\s*\(/);
+});
+
+// --- Session feel (070): when the completion screen asks, and what a valid answer is.
+check('session feel: a session that followed the plan with effort on target is not asked about', () => {
+  assert.equal(feel.shouldAskSessionFeel({ outcomeKind: 'followed_plan', meanRpeDrift: 0 }), false);
+  assert.equal(feel.shouldAskSessionFeel({ outcomeKind: 'followed_plan', meanRpeDrift: 0.99 }), false);
+  assert.equal(feel.shouldAskSessionFeel({ outcomeKind: 'followed_plan', meanRpeDrift: -0.99 }), false);
+  assert.equal(feel.shouldAskSessionFeel({ outcomeKind: 'followed_plan', meanRpeDrift: null }), false);
+});
+
+check('session feel: effort a full point off target, either way, is asked about', () => {
+  assert.equal(feel.SESSION_FEEL_RPE_DRIFT_THRESHOLD, 1);
+  assert.equal(feel.shouldAskSessionFeel({ outcomeKind: 'followed_plan', meanRpeDrift: 1 }), true);
+  assert.equal(feel.shouldAskSessionFeel({ outcomeKind: 'followed_plan', meanRpeDrift: -1 }), true);
+  assert.equal(feel.shouldAskSessionFeel({ outcomeKind: 'followed_plan', meanRpeDrift: Number.NaN }), false);
+});
+
+check('session feel: every outcome other than followed_plan is asked about', () => {
+  for (const outcomeKind of ['adapted_session', 'stopped_safely', 'session_recorded', 'a_kind_from_a_later_build']) {
+    assert.equal(feel.shouldAskSessionFeel({ outcomeKind, meanRpeDrift: null }), true, outcomeKind);
+    assert.equal(feel.shouldAskSessionFeel({ outcomeKind, meanRpeDrift: 0 }), true, outcomeKind);
+  }
+});
+
+check('session feel: mean drift uses only sets that carry both a rating and a target', () => {
+  assert.equal(feel.meanRpeDrift([]), null);
+  assert.equal(feel.meanRpeDrift([{ rpe: null, targetRpe: 7 }, { rpe: 8, targetRpe: null }]), null);
+  assert.equal(feel.meanRpeDrift([{ rpe: 9, targetRpe: 7 }, { rpe: 8, targetRpe: 7 }, { rpe: null, targetRpe: 7 }]), 1.5);
+  assert.equal(feel.meanRpeDrift([{ rpe: 6, targetRpe: 8 }, { rpe: 8, targetRpe: 8 }]), -1);
+  assert.equal(feel.meanRpeDrift([{ rpe: Number.NaN, targetRpe: 7 }, { rpe: 8, targetRpe: 7 }]), 1);
+});
+
+check('session feel: an answer needs a choice, and any choice but "as planned" needs a reason', () => {
+  assert.deepEqual(feel.validateSessionFeel({ feel: null, reasons: ['tired'] }), { ok: false, problem: 'feel_required' });
+  for (const kindOfFeel of ['harder', 'easier', 'stopped_early']) {
+    assert.deepEqual(feel.validateSessionFeel({ feel: kindOfFeel, reasons: [] }), { ok: false, problem: 'reason_required' });
+  }
+  assert.deepEqual(feel.validateSessionFeel({ feel: 'harder', reasons: ['unwell', 'tired', 'tired'] }),
+    { ok: true, record: { feel: 'harder', reasons: ['tired', 'unwell'] } });
+});
+
+check('session feel: "as planned" is saved with no reasons, whatever was tapped before', () => {
+  assert.deepEqual(feel.validateSessionFeel({ feel: 'as_planned', reasons: [] }),
+    { ok: true, record: { feel: 'as_planned', reasons: [] } });
+  assert.deepEqual(feel.validateSessionFeel({ feel: 'as_planned', reasons: ['pain', 'other'] }),
+    { ok: true, record: { feel: 'as_planned', reasons: [] } });
+});
+
+check('session feel: a value outside the closed lists is refused', () => {
+  assert.deepEqual(feel.validateSessionFeel({ feel: 'terrible', reasons: ['tired'] }), { ok: false, problem: 'unknown_value' });
+  assert.deepEqual(feel.validateSessionFeel({ feel: 'harder', reasons: ['weather'] }), { ok: false, problem: 'unknown_value' });
+});
+
+check('session feel: the closed lists mirror the 070 schema exactly', () => {
+  const sql = readFileSync(new URL('../../core-db/src/schema/070_session_feel.sql', import.meta.url), 'utf8');
+  const domain = /feel\s+TEXT NOT NULL CHECK \(feel IN \(([^)]+)\)\)/.exec(sql);
+  assert.ok(domain, 'the feel CHECK domain was not found in 070');
+  assert.deepEqual(domain[1].split(',').map((value) => value.trim().replace(/'/g, '')), [...feel.SESSION_FEEL_KINDS]);
+  const columns = [...sql.matchAll(/^\s+reason_([a-z_]+)\s+INTEGER NOT NULL DEFAULT 0 CHECK/gm)].map((match) => match[1]);
+  assert.deepEqual(columns, [...feel.SESSION_FEEL_REASONS]);
+});
+
+check('session feel: the module reads no clock, no randomness and no free text', () => {
+  const source = readFileSync(new URL('../src/sessionFeel.ts', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /Date\.now\s*\(|new\s+Date\s*\(|Math\.random\s*\(|performance\.now\s*\(/);
+  assert.doesNotMatch(source, /resolveReport|scanRedFlags|triage\s*\(|embed\s*\(/);
 });
 
 console.log(`verify:outcomes - all ${n} checks green`);

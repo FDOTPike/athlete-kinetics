@@ -72,7 +72,10 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   '064_accessible_coach_support.sql',
   // 069 adds resting_hr_daily, which the store writes on every biometrics sync,
   // reads for measured history and empties on reset. It depends only on 001.
-  '069_resting_heart_rate.sql'];
+  '069_resting_heart_rate.sql',
+  // 070 adds session_feel, which the store writes from the completion screen,
+  // reads back for it and empties on reset. It depends only on 001.
+  '070_session_feel.sql'];
 
 
 const db = new DatabaseSync(':memory:');
