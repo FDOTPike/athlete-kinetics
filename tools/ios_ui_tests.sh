@@ -82,6 +82,13 @@ for test in "${TESTS[@]}"; do
       echo "::error title=ui $test::the app DID receive HealthKit's answer (trace: request settled) but the UI never showed it"
       code=1
       FAILED=1
+    elif [ "$(grep -c '\[ak-health\] request start' "$OUT/$test.system.log" || true)" != "1" ]; then
+      # The test ends the unanswered request by relaunching. More than one
+      # "request start" would mean a relaunch, a new athlete or a switch asked
+      # again; none would mean the trace is missing.
+      echo "::error title=ui $test::an unanswered HealthKit request is accepted only when the app asked exactly once; its trace shows $(grep -c '\[ak-health\] request start' "$OUT/$test.system.log" || true) request start(s)"
+      code=1
+      FAILED=1
     else
       echo "::warning title=ui $test HealthKit unanswered::healthd never answered the app on this simulator (no 'request settled' in the app trace). Real-sheet denial needs a physical-device check (owner). The app claimed nothing and kept the request pending."
     fi

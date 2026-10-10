@@ -272,9 +272,11 @@ final class AthleteKineticsUITests: XCTestCase {
       wait(element(marker), "the \(screen) screen marker (\(marker))")
       // Today and Plan share a screen marker, so the marker alone does not
       // prove the switch has rendered; the selected state must follow.
+      // One lookup on the 300-movement Library took 9.5 s on a loaded runner
+      // (CI evidence 31e8bc4), so a 10 s bound allowed a single reading.
       let selected = XCTWaiter.wait(for: [XCTNSPredicateExpectation(
-        predicate: NSPredicate(format: "isSelected == true"), object: element(key))], timeout: 10)
-      XCTAssertEqual(selected, .completed, "\(screen) control is not marked selected within 10 s of tapping it")
+        predicate: NSPredicate(format: "isSelected == true"), object: element(key))], timeout: 30)
+      XCTAssertEqual(selected, .completed, "\(screen) control is not marked selected within 30 s of tapping it")
       log("visited \(screen)")
       guard #available(iOS 17.0, *) else {
         XCTFail("the accessibility audit needs iOS 17+; this runtime is older")
@@ -347,7 +349,13 @@ final class AthleteKineticsUITests: XCTestCase {
     completeOnboarding("athlete A")
     openProfile()
     let idle = element(labelBeginsWith: "Apple Health is available.")
-    wait(idle, "the Apple Health 'available' wording before any request")
+    // CI evidence c3e7de5 (Xcode 27 row, iOS 27.0 simulator): 30 s after the
+    // Profile opened the app still read "Checking Apple Health…"; the same
+    // test had the wording in time on the run before. The wording must still
+    // appear; the time it took is recorded and the bound is 2 minutes.
+    let idleStart = Date()
+    wait(idle, "the Apple Health 'available' wording before any request", timeout: 120)
+    log("health availability shown after \(Int(Date().timeIntervalSince(idleStart))) s")
     // CI evidence (5bdc452): the simulator's HealthKit sheet service can start
     // slower than HealthKit's own 10 s authorization session; HealthKit then
     // fails the request ("Authorization session timed out") and the app shows
@@ -418,18 +426,23 @@ final class AthleteKineticsUITests: XCTestCase {
     // appeared, the same steps passed. The stuck system authorization view is
     // recorded and cleared by relaunching the app (data persists on disk). The
     // same sequence on a physical device is an owner check.
+    // CI evidence (31e8bc4, iOS 27): the app was still hittable here, and the
+    // sheet for this one request (the app's trace shows a single "request
+    // start") came up 12.5 minutes later, over the athlete switcher. An
+    // unanswered request is therefore always ended by the relaunch, and
+    // tools/ios_ui_tests.sh requires the trace to show one request only.
     if !answered {
       let header = element("header-athlete")
       if header.exists && !header.isHittable {
         log("HEALTH-VIEW-STUCK the app was not hittable after the unanswered Health request; relaunching")
-        app.terminate()
-        launch(["-AKUITestTrace", "1"])
-        // The relaunch opens on Today; the steps below start from Profile.
-        openProfile()
-        log("after relaunch: Profile hittable=\(element("athlete-screen-shown").exists && element("header-athlete").isHittable)")
       } else {
-        log("app hittable after the Health request: \(header.exists ? "yes" : "header absent")")
+        log("app hittable after the Health request: \(header.exists ? "yes" : "header absent"); relaunching to end the unanswered request")
       }
+      app.terminate()
+      launch(["-AKUITestTrace", "1"])
+      // The relaunch opens on Today; the steps below start from Profile.
+      openProfile()
+      log("after relaunch: Profile hittable=\(element("athlete-screen-shown").exists && element("header-athlete").isHittable)")
     }
 
     let before = expandCoachMode()
@@ -500,8 +513,9 @@ final class AthleteKineticsUITests: XCTestCase {
     // Restore. First the person backs out of the Files sheet: nothing changes.
     enterText(into: "Backup password, at least 12 characters", password)
     tap("choose-restore-button", "RESTORE ENCRYPTED BACKUP")
-    let cancel = app.buttons["Cancel"]
-    wait(cancel, "the Files sheet's Cancel", timeout: 30)
+    let cancel = filesControl(["Cancel", "Close"])
+    if !cancel.waitForExistence(timeout: 30) { log("files sheet without Cancel: \(filesSheetInventory())") }
+    wait(cancel, "the Files sheet's Cancel", timeout: 1)
     cancel.tap()
     settledLabel(element("backup-status-message"), beginsWith: "Restore cancelled. Your data is unchanged.",
                  "status after cancelling the Files sheet", timeout: 30)
@@ -629,6 +643,27 @@ final class AthleteKineticsUITests: XCTestCase {
 
   // MARK: - Files
 
+  /// A control of the Files sheet by its visible name. Up to iOS 26 these are
+  /// buttons; on iOS 27 "Save" was on screen with no Button of that name (CI
+  /// evidence 3f126c3), so a button is preferred and any element carrying the
+  /// name is accepted.
+  private func filesControl(_ names: [String]) -> XCUIElement {
+    let named = NSPredicate(format: "label IN %@ OR identifier IN %@", names, names)
+    let button = app.buttons.matching(named).firstMatch
+    return button.exists ? button : app.descendants(matching: .any).matching(named).firstMatch
+  }
+
+  /// What the Files sheet exposes: the elements of its bar by type, label and
+  /// identifier, and the last buttons in the tree (the sheet's follow the app's).
+  private func filesSheetInventory() -> String {
+    let bar = app.navigationBars.matching(NSPredicate(format: "identifier CONTAINS 'DocumentManager'")).firstMatch
+    let inBar = !bar.exists ? "absent" : bar.descendants(matching: .any).allElementsBoundByIndex.prefix(30)
+      .map { "\($0.elementType.rawValue):\($0.label.prefix(30))|\($0.identifier.prefix(30))" }.joined(separator: "; ")
+    let lastButtons = app.buttons.allElementsBoundByIndex.suffix(20)
+      .map { String(($0.label.isEmpty ? $0.identifier : $0.label).prefix(30)) }.joined(separator: "; ")
+    return "bar[\(inBar)] last buttons[\(lastButtons)]"
+  }
+
   private func onMyIPhone() {
     let browse = app.buttons.matching(identifier: "Browse").firstMatch
     if browse.waitForExistence(timeout: 10) && !browse.isSelected { browse.tap() }
@@ -645,12 +680,13 @@ final class AthleteKineticsUITests: XCTestCase {
 
   private func saveInFiles() {
     // Encrypting the snapshot (scrypt) precedes the sheet: wait for the sheet
-    // or a final status, up to 3 minutes, recording the status as it goes.
+    // or a final status, up to 5 minutes (150 s was measured on CI, c3e7de5),
+    // recording the status as it goes.
     let status = element("backup-status-message")
-    let deadline = Date().addingTimeInterval(180)
+    let deadline = Date().addingTimeInterval(300)
     var lastStatus = ""
     while Date() < deadline {
-      if ["Save", "Move", "Done", "Open", "Cancel"].contains(where: { app.buttons[$0].exists }) { break }
+      if filesControl(["Save", "Move", "Done", "Open", "Cancel"]).exists { break }
       if status.exists && status.label != lastStatus {
         lastStatus = status.label
         log("backup status while waiting for the Files sheet: \(lastStatus.prefix(160))")
@@ -661,14 +697,14 @@ final class AthleteKineticsUITests: XCTestCase {
     // UIDocumentPickerViewController (export, as a copy) into On My iPhone.
     onMyIPhone()
     for name in ["Save", "Move", "Done", "Open"] {
-      let b = app.buttons[name]
+      let b = filesControl([name])
       if b.waitForExistence(timeout: 5) && b.isEnabled {
         b.tap()
         log("files export: \(name)")
         return
       }
     }
-    log("files export: no enabled action; status=\(element("backup-status-message").exists ? element("backup-status-message").label : "-"); app{\(visibleLabels(app))}")
+    log("files sheet without an enabled Save/Move action: \(filesSheetInventory()); status=\(element("backup-status-message").exists ? element("backup-status-message").label : "-")")
     XCTFail("the Files export sheet had no enabled Save/Move action")
   }
 
@@ -679,8 +715,14 @@ final class AthleteKineticsUITests: XCTestCase {
     wait(file, "the saved backup file in Files", timeout: 30)
     log("files import: picking \(file.label)")
     file.tap()
-    let open = app.buttons["Open"]
+    let open = filesControl(["Open"])
     if open.waitForExistence(timeout: 5) && open.isEnabled { open.tap() }
-    wait(element("restore-preview"), "the restore preview", timeout: 120)
+    // Reading the backup derives its key (scrypt in JavaScript on Hermes), the
+    // same work as creating it. CI evidence c3e7de5 (Xcode 26 row): creating
+    // took 150 s and the preview, bounded at 120 s, arrived after the bound.
+    // The time taken is recorded; the bound is 5 minutes.
+    let previewStart = Date()
+    wait(element("restore-preview"), "the restore preview", timeout: 300)
+    log("restore preview shown after \(Int(Date().timeIntervalSince(previewStart))) s")
   }
 }

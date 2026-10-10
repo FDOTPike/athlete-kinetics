@@ -1317,6 +1317,9 @@ let biometrics: BiometricsBridge | null = null;
 /** Upper bound on one native Health read (see syncBiometrics). Generous: a
  *  week of compacted reads finishes in well under a second on device. */
 const BIOMETRICS_READ_TIMEOUT_MS = 30_000;
+/** Upper bound on the read-only permission check at boot (see
+ *  connectBiometrics). It normally answers at once. */
+const BIOMETRICS_STATUS_TIMEOUT_MS = 10_000;
 /**
  * Health permission operations are ORDERED (reviewed async-ownership repair,
  * ported 2026-10-04). Every connect/request/disconnect starts a new revision
@@ -5404,7 +5407,17 @@ export const useStore = create<KineticsStore>()((set, get) => {
     try {
       // Boot is READ-ONLY: already-granted -> sync; otherwise wait for the
       // athlete to tap CONNECT. No automatic permission sheet, ever.
-      const granted = await bridge.hasGrantedPermissions();
+      // A check that never settles must not leave the status at "checking"
+      // with no CONNECT (seen on an iOS 27 simulator whose Health service had
+      // restarted): past the bound it counts as not granted, which claims
+      // nothing, and any late answer is discarded.
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const answered = await Promise.race([
+        bridge.hasGrantedPermissions(),
+        new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), BIOMETRICS_STATUS_TIMEOUT_MS); }),
+      ]).finally(() => { if (timer !== undefined) clearTimeout(timer); });
+      if (answered === null) uiTestTrace(`connect unanswered rev=${operation.revision}`);
+      const granted = answered === true;
       uiTestTrace(`connect settled rev=${operation.revision} answered=${granted} owns=${ownsOperation()} current=${stillCurrent()}`);
       if (!ownsOperation()) return; // a newer connect/request/disconnect owns status
       if (!stillCurrent()) {
