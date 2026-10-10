@@ -12617,3 +12617,14 @@ FDOTPike/athlete-kinetics PR #63 has 2 new review comments (quoted below). Pleas
 ```
 
 The event then quoted GitHub text, which is data and is not reproduced here: the failing check name ("iOS unsigned simulator build + native smoke"), a Copilot notice that it could not review (quota), and CodeRabbit's summary comment 6073415956 on pull request 63 ("No actionable comments").
+
+### Output
+
+- **Master run for the pull request 43 merge.** Run 37871312204 on `637ecd6` completed: success, all three jobs. This closes the open item in Entry 0197.
+- **iOS failures on pull requests 62 and 63.** Neither pull request changes app code (one YAML file; this ledger). Both failed in "UI tests on the simulator (fails closed)", in different tests:
+  - Pull request 63, run 37877676636: `test4_backupToFilesAndRestore`, "the restore preview did not appear within 120 s" after the saved backup was picked in Files. No `FOCUS-RETRY` line.
+  - Pull request 62, run 37877632952: `test3_healthDenialAndAthleteSwitching`, "onboarding (athlete B) did not appear within 60 s", and `test1_onboardingNavigationAndAccessibility`, "No, nothing to note did not appear within 30 s". No `FOCUS-RETRY` line.
+  - The failed job was re-run on each head (attempt 2); no test was changed. The causes are not established: the per-test logs are inside the 557 MB evidence artifact and were not downloaded. With runs 37386116975 and 37603984164 that makes five intermittent failures of this suite with five different messages; diagnosing them was raised with the owner as a separate task.
+- **CodeRabbit on pull request 62.** It used the file from the branch ("Repository YAML (base), Repository UI (inherited)", plan Advanced). All eight pre-merge checks passed, the four custom checks among them, so four custom checks are within the plan. It posted one finding, on the file itself: the "Frozen migration chain" check would fail on a change to `004_state_vector_materialize.sql`, which is the daily upsert and not a migration. Verified against `migrations.ts`, fixed in `884bd5c` (the check exempts `004_*.sql`; the path instruction says it is not frozen), replied to and resolved. The file was re-validated, its keys and path patterns re-checked, and `npm run typecheck` exit 0.
+- **CodeRabbit on pull request 63.** No actionable comments. That review ran from the dashboard settings, because this branch does not contain the configuration file.
+- **Not done.** Neither pull request is merged; both wait for CI on their current heads.
