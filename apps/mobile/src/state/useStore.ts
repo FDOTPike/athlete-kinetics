@@ -168,6 +168,10 @@ import {
   type RungResolution,
   targetLoadKg,
   evaluateSessionOutcome,
+  SESSION_FEEL_REASONS,
+  meanRpeDrift,
+  shouldAskSessionFeel,
+  validateSessionFeel,
   advance as advanceSessionRunner,
   currentSlot as currentRunnerSlot,
   deserializeRunner,
@@ -177,6 +181,12 @@ import {
   type RunnerState,
   type RunnerTarget,
   type SessionOutcomeDecision,
+  type SessionOutcomeKind,
+  type SessionFeelDraft,
+  type SessionFeelKind,
+  type SessionFeelProblem,
+  type SessionFeelReason,
+  type SessionFeelRecord,
   type SessionOutcomeInput,
   type SessionOutcomeOriginKind,
   type SessionOutcomeProvenanceKind,
@@ -523,6 +533,15 @@ export interface ActiveBlock {
 }
 
 /** One cell of the block grid (a planned training day). */
+/** What the completion screen needs to ask, or show, how a session went. */
+export interface SessionFeelView {
+  /** True when the session did not go to plan (see sessionFeel.ts). */
+  ask: boolean;
+  saved: SessionFeelRecord | null;
+  /** The typed note saved with the session, word for word; null when none. */
+  note: string | null;
+}
+
 export interface BlockSessionSummary {
   plannedSessionId: number;
   weekIndex: number;
@@ -869,6 +888,14 @@ interface KineticsStore {
   loadCoachMovementAccessContext: () => CoachMovementAccessContext;
   /** Attach/replace a free-text note on the last completed session. */
   saveSessionNote: (text: string) => void;
+  /** Record how the last completed session went and why (070). The typed
+   *  note, when there is one, is saved word for word in session_note and is
+   *  never interpreted. Changes no prescription, block or progression.
+   *  Returns null when saved, otherwise why it was not. */
+  saveSessionFeel: (draft: SessionFeelDraft, note: string) => SessionFeelProblem | 'not_saved' | null;
+  /** Read-only: whether the completion screen should ask how this session
+   *  went, and the answer and note already saved for it. */
+  loadSessionFeel: (sessionId: number) => SessionFeelView;
   /** Wire the Health Connect bridge (null = unavailable). READ-ONLY at
    *  boot: checks existing grants, NEVER opens a permission sheet (the
    *  v0.11.0 boot crash lived in an automatic boot-time request). */
@@ -5757,6 +5784,90 @@ export const useStore = create<KineticsStore>()((set, get) => {
     );
   },
 
+  /** Save how the last ended session went (070) and, when one was typed, its
+   *  note, in one transaction. A record only: writes session_feel and
+   *  session_note and nothing a prescription, block or progression reads. */
+  saveSessionFeel: (draft, note) => {
+    const sessionId = get().lastEndedSessionId;
+    if (sessionId === null) return 'not_saved';
+    const checked = validateSessionFeel(draft);
+    if (!checked.ok) return checked.problem;
+    const flag = (reason: SessionFeelReason): number => (checked.record.reasons.includes(reason) ? 1 : 0);
+    const typed = note.trim().slice(0, 1000);
+    const now = Date.now();
+    const d = getDb();
+    d.executeSync('BEGIN');
+    try {
+      // Only a finished session carries an answer.
+      const finished = rowsOf<{ present: number }>(d.executeSync(
+        'SELECT 1 AS present FROM session_outcome WHERE session_id = ?', [sessionId],
+      )).length > 0;
+      if (!finished) {
+        d.executeSync('ROLLBACK');
+        return 'not_saved';
+      }
+      d.executeSync(
+        'INSERT INTO session_feel (session_id, feel, reason_pain, reason_tired, reason_unwell, reason_technique, reason_equipment, reason_time, reason_felt_good, reason_other, recorded_at_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(session_id) DO UPDATE SET feel = excluded.feel, reason_pain = excluded.reason_pain, reason_tired = excluded.reason_tired, reason_unwell = excluded.reason_unwell, reason_technique = excluded.reason_technique, reason_equipment = excluded.reason_equipment, reason_time = excluded.reason_time, reason_felt_good = excluded.reason_felt_good, reason_other = excluded.reason_other, recorded_at_ms = excluded.recorded_at_ms',
+        [
+          sessionId, checked.record.feel,
+          flag('pain'), flag('tired'), flag('unwell'), flag('technique'),
+          flag('equipment'), flag('time'), flag('felt_good'), flag('other'),
+          now,
+        ],
+      );
+      // The note is stored as typed. An empty note leaves an earlier one alone.
+      if (typed.length > 0) {
+        d.executeSync(
+          'INSERT INTO session_note (session_id, note, created_at_ms) VALUES (?, ?, ?) ON CONFLICT(session_id) DO UPDATE SET note = excluded.note, created_at_ms = excluded.created_at_ms',
+          [sessionId, typed, now],
+        );
+      }
+      d.executeSync('COMMIT');
+      return null;
+    } catch (error) {
+      try { d.executeSync('ROLLBACK'); } catch { /* nothing was written */ }
+      set({ error: error instanceof Error ? error.message : String(error) });
+      return 'not_saved';
+    }
+  },
+
+  /** Read-only: whether to ask how this session went (it did not go to plan)
+   *  and the answer and note already saved for it. Never throws. */
+  loadSessionFeel: (sessionId) => {
+    const nothing: SessionFeelView = { ask: false, saved: null, note: null };
+    try {
+      const d = getDb();
+      const outcome = rowsOf<{ outcome_kind: string }>(d.executeSync(
+        'SELECT outcome_kind FROM session_outcome WHERE session_id = ?', [sessionId],
+      ))[0];
+      if (outcome === undefined) return nothing;
+      const effort = rowsOf<{ rpe: number | null; target_rpe: number | null }>(d.executeSync(
+        'SELECT sr.rpe AS rpe, st.target_rpe AS target_rpe FROM set_record sr LEFT JOIN set_target st ON st.set_id = sr.set_id WHERE sr.session_id = ?',
+        [sessionId],
+      ));
+      const ask = shouldAskSessionFeel({
+        // An outcome kind this build does not know is, at the least, not "followed the plan".
+        outcomeKind: outcome.outcome_kind as SessionOutcomeKind,
+        meanRpeDrift: meanRpeDrift(effort.map((row) => ({ rpe: row.rpe, targetRpe: row.target_rpe }))),
+      });
+      const row = rowsOf<Record<string, number | string>>(d.executeSync(
+        'SELECT feel, reason_pain, reason_tired, reason_unwell, reason_technique, reason_equipment, reason_time, reason_felt_good, reason_other FROM session_feel WHERE session_id = ?',
+        [sessionId],
+      ))[0];
+      const noteRow = rowsOf<{ note: string }>(d.executeSync(
+        'SELECT note FROM session_note WHERE session_id = ?', [sessionId],
+      ))[0];
+      const saved: SessionFeelRecord | null = row === undefined ? null : {
+        feel: row.feel as SessionFeelKind,
+        reasons: SESSION_FEEL_REASONS.filter((reason) => row[`reason_${reason}`] === 1),
+      };
+      return { ask, saved, note: noteRow === undefined ? null : noteRow.note };
+    } catch {
+      // Reading the answer must never block the completion screen.
+      return nothing;
+    }
+  },
+
   loadSessionSlots: (plannedSessionId) => {
     const slots = rowsOf<{
       slot_index: number; planned_slot_id: number; movement_id: number;
@@ -7745,6 +7856,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       // FKs off this explicit pass removes the now-parentless rows.
       d.executeSync('DELETE FROM set_dose_target');
       d.executeSync('DELETE FROM session_note');
+      d.executeSync('DELETE FROM session_feel');
       d.executeSync('DELETE FROM report_severity');
       d.executeSync('DELETE FROM slot_override');
       d.executeSync('DELETE FROM planned_slot');

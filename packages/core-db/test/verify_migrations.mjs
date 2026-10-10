@@ -68,7 +68,8 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '066_focus_and_goals.sql',
   '067_sport_and_emphasis.sql',
   '068_movement_content_correction_v2.sql',
-  '069_resting_heart_rate.sql'];
+  '069_resting_heart_rate.sql',
+  '070_session_feel.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
@@ -1765,11 +1766,11 @@ console.log('[2u] 057 block_meta phase/index repair + enforcement');
     const db = freshDb();
     runMigrations(db, MIGRATIONS);
     // Slot 004 is the parameterized materialize script, never a migration:
-    // 68 files (slots 001-069, no 004) -> user_version 68. This count is
+    // 69 files (slots 001-070, no 004) -> user_version 69. This count is
     // pinned deliberately so adding a migration is a conscious act, not a
-    // silent one. Re-pinned for 069 (resting heart rate).
-    check('fresh install reaches user_version 68 (68 files, no slot 004)',
-      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 68,
+    // silent one. Re-pinned for 070 (session feel).
+    check('fresh install reaches user_version 69 (69 files, no slot 004)',
+      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 69,
       String(uv(db)));
     const trig = db.raw.prepare(
       `SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'trigger'
@@ -4031,8 +4032,8 @@ const isTemplate = (row) => row.instructions.startsWith(`Set up ${row.name} with
 console.log('[069] resting heart rate (resting_hr_daily)');
 const IDX_069 = FILES.indexOf('069_resting_heart_rate.sql');
 {
-  check('069 is appended after 068 and completes the chain',
-    IDX_069 === IDX_068 + 1 && IDX_069 === MIGRATIONS.length - 1 && IDX_069 === 67, `index=${IDX_069}`);
+  check('069 is appended directly after 068',
+    IDX_069 === IDX_068 + 1 && IDX_069 === 67, `index=${IDX_069}`);
 
   const telemetry = (db) => JSON.stringify({
     hrv: db.raw.prepare('SELECT * FROM hrv_daily ORDER BY date').all(),
@@ -4091,6 +4092,97 @@ const IDX_069 = FILES.indexOf('069_resting_heart_rate.sql');
   runMigrations(lost, MIGRATIONS);
   check('a lost resting_hr_daily table is detected and rebuilt by self-heal',
     detected && sentinelsMissing(lost).length === 0 && rhrRows(lost).length === 0);
+}
+
+// =============================================================================
+// [070] how a finished session went, and why
+// =============================================================================
+// Append-only: one new table, nothing existing changes. Proves it lands on a
+// fresh install and on a populated upgrade without inventing or moving data,
+// that its one rule is enforced by the schema, that its rows survive every
+// replay and leave with their session, and that a lost table is detected and
+// rebuilt.
+console.log('[070] session feel (session_feel)');
+const IDX_070 = FILES.indexOf('070_session_feel.sql');
+{
+  check('070 is appended after 069 and completes the chain',
+    IDX_070 === IDX_069 + 1 && IDX_070 === MIGRATIONS.length - 1 && IDX_070 === 68, `index=${IDX_070}`);
+
+  const feelRows = (db) => db.raw.prepare('SELECT * FROM session_feel ORDER BY session_id').all();
+  const sessionFacts = (db) => JSON.stringify({
+    sessions: db.raw.prepare('SELECT * FROM session ORDER BY session_id').all(),
+    notes: db.raw.prepare('SELECT * FROM session_note ORDER BY session_id').all(),
+    reports: db.raw.prepare('SELECT * FROM subjective_report ORDER BY report_id').all(),
+  });
+
+  // Populated pre-070 install: a finished session with a typed note beside it.
+  const upgrade = freshDb();
+  applyRaw(upgrade, MIGRATIONS, 0, IDX_070);
+  upgrade.raw.exec("INSERT INTO session (micro_cycle_id, session_date, started_at_ms, duration_min) VALUES (NULL, '2026-10-08', 1111, 48.0)");
+  upgrade.raw.exec("INSERT INTO session_note (session_id, note, created_at_ms) VALUES (1, 'left knee felt off on the last set', 2222)");
+  const before = sessionFacts(upgrade);
+  runMigrations(upgrade, MIGRATIONS);
+  check('a populated v68 install upgrades to the latest version with every sentinel present',
+    uv(upgrade) === MIGRATIONS.length && sentinelsMissing(upgrade).length === 0, `uv=${uv(upgrade)}`);
+  check('the upgrade leaves sessions, typed notes and reports byte-identical', sessionFacts(upgrade) === before);
+  check('the upgrade invents no answer (the new table starts empty)', feelRows(upgrade).length === 0);
+
+  // Domain: the one rule is in the schema.
+  const fresh = freshDb();
+  runMigrations(fresh, MIGRATIONS);
+  fresh.raw.exec('PRAGMA foreign_keys = ON');
+  for (const day of ['01', '02', '03', '04', '05']) {
+    fresh.raw.exec(`INSERT INTO session (micro_cycle_id, session_date, started_at_ms) VALUES (NULL, '2026-10-${day}', 1)`);
+  }
+  const insert = (sessionId, feel, reasons = {}) => {
+    const columns = Object.keys(reasons);
+    fresh.raw.prepare(
+      `INSERT INTO session_feel (session_id, feel${columns.map((c) => `, reason_${c}`).join('')}, recorded_at_ms)
+       VALUES (?, ?${columns.map(() => ', ?').join('')}, 1)`,
+    ).run(sessionId, feel, ...Object.values(reasons));
+  };
+  const rejects = (fn) => { try { fn(); return false; } catch { return true; } };
+  insert(1, 'as_planned');
+  insert(2, 'harder', { tired: 1, unwell: 1 });
+  insert(3, 'easier', { felt_good: 1 });
+  insert(4, 'stopped_early', { pain: 1 });
+  check('each of the four answers is accepted in its valid form', feelRows(fresh).length === 4);
+  check('"as planned" with a reason is rejected', rejects(() => insert(5, 'as_planned', { tired: 1 })));
+  check('any other answer with no reason is rejected',
+    rejects(() => insert(5, 'harder')) && rejects(() => insert(5, 'easier')) && rejects(() => insert(5, 'stopped_early')));
+  check('an unknown answer is rejected', rejects(() => insert(5, 'terrible', { other: 1 })) && rejects(() => insert(5, null, { other: 1 })));
+  check('a reason flag outside 0/1 is rejected', rejects(() => insert(5, 'harder', { pain: 2 })) && rejects(() => insert(5, 'harder', { pain: -1 })));
+  check('the table is STRICT (a text reason flag is rejected, not coerced)', rejects(() => insert(5, 'harder', { pain: 'yes' })));
+  check('a second row for the same session is rejected (one answer per session)', rejects(() => insert(1, 'harder', { other: 1 })));
+  check('an answer for a session that does not exist is rejected', rejects(() => insert(99, 'harder', { other: 1 })));
+  check('a negative timestamp is rejected', rejects(() => fresh.raw
+    .prepare("INSERT INTO session_feel (session_id, feel, recorded_at_ms) VALUES (5, 'as_planned', -1)").run()));
+  fresh.raw.prepare("UPDATE session_feel SET feel = 'as_planned', reason_tired = 0, reason_unwell = 0 WHERE session_id = 2").run();
+  check('an answer can be corrected to a valid one',
+    feelRows(fresh).find((row) => row.session_id === 2).feel === 'as_planned');
+  check('a correction that breaks the rule is rejected',
+    rejects(() => fresh.raw.prepare("UPDATE session_feel SET feel = 'as_planned' WHERE session_id = 4").run()));
+  fresh.raw.exec('DELETE FROM session WHERE session_id = 3');
+  check('an answer leaves with its session', feelRows(fresh).every((row) => row.session_id !== 3) && feelRows(fresh).length === 3);
+
+  // Replays keep the rows.
+  const kept = JSON.stringify(feelRows(fresh));
+  runMigrations(fresh, MIGRATIONS);
+  fresh.executeSync(`PRAGMA user_version = ${IDX_070};`);
+  runMigrations(fresh, MIGRATIONS);
+  fresh.executeSync('PRAGMA user_version = 0;');
+  runMigrations(fresh, MIGRATIONS);
+  check('answers survive a reboot, a replay from 070 and a full re-apply from 0',
+    JSON.stringify(feelRows(fresh)) === kept && uv(fresh) === MIGRATIONS.length);
+
+  // A database that claims the latest version but lost the table.
+  const lost = freshDb();
+  runMigrations(lost, MIGRATIONS);
+  lost.raw.exec('DROP TABLE session_feel');
+  const detected = sentinelsMissing(lost).includes('session_feel');
+  runMigrations(lost, MIGRATIONS);
+  check('a lost session_feel table is detected and rebuilt by self-heal',
+    detected && sentinelsMissing(lost).length === 0 && feelRows(lost).length === 0);
 }
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
