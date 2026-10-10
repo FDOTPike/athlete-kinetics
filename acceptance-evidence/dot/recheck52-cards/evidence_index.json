@@ -1,0 +1,591 @@
+{
+  "generatedBy": "tools/rendering/render_movement_evidence.mjs",
+  "rendering": "headless librsvg approximation of production layout primitives; NOT native-device evidence",
+  "sourceCommit": "cad9de98fe9173a7533c294f7a62fd6ba9ea35b7",
+  "sourcesCommittedAtRender": true,
+  "generatorCommit": "0ad4be821ef1220112476dbb69410be4b7a50041",
+  "manifestShaScheme": "split-preview-data-sha256",
+  "manifestSha256": "8ea9465b0d869cf5f5358f42ad5c8e7e165cca14d1ccb4b02784faeca94b8027",
+  "movementId": 52,
+  "movementName": "Dumbbell Reverse Lunge",
+  "assetKey": "movement/dumbbell-reverse-lunge/demo/v1",
+  "slug": "dumbbell-reverse-lunge",
+  "view": "side",
+  "viewBox": [
+    -6,
+    6,
+    80,
+    96
+  ],
+  "totalFrames": 6,
+  "bodyContract": "neutral",
+  "bodies": [
+    "neutral"
+  ],
+  "sizes": [
+    "app240",
+    "320px",
+    "390px"
+  ],
+  "fontScale": 1.3,
+  "cards": [
+    {
+      "body": "neutral",
+      "mode": "app240",
+      "position": 1,
+      "frameId": "p1",
+      "caption": "Stand tall with a dumbbell in each hand and both feet on the floor.",
+      "cardWidth": 320,
+      "cardHeight": 517,
+      "stageScale": 2.5,
+      "stage": {
+        "x": 60,
+        "y": 89.43,
+        "w": 200,
+        "h": 240
+      },
+      "visibleFigureBounds": {
+        "minX": 161.96,
+        "maxX": 228.04,
+        "minY": 102.03,
+        "maxY": 316.68
+      },
+      "primCount": 51,
+      "svgPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_app240_pos1.svg",
+      "pngPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_app240_pos1.png",
+      "svgSha256": "9bd8a85fead8699aff0177c8b594f885756aa6825a623d855c771160b942526a",
+      "pngSha256": "4515e07f71e10ad9fd9d38ab9492aa5ced63818fb063f7dc6983b3aa8a84c8a7"
+    },
+    {
+      "body": "neutral",
+      "mode": "app240",
+      "position": 2,
+      "frameId": "p2",
+      "caption": "Step the rear foot back softly; keep the whole front foot planted.",
+      "cardWidth": 320,
+      "cardHeight": 492,
+      "stageScale": 2.5,
+      "stage": {
+        "x": 60,
+        "y": 89.43,
+        "w": 200,
+        "h": 240
+      },
+      "visibleFigureBounds": {
+        "minX": 75.08,
+        "maxX": 208.5,
+        "minY": 121.43,
+        "maxY": 318.91
+      },
+      "primCount": 51,
+      "svgPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_app240_pos2.svg",
+      "pngPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_app240_pos2.png",
+      "svgSha256": "60cbf1f0b01f46a2d32ebb46695ea6c256374a3ce4b93e64c23b176670a1d7b5",
+      "pngSha256": "1ef77194dc284a3b8c58ebb5034b2b5055db124d27590dcfa8e1245885a1d75e"
+    },
+    {
+      "body": "neutral",
+      "mode": "app240",
+      "position": 3,
+      "frameId": "p3",
+      "caption": "Lower with the torso stacked until the back knee hovers above the floor.",
+      "cardWidth": 320,
+      "cardHeight": 517,
+      "stageScale": 2.5,
+      "stage": {
+        "x": 60,
+        "y": 89.43,
+        "w": 200,
+        "h": 240
+      },
+      "visibleFigureBounds": {
+        "minX": 75.08,
+        "maxX": 208.5,
+        "minY": 147.43,
+        "maxY": 318.91
+      },
+      "primCount": 51,
+      "svgPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_app240_pos3.svg",
+      "pngPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_app240_pos3.png",
+      "svgSha256": "ecb36223101b5f20223613365157e050a379a757262881877cf689e0f0fbdd0e",
+      "pngSha256": "438011443ea203ea6d5c88d7f16e6ad60f1b5d996f6d8611ab35c3b122dbda64"
+    },
+    {
+      "body": "neutral",
+      "mode": "app240",
+      "position": 4,
+      "frameId": "p4",
+      "caption": "Keep the front heel down; the front leg works while the rear toes support balance.",
+      "cardWidth": 320,
+      "cardHeight": 517,
+      "stageScale": 2.5,
+      "stage": {
+        "x": 60,
+        "y": 89.43,
+        "w": 200,
+        "h": 240
+      },
+      "visibleFigureBounds": {
+        "minX": 75.08,
+        "maxX": 208.5,
+        "minY": 147.43,
+        "maxY": 318.91
+      },
+      "primCount": 51,
+      "svgPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_app240_pos4.svg",
+      "pngPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_app240_pos4.png",
+      "svgSha256": "7434c2f610c4addb82f894d70a744a4c1202a1809ab582ee5f084c71992fd9fc",
+      "pngSha256": "f3118dd88e387e544d320d76f2ef6f046fcd93a3c8c0441265f1bbd0d28c21e1"
+    },
+    {
+      "body": "neutral",
+      "mode": "app240",
+      "position": 5,
+      "frameId": "p5",
+      "caption": "Drive through the whole front foot to raise the body under control.",
+      "cardWidth": 320,
+      "cardHeight": 492,
+      "stageScale": 2.5,
+      "stage": {
+        "x": 60,
+        "y": 89.43,
+        "w": 200,
+        "h": 240
+      },
+      "visibleFigureBounds": {
+        "minX": 75.08,
+        "maxX": 208.5,
+        "minY": 121.43,
+        "maxY": 318.91
+      },
+      "primCount": 51,
+      "svgPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_app240_pos5.svg",
+      "pngPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_app240_pos5.png",
+      "svgSha256": "5b3efe69fe5e3b7aaac45336d3089f7234715cde276a4798f2f21965ddd37bca",
+      "pngSha256": "0493c330bb463e7ff584359eae8f7317fab82bcf5eb2254c3995155084105399"
+    },
+    {
+      "body": "neutral",
+      "mode": "app240",
+      "position": 6,
+      "frameId": "p6",
+      "caption": "Bring the rear foot back beside the planted front foot and stand tall again.",
+      "cardWidth": 320,
+      "cardHeight": 517,
+      "stageScale": 2.5,
+      "stage": {
+        "x": 60,
+        "y": 89.43,
+        "w": 200,
+        "h": 240
+      },
+      "visibleFigureBounds": {
+        "minX": 161.96,
+        "maxX": 228.04,
+        "minY": 102.03,
+        "maxY": 316.68
+      },
+      "primCount": 51,
+      "svgPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_app240_pos6.svg",
+      "pngPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_app240_pos6.png",
+      "svgSha256": "b80f6ce1503756c05ac3708ce5a7e2e95afbb0657105db06f1b77f5f16a89ca5",
+      "pngSha256": "40305f2c31b51d24eb21e961462b0a757429b0e5a87cd2e8f3a51aca34399980"
+    },
+    {
+      "body": "neutral",
+      "mode": "320px",
+      "position": 1,
+      "frameId": "p1",
+      "caption": "Stand tall with a dumbbell in each hand and both feet on the floor.",
+      "cardWidth": 320,
+      "cardHeight": 622,
+      "stageScale": 3.6,
+      "stage": {
+        "x": 16,
+        "y": 89.43,
+        "w": 288,
+        "h": 345.6
+      },
+      "visibleFigureBounds": {
+        "minX": 162.82,
+        "maxX": 257.98,
+        "minY": 107.57,
+        "maxY": 416.67
+      },
+      "primCount": 51,
+      "svgPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_320px_pos1.svg",
+      "pngPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_320px_pos1.png",
+      "svgSha256": "55a88c8600953ec9a58c8ded878696826bdba3ebe43022c37ef5a833da740578",
+      "pngSha256": "e35c98d348546a90ca7de7dd3837afa2a2a27c2c6bc93e5782f6e2d9def7890d"
+    },
+    {
+      "body": "neutral",
+      "mode": "320px",
+      "position": 2,
+      "frameId": "p2",
+      "caption": "Step the rear foot back softly; keep the whole front foot planted.",
+      "cardWidth": 320,
+      "cardHeight": 598,
+      "stageScale": 3.6,
+      "stage": {
+        "x": 16,
+        "y": 89.43,
+        "w": 288,
+        "h": 345.6
+      },
+      "visibleFigureBounds": {
+        "minX": 37.72,
+        "maxX": 229.84,
+        "minY": 135.51,
+        "maxY": 419.88
+      },
+      "primCount": 51,
+      "svgPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_320px_pos2.svg",
+      "pngPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_320px_pos2.png",
+      "svgSha256": "635bb9eed118fb4b1e3b2c1310442f03dd953d6cc215101dc71e127a688d4ff9",
+      "pngSha256": "fe3adb3d1b3f5cb69a0799254902eb79194d3fcf918a5283a1f06c41c3eb4398"
+    },
+    {
+      "body": "neutral",
+      "mode": "320px",
+      "position": 3,
+      "frameId": "p3",
+      "caption": "Lower with the torso stacked until the back knee hovers above the floor.",
+      "cardWidth": 320,
+      "cardHeight": 622,
+      "stageScale": 3.6,
+      "stage": {
+        "x": 16,
+        "y": 89.43,
+        "w": 288,
+        "h": 345.6
+      },
+      "visibleFigureBounds": {
+        "minX": 37.72,
+        "maxX": 229.84,
+        "minY": 172.95,
+        "maxY": 419.88
+      },
+      "primCount": 51,
+      "svgPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_320px_pos3.svg",
+      "pngPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_320px_pos3.png",
+      "svgSha256": "988a69413b175ba8e0b66f4eee079061eee139fb2d137cae563f159cad8b4d70",
+      "pngSha256": "6312067cf2024103c0817c763e4cadb31519cca5f7bd0bf306754480f7d88e0a"
+    },
+    {
+      "body": "neutral",
+      "mode": "320px",
+      "position": 4,
+      "frameId": "p4",
+      "caption": "Keep the front heel down; the front leg works while the rear toes support balance.",
+      "cardWidth": 320,
+      "cardHeight": 622,
+      "stageScale": 3.6,
+      "stage": {
+        "x": 16,
+        "y": 89.43,
+        "w": 288,
+        "h": 345.6
+      },
+      "visibleFigureBounds": {
+        "minX": 37.72,
+        "maxX": 229.84,
+        "minY": 172.95,
+        "maxY": 419.88
+      },
+      "primCount": 51,
+      "svgPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_320px_pos4.svg",
+      "pngPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_320px_pos4.png",
+      "svgSha256": "10ffb77b891c9f2f0092eb4d185499d43919a1217fc95b260041f7338d87635c",
+      "pngSha256": "34b6d5971969d6c7734e8a638a5b872a690a02ad7261744034a963dceb702f88"
+    },
+    {
+      "body": "neutral",
+      "mode": "320px",
+      "position": 5,
+      "frameId": "p5",
+      "caption": "Drive through the whole front foot to raise the body under control.",
+      "cardWidth": 320,
+      "cardHeight": 598,
+      "stageScale": 3.6,
+      "stage": {
+        "x": 16,
+        "y": 89.43,
+        "w": 288,
+        "h": 345.6
+      },
+      "visibleFigureBounds": {
+        "minX": 37.72,
+        "maxX": 229.84,
+        "minY": 135.51,
+        "maxY": 419.88
+      },
+      "primCount": 51,
+      "svgPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_320px_pos5.svg",
+      "pngPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_320px_pos5.png",
+      "svgSha256": "7e614f007bd8006984622bf9c593567e5aec860ae5eab2bf7d2b16bb4474f4eb",
+      "pngSha256": "7a6d2f482683aa9a8d97814bac6e2871b55e9ba76c3847ee8db4d115051381d2"
+    },
+    {
+      "body": "neutral",
+      "mode": "320px",
+      "position": 6,
+      "frameId": "p6",
+      "caption": "Bring the rear foot back beside the planted front foot and stand tall again.",
+      "cardWidth": 320,
+      "cardHeight": 622,
+      "stageScale": 3.6,
+      "stage": {
+        "x": 16,
+        "y": 89.43,
+        "w": 288,
+        "h": 345.6
+      },
+      "visibleFigureBounds": {
+        "minX": 162.82,
+        "maxX": 257.98,
+        "minY": 107.57,
+        "maxY": 416.67
+      },
+      "primCount": 51,
+      "svgPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_320px_pos6.svg",
+      "pngPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_320px_pos6.png",
+      "svgSha256": "59436b0cffd12d8e85a8fb89b27f2b71223d88cb3bc6b014295a67b31773949c",
+      "pngSha256": "3eca36a54cd43bc1e9f480a08e9c974f15bc63b833a3bb1be7a056b50d029b55"
+    },
+    {
+      "body": "neutral",
+      "mode": "390px",
+      "position": 1,
+      "frameId": "p1",
+      "caption": "Stand tall with a dumbbell in each hand and both feet on the floor.",
+      "cardWidth": 390,
+      "cardHeight": 682,
+      "stageScale": 4.475,
+      "stage": {
+        "x": 16,
+        "y": 89.43,
+        "w": 358,
+        "h": 429.6
+      },
+      "visibleFigureBounds": {
+        "minX": 198.51,
+        "maxX": 316.79,
+        "minY": 111.98,
+        "maxY": 496.2
+      },
+      "primCount": 51,
+      "svgPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_390px_pos1.svg",
+      "pngPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_390px_pos1.png",
+      "svgSha256": "ad0e57521217fa4418163dbafae205d7800e43fc1c7f4ba0b80efe31153bfbda",
+      "pngSha256": "dbd863645ee8ed18077bb2f1fd2b941826c92d660f79d11e41bcab099d33f924"
+    },
+    {
+      "body": "neutral",
+      "mode": "390px",
+      "position": 2,
+      "frameId": "p2",
+      "caption": "Step the rear foot back softly; keep the whole front foot planted.",
+      "cardWidth": 390,
+      "cardHeight": 682,
+      "stageScale": 4.475,
+      "stage": {
+        "x": 16,
+        "y": 89.43,
+        "w": 358,
+        "h": 429.6
+      },
+      "visibleFigureBounds": {
+        "minX": 43,
+        "maxX": 281.81,
+        "minY": 146.71,
+        "maxY": 500.2
+      },
+      "primCount": 51,
+      "svgPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_390px_pos2.svg",
+      "pngPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_390px_pos2.png",
+      "svgSha256": "51b582d6a3990665dd0a2b5327b78a685f6270c397028cc4cf8b1713ec2c2dcc",
+      "pngSha256": "d5cbae35bc3b37c671d6c3086bc0144fec23a872a7c416ab2a0beefa36449303"
+    },
+    {
+      "body": "neutral",
+      "mode": "390px",
+      "position": 3,
+      "frameId": "p3",
+      "caption": "Lower with the torso stacked until the back knee hovers above the floor.",
+      "cardWidth": 390,
+      "cardHeight": 682,
+      "stageScale": 4.475,
+      "stage": {
+        "x": 16,
+        "y": 89.43,
+        "w": 358,
+        "h": 429.6
+      },
+      "visibleFigureBounds": {
+        "minX": 43,
+        "maxX": 281.81,
+        "minY": 193.25,
+        "maxY": 500.2
+      },
+      "primCount": 51,
+      "svgPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_390px_pos3.svg",
+      "pngPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_390px_pos3.png",
+      "svgSha256": "d976683c55bd1f7971a9c9e62c13a6f972187e1472d3bc4a280c7d66b493ef04",
+      "pngSha256": "0e559ad1d508cf3a0e8036f6bab6e19e3f4e7905b51cbeda9c102208bd23e1f8"
+    },
+    {
+      "body": "neutral",
+      "mode": "390px",
+      "position": 4,
+      "frameId": "p4",
+      "caption": "Keep the front heel down; the front leg works while the rear toes support balance.",
+      "cardWidth": 390,
+      "cardHeight": 682,
+      "stageScale": 4.475,
+      "stage": {
+        "x": 16,
+        "y": 89.43,
+        "w": 358,
+        "h": 429.6
+      },
+      "visibleFigureBounds": {
+        "minX": 43,
+        "maxX": 281.81,
+        "minY": 193.25,
+        "maxY": 500.2
+      },
+      "primCount": 51,
+      "svgPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_390px_pos4.svg",
+      "pngPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_390px_pos4.png",
+      "svgSha256": "5af8d614c56c4e842ac13465a490673543e3b7f77140dc72f1dd9cdf9cb4c5e8",
+      "pngSha256": "180aefa78f14a44d44202c67f12fdc48c223f28125e7ffbcb50f791db637e103"
+    },
+    {
+      "body": "neutral",
+      "mode": "390px",
+      "position": 5,
+      "frameId": "p5",
+      "caption": "Drive through the whole front foot to raise the body under control.",
+      "cardWidth": 390,
+      "cardHeight": 682,
+      "stageScale": 4.475,
+      "stage": {
+        "x": 16,
+        "y": 89.43,
+        "w": 358,
+        "h": 429.6
+      },
+      "visibleFigureBounds": {
+        "minX": 43,
+        "maxX": 281.81,
+        "minY": 146.71,
+        "maxY": 500.2
+      },
+      "primCount": 51,
+      "svgPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_390px_pos5.svg",
+      "pngPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_390px_pos5.png",
+      "svgSha256": "f486e8201e28537863e4d2cd125f4610d4bf0471c6ac7724f2fb3e07116f383f",
+      "pngSha256": "d4fb4638a69b2f2af5b4b6f8fb2d4508113dbe0eb7ccf11c0ab3d25d66a16e61"
+    },
+    {
+      "body": "neutral",
+      "mode": "390px",
+      "position": 6,
+      "frameId": "p6",
+      "caption": "Bring the rear foot back beside the planted front foot and stand tall again.",
+      "cardWidth": 390,
+      "cardHeight": 682,
+      "stageScale": 4.475,
+      "stage": {
+        "x": 16,
+        "y": 89.43,
+        "w": 358,
+        "h": 429.6
+      },
+      "visibleFigureBounds": {
+        "minX": 198.51,
+        "maxX": 316.79,
+        "minY": 111.98,
+        "maxY": 496.2
+      },
+      "primCount": 51,
+      "svgPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_390px_pos6.svg",
+      "pngPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_390px_pos6.png",
+      "svgSha256": "bbfe7a47f8f4c5d747c5ec4da62ca02b09b0f5040959de060d4074e73db12389",
+      "pngSha256": "a6d2c6b6eb50790d06e9e75767715058d2839bfbbeb6364a162faf96526cffd1"
+    }
+  ],
+  "sheets": [
+    {
+      "body": "neutral",
+      "mode": "app240",
+      "columns": 6,
+      "width": 1920,
+      "height": 517,
+      "svgPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_app240_sheet.svg",
+      "pngPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_app240_sheet.png",
+      "svgSha256": "e57cd1c7bdc5728370f85d7c6f1c4b4627d31dd3c3638e60a654c31f64d4b61c",
+      "pngSha256": "f5fcb817cb2a7031657ccd2e03c5cac91f771f44ff3d6b58b24f54fe7b4499a1"
+    },
+    {
+      "body": "neutral",
+      "mode": "320px",
+      "columns": 6,
+      "width": 1920,
+      "height": 622,
+      "svgPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_320px_sheet.svg",
+      "pngPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_320px_sheet.png",
+      "svgSha256": "cb0a4251420d3c8d58b42d1e7d01750ea32e81219f246dfe87a2d4176b308395",
+      "pngSha256": "082826c7c55b25e2669ff20554a4674068e72d3ca8dfa956724495e802fb3b6a"
+    },
+    {
+      "body": "neutral",
+      "mode": "390px",
+      "columns": 6,
+      "width": 2340,
+      "height": 682,
+      "svgPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_390px_sheet.svg",
+      "pngPath": "acceptance-evidence/dot/recheck52-cards/dumbbell-reverse-lunge_neutral_390px_sheet.png",
+      "svgSha256": "eab2753ce30ef2ea7eb99918a678e6886251357a0a3361a418b245577d875a69",
+      "pngSha256": "26f81cfa857859cc9600e518b92b407b8ac6ca032385e7eadbf475f7ad2d28bb"
+    }
+  ],
+  "boneVariance": {
+    "spine": {
+      "min": 24,
+      "max": 24,
+      "variancePct": 0
+    },
+    "nearThigh": {
+      "min": 22.25,
+      "max": 22.25,
+      "variancePct": 0
+    },
+    "nearShin": {
+      "min": 22.25,
+      "max": 22.25,
+      "variancePct": 0
+    },
+    "farThigh": {
+      "min": 22.65,
+      "max": 22.65,
+      "variancePct": 0
+    },
+    "farShin": {
+      "min": 22.25,
+      "max": 22.25,
+      "variancePct": 0
+    },
+    "nearForearm": {
+      "min": 12,
+      "max": 12,
+      "variancePct": 0
+    },
+    "farForearm": {
+      "min": 12,
+      "max": 12,
+      "variancePct": 0
+    }
+  }
+}

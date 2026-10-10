@@ -1,0 +1,68 @@
+{
+  "scope": "Pending source-bound flye drafts; source ratification and technique/native approval are not granted",
+  "movements": [
+    {
+      "id": 49,
+      "name": "Dumbbell Flye",
+      "assetKey": "movement/dumbbell-flye/demo/v1",
+      "repoProvenance": {
+        "commit": "12a1fb15aff5611b771348a53e2e04f4079e0e34",
+        "relative_path": "packages/core-db/src/schema/025_movement_coaching_content.sql",
+        "line": 61,
+        "file_sha256": "ef14633458e4702ede2994a3817873d072ed1041332bdf79b7df36e21a47752d"
+      },
+      "instructions": "Lie on a flat bench with the dumbbells over the chest and the palms facing each other. Open the arms in a wide arc with one soft elbow angle until the chest reaches an owned stretch. Bring the bells back along the same arc, like hugging a barrel. Keep control through the return; the rep is won in the long arc, not by crashing the bells together at the top.",
+      "cues": "Elbow angle locked the whole arc. Open to a deep working stretch, then hug the barrel back up. Lighter than you think — this movement punishes ego.",
+      "ownerRatification": "not_established_by_this_audit",
+      "schematicBenchInclineDeg": 0
+    },
+    {
+      "id": 178,
+      "name": "Decline Dumbbell Flyes",
+      "assetKey": "movement/decline-dumbbell-flyes/demo/v1",
+      "repoProvenance": {
+        "commit": "12a1fb15aff5611b771348a53e2e04f4079e0e34",
+        "relative_path": "packages/core-db/src/schema/068_movement_content_correction_v2.sql",
+        "line": 340,
+        "file_sha256": "e30d88808e8dc635b4e255714b0fa7eb88eb7fd8ce7b2e29a3c0e42974507fb2"
+      },
+      "instructions": "Secure the legs on a decline bench, lie back and hold a dumbbell in each hand above the chest with the palms facing each other and the arms almost straight. With a slight, fixed bend in the elbows, lower the arms out to the sides in a wide arc until you feel a stretch across the chest. Bring the dumbbells back together above the chest along the same arc.",
+      "cues": "Keep the elbow bend fixed. Open wide, slowly. Squeeze the chest to close.",
+      "ownerRatification": "pending_owner_review",
+      "schematicBenchInclineDeg": -15
+    },
+    {
+      "id": 220,
+      "name": "Incline Dumbbell Flyes",
+      "assetKey": "movement/incline-dumbbell-flyes/demo/v1",
+      "repoProvenance": {
+        "commit": "12a1fb15aff5611b771348a53e2e04f4079e0e34",
+        "relative_path": "packages/core-db/src/schema/068_movement_content_correction_v2.sql",
+        "line": 574,
+        "file_sha256": "e30d88808e8dc635b4e255714b0fa7eb88eb7fd8ce7b2e29a3c0e42974507fb2"
+      },
+      "instructions": "Lie back on a bench set to a low incline holding a dumbbell in each hand above the chest, arms almost straight. Keeping the same slight bend in the elbows, lower the arms out to the sides in a wide arc until you feel a stretch across the chest. Bring the dumbbells back up along the same arc to the start.",
+      "cues": "Keep the elbow bend fixed. Move only at the shoulders. Lower slowly.",
+      "ownerRatification": "pending_owner_review",
+      "schematicBenchInclineDeg": 30
+    }
+  ],
+  "physicalContract": {
+    "cameraYawDeg": 35,
+    "upperArm": 12.5,
+    "forearm": 12,
+    "constantElbowFlexionDeg": 15,
+    "wideShoulderBearingDeg": 85,
+    "closedWristGap": 7,
+    "worldArmPlane": "chest-normal plus transverse; no longitudinal travel",
+    "load": "two rigid neutral-grip dumbbells, shaft parallel to trunk and perpendicular to forearm",
+    "support": "body-specific pad/head contact; secured decline ankle roller; floor feet for flat/low incline",
+    "tempoMs": [
+      1000,
+      1000,
+      300,
+      1800
+    ],
+    "numericChoiceAuthority": "schematic implementation choices needing separate review; source does not prescribe these angles"
+  }
+}

@@ -1,0 +1,29 @@
+source commit: 93f54c5f343aba59a8a4fa7387b8c41bac999788
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with identity-mov26.json
+
+movements measured: 174 (baseline 174)
+added: none
+removed: none
+changed, expected: 141 Bench Press - With Bands; 196 Extended Range One-Arm Kettlebell Floor Press; 197 External Rotation; 247 One-Arm Dumbbell Row; 245 Oblique Crunches
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  141 Bench Press - With Bands: drawn 6a8a5247bd46a409b346691bb1416299c2a1ec3b5e91eb682f378f312247b593 captions 3a59df96f6abd6e02e207769f7f701f6ea1372169144bb8a1944f7203492d1bb stage 240.00x181.54 cycle 4200 ms
+  196 Extended Range One-Arm Kettlebell Floor Press: drawn 8a25cf7f9fd98efda78c61afa15e868db48aa34275612ea3e2e74a13f4c546e7 captions 29c94f58b0d33998751c3f79522e552d7c890ec4063e0cade3e6856adaae1819 stage 240.00x110.97 cycle 3800 ms
+  273 Shotgun Row: drawn 70d3e25e259cfccddebe5854bfe80d98c2c6a3ca54a879ee82785d0c07320191 captions 6bd055b1e64ed7a0402559cb937cfb9edf7d39e51c71e6623fc2f8de99ad0941 stage 240.00x199.09 cycle 3800 ms
+  197 External Rotation: drawn 48765c9945ee8fec133b4eecd3c0d58253523f4572c6c8adc420a725b959af69 captions 0ad0fbe4f33e88cee1296e4529305cfa33427f0b24e95080febc1b23febc4120 stage 240.00x122.31 cycle 4600 ms
+  198 External Rotation with Cable: drawn 11656e0e4ca18445071a8b7d311ea466af7752e4e5e14ee2696b3fe68ee5da8f captions c26b75369ad866c11d80bcb81076dd82a3faacb641e76fa7fccc4f759a2501e3 stage 178.72x240.00 cycle 4000 ms
+  247 One-Arm Dumbbell Row: drawn 4af5983c6878a5c9812f9ec984bbb880fc21f50f975fbaa38390bf2d6c9f3462 captions c67db182bc80505387961ffad8bb3b7bc340dee72808bc70ec5f3fdaa147f626 stage 240.00x174.81 cycle 3700 ms
+  216 Incline Cable Chest Press: drawn 93aeb842682a2ededd48666877d8bb46de079071eb9570c6e42c5ceeec7bb356 captions 4ce965fe434ce044ef900e003865cc44f47206d36d0fb21769041381093d8a5a stage 240.00x214.74 cycle 4200 ms
+  175 Crunches: drawn a008720ae2cb95c0045a2b9863a93475bbf8ad331129a7e78d40be677348b803 captions c4ad7fc42d96de5da816b3f4f7102f0016f50fbc482329caa1264387b43597e5 stage 240.00x132.00 cycle 4700 ms
+  263 Rope Crunch: drawn 0e5e2a68e14ea2e812cbe09ab4e53f5970b5ff18e052b5dac3a851c5711c45b3 captions 7a16742fa3afa96345ef11c92fd91289dae2a094d467c383e3be537644aa0416 stage 167.80x240.00 cycle 4300 ms
+  157 Cable One Arm Tricep Extension: drawn e3ec5d746e90fce770e1c190a1e9b4796249739cffddfdcf1ba4d82e977e31c7 captions f98ebd5a74b975aa1f7690d8928dc3d901e59ea61d603c6816d88677d14d584f stage 87.48x240.00 cycle 4400 ms
+  193 Dumbbell Tricep Extension -Pronated Grip: drawn f3a888cf11b0262ba06268793c2264573b8f3f6ff5c388dfb13ff02f3be3f5a0 captions 594c426dec573ab04404e400d89ea51f40617a7c502a466f102b45249db21f7e stage 240.00x177.00 cycle 3900 ms
+  138 Barbell Shrug Behind The Back: drawn 38a7fc3d86a04df5826b1edf36f47e474fca486f37cbb2ea696ed8402563532e captions c40162a0976136846f3e44fa548943a167a91e7d7fe942dff229b9279e349138 stage 67.83x240.00 cycle 4200 ms
+  163 Cable Shrugs: drawn 2f7ab9705ab6bb32ab08a56a5d1983518953a92f8533ab9e69d6669d50436768 captions d3e263aa999cbc79c5133cdc58333a6c39d95dff7472e08ae80b6d102bfb09d6 stage 74.84x240.00 cycle 4200 ms
+  125 3/4 Sit-Up: drawn 93a9ddd1b66373cd6c565f71507ebae4ab5feeee291f319bec4f7b7598070fab captions 2329502b460f48a3aceab54b6f97e9a7112cad9d27c7ef8ed2f8e81cb4c6b066 stage 240.00x155.12 cycle 7800 ms
+  132 Band Good Morning (Pull Through): drawn 0d345a31a4e86f4decb6e6c7d99e5e67a392f270d7d1f492772a4314ccc0c175 captions 6a592a4ffbe49595b9a05c34c2e44345cacd128dda0ce775b24414297c4b987b stage 185.81x240.00 cycle 4300 ms
+  214 Hip Extension with Bands: drawn ce98d8c935eaa0e10a355a1f73516e3a84e106a6834cbef871b4a26146ced409 captions c34fb8689b17f3048644dadb59897717d043cf488247f0808edcc2c5db15e2a7 stage 129.03x240.00 cycle 3900 ms
+  253 Preacher Hammer Dumbbell Curl: drawn 564f3d950aeb8a571dbba60e4b2b0b4d3882e782d34c78d2b5b02119e1807912 captions f8edff33a9854907ea1c115364e47ca633dc31d0473a5efb121954ffc1057901 stage 169.01x240.00 cycle 4400 ms
+  245 Oblique Crunches: drawn 5151e4b871e69a57830a6f933279c20d013e1a08e7b4771383470da571655b5e captions 1a784e324a8e45b2a41cbad579b70e929b6d0fb9b2089bd23d65d9a8dffb128f stage 240.00x143.38 cycle 3900 ms
+  234 Kneeling High Pulley Row: drawn 1e0f93e9c9fa639df3e32b219e809cc600178b71bd0e7fad494d6d0e97716c03 captions 780e02682f9d48d038cf20839317c099e02cde8968bfa9a4ff8a2bf4d7ccefb7 stage 116.70x240.00 cycle 4100 ms
+exit code: 0 (probe run exit 0)

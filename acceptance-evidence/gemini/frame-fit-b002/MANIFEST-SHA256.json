@@ -1,0 +1,19 @@
+{
+  "files": [
+    {
+      "name": "jest-movement-preview.log",
+      "sha256": "5eb77aad3fdf8010bfecea6f2a6ee6dee1c1aa1b7d90497f4f21995ed9bb0019",
+      "bytes": 2615
+    },
+    {
+      "name": "remediation-summary.json",
+      "sha256": "1da885759a2d3ff7acf80dfc1dfecde37bb955e511a05686f4752c609b8b9c64",
+      "bytes": 11323
+    },
+    {
+      "name": "typecheck.log",
+      "sha256": "3fee9ca9571ef091d77a09866aa2e00970803e68079013a472d87126aa7d6a2f",
+      "bytes": 98
+    }
+  ]
+}

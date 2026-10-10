@@ -1,0 +1,55 @@
+
+> athlete-kinetics@0.1.0 verify:native-config
+> node tools/verify_native_config.mjs
+
+[N1] op-sqlite SQLite math functions on both platforms
+  PASS  root package.json carries the op-sqlite config the hoisted iOS podspec reads
+  PASS  root and apps/mobile op-sqlite configs are identical
+  PASS  the config enables SQLITE_ENABLE_MATH_FUNCTIONS (003 uses ln/sqrt)
+  PASS  installed podspec still resolves the app package.json by walking up from the hoisted module
+[N2] pinned embedder model staged into the iOS bundle
+  PASS  the target runs "Stage embedder model" after Resources  [[CP] Check Pods Manifest.lock > Sources > Frameworks > Resources > Stage embedder model > Bundle React Native code and images > [CP] Embed Pods Frameworks > [CP] Copy Pods Resources]
+  PASS  the phase runs scripts/stage-native-embedder.mjs into the app bundle as minilm.onnx
+  PASS  Release builds require the model (--required)
+  PASS  script sandboxing is off on both target configurations (the phase reads outside SRCROOT)
+  PASS  deviceEmbedder pin prefix matches the ratified model SHA-256  [afdb6f1a0e45b715]
+  PASS  the native smoke exercises the production backup CSPRNG, not a global polyfill
+  PASS  iOS opens the bundled model in place (no Documents copy)
+  PASS  the staging script verifies against KNOWN_SHA256 and never downloads
+[N3] Info.plist privacy and presentation
+  PASS  Health read usage description present and names both read types
+  PASS  no Health write usage description (the app never writes to Health)
+  PASS  no empty usage-description strings
+  PASS  display name is the product name, not the scaffold
+  PASS  UIAppFonts registers the Archivo variable font
+  PASS  launch screen carries no scaffold text
+[N4] HealthKit entitlement, read-only
+  PASS  entitlements enable HealthKit
+  PASS  no clinical-records or background-delivery entitlement is requested
+  PASS  both target configurations sign with the entitlements file
+  PASS  the adapter requests only sleep and resting HR, and shares nothing
+  PASS  the adapter never requests an HRV type (HealthKit HRV is SDNN, not RMSSD)
+[N5] identity
+  PASS  no React Native template bundle identifier
+  PASS  one bundle identifier across configurations  [com.pikemethods.training]
+  PASS  the iOS bundle identifier is the permanent Android application id  [com.pikemethods.training vs com.pikemethods.training]
+  PASS  iOS and Android launch the component the JS bundle registers (app.json name)  [registered=pikeMethods ios=pikeMethods android=pikeMethods]
+  PASS  no development team is committed (owner-supplied at signing time)
+[N6] platform-scoped native health modules
+  PASS  @kingstinct/react-native-healthkit is not autolinked on Android
+  PASS  @react-native-healthkit/core is not autolinked on Android
+  PASS  react-native-nitro-modules is not autolinked on Android
+  PASS  Apple Health binding is pinned exactly
+[N7] font parity
+  PASS  iOS bundles the Android hash-pinned Archivo file  [bc878c6e9e36b848bfa2fb9174acdf812ea6df640fd167f2c95b42674729f6b5]
+[N8] privacy manifest and device backup
+  PASS  privacy manifest declares no tracking
+  PASS  Android device backup stays disabled
+  PASS  iOS excludes app data directories from device backup at startup and keeps the outcome
+  PASS  the native smoke requires the startup exclusion result and CI reads the real resource values
+[N9] Xcode 26 / fmt consteval compatibility
+  PASS  the Podfile post_install applies the fmt Apple clang consteval patch
+  PASS  the Podfile post_install makes glog's namespace-included headers textual (Swift/C++ interop)
+  PASS  the installed React Native still pins the fmt version the patch is written for  [11.0.2]
+
+NATIVE CONFIG VERIFIED (static contract; native build evidence comes from the macOS CI job)

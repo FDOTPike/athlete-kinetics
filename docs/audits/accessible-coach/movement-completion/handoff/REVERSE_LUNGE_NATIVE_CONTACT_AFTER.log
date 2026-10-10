@@ -1,0 +1,11 @@
+PASS test/components/MovementPreview.approval.test.js
+PASS test/components/MovementPreview.layout.test.js
+PASS test/components/MovementPreview.reverseLunge.test.js
+PASS test/components/MovementPreview.lazyFamilyLoad.test.js
+PASS test/components/MovementPreview.reverseLungeNativeContact.test.js
+
+Test Suites: 5 passed, 5 total
+Tests:       153 passed, 153 total
+Snapshots:   0 total
+Time:        5.641 s
+Ran all test suites matching /MovementPreview.reverseLunge|MovementPreview.approval|MovementPreview.layout|MovementPreview.lazyFamilyLoad/i.

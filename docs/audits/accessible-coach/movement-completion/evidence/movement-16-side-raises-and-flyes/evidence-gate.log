@@ -1,0 +1,32 @@
+source commit: 705a75be7b15c688c48a1064a90ed6fcfc079a55
+command: node tools/rendering/test_verify_movement_evidence.mjs
+
+probe corpus: movement 14 rendered to C:\Users\fpike\AppData\Local\Temp\wo09-evidence-probe-0yRMs1\clean
+  11-position contract 33 cards / 3 sheets / 72 SVG+PNG files
+  clean render      pass
+  clean source-bound draft pass
+  draft different manifest hash rejected by C10
+  draft empty commit rejected by C10
+  draft malformed commit rejected by C10
+  M1  non-finite coordinate (the wrong-viewBox NaN defect)  rejected by C1
+  M2  theme role name emitted as an SVG colour  rejected by C2
+  M3  a <line> primitive production never emits  rejected by C3
+  M4  blank figure (stage drawn, no bones)  rejected by C4
+  M5  off-card geometry (stage pushed past the card edge)  rejected by C5
+  M6  caption clipped at the card edge (font scale 1.30, unwrapped)  rejected by C6
+  M7  card does not declare itself a headless approximation  rejected by C7
+  M8  same-size position swap, index untouched (audit P1a)  rejected by C10
+  M9  contact sheet PNG deleted (audit P1b)  rejected by C0
+  M10 contact sheet PNG blanked at the same dimensions  rejected by C11
+  M11 position swap WITH the index hashes swapped to match  rejected by C10
+  M12 an authored position has no card at all  rejected by C13
+  M13 a stray render artifact sits beside the graded ones  rejected by C13
+  M15 ONLY the PNG swapped, its hash forged, SVG left correct  rejected by C11
+  M16 legacy male filename injected into neutral evidence  rejected by C13
+  M19 legacy body label injected into evidence metadata  rejected by C0
+  M17 a card PNG caption band repainted with the caption from another position, hash forged  rejected by C14
+  M18 a contact sheet heading band blanked, hash forged  rejected by C14
+  M14 caption text altered in the card only  rejected by C10
+
+PASS — clean evidence passes and all 19 injected defects are rejected by their own check.
+exit code: 0

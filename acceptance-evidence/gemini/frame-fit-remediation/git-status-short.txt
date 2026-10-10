@@ -1,0 +1,4 @@
+﻿ M apps/mobile/src/components/movementPreview/MovementPreview.tsx
+?? acceptance-evidence/gemini/frame-fit-remediation/
+?? apps/mobile/test/components/MovementPreview.canonicalFrameFit.test.js
+?? apps/mobile/test/components/MovementPreview.fixedBarBodyMotion.test.js

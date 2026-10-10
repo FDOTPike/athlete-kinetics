@@ -1,0 +1,78 @@
+FAIL acceptance-evidence/dot/runtime-audit/recheck52.test.js
+  ├ù 52 full actual RN View cycle and terminal closure (neutral) (877 ms)
+  ├ù 52 full actual RN View cycle and terminal closure (male) (157 ms)
+  ├ù 52 full actual RN View cycle and terminal closure (female) (178 ms)
+  Γùï skipped 52 authored reduced-motion bounds, contact, captions and accessibility (neutral)
+  Γùï skipped 52 authored reduced-motion bounds, contact, captions and accessibility (male)
+  Γùï skipped 52 authored reduced-motion bounds, contact, captions and accessibility (female)
+  Γùï skipped 52 pause/resume/background/reduced-motion/identity/unmount (neutral)
+  Γùï skipped 52 pause/resume/background/reduced-motion/identity/unmount (male)
+  Γùï skipped 52 pause/resume/background/reduced-motion/identity/unmount (female)
+  Γùï skipped 52 real source remains pending and default global gate never opens
+
+  ΓùÅ 52 full actual RN View cycle and terminal closure (neutral)
+
+    expect(received).toBeLessThan(expected)
+
+    Expected: < 0.05
+    Received:   3.299999999999983
+
+      20 | function inspect(bodyName,phase,sample){const all=styles(),surface=StyleSheet.flatten(stage().props.style),entry=fixtures.get(52),body=DUAL_BODY_PARAMETERS[bodyName],scale=Math.min(240/entry.frameData.viewBox[2],240/entry.frameData.viewBox[3]);const floor=all.find(s=>s.height===1&&s.right===0&&s.backgroundColor===theme.color.line);expect(floor).toBeDefined();
+      21 |  let maxCropExcess=0;for(const s of all){if(s.width===undefined||s.height===undefined||s.opacity===0)continue;expect([s.left,s.top,s.width,s.height].every(Number.isFinite)).toBe(true);const b=bounds(s);maxCropExcess=Math.max(maxCropExcess,0,-b.left,-b.top,b.right-surface.width,b.bottom-surface.height);}expect(maxCropExcess).toBeLessThanOrEqual(.05);
+    > 22 |  const feet=all.filter(s=>s.transform&&near(s.width,5.4*scale)&&near(s.height,body.lw*.9*scale));expect(feet).toHaveLength(2);const gaps={};for(const foot of feet){const gap=floor.top-bounds(foot).bottom,side=foot.opacity===1?'front':'rear';gaps[side]=gap;expect(gap).toBeGreaterThanOrEqual(-.05);if(side==='front'||phase===0||phase===4||phase>=1&&phase<=3)expect(Math.abs(gap)).toBeLessThan(.05);if(side==='rear'&&phase>.05&&phase<.95)expect(gap).toBeGreaterThan(0);}
+         |                                                                                                                                                                                                                                                                                                                                                                                            ^
+      23 |  measurements.push({body:bodyName,sample,phase,floorTopDp:floor.top,frontGapDp:gaps.front,rearGapDp:gaps.rear,maxCropExcessDp:maxCropExcess});return feet.find(s=>s.opacity===1);
+      24 | }
+      25 | beforeEach(()=>{jest.useFakeTimers();coordinator.resetPreviewPlayback();jest.spyOn(AccessibilityInfo,'isReduceMotionEnabled').mockResolvedValue(false);jest.spyOn(manifest,'resolveMovementPreview').mockImplementation(s=>fixtures.get(s?.movement_id)??null);});
+
+      at toBeLessThan (../../acceptance-evidence/dot/runtime-audit/recheck52.test.js:22:380)
+      at inspect (../../acceptance-evidence/dot/runtime-audit/recheck52.test.js:28:131)
+      at asyncGeneratorStep (../../node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ΓùÅ 52 full actual RN View cycle and terminal closure (male)
+
+    expect(received).toBeLessThan(expected)
+
+    Expected: < 0.05
+    Received:   3.5749999999999886
+
+      20 | function inspect(bodyName,phase,sample){const all=styles(),surface=StyleSheet.flatten(stage().props.style),entry=fixtures.get(52),body=DUAL_BODY_PARAMETERS[bodyName],scale=Math.min(240/entry.frameData.viewBox[2],240/entry.frameData.viewBox[3]);const floor=all.find(s=>s.height===1&&s.right===0&&s.backgroundColor===theme.color.line);expect(floor).toBeDefined();
+      21 |  let maxCropExcess=0;for(const s of all){if(s.width===undefined||s.height===undefined||s.opacity===0)continue;expect([s.left,s.top,s.width,s.height].every(Number.isFinite)).toBe(true);const b=bounds(s);maxCropExcess=Math.max(maxCropExcess,0,-b.left,-b.top,b.right-surface.width,b.bottom-surface.height);}expect(maxCropExcess).toBeLessThanOrEqual(.05);
+    > 22 |  const feet=all.filter(s=>s.transform&&near(s.width,5.4*scale)&&near(s.height,body.lw*.9*scale));expect(feet).toHaveLength(2);const gaps={};for(const foot of feet){const gap=floor.top-bounds(foot).bottom,side=foot.opacity===1?'front':'rear';gaps[side]=gap;expect(gap).toBeGreaterThanOrEqual(-.05);if(side==='front'||phase===0||phase===4||phase>=1&&phase<=3)expect(Math.abs(gap)).toBeLessThan(.05);if(side==='rear'&&phase>.05&&phase<.95)expect(gap).toBeGreaterThan(0);}
+         |                                                                                                                                                                                                                                                                                                                                                                                            ^
+      23 |  measurements.push({body:bodyName,sample,phase,floorTopDp:floor.top,frontGapDp:gaps.front,rearGapDp:gaps.rear,maxCropExcessDp:maxCropExcess});return feet.find(s=>s.opacity===1);
+      24 | }
+      25 | beforeEach(()=>{jest.useFakeTimers();coordinator.resetPreviewPlayback();jest.spyOn(AccessibilityInfo,'isReduceMotionEnabled').mockResolvedValue(false);jest.spyOn(manifest,'resolveMovementPreview').mockImplementation(s=>fixtures.get(s?.movement_id)??null);});
+
+      at toBeLessThan (../../acceptance-evidence/dot/runtime-audit/recheck52.test.js:22:380)
+      at inspect (../../acceptance-evidence/dot/runtime-audit/recheck52.test.js:28:131)
+      at asyncGeneratorStep (../../node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ΓùÅ 52 full actual RN View cycle and terminal closure (female)
+
+    expect(received).toBeLessThan(expected)
+
+    Expected: < 0.05
+    Received:   3.0250000000000057
+
+      20 | function inspect(bodyName,phase,sample){const all=styles(),surface=StyleSheet.flatten(stage().props.style),entry=fixtures.get(52),body=DUAL_BODY_PARAMETERS[bodyName],scale=Math.min(240/entry.frameData.viewBox[2],240/entry.frameData.viewBox[3]);const floor=all.find(s=>s.height===1&&s.right===0&&s.backgroundColor===theme.color.line);expect(floor).toBeDefined();
+      21 |  let maxCropExcess=0;for(const s of all){if(s.width===undefined||s.height===undefined||s.opacity===0)continue;expect([s.left,s.top,s.width,s.height].every(Number.isFinite)).toBe(true);const b=bounds(s);maxCropExcess=Math.max(maxCropExcess,0,-b.left,-b.top,b.right-surface.width,b.bottom-surface.height);}expect(maxCropExcess).toBeLessThanOrEqual(.05);
+    > 22 |  const feet=all.filter(s=>s.transform&&near(s.width,5.4*scale)&&near(s.height,body.lw*.9*scale));expect(feet).toHaveLength(2);const gaps={};for(const foot of feet){const gap=floor.top-bounds(foot).bottom,side=foot.opacity===1?'front':'rear';gaps[side]=gap;expect(gap).toBeGreaterThanOrEqual(-.05);if(side==='front'||phase===0||phase===4||phase>=1&&phase<=3)expect(Math.abs(gap)).toBeLessThan(.05);if(side==='rear'&&phase>.05&&phase<.95)expect(gap).toBeGreaterThan(0);}
+         |                                                                                                                                                                                                                                                                                                                                                                                            ^
+      23 |  measurements.push({body:bodyName,sample,phase,floorTopDp:floor.top,frontGapDp:gaps.front,rearGapDp:gaps.rear,maxCropExcessDp:maxCropExcess});return feet.find(s=>s.opacity===1);
+      24 | }
+      25 | beforeEach(()=>{jest.useFakeTimers();coordinator.resetPreviewPlayback();jest.spyOn(AccessibilityInfo,'isReduceMotionEnabled').mockResolvedValue(false);jest.spyOn(manifest,'resolveMovementPreview').mockImplementation(s=>fixtures.get(s?.movement_id)??null);});
+
+      at toBeLessThan (../../acceptance-evidence/dot/runtime-audit/recheck52.test.js:22:380)
+      at inspect (../../acceptance-evidence/dot/runtime-audit/recheck52.test.js:28:131)
+      at asyncGeneratorStep (../../node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+Test Suites: 1 failed, 1 total
+Tests:       3 failed, 7 skipped, 10 total
+Snapshots:   0 total
+Time:        4.34 s
+Ran all test suites with tests matching "full actual RN View cycle".
+Test results written to: acceptance-evidence\dot\runtime-audit\contact-negative-results.json

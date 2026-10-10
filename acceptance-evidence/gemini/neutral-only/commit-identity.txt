@@ -1,0 +1,50 @@
+Commit: 7754e1507f3688d17b57552810554c07a4269b15
+Branch: gemini/movement-animation-completion-2026-10-05
+Tree state: clean committed tree
+
+commit 7754e1507f3688d17b57552810554c07a4269b15
+Author: Francis Saga Pike <fpike02@postoffice.csu.edu.au>
+Date:   Mon Oct 5 15:19:41 2026 +1100
+
+    feat(movementPreview): MOV-B001 reconcile animation pipeline to single neutral silhouette
+
+ .../components/movementPreview/canonicalFigure.ts  | 23 ++++--
+ .../src/components/movementPreview/derivation.ts   | 90 +++++++++++-----------
+ .../mobile/src/components/movementPreview/index.ts |  1 +
+ .../src/components/movementPreview/manifest.ts     |  2 +-
+ .../MovementPreview.batch3Perspective.test.js      |  8 +-
+ .../components/MovementPreview.cableLow.test.js    |  2 +-
+ .../components/MovementPreview.canonical.test.js   | 22 +++---
+ .../MovementPreview.canonicalFrameFit.test.js      |  4 +-
+ .../MovementPreview.canonicalNavigation.test.js    |  2 +-
+ .../MovementPreview.fixedBarBodyMotion.test.js     |  4 +-
+ .../test/components/MovementPreview.flye.test.js   |  4 +-
+ .../components/MovementPreview.gripDelta.test.js   | 11 ++-
+ .../components/MovementPreview.headSupport.test.js |  2 +-
+ .../components/MovementPreview.kickback.test.js    |  2 +-
+ .../test/components/MovementPreview.layout.test.js |  6 +-
+ .../MovementPreview.lungeContact.test.js           |  2 +-
+ .../MovementPreview.lungeContactMutation.test.js   |  2 +-
+ .../MovementPreview.lungeReducedMotion.test.js     |  2 +-
+ .../components/MovementPreview.pushdown.test.js    |  4 +-
+ .../MovementPreview.reverseLunge.test.js           |  2 +-
+ ...vementPreview.reverseLungeNativeContact.test.js |  2 +-
+ .../components/MovementPreview.ropeTension.test.js |  2 +-
+ .../MovementPreview.straightArmPulldown.test.js    |  2 +-
+ .../MovementPreview.supportedGeometry.test.js      | 12 +--
+ .../test/components/MovementPreview.torso.test.js  |  6 +-
+ .../MovementPreview.walkingLunge.test.js           |  2 +-
+ .../mobile/test/fixtures/torso-front-baseline.json | 20 +----
+ .../movement-completion/IMPLEMENTATION_STATUS.md   |  4 +
+ .../movement-completion/MOTION_COMPLETION_AUDIT.md |  4 +
+ tools/rendering/render_manifest_evidence.mjs       | 19 ++---
+ tools/rendering/render_motion_cycle.mjs            |  2 +-
+ tools/rendering/repair_motion_crops.mjs            |  2 +-
+ 32 files changed, 132 insertions(+), 140 deletions(-)
+
+On branch gemini/movement-animation-completion-2026-10-05
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+	acceptance-evidence/gemini/neutral-only/
+
+nothing added to commit but untracked files present (use "git add" to track)

@@ -1,0 +1,25 @@
+﻿node.exe : PASS apps/mobile/test/components/MovementPreview.canonicalFrameFit.test.js (32.761 s)
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Users\fpike\AppData\Roaming\ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (PASS apps/mobil...t.js (32.761 s):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+PASS apps/mobile/test/components/MovementPreview.challenger_m7_1.test.js
+PASS apps/mobile/test/components/MovementPreview.reverseLunge.test.js
+PASS apps/mobile/test/components/MovementPreview.lungeContactMutation.test.js
+PASS apps/mobile/test/components/MovementPreview.lungeReducedMotion.test.js
+PASS apps/mobile/test/components/MovementPreview.reverseLungeNativeContact.test.js
+PASS apps/mobile/test/components/MovementPreview.challenger_m6_4.test.js
+PASS apps/mobile/test/components/MovementPreview.lungeContact.test.js
+
+Test Suites: 8 passed, 8 total
+Tests:       41 passed, 41 total
+Snapshots:   0 total
+Time:        38.756 s
+Ran all test suites matching /apps\\mobile\\test\\components\\MovementPreview.reverseLunge.test.js|apps\\mobile\\test\\
+components\\MovementPreview.reverseLungeNativeContact.test.js|apps\\mobile\\test\\components\\MovementPreview.lungeCont
+act.test.js|apps\\mobile\\test\\components\\MovementPreview.lungeContactMutation.test.js|apps\\mobile\\test\\components
+\\MovementPreview.lungeReducedMotion.test.js|apps\\mobile\\test\\components\\MovementPreview.challenger_m6_4.test.js|ap
+ps\\mobile\\test\\components\\MovementPreview.challenger_m7_1.test.js|apps\\mobile\\test\\components\\MovementPreview.c
+anonicalFrameFit.test.js/i.

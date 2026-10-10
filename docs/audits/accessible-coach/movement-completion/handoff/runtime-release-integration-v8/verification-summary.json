@@ -1,0 +1,1231 @@
+{
+  "sourceCommit": "1185f0d0d6eb91b482afe60af4a0bf8173ba8c06",
+  "acceptance": "Movement 52 rear-toe native View contact FAIL; bounded host controls/geometry/preservation have passing evidence. No native animation or technique approval.",
+  "freeze": {
+    "head": "1185f0d0d6eb91b482afe60af4a0bf8173ba8c06",
+    "gitStatus": "",
+    "captures": {
+      "source": {
+        "count": 811,
+        "unchanged": true,
+        "beforeInventorySha256": "c0109942ebeda437cfb9d5c06bb7357b512c6ad3aa7d3a0ab09c1ff2706d9a20",
+        "afterInventorySha256": "c0109942ebeda437cfb9d5c06bb7357b512c6ad3aa7d3a0ab09c1ff2706d9a20",
+        "changed": []
+      },
+      "assets": {
+        "count": 762,
+        "unchanged": true,
+        "beforeInventorySha256": "449a766edbe7ce56077f83a250942baca4b8dfb3b918084f376d2654b8371d3c",
+        "afterInventorySha256": "449a766edbe7ce56077f83a250942baca4b8dfb3b918084f376d2654b8371d3c",
+        "changed": []
+      }
+    },
+    "stableSource": true
+  },
+  "integration": {
+    "sourceCommit": "1185f0d0d6eb91b482afe60af4a0bf8173ba8c06",
+    "releaseBase": "cf4c221ef3993341f903a1d228e94d4893002081",
+    "changedPaths": [
+      "M\t.gitignore",
+      "A\tacceptance-evidence/wo09/batch3-perspective/base-primitives.json",
+      "A\tacceptance-evidence/wo09/batch3-perspective/draft-manifest.json",
+      "A\tapps/mobile/src/components/movementPreview/MovementPreview.tsx",
+      "A\tapps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "A\tapps/mobile/src/components/movementPreview/derivation.ts",
+      "A\tapps/mobile/src/components/movementPreview/families/calf-raise__seated.json",
+      "A\tapps/mobile/src/components/movementPreview/families/calf-raise__standing.json",
+      "A\tapps/mobile/src/components/movementPreview/families/carry__standing.json",
+      "A\tapps/mobile/src/components/movementPreview/families/dead-bug__supine.json",
+      "A\tapps/mobile/src/components/movementPreview/families/elbow-extension__standing-overhead.json",
+      "A\tapps/mobile/src/components/movementPreview/families/elbow-extension__standing-pushdown.json",
+      "A\tapps/mobile/src/components/movementPreview/families/elbow-flexion__preacher.json",
+      "A\tapps/mobile/src/components/movementPreview/families/elbow-flexion__standing.json",
+      "A\tapps/mobile/src/components/movementPreview/families/face-pull__standing.json",
+      "A\tapps/mobile/src/components/movementPreview/families/flye__decline.json",
+      "A\tapps/mobile/src/components/movementPreview/families/flye__incline.json",
+      "A\tapps/mobile/src/components/movementPreview/families/flye__supine.json",
+      "A\tapps/mobile/src/components/movementPreview/families/front-raise__incline.json",
+      "A\tapps/mobile/src/components/movementPreview/families/glute-kickback__standing.json",
+      "A\tapps/mobile/src/components/movementPreview/families/hip-extension__standing.json",
+      "A\tapps/mobile/src/components/movementPreview/families/hip-extension__supine.json",
+      "A\tapps/mobile/src/components/movementPreview/families/hip-hinge__standing.json",
+      "A\tapps/mobile/src/components/movementPreview/families/horizontal-press__incline.json",
+      "A\tapps/mobile/src/components/movementPreview/families/horizontal-press__supine.json",
+      "A\tapps/mobile/src/components/movementPreview/families/horizontal-pull__bent-over.json",
+      "A\tapps/mobile/src/components/movementPreview/families/horizontal-pull__kneeling.json",
+      "A\tapps/mobile/src/components/movementPreview/families/horizontal-pull__prone-supported.json",
+      "A\tapps/mobile/src/components/movementPreview/families/horizontal-pull__seated.json",
+      "A\tapps/mobile/src/components/movementPreview/families/horizontal-pull__standing.json",
+      "A\tapps/mobile/src/components/movementPreview/families/locomotion__standing.json",
+      "A\tapps/mobile/src/components/movementPreview/families/lunge__reverse.json",
+      "A\tapps/mobile/src/components/movementPreview/families/lunge__split-stance.json",
+      "A\tapps/mobile/src/components/movementPreview/families/lunge__standing.json",
+      "A\tapps/mobile/src/components/movementPreview/families/lunge__traveling.json",
+      "A\tapps/mobile/src/components/movementPreview/families/pallof__standing.json",
+      "A\tapps/mobile/src/components/movementPreview/families/plank__prone.json",
+      "A\tapps/mobile/src/components/movementPreview/families/push-up__floor.json",
+      "A\tapps/mobile/src/components/movementPreview/families/push-up__incline.json",
+      "A\tapps/mobile/src/components/movementPreview/families/rear-delt__bent-over.json",
+      "A\tapps/mobile/src/components/movementPreview/families/rear-delt__standing.json",
+      "A\tapps/mobile/src/components/movementPreview/families/shoulder-rotation__standing.json",
+      "A\tapps/mobile/src/components/movementPreview/families/shrug__standing.json",
+      "A\tapps/mobile/src/components/movementPreview/families/squat__standing.json",
+      "A\tapps/mobile/src/components/movementPreview/families/squat__sumo-stance.json",
+      "A\tapps/mobile/src/components/movementPreview/families/straight-arm-pulldown__standing.json",
+      "A\tapps/mobile/src/components/movementPreview/families/trunk-flex__seated.json",
+      "A\tapps/mobile/src/components/movementPreview/families/trunk-flex__standing.json",
+      "A\tapps/mobile/src/components/movementPreview/families/trunk-flex__supine.json",
+      "A\tapps/mobile/src/components/movementPreview/families/trunk-twist__supine.json",
+      "A\tapps/mobile/src/components/movementPreview/families/vertical-press__seated.json",
+      "A\tapps/mobile/src/components/movementPreview/families/vertical-press__standing.json",
+      "A\tapps/mobile/src/components/movementPreview/families/vertical-pull__standing.json",
+      "A\tapps/mobile/src/components/movementPreview/familyLoaders.ts",
+      "A\tapps/mobile/src/components/movementPreview/index.ts",
+      "A\tapps/mobile/src/components/movementPreview/manifest.ts",
+      "A\tapps/mobile/src/components/movementPreview/movementPreviewManifest.json",
+      "A\tapps/mobile/src/components/movementPreview/playbackCoordinator.ts",
+      "A\tapps/mobile/src/components/movementPreview/previewIndex.json",
+      "M\tapps/mobile/src/components/ui/motionDuration.ts",
+      "M\tapps/mobile/src/screens/LibraryScreenV2.tsx",
+      "M\tapps/mobile/src/screens/SessionScreen.tsx",
+      "A\tapps/mobile/test/components/MovementPreview.adversarial.test.js",
+      "A\tapps/mobile/test/components/MovementPreview.approval.test.js",
+      "A\tapps/mobile/test/components/MovementPreview.batch3Perspective.test.js",
+      "A\tapps/mobile/test/components/MovementPreview.cableLow.test.js",
+      "A\tapps/mobile/test/components/MovementPreview.canonical.test.js",
+      "A\tapps/mobile/test/components/MovementPreview.canonicalNavigation.test.js",
+      "A\tapps/mobile/test/components/MovementPreview.captionIntegrity.test.js",
+      "A\tapps/mobile/test/components/MovementPreview.challenger_m6_4.test.js",
+      "A\tapps/mobile/test/components/MovementPreview.challenger_m7_1.test.js",
+      "A\tapps/mobile/test/components/MovementPreview.derivation.test.js",
+      "A\tapps/mobile/test/components/MovementPreview.flye.test.js",
+      "A\tapps/mobile/test/components/MovementPreview.gripDelta.test.js",
+      "A\tapps/mobile/test/components/MovementPreview.headSupport.test.js",
+      "A\tapps/mobile/test/components/MovementPreview.jointOffsets.test.js",
+      "A\tapps/mobile/test/components/MovementPreview.kickback.test.js",
+      "A\tapps/mobile/test/components/MovementPreview.layout.test.js",
+      "A\tapps/mobile/test/components/MovementPreview.lazyFamilyLoad.test.js",
+      "A\tapps/mobile/test/components/MovementPreview.lifecycle_stress.test.js",
+      "A\tapps/mobile/test/components/MovementPreview.lungeContact.test.js",
+      "A\tapps/mobile/test/components/MovementPreview.lungeContactMutation.test.js",
+      "A\tapps/mobile/test/components/MovementPreview.lungeReducedMotion.test.js",
+      "A\tapps/mobile/test/components/MovementPreview.manifestSplit.test.js",
+      "A\tapps/mobile/test/components/MovementPreview.pushdown.test.js",
+      "A\tapps/mobile/test/components/MovementPreview.reverseLunge.test.js",
+      "A\tapps/mobile/test/components/MovementPreview.ropeTension.test.js",
+      "A\tapps/mobile/test/components/MovementPreview.runtimeRegression.test.js",
+      "A\tapps/mobile/test/components/MovementPreview.straightArmPulldown.test.js",
+      "A\tapps/mobile/test/components/MovementPreview.supportedGeometry.test.js",
+      "A\tapps/mobile/test/components/MovementPreview.test.js",
+      "A\tapps/mobile/test/components/MovementPreview.torso.test.js",
+      "A\tapps/mobile/test/components/MovementPreview.walkingLunge.test.js",
+      "A\tapps/mobile/test/components/lungeContactProbe.js",
+      "A\tapps/mobile/test/components/previewManifest.js",
+      "A\tapps/mobile/test/fixtures/torso-front-baseline.json",
+      "A\tdocs/audits/accessible-coach/MOVEMENT_COMPLETION_STATUS.md",
+      "A\tdocs/audits/accessible-coach/WO09_MOTION_FAMILIES.json",
+      "A\tdocs/audits/accessible-coach/WO09_MOTION_FAMILIES_FLAT.json",
+      "A\tdocs/audits/accessible-coach/WO09_MOVEMENT_CATALOGUE.json",
+      "A\tdocs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "A\tdocs/audits/accessible-coach/movement-completion/ASSET_BUDGET_DECISION.md",
+      "A\tdocs/audits/accessible-coach/movement-completion/FIRST_BATCH_GEOMETRY_PLAN.md",
+      "A\tdocs/audits/accessible-coach/movement-completion/FLYE_SOURCE_BINDINGS.json",
+      "A\tdocs/audits/accessible-coach/movement-completion/IMPLEMENTATION_STATUS.md",
+      "A\tdocs/audits/accessible-coach/movement-completion/KICKBACK_SOURCE_BINDING.json",
+      "A\tdocs/audits/accessible-coach/movement-completion/MOTION_COMPLETION_AUDIT.md",
+      "A\tdocs/audits/accessible-coach/movement-completion/ORDERED_BACKLOG.json",
+      "A\tdocs/audits/accessible-coach/movement-completion/PUSHDOWN_SOURCE_BINDINGS.json",
+      "A\tdocs/audits/accessible-coach/movement-completion/REVERSE_LUNGE_SOURCE_BINDING.json",
+      "A\tdocs/audits/accessible-coach/movement-completion/STRAIGHT_ARM_SOURCE_BINDING.json",
+      "A\ttools/rendering/author_flye_motion.mjs",
+      "A\ttools/rendering/author_kickback_motion.mjs",
+      "A\ttools/rendering/author_pushdown_motion.mjs",
+      "A\ttools/rendering/author_reverse_lunge_motion.mjs",
+      "A\ttools/rendering/author_straight_arm_pulldown.mjs",
+      "A\ttools/rendering/lib/canonicalSvg.mjs",
+      "A\ttools/rendering/lib/derivation.mjs",
+      "A\ttools/rendering/lib/draftInput.mjs",
+      "A\ttools/rendering/lib/evidenceCard.mjs",
+      "A\ttools/rendering/lib/previewData.mjs",
+      "A\ttools/rendering/lib/textFit.mjs",
+      "A\ttools/rendering/render_manifest_evidence.mjs",
+      "A\ttools/rendering/render_motion_cycle.mjs",
+      "A\ttools/rendering/render_movement_evidence.mjs",
+      "A\ttools/rendering/repair_motion_crops.mjs",
+      "A\ttools/rendering/repair_supported_motion.mjs",
+      "A\ttools/rendering/test_native_border_bounds.mjs",
+      "A\ttools/rendering/test_verify_movement_evidence.mjs",
+      "A\ttools/rendering/verify_movement_evidence.mjs",
+      "A\ttools/rendering/verify_preview_storage.mjs",
+      "A\ttools/rendering/wo09_split_preview_manifest.mjs"
+    ],
+    "protectedPaths": [
+      "apps/mobile/android",
+      "apps/mobile/ios",
+      "apps/mobile/package.json",
+      "package.json",
+      "package-lock.json",
+      "packages",
+      "apps/mobile/src/state",
+      "apps/mobile/src/services",
+      "apps/mobile/src/storage",
+      "apps/mobile/src/db",
+      ".github/workflows"
+    ],
+    "protectedDiff": "",
+    "protectedUnchanged": true,
+    "lockSha256": "9e02ca7f8c0f95ccbf0860d8ebeadaac64d016bcda3f978d7f39ff56d507f5cf",
+    "installedLockSha256": "4606166baa5385cb5f1172e19fbde32c40b67824758081e9f976f304d864e6dd"
+  },
+  "dependencyMetadata": {
+    "compared": 795,
+    "unknown": [],
+    "mismatches": []
+  },
+  "runtimeVersions": {
+    "react": "19.1.4",
+    "react-native": "0.81.6",
+    "jest": "29.7.0",
+    "typescript": "5.9.3",
+    "sharp": "0.32.6",
+    "@testing-library/react-native": "13.3.3"
+  },
+  "coverage": {
+    "sourceCommit": "1185f0d0d6eb91b482afe60af4a0bf8173ba8c06",
+    "entries": 138,
+    "familyFiles": 47,
+    "statuses": {
+      "covered": 3,
+      "pending": 132,
+      "intentionally_unsuitable": 3
+    },
+    "nonUnsuitableRecords": 135,
+    "sourceCoveredIds": [
+      28,
+      16,
+      88
+    ],
+    "techniqueReview": {
+      "status": "pending",
+      "detail": "Positions were authored against this repository's own curated instructions and cues. No qualified strength or clinical professional has reviewed them. Nothing here is medical, injury-prevention or technique-certification advice."
+    }
+  },
+  "componentRuns": {
+    "initial": {
+      "suites": 4,
+      "total": 21,
+      "passed": 18,
+      "failed": 3,
+      "pending": 0
+    },
+    "targeted": {
+      "total": 3,
+      "passed": 3,
+      "failed": 0
+    },
+    "distinctCasesWithPassingEvidence": 21,
+    "singleCleanAggregateRun": false,
+    "initialFailureCause": "Auditor adaptation replaced .ke inside Object.keys, producing Object.rlys. Corrected only identifier and stale scalar in test title; source unchanged. Initial fixture and failures preserved.",
+    "countingMethod": "21 parameterized Jest cases: targeted lazy-family suite contained only the three previously failing cases. Counts use case instances, including three body arguments, rather than deduplicating formatted fullName strings."
+  },
+  "actualRNContact": {
+    "total": 3,
+    "passed": 0,
+    "failed": 3,
+    "measurements": [
+      {
+        "body": "neutral",
+        "frame": 0,
+        "phase": 0,
+        "side": "front",
+        "floorTopDp": 227.25,
+        "paintedBottomDp": 227.25000000000003,
+        "gapDp": -2.842170943040401E-14,
+        "foot": {
+          "position": "absolute",
+          "left": 135,
+          "top": 216.45000000000002,
+          "width": 13.5,
+          "height": 10.8,
+          "borderRadius": 5.4,
+          "backgroundColor": "#F7F6F3",
+          "opacity": 1,
+          "transform": [
+            {
+              "rotate": "0deg"
+            }
+          ]
+        }
+      },
+      {
+        "body": "neutral",
+        "frame": 0,
+        "phase": 0,
+        "side": "rear",
+        "floorTopDp": 227.25,
+        "paintedBottomDp": 227.25000000000003,
+        "gapDp": -2.842170943040401E-14,
+        "foot": {
+          "position": "absolute",
+          "left": 124.375,
+          "top": 216.45000000000002,
+          "width": 13.5,
+          "height": 10.8,
+          "borderRadius": 5.4,
+          "backgroundColor": "#6B6963",
+          "opacity": 0.9,
+          "transform": [
+            {
+              "rotate": "0deg"
+            }
+          ]
+        }
+      },
+      {
+        "body": "neutral",
+        "frame": 1,
+        "phase": 1,
+        "side": "front",
+        "floorTopDp": 227.25,
+        "paintedBottomDp": 227.25000000000003,
+        "gapDp": -2.842170943040401E-14,
+        "foot": {
+          "position": "absolute",
+          "left": 135,
+          "top": 216.45000000000002,
+          "width": 13.5,
+          "height": 10.8,
+          "borderRadius": 5.4,
+          "backgroundColor": "#F7F6F3",
+          "opacity": 1,
+          "transform": [
+            {
+              "rotate": "0deg"
+            }
+          ]
+        }
+      },
+      {
+        "body": "neutral",
+        "frame": 1,
+        "phase": 1,
+        "side": "rear",
+        "floorTopDp": 227.25,
+        "paintedBottomDp": 223.95000000000002,
+        "gapDp": 3.299999999999983,
+        "foot": {
+          "position": "absolute",
+          "left": 17.342927568290627,
+          "top": 212.32500000000002,
+          "width": 13.499999999999998,
+          "height": 10.8,
+          "borderRadius": 5.4,
+          "backgroundColor": "#6B6963",
+          "opacity": 0.9,
+          "transform": [
+            {
+              "rotate": "37.66988696432963deg"
+            }
+          ]
+        }
+      },
+      {
+        "body": "male",
+        "frame": 0,
+        "phase": 0,
+        "side": "front",
+        "floorTopDp": 227.25,
+        "paintedBottomDp": 227.25,
+        "gapDp": 0,
+        "foot": {
+          "position": "absolute",
+          "left": 135,
+          "top": 215.55,
+          "width": 13.5,
+          "height": 11.700000000000001,
+          "borderRadius": 5.8500000000000005,
+          "backgroundColor": "#F7F6F3",
+          "opacity": 1,
+          "transform": [
+            {
+              "rotate": "0deg"
+            }
+          ]
+        }
+      },
+      {
+        "body": "male",
+        "frame": 0,
+        "phase": 0,
+        "side": "rear",
+        "floorTopDp": 227.25,
+        "paintedBottomDp": 227.25,
+        "gapDp": 0,
+        "foot": {
+          "position": "absolute",
+          "left": 125.25,
+          "top": 215.55,
+          "width": 13.5,
+          "height": 11.700000000000001,
+          "borderRadius": 5.8500000000000005,
+          "backgroundColor": "#6B6963",
+          "opacity": 0.9,
+          "transform": [
+            {
+              "rotate": "0deg"
+            }
+          ]
+        }
+      },
+      {
+        "body": "male",
+        "frame": 1,
+        "phase": 1,
+        "side": "front",
+        "floorTopDp": 227.25,
+        "paintedBottomDp": 227.25,
+        "gapDp": 0,
+        "foot": {
+          "position": "absolute",
+          "left": 135,
+          "top": 215.55,
+          "width": 13.5,
+          "height": 11.700000000000001,
+          "borderRadius": 5.8500000000000005,
+          "backgroundColor": "#F7F6F3",
+          "opacity": 1,
+          "transform": [
+            {
+              "rotate": "0deg"
+            }
+          ]
+        }
+      },
+      {
+        "body": "male",
+        "frame": 1,
+        "phase": 1,
+        "side": "rear",
+        "floorTopDp": 227.25,
+        "paintedBottomDp": 223.675,
+        "gapDp": 3.5749999999999886,
+        "foot": {
+          "position": "absolute",
+          "left": 18.217927568290634,
+          "top": 211.425,
+          "width": 13.500000000000002,
+          "height": 11.700000000000001,
+          "borderRadius": 5.8500000000000005,
+          "backgroundColor": "#6B6963",
+          "opacity": 0.9,
+          "transform": [
+            {
+              "rotate": "37.66988696432963deg"
+            }
+          ]
+        }
+      },
+      {
+        "body": "female",
+        "frame": 0,
+        "phase": 0,
+        "side": "front",
+        "floorTopDp": 227.25,
+        "paintedBottomDp": 227.25,
+        "gapDp": 0,
+        "foot": {
+          "position": "absolute",
+          "left": 135,
+          "top": 217.35000000000002,
+          "width": 13.5,
+          "height": 9.9,
+          "borderRadius": 4.95,
+          "backgroundColor": "#F7F6F3",
+          "opacity": 1,
+          "transform": [
+            {
+              "rotate": "0deg"
+            }
+          ]
+        }
+      },
+      {
+        "body": "female",
+        "frame": 0,
+        "phase": 0,
+        "side": "rear",
+        "floorTopDp": 227.25,
+        "paintedBottomDp": 227.25,
+        "gapDp": 0,
+        "foot": {
+          "position": "absolute",
+          "left": 123.5,
+          "top": 217.35000000000002,
+          "width": 13.5,
+          "height": 9.9,
+          "borderRadius": 4.95,
+          "backgroundColor": "#6B6963",
+          "opacity": 0.9,
+          "transform": [
+            {
+              "rotate": "0deg"
+            }
+          ]
+        }
+      },
+      {
+        "body": "female",
+        "frame": 1,
+        "phase": 1,
+        "side": "front",
+        "floorTopDp": 227.25,
+        "paintedBottomDp": 227.25,
+        "gapDp": 0,
+        "foot": {
+          "position": "absolute",
+          "left": 135,
+          "top": 217.35000000000002,
+          "width": 13.5,
+          "height": 9.9,
+          "borderRadius": 4.95,
+          "backgroundColor": "#F7F6F3",
+          "opacity": 1,
+          "transform": [
+            {
+              "rotate": "0deg"
+            }
+          ]
+        }
+      },
+      {
+        "body": "female",
+        "frame": 1,
+        "phase": 1,
+        "side": "rear",
+        "floorTopDp": 227.25,
+        "paintedBottomDp": 224.225,
+        "gapDp": 3.0250000000000057,
+        "foot": {
+          "position": "absolute",
+          "left": 16.467927568290627,
+          "top": 213.22500000000002,
+          "width": 13.500000000000002,
+          "height": 9.9,
+          "borderRadius": 4.95,
+          "backgroundColor": "#6B6963",
+          "opacity": 0.9,
+          "transform": [
+            {
+              "rotate": "37.66988696432963deg"
+            }
+          ]
+        }
+      }
+    ],
+    "responsibleLayer": "Finite rotated rounded-foot View outer bounds; endpointY + radius proxy overstates toe bottom by r*sin(theta).",
+    "smallestCorrection": "Derive rear ankle height from finite foot contact and reuse constrained leg solver, retaining fixed front sole/native floor/full return."
+  },
+  "phaseContinuity": {
+    "sourceCommit": "1185f0d0d6eb91b482afe60af4a0bf8173ba8c06",
+    "checked": 12003,
+    "motions": [
+      {
+        "body": "neutral",
+        "phaseSamples": 4001,
+        "lengthError": 2.1316282072803006E-14,
+        "connectionError": 0,
+        "frontGapError": 0,
+        "rearPenetration": 0,
+        "rearContactGapBoxUnits": 1.3200000000000074,
+        "rearContactGapDp": 3.3000000000000185,
+        "kneeHoverBoxUnits": 3.4180044229494877,
+        "maxBoundaryJump": 1.2158174549356042E-10,
+        "maxKneeBearingStepDegreesPerPhase001": 1.095472576934151,
+        "minimumRearLiftBoxUnits": 1.184076216789407,
+        "closed": true
+      },
+      {
+        "body": "male",
+        "phaseSamples": 4001,
+        "lengthError": 1.7763568394002505E-14,
+        "connectionError": 0,
+        "frontGapError": 0,
+        "rearPenetration": 0,
+        "rearContactGapBoxUnits": 1.4300000000000068,
+        "rearContactGapDp": 3.575000000000017,
+        "kneeHoverBoxUnits": 3.1820015718353694,
+        "maxBoundaryJump": 1.2158174549356042E-10,
+        "maxKneeBearingStepDegreesPerPhase001": 1.1078155447413542,
+        "minimumRearLiftBoxUnits": 1.1896862167894113,
+        "closed": true
+      },
+      {
+        "body": "female",
+        "phaseSamples": 4001,
+        "lengthError": 2.1316282072803006E-14,
+        "connectionError": 0,
+        "frontGapError": 0,
+        "rearPenetration": 0,
+        "rearContactGapBoxUnits": 1.2099999999999937,
+        "rearContactGapDp": 3.0249999999999844,
+        "kneeHoverBoxUnits": 3.6540100562953093,
+        "maxBoundaryJump": 1.2158174549356042E-10,
+        "maxKneeBearingStepDegreesPerPhase001": 1.0829855364436682,
+        "minimumRearLiftBoxUnits": 1.1784662167893885,
+        "closed": true
+      }
+    ],
+    "errors": [
+      {
+        "type": "actual-rounded-rear-foot-floor-gap",
+        "body": "neutral",
+        "gapBoxUnits": 1.3200000000000074,
+        "gapDp": 3.3000000000000185
+      },
+      {
+        "type": "actual-rounded-rear-foot-floor-gap",
+        "body": "male",
+        "gapBoxUnits": 1.4300000000000068,
+        "gapDp": 3.575000000000017
+      },
+      {
+        "type": "actual-rounded-rear-foot-floor-gap",
+        "body": "female",
+        "gapBoxUnits": 1.2099999999999937,
+        "gapDp": 3.0249999999999844
+      }
+    ],
+    "pass": false
+  },
+  "math": {
+    "rawPass": false,
+    "errors": [
+      {
+        "type": "cache",
+        "cached": "tools/rendering/.build/canonicalFigure.js"
+      },
+      {
+        "type": "cache",
+        "cached": "tools/rendering/.build-derivation/canonicalFigure.js"
+      }
+    ],
+    "cacheChecks": [
+      {
+        "fresh": "fresh-figure/canonicalFigure.js",
+        "cached": "tools/rendering/.build/canonicalFigure.js",
+        "present": true,
+        "same": false
+      },
+      {
+        "fresh": "fresh-derivation/canonicalFigure.js",
+        "cached": "tools/rendering/.build-derivation/canonicalFigure.js",
+        "present": true,
+        "same": false
+      },
+      {
+        "fresh": "fresh-derivation/derivation.js",
+        "cached": "tools/rendering/.build-derivation/derivation.js",
+        "present": true,
+        "same": true
+      }
+    ],
+    "draws": 6702.0,
+    "cycles": 51,
+    "priorEntryCount": 137,
+    "priorSourceChanges": [],
+    "priorPoseDifferences": 0,
+    "priorPrimitiveDifferences": 0,
+    "priorCycleMatches": 48,
+    "priorCycleFailures": 0,
+    "budgets": {
+      "rawBytes": 406094,
+      "gzipBytes": 61699,
+      "maxFamilyBytes": 40322,
+      "limits": {
+        "rawBytes": 1048576,
+        "gzipBytes": 196608,
+        "familyBytes": 65536,
+        "singleFamilyMaxBytes": 262144,
+        "allFamiliesMaxBytes": 2097152
+      }
+    }
+  },
+  "cards": {
+    "pass": true,
+    "movements": 17,
+    "cards": 270,
+    "sheets": 51,
+    "body": "neutral",
+    "sizes": [
+      240,
+      320,
+      390
+    ],
+    "fontScale": 1.3,
+    "limitation": "Card identity/raster/margins pass; native glyph/layout and technique approval are separate."
+  },
+  "sourceIdentity": {
+    "previewDataSha256": "8ea9465b0d869cf5f5358f42ad5c8e7e165cca14d1ccb4b02784faeca94b8027",
+    "cycleMetadataSha256": "4f35e47b0082dfc67822eadf5cc4bb1a5b6bea05d4c9f1261a6b9a541557b5aa",
+    "sourceHashes": {
+      "apps/mobile/src/components/movementPreview/previewIndex.json": "d7b94a57668344bcc505251effef48c92a3d1c55d1a4b0251d99edf214e42c2e",
+      "apps/mobile/src/components/movementPreview/families/calf-raise__seated.json": "a5505d974257a0cb3206dbb16e86f5b4eb5158b73316bc59c154863652c282fc",
+      "apps/mobile/src/components/movementPreview/families/calf-raise__standing.json": "48d8d9d37e5216d899e9d88c5e410341aad6a84880eae12a09ec805d5de5900f",
+      "apps/mobile/src/components/movementPreview/families/carry__standing.json": "84e2d2d0e2dbc74b20b7a4e45e7b6cf73cfa1b11f06de8352bc852280f0d91b1",
+      "apps/mobile/src/components/movementPreview/families/dead-bug__supine.json": "7238a4f476b84225365f570d07099ef37e52435c86d392145f3ea2f75ac7bdc4",
+      "apps/mobile/src/components/movementPreview/families/elbow-extension__standing-overhead.json": "53202d5bbade091d9651581c3d10e76a4ee6a75ef7105156bab2e160a4dadac9",
+      "apps/mobile/src/components/movementPreview/families/elbow-extension__standing-pushdown.json": "90f47cc370395e1f4f5865771042646b906d2900888920093ff62a1ef0d903c7",
+      "apps/mobile/src/components/movementPreview/families/elbow-flexion__preacher.json": "0355638f947b68167280b6cbc4f88b38acd20bf9ce656d3af5abaacd1afa7e23",
+      "apps/mobile/src/components/movementPreview/families/elbow-flexion__standing.json": "2210f422efd0319444802d2cd8efd468d83c8aa47ab4862762c760b64fb60d1c",
+      "apps/mobile/src/components/movementPreview/families/face-pull__standing.json": "5233dd4ac70c38daa6593f753c9db4468c3558cc00e70e8abe7d084060b2576a",
+      "apps/mobile/src/components/movementPreview/families/flye__decline.json": "60d0283ba05520d9d06d402b256c27a22a1abdf883af13161b86d46cbec12113",
+      "apps/mobile/src/components/movementPreview/families/flye__incline.json": "784fef14e0ef35a4bfa3d466de46eff4e22c1e580951abb7afd2294673d9ca93",
+      "apps/mobile/src/components/movementPreview/families/flye__supine.json": "4f288c187ed4fb70fd716de50598dee3fdfe2783628669fffef9ec8cf8576432",
+      "apps/mobile/src/components/movementPreview/families/front-raise__incline.json": "1505c308d5616418497e2892b29cf65cb0d78388969ee26104af3bc9c8502710",
+      "apps/mobile/src/components/movementPreview/families/glute-kickback__standing.json": "505e9b914ec3d576787f88564b17602315032990cdcf9d9d82e8a3bec7f10afc",
+      "apps/mobile/src/components/movementPreview/families/hip-extension__standing.json": "44c367c41f82abf647a5c1e345811d81de06ca12d0d7ce6b7fac16c4e4360e4e",
+      "apps/mobile/src/components/movementPreview/families/hip-extension__supine.json": "02801c78342ba895dcbad701795caacfdc024bc087e6161797f2e53bd9ec3aa4",
+      "apps/mobile/src/components/movementPreview/families/hip-hinge__standing.json": "6f6751402288cee90c3a9276d7dcfbf559beb2f520035aa62e74193b2b9ff6ab",
+      "apps/mobile/src/components/movementPreview/families/horizontal-press__incline.json": "05c62c969d1c4523091218bf6e8bbf25aa3f466c14a1b13d188a50821b39b8ee",
+      "apps/mobile/src/components/movementPreview/families/horizontal-press__supine.json": "f02b4ebdd05b9c1f357cd3cad8c69e43d21a6aa839fbaf5ca343905339f4e3b6",
+      "apps/mobile/src/components/movementPreview/families/horizontal-pull__bent-over.json": "78eee86c604524a3d53e405052883e28b14de1258b2749a356b20d0a9f412ffd",
+      "apps/mobile/src/components/movementPreview/families/horizontal-pull__kneeling.json": "65a767fcb91de0319482851a63c4015817ca6f20552fe0c4ebff8120b30b39e9",
+      "apps/mobile/src/components/movementPreview/families/horizontal-pull__prone-supported.json": "c1bcbcf65a9a102441077080a872b72fbf5d02713288a08ec6b91be89eea85f3",
+      "apps/mobile/src/components/movementPreview/families/horizontal-pull__seated.json": "a690cf1dc453f422f8592c44c5128145f167f1fe84d2d227fb81d66c7deb1146",
+      "apps/mobile/src/components/movementPreview/families/horizontal-pull__standing.json": "9d5ae1ca045621f87d150913f9325718f00f5d1d870552278c443470c37eaa14",
+      "apps/mobile/src/components/movementPreview/families/locomotion__standing.json": "8627d8fc74cda7e64ff7dccdf8b4d32e952dcc96e9a642473327490e2f9f112a",
+      "apps/mobile/src/components/movementPreview/families/lunge__reverse.json": "94d1b96239d8b96c0713fbd793c6ff8714b8e79787cd83c9db378d162234fa4e",
+      "apps/mobile/src/components/movementPreview/families/lunge__split-stance.json": "d0a6553ca3c4269ecc754cbe9e9e2964eeb6ae6d013ae2122bbbc964ddf39975",
+      "apps/mobile/src/components/movementPreview/families/lunge__standing.json": "faae291edf7a3252d92a98d27193ae6273f66ccf2cdc683d46d01c3ac51e0d65",
+      "apps/mobile/src/components/movementPreview/families/lunge__traveling.json": "642f640bf0ff77c2cc5ccfb61ed8ccd242e1495a5cc4f9702dd53cdaed6872c0",
+      "apps/mobile/src/components/movementPreview/families/pallof__standing.json": "ee1f09ddebd84c55a45a37312d588057a80eefcac2b5a3066e6266a0debb9928",
+      "apps/mobile/src/components/movementPreview/families/plank__prone.json": "69f9360eadca89e88e85cef4f13794c8769e691933ab44abf69e7b42d4525eaa",
+      "apps/mobile/src/components/movementPreview/families/push-up__floor.json": "fabcae79a82c0b5f6b0e4f263410b89f325755ee647cac34240d50e0313b44b0",
+      "apps/mobile/src/components/movementPreview/families/push-up__incline.json": "b239070a3cafbd399da04529c12e9005516e8f0d3633047779a597783638cd72",
+      "apps/mobile/src/components/movementPreview/families/rear-delt__bent-over.json": "45079dda4fff3511b9b1a7c4326f8a2495fe73c0e6408a37c12061caadc34559",
+      "apps/mobile/src/components/movementPreview/families/rear-delt__standing.json": "8c8d59f8f17c91e6e0c3c565daf45ae6bef85dc2ed9649ca0f829a5b3fff3faa",
+      "apps/mobile/src/components/movementPreview/families/shoulder-rotation__standing.json": "e2d89e7ee72d58d876d79764ea6199b72949baae7f65f753a19e4bf2a8f8748d",
+      "apps/mobile/src/components/movementPreview/families/shrug__standing.json": "fe85f671fbe7184a93b3907d9ed667b001b4d6d8c79ac69086619b8de09585e6",
+      "apps/mobile/src/components/movementPreview/families/squat__standing.json": "66349c1d5f3b299174b0182ceca8de0084fa092ad7cef11bec730b2f9af942aa",
+      "apps/mobile/src/components/movementPreview/families/squat__sumo-stance.json": "21dea099db7ccd83678a1e282ada75cf142bdc35ba5df8717151f3752fc46d03",
+      "apps/mobile/src/components/movementPreview/families/straight-arm-pulldown__standing.json": "565c1f2ac2912469e0705dfe4092a2bfa793c34306b44aea4ffeb7778c16567d",
+      "apps/mobile/src/components/movementPreview/families/trunk-flex__seated.json": "ebaf8e879b4ab9f444f6eccf99aafab5dc24f702e7f2e42484f8d1ec873fef9d",
+      "apps/mobile/src/components/movementPreview/families/trunk-flex__standing.json": "645d759ac6cc21c737c75e3279302ec686839f8a2c0958f9c0ddff4c73f87794",
+      "apps/mobile/src/components/movementPreview/families/trunk-flex__supine.json": "8d7390c4c69a33768dcd8cede309e948755a2a161852b1c8df17d8a7f3a150b9",
+      "apps/mobile/src/components/movementPreview/families/trunk-twist__supine.json": "0c2c206b11ab6c6680784d9d9815296fa805632718673a5237979239c6368f68",
+      "apps/mobile/src/components/movementPreview/families/vertical-press__seated.json": "63bce93cd850a244a48192a2294d3f2584fd34c6054a19d258916805a9d08bcd",
+      "apps/mobile/src/components/movementPreview/families/vertical-press__standing.json": "6f8a0773a6c73f5f9914bb9c62c34ba88a97cb82645b7ecf8ed293a348dcfe44",
+      "apps/mobile/src/components/movementPreview/families/vertical-pull__standing.json": "df9712df793faebf96ccde69b9bab7b084c49b30aa5f8839c79aad47a973d7f8",
+      "apps/mobile/src/components/movementPreview/canonicalFigure.ts": "8b2627a4421e39d2e5c4f66abbf87c682f089d66ea5799d304605d1b73c35d45",
+      "apps/mobile/src/components/movementPreview/derivation.ts": "10689809b038fbdac8d327f98eb9462409467c869c7daffcaa1e207a7d5b2f02",
+      "apps/mobile/src/components/movementPreview/MovementPreview.tsx": "828033dcdb8cd4f62770584b7b0019bfeaca0822bb37ea099b92e40d5f923173",
+      "tools/rendering/render_motion_cycle.mjs": "5e5f091261326f87ccbc408f62a23792fd2c03a0b208e78b8e5220589948fdda",
+      "tools/rendering/lib/canonicalSvg.mjs": "0c6a0d6a0c51a1f4fa49633082ae77f8b4b6bb2330bceb280e6a73471eb974ff"
+    },
+    "sourcesCommittedAtRender": true
+  },
+  "ciSnapshot": {
+    "observedAtUtc": "2026-10-04 14:48 UTC",
+    "jobs": {
+      "conclusion": "",
+      "headSha": "1185f0d0d6eb91b482afe60af4a0bf8173ba8c06",
+      "jobs": [
+        {
+          "completedAt": "2026-10-04T14:43:55Z",
+          "conclusion": "success",
+          "databaseId": 111457529032,
+          "name": "Verification suite (24 gates + typecheck)",
+          "startedAt": "2026-10-04T14:30:00Z",
+          "status": "completed",
+          "steps": [
+            {
+              "completedAt": "2026-10-04T14:30:01Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-10-04T14:30:00Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-04T14:30:03Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@v6",
+              "number": 2,
+              "startedAt": "2026-10-04T14:30:01Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-04T14:30:04Z",
+              "conclusion": "success",
+              "name": "Run actions/setup-node@v6",
+              "number": 3,
+              "startedAt": "2026-10-04T14:30:03Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-04T14:30:04Z",
+              "conclusion": "success",
+              "name": "Run actions/setup-python@v6",
+              "number": 4,
+              "startedAt": "2026-10-04T14:30:04Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-04T14:30:29Z",
+              "conclusion": "success",
+              "name": "Run npm ci",
+              "number": 5,
+              "startedAt": "2026-10-04T14:30:04Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-04T14:30:29Z",
+              "conclusion": "success",
+              "name": "Cache embedding model",
+              "number": 6,
+              "startedAt": "2026-10-04T14:30:29Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-04T14:30:31Z",
+              "conclusion": "success",
+              "name": "Fetch embedder assets",
+              "number": 7,
+              "startedAt": "2026-10-04T14:30:29Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-04T14:43:27Z",
+              "conclusion": "success",
+              "name": "verify:ci (24 gates + typecheck)",
+              "number": 8,
+              "startedAt": "2026-10-04T14:30:31Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-04T14:43:28Z",
+              "conclusion": "success",
+              "name": "Seeder physiology — pinned alignment + today's alignment",
+              "number": 9,
+              "startedAt": "2026-10-04T14:43:27Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-04T14:43:50Z",
+              "conclusion": "success",
+              "name": "Metro production bundle",
+              "number": 10,
+              "startedAt": "2026-10-04T14:43:28Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-04T14:43:51Z",
+              "conclusion": "success",
+              "name": "Post Cache embedding model",
+              "number": 17,
+              "startedAt": "2026-10-04T14:43:50Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-04T14:43:51Z",
+              "conclusion": "success",
+              "name": "Post Run actions/setup-python@v6",
+              "number": 18,
+              "startedAt": "2026-10-04T14:43:51Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-04T14:43:53Z",
+              "conclusion": "success",
+              "name": "Post Run actions/setup-node@v6",
+              "number": 19,
+              "startedAt": "2026-10-04T14:43:51Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-04T14:43:54Z",
+              "conclusion": "success",
+              "name": "Post Run actions/checkout@v6",
+              "number": 20,
+              "startedAt": "2026-10-04T14:43:53Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-04T14:43:54Z",
+              "conclusion": "success",
+              "name": "Complete job",
+              "number": 21,
+              "startedAt": "2026-10-04T14:43:54Z",
+              "status": "completed"
+            }
+          ],
+          "url": "https://github.com/FDOTPike/athlete-kinetics/actions/runs/37209472917/job/111457529032"
+        },
+        {
+          "completedAt": "0001-01-01T00:00:00Z",
+          "conclusion": "",
+          "databaseId": 111460069297,
+          "name": "Android QA + debug APKs (sideloadable, never for Play)",
+          "startedAt": "2026-10-04T14:43:57Z",
+          "status": "in_progress",
+          "steps": [
+            {
+              "completedAt": "2026-10-04T14:44:00Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-10-04T14:43:58Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-04T14:44:02Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@v6",
+              "number": 2,
+              "startedAt": "2026-10-04T14:44:00Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-04T14:44:08Z",
+              "conclusion": "success",
+              "name": "Run actions/setup-node@v6",
+              "number": 3,
+              "startedAt": "2026-10-04T14:44:02Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-04T14:44:10Z",
+              "conclusion": "success",
+              "name": "Run actions/setup-java@v5",
+              "number": 4,
+              "startedAt": "2026-10-04T14:44:08Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-04T14:44:15Z",
+              "conclusion": "success",
+              "name": "Install pinned Android native toolchain",
+              "number": 5,
+              "startedAt": "2026-10-04T14:44:10Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-04T14:44:30Z",
+              "conclusion": "success",
+              "name": "Run npm ci",
+              "number": 6,
+              "startedAt": "2026-10-04T14:44:15Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-04T14:44:31Z",
+              "conclusion": "success",
+              "name": "Cache embedding model",
+              "number": 7,
+              "startedAt": "2026-10-04T14:44:30Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-04T14:44:32Z",
+              "conclusion": "success",
+              "name": "Stage embedder model into Android assets",
+              "number": 8,
+              "startedAt": "2026-10-04T14:44:31Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "0001-01-01T00:00:00Z",
+              "conclusion": "",
+              "name": "Build debug QA APK",
+              "number": 9,
+              "startedAt": "2026-10-04T14:44:32Z",
+              "status": "in_progress"
+            },
+            {
+              "completedAt": "0001-01-01T00:00:00Z",
+              "conclusion": "",
+              "name": "Build QA candidate APK",
+              "number": 10,
+              "startedAt": "0001-01-01T00:00:00Z",
+              "status": "pending"
+            },
+            {
+              "completedAt": "0001-01-01T00:00:00Z",
+              "conclusion": "",
+              "name": "Assert QA candidate source stayed clean",
+              "number": 11,
+              "startedAt": "0001-01-01T00:00:00Z",
+              "status": "pending"
+            },
+            {
+              "completedAt": "0001-01-01T00:00:00Z",
+              "conclusion": "",
+              "name": "verify:qa-candidate (real artifact, fails closed)",
+              "number": 12,
+              "startedAt": "0001-01-01T00:00:00Z",
+              "status": "pending"
+            },
+            {
+              "completedAt": "0001-01-01T00:00:00Z",
+              "conclusion": "",
+              "name": "Run actions/upload-artifact@v6",
+              "number": 13,
+              "startedAt": "0001-01-01T00:00:00Z",
+              "status": "pending"
+            },
+            {
+              "completedAt": "0001-01-01T00:00:00Z",
+              "conclusion": "",
+              "name": "Run actions/upload-artifact@v6",
+              "number": 14,
+              "startedAt": "0001-01-01T00:00:00Z",
+              "status": "pending"
+            },
+            {
+              "completedAt": "0001-01-01T00:00:00Z",
+              "conclusion": "",
+              "name": "Post Cache embedding model",
+              "number": 25,
+              "startedAt": "0001-01-01T00:00:00Z",
+              "status": "pending"
+            },
+            {
+              "completedAt": "0001-01-01T00:00:00Z",
+              "conclusion": "",
+              "name": "Post Run actions/setup-java@v5",
+              "number": 26,
+              "startedAt": "0001-01-01T00:00:00Z",
+              "status": "pending"
+            },
+            {
+              "completedAt": "0001-01-01T00:00:00Z",
+              "conclusion": "",
+              "name": "Post Run actions/setup-node@v6",
+              "number": 27,
+              "startedAt": "0001-01-01T00:00:00Z",
+              "status": "pending"
+            },
+            {
+              "completedAt": "0001-01-01T00:00:00Z",
+              "conclusion": "",
+              "name": "Post Run actions/checkout@v6",
+              "number": 28,
+              "startedAt": "0001-01-01T00:00:00Z",
+              "status": "pending"
+            }
+          ],
+          "url": "https://github.com/FDOTPike/athlete-kinetics/actions/runs/37209472917/job/111460069297"
+        },
+        {
+          "completedAt": "0001-01-01T00:00:00Z",
+          "conclusion": "",
+          "databaseId": 111460069336,
+          "name": "iOS unsigned simulator build + native smoke",
+          "startedAt": "2026-10-04T14:44:02Z",
+          "status": "in_progress",
+          "steps": [
+            {
+              "completedAt": "2026-10-04T14:44:04Z",
+              "conclusion": "success",
+              "name": "Set up job",
+              "number": 1,
+              "startedAt": "2026-10-04T14:44:03Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-04T14:44:07Z",
+              "conclusion": "success",
+              "name": "Run actions/checkout@v6",
+              "number": 2,
+              "startedAt": "2026-10-04T14:44:05Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-04T14:44:09Z",
+              "conclusion": "success",
+              "name": "Run actions/setup-node@v6",
+              "number": 3,
+              "startedAt": "2026-10-04T14:44:07Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-04T14:44:11Z",
+              "conclusion": "success",
+              "name": "Select pinned Xcode major",
+              "number": 4,
+              "startedAt": "2026-10-04T14:44:09Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-04T14:44:22Z",
+              "conclusion": "success",
+              "name": "Run ruby/setup-ruby@v1",
+              "number": 5,
+              "startedAt": "2026-10-04T14:44:11Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-04T14:44:51Z",
+              "conclusion": "success",
+              "name": "Run npm ci",
+              "number": 6,
+              "startedAt": "2026-10-04T14:44:22Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-04T14:44:53Z",
+              "conclusion": "success",
+              "name": "Cache embedding model",
+              "number": 7,
+              "startedAt": "2026-10-04T14:44:51Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-04T14:44:54Z",
+              "conclusion": "success",
+              "name": "Fetch embedder assets",
+              "number": 8,
+              "startedAt": "2026-10-04T14:44:53Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "2026-10-04T14:45:49Z",
+              "conclusion": "success",
+              "name": "Install pods",
+              "number": 9,
+              "startedAt": "2026-10-04T14:44:54Z",
+              "status": "completed"
+            },
+            {
+              "completedAt": "0001-01-01T00:00:00Z",
+              "conclusion": "",
+              "name": "Build unsigned Release for the simulator",
+              "number": 10,
+              "startedAt": "2026-10-04T14:45:49Z",
+              "status": "in_progress"
+            },
+            {
+              "completedAt": "0001-01-01T00:00:00Z",
+              "conclusion": "",
+              "name": "Inspect the built app (fails closed)",
+              "number": 11,
+              "startedAt": "0001-01-01T00:00:00Z",
+              "status": "pending"
+            },
+            {
+              "completedAt": "0001-01-01T00:00:00Z",
+              "conclusion": "",
+              "name": "Simulator native smoke (fails closed)",
+              "number": 12,
+              "startedAt": "0001-01-01T00:00:00Z",
+              "status": "pending"
+            },
+            {
+              "completedAt": "0001-01-01T00:00:00Z",
+              "conclusion": "",
+              "name": "Keep the smoked unsigned app",
+              "number": 13,
+              "startedAt": "0001-01-01T00:00:00Z",
+              "status": "pending"
+            },
+            {
+              "completedAt": "0001-01-01T00:00:00Z",
+              "conclusion": "",
+              "name": "Build the UI tests (simulator, ad-hoc signed to run locally)",
+              "number": 14,
+              "startedAt": "0001-01-01T00:00:00Z",
+              "status": "pending"
+            },
+            {
+              "completedAt": "0001-01-01T00:00:00Z",
+              "conclusion": "",
+              "name": "UI tests on the simulator (fails closed)",
+              "number": 15,
+              "startedAt": "0001-01-01T00:00:00Z",
+              "status": "pending"
+            },
+            {
+              "completedAt": "0001-01-01T00:00:00Z",
+              "conclusion": "",
+              "name": "Annotate the failure",
+              "number": 16,
+              "startedAt": "0001-01-01T00:00:00Z",
+              "status": "pending"
+            },
+            {
+              "completedAt": "0001-01-01T00:00:00Z",
+              "conclusion": "",
+              "name": "Record source and toolchain identity",
+              "number": 17,
+              "startedAt": "0001-01-01T00:00:00Z",
+              "status": "pending"
+            },
+            {
+              "completedAt": "0001-01-01T00:00:00Z",
+              "conclusion": "",
+              "name": "Run actions/upload-artifact@v6",
+              "number": 18,
+              "startedAt": "0001-01-01T00:00:00Z",
+              "status": "pending"
+            },
+            {
+              "completedAt": "0001-01-01T00:00:00Z",
+              "conclusion": "",
+              "name": "Post Cache embedding model",
+              "number": 34,
+              "startedAt": "0001-01-01T00:00:00Z",
+              "status": "pending"
+            },
+            {
+              "completedAt": "0001-01-01T00:00:00Z",
+              "conclusion": "",
+              "name": "Post Run actions/setup-node@v6",
+              "number": 35,
+              "startedAt": "0001-01-01T00:00:00Z",
+              "status": "pending"
+            },
+            {
+              "completedAt": "0001-01-01T00:00:00Z",
+              "conclusion": "",
+              "name": "Post Run actions/checkout@v6",
+              "number": 36,
+              "startedAt": "0001-01-01T00:00:00Z",
+              "status": "pending"
+            }
+          ],
+          "url": "https://github.com/FDOTPike/athlete-kinetics/actions/runs/37209472917/job/111460069336"
+        }
+      ],
+      "status": "in_progress",
+      "url": "https://github.com/FDOTPike/athlete-kinetics/actions/runs/37209472917",
+      "workflowName": "CI"
+    },
+    "artifactCount": 0,
+    "limitation": "Verification suite succeeded; Android QA/debug and unsigned iOS simulator/native smoke still running. No artifacts available; no animation FPS/signing/device inference."
+  },
+  "parentReportedChecks": {
+    "suites": 31,
+    "tests": 854,
+    "typecheck": "PASS",
+    "nativeConfig": "PASS",
+    "storage": "PASS",
+    "source": "Combined source before 1185 commit, per parent.",
+    "independentlyRerun": false
+  },
+  "holds": [
+    "Repair the actual painted rear-toe gap on movement52 and repeat focused contact/continuity/crop/source-bound evidence at the repair commit.",
+    "Global technique review pending; legacy source-covered labels remain gated; 220 source ambiguity and 135/187 endpoint holds belong to independent technique lane.",
+    "Observe exact-revision native CI outcome/artifacts separately; unsigned smoke is not animation FPS or signed physical iPhone acceptance.",
+    "Native compositor, repeated lifecycle/list scrolling/accessibility and signed full-app acceptance remain outside this host report.",
+    "User-deferred 4 GB device download acceptance is not inferred from host storage/clone checks."
+  ],
+  "postAuditParentRepair": {
+    "commit": "0ad4be821ef1220112476dbb69410be4b7a50041",
+    "parentReportedSuites": 5,
+    "parentReportedTests": 153,
+    "parentReportedContactTests": 3,
+    "independentlyInspected": false,
+    "independentV9Acceptance": false
+  },
+  "stopDirection": "User requested self-contained handoff to Dot, then stop. No further source/native audit work."
+}

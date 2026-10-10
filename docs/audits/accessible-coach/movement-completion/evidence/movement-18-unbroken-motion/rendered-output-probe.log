@@ -1,0 +1,19 @@
+source commit: d55409a7a01cda57f49c317b44161612e6196aa6
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with identity-mov17.json
+
+movements measured: 173 (baseline 173)
+added: none
+removed: none
+changed, expected: 135 Barbell Incline Shoulder Raise; 187 Dumbbell Incline Shoulder Raise; 66 Inverted Row; 152 Body Tricep Press; 50 Dumbbell Lateral Raise; 236 Lateral Raise - With Bands; 87 Dumbbell Front Raise; 206 Front Cable Raise; 272 Seated Side Lateral Raise
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  135 Barbell Incline Shoulder Raise: drawn 88f519c8c9395499d267684df88f96d640515b37c88b432d6cea68c667767679 captions e180c26b564c7975dc6dc8b511bd2768de34d22c1981d73029295e75264fa45a stage 205.71x240.00 cycle 3200 ms
+  187 Dumbbell Incline Shoulder Raise: drawn c064f097ba7c92eae07fb11282a032d812df7cc8119835e7e46e2fca2b7a96c4 captions 6aafb10556aa4e0b7339b8a533af6964fa3ca782ab3498e133d3451dd8199c04 stage 222.86x240.00 cycle 3200 ms
+  66 Inverted Row: drawn 32f6040e8bac47bd7d3e89f041f393be518a6513cc06cbce9fd277fcfd05f5bc captions cf963119389bab389843de15c29822bf594b0fd50e080a4173961927db963603 stage 240.00x240.00 cycle 3900 ms
+  152 Body Tricep Press: drawn 6644db1f07c3b59ddb3856452be987a4cae4e6eb9be7044ed3fad23561dc0e79 captions 6504cfa112f585037fe3a81e4b1f27ae18133074efbca3608c173d6ff7de6aca stage 221.74x240.00 cycle 4100 ms
+  50 Dumbbell Lateral Raise: drawn 703ec34b22fb58bd12b855f867327876d0fc676af03d1a34c2e7ced794dad329 captions 5d17aa38f64c1eaf167dd3b21686a5ec14efebfdad078287cb2a0a2b6176ebb6 stage 213.33x240.00 cycle 4900 ms
+  236 Lateral Raise - With Bands: drawn e803d01fcac13f77715fcef25009ea747b78d23d11f98b0bbe3315bdb3b78c28 captions 80415d0c5a920bd84e918636f36a3f205a1f29cd9b8ae0417a26ab1c4007e1b7 stage 213.33x240.00 cycle 4500 ms
+  87 Dumbbell Front Raise: drawn bd642e7784a67f2eb023112ff4a30ae66bba9165552597a9b54f8abaeda2150f captions 04b28a5bdbf6221e3546510bde52375ad6cfe3a6c16e3776f2541ce792a6bcdf stage 142.98x240.00 cycle 3400 ms
+  206 Front Cable Raise: drawn beba656ea122a9b707b5b4aa30b116d1811d33517c75bb290ad412c42787b5d8 captions 414ed9ef5ec27b3ea986dd81dead8fbc3900d724ce1021617c51304986daec26 stage 173.62x240.00 cycle 4300 ms
+  272 Seated Side Lateral Raise: drawn 03eed2a937bc4579b5d88fd1cae1d3137f5c9c6a73da1a3428e1f14477613155 captions 3fc223b8943e2bf4f9a4e5c474d06457d4cae26ae84c1f8344205f72e315865e stage 233.51x240.00 cycle 4600 ms
+exit code: 0 (probe run exit 0)

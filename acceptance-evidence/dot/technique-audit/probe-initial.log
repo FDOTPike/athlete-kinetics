@@ -1,0 +1,77 @@
+warning: unable to access 'C:\Users\fpike/.config/git/ignore': Permission denied
+warning: unable to access 'C:\Users\fpike/.config/git/ignore': Permission denied
+fatal: Not a valid object name 510127dd54798ad7963139908a2207e73531d119^{commit}
+V7 source object unavailable; direct V8 comparison still runs
+warning: unable to access 'C:\Users\fpike/.config/git/ignore': Permission denied
+warning: unable to access 'C:\Users\fpike/.config/git/ignore': Permission denied
+warning: unable to access 'C:\Users\fpike/.config/git/ignore': Permission denied
+warning: unable to access 'C:\Users\fpike/.config/git/ignore': Permission denied
+{
+  "candidate": {
+    "worktree": "C:\\Users\\fpike\\.codex\\2026-10-05\\task\\athlete-kinetics",
+    "branch": "codex/dot-movement-completion-2026-10-05",
+    "head": "cad9de98fe9173a7533c294f7a62fd6ba9ea35b7",
+    "tree": "d430fad5a52c2970845844162637e2b213611278",
+    "status": "?? acceptance-evidence/dot/"
+  },
+  "preservation": [
+    {
+      "baseline": "1185f0d0d6eb91b482afe60af4a0bf8173ba8c06",
+      "cycles": 48,
+      "poses": 6297
+    }
+  ],
+  "repair": [
+    {
+      "body": "neutral",
+      "tickCount": 135,
+      "totalMs": 4400,
+      "supportedSampleCount": 79,
+      "maxAbsoluteSupportedGapCanonical": 0,
+      "old1185SupportedGapCanonical": 1.3200000000000074,
+      "old1185SupportedGapApp240Dp": 3.3000000000000185,
+      "minRearKneeConservativeEnvelopeGapCanonical": 3.4181453695771404,
+      "minRearKneeConservativeEnvelopeGapApp240Dp": 8.54536342394285,
+      "maxLegLengthError": 1.7763568394002505e-14,
+      "maxArmLengthError": 7.105427357601002e-15,
+      "maxDumbbellCenterError": 3.552713678800501e-15,
+      "jointLoopClosed": true,
+      "completePrimitiveLoopClosed": true
+    },
+    {
+      "body": "male",
+      "tickCount": 135,
+      "totalMs": 4400,
+      "supportedSampleCount": 79,
+      "maxAbsoluteSupportedGapCanonical": 1.4210854715202004e-14,
+      "old1185SupportedGapCanonical": 1.4300000000000068,
+      "old1185SupportedGapApp240Dp": 3.575000000000017,
+      "minRearKneeConservativeEnvelopeGapCanonical": 3.1820973396601153,
+      "minRearKneeConservativeEnvelopeGapApp240Dp": 7.9552433491502885,
+      "maxLegLengthError": 1.7763568394002505e-14,
+      "maxArmLengthError": 7.105427357601002e-15,
+      "maxDumbbellCenterError": 0,
+      "jointLoopClosed": true,
+      "completePrimitiveLoopClosed": true
+    },
+    {
+      "body": "female",
+      "tickCount": 135,
+      "totalMs": 4400,
+      "supportedSampleCount": 79,
+      "maxAbsoluteSupportedGapCanonical": 1.4210854715202004e-14,
+      "old1185SupportedGapCanonical": 1.2099999999999937,
+      "old1185SupportedGapApp240Dp": 3.0249999999999844,
+      "minRearKneeConservativeEnvelopeGapCanonical": 3.6542093461847323,
+      "minRearKneeConservativeEnvelopeGapApp240Dp": 9.13552336546183,
+      "maxLegLengthError": 1.7763568394002505e-14,
+      "maxArmLengthError": 7.105427357601002e-15,
+      "maxDumbbellCenterError": 0,
+      "jointLoopClosed": true,
+      "completePrimitiveLoopClosed": true
+    }
+  ],
+  "verifiedCycleCount": 51,
+  "verifiedPoseCount": 6702,
+  "verifiedCardCount": 18
+}

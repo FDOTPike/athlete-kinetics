@@ -1,0 +1,755 @@
+{
+  "head": "1185f0d0d6eb91b482afe60af4a0bf8173ba8c06",
+  "previewDataSha256": "8ea9465b0d869cf5f5358f42ad5c8e7e165cca14d1ccb4b02784faeca94b8027",
+  "cacheChecks": [
+    {
+      "fresh": "fresh-figure/canonicalFigure.js",
+      "cached": "tools/rendering/.build/canonicalFigure.js",
+      "present": true,
+      "same": false
+    },
+    {
+      "fresh": "fresh-derivation/canonicalFigure.js",
+      "cached": "tools/rendering/.build-derivation/canonicalFigure.js",
+      "present": true,
+      "same": false
+    },
+    {
+      "fresh": "fresh-derivation/derivation.js",
+      "cached": "tools/rendering/.build-derivation/derivation.js",
+      "present": true,
+      "same": true
+    }
+  ],
+  "motions": [
+    {
+      "id": 143,
+      "assetKey": "movement/bent-over-dumbbell-rear-delt-raise-with-head-on-bench/demo/v1",
+      "checked": 477,
+      "radiusVariation": 5.329070518200751e-15,
+      "upperVariation": 3.552713678800501e-15,
+      "maxBearingTick": 3.3339572351970332,
+      "maxAnchorShift": 0,
+      "maxBoundaryDelta": 7.807108348221908e-11,
+      "worldProjectionError": 1.4210854715202004e-14,
+      "maxGripCenterError": 0,
+      "maxRopeBranchError": 0,
+      "maxFlexionScalarError": 0,
+      "maxTautAlignmentError": 0,
+      "maxStraightArmError": 0,
+      "maxFlyeBendError": 0,
+      "maxFlyePlaneError": 0,
+      "maxLoadLengthError": 0,
+      "maxLoadCentreError": 0,
+      "maxLoadOrthogonalError": 0,
+      "maxWorkingLegRadiusError": 0,
+      "maxSoftKneeError": 0,
+      "maxAnkleCuffError": 0,
+      "maxWorkingLegBearingTick": 0,
+      "minSignedCurl": null,
+      "maxSignedCurl": null
+    },
+    {
+      "id": 53,
+      "assetKey": "movement/dumbbell-shrug/demo/v1",
+      "checked": 285,
+      "radiusVariation": 7.105427357601002e-15,
+      "upperVariation": 3.552713678800501e-15,
+      "maxBearingTick": 0,
+      "maxAnchorShift": 0,
+      "maxBoundaryDelta": 5.854804882163546e-11,
+      "worldProjectionError": 0,
+      "maxGripCenterError": 0,
+      "maxRopeBranchError": 0,
+      "maxFlexionScalarError": 0,
+      "maxTautAlignmentError": 0,
+      "maxStraightArmError": 0,
+      "maxFlyeBendError": 0,
+      "maxFlyePlaneError": 0,
+      "maxLoadLengthError": 0,
+      "maxLoadCentreError": 0,
+      "maxLoadOrthogonalError": 0,
+      "maxWorkingLegRadiusError": 0,
+      "maxSoftKneeError": 0,
+      "maxAnkleCuffError": 0,
+      "maxWorkingLegBearingTick": 0,
+      "minSignedCurl": null,
+      "maxSignedCurl": null
+    },
+    {
+      "id": 82,
+      "assetKey": "movement/barbell-shrug/demo/v1",
+      "checked": 285,
+      "radiusVariation": 5.329070518200751e-15,
+      "upperVariation": 1.7763568394002505e-15,
+      "maxBearingTick": 0,
+      "maxAnchorShift": 0,
+      "maxBoundaryDelta": 5.854804882163546e-11,
+      "worldProjectionError": 0,
+      "maxGripCenterError": 0,
+      "maxRopeBranchError": 0,
+      "maxFlexionScalarError": 0,
+      "maxTautAlignmentError": 0,
+      "maxStraightArmError": 0,
+      "maxFlyeBendError": 0,
+      "maxFlyePlaneError": 0,
+      "maxLoadLengthError": 0,
+      "maxLoadCentreError": 0,
+      "maxLoadOrthogonalError": 0,
+      "maxWorkingLegRadiusError": 0,
+      "maxSoftKneeError": 0,
+      "maxAnkleCuffError": 0,
+      "maxWorkingLegBearingTick": 0,
+      "minSignedCurl": null,
+      "maxSignedCurl": null
+    },
+    {
+      "id": 138,
+      "assetKey": "movement/barbell-shrug-behind-the-back/demo/v1",
+      "checked": 285,
+      "radiusVariation": 5.329070518200751e-15,
+      "upperVariation": 1.7763568394002505e-15,
+      "maxBearingTick": 1.4210854715202004e-14,
+      "maxAnchorShift": 0,
+      "maxBoundaryDelta": 5.854804882163546e-11,
+      "worldProjectionError": 0,
+      "maxGripCenterError": 0,
+      "maxRopeBranchError": 0,
+      "maxFlexionScalarError": 0,
+      "maxTautAlignmentError": 0,
+      "maxStraightArmError": 0,
+      "maxFlyeBendError": 0,
+      "maxFlyePlaneError": 0,
+      "maxLoadLengthError": 0,
+      "maxLoadCentreError": 0,
+      "maxLoadOrthogonalError": 0,
+      "maxWorkingLegRadiusError": 0,
+      "maxSoftKneeError": 0,
+      "maxAnkleCuffError": 0,
+      "maxWorkingLegBearingTick": 0,
+      "minSignedCurl": null,
+      "maxSignedCurl": null
+    },
+    {
+      "id": 163,
+      "assetKey": "movement/cable-shrugs/demo/v1",
+      "checked": 285,
+      "radiusVariation": 5.329070518200751e-15,
+      "upperVariation": 1.7763568394002505e-15,
+      "maxBearingTick": 0,
+      "maxAnchorShift": 0,
+      "maxBoundaryDelta": 5.854804882163546e-11,
+      "worldProjectionError": 0,
+      "maxGripCenterError": 0,
+      "maxRopeBranchError": 0,
+      "maxFlexionScalarError": 0,
+      "maxTautAlignmentError": 0,
+      "maxStraightArmError": 0,
+      "maxFlyeBendError": 0,
+      "maxFlyePlaneError": 0,
+      "maxLoadLengthError": 0,
+      "maxLoadCentreError": 0,
+      "maxLoadOrthogonalError": 0,
+      "maxWorkingLegRadiusError": 0,
+      "maxSoftKneeError": 0,
+      "maxAnkleCuffError": 0,
+      "maxWorkingLegBearingTick": 0,
+      "minSignedCurl": null,
+      "maxSignedCurl": null
+    },
+    {
+      "id": 92,
+      "assetKey": "movement/preacher-curl/demo/v1",
+      "checked": 486,
+      "radiusVariation": 7.105427357601002e-15,
+      "upperVariation": 0,
+      "maxBearingTick": 8.9045680473373,
+      "maxAnchorShift": 0,
+      "maxBoundaryDelta": 1.3880452343073557e-10,
+      "worldProjectionError": 0,
+      "maxGripCenterError": 0,
+      "maxRopeBranchError": 0,
+      "maxFlexionScalarError": 0,
+      "maxTautAlignmentError": 0,
+      "maxStraightArmError": 0,
+      "maxFlyeBendError": 0,
+      "maxFlyePlaneError": 0,
+      "maxLoadLengthError": 0,
+      "maxLoadCentreError": 0,
+      "maxLoadOrthogonalError": 0,
+      "maxWorkingLegRadiusError": 0,
+      "maxSoftKneeError": 0,
+      "maxAnkleCuffError": 0,
+      "maxWorkingLegBearingTick": 0,
+      "minSignedCurl": 10.000000000000004,
+      "maxSignedCurl": 150.00000000000003
+    },
+    {
+      "id": 158,
+      "assetKey": "movement/cable-preacher-curl/demo/v1",
+      "checked": 486,
+      "radiusVariation": 7.105427357601002e-15,
+      "upperVariation": 0,
+      "maxBearingTick": 8.9045680473373,
+      "maxAnchorShift": 0,
+      "maxBoundaryDelta": 1.3880452343073557e-10,
+      "worldProjectionError": 0,
+      "maxGripCenterError": 0,
+      "maxRopeBranchError": 0,
+      "maxFlexionScalarError": 0,
+      "maxTautAlignmentError": 0,
+      "maxStraightArmError": 0,
+      "maxFlyeBendError": 0,
+      "maxFlyePlaneError": 0,
+      "maxLoadLengthError": 0,
+      "maxLoadCentreError": 0,
+      "maxLoadOrthogonalError": 0,
+      "maxWorkingLegRadiusError": 0,
+      "maxSoftKneeError": 0,
+      "maxAnkleCuffError": 0,
+      "maxWorkingLegBearingTick": 0,
+      "minSignedCurl": 10.000000000000004,
+      "maxSignedCurl": 150.00000000000003
+    },
+    {
+      "id": 253,
+      "assetKey": "movement/preacher-hammer-dumbbell-curl/demo/v1",
+      "checked": 486,
+      "radiusVariation": 7.105427357601002e-15,
+      "upperVariation": 0,
+      "maxBearingTick": 8.9045680473373,
+      "maxAnchorShift": 0,
+      "maxBoundaryDelta": 1.3880452343073557e-10,
+      "worldProjectionError": 0,
+      "maxGripCenterError": 0,
+      "maxRopeBranchError": 0,
+      "maxFlexionScalarError": 0,
+      "maxTautAlignmentError": 0,
+      "maxStraightArmError": 0,
+      "maxFlyeBendError": 0,
+      "maxFlyePlaneError": 0,
+      "maxLoadLengthError": 0,
+      "maxLoadCentreError": 0,
+      "maxLoadOrthogonalError": 0,
+      "maxWorkingLegRadiusError": 0,
+      "maxSoftKneeError": 0,
+      "maxAnkleCuffError": 0,
+      "maxWorkingLegBearingTick": 0,
+      "minSignedCurl": 10.000000000000004,
+      "maxSignedCurl": 150.00000000000003
+    },
+    {
+      "id": 80,
+      "assetKey": "movement/triceps-pushdown/demo/v1",
+      "checked": 414,
+      "radiusVariation": 3.552713678800501e-15,
+      "upperVariation": 0,
+      "maxBearingTick": 6.1838872289966496,
+      "maxAnchorShift": 0,
+      "maxBoundaryDelta": 1.0447774213800666e-10,
+      "worldProjectionError": 7.105427357601002e-15,
+      "maxGripCenterError": 0,
+      "maxRopeBranchError": 0,
+      "maxFlexionScalarError": 2.5972314576794275e-11,
+      "maxTautAlignmentError": 0,
+      "maxStraightArmError": 0,
+      "maxFlyeBendError": 0,
+      "maxFlyePlaneError": 0,
+      "maxLoadLengthError": 0,
+      "maxLoadCentreError": 0,
+      "maxLoadOrthogonalError": 0,
+      "maxWorkingLegRadiusError": 0,
+      "maxSoftKneeError": 0,
+      "maxAnkleCuffError": 0,
+      "maxWorkingLegBearingTick": 0,
+      "minSignedCurl": null,
+      "maxSignedCurl": null
+    },
+    {
+      "id": 262,
+      "assetKey": "movement/reverse-grip-triceps-pushdown/demo/v1",
+      "checked": 414,
+      "radiusVariation": 3.552713678800501e-15,
+      "upperVariation": 0,
+      "maxBearingTick": 6.1838872289966496,
+      "maxAnchorShift": 0,
+      "maxBoundaryDelta": 1.0447774213800666e-10,
+      "worldProjectionError": 7.105427357601002e-15,
+      "maxGripCenterError": 0,
+      "maxRopeBranchError": 0,
+      "maxFlexionScalarError": 2.5972314576794275e-11,
+      "maxTautAlignmentError": 0,
+      "maxStraightArmError": 0,
+      "maxFlyeBendError": 0,
+      "maxFlyePlaneError": 0,
+      "maxLoadLengthError": 0,
+      "maxLoadCentreError": 0,
+      "maxLoadOrthogonalError": 0,
+      "maxWorkingLegRadiusError": 0,
+      "maxSoftKneeError": 0,
+      "maxAnkleCuffError": 0,
+      "maxWorkingLegBearingTick": 0,
+      "minSignedCurl": null,
+      "maxSignedCurl": null
+    },
+    {
+      "id": 292,
+      "assetKey": "movement/triceps-pushdown-rope-attachment/demo/v1",
+      "checked": 414,
+      "radiusVariation": 3.552713678800501e-15,
+      "upperVariation": 0,
+      "maxBearingTick": 5.441093739032198,
+      "maxAnchorShift": 0,
+      "maxBoundaryDelta": 1.090487346974541e-10,
+      "worldProjectionError": 1.4210854715202004e-14,
+      "maxGripCenterError": 0,
+      "maxRopeBranchError": 5.329070518200751e-15,
+      "maxFlexionScalarError": 2.5972314576794275e-11,
+      "maxTautAlignmentError": 7.771561172376096e-16,
+      "maxStraightArmError": 0,
+      "maxFlyeBendError": 0,
+      "maxFlyePlaneError": 0,
+      "maxLoadLengthError": 0,
+      "maxLoadCentreError": 0,
+      "maxLoadOrthogonalError": 0,
+      "maxWorkingLegRadiusError": 0,
+      "maxSoftKneeError": 0,
+      "maxAnkleCuffError": 0,
+      "maxWorkingLegBearingTick": 0,
+      "minSignedCurl": null,
+      "maxSignedCurl": null
+    },
+    {
+      "id": 264,
+      "assetKey": "movement/rope-straight-arm-pulldown/demo/v1",
+      "checked": 441,
+      "radiusVariation": 3.552713678800501e-15,
+      "upperVariation": 3.552713678800501e-15,
+      "maxBearingTick": 5.095623710793136,
+      "maxAnchorShift": 0,
+      "maxBoundaryDelta": 1.5141049571605206e-10,
+      "worldProjectionError": 0,
+      "maxGripCenterError": 0,
+      "maxRopeBranchError": 1.7763568394002505e-15,
+      "maxFlexionScalarError": 0,
+      "maxTautAlignmentError": 6.661338147750939e-16,
+      "maxStraightArmError": 3.552713678800501e-15,
+      "maxFlyeBendError": 0,
+      "maxFlyePlaneError": 0,
+      "maxLoadLengthError": 0,
+      "maxLoadCentreError": 0,
+      "maxLoadOrthogonalError": 0,
+      "maxWorkingLegRadiusError": 0,
+      "maxSoftKneeError": 0,
+      "maxAnkleCuffError": 0,
+      "maxWorkingLegBearingTick": 0,
+      "minSignedCurl": null,
+      "maxSignedCurl": null
+    },
+    {
+      "id": 49,
+      "assetKey": "movement/dumbbell-flye/demo/v1",
+      "checked": 378,
+      "radiusVariation": 5.329070518200751e-15,
+      "upperVariation": 5.329070518200751e-15,
+      "maxBearingTick": 2.719189501335478,
+      "maxAnchorShift": 0,
+      "maxBoundaryDelta": 5.666353968843298e-11,
+      "worldProjectionError": 0,
+      "maxGripCenterError": 0,
+      "maxRopeBranchError": 0,
+      "maxFlexionScalarError": 0,
+      "maxTautAlignmentError": 0,
+      "maxStraightArmError": 0,
+      "maxFlyeBendError": 1.2789769243681803e-13,
+      "maxFlyePlaneError": 0,
+      "maxLoadLengthError": 0,
+      "maxLoadCentreError": 0,
+      "maxLoadOrthogonalError": 0,
+      "maxWorkingLegRadiusError": 0,
+      "maxSoftKneeError": 0,
+      "maxAnkleCuffError": 0,
+      "maxWorkingLegBearingTick": 0,
+      "minSignedCurl": null,
+      "maxSignedCurl": null
+    },
+    {
+      "id": 178,
+      "assetKey": "movement/decline-dumbbell-flyes/demo/v1",
+      "checked": 378,
+      "radiusVariation": 5.329070518200751e-15,
+      "upperVariation": 5.329070518200751e-15,
+      "maxBearingTick": 3.3309289605700907,
+      "maxAnchorShift": 0,
+      "maxBoundaryDelta": 6.207879970631513e-11,
+      "worldProjectionError": 0,
+      "maxGripCenterError": 0,
+      "maxRopeBranchError": 0,
+      "maxFlexionScalarError": 0,
+      "maxTautAlignmentError": 0,
+      "maxStraightArmError": 0,
+      "maxFlyeBendError": 1.2789769243681803e-13,
+      "maxFlyePlaneError": 2.220446049250313e-15,
+      "maxLoadLengthError": 3.552713678800501e-15,
+      "maxLoadCentreError": 4.440892098500626e-16,
+      "maxLoadOrthogonalError": 4.618527782440651e-14,
+      "maxWorkingLegRadiusError": 0,
+      "maxSoftKneeError": 0,
+      "maxAnkleCuffError": 0,
+      "maxWorkingLegBearingTick": 0,
+      "minSignedCurl": null,
+      "maxSignedCurl": null
+    },
+    {
+      "id": 220,
+      "assetKey": "movement/incline-dumbbell-flyes/demo/v1",
+      "checked": 378,
+      "radiusVariation": 5.329070518200751e-15,
+      "upperVariation": 5.329070518200751e-15,
+      "maxBearingTick": 1.8069423253818968,
+      "maxAnchorShift": 0,
+      "maxBoundaryDelta": 6.624691421050545e-11,
+      "worldProjectionError": 0,
+      "maxGripCenterError": 0,
+      "maxRopeBranchError": 0,
+      "maxFlexionScalarError": 0,
+      "maxTautAlignmentError": 0,
+      "maxStraightArmError": 0,
+      "maxFlyeBendError": 1.2789769243681803e-13,
+      "maxFlyePlaneError": 2.6645352591003757e-15,
+      "maxLoadLengthError": 1.7763568394002505e-15,
+      "maxLoadCentreError": 3.552713678800501e-15,
+      "maxLoadOrthogonalError": 5.684341886080802e-14,
+      "maxWorkingLegRadiusError": 0,
+      "maxSoftKneeError": 0,
+      "maxAnkleCuffError": 0,
+      "maxWorkingLegBearingTick": 0,
+      "minSignedCurl": null,
+      "maxSignedCurl": null
+    },
+    {
+      "id": 84,
+      "assetKey": "movement/cable-glute-kickback/demo/v1",
+      "checked": 405,
+      "radiusVariation": 3.552713678800501e-15,
+      "upperVariation": 3.552713678800501e-15,
+      "maxBearingTick": 0,
+      "maxAnchorShift": 0,
+      "maxBoundaryDelta": 0,
+      "worldProjectionError": 0,
+      "maxGripCenterError": 0,
+      "maxRopeBranchError": 0,
+      "maxFlexionScalarError": 0,
+      "maxTautAlignmentError": 0,
+      "maxStraightArmError": 0,
+      "maxFlyeBendError": 0,
+      "maxFlyePlaneError": 0,
+      "maxLoadLengthError": 0,
+      "maxLoadCentreError": 0,
+      "maxLoadOrthogonalError": 0,
+      "maxWorkingLegRadiusError": 1.0658141036401503e-14,
+      "maxSoftKneeError": 4.4586556668946287e-13,
+      "maxAnkleCuffError": 0,
+      "maxWorkingLegBearingTick": 1.149540816326526,
+      "minSignedCurl": null,
+      "maxSignedCurl": null
+    },
+    {
+      "id": 52,
+      "assetKey": "movement/dumbbell-reverse-lunge/demo/v1",
+      "checked": 405,
+      "radiusVariation": 7.105427357601002e-15,
+      "upperVariation": 0,
+      "maxBearingTick": 0,
+      "maxAnchorShift": 0,
+      "maxBoundaryDelta": 6.700144060686269e-11,
+      "worldProjectionError": 0,
+      "maxGripCenterError": 0,
+      "maxRopeBranchError": 0,
+      "maxFlexionScalarError": 0,
+      "maxTautAlignmentError": 0,
+      "maxStraightArmError": 0,
+      "maxFlyeBendError": 0,
+      "maxFlyePlaneError": 0,
+      "maxLoadLengthError": 0,
+      "maxLoadCentreError": 0,
+      "maxLoadOrthogonalError": 0,
+      "maxWorkingLegRadiusError": 0,
+      "maxSoftKneeError": 0,
+      "maxAnkleCuffError": 0,
+      "maxWorkingLegBearingTick": 0,
+      "minSignedCurl": null,
+      "maxSignedCurl": null
+    }
+  ],
+  "poseEngineDifferences": [],
+  "unchangedPrimitiveDifferences": [],
+  "intentionalSupportPrimitiveDifferences": [],
+  "priorCycleMatches": [
+    {
+      "id": 143,
+      "body": "neutral",
+      "same": true
+    },
+    {
+      "id": 143,
+      "body": "male",
+      "same": true
+    },
+    {
+      "id": 143,
+      "body": "female",
+      "same": true
+    },
+    {
+      "id": 53,
+      "body": "neutral",
+      "same": true
+    },
+    {
+      "id": 53,
+      "body": "male",
+      "same": true
+    },
+    {
+      "id": 53,
+      "body": "female",
+      "same": true
+    },
+    {
+      "id": 82,
+      "body": "neutral",
+      "same": true
+    },
+    {
+      "id": 82,
+      "body": "male",
+      "same": true
+    },
+    {
+      "id": 82,
+      "body": "female",
+      "same": true
+    },
+    {
+      "id": 138,
+      "body": "neutral",
+      "same": true
+    },
+    {
+      "id": 138,
+      "body": "male",
+      "same": true
+    },
+    {
+      "id": 138,
+      "body": "female",
+      "same": true
+    },
+    {
+      "id": 163,
+      "body": "neutral",
+      "same": true
+    },
+    {
+      "id": 163,
+      "body": "male",
+      "same": true
+    },
+    {
+      "id": 163,
+      "body": "female",
+      "same": true
+    },
+    {
+      "id": 92,
+      "body": "neutral",
+      "same": true
+    },
+    {
+      "id": 92,
+      "body": "male",
+      "same": true
+    },
+    {
+      "id": 92,
+      "body": "female",
+      "same": true
+    },
+    {
+      "id": 158,
+      "body": "neutral",
+      "same": true
+    },
+    {
+      "id": 158,
+      "body": "male",
+      "same": true
+    },
+    {
+      "id": 158,
+      "body": "female",
+      "same": true
+    },
+    {
+      "id": 253,
+      "body": "neutral",
+      "same": true
+    },
+    {
+      "id": 253,
+      "body": "male",
+      "same": true
+    },
+    {
+      "id": 253,
+      "body": "female",
+      "same": true
+    },
+    {
+      "id": 80,
+      "body": "neutral",
+      "same": true
+    },
+    {
+      "id": 80,
+      "body": "male",
+      "same": true
+    },
+    {
+      "id": 80,
+      "body": "female",
+      "same": true
+    },
+    {
+      "id": 262,
+      "body": "neutral",
+      "same": true
+    },
+    {
+      "id": 262,
+      "body": "male",
+      "same": true
+    },
+    {
+      "id": 262,
+      "body": "female",
+      "same": true
+    },
+    {
+      "id": 292,
+      "body": "neutral",
+      "same": true
+    },
+    {
+      "id": 292,
+      "body": "male",
+      "same": true
+    },
+    {
+      "id": 292,
+      "body": "female",
+      "same": true
+    },
+    {
+      "id": 264,
+      "body": "neutral",
+      "same": true
+    },
+    {
+      "id": 264,
+      "body": "male",
+      "same": true
+    },
+    {
+      "id": 264,
+      "body": "female",
+      "same": true
+    },
+    {
+      "id": 49,
+      "body": "neutral",
+      "same": true
+    },
+    {
+      "id": 49,
+      "body": "male",
+      "same": true
+    },
+    {
+      "id": 49,
+      "body": "female",
+      "same": true
+    },
+    {
+      "id": 178,
+      "body": "neutral",
+      "same": true
+    },
+    {
+      "id": 178,
+      "body": "male",
+      "same": true
+    },
+    {
+      "id": 178,
+      "body": "female",
+      "same": true
+    },
+    {
+      "id": 220,
+      "body": "neutral",
+      "same": true
+    },
+    {
+      "id": 220,
+      "body": "male",
+      "same": true
+    },
+    {
+      "id": 220,
+      "body": "female",
+      "same": true
+    },
+    {
+      "id": 84,
+      "body": "neutral",
+      "same": true
+    },
+    {
+      "id": 84,
+      "body": "male",
+      "same": true
+    },
+    {
+      "id": 84,
+      "body": "female",
+      "same": true
+    }
+  ],
+  "priorEntriesChecked": 137,
+  "priorGeometryChanges": [],
+  "budgets": {
+    "rawBytes": 406094,
+    "gzipBytes": 61699,
+    "maxFamilyBytes": 40322,
+    "limits": {
+      "rawBytes": 1048576,
+      "gzipBytes": 196608,
+      "familyBytes": 65536,
+      "singleFamilyMaxBytes": 262144,
+      "allFamiliesMaxBytes": 2097152
+    }
+  },
+  "errors": [
+    {
+      "type": "cache",
+      "cached": "tools/rendering/.build/canonicalFigure.js"
+    },
+    {
+      "type": "cache",
+      "cached": "tools/rendering/.build-derivation/canonicalFigure.js"
+    }
+  ],
+  "pass": false
+}

@@ -1,0 +1,43 @@
+source commit: 88eaa486c56f8ef723e405bf1cfaa20dc070e218
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with identity-mov28.json
+
+movements measured: 176 (baseline 176)
+added: none
+removed: none
+changed, expected: none
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  128 Alternating Floor Press: drawn 89928a3c6cb5e4ec0f43b91a66de19458bf12a48a0b2287482436c600bd8f13a captions 0eb765b71b26e4e11b7d4c640ec3e39f81377c851789f1435e10cd0cd0d2bdec stage 240.00x132.88 cycle 3540 ms
+  133 Barbell Bench Press - Medium Grip: drawn 0bbca1e258d19a1307bb0006ff300f3e8e22deace8f33f6bf1fae7fd65489519 captions 3d9ff98f0ad0388d3ad3096f7c0833901161f7299c24f2a5be925177ce09c5cc stage 222.44x240.00 cycle 3100 ms
+  117 Cable Rope Rear-Delt Rows: drawn 8f713349b2f967bd44742fcab68a95c71f2c13d94eb6d9f5f0c8743089d997d2 captions f3f5f7fdb613660de1190633d19f615da2587b91c75ceb632696cc6351872f99 stage 211.43x240.00 cycle 3020 ms
+  32 Band External Rotation: drawn a9121cbfd7bc66976b1a9322aa93e08b7f7d01f422690bd417c82eea86faced0 captions 96554df132e537b0ca09dbf1747e74f3d8b52216ed5e8c44d87abcac4b524e32 stage 186.67x240.00 cycle 4080 ms
+  127 Alternating Cable Shoulder Press: drawn 19da5367d96e7316a3bd253e1b73fac741072230d1a3c668b75dd5437118f2ae captions 5a0e44f3512e776bbde0e56c87d8cfc87b669eb20325733e5435aae5378e0d17 stage 177.60x240.00 cycle 3700 ms
+  15 Kettlebell Swing: drawn 725c94e4a98f4c27cfcf762af5a76d48d7c5547227f9a118cc5cdecdd9871659 captions deaf60ae58b2aa817f158e883eca3ef80d7982d5ed0f2a065086cdb64e72bd9b stage 158.30x240.00 cycle 1400 ms
+  11 Dumbbell Shoulder Press: drawn 5f20d97de94d68e8fbb0475c51fd67d3b31875817c815a5fa28d8ea76de0df33 captions 8ab22dee6a790f0c5c08db7e1252bd2e66528c1b845f4ee51b116548b732149b stage 117.21x240.00 cycle 3160 ms
+  103 One Arm Lat Pulldown: drawn f2efcc6db113c6c2540b5e9e19a4c2514a320f5a7d49a8616adffca649ee319a captions a25ac103fd4c7c6731d226ae3196a2bbf9e5370b470e4060670e2cab6cfa3fd9 stage 160.00x240.00 cycle 3920 ms
+  19 Farmer Carry: drawn 0c88f6d2a86f239f93705cd3bee80f084ec36e603a69bbcb1715751d7f790697 captions 0286188d1d1f5217954a9474f5d137437f254b767a202d0303ceffffd1097899 stage 122.55x240.00 cycle 3840 ms
+  20 Suitcase Carry: drawn 1a6d8f36e077977c7ec0b1343e81a041aea44fd1e227cf5d3966b135a8df8bb5 captions 950e968b6aeca79820ec576173ca979abc82c7bbc3345e496cb1c857c3e66d63 stage 122.55x240.00 cycle 3840 ms
+  134 Barbell Incline Bench Press - Medium Grip: drawn f67e263295b3c5e39cb64040eb73ed78bced5c9ca753d590662dc7ff26d354fe captions cbdbbf7e02615f35e4e62467d0103d0e03cc35b7eb97389376d753158d9bb982 stage 214.88x240.00 cycle 3940 ms
+  218 Incline Dumbbell Bench With Palms Facing In: drawn 4bbf902f919f3e627fd31a1f8f0c86bf31bec89ada5a1599fbc07b9824683c16 captions f300a5ed3c2487f05fa9e5c5b12eee842017fdf07210a4f0dae5cfef0de19405 stage 214.88x240.00 cycle 3660 ms
+  24 Band Pull-Apart: drawn 19e7b7114fd9830ad7a6995ddd51e6635e279bfa0dce1d8d1cf075f7e07b1e2c captions 37be0e23003c9c2e8511c5943ca4ec7a9adbb3b7bee22cecf7453216caae7864 stage 219.13x240.00 cycle 2400 ms
+  159 Cable Rear Delt Fly: drawn b704c637530d26eb516ea81685826e3c4d79dad724743792a5b8bc4840a7040a captions dcf17d44a3b40b829e86b003e85affcba8636b36461daed939b530913d0dc70a stage 211.52x240.00 cycle 4580 ms
+  111 Barbell Seated Calf Raise: drawn c95edbfd8bc311782e0656b6d90653bc4adcac1acc96bc985dafe1794826c1d1 captions 3378bf9df08fe05a70d879a749c75c7ab574f630720e987bbbea7c1790f133fd stage 186.67x240.00 cycle 2980 ms
+  191 Dumbbell Seated One-Leg Calf Raise: drawn e43167b65708f1a1059784ceec1ffaa549efa1a70f9fcf282e570955b5649294 captions 63e9ab8e617b9c419adc0f4e7bb9fca681d654d56267f32a647373aa584e3858 stage 186.67x240.00 cycle 2980 ms
+  26 Plank: drawn 647bfeed07ffbb18db3010e09de1f1f86fce7a057196ca54bf5b25e1bc373b36 captions 47cb2db21f9a11236191b4f0b062ab1b5de228d439f968aa88b5a326982aa6f7 stage 240.00x117.21 cycle 2320 ms
+  42 Chest-Supported Dumbbell Row: drawn ca3909b3d176967e6dbf9d1f5c3316283d9476eb5859c1041cdbd143e20561f7 captions c5f18ae91b0d2201a1139a15d2d9ee72a8e6c8e07a87c22d9283279a26d70290 stage 221.35x240.00 cycle 2140 ms
+  44 Dead Bug: drawn 462e3617b03fd9c4c251e7d3b4eb5648f5e2f5d84201bda957ede76c956c723c captions f3e5f28e8de7f81629301231c1756fec1d2eb826158fcc256bb7c20de762fffa stage 240.00x153.19 cycle 3280 ms
+  60 Feet-Elevated Push-Up: drawn a92cb6e211bbcb717b22224a6865f9ebba0a77d973aab36a257dc97e2874699e captions fc87523495be8390bfcd667029e055fe318cae1d35de94fa1db296cbba22024d stage 240.00x127.35 cycle 2140 ms
+  255 Push-Up Wide: drawn c6ef7ea644a5324ea42d69f4c30d9436ec9fa15183e1ea8ec7dba3447e46d16c captions 2cc9bda1e6f13ca35ca0ad198881cf04c3a6c53bd8cf9815ea5d6dea16f4422a stage 240.00x127.35 cycle 2140 ms
+  116 Cable Rope Overhead Triceps Extension: drawn 93eecd6e4d67530220ba907bda7ac2a4a7b9a86d03fd5d9e55e1cf55498c2661 captions 28a38ce72768fb40aa9b10c4ac422f956eb007a1c330a84cbbb7cac9eb897a3c stage 193.31x240.00 cycle 2140 ms
+  282 Standing Dumbbell Triceps Extension: drawn e2f51f11e5af5318e20ab38052b8e1091e92faf632a1c833f443242b24b2a7ba captions 540e084054561490e7cd61ebf9d30b5aa969ed3c256ff801500553657c31a86c stage 184.12x240.00 cycle 2140 ms
+  283 Standing Overhead Barbell Triceps Extension: drawn 0e91eab73fdf3c9d2e10cecaa21af6268777d85aff234e65db6e141945a93566 captions 590126787b3983df14a20de17c3bf44ab08de205e63e90bb4742ed6bdc3621db stage 193.31x240.00 cycle 2140 ms
+  225 Jackknife Sit-Up: drawn bc6f4d6a5911426e258d84c3acaf5bf8027e8fe15fae28942e84d6c674967053 captions a77398eae15fcf4db57637e68c9599baced93223f5f261566dc3338b2da2396d stage 240.00x161.66 cycle 2140 ms
+  90 Incline Push-Up: drawn 3a606e66768ad865f77f9a23396baf3fcf3fee6439c6256cb94473a717045e72 captions 50aba4caa2b00ff5e31cf4622a6df770e369369896eb44130e431d32bc0e3bca stage 240.00x197.27 cycle 2140 ms
+  222 Incline Push-Up Close-Grip: drawn 1585657177fd37a62228d2d7db4f31a3eebf68f471c6b7688c3dc0e5c0d27d4d captions 0d2765ef2d4588438c88115a58b7a403be5afa93123e659e4c24054e21dd275c stage 240.00x201.94 cycle 2140 ms
+  223 Incline Push-Up Wide: drawn a9bb8c6360ebbaf069744ed9b415b117ca675287b1f944e7897f90051e52083c captions 0a36609d53f817197d457598969c3775a5f77c32a7a67bc1e5b4f2fe82c92a40 stage 240.00x192.37 cycle 2140 ms
+  73 Russian Twist: drawn bae603bc913d54defc829d5b9c2857feff67e4712f547b2368692fc76cc269e2 captions ce041ab14d4b06e9d70150edc93b9e4ff017a64fb52e8d0b5be69ded9445efe4 stage 240.00x153.19 cycle 2140 ms
+  29 Glute Bridge: drawn 648392165e704215dd986682f3a54a289af2616341c53dbb3bf01202c2388aa0 captions 62068d0f60aea95d22480fac7bf7d8eaab8179651083e93896948e6fcaa7ea21 stage 240.00x153.19 cycle 2140 ms
+  75 Single-Leg Glute Bridge: drawn f1e80cf4da8a2c182765a071882094f27e830bf3e4a2488a352d55662daa9acf captions 2503b77dc7568702f45735d272dbca5ac00213ca8bcd94d5679100ca39fc2c2d stage 240.00x153.19 cycle 2140 ms
+  51 Dumbbell Lunge: drawn a104f47541574202cb59c40fdff98e3d95d05c12b10128ff165689806826b49e captions 61f557893b2b59083e5fb56db2e81b85095be0cc5e40977c6fc0fcdcd6277cdb stage 218.67x240.00 cycle 2140 ms
+  122 Kneeling Single-Arm High Pulley Row: drawn ee0adcf970ec802ea85ea428d121b7d009273d40de5371a965f6c7a56f6ee938 captions 79f9f5b563cd1b7f8a170c58541f3f17486be2e74ba3899c712c1c9b9d9b4430 stage 223.64x240.00 cycle 2140 ms
+exit code: 0 (probe run exit 0)

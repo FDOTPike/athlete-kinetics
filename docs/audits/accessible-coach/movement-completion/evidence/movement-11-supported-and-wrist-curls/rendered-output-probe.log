@@ -1,0 +1,15 @@
+source commit: 78e51522d0331fcb801172225345b2baca1096aa
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with identity-mov10.json
+
+movements measured: 152 (baseline 147)
+added: 276 Spider Curl; 171 Concentration Curls; 268 Seated Dumbbell Palms-Down Wrist Curl; 269 Seated Dumbbell Palms-Up Wrist Curl; 164 Cable Wrist Curl
+removed: none
+changed, expected: none
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  276 Spider Curl: drawn cb66f3ffdbafaac8f06c83a62d139d4ff68257b1603e10936fe9a3e2e658bffe captions 9114b3497ee71cc34e1df5e8c7fa159e8fa011362aa685ffc3d7c1d34d54eaaa stage 219.26x240.00 cycle 4200 ms
+  171 Concentration Curls: drawn eb82156551734465157eeef7417c140957c14841b782f31728b1c1611f04482c captions eacffa968f7d0a4bcb9ea88ca5b951fb25eab926f444f42e54999156a1dd607f stage 193.55x240.00 cycle 4200 ms
+  268 Seated Dumbbell Palms-Down Wrist Curl: drawn f48dbb7e3e3fcb13d703a12d3dbc17fe59ad3aff95ea163dc617a233c8388314 captions ba02826e9afeb3b938ee7df3424b18a1f5025d790f0aeab49eed0a37d345b5c2 stage 224.76x240.00 cycle 3500 ms
+  269 Seated Dumbbell Palms-Up Wrist Curl: drawn 4005dcd3f19468b71740279b520b9c23e5c4363dfce46797edadfae04faf9d13 captions eb1124ea7a9a681d4a3037063dd2da6249f2eef12d22068294199df97cf55cfe stage 224.76x240.00 cycle 3500 ms
+  164 Cable Wrist Curl: drawn 07a428817ff6b26e88b827f479a196ddee918d681ae84ceecf66e36d0e84307e captions ad464963b060d41b1535ecde70e149e43d4487e878e9ffe5430ee836321f8d44 stage 240.00x175.81 cycle 3800 ms
+exit code: 0 (probe run exit 0)

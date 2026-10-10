@@ -1,0 +1,80 @@
+﻿node.exe : FAIL apps/mobile/test/components/MovementPreview.canonicalFrameFit.test.js (5.429 s)
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Users\fpike\AppData\Roaming\ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (FAIL apps/mobil...st.js (5.429 s):String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+  MovementPreview canonical stage and frame fit
+    ├ù 52 all painted limbs and floor line lie within the visible frame window (neutral) (571 ms)
+    ├ù 52 all painted limbs and floor line lie within the visible frame window (male) (54 ms)
+    ├ù 52 all painted limbs and floor line lie within the visible frame window (female) (44 ms)
+
+  ΓùÅ MovementPreview canonical stage and frame fit ΓÇ║ 52 all painted limbs and floor line lie within the visible 
+frame window (neutral)
+
+    expect(received).toBeLessThanOrEqual(expected)
+
+    Expected: <= 205.71428571428572
+    Received:    227.25
+
+    [0m [90m  99 |[39m         expect(floor)[33m.[39mtoBeDefined()[33m;[39m
+     [90m 100 |[39m         expect(floor[33m.[39mtop)[33m.[39mtoBeGreaterThanOrEqual(visibleMinY)[33m;[39m
+    [31m[1m>[22m[39m[90m 101 |[39m         
+expect(floor[33m.[39mtop)[33m.[39mtoBeLessThanOrEqual(visibleMaxY)[33m;[39m
+     [90m     |[39m                           [31m[1m^[22m[39m
+     [90m 102 |[39m
+     [90m 103 |[39m         [90m// All rendered primitive views must lie within visible window[39m
+     [90m 104 |[39m         [36mfor[39m ([36mconst[39m child [36mof[39m children) {[0m
+
+      at toBeLessThanOrEqual (test/components/MovementPreview.canonicalFrameFit.test.js:101:27)
+      at asyncGeneratorStep (../../node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ΓùÅ MovementPreview canonical stage and frame fit ΓÇ║ 52 all painted limbs and floor line lie within the visible 
+frame window (male)
+
+    expect(received).toBeLessThanOrEqual(expected)
+
+    Expected: <= 205.71428571428572
+    Received:    227.25
+
+    [0m [90m  99 |[39m         expect(floor)[33m.[39mtoBeDefined()[33m;[39m
+     [90m 100 |[39m         expect(floor[33m.[39mtop)[33m.[39mtoBeGreaterThanOrEqual(visibleMinY)[33m;[39m
+    [31m[1m>[22m[39m[90m 101 |[39m         
+expect(floor[33m.[39mtop)[33m.[39mtoBeLessThanOrEqual(visibleMaxY)[33m;[39m
+     [90m     |[39m                           [31m[1m^[22m[39m
+     [90m 102 |[39m
+     [90m 103 |[39m         [90m// All rendered primitive views must lie within visible window[39m
+     [90m 104 |[39m         [36mfor[39m ([36mconst[39m child [36mof[39m children) {[0m
+
+      at toBeLessThanOrEqual (test/components/MovementPreview.canonicalFrameFit.test.js:101:27)
+      at asyncGeneratorStep (../../node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ΓùÅ MovementPreview canonical stage and frame fit ΓÇ║ 52 all painted limbs and floor line lie within the visible 
+frame window (female)
+
+    expect(received).toBeLessThanOrEqual(expected)
+
+    Expected: <= 205.71428571428572
+    Received:    227.25
+
+    [0m [90m  99 |[39m         expect(floor)[33m.[39mtoBeDefined()[33m;[39m
+     [90m 100 |[39m         expect(floor[33m.[39mtop)[33m.[39mtoBeGreaterThanOrEqual(visibleMinY)[33m;[39m
+    [31m[1m>[22m[39m[90m 101 |[39m         
+expect(floor[33m.[39mtop)[33m.[39mtoBeLessThanOrEqual(visibleMaxY)[33m;[39m
+     [90m     |[39m                           [31m[1m^[22m[39m
+     [90m 102 |[39m
+     [90m 103 |[39m         [90m// All rendered primitive views must lie within visible window[39m
+     [90m 104 |[39m         [36mfor[39m ([36mconst[39m child [36mof[39m children) {[0m
+
+      at toBeLessThanOrEqual (test/components/MovementPreview.canonicalFrameFit.test.js:101:27)
+      at asyncGeneratorStep (../../node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+Test Suites: 1 failed, 1 total
+Tests:       3 failed, 3 total
+Snapshots:   0 total
+Time:        6.114 s, estimated 9 s
+Ran all test suites matching /apps\\mobile\\test\\components\\MovementPreview.canonicalFrameFit.test.js/i.

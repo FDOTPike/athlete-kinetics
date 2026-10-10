@@ -1,0 +1,74 @@
+FAIL ../../../visualizations/2026/10/04/01a10600-ce62-7120-b660-90110f93f889/audit/motion-completion/runtime-release-integration-v8/reverse-native-contact.test.js (8.752 s)
+  × 52 actual RN front sole and rear toe contact the native floor (52) (1820 ms)
+  × 52 actual RN front sole and rear toe contact the native floor (52) (32 ms)
+  × 52 actual RN front sole and rear toe contact the native floor (52) (30 ms)
+
+  ● 52 actual RN front sole and rear toe contact the native floor (52)
+
+    expect(received).toBeLessThan(expected)
+
+    Expected: < 0.05
+    Received:   3.299999999999983
+
+      46 |    const bottom=center(foot)[1]+(foot.width/2-r)*Math.abs(Math.sin(theta))+(foot.height/2-r)*Math.abs(Math.cos(theta))+r,gap=floor.top-bottom;
+      47 |    contacts.push({body:bodyName,frame,phase:entry.frames[frame].joints.rl,side:nearSide?'front':'rear',floorTopDp:floor.top,paintedBottomDp:bottom,gapDp:gap,foot});
+    > 48 |    expect(gap).toBeGreaterThanOrEqual(-.05);expect(Math.abs(gap)).toBeLessThan(.05);
+         |                                                                   ^
+      49 |   }
+      50 |   fireEvent.press(control());noPlayback();
+      51 |  }
+
+      at toBeLessThan (../../../../../visualizations/2026/10/04/01a10600-ce62-7120-b660-90110f93f889/audit/motion-completion/runtime-release-integration-v8/reverse-native-contact.test.js:48:67)
+          at _loop.next (<anonymous>)
+      at _loop (../../../../../visualizations/2026/10/04/01a10600-ce62-7120-b660-90110f93f889/audit/motion-completion/runtime-release-integration-v8/reverse-native-contact.test.js:44:37)
+      at asyncGeneratorStep (../../../../release-feature-audit-2026-10-04/Athlete App/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../../../release-feature-audit-2026-10-04/Athlete App/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● 52 actual RN front sole and rear toe contact the native floor (52)
+
+    expect(received).toBeLessThan(expected)
+
+    Expected: < 0.05
+    Received:   3.5749999999999886
+
+      46 |    const bottom=center(foot)[1]+(foot.width/2-r)*Math.abs(Math.sin(theta))+(foot.height/2-r)*Math.abs(Math.cos(theta))+r,gap=floor.top-bottom;
+      47 |    contacts.push({body:bodyName,frame,phase:entry.frames[frame].joints.rl,side:nearSide?'front':'rear',floorTopDp:floor.top,paintedBottomDp:bottom,gapDp:gap,foot});
+    > 48 |    expect(gap).toBeGreaterThanOrEqual(-.05);expect(Math.abs(gap)).toBeLessThan(.05);
+         |                                                                   ^
+      49 |   }
+      50 |   fireEvent.press(control());noPlayback();
+      51 |  }
+
+      at toBeLessThan (../../../../../visualizations/2026/10/04/01a10600-ce62-7120-b660-90110f93f889/audit/motion-completion/runtime-release-integration-v8/reverse-native-contact.test.js:48:67)
+          at _loop.next (<anonymous>)
+      at _loop (../../../../../visualizations/2026/10/04/01a10600-ce62-7120-b660-90110f93f889/audit/motion-completion/runtime-release-integration-v8/reverse-native-contact.test.js:44:37)
+      at asyncGeneratorStep (../../../../release-feature-audit-2026-10-04/Athlete App/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../../../release-feature-audit-2026-10-04/Athlete App/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+  ● 52 actual RN front sole and rear toe contact the native floor (52)
+
+    expect(received).toBeLessThan(expected)
+
+    Expected: < 0.05
+    Received:   3.0250000000000057
+
+      46 |    const bottom=center(foot)[1]+(foot.width/2-r)*Math.abs(Math.sin(theta))+(foot.height/2-r)*Math.abs(Math.cos(theta))+r,gap=floor.top-bottom;
+      47 |    contacts.push({body:bodyName,frame,phase:entry.frames[frame].joints.rl,side:nearSide?'front':'rear',floorTopDp:floor.top,paintedBottomDp:bottom,gapDp:gap,foot});
+    > 48 |    expect(gap).toBeGreaterThanOrEqual(-.05);expect(Math.abs(gap)).toBeLessThan(.05);
+         |                                                                   ^
+      49 |   }
+      50 |   fireEvent.press(control());noPlayback();
+      51 |  }
+
+      at toBeLessThan (../../../../../visualizations/2026/10/04/01a10600-ce62-7120-b660-90110f93f889/audit/motion-completion/runtime-release-integration-v8/reverse-native-contact.test.js:48:67)
+          at _loop.next (<anonymous>)
+      at _loop (../../../../../visualizations/2026/10/04/01a10600-ce62-7120-b660-90110f93f889/audit/motion-completion/runtime-release-integration-v8/reverse-native-contact.test.js:44:37)
+      at asyncGeneratorStep (../../../../release-feature-audit-2026-10-04/Athlete App/node_modules/@babel/runtime/helpers/asyncToGenerator.js:3:17)
+      at _next (../../../../release-feature-audit-2026-10-04/Athlete App/node_modules/@babel/runtime/helpers/asyncToGenerator.js:17:9)
+
+Test Suites: 1 failed, 1 total
+Tests:       3 failed, 3 total
+Snapshots:   0 total
+Time:        11.086 s
+Ran all test suites.
+Test results written to: ..\..\..\visualizations\2026\10\04\01a10600-ce62-7120-b660-90110f93f889\audit\motion-completion\runtime-release-integration-v8\contact-jest-results.json

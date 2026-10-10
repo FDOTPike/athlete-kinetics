@@ -1,0 +1,12 @@
+source commit: 48765564e336496108768c635b364065953c5900
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with identity-mov05.json
+
+movements measured: 138 (baseline 136)
+added: 87 Dumbbell Front Raise; 206 Front Cable Raise
+removed: none
+changed, expected: none
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  87 Dumbbell Front Raise: drawn 6ca0fdfacb079e94ebd286e4f01b8558e5762ee08d7a90099f3dd8c4e55c5d8e captions 8bc53bc866441eb96eaed80b3e337f902f639fb5dcbf42b3487087a746f0bc42 stage 142.98x240.00 cycle 2900 ms
+  206 Front Cable Raise: drawn 603333ca95c6182d12d5c65559cff43d78b04ca628d737e1681810e99f0828fa captions a8332309cabae823474de05669d99fbfaf2af7eea78624be54f4526597e6059a stage 173.62x240.00 cycle 3800 ms
+exit code: 0 (probe run exit 0)

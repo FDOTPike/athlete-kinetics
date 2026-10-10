@@ -1,0 +1,655 @@
+{
+  "sourceCommit": "d3bfe0a2d00b9067583cb74f585701f894440948",
+  "sourcesCommittedAtRender": true,
+  "previewDataSha256": "8ea9465b0d869cf5f5358f42ad5c8e7e165cca14d1ccb4b02784faeca94b8027",
+  "rendering": "Headless production primitives; no native FPS or technique approval.",
+  "sourceHashes": {
+    "apps/mobile/src/components/movementPreview/previewIndex.json": "d7b94a57668344bcc505251effef48c92a3d1c55d1a4b0251d99edf214e42c2e",
+    "apps/mobile/src/components/movementPreview/families/calf-raise__seated.json": "a5505d974257a0cb3206dbb16e86f5b4eb5158b73316bc59c154863652c282fc",
+    "apps/mobile/src/components/movementPreview/families/calf-raise__standing.json": "48d8d9d37e5216d899e9d88c5e410341aad6a84880eae12a09ec805d5de5900f",
+    "apps/mobile/src/components/movementPreview/families/carry__standing.json": "84e2d2d0e2dbc74b20b7a4e45e7b6cf73cfa1b11f06de8352bc852280f0d91b1",
+    "apps/mobile/src/components/movementPreview/families/dead-bug__supine.json": "7238a4f476b84225365f570d07099ef37e52435c86d392145f3ea2f75ac7bdc4",
+    "apps/mobile/src/components/movementPreview/families/elbow-extension__standing-overhead.json": "53202d5bbade091d9651581c3d10e76a4ee6a75ef7105156bab2e160a4dadac9",
+    "apps/mobile/src/components/movementPreview/families/elbow-extension__standing-pushdown.json": "90f47cc370395e1f4f5865771042646b906d2900888920093ff62a1ef0d903c7",
+    "apps/mobile/src/components/movementPreview/families/elbow-flexion__preacher.json": "0355638f947b68167280b6cbc4f88b38acd20bf9ce656d3af5abaacd1afa7e23",
+    "apps/mobile/src/components/movementPreview/families/elbow-flexion__standing.json": "2210f422efd0319444802d2cd8efd468d83c8aa47ab4862762c760b64fb60d1c",
+    "apps/mobile/src/components/movementPreview/families/face-pull__standing.json": "5233dd4ac70c38daa6593f753c9db4468c3558cc00e70e8abe7d084060b2576a",
+    "apps/mobile/src/components/movementPreview/families/flye__decline.json": "60d0283ba05520d9d06d402b256c27a22a1abdf883af13161b86d46cbec12113",
+    "apps/mobile/src/components/movementPreview/families/flye__incline.json": "784fef14e0ef35a4bfa3d466de46eff4e22c1e580951abb7afd2294673d9ca93",
+    "apps/mobile/src/components/movementPreview/families/flye__supine.json": "4f288c187ed4fb70fd716de50598dee3fdfe2783628669fffef9ec8cf8576432",
+    "apps/mobile/src/components/movementPreview/families/front-raise__incline.json": "1505c308d5616418497e2892b29cf65cb0d78388969ee26104af3bc9c8502710",
+    "apps/mobile/src/components/movementPreview/families/glute-kickback__standing.json": "505e9b914ec3d576787f88564b17602315032990cdcf9d9d82e8a3bec7f10afc",
+    "apps/mobile/src/components/movementPreview/families/hip-extension__standing.json": "44c367c41f82abf647a5c1e345811d81de06ca12d0d7ce6b7fac16c4e4360e4e",
+    "apps/mobile/src/components/movementPreview/families/hip-extension__supine.json": "02801c78342ba895dcbad701795caacfdc024bc087e6161797f2e53bd9ec3aa4",
+    "apps/mobile/src/components/movementPreview/families/hip-hinge__standing.json": "6f6751402288cee90c3a9276d7dcfbf559beb2f520035aa62e74193b2b9ff6ab",
+    "apps/mobile/src/components/movementPreview/families/horizontal-press__incline.json": "05c62c969d1c4523091218bf6e8bbf25aa3f466c14a1b13d188a50821b39b8ee",
+    "apps/mobile/src/components/movementPreview/families/horizontal-press__supine.json": "f02b4ebdd05b9c1f357cd3cad8c69e43d21a6aa839fbaf5ca343905339f4e3b6",
+    "apps/mobile/src/components/movementPreview/families/horizontal-pull__bent-over.json": "78eee86c604524a3d53e405052883e28b14de1258b2749a356b20d0a9f412ffd",
+    "apps/mobile/src/components/movementPreview/families/horizontal-pull__kneeling.json": "65a767fcb91de0319482851a63c4015817ca6f20552fe0c4ebff8120b30b39e9",
+    "apps/mobile/src/components/movementPreview/families/horizontal-pull__prone-supported.json": "c1bcbcf65a9a102441077080a872b72fbf5d02713288a08ec6b91be89eea85f3",
+    "apps/mobile/src/components/movementPreview/families/horizontal-pull__seated.json": "a690cf1dc453f422f8592c44c5128145f167f1fe84d2d227fb81d66c7deb1146",
+    "apps/mobile/src/components/movementPreview/families/horizontal-pull__standing.json": "9d5ae1ca045621f87d150913f9325718f00f5d1d870552278c443470c37eaa14",
+    "apps/mobile/src/components/movementPreview/families/locomotion__standing.json": "8627d8fc74cda7e64ff7dccdf8b4d32e952dcc96e9a642473327490e2f9f112a",
+    "apps/mobile/src/components/movementPreview/families/lunge__reverse.json": "94d1b96239d8b96c0713fbd793c6ff8714b8e79787cd83c9db378d162234fa4e",
+    "apps/mobile/src/components/movementPreview/families/lunge__split-stance.json": "d0a6553ca3c4269ecc754cbe9e9e2964eeb6ae6d013ae2122bbbc964ddf39975",
+    "apps/mobile/src/components/movementPreview/families/lunge__standing.json": "faae291edf7a3252d92a98d27193ae6273f66ccf2cdc683d46d01c3ac51e0d65",
+    "apps/mobile/src/components/movementPreview/families/lunge__traveling.json": "642f640bf0ff77c2cc5ccfb61ed8ccd242e1495a5cc4f9702dd53cdaed6872c0",
+    "apps/mobile/src/components/movementPreview/families/pallof__standing.json": "ee1f09ddebd84c55a45a37312d588057a80eefcac2b5a3066e6266a0debb9928",
+    "apps/mobile/src/components/movementPreview/families/plank__prone.json": "69f9360eadca89e88e85cef4f13794c8769e691933ab44abf69e7b42d4525eaa",
+    "apps/mobile/src/components/movementPreview/families/push-up__floor.json": "fabcae79a82c0b5f6b0e4f263410b89f325755ee647cac34240d50e0313b44b0",
+    "apps/mobile/src/components/movementPreview/families/push-up__incline.json": "b239070a3cafbd399da04529c12e9005516e8f0d3633047779a597783638cd72",
+    "apps/mobile/src/components/movementPreview/families/rear-delt__bent-over.json": "45079dda4fff3511b9b1a7c4326f8a2495fe73c0e6408a37c12061caadc34559",
+    "apps/mobile/src/components/movementPreview/families/rear-delt__standing.json": "8c8d59f8f17c91e6e0c3c565daf45ae6bef85dc2ed9649ca0f829a5b3fff3faa",
+    "apps/mobile/src/components/movementPreview/families/shoulder-rotation__standing.json": "e2d89e7ee72d58d876d79764ea6199b72949baae7f65f753a19e4bf2a8f8748d",
+    "apps/mobile/src/components/movementPreview/families/shrug__standing.json": "fe85f671fbe7184a93b3907d9ed667b001b4d6d8c79ac69086619b8de09585e6",
+    "apps/mobile/src/components/movementPreview/families/squat__standing.json": "66349c1d5f3b299174b0182ceca8de0084fa092ad7cef11bec730b2f9af942aa",
+    "apps/mobile/src/components/movementPreview/families/squat__sumo-stance.json": "21dea099db7ccd83678a1e282ada75cf142bdc35ba5df8717151f3752fc46d03",
+    "apps/mobile/src/components/movementPreview/families/straight-arm-pulldown__standing.json": "565c1f2ac2912469e0705dfe4092a2bfa793c34306b44aea4ffeb7778c16567d",
+    "apps/mobile/src/components/movementPreview/families/trunk-flex__seated.json": "ebaf8e879b4ab9f444f6eccf99aafab5dc24f702e7f2e42484f8d1ec873fef9d",
+    "apps/mobile/src/components/movementPreview/families/trunk-flex__standing.json": "645d759ac6cc21c737c75e3279302ec686839f8a2c0958f9c0ddff4c73f87794",
+    "apps/mobile/src/components/movementPreview/families/trunk-flex__supine.json": "8d7390c4c69a33768dcd8cede309e948755a2a161852b1c8df17d8a7f3a150b9",
+    "apps/mobile/src/components/movementPreview/families/trunk-twist__supine.json": "0c2c206b11ab6c6680784d9d9815296fa805632718673a5237979239c6368f68",
+    "apps/mobile/src/components/movementPreview/families/vertical-press__seated.json": "63bce93cd850a244a48192a2294d3f2584fd34c6054a19d258916805a9d08bcd",
+    "apps/mobile/src/components/movementPreview/families/vertical-press__standing.json": "6f8a0773a6c73f5f9914bb9c62c34ba88a97cb82645b7ecf8ed293a348dcfe44",
+    "apps/mobile/src/components/movementPreview/families/vertical-pull__standing.json": "df9712df793faebf96ccde69b9bab7b084c49b30aa5f8839c79aad47a973d7f8",
+    "apps/mobile/src/components/movementPreview/canonicalFigure.ts": "4764737a266ab57c15f411501059cb5295ce77a2f7857b4f152b677084b128af",
+    "apps/mobile/src/components/movementPreview/derivation.ts": "10689809b038fbdac8d327f98eb9462409467c869c7daffcaa1e207a7d5b2f02",
+    "apps/mobile/src/components/movementPreview/MovementPreview.tsx": "828033dcdb8cd4f62770584b7b0019bfeaca0822bb37ea099b92e40d5f923173",
+    "tools/rendering/render_motion_cycle.mjs": "5e5f091261326f87ccbc408f62a23792fd2c03a0b208e78b8e5220589948fdda",
+    "tools/rendering/lib/canonicalSvg.mjs": "0c6a0d6a0c51a1f4fa49633082ae77f8b4b6bb2330bceb280e6a73471eb974ff"
+  },
+  "movements": [
+    {
+      "id": 143,
+      "assetKey": "movement/bent-over-dumbbell-rear-delt-raise-with-head-on-bench/demo/v1",
+      "view": "oblique",
+      "viewBox": [
+        8,
+        12,
+        96,
+        90
+      ],
+      "records": [
+        {
+          "body": "neutral",
+          "tickCount": 159,
+          "totalMs": 5200,
+          "sheetSha256": "e3161af0a7dbaa03d03535bb09d14c4c50636669073d3a2e5983d53a56ea8aef",
+          "htmlSha256": "baa1e71cbbb1f39aa4fe8c5f3022f9990519ad78813224b41fcd5ffa087904d5",
+          "primitiveFramesSha256": "eeabc9bb73c9b287b670708d73fb7a78eefbadffe7a3dc31a4941b19da39bb3c"
+        },
+        {
+          "body": "male",
+          "tickCount": 159,
+          "totalMs": 5200,
+          "sheetSha256": "c157f3616f7bb1b74dfd7baaca4f0a79b93123e851f5184bc3cf4afa2cc3a42f",
+          "htmlSha256": "4339bc161d38cc34c5d128459794d5131d835381354192d534e44a4b2ea84717",
+          "primitiveFramesSha256": "1eae5d0a6e8619b523a294dee8417fc3788b76a874575c3b45e186be62bcfeaf"
+        },
+        {
+          "body": "female",
+          "tickCount": 159,
+          "totalMs": 5200,
+          "sheetSha256": "9c580cb98a695874ac1ae2eb747289803c6e87bc258b3cd1f94589839bfcda29",
+          "htmlSha256": "17ba0639af40ea7a3a353019a4163f2d61660cb6d8b44553b345b4de5640b043",
+          "primitiveFramesSha256": "e59768187b8652db7f225847a18b2610df948ec33f5b25fd34d94636bede4c10"
+        }
+      ]
+    },
+    {
+      "id": 53,
+      "assetKey": "movement/dumbbell-shrug/demo/v1",
+      "view": "side",
+      "viewBox": [
+        10,
+        6,
+        80,
+        94.47
+      ],
+      "records": [
+        {
+          "body": "neutral",
+          "tickCount": 95,
+          "totalMs": 3100,
+          "sheetSha256": "6973434904115d7059a2c221aceecadd559094c1ffe2b78c0e2b57d2f5513659",
+          "htmlSha256": "66335f114284da06909f25e4813cefc522c1cdabe33d31966c474cd6483d9c80",
+          "primitiveFramesSha256": "f482000ef109e21a1da2db61427d3d46bc6942ecf688ba58ccd24a2f5de13c6f"
+        },
+        {
+          "body": "male",
+          "tickCount": 95,
+          "totalMs": 3100,
+          "sheetSha256": "1eadef45f33b9cc85bd075d482ff0bc1e7535a810cb1fa873f2c2e6347d96f69",
+          "htmlSha256": "c8f0573e91d5ce1c9ab880e89af75e36d3ac5226b95a353ee7b2aeeb52dcac19",
+          "primitiveFramesSha256": "15e7710dfbf1713fbd36836a348cce457f1eb9261ec50d6f0a2a4473072556ba"
+        },
+        {
+          "body": "female",
+          "tickCount": 95,
+          "totalMs": 3100,
+          "sheetSha256": "c6383ecd40cd01bd91b2afc2ee1b9975e18af82ef7e812e96153125314da8ea8",
+          "htmlSha256": "1cb04395844141485d1cf18e66eefff50fa8e27c8ffce997570ce03d0cc529c5",
+          "primitiveFramesSha256": "761d0ea60f21a53f0a585cd5e9caf3d5cf1443f3315e461821053e0454cd60d1"
+        }
+      ]
+    },
+    {
+      "id": 82,
+      "assetKey": "movement/barbell-shrug/demo/v1",
+      "view": "side",
+      "viewBox": [
+        10,
+        6,
+        80,
+        94.47
+      ],
+      "records": [
+        {
+          "body": "neutral",
+          "tickCount": 95,
+          "totalMs": 3100,
+          "sheetSha256": "f322ecca5171c19295dff18c0c538f6e283dc61ee2101eacc9c5808cf408bedd",
+          "htmlSha256": "f644cb0e32f7ba20c6fa238990feacfe233b9618385f79117160e5fa69727f04",
+          "primitiveFramesSha256": "a5a73136319c77188c270b69fa383d792ebeb17db9acbf573104df26fd9d2ee8"
+        },
+        {
+          "body": "male",
+          "tickCount": 95,
+          "totalMs": 3100,
+          "sheetSha256": "7a7736bdfbf191ead92c02fb83e2a4a51ddb0257884eef5b8c784f02e7e57526",
+          "htmlSha256": "463f83dd0d59c5c22e57a421e1e6a309703e05a1c4c127024580e11623ba6d94",
+          "primitiveFramesSha256": "ad1eb9bb717b084b5170aba13fb49ce4422ec8fa4034aa8f590a0bfeebb5bd5c"
+        },
+        {
+          "body": "female",
+          "tickCount": 95,
+          "totalMs": 3100,
+          "sheetSha256": "b6a656616eab3040a72984fb8dbeb274ca41f48b068b750de66d6d55ce7af547",
+          "htmlSha256": "689f7beea4614ab11201892db9529229d3093ce9841c241795da5b7b7a6b927b",
+          "primitiveFramesSha256": "905cd2cd03bbfe6d5a9b56834bf6bb62c63e6908d2606fa5d48475b6c96e2abb"
+        }
+      ]
+    },
+    {
+      "id": 138,
+      "assetKey": "movement/barbell-shrug-behind-the-back/demo/v1",
+      "view": "side",
+      "viewBox": [
+        10,
+        6,
+        80,
+        94.47
+      ],
+      "records": [
+        {
+          "body": "neutral",
+          "tickCount": 95,
+          "totalMs": 3100,
+          "sheetSha256": "4ad44a61db8af31a505be425c704644adcb9f1b989eb72ec64e607ddf325fee5",
+          "htmlSha256": "c83b521f33e82ad526008c2e41fa58ea05cea900e9f89eb02dad5607630f7b78",
+          "primitiveFramesSha256": "0f54861fcdedc5ae1f194d2032947102b1d14200808e5004ef2f99c94df74c7e"
+        },
+        {
+          "body": "male",
+          "tickCount": 95,
+          "totalMs": 3100,
+          "sheetSha256": "a32272390b3a5384c2f27a38eb06ec07b383d403a9b9425769ae97982ebf9bce",
+          "htmlSha256": "558335adc9a6bfa442b6c1c32efe5f691fc9663712dcdc215ab9f70c72688df3",
+          "primitiveFramesSha256": "5b6f30e3781ff95b8e80acc9fc8401c5f53ca5777660e9b52d79b7d4114ccc2e"
+        },
+        {
+          "body": "female",
+          "tickCount": 95,
+          "totalMs": 3100,
+          "sheetSha256": "4ffee3f83a9402212b92592ed339187c34d9c3c26af02eb1072a053ee08a7ed8",
+          "htmlSha256": "16ac66e35437d2d7c29fd3ca163a05c660ff167cfdd97ab107d568e0a97bb918",
+          "primitiveFramesSha256": "25bc574462017f949e6b57b0cbb64c843f210efdc2d1b2ad86309b7e7275011a"
+        }
+      ]
+    },
+    {
+      "id": 163,
+      "assetKey": "movement/cable-shrugs/demo/v1",
+      "view": "side",
+      "viewBox": [
+        9.69,
+        6,
+        80.61,
+        94.47
+      ],
+      "records": [
+        {
+          "body": "neutral",
+          "tickCount": 95,
+          "totalMs": 3100,
+          "sheetSha256": "6a1516d7fb72e72fe203ead80360fd8a4d4c7afde6454d9b96e238890b570ce4",
+          "htmlSha256": "da42d0b44ef4477412d80862e140860af4bd5900d2958973c71dd446381d987d",
+          "primitiveFramesSha256": "5bbc4725cb3855e38c85e020c8f9620b1e6bbfc2e44764812dbd6b77df6f701c"
+        },
+        {
+          "body": "male",
+          "tickCount": 95,
+          "totalMs": 3100,
+          "sheetSha256": "ae763973e8aece828942687b9141e38e61e389811c114eaffac71fc2eb790a66",
+          "htmlSha256": "433a4f676b65473b49cd46a6c9ca47256f67fc645fe9566ce7945d8184439568",
+          "primitiveFramesSha256": "a85e258073fd6fdb812e507a8a60bb2413f0634cc272fdf546bc64d96b3cbe3b"
+        },
+        {
+          "body": "female",
+          "tickCount": 95,
+          "totalMs": 3100,
+          "sheetSha256": "09cb80346addc2fcba672a4c26a6846824e89d992f87e9a8852a7735dfc018ee",
+          "htmlSha256": "c1c52b39b617fd4a4ae65f11808f81b990b3b04758d347fc7d65772be237b14e",
+          "primitiveFramesSha256": "70b02d7104d3b1c1bbb6668c254c3726758f0580c4c2b49390ff9730162c3e86"
+        }
+      ]
+    },
+    {
+      "id": 92,
+      "assetKey": "movement/preacher-curl/demo/v1",
+      "view": "side",
+      "viewBox": [
+        10,
+        8,
+        72,
+        94
+      ],
+      "records": [
+        {
+          "body": "neutral",
+          "tickCount": 162,
+          "totalMs": 5300,
+          "sheetSha256": "af3825933253a5f81fc7e2943029dc88675de28349f7b8a560bb855b58de94cc",
+          "htmlSha256": "37157436530b6193c9a6a0864cf855751b3d484761388ad41e3e0ccd44f10273",
+          "primitiveFramesSha256": "0b80926affe5321e7dc6cebba0c58c8e323385b71ad9621a03bf23c923fc3cf9"
+        },
+        {
+          "body": "male",
+          "tickCount": 162,
+          "totalMs": 5300,
+          "sheetSha256": "c424dc9fe95213ba0295bcc200688bfd3d5a1d0c17ad848a110bea728657e20d",
+          "htmlSha256": "df562bf04105bd65557c74c446cc6a851c84be83ea42c276a1bfbccb6fb20079",
+          "primitiveFramesSha256": "705e3af1a5fa566f0918d4f240e2e73605e4fdc8ab9621d16cafab1936504eb0"
+        },
+        {
+          "body": "female",
+          "tickCount": 162,
+          "totalMs": 5300,
+          "sheetSha256": "c5458088e38f05b101c0f4e2a33724b00e82e422b87c319c3172206c0c449db3",
+          "htmlSha256": "5ee9bd9862b721b3fa0f8b4811c6a2fba94df351d128068344f9b65e3ac1e758",
+          "primitiveFramesSha256": "898b4744fdb651678a56f8cf3575f8c21eafcd4e61fa6957f8cabf3b10e01cc5"
+        }
+      ]
+    },
+    {
+      "id": 158,
+      "assetKey": "movement/cable-preacher-curl/demo/v1",
+      "view": "side",
+      "viewBox": [
+        10,
+        8,
+        72,
+        94
+      ],
+      "records": [
+        {
+          "body": "neutral",
+          "tickCount": 162,
+          "totalMs": 5300,
+          "sheetSha256": "fb0363966183009d38b9ddabc86d1dc88cc103f77cc74ef7b507530b4343eeec",
+          "htmlSha256": "d143e2467abc1cdd1abfcf6f74b979486b10ae2609119c9a2cf8260d9a0c9efe",
+          "primitiveFramesSha256": "33b53e88b911fda39926bbf3498f33621c313101c30a3d809515c8ecdca0d1ab"
+        },
+        {
+          "body": "male",
+          "tickCount": 162,
+          "totalMs": 5300,
+          "sheetSha256": "319ba1363b3df29649e40d4c77050c1f6bc587594914190423c894b4316db04e",
+          "htmlSha256": "009430e7948cf10c0424fc006845d855a875df69886eed9cb51adb419387cff8",
+          "primitiveFramesSha256": "b26e3867f43d59f446ef45c3b337496432dde9fa64bef5171212830d70914373"
+        },
+        {
+          "body": "female",
+          "tickCount": 162,
+          "totalMs": 5300,
+          "sheetSha256": "ca150dee3a0a5ca81811160a2ed17094610f56240f958d3c47ed914dde9fc520",
+          "htmlSha256": "7ce8910d67e88e527aa607c70b896c9084de22d4e53faf07d6507a9763fa1bfb",
+          "primitiveFramesSha256": "a828c7bdf297167c05694ce66683e6b51155502555e11833eb5b35419732e7dd"
+        }
+      ]
+    },
+    {
+      "id": 253,
+      "assetKey": "movement/preacher-hammer-dumbbell-curl/demo/v1",
+      "view": "side",
+      "viewBox": [
+        10,
+        8,
+        72,
+        94
+      ],
+      "records": [
+        {
+          "body": "neutral",
+          "tickCount": 162,
+          "totalMs": 5300,
+          "sheetSha256": "f79c2c9484265adaa69ece5dfc65ef2d17053c230f52121f38c8b4ca3156184e",
+          "htmlSha256": "8ea06bc64820f94cdb6672a3f7a00fc377ac8d8d47ed2de58337749eeb92589b",
+          "primitiveFramesSha256": "17932606fb31e6da3d83de4c3a04155319cf9a8855a79abefec2ed6589b29f29"
+        },
+        {
+          "body": "male",
+          "tickCount": 162,
+          "totalMs": 5300,
+          "sheetSha256": "5dc2d0285cb5b4f4e37342f15c792d3cf0c8eb6be74a7a933e43c255c9661cfc",
+          "htmlSha256": "da979bc092e13747372c0e5516b815480d1f38dc5e9367adcf821f931dd70b91",
+          "primitiveFramesSha256": "7f700dd4acdb824f731a451034e7ef8ccbbd1daa8f3c25a80a182f6e925b518a"
+        },
+        {
+          "body": "female",
+          "tickCount": 162,
+          "totalMs": 5300,
+          "sheetSha256": "1588e84c6f7c983549fa140890840ac7abdcefaaf61b5fe4ec4e45586bbf5546",
+          "htmlSha256": "1909a3dc1e31f0f921211fc88ae419f392b568cba087353241b958e4034d1e93",
+          "primitiveFramesSha256": "e34cfd0e6500cc81e2e8ae4f11623b71347d940b003fcc8fa9727a8a6623d477"
+        }
+      ]
+    },
+    {
+      "id": 80,
+      "assetKey": "movement/triceps-pushdown/demo/v1",
+      "view": "oblique",
+      "viewBox": [
+        10,
+        4,
+        82,
+        98
+      ],
+      "records": [
+        {
+          "body": "neutral",
+          "tickCount": 138,
+          "totalMs": 4500,
+          "sheetSha256": "b4a47a13a87db95f041f30fac03abebebe01fcdc2dc8d17f635fd009a94a31b2",
+          "htmlSha256": "dad691ffa24d83666a416474d3c010ef11d59aeb545574e8bb51319a3156322c",
+          "primitiveFramesSha256": "c45158e55ae38fbcd3799e7329bf2015a30491bee1fe98d2fa25b7c063921cce"
+        },
+        {
+          "body": "male",
+          "tickCount": 138,
+          "totalMs": 4500,
+          "sheetSha256": "ca30fedbf365a3526de78dcbd9e14bdb066a5d86b91f5795f19f715c1421ceaf",
+          "htmlSha256": "5f9a92d401cc6298b2bee60356da43aa32182595cf85368200f01c29a4c4eac7",
+          "primitiveFramesSha256": "c184ec04e58383b70e6cd45b35d82c481e59e1675c3adc0db5be6d1bc13a64eb"
+        },
+        {
+          "body": "female",
+          "tickCount": 138,
+          "totalMs": 4500,
+          "sheetSha256": "84c6169296b85414273824453b04676bbc6d3134f87a0d569ac4b6cd1b282243",
+          "htmlSha256": "56fe8cf3f636ce0e9f5afe844b15deff34113ea41e15b8586f08938e460d36c2",
+          "primitiveFramesSha256": "7c67e7f0a8f380b69efff97d0d251147647383cda9aa7ce8e94576f0b553c0d5"
+        }
+      ]
+    },
+    {
+      "id": 262,
+      "assetKey": "movement/reverse-grip-triceps-pushdown/demo/v1",
+      "view": "oblique",
+      "viewBox": [
+        10,
+        4,
+        82,
+        98
+      ],
+      "records": [
+        {
+          "body": "neutral",
+          "tickCount": 138,
+          "totalMs": 4500,
+          "sheetSha256": "6e6f7ae0452f73b902f66c74e26a49f7df26f4f541c080375f90f8432ca7056a",
+          "htmlSha256": "c9705335f05168826b0d0e5dbf751652e61941f37b3f36b1474de5255ee1a346",
+          "primitiveFramesSha256": "280679cd1daff389a892d270c4284801fcab6632e89b8d07d95d4ba00d9a6df7"
+        },
+        {
+          "body": "male",
+          "tickCount": 138,
+          "totalMs": 4500,
+          "sheetSha256": "b97381abb0436c90618a165e7b7cf7191c2ac517515c5ad12b75072cec5fbc9d",
+          "htmlSha256": "cf3d0ca72a9ef6bd3ed2b68c116a0a5ac500415d39f10763c146ce84ef5543cf",
+          "primitiveFramesSha256": "723961b6a02cf1fe3da84866a54be5297e65aa77909af39c638a092e564c69ff"
+        },
+        {
+          "body": "female",
+          "tickCount": 138,
+          "totalMs": 4500,
+          "sheetSha256": "0edaec8cb259b62db107e65f3300e16417624445c3edf483357c156c1496e959",
+          "htmlSha256": "15919d32d56037ab92bb7cbe45ca5ac56be14e8cb692d46c352070fe3e3afb03",
+          "primitiveFramesSha256": "4f3966a7d58852a6e3581cdfbb05357753138c4e6b1f44bb070be8b783f0f24a"
+        }
+      ]
+    },
+    {
+      "id": 292,
+      "assetKey": "movement/triceps-pushdown-rope-attachment/demo/v1",
+      "view": "oblique",
+      "viewBox": [
+        10,
+        4,
+        82,
+        98
+      ],
+      "records": [
+        {
+          "body": "neutral",
+          "tickCount": 138,
+          "totalMs": 4500,
+          "sheetSha256": "9bef929b5852c29fbaa52fe238327be32b0d2a23bf3945ae174d948f8757c8cd",
+          "htmlSha256": "144d3181a19af785aa5fd2c4a6b110c47c6fd44cc7c56a3173f8c938fa723850",
+          "primitiveFramesSha256": "c1006323e4be05872c9d982bc24c161800771582229e1becb54d6b709f35ae08"
+        },
+        {
+          "body": "male",
+          "tickCount": 138,
+          "totalMs": 4500,
+          "sheetSha256": "ab99fd7571e90d6b04400a7e80849304a03da1cd057dd6d6dc1b0985a5427189",
+          "htmlSha256": "88357f8807bb2971abfa4ed2d58aab9b84e05ae5db42dfa1ff278d85b5a70dfa",
+          "primitiveFramesSha256": "9c7e623e0d9be2b420803ba73713fe15d0aea3e956f476e60fc5fa4b8464c8e0"
+        },
+        {
+          "body": "female",
+          "tickCount": 138,
+          "totalMs": 4500,
+          "sheetSha256": "6e455d8061c881e3cb2255285cdfff82ad028640affd63a6aea68e6fcb273178",
+          "htmlSha256": "eb25382a53b80b8b2e2d199386f26f842b1861524363abc27f90b6d5879a5ee0",
+          "primitiveFramesSha256": "0b24f4ee1b0f35f7366d6ba36428716c3e24168c49093dd887e5c3dbe971904d"
+        }
+      ]
+    },
+    {
+      "id": 264,
+      "assetKey": "movement/rope-straight-arm-pulldown/demo/v1",
+      "view": "oblique",
+      "viewBox": [
+        6,
+        -5,
+        94,
+        107
+      ],
+      "records": [
+        {
+          "body": "neutral",
+          "tickCount": 147,
+          "totalMs": 4800,
+          "sheetSha256": "f5360a99f7e663c59b215043e2d69c0bea4b2abcd38a44c64167d003edf40810",
+          "htmlSha256": "62c0f5e9c3787e1ab31c0d575bf5a521f17164fd21387609eb6f2a81852ed517",
+          "primitiveFramesSha256": "ef0cfcfb018612a39f87de2ffdec7bd084b7db1a67942623d2f3445c6a3a3388"
+        },
+        {
+          "body": "male",
+          "tickCount": 147,
+          "totalMs": 4800,
+          "sheetSha256": "adbf591abff6204c653e2e96eb7eb70d3a4175057b035d2f4e6a8e3f801c3f8f",
+          "htmlSha256": "8fb1f87de74d07827c0c6d8143338f9f4bc15784d549fae9c94ae6294b441b4b",
+          "primitiveFramesSha256": "d51a0cf0e78e9aa634c19fbb16ddbce62d24d3591246fc0804ebf72d4440c931"
+        },
+        {
+          "body": "female",
+          "tickCount": 147,
+          "totalMs": 4800,
+          "sheetSha256": "0ee46adde9b1900211e862c343538488784810304917ed5150f66c21818957f4",
+          "htmlSha256": "822386cd4e524b25538cd59ead1393818db77dcd32b0315b3a43a145f026ba20",
+          "primitiveFramesSha256": "8c00da9363a17a5c72fb46e94604a72b27ece8aa874dfe6506dd6b1b476dcd2f"
+        }
+      ]
+    },
+    {
+      "id": 49,
+      "assetKey": "movement/dumbbell-flye/demo/v1",
+      "view": "oblique",
+      "viewBox": [
+        0,
+        15,
+        104,
+        88
+      ],
+      "records": [
+        {
+          "body": "neutral",
+          "tickCount": 126,
+          "totalMs": 4100,
+          "sheetSha256": "5276f33e456243fdd370e77b41d17b198e5f42b9d93eaf9fc7bd596bba8928b1",
+          "htmlSha256": "6e9b75d9fe8e7c1a66904b9262db6cd63cd71513f854a11dbcacd871ce9860d2",
+          "primitiveFramesSha256": "a608bd61201d7f0ea18be4d04d5f13d1d5179c975720095c762db78cd9e39ad0"
+        },
+        {
+          "body": "male",
+          "tickCount": 126,
+          "totalMs": 4100,
+          "sheetSha256": "563e48fa64c6aa376274deb79675badcf0eb46d649ffd46423db422d0ca41bb3",
+          "htmlSha256": "7a6c6c3e5b002ee6927df92fb9b5651e9dd8e76cfeddcbbbc395b83482418b6d",
+          "primitiveFramesSha256": "daeed31f4c1dc620b31d87147e59b95ecc3c96f53691544e26295c2b39718265"
+        },
+        {
+          "body": "female",
+          "tickCount": 126,
+          "totalMs": 4100,
+          "sheetSha256": "b326016561ab5bec6a16c6fa7d0b2eb2a25891e8c35391bfb4f0742814a7c288",
+          "htmlSha256": "9bda6b1a24e55a53ce46ff142fdd51404a7779ee2ee8f4269ef59316bda6a246",
+          "primitiveFramesSha256": "b1508a9658275dab813262c1890dca4b68ea9a62f3ee1ec59d2d2ccaed6e2b07"
+        }
+      ]
+    },
+    {
+      "id": 178,
+      "assetKey": "movement/decline-dumbbell-flyes/demo/v1",
+      "view": "oblique",
+      "viewBox": [
+        0,
+        15,
+        104,
+        88
+      ],
+      "records": [
+        {
+          "body": "neutral",
+          "tickCount": 126,
+          "totalMs": 4100,
+          "sheetSha256": "95a84bf2cf186f3c9f2aeaf5e3adeb06b91d82a47b8847d5531974d086ca5529",
+          "htmlSha256": "a95a84d1fd6a28824b39bc805606a88f4ce323aee19335bbf7d67bcdfad90f07",
+          "primitiveFramesSha256": "a999159f47313a6300d415b8a57896b43f761744a122973d84c2f8f11674655d"
+        },
+        {
+          "body": "male",
+          "tickCount": 126,
+          "totalMs": 4100,
+          "sheetSha256": "8105212816059981ac138335a07084206ec1524e19dd22df35aaddd206ed1189",
+          "htmlSha256": "9acd8ffc78f7cad39112e78b874f64e11652d2c7c9b1d20b34c5359974d0e5f7",
+          "primitiveFramesSha256": "52461b9e7171828b237fe24f196e6cc2f771586bfc5be3f74d9859cc68708d6a"
+        },
+        {
+          "body": "female",
+          "tickCount": 126,
+          "totalMs": 4100,
+          "sheetSha256": "c4045d59c74d220b0a991138bd2e4d96e55985f22466480e3a4d431b22cf0613",
+          "htmlSha256": "49b6c9de684fe060de54171fea15b97960676297a8666df29adf894f7e318eee",
+          "primitiveFramesSha256": "b68f40963ed653d049981ab13310d4a96efc5d2266b9ff8e3cb5216c34927438"
+        }
+      ]
+    },
+    {
+      "id": 220,
+      "assetKey": "movement/incline-dumbbell-flyes/demo/v1",
+      "view": "oblique",
+      "viewBox": [
+        0,
+        15,
+        104,
+        88
+      ],
+      "records": [
+        {
+          "body": "neutral",
+          "tickCount": 126,
+          "totalMs": 4100,
+          "sheetSha256": "18c43c0abae67c8634a441bf6f8801882be23c1be1e96682f3db12ffe09da050",
+          "htmlSha256": "f1675a76ccb37b717edbfb33fcb7e77f1f2f2f12f3619ad1fe3756deb3535f46",
+          "primitiveFramesSha256": "4cc61a83ccfdf84e7a60b14f0a5c329da1e32c74f60e8d2a1f54da7609f5ccdd"
+        },
+        {
+          "body": "male",
+          "tickCount": 126,
+          "totalMs": 4100,
+          "sheetSha256": "2722bd316c3d9dfc9a231d879b598e115c850f4ab44f1bfea682605e18775229",
+          "htmlSha256": "3438066f0b0da7b775ec0ba70a8bbbd962e49f0866537d58229b047651f9a230",
+          "primitiveFramesSha256": "65eb5e8fdf1047e21cddafb343a1814be4e142c145e1690f6d826b5cefb94659"
+        },
+        {
+          "body": "female",
+          "tickCount": 126,
+          "totalMs": 4100,
+          "sheetSha256": "896674caa2330e2c7bf79d0235dcc15ed375e7e6cb6ee58c13b141c35448772d",
+          "htmlSha256": "308a82af496d4c8c8e379d962374679253e1fdafdc6b44080b8bb2cb45d91bf2",
+          "primitiveFramesSha256": "2161664636238fa65b1ac2aaade152978d54c63d3711a54fe2b56771062ae2a5"
+        }
+      ]
+    },
+    {
+      "id": 84,
+      "assetKey": "movement/cable-glute-kickback/demo/v1",
+      "view": "side",
+      "viewBox": [
+        6,
+        8,
+        88,
+        96
+      ],
+      "records": [
+        {
+          "body": "neutral",
+          "tickCount": 135,
+          "totalMs": 4400,
+          "sheetSha256": "0fc33228f1b54e43d320fec211b55f2b880fbfe87502aca9893837decaa044a3",
+          "htmlSha256": "1e91ab55734bc7a122a4434a9d6c9ff28aad72d8fccc07f6d6f26c10db07e16f",
+          "primitiveFramesSha256": "38bd907f586bc0327be94a84c6977d756e5db66f0400d1990a6a9c71eca0d2af"
+        },
+        {
+          "body": "male",
+          "tickCount": 135,
+          "totalMs": 4400,
+          "sheetSha256": "0e3cab7ad5b77b885eea4273d30251b96206cce0c7391501f7f86ba116e00035",
+          "htmlSha256": "867be7252b61db7370d437f02ea1b22001562bd8078ee33cf9c66638db753860",
+          "primitiveFramesSha256": "a0a8643d809dfc62ebfb586644cce940b5138513293bde4d726eaa0108974c71"
+        },
+        {
+          "body": "female",
+          "tickCount": 135,
+          "totalMs": 4400,
+          "sheetSha256": "a362b30ef609597086f436ebc53f780d4d8fc923d6fcdf987c18626cea62801b",
+          "htmlSha256": "fcb72130597f6322971e4aedc5fca6e0b20014e1d78bb75ba139e61c849b526f",
+          "primitiveFramesSha256": "83e4d4574f852496da5116bd4c5314da443bde51194d3a336bc89b10fafac2eb"
+        }
+      ]
+    }
+  ]
+}

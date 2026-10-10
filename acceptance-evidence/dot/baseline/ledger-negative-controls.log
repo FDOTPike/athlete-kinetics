@@ -1,0 +1,5 @@
+REJECTED: catalogue row absent Catalogue must contain exactly IDs1..300 once
+REJECTED: duplicate catalogue ID Catalogue must contain exactly IDs1..300 once
+REJECTED: wrong asset identity Family bytes/content projection differs for28
+REJECTED: unproven global approval Global review gate changed without final evidence
+UNMODIFIED CANDIDATE: {'catalogue': 300, 'records': 138, 'drawable': 135, 'recordStatuses': {'covered': 3, 'pending': 132, 'intentionally_unsuitable': 3}, 'coverageStates': {'missing_draft': 153, 'truthful_activity_fallback': 1, 'authored_draft': 113, 'prototype_exclusion_needs_authored_replacement': 2, 'source_hold_with_draft': 22, 'source_hold': 9}, 'originalMissingRemaining': 160, 'sourceHolds': 31, 'enabled': 0}

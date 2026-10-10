@@ -1,0 +1,14 @@
+source commit: bc0d89f720a5310e0d7b4534f714c25ffdc21bc8
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with identity-mov08.json
+
+movements measured: 143 (baseline 139)
+added: 219 Incline Dumbbell Curl; 221 Incline Hammer Curls; 207 Front Incline Dumbbell Raise; 155 Cable Incline Triceps Extension
+removed: none
+changed, expected: none
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  219 Incline Dumbbell Curl: drawn 7bfec5d66f7b10a8f30b40497cf4982b259b744b163357c7aa560a0295b21ac0 captions 25c742050ac2b89e7c144bc051dd533d69aa3d5a69027c1c79c82308a8487449 stage 229.25x240.00 cycle 4200 ms
+  221 Incline Hammer Curls: drawn b6ce80cf343a01b072c67b9f47ec4e1d16909896b775edbc81e37545ff5f179e captions f4a00a77fe90984fa3fd6286c82861047bc015d792c37f18f6c607ca08a8d661 stage 229.25x240.00 cycle 4500 ms
+  207 Front Incline Dumbbell Raise: drawn a02ffeaf5adfc00f8bd0f56edbe39907a2abbc6cae744b2d8338b1af19f495f4 captions 78759b41af4f65786f4f250ce4181e364583830f8081711b72bf447878b06817 stage 240.00x212.57 cycle 4300 ms
+  155 Cable Incline Triceps Extension: drawn ccd205feeda15ecedc57ecaf2e0e76871109b9909a479befbe71c2f19c6b41b5 captions 72de842d4ff488cb0876f3a385fac4296f2bc9a49667ddfbe3497bb7f4ed9b48 stage 221.33x240.00 cycle 4200 ms
+exit code: 0 (probe run exit 0)

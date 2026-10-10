@@ -1,0 +1,290 @@
+[
+  {
+    "body": "neutral",
+    "frame": 0,
+    "phase": 0,
+    "side": "front",
+    "floorTopDp": 227.25,
+    "paintedBottomDp": 227.25000000000003,
+    "gapDp": -2.842170943040401e-14,
+    "foot": {
+      "position": "absolute",
+      "left": 135,
+      "top": 216.45000000000002,
+      "width": 13.5,
+      "height": 10.8,
+      "borderRadius": 5.4,
+      "backgroundColor": "#F7F6F3",
+      "opacity": 1,
+      "transform": [
+        {
+          "rotate": "0deg"
+        }
+      ]
+    }
+  },
+  {
+    "body": "neutral",
+    "frame": 0,
+    "phase": 0,
+    "side": "rear",
+    "floorTopDp": 227.25,
+    "paintedBottomDp": 227.25000000000003,
+    "gapDp": -2.842170943040401e-14,
+    "foot": {
+      "position": "absolute",
+      "left": 124.375,
+      "top": 216.45000000000002,
+      "width": 13.5,
+      "height": 10.8,
+      "borderRadius": 5.4,
+      "backgroundColor": "#6B6963",
+      "opacity": 0.9,
+      "transform": [
+        {
+          "rotate": "0deg"
+        }
+      ]
+    }
+  },
+  {
+    "body": "neutral",
+    "frame": 1,
+    "phase": 1,
+    "side": "front",
+    "floorTopDp": 227.25,
+    "paintedBottomDp": 227.25000000000003,
+    "gapDp": -2.842170943040401e-14,
+    "foot": {
+      "position": "absolute",
+      "left": 135,
+      "top": 216.45000000000002,
+      "width": 13.5,
+      "height": 10.8,
+      "borderRadius": 5.4,
+      "backgroundColor": "#F7F6F3",
+      "opacity": 1,
+      "transform": [
+        {
+          "rotate": "0deg"
+        }
+      ]
+    }
+  },
+  {
+    "body": "neutral",
+    "frame": 1,
+    "phase": 1,
+    "side": "rear",
+    "floorTopDp": 227.25,
+    "paintedBottomDp": 223.95000000000002,
+    "gapDp": 3.299999999999983,
+    "foot": {
+      "position": "absolute",
+      "left": 17.342927568290627,
+      "top": 212.32500000000002,
+      "width": 13.499999999999998,
+      "height": 10.8,
+      "borderRadius": 5.4,
+      "backgroundColor": "#6B6963",
+      "opacity": 0.9,
+      "transform": [
+        {
+          "rotate": "37.66988696432963deg"
+        }
+      ]
+    }
+  },
+  {
+    "body": "male",
+    "frame": 0,
+    "phase": 0,
+    "side": "front",
+    "floorTopDp": 227.25,
+    "paintedBottomDp": 227.25,
+    "gapDp": 0,
+    "foot": {
+      "position": "absolute",
+      "left": 135,
+      "top": 215.55,
+      "width": 13.5,
+      "height": 11.700000000000001,
+      "borderRadius": 5.8500000000000005,
+      "backgroundColor": "#F7F6F3",
+      "opacity": 1,
+      "transform": [
+        {
+          "rotate": "0deg"
+        }
+      ]
+    }
+  },
+  {
+    "body": "male",
+    "frame": 0,
+    "phase": 0,
+    "side": "rear",
+    "floorTopDp": 227.25,
+    "paintedBottomDp": 227.25,
+    "gapDp": 0,
+    "foot": {
+      "position": "absolute",
+      "left": 125.25,
+      "top": 215.55,
+      "width": 13.5,
+      "height": 11.700000000000001,
+      "borderRadius": 5.8500000000000005,
+      "backgroundColor": "#6B6963",
+      "opacity": 0.9,
+      "transform": [
+        {
+          "rotate": "0deg"
+        }
+      ]
+    }
+  },
+  {
+    "body": "male",
+    "frame": 1,
+    "phase": 1,
+    "side": "front",
+    "floorTopDp": 227.25,
+    "paintedBottomDp": 227.25,
+    "gapDp": 0,
+    "foot": {
+      "position": "absolute",
+      "left": 135,
+      "top": 215.55,
+      "width": 13.5,
+      "height": 11.700000000000001,
+      "borderRadius": 5.8500000000000005,
+      "backgroundColor": "#F7F6F3",
+      "opacity": 1,
+      "transform": [
+        {
+          "rotate": "0deg"
+        }
+      ]
+    }
+  },
+  {
+    "body": "male",
+    "frame": 1,
+    "phase": 1,
+    "side": "rear",
+    "floorTopDp": 227.25,
+    "paintedBottomDp": 223.675,
+    "gapDp": 3.5749999999999886,
+    "foot": {
+      "position": "absolute",
+      "left": 18.217927568290634,
+      "top": 211.425,
+      "width": 13.500000000000002,
+      "height": 11.700000000000001,
+      "borderRadius": 5.8500000000000005,
+      "backgroundColor": "#6B6963",
+      "opacity": 0.9,
+      "transform": [
+        {
+          "rotate": "37.66988696432963deg"
+        }
+      ]
+    }
+  },
+  {
+    "body": "female",
+    "frame": 0,
+    "phase": 0,
+    "side": "front",
+    "floorTopDp": 227.25,
+    "paintedBottomDp": 227.25,
+    "gapDp": 0,
+    "foot": {
+      "position": "absolute",
+      "left": 135,
+      "top": 217.35000000000002,
+      "width": 13.5,
+      "height": 9.9,
+      "borderRadius": 4.95,
+      "backgroundColor": "#F7F6F3",
+      "opacity": 1,
+      "transform": [
+        {
+          "rotate": "0deg"
+        }
+      ]
+    }
+  },
+  {
+    "body": "female",
+    "frame": 0,
+    "phase": 0,
+    "side": "rear",
+    "floorTopDp": 227.25,
+    "paintedBottomDp": 227.25,
+    "gapDp": 0,
+    "foot": {
+      "position": "absolute",
+      "left": 123.5,
+      "top": 217.35000000000002,
+      "width": 13.5,
+      "height": 9.9,
+      "borderRadius": 4.95,
+      "backgroundColor": "#6B6963",
+      "opacity": 0.9,
+      "transform": [
+        {
+          "rotate": "0deg"
+        }
+      ]
+    }
+  },
+  {
+    "body": "female",
+    "frame": 1,
+    "phase": 1,
+    "side": "front",
+    "floorTopDp": 227.25,
+    "paintedBottomDp": 227.25,
+    "gapDp": 0,
+    "foot": {
+      "position": "absolute",
+      "left": 135,
+      "top": 217.35000000000002,
+      "width": 13.5,
+      "height": 9.9,
+      "borderRadius": 4.95,
+      "backgroundColor": "#F7F6F3",
+      "opacity": 1,
+      "transform": [
+        {
+          "rotate": "0deg"
+        }
+      ]
+    }
+  },
+  {
+    "body": "female",
+    "frame": 1,
+    "phase": 1,
+    "side": "rear",
+    "floorTopDp": 227.25,
+    "paintedBottomDp": 224.225,
+    "gapDp": 3.0250000000000057,
+    "foot": {
+      "position": "absolute",
+      "left": 16.467927568290627,
+      "top": 213.22500000000002,
+      "width": 13.500000000000002,
+      "height": 9.9,
+      "borderRadius": 4.95,
+      "backgroundColor": "#6B6963",
+      "opacity": 0.9,
+      "transform": [
+        {
+          "rotate": "37.66988696432963deg"
+        }
+      ]
+    }
+  }
+]

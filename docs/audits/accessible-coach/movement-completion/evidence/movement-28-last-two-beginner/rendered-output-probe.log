@@ -1,0 +1,12 @@
+source commit: 8a2196c5c45daf7f85cee7f81b53ce86be1c0cc1
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with identity-mov27.json
+
+movements measured: 176 (baseline 174)
+added: 154 Cable Incline Pushdown; 279 Standing Cable Chest Press
+removed: none
+changed, expected: none
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  154 Cable Incline Pushdown: drawn 922f71573e4f02c7f09ed63b8f192c5072130f83eed9bcf79f476e23c754644e captions f0b4032e42eddb3bb37786387f39a72f56ec9f96c3f106626f7e8273babab30f stage 204.11x240.00 cycle 3800 ms
+  279 Standing Cable Chest Press: drawn 90a125ed2082d50e27989b07ce4ad7ecef9678205a770d3d7363a27df3c8999c captions b61be162f0080497454eeda4aaec8458dad2129006615016ff30b9d025725c9b stage 186.67x240.00 cycle 3700 ms
+exit code: 0 (probe run exit 0)

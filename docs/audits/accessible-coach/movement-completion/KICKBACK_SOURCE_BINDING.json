@@ -1,0 +1,38 @@
+{
+  "scope": "Pending ankle-cuff kickback; independent technique/native acceptance required",
+  "id": 84,
+  "name": "Cable Glute Kickback",
+  "assetKey": "movement/cable-glute-kickback/demo/v1",
+  "repoProvenance": {
+    "commit": "12a1fb15aff5611b771348a53e2e04f4079e0e34",
+    "relative_path": "packages/core-db/src/schema/017_movement_batch.sql",
+    "line": 32,
+    "file_sha256": "7c09a62ffa2e96895d8f4fb04a67d5ce2c55a1b677637a034bbe442599fa13fc"
+  },
+  "instructions": "Strap a low cable to one ankle, face the stack, and hold it for balance with a slight forward lean. Drive the strapped leg straight back and slightly up by squeezing the glute, then return under control. The range is shorter than people want it to be — where the lower back starts arching is where the glute stopped working.",
+  "cues": "Push the heel back, squeeze at the end. Torso still, hips level. Short honest range beats a high arched kick.",
+  "geometry": {
+    "hipExtensionDeg": [
+      0,
+      12.5,
+      25,
+      25,
+      0
+    ],
+    "fixedKneeFlexionDeg": 5,
+    "upperAndLowerLegLength": 22.25,
+    "quietTorsoHingeDeg": 14.0362434679,
+    "lowPulley": [
+      84,
+      89
+    ],
+    "attachment": "actual working ankle cuff; balance hands hold connected crossbar",
+    "tempoMs": [
+      700,
+      700,
+      800,
+      2200
+    ],
+    "numericAuthority": "small schematic draft range, no universal technique prescription"
+  }
+}

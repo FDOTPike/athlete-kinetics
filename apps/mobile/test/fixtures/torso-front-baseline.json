@@ -1,0 +1,19 @@
+{
+  "sourceCommit": "b6b32b7140bcf066aa24205eeb1ab7ef1a620c17",
+  "layoutSha256": "d664eddffc8177b93ae2f73b88e86e46b978e2e2eb0d6a869e427c3f75a748cf",
+  "manifestSha256": "b84ab3c8fa0d601ba632dad578cb099085afd4e094e2f43e1e78f265f3bc647a",
+  "cases": [
+    {
+      "movementId": 19,
+      "body": "neutral",
+      "samples": 17,
+      "sha256": "d5ca260f1e00e13a778880c92cc15b052d6b1577d81a6655f049c3ce24daa8ed"
+    },
+    {
+      "movementId": 62,
+      "body": "neutral",
+      "samples": 9,
+      "sha256": "b96f63dc49b2f341441c5c8dbb33b10a239e977bb10b78b576383091430c6f2d"
+    }
+  ]
+}

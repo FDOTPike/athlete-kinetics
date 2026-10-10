@@ -1,0 +1,10 @@
+source commit: 705a75be7b15c688c48a1064a90ed6fcfc079a55
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with identity-mov16.json
+
+movements measured: 173 (baseline 173)
+added: none
+removed: none
+changed, expected: none
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+exit code: 0 (probe run exit 0)

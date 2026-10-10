@@ -1,0 +1,45 @@
+{
+  "verdict": "INCOMPLETE",
+  "testSuitesPassed": 5,
+  "testsPassed": 153,
+  "currentLandedRearGap": [
+    {
+      "body": "neutral",
+      "gapCanonical": 0,
+      "gapDp": 0
+    },
+    {
+      "body": "male",
+      "gapCanonical": -1.4210854715202004e-14,
+      "gapDp": -3.552713678800501e-14
+    },
+    {
+      "body": "female",
+      "gapCanonical": 1.4210854715202004e-14,
+      "gapDp": 3.552713678800501e-14
+    }
+  ],
+  "negativeControl1185Gaps": [
+    {
+      "body": "neutral",
+      "gapCanonical": 1.3200000000000074,
+      "gapDp": 3.3000000000000185
+    },
+    {
+      "body": "male",
+      "gapCanonical": 1.4300000000000068,
+      "gapDp": 3.575000000000017
+    },
+    {
+      "body": "female",
+      "gapCanonical": 1.2099999999999937,
+      "gapDp": 3.0249999999999844
+    }
+  ],
+  "nativeRuntimeBoundaries": [
+    "No Android/iOS physical device frame timing or live compositor capture obtained by this probe.",
+    "Headless Node/Jest tests and SVG/PNG renders do not establish native 60fps compositor smoothness.",
+    "Owner 4GB device test deferred to Francis.",
+    "Apple signing deferred; unsigned CI verification active."
+  ]
+}

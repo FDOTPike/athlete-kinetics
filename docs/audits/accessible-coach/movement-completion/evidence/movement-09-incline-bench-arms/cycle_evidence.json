@@ -1,0 +1,156 @@
+{
+  "sourceCommit": "bc0d89f720a5310e0d7b4534f714c25ffdc21bc8",
+  "sourcesCommittedAtRender": true,
+  "previewDataSha256": "585e5e1cf6fef58c1fb66cca49552f2fa62f55edb63b1777632c0a0a38dae976",
+  "rendering": "Headless production primitives; no native FPS or technique approval.",
+  "sourceHashes": {
+    "apps/mobile/src/components/movementPreview/previewIndex.json": "39ae016b5f5704178d8d86d65f4e383fc89616c4501338ea21be19fe206ce4ec",
+    "apps/mobile/src/components/movementPreview/families/calf-raise__seated.json": "a5505d974257a0cb3206dbb16e86f5b4eb5158b73316bc59c154863652c282fc",
+    "apps/mobile/src/components/movementPreview/families/calf-raise__standing.json": "48d8d9d37e5216d899e9d88c5e410341aad6a84880eae12a09ec805d5de5900f",
+    "apps/mobile/src/components/movementPreview/families/carry__standing.json": "84e2d2d0e2dbc74b20b7a4e45e7b6cf73cfa1b11f06de8352bc852280f0d91b1",
+    "apps/mobile/src/components/movementPreview/families/dead-bug__supine.json": "7238a4f476b84225365f570d07099ef37e52435c86d392145f3ea2f75ac7bdc4",
+    "apps/mobile/src/components/movementPreview/families/elbow-extension__bodyweight-supported.json": "8d7224737feb97b56676119f24b08333c83f6d6a431946db593046e5da491350",
+    "apps/mobile/src/components/movementPreview/families/elbow-extension__incline.json": "fc17be85a24dab44118a5c9498ab9880fa021e5b7e8dc76b699ebe106adb9b8b",
+    "apps/mobile/src/components/movementPreview/families/elbow-extension__standing-overhead.json": "fdc05d92b4a9f9b3f97057d1401ca3571ed91aaf9a9f574755c698bb45fe39dc",
+    "apps/mobile/src/components/movementPreview/families/elbow-extension__standing-pushdown.json": "90f47cc370395e1f4f5865771042646b906d2900888920093ff62a1ef0d903c7",
+    "apps/mobile/src/components/movementPreview/families/elbow-flexion__incline.json": "177477273ed652ced95919e99390cda012495d92297833c5e2b1a0e0811f9328",
+    "apps/mobile/src/components/movementPreview/families/elbow-flexion__preacher.json": "0355638f947b68167280b6cbc4f88b38acd20bf9ce656d3af5abaacd1afa7e23",
+    "apps/mobile/src/components/movementPreview/families/elbow-flexion__standing.json": "2210f422efd0319444802d2cd8efd468d83c8aa47ab4862762c760b64fb60d1c",
+    "apps/mobile/src/components/movementPreview/families/face-pull__standing.json": "5233dd4ac70c38daa6593f753c9db4468c3558cc00e70e8abe7d084060b2576a",
+    "apps/mobile/src/components/movementPreview/families/flye__decline.json": "60d0283ba05520d9d06d402b256c27a22a1abdf883af13161b86d46cbec12113",
+    "apps/mobile/src/components/movementPreview/families/flye__incline.json": "784fef14e0ef35a4bfa3d466de46eff4e22c1e580951abb7afd2294673d9ca93",
+    "apps/mobile/src/components/movementPreview/families/flye__supine.json": "4f288c187ed4fb70fd716de50598dee3fdfe2783628669fffef9ec8cf8576432",
+    "apps/mobile/src/components/movementPreview/families/front-raise__incline.json": "300c57d85c0a8b2c99c03eb2de12cf01688383958b998a74b8579cca4d06e8eb",
+    "apps/mobile/src/components/movementPreview/families/front-raise__standing.json": "47a9a8735ca9799c198ad888501f76f4a731e5bb6eb74b2886c6fa62dd40d8ee",
+    "apps/mobile/src/components/movementPreview/families/glute-kickback__standing.json": "505e9b914ec3d576787f88564b17602315032990cdcf9d9d82e8a3bec7f10afc",
+    "apps/mobile/src/components/movementPreview/families/hip-extension__standing.json": "44c367c41f82abf647a5c1e345811d81de06ca12d0d7ce6b7fac16c4e4360e4e",
+    "apps/mobile/src/components/movementPreview/families/hip-extension__supine.json": "02801c78342ba895dcbad701795caacfdc024bc087e6161797f2e53bd9ec3aa4",
+    "apps/mobile/src/components/movementPreview/families/hip-hinge__standing.json": "6e44d4da536cbf6e2a75360156d72ac33519377e7bdbb4ecb91d205b43fa58fb",
+    "apps/mobile/src/components/movementPreview/families/horizontal-press__incline.json": "05c62c969d1c4523091218bf6e8bbf25aa3f466c14a1b13d188a50821b39b8ee",
+    "apps/mobile/src/components/movementPreview/families/horizontal-press__supine.json": "c37b728c8998f2e24a47e711f351c594b1e60e3e8f9247c3db2ac0aba3ba0d77",
+    "apps/mobile/src/components/movementPreview/families/horizontal-pull__bent-over.json": "78eee86c604524a3d53e405052883e28b14de1258b2749a356b20d0a9f412ffd",
+    "apps/mobile/src/components/movementPreview/families/horizontal-pull__kneeling.json": "65a767fcb91de0319482851a63c4015817ca6f20552fe0c4ebff8120b30b39e9",
+    "apps/mobile/src/components/movementPreview/families/horizontal-pull__prone-supported.json": "f734359c7693858425c9e3f17973aa4cefa0e6d4a13b93b4a4c2d87fdff5da9a",
+    "apps/mobile/src/components/movementPreview/families/horizontal-pull__seated.json": "a690cf1dc453f422f8592c44c5128145f167f1fe84d2d227fb81d66c7deb1146",
+    "apps/mobile/src/components/movementPreview/families/horizontal-pull__standing.json": "9d5ae1ca045621f87d150913f9325718f00f5d1d870552278c443470c37eaa14",
+    "apps/mobile/src/components/movementPreview/families/horizontal-pull__supine.json": "4cbcbf28d779fdb79f29236392f62647b00e60213a2b579bd52a09014ea43d34",
+    "apps/mobile/src/components/movementPreview/families/isolation-other__incline.json": "3ce388f9db170d958a63c4ba7d7219386f152077cbc95995822cf0715bcd2a1b",
+    "apps/mobile/src/components/movementPreview/families/lateral-raise__seated.json": "be9760653a769408471ff60c71f859f7d42b1529b6fb7fe93deb596cda41d76a",
+    "apps/mobile/src/components/movementPreview/families/lateral-raise__standing.json": "0624052005553ef2f7a1609e1a2ab4cb122739f117f82d038e38761a05f07a71",
+    "apps/mobile/src/components/movementPreview/families/locomotion__standing.json": "8627d8fc74cda7e64ff7dccdf8b4d32e952dcc96e9a642473327490e2f9f112a",
+    "apps/mobile/src/components/movementPreview/families/lunge__reverse.json": "94d1b96239d8b96c0713fbd793c6ff8714b8e79787cd83c9db378d162234fa4e",
+    "apps/mobile/src/components/movementPreview/families/lunge__split-stance.json": "d0a6553ca3c4269ecc754cbe9e9e2964eeb6ae6d013ae2122bbbc964ddf39975",
+    "apps/mobile/src/components/movementPreview/families/lunge__standing.json": "faae291edf7a3252d92a98d27193ae6273f66ccf2cdc683d46d01c3ac51e0d65",
+    "apps/mobile/src/components/movementPreview/families/lunge__traveling.json": "642f640bf0ff77c2cc5ccfb61ed8ccd242e1495a5cc4f9702dd53cdaed6872c0",
+    "apps/mobile/src/components/movementPreview/families/pallof__standing.json": "ee1f09ddebd84c55a45a37312d588057a80eefcac2b5a3066e6266a0debb9928",
+    "apps/mobile/src/components/movementPreview/families/plank__prone.json": "69f9360eadca89e88e85cef4f13794c8769e691933ab44abf69e7b42d4525eaa",
+    "apps/mobile/src/components/movementPreview/families/push-up__floor.json": "fabcae79a82c0b5f6b0e4f263410b89f325755ee647cac34240d50e0313b44b0",
+    "apps/mobile/src/components/movementPreview/families/push-up__incline.json": "b239070a3cafbd399da04529c12e9005516e8f0d3633047779a597783638cd72",
+    "apps/mobile/src/components/movementPreview/families/rear-delt__bent-over.json": "45079dda4fff3511b9b1a7c4326f8a2495fe73c0e6408a37c12061caadc34559",
+    "apps/mobile/src/components/movementPreview/families/rear-delt__standing.json": "8c8d59f8f17c91e6e0c3c565daf45ae6bef85dc2ed9649ca0f829a5b3fff3faa",
+    "apps/mobile/src/components/movementPreview/families/shoulder-raise__standing.json": "3fbb85ab81674a57d464d28ad3180e5de35224f1d39c9cf8d6dcffd85690dfa3",
+    "apps/mobile/src/components/movementPreview/families/shoulder-rotation__standing.json": "e2d89e7ee72d58d876d79764ea6199b72949baae7f65f753a19e4bf2a8f8748d",
+    "apps/mobile/src/components/movementPreview/families/shrug__standing.json": "fe85f671fbe7184a93b3907d9ed667b001b4d6d8c79ac69086619b8de09585e6",
+    "apps/mobile/src/components/movementPreview/families/squat__standing.json": "66349c1d5f3b299174b0182ceca8de0084fa092ad7cef11bec730b2f9af942aa",
+    "apps/mobile/src/components/movementPreview/families/squat__sumo-stance.json": "21dea099db7ccd83678a1e282ada75cf142bdc35ba5df8717151f3752fc46d03",
+    "apps/mobile/src/components/movementPreview/families/straight-arm-pulldown__standing.json": "565c1f2ac2912469e0705dfe4092a2bfa793c34306b44aea4ffeb7778c16567d",
+    "apps/mobile/src/components/movementPreview/families/trunk-flex__seated.json": "adc41ba146bb694465d4339d11f5ae50a69015133aab5193ea8642b4728aa61f",
+    "apps/mobile/src/components/movementPreview/families/trunk-flex__standing.json": "645d759ac6cc21c737c75e3279302ec686839f8a2c0958f9c0ddff4c73f87794",
+    "apps/mobile/src/components/movementPreview/families/trunk-flex__supine.json": "8d7390c4c69a33768dcd8cede309e948755a2a161852b1c8df17d8a7f3a150b9",
+    "apps/mobile/src/components/movementPreview/families/trunk-twist__supine.json": "f1d380b31841cd5fe09cfefb5f8c02e2b1e8d34bd53c9004b5c194c526fad941",
+    "apps/mobile/src/components/movementPreview/families/vertical-press__seated.json": "63bce93cd850a244a48192a2294d3f2584fd34c6054a19d258916805a9d08bcd",
+    "apps/mobile/src/components/movementPreview/families/vertical-press__standing.json": "6f8a0773a6c73f5f9914bb9c62c34ba88a97cb82645b7ecf8ed293a348dcfe44",
+    "apps/mobile/src/components/movementPreview/families/vertical-pull__standing.json": "df9712df793faebf96ccde69b9bab7b084c49b30aa5f8839c79aad47a973d7f8",
+    "apps/mobile/src/components/movementPreview/canonicalFigure.ts": "59d12bda78f5573c0d39023b28e5be195050becb4760512e9b0218514ef33380",
+    "apps/mobile/src/components/movementPreview/derivation.ts": "86735900bce5752ce01cd87b63e4d0624b7e395ae2d15cc1d9fea3f3b8cf74e8",
+    "apps/mobile/src/components/movementPreview/MovementPreview.tsx": "273b71c1a7a56887601830417a50da14411ca88bfe8f49bfc315a73ab6cdb826",
+    "tools/rendering/render_motion_cycle.mjs": "2eb81540bdca33d8f83c15884a2142329f75d63d6104ca56fda8c76e6b5a6307",
+    "tools/rendering/lib/canonicalSvg.mjs": "0c6a0d6a0c51a1f4fa49633082ae77f8b4b6bb2330bceb280e6a73471eb974ff"
+  },
+  "movements": [
+    {
+      "id": 219,
+      "assetKey": "movement/incline-dumbbell-curl/demo/v1",
+      "view": "side",
+      "viewBox": [
+        15,
+        34,
+        64,
+        67
+      ],
+      "records": [
+        {
+          "body": "neutral",
+          "tickCount": 129,
+          "totalMs": 4200,
+          "sheetSha256": "72a4603dcf4f6549b9b8bebb6aa023b9754fc903de2b1b948841730e2f5a311d",
+          "htmlSha256": "0dea5e2e23ee9f1192271983d753e221f03ab46a8b9dfce5b9bb5e6d9ea0d138",
+          "primitiveFramesSha256": "38c375acb8271fce0abf25d659379f91bbaf574afbf408b1f349f803a97922a5"
+        }
+      ]
+    },
+    {
+      "id": 221,
+      "assetKey": "movement/incline-hammer-curls/demo/v1",
+      "view": "side",
+      "viewBox": [
+        15,
+        34,
+        64,
+        67
+      ],
+      "records": [
+        {
+          "body": "neutral",
+          "tickCount": 138,
+          "totalMs": 4500,
+          "sheetSha256": "1defc2b28184462587f03fe41485cae79f2c048a3ae8feb48b2acf3398671972",
+          "htmlSha256": "3a9c2ba772cc89d04b82e0989f447d98b3d2780b84ee9f602efd597e7e10a69e",
+          "primitiveFramesSha256": "8b57292dbbcb2e2eb42dc2aa08905f91f032200e4b441b05a7a84c9e4824bf0a"
+        }
+      ]
+    },
+    {
+      "id": 207,
+      "assetKey": "movement/front-incline-dumbbell-raise/demo/v1",
+      "view": "side",
+      "viewBox": [
+        11,
+        39,
+        70,
+        62
+      ],
+      "records": [
+        {
+          "body": "neutral",
+          "tickCount": 132,
+          "totalMs": 4300,
+          "sheetSha256": "c8ff93386544587166c5f9febda2a7f1d766385e89bc475e96eae0b26a714ce0",
+          "htmlSha256": "b3a10855e18e83662da9feab9129f008c60d3d4074090c00e0ff61a5ac61a7c2",
+          "primitiveFramesSha256": "440da0acee6e7ec1fd7395879b04cc7eeeb8d060d0e672003adf83029df7c352"
+        }
+      ]
+    },
+    {
+      "id": 155,
+      "assetKey": "movement/cable-incline-triceps-extension/demo/v1",
+      "view": "side",
+      "viewBox": [
+        0,
+        11,
+        83,
+        90
+      ],
+      "records": [
+        {
+          "body": "neutral",
+          "tickCount": 129,
+          "totalMs": 4200,
+          "sheetSha256": "091d7a2b274e111268237290d03daca2c59710dc1c304ac0a70e69324cdb3059",
+          "htmlSha256": "0688f41e3d05e9c6c8922c8b5e36bf1d5807ad0c2f330a7e0edcbea145bad9c8",
+          "primitiveFramesSha256": "5c05c506d84e0254038d07dafff232ea29795d18ce8ad017682009bf612dde1a"
+        }
+      ]
+    }
+  ]
+}

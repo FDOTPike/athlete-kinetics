@@ -1,0 +1,408 @@
+{
+  "files": 67,
+  "matches": 67,
+  "rows": [
+    {
+      "path": "packages/core-db/src/schema/001_mechanical_input.sql",
+      "expected": "ed47cecf5e94e21f2b4fd51dc19bf62e96ddfd2e6932a26f6f4795198bdc2818",
+      "candidateSha256": "ed47cecf5e94e21f2b4fd51dc19bf62e96ddfd2e6932a26f6f4795198bdc2818",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/002_telemetry.sql",
+      "expected": "efc257a416d6dd98ac530269eeb6071cd6cc91fa2921cbaf3b8b5123ac589e85",
+      "candidateSha256": "efc257a416d6dd98ac530269eeb6071cd6cc91fa2921cbaf3b8b5123ac589e85",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/003_state_vector.sql",
+      "expected": "341b34b131a794a1345cc6b9ee6d49eb228410b8c0d13052a2b98fa58dacb733",
+      "candidateSha256": "341b34b131a794a1345cc6b9ee6d49eb228410b8c0d13052a2b98fa58dacb733",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/005_subjective_report.sql",
+      "expected": "bbd0e0d627dcd38946621835dadcccdcac8000fe78c43a8e288cb4a0e07e7b35",
+      "candidateSha256": "bbd0e0d627dcd38946621835dadcccdcac8000fe78c43a8e288cb4a0e07e7b35",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/006_user_profile.sql",
+      "expected": "8b1340d7e7c5da48fd21b20f3c7ba722301fc82cc8f7104e202b6f94cae81b74",
+      "candidateSha256": "8b1340d7e7c5da48fd21b20f3c7ba722301fc82cc8f7104e202b6f94cae81b74",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/007_program_engine.sql",
+      "expected": "aabd5992b75d4eafac07fa560c99f032ad096b47b0731517ca076f695fb92a1a",
+      "candidateSha256": "aabd5992b75d4eafac07fa560c99f032ad096b47b0731517ca076f695fb92a1a",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/008_taxonomy.sql",
+      "expected": "68f3c395417679c05e1e08b834b4e931ded5d5f4b4720b0764537433a7959496",
+      "candidateSha256": "68f3c395417679c05e1e08b834b4e931ded5d5f4b4720b0764537433a7959496",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/009_periodization.sql",
+      "expected": "710a0680662941afeaf176003e97d80271951801a5554e5c9db39be63da74627",
+      "candidateSha256": "710a0680662941afeaf176003e97d80271951801a5554e5c9db39be63da74627",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/010_movement_library.sql",
+      "expected": "f0161f239ef322219a79769baaafd8e211772a0fa2d9b52073b66d1618c73dba",
+      "candidateSha256": "f0161f239ef322219a79769baaafd8e211772a0fa2d9b52073b66d1618c73dba",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/011_niggle_tracking.sql",
+      "expected": "68b50bc981754687066e87cf076340de3c07715e3817ec23c9a751f73a8c649f",
+      "candidateSha256": "68b50bc981754687066e87cf076340de3c07715e3817ec23c9a751f73a8c649f",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/012_report_severity.sql",
+      "expected": "57099ce769915b5db0b11f1959c7034ec4bcc2707eb9336285c319f1e55254e3",
+      "candidateSha256": "57099ce769915b5db0b11f1959c7034ec4bcc2707eb9336285c319f1e55254e3",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/013_profile_slot.sql",
+      "expected": "10f47993b6b1f574054b4d3f99482359124aff2a343261d616f0cbac457dfbf7",
+      "candidateSha256": "10f47993b6b1f574054b4d3f99482359124aff2a343261d616f0cbac457dfbf7",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/014_movement_prefixes.sql",
+      "expected": "d9fad2179e5eb8a1b8162e5b2afbf1fffc485dc6ff89b7e071322aa1ad93c728",
+      "candidateSha256": "d9fad2179e5eb8a1b8162e5b2afbf1fffc485dc6ff89b7e071322aa1ad93c728",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/015_set_prefix.sql",
+      "expected": "c397883758dbe5c8b517f726b546443664203e031285db15256ed19128f57ac6",
+      "candidateSha256": "c397883758dbe5c8b517f726b546443664203e031285db15256ed19128f57ac6",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/016_movement_library_seed.sql",
+      "expected": "2b595f9474143febc9291fde4ae3eb8baaa5a537d4eafb79c54ae056f13c6328",
+      "candidateSha256": "2b595f9474143febc9291fde4ae3eb8baaa5a537d4eafb79c54ae056f13c6328",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/017_movement_batch.sql",
+      "expected": "7c09a62ffa2e96895d8f4fb04a67d5ce2c55a1b677637a034bbe442599fa13fc",
+      "candidateSha256": "7c09a62ffa2e96895d8f4fb04a67d5ce2c55a1b677637a034bbe442599fa13fc",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/018_logging_modes.sql",
+      "expected": "807d5f9084b84106362ee84b095f78955103b541ed307dcf409adee1678134ed",
+      "candidateSha256": "807d5f9084b84106362ee84b095f78955103b541ed307dcf409adee1678134ed",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/019_movement_batch.sql",
+      "expected": "2845f0fbec078de1be2aa51e57d9acb6206994dff72aa79d41eebed8e186dc57",
+      "candidateSha256": "2845f0fbec078de1be2aa51e57d9acb6206994dff72aa79d41eebed8e186dc57",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/020_movement_batch.sql",
+      "expected": "799ea6f56808503ecb1c987f6cf2e31b55882460ca6b56ad03997bd3ff3c8252",
+      "candidateSha256": "799ea6f56808503ecb1c987f6cf2e31b55882460ca6b56ad03997bd3ff3c8252",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/021_taxonomy_corrections.sql",
+      "expected": "f7dcd61d74ffdbd3dc5015909a2f85d44297c67a603279c75408e2122a69fdb3",
+      "candidateSha256": "f7dcd61d74ffdbd3dc5015909a2f85d44297c67a603279c75408e2122a69fdb3",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/022_set_target.sql",
+      "expected": "c7aab1372d8406620ecb3c8f95a3313c7578a23e9cfeb81f3bd124253f3f41d5",
+      "candidateSha256": "c7aab1372d8406620ecb3c8f95a3313c7578a23e9cfeb81f3bd124253f3f41d5",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/023_phase17_session_foundation.sql",
+      "expected": "de42af48c58a8b90ed981976ec7984baa988f0fd9d1e16c0451d600681572b4b",
+      "candidateSha256": "de42af48c58a8b90ed981976ec7984baa988f0fd9d1e16c0451d600681572b4b",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/024_phase17_equipment_fixes.sql",
+      "expected": "09750fc1dfa3caf6062c55fb5c1e64b04e7121f706100795931a03e858c41e96",
+      "candidateSha256": "09750fc1dfa3caf6062c55fb5c1e64b04e7121f706100795931a03e858c41e96",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/025_movement_coaching_content.sql",
+      "expected": "ef14633458e4702ede2994a3817873d072ed1041332bdf79b7df36e21a47752d",
+      "candidateSha256": "ef14633458e4702ede2994a3817873d072ed1041332bdf79b7df36e21a47752d",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/026_phase18_session_outcome.sql",
+      "expected": "57d6b9b2ae95422afa0e9e1c61375adbff0945ecca01ac44c8328bca9b066542",
+      "candidateSha256": "57d6b9b2ae95422afa0e9e1c61375adbff0945ecca01ac44c8328bca9b066542",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/027_operational_safeguards.sql",
+      "expected": "3fff0fdb7c120d91ea177e37bd22f681bc5d7f24a6fa983f402e8a5d11ef108b",
+      "candidateSha256": "3fff0fdb7c120d91ea177e37bd22f681bc5d7f24a6fa983f402e8a5d11ef108b",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/028_capability_graph.sql",
+      "expected": "0d55ef1a5aeb55f9e977416c48a9f2538aef09897da94c32004138728fe08b75",
+      "candidateSha256": "0d55ef1a5aeb55f9e977416c48a9f2538aef09897da94c32004138728fe08b75",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/029_routine_history_analytics.sql",
+      "expected": "bb0172e41fb1e59a021953de70b0aa6a56a85d7a4b5edf4d1fcf9a238af4295e",
+      "candidateSha256": "bb0172e41fb1e59a021953de70b0aa6a56a85d7a4b5edf4d1fcf9a238af4295e",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/030_readiness_import_integration.sql",
+      "expected": "9ec9d84359cffab0faed03313d044c94b1acf7a59ab0058409799f705f773b02",
+      "candidateSha256": "9ec9d84359cffab0faed03313d044c94b1acf7a59ab0058409799f705f773b02",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/031_planned_session_method.sql",
+      "expected": "88197d48aa5140c4be61c8ba4680490eb8a74740dfcdd8d5089538f8ffe35779",
+      "candidateSha256": "88197d48aa5140c4be61c8ba4680490eb8a74740dfcdd8d5089538f8ffe35779",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/032_capability_content.sql",
+      "expected": "999bd9d1c436b1b13d81cec2a354d5e8afedc3854125d3eed226cba2e804e0c6",
+      "candidateSha256": "999bd9d1c436b1b13d81cec2a354d5e8afedc3854125d3eed226cba2e804e0c6",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/033_goal_program.sql",
+      "expected": "ba5f4b7c3e05e845e48f20c52e4154e31ed7f624d1795f2a6ec294a51c038226",
+      "candidateSha256": "ba5f4b7c3e05e845e48f20c52e4154e31ed7f624d1795f2a6ec294a51c038226",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/034_autopilot_attribution.sql",
+      "expected": "0cb250e3158f7e7fe3c7dffc039b561edbb28491ffc6bc9c41148bd2ac13e500",
+      "candidateSha256": "0cb250e3158f7e7fe3c7dffc039b561edbb28491ffc6bc9c41148bd2ac13e500",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/035_profile_load_preference.sql",
+      "expected": "07c2c0849fea9b3a2945f18f17b90c6bdf6fc655ee98544e7803d07edc5024c8",
+      "candidateSha256": "07c2c0849fea9b3a2945f18f17b90c6bdf6fc655ee98544e7803d07edc5024c8",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/036_movement_media.sql",
+      "expected": "3737214a6e806c1c66ce937da8167f265d492135ed51ddde7a2b6f97c593e6e2",
+      "candidateSha256": "3737214a6e806c1c66ce937da8167f265d492135ed51ddde7a2b6f97c593e6e2",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/037_movement_library_v2_batch.sql",
+      "expected": "3b1bc496265d69284d18d88e175b254f71e9cd1cc869842bc813de8bb426d9d1",
+      "candidateSha256": "3b1bc496265d69284d18d88e175b254f71e9cd1cc869842bc813de8bb426d9d1",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/038_movement_library_v2_batch.sql",
+      "expected": "9ad7c0ba7984e5838cd2abf78a6e0fdd13e4bec51da20cf4bca55db162e8c347",
+      "candidateSha256": "9ad7c0ba7984e5838cd2abf78a6e0fdd13e4bec51da20cf4bca55db162e8c347",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/039_movement_library_v2_batch.sql",
+      "expected": "b802c039c0a110d68d61f4fbb87f0df958c5c21bc19e78d0a234dc9a4e3ba983",
+      "candidateSha256": "b802c039c0a110d68d61f4fbb87f0df958c5c21bc19e78d0a234dc9a4e3ba983",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/040_movement_library_v2_batch.sql",
+      "expected": "b36d8ecdc99234fc44db848da28725595cbc3e17abe17aaee8f52aa4a687539a",
+      "candidateSha256": "b36d8ecdc99234fc44db848da28725595cbc3e17abe17aaee8f52aa4a687539a",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/041_movement_library_v2_batch.sql",
+      "expected": "f711dda0d0c4d69a2c7a6ca4f425f3ed40adb83ffc2c977c1a164c929858d76f",
+      "candidateSha256": "f711dda0d0c4d69a2c7a6ca4f425f3ed40adb83ffc2c977c1a164c929858d76f",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/042_movement_library_v2_batch.sql",
+      "expected": "57f9d16c875d934854f37d8739a8325d3525887550daaeccf189e168d1d6cbec",
+      "candidateSha256": "57f9d16c875d934854f37d8739a8325d3525887550daaeccf189e168d1d6cbec",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/043_movement_library_v2_batch.sql",
+      "expected": "cf1ca39f721d75c6991bafca26a92928d914366b98736df1dddcf537960e5d68",
+      "candidateSha256": "cf1ca39f721d75c6991bafca26a92928d914366b98736df1dddcf537960e5d68",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/044_movement_library_v2_batch.sql",
+      "expected": "7569e43e22957eb9ca3b0538825a17275d36321ab1f72cb67ec45c91d5365e1b",
+      "candidateSha256": "7569e43e22957eb9ca3b0538825a17275d36321ab1f72cb67ec45c91d5365e1b",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/045_movement_library_v2_batch.sql",
+      "expected": "7d453c939d8eee8f90fab08047a400e7d02d0f4d2a77d6432ab1ed84145354b1",
+      "candidateSha256": "7d453c939d8eee8f90fab08047a400e7d02d0f4d2a77d6432ab1ed84145354b1",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/046_movement_library_v2_batch.sql",
+      "expected": "71f4cf40c7990aa84bb7f865ea924f73fbe2492f440698ff21db33458c81f6af",
+      "candidateSha256": "71f4cf40c7990aa84bb7f865ea924f73fbe2492f440698ff21db33458c81f6af",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/047_movement_library_v2_batch.sql",
+      "expected": "c47f748b3ee0f3ef82b4f56334ec66b4463373ef4ed8594fe2ee56ecf6172551",
+      "candidateSha256": "c47f748b3ee0f3ef82b4f56334ec66b4463373ef4ed8594fe2ee56ecf6172551",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/048_movement_library_v2_batch.sql",
+      "expected": "fb8fb05e083bd9fb95c252d389825a003e8693ae55c81f011dd57cac56ed83eb",
+      "candidateSha256": "fb8fb05e083bd9fb95c252d389825a003e8693ae55c81f011dd57cac56ed83eb",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/049_movement_content_correction_v1.sql",
+      "expected": "467950bc651fbf84fbb5dded0d99ad9797437431ddb718442cc573fc50042d68",
+      "candidateSha256": "467950bc651fbf84fbb5dded0d99ad9797437431ddb718442cc573fc50042d68",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/050_movement_role_convergence.sql",
+      "expected": "2a58ba551d56fc657e1f61577259f3e5eb7deda64ac34b32d383828854e71525",
+      "candidateSha256": "2a58ba551d56fc657e1f61577259f3e5eb7deda64ac34b32d383828854e71525",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/051_routine_access_context.sql",
+      "expected": "117e896bc76cdd0641a76136e774b8ebd8683a2c3070fc8388ed8c13764077d2",
+      "candidateSha256": "117e896bc76cdd0641a76136e774b8ebd8683a2c3070fc8388ed8c13764077d2",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/052_bounded_microcycle_roles.sql",
+      "expected": "2d86d7ac94d6f2f75ecbdd1dc19b4a515386d94d024b01239ceef9549791e756",
+      "candidateSha256": "2d86d7ac94d6f2f75ecbdd1dc19b4a515386d94d024b01239ceef9549791e756",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/053_routine_role_compatibility.sql",
+      "expected": "5e2a522f9f2450a890ef97366a44be70aaf90b2dc5380630d51b5e5cac4bceb5",
+      "candidateSha256": "5e2a522f9f2450a890ef97366a44be70aaf90b2dc5380630d51b5e5cac4bceb5",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/054_contract_cutoff_provenance.sql",
+      "expected": "b0f1d00cd350c9307cbd9a40a343defcb60a1ed74129f70069ff0b6443ab70c0",
+      "candidateSha256": "b0f1d00cd350c9307cbd9a40a343defcb60a1ed74129f70069ff0b6443ab70c0",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/055_return_checkin_ack.sql",
+      "expected": "476f3ab5d8fc0c43276873e747c4d7975b3793f0f0077669d98d4df299a3f917",
+      "candidateSha256": "476f3ab5d8fc0c43276873e747c4d7975b3793f0f0077669d98d4df299a3f917",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/056_movement_taxonomy_backfill.sql",
+      "expected": "2cb64589db95f66d6203fe2b0a1233d50d601dc1a782b2f5ba8ddc3d02e6ae19",
+      "candidateSha256": "2cb64589db95f66d6203fe2b0a1233d50d601dc1a782b2f5ba8ddc3d02e6ae19",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/057_block_meta_phase_invariant.sql",
+      "expected": "33476b2f0404cd3e5c46ba1f0beb6309726a8cc2de81944f67f6e7ea1bc65c3d",
+      "candidateSha256": "33476b2f0404cd3e5c46ba1f0beb6309726a8cc2de81944f67f6e7ea1bc65c3d",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/058_suspension_episode.sql",
+      "expected": "a91a4c146245e70ee8182c456483bcd94c1f0c34ac4d172c8a1486c99bc3fdca",
+      "candidateSha256": "a91a4c146245e70ee8182c456483bcd94c1f0c34ac4d172c8a1486c99bc3fdca",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/059_suspension_state_and_load_intent.sql",
+      "expected": "03fbd37fe1498c0f706e28e87a8b6e7271bc5c541babe3d2706ee69a8619c330",
+      "candidateSha256": "03fbd37fe1498c0f706e28e87a8b6e7271bc5c541babe3d2706ee69a8619c330",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/060_program_goal_tier_alignment.sql",
+      "expected": "9c1a3d5ee10669538e12eff12d43f6fb62613e177d29c15bcdda9d96254a8313",
+      "candidateSha256": "9c1a3d5ee10669538e12eff12d43f6fb62613e177d29c15bcdda9d96254a8313",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/061_autopilot_attribution_convergence.sql",
+      "expected": "e8fa5e9efd3b77189cd59933575105aada0a4a79b3ad008c010dcc4379822f07",
+      "candidateSha256": "e8fa5e9efd3b77189cd59933575105aada0a4a79b3ad008c010dcc4379822f07",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/062_suspension_sidecar_immutability.sql",
+      "expected": "b84d7d71aad57ea0754d6d5b44eac8c44d1f343b9d631e6e5af8621ffcf2de5c",
+      "candidateSha256": "b84d7d71aad57ea0754d6d5b44eac8c44d1f343b9d631e6e5af8621ffcf2de5c",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/063_movement_load_intent.sql",
+      "expected": "8d4ebf9c9f36d735e763b449a702d1216a6a918b4933c1f4d8d3196688025a2c",
+      "candidateSha256": "8d4ebf9c9f36d735e763b449a702d1216a6a918b4933c1f4d8d3196688025a2c",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/064_accessible_coach_support.sql",
+      "expected": "b141b149717fb2f26f585a67239fea05ab03220ab040d5d86500cf8c38022a8a",
+      "candidateSha256": "b141b149717fb2f26f585a67239fea05ab03220ab040d5d86500cf8c38022a8a",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/065_session_preparation.sql",
+      "expected": "d04f4e30a886ec353a6ffc56bb3bbf929bb92f71eef183945b09c46c5422932d",
+      "candidateSha256": "d04f4e30a886ec353a6ffc56bb3bbf929bb92f71eef183945b09c46c5422932d",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/066_focus_and_goals.sql",
+      "expected": "52e16facdf5fe7d3e02b797b3b49d1bc430c79ca24e2a20cb836e09474aae5de",
+      "candidateSha256": "52e16facdf5fe7d3e02b797b3b49d1bc430c79ca24e2a20cb836e09474aae5de",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/067_sport_and_emphasis.sql",
+      "expected": "c9a2e33d12e0ee7fb43f7d1eb1d644881b91945a0dc14f591c7f56a4a37337ca",
+      "candidateSha256": "c9a2e33d12e0ee7fb43f7d1eb1d644881b91945a0dc14f591c7f56a4a37337ca",
+      "match": true
+    },
+    {
+      "path": "packages/core-db/src/schema/068_movement_content_correction_v2.sql",
+      "expected": "e30d88808e8dc635b4e255714b0fa7eb88eb7fd8ce7b2e29a3c0e42974507fb2",
+      "candidateSha256": "e30d88808e8dc635b4e255714b0fa7eb88eb7fd8ce7b2e29a3c0e42974507fb2",
+      "match": true
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+  bent-over-dumbbell-rear-delt-raise-with-head-on-bench: 15 cards, 3 sheets, viewBox [8,12,96,90]
+  dumbbell-shrug: 18 cards, 3 sheets, viewBox [10,6,80,94.47]
+  barbell-shrug: 18 cards, 3 sheets, viewBox [10,6,80,94.47]
+  barbell-shrug-behind-the-back: 18 cards, 3 sheets, viewBox [10,6,80,94.47]
+  cable-shrugs: 18 cards, 3 sheets, viewBox [9.69,6,80.61,94.47]
+  preacher-curl: 15 cards, 3 sheets, viewBox [10,8,72,94]
+  cable-preacher-curl: 15 cards, 3 sheets, viewBox [10,8,72,94]
+  preacher-hammer-dumbbell-curl: 15 cards, 3 sheets, viewBox [10,8,72,94]
+  triceps-pushdown: 15 cards, 3 sheets, viewBox [10,4,82,98]
+  reverse-grip-triceps-pushdown: 15 cards, 3 sheets, viewBox [10,4,82,98]
+  triceps-pushdown-rope-attachment: 15 cards, 3 sheets, viewBox [10,4,82,98]
+  rope-straight-arm-pulldown: 15 cards, 3 sheets, viewBox [6,-5,94,107]
+  dumbbell-flye: 15 cards, 3 sheets, viewBox [0,15,104,88]
+  decline-dumbbell-flyes: 15 cards, 3 sheets, viewBox [0,15,104,88]
+  incline-dumbbell-flyes: 15 cards, 3 sheets, viewBox [0,15,104,88]
+  cable-glute-kickback: 15 cards, 3 sheets, viewBox [6,8,88,96]
+  dumbbell-reverse-lunge: 18 cards, 3 sheets, viewBox [-6,6,80,96]
+
+checked 270 cards and 51 contact sheets across 17 movement(s)
+PASS — what is proven: the SVG of every card and sheet is byte-identical to the
+       rebuild from the manifest; every file matches its recorded hash; the figure
+       stage of every PNG matches a fresh raster of its own SVG; every card PNG
+       agrees with its column in the contact sheet across the whole card, text
+       included, to within measured rasterizer noise; coverage is complete; and
+       every text band is inked and inside the card.
+
+NOT AUTOMATICALLY CERTIFIED — that the GLYPHS rasterized into a PNG spell the text
+       its SVG contains. `sans-serif` resolves to a host font, so proving it needs
+       a font-deterministic pipeline and a re-render of every artifact. C10 proves
+       the SVG text is exactly what the manifest dictates and C14 proves the card
+       and sheet renders agree, but agreement is not correctness.
+       Axis-B render evidence requires human visual review before approval.

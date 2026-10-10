@@ -1,0 +1,11 @@
+const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),cp=require('node:child_process');
+const root=process.cwd(),out=path.join(root,'acceptance-evidence/dot/runtime-audit');
+const hash=p=>crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex');
+const paths=cp.execFileSync('git',['ls-files','apps/mobile/src/components/movementPreview','apps/mobile/src/components/ui/motionDuration.ts','apps/mobile/src/screens/LibraryScreenV2.tsx','apps/mobile/src/screens/SessionScreen.tsx','apps/mobile/test/components/MovementPreview*','tools/rendering','package-lock.json'],{env:{...process.env,GIT_OPTIONAL_LOCKS:'0'}}).toString().trim().split(/\r?\n/);
+const walk=p=>fs.readdirSync(p,{withFileTypes:true}).flatMap(d=>d.isDirectory()?walk(path.join(p,d.name)):[path.join(p,d.name)]);
+const artifacts=['recheck52-cycles','recheck52-cards'].flatMap(n=>walk(path.join(root,'acceptance-evidence/dot',n))).map(p=>({path:path.relative(root,p).replaceAll('\\','/'),sha256:hash(p)}));
+const receipt={head:cp.execFileSync('git',['rev-parse','HEAD']).toString().trim(),tree:cp.execFileSync('git',['rev-parse','HEAD^{tree}']).toString().trim(),branch:cp.execFileSync('git',['branch','--show-current']).toString().trim(),source:paths.map(p=>({path:p,sha256:hash(path.join(root,p))})),artifacts};fs.writeFileSync(path.join(out,'initial-freeze-before.json'),JSON.stringify(receipt,null,2)+'\n');
+const base=require(path.join(root,'apps/mobile/jest.config.js'));base.roots=[path.join(root,'apps/mobile'),out];base.testMatch=[out.replaceAll('\\','/')+'/*.test.js'];base.modulePaths=[path.join(root,'node_modules')];
+const cfg="const root=require('node:path').resolve(__dirname,'../../..');const base=require(root+'/apps/mobile/jest.config.js');module.exports={...base,roots:[root+'/apps/mobile',__dirname],testMatch:[__dirname.replaceAll('\\\\','/')+'/*.test.js'],modulePaths:[root+'/node_modules']};\n";
+fs.writeFileSync(path.join(out,'jest-audit.config.cjs'),cfg);
+console.log(JSON.stringify({head:receipt.head,tree:receipt.tree,sourceFiles:receipt.source.length,artifacts:artifacts.length},null,2));

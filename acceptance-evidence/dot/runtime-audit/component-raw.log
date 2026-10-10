@@ -1,0 +1,18 @@
+PASS acceptance-evidence/dot/runtime-audit/recheck52.test.js (5.743 s)
+  ΓêÜ 52 full actual RN View cycle and terminal closure (neutral) (1624 ms)
+  ΓêÜ 52 full actual RN View cycle and terminal closure (male) (692 ms)
+  ΓêÜ 52 full actual RN View cycle and terminal closure (female) (587 ms)
+  ΓêÜ 52 authored reduced-motion bounds, contact, captions and accessibility (neutral) (26 ms)
+  ΓêÜ 52 authored reduced-motion bounds, contact, captions and accessibility (male) (25 ms)
+  ΓêÜ 52 authored reduced-motion bounds, contact, captions and accessibility (female) (23 ms)
+  ΓêÜ 52 pause/resume/background/reduced-motion/identity/unmount (neutral) (18 ms)
+  ΓêÜ 52 pause/resume/background/reduced-motion/identity/unmount (male) (25 ms)
+  ΓêÜ 52 pause/resume/background/reduced-motion/identity/unmount (female) (58 ms)
+  ΓêÜ 52 real source remains pending and default global gate never opens
+
+Test Suites: 1 passed, 1 total
+Tests:       10 passed, 10 total
+Snapshots:   0 total
+Time:        6.761 s
+Ran all test suites.
+Test results written to: acceptance-evidence\dot\runtime-audit\component-results.json

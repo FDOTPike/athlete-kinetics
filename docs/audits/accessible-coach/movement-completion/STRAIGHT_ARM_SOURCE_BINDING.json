@@ -1,0 +1,31 @@
+{
+  "scope": "264 source binding and static physical contract; independent technique/native review pending",
+  "movementId": 264,
+  "name": "Rope Straight-Arm Pulldown",
+  "assetKey": "movement/rope-straight-arm-pulldown/demo/v1",
+  "repoProvenance": {
+    "commit": "12a1fb15aff5611b771348a53e2e04f4079e0e34",
+    "relative_path": "packages/core-db/src/schema/049_movement_content_correction_v1.sql",
+    "line": 275,
+    "file_sha256": "467950bc651fbf84fbb5dded0d99ad9797437431ddb718442cc573fc50042d68"
+  },
+  "instructions": "Stand facing a high pulley with a rope, feet staggered, arms extended up and in front of you and a slight hinge at the hips. Keeping the elbows straight, sweep the rope down in an arc until the hands reach the thighs. Return overhead under control; when the elbows start to bend, reduce the load.",
+  "cues": "Keep the elbows straight the whole rep. Move from the shoulders. Feel the lats finish the arc.",
+  "geometry": {
+    "upperArmLength": 12.5,
+    "forearmLength": 12,
+    "elbowFlexion": 0,
+    "shoulderBearings": [
+      -30,
+      30,
+      85,
+      85,
+      -30
+    ],
+    "holdMs": 600,
+    "returnMs": 2600,
+    "ropeBranchLength": 12,
+    "ropeJunction": "toward actual pulley; equal branch resultant collinear with main cable",
+    "romAuthority": "overhead/front to thighs; numeric bearings are schematic implementation choices requiring independent review"
+  }
+}
