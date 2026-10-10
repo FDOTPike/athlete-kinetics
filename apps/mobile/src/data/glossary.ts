@@ -112,6 +112,14 @@ export const GLOSSARY_ENTRIES: readonly GlossaryEntry[] = [
     aliases: ['one-rep max', 'one rep max', '1-rm', 'max lift'],
   },
   {
+    id: 'PR',
+    term: 'PR',
+    category: 'metric',
+    definition:
+      'Personal record — your best ever result for a lift at a given rep count, or for a time or distance. Your 1RM is your single-rep PR.',
+    aliases: ['personal record', 'personal best', 'pb'],
+  },
+  {
     id: 'LOAD',
     term: 'LOAD',
     category: 'metric',
@@ -126,6 +134,14 @@ export const GLOSSARY_ENTRIES: readonly GlossaryEntry[] = [
     definition:
       'A group of consecutive repetitions of an exercise followed by a rest interval. In session planning, a separate set-count adjustment can modify your planned number of sets for the day.',
     aliases: ['set count', 'planned sets'],
+  },
+  {
+    id: 'WORKING SET',
+    term: 'WORKING SET',
+    category: 'metric',
+    definition:
+      'A set done at the planned load and effort. Preparation sets before it do not count; the sets the program plans and counts are working sets.',
+    aliases: ['working sets', 'work set', 'main sets'],
   },
   {
     id: 'REPS',
@@ -177,6 +193,14 @@ export const GLOSSARY_ENTRIES: readonly GlossaryEntry[] = [
   },
 
   // --- Loading Methods ---
+  {
+    id: 'PROGRESSIVE OVERLOAD',
+    term: 'PROGRESSIVE OVERLOAD',
+    category: 'loading',
+    definition:
+      'Doing a little more over time — load, reps or sets — so the body keeps adapting. Each loading method here is one way of planning it.',
+    aliases: ['progressive overload', 'overload principle'],
+  },
   {
     id: 'LINEAR',
     term: 'Linear',
@@ -233,7 +257,7 @@ export const GLOSSARY_ENTRIES: readonly GlossaryEntry[] = [
     category: 'structure',
     definition:
       'One week inside a block — the repeating pattern of days.',
-    aliases: ['training week', 'weekly microcycle'],
+    aliases: ['training week', 'weekly microcycle', 'split', 'training split', 'workout split'],
   },
   {
     id: 'MACROCYCLE',
@@ -266,6 +290,22 @@ export const GLOSSARY_ENTRIES: readonly GlossaryEntry[] = [
     definition:
       "The peak week. Lowest volume, highest effort — this is where the block's work shows up.",
     aliases: ['realization phase', 'peak week', 'realize'],
+  },
+  {
+    id: 'PREPARATION',
+    term: 'PREPARATION',
+    category: 'structure',
+    definition:
+      'The easy work before the first working set: light movement, then one or two preparation sets of the first exercise at a lighter weight.',
+    aliases: ['warm up', 'warm-up', 'warmup', 'preparation set', 'ramp set'],
+  },
+  {
+    id: 'REST TIMER',
+    term: 'REST TIMER',
+    category: 'general',
+    definition:
+      'The pause between sets. After each set the session counts down a rest whose length follows how hard that set was — longer after a harder set. It can be switched off in Profile.',
+    aliases: ['rest between sets', 'rest interval', 'rest countdown'],
   },
 
   // --- Goals ---
