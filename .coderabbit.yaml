@@ -81,7 +81,7 @@ reviews:
         The migration chain (AGENT_WORKFLOW.md section 1 rule 5, and section 4).
 
         - A migration file that exists on the base branch has shipped and is frozen. Flag any edit, rename or deletion of one, including comments and whitespace. A correction ships as a new file with the next number.
-        - 004_*.sql is the daily upsert run by the data layer. It is not in the chain.
+        - 004_*.sql is the daily upsert run by the data layer. It is not in the chain and is not frozen; review a change to it as code.
         - The MIGRATIONS array in migrations.ts is append-only: a device's user_version is its index into that array. Flag an entry inserted before the end, removed or reordered.
         - Self-heal re-applies every migration, so each one must give the same result on every run. Flag CREATE without IF NOT EXISTS (a trigger or view may DROP then CREATE instead), INSERT without OR IGNORE, and an UPDATE or DELETE whose effect depends on how many times it has run.
         - New tables are STRICT.
@@ -269,7 +269,7 @@ reviews:
       - name: "Frozen migration chain"
         mode: warning
         instructions: |-
-          Decide from the diff only. FAIL if the pull request modifies, renames or deletes any file that exists on the base branch under packages/core-db/src/schema/ or packages/core-db/test/fixtures/lineage/. FAIL if it changes packages/core-db/src/migrations.ts in any way other than adding import lines and appending entries to the end of the MIGRATIONS array (no removal, no insertion before the end, no reordering). PASS if the pull request only adds new migration files and appends them, or does not touch these paths.
+          Decide from the diff only. FAIL if the pull request modifies, renames or deletes any file that exists on the base branch under packages/core-db/src/schema/ (except 004_*.sql, the daily upsert, which is not in the chain) or packages/core-db/test/fixtures/lineage/. FAIL if it changes packages/core-db/src/migrations.ts in any way other than adding import lines and appending entries to the end of the MIGRATIONS array (no removal, no insertion before the end, no reordering). PASS if the pull request only adds new migration files and appends them, or does not touch these paths.
 
       - name: "No skipped or weakened tests"
         mode: warning
