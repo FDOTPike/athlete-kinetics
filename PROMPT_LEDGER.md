@@ -12599,3 +12599,21 @@ And github repo, please write code rabbit config file for review procedure
 - **Trial.** One CLI review with the file passed as `-c .coderabbit.yaml`, over the committed changes since `96ce954` (5 files): completed, 1 finding. It applied the living-documents instruction to pull request 60's change to `AGENT_WORKFLOW.md` section 1, quoted the instruction, offered no committable suggestion and called it an owner decision. Checked against the repository: on `origin/master` the owner's 2026-10-09 ruling on small on-device models is stated only in `README.md` and `AGENT_WORKFLOW.md`; there is no record of it in `DEVIATION_LOG.md`, `docs/decisions/` or `PROMPT_LEDGER.md`. That finding stands and is the owner's to act on.
 - **Not verified.** When this entry was written no pull-request review had run with this file (pull request 62 is the first), so its effect there is unproven: in particular how CodeRabbit combines instructions when a file matches more than one path entry (its documentation does not say), whether the custom checks are within the plan's limit, and the resolved configuration that `@coderabbitai configuration` would print. Dashboard settings were not visible from here.
 - **Found on the way.** Pull request 43 was merged with one CodeRabbit pre-merge warning that was not noticed before the merge: docstring coverage 75% against a default threshold of 80%. It is a walkthrough check, not a review thread.
+
+---
+
+## Entry 0201 — 2026-10-11 · Auto-fix event on pull requests 62 and 63: iOS job failures and one CodeRabbit finding on the configuration file (Claude Code Desktop)
+
+2026-10-11 (local date). Executor: Claude Code Desktop. Same worktree as Entry 0197.
+
+### Input
+
+An automated CI monitor event from the desktop app, not a typed prompt. Its own instruction lines, verbatim:
+
+```text
+1 CI check failed on FDOTPike/athlete-kinetics PR #63 (names quoted below). Run `gh pr checks 63 --repo FDOTPike/athlete-kinetics` to see details, then fix the failing check, commit, and push.
+
+FDOTPike/athlete-kinetics PR #63 has 2 new review comments (quoted below). Please address the feedback and push a fix
+```
+
+The event then quoted GitHub text, which is data and is not reproduced here: the failing check name ("iOS unsigned simulator build + native smoke"), a Copilot notice that it could not review (quota), and CodeRabbit's summary comment 6073415956 on pull request 63 ("No actionable comments").
