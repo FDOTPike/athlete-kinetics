@@ -323,6 +323,9 @@ export const SENTINELS: readonly MigrationSentinel[] = [
   // 069 resting heart rate independent of HRV. Losing the table would make
   // every later sync fail its write and drop the athlete's resting HR.
   { type: 'table', name: 'resting_hr_daily' },                                // 069
+  // 070 how a finished session went and why. Losing the table would make the
+  // completion screen's save fail and drop every answer already recorded.
+  { type: 'table', name: 'session_feel' },                                    // 070
 ];
 
 /** Durable tables deliberately absent from SENTINELS, each with the reason it
