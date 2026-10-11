@@ -22,6 +22,9 @@ import {
   describeSessionFeel,
   SESSION_FEEL_LABEL,
   SESSION_FEEL_REASON_LABEL,
+  SESSION_FEEL_NOTE_MAX_LENGTH,
+  SESSION_NOTE_STARTERS,
+  withNoteStarter,
 } from '../../src/components/SessionFeelPanel';
 
 jest.setTimeout(30_000);
@@ -109,6 +112,38 @@ describe('SessionFeelPanel: an answer by tapping', () => {
     fireEvent.press(screen.getByTestId('session-feel-reason-other'));
     fireEvent.press(screen.getByTestId('session-feel-save'));
     expect(onSave).toHaveBeenLastCalledWith({ feel: 'easier', reasons: ['felt_good'] }, '');
+  });
+
+  test('a note starter puts its words on a line of its own and shows one example; it saves nothing', () => {
+    const onSave = ruleOnly();
+    render(<SessionFeelPanel saved={null} note={null} onSave={onSave} onClose={jest.fn()} />);
+    expect(SESSION_NOTE_STARTERS.map((entry) => entry.id)).toEqual(['effort', 'body', 'recovery', 'changed', 'went_well', 'question']);
+    expect(screen.queryByTestId('session-note-example')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('session-note-starter-body'));
+    expect(screen.getByTestId('session-feel-note').props.value).toBe('Body: ');
+    expect(screen.getByTestId('session-note-example')).toHaveTextContent('For example: left knee, sharp, 4/10, on the way down, since set 2');
+
+    fireEvent.changeText(screen.getByTestId('session-feel-note'), 'Body: left knee, 4/10, since set 2');
+    fireEvent.press(screen.getByTestId('session-note-starter-recovery'));
+    expect(screen.getByTestId('session-feel-note').props.value).toBe('Body: left knee, 4/10, since set 2\nRecovery: ');
+    expect(screen.getByTestId('session-note-example')).toHaveTextContent('For example: slept 5 h, night shift');
+    expect(onSave).not.toHaveBeenCalled();
+
+    // The note is still handed over exactly as it stands, starters included.
+    fireEvent.press(screen.getByTestId('session-feel-as_planned'));
+    fireEvent.press(screen.getByTestId('session-feel-save'));
+    expect(onSave).toHaveBeenLastCalledWith({ feel: 'as_planned', reasons: [] }, 'Body: left knee, 4/10, since set 2\nRecovery: ');
+  });
+
+  test('a starter never pushes the note past its length limit, and never starts a line mid-line', () => {
+    expect(withNoteStarter('', 'Effort')).toBe('Effort: ');
+    expect(withNoteStarter('felt fine', 'Effort')).toBe('felt fine\nEffort: ');
+    expect(withNoteStarter('felt fine\n', 'Effort')).toBe('felt fine\nEffort: ');
+    const full = 'x'.repeat(SESSION_FEEL_NOTE_MAX_LENGTH - 3);
+    expect(withNoteStarter(full, 'Effort')).toBe(full);
+    const room = 'x'.repeat(SESSION_FEEL_NOTE_MAX_LENGTH - 'Effort: '.length - 1);
+    expect(withNoteStarter(room, 'Effort')).toHaveLength(SESSION_FEEL_NOTE_MAX_LENGTH);
   });
 
   test('the typed note is handed over exactly as typed, with no rewriting', () => {
