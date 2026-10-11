@@ -199,12 +199,31 @@ describe('SessionFeelPanel: an answer by tapping', () => {
       fireEvent.press(screen.getByTestId('session-feel-reason-pain'));
       expect(size()).toBe(theme.font.body.fontSize);
       expect(theme.font.body.fontSize).toBeGreaterThan(theme.font.label.fontSize);
+      // Larger, and no lighter than it was.
+      expect(StyleSheet.flatten(screen.getByTestId('session-feel-record-only').props.style).fontWeight)
+        .toBe(theme.font.label.fontWeight);
       expect(announce).toHaveBeenCalledTimes(1);
       expect(announce).toHaveBeenLastCalledWith(SESSION_FEEL_RECORD_ONLY_TEXT);
 
       // Already standing out: a second body reason and a Body line say nothing more.
       fireEvent.press(screen.getByTestId('session-feel-reason-unwell'));
       fireEvent.press(screen.getByTestId('session-note-starter-body'));
+      expect(announce).toHaveBeenCalledTimes(1);
+    } finally {
+      announce.mockRestore();
+    }
+  });
+
+  test('a "Body" line started first is announced too, once', () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => {});
+    try {
+      render(<SessionFeelPanel saved={null} note={null} onSave={ruleOnly()} onClose={jest.fn()} />);
+      fireEvent.press(screen.getByTestId('session-note-starter-effort'));
+      expect(announce).not.toHaveBeenCalled();
+      fireEvent.press(screen.getByTestId('session-note-starter-body'));
+      expect(announce).toHaveBeenCalledTimes(1);
+      expect(announce).toHaveBeenLastCalledWith(SESSION_FEEL_RECORD_ONLY_TEXT);
+      fireEvent.press(screen.getByTestId('session-note-starter-recovery'));
       expect(announce).toHaveBeenCalledTimes(1);
     } finally {
       announce.mockRestore();

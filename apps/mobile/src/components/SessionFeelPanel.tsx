@@ -326,9 +326,11 @@ const styles = StyleSheet.create({
     ...theme.font.label,
     color: theme.color.textMid,
   },
-  // Larger as well as brighter, so the change does not rest on colour alone.
+  // Larger as well as brighter, so the change does not rest on colour alone,
+  // and no lighter in weight than the standing sentence it replaces.
   notice: {
     ...theme.font.body,
+    fontWeight: theme.font.label.fontWeight,
     color: theme.color.textHi,
   },
   problem: {
