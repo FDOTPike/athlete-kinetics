@@ -12379,3 +12379,30 @@ master from origin. I'll decide later how to renumber and carry those entries.
 - **Local edits preserved.** In the primary checkout, the uncommitted additions to `AGENT_WORKFLOW.md` (section 0.2) and `PROMPT_LEDGER.md` (entries 0023-0028 in the pre-merge master numbering) were committed unchanged to the new local branch `local-ledger-0023-0028` (`52221e7e`, parent `3358be6`; 2 files, 359 insertions). Not pushed. Renumbering and carrying them forward remains the owner's decision.
 - **Local master updated.** `git merge --ff-only origin/master` first stopped on one untracked file, `docs/WORK_ORDERS_2026-09-12_ACCESSIBLE_COACH.md`, which `origin/master` tracks. Its content was identical to the tracked version (blob `30fec443` both ways), so the untracked copy was moved aside, not deleted, and the fast-forward then completed: local `master` is `96ce954`, level with `origin/master`. The file at that path hashes the same before and after. The other untracked files in the primary checkout were not touched.
 - **Push and pull request (item 1).** The branch is pushed and opened as a pull request against `master` after this commit; its number is not known at commit time. It is to be merged with a merge commit only when CI is fully green on its head, including the iOS UI tests. If `test4` fails again, the `FOCUS-RETRY` lines and the error are reported and the test is left as strict as it is.
+
+---
+
+## Entry 0202 — 2026-10-11 · iOS UI test job: establish the cause of each intermittent failure from the run evidence and fix what it supports (Claude Code Desktop)
+
+2026-10-11. Executor: Claude Code Desktop. Worktree cut from `origin/master` (`45b7ec12`), branch `claude/ios-ui-test-flakes-2026-10-11`. Entries 0195 to 0201 are in use on other branches and open pull requests, so this entry takes 0202.
+
+### Input
+
+Received verbatim; the text below was the whole message.
+
+```text
+Repository: FDOTPike/athlete-kinetics (public; local checkout at C:\Users\fpike\Documents\Claude Coding\Athlete App; work in a new git worktree cut from origin/master, never in the main checkout). Read AGENT_WORKFLOW.md and .agents/rules/coding-rules-general.md first.
+
+Problem: the CI job "iOS unsigned simulator build + native smoke" (.github/workflows/ci.yml) runs five XCUITest UI tests through tools/ios_ui_tests.sh against apps/mobile/ios/AthleteKineticsUITests/AthleteKineticsUITests.swift and fails closed. It fails intermittently on changes that touch no app code. Known failures of the current suite, each a different cause:
+1. Run 37386116975 (master b99d0cb): test4_backupToFilesAndRestore, "Neither element nor any descendant has keyboard focus" typing the backup password. PR #43 (merged as 637ecd6) added a focus() helper that re-taps and logs an "AKUI FOCUS-RETRY" line; no FOCUS-RETRY line has appeared since.
+2. Run 37603984164 attempt 1 (PR #43 head 02e775f): test1_onboardingNavigationAndAccessibility, Apple accessibility audit on the Ready screen: "Audit failed to complete in time" (code -56).
+3. Run 37877676636 attempt 1 (PR #63, ledger only): test4, "the restore preview did not appear within 120 s" after picking the .pmbak in Files (pickBackupInFiles()).
+4. Run 37877632952 attempt 1 (PR #62, one YAML file): test3_healthDenialAndAthleteSwitching, "onboarding (athlete B) did not appear within 60 s", with "Unable to monitor event loop" in the log; and test1, "No, nothing to note did not appear within 30 s".
+Passing runs of the same suite include facd32e, a3483a2, 96ce954, fcc7da7c, 637ecd6f (master) and the second attempt of run 37603984164.
+
+Evidence: each run uploads the artifact "athlete-kinetics-ios-simulator-unsigned" (about 557 MB), which contains ios-evidence/ui-tests/ with one .log, .system.log and .xcresult per test. The owner has said, for test4 failures, to download the run's artifact, read the log around the failing step, find the actual cause and fix it; ask the owner before downloading if that instruction does not clearly cover the run you need. Failure annotations are readable without a download: gh api repos/FDOTPike/athlete-kinetics/check-runs/<iOS job id>/annotations.
+
+Task: establish the actual cause of each failure from the logs (do not guess from the message), decide whether each is a test-harness timing problem on a slow shared runner or a real app defect, and fix what the evidence supports on a branch with a pull request against master. Report any failure whose cause the evidence does not establish as NOT VERIFIED.
+
+Hard rules from the owner: never skip, disable or quarantine a test; never weaken an assertion or widen a timeout without evidence of the failure it answers, and report every retry in the test output; no changes to animation or movement-preview code; no model identifiers in commits, PR text or code (no Co-Authored-By model trailer); the repository is public, so no credentials or personal data; run `npm run typecheck` before every commit; the Swift suite only compiles and runs in the macOS CI job. Review the branch with the CodeRabbit CLI before pushing ("C:\Users\fpike\AppData\Local\Programs\coderabbit\coderabbit.exe" review --committed --base origin/master --agent; never pass --use-credits). Append a verbatim-input entry to PROMPT_LEDGER.md as the first file operation (check existing entry numbers on origin/master and open pull requests first; entries up to 0201 are in use).
+```
