@@ -14,6 +14,8 @@
  * 4. THE COMPLETION SCREEN NEVER DEPENDS ON IT — an absent or failing loader
  *    leaves the screen as it was, and "Back to Today" still dismisses once.
  */
+import fs from 'fs';
+import path from 'path';
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import SessionScreen from '../../src/screens/SessionScreen';
@@ -23,6 +25,7 @@ import {
   SESSION_FEEL_LABEL,
   SESSION_FEEL_REASON_LABEL,
   SESSION_FEEL_NOTE_MAX_LENGTH,
+  SESSION_FEEL_RECORD_ONLY_TEXT,
   SESSION_NOTE_STARTERS,
   withNoteStarter,
 } from '../../src/components/SessionFeelPanel';
@@ -144,6 +147,59 @@ describe('SessionFeelPanel: an answer by tapping', () => {
     expect(withNoteStarter(full, 'Effort')).toBe(full);
     const room = 'x'.repeat(SESSION_FEEL_NOTE_MAX_LENGTH - 'Effort: '.length - 1);
     expect(withNoteStarter(room, 'Effort')).toHaveLength(SESSION_FEEL_NOTE_MAX_LENGTH);
+  });
+
+  test('a reason about the body says this is a record only and where the app acts; other reasons say nothing', () => {
+    const onSave = ruleOnly();
+    render(<SessionFeelPanel saved={null} note={null} onSave={onSave} onClose={jest.fn()} />);
+    expect(screen.queryByTestId('session-feel-record-only')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('session-feel-harder'));
+    for (const reason of ['tired', 'technique', 'equipment', 'time', 'felt_good', 'other']) {
+      fireEvent.press(screen.getByTestId(`session-feel-reason-${reason}`));
+    }
+    expect(screen.queryByTestId('session-feel-record-only')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('session-feel-reason-pain'));
+    expect(screen.getByTestId('session-feel-record-only')).toHaveTextContent(SESSION_FEEL_RECORD_ONLY_TEXT);
+    fireEvent.press(screen.getByTestId('session-feel-reason-pain'));
+    expect(screen.queryByTestId('session-feel-record-only')).toBeNull();
+    fireEvent.press(screen.getByTestId('session-feel-reason-unwell'));
+    expect(screen.getByTestId('session-feel-record-only')).toHaveTextContent(SESSION_FEEL_RECORD_ONLY_TEXT);
+
+    // It is shown once, however it was reached, and it goes when neither applies.
+    fireEvent.press(screen.getByTestId('session-note-starter-body'));
+    expect(screen.getAllByTestId('session-feel-record-only')).toHaveLength(1);
+    fireEvent.press(screen.getByTestId('session-feel-as_planned'));
+    expect(screen.getAllByTestId('session-feel-record-only')).toHaveLength(1);
+    fireEvent.press(screen.getByTestId('session-note-starter-effort'));
+    expect(screen.queryByTestId('session-feel-record-only')).toBeNull();
+
+    // A sentence on the screen and nothing more: it asks the store for nothing.
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  test('a "Body" line says the same with no reason chosen; typed words never bring it up', () => {
+    render(<SessionFeelPanel saved={null} note={null} onSave={ruleOnly()} onClose={jest.fn()} />);
+    fireEvent.changeText(screen.getByTestId('session-feel-note'), 'left knee hurts, sharp, 6/10');
+    expect(screen.queryByTestId('session-feel-record-only')).toBeNull();
+
+    fireEvent.press(screen.getByTestId('session-note-starter-body'));
+    expect(screen.getByTestId('session-feel-record-only')).toHaveTextContent(SESSION_FEEL_RECORD_ONLY_TEXT);
+    fireEvent.press(screen.getByTestId('session-note-starter-question'));
+    expect(screen.queryByTestId('session-feel-record-only')).toBeNull();
+  });
+
+  test('the two places it names exist under those names, and it promises no advice', () => {
+    const source = (file) => fs.readFileSync(path.join(__dirname, '..', '..', 'src', file), 'utf8');
+    expect(SESSION_FEEL_RECORD_ONLY_TEXT).toContain('"Report discomfort"');
+    expect(source('screens/SessionScreen.tsx')).toContain('label="Report discomfort"');
+    expect(SESSION_FEEL_RECORD_ONLY_TEXT).toContain('"Something feels off"');
+    expect(source('screens/BlockScreen.tsx')).toContain('label="Something feels off"');
+    expect(SESSION_FEEL_RECORD_ONLY_TEXT).toContain('on the Plan screen');
+    expect(source('App.tsx')).toContain("coach: 'Plan'");
+    expect(SESSION_FEEL_RECORD_ONLY_TEXT).toMatch(/^This is a record only\. It does not adjust your training\./);
+    expect(SESSION_FEEL_RECORD_ONLY_TEXT).not.toMatch(/\b(should|must|rest|doctor|physio|treat)\b/i);
   });
 
   test('the typed note is handed over exactly as typed, with no rewriting', () => {

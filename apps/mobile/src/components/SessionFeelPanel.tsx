@@ -9,6 +9,11 @@
  * only put a few words into the note for the athlete to finish: they are a
  * prompt for what is worth writing down, and they record nothing themselves.
  *
+ * Because nothing here acts, a reason about the athlete's body, or a "Body"
+ * line, shows one sentence saying so and naming the two places in the app
+ * that do act on such a report. It follows the taps only, never the typed
+ * words.
+ *
  * The rules for a valid answer live in the pure module (sessionFeel.ts) and
  * are applied by the store; this component only reports what the store said.
  *
@@ -49,6 +54,20 @@ export const SESSION_FEEL_REASON_LABEL: Record<SessionFeelReason, string> = {
 };
 
 export const SESSION_FEEL_NOTE_MAX_LENGTH = 1000;
+
+/** Reasons that are about the athlete's body rather than the session. */
+const BODY_REASONS: readonly SessionFeelReason[] = ['pain', 'unwell'];
+
+/**
+ * Shown with a body reason or a "Body" line. This panel only records, so the
+ * athlete is told where a report does change training. The two names are the
+ * labels of those controls (SessionScreen, BlockScreen) and "Plan" is that
+ * tab's name; a test keeps them in step.
+ */
+export const SESSION_FEEL_RECORD_ONLY_TEXT =
+  'This is a record only. It does not adjust your training. If something hurts or you feel unwell, '
+  + 'report it where the app can act on it: "Report discomfort" on a lift during a session, '
+  + 'or "Something feels off" on the Plan screen.';
 
 /**
  * Note starters: six kinds of line worth writing, each with the words a tap
@@ -140,6 +159,11 @@ export function SessionFeelPanel({ saved, note, answerOptional = false, onSave, 
     else setProblem(result);
   };
 
+  const reasonsShown = feel !== null && feel !== 'as_planned';
+  const bodyReasonChosen = reasonsShown && reasons.some((reason) => BODY_REASONS.includes(reason));
+  // Shown once: beside the reasons when one was chosen, otherwise beside the note.
+  const bodyLineStarted = starter === 'body' && !bodyReasonChosen;
+
   return (
     <KeyboardAwareScrollView
       style={styles.screen}
@@ -164,7 +188,7 @@ export function SessionFeelPanel({ saved, note, answerOptional = false, onSave, 
         ))}
       </View>
 
-      {feel !== null && feel !== 'as_planned' && (
+      {reasonsShown && (
         <View style={styles.group} testID="session-feel-reasons">
           <Text style={styles.label}>Why? Choose any that apply.</Text>
           <View style={styles.chipRow}>
@@ -178,6 +202,11 @@ export function SessionFeelPanel({ saved, note, answerOptional = false, onSave, 
               />
             ))}
           </View>
+          {bodyReasonChosen && (
+            <Text style={styles.notice} accessibilityLiveRegion="polite" testID="session-feel-record-only">
+              {SESSION_FEEL_RECORD_ONLY_TEXT}
+            </Text>
+          )}
         </View>
       )}
 
@@ -201,6 +230,11 @@ export function SessionFeelPanel({ saved, note, answerOptional = false, onSave, 
         {starter !== null && (
           <Text style={styles.caption} testID="session-note-example">
             {`For example: ${SESSION_NOTE_STARTERS.find((entry) => entry.id === starter)?.example ?? ''}`}
+          </Text>
+        )}
+        {bodyLineStarted && (
+          <Text style={styles.notice} accessibilityLiveRegion="polite" testID="session-feel-record-only">
+            {SESSION_FEEL_RECORD_ONLY_TEXT}
           </Text>
         )}
         <TextInput
@@ -275,6 +309,10 @@ const styles = StyleSheet.create({
   caption: {
     ...theme.font.label,
     color: theme.color.textLow,
+  },
+  notice: {
+    ...theme.font.label,
+    color: theme.color.textHi,
   },
   problem: {
     ...theme.font.body,
