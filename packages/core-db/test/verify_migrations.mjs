@@ -4195,11 +4195,11 @@ const IDX_070 = FILES.indexOf('070_session_feel.sql');
 // sqlite3_prepare consumed) is the oracle here, not the runner's scanner.
 console.log('\n[one statement per database call]');
 {
-  // Whether SQLite finds a statement in the text; none is "finalized".
-  const holdsStatement = (raw, sql) => {
-    try { return raw.prepare(sql).sourceSQL.length > 0; }
-    catch (error) { return error.code !== 'ERR_INVALID_STATE'; }
-  };
+  // Text with nothing in it but whitespace, comments and bare ';' holds no
+  // statement. SQLite is never asked about such text: node's SQLite answers
+  // differently by release (24.11 hands back a finalized statement, 24.21
+  // throws ERR_INVALID_ARG_VALUE "The SQL query contains no statements").
+  const isBlank = (sql) => sql.replace(/\/\*[\s\S]*?\*\//g, '').replace(/--[^\n]*/g, '').replace(/[\s;]/g, '') === '';
   const recorded = freshDb();
   const calls = [];
   const multi = [];
@@ -4208,7 +4208,7 @@ console.log('\n[one statement per database call]');
     calls.push(sql);
     let consumed = sql.length;
     try { consumed = recorded.raw.prepare(sql).sourceSQL.length; } catch { /* the call itself reports it */ }
-    if (holdsStatement(recorded.raw, sql.slice(consumed))) multi.push(sql);
+    if (!isBlank(sql.slice(consumed))) multi.push(sql);
     return inner(sql);
   };
   runMigrations(recorded, MIGRATIONS);
@@ -4228,15 +4228,13 @@ console.log('\n[one statement per database call]');
   const expected = [];
   for (const file of MIGRATIONS) {
     let rest = file;
-    for (;;) {
-      let text;
-      try { text = reference.raw.prepare(rest).sourceSQL; } catch (error) {
-        if (error.code !== 'ERR_INVALID_STATE') throw error;
-        const empty = rest.match(/^\s*;/); // a bare ';' is an empty statement
-        if (empty === null) break;
+    while (!isBlank(rest)) {
+      const empty = rest.match(/^\s*;/); // a bare ';' is an empty statement
+      if (empty !== null) {
         rest = rest.slice(empty[0].length);
         continue;
       }
+      const text = reference.raw.prepare(rest).sourceSQL;
       reference.raw.exec(text);
       expected.push(text.trim());
       rest = rest.slice(text.length);
