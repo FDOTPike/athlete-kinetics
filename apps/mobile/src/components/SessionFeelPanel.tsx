@@ -13,7 +13,8 @@
  * in the app that do act on a report about the athlete's body. It is always
  * on the panel, so it is there for pain that is typed with no tap as well,
  * and it stands out once a reason about the body is chosen or a "Body" line
- * is started. It follows the taps only, never the typed words.
+ * is started: larger and brighter for the eye, and read out once for a screen
+ * reader. It follows the taps only, never the typed words.
  *
  * The rules for a valid answer live in the pure module (sessionFeel.ts) and
  * are applied by the store; this component only reports what the store said.
@@ -21,8 +22,8 @@
  * Law: zero hex literals — theme tokens only.
  * Law: touch targets >= 56pt (Chip and the buttons carry it).
  */
-import React, { useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { AccessibilityInfo, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   SESSION_FEEL_KINDS,
   SESSION_FEEL_REASONS,
@@ -168,6 +169,15 @@ export function SessionFeelPanel({ saved, note, answerOptional = false, onSave, 
   const bodyReasonChosen = reasonsShown && reasons.some((reason) => BODY_REASONS.includes(reason));
   // The sentence is always there; this only decides whether it stands out.
   const aboutTheBody = bodyReasonChosen || bodyLineStarted;
+  // A screen reader hears it at the moment a sighted athlete sees it change.
+  // Not on opening a saved answer: nothing was tapped then.
+  const stoodOut = useRef(aboutTheBody);
+  useEffect(() => {
+    if (aboutTheBody && !stoodOut.current) {
+      AccessibilityInfo.announceForAccessibility(SESSION_FEEL_RECORD_ONLY_TEXT);
+    }
+    stoodOut.current = aboutTheBody;
+  }, [aboutTheBody]);
 
   return (
     <KeyboardAwareScrollView
@@ -252,7 +262,7 @@ export function SessionFeelPanel({ saved, note, answerOptional = false, onSave, 
           testID="session-feel-note"
         />
         <Text style={styles.caption}>
-          Saved in your training log exactly as you typed it. Nothing here changes your plan.
+          Saved in your training log exactly as you typed it.
         </Text>
       </View>
 
@@ -316,8 +326,9 @@ const styles = StyleSheet.create({
     ...theme.font.label,
     color: theme.color.textMid,
   },
+  // Larger as well as brighter, so the change does not rest on colour alone.
   notice: {
-    ...theme.font.label,
+    ...theme.font.body,
     color: theme.color.textHi,
   },
   problem: {

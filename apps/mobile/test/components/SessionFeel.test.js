@@ -17,7 +17,7 @@
 import fs from 'fs';
 import path from 'path';
 import React from 'react';
-import { StyleSheet } from 'react-native';
+import { AccessibilityInfo, StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import SessionScreen from '../../src/screens/SessionScreen';
 import {
@@ -182,6 +182,53 @@ describe('SessionFeelPanel: an answer by tapping', () => {
     // One sentence however it was reached, and it asks the store for nothing.
     expect(sentence()).toHaveLength(1);
     expect(onSave).not.toHaveBeenCalled();
+  });
+
+  test('standing out is more than a colour: the sentence is larger, and a screen reader hears it once per change', () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => {});
+    try {
+      render(<SessionFeelPanel saved={null} note={null} onSave={ruleOnly()} onClose={jest.fn()} />);
+      const size = () => StyleSheet.flatten(screen.getByTestId('session-feel-record-only').props.style).fontSize;
+      expect(size()).toBe(theme.font.label.fontSize);
+      expect(announce).not.toHaveBeenCalled();
+
+      fireEvent.press(screen.getByTestId('session-feel-harder'));
+      fireEvent.press(screen.getByTestId('session-feel-reason-tired'));
+      expect(announce).not.toHaveBeenCalled();
+
+      fireEvent.press(screen.getByTestId('session-feel-reason-pain'));
+      expect(size()).toBe(theme.font.body.fontSize);
+      expect(theme.font.body.fontSize).toBeGreaterThan(theme.font.label.fontSize);
+      expect(announce).toHaveBeenCalledTimes(1);
+      expect(announce).toHaveBeenLastCalledWith(SESSION_FEEL_RECORD_ONLY_TEXT);
+
+      // Already standing out: a second body reason and a Body line say nothing more.
+      fireEvent.press(screen.getByTestId('session-feel-reason-unwell'));
+      fireEvent.press(screen.getByTestId('session-note-starter-body'));
+      expect(announce).toHaveBeenCalledTimes(1);
+    } finally {
+      announce.mockRestore();
+    }
+  });
+
+  test('opening a saved answer about the body announces nothing, and the panel says "changes nothing" once', () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => {});
+    try {
+      render(
+        <SessionFeelPanel
+          saved={{ feel: 'harder', reasons: ['unwell'] }}
+          note={null}
+          onSave={ruleOnly()}
+          onClose={jest.fn()}
+        />,
+      );
+      expect(announce).not.toHaveBeenCalled();
+      expect(screen.getAllByText(/does not adjust your training/)).toHaveLength(1);
+      expect(screen.queryByText(/Nothing here changes your plan/)).toBeNull();
+      expect(screen.getByText('Saved in your training log exactly as you typed it.')).toBeOnTheScreen();
+    } finally {
+      announce.mockRestore();
+    }
   });
 
   test('a "Body" line makes it stand out and it stays so when another line is started; typed words never do', () => {
