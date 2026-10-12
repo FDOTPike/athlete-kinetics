@@ -107,16 +107,48 @@ final class AthleteKineticsUITests: XCTestCase {
     return el.descendants(matching: .any).matching(NSPredicate(format: "hasKeyboardFocus == true")).firstMatch.exists
   }
 
+  /// Scrolls until the whole element lies on the page's visible band: below
+  /// the top header and above the primary tabs, where a tap at its centre
+  /// lands on it. XCTest reports an element hittable when any sliver of it
+  /// shows (CI evidence b99d0cb, run 37386116975: the backup password field
+  /// was "hittable" with 1.2 pt of its 54 pt above the tabs, the tap went to
+  /// that sliver's corner at (18.0, 796.8), and the field never took focus).
+  /// Every drag is recorded.
+  private func bringClear(_ el: XCUIElement, _ what: String) {
+    for nudge in 1...6 {
+      let screen = app.frame
+      let header = element("shell-top-header")
+      let tabs = element("shell-primary-tabs")
+      let top = header.exists ? header.frame.maxY : screen.minY
+      let bottom = tabs.exists ? tabs.frame.minY : screen.maxY
+      let frame = el.frame
+      if frame.minY >= top && frame.maxY <= bottom { return }
+      // Drag the page towards centring the element in the band; the drag
+      // itself stays inside the band and ends held, so nothing coasts.
+      let centre = (top + bottom) / 2
+      let reach = (bottom - top) * 0.4
+      let distance = max(-reach, min(reach, frame.midY - centre))
+      log("REVEAL-NUDGE \(what): y \(Int(frame.minY))-\(Int(frame.maxY)) is not inside the visible band \(Int(top))-\(Int(bottom)); dragging the page \(Int(distance)) pt (nudge \(nudge))")
+      let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
+        .withOffset(CGVector(dx: screen.midX, dy: centre + distance / 2))
+      from.press(forDuration: 0.1, thenDragTo: from.withOffset(CGVector(dx: 0, dy: -distance)),
+                 withVelocity: .slow, thenHoldForDuration: 0.3)
+    }
+  }
+
   /// Taps the field until it holds keyboard focus, as a person does when a
   /// tap is not taken; typing into an unfocused field fails the test (CI
   /// evidence b99d0cb: the backup password field, just scrolled into view,
-  /// had no keyboard focus when typing began). Every further tap is recorded.
+  /// had no keyboard focus when typing began). The field is first brought
+  /// clear of the page's edges, since a tap on a sliver of it is not taken.
+  /// Every further tap is recorded.
   private func focus(_ el: XCUIElement, _ what: String, file: StaticString = #filePath, line: UInt = #line) {
     for attempt in 1...3 {
       if attempt > 1 {
         log("FOCUS-RETRY \(what): no keyboard focus 5 s after tap \(attempt - 1); tapping again")
         reveal(el, what, file: file, line: line)
       }
+      bringClear(el, what)
       el.tap()
       let deadline = Date().addingTimeInterval(5)
       while Date() < deadline {
@@ -158,11 +190,35 @@ final class AthleteKineticsUITests: XCTestCase {
     wait(element("shell-root"), "the app shell", timeout: 90)
   }
 
+  /// The onboarding screen now showing: its first text after the wordmark
+  /// (every step opens with its own heading), or nil while none is readable.
+  private func onboardingHeading() -> String? {
+    currentLabel(app.staticTexts.matching(
+      NSPredicate(format: "label != '' AND NOT (label ==[c] %@)", "pikemethods")).firstMatch)
+  }
+
   /// The default eight-screen onboarding, through the real UI.
   private func completeOnboarding(_ who: String, createProgram: Bool = false) {
     wait(element("Next"), "onboarding (\(who))", timeout: 60)
     log("onboarding started (\(who)): progress=\(element(labelBeginsWith: "Step ").exists ? element(labelBeginsWith: "Step ").label : "-")")
-    for step in 1...6 { tap("Next", "Next (step \(step), \(who))") }
+    // Each Next must change the screen. CI evidence (run 37877632952, test1):
+    // six taps were sent to the centre of Next (359.5, 818.0), yet onboarding
+    // stood one screen short, and the failure surfaced two steps later with no
+    // record of which tap had not been taken. The tap that leaves the screen
+    // unchanged now fails by name; it is not repeated.
+    for step in 1...6 {
+      let before = onboardingHeading()
+      tap("Next", "Next (step \(step), \(who))")
+      let deadline = Date().addingTimeInterval(30)
+      var now = onboardingHeading()
+      while (now == nil || now == before) && Date() < deadline {
+        usleep(500_000)
+        now = onboardingHeading()
+      }
+      if now == nil || now == before {
+        XCTFail("Next (step \(step), \(who)) did not change the onboarding screen within 30 s; it still shows: \(before ?? "<no heading>")")
+      }
+    }
     tap("No, nothing to note")
     tap("Next", "Next to review (\(who))")
     tap("START TRAINING")
@@ -290,25 +346,42 @@ final class AthleteKineticsUITests: XCTestCase {
   @available(iOS 17.0, *)
   private func audit(_ screen: String) -> [String] {
     var issues: [String] = []
-    do {
-      try app.performAccessibilityAudit(for: .all) { issue in
-        let who = issue.element.map { "\($0.elementType.rawValue)|\($0.identifier)|\($0.label.prefix(80))" } ?? "-"
-        // React Native text fields scale their font with the person's text
-        // size through RN's own font multiplier, not UIKit's
-        // adjustsFontForContentSizeCategory, which is what this audit reads.
-        // test2 MEASURES that a text field grows at AX XXXL; only this exact
-        // pairing (Dynamic Type x text field) is classified, and it is still
-        // reported. Everything else fails the test.
-        let fieldTypes: [XCUIElement.ElementType] = [.textField, .secureTextField, .searchField]
-        if issue.auditType == .dynamicType, let el = issue.element, fieldTypes.contains(el.elementType) {
-          self.log("A11Y-MEASURED \(screen) [dynamicType] RN text field \(el.label.prefix(60)): scaling measured in test2")
-          return true
+    // CI evidence (02e775f, run 37603984164 attempt 1): the Ready audit ended
+    // with "Audit failed to complete in time" (code -56) after 18 s. The app
+    // had done the same work as in a passing audit (318 log lines, 13 trait
+    // updates) within 1.5 s and then sat idle: the audit's result never came
+    // back from outside the app. An audit that does not complete has examined
+    // nothing, so it is run once more and the repeat is recorded; issues
+    // already reported are kept, and a second failure to complete fails the
+    // test like any other.
+    for attempt in 1...2 {
+      do {
+        try app.performAccessibilityAudit(for: .all) { issue in
+          let who = issue.element.map { "\($0.elementType.rawValue)|\($0.identifier)|\($0.label.prefix(80))" } ?? "-"
+          // React Native text fields scale their font with the person's text
+          // size through RN's own font multiplier, not UIKit's
+          // adjustsFontForContentSizeCategory, which is what this audit reads.
+          // test2 MEASURES that a text field grows at AX XXXL; only this exact
+          // pairing (Dynamic Type x text field) is classified, and it is still
+          // reported. Everything else fails the test.
+          let fieldTypes: [XCUIElement.ElementType] = [.textField, .secureTextField, .searchField]
+          if issue.auditType == .dynamicType, let el = issue.element, fieldTypes.contains(el.elementType) {
+            self.log("A11Y-MEASURED \(screen) [dynamicType] RN text field \(el.label.prefix(60)): scaling measured in test2")
+            return true
+          }
+          issues.append("\(screen) [\(issue.auditType.rawValue)] \(issue.compactDescription) @ \(who)")
+          return true // collect every issue; the caller fails the test if any exist
         }
-        issues.append("\(screen) [\(issue.auditType.rawValue)] \(issue.compactDescription) @ \(who)")
-        return true // collect every issue; the caller fails the test if any exist
+        break
+      } catch {
+        let failure = error as NSError
+        if attempt == 1 && failure.domain == "com.apple.xcode.xctest.accessibilityAudit" && failure.code == -56 {
+          log("AUDIT-RETRY \(screen): the audit did not complete in time (code -56); running it once more")
+          continue
+        }
+        issues.append("\(screen) audit did not complete: \(error)")
+        break
       }
-    } catch {
-      issues.append("\(screen) audit did not complete: \(error)")
     }
     for issue in issues { log("A11Y \(issue)") }
     log("a11y \(screen): \(issues.count) issue(s)")
@@ -717,12 +790,39 @@ final class AthleteKineticsUITests: XCTestCase {
     file.tap()
     let open = filesControl(["Open"])
     if open.waitForExistence(timeout: 5) && open.isEnabled { open.tap() }
-    // Reading the backup derives its key (scrypt in JavaScript on Hermes), the
-    // same work as creating it. CI evidence c3e7de5 (Xcode 26 row): creating
-    // took 150 s and the preview, bounded at 120 s, arrived after the bound.
-    // The time taken is recorded; the bound is 5 minutes.
-    let previewStart = Date()
-    wait(element("restore-preview"), "the restore preview", timeout: 300)
-    log("restore preview shown after \(Int(Date().timeIntervalSince(previewStart))) s")
+    // Opening the backup derives its key (scrypt in JavaScript on Hermes)
+    // before the preview can show. CI evidence (run 37877676636): at the old
+    // 120 s bound the status still read "Opening encrypted backup…", and the
+    // preview was on screen by the failure screenshot 35 s later, 131 to
+    // 166 s after the pick; passing runs took 110 to 134 s. The wait now
+    // follows the app's own status: it lasts while the app says it is opening
+    // (or the Files sheet still covers it), ends at once on any other settled
+    // status, and stops at 300 s. The time taken is recorded on every run.
+    let preview = element("restore-preview")
+    let status = element("backup-status-message")
+    let started = Date()
+    var lastStatus = ""
+    var unexpected = 0
+    while !preview.exists {
+      let waited = Int(Date().timeIntervalSince(started))
+      let now = currentLabel(status) ?? "<absent>"
+      if now != lastStatus {
+        log("restore preview t=\(waited)s: \(now.prefix(120))")
+        lastStatus = now
+      }
+      let inProgress = now == "<absent>" || now.hasPrefix("Opening encrypted backup") || now.hasPrefix("Review this backup")
+      // Read twice, 2 s apart, before it counts: one read can catch a redraw.
+      unexpected = inProgress ? 0 : unexpected + 1
+      if unexpected >= 2 && !preview.exists {
+        XCTFail("the backup did not open: no restore preview, and the status read: \(now)")
+        return
+      }
+      if waited >= 300 {
+        XCTFail("the restore preview did not appear within 300 s; the status read: \(now)")
+        return
+      }
+      sleep(2)
+    }
+    log("restore preview shown \(Int(Date().timeIntervalSince(started))) s after the pick")
   }
 }
