@@ -310,6 +310,7 @@ test('manual bodyweight initializes identity load 0.0 and remains loggable', () 
   expect(mockState.logSet).toHaveBeenCalledWith(
     1, 5, 0, null,
     undefined, undefined, undefined, undefined, 1,
+    expect.any(Object),
   );
 });
 
@@ -371,6 +372,7 @@ test('invalid draft is distinct from blank, while explicit zero is valid and log
   expect(mockState.logSet).toHaveBeenCalledWith(
     1, 5, 0, null,
     undefined, undefined, undefined, undefined, 1,
+    expect.any(Object),
   );
 });
 
@@ -394,6 +396,93 @@ test('athlete-entered load survives a rerender and refreshed history evidence', 
 });
 
 
+// --- 071: the seed of the load draft reaches logSet, exactly ------------------
+const seedOfFirstLog = () => mockState.logSet.mock.calls[0][9];
+const barbell = () => [movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }), movement(2, 'Later movement')];
+
+test('071 history seed: the prefilled load and its source are passed with the set, whatever load is then logged', () => {
+  mockState = state({
+    movements: barbell(),
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    lastLoggedLoads: { 1: 37.5 },
+  });
+  render(<SessionScreen />);
+  fireEvent.changeText(screen.getByTestId('session-load-input'), '40');
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(mockState.logSet.mock.calls[0][2]).toBe(40);
+  expect(seedOfFirstLog()).toEqual({ source: 'history', shownLoadKg: 37.5, advisoryKg: null, advisoryKind: null });
+});
+
+test('071 derived seed: an absolute prescription is passed as the load shown', () => {
+  mockState = state({
+    movements: barbell(),
+    profile: { training_age: 'advanced', equipment_inventory: [], session_duration_cap_min: 60 },
+    loadPreference: 'auto',
+    oneRepMaxes: { 1: 100 },
+    lastLoggedLoads: { 1: 37.5 },
+    sessionPlan: [slot(1, 1, 5, { overrideLoadKg: 55 }), slot(2, 2, 8)],
+  });
+  render(<SessionScreen />);
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(seedOfFirstLog()).toEqual({ source: 'derived', shownLoadKg: 55, advisoryKg: null, advisoryKind: null });
+});
+
+test('071 blank seed: a field that started empty is passed as null with its advisory, not as the load the athlete typed', () => {
+  mockState = state({
+    movements: barbell(),
+    profile: { training_age: 'advanced', equipment_inventory: [], session_duration_cap_min: 60 },
+    loadPreference: 'manual',
+    oneRepMaxes: { 1: 100 },
+    lastLoggedLoads: { 1: 37.5 },
+    sessionPlan: [slot(1, 1, 5, { overrideLoadKg: 55 }), slot(2, 2, 8)],
+  });
+  render(<SessionScreen />);
+  fireEvent.changeText(screen.getByTestId('session-load-input'), '50');
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(mockState.logSet.mock.calls[0][2]).toBe(50);
+  expect(seedOfFirstLog()).toEqual({ source: 'manual', shownLoadKg: null, advisoryKg: 55, advisoryKind: 'apre' });
+});
+
+test('071 zero seed: bodyweight work is passed as a real zero, not as blank', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    loadPreference: 'manual',
+  });
+  render(<SessionScreen />);
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(seedOfFirstLog()).toMatchObject({ shownLoadKg: 0 });
+  expect(seedOfFirstLog().shownLoadKg).not.toBeNull();
+});
+
+test('071 the seed is the number the field showed: one decimal, as displayed', () => {
+  mockState = state({
+    movements: barbell(),
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    lastLoggedLoads: { 1: 37.46 },
+  });
+  render(<SessionScreen />);
+  expect(screen.getByTestId('session-load-input').props.value).toBe('37.5');
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(seedOfFirstLog()).toEqual({ source: 'history', shownLoadKg: 37.5, advisoryKg: null, advisoryKind: null });
+});
+
+test('071 evidence that changes after the draft was seeded does not change what is recorded as shown', () => {
+  mockState = state({
+    movements: barbell(),
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    lastLoggedLoads: { 1: 37.5 },
+  });
+  const view = render(<SessionScreen />);
+  expect(screen.getByTestId('session-load-input').props.value).toBe('37.5');
+  mockState.lastLoggedLoads = { 1: 80 };
+  mockState.oneRepMaxes = { 1: 120 };
+  view.rerender(<SessionScreen />);
+  expect(screen.getByTestId('session-load-input').props.value).toBe('37.5');
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(mockState.logSet.mock.calls[0][2]).toBe(37.5);
+  expect(seedOfFirstLog()).toEqual({ source: 'history', shownLoadKg: 37.5, advisoryKg: null, advisoryKind: null });
+});
+
 test('guided mode keeps only the current movement expanded and future work unavailable', () => {
   render(<SessionScreen />);
   expect(screen.getByText('First movement')).toBeOnTheScreen();
@@ -411,6 +500,7 @@ test('untouched actual RPE logs null instead of fabricating target equality', ()
   expect(mockState.logSet).toHaveBeenCalledWith(
     1, 5, 0, null,
     undefined, undefined, undefined, undefined, 1,
+    expect.any(Object),
   );
 });
 
@@ -425,6 +515,7 @@ test('adjusting actual RPE marks and records the changed answer', () => {
   expect(mockState.logSet).toHaveBeenCalledWith(
     1, 5, 0, 8.5,
     undefined, undefined, undefined, undefined, 1,
+    expect.any(Object),
   );
 });
 
@@ -488,6 +579,7 @@ test('§7.2 Item 3: logging without an answer persists null actual RPE (pre-exis
   expect(mockState.logSet).toHaveBeenCalledWith(
     1, 5, 0, null,
     undefined, undefined, undefined, undefined, 1,
+    expect.any(Object),
   );
 });
 
@@ -501,6 +593,7 @@ test('§7.2 Item 4: selecting Not sure persists null actual RPE', () => {
   expect(mockState.logSet).toHaveBeenCalledWith(
     1, 5, 0, null,
     undefined, undefined, undefined, undefined, 1,
+    expect.any(Object),
   );
 });
 
@@ -520,6 +613,7 @@ test.each([
   expect(mockState.logSet).toHaveBeenCalledWith(
     1, 5, 0, expectedRpe,
     undefined, undefined, undefined, undefined, 1,
+    expect.any(Object),
   );
 });
 
@@ -536,6 +630,7 @@ test('§7.2 Item 6: selecting an RIR answer, rerendering the same set, and loggi
   expect(mockState.logSet).toHaveBeenCalledWith(
     1, 5, 0, 8.0,
     undefined, undefined, undefined, undefined, 1,
+    expect.any(Object),
   );
 });
 
@@ -563,6 +658,7 @@ test('§7.2 Item 7: advancing to the next set resets actual effort to unanswered
   expect(mockState.logSet).toHaveBeenCalledWith(
     1, 5, 0, null,
     undefined, undefined, undefined, undefined, 1,
+    expect.any(Object),
   );
 });
 
@@ -585,6 +681,7 @@ test('§7.2 Item 8: changing the planned target does not silently change a selec
   expect(mockState.logSet).toHaveBeenCalledWith(
     1, 5, 0, 7.0,
     undefined, undefined, undefined, undefined, 1,
+    expect.any(Object),
   );
 });
 
@@ -601,6 +698,7 @@ test('§7.2 Item 9: optional direct RPE entry supports half-step boundaries with
   expect(mockState.logSet).toHaveBeenCalledWith(
     1, 5, 0, null,
     undefined, undefined, undefined, undefined, 1,
+    expect.any(Object),
   );
 });
 
@@ -639,6 +737,7 @@ test('F-01 falsifier 2: first increment from opened direct-entry stepper does no
   expect(mockState.logSet).toHaveBeenCalledWith(
     1, 5, 0, 8.5,
     undefined, undefined, undefined, undefined, 1,
+    expect.any(Object),
   );
 });
 
@@ -668,6 +767,7 @@ test('target-derived effort cue is not shown when actual effort is unanswered or
   expect(mockState.logSet).toHaveBeenCalledWith(
     1, 5, 0, null,
     undefined, undefined, undefined, undefined, 1,
+    expect.any(Object),
   );
 });
 
@@ -709,6 +809,7 @@ test('explicit RIR or direct RPE answer derives cue from safeRpe only, restoring
   expect(mockState.logSet).toHaveBeenCalledWith(
     1, 5, 0, null,
     undefined, undefined, undefined, undefined, 1,
+    expect.any(Object),
   );
 });
 
@@ -744,6 +845,7 @@ test('§7.2 Item 11: existing bodyweight actual-reps behavior remains unchanged 
   expect(mockState.logSet).toHaveBeenCalledWith(
     1, 8, 0, null,
     undefined, undefined, undefined, undefined, 1,
+    expect.any(Object),
   );
 });
 
@@ -909,7 +1011,7 @@ test('bodyweight actual reps initialize from the plan, edit, and reach logSet un
   // The stored set carries the ATHLETE-ENTERED number (12), the bodyweight
   // identity load (0), and null RPE — the planned target in the plan row is
   // untouched (it only exists in the slot, not the set).
-  expect(mockState.logSet).toHaveBeenCalledWith(1, 12, 0, null, undefined, undefined, undefined, undefined, 1);
+  expect(mockState.logSet).toHaveBeenCalledWith(1, 12, 0, null, undefined, undefined, undefined, undefined, 1, expect.any(Object));
 });
 
 test.each(['planned', 'substituted', 'day_swapped', 'added', 'free_form'])(
@@ -1283,6 +1385,7 @@ test.each([
   fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
   expect(mockState.logSet).toHaveBeenCalledWith(
     1, 5, expected, null, undefined, undefined, undefined, undefined, 1,
+    expect.any(Object),
   );
 });
 
@@ -1639,6 +1742,7 @@ test('R4 explains the 1-10 effort scale truthfully and keeps direct working-set 
   expect(mockState.logSet).toHaveBeenCalledWith(
     1, 5, 0, null,
     undefined, undefined, undefined, undefined, 1,
+    expect.any(Object),
   );
 });
 

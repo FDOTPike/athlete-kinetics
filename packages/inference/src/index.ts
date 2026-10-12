@@ -84,6 +84,8 @@ export {
   type RankingSlotRole,
 } from './movementRanking';
 export {
+  ADVISORY_KINDS,
+  LOAD_SOURCES,
   defaultLoadPreference,
   resolveLoadSelection,
   transitionLoadPreference,

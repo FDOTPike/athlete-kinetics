@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING_NOTE, EFFORT_STOP_GUIDANCE, effortCue, mapRirToRpe, RIR_OPTIONS, PREPARATION_STATUS_LABEL, isTerminalPreparationStatus, preparationDoseUnit, type EffortAnswer, type RunnerHaltReason } from '@ak/inference';
-import { formatTeachingOnlyReason, useStore, type LoadSelection, type LoggedSet, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
+import { formatTeachingOnlyReason, useStore, type LoadSelection, type LoggedSet, type SetLoadShown, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
 import { useSubViewBack } from '../navigation/navigation';
 import { buildSessionSummary, NO_NEXT_SESSION_TEXT } from '../state/sessionSummary';
 import { SUPPORT_HELD_MESSAGE, SUPPORT_UNAVAILABLE_MESSAGE } from '../state/healthSupportStore';
@@ -332,6 +332,10 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
   const [directRpe, setDirectRpe] = useState<number | null>(null);
   const [directEntryOpen, setDirectEntryOpen] = useState(false);
   const lastSetKeyRef = useRef<string | null>(null);
+  // 071: what the current load draft was seeded with. Written by the one-time
+  // draft initializer and by nothing else, so a rerender or a new advisory
+  // cannot change what is recorded beside the set that is then logged.
+  const loadShownRef = useRef<SetLoadShown | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [niggleRegion, setNiggleRegion] = useState<string | null>(null);
@@ -510,14 +514,23 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
     // resolver's output is intentionally NOT a dependency: rerenders,
     // preference hydration, and evidence refreshes must never overwrite a
     // draft the athlete has already entered.
-    const initial = state.resolveSlotLoad({
+    const seed = state.resolveSlotLoad({
       movementId: currentSlot.movementId,
       bodyweightMode,
       targetReps: target.kind === 'reps' ? target.reps : null,
       targetRpe: stableTargetRpe,
       overrideLoadKg: currentSlot.overrideLoadKg,
       sessionPlanSlotId: currentSlot.sessionPlanSlotId,
-    }).initialLoadKg;
+    });
+    const initial = seed.initialLoadKg;
+    // The record holds the number the field showed (one decimal), not the
+    // resolver's unrounded value; null stays null (a blank field).
+    loadShownRef.current = {
+      source: seed.source,
+      shownLoadKg: initial === null ? null : Number(initial.toFixed(1)),
+      advisoryKg: seed.advisoryKg,
+      advisoryKind: seed.advisoryKind,
+    };
     setLoadText(initial === null ? '' : initial.toFixed(1));
     setLoadInvalid(false);
   }, [
@@ -837,7 +850,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
     }
     const safeLoad = parsed;
     const metrics = target.kind === 'time' ? { timeS: Math.round(clamp(seconds, 1, 3600)), ...(bandLevel === null ? {} : { bandLevel }) } : bandLevel === null ? undefined : { bandLevel };
-    logSet(currentMovement.movement_id, target.kind === 'time' ? 1 : Math.round(clamp(reps, 1, 50)), safeLoad, safeRpe, undefined, undefined, undefined, metrics, currentSlot.sessionPlanSlotId);
+    logSet(currentMovement.movement_id, target.kind === 'time' ? 1 : Math.round(clamp(reps, 1, 50)), safeLoad, safeRpe, undefined, undefined, undefined, metrics, currentSlot.sessionPlanSlotId, loadShownRef.current);
     if (runner === null) {
       if (uiPreferences.restTimerEnabled) setLocalRest({
         startedAtMs: Date.now(),
