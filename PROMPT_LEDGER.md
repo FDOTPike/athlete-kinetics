@@ -12787,3 +12787,26 @@ Comment 2 — PR comment, no inline thread
 - **Review comments.** The two CodeRabbit comments in the event are its summary ("No actionable comments were generated in the recent review.") and the acknowledgement of the review request. Neither has an inline thread or asks for a change, so nothing was replied to or resolved.
 - **Correction to Entry 0202.** Its statement that `verify:migrations` exits 0 holds for Node v24.11.1 only; the entry did not say which Node it was run on.
 - **CodeRabbit command-line review before pushing this fix:** `"findings":1`, minor: Entry 0202's Input contains the local checkout path, which shows the local account name. Checked: the finding is accurate, and `git grep` finds the same account path on 26 lines of `PROMPT_LEDGER.md` on `origin/master` and in eleven other tracked files, so this entry publishes nothing that is not already public. The Input is recorded verbatim by the ledger protocol and was pushed with the first commit of this branch. Not changed; whether to redact it, here and in the earlier entries, is the owner's decision.
+
+---
+
+## Entry 0220 — 2026-10-12 · Auto-fix event on pull request 63: merge conflict with master; pull request 62 merged (Claude Code Desktop)
+
+2026-10-12 (local date). Executor: Claude Code Desktop. Same worktree as Entry 0197.
+
+> **Ledger numbering note.** `master` holds Entries 0202 and 0203. The primary checkout holds uncommitted entries from other sessions numbered up to 0219, some of which reuse 0202 and 0203. This entry takes 0220 to stay clear of all of them. Those uncommitted entries were not touched.
+
+### Input
+
+An automated CI monitor event from the desktop app, not a typed prompt. Its instruction, verbatim in part:
+
+```text
+FDOTPike/athlete-kinetics PR #63 has merge conflicts with its base branch `master` (GitHub's verdict for head commit 7fa83fe691). Resolve them now, without asking first: fetch `master` from the remote that points at `FDOTPike/athlete-kinetics` [...] and merge the ref you just fetched [...] into this branch — never rebase or force-push [...]; resolve each conflict by keeping the intent of both sides, run the project's checks for the files you touched, commit, and push.
+```
+
+### Output
+
+- **Conflict.** `master` (`fe3ad2d`, after pull request 69) had appended Entries 0202 and 0203 to `PROMPT_LEDGER.md` at the point where this branch appended 0197 to 0201. Only that file conflicted.
+- **Resolution.** `origin/master` merged in (merge commit `c5d55ce`), no rebase. The file is the common base text, then this branch's entries, then master's, which is number order. Checked byte for byte: both versions start with the base text, and each side's appended text is present intact in the result. `npm run typecheck` exit 0 on the merged tree. Pushed.
+- **Pull request 62 merged.** With a merge commit, `bf77f64` (2026-10-12T11:31Z). On its head `884bd5c`: verification suite, Android and iOS jobs all green; no open review thread; CodeRabbit's eight pre-merge checks passed. `.coderabbit.yaml` is now on `master`, so it applies to branches cut from here on. The master run for that merge commit had not finished when this entry was written.
+- **Not done.** Pull request 63 is not merged; it waits for CI on its new head.
