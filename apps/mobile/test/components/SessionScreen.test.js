@@ -483,6 +483,23 @@ test('071 evidence that changes after the draft was seeded does not change what 
   expect(seedOfFirstLog()).toEqual({ source: 'history', shownLoadKg: 37.5, advisoryKg: null, advisoryKind: null });
 });
 
+test('071 after the current slot changes, the seed passed is that of the new slot', () => {
+  mockState = state({
+    movements: [movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }), movement(2, 'Later movement', { supportedPrefixes: ['Barbell'] })],
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    lastLoggedLoads: { 1: 37.5, 2: 60 },
+  });
+  const view = render(<SessionScreen />);
+  expect(screen.getByTestId('session-load-input').props.value).toBe('37.5');
+  mockState.runner = runner({ slotIndex: 1 });
+  view.rerender(<SessionScreen />);
+  expect(screen.getByTestId('session-load-input').props.value).toBe('60.0');
+  fireEvent.press(screen.getByLabelText('Log set 1 for Later movement'));
+  const call = mockState.logSet.mock.calls[0];
+  expect([call[0], call[2], call[8]]).toEqual([2, 60, 2]);
+  expect(call[9]).toEqual({ source: 'history', shownLoadKg: 60, advisoryKg: null, advisoryKind: null });
+});
+
 test('guided mode keeps only the current movement expanded and future work unavailable', () => {
   render(<SessionScreen />);
   expect(screen.getByText('First movement')).toBeOnTheScreen();

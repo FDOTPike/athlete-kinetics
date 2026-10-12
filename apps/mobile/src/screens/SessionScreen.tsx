@@ -334,8 +334,10 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
   const lastSetKeyRef = useRef<string | null>(null);
   // 071: what the current load draft was seeded with. Written by the one-time
   // draft initializer and by nothing else, so a rerender or a new advisory
-  // cannot change what is recorded beside the set that is then logged.
-  const loadShownRef = useRef<SetLoadShown | null>(null);
+  // cannot change what is recorded beside the set that is then logged. It is
+  // held with the slot and set it was seeded for, and passed only with that
+  // set: a seed that belongs to another slot is never recorded beside this one.
+  const loadShownRef = useRef<{ slotId: number; logged: number; seed: SetLoadShown } | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [niggleRegion, setNiggleRegion] = useState<string | null>(null);
@@ -526,10 +528,14 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
     // The record holds the number the field showed (one decimal), not the
     // resolver's unrounded value; null stays null (a blank field).
     loadShownRef.current = {
-      source: seed.source,
-      shownLoadKg: initial === null ? null : Number(initial.toFixed(1)),
-      advisoryKg: seed.advisoryKg,
-      advisoryKind: seed.advisoryKind,
+      slotId: currentSlot.sessionPlanSlotId,
+      logged: currentLogged,
+      seed: {
+        source: seed.source,
+        shownLoadKg: initial === null ? null : Number(initial.toFixed(1)),
+        advisoryKg: seed.advisoryKg,
+        advisoryKind: seed.advisoryKind,
+      },
     };
     setLoadText(initial === null ? '' : initial.toFixed(1));
     setLoadInvalid(false);
@@ -850,7 +856,11 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
     }
     const safeLoad = parsed;
     const metrics = target.kind === 'time' ? { timeS: Math.round(clamp(seconds, 1, 3600)), ...(bandLevel === null ? {} : { bandLevel }) } : bandLevel === null ? undefined : { bandLevel };
-    logSet(currentMovement.movement_id, target.kind === 'time' ? 1 : Math.round(clamp(reps, 1, 50)), safeLoad, safeRpe, undefined, undefined, undefined, metrics, currentSlot.sessionPlanSlotId, loadShownRef.current);
+    // No seed is better than another set's seed: if the draft was not initialized for exactly this
+    // slot and set (a press landing before the initializer has run), nothing is recorded as shown.
+    const held = loadShownRef.current;
+    const seededForThisSet = held !== null && held.slotId === currentSlot.sessionPlanSlotId && held.logged === currentLogged ? held.seed : null;
+    logSet(currentMovement.movement_id, target.kind === 'time' ? 1 : Math.round(clamp(reps, 1, 50)), safeLoad, safeRpe, undefined, undefined, undefined, metrics, currentSlot.sessionPlanSlotId, seededForThisSet);
     if (runner === null) {
       if (uiPreferences.restTimerEnabled) setLocalRest({
         startedAtMs: Date.now(),
