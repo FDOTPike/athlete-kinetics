@@ -19,7 +19,7 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
 const require = createRequire(import.meta.url);
-const { runMigrations, sentinelsMissing, SENTINELS, DURABLE_TABLE_EXEMPTIONS } = require('./.build/migrationRunner.js');
+const { runMigrations, splitSqlStatements, sentinelsMissing, SENTINELS, DURABLE_TABLE_EXEMPTIONS } = require('./.build/migrationRunner.js');
 
 const SCHEMA_DIR = join(import.meta.dirname, '..', 'src', 'schema');
 const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vector.sql',
@@ -4183,6 +4183,83 @@ const IDX_070 = FILES.indexOf('070_session_feel.sql');
   runMigrations(lost, MIGRATIONS);
   check('a lost session_feel table is detected and rebuilt by self-heal',
     detected && sentinelsMissing(lost).length === 0 && feelRows(lost).length === 0);
+}
+
+// --- one statement per database call ------------------------------------------
+// CI evidence (run 37877632952, iOS test3): op-sqlite 16.2.0 reads the rows of
+// one executeSync call at the combined column count of every statement in that
+// call, so a script with more than one row-returning statement is read past
+// the end of its rows (EXC_BAD_ACCESS in create_js_rows while a new athlete's
+// database was being built). The runner therefore hands the database one
+// statement per call. SQLite's own statement boundary (sourceSQL is the text
+// sqlite3_prepare consumed) is the oracle here, not the runner's scanner.
+console.log('\n[one statement per database call]');
+{
+  // Text with nothing in it but whitespace, comments and bare ';' holds no
+  // statement. SQLite is never asked about such text: node's SQLite answers
+  // differently by release (24.11 hands back a finalized statement, 24.21
+  // throws ERR_INVALID_ARG_VALUE "The SQL query contains no statements").
+  const isBlank = (sql) => sql.replace(/\/\*[\s\S]*?\*\//g, '').replace(/--[^\n]*/g, '').replace(/[\s;]/g, '') === '';
+  const recorded = freshDb();
+  const calls = [];
+  const multi = [];
+  const inner = recorded.executeSync.bind(recorded);
+  recorded.executeSync = (sql) => {
+    calls.push(sql);
+    let consumed = sql.length;
+    try { consumed = recorded.raw.prepare(sql).sourceSQL.length; } catch { /* the call itself reports it */ }
+    if (!isBlank(sql.slice(consumed))) multi.push(sql);
+    return inner(sql);
+  };
+  runMigrations(recorded, MIGRATIONS);
+  check('a fresh install hands the database exactly one statement per call',
+    multi.length === 0,
+    multi.length === 0 ? `${calls.length} calls` : `${multi.length} multi-statement call(s); first begins: ${multi[0].trim().slice(0, 60)}`);
+  const assertionCalls = ['role_eligibility', 'capability_family', 'capability_edge']
+    .map((table) => calls.filter((sql) => sql.includes(`ASSERTION_FAILED_movement_${table}_row_count_mismatch`)));
+  check('032 sends each of its three row-count assertions as its own call',
+    assertionCalls.every((found) => found.length === 1) && new Set(assertionCalls.flat()).size === 3,
+    assertionCalls.map((found) => found.length).join('/'));
+
+  // The runner must execute exactly the statements SQLite itself finds in each
+  // file, in order: walk every file with SQLite's own boundaries on a second
+  // database and compare with what the runner sent.
+  const reference = freshDb();
+  const expected = [];
+  for (const file of MIGRATIONS) {
+    let rest = file;
+    while (!isBlank(rest)) {
+      const empty = rest.match(/^\s*;/); // a bare ';' is an empty statement
+      if (empty !== null) {
+        rest = rest.slice(empty[0].length);
+        continue;
+      }
+      const text = reference.raw.prepare(rest).sourceSQL;
+      reference.raw.exec(text);
+      expected.push(text.trim());
+      rest = rest.slice(text.length);
+    }
+  }
+  const sentinelReads = SENTINELS.filter((sentinel) => sentinel.presenceSql !== undefined)
+    .map((sentinel) => sentinel.presenceSql.trim());
+  const sent = calls.map((sql) => sql.trim())
+    .filter((sql) => sql !== 'BEGIN' && sql !== 'COMMIT' && !/^PRAGMA user_version( = \d+)?;$/.test(sql)
+      && !/^SELECT 1 AS ok FROM sqlite_master /.test(sql) && !sentinelReads.includes(sql));
+  const firstDifference = expected.findIndex((sql, index) => sql !== sent[index]);
+  check(`the runner executes exactly SQLite's own statement sequence for all ${MIGRATIONS.length} files`,
+    expected.length === sent.length && firstDifference === -1,
+    `${expected.length} statements expected, ${sent.length} sent${firstDifference === -1 ? '' : `; first difference at ${firstDifference}`}`);
+
+  const split = (sql) => JSON.stringify(splitSqlStatements(sql).map((statement) => statement.trim()));
+  check('scanner: a trigger body, with CASE ... END and a quoted semicolon, stays one statement',
+    split("CREATE TABLE t(a); CREATE TRIGGER tr AFTER INSERT ON t BEGIN SELECT CASE WHEN 1 THEN 2 END; UPDATE t SET a = ';'; END; SELECT 1;")
+      === JSON.stringify(['CREATE TABLE t(a);', "CREATE TRIGGER tr AFTER INSERT ON t BEGIN SELECT CASE WHEN 1 THEN 2 END; UPDATE t SET a = ';'; END;", 'SELECT 1;']));
+  check('scanner: semicolons in comments, strings and quoted names do not split',
+    split("-- a; b\nINSERT INTO \"x;y\" VALUES ('it''s; fine', [z;]); /* c; d */ SELECT 2")
+      === JSON.stringify(["-- a; b\nINSERT INTO \"x;y\" VALUES ('it''s; fine', [z;]);", '/* c; d */ SELECT 2']));
+  check('scanner: blank pieces are dropped and names that merely contain keywords are plain names',
+    split(';; CREATE TABLE end_log(trigger_name, constructor); ; -- done\n')
+      === JSON.stringify(['CREATE TABLE end_log(trigger_name, constructor);']));
 }
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
