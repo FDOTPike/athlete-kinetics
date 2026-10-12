@@ -14,7 +14,10 @@
  * 4. THE COMPLETION SCREEN NEVER DEPENDS ON IT — an absent or failing loader
  *    leaves the screen as it was, and "Back to Today" still dismisses once.
  */
+import fs from 'fs';
+import path from 'path';
 import React from 'react';
+import { AccessibilityInfo, StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import SessionScreen from '../../src/screens/SessionScreen';
 import {
@@ -23,9 +26,11 @@ import {
   SESSION_FEEL_LABEL,
   SESSION_FEEL_REASON_LABEL,
   SESSION_FEEL_NOTE_MAX_LENGTH,
+  SESSION_FEEL_RECORD_ONLY_TEXT,
   SESSION_NOTE_STARTERS,
   withNoteStarter,
 } from '../../src/components/SessionFeelPanel';
+import { theme } from '../../src/theme/theme';
 
 jest.setTimeout(30_000);
 
@@ -144,6 +149,149 @@ describe('SessionFeelPanel: an answer by tapping', () => {
     expect(withNoteStarter(full, 'Effort')).toBe(full);
     const room = 'x'.repeat(SESSION_FEEL_NOTE_MAX_LENGTH - 'Effort: '.length - 1);
     expect(withNoteStarter(room, 'Effort')).toHaveLength(SESSION_FEEL_NOTE_MAX_LENGTH);
+  });
+
+  test('the record-only sentence is always on the panel, once, and stands out only for a reason about the body', () => {
+    const onSave = ruleOnly();
+    render(<SessionFeelPanel saved={null} note={null} onSave={onSave} onClose={jest.fn()} />);
+    const sentence = () => screen.getAllByTestId('session-feel-record-only');
+    const colour = () => StyleSheet.flatten(sentence()[0].props.style).color;
+
+    // There from the first render, before anything is tapped or typed.
+    expect(sentence()).toHaveLength(1);
+    expect(sentence()[0]).toHaveTextContent(SESSION_FEEL_RECORD_ONLY_TEXT);
+    expect(colour()).toBe(theme.color.textMid);
+
+    fireEvent.press(screen.getByTestId('session-feel-harder'));
+    for (const reason of ['tired', 'technique', 'equipment', 'time', 'felt_good', 'other']) {
+      fireEvent.press(screen.getByTestId(`session-feel-reason-${reason}`));
+    }
+    expect(colour()).toBe(theme.color.textMid);
+
+    fireEvent.press(screen.getByTestId('session-feel-reason-pain'));
+    expect(colour()).toBe(theme.color.textHi);
+    fireEvent.press(screen.getByTestId('session-feel-reason-pain'));
+    expect(colour()).toBe(theme.color.textMid);
+    fireEvent.press(screen.getByTestId('session-feel-reason-unwell'));
+    expect(colour()).toBe(theme.color.textHi);
+
+    // A reason that is hidden again no longer counts.
+    fireEvent.press(screen.getByTestId('session-feel-as_planned'));
+    expect(colour()).toBe(theme.color.textMid);
+
+    // One sentence however it was reached, and it asks the store for nothing.
+    expect(sentence()).toHaveLength(1);
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  test('standing out is more than a colour: the sentence is larger, and a screen reader hears it once per change', () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => {});
+    try {
+      render(<SessionFeelPanel saved={null} note={null} onSave={ruleOnly()} onClose={jest.fn()} />);
+      const size = () => StyleSheet.flatten(screen.getByTestId('session-feel-record-only').props.style).fontSize;
+      expect(size()).toBe(theme.font.label.fontSize);
+      expect(announce).not.toHaveBeenCalled();
+
+      fireEvent.press(screen.getByTestId('session-feel-harder'));
+      fireEvent.press(screen.getByTestId('session-feel-reason-tired'));
+      expect(announce).not.toHaveBeenCalled();
+
+      fireEvent.press(screen.getByTestId('session-feel-reason-pain'));
+      expect(size()).toBe(theme.font.body.fontSize);
+      expect(theme.font.body.fontSize).toBeGreaterThan(theme.font.label.fontSize);
+      // Larger, and no lighter than it was.
+      expect(StyleSheet.flatten(screen.getByTestId('session-feel-record-only').props.style).fontWeight)
+        .toBe(theme.font.label.fontWeight);
+      expect(announce).toHaveBeenCalledTimes(1);
+      expect(announce).toHaveBeenLastCalledWith(SESSION_FEEL_RECORD_ONLY_TEXT);
+
+      // Already standing out: a second body reason and a Body line say nothing more.
+      fireEvent.press(screen.getByTestId('session-feel-reason-unwell'));
+      fireEvent.press(screen.getByTestId('session-note-starter-body'));
+      expect(announce).toHaveBeenCalledTimes(1);
+    } finally {
+      announce.mockRestore();
+    }
+  });
+
+  test('a "Body" line started first is announced too, once', () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => {});
+    try {
+      render(<SessionFeelPanel saved={null} note={null} onSave={ruleOnly()} onClose={jest.fn()} />);
+      fireEvent.press(screen.getByTestId('session-note-starter-effort'));
+      expect(announce).not.toHaveBeenCalled();
+      fireEvent.press(screen.getByTestId('session-note-starter-body'));
+      expect(announce).toHaveBeenCalledTimes(1);
+      expect(announce).toHaveBeenLastCalledWith(SESSION_FEEL_RECORD_ONLY_TEXT);
+      fireEvent.press(screen.getByTestId('session-note-starter-recovery'));
+      expect(announce).toHaveBeenCalledTimes(1);
+    } finally {
+      announce.mockRestore();
+    }
+  });
+
+  test('opening a saved answer about the body announces nothing, and the panel says "changes nothing" once', () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => {});
+    try {
+      render(
+        <SessionFeelPanel
+          saved={{ feel: 'harder', reasons: ['unwell'] }}
+          note={null}
+          onSave={ruleOnly()}
+          onClose={jest.fn()}
+        />,
+      );
+      expect(announce).not.toHaveBeenCalled();
+      expect(screen.getAllByText(/does not adjust your training/)).toHaveLength(1);
+      expect(screen.queryByText(/Nothing here changes your plan/)).toBeNull();
+      expect(screen.getByText('Saved in your training log exactly as you typed it.')).toBeOnTheScreen();
+    } finally {
+      announce.mockRestore();
+    }
+  });
+
+  test('a "Body" line makes it stand out and it stays so when another line is started; typed words never do', () => {
+    render(<SessionFeelPanel saved={null} note={null} onSave={ruleOnly()} onClose={jest.fn()} />);
+    const colour = () => StyleSheet.flatten(screen.getByTestId('session-feel-record-only').props.style).color;
+
+    fireEvent.changeText(screen.getByTestId('session-feel-note'), 'left knee hurts, sharp, 6/10');
+    expect(colour()).toBe(theme.color.textMid);
+    fireEvent.press(screen.getByTestId('session-note-starter-effort'));
+    expect(colour()).toBe(theme.color.textMid);
+
+    fireEvent.press(screen.getByTestId('session-note-starter-body'));
+    expect(colour()).toBe(theme.color.textHi);
+    // The Body line is still in the note, so the sentence keeps standing out.
+    fireEvent.press(screen.getByTestId('session-note-starter-recovery'));
+    expect(screen.getByTestId('session-feel-note').props.value).toContain('Body: ');
+    expect(colour()).toBe(theme.color.textHi);
+  });
+
+  test('a saved answer with a reason about the body is shown with the sentence standing out', () => {
+    render(
+      <SessionFeelPanel
+        saved={{ feel: 'stopped_early', reasons: ['pain'] }}
+        note="Body: left knee, 4/10"
+        onSave={ruleOnly()}
+        onClose={jest.fn()}
+      />,
+    );
+    expect(StyleSheet.flatten(screen.getByTestId('session-feel-record-only').props.style).color).toBe(theme.color.textHi);
+  });
+
+  test('the places it names exist under those names, the one usable after a session comes first, and it gives no advice', () => {
+    const source = (file) => fs.readFileSync(path.join(__dirname, '..', '..', 'src', file), 'utf8');
+    expect(SESSION_FEEL_RECORD_ONLY_TEXT).toMatch(/^This is a record only\. It does not adjust your training\./);
+    expect(SESSION_FEEL_RECORD_ONLY_TEXT).toContain('"Something feels off" on the Plan screen');
+    expect(source('screens/BlockScreen.tsx')).toContain('label="Something feels off"');
+    // "Plan" is the tab that shows the screen holding that control.
+    expect(source('App.tsx')).toContain("coach: 'Plan'");
+    expect(source('App.tsx')).toMatch(/tab === 'coach'[\s\S]{0,80}<BlockScreen/);
+    expect(SESSION_FEEL_RECORD_ONLY_TEXT).toContain('During a session, use "Report discomfort" on the lift');
+    expect(source('screens/SessionScreen.tsx')).toContain('label="Report discomfort"');
+    expect(SESSION_FEEL_RECORD_ONLY_TEXT.indexOf('Something feels off'))
+      .toBeLessThan(SESSION_FEEL_RECORD_ONLY_TEXT.indexOf('Report discomfort'));
+    expect(SESSION_FEEL_RECORD_ONLY_TEXT).not.toMatch(/\b(should|must|rest|doctor|physio|treat)\b/i);
   });
 
   test('the typed note is handed over exactly as typed, with no rewriting', () => {
