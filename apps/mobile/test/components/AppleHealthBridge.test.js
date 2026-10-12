@@ -443,6 +443,40 @@ test('a native Health read that never settles releases the data lease and writes
   await useStore.getState().connectBiometrics(null);
 });
 
+test('a permission check that never settles ends at "available", claims nothing, and a late answer is discarded', async () => {
+  Platform.OS = 'ios';
+  await bootFreshStore();
+  let answer;
+  let requests = 0;
+  const silent = {
+    provider: 'apple_health',
+    hasGrantedPermissions: () => new Promise((resolve) => { answer = resolve; }),
+    requestPermissions: async () => { requests += 1; return true; },
+    readDaily: async () => [],
+  };
+  jest.useFakeTimers({ doNotFake: ['setImmediate', 'nextTick', 'queueMicrotask'] });
+  try {
+    const connect = useStore.getState().connectBiometrics(silent);
+    await Promise.resolve();
+    // Until the bound the check is still outstanding: nothing is offered yet.
+    jest.advanceTimersByTime(9_999);
+    await Promise.resolve();
+    expect(useStore.getState().biometricsStatus).toBe('off');
+    jest.advanceTimersByTime(1);
+    await connect;
+  } finally {
+    jest.useRealTimers();
+  }
+  // "available": CONNECT is offered, no permission sheet was opened, no access is claimed.
+  expect(useStore.getState().biometricsStatus).toBe('idle');
+  expect(requests).toBe(0);
+  // An answer arriving after the bound changes nothing.
+  answer(true);
+  await new Promise((resolve) => setImmediate(resolve));
+  expect(useStore.getState().biometricsStatus).toBe('idle');
+  await useStore.getState().connectBiometrics(null);
+});
+
 test('iOS wording never claims access was granted and names where to change it', () => {
   for (const status of ['off', 'unavailable', 'idle', 'denied', 'ready']) {
     const copy = biometricsCopy('apple_health', status);
