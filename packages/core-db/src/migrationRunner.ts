@@ -326,6 +326,11 @@ export const SENTINELS: readonly MigrationSentinel[] = [
   // 070 how a finished session went and why. Losing the table would make the
   // completion screen's save fail and drop every answer already recorded.
   { type: 'table', name: 'session_feel' },                                    // 070
+  // 071 which planned slots were skipped, and what the load entry was seeded
+  // with. Losing either table would make session finalization or set logging
+  // fail its write and drop every record already kept.
+  { type: 'table', name: 'session_skipped_slot' },                            // 071
+  { type: 'table', name: 'set_load_shown' },                                  // 071
 ];
 
 /** Durable tables deliberately absent from SENTINELS, each with the reason it

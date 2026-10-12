@@ -351,6 +351,11 @@
         "ordinal": 69,
         "file": "070_session_feel.sql",
         "sha256": "ff7f567ce3349a4ecd0d4bcc77377c7529ffb0eff716b41e43e6e5009e7bbebb"
+      },
+      {
+        "ordinal": 70,
+        "file": "071_beta_recording.sql",
+        "sha256": "42d51be93dd53ff6a60b6eb9a1c7cf5c72f9e1afb8dfc1a20472d3803f504d0f"
       }
     ]
   },
