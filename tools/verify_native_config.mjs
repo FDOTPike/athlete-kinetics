@@ -110,6 +110,17 @@ console.log('[N3] Info.plist privacy and presentation');
   check('display name is the product name, not the scaffold', plist.get('CFBundleDisplayName') === 'pikeMethods');
   const fonts = String(plist.get('UIAppFonts') ?? '');
   check('UIAppFonts registers the Archivo variable font', fonts.includes('Archivo-VariableFont_wdth,wght.ttf'));
+  // The iOS 27 SDK stops an app at launch unless it uses the UIScene life
+  // cycle: the manifest names the scene delegate, and the window is made for
+  // the scene there, not for the screen in the app delegate.
+  const appDelegate = read('apps/mobile/ios/AthleteKinetics/AppDelegate.swift');
+  const sceneBody = appDelegate.match(/^class SceneDelegate: UIResponder, UIWindowSceneDelegate \{\n([\s\S]*?)\n^\}$/m)?.[1] ?? '';
+  check('the app adopts the UIScene life cycle: one scene, its delegate named in Info.plist',
+    /<key>UIApplicationSceneManifest<\/key>\s*<dict>\s*<key>UIApplicationSupportsMultipleScenes<\/key>\s*<false\/>/.test(plistXml)
+      && /<key>UIWindowSceneSessionRoleApplication<\/key>\s*<array>\s*<dict>\s*<key>UISceneConfigurationName<\/key>\s*<string>[^<]+<\/string>\s*<key>UISceneDelegateClassName<\/key>\s*<string>\$\(PRODUCT_MODULE_NAME\)\.SceneDelegate<\/string>\s*<\/dict>\s*<\/array>/.test(plistXml));
+  check('React Native starts in a window made for the scene, and no window is made for the screen',
+    sceneBody.includes('UIWindow(windowScene: windowScene)') && /factory\.startReactNative\(\s*withModuleName:/.test(sceneBody)
+      && sceneBody.includes('appDelegate.window = window') && !appDelegate.includes('UIWindow(frame:'));
   const launch = read('apps/mobile/ios/AthleteKinetics/LaunchScreen.storyboard');
   check('launch screen carries no scaffold text', !/AthleteKinetics|Powered by React Native/.test(launch));
 }
@@ -194,6 +205,23 @@ console.log('[N9] Xcode 26 / fmt consteval compatibility');
   check('the Podfile post_install makes glog\'s namespace-included headers textual (Swift/C++ interop)',
     /make_glog_namespace_headers_textual!\(installer\)/.test(podfile)
       && /textual = %w\[log_severity\.h vlog_is_on\.h\]/.test(podfile));
+  // Xcode 27 refuses a pod target below iOS 15.0 (issue #38).
+  check('the Podfile post_install raises pod deployment targets below the app minimum, and lowers none',
+    /^\s+raise_pod_deployment_targets!\(installer\)$/m.test(podfile)
+      && /Gem::Version\.new\(current\) < minimum/.test(podfile)
+      && podfile.includes("config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = min_ios_version_supported"));
+  // Xcode 27 builds with explicit modules; the pinned Apple Health binding
+  // (16.0.0) needs its core's private module on the dependents' include path.
+  // Read from the helper's own body, in order: the version guard returns
+  // before the dependents are selected and before any include path is set.
+  const exposeBody = podfile.match(/^def expose_healthkit_core_private_module!\(installer\)\n([\s\S]*?)\n^end$/m)?.[1] ?? '';
+  const exposeGuard = exposeBody.search(/unless version == '16\.0\.0'\n[^\n]*\n\s+return\n\s+end\n/);
+  const exposeSelect = exposeBody.indexOf("dependency.pod_name == 'ReactNativeHealthkitCore'");
+  const exposeSet = exposeBody.indexOf("config.build_settings['SWIFT_INCLUDE_PATHS'] = \"#{current} #{include_path}\"");
+  check('the Podfile post_install makes the Apple Health core\'s private module resolvable for its dependents (16.0.0 only)',
+    /^\s+expose_healthkit_core_private_module!\(installer\)$/m.test(podfile)
+      && exposeGuard !== -1 && exposeGuard < exposeSelect && exposeSelect < exposeSet,
+    `guard@${exposeGuard} select@${exposeSelect} set@${exposeSet}`);
   if (fmtVersion !== undefined) {
     check('the installed React Native still pins the fmt version the patch is written for', fmtVersion === '11.0.2', fmtVersion);
   }

@@ -171,14 +171,30 @@ jobs:
   # the App Store, or touch TestFlight — those need the owner's Apple team,
   # registered bundle id and signing credentials (none are configured here).
   ios-simulator:
-    name: iOS unsigned simulator build + native smoke
-    runs-on: macos-26
+    name: iOS unsigned simulator build + native smoke${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
     needs: verify
     timeout-minutes: 150
+    strategy:
+      # Each Xcode reports its own result; one failing does not cancel the other.
+      fail-fast: false
+      matrix:
+        include:
+          # Xcode/iOS SDK 26+ is the current App Store upload requirement. The
+          # job selects the newest installed Xcode of this major and records it.
+          - runner: macos-26
+            xcode: '26'
+            label: ''
+            artifact: athlete-kinetics-ios-simulator-unsigned
+          # Xcode 27.0, the version a tester's Mac runs (issue #38), on
+          # GitHub's Xcode 27 image. The same steps, fail closed: pods that
+          # build on Xcode 26 have stopped the Xcode 27 build before.
+          - runner: xcode-27
+            xcode: '27.0'
+            label: ' (Xcode 27)'
+            artifact: athlete-kinetics-ios-simulator-unsigned-xcode27
     env:
-      # Xcode/iOS SDK 26+ is the current App Store upload requirement. The job
-      # selects the newest installed Xcode of this major and records it.
-      XCODE_MAJOR: '26'
+      XCODE_MAJOR: ${{ matrix.xcode }}
       BUNDLE_ID: com.pikemethods.training
     steps:
       - uses: actions/checkout@v6
@@ -334,6 +350,6 @@ jobs:
       - uses: actions/upload-artifact@v6
         if: always()
         with:
-          name: athlete-kinetics-ios-simulator-unsigned
+          name: ${{ matrix.artifact }}
           path: ios-evidence/
           if-no-files-found: error
