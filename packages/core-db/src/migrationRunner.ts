@@ -323,6 +323,9 @@ export const SENTINELS: readonly MigrationSentinel[] = [
   // 069 resting heart rate independent of HRV. Losing the table would make
   // every later sync fail its write and drop the athlete's resting HR.
   { type: 'table', name: 'resting_hr_daily' },                                // 069
+  // 070 how a finished session went and why. Losing the table would make the
+  // completion screen's save fail and drop every answer already recorded.
+  { type: 'table', name: 'session_feel' },                                    // 070
 ];
 
 /** Durable tables deliberately absent from SENTINELS, each with the reason it
@@ -408,11 +411,102 @@ function userVersion(db: MigrationDb): number {
   return Number(db.executeSync('PRAGMA user_version;').rows[0]?.user_version ?? 0);
 }
 
+// Statement-boundary scanner: the token classes and transition table of
+// SQLite's own sqlite3_complete(). A statement ends at a ';' outside strings,
+// comments and quoted names; a CREATE [TEMP] TRIGGER ends only at the ';' that
+// follows its closing END. State 1 is "at a statement boundary".
+const TOKEN_SEMI = 0;
+const TOKEN_SPACE = 1;
+const TOKEN_OTHER = 2;
+const STATEMENT_KEYWORDS: ReadonlyMap<string, number> = new Map([
+  ['explain', 3], ['create', 4], ['temp', 5], ['temporary', 5], ['trigger', 6], ['end', 7],
+]);
+const STATEMENT_TRANSITIONS: readonly (readonly number[])[] = [
+  /* 0 before any input */ [1, 0, 2, 3, 4, 2, 2, 2],
+  /* 1 at a boundary    */ [1, 1, 2, 3, 4, 2, 2, 2],
+  /* 2 in a statement   */ [1, 2, 2, 2, 2, 2, 2, 2],
+  /* 3 after EXPLAIN    */ [1, 3, 3, 2, 4, 2, 2, 2],
+  /* 4 after CREATE     */ [1, 4, 2, 2, 2, 4, 5, 2],
+  /* 5 in a trigger     */ [6, 5, 5, 5, 5, 5, 5, 5],
+  /* 6 trigger, at ';'  */ [6, 6, 5, 5, 5, 5, 5, 7],
+  /* 7 trigger, at END  */ [1, 7, 5, 5, 5, 5, 5, 5],
+];
+const NAME_CHARACTER = /[A-Za-z0-9_$\u0080-￿]/;
+
+/** The statements of a SQL script, in order, each with its own text. Pieces
+ *  that hold only whitespace, comments or a bare ';' are dropped. */
+export function splitSqlStatements(sql: string): string[] {
+  const statements: string[] = [];
+  const length = sql.length;
+  let state = 0;
+  let start = 0;
+  let hasContent = false;
+  let i = 0;
+  while (i < length) {
+    const c = sql.charAt(i);
+    let token = TOKEN_OTHER;
+    if (c === ';') {
+      token = TOKEN_SEMI;
+      i += 1;
+    } else if (c === ' ' || c === '\t' || c === '\n' || c === '\r' || c === '\f') {
+      token = TOKEN_SPACE;
+      i += 1;
+    } else if (c === '/' && sql.charAt(i + 1) === '*') {
+      const close = sql.indexOf('*/', i + 2);
+      token = TOKEN_SPACE;
+      i = close < 0 ? length : close + 2;
+    } else if (c === '-' && sql.charAt(i + 1) === '-') {
+      const lineEnd = sql.indexOf('\n', i);
+      token = TOKEN_SPACE;
+      i = lineEnd < 0 ? length : lineEnd;
+    } else if (c === "'" || c === '"' || c === '`' || c === '[') {
+      // A doubled quote inside a string reads as one string ending and the
+      // next beginning: the same token class either way.
+      const close = sql.indexOf(c === '[' ? ']' : c, i + 1);
+      i = close < 0 ? length : close + 1;
+    } else if (NAME_CHARACTER.test(c)) {
+      let end = i + 1;
+      while (end < length && NAME_CHARACTER.test(sql.charAt(end))) end += 1;
+      token = STATEMENT_KEYWORDS.get(sql.slice(i, end).toLowerCase()) ?? TOKEN_OTHER;
+      i = end;
+    } else {
+      i += 1;
+    }
+    if (token !== TOKEN_SEMI && token !== TOKEN_SPACE) hasContent = true;
+    state = STATEMENT_TRANSITIONS[state]?.[token] ?? state;
+    if (token === TOKEN_SEMI && state === 1) {
+      if (hasContent) statements.push(sql.slice(start, i));
+      start = i;
+      hasContent = false;
+    }
+  }
+  if (hasContent) statements.push(sql.slice(start));
+  return statements;
+}
+
+/**
+ * Runs a multi-statement script one statement per call.
+ *
+ * CI evidence (run 37877632952, iOS test3): the app died with EXC_BAD_ACCESS
+ * inside op-sqlite's executeSync while a new athlete's database was being
+ * built. For one call, op-sqlite 16.2.0 collects the column names of EVERY
+ * statement in the script but keeps each result row at its own statement's
+ * width, then reads every row at the combined width (create_js_rows). A script
+ * with more than one row-returning statement is therefore read past the end of
+ * its rows: usually a harmless garbage value the runner ignores, sometimes a
+ * crash. 032's three row-count assertions are such a script. One statement per
+ * call keeps the two widths equal. (executeRawSync is not an alternative: it
+ * steps only the first statement of a script.)
+ */
+function executeScript(db: MigrationDb, sql: string): void {
+  for (const statement of splitSqlStatements(sql)) db.executeSync(statement);
+}
+
 function applyFrom(db: MigrationDb, migrations: readonly string[], start: number): void {
   for (let v = start; v < migrations.length; v++) {
     db.executeSync('BEGIN');
     try {
-      db.executeSync(migrations[v]);
+      executeScript(db, migrations[v]);
       db.executeSync(`PRAGMA user_version = ${v + 1};`);
       db.executeSync('COMMIT');
     } catch (e) {
@@ -447,7 +541,7 @@ function applyFailClosedRepairs(db: MigrationDb, missing: readonly string[]): vo
 
   db.executeSync('BEGIN');
   try {
-    for (const repairSql of repairs) db.executeSync(repairSql);
+    for (const repairSql of repairs) executeScript(db, repairSql);
     db.executeSync('COMMIT');
   } catch (error) {
     try {

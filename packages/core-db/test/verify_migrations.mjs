@@ -19,7 +19,7 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
 const require = createRequire(import.meta.url);
-const { runMigrations, sentinelsMissing, SENTINELS, DURABLE_TABLE_EXEMPTIONS } = require('./.build/migrationRunner.js');
+const { runMigrations, splitSqlStatements, sentinelsMissing, SENTINELS, DURABLE_TABLE_EXEMPTIONS } = require('./.build/migrationRunner.js');
 
 const SCHEMA_DIR = join(import.meta.dirname, '..', 'src', 'schema');
 const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vector.sql',
@@ -68,7 +68,8 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '066_focus_and_goals.sql',
   '067_sport_and_emphasis.sql',
   '068_movement_content_correction_v2.sql',
-  '069_resting_heart_rate.sql'];
+  '069_resting_heart_rate.sql',
+  '070_session_feel.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
@@ -1765,11 +1766,11 @@ console.log('[2u] 057 block_meta phase/index repair + enforcement');
     const db = freshDb();
     runMigrations(db, MIGRATIONS);
     // Slot 004 is the parameterized materialize script, never a migration:
-    // 68 files (slots 001-069, no 004) -> user_version 68. This count is
+    // 69 files (slots 001-070, no 004) -> user_version 69. This count is
     // pinned deliberately so adding a migration is a conscious act, not a
-    // silent one. Re-pinned for 069 (resting heart rate).
-    check('fresh install reaches user_version 68 (68 files, no slot 004)',
-      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 68,
+    // silent one. Re-pinned for 070 (session feel).
+    check('fresh install reaches user_version 69 (69 files, no slot 004)',
+      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 69,
       String(uv(db)));
     const trig = db.raw.prepare(
       `SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'trigger'
@@ -4031,8 +4032,8 @@ const isTemplate = (row) => row.instructions.startsWith(`Set up ${row.name} with
 console.log('[069] resting heart rate (resting_hr_daily)');
 const IDX_069 = FILES.indexOf('069_resting_heart_rate.sql');
 {
-  check('069 is appended after 068 and completes the chain',
-    IDX_069 === IDX_068 + 1 && IDX_069 === MIGRATIONS.length - 1 && IDX_069 === 67, `index=${IDX_069}`);
+  check('069 is appended directly after 068',
+    IDX_069 === IDX_068 + 1 && IDX_069 === 67, `index=${IDX_069}`);
 
   const telemetry = (db) => JSON.stringify({
     hrv: db.raw.prepare('SELECT * FROM hrv_daily ORDER BY date').all(),
@@ -4091,6 +4092,174 @@ const IDX_069 = FILES.indexOf('069_resting_heart_rate.sql');
   runMigrations(lost, MIGRATIONS);
   check('a lost resting_hr_daily table is detected and rebuilt by self-heal',
     detected && sentinelsMissing(lost).length === 0 && rhrRows(lost).length === 0);
+}
+
+// =============================================================================
+// [070] how a finished session went, and why
+// =============================================================================
+// Append-only: one new table, nothing existing changes. Proves it lands on a
+// fresh install and on a populated upgrade without inventing or moving data,
+// that its one rule is enforced by the schema, that its rows survive every
+// replay and leave with their session, and that a lost table is detected and
+// rebuilt.
+console.log('[070] session feel (session_feel)');
+const IDX_070 = FILES.indexOf('070_session_feel.sql');
+{
+  check('070 is appended after 069 and completes the chain',
+    IDX_070 === IDX_069 + 1 && IDX_070 === MIGRATIONS.length - 1 && IDX_070 === 68, `index=${IDX_070}`);
+
+  const feelRows = (db) => db.raw.prepare('SELECT * FROM session_feel ORDER BY session_id').all();
+  const sessionFacts = (db) => JSON.stringify({
+    sessions: db.raw.prepare('SELECT * FROM session ORDER BY session_id').all(),
+    notes: db.raw.prepare('SELECT * FROM session_note ORDER BY session_id').all(),
+    reports: db.raw.prepare('SELECT * FROM subjective_report ORDER BY report_id').all(),
+  });
+
+  // Populated pre-070 install: a finished session with a typed note beside it.
+  const upgrade = freshDb();
+  applyRaw(upgrade, MIGRATIONS, 0, IDX_070);
+  upgrade.raw.exec("INSERT INTO session (micro_cycle_id, session_date, started_at_ms, duration_min) VALUES (NULL, '2026-10-08', 1111, 48.0)");
+  upgrade.raw.exec("INSERT INTO session_note (session_id, note, created_at_ms) VALUES (1, 'left knee felt off on the last set', 2222)");
+  const before = sessionFacts(upgrade);
+  runMigrations(upgrade, MIGRATIONS);
+  check('a populated v68 install upgrades to the latest version with every sentinel present',
+    uv(upgrade) === MIGRATIONS.length && sentinelsMissing(upgrade).length === 0, `uv=${uv(upgrade)}`);
+  check('the upgrade leaves sessions, typed notes and reports byte-identical', sessionFacts(upgrade) === before);
+  check('the upgrade invents no answer (the new table starts empty)', feelRows(upgrade).length === 0);
+
+  // Domain: the one rule is in the schema.
+  const fresh = freshDb();
+  runMigrations(fresh, MIGRATIONS);
+  fresh.raw.exec('PRAGMA foreign_keys = ON');
+  for (const day of ['01', '02', '03', '04', '05']) {
+    fresh.raw.exec(`INSERT INTO session (micro_cycle_id, session_date, started_at_ms) VALUES (NULL, '2026-10-${day}', 1)`);
+  }
+  const insert = (sessionId, feel, reasons = {}) => {
+    const columns = Object.keys(reasons);
+    fresh.raw.prepare(
+      `INSERT INTO session_feel (session_id, feel${columns.map((c) => `, reason_${c}`).join('')}, recorded_at_ms)
+       VALUES (?, ?${columns.map(() => ', ?').join('')}, 1)`,
+    ).run(sessionId, feel, ...Object.values(reasons));
+  };
+  const rejects = (fn) => { try { fn(); return false; } catch { return true; } };
+  insert(1, 'as_planned');
+  insert(2, 'harder', { tired: 1, unwell: 1 });
+  insert(3, 'easier', { felt_good: 1 });
+  insert(4, 'stopped_early', { pain: 1 });
+  check('each of the four answers is accepted in its valid form', feelRows(fresh).length === 4);
+  check('"as planned" with a reason is rejected', rejects(() => insert(5, 'as_planned', { tired: 1 })));
+  check('any other answer with no reason is rejected',
+    rejects(() => insert(5, 'harder')) && rejects(() => insert(5, 'easier')) && rejects(() => insert(5, 'stopped_early')));
+  check('an unknown answer is rejected', rejects(() => insert(5, 'terrible', { other: 1 })) && rejects(() => insert(5, null, { other: 1 })));
+  check('a reason flag outside 0/1 is rejected', rejects(() => insert(5, 'harder', { pain: 2 })) && rejects(() => insert(5, 'harder', { pain: -1 })));
+  check('the table is STRICT (a text reason flag is rejected, not coerced)', rejects(() => insert(5, 'harder', { pain: 'yes' })));
+  check('a second row for the same session is rejected (one answer per session)', rejects(() => insert(1, 'harder', { other: 1 })));
+  check('an answer for a session that does not exist is rejected', rejects(() => insert(99, 'harder', { other: 1 })));
+  check('a negative timestamp is rejected', rejects(() => fresh.raw
+    .prepare("INSERT INTO session_feel (session_id, feel, recorded_at_ms) VALUES (5, 'as_planned', -1)").run()));
+  fresh.raw.prepare("UPDATE session_feel SET feel = 'as_planned', reason_tired = 0, reason_unwell = 0 WHERE session_id = 2").run();
+  check('an answer can be corrected to a valid one',
+    feelRows(fresh).find((row) => row.session_id === 2).feel === 'as_planned');
+  check('a correction that breaks the rule is rejected',
+    rejects(() => fresh.raw.prepare("UPDATE session_feel SET feel = 'as_planned' WHERE session_id = 4").run()));
+  fresh.raw.exec('DELETE FROM session WHERE session_id = 3');
+  check('an answer leaves with its session', feelRows(fresh).every((row) => row.session_id !== 3) && feelRows(fresh).length === 3);
+
+  // Replays keep the rows.
+  const kept = JSON.stringify(feelRows(fresh));
+  runMigrations(fresh, MIGRATIONS);
+  fresh.executeSync(`PRAGMA user_version = ${IDX_070};`);
+  runMigrations(fresh, MIGRATIONS);
+  fresh.executeSync('PRAGMA user_version = 0;');
+  runMigrations(fresh, MIGRATIONS);
+  check('answers survive a reboot, a replay from 070 and a full re-apply from 0',
+    JSON.stringify(feelRows(fresh)) === kept && uv(fresh) === MIGRATIONS.length);
+
+  // A database that claims the latest version but lost the table.
+  const lost = freshDb();
+  runMigrations(lost, MIGRATIONS);
+  lost.raw.exec('DROP TABLE session_feel');
+  const detected = sentinelsMissing(lost).includes('session_feel');
+  runMigrations(lost, MIGRATIONS);
+  check('a lost session_feel table is detected and rebuilt by self-heal',
+    detected && sentinelsMissing(lost).length === 0 && feelRows(lost).length === 0);
+}
+
+// --- one statement per database call ------------------------------------------
+// CI evidence (run 37877632952, iOS test3): op-sqlite 16.2.0 reads the rows of
+// one executeSync call at the combined column count of every statement in that
+// call, so a script with more than one row-returning statement is read past
+// the end of its rows (EXC_BAD_ACCESS in create_js_rows while a new athlete's
+// database was being built). The runner therefore hands the database one
+// statement per call. SQLite's own statement boundary (sourceSQL is the text
+// sqlite3_prepare consumed) is the oracle here, not the runner's scanner.
+console.log('\n[one statement per database call]');
+{
+  // Text with nothing in it but whitespace, comments and bare ';' holds no
+  // statement. SQLite is never asked about such text: node's SQLite answers
+  // differently by release (24.11 hands back a finalized statement, 24.21
+  // throws ERR_INVALID_ARG_VALUE "The SQL query contains no statements").
+  const isBlank = (sql) => sql.replace(/\/\*[\s\S]*?\*\//g, '').replace(/--[^\n]*/g, '').replace(/[\s;]/g, '') === '';
+  const recorded = freshDb();
+  const calls = [];
+  const multi = [];
+  const inner = recorded.executeSync.bind(recorded);
+  recorded.executeSync = (sql) => {
+    calls.push(sql);
+    let consumed = sql.length;
+    try { consumed = recorded.raw.prepare(sql).sourceSQL.length; } catch { /* the call itself reports it */ }
+    if (!isBlank(sql.slice(consumed))) multi.push(sql);
+    return inner(sql);
+  };
+  runMigrations(recorded, MIGRATIONS);
+  check('a fresh install hands the database exactly one statement per call',
+    multi.length === 0,
+    multi.length === 0 ? `${calls.length} calls` : `${multi.length} multi-statement call(s); first begins: ${multi[0].trim().slice(0, 60)}`);
+  const assertionCalls = ['role_eligibility', 'capability_family', 'capability_edge']
+    .map((table) => calls.filter((sql) => sql.includes(`ASSERTION_FAILED_movement_${table}_row_count_mismatch`)));
+  check('032 sends each of its three row-count assertions as its own call',
+    assertionCalls.every((found) => found.length === 1) && new Set(assertionCalls.flat()).size === 3,
+    assertionCalls.map((found) => found.length).join('/'));
+
+  // The runner must execute exactly the statements SQLite itself finds in each
+  // file, in order: walk every file with SQLite's own boundaries on a second
+  // database and compare with what the runner sent.
+  const reference = freshDb();
+  const expected = [];
+  for (const file of MIGRATIONS) {
+    let rest = file;
+    while (!isBlank(rest)) {
+      const empty = rest.match(/^\s*;/); // a bare ';' is an empty statement
+      if (empty !== null) {
+        rest = rest.slice(empty[0].length);
+        continue;
+      }
+      const text = reference.raw.prepare(rest).sourceSQL;
+      reference.raw.exec(text);
+      expected.push(text.trim());
+      rest = rest.slice(text.length);
+    }
+  }
+  const sentinelReads = SENTINELS.filter((sentinel) => sentinel.presenceSql !== undefined)
+    .map((sentinel) => sentinel.presenceSql.trim());
+  const sent = calls.map((sql) => sql.trim())
+    .filter((sql) => sql !== 'BEGIN' && sql !== 'COMMIT' && !/^PRAGMA user_version( = \d+)?;$/.test(sql)
+      && !/^SELECT 1 AS ok FROM sqlite_master /.test(sql) && !sentinelReads.includes(sql));
+  const firstDifference = expected.findIndex((sql, index) => sql !== sent[index]);
+  check(`the runner executes exactly SQLite's own statement sequence for all ${MIGRATIONS.length} files`,
+    expected.length === sent.length && firstDifference === -1,
+    `${expected.length} statements expected, ${sent.length} sent${firstDifference === -1 ? '' : `; first difference at ${firstDifference}`}`);
+
+  const split = (sql) => JSON.stringify(splitSqlStatements(sql).map((statement) => statement.trim()));
+  check('scanner: a trigger body, with CASE ... END and a quoted semicolon, stays one statement',
+    split("CREATE TABLE t(a); CREATE TRIGGER tr AFTER INSERT ON t BEGIN SELECT CASE WHEN 1 THEN 2 END; UPDATE t SET a = ';'; END; SELECT 1;")
+      === JSON.stringify(['CREATE TABLE t(a);', "CREATE TRIGGER tr AFTER INSERT ON t BEGIN SELECT CASE WHEN 1 THEN 2 END; UPDATE t SET a = ';'; END;", 'SELECT 1;']));
+  check('scanner: semicolons in comments, strings and quoted names do not split',
+    split("-- a; b\nINSERT INTO \"x;y\" VALUES ('it''s; fine', [z;]); /* c; d */ SELECT 2")
+      === JSON.stringify(["-- a; b\nINSERT INTO \"x;y\" VALUES ('it''s; fine', [z;]);", '/* c; d */ SELECT 2']));
+  check('scanner: blank pieces are dropped and names that merely contain keywords are plain names',
+    split(';; CREATE TABLE end_log(trigger_name, constructor); ; -- done\n')
+      === JSON.stringify(['CREATE TABLE end_log(trigger_name, constructor);']));
 }
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);

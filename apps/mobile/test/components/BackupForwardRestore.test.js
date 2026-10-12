@@ -702,7 +702,12 @@ describe('every registered pre-upgrade schema restores, not only the first', () 
     const v68 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 68);
     expect(v68.fingerprint).not.toBe(v67.fingerprint);
     expect([v68.migrationSlot, v68.tableCount]).toEqual([69, v67.tableCount + 1]);
-    expect(PRE_UPGRADE.length).toBeGreaterThanOrEqual(5);
+    // 070 adds a table too (session_feel), so v69 is the current schema with its own fingerprint.
+    const v69 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 69);
+    expect(v69).toBe(CURRENT);
+    expect(v69.fingerprint).not.toBe(v68.fingerprint);
+    expect([v69.migrationSlot, v69.tableCount]).toEqual([70, v68.tableCount + 1]);
+    expect(PRE_UPGRADE.length).toBeGreaterThanOrEqual(6);
   });
 
   test.each(PRE_UPGRADE.map((contract) => [contract.userVersion, contract]))(
