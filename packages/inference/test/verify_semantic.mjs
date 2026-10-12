@@ -202,5 +202,46 @@ r5 = await resolveLive('feeling amazing, weights are flying up');
 check('clean positive report untouched by the override layer',
   !r5.overrideApplied && r5.entry?.id === 'positive-strong');
 
+
+// 5d. systemic language beside a confident curated match that does not halt
+// (owner ruling 2026-10-13). Before this, each of the three reports below left
+// with a soreness or fatigue adjustment and no halt.
+for (const text of [
+  'hamstrings are tight and sore and i feel faint between sets',
+  'really tired today and a bit lightheaded on the warm up',
+  'quads ache from squats and i feel nauseous',
+]) {
+  r5 = await resolveLive(text);
+  check(`systemic language beside a routine match halts: "${text}"`,
+    r5.confident && r5.overrideApplied && r5.entry?.id === 'red-flag-systemic' && r5.entry.guardrail.halt === true,
+    `${r5.entry?.id} override=${r5.overrideApplied}`);
+  // The keyword layer alone gives the same answer, so the report halts whether or not the embedder is available.
+  const keywordOnly = redFlag.resolveReport(text, null);
+  check(`  ... and identically with the embedder unavailable`, keywordOnly.entry?.id === 'red-flag-systemic');
+}
+// What the change does NOT touch.
+r5 = await resolveLive('legs are sore from yesterday and i got dizzy standing up');
+check('a curated match that already halts keeps its own entry and wording',
+  r5.entry?.id === 'dizzy' && r5.entry.guardrail.halt === true && !r5.overrideApplied, r5.entry?.id);
+r5 = await resolveLive('quads still hurt from the last squat day');
+check('a pain word beside a confident routine match is still not raised to the pain floor (only systemic language outranks a match)',
+  !r5.overrideApplied && r5.entry?.guardrail.halt === false, `${r5.entry?.id} override=${r5.overrideApplied}`);
+r5 = await resolveLive('quads are sore from squats, not dizzy');
+check('a denial the one-word negation check catches is read as it was',
+  redFlag.scanRedFlags('quads are sore from squats, not dizzy').systemic === false && !r5.overrideApplied,
+  `${r5.entry?.id} override=${r5.overrideApplied}`);
+// KNOWN TRADE-OFF, pinned so that it is seen and not forgotten. The negation
+// check looks one word back, so "not feeling dizzy" still reads as dizzy. This
+// report used to leave with a soreness adjustment; it now halts, and the
+// athlete's severity rating cannot undo a halt. It is the price of the rule
+// above until the negation check is repaired, which is a separate change that
+// LOOSENS symptom handling and so needs its own review. If that repair lands,
+// this check is the one to change.
+r5 = await resolveLive('back muscles are sore but i am not feeling dizzy');
+check('KNOWN TRADE-OFF: a denial two words back ("not feeling dizzy") beside a routine match now halts',
+  redFlag.scanRedFlags('back muscles are sore but i am not feeling dizzy').systemic === true
+    && r5.overrideApplied && r5.entry?.id === 'red-flag-systemic',
+  `${r5.entry?.id} override=${r5.overrideApplied}`);
+
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}  (routing ${routedOk}/${CASES.length})`);
 process.exit(fail ? 1 : 0);
