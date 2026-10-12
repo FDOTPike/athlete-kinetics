@@ -12,6 +12,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
   var reactNativeFactory: RCTReactNativeFactory?
   var launchOptions: [UIApplication.LaunchOptionsKey: Any]?
 
+  /// Builds the React Native factory and keeps the launch options for the
+  /// scene. No window is made here: SceneDelegate makes it when the scene
+  /// connects.
   func application(
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
@@ -36,6 +39,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
   var window: UIWindow?
 
+  /// Makes the app's one window for the connecting scene, points the app
+  /// delegate's window at it, and starts React Native in it with the launch
+  /// options the app delegate kept.
   func scene(
     _ scene: UIScene,
     willConnectTo session: UISceneSession,

@@ -737,6 +737,8 @@ final class AthleteKineticsUITests: XCTestCase {
     return "bar[\(inBar)] last buttons[\(lastButtons)]"
   }
 
+  /// Brings the Files sheet to its local location (Browse, then On My iPhone),
+  /// so the backup is saved to and picked from the simulator itself.
   private func onMyIPhone() {
     let browse = app.buttons.matching(identifier: "Browse").firstMatch
     if browse.waitForExistence(timeout: 10) && !browse.isSelected { browse.tap() }
@@ -751,6 +753,9 @@ final class AthleteKineticsUITests: XCTestCase {
     }
   }
 
+  /// Waits for the Files export sheet, then saves the backup in On My iPhone
+  /// with the sheet's own Save (or Move, Done, Open) control. Fails when the
+  /// sheet offers no enabled action.
   private func saveInFiles() {
     // Encrypting the snapshot (scrypt) precedes the sheet: wait for the sheet
     // or a final status, up to 5 minutes (150 s was measured on CI, c3e7de5),
@@ -781,6 +786,8 @@ final class AthleteKineticsUITests: XCTestCase {
     XCTFail("the Files export sheet had no enabled Save/Move action")
   }
 
+  /// Picks the saved backup (not a recovery copy) in the Files import sheet
+  /// and waits for the app to show its restore preview.
   private func pickBackupInFiles() {
     onMyIPhone()
     let file = app.descendants(matching: .any)
