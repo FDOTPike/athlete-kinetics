@@ -12602,9 +12602,9 @@ And github repo, please write code rabbit config file for review procedure
 
 ---
 
-## Entry 0221 — 2026-10-11 · Auto-fix event on pull requests 62 and 63: iOS job failures and one CodeRabbit finding on the configuration file (Claude Code Desktop)
+## Entry 0223 — 2026-10-11 · Auto-fix event on pull requests 62 and 63: iOS job failures and one CodeRabbit finding on the configuration file (Claude Code Desktop)
 
-> **Ledger numbering note.** Written as Entry 0201 and renumbered to 0221 on 2026-10-13, before it reached `master`, because `master` gained a different Entry 0201 (pull request 64) first. Its place in the file, by date, is unchanged.
+> **Ledger numbering note.** Written as Entry 0201, renumbered to 0221 and then to 0223 on 2026-10-13, each time before it reached `master`, because `master` first gained a different Entry 0201 (pull request 64) and then a different Entry 0221 (pull request 71). Its place in the file, by date, is unchanged.
 
 2026-10-11 (local date). Executor: Claude Code Desktop. Same worktree as Entry 0197.
 
@@ -12869,6 +12869,32 @@ FDOTPike/athlete-kinetics PR #64 has merge conflicts with its base branch `maste
 
 ---
 
+## Entry 0221 — 2026-10-12 · Merge pull request 64 when CI is green; ask the tester's agent to check the Simulator run (Claude Code Desktop)
+
+2026-10-12 to 2026-10-13. Executor: Claude Code Desktop. Worktree `.claude/worktrees/xcode27-pods`, branch `claude/pr64-followup-2026-10-13`, cut from `origin/master` at `cc6e9ea`.
+
+> **Ledger numbering note.** `origin/master` ends at Entry 0204 (Entry 0201 follows Entry 0203 there; see the note in Entry 0204). Other remote branches hold entries up to 0220, so this entry takes 0221. It was written after the work it records: the instruction called for no file change, and a commit on pull request 64's branch would have restarted the CI run that the merge was waiting for.
+
+### Input
+
+Received verbatim:
+
+```text
+merge it when CI is green and please comment on the issue for her Opus to check if it runs on the emulator
+```
+
+### Output
+
+- **Waiting for CI.** GitHub's auto-merge is off for this repository and `master` has no required checks, so the merge could not be left to GitHub. One background `gh run watch` on run 38244249169 (head `54df836`, the merge of `master` into the branch recorded in Entry 0204) reported when it ended.
+- **CI result on `54df836`.** Run 38244249169: success. "Verification suite (24 gates + typecheck)", "Android QA + debug APKs", "iOS unsigned simulator build + native smoke" (Xcode 26) and "iOS unsigned simulator build + native smoke (Xcode 27)" all passed, each iOS row with its five UI tests. CodeRabbit: success. No unresolved review thread. Merge state: clean.
+- **One review item was open at the merge, and the merge went ahead with it.** CodeRabbit's pre-merge checks listed one warning: docstring coverage 37.5 % of the functions the diff touched, against its 80 % threshold. It is a documentation warning, not a correctness finding. It was read before merging, and this branch answers it (below).
+- **Merge.** `gh pr merge 64 --merge --match-head-commit 54df836b27b983d75a8b16321f3db695dd5acc6a`: merged into `master` as `cc6e9eac227ebbf1fb118bc63076dac69dc19b2e` at 2026-10-12T14:29:02Z. `master` had gained pull request 70 since the CI run began; the pull request was still mergeable without conflict, and the merge commit's own CI run (38263243742) had started and not finished when this was written.
+- **Issue #38.** Comment 6126319720 ends the pause for one run. It gives the tester's agent the merge commit to check out, the same build and UI-test steps as before, what is expected on a simulator (the silent backup steps, the Apple Health markers), and the report format. It says why the tester's Mac still adds something (Xcode 27 with the iOS 26.5 runtime; CI's Xcode 27 row uses iOS 27.0), and asks the agent to stop after posting one report.
+- **This branch.** Doc comments for the functions pull request 64 touched that had none: `application(_:didFinishLaunchingWithOptions:)` and `scene(_:willConnectTo:options:)` in `AppDelegate.swift`; `onMyIPhone`, `saveInFiles` and `pickBackupInFiles` in the UI test suite; `connectBiometrics` in `useStore.ts`. Comments only; no statement was changed. `npm run typecheck` and `npm run verify:native-config` exit 0 on this PC (Node v24.11.1). The Swift files are compiled by CI.
+- **Not verified.** Whether the app runs in the Simulator on the tester's Mac: no report had arrived when this was written.
+
+---
+
 ## Entry 0220 — 2026-10-12 · Auto-fix event on pull request 63: merge conflict with master; pull request 62 merged (Claude Code Desktop)
 
 2026-10-12 (local date). Executor: Claude Code Desktop. Same worktree as Entry 0197.
@@ -12885,7 +12911,7 @@ FDOTPike/athlete-kinetics PR #63 has merge conflicts with its base branch `maste
 
 ### Output
 
-- **Conflict.** `master` (`fe3ad2d`, after pull request 69) had appended Entries 0202 and 0203 to `PROMPT_LEDGER.md` at the point where this branch appended 0197 to 0200 and the entry now numbered 0221. Only that file conflicted.
+- **Conflict.** `master` (`fe3ad2d`, after pull request 69) had appended Entries 0202 and 0203 to `PROMPT_LEDGER.md` at the point where this branch appended 0197 to 0200 and the entry now numbered 0223. Only that file conflicted.
 - **Resolution.** `origin/master` merged in (merge commit `c5d55ce`), no rebase. The file is the common base text, then this branch's entries, then master's, which is number order. Checked byte for byte: both versions start with the base text, and each side's appended text is present intact in the result. `npm run typecheck` exit 0 on the merged tree. Pushed.
 - **Pull request 62 merged.** With a merge commit, `bf77f64` (2026-10-12T11:31Z). On its head `884bd5c`: verification suite, Android and iOS jobs all green; no open review thread; CodeRabbit's eight pre-merge checks passed. `.coderabbit.yaml` is now on `master`, so it applies to branches cut from here on. The master run for that merge commit had not finished when this entry was written.
 - **Not done.** Pull request 63 is not merged; it waits for CI on its new head.
@@ -12903,7 +12929,29 @@ An automated CI monitor event from the desktop app, not a typed prompt: the same
 ### Output
 
 - **Conflict.** `master` (`cc6e9ea`, after pull requests 70 and 64) had appended two more ledger entries, 0201 (issue #38, the tester's Xcode 27 report) and 0204. Only `PROMPT_LEDGER.md` conflicted.
-- **Number clash.** This branch already had an Entry 0201 of its own. It had not reached `master`, so it was renumbered to 0221 and carries a note saying so; its text and its place in the file are otherwise unchanged. The one reference to it in Entry 0220 was updated.
+- **Number clash.** This branch already had an Entry 0201 of its own. It had not reached `master`, so it was renumbered to 0221 (and later to 0223, see Entry 0224) and carries a note saying so; its text and its place in the file are otherwise unchanged. The one reference to it in Entry 0220 was updated.
 - **Resolution.** `origin/master` merged in, no rebase. Master's two new entries were placed after 0203, as they are on `master`, and before Entry 0220. Checked: master's appended text is present intact; no conflict marker remains; no entry number on this branch duplicates one on `master`.
 - **Master runs.** The run for the pull request 62 merge commit `bf77f64` completed: success. The run for `2da2801` (pull request 70, not this session's) completed with a failure and was not investigated here. The run for `cc6e9ea` was in progress.
 - **Not done.** Pull request 63 is not merged; it waits for CI on its new head.
+
+---
+
+## Entry 0224 — 2026-10-13 · Third merge conflict on pull request 63; the owner says to finish merging (Claude Code Desktop)
+
+2026-10-13 (local date). Executor: Claude Code Desktop. Same worktree as Entry 0197.
+
+### Input
+
+An automated CI monitor event from the desktop app (the same instruction as in Entry 0220, for head commit `70001bf8d8`), and then, while that was being handled, this message from the owner, verbatim:
+
+```text
+Please finish merging if there no claashes with other PR's
+```
+
+### Output
+
+- **Conflict.** `master` (`836a213`, after pull request 71) had appended one more ledger entry, numbered 0221. Only `PROMPT_LEDGER.md` conflicted.
+- **Number clash.** This branch's entry about pull requests 62 and 63 had been renumbered to 0221 earlier the same day. It had not reached `master`, so it is now 0223, with its note and the two references to it updated.
+- **Resolution.** `origin/master` merged in, no rebase; master's entry sits after 0204 as it does on `master`. A first attempt at the resolution read `FETCH_HEAD` after a later fetch had moved it to this branch's own head, which left master's entry out; that was caught before any commit by checking the headings, and the resolution was redone against `MERGE_HEAD` (confirmed equal to `origin/master`). Checked on the result: master's appended text is present intact, no conflict marker, no duplicate entry number from 0195 up. `npm run typecheck` exit 0.
+- **Clashes with other pull requests.** None found: of the open pull requests that target `master` (72, 73, 74), none changes `PROMPT_LEDGER.md`, the only file this one changes.
+- **Merge.** On the owner's instruction above, pull request 63 is merged once this commit is pushed, without waiting for a full CI run on the final head. What had run: on the earlier head `9554681`, the verification suite and the Android job passed and the iOS job failed in one UI test (Entry 0223); later heads' runs were superseded by these merges. The change is this one Markdown file.
