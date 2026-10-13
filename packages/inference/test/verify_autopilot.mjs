@@ -348,7 +348,7 @@ console.log('[6] bounded authority / anti-windup');
   check('R1 release resets when the persisted macro index rolls 8→1',
     deriveControlAction(allHeadroom, NEUTRAL_PROFILE, GPP, 1).blockAddedRpe === 0.5);
 
-  // Owner ruling 2026-10-13: a block generated while a suspension is open gets
+  // Decision of 2026-10-13: a block generated while a suspension is open gets
   // no positive RPE grant, at any position, because it consumes no position and
   // the per-position ceiling would not count it.
   const withheld = Array.from(

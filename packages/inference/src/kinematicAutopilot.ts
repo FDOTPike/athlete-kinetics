@@ -481,7 +481,7 @@ export function deriveControlAction(
   // is open: the position is frozen and blocks generated in the episode consume
   // none (S6(b)), so the same position's grant would be offered again for every
   // such block. The caller therefore withholds the grant for those blocks
-  // (`rpeRaisePermitted` false; owner ruling 2026-10-13,
+  // (`rpeRaisePermitted` false; decision of 2026-10-13,
   // docs/decisions/SUSPENSION_RPE_RAISE_2026-10-13.md). Only the positive RPE
   // grant is withheld: cuts, set changes and everything else are as they were.
   // Unused early grants do not bank; cuts are not in `rpePositives` and remain

@@ -4442,7 +4442,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const flawReport = detectFlaws(windowVectors, patternWindow, profile.training_age, autopilotGuardrail);
 
     const blockEmphasisInput = programEmphasisFor(d, today);
-    // Owner ruling 2026-10-13: a block generated while a suspension is open gets
+    // Decision of 2026-10-13: a block generated while a suspension is open gets
     // no autopilot effort raise. It consumes no macro position (S6(b)), so the
     // per-position ceiling on raises would not count it. Read once here and
     // checked again at commit, where the block is attributed to the episode.

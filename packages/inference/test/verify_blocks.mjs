@@ -1325,7 +1325,7 @@ check('C6B fallback applied-slot cumulative RPE raise ≤ 2.5 over macro blocks 
   macroAppliedRpeRaise >= 0 && macroAppliedRpeRaise <= 2.5,
   `delta=${macroAppliedRpeRaise}`);
 
-// Owner ruling 2026-10-13: a block generated while a suspension is open gets
+// Decision of 2026-10-13: a block generated while a suspension is open gets
 // no autopilot effort raise. Position by position: no slot is raised above the
 // plan without a flaw report, and the block is otherwise the block the
 // autopilot would have produced.

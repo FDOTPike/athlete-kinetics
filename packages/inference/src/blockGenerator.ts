@@ -295,7 +295,8 @@ export interface BlockInput {
   /** False for a block generated while a suspension is open: the autopilot's
    *  positive RPE grant is then withheld, because such a block consumes no
    *  macro position and the per-position ceiling would not count it. Cuts and
-   *  set changes are unaffected. Defaults to true. (Owner ruling 2026-10-13.) */
+   *  set changes are unaffected. Defaults to true. (Decision of 2026-10-13,
+   *  docs/decisions/SUSPENSION_RPE_RAISE_2026-10-13.md.) */
   autopilotRpeRaisePermitted?: boolean;
   /** Explicit repeating weekly schedule for a goal program. */
   programDays?: readonly ProgramDayPreference[];

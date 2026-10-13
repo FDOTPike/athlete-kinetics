@@ -525,7 +525,7 @@ check('suspension carries no dose modifier of its own',
   !/suspension[\s\S]{0,600}?(dLoad|dRpe|dSet|multiplier|deload)/i.test(
     src.slice(src.indexOf('beginSuspension: (reason, atMs)'),
               src.indexOf('beginSuspension: (reason, atMs)') + 1400)));
-// Owner ruling 2026-10-13 (docs/decisions/SUSPENSION_RPE_RAISE_2026-10-13.md),
+// Decision of 2026-10-13 (docs/decisions/SUSPENSION_RPE_RAISE_2026-10-13.md),
 // the one recorded exception to the check above. It lives at block GENERATION,
 // not in the suspension path, which is why that check neither covers nor
 // forbids it: a block generated while an episode is open is denied the
@@ -547,6 +547,16 @@ check('suspension carries no dose modifier of its own',
       && call.split('suspension').length === 2 && call.split('Suspension').length === 1, call.match(/[sS]uspension\w*/g)?.join(','));
   check('the suspension reaches the generator as that one permission: no dose value is derived from it at generation',
     !/suspensionBeforeGeneration[\s\S]{0,200}?(dLoad|dRpe|dSet|multiplier|deload|rpe_cap|load_modifier)/i.test(src.slice(genStart, genEnd)));
+  // A program preview is generated WITHOUT a flaw report, so it carries no autopilot correction at all, raised or
+  // cut, in or out of a suspension. That is why the permission is not passed there. If a preview ever takes a
+  // flaw report, it must take the permission with it, and this check is the reminder.
+  const previewStart = src.indexOf('previewTrainingProgram: (input) => {');
+  const previewCall = src.indexOf('generateBlock({', previewStart);
+  const previewCallEnd = src.indexOf('});', previewCall);
+  check('a program preview is generated without a flaw report, so it can show no autopilot raise',
+    previewStart > 0 && previewCall > previewStart && previewCall < genStart
+      && !/flawReport/.test(src.slice(previewCall, previewCallEnd))
+      && src.split('flawReport,').length === 2);
   check('the block is committed under the same episode it was generated under, or not at all',
     /const openAtGeneration = openSuspension\(d\);[\s\S]{0,400}?\(openAtGeneration\?\.episode_id \?\? null\) !== \(suspensionBeforeGeneration\?\.episode_id \?\? null\)[\s\S]{0,80}?throw new Error/.test(src));
 }

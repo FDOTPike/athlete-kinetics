@@ -1,6 +1,6 @@
 /**
  * SuspensionRpeRaise.test.js — a block generated while a suspension is open
- * gets no autopilot effort raise (owner ruling 2026-10-13,
+ * gets no autopilot effort raise (decision of 2026-10-13,
  * docs/decisions/SUSPENSION_RPE_RAISE_2026-10-13.md).
  *
  * The real zustand store over the real migration chain. The history seeded
@@ -150,4 +150,88 @@ test('a block generated during a suspension is still eased: a history that reads
   const shape = (blockId) => JSON.stringify(deltasOf(blockId).map((row) => [row.rpe_delta, row.set_delta]).sort());
   expect(cutsIn(suspended)).toBe(cutsIn(open));
   expect(shape(suspended)).toBe(shape(open));
+});
+
+/** Age the active block past the 28-day continuation gate so the guided-program
+ *  path is reachable without touching the clock (as SuspensionLifecycle does). */
+const ageActiveBlockPastContinuationGate = () => {
+  raw().prepare("UPDATE training_block SET start_date = date(?, '-40 days') WHERE status = 'active'").run(localToday());
+  store().refreshBlock();
+  store().refreshProgram();
+};
+const openEpisodeId = () => Number(raw().prepare('SELECT episode_id AS id FROM suspension_episode WHERE ended_at_ms IS NULL').get().id);
+const episodeOf = (blockId) => all('SELECT episode_id FROM block_suspension_origin WHERE block_id = ?', blockId).map((row) => Number(row.episode_id));
+
+test('a second episode opened at the same position withholds the raise again; each block is attributed to its own episode; the raise returns only once the athlete has resumed', () => {
+  seedHistory(9, 6);
+  expect(raisesIn(generate())).toBeGreaterThanOrEqual(1);
+
+  const frozen = store().beginSuspension('injury', 1_756_000_000_000);
+  const firstEpisode = openEpisodeId();
+  const inFirst = generate();
+  expect(raisesIn(inFirst)).toBe(0);
+  expect(episodeOf(inFirst)).toEqual([firstEpisode]);
+  store().endSuspension(1_756_500_000_000);
+
+  // Reopened before any block was generated after the resume: the position has still not been used.
+  expect(store().beginSuspension('illness', 1_757_000_000_000)).toBe(frozen);
+  const secondEpisode = openEpisodeId();
+  expect(secondEpisode).not.toBe(firstEpisode);
+  for (const blockId of [generate(), generate()]) {
+    expect(macroIndexOf(blockId)).toBe(frozen);
+    expect(raisesIn(blockId)).toBe(0);
+    expect(episodeOf(blockId)).toEqual([secondEpisode]);
+  }
+  store().endSuspension(1_757_500_000_000);
+
+  const after = generate();
+  expect(macroIndexOf(after)).toBe(frozen);
+  expect(episodeOf(after)).toEqual([]);
+  expect(raisesIn(after)).toBeGreaterThanOrEqual(1);
+});
+
+test('guided program: the first block earns the raise; a continuation generated during a suspension does not; a continuation after the resume does', () => {
+  seedHistory(9, 6);
+  expect(store().createTrainingProgram({ horizon: { kind: 'weeks', blockCount: 4 }, schemaType: 'LINEAR', dayIndices: [1, 3, 5] })).toBe(true);
+  expect(store().error).toBeNull();
+  const created = lastBlockId();
+  expect(macroIndexOf(created)).toBeLessThanOrEqual(5);
+  expect(raisesIn(created)).toBeGreaterThanOrEqual(1);
+  ageActiveBlockPastContinuationGate();
+
+  const frozen = store().beginSuspension('injury', 1_756_000_000_000);
+  expect(frozen).toBeLessThanOrEqual(5);
+  const episode = openEpisodeId();
+  store().continueTrainingProgram();
+  expect(store().error).toBeNull();
+  const during = lastBlockId();
+  expect(during).not.toBe(created);
+  expect(macroIndexOf(during)).toBe(frozen);
+  expect(episodeOf(during)).toEqual([episode]);
+  expect(raisesIn(during)).toBe(0);
+
+  store().endSuspension(1_756_900_000_000);
+  ageActiveBlockPastContinuationGate();
+  store().continueTrainingProgram();
+  expect(store().error).toBeNull();
+  const after = lastBlockId();
+  expect(after).not.toBe(during);
+  expect(macroIndexOf(after)).toBe(frozen);
+  expect(raisesIn(after)).toBeGreaterThanOrEqual(1);
+});
+
+test('a halt during a suspension still snaps the block to recovery, exactly as it does outside one', () => {
+  seedHistory(9, 6);
+  // A severe niggle today is a block-level halt for this tier, in or out of a suspension.
+  raw().prepare("INSERT INTO niggle (id, region, severity, reported_at_ms) VALUES ('halt-probe', 'knee', 9, ?)").run(Date.now());
+  const open = generate();
+  expect(raisesIn(open)).toBe(0);
+  store().beginSuspension('injury', 1_756_000_000_000);
+  const suspended = generate();
+  expect(raisesIn(suspended)).toBe(0);
+  const plan = (blockId) => JSON.stringify(all(
+    `SELECT s.week_index, s.day_index, s.phase, ps.slot_index, ps.movement_id, ps.sets, ps.reps, ps.target_rpe
+     FROM planned_slot ps JOIN planned_session s ON s.planned_session_id = ps.planned_session_id
+     WHERE s.block_id = ? ORDER BY s.week_index, s.day_index, ps.slot_index`, blockId));
+  expect(plan(suspended)).toBe(plan(open));
 });
