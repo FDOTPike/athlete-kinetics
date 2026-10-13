@@ -75,7 +75,11 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   '069_resting_heart_rate.sql',
   // 070 adds session_feel, which the store writes from the completion screen,
   // reads back for it and empties on reset. It depends only on 001.
-  '070_session_feel.sql'];
+  '070_session_feel.sql',
+  // 071 adds session_skipped_slot and set_load_shown, which the store writes
+  // (at finalization and with each logged set) and empties on reset. It depends
+  // on 001 and 022.
+  '071_beta_recording.sql'];
 
 
 const db = new DatabaseSync(':memory:');
@@ -912,6 +916,9 @@ if (resetTables.length >= 15) {
   ) VALUES (701,'followed_plan','complete',NULL,'planned','guided','beginner',
     1,1,1,1,0,0,0,0,0,0,0,0,0,0,1,1)`);
   db.exec("INSERT INTO set_prefix (set_id,applied_prefixes,cns_load_modifier,stability_requirement_modifier,difficulty_modifier,effective_load_kg) VALUES (701,'[]',1,1,1,100)");
+  db.exec("INSERT INTO session_plan_slot (session_plan_slot_id,session_id,slot_index,movement_id,planned_sets,provenance_kind) VALUES (701,701,0,1,3,'free_form')");
+  db.exec('INSERT INTO session_skipped_slot (session_plan_slot_id) VALUES (701)');
+  db.exec("INSERT INTO set_load_shown (set_id,load_source,shown_load_kg) VALUES (701,'history',100)");
   db.exec("INSERT INTO niggle (id,region,severity,reported_at_ms) VALUES ('rn1','knee',5,1000)");
   db.exec("INSERT INTO one_rep_max (movement_id,load_kg,updated_at_ms) VALUES (1,100,0)");
   db.exec("INSERT INTO training_block (block_id,start_date,objective,created_at_ms) VALUES (701,'2026-06-01','strength',0)");
@@ -923,7 +930,7 @@ if (resetTables.length >= 15) {
   db.exec("INSERT INTO planned_slot_legacy_role_allowance (planned_slot_id,role) VALUES (701,'supplementary')");
   db.prepare(MAT).run('2026-06-10'); // materializes a state_vector row (mech_daily already filled by trigger)
   const cnt = (t) => Number(db.prepare(`SELECT count(*) c FROM ${t}`).get().c);
-  const seeded = ['session', 'set_record', 'set_dose_target', 'session_outcome', 'set_prefix', 'niggle', 'one_rep_max', 'training_block', 'planned_session', 'planned_session_method', 'planned_slot', 'planned_slot_autopilot', 'planned_slot_routine_decision', 'planned_slot_legacy_role_allowance', 'mech_daily', 'state_vector'];
+  const seeded = ['session', 'set_record', 'session_plan_slot', 'session_skipped_slot', 'set_load_shown', 'set_dose_target', 'session_outcome', 'set_prefix', 'niggle', 'one_rep_max', 'training_block', 'planned_session', 'planned_session_method', 'planned_slot', 'planned_slot_autopilot', 'planned_slot_routine_decision', 'planned_slot_legacy_role_allowance', 'mech_daily', 'state_vector'];
   a('seed populated the history tables', seeded.every((t) => cnt(t) > 0));
   const profBefore = cnt('athlete_profile'); const movBefore = cnt('movement');
   for (const t of resetTables) db.prepare(`DELETE FROM ${t}`).run(); // the store's exact sequence
@@ -932,6 +939,68 @@ if (resetTables.length >= 15) {
     cnt('athlete_profile') === profBefore && profBefore === 1 && cnt('movement') === movBefore && movBefore === 300,
     `profile ${cnt('athlete_profile')}/${profBefore}, movement ${cnt('movement')}/${movBefore}`);
   db.exec('ROLLBACK');
+}
+
+// --- 071 beta recording: two record-only tables --------------------------------
+// The store may name each table in exactly one INSERT and one reset DELETE, and
+// nothing else in the app or the engine may name them at all: they are records,
+// and a SELECT anywhere would be the first step to something reading them.
+{
+  const { readdirSync, statSync } = await import('node:fs');
+  const storeSrc = readFileSync(join(import.meta.dirname, '..', 'src', 'state', 'useStore.ts'), 'utf-8');
+  const sqlNaming = (table) => [...storeSrc.matchAll(new RegExp("'([^'\\n]*\\b" + table + "\\b[^'\\n]*)'", 'g'))].map((m) => m[1]);
+  a('071: the store names session_skipped_slot in one INSERT and one DELETE only',
+    JSON.stringify(sqlNaming('session_skipped_slot').sort()) === JSON.stringify([
+      'DELETE FROM session_skipped_slot',
+      'INSERT INTO session_skipped_slot (session_plan_slot_id) VALUES (?)',
+    ]), sqlNaming('session_skipped_slot').join(' | '));
+  a('071: the store names set_load_shown in one INSERT and one DELETE only',
+    JSON.stringify(sqlNaming('set_load_shown').sort()) === JSON.stringify([
+      'DELETE FROM set_load_shown',
+      'INSERT INTO set_load_shown (set_id, load_source, shown_load_kg, advisory_kg, advisory_kind) VALUES (?, ?, ?, ?, ?)',
+    ]), sqlNaming('set_load_shown').join(' | '));
+
+  // Where each write sits.
+  const logStart = storeSrc.indexOf('  logSet: (movementId, reps, loadKg, rpe,');
+  const logEnd = storeSrc.indexOf('\n  deleteSet: (setId) => {', logStart);
+  const logBody = storeSrc.slice(logStart, logEnd);
+  const order = (body, ...needles) => needles.map((needle) => body.indexOf(needle)).every((at, i, all) => at >= 0 && (i === 0 || at > all[i - 1]));
+  a('071: the seed is written inside logSet\'s transaction, after the set and before COMMIT',
+    logStart >= 0 && logEnd > logStart
+      && order(logBody, "d.executeSync('BEGIN')", 'INSERT INTO set_record', 'INSERT INTO set_load_shown', "d.executeSync('COMMIT')"));
+  const endStart = storeSrc.indexOf('  endSession: () => {');
+  const endEnd = storeSrc.indexOf('\n  resetTrainingData: () => {', endStart);
+  const endBody = storeSrc.slice(endStart, endEnd);
+  a('071: skipped slots are written with the outcome, before the checkpoint is deleted and before COMMIT',
+    endStart >= 0 && endEnd > endStart
+      && order(endBody, 'persistSessionOutcome(', 'INSERT INTO session_skipped_slot', "'DELETE FROM session_runner_checkpoint WHERE session_id = ?'", "d.executeSync('COMMIT')"));
+  a('071: reset empties each table before its parent',
+    order(resetBody, "'DELETE FROM session_skipped_slot'", "'DELETE FROM session_plan_slot'")
+      && order(resetBody, "'DELETE FROM set_load_shown'", "'DELETE FROM set_record'"));
+
+  // Nothing else names them.
+  const sources = [];
+  const walk = (dir) => {
+    for (const name of readdirSync(dir)) {
+      const full = join(dir, name);
+      if (statSync(full).isDirectory()) { if (name !== 'node_modules' && name !== '.build' && name !== 'schema') walk(full); }
+      else if (/\.(ts|tsx)$/.test(name)) sources.push(full);
+    }
+  };
+  walk(join(ROOT, 'apps', 'mobile', 'src'));
+  for (const pkg of readdirSync(join(ROOT, 'packages'))) {
+    const src = join(ROOT, 'packages', pkg, 'src');
+    if (existsSync(src)) walk(src);
+  }
+  const allowed = new Set([
+    join(ROOT, 'apps', 'mobile', 'src', 'state', 'useStore.ts'),
+    join(ROOT, 'packages', 'core-db', 'src', 'migrationRunner.ts'),   // recovery sentinels
+    join(ROOT, 'packages', 'core-db', 'src', 'backup', 'schemaContract.ts'), // a comment naming the contract
+  ]);
+  const naming = sources.filter((file) => /\b(session_skipped_slot|set_load_shown)\b/.test(readFileSync(file, 'utf-8')));
+  a('071: no other source file in the app or the engine names either table',
+    sources.length > 100 && naming.every((file) => allowed.has(file)) && naming.includes(join(ROOT, 'apps', 'mobile', 'src', 'state', 'useStore.ts')),
+    naming.filter((file) => !allowed.has(file)).join(', ') || String(sources.length) + ' files scanned');
 }
 
 // --- wipe/reset behavior contracts (audit A2/A3/A4 + reset defect) -----------

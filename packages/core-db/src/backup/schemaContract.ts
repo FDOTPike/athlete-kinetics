@@ -92,6 +92,15 @@ export const SUPPORTED_BACKUP_SCHEMA_CONTRACTS: readonly BackupSchemaContract[] 
     objectCount: 205,
     fingerprint: '3d718e2b66f0f09e4e34cfd791b971a20ffb7fbf5b023161e2bdb00c1e1ca802',
   },
+  // Through 071_beta_recording — adds session_skipped_slot and set_load_shown,
+  // two record-only side tables (two tables, no index or trigger).
+  {
+    userVersion: 70,
+    migrationSlot: 71,
+    tableCount: 121,
+    objectCount: 207,
+    fingerprint: '19a684a3b413a3ae15ae3f919851a803e27a36a02d1e77d52f000672d35f4d53',
+  },
 ];
 
 export const CURRENT_BACKUP_SCHEMA_CONTRACT: BackupSchemaContract =

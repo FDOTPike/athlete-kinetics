@@ -197,15 +197,42 @@ import {
   type StateVectorRow,
   type TriageResult,
   type UserProfile,
+  ADVISORY_KINDS,
+  LOAD_SOURCES,
   defaultLoadPreference,
   resolveLoadSelection,
   transitionLoadPreference,
+  type AdvisoryKind,
   type LoadPreference,
   type LoadSelection,
+  type LoadSource,
 } from '@ak/inference';
 
 export type { MovementAvailability };
 export type { LoadPreference, LoadSelection, LoadSource } from '@ak/inference';
+
+/** What the load entry was seeded with for the set being logged, as the session
+ *  screen held it (071). `shownLoadKg` null means the field was blank and the
+ *  athlete had to choose; 0 is a real zero. A record only: nothing reads it. */
+export interface SetLoadShown {
+  source: LoadSource;
+  shownLoadKg: number | null;
+  advisoryKg: number | null;
+  advisoryKind: AdvisoryKind | null;
+}
+
+/** The seed as it may be stored, or null when it is absent or malformed. A
+ *  malformed seed is left unrecorded: it must never stop a set being logged,
+ *  and a row is never invented from a default. */
+export const storableLoadShown = (shown: SetLoadShown | null | undefined): SetLoadShown | null => {
+  if (shown === null || shown === undefined) return null;
+  const kgOk = (kg: number | null): boolean => kg === null || (typeof kg === 'number' && Number.isFinite(kg) && kg >= 0);
+  if (!LOAD_SOURCES.includes(shown.source)) return null;
+  if (!kgOk(shown.shownLoadKg) || !kgOk(shown.advisoryKg)) return null;
+  if ((shown.advisoryKg === null) !== (shown.advisoryKind === null)) return null;
+  if (shown.advisoryKind !== null && !ADVISORY_KINDS.includes(shown.advisoryKind)) return null;
+  return { source: shown.source, shownLoadKg: shown.shownLoadKg, advisoryKg: shown.advisoryKg, advisoryKind: shown.advisoryKind };
+};
 import {
   PREPARATION_FLOOR_MIN,
   PREPARATION_HELD_MOVEMENT_IDS,
@@ -1114,8 +1141,10 @@ interface KineticsStore {
    *  concatenation (e.g. 'DB Bench Press') into the in-memory log payload;
    *  falls back to the movement's canonical name when absent. `appliedPrefixes`
    *  (Phase 13) are the toggled condition tokens; their compound multipliers +
-   *  effective load are persisted to the set_prefix side-car. */
-  logSet: (movementId: number, reps: number, loadKg: number, rpe: number | null, displayName?: string, appliedPrefixes?: readonly MovementPrefix[], implement?: MovementPrefix, metrics?: { timeS?: number; bandLevel?: number }, sessionPlanSlotId?: number) => void;
+   *  effective load are persisted to the set_prefix side-car. `loadShown`
+   *  (071) is what the load entry was seeded with; it is recorded beside the
+   *  set and read by nothing. Absent, no row is written. */
+  logSet: (movementId: number, reps: number, loadKg: number, rpe: number | null, displayName?: string, appliedPrefixes?: readonly MovementPrefix[], implement?: MovementPrefix, metrics?: { timeS?: number; bandLevel?: number }, sessionPlanSlotId?: number, loadShown?: SetLoadShown | null) => void;
   /** Hard-delete one logged set. The 001 AFTER DELETE trigger
    *  (trg_set_record_ad) drains mech_daily by this row's exact contribution;
    *  the in-memory list drops the row. */
@@ -7184,7 +7213,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
     get().refreshBlock();
   },
 
-  logSet: (movementId, reps, loadKg, rpe, displayName, appliedPrefixes, implement, metrics, sessionPlanSlotId) => {
+  logSet: (movementId, reps, loadKg, rpe, displayName, appliedPrefixes, implement, metrics, sessionPlanSlotId, loadShown) => {
     const state = get();
     const s = state.session;
     if (s === null) return;
@@ -7354,6 +7383,16 @@ export const useStore = create<KineticsStore>()((set, get) => {
             prescribedDose.kind === 'reps' ? prescribedDose.reps : null,
             prescribedDose.kind === 'time' ? prescribedDose.seconds : null,
           ],
+        );
+      }
+      // 071: what the entry was seeded with. Same transaction as the set, so a
+      // fault here rolls the set back with it; a missing or malformed seed
+      // writes no row.
+      const shown = storableLoadShown(loadShown);
+      if (shown !== null) {
+        d.executeSync(
+          'INSERT INTO set_load_shown (set_id, load_source, shown_load_kg, advisory_kg, advisory_kind) VALUES (?, ?, ?, ?, ?)',
+          [setId, shown.source, shown.shownLoadKg, shown.advisoryKg, shown.advisoryKind],
         );
       }
       if (timeMode && metrics?.timeS !== undefined && metrics.timeS > 0) {
@@ -7612,6 +7651,12 @@ export const useStore = create<KineticsStore>()((set, get) => {
           terminalRunner.tier,
           outcomeDecision,
         );
+        // 071: which slots were skipped. The outcome above keeps their count;
+        // the ids lived only in the checkpoint deleted below. Same ids, same
+        // transaction, so the two cannot disagree.
+        for (const sessionPlanSlotId of terminalRunner.skippedSessionPlanSlotIds) {
+          d.executeSync('INSERT INTO session_skipped_slot (session_plan_slot_id) VALUES (?)', [sessionPlanSlotId]);
+        }
       }
 
       // Always the final DML before COMMIT. A fault here rolls session
@@ -7871,9 +7916,15 @@ export const useStore = create<KineticsStore>()((set, get) => {
       d.executeSync('DELETE FROM planned_slot_load_intent');
       d.executeSync('DELETE FROM planned_session_routine_context');
       d.executeSync('DELETE FROM planned_session_method');
+      // 071 records, each before its parent. Named explicitly for the reason
+      // given for preparation above: ids are reused once the parent is empty,
+      // and an orphan surviving an FK-OFF reset would attach an old record to
+      // new work.
+      d.executeSync('DELETE FROM session_skipped_slot');
       d.executeSync('DELETE FROM session_plan_slot');
       d.executeSync('DELETE FROM session_origin');
       d.executeSync('DELETE FROM set_prefix');
+      d.executeSync('DELETE FROM set_load_shown');
       d.executeSync('DELETE FROM set_record');
       // 026 snapshot immutability permits deletion only after its parent is
       // gone. With FKs on the parent cascade already emptied this table; with

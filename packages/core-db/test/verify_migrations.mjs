@@ -69,7 +69,7 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '067_sport_and_emphasis.sql',
   '068_movement_content_correction_v2.sql',
   '069_resting_heart_rate.sql',
-  '070_session_feel.sql'];
+  '070_session_feel.sql', '071_beta_recording.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
@@ -1766,11 +1766,11 @@ console.log('[2u] 057 block_meta phase/index repair + enforcement');
     const db = freshDb();
     runMigrations(db, MIGRATIONS);
     // Slot 004 is the parameterized materialize script, never a migration:
-    // 69 files (slots 001-070, no 004) -> user_version 69. This count is
+    // 70 files (slots 001-071, no 004) -> user_version 70. This count is
     // pinned deliberately so adding a migration is a conscious act, not a
-    // silent one. Re-pinned for 070 (session feel).
-    check('fresh install reaches user_version 69 (69 files, no slot 004)',
-      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 69,
+    // silent one. Re-pinned for 071 (beta recording).
+    check('fresh install reaches user_version 70 (70 files, no slot 004)',
+      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 70,
       String(uv(db)));
     const trig = db.raw.prepare(
       `SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'trigger'
@@ -4105,8 +4105,8 @@ const IDX_069 = FILES.indexOf('069_resting_heart_rate.sql');
 console.log('[070] session feel (session_feel)');
 const IDX_070 = FILES.indexOf('070_session_feel.sql');
 {
-  check('070 is appended after 069 and completes the chain',
-    IDX_070 === IDX_069 + 1 && IDX_070 === MIGRATIONS.length - 1 && IDX_070 === 68, `index=${IDX_070}`);
+  check('070 is appended after 069',
+    IDX_070 === IDX_069 + 1 && IDX_070 === 68, `index=${IDX_070}`);
 
   const feelRows = (db) => db.raw.prepare('SELECT * FROM session_feel ORDER BY session_id').all();
   const sessionFacts = (db) => JSON.stringify({
@@ -4183,6 +4183,156 @@ const IDX_070 = FILES.indexOf('070_session_feel.sql');
   runMigrations(lost, MIGRATIONS);
   check('a lost session_feel table is detected and rebuilt by self-heal',
     detected && sentinelsMissing(lost).length === 0 && feelRows(lost).length === 0);
+}
+
+// =============================================================================
+// [071] which slots were skipped, and what the load entry was seeded with
+// =============================================================================
+// Append-only: two new record-only tables, nothing existing changes. Proves it
+// lands on a fresh install and on a populated upgrade without inventing a row
+// for work already finalized, that each rule is enforced by the schema, that
+// rows survive every replay and leave with their parents, and that each table,
+// lost on its own, is detected and rebuilt.
+console.log('[071] beta recording (session_skipped_slot, set_load_shown)');
+const IDX_071 = FILES.indexOf('071_beta_recording.sql');
+{
+  check('071 is appended after 070 and completes the chain',
+    IDX_071 === IDX_070 + 1 && IDX_071 === MIGRATIONS.length - 1 && IDX_071 === 69, `index=${IDX_071}`);
+  const skippedRows = (db) => db.raw.prepare('SELECT * FROM session_skipped_slot ORDER BY session_plan_slot_id').all();
+  const shownRows = (db) => db.raw.prepare('SELECT * FROM set_load_shown ORDER BY set_id').all();
+  const priorFacts = (db) => JSON.stringify({
+    sessions: db.raw.prepare('SELECT * FROM session ORDER BY session_id').all(),
+    slots: db.raw.prepare('SELECT * FROM session_plan_slot ORDER BY session_plan_slot_id').all(),
+    sets: db.raw.prepare('SELECT * FROM set_record ORDER BY set_id').all(),
+    targets: db.raw.prepare('SELECT * FROM set_target ORDER BY set_id').all(),
+    outcomes: db.raw.prepare('SELECT * FROM session_outcome ORDER BY session_id').all(),
+  });
+  const seed = (db) => {
+    db.raw.exec("INSERT INTO session (session_id, micro_cycle_id, session_date, started_at_ms) VALUES (1, NULL, '2026-10-08', 1111), (2, NULL, '2026-10-09', 1111)");
+    db.raw.exec(`INSERT INTO session_plan_slot (session_plan_slot_id, session_id, slot_index, movement_id, planned_sets, provenance_kind)
+      VALUES (11, 1, 0, 1, 3, 'free_form'), (12, 1, 1, 2, 3, 'free_form'), (13, 1, 2, 3, 3, 'free_form'), (21, 2, 0, 1, 3, 'free_form')`);
+    db.raw.exec(`INSERT INTO set_record (set_id, session_id, movement_id, set_index, reps, load_kg, rpe, logged_at_ms)
+      VALUES (101, 1, 1, 1, 8, 40, 7, 2222), (102, 1, 1, 2, 8, 40, NULL, 2223), (103, 1, 1, 3, 6, 40, 8, 2224), (201, 2, 1, 1, 8, 42.5, 7, 2225)`);
+  };
+
+  // Populated pre-071 install: a finalized session whose outcome already counts
+  // two skipped slots. The count is all that was kept, and it stays that way.
+  const upgrade = freshDb();
+  applyRaw(upgrade, MIGRATIONS, 0, IDX_071);
+  seed(upgrade);
+  upgrade.raw.exec(`INSERT INTO session_outcome (
+      session_id, outcome_kind, terminal_phase, halt_reason, origin_kind,
+      session_mode, training_age, slot_count, planned_set_count, logged_set_count,
+      exact_dose_count, under_dose_count, over_dose_count, unknown_dose_count,
+      unmapped_set_count, missing_set_count, missing_unskipped_set_count,
+      extra_set_count, adapted_slot_count, skipped_slot_count, off_plan_slot_count,
+      finalized_at_ms, engine_version
+    ) VALUES (
+      1, 'adapted_session', 'complete', NULL, 'planned',
+      'guided', 'beginner', 3, 9, 3,
+      3, 0, 0, 0,
+      0, 6, 0,
+      0, 2, 2, 0,
+      3333, 1
+    )`);
+  const before = priorFacts(upgrade);
+  runMigrations(upgrade, MIGRATIONS);
+  check('a populated v69 install upgrades to the latest version with every sentinel present',
+    uv(upgrade) === MIGRATIONS.length && sentinelsMissing(upgrade).length === 0, `uv=${uv(upgrade)}`);
+  check('the upgrade leaves sessions, planned slots, sets, targets and outcomes byte-identical', priorFacts(upgrade) === before);
+  check('the upgrade invents nothing: an outcome that counts two skipped slots gets no skipped-slot row, and no set gets a shown load',
+    skippedRows(upgrade).length === 0 && shownRows(upgrade).length === 0
+      && upgrade.raw.prepare('SELECT skipped_slot_count AS c FROM session_outcome WHERE session_id = 1').get().c === 2);
+
+  const fresh = freshDb();
+  runMigrations(fresh, MIGRATIONS);
+  fresh.raw.exec('PRAGMA foreign_keys = ON');
+  seed(fresh);
+  const rejects = (fn) => { try { fn(); return false; } catch { return true; } };
+
+  // session_skipped_slot
+  const skip = (slotId) => fresh.raw.prepare('INSERT INTO session_skipped_slot (session_plan_slot_id) VALUES (?)').run(slotId);
+  skip(12); skip(13); skip(21);
+  check('a skipped planned slot is recorded by its id', skippedRows(fresh).length === 3);
+  check('the same slot cannot be recorded as skipped twice', rejects(() => skip(12)));
+  check('a slot that does not exist is rejected', rejects(() => skip(999)));
+  check('the table is STRICT (a text id is rejected, not coerced)', rejects(() => skip('twelve')));
+  check('skipped slots are counted per session through the slot, which carries its session',
+    fresh.raw.prepare('SELECT COUNT(*) AS c FROM session_skipped_slot k JOIN session_plan_slot s ON s.session_plan_slot_id = k.session_plan_slot_id WHERE s.session_id = 1').get().c === 2);
+
+  // set_load_shown
+  const shown = (setId, source, kg, advisoryKg = null, advisoryKind = null) => fresh.raw
+    .prepare('INSERT INTO set_load_shown (set_id, load_source, shown_load_kg, advisory_kg, advisory_kind) VALUES (?, ?, ?, ?, ?)')
+    .run(setId, source, kg, advisoryKg, advisoryKind);
+  shown(101, 'history', 40);
+  shown(102, 'manual', null, 42.5, 'onerm');
+  shown(103, 'seeded', 0);
+  check('each kind of seed is accepted: a load, a blank field with an advisory, and a real zero',
+    shownRows(fresh).length === 3
+      && shownRows(fresh).find((row) => row.set_id === 102).shown_load_kg === null
+      && shownRows(fresh).find((row) => row.set_id === 103).shown_load_kg === 0);
+  check('every load source the app has is accepted, and no other', (() => {
+    const probe = freshDb();
+    runMigrations(probe, MIGRATIONS);
+    seed(probe);
+    const put = (setId, source) => probe.raw.prepare('INSERT INTO set_load_shown (set_id, load_source) VALUES (?, ?)').run(setId, source);
+    put(101, 'seeded'); put(102, 'history'); put(103, 'derived'); put(201, 'manual');
+    probe.raw.exec('DELETE FROM set_load_shown');
+    return rejects(() => put(101, 'auto')) && rejects(() => put(101, '')) && rejects(() => put(101, null)) && rejects(() => put(101, 'History'));
+  })());
+  check('every advisory kind the app has is accepted, and no other', (() => {
+    const probe = freshDb();
+    runMigrations(probe, MIGRATIONS);
+    seed(probe);
+    const put = (setId, kind) => probe.raw.prepare("INSERT INTO set_load_shown (set_id, load_source, advisory_kg, advisory_kind) VALUES (?, 'manual', 40, ?)").run(setId, kind);
+    put(101, 'apre'); put(102, 'onerm'); put(103, 'history');
+    return rejects(() => put(201, 'derived')) && rejects(() => put(201, ''));
+  })());
+  check('a negative shown load or advisory is rejected',
+    rejects(() => shown(201, 'history', -0.5)) && rejects(() => shown(201, 'manual', null, -1, 'apre')));
+  check('an advisory value and its kind are stored together or not at all',
+    rejects(() => shown(201, 'manual', null, 40, null)) && rejects(() => shown(201, 'manual', null, null, 'apre')));
+  check('the table is STRICT (a text load is rejected, not coerced)', rejects(() => shown(201, 'history', 'forty')));
+  check('a second row for the same set is rejected (one seed per set)', rejects(() => shown(101, 'manual', null)));
+  check('a row for a set that does not exist is rejected', rejects(() => shown(999, 'history', 40)));
+  fresh.raw.exec('UPDATE set_record SET load_kg = 45 WHERE set_id = 101');
+  check('editing the logged load leaves what was shown as it was',
+    shownRows(fresh).find((row) => row.set_id === 101).shown_load_kg === 40);
+
+  // Replays keep the rows.
+  const kept = JSON.stringify({ skipped: skippedRows(fresh), shown: shownRows(fresh) });
+  const now = (db) => JSON.stringify({ skipped: skippedRows(db), shown: shownRows(db) });
+  runMigrations(fresh, MIGRATIONS);
+  fresh.executeSync(`PRAGMA user_version = ${IDX_071};`);
+  runMigrations(fresh, MIGRATIONS);
+  fresh.executeSync('PRAGMA user_version = 0;');
+  runMigrations(fresh, MIGRATIONS);
+  check('both records survive a reboot, a replay from 071 and a full re-apply from 0',
+    now(fresh) === kept && uv(fresh) === MIGRATIONS.length);
+
+  // Rows leave with their parents.
+  fresh.raw.exec('PRAGMA foreign_keys = ON');
+  fresh.raw.exec('DELETE FROM set_record WHERE set_id = 103');
+  check('a shown load leaves with its set', shownRows(fresh).every((row) => row.set_id !== 103) && shownRows(fresh).length === 2);
+  fresh.raw.exec('DELETE FROM session WHERE session_id = 1');
+  check('both records leave with their session',
+    shownRows(fresh).length === 0 && skippedRows(fresh).length === 1 && skippedRows(fresh)[0].session_plan_slot_id === 21);
+
+  // A database that claims the latest version but lost one table, then the other.
+  for (const [table, other] of [['session_skipped_slot', 'set_load_shown'], ['set_load_shown', 'session_skipped_slot']]) {
+    const lost = freshDb();
+    runMigrations(lost, MIGRATIONS);
+    seed(lost);
+    lost.raw.prepare('INSERT INTO session_skipped_slot (session_plan_slot_id) VALUES (12)').run();
+    lost.raw.prepare("INSERT INTO set_load_shown (set_id, load_source, shown_load_kg) VALUES (101, 'history', 40)").run();
+    lost.raw.exec(`DROP TABLE ${table}`);
+    const missing = sentinelsMissing(lost);
+    runMigrations(lost, MIGRATIONS);
+    check(`a lost ${table} table is detected and rebuilt by self-heal, and the other table keeps its row`,
+      missing.includes(table) && !missing.includes(other) && sentinelsMissing(lost).length === 0
+        && Number(lost.raw.prepare(`SELECT COUNT(*) AS c FROM ${table}`).get().c) === 0
+        && Number(lost.raw.prepare(`SELECT COUNT(*) AS c FROM ${other}`).get().c) === 1);
+  }
 }
 
 // --- one statement per database call ------------------------------------------
