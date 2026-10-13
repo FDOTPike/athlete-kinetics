@@ -13,7 +13,8 @@
  *     not halt. Then the systemic halt stands (next but one bullet). A sore
  *     back with dizziness is a halt, not a soreness adjustment. Until
  *     2026-10-13 the curated entry won here too, so the two rules collided
- *     and the report left without a halt; the owner ruled for the halt;
+ *     and the report left without a halt (decision recorded in
+ *     DEVIATION_LOG.md, 2026-10-13);
  *   - flags + below-gate OR a non-body match (positive/technique/equipment,
  *     i.e. a semantic misfire on a mixed report) -> the red-flag entry fires
  *     as a fully confident deterministic override;

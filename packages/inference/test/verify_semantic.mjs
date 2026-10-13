@@ -204,13 +204,56 @@ check('clean positive report untouched by the override layer',
 
 
 // 5d. systemic language beside a confident curated match that does not halt
-// (owner ruling 2026-10-13). Before this, each of the three reports below left
-// with a soreness or fatigue adjustment and no halt.
+// (decision of 2026-10-13, DEVIATION_LOG.md).
+//
+// First with fixed inputs, so the rule is pinned whatever the embedder does:
+// the resolver is handed a match directly.
+{
+  const entryById = (id) => loaded.entries.find((e) => e.id === id);
+  const matched = (id, confident = true) => ({ entry: entryById(id), similarity: 0.9, confident });
+  const routine = loaded.entries.filter((e) => ['pain', 'illness', 'fatigue'].includes(e.category) && e.guardrail.halt === false);
+  const halting = loaded.entries.filter((e) => ['pain', 'illness', 'fatigue'].includes(e.category) && e.guardrail.halt === true);
+  const outside = loaded.entries.filter((e) => !['pain', 'illness', 'fatigue'].includes(e.category));
+  check('fixture: the codebase has curated entries that restrict, curated entries that halt, and entries outside the curated categories',
+    routine.length >= 3 && halting.length >= 2 && outside.length >= 2, `${routine.length}/${halting.length}/${outside.length}`);
+  check('fixed inputs: systemic language beside EVERY confident curated entry that does not halt is a systemic halt',
+    routine.every((e) => {
+      const r = redFlag.resolveReport('i feel dizzy', matched(e.id));
+      return r.entry.id === 'red-flag-systemic' && r.entry.guardrail.halt === true && r.overrideApplied && r.confident;
+    }));
+  check('fixed inputs: beside every confident curated entry that already halts, that entry is kept as it is',
+    halting.every((e) => {
+      const r = redFlag.resolveReport('i feel dizzy', matched(e.id));
+      return r.entry.id === e.id && !r.overrideApplied;
+    }));
+  check('fixed inputs: a pain word beside every confident curated entry, halting or not, still yields to it',
+    [...routine, ...halting].every((e) => {
+      const r = redFlag.resolveReport('my knee hurts', matched(e.id));
+      return r.entry.id === e.id && !r.overrideApplied;
+    }));
+  check('fixed inputs: outside the curated categories, and below the gate, the override is what it always was',
+    outside.every((e) => redFlag.resolveReport('i feel dizzy', matched(e.id)).entry.id === 'red-flag-systemic'
+      && redFlag.resolveReport('my knee hurts', matched(e.id)).entry.id === redFlag.RED_FLAG_PAIN.id)
+    && routine.every((e) => redFlag.resolveReport('i feel dizzy', matched(e.id, false)).entry.id === 'red-flag-systemic'));
+  check('fixed inputs: with no flag in the text, a confident match is returned untouched',
+    [...routine, ...halting, ...outside].every((e) => {
+      const r = redFlag.resolveReport('all moving well today', matched(e.id));
+      return r.entry.id === e.id && !r.overrideApplied;
+    }));
+}
+// Then through the live embedder. Before this change each of the three reports
+// below left with a soreness or fatigue adjustment and no halt.
 for (const text of [
   'hamstrings are tight and sore and i feel faint between sets',
   'really tired today and a bit lightheaded on the warm up',
   'quads ache from squats and i feel nauseous',
 ]) {
+  // The precondition, asserted so that the check below cannot pass for another reason (a match that
+  // drifts below the gate, or into a category outside the curated set, was always overridden).
+  const alone = triageMod.triage(await embedOne(text), loaded);
+  check(`  precondition: the match alone is confident, curated and does not halt: "${text}"`,
+    alone.confident === true && alone.entry !== null && ['pain', 'illness', 'fatigue'].includes(alone.entry.category)
+      && alone.entry.guardrail.halt === false, `${alone.entry?.id} ${alone.similarity.toFixed(3)}`);
   r5 = await resolveLive(text);
   check(`systemic language beside a routine match halts: "${text}"`,
     r5.confident && r5.overrideApplied && r5.entry?.id === 'red-flag-systemic' && r5.entry.guardrail.halt === true,
@@ -237,6 +280,12 @@ check('a denial the one-word negation check catches is read as it was',
 // above until the negation check is repaired, which is a separate change that
 // LOOSENS symptom handling and so needs its own review. If that repair lands,
 // this check is the one to change.
+{
+  const alone = triageMod.triage(await embedOne('back muscles are sore but i am not feeling dizzy'), loaded);
+  check('  precondition for the trade-off: the match alone is confident, curated and does not halt',
+    alone.confident === true && alone.entry !== null && ['pain', 'illness', 'fatigue'].includes(alone.entry.category)
+      && alone.entry.guardrail.halt === false, `${alone.entry?.id} ${alone.similarity.toFixed(3)}`);
+}
 r5 = await resolveLive('back muscles are sore but i am not feeling dizzy');
 check('KNOWN TRADE-OFF: a denial two words back ("not feeling dizzy") beside a routine match now halts',
   redFlag.scanRedFlags('back muscles are sore but i am not feeling dizzy').systemic === true
