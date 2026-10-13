@@ -292,6 +292,11 @@ export interface BlockInput {
   schemaType?: SchemaType;
   /** Position in the 32-week macro-cycle (1..8); defaults to 1. */
   macroBlockIndex?: number;
+  /** False for a block generated while a suspension is open: the autopilot's
+   *  positive RPE grant is then withheld, because such a block consumes no
+   *  macro position and the per-position ceiling would not count it. Cuts and
+   *  set changes are unaffected. Defaults to true. (Owner ruling 2026-10-13.) */
+  autopilotRpeRaisePermitted?: boolean;
   /** Explicit repeating weekly schedule for a goal program. */
   programDays?: readonly ProgramDayPreference[];
 
@@ -958,7 +963,7 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
   const recovery = flawReport?.globalGuardrail?.halt === true;
   const control: ControlAction | null =
     flawReport !== undefined && !recovery
-      ? deriveControlAction(flawReport, profile, macroPhase, macroBlockIndex)
+      ? deriveControlAction(flawReport, profile, macroPhase, macroBlockIndex, input.autopilotRpeRaisePermitted !== false)
       : null;
   // Positive set additions are granted ONCE per pattern (the block-wide +2 cap is
   // already enforced inside deriveControlAction.blockAddedSets).

@@ -348,6 +348,33 @@ console.log('[6] bounded authority / anti-windup');
   check('R1 release resets when the persisted macro index rolls 8→1',
     deriveControlAction(allHeadroom, NEUTRAL_PROFILE, GPP, 1).blockAddedRpe === 0.5);
 
+  // Owner ruling 2026-10-13: a block generated while a suspension is open gets
+  // no positive RPE grant, at any position, because it consumes no position and
+  // the per-position ceiling would not count it.
+  const withheld = Array.from(
+    { length: 8 },
+    (_, i) => deriveControlAction(allHeadroom, NEUTRAL_PROFILE, GPP, i + 1, false),
+  );
+  check('suspension: no RPE grant is released at any macro position',
+    eq(withheld.map((a) => a.blockAddedRpe), [0, 0, 0, 0, 0, 0, 0, 0]) &&
+    withheld.every((a) => MOVEMENT_PATTERNS.every((p) => a.corrections[p].dRpe_p <= 0)));
+  check('suspension: any number of blocks at one frozen position adds nothing to the cycle (the gap this closes: six grants at position 3 summed to 3.0)',
+    Array.from({ length: 6 }, () => deriveControlAction(allHeadroom, NEUTRAL_PROFILE, GPP, 3, false))
+      .reduce((sum, a) => sum + a.blockAddedRpe, 0) === 0 &&
+    Array.from({ length: 6 }, () => deriveControlAction(allHeadroom, NEUTRAL_PROFILE, GPP, 3))
+      .reduce((sum, a) => sum + a.blockAddedRpe, 0) === 3.0);
+  check('suspension: only the RPE raise is withheld — set and load corrections are identical with and without it',
+    withheld.every((a, i) => MOVEMENT_PATTERNS.every((p) =>
+      a.corrections[p].dSet_p === macroActions[i].corrections[p].dSet_p &&
+      a.corrections[p].dLoad_p === macroActions[i].corrections[p].dLoad_p)) &&
+    withheld.every((a, i) => a.blockAddedSets === macroActions[i].blockAddedSets));
+  check('suspension: cuts are untouched — a deficit report gives the same action with and without it, at every position',
+    Array.from({ length: 8 }, (_, i) => i + 1).every((index) =>
+      eq(deriveControlAction(allDeficit, NEUTRAL_PROFILE, GPP, index, false), deriveControlAction(allDeficit, NEUTRAL_PROFILE, GPP, index))));
+  check('the permission defaults to granted: omitted or explicitly true, the action is the same at every position',
+    Array.from({ length: 8 }, (_, i) => i + 1).every((index) =>
+      eq(deriveControlAction(allHeadroom, NEUTRAL_PROFILE, GPP, index, true), macroActions[index - 1])));
+
   const failClosedIndexActions = [
     deriveControlAction(allHeadroom, NEUTRAL_PROFILE, GPP),
     deriveControlAction(allHeadroom, NEUTRAL_PROFILE, GPP, undefined),

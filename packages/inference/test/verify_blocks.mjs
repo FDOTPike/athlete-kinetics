@@ -1325,6 +1325,35 @@ check('C6B fallback applied-slot cumulative RPE raise ≤ 2.5 over macro blocks 
   macroAppliedRpeRaise >= 0 && macroAppliedRpeRaise <= 2.5,
   `delta=${macroAppliedRpeRaise}`);
 
+// Owner ruling 2026-10-13: a block generated while a suspension is open gets
+// no autopilot effort raise. Position by position: no slot is raised above the
+// plan without a flaw report, and the block is otherwise the block the
+// autopilot would have produced.
+let suspendedRaise = 0;
+let suspendedBlocksCompared = 0;
+let suspendedOnlyRpeDiffers = true;
+for (let macroBlockIndex = 1; macroBlockIndex <= 8; macroBlockIndex++) {
+  const common = { profile: prof({ objective: 'strength' }), movements, startDate: START, macroBlockIndex };
+  const base = generateBlock(common);
+  const granted = generateBlock({ ...common, flawReport: allHeadroomReport });
+  const withheld = generateBlock({ ...common, flawReport: allHeadroomReport, autopilotRpeRaisePermitted: false });
+  const explicit = generateBlock({ ...common, flawReport: allHeadroomReport, autopilotRpeRaisePermitted: true });
+  const rpes = (plan) => plan.sessions.flatMap((s) => s.slots.map((sl) => sl.target_rpe));
+  const shape = (plan) => JSON.stringify(plan.sessions.map((s) => s.slots.map((sl) => [sl.movement_id, sl.sets, sl.reps])));
+  suspendedRaise += rpes(withheld).reduce((sum, rpe, i) => sum + Math.max(0, rpe - (rpes(base)[i] ?? rpe)), 0);
+  if (JSON.stringify(explicit) !== JSON.stringify(granted)) suspendedOnlyRpeDiffers = false;
+  // Sets, reps and movements are what the autopilot gave; only effort targets may differ, and only downward.
+  if (shape(withheld) !== shape(granted)) suspendedOnlyRpeDiffers = false;
+  if (!rpes(withheld).every((rpe, i) => rpe <= rpes(granted)[i])) suspendedOnlyRpeDiffers = false;
+  suspendedBlocksCompared += 1;
+}
+check('suspension: a block generated with the raise withheld has no effort target above the plain plan, at any macro position',
+  suspendedRaise === 0 && suspendedBlocksCompared === 8, `raise=${suspendedRaise}`);
+check('suspension: withholding changes effort targets only, and only downward; granted explicitly is the default block',
+  suspendedOnlyRpeDiffers);
+check('suspension: the raise the default grants is real, so the check above is not empty',
+  macroAppliedRpeRaise > 0, `default cycle raise=${macroAppliedRpeRaise}`);
+
 const allDeficitReport = makeFlawReport(Object.fromEntries(
   MOVEMENT_PATTERNS.map((p) => [p, { phi: 0.5 }]),
 ));
@@ -1341,6 +1370,16 @@ const lateCutRpe = lateCut.sessions.flatMap((s) => s.slots.map((sl) => sl.target
 check('R1 late-cycle cuts remain applied and unrationed',
   lateCutRpe.every((rpe, i) => rpe <= lateBaseRpe[i]) &&
   lateCutRpe.some((rpe, i) => rpe < lateBaseRpe[i]));
+const suspendedCut = generateBlock({
+  profile: prof({ objective: 'strength' }), movements, startDate: START,
+  macroBlockIndex: 3, flawReport: allDeficitReport, autopilotRpeRaisePermitted: false,
+});
+const openCut = generateBlock({
+  profile: prof({ objective: 'strength' }), movements, startDate: START,
+  macroBlockIndex: 3, flawReport: allDeficitReport,
+});
+check('suspension: cuts are applied in full — a deficit block is identical with and without the raise withheld',
+  JSON.stringify(suspendedCut) === JSON.stringify(openCut));
 
 // thin-data / injury safety propagates through the generator (Step-3 R2#1 fix).
 const injuredThin = genFR({ objective: 'strength' },

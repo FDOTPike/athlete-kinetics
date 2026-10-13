@@ -4442,12 +4442,18 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const flawReport = detectFlaws(windowVectors, patternWindow, profile.training_age, autopilotGuardrail);
 
     const blockEmphasisInput = programEmphasisFor(d, today);
+    // Owner ruling 2026-10-13: a block generated while a suspension is open gets
+    // no autopilot effort raise. It consumes no macro position (S6(b)), so the
+    // per-position ceiling on raises would not count it. Read once here and
+    // checked again at commit, where the block is attributed to the episode.
+    const suspensionBeforeGeneration = openSuspension(d);
     const plan = generateBlock({
       profile,
       movements: genMovements,
       startDate: today,
       schemaType,
       macroBlockIndex,
+      autopilotRpeRaisePermitted: suspensionBeforeGeneration === null,
       programDays: pendingProgramCreation?.programDays ?? pendingProgramContinuation?.programDays,
       flawReport,
       powerPreferredMovementNames: powerNamesGenerate,
@@ -4540,6 +4546,11 @@ export const useStore = create<KineticsStore>()((set, get) => {
         insertBlockEmphasis(d, blockId, blockEmphasisInput, plan.emphasis, Date.now());
       }
       const openAtGeneration = openSuspension(d);
+      // The plan was generated under one suspension state; it is committed under
+      // the same one or not at all.
+      if ((openAtGeneration?.episode_id ?? null) !== (suspensionBeforeGeneration?.episode_id ?? null)) {
+        throw new Error('The suspension state changed while the block was being generated. Nothing was saved; generate the block again.');
+      }
       if (programId !== null && openAtGeneration === null) {
         linkTrainingBlockProgram(d, blockId, programId, pendingProgramContinuation?.sequenceIndex ?? 1);
       }
