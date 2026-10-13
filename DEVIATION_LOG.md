@@ -646,8 +646,10 @@ position (S6(b)). Each such block was therefore offered the frozen position's
 half point again; six at one position summed to 3.0. The two rules were
 ratified a month apart and nothing tested them together.
 
-Scope: the positive RPE grant only. Cuts, set changes, substitution, the rehab
-effort ceiling and halts are unchanged; training continues; the position is
+Scope: the positive RPE grant only. Cuts, the autopilot's set corrections,
+substitution, the rehab effort ceiling and halts are unchanged (the session-time
+fit follows the effort targets actually planned, as it always has, so a session
+at its limit may keep a set a raised target's longer rest would have trimmed); training continues; the position is
 frozen and resumed exactly as before; no constant, migration or storage
 changes. 058 is shipped and is not edited. The gate sits at block generation
 in the store (one read of the open episode, one typed input to the generator),

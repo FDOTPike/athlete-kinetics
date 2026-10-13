@@ -1342,7 +1342,8 @@ for (let macroBlockIndex = 1; macroBlockIndex <= 8; macroBlockIndex++) {
   const shape = (plan) => JSON.stringify(plan.sessions.map((s) => s.slots.map((sl) => [sl.movement_id, sl.sets, sl.reps])));
   suspendedRaise += rpes(withheld).reduce((sum, rpe, i) => sum + Math.max(0, rpe - (rpes(base)[i] ?? rpe)), 0);
   if (JSON.stringify(explicit) !== JSON.stringify(granted)) suspendedOnlyRpeDiffers = false;
-  // Sets, reps and movements are what the autopilot gave; only effort targets may differ, and only downward.
+  // In this fixture no session is at its time limit, so sets, reps and movements are what the autopilot gave and
+  // only effort targets differ, downward. (At the limit the time fit follows the planned targets, as for any block.)
   if (shape(withheld) !== shape(granted)) suspendedOnlyRpeDiffers = false;
   if (!rpes(withheld).every((rpe, i) => rpe <= rpes(granted)[i])) suspendedOnlyRpeDiffers = false;
   suspendedBlocksCompared += 1;

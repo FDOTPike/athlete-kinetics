@@ -33,9 +33,6 @@ jest.mock('../../src/state/athleteRegistry', () => {
   };
 });
 
-// The first heavy module load in a fresh jest worker is slow.
-jest.setTimeout(60_000);
-
 const store = () => useStore.getState();
 const raw = () => mockDriver.raw;
 const all = (sql, ...params) => raw().prepare(sql).all(...params);

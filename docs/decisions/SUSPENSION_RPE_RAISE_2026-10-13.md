@@ -28,7 +28,8 @@ On 2026-10-13 the owner was asked whether the ceiling should hold while a suspen
 ## What does not change
 
 - **Training continues during a suspension**, and blocks are still generated. S6(b), S5(c) and S4 stand as written: the position stays frozen and is resumed exactly.
-- **Only the positive effort raise is withheld.** Cuts, set changes, substitution, the rehab effort ceiling, halts and every other correction are as they were. A block generated during a suspension can still be eased.
+- **Only the positive effort raise is withheld.** Cuts, the autopilot's set corrections, substitution, the rehab effort ceiling, halts and every other correction are as they were. A block generated during a suspension can still be eased.
+- **One consequence, stated so it is not a surprise.** A session is fitted to the athlete's time limit from the effort targets actually planned, as for every block: a higher target carries a longer rest estimate. So a session at its limit can keep a set that the raised target's longer rest would have trimmed. The block is fitted exactly as the same block is at a position that grants no raise. Nothing in the fitting was changed.
 - **No number changes.** The ceiling stays 2.5, the step stays 0.5, the five granting positions stay the first five. No migration, no new storage.
 - Blocks generated outside a suspension are generated exactly as before. The autopilot's verifiers and the C6B authority sweep give the same results as before this change.
 
