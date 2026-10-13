@@ -622,10 +622,30 @@ feeling dizzy" beside a routine match now halts where it used to restrict, and
 a halt cannot be undone by the severity rating. Repairing the negation check
 would loosen symptom handling and is deliberately not part of this change.
 
-Evidence and its limit: on the private lab's open set the change recovers two
-halts and loses or adds nothing else, which is too few notes to qualify by
-that lab's own promotion rule. This therefore ships outside that route, as an
-explicit exception. It carries no clinical claim.
+Evidence and its limit.
+
+Verifiable in this repository: `npm run verify:semantic`. On this change it
+passes these checks, and with the rule switched off five of them fail (the
+first, the three live reports and the trade-off):
+- "fixed inputs: systemic language beside EVERY confident curated entry that
+  does not halt is a systemic halt";
+- "systemic language beside a routine match halts: ..." for three reports, each
+  preceded by "precondition: the match alone is confident, curated and does
+  not halt";
+- "a curated match that already halts keeps its own entry and wording", "a
+  pain word beside a confident routine match is still not raised to the pain
+  floor", "a denial the one-word negation check catches is read as it was";
+- "KNOWN TRADE-OFF: a denial two words back ("not feeling dizzy") beside a
+  routine match now halts".
+
+NOT VERIFIED from this repository: on a private benchmark of 378 open notes
+the change was measured to recover two halts and to lose or add nothing else.
+That benchmark and its run record are not part of this repository, so the
+figure cannot be checked here, and nothing here depends on it. It is in any
+case too few notes to qualify by that benchmark's own promotion rule, so this
+change ships outside that route, as an explicit exception.
+
+It carries no clinical claim.
 
 Authority: proposed on 2026-10-13 after the owner deferred the choice; it
 takes effect, and is ratified, by the owner's merge of the pull request that
