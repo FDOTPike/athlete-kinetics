@@ -604,6 +604,34 @@ rule's own "no barbell for beginners" clause (verify:library caught the
 contradiction). Enforced in blockGenerator, substitution L1/L2/L3, and the
 SessionScreen picker; machine-checked in verify:blocks + verify:library.
 
+## 2026-10-13 — Systemic language outranks a confident curated match that does not halt
+
+`redFlag.ts` stated two rules: a flag beside a confident match in a curated
+body-state category means the curated entry wins; and systemic language
+(dizziness, faintness, chest symptoms) is a halt, not a floor. When both
+applied and the curated entry only restricted, the code followed the first,
+so a report such as "sore and feeling faint" left without a halt.
+
+Decision: in that one case the systemic halt stands. A curated entry that
+already halts is kept as it is. A pain word gains no such precedence: the pain
+floor still yields to a confident curated match. No keyword, phrase, threshold
+or entry changes.
+
+Known price: the keyword scan's negation check looks one word back, so "not
+feeling dizzy" beside a routine match now halts where it used to restrict, and
+a halt cannot be undone by the severity rating. Repairing the negation check
+would loosen symptom handling and is deliberately not part of this change.
+
+Evidence and its limit: on the private lab's open set the change recovers two
+halts and loses or adds nothing else, which is too few notes to qualify by
+that lab's own promotion rule. This therefore ships outside that route, as an
+explicit exception. It carries no clinical claim.
+
+Authority: proposed on 2026-10-13 after the owner deferred the choice; it
+takes effect, and is ratified, by the owner's merge of the pull request that
+adds this entry. Machine-checked in verify:semantic, with fixed inputs and
+through the live embedder, including the known price.
+
 ## 2026-10-13 — A suspension also withholds the autopilot's effort raise (exception to 058)
 
 Migration 058's header says of a suspension: "It freezes the macro position.
