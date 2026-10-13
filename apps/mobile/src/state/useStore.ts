@@ -5457,6 +5457,12 @@ export const useStore = create<KineticsStore>()((set, get) => {
     get().refreshBlock();
     return { plannedSessionId, archivedPreviousBlock };
   },
+  /**
+   * Boot-time Health connection: records the bridge (null means this device
+   * cannot serve biometrics) and makes one read-only permission check, bounded
+   * at BIOMETRICS_STATUS_TIMEOUT_MS. It never opens a permission sheet; the
+   * athlete asks for access with CONNECT (requestBiometricsAccess).
+   */
   connectBiometrics: async (bridge) => {
     biometrics = bridge;
     const athleteId = get().activeAthleteId;

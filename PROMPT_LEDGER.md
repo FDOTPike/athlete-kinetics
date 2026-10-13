@@ -12615,3 +12615,29 @@ FDOTPike/athlete-kinetics PR #64 has merge conflicts with its base branch `maste
   - `AthleteKineticsUITests.swift`, one hunk, the wait for the restore preview. Both sides had raised its bound from 120 s to 300 s and recorded the time taken; `master`'s version (pull request 69) also follows the app's status while it waits and fails at once on an unexpected status. It keeps this branch's intent and adds to it, so it was taken whole. The rest of this branch's changes to the suite merged cleanly; against `master` the suite now differs only by this branch's remaining changes (Files-sheet controls by visible name, the backup-creation and Apple Health availability bounds, the relaunch after an unanswered Health request, the 30 s tab-selection bound).
 - **Checks (this PC, Node v24.11.1; CI runs Node 24.21.0).** `npm run typecheck` exit 0. `npm run verify:native-config` exit 0 (NATIVE CONFIG VERIFIED). `npm run verify:migrations` exit 0 (ALL LINEAGE CHECKS PASSED). `npm run verify:store` exit 0. `bash -n tools/ios_ui_tests.sh` exit 0. Six jest suites that exercise the merged store, run with `--no-cache` in band: 6 passed, 182 tests (AppleHealthBridge, SessionFeelStore, SessionFeel, AsyncAthleteOwnership, NavigationShell, BackupForwardRestore). Not run here: the rest of `verify:ci` and `verify:components`, and the Swift suite, which cannot be compiled on this machine; CI runs all of them, the suite on both Xcode rows.
 - **Not done.** Pull request 64 is not merged into `master`.
+
+---
+
+## Entry 0221 — 2026-10-12 · Merge pull request 64 when CI is green; ask the tester's agent to check the Simulator run (Claude Code Desktop)
+
+2026-10-12 to 2026-10-13. Executor: Claude Code Desktop. Worktree `.claude/worktrees/xcode27-pods`, branch `claude/pr64-followup-2026-10-13`, cut from `origin/master` at `cc6e9ea`.
+
+> **Ledger numbering note.** `origin/master` ends at Entry 0204 (Entry 0201 follows Entry 0203 there; see the note in Entry 0204). Other remote branches hold entries up to 0220, so this entry takes 0221. It was written after the work it records: the instruction called for no file change, and a commit on pull request 64's branch would have restarted the CI run that the merge was waiting for.
+
+### Input
+
+Received verbatim:
+
+```text
+merge it when CI is green and please comment on the issue for her Opus to check if it runs on the emulator
+```
+
+### Output
+
+- **Waiting for CI.** GitHub's auto-merge is off for this repository and `master` has no required checks, so the merge could not be left to GitHub. One background `gh run watch` on run 38244249169 (head `54df836`, the merge of `master` into the branch recorded in Entry 0204) reported when it ended.
+- **CI result on `54df836`.** Run 38244249169: success. "Verification suite (24 gates + typecheck)", "Android QA + debug APKs", "iOS unsigned simulator build + native smoke" (Xcode 26) and "iOS unsigned simulator build + native smoke (Xcode 27)" all passed, each iOS row with its five UI tests. CodeRabbit: success. No unresolved review thread. Merge state: clean.
+- **One review item was open at the merge, and the merge went ahead with it.** CodeRabbit's pre-merge checks listed one warning: docstring coverage 37.5 % of the functions the diff touched, against its 80 % threshold. It is a documentation warning, not a correctness finding. It was read before merging, and this branch answers it (below).
+- **Merge.** `gh pr merge 64 --merge --match-head-commit 54df836b27b983d75a8b16321f3db695dd5acc6a`: merged into `master` as `cc6e9eac227ebbf1fb118bc63076dac69dc19b2e` at 2026-10-12T14:29:02Z. `master` had gained pull request 70 since the CI run began; the pull request was still mergeable without conflict, and the merge commit's own CI run (38263243742) had started and not finished when this was written.
+- **Issue #38.** Comment 6126319720 ends the pause for one run. It gives the tester's agent the merge commit to check out, the same build and UI-test steps as before, what is expected on a simulator (the silent backup steps, the Apple Health markers), and the report format. It says why the tester's Mac still adds something (Xcode 27 with the iOS 26.5 runtime; CI's Xcode 27 row uses iOS 27.0), and asks the agent to stop after posting one report.
+- **This branch.** Doc comments for the functions pull request 64 touched that had none: `application(_:didFinishLaunchingWithOptions:)` and `scene(_:willConnectTo:options:)` in `AppDelegate.swift`; `onMyIPhone`, `saveInFiles` and `pickBackupInFiles` in the UI test suite; `connectBiometrics` in `useStore.ts`. Comments only; no statement was changed. `npm run typecheck` and `npm run verify:native-config` exit 0 on this PC (Node v24.11.1). The Swift files are compiled by CI.
+- **Not verified.** Whether the app runs in the Simulator on the tester's Mac: no report had arrived when this was written.
