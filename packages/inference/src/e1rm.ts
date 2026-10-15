@@ -16,9 +16,10 @@
  *
  * It is used forward — known 1RM -> target load. This module reads the SAME
  * function backwards, with no second formula. The qualifying effort floor is
- * RPE 6 (`rpe < 6` yields `null`; 6.0 qualifies, 5.5 and lower do not), which
- * is the owner's rule (Francis, 2026-10-15: "anything below rpe 6 shouldnt even
- * qualify"), recorded in `docs/decisions/E1RM_RPE_FLOOR_2026-10-15.md` and in
+ * RPE 6 (`rpe < 6` yields `null`; 6.0 qualifies, 5.5 and lower do not), the
+ * owner's rule (Francis, 2026-10-15):
+ * "anything below rpe 6 shouldnt even qualify"
+ * Recorded in `docs/decisions/E1RM_RPE_FLOOR_2026-10-15.md` and in
  * `docs/decisions/CALIBRATION_POLICY_V1.md` section 5.
  *
  * WHAT THIS IS NOT
