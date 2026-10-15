@@ -13030,4 +13030,12 @@ The status assertion and its wording are unchanged, and its 30 s bound still run
 
 **For the owner.**
 - The hermes-engine tarball download from `repo1.maven.org` failed in two Xcode 27 jobs on 2026-10-13. Caching that tarball between runs would remove this class of failure; no change was made here.
-- In run 38345092343 attempt 1, the Xcode 26 iOS job also failed, in `test1`, with "the Workout screen marker (session-screen-shown) did not appear within 30 s". In 38344991834 attempt 1 it failed in `test1` with "the Progress screen marker (progress-screen) did not appear within 30 s". Neither was investigated here.
+- In run 38345092343 attempt 1, the Xcode 26 iOS job also failed, in `test1`, with "the Workout screen marker (session-screen-shown) did not appear within 30 s".
+
+**After the pull request was opened (pull request 77).**
+- **CI on `1a3f7de`:** all four checks succeeded. The Swift compiled on both iOS rows, and `test4` passed on both. The new lines read, Xcode 26 row (job 116638056643): `files sheet cancel: tapping 9:'Cancel'|'' at {{299, 82}, {36, 36}} found by the sheet's bar 15.8 s after RESTORE`, `files sheet closed 2.6 s after Cancel`. Xcode 27 row (job 116638056517): `... at {{299, 72}, {36, 36}} found by the sheet's bar 14.2 s after RESTORE`, `files sheet closed 2.4 s after Cancel`. On both rows the control was a Button in the sheet's bar. The fallback lookup was not used. One passing run per row says nothing about the 2-in-28 failure rate.
+- **CodeRabbit (requested on the draft with `@coderabbitai review`):** one minor finding and one trivial nit, both fixed in `d2859c5`.
+  - The minor finding: when no sheet bar is found, nothing confirmed the sheet closed. Now the tapped control must disappear.
+  - The nit: the settled check now also compares the element's type, identifier and label.
+  - Still no retry and no new bound. `npm run typecheck` exit 0; `verify:native-config` exit 0.
+ In 38344991834 attempt 1 it failed in `test1` with "the Progress screen marker (progress-screen) did not appear within 30 s". Neither was investigated here.
