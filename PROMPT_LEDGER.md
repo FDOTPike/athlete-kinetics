@@ -13020,7 +13020,7 @@ The status assertion and its wording are unchanged, and its 30 s bound still run
 - Whether the change removes the failure: it occurred in 2 of 28 Xcode 27 jobs that reached the step, so a single green run shows little.
 
 **Not done, and why.**
-- **CodeRabbit command-line review before pushing.** The command given is a Windows install that this container lacks, and `cli.coderabbit.ai` is refused by the same network policy, so it could not be installed. Raised with the owner rather than pushed around.
+- **CodeRabbit command-line review before pushing.** The command given is a Windows install that this container lacks, and `cli.coderabbit.ai` is refused by the same network policy, so it could not be installed. Raised with the owner, whose answer through the question card was "Push + draft PR (Recommended)": push the branch and open a draft pull request against `master`, have CodeRabbit's GitHub app review it there, and act on its findings before the pull request leaves draft. This departs from the rule of a command-line review before pushing, by the owner's decision.
 
 **Judgment calls.**
 - No retry of the Cancel tap, following Entry 0202 on failure 5. A printed single re-tap is the owner's call.
