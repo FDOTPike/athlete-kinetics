@@ -12978,4 +12978,56 @@ Fix what the evidence supports on a branch with a pull request against master. H
 
 ### Output
 
-(Written at the end of the session, below.)
+**How the evidence was read, and what could not be.** The run's artifact (`athlete-kinetics-ios-simulator-unsigned-xcode27`, id 11794365453, 248,081,081 B) could not be read in any form. Both routes to it (the REST `artifacts/<id>/zip` redirect and the GitHub connector's download link) point at `productionresultssa19.blob.core.windows.net`. This session's network policy refuses that host (the proxy logged `connect_rejected` for it), so no range request was possible and the per-test `.log`, `.system.log` and `.xcresult` were not read. The memory note on PR 69 lives on the owner's PC and was not available here; Entry 0202 was read in its place. What was read:
+- the check-run annotations through the API, which `tools/ios_ui_annotate.mjs` builds from the per-test log, including the `FAIL-TREE` element inventory printed in `tearDown`;
+- the job logs through the GitHub connector;
+- the app and test source.
+
+**Verdict, run 38345092343 attempt 1 (job 115128575350), test4: not an app defect; the test's Cancel tap did not close the Files sheet. EVIDENCE CAPTURED for the sheet still being open and the app still waiting for the picker. Which element the tap reached, and whether it came before the sheet could take it, NOT VERIFIED.**
+- The `FAIL-TREE` warning, printed straight after the 30 s status wait failed, reads `app{nav[FullDocumentManagerViewControllerNavigationBar] ...` and `cell[pikeMethods-2026-10-13.pmbak, pmbak, 6:34 AM, 2.4 MB]`. The Files sheet, with the saved backup's row, was still in the app's tree.
+- No `files sheet without Cancel` line appears in that warning, so an element named Cancel or Close was found within 30 s and tapped.
+- `apps/mobile/src/state/backupStore.ts:1071` sets "Opening encrypted backup…" before `pickerOpen()` presents the sheet. The status changes only once the picker answers: to "Restore cancelled. Your data is unchanged." on `OPERATION_CANCELED` (line 1076), or to the preview or an error after a file is chosen. A file choice closes the sheet, so with the sheet still up the app was still waiting for the picker and had not begun opening a backup.
+- `BackupTransferPanel.tsx` has no control named Cancel or Close. A search of `apps/mobile/src` for those names finds them only in `RoutineTemplateBuilder.tsx`, `SessionFeelPanel.tsx`, `PreparationPanel.tsx`, `NewBlockChooserScreen.tsx`, `BlockScreen.tsx` and `ProgramSetupScreen.tsx`. The `FAIL-TREE` inventory (first 40 buttons, first 45 texts) holds neither name. Whether an app element carrying either name existed elsewhere in the tree is NOT VERIFIED; the inventory is truncated.
+- Before this change, `filesControl(["Cancel", "Close"])` chose its control at the instant RESTORE had been tapped: a Button of that name if one existed then, otherwise the first element of any type in the app carrying the name. The test tapped it as soon as it existed and never checked that the sheet closed.
+- What the evidence does not settle needs the per-test log's tap record and the result bundle's synthesized-event point:
+  - the element that query resolved to;
+  - its frame;
+  - whether the sheet was still presenting.
+
+**Same failure elsewhere.** Run 38299228248 attempt 1 (Xcode 27 job 114983541522, head `0fde6f5f`) failed identically at line 183 ("it read: Opening encrypted backup…"); that job printed no `FAIL-TREE` warning. Across the Xcode 27 jobs with annotations, from 2026-10-09 to 2026-10-15, the cancel step's recorded status was "Restore cancelled" in 26 jobs and "Opening encrypted backup" in 2; 4 did not reach it. In the 107 other iOS jobs listed for the same runs (the job without the "(Xcode 27)" suffix), every annotation that records this step reads "Restore cancelled" (71 jobs).
+
+**Runs 38344991834 and 38334844301: not this failure. Neither reached the UI tests.** Both stopped on the hermes-engine tarball download from `repo1.maven.org`:
+- **38334844301** (job 115096318191) failed in "Install pods". The log line is `[!] /usr/bin/curl -f -L ... https://repo1.maven.org/maven2/com/facebook/react/react-native-artifacts/0.81.6/react-native-artifacts-0.81.6-hermes-ios-debug.tar.gz ...`. curl's progress stood at 8% of 29.0 M after 24 minutes, then `curl: (18) Transferred a partial file`.
+- **38344991834** (job 115126468395) failed in "Build unsigned Release for the simulator". During pod install, `curl: (92) HTTP/2 stream 1 was not closed cleanly: INTERNAL_ERROR (err 2)` at 91% of 20.3 M. The build then logged `tar: .../Pods/hermes-engine-artifacts/hermes-ios-0.81.6-release.tar.gz: m: No such file or directory` and `rsync(38654): error: .../hermes.xcframework/ios-arm64_x86_64-simulator/*: (l)stat: No such file or directory`.
+- EVIDENCE CAPTURED for both download failures. That the interrupted download is why the release tarball was missing in 38344991834 is an inference from the order of the lines, NOT VERIFIED.
+- Both passed on attempt 2. Nothing was changed for them.
+
+**Change.** Only `apps/mobile/ios/AthleteKineticsUITests/AthleteKineticsUITests.swift`. The cancel step now calls `cancelFilesSheet()`, which:
+- takes the Cancel or Close from the sheet's bar (`filesSheetBar()`, identifier containing `DocumentManager`) when the bar holds a hittable one, otherwise the earlier lookup;
+- taps only once the control is hittable and its frame is unchanged across two reads 0.5 s apart, within the same 30 s bound as before;
+- prints `files sheet cancel: tapping <type>:'<label>'|'<identifier>' at {{x, y}, {w, h}} found by <lookup> <s> s after RESTORE`;
+- after the tap, when the bar had been up, fails with "the Files sheet was still open 30 s after its Cancel was tapped" (with the sheet inventory), or prints how long the sheet took to close.
+
+The status assertion and its wording are unchanged, and its 30 s bound still runs from the tap. Nothing is tapped twice and no test is skipped. The next occurrence will name, in the annotations alone, the element tapped and whether the sheet stayed open.
+
+**Commands and decisive output.**
+- `npm run typecheck` on Node v24.21.0: exit 0, before each commit. Node 22 failed `npm ci` with `EBADENGINE` (the repo requires `>=24.0.0`), so Node 24.21.0 was fetched from nodejs.org and its SHA-256 checked (`node-v24.21.0-linux-x64.tar.xz: OK`).
+- `npm run verify:native-config`: exit 0, `NATIVE CONFIG VERIFIED (static contract; native build evidence comes from the macOS CI job)`, including `PASS  every UI test in the suite is run by CI, none skipped`.
+
+**Not verified.**
+- The Swift has not been compiled or run; this container has no Swift toolchain. The first CI run of this branch is its first compile.
+- Which element the failed taps reached, and their timing, as above.
+- Whether the change removes the failure: it occurred in 2 of 28 Xcode 27 jobs that reached the step, so a single green run shows little.
+
+**Not done, and why.**
+- **CodeRabbit command-line review before pushing.** The command given is a Windows install that this container lacks, and `cli.coderabbit.ai` is refused by the same network policy, so it could not be installed. Raised with the owner rather than pushed around.
+
+**Judgment calls.**
+- No retry of the Cancel tap, following Entry 0202 on failure 5. A printed single re-tap is the owner's call.
+- The sheet's bar is preferred, with the earlier lookup kept as the fallback. The Xcode 26 row's bar identifier is not in any annotation read, and a bar-only lookup could fail where the old one passed.
+- The model co-author trailer was left off the commits under the owner's rule against model identifiers; a session-link trailer was kept.
+- No handover file and no `DEVIATION_LOG.md` entry: a test-harness change inside the existing architecture.
+
+**For the owner.**
+- The hermes-engine tarball download from `repo1.maven.org` failed in two Xcode 27 jobs on 2026-10-13. Caching that tarball between runs would remove this class of failure; no change was made here.
+- In run 38345092343 attempt 1, the Xcode 26 iOS job also failed, in `test1`, with "the Workout screen marker (session-screen-shown) did not appear within 30 s". In 38344991834 attempt 1 it failed in `test1` with "the Progress screen marker (progress-screen) did not appear within 30 s". Neither was investigated here.
