@@ -12955,3 +12955,27 @@ Please finish merging if there no claashes with other PR's
 - **Resolution.** `origin/master` merged in, no rebase; master's entry sits after 0204 as it does on `master`. A first attempt at the resolution read `FETCH_HEAD` after a later fetch had moved it to this branch's own head, which left master's entry out; that was caught before any commit by checking the headings, and the resolution was redone against `MERGE_HEAD` (confirmed equal to `origin/master`). Checked on the result: master's appended text is present intact, no conflict marker, no duplicate entry number from 0195 up. `npm run typecheck` exit 0.
 - **Clashes with other pull requests.** None found: of the open pull requests that target `master` (72, 73, 74), none changes `PROMPT_LEDGER.md`, the only file this one changes.
 - **Merge.** On the owner's instruction above, pull request 63 is merged once this commit is pushed, without waiting for a full CI run on the final head. What had run: on the earlier head `9554681`, the verification suite and the Android job passed and the iOS job failed in one UI test (Entry 0223); later heads' runs were superseded by these merges. The change is this one Markdown file.
+
+---
+
+## Entry 0225 — 2026-10-15 · Xcode 27 iOS job, test4: did the test tap the wrong Cancel, or does the app open a backup after the Files sheet is cancelled? (Claude Code, cloud session)
+
+2026-10-15. Executor: Claude Code in a cloud session (not the owner's PC). Worktree cut from `origin/master` (`09c1e19`), branch `claude/inspiring-heisenberg-ovfj77`. Numbers up to 0224 are on `origin/master`; the open pull requests (7, 21, 37, 74, 75) carry no entry above 0221, so this entry takes 0225.
+
+### Input
+
+Received verbatim; the text below was the whole message.
+
+```text
+Repository: FDOTPike/athlete-kinetics (public; local checkout at C:\Users\fpike\Documents\Claude Coding\Athlete App; work in a new git worktree cut from origin/master, never in the main checkout). Read AGENT_WORKFLOW.md, .agents/rules/coding-rules-general.md and the memory note on the earlier iOS UI flake investigation (PR 69, ledger Entry 0202) first.
+
+Failure to investigate: CI run 38345092343 (PR #63, head 69dd7d2b, which changes only PROMPT_LEDGER.md), job "iOS unsigned simulator build + native smoke (Xcode 27)", step "UI tests on the simulator (fails closed)". test4_backupToFilesAndRestore failed at apps/mobile/ios/AthleteKineticsUITests/AthleteKineticsUITests.swift:183 with: "status after cancelling the Files sheet did not become 'Restore cancelled. Your data is unchanged.…' within 30 s; it read: Opening encrypted backup…". In the test, this is the step that taps RESTORE ENCRYPTED BACKUP, waits for app.buttons["Cancel"] in the Files sheet, taps it, and expects the status "Restore cancelled. Your data is unchanged.".
+
+The question: on Xcode 27 / the newer iOS runtime, did the test tap a different "Cancel" (or tap before the document picker was the one on screen), or does the app really begin opening a backup after the person cancels the Files sheet? The second would be an app defect in the restore flow (apps/mobile/src/state/backupStore.ts and apps/mobile/src/components/BackupTransferPanel.tsx), not a test problem. Establish which from the run's evidence (the per-test .log, .system.log and .xcresult under ios-evidence/ui-tests in the run's iOS artifact; the PR 69 memory note describes reading CI artifacts by range request instead of a full download, and the owner's rule on artifact downloads). The same Xcode 27 job also failed on runs 38344991834 and 38334844301; check whether those are the same failure. Report a cause the evidence does not establish as NOT VERIFIED.
+
+Fix what the evidence supports on a branch with a pull request against master. Hard rules from the owner: never skip, disable or quarantine a test; never weaken an assertion or widen a timeout without evidence of the failure it answers; no changes to animation or movement-preview code; no model identifiers in commits, PR text or code; the repository is public; run `npm run typecheck` before every commit; review with the CodeRabbit CLI before pushing ("C:\Users\fpike\AppData\Local\Programs\coderabbit\coderabbit.exe" review --committed --base origin/master --agent; never --use-credits); the first file operation appends a verbatim-input entry to PROMPT_LEDGER.md, with a number checked against origin/master and every open pull request (numbers up to 0224 are taken).
+```
+
+### Output
+
+(Written at the end of the session, below.)
