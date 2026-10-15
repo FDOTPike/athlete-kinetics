@@ -501,6 +501,7 @@ check('an RPE outside the set_record CHECK domain yields no estimate',
 check('a set at RPE 5.5 (below the 6.0 floor) yields no estimate',
   estimateOneRepMax(100, 5, 5.5) === null
   && estimateOneRepMax(100, 5, 5.9) === null
+  && estimateOneRepMax(100, 5, 5.99) === null
   && estimateOneRepMax(100, 5, 0) === null);
 check('a set at RPE 6.0 (at the floor) yields an estimate',
   estimateOneRepMax(100, 5, 6.0) !== null

@@ -476,6 +476,7 @@ const { targetPct } = require('./.build/blockGenerator.js');
 check('e1RM RPE floor is 6.0: estimateOneRepMax returns null below 6 and an estimate at 6.0',
   e1rm.estimateOneRepMax(100, 5, 5.5) === null &&
   e1rm.estimateOneRepMax(100, 5, 5.9) === null &&
+  e1rm.estimateOneRepMax(100, 5, 5.99) === null &&
   e1rm.estimateOneRepMax(100, 5, 6.0) !== null &&
   Math.abs(e1rm.estimateOneRepMax(100, 5, 6.0) - 100 / targetPct(5, 6.0)) < 1e-9);
 
