@@ -742,7 +742,8 @@ final class AthleteKineticsUITests: XCTestCase {
   /// tapped as soon as it existed. It is now taken from the sheet's bar when
   /// the bar holds a hittable one (otherwise as before), tapped only once it
   /// is hittable and has stopped moving, recorded with its type, identifier
-  /// and frame, and the sheet must then close. Nothing is tapped twice.
+  /// and frame, and the sheet must then close: its bar must go, or, when no
+  /// bar was found, the tapped control must go. Nothing is tapped twice.
   @discardableResult
   private func cancelFilesSheet(file: StaticString = #filePath, line: UInt = #line) -> Date {
     let names = ["Cancel", "Close"]
@@ -751,6 +752,7 @@ final class AthleteKineticsUITests: XCTestCase {
     var found: XCUIElement?
     var inBar = false
     var lastFrame = CGRect.null
+    var lastIdentity = ""
     while Date().timeIntervalSince(opened) < 30 {
       // The first hittable of: a button in the sheet's bar, any element in
       // that bar, then the earlier lookup over the whole app.
@@ -762,14 +764,17 @@ final class AthleteKineticsUITests: XCTestCase {
       ]
       if let choice = choices.first(where: { $0.0.exists && $0.0.isHittable }) {
         let (candidate, fromBar) = choice
-        // Settled: the same element and frame on two reads half a second
-        // apart, so the tap is not aimed at a sheet still sliding in.
+        // Settled: the same element (type, identifier, label, lookup) at the
+        // same frame on two reads half a second apart, so the tap is not
+        // aimed at a sheet still sliding in.
         let frame = candidate.frame
-        if frame == lastFrame && fromBar == inBar { found = candidate; break }
+        let identity = "\(candidate.elementType.rawValue)|\(candidate.identifier)|\(candidate.label)|\(fromBar)"
+        if frame == lastFrame && identity == lastIdentity { found = candidate; inBar = fromBar; break }
         lastFrame = frame
-        inBar = fromBar
+        lastIdentity = identity
       } else {
         lastFrame = .null
+        lastIdentity = ""
       }
       usleep(500_000)
     }
@@ -784,15 +789,17 @@ final class AthleteKineticsUITests: XCTestCase {
     log("files sheet cancel: tapping \(cancel.elementType.rawValue):'\(cancel.label)'|'\(cancel.identifier)' at {{\(Int(f.minX)), \(Int(f.minY))}, {\(Int(f.width)), \(Int(f.height))}} found by \(inBar ? "the sheet's bar" : "the whole-app lookup") \(String(format: "%.1f", shown)) s after RESTORE")
     cancel.tap()
     let tapped = Date()
-    if barWasUp {
-      let deadline = tapped.addingTimeInterval(30)
-      while filesSheetBar().exists && Date() < deadline { usleep(250_000) }
-      if filesSheetBar().exists {
-        log("files sheet still open after Cancel: \(filesSheetInventory())")
-        XCTFail("the Files sheet was still open 30 s after its Cancel was tapped", file: file, line: line)
-      } else {
-        log("files sheet closed \(String(format: "%.1f", Date().timeIntervalSince(tapped))) s after Cancel")
-      }
+    // Closed: the sheet's bar is gone, or, when no bar was found, the
+    // tapped control (part of the sheet) is gone.
+    let signal = barWasUp ? "its bar" : "the tapped control"
+    let stillOpen = { barWasUp ? self.filesSheetBar().exists : cancel.exists }
+    let deadline = tapped.addingTimeInterval(30)
+    while stillOpen() && Date() < deadline { usleep(250_000) }
+    if stillOpen() {
+      log("files sheet still open after Cancel (\(signal) still on screen): \(filesSheetInventory())")
+      XCTFail("the Files sheet was still open 30 s after its Cancel was tapped (\(signal) still on screen)", file: file, line: line)
+    } else {
+      log("files sheet closed \(String(format: "%.1f", Date().timeIntervalSince(tapped))) s after Cancel (\(signal) gone)")
     }
     return tapped
   }
