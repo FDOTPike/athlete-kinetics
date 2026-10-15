@@ -781,7 +781,7 @@ final class AthleteKineticsUITests: XCTestCase {
     let shown = Date().timeIntervalSince(opened)
     let barWasUp = filesSheetBar().exists
     let f = cancel.frame
-    log("files sheet cancel: tapping \(cancel.elementType.rawValue):'\(cancel.label)'|'\(cancel.identifier)' at {{\(Int(f.minX)), \(Int(f.minY))}, {\(Int(f.width)), \(Int(f.height))}} \(inBar ? "in the sheet's bar" : "not in a sheet bar") \(String(format: "%.1f", shown)) s after RESTORE")
+    log("files sheet cancel: tapping \(cancel.elementType.rawValue):'\(cancel.label)'|'\(cancel.identifier)' at {{\(Int(f.minX)), \(Int(f.minY))}, {\(Int(f.width)), \(Int(f.height))}} found by \(inBar ? "the sheet's bar" : "the whole-app lookup") \(String(format: "%.1f", shown)) s after RESTORE")
     cancel.tap()
     let tapped = Date()
     if barWasUp {
