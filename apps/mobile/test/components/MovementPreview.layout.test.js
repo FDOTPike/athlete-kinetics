@@ -45,8 +45,8 @@ test('every canonical movement, both bodies, every keyframe: no duplicate primit
   // Finger Curls, drawn with a close-up of the hand, came next, and One-Arm
   // Dumbbell Row, once a variant of Single-Arm Dumbbell Row, now has its own frames.
   // Cable Incline Pushdown and Standing Cable Chest Press, the last two beginner
-  // movements without a drawing, make 174.
-  expect(CANONICAL.length).toBe(174);
+  // movements without a drawing, make 174. MOV-A01 adds 9 squats, making 183.
+  expect(CANONICAL.length).toBe(183);
   for (const entry of CANONICAL) {
     for (const bodyName of ['neutral']) {
       for (const frame of entry.frames) {

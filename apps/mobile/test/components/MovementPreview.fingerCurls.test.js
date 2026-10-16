@@ -186,6 +186,6 @@ describe('what the fingers do', () => {
   });
 });
 
-test('no other movement has a close-up', () => {
-  expect(Object.keys(CHAIN_MOVEMENTS).filter((slug) => CHAIN_MOVEMENTS[slug].closeUp !== undefined)).toEqual(['finger-curls']);
+test('only finger-curls and front-squat-clean-grip have a close-up', () => {
+  expect(Object.keys(CHAIN_MOVEMENTS).filter((slug) => CHAIN_MOVEMENTS[slug].closeUp !== undefined)).toEqual(['finger-curls', 'front-squat-clean-grip']);
 });
