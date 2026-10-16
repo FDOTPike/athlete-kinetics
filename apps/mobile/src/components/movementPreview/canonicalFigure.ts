@@ -4283,7 +4283,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
         upperArm: [-88.2, -11.8], forearm: [-88.2, -11.8],
       },
       {
-        at: [-1.38, 67.2], trunk: 89, head: 90, shrug: 0, thigh: -90, shin: -90,
+        at: [-1.38, 66.0], trunk: 89, head: 90, shrug: 0, thigh: -90, shin: -90,
         ankle: [-2.2, CHAIN_ANKLE_HEIGHT, 25.0], farAnkle: [-2.2, CHAIN_ANKLE_HEIGHT, -25.0],
         foot: [0, 38], kneeOut: 14,
         upperArm: [-86, -11.8], forearm: [-86, -11.8],
@@ -4327,7 +4327,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
         upperArm: [-88.2, -11.8], forearm: [-88.2, -11.8],
       },
       {
-        at: [-1.38, 67.2], trunk: 89, head: 90, shrug: 0, thigh: -90, shin: -90,
+        at: [-1.38, 66.0], trunk: 89, head: 90, shrug: 0, thigh: -90, shin: -90,
         ankle: [-2.2, CHAIN_ANKLE_HEIGHT, 25.0], farAnkle: [-2.2, CHAIN_ANKLE_HEIGHT, -25.0],
         foot: [0, 38], kneeOut: 14,
         upperArm: [-86, -11.8], forearm: [-86, -11.8],
@@ -4363,7 +4363,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
         upperArm: [-88.2, -11.8], forearm: [-88.2, -11.8],
       },
       {
-        at: [-1.38, 67.2], trunk: 89, head: 90, shrug: 0, thigh: -90, shin: -90,
+        at: [-1.38, 66.0], trunk: 89, head: 90, shrug: 0, thigh: -90, shin: -90,
         ankle: [-2.2, CHAIN_ANKLE_HEIGHT, 25.0], farAnkle: [-2.2, CHAIN_ANKLE_HEIGHT, -25.0],
         foot: [0, 38], kneeOut: 14,
         upperArm: [-86, -11.8], forearm: [-86, -11.8],
