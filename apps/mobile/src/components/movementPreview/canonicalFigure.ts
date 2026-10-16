@@ -1328,9 +1328,11 @@ export interface ChainMovement {
    * body: from pose 0 to pose 1 the panel grows out of the hand, and from
    * pose 1 to pose 2 the fingers open and the bar rolls from the palm to the
    * fingertips. `at` is the panel's centre, `r` its radius and `scale` how
-   * many times larger than the figure the hand is drawn.
+   * many times larger than the figure the hand is drawn. Optional `zoom` and
+   * `open` fix the panel expansion and finger opening across all phases when a
+   * movement holds a constant finger grip (such as a clean-grip front rack).
    */
-  closeUp?: { at: ChainPoint; r: number; scale: number };
+  closeUp?: { at: ChainPoint; r: number; scale: number; zoom?: number; open?: number };
 }
 
 const CHAIN_TRUNK = 24;
@@ -3714,60 +3716,63 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     ],
   },
   // Front Squat (id 8): bar resting across the front of the shoulders with a
-  // secure grip and elbows pointing forward, upright torso into a full squat.
+  // secure grip slightly wider than shoulder-width and elbows pointing forward,
+  // upright torso into a full squat.
   'front-squat': {
     root: 'hip',
     view: 'oblique',
-    yawDeg: 30,
-    originX: 50,
+    yawDeg: 10,
+    originX: 54,
     implement: 'bar',
     armsFollowTrunk: true,
     footSpread: 4.6,
     equipment: [
-      { kind: 'frame', a: [15, 0.5, 16], b: [15, 78, 16] },
-      { kind: 'frame', a: [15, 0.5, -16], b: [15, 78, -16] },
-      { kind: 'frame', a: [15, 68, 16], b: [11.5, 68, 16] },
-      { kind: 'frame', a: [15, 68, -16], b: [11.5, 68, -16] },
+      { kind: 'frame', a: [14, 0.5, 16], b: [14, 78, 16] },
+      { kind: 'frame', a: [14, 0.5, -16], b: [14, 78, -16] },
+      { kind: 'frame', a: [14, 68.5, 16], b: [10.5, 68.5, 16] },
+      { kind: 'frame', a: [14, 68.5, -16], b: [10.5, 68.5, -16] },
     ],
     poses: [
       {
         at: [0.0, 46.10], trunk: 89, thigh: -90, shin: -90,
         ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 10,
-        upperArm: [4, -10], forearm: [-176, 27],
+        upperArm: [3, -8], forearm: [-177, 25],
       },
       {
         at: [-10.4, 18.8], trunk: 68, thigh: -90, shin: -90,
         ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 14,
-        upperArm: [4, -10], forearm: [-176, 27],
+        upperArm: [24, -8], forearm: [-156, 25],
       },
     ],
   },
   // Front Squat (Clean Grip) (id 208): rack set just below shoulder height,
-  // fingertips under the bar outside the shoulders with elbows high and chest up.
+  // hands just outside the shoulders with fingertips under the bar (shown in
+  // closeUp) and elbows high with chest up.
   'front-squat-clean-grip': {
     root: 'hip',
     view: 'oblique',
-    yawDeg: 30,
-    originX: 50,
+    yawDeg: 10,
+    originX: 54,
     implement: 'bar',
     armsFollowTrunk: true,
     footSpread: 4.8,
+    closeUp: { at: [-33, 73], r: 15, scale: 5, zoom: 1, open: 1 },
     equipment: [
-      { kind: 'frame', a: [15, 0.5, 16], b: [15, 78, 16] },
-      { kind: 'frame', a: [15, 0.5, -16], b: [15, 78, -16] },
-      { kind: 'frame', a: [15, 67.2, 16], b: [11.2, 67.2, 16] },
-      { kind: 'frame', a: [15, 67.2, -16], b: [11.2, 67.2, -16] },
+      { kind: 'frame', a: [14, 0.5, 16], b: [14, 78, 16] },
+      { kind: 'frame', a: [14, 0.5, -16], b: [14, 78, -16] },
+      { kind: 'frame', a: [14, 63.0, 16], b: [10.2, 63.0, 16] },
+      { kind: 'frame', a: [14, 63.0, -16], b: [10.2, 63.0, -16] },
     ],
     poses: [
       {
         at: [0.0, 46.08], trunk: 90, thigh: -90, shin: -90,
         ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 10,
-        upperArm: [11, -3], forearm: [-150, 33], hand: [125, -30],
+        upperArm: [8, -4], forearm: [-150, 14], hand: [100, -4],
       },
       {
         at: [-9.6, 18.2], trunk: 72, thigh: -90, shin: -90,
         ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 16,
-        upperArm: [11, -3], forearm: [-150, 33], hand: [107, -30],
+        upperArm: [26, -4], forearm: [-132, 14], hand: [100, -4],
       },
     ],
   },
@@ -4389,8 +4394,8 @@ function closeUpBar(open: number): [number, number] {
 export function handCloseUp(figure: ReturnType<typeof chainGeometry>) {
   const closeUp = figure.movement.closeUp;
   if (closeUp === undefined) return null;
-  const zoom = Math.max(0, Math.min(1, figure.ph));
-  const open = Math.max(0, Math.min(1, figure.ph - 1));
+  const zoom = closeUp.zoom ?? Math.max(0, Math.min(1, figure.ph));
+  const open = closeUp.open ?? Math.max(0, Math.min(1, figure.ph - 1));
   if (zoom < 1e-6) return null;
   const hand = figure.grip.near;
   const target = figure.project(chainWorld(closeUp.at));
@@ -4400,7 +4405,7 @@ export function handCloseUp(figure: ReturnType<typeof chainGeometry>) {
   const j = figure.joints;
   const length = Math.hypot(j.wr[0] - j.el[0], j.wr[1] - j.el[1]) || 1;
   const along: CanonicalPoint = [(j.wr[0] - j.el[0]) / length, (j.wr[1] - j.el[1]) / length];
-  const palmSide: CanonicalPoint = [along[1], -along[0]];
+  const palmSide: CanonicalPoint = along[0] < 0 ? [-along[1], along[0]] : [along[1], -along[0]];
   const place = (q: readonly [number, number]): CanonicalPoint => [
     centre[0] + (along[0] * (q[0] + CLOSE_UP_KNUCKLE[0]) + palmSide[0] * (q[1] + CLOSE_UP_KNUCKLE[1])) * scale,
     centre[1] + (along[1] * (q[0] + CLOSE_UP_KNUCKLE[0]) + palmSide[1] * (q[1] + CLOSE_UP_KNUCKLE[1])) * scale,

@@ -1751,7 +1751,7 @@ export const CHAIN_SPECS = [
       'Drive back to standing with the bar over mid-foot.',
       'Drive the elbows forward and high, root the whole foot, and stay tall through the drive.',
     ],
-    reason: 'Source-bound draft, drawn from a 3D model turned 30 degrees so the front-rack bar placement, forward-pointing elbows, upright torso, and shoulder-width stance all show: barbell set across the front of the shoulders with a secure grip and the elbows pointing forward, squatting between the hips with the elbows high, and driving back to standing with the bar over mid-foot.',
+    reason: 'Source-bound draft, drawn from a 3D model turned 10 degrees so the horizontal upper arms pointing forward, the bar resting on the front of the shoulders, and the upright torso read clearly without an end-on plate covering the shoulder: barbell set across the front of the shoulders with a secure grip slightly wider than shoulder width and the elbows pointing forward, squatting between the hips while holding the rack shelf horizontal, and driving back to standing with the bar over mid-foot.',
     summary: 'With the bar across the front of the shoulders in a secure grip and the elbows pointing forward, squat between the hips while keeping the elbows high, then drive back to standing with the bar over mid-foot.',
   },
   {
@@ -1768,7 +1768,7 @@ export const CHAIN_SPECS = [
       'Drive through the middle of the feet to stand back up.',
       'Elbows high, chest up, sit straight down, and let the knees track over the toes.',
     ],
-    reason: 'Source-bound draft, drawn from a 3D model turned 30 degrees so it can be compared side by side with Front Squat: rack J-hooks set just below standing shoulder height, the barbell resting on the front of the shoulders with bent wrists placing the fingertips under the bar and the elbows held high, sitting straight down between the legs with the chest up, and driving through the middle of the feet to stand.',
+    reason: 'Source-bound draft, drawn from a 3D model turned 10 degrees so it can be compared side by side with Front Squat: rack J-hooks set visibly below standing shoulder height, hands just outside the shoulders (narrower than Front Squat) with the barbell resting on the front of the shoulders, a magnified close-up panel of the near hand showing the open hand with the fingertips under the bar, elbows held higher than Front Squat throughout the squat, sitting straight down between the legs with the chest up, and driving through the middle of the feet to stand.',
     summary: 'With the bar set in a rack just below shoulder height and resting on the front of the shoulders with the fingertips under the bar and the elbows high, sit straight down between the legs, then drive through the middle of the feet to stand.',
   },
   {

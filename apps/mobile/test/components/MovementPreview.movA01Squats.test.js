@@ -1,11 +1,12 @@
 /**
- * MOV-A01: 9 barbell, front, and box squats (IDs 1, 123, 277, 299, 8, 208, 38, 256, 275)
- * and the three chain-kit additions (footSpread, kneeOut, nearBarEnd/farBarEnd).
+ * MOV-A01 / MOV-A01-R1: 9 barbell, front, and box squats (IDs 1, 123, 277, 299, 8, 208, 38, 256, 275)
+ * and the chain-kit additions (footSpread, kneeOut, nearBarEnd/farBarEnd, closeUp zoom/open).
  */
 import {
   CANONICAL_BODY_PARAMETERS,
   CHAIN_MOVEMENTS,
   chainGeometry,
+  handCloseUp,
   layoutCanonicalFigure,
   poseAtTime,
 } from '../../src/components/movementPreview/canonicalFigure';
@@ -91,6 +92,24 @@ describe('MOV-A01 chain kit additions: footSpread, kneeOut, nearBarEnd / farBarE
       expect(ends[1][1]).toBeCloseTo(fig.barEnd.near[1], 5);
     }
   });
+
+  test('closeUp optional zoom and open keep a constant open-hand fingertip panel across all phases without altering phase-driven finger-curls', () => {
+    for (const ph of [0, 0.5, 1]) {
+      const cleanFig = chainGeometry('front-squat-clean-grip', ph, BODY);
+      const panel = handCloseUp(cleanFig);
+      expect(panel).not.toBeNull();
+      expect(panel.zoom).toBe(1);
+      expect(panel.open).toBe(1);
+      // In screen coordinates (+y downward), the open fingertips (finger[2], finger[3]) sit directly under the bar (larger y than bar[1]).
+      expect(panel.finger[2][1]).toBeGreaterThan(panel.bar[1] + 3.0);
+      expect(panel.finger[3][1]).toBeGreaterThan(panel.bar[1] + 1.5);
+      expect(dist2(panel.centre, panel.bar)).toBeLessThan(panel.r);
+    }
+    // Omitted zoom/open on finger-curls preserves phase-driven panel opening.
+    expect(handCloseUp(chainGeometry('finger-curls', 0, BODY))).toBeNull();
+    expect(handCloseUp(chainGeometry('finger-curls', 1, BODY)).open).toBe(0);
+    expect(handCloseUp(chainGeometry('finger-curls', 2, BODY)).open).toBe(1);
+  });
 });
 
 describe('MOV-A01 universal invariants across all 9 squats', () => {
@@ -102,8 +121,9 @@ describe('MOV-A01 universal invariants across all 9 squats', () => {
     expect(entry.status).toBe('pending');
     expect(entry.view).toBe('oblique');
     expect(def.view).toBe('oblique');
-    const expectedYaw = [1, 123, 277, 299].includes(id) ? 32 : 30;
+    const expectedYaw = [1, 123, 277, 299].includes(id) ? 32 : [8, 208].includes(id) ? 10 : 30;
     expect(def.yawDeg).toBe(expectedYaw);
+    if ([8, 208].includes(id)) expect(def.yawDeg).toBeLessThanOrEqual(10);
     expect(entry.reason).toContain(`turned ${expectedYaw} degrees`);
     expect(entry.frames.length).toBeGreaterThanOrEqual(5);
 
@@ -255,24 +275,33 @@ describe('MOV-A01 per-movement source-bound biomechanics', () => {
     expect(bottom.world.near.knee[1] - bottom.world.hip[1]).toBeLessThanOrEqual(1.5);
   });
 
-  test('8 Front Squat: bar across front of shoulders, secure grip with elbows pointing forward, upright torso into full squat', () => {
+  test('8 Front Squat: bar across front of shoulders, secure grip slightly wider than shoulder-width, upper arms near horizontal and pointing forward at every tick', () => {
     const row = rowFor(8);
     expect(row.source.instructions).toContain('Set the bar across the front of the shoulders with a secure grip and the elbows pointing forward');
     expect(row.source.cues).toContain('Stay tall through the drive');
 
+    const entry = entryFor(8);
     const bottom = chainGeometry('front-squat', 1, BODY);
     const compBottom = chainGeometry('competition-squat', 1, BODY);
 
-    // Secure grip directly on the bar (no wrist-extension hand segment).
+    // Secure grip directly on the bar (no wrist-extension hand segment, no closeUp).
     expect(bottom.angles.hand).toBeUndefined();
+    expect(handCloseUp(bottom)).toBeNull();
 
-    // Bar sits across the front of the shoulders (anterior to neck) on every tick, with elbows pointing forward.
-    for (const ph of [0, 0.25, 0.5, 0.75, 1]) {
-      const fig = chainGeometry('front-squat', ph, BODY);
+    // At every 33ms tick, bar sits across the front of the shoulders and upper arms stay near horizontal (within 10 deg) and pointing forward.
+    const total = entry.segmentDurationsMs.reduce((a, b) => a + b, 0);
+    for (let t = 0; t <= total; t += 33) {
+      const p = poseAtTime(entry.frames.map((f) => f.joints), t, entry.segmentDurationsMs);
+      const fig = chainGeometry('front-squat', p.ph, BODY);
       const bar = barMidWorld(fig);
       expect(bar[0]).toBeGreaterThan(fig.world.neck[0] + 1.0);
       expect(Math.hypot(bar[0] - fig.world.neck[0], bar[1] - fig.world.neck[1])).toBeLessThanOrEqual(2.5);
-      expect(fig.world.near.elbow[0] - fig.world.near.shoulder[0]).toBeGreaterThan(11.0);
+
+      const dx = fig.world.near.elbow[0] - fig.world.near.shoulder[0];
+      const dy = fig.world.near.elbow[1] - fig.world.near.shoulder[1];
+      const upperArmPitchDeg = Math.atan2(dy, dx) * 180 / Math.PI;
+      expect(dx).toBeGreaterThan(12.0);
+      expect(Math.abs(upperArmPitchDeg)).toBeLessThanOrEqual(10.0);
     }
 
     // Upright torso (more vertical than back squat) and full squat depth.
@@ -280,36 +309,55 @@ describe('MOV-A01 per-movement source-bound biomechanics', () => {
     expect(bottom.world.hip[1]).toBeLessThan(bottom.world.near.knee[1] - 1.0);
   });
 
-  test('208 Front Squat (Clean Grip): rack set just below shoulder height, fingertips under bar, elbows lifted higher than standard front squat', () => {
+  test('208 Front Squat (Clean Grip): rack visibly below shoulder height, hands just outside shoulders (narrower than 8), fingertips under bar in closeUp, elbows at least as high as 8 at every tick', () => {
     const row = rowFor(208);
     expect(row.source.instructions).toContain('Set the bar in a rack just below shoulder height');
     expect(row.source.instructions).toContain('fingertips under the bar and the elbows high');
 
+    const entry = entryFor(208);
     const top = chainGeometry('front-squat-clean-grip', 0, BODY);
     const bottom = chainGeometry('front-squat-clean-grip', 1, BODY);
     const stdTop = chainGeometry('front-squat', 0, BODY);
 
-    // Rack J-hook height (67.2) is set just below standing shoulder height (70.08).
-    const jHookY = 67.2;
-    expect(jHookY).toBeLessThan(top.world.near.shoulder[1]);
-    expect(top.world.near.shoulder[1] - jHookY).toBeLessThanOrEqual(4.0);
+    // Rack J-hook height (63.0) is visibly below standing shoulder height (70.08) and lower than 8 Front Squat's J-hooks (68.5).
+    const cleanHookY = 63.0;
+    const stdHookY = 68.5;
+    expect(top.world.near.shoulder[1] - cleanHookY).toBeGreaterThanOrEqual(6.5);
+    expect(cleanHookY).toBeLessThan(stdHookY - 5.0);
 
-    // Clean-grip uses a wrist-extension hand segment placing fingertips under the bar outside the shoulders.
-    expect(top.angles.hand).toBeDefined();
-    expect(top.world.near.grip[2]).toBeGreaterThan(top.world.near.shoulder[2] + 3.5);
+    // Grip width relationship: 8 ("slightly wider than shoulder-width") has wider hand spacing than 208 ("hands just outside the shoulders"), and both are outside the shoulders.
+    const shoulderSpanZ = top.world.near.shoulder[2] - top.world.far.shoulder[2];
+    const cleanGripSpanZ = top.world.near.grip[2] - top.world.far.grip[2];
+    const stdGripSpanZ = stdTop.world.near.grip[2] - stdTop.world.far.grip[2];
+    expect(cleanGripSpanZ).toBeGreaterThan(shoulderSpanZ + 3.0);
+    expect(stdGripSpanZ).toBeGreaterThan(cleanGripSpanZ + 2.0);
 
-    // Elbows are lifted higher above the shoulder line than in 8 Front Squat.
-    expect(top.world.near.elbow[1] - top.world.near.shoulder[1]).toBeGreaterThan(
-      stdTop.world.near.elbow[1] - stdTop.world.near.shoulder[1] + 1.2,
-    );
+    // At every 33ms tick: bar rests on front of shoulders, upper arms are near horizontal and pointing forward with elbows higher than 8, and closeUp shows fingertips under the bar.
+    const total = entry.segmentDurationsMs.reduce((a, b) => a + b, 0);
+    for (let t = 0; t <= total; t += 33) {
+      const p = poseAtTime(entry.frames.map((f) => f.joints), t, entry.segmentDurationsMs);
+      const cleanFig = chainGeometry('front-squat-clean-grip', p.ph, BODY);
+      const stdFig = chainGeometry('front-squat', p.ph, BODY);
+      const bar = barMidWorld(cleanFig);
+      expect(bar[0]).toBeGreaterThan(cleanFig.world.neck[0] + 1.0);
+      expect(Math.hypot(bar[0] - cleanFig.world.neck[0], bar[1] - cleanFig.world.neck[1])).toBeLessThanOrEqual(2.5);
 
-    // Bar rests across the front of the shoulders at every tick, and squat reaches full depth.
-    for (const ph of [0, 0.25, 0.5, 0.75, 1]) {
-      const fig = chainGeometry('front-squat-clean-grip', ph, BODY);
-      const bar = barMidWorld(fig);
-      expect(bar[0]).toBeGreaterThan(fig.world.neck[0] + 1.0);
-      expect(Math.hypot(bar[0] - fig.world.neck[0], bar[1] - fig.world.neck[1])).toBeLessThanOrEqual(2.5);
+      const cleanDx = cleanFig.world.near.elbow[0] - cleanFig.world.near.shoulder[0];
+      const cleanDy = cleanFig.world.near.elbow[1] - cleanFig.world.near.shoulder[1];
+      const stdDy = stdFig.world.near.elbow[1] - stdFig.world.near.shoulder[1];
+      const cleanPitchDeg = Math.atan2(cleanDy, cleanDx) * 180 / Math.PI;
+      expect(cleanDx).toBeGreaterThan(12.0);
+      expect(Math.abs(cleanPitchDeg)).toBeLessThanOrEqual(10.0);
+      expect(cleanDy).toBeGreaterThanOrEqual(stdDy + 1.0);
+
+      const panel = handCloseUp(cleanFig);
+      expect(panel).not.toBeNull();
+      expect(panel.open).toBe(1);
+      expect(panel.finger[2][1]).toBeGreaterThan(panel.bar[1] + 3.0);
+      expect(panel.finger[3][1]).toBeGreaterThan(panel.bar[1] + 1.5);
+      expect(panel.centre[0] + panel.r).toBeLessThan(cleanFig.joints.hd[0] - 8);
     }
+
     expect(bottom.world.hip[1]).toBeLessThan(bottom.world.near.knee[1] - 2.0);
   });
 
