@@ -4,6 +4,7 @@
  */
 import {
   CANONICAL_BODY_PARAMETERS,
+  CHAIN_FLOOR_PLATE,
   CHAIN_MOVEMENTS,
   chainGeometry,
   layoutCanonicalFigure,
@@ -21,6 +22,41 @@ const slugFor = (id) => entryFor(id).assetKey.split('/')[1];
 
 const dist3 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 const dist2 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+const FLOOR = 96.9;
+
+const elbowAngleDeg = (side) => {
+  const u = [side.shoulder[0] - side.elbow[0], side.shoulder[1] - side.elbow[1], side.shoulder[2] - side.elbow[2]];
+  const v = [side.wrist[0] - side.elbow[0], side.wrist[1] - side.elbow[1], side.wrist[2] - side.elbow[2]];
+  const dot = u[0] * v[0] + u[1] * v[1] + u[2] * v[2];
+  const mag = Math.hypot(...u) * Math.hypot(...v);
+  return (Math.acos(Math.max(-1, Math.min(1, dot / mag))) * 180) / Math.PI;
+};
+
+const segPointDist2D = (x1, y1, x2, y2, px, py) => {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const l2 = dx * dx + dy * dy;
+  if (l2 === 0) return Math.hypot(px - x1, py - y1);
+  const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / l2));
+  return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+};
+
+const primBounds = (p) => {
+  if (p.kind === 'circle') {
+    const pad = p.r + (p.strokeWidth ?? 0) / 2;
+    return { minX: p.cx - pad, minY: p.cy - pad, maxX: p.cx + pad, maxY: p.cy + pad };
+  }
+  const pad = (p.w ?? 0) / 2 + (p.strokeWidth ?? 0) / 2;
+  return {
+    minX: Math.min(p.x1, p.x2) - pad,
+    minY: Math.min(p.y1, p.y2) - pad,
+    maxX: Math.max(p.x1, p.x2) + pad,
+    maxY: Math.max(p.y1, p.y2) + pad,
+  };
+};
+
+const boxesOverlap = (a, b) =>
+  a.minX < b.maxX && a.maxX > b.minX && a.minY < b.maxY && a.maxY > b.minY;
 
 const barMidWorld = (fig) => [
   (fig.world.near.hold[0] + fig.world.far.hold[0]) / 2,
@@ -28,7 +64,7 @@ const barMidWorld = (fig) => [
   (fig.world.near.hold[2] + fig.world.far.hold[2]) / 2,
 ];
 
-describe('MOV-A02 chain kit additions: barAt and double kettlebells', () => {
+describe('MOV-A02 chain kit additions: barAt, plateRadius, and double kettlebells', () => {
   test('barAt: "elbows" cradles the barbell in the elbow crooks while omitting barAt keeps the bar in the hands', () => {
     const zercher = chainGeometry('zercher-squat', 0.5, BODY);
     const comp = chainGeometry('competition-squat', 0.5, BODY);
@@ -62,6 +98,20 @@ describe('MOV-A02 chain kit additions: barAt and double kettlebells', () => {
     expect(farPlateIdx(compPrims)).toBeGreaterThan(farThighIdx(compPrims));
   });
 
+  test('plateRadius sizes floor-starting barbell plates to CHAIN_FLOOR_PLATE while omitting plateRadius keeps 4.2', () => {
+    const hackEntry = entryFor(98);
+    const compEntry = entryFor(1);
+    const hackPrims = layoutCanonicalFigure(hackEntry.frames[0].joints, { ...hackEntry, body: BODY });
+    const compPrims = layoutCanonicalFigure(compEntry.frames[0].joints, { ...compEntry, body: BODY });
+
+    const plateHalfLen = (prims) => {
+      const p = prims.find((pr) => pr.kind === 'bone' && pr.color === 'textHi' && Math.abs(pr.w - 2.4) < 1e-6 && pr.stroke === 'ink1');
+      return Math.hypot(p.x2 - p.x1, p.y2 - p.y1) / 2;
+    };
+    expect(plateHalfLen(hackPrims)).toBeCloseTo(CHAIN_FLOOR_PLATE, 6);
+    expect(plateHalfLen(compPrims)).toBeCloseTo(4.2, 6);
+  });
+
   test('implement: "kettlebells" draws both near and far kettlebell bodies and handles', () => {
     const singleEntry = entryFor(105);
     const doubleEntry = entryFor(48);
@@ -89,7 +139,6 @@ describe('MOV-A02 universal invariants across all 8 other squats', () => {
     const expectedYaw =
       [140, 192, 235].includes(id) ? 10 :
       id === 98 ? 26 :
-      id === 120 ? 38 :
       28;
     expect(def.yawDeg).toBe(expectedYaw);
     expect(entry.reason).toContain(`turned ${expectedYaw} degrees`);
@@ -233,6 +282,7 @@ describe('MOV-A02 per-movement source-bound biomechanics', () => {
     expect(row.source.instructions).toContain('letting the bar skim up behind the legs');
     expect(row.source.cues).toContain('Keep the bar close behind the legs');
 
+    const entry = entryFor(98);
     const floor = chainGeometry('barbell-hack-squat', 0, BODY);
     const mid = chainGeometry('barbell-hack-squat', 0.5, BODY);
     const top = chainGeometry('barbell-hack-squat', 1, BODY);
@@ -243,12 +293,28 @@ describe('MOV-A02 per-movement source-bound biomechanics', () => {
     expect(top.world.hip[1]).toBeGreaterThan(42);
     expect(barMidWorld(top)[1]).toBeGreaterThan(43);
 
+    // At the bottom keyframe (ph=0), the barbell plates rest on the floor line (FLOOR = 96.9)
+    // and the hands hold the bar with straight elbows (180 degrees, full 24.5 reach).
+    const floorPrims = layoutCanonicalFigure(entry.frames[0].joints, { ...entry, body: BODY });
+    const floorPlates = floorPrims.filter((p) => p.kind === 'bone' && Math.abs(p.w - 2.4) < 1e-6 && p.stroke === 'ink1');
+    expect(floorPlates).toHaveLength(2);
+    for (const plate of floorPlates) {
+      const plateBottom = Math.max(plate.y1, plate.y2) + plate.w / 2;
+      expect(plateBottom).toBeCloseTo(FLOOR, 5);
+    }
+    expect(dist3(floor.world.near.wrist, floor.world.near.hold)).toBeLessThan(1e-6);
+    expect(dist3(floor.world.far.wrist, floor.world.far.hold)).toBeLessThan(1e-6);
+    expect(elbowAngleDeg(floor.world.near)).toBeCloseTo(180, 5);
+    expect(elbowAngleDeg(floor.world.far)).toBeCloseTo(180, 5);
+    expect(dist3(floor.world.near.shoulder, floor.world.near.wrist)).toBeCloseTo(24.5, 5);
+
     // Across the entire pull, the bar stays strictly behind the calves and knees, with arms long.
     for (const fig of [floor, mid, top]) {
       const bar = barMidWorld(fig);
       expect(bar[0]).toBeLessThan(fig.world.near.ankle[0] - 1.0);
       expect(bar[0]).toBeLessThan(fig.world.near.knee[0] - 2.0);
       expect(fig.world.near.wrist[1]).toBeLessThan(fig.world.near.shoulder[1] - 21);
+      expect(elbowAngleDeg(fig.world.near)).toBeCloseTo(180, 5);
     }
   });
 
@@ -258,19 +324,39 @@ describe('MOV-A02 per-movement source-bound biomechanics', () => {
     expect(row.source.instructions).toContain('take one hand in front of the body and one behind at equal distances');
     expect(row.source.instructions).toContain('with the bar travelling between the legs');
 
+    const entry = entryFor(120);
     const bottom = chainGeometry('jefferson-squats', 0, BODY);
     const top = chainGeometry('jefferson-squats', 1, BODY);
+
+    // At the bottom keyframe (ph=0), the barbell plates rest on the floor line (FLOOR = 96.9)
+    // and both hands hold the bar with straight elbows (180 degrees, full 24.5 reach).
+    const bottomPrims = layoutCanonicalFigure(entry.frames[0].joints, { ...entry, body: BODY });
+    const bottomPlates = bottomPrims.filter((p) => p.kind === 'bone' && Math.abs(p.w - 2.4) < 1e-6 && p.stroke === 'ink1');
+    expect(bottomPlates).toHaveLength(2);
+    for (const plate of bottomPlates) {
+      const plateBottom = Math.max(plate.y1, plate.y2) + plate.w / 2;
+      expect(plateBottom).toBeCloseTo(FLOOR, 5);
+    }
+    expect(dist3(bottom.world.near.wrist, bottom.world.near.hold)).toBeLessThan(1e-6);
+    expect(dist3(bottom.world.far.wrist, bottom.world.far.hold)).toBeLessThan(1e-6);
+    expect(elbowAngleDeg(bottom.world.near)).toBeCloseTo(180, 5);
+    expect(elbowAngleDeg(bottom.world.far)).toBeCloseTo(180, 5);
+    expect(dist3(bottom.world.near.shoulder, bottom.world.near.wrist)).toBeCloseTo(24.5, 5);
+    expect(dist3(bottom.world.far.shoulder, bottom.world.far.wrist)).toBeCloseTo(24.5, 5);
 
     // Straddle stance: near foot steps behind the bar (X < 0) and far foot steps in front of the bar (X > 0), wide across Z.
     expect(top.world.near.ankle[0]).toBeLessThan(-4);
     expect(top.world.far.ankle[0]).toBeGreaterThan(4);
     expect(top.world.near.ankle[2] - top.world.far.ankle[2]).toBeGreaterThan(30);
 
-    // Mixed straddle grip: near hand reaches in front of the bar (+X), far hand reaches behind the bar (-X).
+    // Mixed straddle grip: near hand reaches in front of the bar (+X), far hand reaches behind the bar (-X),
+    // and in 2D screen space both hands sit well outside the trunk on opposite sides so neither hand is hidden.
     for (const fig of [top, bottom]) {
       const bar = barMidWorld(fig);
       expect(fig.world.near.wrist[0]).toBeGreaterThan(bar[0] + 4);
       expect(fig.world.far.wrist[0]).toBeLessThan(bar[0] - 4);
+      expect(fig.joints.wr[0]).toBeGreaterThan(fig.joints.hp[0] + 8);
+      expect(fig.joints.wf[0]).toBeLessThan(fig.joints.hp[0] - 8);
       // Bar stays between the legs (below the pelvis crease).
       expect(bar[1]).toBeLessThan(fig.world.hip[1] - 1.5);
     }
@@ -303,7 +389,7 @@ describe('MOV-A02 per-movement source-bound biomechanics', () => {
     expect(dist2([back.world.hip[0], back.world.hip[1]], [back.world.near.ankle[0], back.world.near.ankle[1]])).toBeLessThan(15);
   });
 
-  test('105 One-Arm Overhead Kettlebell Squat: one kettlebell locked overhead stacked over shoulder, free arm forward, pause at bottom', () => {
+  test('105 One-Arm Overhead Kettlebell Squat: one kettlebell locked overhead stacked over shoulder, free arm forward, pause at bottom, head clear of arm', () => {
     const row = rowFor(105);
     expect(row.source.instructions).toContain('Clean and press one kettlebell overhead, lock the elbow');
     expect(row.source.instructions).toContain('Pause at the deepest owned position');
@@ -323,6 +409,24 @@ describe('MOV-A02 per-movement source-bound biomechanics', () => {
 
       // Far arm reaches forward as a counterbalance.
       expect(w.far.wrist[0] - w.far.shoulder[0]).toBeGreaterThan(18);
+
+      // Neither the near upper arm nor the near forearm overlaps the head ring or its painted bounds.
+      const prims = layoutCanonicalFigure(p, { ...entry, body: BODY });
+      const j = fig.joints;
+      const head = prims.find((pr) => pr.kind === 'circle' && Math.abs(pr.cx - j.hd[0]) < 1e-4 && Math.abs(pr.cy - j.hd[1]) < 1e-4);
+      const upperArmBone = prims.find((pr) => pr.kind === 'bone' && Math.abs(pr.x1 - j.nArm[0]) < 1e-4 && Math.abs(pr.y1 - j.nArm[1]) < 1e-4 && Math.abs(pr.x2 - j.el[0]) < 1e-4 && Math.abs(pr.y2 - j.el[1]) < 1e-4);
+      const forearmBone = prims.find((pr) => pr.kind === 'bone' && Math.abs(pr.x1 - j.el[0]) < 1e-4 && Math.abs(pr.y1 - j.el[1]) < 1e-4 && Math.abs(pr.x2 - j.wr[0]) < 1e-4 && Math.abs(pr.y2 - j.wr[1]) < 1e-4);
+      expect(head).toBeDefined();
+      expect(upperArmBone).toBeDefined();
+      expect(forearmBone).toBeDefined();
+
+      const headOuterR = head.r + (head.strokeWidth ?? 0) / 2;
+      for (const bone of [upperArmBone, forearmBone]) {
+        const centerDist = segPointDist2D(bone.x1, bone.y1, bone.x2, bone.y2, head.cx, head.cy);
+        const clearance = centerDist - bone.w / 2 - headOuterR;
+        expect(clearance).toBeGreaterThan(0);
+        expect(boxesOverlap(primBounds(bone), primBounds(head))).toBe(false);
+      }
     }
 
     // Pause in the deepest position (two consecutive ph=1 frames).

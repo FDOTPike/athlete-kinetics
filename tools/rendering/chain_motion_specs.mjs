@@ -1904,7 +1904,7 @@ export const CHAIN_SPECS = [
       'Lower the bar under control along the same centred path between the legs.',
       'Centre the torso over the bar, push both feet through the floor, and switch orientation between sets.',
     ],
-    reason: 'Source-bound draft, drawn from a 3D model turned 38 degrees so the straddle stance across the bar, one hand gripping in front of the body and the other behind at equal distances, and the bar running between the legs all read clearly: starting squatted over the straddled bar with a tall centred torso, pushing both feet through the floor to stand with the bar travelling straight up between the legs, and lowering along the same centred path.',
+    reason: 'Source-bound draft, drawn from a 3D model turned 28 degrees so the straddle stance across the bar, one hand gripping in front of the body and the other behind at equal distances on straight arms outside the trunk silhouette, and the bar running between the legs from the floor all read clearly: starting squatted over the straddled bar on the floor with a tall centred torso, pushing both feet through the floor to stand with the bar travelling straight up between the legs, and lowering along the same centred path.',
     summary: 'Straddling the bar with one hand in front of the body and one behind at equal distances, brace a tall torso and push both feet through the floor to stand with the bar travelling between the legs, then lower along the same centred path.',
   },
   {

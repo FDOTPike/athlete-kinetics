@@ -1294,6 +1294,8 @@ export interface ChainMovement {
   implement?: 'none' | 'bells' | 'bell' | 'hammer' | 'bar' | 'ez' | 'cableBar' | 'handle' | 'handles' | 'rope' | 'longBar' | 'kettlebell' | 'kettlebells';
   /** Where a held bar rests on the figure: across the hands by default, cradled in the elbow crooks ('elbows'), or held in the hands with its far half behind the legs ('behind'). */
   barAt?: 'hands' | 'elbows' | 'behind';
+  /** Half-length of a held barbell's plate segment (4.2 by default; larger for floor-starting barbell lifts). */
+  plateRadius?: number;
   /** For 'longBar': the point on the floor the bar's far end is braced at, and the bar's whole length from there. */
   barAnchor?: ChainPoint;
   barLength?: number;
@@ -1347,6 +1349,9 @@ const CHAIN_PALM = 1.8;
 const CHAIN_FOOT = 5.4;
 /** The floor the soles rest on. */
 const CHAIN_FLOOR = 96.9;
+/** Half-length of a floor-starting barbell plate segment (with its 1.2 cap, outer radius is 9.5). */
+export const CHAIN_FLOOR_PLATE = 8.3;
+export const CHAIN_FLOOR_BAR_HEIGHT = CHAIN_FLOOR_PLATE + 1.2;
 const CHAIN_SPINE_STEPS = 32;
 /** The height of an ankle whose flat foot is on the floor, and of the hip of a figure standing straight on it. */
 export const CHAIN_ANKLE_HEIGHT = CANONICAL_BODY_PARAMETERS.lw * 0.9 / 2;
@@ -3975,17 +3980,22 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     originX: 50,
     implement: 'bar',
     barAt: 'behind',
+    plateRadius: CHAIN_FLOOR_PLATE,
     footSpread: 4.0,
     poses: [
       {
-        at: [3.2, 24.8], trunk: 58, thigh: -90, shin: -90,
+        at: [
+          -4.83,
+          CHAIN_FLOOR_BAR_HEIGHT - CHAIN_TRUNK * Math.sin(chainRad(50)) - (SAGITTAL_UPPER_ARM + SAGITTAL_FOREARM) * Math.sin(chainRad(-98)) * Math.cos(chainRad(4)),
+        ],
+        trunk: 50, thigh: -90, shin: -90,
         ankle: [10, CHAIN_ANKLE_HEIGHT], kneeOut: 12,
-        upperArm: [-110, 18], forearm: [-108, 14],
+        upperArm: [-98, 4], forearm: [-98, 4],
       },
       {
         at: [8.5, 45.70], trunk: 88, thigh: -90, shin: -90,
         ankle: [10, CHAIN_ANKLE_HEIGHT], kneeOut: 8,
-        upperArm: [-104, 18], forearm: [-104, 14],
+        upperArm: [-102, 4], forearm: [-102, 4],
       },
     ],
   },
@@ -3996,25 +4006,30 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
   'jefferson-squats': {
     root: 'hip',
     view: 'oblique',
-    yawDeg: 38,
+    yawDeg: 28,
     originX: 50,
     feet: 'free',
     implement: 'bar',
-    elbowPole: [0, 60],
+    plateRadius: CHAIN_FLOOR_PLATE,
+    kneePole: [90, 36],
     poses: [
       {
-        at: [0, 23.4], trunk: 88, twist: 35, shrug: -2.0, thigh: -90, shin: -90,
-        ankle: [-5, CHAIN_ANKLE_HEIGHT, 15.5], farAnkle: [5, CHAIN_ANKLE_HEIGHT, -15.5],
-        foot: [0, -8], farFoot: [0, 20], kneeOut: 26,
-        upperArm: -90, forearm: -90,
-        wrist: [5.4, 21.6, 3.6], farWrist: [-5.4, 21.6, -3.6],
+        at: [
+          0,
+          CHAIN_FLOOR_BAR_HEIGHT - (CHAIN_TRUNK - 1.6) - (SAGITTAL_UPPER_ARM + SAGITTAL_FOREARM) * Math.sin(chainRad(-83.5)) * Math.cos(chainRad(-10)),
+        ],
+        trunk: 90, twist: 58, shrug: -1.6, thigh: -90, shin: -90,
+        ankle: [-7.0, CHAIN_ANKLE_HEIGHT, 18.0], farAnkle: [7.0, CHAIN_ANKLE_HEIGHT, -18.0],
+        foot: [0, -8], farFoot: [0, 20], kneeOut: 18,
+        upperArm: [-83.5, -10], forearm: [-83.5, -10],
+        farUpperArm: [-96.5, -10], farForearm: [-96.5, -10],
       },
       {
-        at: [0, 44.2], trunk: 90, twist: 35, shrug: -2.0, thigh: -90, shin: -90,
-        ankle: [-5, CHAIN_ANKLE_HEIGHT, 15.5], farAnkle: [5, CHAIN_ANKLE_HEIGHT, -15.5],
-        foot: [0, -8], farFoot: [0, 20], kneeOut: 16,
-        upperArm: -90, forearm: -90,
-        wrist: [5.4, 42.6, 3.6], farWrist: [-5.4, 42.6, -3.6],
+        at: [0, 44.2], trunk: 90, twist: 58, shrug: -1.6, thigh: -90, shin: -90,
+        ankle: [-7.0, CHAIN_ANKLE_HEIGHT, 18.0], farAnkle: [7.0, CHAIN_ANKLE_HEIGHT, -18.0],
+        foot: [0, -8], farFoot: [0, 20], kneeOut: 14,
+        upperArm: [-83.5, -10], forearm: [-83.5, -10],
+        farUpperArm: [-96.5, -10], farForearm: [-96.5, -10],
       },
     ],
   },
@@ -4063,15 +4078,15 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     footSpread: 5.2,
     poses: [
       {
-        at: [0.0, 45.95], trunk: 88, thigh: -90, shin: -90,
+        at: [0.0, 45.95], trunk: 80, twist: -34, thigh: -90, shin: -90,
         ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 12,
-        upperArm: [90, 0], forearm: [90, 0],
+        upperArm: [92, 8], forearm: [90, 6],
         farUpperArm: [6, 12], farForearm: [10, 6],
       },
       {
-        at: [-10.8, 20.2], trunk: 66, thigh: -90, shin: -90,
+        at: [-10.8, 20.2], trunk: 64, twist: -22, thigh: -90, shin: -90,
         ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 24,
-        upperArm: [90, 0], forearm: [90, 0],
+        upperArm: [92, 8], forearm: [90, 6],
         farUpperArm: [6, 12], farForearm: [10, 6],
       },
     ],
@@ -4517,8 +4532,9 @@ function layoutChainExtras(
       farGroup.push(line(mid, farEnd, 1.6, farTone, farAlpha));
       near.push(line(mid, nearEnd, 1.6, 'textHi', 1));
       if (kind !== 'cableBar') {
+        const pr = movement.plateRadius ?? 4.2;
         const plate = (c: CanonicalPoint, color: ColorRole, opacity: number): FigurePrim =>
-          ({ ...line([c[0] + uy * 4.2, c[1] - ux * 4.2], [c[0] - uy * 4.2, c[1] + ux * 4.2], 2.4, color, opacity), stroke: 'ink1', strokeWidth: 0.6 });
+          ({ ...line([c[0] + uy * pr, c[1] - ux * pr], [c[0] - uy * pr, c[1] + ux * pr], 2.4, color, opacity), stroke: 'ink1', strokeWidth: 0.6 });
         farGroup.push(plate([farEnd[0] + ux * 2, farEnd[1] + uy * 2], farTone, farAlpha));
         near.push(plate([nearEnd[0] - ux * 2, nearEnd[1] - uy * 2], 'textHi', 1));
       }
