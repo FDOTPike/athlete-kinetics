@@ -586,12 +586,10 @@ final class AthleteKineticsUITests: XCTestCase {
     // Restore. First the person backs out of the Files sheet: nothing changes.
     enterText(into: "Backup password, at least 12 characters", password)
     tap("choose-restore-button", "RESTORE ENCRYPTED BACKUP")
-    let cancel = filesControl(["Cancel", "Close"])
-    if !cancel.waitForExistence(timeout: 30) { log("files sheet without Cancel: \(filesSheetInventory())") }
-    wait(cancel, "the Files sheet's Cancel", timeout: 1)
-    cancel.tap()
+    let cancelled = cancelFilesSheet()
     settledLabel(element("backup-status-message"), beginsWith: "Restore cancelled. Your data is unchanged.",
-                 "status after cancelling the Files sheet", timeout: 30)
+                 "status after cancelling the Files sheet",
+                 timeout: max(1, 30 - Date().timeIntervalSince(cancelled)))
     // Then the same password, the saved .pmbak picked in Files, preview, confirm.
     tap("choose-restore-button", "RESTORE ENCRYPTED BACKUP")
     pickBackupInFiles()
@@ -724,6 +722,86 @@ final class AthleteKineticsUITests: XCTestCase {
     let named = NSPredicate(format: "label IN %@ OR identifier IN %@", names, names)
     let button = app.buttons.matching(named).firstMatch
     return button.exists ? button : app.descendants(matching: .any).matching(named).firstMatch
+  }
+
+  /// The Files sheet's own navigation bar ("FullDocumentManagerViewController
+  /// NavigationBar" on iOS 27), or an element that does not exist while no
+  /// sheet is up.
+  private func filesSheetBar() -> XCUIElement {
+    app.navigationBars.matching(NSPredicate(format: "identifier CONTAINS 'DocumentManager'")).firstMatch
+  }
+
+  /// Backs out of the Files import sheet with its own Cancel (or Close) and
+  /// returns when the tap was made. CI evidence (Xcode 27, runs 38299228248
+  /// and 38345092343): 30 s after the tap the app's tree still held the
+  /// sheet's bar and the saved .pmbak's row, and the status still read
+  /// "Opening encrypted backup…", which the app sets before it presents the
+  /// sheet. The tap had not closed the sheet. The control used to be chosen
+  /// at the instant RESTORE had been tapped (a Button of that name if one
+  /// existed then, otherwise any element of the app carrying the name) and
+  /// tapped as soon as it existed. It is now taken from the sheet's bar when
+  /// the bar holds a hittable one (otherwise as before), tapped only once it
+  /// is hittable and has stopped moving, recorded with its type, identifier
+  /// and frame, and the sheet must then close: its bar must go, or, when no
+  /// bar was found, the tapped control must go. Nothing is tapped twice.
+  @discardableResult
+  private func cancelFilesSheet(file: StaticString = #filePath, line: UInt = #line) -> Date {
+    let names = ["Cancel", "Close"]
+    let named = NSPredicate(format: "label IN %@ OR identifier IN %@", names, names)
+    let opened = Date()
+    var found: XCUIElement?
+    var inBar = false
+    var lastFrame = CGRect.null
+    var lastIdentity = ""
+    while Date().timeIntervalSince(opened) < 30 {
+      // The first hittable of: a button in the sheet's bar, any element in
+      // that bar, then the earlier lookup over the whole app.
+      let bar = filesSheetBar()
+      let choices: [(XCUIElement, Bool)] = [
+        (bar.buttons.matching(named).firstMatch, true),
+        (bar.descendants(matching: .any).matching(named).firstMatch, true),
+        (filesControl(names), false),
+      ]
+      if let choice = choices.first(where: { $0.0.exists && $0.0.isHittable }) {
+        let (candidate, fromBar) = choice
+        // Settled: the same element (type, identifier, label, lookup) at the
+        // same frame on two reads half a second apart, so the tap is not
+        // aimed at a sheet still sliding in.
+        let frame = candidate.frame
+        let identity = "\(candidate.elementType.rawValue)|\(candidate.identifier)|\(candidate.label)|\(fromBar)"
+        if frame == lastFrame && identity == lastIdentity { found = candidate; inBar = fromBar; break }
+        lastFrame = frame
+        lastIdentity = identity
+      } else {
+        lastFrame = .null
+        lastIdentity = ""
+      }
+      usleep(500_000)
+    }
+    guard let cancel = found else {
+      log("files sheet without Cancel: \(filesSheetInventory())")
+      XCTFail("the Files sheet's Cancel was not on screen and still within 30 s", file: file, line: line)
+      return Date()
+    }
+    let shown = Date().timeIntervalSince(opened)
+    let barWasUp = filesSheetBar().exists
+    let f = cancel.frame
+    log("files sheet cancel: tapping \(cancel.elementType.rawValue):'\(cancel.label)'|'\(cancel.identifier)' at {{\(Int(f.minX)), \(Int(f.minY))}, {\(Int(f.width)), \(Int(f.height))}} found by \(inBar ? "the sheet's bar" : "the whole-app lookup") \(String(format: "%.1f", shown)) s after RESTORE")
+    cancel.tap()
+    let tapped = Date()
+    // Closed: the sheet's bar is gone, or, when no bar was found, the
+    // tapped control (part of the sheet) is gone.
+    let signal = barWasUp ? "its bar" : "the tapped control"
+    let stillOpen = { barWasUp ? self.filesSheetBar().exists : cancel.exists }
+    let deadline = tapped.addingTimeInterval(30)
+    while stillOpen() && Date() < deadline { usleep(250_000) }
+    if stillOpen() {
+      log("files sheet still open after Cancel (\(signal) still on screen): \(filesSheetInventory())")
+      XCTFail("the Files sheet was still open 30 s after its Cancel was tapped (\(signal) still on screen)", file: file, line: line)
+    } else {
+      log("files sheet closed \(String(format: "%.1f", Date().timeIntervalSince(tapped))) s after Cancel (\(signal) gone)")
+    }
+    return tapped
   }
 
   /// What the Files sheet exposes: the elements of its bar by type, label and

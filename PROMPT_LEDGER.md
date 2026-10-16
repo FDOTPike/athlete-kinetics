@@ -12955,3 +12955,87 @@ Please finish merging if there no claashes with other PR's
 - **Resolution.** `origin/master` merged in, no rebase; master's entry sits after 0204 as it does on `master`. A first attempt at the resolution read `FETCH_HEAD` after a later fetch had moved it to this branch's own head, which left master's entry out; that was caught before any commit by checking the headings, and the resolution was redone against `MERGE_HEAD` (confirmed equal to `origin/master`). Checked on the result: master's appended text is present intact, no conflict marker, no duplicate entry number from 0195 up. `npm run typecheck` exit 0.
 - **Clashes with other pull requests.** None found: of the open pull requests that target `master` (72, 73, 74), none changes `PROMPT_LEDGER.md`, the only file this one changes.
 - **Merge.** On the owner's instruction above, pull request 63 is merged once this commit is pushed, without waiting for a full CI run on the final head. What had run: on the earlier head `9554681`, the verification suite and the Android job passed and the iOS job failed in one UI test (Entry 0223); later heads' runs were superseded by these merges. The change is this one Markdown file.
+
+---
+
+## Entry 0225 — 2026-10-15 · Xcode 27 iOS job, test4: did the test tap the wrong Cancel, or does the app open a backup after the Files sheet is cancelled? (Claude Code, cloud session)
+
+2026-10-15. Executor: Claude Code in a cloud session (not the owner's PC). Worktree cut from `origin/master` (`09c1e19`), branch `claude/inspiring-heisenberg-ovfj77`. Numbers up to 0224 are on `origin/master`; the open pull requests (7, 21, 37, 74, 75) carry no entry above 0221, so this entry takes 0225.
+
+### Input
+
+Received verbatim; the text below was the whole message.
+
+```text
+Repository: FDOTPike/athlete-kinetics (public; local checkout at C:\Users\fpike\Documents\Claude Coding\Athlete App; work in a new git worktree cut from origin/master, never in the main checkout). Read AGENT_WORKFLOW.md, .agents/rules/coding-rules-general.md and the memory note on the earlier iOS UI flake investigation (PR 69, ledger Entry 0202) first.
+
+Failure to investigate: CI run 38345092343 (PR #63, head 69dd7d2b, which changes only PROMPT_LEDGER.md), job "iOS unsigned simulator build + native smoke (Xcode 27)", step "UI tests on the simulator (fails closed)". test4_backupToFilesAndRestore failed at apps/mobile/ios/AthleteKineticsUITests/AthleteKineticsUITests.swift:183 with: "status after cancelling the Files sheet did not become 'Restore cancelled. Your data is unchanged.…' within 30 s; it read: Opening encrypted backup…". In the test, this is the step that taps RESTORE ENCRYPTED BACKUP, waits for app.buttons["Cancel"] in the Files sheet, taps it, and expects the status "Restore cancelled. Your data is unchanged.".
+
+The question: on Xcode 27 / the newer iOS runtime, did the test tap a different "Cancel" (or tap before the document picker was the one on screen), or does the app really begin opening a backup after the person cancels the Files sheet? The second would be an app defect in the restore flow (apps/mobile/src/state/backupStore.ts and apps/mobile/src/components/BackupTransferPanel.tsx), not a test problem. Establish which from the run's evidence (the per-test .log, .system.log and .xcresult under ios-evidence/ui-tests in the run's iOS artifact; the PR 69 memory note describes reading CI artifacts by range request instead of a full download, and the owner's rule on artifact downloads). The same Xcode 27 job also failed on runs 38344991834 and 38334844301; check whether those are the same failure. Report a cause the evidence does not establish as NOT VERIFIED.
+
+Fix what the evidence supports on a branch with a pull request against master. Hard rules from the owner: never skip, disable or quarantine a test; never weaken an assertion or widen a timeout without evidence of the failure it answers; no changes to animation or movement-preview code; no model identifiers in commits, PR text or code; the repository is public; run `npm run typecheck` before every commit; review with the CodeRabbit CLI before pushing ("C:\Users\fpike\AppData\Local\Programs\coderabbit\coderabbit.exe" review --committed --base origin/master --agent; never --use-credits); the first file operation appends a verbatim-input entry to PROMPT_LEDGER.md, with a number checked against origin/master and every open pull request (numbers up to 0224 are taken).
+```
+
+### Output
+
+**How the evidence was read, and what could not be.** The run's artifact (`athlete-kinetics-ios-simulator-unsigned-xcode27`, id 11794365453, 248,081,081 B) could not be read in any form. Both routes to it (the REST `artifacts/<id>/zip` redirect and the GitHub connector's download link) point at `productionresultssa19.blob.core.windows.net`. This session's network policy refuses that host (the proxy logged `connect_rejected` for it), so no range request was possible and the per-test `.log`, `.system.log` and `.xcresult` were not read. The memory note on PR 69 lives on the owner's PC and was not available here; Entry 0202 was read in its place. What was read:
+- the check-run annotations through the API, which `tools/ios_ui_annotate.mjs` builds from the per-test log, including the `FAIL-TREE` element inventory printed in `tearDown`;
+- the job logs through the GitHub connector;
+- the app and test source.
+
+**Verdict, run 38345092343 attempt 1 (job 115128575350), test4: not an app defect; the test's Cancel tap did not close the Files sheet. EVIDENCE CAPTURED for the sheet still being open and the app still waiting for the picker. Which element the tap reached, and whether it came before the sheet could take it, NOT VERIFIED.**
+- The `FAIL-TREE` warning, printed straight after the 30 s status wait failed, reads `app{nav[FullDocumentManagerViewControllerNavigationBar] ...` and `cell[pikeMethods-2026-10-13.pmbak, pmbak, 6:34 AM, 2.4 MB]`. The Files sheet, with the saved backup's row, was still in the app's tree.
+- No `files sheet without Cancel` line appears in that warning, so an element named Cancel or Close was found within 30 s and tapped.
+- `apps/mobile/src/state/backupStore.ts:1071` sets "Opening encrypted backup…" before `pickerOpen()` presents the sheet. The status changes only once the picker answers: to "Restore cancelled. Your data is unchanged." on `OPERATION_CANCELED` (line 1076), or to the preview or an error after a file is chosen. A file choice closes the sheet, so with the sheet still up the app was still waiting for the picker and had not begun opening a backup.
+- `BackupTransferPanel.tsx` has no control named Cancel or Close. A search of `apps/mobile/src` for those names finds them only in `RoutineTemplateBuilder.tsx`, `SessionFeelPanel.tsx`, `PreparationPanel.tsx`, `NewBlockChooserScreen.tsx`, `BlockScreen.tsx` and `ProgramSetupScreen.tsx`. The `FAIL-TREE` inventory (first 40 buttons, first 45 texts) holds neither name. Whether an app element carrying either name existed elsewhere in the tree is NOT VERIFIED; the inventory is truncated.
+- Before this change, `filesControl(["Cancel", "Close"])` chose its control at the instant RESTORE had been tapped: a Button of that name if one existed then, otherwise the first element of any type in the app carrying the name. The test tapped it as soon as it existed and never checked that the sheet closed.
+- What the evidence does not settle needs the per-test log's tap record and the result bundle's synthesized-event point:
+  - the element that query resolved to;
+  - its frame;
+  - whether the sheet was still presenting.
+
+**Same failure elsewhere.** Run 38299228248 attempt 1 (Xcode 27 job 114983541522, head `0fde6f5f`) failed identically at line 183 ("it read: Opening encrypted backup…"); that job printed no `FAIL-TREE` warning. Across the Xcode 27 jobs with annotations, from 2026-10-09 to 2026-10-15, the cancel step's recorded status was "Restore cancelled" in 26 jobs and "Opening encrypted backup" in 2; 4 did not reach it. In the 107 other iOS jobs listed for the same runs (the job without the "(Xcode 27)" suffix), every annotation that records this step reads "Restore cancelled" (71 jobs).
+
+**Runs 38344991834 and 38334844301: not this failure. Neither reached the UI tests.** Both stopped on the hermes-engine tarball download from `repo1.maven.org`:
+- **38334844301** (job 115096318191) failed in "Install pods". The log line is `[!] /usr/bin/curl -f -L ... https://repo1.maven.org/maven2/com/facebook/react/react-native-artifacts/0.81.6/react-native-artifacts-0.81.6-hermes-ios-debug.tar.gz ...`. curl's progress stood at 8% of 29.0 M after 24 minutes, then `curl: (18) Transferred a partial file`.
+- **38344991834** (job 115126468395) failed in "Build unsigned Release for the simulator". During pod install, `curl: (92) HTTP/2 stream 1 was not closed cleanly: INTERNAL_ERROR (err 2)` at 91% of 20.3 M. The build then logged `tar: .../Pods/hermes-engine-artifacts/hermes-ios-0.81.6-release.tar.gz: m: No such file or directory` and `rsync(38654): error: .../hermes.xcframework/ios-arm64_x86_64-simulator/*: (l)stat: No such file or directory`.
+- EVIDENCE CAPTURED for both download failures. That the interrupted download is why the release tarball was missing in 38344991834 is an inference from the order of the lines, NOT VERIFIED.
+- Both passed on attempt 2. Nothing was changed for them.
+
+**Change.** Only `apps/mobile/ios/AthleteKineticsUITests/AthleteKineticsUITests.swift`. The cancel step now calls `cancelFilesSheet()`, which:
+- takes the Cancel or Close from the sheet's bar (`filesSheetBar()`, identifier containing `DocumentManager`) when the bar holds a hittable one, otherwise the earlier lookup;
+- taps only once the control is hittable and its frame is unchanged across two reads 0.5 s apart, within the same 30 s bound as before;
+- prints `files sheet cancel: tapping <type>:'<label>'|'<identifier>' at {{x, y}, {w, h}} found by <lookup> <s> s after RESTORE`;
+- after the tap, when the bar had been up, fails with "the Files sheet was still open 30 s after its Cancel was tapped" (with the sheet inventory), or prints how long the sheet took to close.
+
+The status assertion and its wording are unchanged, and its 30 s bound still runs from the tap. Nothing is tapped twice and no test is skipped. The next occurrence will name, in the annotations alone, the element tapped and whether the sheet stayed open.
+
+**Commands and decisive output.**
+- `npm run typecheck` on Node v24.21.0: exit 0, before each commit. Node 22 failed `npm ci` with `EBADENGINE` (the repo requires `>=24.0.0`), so Node 24.21.0 was fetched from nodejs.org and its SHA-256 checked (`node-v24.21.0-linux-x64.tar.xz: OK`).
+- `npm run verify:native-config`: exit 0, `NATIVE CONFIG VERIFIED (static contract; native build evidence comes from the macOS CI job)`, including `PASS  every UI test in the suite is run by CI, none skipped`.
+
+**Not verified.**
+- The Swift has not been compiled or run; this container has no Swift toolchain. The first CI run of this branch is its first compile.
+- Which element the failed taps reached, and their timing, as above.
+- Whether the change removes the failure: it occurred in 2 of 28 Xcode 27 jobs that reached the step, so a single green run shows little.
+
+**Not done, and why.**
+- **CodeRabbit command-line review before pushing.** The command given is a Windows install that this container lacks, and `cli.coderabbit.ai` is refused by the same network policy, so it could not be installed. Raised with the owner, whose answer through the question card was "Push + draft PR (Recommended)": push the branch and open a draft pull request against `master`, have CodeRabbit's GitHub app review it there, and act on its findings before the pull request leaves draft. This departs from the rule of a command-line review before pushing, by the owner's decision.
+
+**Judgment calls.**
+- No retry of the Cancel tap, following Entry 0202 on failure 5. A printed single re-tap is the owner's call.
+- The sheet's bar is preferred, with the earlier lookup kept as the fallback. The Xcode 26 row's bar identifier is not in any annotation read, and a bar-only lookup could fail where the old one passed.
+- The model co-author trailer was left off the commits under the owner's rule against model identifiers; a session-link trailer was kept.
+- No handover file and no `DEVIATION_LOG.md` entry: a test-harness change inside the existing architecture.
+
+**For the owner.**
+- The hermes-engine tarball download from `repo1.maven.org` failed in two Xcode 27 jobs on 2026-10-13. Caching that tarball between runs would remove this class of failure; no change was made here.
+- In run 38345092343 attempt 1, the Xcode 26 iOS job also failed, in `test1`, with "the Workout screen marker (session-screen-shown) did not appear within 30 s".
+
+**After the pull request was opened (pull request 77).**
+- **CI on `1a3f7de`:** all four checks succeeded. The Swift compiled on both iOS rows, and `test4` passed on both. The new lines read, Xcode 26 row (job 116638056643): `files sheet cancel: tapping 9:'Cancel'|'' at {{299, 82}, {36, 36}} found by the sheet's bar 15.8 s after RESTORE`, `files sheet closed 2.6 s after Cancel`. Xcode 27 row (job 116638056517): `... at {{299, 72}, {36, 36}} found by the sheet's bar 14.2 s after RESTORE`, `files sheet closed 2.4 s after Cancel`. On both rows the control was a Button in the sheet's bar. The fallback lookup was not used. One passing run per row says nothing about the 2-in-28 failure rate.
+- **CodeRabbit (requested on the draft with `@coderabbitai review`):** one minor finding and one trivial nit, both fixed in `d2859c5`.
+  - The minor finding: when no sheet bar is found, nothing confirmed the sheet closed. Now the tapped control must disappear.
+  - The nit: the settled check now also compares the element's type, identifier and label.
+  - Still no retry and no new bound. `npm run typecheck` exit 0; `verify:native-config` exit 0.
+ In 38344991834 attempt 1 it failed in `test1` with "the Progress screen marker (progress-screen) did not appear within 30 s". Neither was investigated here.
