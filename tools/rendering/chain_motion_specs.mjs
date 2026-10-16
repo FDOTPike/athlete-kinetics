@@ -1747,11 +1747,11 @@ export const CHAIN_SPECS = [
     captions: [
       'Set the bar across the front of the shoulders with a secure grip and the elbows pointing forward.',
       'Stand around shoulder width, root the whole foot, and keep the elbows high before descending.',
-      'Squat between the hips while holding the rack.',
+      'Squat between the hips with the elbows kept high.',
       'Drive back to standing with the bar over mid-foot.',
       'Drive the elbows forward and high, root the whole foot, and stay tall through the drive.',
     ],
-    reason: 'Source-bound draft, drawn from a 3D model turned 10 degrees so the horizontal upper arms pointing forward, the bar resting on the front of the shoulders, and the upright torso read clearly without an end-on plate covering the shoulder: barbell set across the front of the shoulders with a secure grip slightly wider than shoulder width and the elbows pointing forward, squatting between the hips while holding the rack shelf horizontal, and driving back to standing with the bar over mid-foot.',
+    reason: 'Source-bound draft, drawn from a 3D model turned 10 degrees so the horizontal upper arms pointing forward, the bar resting on the front of the shoulders, and the upright torso read clearly without an end-on plate covering the shoulder: barbell set across the front of the shoulders with a secure grip slightly wider than shoulder width and the elbows pointing forward, squatting between the hips with the upper arms kept horizontal and the elbows high, and driving back to standing with the bar over mid-foot.',
     summary: 'With the bar across the front of the shoulders in a secure grip and the elbows pointing forward, squat between the hips while keeping the elbows high, then drive back to standing with the bar over mid-foot.',
   },
   {
