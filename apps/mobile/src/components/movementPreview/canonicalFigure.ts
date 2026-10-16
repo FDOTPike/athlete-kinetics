@@ -1220,6 +1220,10 @@ export interface ChainPose {
   /** An ankle position the legs are solved to, in place of the leg directions (feet planted). */
   ankle?: ChainPoint;
   farAnkle?: ChainPoint;
+  /** Lateral offset of each planted ankle from hip width, in world Z units. */
+  footSpread?: number;
+  /** Lateral out-angle (degrees) added to the solved knee pole so knees track outward. */
+  kneeOut?: number;
 }
 
 /** Where a piece of equipment is painted: behind the figure, between the far limbs and the trunk, or in front of everything. */
@@ -1234,11 +1238,11 @@ export type ChainShape =
   | { kind: 'roller'; at: ChainPoint; layer?: ChainLayer }
   | { kind: 'box'; a: ChainPoint; b: ChainPoint; layer?: ChainLayer };
 
-/** A cable or band from a fixed point, or from under a foot, to a hand or an ankle. */
+/** A cable or band from a fixed point, or from under a foot, to a hand, bar end, or ankle. */
 export interface ChainLine {
   from: ChainPoint | 'nearFoot' | 'farFoot';
-  /** 'midGrip' is half-way between the two hands: the middle of a bar they both hold. */
-  to: 'nearGrip' | 'farGrip' | 'midGrip' | 'nearAnkle' | 'farAnkle';
+  /** 'midGrip' is half-way between the two hands; 'nearBarEnd' and 'farBarEnd' are the outer ends of a held bar. */
+  to: 'nearGrip' | 'farGrip' | 'midGrip' | 'nearBarEnd' | 'farBarEnd' | 'nearAnkle' | 'farAnkle';
   /** 'far' paints the line behind the trunk and the near limbs (a cable that runs between the legs). */
   depth?: 'far';
 }
@@ -1277,6 +1281,10 @@ export interface ChainMovement {
   /** The way a solved elbow or knee points. */
   elbowPole?: ChainDir;
   kneePole?: ChainDir;
+  /** Lateral offset of each planted ankle from hip width, in world Z units. */
+  footSpread?: number;
+  /** Lateral out-angle (degrees) added to the solved knee pole so knees track outward. */
+  kneeOut?: number;
   /**
    * 'flat': level and on the floor. 'free': along the pose's foot direction.
    * 'front': standing, seen from the front, drawn the way every front view draws a foot.
@@ -3584,6 +3592,283 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       { at: STANDING_PRESS_HIP, trunk: 90, thigh: -90, shin: -90, ankle: [-10, CHAIN_ANKLE_HEIGHT], farAnkle: [10, CHAIN_ANKLE_HEIGHT], upperArm: 0, forearm: 0, ...cablePressHands(true) },
     ],
   },
+  // Barbell Squat (id 1): back-rack squat in a rack, feet shoulder-width or
+  // slightly wider, descending until the hip crease passes the top of the knee.
+  'competition-squat': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 32,
+    originX: 50,
+    implement: 'bar',
+    armsFollowTrunk: true,
+    footSpread: 5.4,
+    equipment: [
+      { kind: 'frame', a: [-15, 0.5, 16], b: [-15, 78, 16] },
+      { kind: 'frame', a: [-15, 0.5, -16], b: [-15, 78, -16] },
+      { kind: 'frame', a: [-15, 68, 16], b: [-11.5, 68, 16] },
+      { kind: 'frame', a: [-15, 68, -16], b: [-11.5, 68, -16] },
+    ],
+    poses: [
+      {
+        at: [-0.2, 46.20], trunk: 86, thigh: -90, shin: -90,
+        ankle: [-2, CHAIN_ANKLE_HEIGHT], kneeOut: 8,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+      {
+        at: [-12.5, 19.5], trunk: 52, thigh: -90, shin: -90,
+        ankle: [-2, CHAIN_ANKLE_HEIGHT], kneeOut: 18,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+    ],
+  },
+  // Narrow Stance Squats (id 123): feet narrower than shoulder width, knees
+  // tracking forward over the toes into a deep squat.
+  'narrow-stance-squats': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 32,
+    originX: 50,
+    implement: 'bar',
+    armsFollowTrunk: true,
+    footSpread: -0.5,
+    equipment: [
+      { kind: 'frame', a: [-15, 0.5, 16], b: [-15, 78, 16] },
+      { kind: 'frame', a: [-15, 0.5, -16], b: [-15, 78, -16] },
+      { kind: 'frame', a: [-15, 68, 16], b: [-11.5, 68, 16] },
+      { kind: 'frame', a: [-15, 68, -16], b: [-11.5, 68, -16] },
+    ],
+    poses: [
+      {
+        at: [-0.2, 46.45], trunk: 86, thigh: -90, shin: -90,
+        ankle: [-2, CHAIN_ANKLE_HEIGHT], kneeOut: 4,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+      {
+        at: [-9.5, 18.2], trunk: 62, thigh: -90, shin: -90,
+        ankle: [-2, CHAIN_ANKLE_HEIGHT], kneeOut: 4,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+    ],
+  },
+  // Squat with Bands (id 277): wide stance in a rack with bands anchored low
+  // on the rack/floor and attached to the barbell ends, knees pushed out,
+  // descending until the hip crease is level with the top of the knee.
+  'squat-with-bands': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 32,
+    originX: 50,
+    implement: 'bar',
+    armsFollowTrunk: true,
+    footSpread: 10.2,
+    lines: [
+      { from: [-1, 1.2, 16.5], to: 'nearBarEnd' },
+      { from: [-1, 1.2, -16.5], to: 'farBarEnd', depth: 'far' },
+    ],
+    equipment: [
+      { kind: 'frame', a: [-15, 0.5, 16], b: [-15, 78, 16] },
+      { kind: 'frame', a: [-15, 0.5, -16], b: [-15, 78, -16] },
+      { kind: 'frame', a: [-15, 0.8, 16], b: [6, 0.8, 16] },
+      { kind: 'frame', a: [-15, 0.8, -16], b: [6, 0.8, -16] },
+    ],
+    poses: [
+      {
+        at: [-0.2, 45.25], trunk: 86, thigh: -90, shin: -90,
+        ankle: [-2, CHAIN_ANKLE_HEIGHT], kneeOut: 12,
+        upperArm: [-104, 20], forearm: [86, 10],
+      },
+      {
+        at: [-14.6, 24.4], trunk: 52, thigh: -90, shin: -90,
+        ankle: [-2, CHAIN_ANKLE_HEIGHT], kneeOut: 28,
+        upperArm: [-104, 20], forearm: [86, 10],
+      },
+    ],
+  },
+  // Wide Stance Barbell Squat (id 299): feet wider than the shoulders, knees
+  // tracking over the toes, descending until the thighs are just below level.
+  'wide-stance-barbell-squat': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 32,
+    originX: 50,
+    implement: 'bar',
+    armsFollowTrunk: true,
+    footSpread: 10.0,
+    equipment: [
+      { kind: 'frame', a: [-15, 0.5, 16], b: [-15, 78, 16] },
+      { kind: 'frame', a: [-15, 0.5, -16], b: [-15, 78, -16] },
+      { kind: 'frame', a: [-15, 68, 16], b: [-11.5, 68, 16] },
+      { kind: 'frame', a: [-15, 68, -16], b: [-11.5, 68, -16] },
+    ],
+    poses: [
+      {
+        at: [-0.2, 45.30], trunk: 86, thigh: -90, shin: -90,
+        ankle: [-2, CHAIN_ANKLE_HEIGHT], kneeOut: 14,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+      {
+        at: [-14.2, 22.4], trunk: 52, thigh: -90, shin: -90,
+        ankle: [-2, CHAIN_ANKLE_HEIGHT], kneeOut: 26,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+    ],
+  },
+  // Front Squat (id 8): bar resting across the front of the shoulders with a
+  // secure grip and elbows pointing forward, upright torso into a full squat.
+  'front-squat': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 30,
+    originX: 50,
+    implement: 'bar',
+    armsFollowTrunk: true,
+    footSpread: 4.6,
+    equipment: [
+      { kind: 'frame', a: [15, 0.5, 16], b: [15, 78, 16] },
+      { kind: 'frame', a: [15, 0.5, -16], b: [15, 78, -16] },
+      { kind: 'frame', a: [15, 68, 16], b: [11.5, 68, 16] },
+      { kind: 'frame', a: [15, 68, -16], b: [11.5, 68, -16] },
+    ],
+    poses: [
+      {
+        at: [0.0, 46.10], trunk: 89, thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 10,
+        upperArm: [4, -10], forearm: [-176, 27],
+      },
+      {
+        at: [-10.4, 18.8], trunk: 68, thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 14,
+        upperArm: [4, -10], forearm: [-176, 27],
+      },
+    ],
+  },
+  // Front Squat (Clean Grip) (id 208): rack set just below shoulder height,
+  // fingertips under the bar outside the shoulders with elbows high and chest up.
+  'front-squat-clean-grip': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 30,
+    originX: 50,
+    implement: 'bar',
+    armsFollowTrunk: true,
+    footSpread: 4.8,
+    equipment: [
+      { kind: 'frame', a: [15, 0.5, 16], b: [15, 78, 16] },
+      { kind: 'frame', a: [15, 0.5, -16], b: [15, 78, -16] },
+      { kind: 'frame', a: [15, 67.2, 16], b: [11.2, 67.2, 16] },
+      { kind: 'frame', a: [15, 67.2, -16], b: [11.2, 67.2, -16] },
+    ],
+    poses: [
+      {
+        at: [0.0, 46.08], trunk: 90, thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 10,
+        upperArm: [11, -3], forearm: [-150, 33], hand: [125, -30],
+      },
+      {
+        at: [-9.6, 18.2], trunk: 72, thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 16,
+        upperArm: [11, -3], forearm: [-150, 33], hand: [107, -30],
+      },
+    ],
+  },
+  // Box Squat (id 38): sitting hips back onto a box at knee height behind the
+  // lifter with shins near-vertical, pausing seated on the box before standing.
+  'box-squat': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 30,
+    originX: 50,
+    implement: 'bar',
+    armsFollowTrunk: true,
+    footSpread: 9.2,
+    equipment: [
+      { kind: 'box', a: [-24, 20.2], b: [-12, 0.6] },
+      { kind: 'frame', a: [15, 0.5, 16], b: [15, 78, 16] },
+      { kind: 'frame', a: [15, 0.5, -16], b: [15, 78, -16] },
+    ],
+    poses: [
+      {
+        at: [1.8, 45.60], trunk: 86, thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 10,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+      {
+        at: [-16.8, 23.2], trunk: 44, thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 28,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+    ],
+  },
+  // Reverse Band Box Squat (id 256): wide stance in a power rack with bands
+  // hanging from the top of the rack to the barbell ends, sitting back onto a box.
+  'reverse-band-box-squat': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 30,
+    originX: 50,
+    implement: 'bar',
+    armsFollowTrunk: true,
+    footSpread: 9.6,
+    lines: [
+      { from: [-4, 86, 16.5], to: 'nearBarEnd' },
+      { from: [-4, 86, -16.5], to: 'farBarEnd', depth: 'far' },
+    ],
+    equipment: [
+      { kind: 'box', a: [-24, 20.2], b: [-12, 0.6] },
+      { kind: 'frame', a: [-16, 0.5, 16.5], b: [-16, 86, 16.5] },
+      { kind: 'frame', a: [12, 0.5, 16.5], b: [12, 86, 16.5] },
+      { kind: 'frame', a: [-16, 86, 16.5], b: [12, 86, 16.5] },
+      { kind: 'frame', a: [-16, 0.5, -16.5], b: [-16, 86, -16.5] },
+      { kind: 'frame', a: [12, 0.5, -16.5], b: [12, 86, -16.5] },
+      { kind: 'frame', a: [-16, 86, -16.5], b: [12, 86, -16.5] },
+    ],
+    poses: [
+      {
+        at: [1.8, 45.50], trunk: 86, thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 12,
+        upperArm: [-104, 20], forearm: [86, 10],
+      },
+      {
+        at: [-16.8, 23.2], trunk: 44, thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 30,
+        upperArm: [-104, 20], forearm: [86, 10],
+      },
+    ],
+  },
+  // Speed Box Squat (id 275): box squat with floor-anchored bands on the bar
+  // ends, controlled descent to the box and an explosive concentric ascent.
+  'speed-box-squat': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 30,
+    originX: 50,
+    implement: 'bar',
+    armsFollowTrunk: true,
+    footSpread: 9.2,
+    lines: [
+      { from: [-4, 1.2, 16.5], to: 'nearBarEnd' },
+      { from: [-4, 1.2, -16.5], to: 'farBarEnd', depth: 'far' },
+    ],
+    equipment: [
+      { kind: 'box', a: [-24, 20.2], b: [-12, 0.6] },
+      { kind: 'frame', a: [14, 0.5, 16.5], b: [14, 78, 16.5] },
+      { kind: 'frame', a: [14, 0.5, -16.5], b: [14, 78, -16.5] },
+      { kind: 'frame', a: [-14, 0.8, 16.5], b: [14, 0.8, 16.5] },
+      { kind: 'frame', a: [-14, 0.8, -16.5], b: [14, 0.8, -16.5] },
+    ],
+    poses: [
+      {
+        at: [1.8, 45.60], trunk: 86, thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 10,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+      {
+        at: [-16.8, 23.2], trunk: 44, thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 28,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+    ],
+  },
   // chain movements are added above this line
 };
 
@@ -3656,6 +3941,12 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters, tu
   const farWristTarget = point(a.farWrist ?? a.wrist, b.farWrist ?? b.wrist, 'farWrist');
   const ankleTarget = point(a.ankle, b.ankle, 'ankle');
   const farAnkleTarget = point(a.farAnkle ?? a.ankle, b.farAnkle ?? b.ankle, 'farAnkle');
+  const footSpread = a.footSpread !== undefined || b.footSpread !== undefined
+    ? num(a.footSpread ?? movement.footSpread, b.footSpread ?? movement.footSpread)
+    : (movement.footSpread ?? 0);
+  const kneeOut = a.kneeOut !== undefined || b.kneeOut !== undefined
+    ? num(a.kneeOut ?? movement.kneeOut, b.kneeOut ?? movement.kneeOut)
+    : (movement.kneeOut ?? 0);
 
   // The spine, hip to neck, as a run of short steps. A curl turns each step a
   // little further toward the front of the body, so the trunk bends through
@@ -3752,10 +4043,18 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters, tu
     wristTarget, movement.elbowPole ?? -135);
   const farArm = limb(chainAdd(girdleCentre, shoulderAxis, -shoulderHalf), -1, farUpperArm, farForearm, upperLength, foreLength,
     farWristTarget, movement.elbowPole ?? -135);
+  const baseKneePole = chainPair(movement.kneePole ?? 45);
+  const legPole: ChainDir = kneeOut === 0 ? (movement.kneePole ?? 45) : [baseKneePole[0], baseKneePole[1] + kneeOut];
+  const nearAnkleWithSpread: ChainPoint | undefined = ankleTarget === undefined || footSpread === 0 || ankleTarget[2] !== undefined
+    ? ankleTarget
+    : [ankleTarget[0], ankleTarget[1], hipHalf + footSpread];
+  const farAnkleWithSpread: ChainPoint | undefined = farAnkleTarget === undefined || footSpread === 0 || farAnkleTarget[2] !== undefined
+    ? farAnkleTarget
+    : [farAnkleTarget[0], farAnkleTarget[1], -hipHalf - footSpread];
   const nearLeg = limb(chainAdd(hip, hipAxis, hipHalf), 1, thigh, shin, CHAIN_THIGH, CHAIN_SHIN,
-    ankleTarget, movement.kneePole ?? 45);
+    nearAnkleWithSpread, legPole);
   const farLeg = limb(chainAdd(hip, hipAxis, -hipHalf), -1, farThigh, farShin, CHAIN_THIGH, CHAIN_SHIN,
-    farAnkleTarget, movement.kneePole ?? 45);
+    farAnkleWithSpread, legPole);
   const nearGrip = hand === undefined ? nearArm.end : chainAdd(nearArm.end, chainUnit(hand, 1), CHAIN_HAND);
   const farGrip = hand === undefined ? farArm.end : chainAdd(farArm.end, chainUnit(hand, -1), CHAIN_HAND);
   // What a bent hand holds sits on the palm's side of the knuckles.
@@ -3804,6 +4103,15 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters, tu
     el: project(nearArm.mid), wr: project(nearArm.end), ef: projectFar(farArm.mid), wf: projectFar(farArm.end),
     kn: project(nearLeg.mid), an: project(nearLeg.end), kf: projectFar(farLeg.mid), af: projectFar(farLeg.end),
   };
+  const nearHoldProj = project(nearHold), farHoldProj = project(farHold);
+  const holdSpan = Math.hypot(nearHoldProj[0] - farHoldProj[0], nearHoldProj[1] - farHoldProj[1]);
+  const barOver = movement.implement === 'cableBar' ? 3.5 : 9;
+  const barUx = holdSpan >= 3 ? (nearHoldProj[0] - farHoldProj[0]) / holdSpan : 0;
+  const barUy = holdSpan >= 3 ? (nearHoldProj[1] - farHoldProj[1]) / holdSpan : 0;
+  const barEnd: { near: CanonicalPoint; far: CanonicalPoint } = {
+    near: [nearHoldProj[0] + barUx * barOver, nearHoldProj[1] + barUy * barOver],
+    far: [farHoldProj[0] - barUx * barOver, farHoldProj[1] - barUy * barOver],
+  };
   return {
     movement, view, joints, project, projectFar, ph,
     /** The trunk's drawn centreline, neck first. Straight unless the spine is curled. */
@@ -3817,12 +4125,13 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters, tu
     },
     grip: { near: project(nearGrip), far: projectFar(farGrip) },
     /** Where the held weight sits: the grip, moved to the palm's side when the hand is bent. */
-    hold: { near: project(nearHold), far: projectFar(farHold) },
+    hold: { near: nearHoldProj, far: projectFar(farHold) },
+    barEnd,
     toe: { near: nearToe ? project(nearToe) : null, far: farToe ? projectFar(farToe) : null },
     footWidth: feet === 'flat' ? body.lw * 0.9 : body.lw * 0.82,
     /** How far each held bell is tilted, inner end up, in degrees: none below half-way, all of it at the top. */
     peakTilt: movement.supinatedPeak === true ? BELL_TILT_DEG * Math.max(0, Math.min(1, (ph - 0.5) * 2)) : 0,
-    angles: { trunk: given, curl, sideCurl, twist, roll, shrug, thigh, shin, upperArm, forearm, farThigh, farShin, farUpperArm, farForearm, hand, foot },
+    angles: { trunk: given, curl, sideCurl, twist, roll, shrug, thigh, shin, upperArm, forearm, farThigh, farShin, farUpperArm, farForearm, hand, foot, footSpread, kneeOut },
   };
 }
 
@@ -3894,7 +4203,8 @@ function layoutChainExtras(
         : project(chainWorld(cable.from));
     const end: CanonicalPoint = cable.to === 'nearGrip' ? figure.hold.near : cable.to === 'farGrip' ? figure.hold.far
       : cable.to === 'midGrip' ? [(figure.hold.near[0] + figure.hold.far[0]) / 2, (figure.hold.near[1] + figure.hold.far[1]) / 2]
-        : cable.to === 'nearAnkle' ? j.an : j.af;
+        : cable.to === 'nearBarEnd' ? figure.barEnd.near : cable.to === 'farBarEnd' ? figure.barEnd.far
+          : cable.to === 'nearAnkle' ? j.an : j.af;
     (cable.depth === 'far' ? far : lines).push(line(start, end, 1.4, 'textMid', 1));
   }
 
