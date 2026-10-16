@@ -58,6 +58,22 @@ describe('MOV-A03 floor and sumo deadlifts: batch-wide floor plates, straight ar
     const barFloorY = (floorFig.world.near.hold[1] + floorFig.world.far.hold[1]) / 2;
     expect(barFloorY).toBeCloseTo(CHAIN_FLOOR_BAR_HEIGHT, 5);
 
+    // MOV-A03-R1 start-keyframe constraints: arms within 10 deg of vertical,
+    // shoulders 0..4 units ahead of the hands/bar, and hips above the knees.
+    const j0 = floorFig.joints;
+    const armDegFromVertical = Math.abs((Math.atan2(j0.nk[0] - j0.wr[0], j0.wr[1] - j0.nk[1]) * 180) / Math.PI);
+    const nearArmDegFromVertical = Math.abs((Math.atan2(j0.nArm[0] - j0.wr[0], j0.wr[1] - j0.nArm[1]) * 180) / Math.PI);
+    const shoulderToBarDist = j0.nk[0] - j0.wr[0];
+    const shoulderToBarMidDist = j0.nk[0] - (j0.wr[0] + j0.wf[0]) / 2;
+    const hipAboveKnee = j0.kn[1] - j0.hp[1];
+    expect(armDegFromVertical).toBeLessThanOrEqual(10);
+    expect(nearArmDegFromVertical).toBeLessThanOrEqual(10);
+    expect(shoulderToBarDist).toBeGreaterThanOrEqual(0);
+    expect(shoulderToBarDist).toBeLessThanOrEqual(4);
+    expect(shoulderToBarMidDist).toBeGreaterThanOrEqual(0);
+    expect(shoulderToBarMidDist).toBeLessThanOrEqual(4);
+    expect(hipAboveKnee).toBeGreaterThan(0.5);
+
     const floorPrims = layoutCanonicalFigure(entry.frames[0].joints, { ...entry, body: BODY });
     const plates = floorPrims.filter((p) => p.kind === 'bone' && p.w === 2.4 && p.stroke === 'ink1');
     expect(plates.length).toBe(2);
@@ -106,6 +122,26 @@ describe('MOV-A03 floor and sumo deadlifts: batch-wide floor plates, straight ar
       expect(entry.reason).toContain('turned 46 degrees');
     }
   });
+
+  test('sumo start trunk is at least 45 deg from horizontal and at least 10 deg more upright than conventional start, while deficit start has deeper knee and hip bend', () => {
+    const trunkAngleFromHorizontal = (id) => {
+      const j = chainGeometry(slugOf(entryById(id)), 0, BODY).joints;
+      return (Math.atan2(j.hp[1] - j.nk[1], j.nk[0] - j.hp[0]) * 180) / Math.PI;
+    };
+    const convTrunk = trunkAngleFromHorizontal(2);
+    expect(convTrunk).toBeGreaterThanOrEqual(18);
+    expect(convTrunk).toBeLessThanOrEqual(22);
+    for (const id of [176, 257]) {
+      expect(trunkAngleFromHorizontal(id)).toBeCloseTo(convTrunk, 5);
+    }
+    const defTrunk = trunkAngleFromHorizontal(46);
+    expect(defTrunk).toBeLessThan(convTrunk - 4);
+    for (const id of SUMO_IDS) {
+      const sumoTrunk = trunkAngleFromHorizontal(id);
+      expect(sumoTrunk).toBeGreaterThanOrEqual(45);
+      expect(sumoTrunk - convTrunk).toBeGreaterThanOrEqual(10);
+    }
+  });
 });
 
 describe('MOV-A03 per-movement source-bound geometry', () => {
@@ -129,7 +165,7 @@ describe('MOV-A03 per-movement source-bound geometry', () => {
     expect(barFloor[0] - shinXAtBar).toBeGreaterThan(0);
     expect(barFloor[0] - shinXAtBar).toBeLessThanOrEqual(2.5);
     expect(floor.world.hip[1]).toBeGreaterThan(floor.world.near.knee[1] + 1.0);
-    expect(floor.world.neck[1]).toBeGreaterThan(floor.world.hip[1] + 10.0);
+    expect(floor.world.neck[1]).toBeGreaterThan(floor.world.hip[1] + 7.0);
 
     // Bar travels straight up close to the legs to standing lockout.
     for (const ph of [0, 0.25, 0.5, 0.75, 1]) {
