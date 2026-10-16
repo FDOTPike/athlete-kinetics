@@ -71,6 +71,14 @@ const LEGACY_FAMILY_KEYS = {
   38: 'squat@standing',
   256: 'squat@standing',
   275: 'squat@standing',
+  140: 'squat@standing',
+  192: 'squat@standing',
+  81: 'squat@standing',
+  98: 'squat@standing',
+  120: 'squat@standing',
+  235: 'squat@standing',
+  105: 'squat@standing',
+  48: 'squat@standing',
 };
 
 const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
