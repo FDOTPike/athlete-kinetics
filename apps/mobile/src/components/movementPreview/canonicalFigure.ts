@@ -1292,8 +1292,8 @@ export interface ChainMovement {
   feet?: 'flat' | 'free' | 'front' | 'none';
   /** What the hands hold. */
   implement?: 'none' | 'bells' | 'bell' | 'hammer' | 'bar' | 'ez' | 'cableBar' | 'handle' | 'handles' | 'rope' | 'longBar' | 'kettlebell' | 'kettlebells';
-  /** Where a held bar rests on the figure: across the hands by default, cradled in the elbow crooks ('elbows'), or held in the hands with its far half behind the legs ('behind'). */
-  barAt?: 'hands' | 'elbows' | 'behind';
+  /** Where a held bar rests on the figure: across the hands by default, cradled in the elbow crooks ('elbows'), held in the hands with its far half behind the legs ('behind'), or held in front of both legs ('front'). */
+  barAt?: 'hands' | 'elbows' | 'behind' | 'front';
   /** Half-length of a held barbell's plate segment (4.2 by default; larger for floor-starting barbell lifts). */
   plateRadius?: number;
   /** For 'longBar': the point on the floor the bar's far end is braced at, and the bar's whole length from there. */
@@ -4116,6 +4116,256 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       },
     ],
   },
+  // Deadlift (id 2): bar over mid-foot, shins brought to the bar, flat braced
+  // trunk, pushing the floor away to stand tall with the bar close to the legs.
+  'deadlift': {
+    root: 'neck',
+    view: 'oblique',
+    yawDeg: 24,
+    originX: 50,
+    kneePole: 10,
+    implement: 'bar',
+    barAt: 'front',
+    plateRadius: CHAIN_FLOOR_PLATE,
+    farArmOver: true,
+    poses: [
+      {
+        at: [
+          2.2 * Math.cos(chainRad(25)) - (SAGITTAL_UPPER_ARM + SAGITTAL_FOREARM) * Math.cos(chainRad(-96)) * Math.cos(chainRad(10)),
+          CHAIN_FLOOR_BAR_HEIGHT + 2.2 * Math.sin(chainRad(25)) - (SAGITTAL_UPPER_ARM + SAGITTAL_FOREARM) * Math.sin(chainRad(-96)) * Math.cos(chainRad(10)),
+        ],
+        trunk: 25, head: 86, shrug: -2.2, thigh: -90, shin: -90,
+        ankle: [-2.7, CHAIN_ANKLE_HEIGHT], kneeOut: 2,
+        upperArm: [-96, 10], forearm: [-96, 10],
+      },
+      {
+        at: [-2.1, 69.85], trunk: 89, head: 90, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-2.7, CHAIN_ANKLE_HEIGHT], kneeOut: 6,
+        upperArm: [-85, 8], forearm: [-85, 8],
+      },
+    ],
+  },
+  // Deficit Deadlift (id 46): standing on a low platform (1-3 inches) with the
+  // bar over mid-foot, forcing more knee and hip bend at the start with a flat
+  // back and pulling through the longer range to lockout.
+  'deficit-deadlift': {
+    root: 'neck',
+    view: 'oblique',
+    yawDeg: 24,
+    originX: 50,
+    feet: 'free',
+    kneePole: 10,
+    implement: 'bar',
+    barAt: 'front',
+    plateRadius: CHAIN_FLOOR_PLATE,
+    farArmOver: true,
+    equipment: [
+      { kind: 'box', a: [-11.5, 3.5], b: [7.5, 0.5] },
+    ],
+    poses: [
+      {
+        at: [
+          3.4 * Math.cos(chainRad(19.5)) - (SAGITTAL_UPPER_ARM + SAGITTAL_FOREARM) * Math.cos(chainRad(-99)) * Math.cos(chainRad(12)),
+          CHAIN_FLOOR_BAR_HEIGHT + 3.4 * Math.sin(chainRad(19.5)) - (SAGITTAL_UPPER_ARM + SAGITTAL_FOREARM) * Math.sin(chainRad(-99)) * Math.cos(chainRad(12)),
+        ],
+        trunk: 19.5, head: 86, shrug: -3.4, thigh: -90, shin: -90,
+        ankle: [-2.7, CHAIN_ANKLE_HEIGHT + 3.1], foot: 0, kneeOut: 2,
+        upperArm: [-99, 12], forearm: [-99, 12],
+      },
+      {
+        at: [-2.1, 69.85 + 3.1], trunk: 89, head: 90, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-2.7, CHAIN_ANKLE_HEIGHT + 3.1], foot: 0, kneeOut: 6,
+        upperArm: [-85, 8], forearm: [-85, 8],
+      },
+    ],
+  },
+  // Deadlift with Bands (id 176): bands looped over the bar ends and anchored
+  // under the feet, gripping just outside the legs and standing tall against
+  // the band tension.
+  'deadlift-with-bands': {
+    root: 'neck',
+    view: 'oblique',
+    yawDeg: 24,
+    originX: 50,
+    kneePole: 10,
+    implement: 'bar',
+    barAt: 'front',
+    plateRadius: CHAIN_FLOOR_PLATE,
+    farArmOver: true,
+    lines: [
+      { from: 'nearFoot', to: 'nearBarEnd' },
+      { from: 'farFoot', to: 'farBarEnd', depth: 'far' },
+    ],
+    poses: [
+      {
+        at: [
+          2.2 * Math.cos(chainRad(25)) - (SAGITTAL_UPPER_ARM + SAGITTAL_FOREARM) * Math.cos(chainRad(-96)) * Math.cos(chainRad(10)),
+          CHAIN_FLOOR_BAR_HEIGHT + 2.2 * Math.sin(chainRad(25)) - (SAGITTAL_UPPER_ARM + SAGITTAL_FOREARM) * Math.sin(chainRad(-96)) * Math.cos(chainRad(10)),
+        ],
+        trunk: 25, head: 86, shrug: -2.2, thigh: -90, shin: -90,
+        ankle: [-2.7, CHAIN_ANKLE_HEIGHT], kneeOut: 2,
+        upperArm: [-96, 10], forearm: [-96, 10],
+      },
+      {
+        at: [-2.1, 69.85], trunk: 89, head: 90, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-2.7, CHAIN_ANKLE_HEIGHT], kneeOut: 6,
+        upperArm: [-85, 8], forearm: [-85, 8],
+      },
+    ],
+  },
+  // Reverse Band Deadlift (id 257): inside a rack with bands hung from the top
+  // and looped around the bar ends, hip-width stance and shoulder-width grip.
+  'reverse-band-deadlift': {
+    root: 'neck',
+    view: 'oblique',
+    yawDeg: 24,
+    originX: 50,
+    kneePole: 10,
+    implement: 'bar',
+    barAt: 'front',
+    plateRadius: CHAIN_FLOOR_PLATE,
+    farArmOver: true,
+    lines: [
+      { from: [0, 86, 17.5], to: 'nearBarEnd' },
+      { from: [0, 86, -17.5], to: 'farBarEnd', depth: 'far' },
+    ],
+    equipment: [
+      { kind: 'frame', a: [-16, 0.5, 17.5], b: [-16, 86, 17.5] },
+      { kind: 'frame', a: [12, 0.5, 17.5], b: [12, 86, 17.5] },
+      { kind: 'frame', a: [-16, 86, 17.5], b: [12, 86, 17.5] },
+      { kind: 'frame', a: [-16, 0.5, -17.5], b: [-16, 86, -17.5] },
+      { kind: 'frame', a: [12, 0.5, -17.5], b: [12, 86, -17.5] },
+      { kind: 'frame', a: [-16, 86, -17.5], b: [12, 86, -17.5] },
+    ],
+    poses: [
+      {
+        at: [
+          2.2 * Math.cos(chainRad(25)) - (SAGITTAL_UPPER_ARM + SAGITTAL_FOREARM) * Math.cos(chainRad(-96)) * Math.cos(chainRad(10)),
+          CHAIN_FLOOR_BAR_HEIGHT + 2.2 * Math.sin(chainRad(25)) - (SAGITTAL_UPPER_ARM + SAGITTAL_FOREARM) * Math.sin(chainRad(-96)) * Math.cos(chainRad(10)),
+        ],
+        trunk: 25, head: 86, shrug: -2.2, thigh: -90, shin: -90,
+        ankle: [-2.7, CHAIN_ANKLE_HEIGHT], kneeOut: 2,
+        upperArm: [-96, 10], forearm: [-96, 10],
+      },
+      {
+        at: [-2.1, 69.85], trunk: 89, head: 90, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-2.7, CHAIN_ANKLE_HEIGHT], kneeOut: 6,
+        upperArm: [-85, 8], forearm: [-85, 8],
+      },
+    ],
+  },
+  // Sumo Deadlift (id 78): wide stance with toes pointed out, bar over mid-foot,
+  // straight arms gripping inside the knees, driving the floor apart to stand tall.
+  'sumo-deadlift': {
+    root: 'neck',
+    view: 'oblique',
+    yawDeg: 46,
+    originX: 50,
+    feet: 'free',
+    kneePole: 25,
+    implement: 'bar',
+    barAt: 'front',
+    plateRadius: CHAIN_FLOOR_PLATE,
+    farArmOver: true,
+    poses: [
+      {
+        at: [
+          1.5 * Math.cos(chainRad(24)) - (SAGITTAL_UPPER_ARM + SAGITTAL_FOREARM) * Math.cos(chainRad(-92)) * Math.cos(chainRad(-10)),
+          CHAIN_FLOOR_BAR_HEIGHT + 1.5 * Math.sin(chainRad(24)) - (SAGITTAL_UPPER_ARM + SAGITTAL_FOREARM) * Math.sin(chainRad(-92)) * Math.cos(chainRad(-10)),
+        ],
+        trunk: 24, head: 86, shrug: -1.5, thigh: -90, shin: -90,
+        ankle: [-1.8, CHAIN_ANKLE_HEIGHT, 16.0], farAnkle: [-1.8, CHAIN_ANKLE_HEIGHT, -16.0],
+        foot: [0, 38], kneeOut: 18,
+        upperArm: [-92, -10], forearm: [-92, -10],
+      },
+      {
+        at: [-1.38, 68.2], trunk: 89, head: 90, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-1.8, CHAIN_ANKLE_HEIGHT, 16.0], farAnkle: [-1.8, CHAIN_ANKLE_HEIGHT, -16.0],
+        foot: [0, 38], kneeOut: 12,
+        upperArm: [-86, -10], forearm: [-86, -10],
+      },
+    ],
+  },
+  // Reverse Band Sumo Deadlift (id 258): wide sumo stance and inside-knee grip
+  // inside a rack with bands hung from the top and looped around the bar ends.
+  'reverse-band-sumo-deadlift': {
+    root: 'neck',
+    view: 'oblique',
+    yawDeg: 46,
+    originX: 50,
+    feet: 'free',
+    kneePole: 25,
+    implement: 'bar',
+    barAt: 'front',
+    plateRadius: CHAIN_FLOOR_PLATE,
+    farArmOver: true,
+    lines: [
+      { from: [0, 86, 18.5], to: 'nearBarEnd' },
+      { from: [0, 86, -18.5], to: 'farBarEnd', depth: 'far' },
+    ],
+    equipment: [
+      { kind: 'frame', a: [-16, 0.5, 18.5], b: [-16, 86, 18.5] },
+      { kind: 'frame', a: [10, 0.5, 18.5], b: [10, 86, 18.5] },
+      { kind: 'frame', a: [-16, 86, 18.5], b: [10, 86, 18.5] },
+      { kind: 'frame', a: [-16, 0.5, -18.5], b: [-16, 86, -18.5] },
+      { kind: 'frame', a: [10, 0.5, -18.5], b: [10, 86, -18.5] },
+      { kind: 'frame', a: [-16, 86, -18.5], b: [10, 86, -18.5] },
+    ],
+    poses: [
+      {
+        at: [
+          1.5 * Math.cos(chainRad(24)) - (SAGITTAL_UPPER_ARM + SAGITTAL_FOREARM) * Math.cos(chainRad(-92)) * Math.cos(chainRad(-10)),
+          CHAIN_FLOOR_BAR_HEIGHT + 1.5 * Math.sin(chainRad(24)) - (SAGITTAL_UPPER_ARM + SAGITTAL_FOREARM) * Math.sin(chainRad(-92)) * Math.cos(chainRad(-10)),
+        ],
+        trunk: 24, head: 86, shrug: -1.5, thigh: -90, shin: -90,
+        ankle: [-1.8, CHAIN_ANKLE_HEIGHT, 16.0], farAnkle: [-1.8, CHAIN_ANKLE_HEIGHT, -16.0],
+        foot: [0, 38], kneeOut: 18,
+        upperArm: [-92, -10], forearm: [-92, -10],
+      },
+      {
+        at: [-1.38, 68.2], trunk: 89, head: 90, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-1.8, CHAIN_ANKLE_HEIGHT, 16.0], farAnkle: [-1.8, CHAIN_ANKLE_HEIGHT, -16.0],
+        foot: [0, 38], kneeOut: 12,
+        upperArm: [-86, -10], forearm: [-86, -10],
+      },
+    ],
+  },
+  // Sumo Deadlift with Bands (id 290): short bands looped over the bar ends and
+  // stood on with wide sumo feet, gripping inside the legs on straight arms.
+  'sumo-deadlift-with-bands': {
+    root: 'neck',
+    view: 'oblique',
+    yawDeg: 46,
+    originX: 50,
+    feet: 'free',
+    kneePole: 25,
+    implement: 'bar',
+    barAt: 'front',
+    plateRadius: CHAIN_FLOOR_PLATE,
+    farArmOver: true,
+    lines: [
+      { from: 'nearFoot', to: 'nearBarEnd' },
+      { from: 'farFoot', to: 'farBarEnd', depth: 'far' },
+    ],
+    poses: [
+      {
+        at: [
+          1.5 * Math.cos(chainRad(24)) - (SAGITTAL_UPPER_ARM + SAGITTAL_FOREARM) * Math.cos(chainRad(-92)) * Math.cos(chainRad(-10)),
+          CHAIN_FLOOR_BAR_HEIGHT + 1.5 * Math.sin(chainRad(24)) - (SAGITTAL_UPPER_ARM + SAGITTAL_FOREARM) * Math.sin(chainRad(-92)) * Math.cos(chainRad(-10)),
+        ],
+        trunk: 24, head: 86, shrug: -1.5, thigh: -90, shin: -90,
+        ankle: [-1.8, CHAIN_ANKLE_HEIGHT, 16.0], farAnkle: [-1.8, CHAIN_ANKLE_HEIGHT, -16.0],
+        foot: [0, 38], kneeOut: 18,
+        upperArm: [-92, -10], forearm: [-92, -10],
+      },
+      {
+        at: [-1.38, 68.2], trunk: 89, head: 90, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-1.8, CHAIN_ANKLE_HEIGHT, 16.0], farAnkle: [-1.8, CHAIN_ANKLE_HEIGHT, -16.0],
+        foot: [0, 38], kneeOut: 12,
+        upperArm: [-86, -10], forearm: [-86, -10],
+      },
+    ],
+  },
   // chain movements are added above this line
 };
 
@@ -4449,12 +4699,17 @@ function layoutChainExtras(
   }
 
   for (const cable of movement.lines ?? []) {
-    // Under the middle of the foot: ahead of the ankle from the side, at the ankle from the front.
+    // Under the middle of the foot: ahead of the ankle from the side, at the ankle from the front,
+    // or at the midpoint of the drawn foot in a turned view.
     const underFoot = figure.view === 'front' ? 0 : CHAIN_FOOT / 2;
+    const nearFootX = figure.view === 'oblique' && figure.toe.near !== null
+      ? (j.an[0] + figure.toe.near[0]) / 2 : j.an[0] + underFoot;
+    const farFootX = figure.view === 'oblique' && figure.toe.far !== null
+      ? (j.af[0] + figure.toe.far[0]) / 2 : j.af[0] + underFoot;
     // A band trapped under a foot starts on the floor: its own half-width above it.
     const trapped = CHAIN_FLOOR - 0.7;
-    const start: CanonicalPoint = cable.from === 'nearFoot' ? [j.an[0] + underFoot, trapped]
-      : cable.from === 'farFoot' ? [j.af[0] + underFoot, trapped]
+    const start: CanonicalPoint = cable.from === 'nearFoot' ? [nearFootX, trapped]
+      : cable.from === 'farFoot' ? [farFootX, trapped]
         : project(chainWorld(cable.from));
     const end: CanonicalPoint = cable.to === 'nearGrip' ? figure.hold.near : cable.to === 'farGrip' ? figure.hold.far
       : cable.to === 'midGrip' ? [(figure.hold.near[0] + figure.hold.far[0]) / 2, (figure.hold.near[1] + figure.hold.far[1]) / 2]
@@ -4526,7 +4781,7 @@ function layoutChainExtras(
       const farEnd: CanonicalPoint = [p[0] - ux * over, p[1] - uy * over];
       const nearEnd: CanonicalPoint = [q[0] + ux * over, q[1] + uy * over];
       const whole = figure.view === 'front';
-      const farGroup = whole ? near : movement.barAt === 'behind' ? groups.behind : far;
+      const farGroup = whole || movement.barAt === 'front' ? near : movement.barAt === 'behind' ? groups.behind : far;
       const farTone: ColorRole = whole ? 'textHi' : farColor;
       const farAlpha = whole ? 1 : farOpacity;
       farGroup.push(line(mid, farEnd, 1.6, farTone, farAlpha));
