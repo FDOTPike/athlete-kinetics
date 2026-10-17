@@ -424,6 +424,6 @@ describe('250 One-Arm Kettlebell Swings', () => {
 
     // Downswing timing: stays upright until the bell drops back to the thighs (passDown), then hinges quickly into the backswing.
     expect(passDown.figure.angles.trunk[0]).toBeGreaterThanOrEqual(74);
-    expect(segments[0]).toBeLessThanOrEqual(450);
+    expect(segments[0]).toBeLessThanOrEqual(500);
   });
 });

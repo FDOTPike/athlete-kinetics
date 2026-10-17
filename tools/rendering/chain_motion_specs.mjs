@@ -2701,7 +2701,7 @@ export const CHAIN_SPECS = [
       coachingIntent: 'Train the hamstrings, glutes and lower back one side at a time with an explosive hip-hinge kettlebell swing while resisting trunk rotation.',
     },
     phases: [0, 1, 2, 1, 0],
-    segments: [380, 420, 450, 380],
+    segments: [480, 500, 520, 480],
     captions: [
       'Stand with your feet slightly wider than your hips, soften the knees and push the hips back with a flat back, and hike the kettlebell back between your upper thighs on an overhand grip with the free arm swinging back beside your hip.',
       'Immediately drive the hips and knees forward to stand tall as the kettlebell swings past your thighs on a long, straight arm.',
