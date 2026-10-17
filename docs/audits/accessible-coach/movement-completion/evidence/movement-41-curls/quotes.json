@@ -95,7 +95,7 @@
     {
       "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
       "line": 5245,
-      "endLine": 5255,
+      "endLine": 5256,
       "text": "  'zottman-curl': {\n    root: 'hip',\n    view: 'oblique',\n    yawDeg: 40,\n    originX: 48,\n    implement: 'bells',\n    forearmTurn: true,\n    poses: [\n      { at: [0, CHAIN_STANDING_HIP], trunk: 90, thigh: -90, shin: -90, upperArm: [-90, 4], forearm: [-90, 2] },\n      { at: [0, CHAIN_STANDING_HIP], trunk: 90, thigh: -90, shin: -90, upperArm: [-90, 4], forearm: [60, 2] },\n    ],\n  },"
     },
     {
