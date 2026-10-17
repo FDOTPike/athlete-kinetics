@@ -4900,8 +4900,8 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       {
         at: [-2.0, 19.09], trunk: 22, head: 22, roll: 0, twist: 0,
         thigh: -158, shin: -158,
-        ankle: [-42.78, 3.80, 15.8], farAnkle: [-42.78, 3.80, -15.8],
-        foot: -38, farFoot: -38,
+        ankle: [-43.1, 4.65, 15.8], farAnkle: [-43.1, 4.65, -15.8],
+        foot: -28, farFoot: -28,
         upperArm: -90, forearm: -90,
         wrist: [12.5, 21.5, CHAIN_SHOULDER_HALF + 2.2],
         farWrist: [20.252, 3.60, -CHAIN_SHOULDER_HALF],
@@ -4909,8 +4909,8 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       {
         at: [-2.0, 19.09], trunk: 22, head: 22, roll: 0, twist: 0,
         thigh: -158, shin: -158,
-        ankle: [-42.78, 3.80, 15.8], farAnkle: [-42.78, 3.80, -15.8],
-        foot: -38, farFoot: -38,
+        ankle: [-43.1, 4.65, 15.8], farAnkle: [-43.1, 4.65, -15.8],
+        foot: -28, farFoot: -28,
         upperArm: -90, forearm: -90,
         wrist: [20.252, 3.60, CHAIN_SHOULDER_HALF],
         farWrist: [20.252, 3.60, -CHAIN_SHOULDER_HALF],
@@ -4918,8 +4918,8 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       {
         at: [-2.0, 19.09], trunk: 22, head: 22, roll: 0, twist: 0,
         thigh: -158, shin: -158,
-        ankle: [-42.78, 3.80, 15.8], farAnkle: [-42.78, 3.80, -15.8],
-        foot: -38, farFoot: -38,
+        ankle: [-43.1, 4.65, 15.8], farAnkle: [-43.1, 4.65, -15.8],
+        foot: -28, farFoot: -28,
         upperArm: -90, forearm: -90,
         wrist: [20.252, 3.60, CHAIN_SHOULDER_HALF],
         farWrist: [15.5, 19.5, -CHAIN_SHOULDER_HALF - 4.2],
@@ -4951,7 +4951,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
         at: [0, 17.5 + CHAIN_THIGH_HALF], trunk: 90,
         thigh: 0, shin: 0, ankle: [41, 13], foot: 80,
         upperArm: 0, forearm: 0,
-        wrist: [21.60, 34.925, V_HANDLE_HALF], farWrist: [21.60, 34.925, -V_HANDLE_HALF],
+        wrist: [21.55, 35.0, V_HANDLE_HALF], farWrist: [21.55, 35.0, -V_HANDLE_HALF],
       },
       {
         at: [0, 17.5 + CHAIN_THIGH_HALF], trunk: 90,
