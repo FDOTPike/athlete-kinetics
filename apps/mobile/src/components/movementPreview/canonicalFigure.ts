@@ -5775,7 +5775,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
         farUpperArm: [-98, 12], farForearm: [-88, 8],
       },
       {
-        at: [-0.4, 47.18], trunk: 89, head: 90,
+        at: [-0.4, 46.50], trunk: 89, head: 90,
         thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 2,
         upperArm: [-84, 8], forearm: [82, -22],
         farUpperArm: [-88, 10], farForearm: [-84, 6],
