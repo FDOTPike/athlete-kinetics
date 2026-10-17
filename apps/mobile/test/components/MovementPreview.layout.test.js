@@ -51,7 +51,8 @@ test('every canonical movement, both bodies, every keyframe: no duplicate primit
   // MOV-A04 adds 9 hinges and posterior-chain movements (288, 61, 210, 271, 94, 35, 23, 202, 244), making 207.
   // MOV-A05 adds 10 horizontal, incline, decline, floor, board, pin, and cable presses (3, 43, 45, 102, 65, 151, 252, 203, 249, 83), making 217.
   // MOV-A08 adds 6 bent-over rows (5, 104, 107, 293, 79, 130), making 223.
-  expect(CANONICAL.length).toBe(223);
+  // MOV-A11 adds 7 curls (184, 281, 109, 190, 213, 240, 259), making 230.
+  expect(CANONICAL.length).toBe(230);
   for (const entry of CANONICAL) {
     for (const bodyName of ['neutral']) {
       for (const frame of entry.frames) {

@@ -111,6 +111,13 @@ const LEGACY_FAMILY_KEYS = {
   293: 'horizontal-pull@bent-over',
   79: 'horizontal-pull@bent-over',
   130: 'horizontal-pull@bent-over',
+  184: 'elbow-flexion@standing',
+  281: 'elbow-flexion@standing',
+  109: 'elbow-flexion@standing',
+  190: 'elbow-flexion@prone-supported',
+  213: 'elbow-flexion@standing',
+  240: 'elbow-flexion@incline',
+  259: 'elbow-flexion@preacher',
 };
 
 const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
