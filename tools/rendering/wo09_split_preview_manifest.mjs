@@ -95,6 +95,13 @@ const LEGACY_FAMILY_KEYS = {
   23: 'hip-hinge@standing',
   202: 'hip-hinge@standing',
   244: 'hip-hinge@standing',
+  4: 'vertical-press@standing',
+  31: 'vertical-press@standing',
+  41: 'vertical-press@standing',
+  129: 'vertical-press@standing',
+  189: 'vertical-press@standing',
+  228: 'vertical-press@standing',
+  230: 'vertical-press@standing',
 };
 
 const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
