@@ -2313,7 +2313,7 @@ export const CHAIN_SPECS = [
       'Press up and slightly back so the dumbbells finish over your face, not your belly.',
       'Feet planted, upper back tight on the incline bench, earn the stretch at the bottom, and press up and slightly back over the face.',
     ],
-    reason: 'Source-bound draft, drawn from a 3D model turned 32 degrees so the 35-degree incline backrest, the 45-degree elbow tuck, the deep stretch outside the chest, and the upward-and-slightly-back press finishing over the face all read together.',
+    reason: 'Source-bound draft, drawn from a 3D model turned 28 degrees so the 35-degree incline backrest, the 45-degree elbow tuck, the deep stretch outside the chest, and the upward-and-slightly-back press finishing over the face all read together.',
     summary: 'On a 30-to-45-degree incline bench with feet planted, start from the top, lower the dumbbells to a deep stretch just outside the chest with elbows about 45 degrees from your sides, then press up and slightly back to finish over your face.',
   },
   {

@@ -234,8 +234,8 @@ describe('MOV-A05 horizontal, incline, decline, floor, board, pin, and cable pre
     expect(deg3D(top203.world.near.shoulder, top203.world.near.elbow, top203.world.near.hold)).toBeGreaterThanOrEqual(172);
     expect(forearmDegFromVertical3D(bot203.world.near.elbow, bot203.world.near.hold)).toBeLessThanOrEqual(1.0);
     expect(e203.segmentDurationsMs[1]).toBeGreaterThanOrEqual(750);
-    // Upper arm rests on the floor at ph = 1 (elbow Y == lw*0.88/2 = 1.54 so painted bottom edge touches y = 0 / screen 96.9)
-    expect(Math.abs(bot203.world.near.elbow[1] - 1.54)).toBeLessThanOrEqual(0.05);
+    // Upper arm rests on the floor at ph = 1 (elbow Y == BODY.lw*0.88/2 = 2.112 so painted bottom edge touches y = 0 / screen 96.9)
+    expect(Math.abs(bot203.world.near.elbow[1] - (BODY.lw * 0.88) / 2)).toBeLessThanOrEqual(0.05);
     const prims203Bot = rig.layoutCanonicalFigure({ ...e203.frames[1].joints, ph: 1 }, { view: e203.view, assetKey: e203.assetKey, body: BODY });
     const slices203 = torsoSlicesOf(prims203Bot);
     expect(Math.abs(Math.max(slices203[0].y1, slices203[0].y2) + slices203[0].w / 2 - 96.9)).toBeLessThanOrEqual(0.05);
@@ -245,7 +245,7 @@ describe('MOV-A05 horizontal, incline, decline, floor, board, pin, and cable pre
     // presses straight up to lockout over the shoulder while turning the wrist, and lowers slowly (lowering > pressing duration).
     expect(bot249.movement.implement).toBe('kettlebell');
     expect(bot249.movement.kettlebellTurn).toBe(true);
-    expect(Math.abs(bot249.world.near.elbow[1] - 1.54)).toBeLessThanOrEqual(0.05);
+    expect(Math.abs(bot249.world.near.elbow[1] - (BODY.lw * 0.88) / 2)).toBeLessThanOrEqual(0.05);
     expect(forearmDegFromVertical3D(bot249.world.near.elbow, bot249.world.near.hold)).toBeLessThanOrEqual(1.0);
     expect(deg3D(top249.world.near.shoulder, top249.world.near.elbow, top249.world.near.hold)).toBeGreaterThanOrEqual(172);
     expect(Math.abs(top249.world.near.hold[0] - top249.world.near.shoulder[0])).toBeLessThanOrEqual(2.0);

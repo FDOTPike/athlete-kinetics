@@ -4884,7 +4884,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     implement: 'bar',
     footSpread: 4.2,
     kneePole: 90,
-    elbowPole: [-24.3, 14.9],
+    elbowPole: [-21.4, 14.9],
     equipment: [
       { kind: 'frame', a: [-23.5, 0.5, -15.5], b: [-23.5, 48, -15.5], layer: 'behind' },
       { kind: 'frame', a: [-23.5, 29.5, -15.5], b: [-19.5, 29.5, -15.5], layer: 'behind' },
@@ -4893,16 +4893,16 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     ],
     poses: [
       {
-        at: [10, 5.91], trunk: 176.56, curl: -4, head: 178,
+        at: [10, 5.913], trunk: 176.56, curl: -4, head: 178,
         thigh: 42, shin: -52, ankle: [38, CHAIN_ANKLE_HEIGHT],
         upperArm: 90, forearm: 90,
         wrist: [-12.99, 30.74, 12.6], farWrist: [-12.99, 30.74, -12.6],
       },
       {
-        at: [10, 5.91], trunk: 176.56, curl: -4, head: 178,
+        at: [10, 5.913], trunk: 176.56, curl: -4, head: 178,
         thigh: 42, shin: -52, ankle: [38, CHAIN_ANKLE_HEIGHT],
         upperArm: 0, forearm: 90,
-        wrist: [-2.98, 13.54, 12.6], farWrist: [-2.98, 13.54, -12.6],
+        wrist: [-2.74, 14.112, 12.6], farWrist: [-2.74, 14.112, -12.6],
       },
     ],
   },
@@ -4919,19 +4919,19 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     kettlebellTurn: true,
     footSpread: 4.2,
     kneePole: 90,
-    elbowPole: [-24.0, 12.1],
+    elbowPole: [-21.1, 12.1],
     poses: [
       {
-        at: [10, 5.91], trunk: 176.56, curl: -4, head: 178,
+        at: [10, 5.913], trunk: 176.56, curl: -4, head: 178,
         thigh: 42, shin: -52, ankle: [38, CHAIN_ANKLE_HEIGHT],
         upperArm: 0, forearm: 90,
-        wrist: [-2.82, 13.54, 12.0], farWrist: [4.5, 9.5, -26.5],
+        wrist: [-2.59, 14.112, 12.0], farWrist: [-2.59, 14.112, -12.0],
       },
       {
-        at: [10, 5.91], trunk: 176.56, curl: -4, head: 178,
+        at: [10, 5.913], trunk: 176.56, curl: -4, head: 178,
         thigh: 42, shin: -52, ankle: [38, CHAIN_ANKLE_HEIGHT],
         upperArm: 90, forearm: 90,
-        wrist: [-12.5, 31.83, 9.4], farWrist: [4.5, 9.5, -26.5],
+        wrist: [-12.99, 30.95, 9.4], farWrist: [-2.59, 14.112, -12.0],
       },
     ],
   },
