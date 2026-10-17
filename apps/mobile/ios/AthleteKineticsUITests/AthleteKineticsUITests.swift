@@ -276,7 +276,24 @@ final class AthleteKineticsUITests: XCTestCase {
     var tries = 0
     while !build.isHittable && tries < 40 { app.swipeUp(); tries += 1 }
     reveal(build, "the build label")
-    for _ in 1...7 { build.tap() }
+    bringClear(build, "the build label")
+    // ProfileScreen.recordBuildTap forgets the count after 5 s without a tap.
+    // build.tap() looks the label up in the whole element tree again before
+    // every tap, and on a slow runner each look-up took 5-10 s (CI run
+    // 38873157462, test4 after the restore: gaps of 6.9, 6.7, 5.9 and 9.3 s),
+    // so the gesture never reached seven. The label is found once and the
+    // seven taps go to its centre; each gap is recorded.
+    let frame = build.frame
+    let centre = app.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
+      .withOffset(CGVector(dx: frame.midX, dy: frame.midY))
+    var times: [Date] = []
+    for _ in 1...7 { centre.tap(); times.append(Date()) }
+    let gaps = zip(times.dropFirst(), times).map { $0.timeIntervalSince($1) }
+    log("BUILD-TAPS at (\(Int(frame.midX)), \(Int(frame.midY))): gaps \(gaps.map { String(format: "%.2f", $0) }.joined(separator: "/")) s, seven taps in \(String(format: "%.2f", times[6].timeIntervalSince(times[0]))) s")
+    if let slowest = gaps.indices.max(by: { gaps[$0] < gaps[$1] }), gaps[slowest] >= 5 {
+      XCTFail("tap \(slowest + 2) came \(String(format: "%.1f", gaps[slowest])) s after tap \(slowest + 1), beyond ProfileScreen.recordBuildTap's 5 s reset")
+      return
+    }
     wait(element("advanced-athlete-manager"), "the advanced athlete manager after the seven-tap gesture")
   }
 
