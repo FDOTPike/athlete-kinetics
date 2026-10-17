@@ -6,7 +6,8 @@
  * Each movement is tested against its audited draft description in
  * docs/audits/accessible-coach/movement-completion/evidence/movement-45-held-text/DRAFT_TEXT.md
  * (written from the public-domain free-exercise-db entries and their photographs),
- * while the catalogue entries themselves remain unchanged.
+ * while the catalogue entries themselves remain unchanged and quotes.json records
+ * the corresponding bound assertions.
  */
 import fs from 'fs';
 import path from 'path';
