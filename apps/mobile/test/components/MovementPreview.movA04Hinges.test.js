@@ -291,18 +291,19 @@ describe('MOV-A04 hinges and posterior chain: physics, joint angles, contacts, a
       expect(deg3D(fig244.world.far.shoulder, fig244.world.far.elbow, fig244.world.far.wrist)).toBeGreaterThanOrEqual(25);
     }
 
-    // 23 and 202 catch on the floor at the bottom (ph=1) in painted hand contact, stay planted at the start of the return (ph=2) while the elbows extend, and then leave the floor to return upright (ph=0)
+    // 23 and 202 catch on the floor at the bottom (ph=1) in painted hand contact, keep both hands planted on the floor across every 33 ms tick of the push (3100..3600 ms, ph=1..2) while the elbows extend, and only then leave the floor to return upright (ph=0) without further elbow extension.
     const p23 = rig.chainGeometry(slugOf(e23), 2, BODY);
     const p202 = rig.chainGeometry(slugOf(e202), 2, BODY);
     const handRadius = BODY.lw * 0.44;
-    for (const [topFig, botFig, pushFig] of [[t23, b23, p23], [t202, b202, p202]]) {
+    for (const [entry, topFig, botFig, pushFig] of [[e23, t23, b23, p23], [e202, t202, b202, p202]]) {
+      const slug = slugOf(entry);
       const botGap = botFig.world.near.wrist[1] - handRadius;
       const pushGap = pushFig.world.near.wrist[1] - handRadius;
       expect(botGap).toBeGreaterThanOrEqual(0);
       expect(botGap).toBeLessThanOrEqual(0.05);
       expect(pushGap).toBeGreaterThanOrEqual(0);
-      expect(pushGap).toBeLessThanOrEqual(1.0);
-      expect(Math.abs(pushFig.world.near.wrist[0] - botFig.world.near.wrist[0])).toBeLessThanOrEqual(1.0);
+      expect(pushGap).toBeLessThanOrEqual(0.2);
+      expect(Math.abs(pushFig.world.near.wrist[0] - botFig.world.near.wrist[0])).toBeLessThanOrEqual(0.3);
       expect(pushFig.world.neck[1]).toBeGreaterThan(botFig.world.neck[1] + 4.0);
       const elbowBottom = deg3D(botFig.world.near.shoulder, botFig.world.near.elbow, botFig.world.near.wrist);
       const elbowPush = deg3D(pushFig.world.near.shoulder, pushFig.world.near.elbow, pushFig.world.near.wrist);
@@ -310,8 +311,29 @@ describe('MOV-A04 hinges and posterior chain: physics, joint angles, contacts, a
       expect(elbowBottom).toBeGreaterThanOrEqual(80);
       expect(elbowBottom).toBeLessThanOrEqual(115);
       expect(elbowPush - elbowBottom).toBeGreaterThanOrEqual(30);
-      expect(elbowTop).toBeGreaterThan(elbowPush);
+      expect(elbowTop).toBeLessThanOrEqual(elbowPush);
       expect(topFig.world.near.wrist[1]).toBeGreaterThan(30);
+
+      // Every 33 ms tick during the push phase (t = 3100..3600 ms, ph = 1 -> 2):
+      const ds = entry.segmentDurationsMs;
+      const poses = entry.frames.map((f) => f.joints);
+      const pushStartMs = ds[0] + ds[1];
+      const pushEndMs = pushStartMs + ds[2];
+      let prevElbow = elbowBottom;
+      for (let t = pushStartMs; t <= pushEndMs; t += 33) {
+        const pt = rig.poseAtTime(poses, t, ds);
+        const gt = rig.chainGeometry(slug, pt.ph, BODY);
+        for (const side of ['near', 'far']) {
+          const gap = gt.world[side].wrist[1] - handRadius;
+          const drift = Math.abs(gt.world[side].wrist[0] - botFig.world[side].wrist[0]);
+          expect(gap).toBeGreaterThanOrEqual(0);
+          expect(gap).toBeLessThanOrEqual(0.2);
+          expect(drift).toBeLessThanOrEqual(0.3);
+        }
+        const curElbow = deg3D(gt.world.near.shoulder, gt.world.near.elbow, gt.world.near.wrist);
+        expect(curElbow).toBeGreaterThanOrEqual(prevElbow - 1e-6);
+        prevElbow = curElbow;
+      }
     }
   });
 });

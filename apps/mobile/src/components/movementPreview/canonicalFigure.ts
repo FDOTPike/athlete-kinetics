@@ -1264,6 +1264,8 @@ export interface ChainMovement {
    * so a stride does not pulse.
    */
   cycle?: boolean;
+  /** Whether phase 0..1 maps evenly across all poses (0..poses.length - 1). */
+  unitPhase?: boolean;
   /** Side view by default. 'oblique' turns the figure by `yawDeg`; 'front' faces it. */
   view?: 'side' | 'oblique' | 'front';
   yawDeg?: number;
@@ -3922,7 +3924,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       },
       {
         at: [-14.2, 23.2], trunk: 50, thigh: -90, shin: -90,
-        ankle: [0, CHAIN_ANKLE_HEIGHT], foot: [0, 22], kneeOut: 22,
+        ankle: [0, CHAIN_ANKLE_HEIGHT], foot: [0, 22], kneeOut: 14.8,
         upperArm: [-102, 22], forearm: [88, 12],
       },
     ],
@@ -3993,22 +3995,39 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     view: 'oblique',
     yawDeg: 26,
     originX: 50,
+    unitPhase: true,
     implement: 'bar',
     barAt: 'behind',
     plateRadius: CHAIN_FLOOR_PLATE,
     footSpread: 4.0,
     poses: [
       {
-        at: [
-          -4.83,
-          CHAIN_FLOOR_BAR_HEIGHT - CHAIN_TRUNK * Math.sin(chainRad(50)) - (SAGITTAL_UPPER_ARM + SAGITTAL_FOREARM) * Math.sin(chainRad(-98)) * Math.cos(chainRad(4)),
-        ],
-        trunk: 50, thigh: -90, shin: -90,
+        at: [-10.2828, 21.216547], trunk: 40.5, shrug: -4.5, thigh: -90, shin: -90,
         ankle: [10, CHAIN_ANKLE_HEIGHT], kneeOut: 12,
-        upperArm: [-98, 4], forearm: [-98, 4],
+        upperArm: [-86, 4], forearm: [-86, 4],
       },
       {
-        at: [8.5, 45.70], trunk: 88, thigh: -90, shin: -90,
+        at: [-8.0097, 28.6678], trunk: 40, shrug: -5, thigh: -90, shin: -90,
+        ankle: [10, CHAIN_ANKLE_HEIGHT], kneeOut: 11.5,
+        upperArm: [-86, 4], forearm: [-86, 4],
+      },
+      {
+        at: [-8.4912, 33.2697], trunk: 41, shrug: -5.5, thigh: -90, shin: -90,
+        ankle: [10, CHAIN_ANKLE_HEIGHT], kneeOut: 11,
+        upperArm: [-87, 4], forearm: [-87, 4],
+      },
+      {
+        at: [5.1122, 33.9869], trunk: 72.5, shrug: -5, thigh: -90, shin: -90,
+        ankle: [10, CHAIN_ANKLE_HEIGHT], kneeOut: 10,
+        upperArm: [-105, 4], forearm: [-105, 4],
+      },
+      {
+        at: [7.9554, 38.7678], trunk: 83, shrug: -2.5, thigh: -90, shin: -90,
+        ankle: [10, CHAIN_ANKLE_HEIGHT], kneeOut: 9,
+        upperArm: [-105, 4], forearm: [-105, 4],
+      },
+      {
+        at: [8.5, 45.70], trunk: 88, shrug: 0, thigh: -90, shin: -90,
         ankle: [10, CHAIN_ANKLE_HEIGHT], kneeOut: 8,
         upperArm: [-102, 4], forearm: [-102, 4],
       },
@@ -4138,6 +4157,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     view: 'oblique',
     yawDeg: 24,
     originX: 50,
+    unitPhase: true,
     footSpread: -1.2,
     kneePole: 10,
     implement: 'bar',
@@ -4146,18 +4166,34 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     farArmOver: true,
     poses: [
       {
-        at: [
-          -(SAGITTAL_UPPER_ARM + SAGITTAL_FOREARM) * Math.cos(chainRad(-90.5)) * Math.cos(chainRad(-1.4)),
-          CHAIN_FLOOR_BAR_HEIGHT - (SAGITTAL_UPPER_ARM + SAGITTAL_FOREARM) * Math.sin(chainRad(-90.5)) * Math.cos(chainRad(-1.4)),
-        ],
-        trunk: 18, head: 86, shrug: 0, thigh: -90, shin: -90,
-        ankle: [-2.0, CHAIN_ANKLE_HEIGHT], kneeOut: 0,
+        at: [0.0, 33.991754], trunk: 17.2, head: 84, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT], kneeOut: 0,
         upperArm: [-90.5, -1.4], forearm: [-90.5, -1.4],
       },
       {
-        at: [-1.8, 70.62], trunk: 90, head: 90, shrug: 0, thigh: -90, shin: -90,
-        ankle: [-2.0, CHAIN_ANKLE_HEIGHT], kneeOut: 4,
-        upperArm: [-85, -1.4], forearm: [-85, -1.4],
+        at: [0.55, 33.991754], trunk: 21.6, head: 86, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT], kneeOut: 0,
+        upperArm: [-90.5, -1.4], forearm: [-90.5, -1.4],
+      },
+      {
+        at: [-2.20, 42.3799], trunk: 22, head: 87, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT], kneeOut: 1,
+        upperArm: [-84.5, -1.4], forearm: [-84.5, -1.4],
+      },
+      {
+        at: [-0.8548, 49.9778], trunk: 29, head: 88, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT], kneeOut: 2,
+        upperArm: [-88, -1.4], forearm: [-88, -1.4],
+      },
+      {
+        at: [-0.6275, 60.489], trunk: 74, head: 89, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT], kneeOut: 3,
+        upperArm: [-89, -1.4], forearm: [-89, -1.4],
+      },
+      {
+        at: [-4.4, 70.62], trunk: 90, head: 90, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT], kneeOut: 4,
+        upperArm: [-80.84, -1.4], forearm: [-80.84, -1.4],
       },
     ],
   },
@@ -4169,6 +4205,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     view: 'oblique',
     yawDeg: 24,
     originX: 50,
+    unitPhase: true,
     feet: 'free',
     footSpread: -1.2,
     kneePole: 10,
@@ -4181,18 +4218,34 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     ],
     poses: [
       {
-        at: [
-          -(SAGITTAL_UPPER_ARM + SAGITTAL_FOREARM) * Math.cos(chainRad(-90.5)) * Math.cos(chainRad(-1.4)),
-          CHAIN_FLOOR_BAR_HEIGHT - (SAGITTAL_UPPER_ARM + SAGITTAL_FOREARM) * Math.sin(chainRad(-90.5)) * Math.cos(chainRad(-1.4)),
-        ],
-        trunk: 13.5, head: 86, shrug: 0, thigh: -90, shin: -90,
-        ankle: [-2.7, CHAIN_ANKLE_HEIGHT + 3.3], foot: 0, kneeOut: 2,
+        at: [0.05, 33.751232], trunk: 12.6, head: 84, shrug: 1.0, thigh: -90, shin: -90,
+        ankle: [-5.0, CHAIN_ANKLE_HEIGHT + 3.3], foot: 0, kneeOut: 2,
+        upperArm: [-92.5, -1.4], forearm: [-92.5, -1.4],
+      },
+      {
+        at: [0.2137, 33.991754], trunk: 17.2, head: 86, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-5.0, CHAIN_ANKLE_HEIGHT + 3.3], foot: 0, kneeOut: 2,
         upperArm: [-90.5, -1.4], forearm: [-90.5, -1.4],
       },
       {
-        at: [-2.5, 70.62 + 3.3], trunk: 90, head: 90, shrug: 0, thigh: -90, shin: -90,
-        ankle: [-2.7, CHAIN_ANKLE_HEIGHT + 3.3], foot: 0, kneeOut: 4,
-        upperArm: [-85, -1.4], forearm: [-85, -1.4],
+        at: [0.2137, 43.4918], trunk: 18, head: 87, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-5.0, CHAIN_ANKLE_HEIGHT + 3.3], foot: 0, kneeOut: 2.5,
+        upperArm: [-90.5, -1.4], forearm: [-90.5, -1.4],
+      },
+      {
+        at: [0.1137, 53.2918], trunk: 27, head: 88, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-5.0, CHAIN_ANKLE_HEIGHT + 3.3], foot: 0, kneeOut: 3,
+        upperArm: [-90.5, -1.4], forearm: [-90.5, -1.4],
+      },
+      {
+        at: [-0.2863, 63.4918], trunk: 70, head: 89, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-5.0, CHAIN_ANKLE_HEIGHT + 3.3], foot: 0, kneeOut: 3.5,
+        upperArm: [-90.5, -1.4], forearm: [-90.5, -1.4],
+      },
+      {
+        at: [-4.8, 70.62 + 3.3], trunk: 90, head: 90, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-5.0, CHAIN_ANKLE_HEIGHT + 3.3], foot: 0, kneeOut: 4,
+        upperArm: [-80.84, -1.4], forearm: [-80.84, -1.4],
       },
     ],
   },
@@ -4204,6 +4257,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     view: 'oblique',
     yawDeg: 24,
     originX: 50,
+    unitPhase: true,
     footSpread: -1.2,
     kneePole: 10,
     implement: 'bar',
@@ -4216,18 +4270,29 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     ],
     poses: [
       {
-        at: [
-          -(SAGITTAL_UPPER_ARM + SAGITTAL_FOREARM) * Math.cos(chainRad(-90.5)) * Math.cos(chainRad(-1.4)),
-          CHAIN_FLOOR_BAR_HEIGHT - (SAGITTAL_UPPER_ARM + SAGITTAL_FOREARM) * Math.sin(chainRad(-90.5)) * Math.cos(chainRad(-1.4)),
-        ],
-        trunk: 18, head: 86, shrug: 0, thigh: -90, shin: -90,
-        ankle: [-2.0, CHAIN_ANKLE_HEIGHT], kneeOut: 0,
+        at: [0.2137, 33.991754], trunk: 19.5, head: 86, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT], kneeOut: 0,
         upperArm: [-90.5, -1.4], forearm: [-90.5, -1.4],
       },
       {
-        at: [-1.8, 70.62], trunk: 90, head: 90, shrug: 0, thigh: -90, shin: -90,
-        ankle: [-2.0, CHAIN_ANKLE_HEIGHT], kneeOut: 4,
-        upperArm: [-85, -1.4], forearm: [-85, -1.4],
+        at: [-2.3475, 42.3799], trunk: 22, head: 87, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT], kneeOut: 1,
+        upperArm: [-84.5, -1.4], forearm: [-84.5, -1.4],
+      },
+      {
+        at: [-0.4275, 49.989], trunk: 28, head: 88, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT], kneeOut: 2,
+        upperArm: [-89, -1.4], forearm: [-89, -1.4],
+      },
+      {
+        at: [-0.6275, 60.489], trunk: 74, head: 89, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT], kneeOut: 3,
+        upperArm: [-89, -1.4], forearm: [-89, -1.4],
+      },
+      {
+        at: [-4.4, 70.62], trunk: 90, head: 90, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT], kneeOut: 4,
+        upperArm: [-80.84, -1.4], forearm: [-80.84, -1.4],
       },
     ],
   },
@@ -4238,6 +4303,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     view: 'oblique',
     yawDeg: 24,
     originX: 50,
+    unitPhase: true,
     footSpread: -1.2,
     kneePole: 10,
     implement: 'bar',
@@ -4258,18 +4324,29 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     ],
     poses: [
       {
-        at: [
-          -(SAGITTAL_UPPER_ARM + SAGITTAL_FOREARM) * Math.cos(chainRad(-90.5)) * Math.cos(chainRad(-1.4)),
-          CHAIN_FLOOR_BAR_HEIGHT - (SAGITTAL_UPPER_ARM + SAGITTAL_FOREARM) * Math.sin(chainRad(-90.5)) * Math.cos(chainRad(-1.4)),
-        ],
-        trunk: 18, head: 86, shrug: 0, thigh: -90, shin: -90,
-        ankle: [-2.0, CHAIN_ANKLE_HEIGHT], kneeOut: 0,
+        at: [0.2137, 33.991754], trunk: 19.5, head: 86, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT], kneeOut: 0,
         upperArm: [-90.5, -1.4], forearm: [-90.5, -1.4],
       },
       {
-        at: [-1.8, 70.62], trunk: 90, head: 90, shrug: 0, thigh: -90, shin: -90,
-        ankle: [-2.0, CHAIN_ANKLE_HEIGHT], kneeOut: 4,
-        upperArm: [-85, -1.4], forearm: [-85, -1.4],
+        at: [-2.3475, 42.3799], trunk: 22, head: 87, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT], kneeOut: 1,
+        upperArm: [-84.5, -1.4], forearm: [-84.5, -1.4],
+      },
+      {
+        at: [-0.4275, 49.989], trunk: 28, head: 88, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT], kneeOut: 2,
+        upperArm: [-89, -1.4], forearm: [-89, -1.4],
+      },
+      {
+        at: [-0.6275, 60.489], trunk: 74, head: 89, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT], kneeOut: 3,
+        upperArm: [-89, -1.4], forearm: [-89, -1.4],
+      },
+      {
+        at: [-4.4, 70.62], trunk: 90, head: 90, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT], kneeOut: 4,
+        upperArm: [-80.84, -1.4], forearm: [-80.84, -1.4],
       },
     ],
   },
@@ -4280,6 +4357,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     view: 'oblique',
     yawDeg: 46,
     originX: 50,
+    unitPhase: true,
     feet: 'free',
     kneePole: -5,
     implement: 'bar',
@@ -4288,20 +4366,34 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     farArmOver: true,
     poses: [
       {
-        at: [
-          2.0 * Math.cos(chainRad(35.3)) - (SAGITTAL_UPPER_ARM + SAGITTAL_FOREARM) * Math.cos(chainRad(-88.2)) * Math.cos(chainRad(-11.8)),
-          CHAIN_FLOOR_BAR_HEIGHT + 2.0 * Math.sin(chainRad(35.3)) - (SAGITTAL_UPPER_ARM + SAGITTAL_FOREARM) * Math.sin(chainRad(-88.2)) * Math.cos(chainRad(-11.8)),
-        ],
-        trunk: 35.3, head: 86, shrug: -2.0, thigh: -90, shin: -90,
-        ankle: [-2.2, CHAIN_ANKLE_HEIGHT, 25.0], farAnkle: [-2.2, CHAIN_ANKLE_HEIGHT, -25.0],
+        at: [-2.4871, 34.207185], trunk: 33, head: 86, shrug: -2.0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT, 25.0], farAnkle: [-4.6, CHAIN_ANKLE_HEIGHT, -25.0],
         foot: [0, 38], kneeOut: 18,
-        upperArm: [-88.2, -11.8], forearm: [-88.2, -11.8],
+        upperArm: [-80, -11.8], forearm: [-80, -11.8],
       },
       {
-        at: [-1.8, 66.74], trunk: 90, head: 90, shrug: 0, thigh: -90, shin: -90,
-        ankle: [-2.2, CHAIN_ANKLE_HEIGHT, 25.0], farAnkle: [-2.2, CHAIN_ANKLE_HEIGHT, -25.0],
+        at: [-2.7357, 40.9783], trunk: 35, head: 87, shrug: -1.5, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT, 25.0], farAnkle: [-4.6, CHAIN_ANKLE_HEIGHT, -25.0],
+        foot: [0, 38], kneeOut: 17,
+        upperArm: [-80, -11.8], forearm: [-80, -11.8],
+      },
+      {
+        at: [-2.5765, 47.7336], trunk: 38, head: 88, shrug: -1.0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT, 25.0], farAnkle: [-4.6, CHAIN_ANKLE_HEIGHT, -25.0],
+        foot: [0, 38], kneeOut: 16,
+        upperArm: [-80, -11.8], forearm: [-80, -11.8],
+      },
+      {
+        at: [-3.4531, 57.2986], trunk: 82, head: 89, shrug: -0.5, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT, 25.0], farAnkle: [-4.6, CHAIN_ANKLE_HEIGHT, -25.0],
+        foot: [0, 38], kneeOut: 15,
+        upperArm: [-83, -11.8], forearm: [-83, -11.8],
+      },
+      {
+        at: [-4.2, 66.74], trunk: 90, head: 90, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT, 25.0], farAnkle: [-4.6, CHAIN_ANKLE_HEIGHT, -25.0],
         foot: [0, 38], kneeOut: 14,
-        upperArm: [-85.2, -11.8], forearm: [-85.2, -11.8],
+        upperArm: [-81.2, -11.8], forearm: [-81.2, -11.8],
       },
     ],
   },
@@ -4312,6 +4404,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     view: 'oblique',
     yawDeg: 46,
     originX: 50,
+    unitPhase: true,
     feet: 'free',
     kneePole: -5,
     implement: 'bar',
@@ -4332,20 +4425,34 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     ],
     poses: [
       {
-        at: [
-          2.0 * Math.cos(chainRad(35.3)) - (SAGITTAL_UPPER_ARM + SAGITTAL_FOREARM) * Math.cos(chainRad(-88.2)) * Math.cos(chainRad(-11.8)),
-          CHAIN_FLOOR_BAR_HEIGHT + 2.0 * Math.sin(chainRad(35.3)) - (SAGITTAL_UPPER_ARM + SAGITTAL_FOREARM) * Math.sin(chainRad(-88.2)) * Math.cos(chainRad(-11.8)),
-        ],
-        trunk: 35.3, head: 86, shrug: -2.0, thigh: -90, shin: -90,
-        ankle: [-2.2, CHAIN_ANKLE_HEIGHT, 25.0], farAnkle: [-2.2, CHAIN_ANKLE_HEIGHT, -25.0],
+        at: [-2.4871, 34.207185], trunk: 33, head: 86, shrug: -2.0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT, 25.0], farAnkle: [-4.6, CHAIN_ANKLE_HEIGHT, -25.0],
         foot: [0, 38], kneeOut: 18,
-        upperArm: [-88.2, -11.8], forearm: [-88.2, -11.8],
+        upperArm: [-80, -11.8], forearm: [-80, -11.8],
       },
       {
-        at: [-1.8, 66.74], trunk: 90, head: 90, shrug: 0, thigh: -90, shin: -90,
-        ankle: [-2.2, CHAIN_ANKLE_HEIGHT, 25.0], farAnkle: [-2.2, CHAIN_ANKLE_HEIGHT, -25.0],
+        at: [-2.7357, 40.9783], trunk: 35, head: 87, shrug: -1.5, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT, 25.0], farAnkle: [-4.6, CHAIN_ANKLE_HEIGHT, -25.0],
+        foot: [0, 38], kneeOut: 17,
+        upperArm: [-80, -11.8], forearm: [-80, -11.8],
+      },
+      {
+        at: [-2.5765, 47.7336], trunk: 38, head: 88, shrug: -1.0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT, 25.0], farAnkle: [-4.6, CHAIN_ANKLE_HEIGHT, -25.0],
+        foot: [0, 38], kneeOut: 16,
+        upperArm: [-80, -11.8], forearm: [-80, -11.8],
+      },
+      {
+        at: [-3.4531, 57.2986], trunk: 82, head: 89, shrug: -0.5, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT, 25.0], farAnkle: [-4.6, CHAIN_ANKLE_HEIGHT, -25.0],
+        foot: [0, 38], kneeOut: 15,
+        upperArm: [-83, -11.8], forearm: [-83, -11.8],
+      },
+      {
+        at: [-4.2, 66.74], trunk: 90, head: 90, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT, 25.0], farAnkle: [-4.6, CHAIN_ANKLE_HEIGHT, -25.0],
         foot: [0, 38], kneeOut: 14,
-        upperArm: [-85.2, -11.8], forearm: [-85.2, -11.8],
+        upperArm: [-81.2, -11.8], forearm: [-81.2, -11.8],
       },
     ],
   },
@@ -4356,6 +4463,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     view: 'oblique',
     yawDeg: 46,
     originX: 50,
+    unitPhase: true,
     feet: 'free',
     kneePole: -5,
     implement: 'bar',
@@ -4368,20 +4476,34 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     ],
     poses: [
       {
-        at: [
-          2.0 * Math.cos(chainRad(35.3)) - (SAGITTAL_UPPER_ARM + SAGITTAL_FOREARM) * Math.cos(chainRad(-88.2)) * Math.cos(chainRad(-11.8)),
-          CHAIN_FLOOR_BAR_HEIGHT + 2.0 * Math.sin(chainRad(35.3)) - (SAGITTAL_UPPER_ARM + SAGITTAL_FOREARM) * Math.sin(chainRad(-88.2)) * Math.cos(chainRad(-11.8)),
-        ],
-        trunk: 35.3, head: 86, shrug: -2.0, thigh: -90, shin: -90,
-        ankle: [-2.2, CHAIN_ANKLE_HEIGHT, 25.0], farAnkle: [-2.2, CHAIN_ANKLE_HEIGHT, -25.0],
+        at: [-2.4871, 34.207185], trunk: 33, head: 86, shrug: -2.0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT, 25.0], farAnkle: [-4.6, CHAIN_ANKLE_HEIGHT, -25.0],
         foot: [0, 38], kneeOut: 18,
-        upperArm: [-88.2, -11.8], forearm: [-88.2, -11.8],
+        upperArm: [-80, -11.8], forearm: [-80, -11.8],
       },
       {
-        at: [-1.8, 66.74], trunk: 90, head: 90, shrug: 0, thigh: -90, shin: -90,
-        ankle: [-2.2, CHAIN_ANKLE_HEIGHT, 25.0], farAnkle: [-2.2, CHAIN_ANKLE_HEIGHT, -25.0],
+        at: [-2.7357, 40.9783], trunk: 35, head: 87, shrug: -1.5, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT, 25.0], farAnkle: [-4.6, CHAIN_ANKLE_HEIGHT, -25.0],
+        foot: [0, 38], kneeOut: 17,
+        upperArm: [-80, -11.8], forearm: [-80, -11.8],
+      },
+      {
+        at: [-2.5765, 47.7336], trunk: 38, head: 88, shrug: -1.0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT, 25.0], farAnkle: [-4.6, CHAIN_ANKLE_HEIGHT, -25.0],
+        foot: [0, 38], kneeOut: 16,
+        upperArm: [-80, -11.8], forearm: [-80, -11.8],
+      },
+      {
+        at: [-3.4531, 57.2986], trunk: 82, head: 89, shrug: -0.5, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT, 25.0], farAnkle: [-4.6, CHAIN_ANKLE_HEIGHT, -25.0],
+        foot: [0, 38], kneeOut: 15,
+        upperArm: [-83, -11.8], forearm: [-83, -11.8],
+      },
+      {
+        at: [-4.2, 66.74], trunk: 90, head: 90, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT, 25.0], farAnkle: [-4.6, CHAIN_ANKLE_HEIGHT, -25.0],
         foot: [0, 38], kneeOut: 14,
-        upperArm: [-85.2, -11.8], forearm: [-85.2, -11.8],
+        upperArm: [-81.2, -11.8], forearm: [-81.2, -11.8],
       },
     ],
   },
@@ -4402,7 +4524,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       {
         at: [0, CHAIN_ANKLE_HEIGHT], trunk: 89, head: 90, shrug: 0,
         thigh: -77, shin: -103,
-        upperArm: [-86, 5], forearm: [-86, 5],
+        upperArm: [-81.5, 5], forearm: [-81.5, 5],
       },
       {
         at: [0, CHAIN_ANKLE_HEIGHT], trunk: -4, head: 16, shrug: -1.5,
@@ -4574,6 +4696,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     root: 'ankle',
     feet: 'free',
     cycle: true,
+    elbowPole: 135,
     equipment: [
       { kind: 'box', a: [27, 0.6], b: [38, 4.2] },
       { kind: 'post', at: [11.5, 9.6] },
@@ -4583,17 +4706,19 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       {
         at: [10, 6.8], trunk: 90, head: 90,
         thigh: -90, shin: 180, foot: -56,
-        upperArm: -68, forearm: -43,
+        upperArm: -68, forearm: -22,
       },
       {
         at: [10, 6.8], trunk: 17, head: 23,
         thigh: -163, shin: 180, foot: -56,
-        upperArm: -133, forearm: -49.07,
+        upperArm: -133.0272, forearm: -49.0423,
+        wrist: [75.8158, 2.122],
       },
       {
         at: [10, 6.8], trunk: 23, head: 29,
         thigh: -157, shin: 180, foot: -56,
-        upperArm: -115, forearm: -63.5,
+        upperArm: -108.6968, forearm: -65.3786,
+        wrist: [75.8158, 2.122],
       },
     ],
   },
@@ -4604,6 +4729,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     root: 'ankle',
     feet: 'free',
     cycle: true,
+    elbowPole: 135,
     equipment: [
       { kind: 'box', a: [8, 0.6], b: [38, 5.2] },
       { kind: 'slab', a: [24, 7.6], b: [38, 7.6] },
@@ -4615,17 +4741,19 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       {
         at: [10, 10.5], trunk: 90, head: 90,
         thigh: -90, shin: 180, foot: -90,
-        upperArm: -68, forearm: -43,
+        upperArm: -68, forearm: -21,
       },
       {
         at: [10, 10.5], trunk: 11, head: 17,
         thigh: -169, shin: 180, foot: -90,
-        upperArm: -135, forearm: -44.24,
+        upperArm: -135.0253, forearm: -44.2133,
+        wrist: [77.4085, 2.122],
       },
       {
         at: [10, 10.5], trunk: 18, head: 24,
         thigh: -162, shin: 180, foot: -90,
-        upperArm: -116, forearm: -61.5,
+        upperArm: -108.6679, forearm: -64.4628,
+        wrist: [77.4085, 2.122],
       },
     ],
   },
@@ -5383,7 +5511,8 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters, tu
   const front = view === 'front';
   const count = movement.poses.length;
   const last = count - 1;
-  let t = Math.max(0, Math.min(last, ph));
+  const rawPh = movement.unitPhase === true ? ph * last : ph;
+  let t = Math.max(0, Math.min(last, rawPh));
   let index = Math.min(Math.max(0, last - 1), Math.floor(t));
   let u = last === 0 ? 0 : t - index;
   let next = Math.min(last, index + 1);
@@ -5407,6 +5536,11 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters, tu
     (x === undefined || y === undefined ? undefined : dir(x, y));
   const point = (x: ChainPoint | undefined, y: ChainPoint | undefined, name: string): ChainPoint | undefined => {
     if (x === undefined && y === undefined) return undefined;
+    if (name === 'wrist' || name === 'farWrist') {
+      if (u === 0) return x;
+      if (u === 1) return y;
+      if (x === undefined || y === undefined) return undefined;
+    }
     if (x === undefined || y === undefined || (x[2] === undefined) !== (y[2] === undefined)) {
       throw new Error(`canonicalFigure: '${slug}' gives '${name}' on some poses only`);
     }

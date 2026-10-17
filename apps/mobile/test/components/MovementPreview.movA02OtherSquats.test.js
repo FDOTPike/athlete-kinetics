@@ -261,14 +261,14 @@ describe('MOV-A02 per-movement source-bound biomechanics', () => {
     const top = chainGeometry('barbell-squat-to-a-bench', 0, BODY);
     const bottom = chainGeometry('barbell-squat-to-a-bench', 1, BODY);
 
-    // Planted feet turn outward and knees track in line with the toes at the bottom.
+    // Planted feet turn outward and the ankle-to-knee ray tracks in line with the toes at the bottom.
     const nearToeYaw = (Math.atan2(top.world.near.toe[2] - top.world.near.ankle[2], top.world.near.toe[0] - top.world.near.ankle[0]) * 180) / Math.PI;
     const farToeYaw = (Math.atan2(-(top.world.far.toe[2] - top.world.far.ankle[2]), top.world.far.toe[0] - top.world.far.ankle[0]) * 180) / Math.PI;
-    const nearKneeYaw = (Math.atan2(bottom.world.near.knee[2] - bottom.world.near.hipJoint[2], bottom.world.near.knee[0] - bottom.world.near.hipJoint[0]) * 180) / Math.PI;
+    const nearKneeYaw = (Math.atan2(bottom.world.near.knee[2] - bottom.world.near.ankle[2], bottom.world.near.knee[0] - bottom.world.near.ankle[0]) * 180) / Math.PI;
     expect(nearToeYaw).toBeGreaterThanOrEqual(15);
     expect(nearToeYaw).toBeLessThanOrEqual(30);
     expect(farToeYaw).toBeCloseTo(nearToeYaw, 5);
-    expect(Math.abs(nearKneeYaw - nearToeYaw)).toBeLessThanOrEqual(8);
+    expect(Math.abs(nearKneeYaw - nearToeYaw)).toBeLessThanOrEqual(3);
 
     // Painted underside of the hips and thighs lightly touches the painted bench top (gap within 0.5 units, no penetration).
     expectPaintedBenchContact(entry);
