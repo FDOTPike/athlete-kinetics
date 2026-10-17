@@ -5563,7 +5563,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     equipment: chainDeclineBench(DECLINE_EXTENSION_HIP, DECLINE_EXTENSION_DEG, DECLINE_EXTENSION_ANKLE),
     poses: [
       { ...DECLINE_EXTENSION_BODY, curl: 0, ...HANDS_BY_EARS },
-      { ...DECLINE_EXTENSION_BODY, curl: 58, upperArm: -18, forearm: 142 },
+      { ...DECLINE_EXTENSION_BODY, curl: 58, ...HANDS_BY_EARS },
     ],
   },
   // 204 Frog Sit-Ups: lie on the back with the soles of the feet together and
@@ -5576,7 +5576,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     originX: 48,
     spine: 'upper',
     feet: 'free',
-    kneePole: [18, 72],
+    kneePole: [52, 64],
     armsFollowTrunk: true,
     poses: [
       {
@@ -5584,14 +5584,14 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
         thigh: 0, shin: 0,
         ankle: [16.0, CHAIN_ANKLE_HEIGHT, 1.6], farAnkle: [16.0, CHAIN_ANKLE_HEIGHT, -1.6],
         foot: [0, -16], farFoot: [0, -16],
-        upperArm: [-70, -18], forearm: [92, -24],
+        upperArm: [-68, -14], forearm: [32, -42],
       },
       {
         at: [-10, CHAIN_LYING_HEIGHT], trunk: 180, curl: 40,
         thigh: 0, shin: 0,
         ankle: [16.0, CHAIN_ANKLE_HEIGHT, 1.6], farAnkle: [16.0, CHAIN_ANKLE_HEIGHT, -1.6],
         foot: [0, -16], farFoot: [0, -16],
-        upperArm: [-70, -18], forearm: [92, -24],
+        upperArm: [-68, -14], forearm: [32, -42],
       },
     ],
   },
@@ -5775,7 +5775,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
         farUpperArm: [-98, 12], farForearm: [-88, 8],
       },
       {
-        at: [-0.8, 46.2], trunk: 89, head: 90,
+        at: [-0.4, 47.18], trunk: 89, head: 90,
         thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 2,
         upperArm: [-84, 8], forearm: [82, -22],
         farUpperArm: [-88, 10], farForearm: [-84, 6],
