@@ -111,42 +111,74 @@ describe('MOV-A06 standing overhead presses: universal physics, painted floor co
     }
   });
 
-  test('4 Overhead Press sets the bar across the front shoulders with a full grip and near-vertical forearms, presses close past the face, and moves the head through to a tall stacked lockout', () => {
+  test('4 Overhead Press keeps a rigid fixed grip width, clears the head by at least head radius + bar radius at every 33 ms tick, shows a closed-hand full grip close-up, and finishes stacked over the mid-foot', () => {
     // Quotes:
     // "Set the bar across the front shoulders with a full grip and the forearms close to vertical. Stand with balanced feet and brace before the bar leaves the shoulders."
     // "Press close past the face, move the head through to a tall lockout, and lower along the same path. If the torso leans into an incline press, reduce the load until the finish stays stacked."
     const e = entryFor(4);
     const slug = slugOf(e);
     const start = rig.chainGeometry(slug, 0, BODY);
-    const top = rig.chainGeometry(slug, 1, BODY);
+    const facePass = rig.chainGeometry(slug, 1, BODY);
+    const top = rig.chainGeometry(slug, 2, BODY);
     const midFootX = (start.world.near.ankle[0] + start.world.near.toe[0]) / 2;
+    const startGripSpan = dist(start.world.near.wrist, start.world.far.wrist);
+    const barRadius = 0.8;
 
     expect(start.movement.implement).toBe('bar');
-    // Full grip on the bar (not a clean-grip fingertip closeUp)
-    expect(start.angles.hand).toBeUndefined();
-    expect(rig.handCloseUp(start)).toBeNull();
+
+    // At every 33 ms tick: wrist-to-wrist distance stays within 0.5 units of start, and head clears the bar by >= BODY.hr + barRadius
+    const poses = e.frames.map((f) => f.joints);
+    const ds = e.segmentDurationsMs;
+    const segDist3D = (a, b, c) => {
+      const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
+      const lenSq = ux * ux + uy * uy + uz * uz || 1;
+      const k = Math.max(0, Math.min(1, ((c[0] - a[0]) * ux + (c[1] - a[1]) * uy + (c[2] - a[2]) * uz) / lenSq));
+      return Math.hypot(c[0] - (a[0] + ux * k), c[1] - (a[1] + uy * k), c[2] - (a[2] + uz * k));
+    };
+    let maxSpanDrift = 0;
+    let minClear3D = Infinity;
+    let minClear2D = Infinity;
+    for (const t of ticksOf(e)) {
+      const p = rig.poseAtTime(poses, t, ds);
+      const g = rig.chainGeometry(slug, p.ph, BODY);
+      const span = dist(g.world.near.wrist, g.world.far.wrist);
+      maxSpanDrift = Math.max(maxSpanDrift, Math.abs(span - startGripSpan));
+      minClear3D = Math.min(minClear3D, segDist3D(g.world.near.hold, g.world.far.hold, g.world.head));
+      const barMid2D = [(g.hold.near[0] + g.hold.far[0]) / 2, (g.hold.near[1] + g.hold.far[1]) / 2];
+      minClear2D = Math.min(minClear2D, dist(g.joints.hd, barMid2D));
+    }
+    expect(maxSpanDrift).toBeLessThanOrEqual(0.5);
+    expect(minClear3D).toBeGreaterThanOrEqual(BODY.hr + barRadius);
+    expect(minClear2D).toBeGreaterThanOrEqual(BODY.hr + barRadius);
+
+    // Closed-hand full grip close-up panel (open = 0 wraps all finger bones around the bar against the palm)
+    const startPanel = rig.handCloseUp(start);
+    expect(startPanel).not.toBeNull();
+    expect(startPanel.open).toBe(0);
+    expect(startPanel.centre[0] + startPanel.r).toBeLessThan(start.joints.hd[0] - 8);
 
     // Bar starts across the front shoulders with forearms close to vertical (<= 10 deg off vertical)
-    expect(start.world.near.hold[0]).toBeGreaterThan(start.world.neck[0] + 0.5);
-    expect(start.world.near.hold[0]).toBeLessThanOrEqual(start.world.neck[0] + 2.0);
+    expect(start.world.near.hold[0]).toBeGreaterThan(start.world.neck[0] + 1.5);
+    expect(start.world.near.hold[0]).toBeLessThanOrEqual(start.world.neck[0] + 4.0);
     expect(Math.abs(start.world.near.hold[1] - start.world.neck[1])).toBeLessThanOrEqual(1.5);
     expect(offVertical3D(start.world.near.elbow, start.world.near.wrist)).toBeLessThanOrEqual(10);
     expect(offVertical3D(start.world.far.elbow, start.world.far.wrist)).toBeLessThanOrEqual(10);
 
-    // Head starts slightly back so the bar presses close past the face, then moves through to a stacked lockout
-    expect(start.world.head[0]).toBeLessThan(start.world.neck[0] - 0.8);
+    // Head draws back as the bar passes close in front of the face, then moves through to a stacked lockout
+    expect(facePass.world.head[0]).toBeLessThan(start.world.head[0] - 0.5);
+    expect(facePass.world.near.hold[1]).toBeGreaterThan(facePass.world.head[1] + BODY.hr);
     expect(Math.abs(top.world.head[0] - top.world.neck[0])).toBeLessThan(0.1);
-    expect(top.world.head[0]).toBeGreaterThan(start.world.head[0] + 0.8);
+    expect(top.world.head[0]).toBeGreaterThan(facePass.world.head[0] + 3.5);
 
-    // Tall, stacked lockout overhead with straight elbows and zero torso lean
-    expect(deg3D(top.world.near.shoulder, top.world.near.elbow, top.world.near.wrist)).toBeGreaterThanOrEqual(176);
-    expect(deg3D(top.world.far.shoulder, top.world.far.elbow, top.world.far.wrist)).toBeGreaterThanOrEqual(176);
+    // Tall, stacked lockout overhead with straight elbows (>= 172 deg) and bar over mid-foot
+    expect(deg3D(top.world.near.shoulder, top.world.near.elbow, top.world.near.wrist)).toBeGreaterThanOrEqual(172);
+    expect(deg3D(top.world.far.shoulder, top.world.far.elbow, top.world.far.wrist)).toBeGreaterThanOrEqual(172);
     expect(top.world.near.hold[1]).toBeGreaterThan(top.world.head[1] + BODY.hr + 8);
     expect(Math.abs(top.world.near.hold[0] - midFootX)).toBeLessThanOrEqual(0.5);
     expect(Math.abs(top.world.neck[0] - top.world.hip[0])).toBeLessThan(0.05);
   });
 
-  test('31 Arnold Press starts with dumbbells at shoulder height, elbows tight in front, and palms facing the athlete, then rotates the palms 180 degrees to face forward at lockout', () => {
+  test('31 Arnold Press starts with dumbbells at shoulder height, elbows tight in front, and palms facing the athlete, then rotates the palms 180 degrees to face forward at lockout with a readable hand close-up', () => {
     // Quotes:
     // "Sit or stand holding dumbbells at shoulder height with palms facing you. Press up while rotating your palms to face forward at the top. Reverse the rotation on the way back down to the start."
     // "Stay tall and braced the whole press — the lean-back arch is the classic cheat, and it quietly turns this into a sloppy incline press."
@@ -180,6 +212,15 @@ describe('MOV-A06 standing overhead presses: universal physics, painted floor co
     expect(deg3D(top.world.near.shoulder, top.world.near.elbow, top.world.near.wrist)).toBeGreaterThanOrEqual(176);
     expect(top.world.near.hold[1]).toBeGreaterThan(top.world.head[1] + BODY.hr + 8);
 
+    // Magnified hand close-up panel makes palm-toward-athlete (start) vs palm-forward (top) readable at card size
+    const startPanel = rig.handCloseUp(start);
+    const topPanel = rig.handCloseUp(top);
+    expect(startPanel).not.toBeNull();
+    expect(topPanel).not.toBeNull();
+    expect(startPanel.palmFacingViewer).toBe(false);
+    expect(topPanel.palmFacingViewer).toBe(true);
+    expect(startPanel.centre[0] + startPanel.r).toBeLessThan(start.joints.hd[0] - 8);
+
     // Painted knuckle wrap order flips between palms-facing-you (ph = 0) and palms-facing-forward (ph = 1)
     const startPrims = rig.layoutCanonicalFigure({ ...e.frames[0].joints, ph: 0 }, { ...e, body: BODY });
     const topPrims = rig.layoutCanonicalFigure({ ...e.frames[1].joints, ph: 1 }, { ...e, body: BODY });
@@ -189,7 +230,7 @@ describe('MOV-A06 standing overhead presses: universal physics, painted floor co
     expect(shaftIdx(topPrims)).toBeGreaterThan(knuckleIdx(topPrims));
   });
 
-  test('41 Cable Shoulder Press presses one handle from shoulder height to overhead lockout against a low pulley that drags forward and down throughout, with the free hand quiet', () => {
+  test('41 Cable Shoulder Press presses one handle from shoulder height to overhead lockout against a low pulley positioned clearly in front of the feet and shins, with the free hand quiet', () => {
     // Quotes:
     // "Set a low pulley and bring the handle to shoulder height, standing tall. Press to lockout overhead against the cable's pull, which drags forward and down the entire rep — that constant tension is the point, there is no rest at the top."
     // "Lower under control back to the shoulder. Usually run one arm at a time; the free hand tells you when you are leaning."
@@ -203,13 +244,14 @@ describe('MOV-A06 standing overhead presses: universal physics, painted floor co
     expect(pulleyShape).toBeDefined();
     const pulley = pulleyShape.at;
     expect(pulley[1]).toBeLessThanOrEqual(12);
+    const pulleyScreen = start.project([pulley[0], pulley[1], pulley[2] ?? 0]);
 
     // Starts at shoulder height and presses to straight-arm lockout overhead
     expect(Math.abs(start.world.near.hold[1] - start.world.near.shoulder[1])).toBeLessThanOrEqual(2.0);
     expect(deg3D(top.world.near.shoulder, top.world.near.elbow, top.world.near.wrist)).toBeGreaterThanOrEqual(176);
     expect(top.world.near.hold[1]).toBeGreaterThan(top.world.head[1] + BODY.hr + 8);
 
-    // Cable drags forward (pulley X > hand X) and down (pulley Y < hand Y) at every 33 ms tick, and only lengthens on the press
+    // Cable drags forward (pulley X > hand X) and down (pulley Y < hand Y) at every 33 ms tick, and pulley projects well clear in front of feet/shins
     const poses = e.frames.map((f) => f.joints);
     const ds = e.segmentDurationsMs;
     const pressEnd = ds[0];
@@ -219,6 +261,8 @@ describe('MOV-A06 standing overhead presses: universal physics, painted floor co
       const g = rig.chainGeometry(slug, p.ph, BODY);
       expect(pulley[0] - g.world.near.hold[0]).toBeGreaterThan(10);
       expect(pulley[1] - g.world.near.hold[1]).toBeLessThan(-55);
+      const maxLegScreenX = Math.max(g.joints.an[0], g.joints.af[0], g.joints.kn[0], g.joints.kf[0], g.toe.near[0], g.toe.far[0]);
+      expect(pulleyScreen[0]).toBeGreaterThanOrEqual(maxLegScreenX + 12);
       // Free far hand stays completely still at the side
       expect(dist(g.world.far.wrist, start.world.far.wrist)).toBeLessThan(1e-6);
       const len = dist(pulley, g.world.near.hold);
@@ -230,7 +274,7 @@ describe('MOV-A06 standing overhead presses: universal physics, painted floor co
     expect(dist(pulley, top.world.near.hold) - dist(pulley, start.world.near.hold)).toBeGreaterThan(20);
   });
 
-  test('129 Alternating Kettlebell Press vs 230 Kettlebell Seesaw Press: 129 keeps one bell waiting at the shoulder while turning the pressing palm from in to forward, whereas 230 moves one bell up as the other comes down', () => {
+  test('129 Alternating Kettlebell Press vs 230 Kettlebell Seesaw Press: 129 keeps one bell waiting at the shoulder with a readable palm-turn close-up, whereas 230 moves one bell up as the other comes down with equal repetitions on each side', () => {
     // 129 Quotes:
     // "Clean two kettlebells to the shoulders and stand tall with the palms facing in. Press one kettlebell straight overhead until the arm is straight, turning the palm to face forward as it rises, while the other stays at the shoulder. Lower it under control back to the shoulder, then press the other side."
     // "Stand tall and squeeze the glutes. One bell moves, the other waits at the shoulder. Finish with the arm straight beside the ear."
@@ -280,7 +324,7 @@ describe('MOV-A06 standing overhead presses: universal physics, painted floor co
       }
     }
 
-    // 230 Kettlebell Seesaw Press: simultaneous opposing motion between ph = 1 and ph = 2
+    // 230 Kettlebell Seesaw Press: simultaneous opposing motion between ph = 1 and ph = 2, and equal top counts per side over the loop
     const e230 = entryFor(230);
     const s230 = slugOf(e230);
     const times230 = keyTimesOf(e230);
@@ -298,18 +342,46 @@ describe('MOV-A06 standing overhead presses: universal physics, painted floor co
     expect(cross230.world.far.hold[1]).toBeGreaterThan(rack230.world.far.shoulder[1] + 10);
     expect(Math.abs(cross230.world.near.hold[1] - cross230.world.far.hold[1])).toBeLessThan(0.05);
 
-    // During segment 1 (times230[1]..times230[2], ph: 1 -> 2), nearY strictly falls while farY strictly rises at the same time
+    // During the seesaw exchange (ph: 1 -> 2), nearY strictly falls while farY strictly rises at the same time
     const poses230 = e230.frames.map((f) => f.joints);
-    const seesawTicks = ticksOf(e230).filter((t) => t >= times230[1] && t <= times230[2]);
+    const seesawEnd = e230.frames.findIndex((f) => f.joints.ph === 2);
+    const seesawTicks = ticksOf(e230).filter((t) => t >= times230[1] && t <= times230[seesawEnd]);
     for (let i = 1; i < seesawTicks.length; i++) {
       const prev = rig.chainGeometry(s230, rig.poseAtTime(poses230, seesawTicks[i - 1], e230.segmentDurationsMs).ph, BODY);
       const curr = rig.chainGeometry(s230, rig.poseAtTime(poses230, seesawTicks[i], e230.segmentDurationsMs).ph, BODY);
       expect(curr.world.near.hold[1]).toBeLessThanOrEqual(prev.world.near.hold[1] + 1e-6);
       expect(curr.world.far.hold[1]).toBeGreaterThanOrEqual(prev.world.far.hold[1] - 1e-6);
     }
+
+    // Count distinct top lockout intervals per side across the full cycle: nearTopCount must equal farTopCount
+    let nearTopCount = 0, farTopCount = 0;
+    let inNearTop = false, inFarTop = false;
+    for (const t of ticksOf(e230)) {
+      const g = rig.chainGeometry(s230, rig.poseAtTime(poses230, t, e230.segmentDurationsMs).ph, BODY);
+      const nearAtTop = g.world.near.hold[1] > g.world.head[1] + BODY.hr + 6
+        && deg3D(g.world.near.shoulder, g.world.near.elbow, g.world.near.wrist) >= 172;
+      const farAtTop = g.world.far.hold[1] > g.world.head[1] + BODY.hr + 6
+        && deg3D(g.world.far.shoulder, g.world.far.elbow, g.world.far.wrist) >= 172;
+      if (nearAtTop && !inNearTop) nearTopCount += 1;
+      if (farAtTop && !inFarTop) farTopCount += 1;
+      inNearTop = nearAtTop;
+      inFarTop = farAtTop;
+    }
+    expect(nearTopCount).toBeGreaterThanOrEqual(1);
+    expect(nearTopCount).toBe(farTopCount);
+
+    // Hand close-up on 129 shows palm-in (90 deg) at the rack and palm-forward (0 deg) at both near and far lockouts
+    const rackPanel129 = rig.handCloseUp(rack129);
+    const nearTopPanel129 = rig.handCloseUp(nearTop129);
+    const farTopPanel129 = rig.handCloseUp(farTop129);
+    expect(rackPanel129).not.toBeNull();
+    expect(rackPanel129.palmYaw).toBe(90);
+    expect(nearTopPanel129.palmYaw).toBe(0);
+    expect(farTopPanel129.palmYaw).toBe(0);
+    expect(Math.abs(nearTopPanel129.handleScreenDir[0])).toBeGreaterThan(Math.abs(rackPanel129.handleScreenDir[0]) + 0.4);
   });
 
-  test('189 Dumbbell One-Arm Shoulder Press and 228 Kettlebell Arnold Press show their distinct implement, wrist rotation (palm-forward throughout vs palm-in to palm-forward), top pause, and slow lowering', () => {
+  test('189 Dumbbell One-Arm Shoulder Press and 228 Kettlebell Arnold Press show their distinct implement, readable palm close-up (palm-forward throughout vs palm-in to palm-forward), top pause, and slow lowering', () => {
     // 189 Quotes:
     // "Sit on a bench with back support or stand tall, and bring one dumbbell to shoulder height with the palm facing forward and the other hand at your side or on a fixed support. Press the dumbbell straight up until the arm is straight. Pause, then lower it slowly to shoulder height."
     // "Ribs down, trunk tall. Press straight up. Lower slowly to the shoulder."
@@ -322,11 +394,16 @@ describe('MOV-A06 standing overhead presses: universal physics, painted floor co
     const top189 = rig.chainGeometry(s189, 1, BODY);
 
     expect(start189.movement.implement).toBe('bell');
-    // 189 keeps the palm facing forward (palmYaw = 0) from shoulder height all the way to lockout
+    // 189 keeps the palm facing forward (palmYaw = 0) from shoulder height all the way to lockout, shown in handCloseUp
     expect(start189.angles.palmYaw).toBe(0);
     expect(top189.angles.palmYaw).toBe(0);
     expect(start189.world.near.palmDir[0]).toBeCloseTo(1, 5);
     expect(top189.world.near.palmDir[0]).toBeCloseTo(1, 5);
+    const startPanel189 = rig.handCloseUp(start189);
+    const topPanel189 = rig.handCloseUp(top189);
+    expect(startPanel189).not.toBeNull();
+    expect(startPanel189.palmFacingViewer).toBe(true);
+    expect(topPanel189.palmFacingViewer).toBe(true);
     expect(Math.abs(start189.world.near.hold[1] - start189.world.near.shoulder[1])).toBeLessThanOrEqual(2.0);
     expect(deg3D(top189.world.near.shoulder, top189.world.near.elbow, top189.world.near.wrist)).toBeGreaterThanOrEqual(176);
     expect(Math.abs(top189.world.near.hold[0] - start189.world.near.hold[0])).toBeLessThanOrEqual(0.5);
@@ -334,7 +411,7 @@ describe('MOV-A06 standing overhead presses: universal physics, painted floor co
     expect(e189.segmentDurationsMs[1]).toBeGreaterThanOrEqual(550);
     expect(e189.segmentDurationsMs[2]).toBeGreaterThanOrEqual(e189.segmentDurationsMs[0] * 1.45);
 
-    // 228 Kettlebell Arnold Press: single kettlebell, palm facing in (90 deg) at the shoulder, rotating to palm forward (0 deg) at lockout
+    // 228 Kettlebell Arnold Press: single kettlebell, palm facing in (90 deg) at the shoulder, rotating to palm forward (0 deg) at lockout, shown in handCloseUp
     const e228 = entryFor(228);
     const s228 = slugOf(e228);
     const start228 = rig.chainGeometry(s228, 0, BODY);
@@ -350,6 +427,13 @@ describe('MOV-A06 standing overhead presses: universal physics, painted floor co
     expect(top228.angles.palmYaw).toBe(0);
     expect(top228.world.near.palmDir[0]).toBeCloseTo(1, 5);
     expect(top228.world.near.handleAxis[2]).toBeCloseTo(1, 5);
+
+    const startPanel228 = rig.handCloseUp(start228);
+    const topPanel228 = rig.handCloseUp(top228);
+    expect(startPanel228).not.toBeNull();
+    expect(startPanel228.palmYaw).toBe(90);
+    expect(topPanel228.palmYaw).toBe(0);
+    expect(Math.abs(topPanel228.handleScreenDir[0])).toBeGreaterThan(Math.abs(startPanel228.handleScreenDir[0]) + 0.4);
 
     // Both 189 and 228 keep the free far hand quiet at the side across every tick
     for (const [e, slug, start] of [[e189, s189, start189], [e228, s228, start228]]) {

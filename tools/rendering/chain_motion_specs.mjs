@@ -2235,8 +2235,8 @@ export const CHAIN_SPECS = [
     slug: 'overhead-press',
     view: 'side',
     equipment: 'barbell',
-    phases: [0, 0.5, 1, 0.5, 0],
-    segments: [650, 650, 750, 750],
+    phases: [0, 1, 2, 1, 0],
+    segments: [550, 650, 700, 700],
     captions: [
       'Set the bar across the front shoulders with a full grip, forearms close to vertical, balanced feet, and a braced trunk before the bar leaves the shoulders.',
       'Press close past the face without leaning the torso back into an incline press.',
@@ -2244,7 +2244,7 @@ export const CHAIN_SPECS = [
       'Lower the bar under control along the same vertical path past the face.',
       'Return the bar to the front shoulders with the forearms close to vertical and the trunk braced.',
     ],
-    reason: 'Source-bound draft, drawn from a 3D model turned 34 degrees so the full grip across the front shoulders, the vertical forearms, the bar path passing close to the face, and the head moving through to a stacked lockout all read clearly without end-on plate occlusion: standing tall with balanced feet and a braced trunk, pressing the barbell close past the face, moving the head through to a tall lockout overhead, and lowering along the same path.',
+    reason: 'Source-bound draft, drawn from a 3D model turned 18 degrees with a closed-hand full-grip close-up panel so the fixed full grip across the front shoulders, the vertical forearms, the bar path passing close in front of the face without intersecting the head, and the head moving through to a stacked lockout over mid-foot all read clearly: standing tall with balanced feet and a braced trunk, pressing the barbell close past the face, moving the head through to a tall lockout overhead, and lowering along the same path.',
     summary: 'Standing with balanced feet and a braced trunk, set the bar across the front shoulders with a full grip and near-vertical forearms, press close past the face, move the head through to a tall stacked lockout, and lower along the same path.',
   },
   {
@@ -2261,7 +2261,7 @@ export const CHAIN_SPECS = [
       'Reverse the rotation smoothly on the way back down without leaning back.',
       'Return the dumbbells to shoulder height with the elbows tight in front and palms facing you.',
     ],
-    reason: 'Source-bound draft, drawn from a 3D model turned 32 degrees so both the tucked front-of-shoulder elbow start and the 180-degree palm and dumbbell rotation from palms-facing-you to palms-facing-forward read clearly: standing tall and braced with dumbbells at shoulder height and palms facing in toward the athlete, pressing overhead while rotating the palms to face forward at lockout, and reversing the rotation on the way down without leaning back.',
+    reason: 'Source-bound draft, drawn from a 3D model turned 32 degrees with a magnified hand close-up panel so both the tucked front-of-shoulder elbow start and the 180-degree palm and dumbbell rotation from palms-facing-you to palms-facing-forward read clearly at card size: standing tall and braced with dumbbells at shoulder height and palms facing in toward the athlete, pressing overhead while rotating the palms to face forward at lockout, and reversing the rotation on the way down without leaning back.',
     summary: 'Standing tall and braced with dumbbells at shoulder height, elbows tight in front, and palms facing you, press overhead while rotating your palms to face forward at lockout, then reverse the rotation back to the start.',
   },
   {
@@ -2278,7 +2278,7 @@ export const CHAIN_SPECS = [
       'Lower the handle under control back toward the shoulder against the low pulley\'s pull.',
       'Return to shoulder height with the trunk tall and braced.',
     ],
-    reason: 'Source-bound draft, drawn from a 3D model turned 36 degrees so the low pulley set forward of the athlete, the forward-and-down cable line, the working arm, and the quiet free hand at the hip all read clearly without overlapping the body: standing tall with the handle at shoulder height, pressing one arm overhead to a stacked lockout against the low pulley\'s forward and downward pull, and lowering under control back to the shoulder.',
+    reason: 'Source-bound draft, drawn from a 3D model turned 24 degrees with the low pulley set well forward of the feet and shins so the low pulley, the forward-and-down cable line, the working arm, and the quiet free hand at the hip all read clearly without overlapping the legs: standing tall with the handle at shoulder height, pressing one arm overhead to a stacked lockout against the low pulley\'s forward and downward pull, and lowering under control back to the shoulder.',
     summary: 'Standing tall beside a low pulley set in front, bring the handle to shoulder height and press overhead to a tall stacked lockout against the cable\'s forward and downward pull, then lower under control back to the shoulder.',
   },
   {
@@ -2297,7 +2297,7 @@ export const CHAIN_SPECS = [
       'Finish the second press with the arm straight beside the ear while the first kettlebell stays at the shoulder.',
       'Lower the second kettlebell under control back to the shoulder to complete the alternating pair.',
     ],
-    reason: 'Source-bound draft, drawn from a 3D model turned 34 degrees so both racked kettlebells, the waiting bell at the shoulder, and the pressing hand\'s rotation from palm-facing-in to palm-facing-forward all read clearly: standing tall with two kettlebells cleaned to the shoulders and palms facing in, pressing one kettlebell straight overhead while turning the palm forward as the other stays at the shoulder, lowering under control, and then pressing the other side.',
+    reason: 'Source-bound draft, drawn from a 3D model turned 34 degrees with a magnified hand close-up panel so both racked kettlebells, the waiting bell at the shoulder, and the pressing hand\'s rotation from palm-facing-in to palm-facing-forward all read clearly at card size: standing tall with two kettlebells cleaned to the shoulders and palms facing in, pressing one kettlebell straight overhead while turning the palm forward as the other stays at the shoulder, lowering under control, and then pressing the other side.',
     summary: 'Standing tall with two kettlebells cleaned to the shoulders and palms facing in, press one kettlebell straight overhead while turning the palm to face forward as the other waits at the shoulder, lower under control, then press the other side.',
   },
   {
@@ -2314,7 +2314,7 @@ export const CHAIN_SPECS = [
       'Lower the dumbbell slowly toward shoulder height with the palm facing forward.',
       'Return to shoulder height under control, complete the repetitions, then change arms.',
     ],
-    reason: 'Source-bound draft, drawn from a 3D model turned 32 degrees so the single dumbbell held with the palm facing forward throughout, the straight vertical press path, and the quiet free hand at the side all read clearly: standing tall with one dumbbell at shoulder height and palm facing forward, pressing straight up to lockout, pausing at the top, and lowering slowly back to shoulder height.',
+    reason: 'Source-bound draft, drawn from a 3D model turned 32 degrees with a magnified hand close-up panel so the single dumbbell held with the palm facing forward throughout, the straight vertical press path, and the quiet free hand at the side all read clearly at card size: standing tall with one dumbbell at shoulder height and palm facing forward, pressing straight up to lockout, pausing at the top, and lowering slowly back to shoulder height.',
     summary: 'Standing tall with one dumbbell at shoulder height, palm facing forward, and the other hand at your side, press the dumbbell straight up until the arm is straight, pause, and lower slowly to shoulder height.',
   },
   {
@@ -2331,7 +2331,7 @@ export const CHAIN_SPECS = [
       'Lower the kettlebell while turning the palm back in toward the shoulder.',
       'Return the kettlebell to the shoulder rack with the palm facing in and the trunk tall.',
     ],
-    reason: 'Source-bound draft, drawn from a 3D model turned 34 degrees so the single kettlebell in the shoulder rack, the wrist rotation from palm-facing-in to palm-facing-forward as the bell swings around the wrist, and the tall posture all read clearly: standing tall with a kettlebell cleaned to the shoulder and palm facing in, pressing overhead while turning the wrist so the palm faces forward at the top, and lowering back to the shoulder while turning the palm back to face in.',
+    reason: 'Source-bound draft, drawn from a 3D model turned 34 degrees with a magnified hand close-up panel so the single kettlebell in the shoulder rack, the wrist rotation from palm-facing-in to palm-facing-forward as the bell swings around the wrist, and the tall posture all read clearly at card size: standing tall with a kettlebell cleaned to the shoulder and palm facing in, pressing overhead while turning the wrist so the palm faces forward at the top, and lowering back to the shoulder while turning the palm back to face in.',
     summary: 'Standing tall with a kettlebell cleaned to the shoulder and the palm facing in, press the kettlebell overhead while turning the wrist so the palm faces forward at lockout, then lower it back to the shoulder while turning the palm in.',
   },
   {
@@ -2339,16 +2339,16 @@ export const CHAIN_SPECS = [
     slug: 'kettlebell-seesaw-press',
     view: 'side',
     equipment: 'kettlebell',
-    phases: [0, 1, 2, 1, 0],
-    segments: [900, 1250, 1250, 950],
+    phases: [0, 1, 1.5, 2, 3],
+    segments: [950, 625, 625, 950],
     captions: [
       'Clean two kettlebells to the shoulders and stand tall with the glutes squeezed.',
-      'Press the first kettlebell overhead until the arm is straight.',
-      'As you lower the first kettlebell to the shoulder, press the other kettlebell up to a straight arm overhead.',
-      'As you lower the second kettlebell to the shoulder, press the first kettlebell back up overhead in a continuous seesaw.',
-      'Lower the kettlebell under control back to the shoulder rack after completing the alternating repetitions.',
+      'Press one kettlebell overhead until the arm is straight.',
+      'As you lower the first kettlebell to the shoulder, press the other kettlebell up at the same time.',
+      'Finish the second press with a straight arm overhead as the first kettlebell reaches the shoulder, giving each side the same number of repetitions.',
+      'Lower the second kettlebell back to the shoulder rack while standing tall with the glutes squeezed.',
     ],
-    reason: 'Source-bound draft, drawn from a 3D model turned 34 degrees so both kettlebells and their simultaneous opposing seesaw paths read clearly without occluding each other: standing tall with two kettlebells cleaned to the shoulders, pressing one kettlebell overhead until the arm is straight, then pressing the other kettlebell up at the same time as the first lowers to the shoulder.',
+    reason: 'Source-bound draft, drawn from a 3D model turned 34 degrees so both kettlebells, their simultaneous opposing seesaw paths, and the equal repetition count per side all read clearly without occluding each other: standing tall with two kettlebells cleaned to the shoulders, pressing one kettlebell overhead until the arm is straight, then pressing the other kettlebell up at the same time as the first lowers to the shoulder.',
     summary: 'Standing tall with two kettlebells cleaned to the shoulders, press one kettlebell overhead until the arm is straight, then press the other kettlebell up as you lower the first to the shoulder in a continuous seesaw.',
   },
   // ── MOV-A09: rows and rear raises ───────────────────────────────────────────
