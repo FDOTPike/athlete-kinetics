@@ -1,7 +1,7 @@
-8bb1c7b96a0fa294507b08d5120c42451748c51df035ab7925b621e65808f31b *./REPORT.md
-9e9f47a4242e9e88030ba9934e0d6b6492297fe4862a4876aa71d26f5f59a8e3 *./cycle_evidence.json
-2b5464395958c74821b2cd497b939f5abb04052f92557c23d3e7c0666abc8541 *./evidence-gate.log
-d814757c097e2598f173ef335045ba11c846741dca9442915ddb5e06e1ffc5d7 *./jest-movement-preview.log
+16c738f04b74b4a5ad9456256864f06220ffc8bee96b02c46d4fe5499275e48b *./REPORT.md
+2fc5cd9885fc5a15929a5bacd96a4512ea3d7f16ba7014f25febf042eae76807 *./cycle_evidence.json
+0d3fbf10f4c0a1583eb8d104d145f24b0fffcffa52ec61c45411b84b256b2665 *./evidence-gate.log
+c3bb5a92346afe7f0be0cd1d363fec29aaf49eccd88b3006f3d4c66e2e51b24a *./jest-movement-preview.log
 4f4a66ce1d75db82c1e35f0f99ff2e0fa7fce8747c2032be1ef385fc85f732a0 *./movement-109/neutral-cycle.png
 76c5dbfb80eb2abdfd47594727ace6c86009479af60d51be47b4e48b4c792514 *./movement-184/neutral-cycle.png
 387a2aaf09ce61cf93d21a10cfec701a2d56b98e474862da8878cdf9151a5ea6 *./movement-190/neutral-cycle.png
@@ -9,7 +9,7 @@ cb964e3af73e84ace052ca71100ca79a70aaa88a84457a08da689381cc07f53f *./movement-213
 3abdf78cb9b42484e20eba857e95b9b5f7b93a2812feaf671d624a7882d0551b *./movement-240/neutral-cycle.png
 5a24396dad15bc603c601c16c5bf2ad7aeb6866acc0e9c2228570b7affb0b5fa *./movement-259/neutral-cycle.png
 fd6b9ac773b91c2e5a8633c4bb8f909b7ba1e7baf48602a3a20a060341fabdfd *./movement-281/neutral-cycle.png
-e25995e1ff25422d53d041dec153da9d0534d16260b425b69ab560b19e1e57f3 *./quotes.json
-62a383be5d7eb65925ac2f2f6645346c86422d31a0bd1afbc5c604764e1af296 *./rendered-output-probe.log
-91f61205d8a1605fd463b5f36a9131ea002325d0868d812fff660d634c2dc9f2 *./storage-guard.log
-4cfbd8cca3a5b30acdc4182144a18a7609d2edee912dbbd8e5a706739cf59db9 *./typecheck.log
+7a9536477c59e7407bac43a12c92e7738c28bcbf11851f126a9c8b3a9faf5f2c *./quotes.json
+ec385d0897c7703d9e4d760e92c0fa91e4f2746e455ea89a3b0df8f73858f34e *./rendered-output-probe.log
+dc39455bb91ac902dcc335948dc6af80256c6cdb47286e98c7d29057881757f9 *./storage-guard.log
+60f0fed45f1bddadf3d784f4200c08fa72c9a15af1dc1dd59896c8eef1572310 *./typecheck.log

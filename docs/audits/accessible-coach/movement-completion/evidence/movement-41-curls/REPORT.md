@@ -3,7 +3,7 @@
 - **Batch:** `MOV-A11`
 - **Branch:** `movement/46-curls-2026-10-18`
 - **Base Commit:** `20c29c8a314c4f7f522ae1a64427e734047fadec`
-- **Source Commit:** `50edaaf2add9b266b761472fe2a4305215b95f73`
+- **Source Commit:** `48f191ffd87f0de2a42ddce60ac83085ea324871`
 - **Movements Authored (7):** `184`, `281`, `109`, `190`, `213`, `240`, `259`
 
 ## 1. Movement Biomechanics and Catalogue Quotes
@@ -47,7 +47,7 @@
 - **Cues:** *"Palms face down throughout. Upper arms stay on the pad. Lower slowly."*
 - **Biomechanical Implementation:** Seated behind the angled preacher pad (`prop: 'preacher'`) holding a cambered EZ-bar (`implement: 'ez'`) with a pronated grip (`palm: 'down'`). Upper arms stay fixed on the preacher pad (`upperArm: [-42, 10]`, `drift = 0.00` across all ticks), starting extended (`170.0 deg`) and curling the EZ-bar up to shoulder height (`wrist.y = 66.85` vs `shoulder.y = 69.90`) with constant rigid grip spacing (`8.00` units).
 
-## 2. Gate Results (`50edaaf2add9b266b761472fe2a4305215b95f73`)
+## 2. Gate Results (`48f191ffd87f0de2a42ddce60ac83085ea324871`)
 
 - **`typecheck.log`:** `exit code: 0`
 - **`jest-movement-preview.log`:** `Test Suites: 64 passed, 64 total`, `Tests: 3688 passed, 3688 total`, `exit code: 0`

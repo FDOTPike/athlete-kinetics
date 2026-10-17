@@ -1,4 +1,4 @@
-source commit: aa5cb0c2753383b5903fe45bb77004ba68724b3a
+source commit: 48f191ffd87f0de2a42ddce60ac83085ea324871
 command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with probe-4bf7490f85b5cee750abb40d30e234d470643844.json
 
 movements measured: 232 (baseline 225)
