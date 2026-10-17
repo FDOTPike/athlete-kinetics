@@ -118,7 +118,8 @@ test('the original canonical neutral drawings stay byte-identical at 20ms interv
     expect(createHash('sha256').update(JSON.stringify(draws)).digest('hex')).toBe(row.sha256);
   }
 });
-const AUTHORED_IN_MANIFEST = [1, 2, 8];
+// MOV-A08 adds 5 (Barbell Row) to the authored manifest.
+const AUTHORED_IN_MANIFEST = [1, 2, 5, 8];
 test.each(draft.entries)('$name: tapered body, actual bar primitives, grips and movement path through sweep',e=>{
   const prod=production.entries.find(p=>p.movementId===e.movementId);
   if (AUTHORED_IN_MANIFEST.includes(e.movementId)) {

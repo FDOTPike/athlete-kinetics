@@ -186,6 +186,11 @@ describe('what the fingers do', () => {
   });
 });
 
-test('only finger-curls and front-squat-clean-grip have a close-up', () => {
-  expect(Object.keys(CHAIN_MOVEMENTS).filter((slug) => CHAIN_MOVEMENTS[slug].closeUp !== undefined)).toEqual(['finger-curls', 'front-squat-clean-grip']);
+// MOV-A08 adds reverse-grip-bent-over-rows (107) with a close-up of the underhand grip.
+test('only finger-curls, front-squat-clean-grip, and reverse-grip-bent-over-rows have a close-up', () => {
+  expect(Object.keys(CHAIN_MOVEMENTS).filter((slug) => CHAIN_MOVEMENTS[slug].closeUp !== undefined)).toEqual([
+    'finger-curls',
+    'front-squat-clean-grip',
+    'reverse-grip-bent-over-rows',
+  ]);
 });
