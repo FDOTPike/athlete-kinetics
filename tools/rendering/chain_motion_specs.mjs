@@ -2491,7 +2491,7 @@ export const CHAIN_SPECS = [
     slug: 'alternating-kettlebell-row',
     view: 'oblique',
     equipment: 'kettlebell',
-    phases: [0, 1, 0, 2, 0],
+    phases: [1, 0, 1, 2, 1],
     segments: [950, 1300, 950, 1300],
     captions: [
       'Stand over two kettlebells, bend the knees slightly, push the hips back and take a handle in each hand with the back flat.',

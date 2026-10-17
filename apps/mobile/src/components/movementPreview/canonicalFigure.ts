@@ -5169,14 +5169,14 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
         at: [-8.5, 33.792], trunk: 3, head: 14,
         thigh: -90, shin: -90, ankle: [14, CHAIN_ANKLE_HEIGHT],
         upperArm: -90, forearm: -90,
-        wrist: [chainNeckOf([-8.5, 33.792], 3)[0], 10.6, 8.4],
+        wrist: [chainOnFront([-8.5, 33.792], 3, 9.5, 6.5)[0], chainOnFront([-8.5, 33.792], 3, 9.5, 6.5)[1], 8.4],
         farWrist: [chainNeckOf([-8.5, 33.792], 3)[0], 10.6, -8.4],
       },
       {
         at: [-8.5, 33.792], trunk: 3, head: 14,
         thigh: -90, shin: -90, ankle: [14, CHAIN_ANKLE_HEIGHT],
         upperArm: -90, forearm: -90,
-        wrist: [chainOnFront([-8.5, 33.792], 3, 9.5, 6.5)[0], chainOnFront([-8.5, 33.792], 3, 9.5, 6.5)[1], 8.4],
+        wrist: [chainNeckOf([-8.5, 33.792], 3)[0], 10.6, 8.4],
         farWrist: [chainNeckOf([-8.5, 33.792], 3)[0], 10.6, -8.4],
       },
       {

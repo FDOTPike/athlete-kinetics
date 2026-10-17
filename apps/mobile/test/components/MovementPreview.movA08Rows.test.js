@@ -244,50 +244,73 @@ describe('MOV-A08 bent-over rows invariants across every 33 ms tick', () => {
     expect(behindTrunkDist(g1.world.far.elbow, g1.world.hip, g1.angles.trunk)).toBeGreaterThanOrEqual(4.0);
   });
 
-  test('130 Alternating Kettlebell Row: standing over two bells on floor, one rows to lower ribs with elbow behind trunk while the other stays on the floor in a straight plumb arm (>= 172 deg)', () => {
+  test('130 Alternating Kettlebell Row: standing over two bells on floor, one rows to lower ribs with elbow behind trunk while the other stays on the floor in a straight plumb arm (>= 172 deg) across every tick', () => {
     const entry = entryById(130);
     const slug = slugOf(entry);
-    const g0 = rig.chainGeometry(slug, 0, BODY);
-    const g1 = rig.chainGeometry(slug, 1, BODY);
-    const g2 = rig.chainGeometry(slug, 2, BODY);
+    const ds = entry.segmentDurationsMs;
+    const poses = entry.frames.map((f) => f.joints);
+    const ticks = ticksOf(entry);
 
-    // Flat back and standing over the two kettlebells.
-    expect(trunkDegOf(g0)).toBeGreaterThanOrEqual(0);
-    expect(trunkDegOf(g0)).toBeLessThanOrEqual(10);
-    expect(g0.world.near.hold[0]).toBeGreaterThanOrEqual(g0.world.near.ankle[0] - 1);
-    expect(g0.world.near.hold[0]).toBeLessThanOrEqual(g0.world.near.toe[0] + 1);
-
-    const kbCircles = (ph) => {
-      const prims = rig.layoutCanonicalFigure({ ...entry.frames[0].joints, ph }, { ...entry, body: BODY });
-      return prims.filter((p) => p.kind === 'circle' && Math.abs(p.r - rig.KETTLEBELL_RADIUS) < 1e-6);
+    const atTime = (t) => {
+      const pt = rig.poseAtTime(poses, t, ds);
+      const g = rig.chainGeometry(slug, pt.ph ?? 0, BODY);
+      const prims = rig.layoutCanonicalFigure(pt, { ...entry, body: BODY });
+      const circles = prims.filter(
+        (p) => p.kind === 'circle' && Math.abs(p.r - rig.KETTLEBELL_RADIUS) < 1e-6,
+      );
+      return {
+        g,
+        nearCircle: circles.find((p) => p.fill === 'textHi'),
+        farCircle: circles.find((p) => p.fill !== 'textHi'),
+      };
     };
 
-    // Pose 0: both kettlebells on the floor in straight plumb arms (>= 172 deg).
-    const c0 = kbCircles(0);
-    expect(c0).toHaveLength(2);
-    expect(c0[0].cy + c0[0].r).toBeCloseTo(FLOOR, 1);
-    expect(c0[1].cy + c0[1].r).toBeCloseTo(FLOOR, 1);
-    expect(Math.abs(g0.world.near.hold[0] - g0.world.near.shoulder[0])).toBeLessThanOrEqual(0.5);
-    expect(Math.abs(g0.world.far.hold[0] - g0.world.far.shoulder[0])).toBeLessThanOrEqual(0.5);
-    expect(deg3D(g0.world.near.shoulder, g0.world.near.elbow, g0.world.near.hold)).toBeGreaterThanOrEqual(172);
-    expect(deg3D(g0.world.far.shoulder, g0.world.far.elbow, g0.world.far.hold)).toBeGreaterThanOrEqual(172);
+    const start = atTime(0);
+    const peakNear = atTime(ds[0]);
+    const midFloor = atTime(ds[0] + ds[1]);
+    const peakFar = atTime(ds[0] + ds[1] + ds[2]);
 
-    // Pose 1: near kettlebell rows toward lower ribs (elbow behind trunk) while far kettlebell stays on the floor in a straight arm.
-    const c1 = kbCircles(1);
-    const farCircle1 = c1.find((p) => p.fill !== 'textHi');
-    const nearCircle1 = c1.find((p) => p.fill === 'textHi');
-    expect(farCircle1.cy + farCircle1.r).toBeCloseTo(FLOOR, 1);
-    expect(nearCircle1.cy + nearCircle1.r).toBeLessThan(FLOOR - 14);
-    expect(deg3D(g1.world.far.shoulder, g1.world.far.elbow, g1.world.far.hold)).toBeGreaterThanOrEqual(172);
-    expect(behindTrunkDist(g1.world.near.elbow, g1.world.hip, g1.angles.trunk)).toBeGreaterThanOrEqual(3.0);
+    // Flat back and standing over the two kettlebells at the floor start pose.
+    expect(trunkDegOf(start.g)).toBeGreaterThanOrEqual(0);
+    expect(trunkDegOf(start.g)).toBeLessThanOrEqual(10);
+    expect(start.g.world.near.hold[0]).toBeGreaterThanOrEqual(start.g.world.near.ankle[0] - 1);
+    expect(start.g.world.near.hold[0]).toBeLessThanOrEqual(start.g.world.near.toe[0] + 1);
 
-    // Pose 2: far kettlebell rows toward lower ribs (elbow behind trunk) while near kettlebell stays on the floor in a straight arm.
-    const c2 = kbCircles(2);
-    const farCircle2 = c2.find((p) => p.fill !== 'textHi');
-    const nearCircle2 = c2.find((p) => p.fill === 'textHi');
-    expect(nearCircle2.cy + nearCircle2.r).toBeCloseTo(FLOOR, 1);
-    expect(farCircle2.cy + farCircle2.r).toBeLessThan(FLOOR - 14);
-    expect(deg3D(g2.world.near.shoulder, g2.world.near.elbow, g2.world.near.hold)).toBeGreaterThanOrEqual(172);
-    expect(behindTrunkDist(g2.world.far.elbow, g2.world.hip, g2.angles.trunk)).toBeGreaterThanOrEqual(3.0);
+    // Start and midpoint: both kettlebells on the floor in straight plumb arms (>= 172 deg).
+    for (const s of [start, midFloor]) {
+      expect(s.nearCircle.cy + s.nearCircle.r).toBeCloseTo(FLOOR, 1);
+      expect(s.farCircle.cy + s.farCircle.r).toBeCloseTo(FLOOR, 1);
+      expect(Math.abs(s.g.world.near.hold[0] - s.g.world.near.shoulder[0])).toBeLessThanOrEqual(0.5);
+      expect(Math.abs(s.g.world.far.hold[0] - s.g.world.far.shoulder[0])).toBeLessThanOrEqual(0.5);
+      expect(deg3D(s.g.world.near.shoulder, s.g.world.near.elbow, s.g.world.near.hold)).toBeGreaterThanOrEqual(172);
+      expect(deg3D(s.g.world.far.shoulder, s.g.world.far.elbow, s.g.world.far.hold)).toBeGreaterThanOrEqual(172);
+    }
+
+    // First pull peak: near kettlebell rows toward lower ribs (elbow behind trunk) while far kettlebell stays on the floor in a straight arm.
+    expect(peakNear.farCircle.cy + peakNear.farCircle.r).toBeCloseTo(FLOOR, 1);
+    expect(peakNear.nearCircle.cy + peakNear.nearCircle.r).toBeLessThan(FLOOR - 14);
+    expect(deg3D(peakNear.g.world.far.shoulder, peakNear.g.world.far.elbow, peakNear.g.world.far.hold)).toBeGreaterThanOrEqual(172);
+    expect(behindTrunkDist(peakNear.g.world.near.elbow, peakNear.g.world.hip, peakNear.g.angles.trunk)).toBeGreaterThanOrEqual(3.0);
+
+    // Second pull peak: far kettlebell rows toward lower ribs (elbow behind trunk) while near kettlebell stays on the floor in a straight arm.
+    expect(peakFar.nearCircle.cy + peakFar.nearCircle.r).toBeCloseTo(FLOOR, 1);
+    expect(peakFar.farCircle.cy + peakFar.farCircle.r).toBeLessThan(FLOOR - 14);
+    expect(deg3D(peakFar.g.world.near.shoulder, peakFar.g.world.near.elbow, peakFar.g.world.near.hold)).toBeGreaterThanOrEqual(172);
+    expect(behindTrunkDist(peakFar.g.world.far.elbow, peakFar.g.world.hip, peakFar.g.angles.trunk)).toBeGreaterThanOrEqual(3.0);
+
+    // Every 33 ms tick: during the first half of the cycle the far kettlebell stays on the floor;
+    // during the second half of the cycle the near kettlebell stays on the floor.
+    const halfTime = ds[0] + ds[1];
+    for (const t of ticks) {
+      const s = atTime(t);
+      if (t <= halfTime) {
+        expect(s.farCircle.cy + s.farCircle.r).toBeCloseTo(FLOOR, 1);
+        expect(deg3D(s.g.world.far.shoulder, s.g.world.far.elbow, s.g.world.far.hold)).toBeGreaterThanOrEqual(172);
+      }
+      if (t >= halfTime) {
+        expect(s.nearCircle.cy + s.nearCircle.r).toBeCloseTo(FLOOR, 1);
+        expect(deg3D(s.g.world.near.shoulder, s.g.world.near.elbow, s.g.world.near.hold)).toBeGreaterThanOrEqual(172);
+      }
+    }
   });
 });
