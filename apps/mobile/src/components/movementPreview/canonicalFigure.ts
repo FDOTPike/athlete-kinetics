@@ -1188,6 +1188,8 @@ export interface ChainPose {
   twist?: number;
   /** How far the shoulders are lifted toward the ears, along the spine (a shrug). */
   shrug?: number;
+  /** How far the shoulder blades are pulled back and together perpendicular to the spine (a prone/incline retraction shrug). */
+  retract?: number;
   /**
    * How far the whole body is rolled about its own length, in degrees: hips
    * and shoulders together. Positive brings the near side toward the front of
@@ -1672,17 +1674,21 @@ export const SEATED_CABLE_RAISE_PULLEYS: readonly [ChainPoint, ChainPoint] = [[2
 /** The Reverse Flyes: the incline the chest lies on, and where the hips are. */
 export const REVERSE_FLYE_INCLINE = 45;
 const REVERSE_FLYE_HIP: readonly [number, number] = [38, 40];
-/** That bench: a pad along the front of the trunk, on a post. */
-function reverseFlyeBench(): ChainShape[] {
-  const along = chainUnit([REVERSE_FLYE_INCLINE, 0], 1);
-  const front = chainUnit([REVERSE_FLYE_INCLINE - 90, 0], 1);
-  const foot = chainAdd([REVERSE_FLYE_HIP[0], REVERSE_FLYE_HIP[1], 0], front, CHAIN_BACK_HALF + 2);
+/** A prone incline bench: a pad along the front of the trunk at `inclineDeg`, on a post and base frame. */
+function proneInclineBench(hip: readonly [number, number], inclineDeg: number): ChainShape[] {
+  const along = chainUnit([inclineDeg, 0], 1);
+  const front = chainUnit([inclineDeg - 90, 0], 1);
+  const foot = chainAdd([hip[0], hip[1], 0], front, CHAIN_BACK_HALF + 2);
   const low = chainAdd(foot, along, -2), high = chainAdd(foot, along, 21), prop = chainAdd(foot, along, 10);
   return [
     { kind: 'post', at: [prop[0], prop[1]] },
     { kind: 'frame', a: [prop[0] - 12, 1.2], b: [prop[0] + 12, 1.2] },
     { kind: 'slab', a: [low[0], low[1]], b: [high[0], high[1]] },
   ];
+}
+/** That bench: a pad along the front of the trunk, on a post. */
+function reverseFlyeBench(): ChainShape[] {
+  return proneInclineBench(REVERSE_FLYE_HIP, REVERSE_FLYE_INCLINE);
 }
 /** The Back Flyes With Bands: where the band is looped round the rack upright, at shoulder height in front. */
 export const BACK_FLYE_ANCHOR: readonly [number, number] = [46, CHAIN_STANDING_HIP + CHAIN_TRUNK];
@@ -4876,6 +4882,215 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       },
     ],
   },
+  // Renegade Row: prone push-up plank on two floor dumbbells with a wide
+  // foot stance for stability; rows one dumbbell to the side of the waist
+  // while keeping the hips square, returns it to the floor, then rows the
+  // other side.
+  'renegade-row': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 48,
+    feet: 'free',
+    implement: 'bells',
+    bellAxis: [1, 0, 0],
+    elbowPole: [125, 25],
+    kneePole: -90,
+    poses: [
+      {
+        at: [-2.0, 19.09], trunk: 22, head: 22, roll: 0, twist: 0,
+        thigh: -158, shin: -158,
+        ankle: [-42.78, 3.80, 15.8], farAnkle: [-42.78, 3.80, -15.8],
+        foot: -38, farFoot: -38,
+        upperArm: -90, forearm: -90,
+        wrist: [12.5, 21.5, CHAIN_SHOULDER_HALF + 2.2],
+        farWrist: [20.252, 3.60, -CHAIN_SHOULDER_HALF],
+      },
+      {
+        at: [-2.0, 19.09], trunk: 22, head: 22, roll: 0, twist: 0,
+        thigh: -158, shin: -158,
+        ankle: [-42.78, 3.80, 15.8], farAnkle: [-42.78, 3.80, -15.8],
+        foot: -38, farFoot: -38,
+        upperArm: -90, forearm: -90,
+        wrist: [20.252, 3.60, CHAIN_SHOULDER_HALF],
+        farWrist: [20.252, 3.60, -CHAIN_SHOULDER_HALF],
+      },
+      {
+        at: [-2.0, 19.09], trunk: 22, head: 22, roll: 0, twist: 0,
+        thigh: -158, shin: -158,
+        ankle: [-42.78, 3.80, 15.8], farAnkle: [-42.78, 3.80, -15.8],
+        foot: -38, farFoot: -38,
+        upperArm: -90, forearm: -90,
+        wrist: [20.252, 3.60, CHAIN_SHOULDER_HALF],
+        farWrist: [15.5, 19.5, -CHAIN_SHOULDER_HALF - 4.2],
+      },
+    ],
+  },
+  // Elevated Cable Rows: seated on an elevated platform/box atop the row
+  // bench with knees bent on the foot platform, pulling the V-handle from
+  // extended arms to the abdomen while keeping the torso stationary.
+  'elevated-cable-rows': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 35,
+    originX: 24,
+    feet: 'free',
+    kneePole: 90,
+    elbowPole: [-170, 18],
+    implement: 'handles',
+    lines: [{ from: NECK_ROW_PULLEY, to: 'nearGrip' }, { from: NECK_ROW_PULLEY, to: 'farGrip' }],
+    equipment: [
+      { kind: 'frame', a: [NECK_ROW_PULLEY[0], 0.5], b: [NECK_ROW_PULLEY[0], 22] },
+      { kind: 'pulley', at: NECK_ROW_PULLEY },
+      { kind: 'frame', a: [47.4, 4], b: [47.4, 22] },
+      { kind: 'box', a: [-8, 12.2], b: [4, 17.5] },
+      ...chainFlatBench(-13, 6, NECK_ROW_SEAT_TOP),
+    ],
+    poses: [
+      {
+        at: [0, 17.5 + CHAIN_THIGH_HALF], trunk: 90,
+        thigh: 0, shin: 0, ankle: [41, 13], foot: 80,
+        upperArm: 0, forearm: 0,
+        wrist: [21.60, 34.925, V_HANDLE_HALF], farWrist: [21.60, 34.925, -V_HANDLE_HALF],
+      },
+      {
+        at: [0, 17.5 + CHAIN_THIGH_HALF], trunk: 90,
+        thigh: 0, shin: 0, ankle: [41, 13], foot: 80,
+        upperArm: 0, forearm: 0,
+        wrist: [7.5, 31.0, V_HANDLE_HALF], farWrist: [7.5, 31.0, -V_HANDLE_HALF],
+      },
+    ],
+  },
+  // Upright Cable Row: standing facing a low pulley with a narrow-grip
+  // straight bar resting against the thighs on straight arms, pulling the
+  // bar vertically toward the chin with the elbows leading high out to the
+  // sides above the hands.
+  'upright-cable-row': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 45,
+    originX: 44,
+    implement: 'cableBar',
+    barAt: 'front',
+    farArmOver: true,
+    elbowPole: [90, 54],
+    lines: [{ from: [18, 5], to: 'midGrip' }],
+    equipment: [
+      { kind: 'frame', a: [18, 0.5], b: [18, 20] },
+      { kind: 'pulley', at: [18, 5] },
+    ],
+    poses: [
+      {
+        at: [0, CHAIN_STANDING_HIP], trunk: 90, thigh: -90, shin: -90,
+        upperArm: -90, forearm: -90,
+        wrist: [5.2, CHAIN_STANDING_SHOULDER - 23.78, 6.8],
+        farWrist: [5.2, CHAIN_STANDING_SHOULDER - 23.78, -6.8],
+      },
+      {
+        at: [0, CHAIN_STANDING_SHOULDER - CHAIN_TRUNK], trunk: 90, thigh: -90, shin: -90,
+        upperArm: -90, forearm: -90,
+        wrist: [5.8, CHAIN_STANDING_SHOULDER - 1.8, 6.8],
+        farWrist: [5.8, CHAIN_STANDING_SHOULDER - 1.8, -6.8],
+      },
+    ],
+  },
+  // Middle Back Shrug: lying chest-down on a prone incline bench with
+  // dumbbells hanging straight down on straight arms, palms facing each
+  // other, retracting the shoulder blades together without bending the elbows.
+  'middle-back-shrug': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 36,
+    originX: 16,
+    implement: 'bells',
+    bellAxis: [Math.cos(chainRad(38)), Math.sin(chainRad(38)), 0],
+    kneePole: 0,
+    equipment: proneInclineBench([38, 38], 38),
+    poses: [
+      {
+        at: [38, 38], trunk: 38, thigh: -110, shin: -110, ankle: [18, CHAIN_ANKLE_HEIGHT],
+        upperArm: [-90, 4], forearm: [-90, 4], retract: 0,
+      },
+      {
+        at: [38, 38], trunk: 38, thigh: -110, shin: -110, ankle: [18, CHAIN_ANKLE_HEIGHT],
+        upperArm: [-90, 4], forearm: [-90, 4], retract: 6.4,
+      },
+    ],
+  },
+  // Dumbbell Lying Rear Lateral Raise: lying chest-down on a bench set to a
+  // shallow 15-degree incline with palms facing each other and a slight
+  // fixed elbow bend, raising the dumbbells out to the sides to shoulder
+  // height and holding for one second at the top.
+  'dumbbell-lying-rear-lateral-raise': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 40,
+    originX: 16,
+    implement: 'bells',
+    bellAxis: [Math.cos(chainRad(15)), Math.sin(chainRad(15)), 0],
+    kneePole: 0,
+    equipment: proneInclineBench([34, 28], 15),
+    poses: [
+      {
+        at: [34, 28], trunk: 15, thigh: -110, shin: -110, ankle: [10, CHAIN_ANKLE_HEIGHT],
+        upperArm: [-88, 8], forearm: [-88, -4],
+      },
+      {
+        at: [34, 28], trunk: 15, thigh: -110, shin: -110, ankle: [10, CHAIN_ANKLE_HEIGHT],
+        upperArm: [-88, 90], forearm: [-88, 78],
+      },
+    ],
+  },
+  // Lying Rear Delt Raise: lying chest-down on a flat bench with palms
+  // facing each other and a slight fixed elbow bend, raising the dumbbells
+  // out to the sides to shoulder height and holding for one second at the top.
+  'lying-rear-delt-raise': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 40,
+    originX: 16,
+    implement: 'bells',
+    bellAxis: [1, 0, 0],
+    kneePole: 0,
+    equipment: chainFlatBench(30, 62, 24.5),
+    poses: [
+      {
+        at: [34, 24.5 + CHAIN_BACK_HALF], trunk: 0, thigh: -110, shin: -110, ankle: [10, CHAIN_ANKLE_HEIGHT],
+        upperArm: [-88, 8], forearm: [-88, -4],
+      },
+      {
+        at: [34, 24.5 + CHAIN_BACK_HALF], trunk: 0, thigh: -110, shin: -110, ankle: [10, CHAIN_ANKLE_HEIGHT],
+        upperArm: [-88, 90], forearm: [-88, 78],
+      },
+    ],
+  },
+  // Seated Bent-Over Rear Delt Raise: seated on the end of a flat bench
+  // with feet together, torso bent forward over the thighs, and dumbbells
+  // tucked behind the calves with palms facing each other; raises the arms
+  // out to the sides in a wide arc until parallel to the floor.
+  'seated-bent-over-rear-delt-raise': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 48,
+    originX: 38,
+    implement: 'bells',
+    kneePole: 90,
+    equipment: chainFlatBench(-28, 5, CHAIN_SEATED_HIP - CHAIN_THIGH_HALF),
+    poses: [
+      {
+        at: [0, CHAIN_SEATED_HIP], trunk: 26, head: 20, thigh: 0, shin: -90,
+        ankle: [21.8, CHAIN_ANKLE_HEIGHT, 2.0], farAnkle: [21.8, CHAIN_ANKLE_HEIGHT, -2.0],
+        upperArm: [-108, -6], forearm: [-108, -18],
+        palmYaw: 90, farPalmYaw: 90,
+      },
+      {
+        at: [0, CHAIN_SEATED_HIP], trunk: 26, head: 20, thigh: 0, shin: -90,
+        ankle: [21.8, CHAIN_ANKLE_HEIGHT, 2.0], farAnkle: [21.8, CHAIN_ANKLE_HEIGHT, -2.0],
+        upperArm: [-108, 90], forearm: [-108, 78],
+        palmYaw: 90, farPalmYaw: 90,
+      },
+    ],
+  },
   // chain movements are added above this line
 };
 
@@ -4928,6 +5143,7 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters, tu
   const sideCurl = num(a.sideCurl, b.sideCurl);
   const roll = num(a.roll, b.roll);
   const shrug = num(a.shrug, b.shrug);
+  const retract = num(a.retract, b.retract);
   const twist = num(a.twist, b.twist) + roll + turn * (movement.turnWithPhase === true ? Math.max(0, Math.min(1, ph)) : 1);
   const given = dir(a.trunk, b.trunk);
   const thigh = dir(a.thigh, b.thigh);
@@ -5057,11 +5273,14 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters, tu
     const mid = chainAdd(root, chainUnit(first, side), firstLength);
     return { root, mid, end: chainAdd(mid, chainUnit(second, side), secondLength) };
   };
-  // A shrug lifts both shoulders along the spine; the neck and head stay where they are.
-  const girdleCentre = shrug === 0 ? neck : chainAdd(neck, neckTangent, shrug);
-  const nearArm = limb(chainAdd(girdleCentre, shoulderAxis, shoulderHalf), 1, upperArm, forearm, upperLength, foreLength,
+  // A shrug lifts both shoulders along the spine; dorsal retraction draws them
+  // toward the back of the chest (`-forward`) and pinches them toward the spine.
+  const girdleBase = shrug === 0 ? neck : chainAdd(neck, neckTangent, shrug);
+  const girdleCentre = retract === 0 ? girdleBase : chainAdd(girdleBase, forward, -retract);
+  const effectiveShoulderHalf = Math.max(2, shoulderHalf - retract * 0.35);
+  const nearArm = limb(chainAdd(girdleCentre, shoulderAxis, effectiveShoulderHalf), 1, upperArm, forearm, upperLength, foreLength,
     wristTarget, movement.elbowPole ?? -135);
-  const farArm = limb(chainAdd(girdleCentre, shoulderAxis, -shoulderHalf), -1, farUpperArm, farForearm, upperLength, foreLength,
+  const farArm = limb(chainAdd(girdleCentre, shoulderAxis, -effectiveShoulderHalf), -1, farUpperArm, farForearm, upperLength, foreLength,
     farWristTarget, movement.elbowPole ?? -135);
   const baseKneePole = chainPair(movement.kneePole ?? 45);
   const legPole: ChainDir = kneeOut === 0 ? (movement.kneePole ?? 45) : [baseKneePole[0], baseKneePole[1] + kneeOut];
@@ -5160,7 +5379,7 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters, tu
     /** How far each held bell is tilted, inner end up, in degrees: none below half-way, all of it at the top. */
     peakTilt: movement.supinatedPeak === true ? BELL_TILT_DEG * Math.max(0, Math.min(1, (ph - 0.5) * 2)) : 0,
     angles: {
-      trunk: given, curl, sideCurl, twist, roll, shrug, thigh, shin, upperArm, forearm, farThigh, farShin, farUpperArm, farForearm, hand, foot, footSpread, kneeOut,
+      trunk: given, curl, sideCurl, twist, roll, shrug, retract, thigh, shin, upperArm, forearm, farThigh, farShin, farUpperArm, farForearm, hand, foot, footSpread, kneeOut,
       ...(hasPalmYaw ? { palmYaw, farPalmYaw } : {}),
     },
   };
