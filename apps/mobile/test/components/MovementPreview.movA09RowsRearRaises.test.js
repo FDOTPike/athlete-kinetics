@@ -113,7 +113,7 @@ describe('MOV-A09 rows and rear raises: source-bound geometry & physics invarian
     }
   });
 
-  test('93 Renegade Row: wide-foot push-up plank on two dumbbells, straight plank line (>=172 deg), alternating row to ribs with zero hip twist', () => {
+  test('93 Renegade Row: wide-foot push-up plank on two dumbbells, straight plank line (>=172 deg), alternating row to ribs with zero hip twist and unobstructed far-side top position', () => {
     const entry = byId.get(93);
     expect(entry).toBeDefined();
     // Text does not prescribe a pause at the top of the row: 5 frames [1, 0, 1, 2, 1], no duplicate hold keyframes
@@ -136,17 +136,42 @@ describe('MOV-A09 rows and rear raises: source-bound geometry & physics invarian
     expect(plank.world.near.hold[1]).toBeLessThanOrEqual(4.5);
     expect(plank.world.far.hold[1]).toBeLessThanOrEqual(4.5);
 
+    // Ribcage reference point along the spine (60% from hip to neck)
+    const ribMid = [
+      plank.world.hip[0] + 0.6 * (plank.world.neck[0] - plank.world.hip[0]),
+      plank.world.hip[1] + 0.6 * (plank.world.neck[1] - plank.world.hip[1]),
+      0,
+    ];
+
     // At ph = 0, near dumbbell rows to the ribs while far dumbbell stays planted on the floor
     expect(rowNear.world.near.hold[1]).toBeGreaterThanOrEqual(18);
+    expect(Math.abs(rowNear.world.near.hold[0] - ribMid[0])).toBeLessThanOrEqual(3.5);
+    expect(Math.abs(rowNear.world.near.hold[1] - ribMid[1])).toBeLessThanOrEqual(3.5);
     expect(rowNear.world.near.elbow[1]).toBeGreaterThan(rowNear.world.neck[1]);
     expect(rowNear.world.far.hold[1]).toBeLessThanOrEqual(4.5);
     expect(deg3D(rowNear.world.far.shoulder, rowNear.world.far.elbow, rowNear.world.far.wrist)).toBeGreaterThanOrEqual(172);
 
-    // At ph = 2, far dumbbell rows to the ribs while near dumbbell stays planted on the floor
+    // At ph = 2, far dumbbell rows symmetrically to the ribs while near dumbbell stays planted on the floor
     expect(rowFar.world.far.hold[1]).toBeGreaterThanOrEqual(18);
+    expect(Math.abs(rowFar.world.far.hold[0] - ribMid[0])).toBeLessThanOrEqual(3.5);
+    expect(Math.abs(rowFar.world.far.hold[1] - ribMid[1])).toBeLessThanOrEqual(3.5);
+    expect(rowFar.world.far.hold[0]).toBeCloseTo(rowNear.world.near.hold[0], 5);
+    expect(rowFar.world.far.hold[1]).toBeCloseTo(rowNear.world.near.hold[1], 5);
+    expect(rowFar.world.far.hold[2]).toBeCloseTo(-rowNear.world.near.hold[2], 5);
     expect(rowFar.world.far.elbow[1]).toBeGreaterThan(rowFar.world.neck[1]);
     expect(rowFar.world.near.hold[1]).toBeLessThanOrEqual(4.5);
     expect(deg3D(rowFar.world.near.shoulder, rowFar.world.near.elbow, rowFar.world.near.wrist)).toBeGreaterThanOrEqual(172);
+
+    // Turned elevated view so BOTH rows (near at ph = 0 and far at ph = 2) sit outside the 2D painted torso silhouette
+    const spineDx = plank.joints.nk[0] - plank.joints.hp[0];
+    const spineDy = plank.joints.nk[1] - plank.joints.hp[1];
+    const spineLen = Math.hypot(spineDx, spineDy);
+    const perpFromSpine = (pt) =>
+      Math.abs((pt[0] - plank.joints.hp[0]) * spineDy - (pt[1] - plank.joints.hp[1]) * spineDx) / spineLen;
+    const trunkHalf = BODY.sw * 0.58;
+    expect(perpFromSpine(rowNear.hold.near)).toBeGreaterThanOrEqual(trunkHalf + 2.0);
+    expect(perpFromSpine(rowFar.hold.far)).toBeGreaterThanOrEqual(trunkHalf + 1.8);
+    expect(perpFromSpine(rowFar.joints.ef)).toBeGreaterThanOrEqual(trunkHalf + 4.5);
 
     // Across every 33ms tick: straight knees (>= 172 deg), straight plank line (>= 172 deg), hips square (|roll| <= 1, |twist| <= 1), body stays a statue
     const samples = sampleCycleGeometries(entry, 33);
@@ -172,7 +197,7 @@ describe('MOV-A09 rows and rear raises: source-bound geometry & physics invarian
     }
   });
 
-  test('195 Elevated Cable Rows: seated on a low platform on the cable-row seat, V-handle, upright still torso, straight-arm reach (>=172 deg) to stomach and slow return', () => {
+  test('195 Elevated Cable Rows: seated on a low platform on the cable-row seat, painted foot-plate contact for both soles, single cable to a single rigid V-handle with palms facing, upright still torso, straight-arm reach (>=172 deg) to stomach and slow return', () => {
     const entry = byId.get(195);
     expect(entry).toBeDefined();
     const reach = chainGeometry('elevated-cable-rows', 0, BODY);
@@ -186,14 +211,21 @@ describe('MOV-A09 rows and rear raises: source-bound geometry & physics invarian
     expect(slabs.length).toBeGreaterThanOrEqual(1);
     expect(reach.world.hip[1]).toBeGreaterThanOrEqual(standardRow.world.hip[1] + 4.5);
 
-    // Feet on foot plate, knees slightly bent
-    const kneeDeg = deg3D(reach.world.near.hipJoint, reach.world.near.knee, reach.world.near.ankle);
-    expect(kneeDeg).toBeGreaterThanOrEqual(130);
-    expect(kneeDeg).toBeLessThanOrEqual(168);
+    // Knees slightly bent (both near and far legs)
+    const nearKneeDeg = deg3D(reach.world.near.hipJoint, reach.world.near.knee, reach.world.near.ankle);
+    const farKneeDeg = deg3D(reach.world.far.hipJoint, reach.world.far.knee, reach.world.far.ankle);
+    expect(nearKneeDeg).toBeGreaterThanOrEqual(130);
+    expect(nearKneeDeg).toBeLessThanOrEqual(168);
+    expect(farKneeDeg).toBeGreaterThanOrEqual(130);
+    expect(farKneeDeg).toBeLessThanOrEqual(168);
 
-    // V-handle held in both hands
-    expect(reach.movement.implement).toBe('handles');
-    expect(reach.world.near.hold[2] - reach.world.far.hold[2]).toBeCloseTo(2 * V_HANDLE_HALF, 3);
+    // Single short rigid V-handle held by both hands (palms facing), connected to ONE cable from the pulley
+    expect(reach.movement.implement).toBe('vHandle');
+    expect(reach.angles.palmYaw).toBe(90);
+    expect(reach.angles.farPalmYaw).toBe(90);
+    expect(reach.world.near.palmDir[2]).toBeCloseTo(-1, 5);
+    expect(reach.world.far.palmDir[2]).toBeCloseTo(1, 5);
+    expect((reach.movement.lines ?? []).length).toBe(1);
 
     // Straight arms at full reach (>= 172 deg)
     expect(deg3D(reach.world.near.shoulder, reach.world.near.elbow, reach.world.near.wrist)).toBeGreaterThanOrEqual(172);
@@ -204,13 +236,79 @@ describe('MOV-A09 rows and rear raises: source-bound geometry & physics invarian
     expect(finish.world.near.elbow[0]).toBeLessThan(finish.world.hip[0]);
     expect(finish.world.near.elbow[2]).toBeLessThanOrEqual(SHOULDER_HALF + 3.5);
 
-    // Torso stays upright and still across every 33ms tick
+    // Foot-plate rails at the near and far foot Z planes
+    const frames = (reach.movement.equipment ?? []).filter((e) => e.kind === 'frame');
+    const nearPlate = frames.find((f) => f.a[0] > 40 && f.a[0] < 46 && (f.a[2] ?? 0) > 0);
+    const farPlate = frames.find((f) => f.a[0] > 40 && f.a[0] < 46 && (f.a[2] ?? 0) < 0);
+    expect(nearPlate).toBeDefined();
+    expect(farPlate).toBeDefined();
+
+    const segDist2D = (a, b, p) => {
+      const ux = b[0] - a[0], uy = b[1] - a[1];
+      const lenSq = ux * ux + uy * uy || 1;
+      const k = Math.max(0, Math.min(1, ((p[0] - a[0]) * ux + (p[1] - a[1]) * uy) / lenSq));
+      return Math.hypot(p[0] - (a[0] + ux * k), p[1] - (a[1] + uy * k));
+    };
+    const footRadius = reach.footWidth / 2;
+    const plateRadius = 0.8;
+    const contactSum = footRadius + plateRadius;
+    const pulleyProj = reach.project([58, 14, 0]);
+
+    // Across every 33ms tick: upright still torso, painted foot-plate contact for both soles, 1 cable line, and V-handle ends fixed at the hands
     const samples = sampleCycleGeometries(entry, 33);
-    for (const { geom } of samples) {
+    for (const { pose, geom } of samples) {
       expect(geom.curled).toBe(false);
       expect(geom.angles.trunk[0]).toBeCloseTo(90, 2);
       expect(dist3D(geom.world.hip, reach.world.hip)).toBeLessThan(0.1);
       expect(dist3D(geom.world.neck, reach.world.neck)).toBeLessThan(0.1);
+
+      // 3D world contact of both soles (ankle and toe) against the foot plate
+      expect(geom.world.near.ankle[2]).toBeCloseTo(nearPlate.a[2], 5);
+      expect(geom.world.far.ankle[2]).toBeCloseTo(farPlate.a[2], 5);
+      const nearAnkle3D = segDist2D(nearPlate.a, nearPlate.b, geom.world.near.ankle);
+      const nearToe3D = segDist2D(nearPlate.a, nearPlate.b, geom.world.near.toe);
+      const farAnkle3D = segDist2D(farPlate.a, farPlate.b, geom.world.far.ankle);
+      const farToe3D = segDist2D(farPlate.a, farPlate.b, geom.world.far.toe);
+      expect(nearAnkle3D).toBeGreaterThanOrEqual(contactSum - 0.35);
+      expect(nearAnkle3D).toBeLessThanOrEqual(contactSum + 0.35);
+      expect(nearToe3D).toBeGreaterThanOrEqual(contactSum - 0.35);
+      expect(nearToe3D).toBeLessThanOrEqual(contactSum + 0.35);
+      expect(farAnkle3D).toBeGreaterThanOrEqual(contactSum - 0.35);
+      expect(farAnkle3D).toBeLessThanOrEqual(contactSum + 0.35);
+      expect(farToe3D).toBeGreaterThanOrEqual(contactSum - 0.35);
+      expect(farToe3D).toBeLessThanOrEqual(contactSum + 0.35);
+
+      // 2D painted contact on the rendered canvas: sole outer surface touches/overlaps the foot-plate outer surface with 0 gap
+      const nearPlateA = geom.project(nearPlate.a);
+      const nearPlateB = geom.project(nearPlate.b);
+      const farPlateA = geom.project(farPlate.a);
+      const farPlateB = geom.project(farPlate.b);
+      expect(segDist2D(nearPlateA, nearPlateB, geom.joints.an)).toBeLessThanOrEqual(contactSum + 0.05);
+      expect(segDist2D(nearPlateA, nearPlateB, geom.toe.near)).toBeLessThanOrEqual(contactSum + 0.05);
+      expect(segDist2D(farPlateA, farPlateB, geom.joints.af)).toBeLessThanOrEqual(contactSum + 0.05);
+      expect(segDist2D(farPlateA, farPlateB, geom.toe.far)).toBeLessThanOrEqual(contactSum + 0.05);
+
+      // Rigid V-handle span and single cable primitive in emitted layout
+      expect(dist3D(geom.world.near.hold, geom.world.far.hold)).toBeCloseTo(2 * V_HANDLE_HALF, 5);
+      const prims = layoutCanonicalFigure(pose, {
+        assetKey: entry.assetKey,
+        view: entry.view,
+        body: BODY,
+      });
+      const cableLines = prims.filter((p) => p.kind === 'bone' && Math.abs(p.w - 1.4) < 1e-6 && p.color === 'textMid');
+      expect(cableLines).toHaveLength(1);
+      const cable = cableLines[0];
+      expect(Math.hypot(cable.x1 - pulleyProj[0], cable.y1 - pulleyProj[1])).toBeLessThan(1e-5);
+
+      const vBranches = prims.filter(
+        (p) => p.kind === 'bone' && Math.abs(p.w - 2.0) < 1e-6 && p.color === 'textHi'
+          && Math.hypot(p.x1 - cable.x2, p.y1 - cable.y2) < 1e-5,
+      );
+      expect(vBranches).toHaveLength(2);
+      const endsAtHands = [geom.hold.near, geom.hold.far].every((h) =>
+        vBranches.some((b) => Math.hypot(b.x2 - h[0], b.y2 - h[1]) < 1e-5),
+      );
+      expect(endsAtHands).toBe(true);
     }
 
     // Cable strictly lengthens on the pull and shortens on the slow return
@@ -219,17 +317,30 @@ describe('MOV-A09 rows and rear raises: source-bound geometry & physics invarian
     expect(entry.segmentDurationsMs[2]).toBeGreaterThan(entry.segmentDurationsMs[0]);
   });
 
-  test('296 Upright Cable Row: standing tall facing low pulley, narrower-than-shoulder grip on straight bar at thighs (arms >=172 deg), lifted close to body toward chin with elbows higher than hands', () => {
+  test('296 Upright Cable Row: standing tall facing low pulley, readable overhand grip (palmYaw = 180 + handCloseUp) slightly narrower than shoulders on straight bar at thighs (arms >=172 deg), lifted close to body toward chin with elbows higher than hands', () => {
     const entry = byId.get(296);
     expect(entry).toBeDefined();
     const bottom = chainGeometry('upright-cable-row', 0, BODY);
     const top = chainGeometry('upright-cable-row', 1, BODY);
 
     expect(bottom.movement.implement).toBe('cableBar');
-    // Overhand grip slightly narrower than the shoulders
+    // Overhand grip slightly narrower than the shoulders, with readable palm close-up showing pronated overhand orientation
     const gripHalf = bottom.world.near.hold[2];
     expect(gripHalf).toBeGreaterThanOrEqual(SHOULDER_HALF * 0.55);
     expect(gripHalf).toBeLessThanOrEqual(SHOULDER_HALF * 0.85);
+    expect(bottom.angles.palmYaw).toBe(180);
+    expect(bottom.angles.farPalmYaw).toBe(180);
+    expect(top.angles.palmYaw).toBe(180);
+    expect(top.angles.farPalmYaw).toBe(180);
+    expect(bottom.world.near.palmDir[0]).toBeCloseTo(-1, 5);
+    const bottomPanel = rig.handCloseUp(bottom);
+    const topPanel = rig.handCloseUp(top);
+    expect(bottomPanel).not.toBeNull();
+    expect(topPanel).not.toBeNull();
+    expect(bottomPanel.palmYaw).toBe(180);
+    expect(bottomPanel.palmFacingViewer).toBe(false);
+    expect(topPanel.palmYaw).toBe(180);
+    expect(topPanel.palmFacingViewer).toBe(false);
 
     // At the bottom against the thighs, arms are straight (>= 172 deg)
     expect(deg3D(bottom.world.near.shoulder, bottom.world.near.elbow, bottom.world.near.wrist)).toBeGreaterThanOrEqual(172);
@@ -242,7 +353,8 @@ describe('MOV-A09 rows and rear raises: source-bound geometry & physics invarian
     expect(top.joints.el[1]).toBeLessThan(top.joints.wr[1] - 3.0);
     expect(top.joints.ef[1]).toBeLessThan(top.joints.wf[1] - 3.0);
 
-    // Standing tall (knees >= 172 deg, trunk 90 deg) and bar stays close to the body across every tick
+    // Standing tall (knees >= 172 deg, trunk 90 deg), rigid grip span, and bar stays close to the body across every tick
+    const startSpan = dist3D(bottom.world.near.hold, bottom.world.far.hold);
     const samples = sampleCycleGeometries(entry, 33);
     for (const { geom } of samples) {
       expect(geom.curled).toBe(false);
@@ -250,6 +362,10 @@ describe('MOV-A09 rows and rear raises: source-bound geometry & physics invarian
       expect(deg3D(geom.world.near.hipJoint, geom.world.near.knee, geom.world.near.ankle)).toBeGreaterThanOrEqual(172);
       expect(deg3D(geom.world.far.hipJoint, geom.world.far.knee, geom.world.far.ankle)).toBeGreaterThanOrEqual(172);
       expect(Math.abs(geom.world.near.hold[0] - geom.world.neck[0])).toBeLessThanOrEqual(7.0);
+      expect(dist3D(geom.world.near.hold, geom.world.far.hold)).toBeCloseTo(startSpan, 5);
+      const panel = rig.handCloseUp(geom);
+      expect(panel).not.toBeNull();
+      expect(panel.palmFacingViewer).toBe(false);
     }
 
     // Pause at top and slower lowering
@@ -257,7 +373,7 @@ describe('MOV-A09 rows and rear raises: source-bound geometry & physics invarian
     expect(entry.segmentDurationsMs[2]).toBeGreaterThan(entry.segmentDurationsMs[0]);
   });
 
-  test('243 Middle Back Shrug: chest down on incline bench, dumbbells in straight hanging arms (>=172 deg at every tick), shoulder blades pull back and together without bending elbows', () => {
+  test('243 Middle Back Shrug: chest down on incline bench viewed from above/behind with upper-back close-up, dumbbells in straight hanging arms (>=172 deg at every tick), shoulder blades visibly pull back and together without bending elbows', () => {
     const entry = byId.get(243);
     expect(entry).toBeDefined();
     const bottom = chainGeometry('middle-back-shrug', 0, BODY);
@@ -266,8 +382,9 @@ describe('MOV-A09 rows and rear raises: source-bound geometry & physics invarian
     expect(bottom.movement.implement).toBe('bells');
     expect(bottom.angles.trunk[0]).toBeGreaterThanOrEqual(30);
     expect(bottom.angles.trunk[0]).toBeLessThanOrEqual(45);
+    expect(bottom.movement.yawDeg).toBeGreaterThanOrEqual(48);
 
-    // Shoulder blades pull back (dorsally up and back) and together (narrower span) while chest stays on bench
+    // Shoulder blades pull back (dorsally up and back) and together (narrower span in both 3D world and 2D projected screen) while chest stays on bench
     expect(dist3D(top.world.hip, bottom.world.hip)).toBeLessThan(0.1);
     expect(dist3D(top.world.neck, bottom.world.neck)).toBeLessThan(0.1);
     expect(top.world.near.shoulder[1] - bottom.world.near.shoulder[1]).toBeGreaterThanOrEqual(3.0);
@@ -276,6 +393,23 @@ describe('MOV-A09 rows and rear raises: source-bound geometry & physics invarian
     const bottomShoulderSpan = bottom.world.near.shoulder[2] - bottom.world.far.shoulder[2];
     const topShoulderSpan = top.world.near.shoulder[2] - top.world.far.shoulder[2];
     expect(bottomShoulderSpan - topShoulderSpan).toBeGreaterThanOrEqual(2.5);
+
+    const bottomScreenSpan = Math.hypot(
+      bottom.joints.nArm[0] - bottom.joints.fArm[0],
+      bottom.joints.nArm[1] - bottom.joints.fArm[1],
+    );
+    const topScreenSpan = Math.hypot(
+      top.joints.nArm[0] - top.joints.fArm[0],
+      top.joints.nArm[1] - top.joints.fArm[1],
+    );
+    expect(bottomScreenSpan - topScreenSpan).toBeGreaterThanOrEqual(3.5);
+
+    // Upper-back close-up panel shows the two shoulder blades pinching together toward the spine
+    const bottomBackPanel = rig.upperBackCloseUp(bottom);
+    const topBackPanel = rig.upperBackCloseUp(top);
+    expect(bottomBackPanel).not.toBeNull();
+    expect(topBackPanel).not.toBeNull();
+    expect(bottomBackPanel.bladeSpan - topBackPanel.bladeSpan).toBeGreaterThanOrEqual(6.0);
 
     // Arms stay straight (>= 172 deg) at every single 33ms tick without bending the elbows
     const samples = sampleCycleGeometries(entry, 33);
@@ -293,7 +427,7 @@ describe('MOV-A09 rows and rear raises: source-bound geometry & physics invarian
     expect(entry.segmentDurationsMs[2]).toBeGreaterThan(entry.segmentDurationsMs[0]);
   });
 
-  test('188 Dumbbell Lying Rear Lateral Raise & 241 Lying Rear Delt Raise: 15-deg shallow incline vs 0-deg flat bench, elbows slightly bent, raised to shoulder height and parallel to floor, 1s hold', () => {
+  test('188 Dumbbell Lying Rear Lateral Raise & 241 Lying Rear Delt Raise: 15-deg shallow incline vs 0-deg flat bench, readable palms facing torso (palmYaw = 90 + handCloseUp), elbows slightly bent, raised to shoulder height and parallel to floor, 1s hold', () => {
     const entry188 = byId.get(188);
     const entry241 = byId.get(241);
     expect(entry188).toBeDefined();
@@ -323,6 +457,20 @@ describe('MOV-A09 rows and rear raises: source-bound geometry & physics invarian
       [entry241, low241, top241],
     ]) {
       expect(low.movement.implement).toBe('bells');
+      // Palms facing the torso (palmYaw = 90, farPalmYaw = 90) and readable handCloseUp panel
+      expect(low.angles.palmYaw).toBe(90);
+      expect(low.angles.farPalmYaw).toBe(90);
+      expect(top.angles.palmYaw).toBe(90);
+      expect(top.angles.farPalmYaw).toBe(90);
+      expect(low.world.near.palmDir[2]).toBeCloseTo(-1, 5);
+      expect(low.world.far.palmDir[2]).toBeCloseTo(1, 5);
+      const lowPanel = rig.handCloseUp(low);
+      const topPanel = rig.handCloseUp(top);
+      expect(lowPanel).not.toBeNull();
+      expect(topPanel).not.toBeNull();
+      expect(lowPanel.palmYaw).toBe(90);
+      expect(topPanel.palmYaw).toBe(90);
+
       // At the top, elbows reach shoulder height and arms are roughly parallel to the floor
       expect(Math.abs(top.world.near.elbow[1] - top.world.near.shoulder[1])).toBeLessThanOrEqual(1.0);
       expect(Math.abs(top.world.far.elbow[1] - top.world.far.shoulder[1])).toBeLessThanOrEqual(1.0);
@@ -334,7 +482,7 @@ describe('MOV-A09 rows and rear raises: source-bound geometry & physics invarian
       expect(entry.segmentDurationsMs[1]).toBeLessThanOrEqual(1100);
       expect(entry.segmentDurationsMs[2]).toBeGreaterThan(entry.segmentDurationsMs[0]);
 
-      // Fixed slight elbow bend and stationary chest on bench across every 33ms tick
+      // Fixed slight elbow bend, stationary chest on bench, and readable palm close-up across every 33ms tick
       const samples = sampleCycleGeometries(entry, 33);
       const baseElbow = deg3D(low.world.near.shoulder, low.world.near.elbow, low.world.near.wrist);
       expect(baseElbow).toBeGreaterThanOrEqual(162);
@@ -345,6 +493,9 @@ describe('MOV-A09 rows and rear raises: source-bound geometry & physics invarian
         expect(dist3D(geom.world.neck, low.world.neck)).toBeLessThan(0.1);
         const elbow = deg3D(geom.world.near.shoulder, geom.world.near.elbow, geom.world.near.wrist);
         expect(Math.abs(elbow - baseElbow)).toBeLessThan(1.0);
+        const panel = rig.handCloseUp(geom);
+        expect(panel).not.toBeNull();
+        expect(panel.palmYaw).toBe(90);
       }
     }
   });
