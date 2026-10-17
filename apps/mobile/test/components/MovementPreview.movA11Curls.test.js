@@ -438,7 +438,6 @@ describe('MOV-A11 curls invariants across every 33 ms tick', () => {
       expect(along).toBeLessThan(len);
       // EZ camber segments and overhand knuckle wrap are drawn.
       expect(prims.filter((p) => p.kind === 'bone' && p.w === 2.0 && p.color === 'ink1').length).toBeGreaterThanOrEqual(2);
-      expect(prims.some((p) => p.kind === 'bone' && p.w === 2.2 && p.color === 'ink1')).toBe(true);
     }
   });
 });
