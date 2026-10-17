@@ -1,0 +1,20 @@
+source commit: 38134f313676d1721c940c5fe5461f42837b03bd
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with probe-abfa57d31016af68b8993b7ba1b5391c27940f27.json
+
+movements measured: 219 (baseline 219)
+added: none
+removed: none
+changed, expected: 2 Deadlift; 46 Deficit Deadlift; 176 Deadlift with Bands; 257 Reverse Band Deadlift; 45 Decline Bench Press; 102 Decline Dumbbell Bench Press; 65 Incline Dumbbell Press; 252 Pin Presses; 249 One-Arm Kettlebell Floor Press; 83 Cable Chest Press
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  2 Deadlift: drawn f9f701b241bd19e5d186c71a73c1d7f74eb3c26998ebc3591587cc729c600346 captions 9d2a8752cf3602407cc76f21e0c7cd02e48d635bf79aec58b6a1daeb4606d673 stage 122.61x240.00 cycle 3600 ms
+  46 Deficit Deadlift: drawn 0e15f71358d959c5b19a309b8f97cb351c2c3f42fd6526f9f763b8dd53851775 captions cf8a13848ca5d53cecab555f8d4670af6ac3dcccb729976c1798e4da668483cf stage 117.50x240.00 cycle 3650 ms
+  176 Deadlift with Bands: drawn db2efe3766d3bc8dce6b3a34493062a5142c805cd2a82a55cb1dbf26a6478529 captions 901139ddb7e017051d3fce3d58e6e39d7d32c65c6cb3c8f06f386358ec31e930 stage 122.61x240.00 cycle 3600 ms
+  257 Reverse Band Deadlift: drawn 1e5a4446eb4cf88eff42a6d02d52a9a9bd9cb9b9573b72a321657e15bf3af1ba captions a863622970652b21647d1ed867aa7e9883aba88aabb5ac02f60cfd8d50e4e2a9 stage 132.77x240.00 cycle 3600 ms
+  45 Decline Bench Press: drawn 8626380ba205a993ad7c79cda1b0edfee22472fff3262bba08a7a43197328c31 captions 4bd02c23812c828ef4855ac058c7ed274d396ebd0980d3d6520e1fb6931b7c48 stage 240.00x144.00 cycle 3050 ms
+  102 Decline Dumbbell Bench Press: drawn 3009fa954183c9ef051551676f93b9dbea93ee72d447bc84a625209a6b1934ed captions b0c3ddaae60cf43c485d0d5a28e101680213bc9f5b8fd5aa7f6da1e9f41f21b5 stage 240.00x153.25 cycle 3100 ms
+  65 Incline Dumbbell Press: drawn f2ce0a3d1ad9af4d989438873e696841c26d11f6b9d13ff8e17aaa18de2117c9 captions 278596af0dcc7ff736bb78d979bef6774b7c0c6378c55f64f76b394606eed174 stage 232.94x240.00 cycle 3100 ms
+  252 Pin Presses: drawn cb474214b8d876122ad6d8fef6a09bc9252af28c70ba521d2d335a538624887c captions 7cb3c0a9ae931e3265a3b1c4af32809e601e4c47aeb8f156476b2909386fc190 stage 201.95x240.00 cycle 3150 ms
+  249 One-Arm Kettlebell Floor Press: drawn a802319607cb0ab29ac9173e2ff03d723ce74c0e9911f87efa4488970b967840 captions e0b003788960523751bdaf380e93f385115688272efed5cf8e05b64bfde2c626 stage 240.00x117.07 cycle 3300 ms
+  83 Cable Chest Press: drawn 8397bd75f2615b9ef55fb7a7b6ef2cbb30d8456368a47b47e20f4979fc75dc3b captions c8dd42b4cc60b4338131fbcd40adc6bdc4ec310120c0bf7e5fed761900211ded stage 176.17x240.00 cycle 3300 ms
+exit code: 0 (probe run exit 0)
