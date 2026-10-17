@@ -5473,6 +5473,209 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       },
     ],
   },
+  // 33 Barbell Ab Rollout: kneel behind a loaded barbell with small plates and
+  // a shoulder-width grip, brace hard with the pelvis tucked, roll the bar
+  // forward as far as possible without the hips sagging, and pull back to the knees.
+  'barbell-ab-rollout': {
+    root: 'ankle',
+    view: 'oblique',
+    yawDeg: 14,
+    originX: 48,
+    feet: 'free',
+    implement: 'bar',
+    poses: [
+      {
+        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 17.19, curl: 16, head: 2,
+        thigh: -92, shin: 180, foot: 180,
+        upperArm: [-78, 10], forearm: [-78, 10],
+      },
+      {
+        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 15.13, curl: 15, head: 2,
+        thigh: -105, shin: 180, foot: 180,
+        upperArm: [-67, 10], forearm: [-67, 10],
+      },
+      {
+        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 13.75, curl: 14, head: 2,
+        thigh: -118, shin: 180, foot: 180,
+        upperArm: [-56, 10], forearm: [-56, 10],
+      },
+      {
+        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 12.31, curl: 13, head: 2,
+        thigh: -131, shin: 180, foot: 180,
+        upperArm: [-44, 10], forearm: [-44, 10],
+      },
+      {
+        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 10.32, curl: 12, head: 0,
+        thigh: -144, shin: 180, foot: 180,
+        upperArm: [-31, 10], forearm: [-31, 10],
+      },
+    ],
+  },
+  // 137 Barbell Rollout from Bench: kneel on a bench with a loaded barbell on
+  // the floor at the end of it, keep the arms straight while the hips extend
+  // and the bar rolls forward until the arms reach overhead, then pull the bar
+  // back under the shoulders.
+  'barbell-rollout-from-bench': {
+    root: 'ankle',
+    view: 'oblique',
+    yawDeg: 14,
+    originX: 52,
+    feet: 'free',
+    implement: 'bar',
+    equipment: chainFlatBench(-46, -18, 9.0),
+    poses: [
+      {
+        at: [-44.25, 9.0 + CHAIN_KNEELING_KNEE], trunk: -1.91, curl: 14, head: -14,
+        thigh: -108, shin: 180, foot: 180,
+        upperArm: [-84, 10], forearm: [-84, 10],
+      },
+      {
+        at: [-44.25, 9.0 + CHAIN_KNEELING_KNEE], trunk: -0.24, curl: 13, head: -10,
+        thigh: -119, shin: 180, foot: 180,
+        upperArm: [-74, 10], forearm: [-74, 10],
+      },
+      {
+        at: [-44.25, 9.0 + CHAIN_KNEELING_KNEE], trunk: 1.00, curl: 12, head: -6,
+        thigh: -130, shin: 180, foot: 180,
+        upperArm: [-63, 10], forearm: [-63, 10],
+      },
+      {
+        at: [-44.25, 9.0 + CHAIN_KNEELING_KNEE], trunk: 1.21, curl: 11, head: -4,
+        thigh: -141, shin: 180, foot: 180,
+        upperArm: [-51, 10], forearm: [-51, 10],
+      },
+      {
+        at: [-44.25, 9.0 + CHAIN_KNEELING_KNEE], trunk: -0.11, curl: 10, head: -6,
+        thigh: -152, shin: 180, foot: 180,
+        upperArm: [-38, 10], forearm: [-38, 10],
+      },
+    ],
+  },
+  // 119 Decline Crunch: secure the legs on a decline bench, fingertips resting
+  // lightly beside the temples, press the lower back into the pad and curl the
+  // shoulder blades up to bring the ribs toward the pelvis without sitting tall.
+  'decline-crunch': {
+    root: 'hip',
+    spine: 'upper',
+    feet: 'free',
+    armsFollowTrunk: true,
+    nearArmOverHead: true,
+    equipment: chainDeclineBench(DECLINE_EXTENSION_HIP, DECLINE_EXTENSION_DEG, DECLINE_EXTENSION_ANKLE),
+    poses: [
+      { ...DECLINE_EXTENSION_BODY, curl: 0, ...HANDS_BY_EARS },
+      { ...DECLINE_EXTENSION_BODY, curl: 44, ...HANDS_BY_EARS },
+    ],
+  },
+  // 204 Frog Sit-Ups: lie on the back with the soles of the feet together and
+  // the knees dropped out to the sides, arms crossed over the chest, lower back
+  // flattened to the floor, curling the head and shoulders up a short way.
+  'frog-sit-ups': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 38,
+    originX: 48,
+    spine: 'upper',
+    feet: 'free',
+    kneePole: [18, 72],
+    armsFollowTrunk: true,
+    poses: [
+      {
+        at: [-10, CHAIN_LYING_HEIGHT], trunk: 180, curl: 0,
+        thigh: 0, shin: 0,
+        ankle: [16.0, CHAIN_ANKLE_HEIGHT, 1.6], farAnkle: [16.0, CHAIN_ANKLE_HEIGHT, -1.6],
+        foot: [0, -16], farFoot: [0, -16],
+        upperArm: [-70, -18], forearm: [92, -24],
+      },
+      {
+        at: [-10, CHAIN_LYING_HEIGHT], trunk: 180, curl: 36,
+        thigh: 0, shin: 0,
+        ankle: [16.0, CHAIN_ANKLE_HEIGHT, 1.6], farAnkle: [16.0, CHAIN_ANKLE_HEIGHT, -1.6],
+        foot: [0, -16], farFoot: [0, -16],
+        upperArm: [-70, -18], forearm: [92, -24],
+      },
+    ],
+  },
+  // 149 Bent-Arm Dumbbell Pullover: lie perpendicular across a flat bench with
+  // only the shoulders on the surface, hips low and feet flat on the floor;
+  // hold one dumbbell over the chest with both palms against the underside and
+  // the elbows bent at a fixed angle, lowering in an arc behind the head.
+  'bent-arm-dumbbell-pullover': {
+    root: 'neck',
+    view: 'oblique',
+    yawDeg: 18,
+    originX: 54,
+    kneePole: 90,
+    implement: 'bell',
+    bellAxis: [1, 0, 0],
+    nearArmOverHead: true,
+    farArmOver: true,
+    equipment: chainFlatBench(-24, -10, 18.0),
+    poses: [
+      {
+        at: [-17.0, 18.0 + CHAIN_BACK_HALF], trunk: 164, head: 180,
+        thigh: 0, shin: -90, ankle: [23.0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [78, -9.3], forearm: [126, -9.3],
+      },
+      {
+        at: [-17.0, 18.0 + CHAIN_BACK_HALF], trunk: 164, head: 180,
+        thigh: 0, shin: -90, ankle: [23.0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [142, -9.3], forearm: [190, -9.3],
+      },
+    ],
+  },
+  // 289 Straight-Arm Dumbbell Pullover: the same perpendicular setup across a
+  // flat bench with only the shoulders on the surface, hips low and feet flat,
+  // holding one dumbbell at full elbow extension through a wider arc behind the head.
+  'straight-arm-dumbbell-pullover': {
+    root: 'neck',
+    view: 'oblique',
+    yawDeg: 18,
+    originX: 54,
+    kneePole: 90,
+    implement: 'bell',
+    bellAxis: [1, 0, 0],
+    nearArmOverHead: true,
+    farArmOver: true,
+    equipment: chainFlatBench(-24, -10, 18.0),
+    poses: [
+      {
+        at: [-17.0, 18.0 + CHAIN_BACK_HALF], trunk: 164, head: 180,
+        thigh: 0, shin: -90, ankle: [23.0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [88, -9.3], forearm: [88, -9.3],
+      },
+      {
+        at: [-17.0, 18.0 + CHAIN_BACK_HALF], trunk: 164, head: 180,
+        thigh: 0, shin: -90, ankle: [23.0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [168, -9.3], forearm: [168, -9.3],
+      },
+    ],
+  },
+  // 148 Bent-Arm Barbell Pullover: lie along a flat bench holding a barbell
+  // with a shoulder-width grip over the chest and a fixed bend in the elbows,
+  // lowering in an arc behind the head and pulling back to pause over the chest.
+  'bent-arm-barbell-pullover': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 18,
+    originX: 54,
+    kneePole: 90,
+    implement: 'bar',
+    nearArmOverHead: true,
+    farArmOver: true,
+    equipment: chainFlatBench(-20, 12, 18.0),
+    poses: [
+      {
+        at: [8.0, 18.0 + CHAIN_BACK_HALF], trunk: 180, head: 180,
+        thigh: 0, shin: -90, ankle: [25.0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [78, 12], forearm: [126, 12],
+      },
+      {
+        at: [8.0, 18.0 + CHAIN_BACK_HALF], trunk: 180, head: 180,
+        thigh: 0, shin: -90, ankle: [25.0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [148, 12], forearm: [196, 12],
+      },
+    ],
+  },
   // chain movements are added above this line
 };
 
@@ -7245,6 +7448,14 @@ export const EQUIPMENT_BY_SLUG: Record<string, string> = {
   'lunge-pass-through': 'kettlebell',
   'kettlebell-pistol-squat': 'kettlebell',
   'standing-barbell-calf-raise': 'barbell',
+  // MOV-A14: trunk and pullovers.
+  'barbell-ab-rollout': 'barbell',
+  'barbell-rollout-from-bench': 'barbell',
+  'decline-crunch': 'bench',
+  'frog-sit-ups': 'none',
+  'bent-arm-dumbbell-pullover': 'dumbbells',
+  'straight-arm-dumbbell-pullover': 'dumbbells',
+  'bent-arm-barbell-pullover': 'barbell',
 };
 
 /**

@@ -118,6 +118,13 @@ const LEGACY_FAMILY_KEYS = {
   239: 'lunge@reverse',
   67: 'squat@standing',
   96: 'calf-raise@standing',
+  33: 'trunk-flex@kneeling',
+  137: 'trunk-flex@kneeling',
+  119: 'trunk-flex@decline',
+  204: 'trunk-flex@supine',
+  149: 'horizontal-pull@supine',
+  289: 'horizontal-pull@supine',
+  148: 'horizontal-pull@supine',
 };
 
 const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
