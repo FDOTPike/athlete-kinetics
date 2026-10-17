@@ -20,7 +20,11 @@ const barEntries = previewManifest.entries
   .filter((e) => {
     const slug = (e.assetKey || '').split('/')[1];
     const m = rig.CHAIN_MOVEMENTS[slug];
-    return Boolean(m && TWO_HAND_BAR_IMPLEMENTS.has(m.implement) && m.barAt !== 'elbows');
+    return Boolean(
+      m &&
+        (TWO_HAND_BAR_IMPLEMENTS.has(m.implement) || slug === 't-bar-row') &&
+        m.barAt !== 'elbows',
+    );
   })
   .map((e) => [e.movementId, e.assetKey.split('/')[1], e]);
 

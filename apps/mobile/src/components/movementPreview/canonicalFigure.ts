@@ -1224,6 +1224,8 @@ export interface ChainPose {
   footSpread?: number;
   /** Lateral out-angle (degrees) added to the solved knee pole so knees track outward. */
   kneeOut?: number;
+  /** Vertical downward reach (protraction) of the working near shoulder at the bottom of a one-arm row. */
+  nearReach?: number;
 }
 
 /** Where a piece of equipment is painted: behind the figure, between the far limbs and the trunk, or in front of everything. */
@@ -1302,6 +1304,8 @@ export interface ChainMovement {
   chestBoard?: { along: number; length: number; height: number };
   /** Whether a held kettlebell starts with the palm facing in at phase 0 and turns 90 degrees as the arm presses to phase 1. */
   kettlebellTurn?: boolean;
+  /** Whether a held kettlebell (or pair of kettlebells) hangs directly beneath the handle as in a row. */
+  kettlebellBelow?: boolean;
   /** For 'longBar': the point on the floor the bar's far end is braced at, and the bar's whole length from there. */
   barAnchor?: ChainPoint;
   barLength?: number;
@@ -4984,6 +4988,206 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       },
     ],
   },
+  // 5 Barbell Row:
+  // "Stand holding the bar just outside the legs, then soften the knees and hinge until the torso
+  // is stable. Let the bar hang beneath the shoulders with the trunk braced and the neck long.
+  // Drive the elbows back to row toward the lower ribs, then lower to long arms without changing
+  // the torso angle. If the torso rises on each pull, reduce the load before the hips turn the
+  // row into a heave."
+  'barbell-row': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 46,
+    implement: 'bar',
+    kneePole: 0,
+    elbowPole: [135, 25],
+    poses: [
+      {
+        at: [0, 44.2], trunk: 24, head: 32,
+        thigh: -90, shin: -90, ankle: [8, CHAIN_ANKLE_HEIGHT],
+        upperArm: -90, forearm: -90,
+        wrist: [chainNeckOf([0, 44.2], 24)[0], chainNeckOf([0, 44.2], 24)[1] - Math.sqrt(CHAIN_LONG_ARM ** 2 - (11.2 - CHAIN_SHOULDER_HALF) ** 2), 11.2],
+        farWrist: [chainNeckOf([0, 44.2], 24)[0], chainNeckOf([0, 44.2], 24)[1] - Math.sqrt(CHAIN_LONG_ARM ** 2 - (11.2 - CHAIN_SHOULDER_HALF) ** 2), -11.2],
+      },
+      {
+        at: [0, 44.2], trunk: 24, head: 32,
+        thigh: -90, shin: -90, ankle: [8, CHAIN_ANKLE_HEIGHT],
+        upperArm: -90, forearm: -90,
+        wrist: [chainOnFront([0, 44.2], 24, 10, 7.2)[0], chainOnFront([0, 44.2], 24, 10, 7.2)[1], 11.2],
+        farWrist: [chainOnFront([0, 44.2], 24, 10, 7.2)[0], chainOnFront([0, 44.2], 24, 10, 7.2)[1], -11.2],
+      },
+    ],
+  },
+  // 104 One-Arm Kettlebell Row:
+  // "Take a staggered stance, hinge until the torso is long and stable, and let the kettlebell
+  // hang beneath one shoulder. Row the bell toward the back pocket by driving the elbow past the
+  // ribs while the hips stay square to the floor. Lower until the shoulder blade reaches
+  // naturally; if the torso opens to finish the pull, the bell is heavier than the row you intended."
+  'one-arm-kettlebell-row': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 46,
+    implement: 'kettlebell',
+    kettlebellBelow: true,
+    kneePole: 0,
+    elbowPole: [150, 12],
+    poses: [
+      {
+        at: [1.5, 40.2], trunk: 24, head: 32, nearReach: 1.8,
+        thigh: -90, shin: -90, ankle: [-5, CHAIN_ANKLE_HEIGHT], farAnkle: [18, CHAIN_ANKLE_HEIGHT],
+        upperArm: -90, forearm: -90,
+        wrist: [chainNeckOf([1.5, 40.2], 24)[0], chainNeckOf([1.5, 40.2], 24)[1] - 1.8 - CHAIN_LONG_ARM, CHAIN_SHOULDER_HALF],
+        farWrist: [15.8, 28.2, -CHAIN_HIP_HALF],
+      },
+      {
+        at: [1.5, 40.2], trunk: 24, head: 32, nearReach: 0,
+        thigh: -90, shin: -90, ankle: [-5, CHAIN_ANKLE_HEIGHT], farAnkle: [18, CHAIN_ANKLE_HEIGHT],
+        upperArm: -90, forearm: -90,
+        wrist: [chainOnFront([1.5, 40.2], 24, 5.5, 6.2)[0], chainOnFront([1.5, 40.2], 24, 5.5, 6.2)[1], CHAIN_SHOULDER_HALF],
+        farWrist: [15.8, 28.2, -CHAIN_HIP_HALF],
+      },
+    ],
+  },
+  // 107 Reverse Grip Bent-Over Rows:
+  // "Take an underhand grip just outside the thighs, soften the knees, and hinge until the bar
+  // hangs below them with the torso braced. Pull the elbows back and row the bar toward the lower
+  // ribs, holding the top long enough to feel the shoulder blades finish. Lower to long arms
+  // without changing the hinge; if the torso rises on every pull, the bar is borrowing range from
+  // the hips."
+  'reverse-grip-bent-over-rows': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 46,
+    implement: 'bar',
+    kneePole: 0,
+    elbowPole: [165, 8],
+    closeUp: { at: [38, 72], r: 14, scale: 4.8, zoom: 1, open: 0 },
+    poses: [
+      {
+        at: [0, 44.2], trunk: 24, head: 32,
+        thigh: -90, shin: -90, ankle: [8, CHAIN_ANKLE_HEIGHT],
+        upperArm: -90, forearm: -90,
+        wrist: [chainNeckOf([0, 44.2], 24)[0], chainNeckOf([0, 44.2], 24)[1] - Math.sqrt(CHAIN_LONG_ARM ** 2 - (9.4 - CHAIN_SHOULDER_HALF) ** 2), 9.4],
+        farWrist: [chainNeckOf([0, 44.2], 24)[0], chainNeckOf([0, 44.2], 24)[1] - Math.sqrt(CHAIN_LONG_ARM ** 2 - (9.4 - CHAIN_SHOULDER_HALF) ** 2), -9.4],
+      },
+      {
+        at: [0, 44.2], trunk: 24, head: 32,
+        thigh: -90, shin: -90, ankle: [8, CHAIN_ANKLE_HEIGHT],
+        upperArm: -90, forearm: -90,
+        wrist: [chainOnFront([0, 44.2], 24, 10, 7.2)[0], chainOnFront([0, 44.2], 24, 10, 7.2)[1], 9.4],
+        farWrist: [chainOnFront([0, 44.2], 24, 10, 7.2)[0], chainOnFront([0, 44.2], 24, 10, 7.2)[1], -9.4],
+      },
+    ],
+  },
+  // 293 Two-Arm Kettlebell Row:
+  // "Stand over two kettlebells, bend the knees slightly, push the hips back and take a handle in
+  // each hand with the back straight. Pull both kettlebells toward the stomach, drawing the
+  // shoulder blades together. Lower them under control until the arms are straight."
+  'two-arm-kettlebell-row': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 46,
+    implement: 'kettlebells',
+    kettlebellBelow: true,
+    kneePole: 0,
+    elbowPole: [145, 16],
+    poses: [
+      {
+        at: [-2, 40.2], trunk: 22, head: 30,
+        thigh: -90, shin: -90, ankle: [15.5, CHAIN_ANKLE_HEIGHT],
+        upperArm: -90, forearm: -90,
+        wrist: [chainNeckOf([-2, 40.2], 22)[0], chainNeckOf([-2, 40.2], 22)[1] - Math.sqrt(CHAIN_LONG_ARM ** 2 - (8.6 - CHAIN_SHOULDER_HALF) ** 2), 8.6],
+        farWrist: [chainNeckOf([-2, 40.2], 22)[0], chainNeckOf([-2, 40.2], 22)[1] - Math.sqrt(CHAIN_LONG_ARM ** 2 - (8.6 - CHAIN_SHOULDER_HALF) ** 2), -8.6],
+      },
+      {
+        at: [-2, 40.2], trunk: 22, head: 30,
+        thigh: -90, shin: -90, ankle: [15.5, CHAIN_ANKLE_HEIGHT],
+        upperArm: -90, forearm: -90,
+        wrist: [chainOnFront([-2, 40.2], 22, 8.5, 6.8)[0], chainOnFront([-2, 40.2], 22, 8.5, 6.8)[1], 8.6],
+        farWrist: [chainOnFront([-2, 40.2], 22, 8.5, 6.8)[0], chainOnFront([-2, 40.2], 22, 8.5, 6.8)[1], -8.6],
+      },
+    ],
+  },
+  // 79 T-Bar Row:
+  // "Straddle the bar, hinge to about 45 degrees, and take the handle with a neutral grip. Pull
+  // the plates to your chest, driving the elbows up and back, and let the bar stretch your lats at
+  // the bottom of every rep. Hold your hinge angle — every degree you stand up as the set gets
+  // hard is range you stole from your back."
+  't-bar-row': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 48,
+    implement: 'longBar',
+    barAnchor: [-32, 2.6, 0],
+    barLength: 64.5,
+    footSpread: 5.2,
+    kneePole: 0,
+    elbowPole: [135, 25],
+    equipment: [
+      { kind: 'frame', a: [-35, 0.8, 0], b: [-28, 0.8, 0] },
+      { kind: 'frame', a: [-32, 0.8, 0], b: [-32, 2.6, 0] },
+      { kind: 'roller', at: [-32, 2.6, 0], layer: 'behind' },
+    ],
+    poses: [
+      {
+        at: [-2, 42.5], trunk: 45, head: 52,
+        thigh: -90, shin: -90, ankle: [8, CHAIN_ANKLE_HEIGHT],
+        upperArm: -90, forearm: -90,
+        wrist: [chainNeckOf([-2, 42.5], 45)[0], chainNeckOf([-2, 42.5], 45)[1] - Math.sqrt(CHAIN_LONG_ARM ** 2 - (3.2 - CHAIN_SHOULDER_HALF) ** 2), 3.2],
+        farWrist: [chainNeckOf([-2, 42.5], 45)[0], chainNeckOf([-2, 42.5], 45)[1] - Math.sqrt(CHAIN_LONG_ARM ** 2 - (3.2 - CHAIN_SHOULDER_HALF) ** 2), -3.2],
+      },
+      {
+        at: [-2, 42.5], trunk: 45, head: 52,
+        thigh: -90, shin: -90, ankle: [8, CHAIN_ANKLE_HEIGHT],
+        upperArm: -90, forearm: -90,
+        wrist: [-32 + 57.516 * Math.cos(chainRad(48.5)), 2.6 + 57.516 * Math.sin(chainRad(48.5)), 3.2],
+        farWrist: [-32 + 57.516 * Math.cos(chainRad(48.5)), 2.6 + 57.516 * Math.sin(chainRad(48.5)), -3.2],
+      },
+    ],
+  },
+  // 130 Alternating Kettlebell Row:
+  // "Stand over two kettlebells, bend the knees slightly, push the hips back and take a handle in
+  // each hand with the back flat. Pull one kettlebell toward the lower ribs, drawing that shoulder
+  // blade back, while the other hand holds its kettlebell on the floor. Lower it under control to
+  // the floor, then row the other side."
+  'alternating-kettlebell-row': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 48,
+    implement: 'kettlebells',
+    kettlebellBelow: true,
+    kneePole: 0,
+    elbowPole: [145, 16],
+    poses: [
+      {
+        at: [-8.5, 33.792], trunk: 3, head: 14,
+        thigh: -90, shin: -90, ankle: [14, CHAIN_ANKLE_HEIGHT],
+        upperArm: -90, forearm: -90,
+        wrist: [chainNeckOf([-8.5, 33.792], 3)[0], 10.6, 8.4],
+        farWrist: [chainNeckOf([-8.5, 33.792], 3)[0], 10.6, -8.4],
+      },
+      {
+        at: [-8.5, 33.792], trunk: 3, head: 14,
+        thigh: -90, shin: -90, ankle: [14, CHAIN_ANKLE_HEIGHT],
+        upperArm: -90, forearm: -90,
+        wrist: [chainOnFront([-8.5, 33.792], 3, 9.5, 6.5)[0], chainOnFront([-8.5, 33.792], 3, 9.5, 6.5)[1], 8.4],
+        farWrist: [chainNeckOf([-8.5, 33.792], 3)[0], 10.6, -8.4],
+      },
+      {
+        at: [-8.5, 33.792], trunk: 3, head: 14,
+        thigh: -90, shin: -90, ankle: [14, CHAIN_ANKLE_HEIGHT],
+        upperArm: -90, forearm: -90,
+        wrist: [chainNeckOf([-8.5, 33.792], 3)[0], 10.6, 8.4],
+        farWrist: [chainOnFront([-8.5, 33.792], 3, 9.5, 6.5)[0], chainOnFront([-8.5, 33.792], 3, 9.5, 6.5)[1], -8.4],
+      },
+    ],
+  },
   // chain movements are added above this line
 };
 
@@ -5036,6 +5240,7 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters, tu
   const sideCurl = num(a.sideCurl, b.sideCurl);
   const roll = num(a.roll, b.roll);
   const shrug = num(a.shrug, b.shrug);
+  const nearReach = num(a.nearReach, b.nearReach);
   const twist = num(a.twist, b.twist) + roll + turn * (movement.turnWithPhase === true ? Math.max(0, Math.min(1, ph)) : 1);
   const given = dir(a.trunk, b.trunk);
   const thigh = dir(a.thigh, b.thigh);
@@ -5154,7 +5359,9 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters, tu
   };
   // A shrug lifts both shoulders along the spine; the neck and head stay where they are.
   const girdleCentre = shrug === 0 ? neck : chainAdd(neck, neckTangent, shrug);
-  const nearArm = limb(chainAdd(girdleCentre, shoulderAxis, shoulderHalf), 1, upperArm, forearm, upperLength, foreLength,
+  const nearShoulderBase = chainAdd(girdleCentre, shoulderAxis, shoulderHalf);
+  const nearShoulderRoot = nearReach === 0 ? nearShoulderBase : chainAdd(nearShoulderBase, [0, -1, 0], nearReach);
+  const nearArm = limb(nearShoulderRoot, 1, upperArm, forearm, upperLength, foreLength,
     wristTarget, movement.elbowPole ?? -135);
   const farArm = limb(chainAdd(girdleCentre, shoulderAxis, -shoulderHalf), -1, farUpperArm, farForearm, upperLength, foreLength,
     farWristTarget, movement.elbowPole ?? -135);
@@ -5422,13 +5629,23 @@ function layoutChainExtras(
       }
     }
   } else if (kind === 'longBar' && movement.barAnchor !== undefined) {
-    // One end braced on the floor, the near hand on the shaft just behind the plates at the other.
-    const from = project(chainWorld(movement.barAnchor)), grip = figure.hold.near;
+    // One end braced on the floor, the near hand on the shaft just behind the plates at the other
+    // (or, in an oblique straddled T-bar row, both hands on a neutral handle centred on the shaft).
+    const from = project(chainWorld(movement.barAnchor));
+    const grip: CanonicalPoint = figure.view === 'oblique'
+      ? [(figure.hold.near[0] + figure.hold.far[0]) / 2, (figure.hold.near[1] + figure.hold.far[1]) / 2]
+      : figure.hold.near;
     const reach = Math.hypot(grip[0] - from[0], grip[1] - from[1]) || 1;
     const ux = (grip[0] - from[0]) / reach, uy = (grip[1] - from[1]) / reach;
     const length = movement.barLength ?? reach + 8;
     const end: CanonicalPoint = [from[0] + ux * length, from[1] + uy * length];
-    near.push(line(from, end, 1.6, 'textHi', 1));
+    if (figure.view === 'oblique') {
+      groups.mid.push(line(from, grip, 1.6, 'textHi', 1));
+      near.push(line(grip, end, 1.6, 'textHi', 1));
+      near.push(line(figure.hold.far, figure.hold.near, 1.8, 'textMid', 1));
+    } else {
+      near.push(line(from, end, 1.6, 'textHi', 1));
+    }
     for (const back of [2, 4.6]) {
       const c: CanonicalPoint = [end[0] - ux * back, end[1] - uy * back];
       near.push({ ...line([c[0] + uy * 6, c[1] - ux * 6], [c[0] - uy * 6, c[1] + ux * 6], 2.4, 'textHi', 1), stroke: 'ink1', strokeWidth: 0.6 });
@@ -5436,11 +5653,14 @@ function layoutChainExtras(
   } else if (kind === 'kettlebell' || kind === 'kettlebells') {
     // One kettlebell in the near hand (or one in each hand for 'kettlebells'):
     // the handle across the palm, and the round bell resting on the back of
-    // the wrist, below and behind the grip.
+    // the wrist (or hanging straight down beneath the handle in a row).
     if (kind === 'kettlebells') {
       const fa = figure.projectFar(chainAdd(w.far.hold, [0, 0, 1], -2.6));
       const fb = figure.projectFar(chainAdd(w.far.hold, [0, 0, 1], 2.6));
-      const fc = figure.projectFar(chainAdd(w.far.hold, [KETTLEBELL_REST[0], KETTLEBELL_REST[1], -KETTLEBELL_REST[2]], 1));
+      const farRest: ChainVec = movement.kettlebellBelow
+        ? [0, -6.0, 0]
+        : [KETTLEBELL_REST[0], KETTLEBELL_REST[1], -KETTLEBELL_REST[2]];
+      const fc = figure.projectFar(chainAdd(w.far.hold, farRest, 1));
       far.push({ kind: 'circle', cx: fc[0], cy: fc[1], r: KETTLEBELL_RADIUS, fill: farColor, stroke: 'ink1', strokeWidth: 1, opacity: farOpacity });
       far.push(line(fa, fb, 2.2, farColor, farOpacity));
     }
@@ -5448,9 +5668,11 @@ function layoutChainExtras(
     const hAxis: ChainVec = movement.kettlebellTurn
       ? [Math.cos(turnT * Math.PI / 2), 0, Math.sin(turnT * Math.PI / 2)]
       : [0, 0, 1];
-    const kbRest: ChainVec = movement.kettlebellTurn
-      ? [-1.8 * turnT, -2.2, 2.2 * (1 - turnT) + 1.4 * turnT]
-      : KETTLEBELL_REST;
+    const kbRest: ChainVec = movement.kettlebellBelow
+      ? [0, -6.0, 0]
+      : movement.kettlebellTurn
+        ? [-1.8 * turnT, -2.2, 2.2 * (1 - turnT) + 1.4 * turnT]
+        : KETTLEBELL_REST;
     const a = project(chainAdd(w.near.hold, hAxis, -2.6)), b = project(chainAdd(w.near.hold, hAxis, 2.6));
     const c = project(chainAdd(w.near.hold, kbRest, 1));
     near.push({ kind: 'circle', cx: c[0], cy: c[1], r: KETTLEBELL_RADIUS, fill: 'textHi', stroke: 'ink1', strokeWidth: 1, opacity: 1 });
@@ -6740,6 +6962,12 @@ export const EQUIPMENT_BY_SLUG: Record<string, string> = {
   'floor-press': 'barbell',
   'one-arm-kettlebell-floor-press': 'kettlebell',
   'cable-chest-press': 'cable_machine',
+  // Family 37 (MOV-A08): the bent-over barbell, T-bar, and kettlebell rows.
+  'one-arm-kettlebell-row': 'kettlebell',
+  'reverse-grip-bent-over-rows': 'barbell',
+  'two-arm-kettlebell-row': 'kettlebell',
+  't-bar-row': 'barbell',
+  'alternating-kettlebell-row': 'kettlebell',
 };
 
 /**
