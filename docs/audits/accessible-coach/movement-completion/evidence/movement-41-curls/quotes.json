@@ -1,0 +1,114 @@
+{
+  "bounds": [
+    {
+      "id": 184,
+      "quote": "Drag the bar straight up the torso, letting the elbows travel back behind the ribs as it rises.",
+      "bound": "Bar x stays within [torsoFrontX, torsoFrontX + 0.5] and constant across all ticks; peak elbow x < hip x - 5 (behind ribs).",
+      "test": "apps/mobile/test/components/MovementPreview.movA11Curls.test.js :: 184 Drag Curl: bar drags straight up against torso, elbows travel behind ribs, rigid bar"
+    },
+    {
+      "id": 184,
+      "quote": "Keep the bar touching the torso.",
+      "bound": "Near and far wrist x remain at torsoFrontX + [0, 0.5] across all 101 ticks (t = 0..1).",
+      "test": "apps/mobile/test/components/MovementPreview.movA11Curls.test.js :: 184 Drag Curl: bar drags straight up against torso, elbows travel behind ribs, rigid bar"
+    },
+    {
+      "id": 281,
+      "quote": "Stand tall with a dumbbell in each hand, arms straight and palms facing down.",
+      "bound": "Start knee angle >= 172 deg, start elbow angle >= 172 deg, palm = 'down' throughout.",
+      "test": "apps/mobile/test/components/MovementPreview.movA11Curls.test.js :: 281 Standing Dumbbell Reverse Curl: palms down throughout, quiet upper arms, straight arms at bottom"
+    },
+    {
+      "id": 281,
+      "quote": "Keeping the upper arms still, curl the dumbbells up to shoulder height with the palms still facing down.",
+      "bound": "Shoulder-to-elbow drift <= 0.5 units across the entire cycle; peak wrist y within 6 units of shoulder y; palm = 'down'.",
+      "test": "apps/mobile/test/components/MovementPreview.movA11Curls.test.js :: 281 Standing Dumbbell Reverse Curl: palms down throughout, quiet upper arms, straight arms at bottom"
+    },
+    {
+      "id": 109,
+      "quote": "At the top, rotate to palms-down while the elbows stay closed, then lower through the overhand grip.",
+      "bound": "forearmTurn = true drives bell slant perpendicular on concentric (t=0.20, dot < 0.15), rotating over at peak (t=0.35..0.55), and parallel on eccentric (t=0.72, dot > 0.95); elbow drift <= 0.5.",
+      "test": "apps/mobile/test/components/MovementPreview.movA11Curls.test.js :: 109 Zottman Curl: four-phase bell rotation (palms-up concentric, top pronation, overhand eccentric, bottom reset)"
+    },
+    {
+      "id": 109,
+      "quote": "Turn back to neutral only at the bottom",
+      "bound": "Bell orientation remains pronated through descent (t=0.72) and resets to neutral at the bottom window (t >= 0.86).",
+      "test": "apps/mobile/test/components/MovementPreview.movA11Curls.test.js :: 109 Zottman Curl: four-phase bell rotation (palms-up concentric, top pronation, overhand eccentric, bottom reset)"
+    },
+    {
+      "id": 190,
+      "quote": "Lie face down on an incline bench with the shoulders near the top and a dumbbell in each hand, arms hanging straight down and palms facing forward.",
+      "bound": "Prone trunk on 38 deg incline pad, start upper-arm hanging vertically (|elbow.x - shoulder.x| < 1.5, elbow.y < shoulder.y - 12), start elbow angle >= 172 deg, palm = 'up'.",
+      "test": "apps/mobile/test/components/MovementPreview.movA11Curls.test.js :: 190 Dumbbell Prone Incline Curl: chest on incline pad, vertical hanging upper arms stay still, full stretch >= 172 deg"
+    },
+    {
+      "id": 190,
+      "quote": "Keeping the upper arms still, curl the dumbbells up until the elbows are fully bent.",
+      "bound": "Elbow position drift <= 0.5 units across all ticks; peak elbow flexion < 55 deg.",
+      "test": "apps/mobile/test/components/MovementPreview.movA11Curls.test.js :: 190 Dumbbell Prone Incline Curl: chest on incline pad, vertical hanging upper arms stay still, full stretch >= 172 deg"
+    },
+    {
+      "id": 213,
+      "quote": "Stand between two high pulleys holding a handle in each hand, upper arms out to the sides at shoulder height and palms facing you.",
+      "bound": "Dual high cable origins above head height (y >= 88, x = 8 and 92); upper arms abducted out to the sides with |elbow.y - shoulder.y| < 2.0.",
+      "test": "apps/mobile/test/components/MovementPreview.movA11Curls.test.js :: 213 High Cable Curls: dual high pulleys, upper arms level with floor, hands curl to ears"
+    },
+    {
+      "id": 213,
+      "quote": "Keeping the upper arms still, curl the handles in toward the ears.",
+      "bound": "Elbow position drift <= 0.5 units across cycle; peak wrist distance to ear (head center) < start distance - 12 and within 9 units of head.",
+      "test": "apps/mobile/test/components/MovementPreview.movA11Curls.test.js :: 213 High Cable Curls: dual high pulleys, upper arms level with floor, hands curl to ears"
+    },
+    {
+      "id": 240,
+      "quote": "Lie on your back facing a low pulley with the feet braced against the base of the machine and the legs straight, holding the bar with a shoulder-width underhand grip and the arms almost straight.",
+      "bound": "Supine trunk (|shoulder.y - hip.y| < 2.0), straight legs (knee angle >= 172 deg), feet braced against machine base at x >= 70, start elbow angle in [150, 171] deg, rigid bar.",
+      "test": "apps/mobile/test/components/MovementPreview.movA11Curls.test.js :: 240 Lying Cable Curl: supine on floor, straight legs braced against machine base, elbows close to body, rigid bar"
+    },
+    {
+      "id": 240,
+      "quote": "Keeping the upper arms still and the elbows close to the body, curl the bar toward the chest.",
+      "bound": "Elbow position drift <= 0.5 units and |elbow.y - torso.y| < 3.0 across all ticks; peak wrist curls toward chest.",
+      "test": "apps/mobile/test/components/MovementPreview.movA11Curls.test.js :: 240 Lying Cable Curl: supine on floor, straight legs braced against machine base, elbows close to body, rigid bar"
+    },
+    {
+      "id": 259,
+      "quote": "Hold an EZ bar with a shoulder-width, palms-down grip and rest the upper arms on the preacher bench pad with the arms extended.",
+      "bound": "implement = 'ez', palm = 'down', preacher bench prop, start elbow angle >= 165 deg.",
+      "test": "apps/mobile/test/components/MovementPreview.movA11Curls.test.js :: 259 Reverse Barbell Preacher Curls: EZ bar with palms-down grip, upper arms stationary on preacher pad"
+    },
+    {
+      "id": 259,
+      "quote": "Keeping the upper arms on the pad, curl the bar up to shoulder height.",
+      "bound": "Upper-arm drift on preacher pad <= 0.5 units across all ticks; peak wrist y within 6 units of shoulder y; rigid EZ-bar wrist distance constant across all ticks.",
+      "test": "apps/mobile/test/components/MovementPreview.movA11Curls.test.js :: 259 Reverse Barbell Preacher Curls: EZ bar with palms-down grip, upper arms stationary on preacher pad"
+    }
+  ],
+  "fileQuotes": [
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5199,
+      "endLine": 5206,
+      "text": "  'drag-curl': {\n    root: 'hip',\n    view: 'oblique',\n    yawDeg: 35,\n    originX: 50,\n    implement: 'bar',\n    palm: 'up',\n    elbowPole: 180,"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5245,
+      "endLine": 5255,
+      "text": "  'zottman-curl': {\n    root: 'hip',\n    view: 'oblique',\n    yawDeg: 40,\n    originX: 48,\n    implement: 'bells',\n    forearmTurn: true,\n    poses: [\n      { at: [0, CHAIN_STANDING_HIP], trunk: 90, thigh: -90, shin: -90, upperArm: [-90, 4], forearm: [-90, 2] },\n      { at: [0, CHAIN_STANDING_HIP], trunk: 90, thigh: -90, shin: -90, upperArm: [-90, 4], forearm: [60, 2] },\n    ],\n  },"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5340,
+      "endLine": 5346,
+      "text": "  'reverse-barbell-preacher-curls': {\n    root: 'hip',\n    view: 'oblique',\n    yawDeg: 28,\n    originX: 36,\n    implement: 'ez',\n    palm: 'down',"
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA11Curls.test.js",
+      "line": 120,
+      "endLine": 126,
+      "text": "      expect(g.world.near.wrist[0] - torsoFrontX).toBeGreaterThanOrEqual(0);\n      expect(g.world.near.wrist[0] - torsoFrontX).toBeLessThanOrEqual(0.5);\n      expect(g.world.far.wrist[0] - torsoFrontX).toBeGreaterThanOrEqual(0);\n      expect(g.world.far.wrist[0] - torsoFrontX).toBeLessThanOrEqual(0.5);\n      // Straight vertical drag path: x does not drift at any tick.\n      expect(Math.abs(g.world.near.wrist[0] - startBarX)).toBeLessThan(1e-6);\n      expect(Math.abs(g.world.far.wrist[0] - startBarX)).toBeLessThan(1e-6);"
+    }
+  ]
+}
