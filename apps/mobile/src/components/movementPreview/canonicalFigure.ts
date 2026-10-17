@@ -1296,6 +1296,8 @@ export interface ChainMovement {
   barAt?: 'hands' | 'elbows' | 'behind' | 'front';
   /** Half-length of a held barbell's plate segment (4.2 by default; larger for floor-starting barbell lifts). */
   plateRadius?: number;
+  /** Whether a held barbell wears a thick pad around the middle of its shaft (as in a Barbell Hip Thrust). */
+  barPad?: boolean;
   /** For 'longBar': the point on the floor the bar's far end is braced at, and the bar's whole length from there. */
   barAnchor?: ChainPoint;
   barLength?: number;
@@ -4370,6 +4372,268 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       },
     ],
   },
+  // Stiff-Legged Barbell Deadlift: starts standing holding a barbell with an
+  // overhand grip, feet shoulder-width or narrower and knees slightly bent.
+  // Keeping that exact knee angle and a straight back, the hips push back so
+  // the bar lowers on plumb arms toward the top of the feet.
+  'stiff-legged-barbell-deadlift': {
+    root: 'ankle',
+    view: 'oblique',
+    yawDeg: 20,
+    originX: 50,
+    footSpread: 1.6,
+    implement: 'bar',
+    barAt: 'front',
+    farArmOver: true,
+    poses: [
+      {
+        at: [0, CHAIN_ANKLE_HEIGHT], trunk: 89, head: 90, shrug: 0,
+        thigh: -77, shin: -103,
+        upperArm: [-86, 5], forearm: [-86, 5],
+      },
+      {
+        at: [0, CHAIN_ANKLE_HEIGHT], trunk: -4, head: 16, shrug: -1.5,
+        thigh: -52, shin: -78,
+        upperArm: [-91.5, 5], forearm: [-91.5, 5],
+      },
+    ],
+  },
+  // Good Morning: barbell set across the upper back as for a squat after
+  // stepping forward from the rack. Knees soften and the hips travel back while
+  // the trunk stays long and straight, then hips drive forward to stand tall.
+  'good-morning': {
+    root: 'ankle',
+    view: 'oblique',
+    yawDeg: 14,
+    originX: 52,
+    footSpread: 3.5,
+    implement: 'bar',
+    armsFollowTrunk: true,
+    equipment: [
+      { kind: 'frame', a: [-16, 0.5, 16], b: [-16, 78, 16] },
+      { kind: 'frame', a: [-16, 0.5, -16], b: [-16, 78, -16] },
+      { kind: 'frame', a: [-16, 68, 16], b: [-12.5, 68, 16] },
+      { kind: 'frame', a: [-16, 68, -16], b: [-12.5, 68, -16] },
+    ],
+    poses: [
+      {
+        at: [4, CHAIN_ANKLE_HEIGHT], trunk: 88, head: 90,
+        thigh: -78, shin: -102,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+      {
+        at: [4, CHAIN_ANKLE_HEIGHT], trunk: 14, head: 28,
+        thigh: -56, shin: -80,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+    ],
+  },
+  // Good Morning off Pins: the bar starts on stomach-height safety pins inside
+  // the rack. The athlete bends under it with torso near level and knees
+  // slightly bent, drives the hips forward to stand tall, then lowers slowly
+  // back to the pins to let the bar settle.
+  'good-morning-off-pins': {
+    root: 'ankle',
+    view: 'oblique',
+    yawDeg: 14,
+    originX: 50,
+    footSpread: 3.5,
+    implement: 'bar',
+    armsFollowTrunk: true,
+    equipment: [
+      { kind: 'frame', a: [-16, 0.5, 16], b: [-16, 78, 16] },
+      { kind: 'frame', a: [-16, 0.5, -16], b: [-16, 78, -16] },
+      { kind: 'frame', a: [18, 0.5, 16], b: [18, 78, 16] },
+      { kind: 'frame', a: [18, 0.5, -16], b: [18, 78, -16] },
+      { kind: 'frame', a: [-16, 47.0, 16], b: [18, 47.0, 16] },
+      { kind: 'frame', a: [-16, 47.0, -16], b: [18, 47.0, -16] },
+    ],
+    poses: [
+      {
+        at: [2, CHAIN_ANKLE_HEIGHT], trunk: 8, head: 22,
+        thigh: -56, shin: -80,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+      {
+        at: [2, CHAIN_ANKLE_HEIGHT], trunk: 88, head: 90,
+        thigh: -78, shin: -102,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+    ],
+  },
+  // Seated Good Mornings: seated on a bench inside a power rack with safety
+  // pins set below the bottom depth. Keeping the lower back arched and shoulder
+  // blades pinched, the athlete hinges forward at the hips, pauses just above
+  // the pins, and reverses to sit upright.
+  'seated-good-mornings': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 14,
+    originX: 48,
+    footSpread: 4.5,
+    implement: 'bar',
+    armsFollowTrunk: true,
+    equipment: [
+      ...chainFlatBench(-16, 6, CHAIN_SEATED_HIP - CHAIN_THIGH_HALF),
+      { kind: 'frame', a: [-18, 0.5, 16], b: [-18, 76, 16] },
+      { kind: 'frame', a: [-18, 0.5, -16], b: [-18, 76, -16] },
+      { kind: 'frame', a: [24, 0.5, 16], b: [24, 76, 16] },
+      { kind: 'frame', a: [24, 0.5, -16], b: [24, 76, -16] },
+      { kind: 'frame', a: [-18, 32.2, 16], b: [24, 32.2, 16] },
+      { kind: 'frame', a: [-18, 32.2, -16], b: [24, 32.2, -16] },
+    ],
+    poses: [
+      {
+        at: [-6, CHAIN_SEATED_HIP], trunk: 90, curl: -8, head: 90,
+        thigh: [0, 10], shin: -90,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+      {
+        at: [-6, CHAIN_SEATED_HIP], trunk: 24, curl: -10, head: 36,
+        thigh: [0, 10], shin: -90,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+    ],
+  },
+  // Single-Leg Romanian Deadlift: kettlebell held in the near hand while
+  // standing on the opposite (far) leg. Hinging forward with square hips, the
+  // free near leg reaches straight back as a counterweight until torso and back
+  // leg are near parallel with the floor and the bell hangs plumb under the shoulder.
+  'single-leg-romanian-deadlift': {
+    root: 'farAnkle',
+    view: 'oblique',
+    yawDeg: 18,
+    originX: 54,
+    feet: 'free',
+    implement: 'kettlebell',
+    farArmOver: true,
+    poses: [
+      {
+        at: [2, CHAIN_ANKLE_HEIGHT], trunk: 88, head: 90, roll: 0,
+        thigh: -82, shin: -112, foot: 0,
+        farThigh: -80, farShin: -100, farFoot: 0,
+        upperArm: [-88, 2], forearm: [-88, 2],
+        farUpperArm: [-92, 6], farForearm: [-86, 6],
+      },
+      {
+        at: [2, CHAIN_ANKLE_HEIGHT], trunk: 8, head: 24, roll: 0,
+        thigh: -172, shin: -172, foot: -82,
+        farThigh: -68, farShin: -92, farFoot: 0,
+        upperArm: [-90, 0], forearm: [-90, 0],
+        farUpperArm: [-135, 10], farForearm: [-125, 10],
+      },
+    ],
+  },
+  // Barbell Hip Thrust: upper back braced against a bench, padded barbell over
+  // the hips. Driving through the heels lifts the hips until thighs and torso
+  // form a level tabletop with vertical shins and a full-beat pause at the top.
+  'barbell-hip-thrust': {
+    root: 'neck',
+    view: 'oblique',
+    yawDeg: -12,
+    originX: 50,
+    kneePole: 90,
+    implement: 'bar',
+    barPad: true,
+    plateRadius: CHAIN_FLOOR_PLATE,
+    armsFollowTrunk: true,
+    farArmOver: true,
+    equipment: [
+      ...chainFlatBench(-36, -20, 20.6),
+    ],
+    poses: [
+      {
+        at: [-19.9, CHAIN_SEATED_HIP], trunk: 146, head: 125,
+        thigh: 0, shin: -90, ankle: [22.25, CHAIN_ANKLE_HEIGHT],
+        upperArm: [-96, 18], forearm: [-54, 18],
+      },
+      {
+        at: [-24.0, CHAIN_SEATED_HIP], trunk: 180, head: 155,
+        thigh: 0, shin: -90, ankle: [22.25, CHAIN_ANKLE_HEIGHT],
+        upperArm: [-96, 18], forearm: [-54, 18],
+      },
+    ],
+  },
+  // Nordic Curl: kneeling on a low floor pad with ankles secured beneath an
+  // immovable floor anchor. One straight line from knees to head lowers slowly
+  // until the hands catch the floor in a push-up position and help the hamstrings return.
+  'nordic-curl': {
+    root: 'ankle',
+    feet: 'free',
+    equipment: [
+      { kind: 'box', a: [27, 0.6], b: [38, 4.2] },
+      { kind: 'post', at: [11.5, 9.6] },
+      { kind: 'roller', at: [11.5, 9.6] },
+    ],
+    poses: [
+      {
+        at: [10, 6.8], trunk: 90, head: 90,
+        thigh: -90, shin: 180, foot: -56,
+        upperArm: -65, forearm: -15,
+      },
+      {
+        at: [10, 6.8], trunk: 22, head: 22,
+        thigh: -158, shin: 180, foot: -56,
+        upperArm: -116, forearm: -52,
+      },
+    ],
+  },
+  // Floor Glute-Ham Raise: kneeling tall in an elevated Nordic bench with ankles
+  // locked under the foot pads. Lowering forward in one knee-to-shoulder line
+  // extends deeper at the knees until the hands catch on the floor and lightly assist.
+  'floor-glute-ham-raise': {
+    root: 'ankle',
+    feet: 'free',
+    equipment: [
+      { kind: 'box', a: [8, 0.6], b: [38, 5.2] },
+      { kind: 'slab', a: [24, 7.6], b: [38, 7.6] },
+      { kind: 'frame', a: [10, 5.2], b: [10, 14.0] },
+      { kind: 'roller', at: [11.5, 13.2] },
+      { kind: 'roller', at: [8.2, 7.5] },
+    ],
+    poses: [
+      {
+        at: [10, 10.5], trunk: 90, head: 90,
+        thigh: -90, shin: 180, foot: -90,
+        upperArm: -65, forearm: -15,
+      },
+      {
+        at: [10, 10.5], trunk: 15, head: 15,
+        thigh: -165, shin: 180, foot: -90,
+        upperArm: -72, forearm: -41.5,
+      },
+    ],
+  },
+  // Natural Glute Ham Raise: set up in a Nordic bench with a band anchored
+  // behind to assist the return. The athlete lowers in one straight line until
+  // the knees are almost straight while holding the band above the floor, then curls back up.
+  'natural-glute-ham-raise': {
+    root: 'ankle',
+    feet: 'free',
+    armsFollowTrunk: true,
+    lines: [{ from: [4, 56], to: 'nearGrip' }],
+    equipment: [
+      { kind: 'frame', a: [4, 0.5], b: [4, 62] },
+      { kind: 'pulley', at: [4, 56] },
+      { kind: 'box', a: [12, 0.6], b: [42, 5.2] },
+      { kind: 'slab', a: [28, 7.6], b: [42, 7.6] },
+      { kind: 'frame', a: [14, 5.2], b: [14, 14.0] },
+      { kind: 'roller', at: [15.5, 13.2] },
+      { kind: 'roller', at: [12.2, 7.5] },
+    ],
+    poses: [
+      {
+        at: [14, 10.5], trunk: 90, head: 90,
+        thigh: -90, shin: 180, foot: -90,
+        upperArm: -35, forearm: 145,
+      },
+      {
+        at: [14, 10.5], trunk: 6, head: 14,
+        thigh: -174, shin: 180, foot: -90,
+        upperArm: -35, forearm: 145,
+      },
+    ],
+  },
   // chain movements are added above this line
 };
 
@@ -4790,6 +5054,10 @@ function layoutChainExtras(
       const farAlpha = whole ? 1 : farOpacity;
       farGroup.push(line(mid, farEnd, 1.6, farTone, farAlpha));
       near.push(line(mid, nearEnd, 1.6, 'textHi', 1));
+      if (movement.barPad === true) {
+        const padHalf = Math.min(3.2, length * 0.36);
+        near.push({ ...line([mid[0] - ux * padHalf, mid[1] - uy * padHalf], [mid[0] + ux * padHalf, mid[1] + uy * padHalf], 4.2, 'textMid', 1), stroke: 'ink1', strokeWidth: 0.6 });
+      }
       if (kind !== 'cableBar') {
         const pr = movement.plateRadius ?? 4.2;
         const plate = (c: CanonicalPoint, color: ColorRole, opacity: number): FigurePrim =>
