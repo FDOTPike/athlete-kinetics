@@ -5053,7 +5053,12 @@ function layoutChainExtras(
       const farTone: ColorRole = whole ? 'textHi' : farColor;
       const farAlpha = whole ? 1 : farOpacity;
       farGroup.push(line(mid, farEnd, 1.6, farTone, farAlpha));
-      near.push(line(mid, nearEnd, 1.6, 'textHi', 1));
+      if (movement.barAt === 'behind') {
+        groups.behind.push(line(mid, q, 1.6, 'textHi', 1));
+        near.push(line(q, nearEnd, 1.6, 'textHi', 1));
+      } else {
+        near.push(line(mid, nearEnd, 1.6, 'textHi', 1));
+      }
       if (movement.barPad === true) {
         const padHalf = Math.min(3.2, length * 0.36);
         near.push({ ...line([mid[0] - ux * padHalf, mid[1] - uy * padHalf], [mid[0] + ux * padHalf, mid[1] + uy * padHalf], 4.2, 'textMid', 1), stroke: 'ink1', strokeWidth: 0.6 });

@@ -79,9 +79,10 @@ describe('MOV-A02 chain kit additions: barAt, plateRadius, and double kettlebell
     expect(dist3(comp.world.near.hold, comp.world.near.elbowCrook)).toBeGreaterThan(9.0);
   });
 
-  test('barAt: "behind" routes the barbell shaft and far plate behind the far and near leg bones', () => {
+  test('barAt: "behind" routes the barbell shaft between the hands and far plate behind the far and near leg bones', () => {
     const hackEntry = entryFor(98);
     const compEntry = entryFor(1);
+    const hackFig = chainGeometry('barbell-hack-squat', 0, BODY);
     const hackPrims = layoutCanonicalFigure(hackEntry.frames[0].joints, { ...hackEntry, body: BODY });
     const compPrims = layoutCanonicalFigure(compEntry.frames[0].joints, { ...compEntry, body: BODY });
 
@@ -89,10 +90,23 @@ describe('MOV-A02 chain kit additions: barAt, plateRadius, and double kettlebell
       prims.findIndex((p) => p.kind === 'bone' && p.color === 'textLow' && Math.abs(p.w - 2.4) < 1e-6 && p.stroke === 'ink1');
     const farThighIdx = (prims) =>
       prims.findIndex((p) => p.kind === 'bone' && p.color === 'textLow' && Math.abs(p.w - BODY.lw * 1.18) < 1e-6);
+    const nearShinIdx = (prims) =>
+      prims.findIndex((p) => p.kind === 'bone' && p.color === 'textHi' && Math.abs(p.w - BODY.lw * 0.9) < 1e-6);
 
-    // On Barbell Hack Squat (barAt: 'behind'), the far plate is painted in groups.behind, strictly before the far thigh.
+    // On Barbell Hack Squat (barAt: 'behind'), the far plate and the shaft between the hands are painted in groups.behind, before the legs.
     expect(farPlateIdx(hackPrims)).toBeGreaterThanOrEqual(0);
     expect(farThighIdx(hackPrims)).toBeGreaterThan(farPlateIdx(hackPrims));
+
+    const minHandX = Math.min(hackFig.hold.near[0], hackFig.hold.far[0]);
+    const maxHandX = Math.max(hackFig.hold.near[0], hackFig.hold.far[0]);
+    const barBetweenHandsAfterNearShin = hackPrims.slice(nearShinIdx(hackPrims) + 1).filter(
+      (p) =>
+        p.kind === 'bone' &&
+        Math.abs(p.w - 1.6) < 1e-6 &&
+        Math.min(p.x1, p.x2) < maxHandX - 1e-6 &&
+        Math.max(p.x1, p.x2) > minHandX + 1e-6,
+    );
+    expect(barBetweenHandsAfterNearShin).toHaveLength(0);
 
     // On Competition Squat (barAt omitted), the far plate is painted in the far implement group, after the far thigh.
     expect(farPlateIdx(compPrims)).toBeGreaterThan(farThighIdx(compPrims));
@@ -201,6 +215,41 @@ describe('MOV-A02 universal invariants across all 8 other squats', () => {
 });
 
 describe('MOV-A02 per-movement source-bound biomechanics', () => {
+  const expectPaintedBenchContact = (entry) => {
+    const bottomFrame = entry.frames.find((f) => f.joints.ph === 1);
+    const bottomPrims = layoutCanonicalFigure(bottomFrame.joints, { ...entry, body: BODY });
+    const benchSlab = bottomPrims.find((p) => p.kind === 'bone' && p.color === 'textMid' && Math.abs(p.w - 4) < 1e-6);
+    expect(benchSlab).toBeDefined();
+    const benchTopY = Math.min(benchSlab.y1, benchSlab.y2) - benchSlab.w / 2;
+    const benchMinX = Math.min(benchSlab.x1, benchSlab.x2);
+    const benchMaxX = Math.max(benchSlab.x1, benchSlab.x2);
+
+    const nearThigh = bottomPrims.find((p) => p.kind === 'bone' && p.color === 'textHi' && Math.abs(p.w - BODY.lw * 1.18) < 1e-6);
+    const farThigh = bottomPrims.find((p) => p.kind === 'bone' && p.color === 'textLow' && Math.abs(p.w - BODY.lw * 1.18) < 1e-6);
+    expect(nearThigh).toBeDefined();
+    expect(farThigh).toBeDefined();
+
+    for (const thigh of [nearThigh, farThigh]) {
+      expect(thigh.x1).toBeGreaterThanOrEqual(benchMinX);
+      expect(thigh.x1).toBeLessThanOrEqual(benchMaxX);
+      const hipUndersideY = thigh.y1 + thigh.w / 2;
+      const thighUndersideY = Math.max(thigh.y1, thigh.y2) + thigh.w / 2;
+      const tBenchEdge = (benchMaxX - thigh.x1) / (thigh.x2 - thigh.x1);
+      const thighAtBenchEdgeUndersideY = thigh.y1 + (thigh.y2 - thigh.y1) * tBenchEdge + thigh.w / 2;
+
+      const hipGap = benchTopY - hipUndersideY;
+      const thighGap = benchTopY - thighUndersideY;
+      const thighEdgeGap = benchTopY - thighAtBenchEdgeUndersideY;
+
+      expect(hipGap).toBeGreaterThanOrEqual(0);
+      expect(hipGap).toBeLessThanOrEqual(0.5);
+      expect(thighGap).toBeGreaterThanOrEqual(0);
+      expect(thighGap).toBeLessThanOrEqual(0.5);
+      expect(thighEdgeGap).toBeGreaterThanOrEqual(0);
+      expect(thighEdgeGap).toBeLessThanOrEqual(0.5);
+    }
+  };
+
   test('140 Barbell Squat To A Bench: bar on upper back, bench behind, hips lightly touch bench and stand without resting', () => {
     const row = rowFor(140);
     expect(row.source.instructions).toContain('until you lightly touch the bench');
@@ -210,8 +259,8 @@ describe('MOV-A02 per-movement source-bound biomechanics', () => {
     const boxEntry = entryFor(38);
     const bottom = chainGeometry('barbell-squat-to-a-bench', 1, BODY);
 
-    // Hips lightly touch the bench top (y = 22) at the bottom.
-    expect(Math.abs(bottom.world.hip[1] - 22)).toBeLessThanOrEqual(1.2);
+    // Painted underside of the hips and thighs lightly touches the painted bench top (gap within 0.5 units, no penetration).
+    expectPaintedBenchContact(entry);
     expect(bottom.world.hip[0]).toBeLessThanOrEqual(-12);
 
     // Bar sits across the upper back at every phase.
@@ -244,8 +293,8 @@ describe('MOV-A02 per-movement source-bound biomechanics', () => {
       expect(fig.world.near.wrist[1]).toBeLessThanOrEqual(fig.world.hip[1] + 0.5);
     }
 
-    // Hips lightly touch the bench top (y = 22) and reverse immediately (single ph=1 turnaround frame).
-    expect(Math.abs(bottom.world.hip[1] - 22)).toBeLessThanOrEqual(1.2);
+    // Painted underside of the hips and thighs lightly touches the painted bench top (gap within 0.5 units, no penetration) and reverses immediately.
+    expectPaintedBenchContact(entry);
     expect(entry.frames.filter((f) => f.joints.ph === 1)).toHaveLength(1);
   });
 
@@ -302,6 +351,23 @@ describe('MOV-A02 per-movement source-bound biomechanics', () => {
       const plateBottom = Math.max(plate.y1, plate.y2) + plate.w / 2;
       expect(plateBottom).toBeCloseTo(FLOOR, 5);
     }
+
+    // At the start pose (ph=0), no bar primitive between the hands is painted after the near shin.
+    const nearShinIdx = floorPrims.findIndex(
+      (p) => p.kind === 'bone' && p.color === 'textHi' && Math.abs(p.w - BODY.lw * 0.9) < 1e-6,
+    );
+    expect(nearShinIdx).toBeGreaterThanOrEqual(0);
+    const minHandX = Math.min(floor.hold.near[0], floor.hold.far[0]);
+    const maxHandX = Math.max(floor.hold.near[0], floor.hold.far[0]);
+    const barBetweenHandsAfterNearShin = floorPrims.slice(nearShinIdx + 1).filter(
+      (p) =>
+        p.kind === 'bone' &&
+        Math.abs(p.w - 1.6) < 1e-6 &&
+        Math.min(p.x1, p.x2) < maxHandX - 1e-6 &&
+        Math.max(p.x1, p.x2) > minHandX + 1e-6,
+    );
+    expect(barBetweenHandsAfterNearShin).toHaveLength(0);
+
     expect(dist3(floor.world.near.wrist, floor.world.near.hold)).toBeLessThan(1e-6);
     expect(dist3(floor.world.far.wrist, floor.world.far.hold)).toBeLessThan(1e-6);
     expect(elbowAngleDeg(floor.world.near)).toBeCloseTo(180, 5);
