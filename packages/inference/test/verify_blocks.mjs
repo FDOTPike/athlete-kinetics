@@ -497,6 +497,15 @@ check('non-positive load, zero reps and non-finite inputs yield no estimate',
   && estimateOneRepMax(100, 5, Number.NaN) === null);
 check('an RPE outside the set_record CHECK domain yields no estimate',
   estimateOneRepMax(100, 5, -1) === null && estimateOneRepMax(100, 5, 11) === null);
+// Owner effort floor (E1RM_RPE_FLOOR_2026-10-15.md): strictly below RPE 6 yields no estimate.
+check('a set at RPE 5.5 (below the 6.0 floor) yields no estimate',
+  estimateOneRepMax(100, 5, 5.5) === null
+  && estimateOneRepMax(100, 5, 5.9) === null
+  && estimateOneRepMax(100, 5, 5.99) === null
+  && estimateOneRepMax(100, 5, 0) === null);
+check('a set at RPE 6.0 (at the floor) yields an estimate',
+  estimateOneRepMax(100, 5, 6.0) !== null
+  && Math.abs(estimateOneRepMax(100, 5, 6.0) - 100 / targetPct(5, 6.0)) < 1e-9);
 
 const mkSet = (set_id, session_id, session_date, reps, load_kg, rpe) => ({
   set_id, session_id, session_date, reps, load_kg, rpe });
@@ -522,6 +531,21 @@ check('bestPerSession is order-independent and does not mutate its input',
     mkSet(2, 10, '2026-07-01', 3, 110, 8),
   ])));
 check('bestPerSession of no sets is an empty series', bestPerSession([]).length === 0);
+check('a session whose only sets are below RPE 6 produces no point from bestPerSession',
+  bestPerSession([
+    mkSet(1, 40, '2026-07-04', 5, 120, 5.5),
+    mkSet(2, 40, '2026-07-04', 5, 130, 5.0),
+  ]).length === 0);
+const mixedFloorSession = bestPerSession([
+  mkSet(1, 50, '2026-07-05', 5, 140, 5.5),
+  mkSet(2, 50, '2026-07-05', 5, 100, 6.0),
+]);
+check('a session with a set below 6 and a set at 6 or above takes its point from the latter only',
+  mixedFloorSession.length === 1
+  && mixedFloorSession[0].session_id === 50
+  && mixedFloorSession[0].set_id === 2
+  && Math.abs(mixedFloorSession[0].e1rm_kg - 100 / targetPct(5, 6.0)) < 1e-9,
+  JSON.stringify(mixedFloorSession));
 
 // Numerical calibration is DEFERRED (Calibration Policy v1 section 5). This module
 // must expose the two derivations and NOTHING else — no MDC, no noise floor, no

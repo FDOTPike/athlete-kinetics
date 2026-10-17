@@ -12382,6 +12382,257 @@ master from origin. I'll decide later how to renumber and carry those entries.
 
 ---
 
+## Entry 0197 — 2026-10-08 · Owner decisions on merging pull request 43, the held pull requests and the remaining hand-over items (Claude Code Desktop)
+
+2026-10-08 (local date; 2026-10-07 UTC). Executor: Claude Code Desktop. Worktree `.claude/worktrees/master-takeover-2026-10-07`, branch `claude/master-followup-2026-10-08`, cut from the pull request 43 head `02e775f` so that this entry does not move that head while its CI is running.
+
+> **Ledger numbering note.** Entries 0193 and 0194 are on the pull request 43 branch. The primary checkout's `PROMPT_LEDGER.md` holds uncommitted entries written by other sessions after its `master` was updated, numbered 0193 (movement order, which clashes with the 0193 above), 0195 and 0196 (Triage Lab). This entry was first written as 0196 and renumbered to 0197 on 2026-10-09, before any push, when the other 0196 appeared. Those uncommitted entries were not touched.
+
+### Input
+
+Received verbatim; the pasted text was the whole message.
+
+```text
+Merging and next steps, decided by the owner:
+
+1. PR #43 (UI tests: confirm keyboard focus). Merge it with a merge commit once ALL
+   CI on its current head is green, including the iOS UI-test step. Before merging,
+   check that test4 passed and report any FOCUS-RETRY lines.
+   - If test4 fails again: do not loosen the test. Download the run's ui-tests
+     artifact, read test4's log around the password field, find the actual cause,
+     and fix it on the same branch.
+   - After merging, confirm that the master run for the merge commit is also green.
+     The b99d0cb lesson: check the master run itself, not only the PR head.
+
+2. Do NOT merge any other open PR. Being green is not enough:
+   - #29, #34–#37, #40–#42 are movement-lane drafts. Hold them: all movements are
+     still "pending", with no technique review from rendered images.
+     - Do not push, rebase, retarget, undraft or merge them, and do not enable
+       previews.
+     - The CodeRabbit findings marked actionable on #34, #36 and #37 go to the movement
+       lane as a further stacked branch, not as pushes to those PRs.
+   - #28 is a draft with a red iOS job. Leave it; it is the owner's and the movement
+     lane's call. Its base branch claude/release-integration was reset to master+#39
+     after #26 merged; mention this in your report, change nothing.
+   - #21 is a draft with merge conflicts. Leave it; report what it would need.
+   - #7 targets codex/program-quality-remediation, which is already fully in master,
+     so merging it would not reach master. Leave it; report whether retargeting it
+     to master would be clean.
+
+3. Then continue with the remaining hand-over items:
+   - Issue #38: watch for the tester's UI-test report from her Mac. When it arrives,
+     verify its claims against CI and the code, fix real defects on a branch + PR, and
+     reply on the issue. Refer to her as "the tester (forgeaura)" in anything committed.
+   - Local checkout: commit my uncommitted AGENT_WORKFLOW.md / PROMPT_LEDGER.md edits
+     to a branch named local-ledger-0023-0028 (do not push it), then update local
+     master from origin.
+   - Owner-gated items (TestFlight, physical-device checks, the owner decisions list):
+     no action. Keep them in your final report.
+
+Report at the end:
+- what you merged, with the merge commit and master CI result;
+- what you left, and why;
+- anything new you found.
+```
+
+### Output
+
+- **Merged.** Pull request 43, with a merge commit: `637ecd6` (2026-10-09T01:45Z). CI on its head `02e775f` was green on the second attempt of run 37603984164: verification suite, Android and iOS jobs all passed, and all five UI tests passed, `test4_backupToFilesAndRestore` among them. No `FOCUS-RETRY` line was printed in either attempt.
+- **First attempt.** The iOS job failed on `test1_onboardingNavigationAndAccessibility`: Apple's accessibility audit on the Ready screen returned "Audit failed to complete in time" (code -56). `test1` types no text, so it does not run the changed code; the message is in none of the 14 earlier runs checked. Only the failed job was re-run, on the same head. The pull request carries a comment recording both attempts. The audit timeout was not addressed.
+- **Master run for the merge commit.** Run 37871312204 on `637ecd6` was in progress when this entry was written; its result is not known here.
+- **Left unmerged, nothing changed.** Movement drafts 29, 34-37 and 40-42, and the later movement pull requests. Pull request 28: its base `claude/release-integration` is at `a3483a2` (master without the #39 merge commit); its head is 3 commits ahead of and 21 behind that base; its last iOS job is red. Pull request 21: conflicts in `PROMPT_LEDGER.md` and `apps/mobile/src/screens/SessionScreen.tsx`, against its base and against master; 9 commits, 22 files. Pull request 7: a trial merge into master has no conflicts; 23 commits, 10 new files under `docs/research/biometric-rpe/`, no source changes; its last CI run predates the iOS job.
+- **Issue #38.** No new report from the tester (forgeaura). Nothing posted.
+- **Local checkout.** Done under Entry 0194: branch `local-ledger-0023-0028` (`52221e7`, not pushed) and local `master` fast-forwarded. Since then other sessions have added uncommitted ledger entries to the primary checkout (see the numbering note); they were left as found.
+- **Owner-gated items.** No action on TestFlight, the physical-device checks or the owner decisions list.
+
+---
+
+## Entry 0198 — 2026-10-09 · Assess an outside architectural review against the code; effort for its recommendations; use of CodeRabbit (Claude Code Desktop)
+
+2026-10-09. Executor: Claude Code Desktop. Same worktree and branch as Entry 0197.
+
+### Input
+
+Two messages, received verbatim. The first:
+
+```text
+Could you please see deep minds review
+Please assess the code base and provide a report on how truthful its statements are, how much work it would take too do, can we utilize code rabbit? im signing up to code rabbits advance tier ,  utilize it
+```
+
+The second, sent after the review could not be found on disk, was "sorry here it is" followed by the pasted review:
+
+```text
+Although you pasted the raw binary content of a ZIP or TAR archive encoded as plain text (which scrambles the actual code), the file paths and directory structure have been preserved perfectly.
+
+By analyzing the file names, module organization, and document titles, I can deduce the system design and provide a comprehensive Architectural Review of the Athlete Kinetics application.
+
+Here is an analysis of your system's architecture, its strengths, and potential areas for improvement.
+
+1. High-Level System Architecture
+The application utilizes a Monorepo structure (likely Yarn workspaces or npm workspaces), cleanly separating the React Native presentation layer from the core business, data, and machine learning logic.
+
+* `apps/mobile/`: The React Native frontend application.
+
+* `packages/core-db/`: The local database schema, migrations, and persistence layer.
+
+* `packages/inference/`: The on-device Machine Learning (ML) and algorithmic rules engine.
+
+* `packages/biometrics/`: The hardware/OS integration layer for health data.
+
+Key Architectural Paradigm: The application is strictly Local-First and Offline-Capable. By placing the database and ML inference directly on the device, the app ensures rapid UI responses, functions without an internet connection, and guarantees absolute data privacy for sensitive health metrics.
+
+2. Module Breakdown & Review
+A. The "Brain": On-Device Inference (`packages/inference`)
+This is the most sophisticated and impressive component of the architecture. Instead of relying on a cloud backend to generate workouts, the app computes everything on the edge.
+
+* Kinematic Autopilot: Files like `kinematicAutopilot.ts`, `progressionEngine.ts`, `loadSelection.ts`, and `routineComposer.ts` represent a complex expert system. It dynamically auto-regulates athlete training, manages periodization, and calculates metrics like e1RM (Estimated 1-Rep Max).
+
+* On-Device NLP & ML: The `src/semantic/` directory contains `onnxEmbedder.ts`, `wordpiece.ts`, and `cosine.ts`, and relies on the `minilm` tokenizer. This proves you are running an ONNX model (likely a quantized MiniLM sentence transformer) directly on the phone. This is used for semantic search (e.g., finding alternative exercises based on intent, or processing natural language coaching cues) entirely offline.
+
+B. Persistence Layer (`packages/core-db`)
+This is a heavily relational local database (SQLite).
+
+* Schema Design: You have 69 sequential SQL migration files (`001_mechanical_input.sql` to `069_resting_heart_rate.sql`). The schema tracks highly specific domain concepts like `telemetry`, `niggle_tracking` (injuries), `suspension_episode`, and `periodization`.
+
+* Secure Backups: Because the app has no cloud backend, device loss means data loss. The presence of `backupCrypto.ts`, `backupStore.ts`, and `canonicalJson.ts` shows a well-architected, encrypted backup and restore mechanism allowing users to securely port their data.
+
+C. Biometrics Integration (`packages/biometrics`)
+
+* You have abstracted OS-level health layers (`appleHealth.ts` and `healthConnect.ts`) behind a unified `platformBridge.ts`. This decoupling ensures your inference engine doesn't need to care whether the user is on iOS or Android; it just consumes standardized physiological data.
+
+D. Frontend & State Management (`apps/mobile`)
+
+* Component Architecture: You use a component-driven design with a robust library of UI primitives in `src/components/ui/` (`Sheet`, `Chip`, `Stepper`, `PrimaryButton`), separated from complex domain views (`FocusGoalsPanel`, `RoutineTemplateBuilder`).
+
+* State Management: The `src/state/` directory is partitioned by domain (`sportStore.ts`, `focusGoalStore.ts`, `todayState.ts`). The naming convention (`useStore.ts`) strongly suggests you are using a lightweight, hook-based state manager like Zustand.
+
+3. Multi-Agent Development Workflow
+The repository contains a massive amount of AI-driven documentation: `HANDOVER_*.md`, `WO_*.md`, `AUDIT_*.md`, and `PROMPT_LEDGER.md`.
+
+* Observation: You are using a highly structured, multi-agent AI framework (referencing LLMs like Opus, Claude, Gemini, DeepSeek, and an orchestrator named "Sol") to architect, audit, and write code.
+
+* Tooling: You have built custom tools to support these agents, such as `tools/autopilot-sim/` (to mathematically simulate and verify the AI coach's training progressions) and `tools/memory-audit/` (to ensure the agents aren't writing code that causes memory leaks).
+
+4. Actionable Recommendations & Risks
+While the architecture is exceptional, there are a few technical debts and risks you should address before a production release:
+
+1. Migration Squashing (`core-db`)
+With 69 SQL migrations, app startup time for new users will be delayed as the SQLite engine sequentially executes every script. Furthermore, files like `037_movement_library_v2_batch.sql` through `048` indicate that you are mixing data seeding/patching with structural migrations.
+
+   * Recommendation: Squash these migrations. Consolidating the 69 files into a single `schema_v1_baseline.sql` will drastically reduce the app's initialization overhead on fresh installs.
+
+2. ONNX Memory & Threading (`inference`)
+Running MiniLM and complex progression math on-device is incredibly CPU/RAM intensive.
+
+   * Recommendation: Ensure you are utilizing hardware acceleration (CoreML on iOS / NNAPI on Android) via your ONNX runtime. Furthermore, ensure these ML tasks and SQLite queries are executed using JSI (JavaScript Interface) bindings or pushed to background native threads. If executed in the standard React Native JS thread, the UI will stutter and freeze during workout generation.
+
+3. Repository Bloat (Agent Logs)
+Storing thousands of conversational logs, work orders, and handovers (`docs/audits/`, `.agents/`) in the main application repository will eventually cause massive Git history bloat and slow down IDE search indexing.
+
+   * Recommendation: Move the `.agents/` folder and all `HANDOVER/AUDIT/WO` markdown files into a separate `athlete-kinetics-docs` repository, or add them to `.gitignore` to keep the main codebase lightweight for CI/CD pipelines.
+```
+
+### Output
+
+No source, schema, gate or configuration file was changed. Every figure below was read or measured on `origin/master` at `637ecd6` on 2026-10-09.
+
+- **What the review could see.** By its own first sentence it read file paths only, not file contents. Its statements about names and layout are mostly right; its statements about behaviour, cost and risk are inferences and several are wrong.
+- **Right.** npm workspaces with `apps/mobile` and `packages/{core-db,inference,biometrics}`; every file it names exists; SQLite through op-sqlite; Zustand; the int8 MiniLM ONNX model run on the device; encrypted backup and restore; offline operation.
+- **Wrong or overstated.**
+  - "69 sequential migrations": 69 `.sql` files, 68 migrations. `004` is the daily upsert the data layer runs, not a migration; the chain's order is the array in `migrations.ts`, and `user_version` reaches 68.
+  - The embedder is not used to find alternative exercises or to process coaching cues. Its one runtime call embeds the athlete's free-text report so it can be matched to the phrase codebase (`apps/mobile/src/state/useStore.ts`). The autopilot, progression, load selection and routine composer do not call it.
+  - `telemetry`, `niggle_tracking` and `periodization` are schema file names, not tables.
+  - "Sol" is the builder in `AGENT_WORKFLOW.md`, not an orchestrator.
+  - `tools/memory-audit` is a RAM budget gate against a ratified ceiling, not a leak detector.
+  - "Thousands of conversational logs": master tracks 854 files, 229 of them Markdown (195 under `docs/`, 102 under `docs/audits/`, 26 root hand-overs). `.agents/` holds one rules file.
+- **Recommendation 1, squash migrations.** A fresh chain (68 entries, 925 KB of SQL, 119 tables, 300 movements) took a median 86 ms over seven runs on this workstation with `node:sqlite`, one transaction per migration as the runner does. Not measured on a phone. Squashing would break the append-only rule, the frozen shipped bytes and the array ordinals, and the full chain would have to stay for installed builds and for self-heal. Assessed as not worth doing; a device timing in the native smoke check would settle the startup question.
+- **Recommendation 2, hardware acceleration and threading.** The session is created with default options, so inference runs on the CPU provider; no CoreML or NNAPI is configured. op-sqlite and onnxruntime-react-native are already JSI modules, and `session.run` is asynchronous. Workout generation does not use the model. Embedding latency on a device was not found in the repository and was not measured here. A different execution provider would need the workstation-parity gate re-proved.
+- **Recommendation 3, move or ignore the documents.** The tracked tree is 29.3 MB, of which `docs/` is 3.6 MB and `PROMPT_LEDGER.md` 0.8 MB. Blobs reachable from master total about 11 MB compressed (`docs/` 1.6 MB); the other remote branches add about 13.5 MB, of which 8.2 MB is PNG evidence. Ignoring the files would take hash-pinned evidence out of version control. Assessed as not worth doing. The real cost seen in this session is the single ledger file: it conflicts between branches and its entry numbers clash between sessions.
+- **CodeRabbit.** No CodeRabbit configuration file is tracked; the pull-request reviews run from the repository settings. It reviews pull-request differences, not a whole repository. The command-line tool is not installed here. Plan names, prices and file limits were taken from third-party pages that disagree with one another and were not confirmed on the vendor's own pricing page.
+
+---
+
+## Entry 0199 — 2026-10-09 · First CodeRabbit command-line review, on the ledger branch (Claude Code Desktop)
+
+2026-10-09. Executor: Claude Code Desktop. Same worktree and branch as Entry 0197.
+
+### Input
+
+Received verbatim, in reply to an offer to try the newly installed CodeRabbit command-line tool on this branch:
+
+```text
+yes try it on the ledger branch
+```
+
+### Output
+
+- `coderabbit review --committed --base origin/master --agent` (CLI 0.9.0), run in this worktree on `claude/master-followup-2026-10-08`: exit 0, review completed, 1 file reviewed (`PROMPT_LEDGER.md`), 0 findings.
+- The run reported that promotional review credits were added to the account; no paid continuation was requested (`--use-credits` was not passed).
+- No file other than this entry changed. Not pushed.
+
+---
+
+## Entry 0200 — 2026-10-09 · Write a CodeRabbit configuration file for the review procedure (Claude Code Desktop)
+
+2026-10-09. Executor: Claude Code Desktop. Ledger entry on `claude/master-followup-2026-10-08`; the configuration file itself is on its own branch, `claude/coderabbit-config-2026-10-09`, cut from `origin/master` at `637ecd6`, so that the one-file change can be reviewed apart from the ledger.
+
+### Input
+
+Received verbatim:
+
+```text
+are you able to have a read through https://docs.coderabbit.ai/getting-started/yaml-configuration
+And github repo, please write code rabbit config file for review procedure
+```
+
+### Output
+
+- **Read.** CodeRabbit's documentation: the YAML configuration page named in the prompt, the configuration reference (every key), and the pages on path instructions, pre-merge checks, configuration inheritance and code guidelines. In the repository: `AGENT_WORKFLOW.md`, `.agents/rules/coding-rules-general.md`, the CI workflow, the layout of `apps/`, `packages/`, `docs/` and `acceptance-evidence/`, and CodeRabbit's own past output here (123 inline findings across 19 pull requests, and its walkthrough comments on pull requests 34, 43 and 60).
+- **Written.** `.coderabbit.yaml` (304 lines) on `claude/coderabbit-config-2026-10-09`, commit `453e351`, cut from `origin/master` at `637ecd6`. One file; nothing else changed. Pushed and opened as pull request 62 against `master`, on this session's own decision: the hand-over rules of Entry 0193 say new work goes on a branch and a pull request, and the owner told the movement lane the same day to finish and merge without waiting to be asked (applying that here is this session's reading, not the owner's words). It is to be merged only when CI is fully green on its head and the review has no open finding.
+- **What it sets.** Inheritance from the dashboard for everything it does not name; reviews against any base branch (pull requests not based on `master` had needed one to six manual review comments each), drafts still on request; three generated-file exclusions; 18 sets of instructions by area; four pass/fail checks in warning mode (frozen migration chain, no skipped or weakened tests, offline runtime, dated records append-only); the docstring coverage check off; `AGENT_WORKFLOW.md` and the coding rules loaded as guidelines.
+- **Checks run.**
+  - `coderabbit config validate .coderabbit.yaml` (CLI 0.9.0): valid against the current schema, exit 0. Negative controls on copies outside the repository: a wrong enum value was rejected (exit 1); a misspelled key was accepted (exit 0), so that command does not catch unknown keys.
+  - Key-by-key comparison with the published schema (`schema.v2.json`), by a script: 30 distinct key paths, no unknown key, no over-length string, no bad enum value. The same script reported the misspelled key in the control copy.
+  - Every path pattern run with minimatch against the file lists of `origin/master` and the newest movement branch (1,795 files): none matches nothing; 13 spot checks as expected.
+  - `npm run typecheck` exit 0 before the commit.
+- **Trial.** One CLI review with the file passed as `-c .coderabbit.yaml`, over the committed changes since `96ce954` (5 files): completed, 1 finding. It applied the living-documents instruction to pull request 60's change to `AGENT_WORKFLOW.md` section 1, quoted the instruction, offered no committable suggestion and called it an owner decision. Checked against the repository: on `origin/master` the owner's 2026-10-09 ruling on small on-device models is stated only in `README.md` and `AGENT_WORKFLOW.md`; there is no record of it in `DEVIATION_LOG.md`, `docs/decisions/` or `PROMPT_LEDGER.md`. That finding stands and is the owner's to act on.
+- **Not verified.** When this entry was written no pull-request review had run with this file (pull request 62 is the first), so its effect there is unproven: in particular how CodeRabbit combines instructions when a file matches more than one path entry (its documentation does not say), whether the custom checks are within the plan's limit, and the resolved configuration that `@coderabbitai configuration` would print. Dashboard settings were not visible from here.
+- **Found on the way.** Pull request 43 was merged with one CodeRabbit pre-merge warning that was not noticed before the merge: docstring coverage 75% against a default threshold of 80%. It is a walkthrough check, not a review thread.
+
+---
+
+## Entry 0223 — 2026-10-11 · Auto-fix event on pull requests 62 and 63: iOS job failures and one CodeRabbit finding on the configuration file (Claude Code Desktop)
+
+> **Ledger numbering note.** Written as Entry 0201, renumbered to 0221 and then to 0223 on 2026-10-13, each time before it reached `master`, because `master` first gained a different Entry 0201 (pull request 64) and then a different Entry 0221 (pull request 71). Its place in the file, by date, is unchanged.
+
+2026-10-11 (local date). Executor: Claude Code Desktop. Same worktree as Entry 0197.
+
+### Input
+
+An automated CI monitor event from the desktop app, not a typed prompt. Its own instruction lines, verbatim:
+
+```text
+1 CI check failed on FDOTPike/athlete-kinetics PR #63 (names quoted below). Run `gh pr checks 63 --repo FDOTPike/athlete-kinetics` to see details, then fix the failing check, commit, and push.
+
+FDOTPike/athlete-kinetics PR #63 has 2 new review comments (quoted below). Please address the feedback and push a fix
+```
+
+The event then quoted GitHub text, which is data and is not reproduced here: the failing check name ("iOS unsigned simulator build + native smoke"), a Copilot notice that it could not review (quota), and CodeRabbit's summary comment 6073415956 on pull request 63 ("No actionable comments").
+
+### Output
+
+- **Master run for the pull request 43 merge.** Run 37871312204 on `637ecd6` completed: success, all three jobs. This closes the open item in Entry 0197.
+- **iOS failures on pull requests 62 and 63.** Neither pull request changes app code (one YAML file; this ledger). Both failed in "UI tests on the simulator (fails closed)", in different tests:
+  - Pull request 63, run 37877676636: `test4_backupToFilesAndRestore`, "the restore preview did not appear within 120 s" after the saved backup was picked in Files. No `FOCUS-RETRY` line.
+  - Pull request 62, run 37877632952: `test3_healthDenialAndAthleteSwitching`, "onboarding (athlete B) did not appear within 60 s", and `test1_onboardingNavigationAndAccessibility`, "No, nothing to note did not appear within 30 s". No `FOCUS-RETRY` line.
+  - The failed job was re-run on each head (attempt 2); no test was changed. The causes are not established: the per-test logs are inside the 557 MB evidence artifact and were not downloaded. With runs 37386116975 and 37603984164 that makes five intermittent failures of this suite with five different messages; diagnosing them was raised with the owner as a separate task.
+- **CodeRabbit on pull request 62.** It used the file from the branch ("Repository YAML (base), Repository UI (inherited)", plan Advanced). All eight pre-merge checks passed, the four custom checks among them, so four custom checks are within the plan. It posted one finding, on the file itself: the "Frozen migration chain" check would fail on a change to `004_state_vector_materialize.sql`, which is the daily upsert and not a migration. Verified against `migrations.ts`, fixed in `884bd5c` (the check exempts `004_*.sql`; the path instruction says it is not frozen), replied to and resolved. The file was re-validated, its keys and path patterns re-checked, and `npm run typecheck` exit 0.
+- **CodeRabbit on pull request 63.** No actionable comments. That review ran from the dashboard settings, because this branch does not contain the configuration file.
+- **Not done.** Neither pull request is merged; both wait for CI on their current heads.
+
+---
+
 ## Entry 0202 — 2026-10-11 · iOS UI test job: establish the cause of each intermittent failure from the run evidence and fix what it supports (Claude Code Desktop)
 
 2026-10-11. Executor: Claude Code Desktop. Worktree cut from `origin/master` (`45b7ec12`), branch `claude/ios-ui-test-flakes-2026-10-11`. Entries 0195 to 0201 are in use on other branches and open pull requests, so this entry takes 0202.
@@ -12641,3 +12892,150 @@ merge it when CI is green and please comment on the issue for her Opus to check 
 - **Issue #38.** Comment 6126319720 ends the pause for one run. It gives the tester's agent the merge commit to check out, the same build and UI-test steps as before, what is expected on a simulator (the silent backup steps, the Apple Health markers), and the report format. It says why the tester's Mac still adds something (Xcode 27 with the iOS 26.5 runtime; CI's Xcode 27 row uses iOS 27.0), and asks the agent to stop after posting one report.
 - **This branch.** Doc comments for the functions pull request 64 touched that had none: `application(_:didFinishLaunchingWithOptions:)` and `scene(_:willConnectTo:options:)` in `AppDelegate.swift`; `onMyIPhone`, `saveInFiles` and `pickBackupInFiles` in the UI test suite; `connectBiometrics` in `useStore.ts`. Comments only; no statement was changed. `npm run typecheck` and `npm run verify:native-config` exit 0 on this PC (Node v24.11.1). The Swift files are compiled by CI.
 - **Not verified.** Whether the app runs in the Simulator on the tester's Mac: no report had arrived when this was written.
+
+---
+
+## Entry 0220 — 2026-10-12 · Auto-fix event on pull request 63: merge conflict with master; pull request 62 merged (Claude Code Desktop)
+
+2026-10-12 (local date). Executor: Claude Code Desktop. Same worktree as Entry 0197.
+
+> **Ledger numbering note.** `master` holds Entries 0202 and 0203. The primary checkout holds uncommitted entries from other sessions numbered up to 0219, some of which reuse 0202 and 0203. This entry takes 0220 to stay clear of all of them. Those uncommitted entries were not touched.
+
+### Input
+
+An automated CI monitor event from the desktop app, not a typed prompt. Its instruction, verbatim in part:
+
+```text
+FDOTPike/athlete-kinetics PR #63 has merge conflicts with its base branch `master` (GitHub's verdict for head commit 7fa83fe691). Resolve them now, without asking first: fetch `master` from the remote that points at `FDOTPike/athlete-kinetics` [...] and merge the ref you just fetched [...] into this branch — never rebase or force-push [...]; resolve each conflict by keeping the intent of both sides, run the project's checks for the files you touched, commit, and push.
+```
+
+### Output
+
+- **Conflict.** `master` (`fe3ad2d`, after pull request 69) had appended Entries 0202 and 0203 to `PROMPT_LEDGER.md` at the point where this branch appended 0197 to 0200 and the entry now numbered 0223. Only that file conflicted.
+- **Resolution.** `origin/master` merged in (merge commit `c5d55ce`), no rebase. The file is the common base text, then this branch's entries, then master's, which is number order. Checked byte for byte: both versions start with the base text, and each side's appended text is present intact in the result. `npm run typecheck` exit 0 on the merged tree. Pushed.
+- **Pull request 62 merged.** With a merge commit, `bf77f64` (2026-10-12T11:31Z). On its head `884bd5c`: verification suite, Android and iOS jobs all green; no open review thread; CodeRabbit's eight pre-merge checks passed. `.coderabbit.yaml` is now on `master`, so it applies to branches cut from here on. The master run for that merge commit had not finished when this entry was written.
+- **Not done.** Pull request 63 is not merged; it waits for CI on its new head.
+
+---
+
+## Entry 0222 — 2026-10-13 · Auto-fix event on pull request 63: a second merge conflict with master (Claude Code Desktop)
+
+2026-10-13 (local date). Executor: Claude Code Desktop. Same worktree as Entry 0197.
+
+### Input
+
+An automated CI monitor event from the desktop app, not a typed prompt: the same instruction as in Entry 0220, for head commit `ff7f725f17` ("PR #63 has merge conflicts with its base branch `master` [...] Resolve them now, without asking first").
+
+### Output
+
+- **Conflict.** `master` (`cc6e9ea`, after pull requests 70 and 64) had appended two more ledger entries, 0201 (issue #38, the tester's Xcode 27 report) and 0204. Only `PROMPT_LEDGER.md` conflicted.
+- **Number clash.** This branch already had an Entry 0201 of its own. It had not reached `master`, so it was renumbered to 0221 (and later to 0223, see Entry 0224) and carries a note saying so; its text and its place in the file are otherwise unchanged. The one reference to it in Entry 0220 was updated.
+- **Resolution.** `origin/master` merged in, no rebase. Master's two new entries were placed after 0203, as they are on `master`, and before Entry 0220. Checked: master's appended text is present intact; no conflict marker remains; no entry number on this branch duplicates one on `master`.
+- **Master runs.** The run for the pull request 62 merge commit `bf77f64` completed: success. The run for `2da2801` (pull request 70, not this session's) completed with a failure and was not investigated here. The run for `cc6e9ea` was in progress.
+- **Not done.** Pull request 63 is not merged; it waits for CI on its new head.
+
+---
+
+## Entry 0224 — 2026-10-13 · Third merge conflict on pull request 63; the owner says to finish merging (Claude Code Desktop)
+
+2026-10-13 (local date). Executor: Claude Code Desktop. Same worktree as Entry 0197.
+
+### Input
+
+An automated CI monitor event from the desktop app (the same instruction as in Entry 0220, for head commit `70001bf8d8`), and then, while that was being handled, this message from the owner, verbatim:
+
+```text
+Please finish merging if there no claashes with other PR's
+```
+
+### Output
+
+- **Conflict.** `master` (`836a213`, after pull request 71) had appended one more ledger entry, numbered 0221. Only `PROMPT_LEDGER.md` conflicted.
+- **Number clash.** This branch's entry about pull requests 62 and 63 had been renumbered to 0221 earlier the same day. It had not reached `master`, so it is now 0223, with its note and the two references to it updated.
+- **Resolution.** `origin/master` merged in, no rebase; master's entry sits after 0204 as it does on `master`. A first attempt at the resolution read `FETCH_HEAD` after a later fetch had moved it to this branch's own head, which left master's entry out; that was caught before any commit by checking the headings, and the resolution was redone against `MERGE_HEAD` (confirmed equal to `origin/master`). Checked on the result: master's appended text is present intact, no conflict marker, no duplicate entry number from 0195 up. `npm run typecheck` exit 0.
+- **Clashes with other pull requests.** None found: of the open pull requests that target `master` (72, 73, 74), none changes `PROMPT_LEDGER.md`, the only file this one changes.
+- **Merge.** On the owner's instruction above, pull request 63 is merged once this commit is pushed, without waiting for a full CI run on the final head. What had run: on the earlier head `9554681`, the verification suite and the Android job passed and the iOS job failed in one UI test (Entry 0223); later heads' runs were superseded by these merges. The change is this one Markdown file.
+
+---
+
+## Entry 0225 — 2026-10-15 · Xcode 27 iOS job, test4: did the test tap the wrong Cancel, or does the app open a backup after the Files sheet is cancelled? (Claude Code, cloud session)
+
+2026-10-15. Executor: Claude Code in a cloud session (not the owner's PC). Worktree cut from `origin/master` (`09c1e19`), branch `claude/inspiring-heisenberg-ovfj77`. Numbers up to 0224 are on `origin/master`; the open pull requests (7, 21, 37, 74, 75) carry no entry above 0221, so this entry takes 0225.
+
+### Input
+
+Received verbatim; the text below was the whole message.
+
+```text
+Repository: FDOTPike/athlete-kinetics (public; local checkout at C:\Users\fpike\Documents\Claude Coding\Athlete App; work in a new git worktree cut from origin/master, never in the main checkout). Read AGENT_WORKFLOW.md, .agents/rules/coding-rules-general.md and the memory note on the earlier iOS UI flake investigation (PR 69, ledger Entry 0202) first.
+
+Failure to investigate: CI run 38345092343 (PR #63, head 69dd7d2b, which changes only PROMPT_LEDGER.md), job "iOS unsigned simulator build + native smoke (Xcode 27)", step "UI tests on the simulator (fails closed)". test4_backupToFilesAndRestore failed at apps/mobile/ios/AthleteKineticsUITests/AthleteKineticsUITests.swift:183 with: "status after cancelling the Files sheet did not become 'Restore cancelled. Your data is unchanged.…' within 30 s; it read: Opening encrypted backup…". In the test, this is the step that taps RESTORE ENCRYPTED BACKUP, waits for app.buttons["Cancel"] in the Files sheet, taps it, and expects the status "Restore cancelled. Your data is unchanged.".
+
+The question: on Xcode 27 / the newer iOS runtime, did the test tap a different "Cancel" (or tap before the document picker was the one on screen), or does the app really begin opening a backup after the person cancels the Files sheet? The second would be an app defect in the restore flow (apps/mobile/src/state/backupStore.ts and apps/mobile/src/components/BackupTransferPanel.tsx), not a test problem. Establish which from the run's evidence (the per-test .log, .system.log and .xcresult under ios-evidence/ui-tests in the run's iOS artifact; the PR 69 memory note describes reading CI artifacts by range request instead of a full download, and the owner's rule on artifact downloads). The same Xcode 27 job also failed on runs 38344991834 and 38334844301; check whether those are the same failure. Report a cause the evidence does not establish as NOT VERIFIED.
+
+Fix what the evidence supports on a branch with a pull request against master. Hard rules from the owner: never skip, disable or quarantine a test; never weaken an assertion or widen a timeout without evidence of the failure it answers; no changes to animation or movement-preview code; no model identifiers in commits, PR text or code; the repository is public; run `npm run typecheck` before every commit; review with the CodeRabbit CLI before pushing ("C:\Users\fpike\AppData\Local\Programs\coderabbit\coderabbit.exe" review --committed --base origin/master --agent; never --use-credits); the first file operation appends a verbatim-input entry to PROMPT_LEDGER.md, with a number checked against origin/master and every open pull request (numbers up to 0224 are taken).
+```
+
+### Output
+
+**How the evidence was read, and what could not be.** The run's artifact (`athlete-kinetics-ios-simulator-unsigned-xcode27`, id 11794365453, 248,081,081 B) could not be read in any form. Both routes to it (the REST `artifacts/<id>/zip` redirect and the GitHub connector's download link) point at `productionresultssa19.blob.core.windows.net`. This session's network policy refuses that host (the proxy logged `connect_rejected` for it), so no range request was possible and the per-test `.log`, `.system.log` and `.xcresult` were not read. The memory note on PR 69 lives on the owner's PC and was not available here; Entry 0202 was read in its place. What was read:
+- the check-run annotations through the API, which `tools/ios_ui_annotate.mjs` builds from the per-test log, including the `FAIL-TREE` element inventory printed in `tearDown`;
+- the job logs through the GitHub connector;
+- the app and test source.
+
+**Verdict, run 38345092343 attempt 1 (job 115128575350), test4: not an app defect; the test's Cancel tap did not close the Files sheet. EVIDENCE CAPTURED for the sheet still being open and the app still waiting for the picker. Which element the tap reached, and whether it came before the sheet could take it, NOT VERIFIED.**
+- The `FAIL-TREE` warning, printed straight after the 30 s status wait failed, reads `app{nav[FullDocumentManagerViewControllerNavigationBar] ...` and `cell[pikeMethods-2026-10-13.pmbak, pmbak, 6:34 AM, 2.4 MB]`. The Files sheet, with the saved backup's row, was still in the app's tree.
+- No `files sheet without Cancel` line appears in that warning, so an element named Cancel or Close was found within 30 s and tapped.
+- `apps/mobile/src/state/backupStore.ts:1071` sets "Opening encrypted backup…" before `pickerOpen()` presents the sheet. The status changes only once the picker answers: to "Restore cancelled. Your data is unchanged." on `OPERATION_CANCELED` (line 1076), or to the preview or an error after a file is chosen. A file choice closes the sheet, so with the sheet still up the app was still waiting for the picker and had not begun opening a backup.
+- `BackupTransferPanel.tsx` has no control named Cancel or Close. A search of `apps/mobile/src` for those names finds them only in `RoutineTemplateBuilder.tsx`, `SessionFeelPanel.tsx`, `PreparationPanel.tsx`, `NewBlockChooserScreen.tsx`, `BlockScreen.tsx` and `ProgramSetupScreen.tsx`. The `FAIL-TREE` inventory (first 40 buttons, first 45 texts) holds neither name. Whether an app element carrying either name existed elsewhere in the tree is NOT VERIFIED; the inventory is truncated.
+- Before this change, `filesControl(["Cancel", "Close"])` chose its control at the instant RESTORE had been tapped: a Button of that name if one existed then, otherwise the first element of any type in the app carrying the name. The test tapped it as soon as it existed and never checked that the sheet closed.
+- What the evidence does not settle needs the per-test log's tap record and the result bundle's synthesized-event point:
+  - the element that query resolved to;
+  - its frame;
+  - whether the sheet was still presenting.
+
+**Same failure elsewhere.** Run 38299228248 attempt 1 (Xcode 27 job 114983541522, head `0fde6f5f`) failed identically at line 183 ("it read: Opening encrypted backup…"); that job printed no `FAIL-TREE` warning. Across the Xcode 27 jobs with annotations, from 2026-10-09 to 2026-10-15, the cancel step's recorded status was "Restore cancelled" in 26 jobs and "Opening encrypted backup" in 2; 4 did not reach it. In the 107 other iOS jobs listed for the same runs (the job without the "(Xcode 27)" suffix), every annotation that records this step reads "Restore cancelled" (71 jobs).
+
+**Runs 38344991834 and 38334844301: not this failure. Neither reached the UI tests.** Both stopped on the hermes-engine tarball download from `repo1.maven.org`:
+- **38334844301** (job 115096318191) failed in "Install pods". The log line is `[!] /usr/bin/curl -f -L ... https://repo1.maven.org/maven2/com/facebook/react/react-native-artifacts/0.81.6/react-native-artifacts-0.81.6-hermes-ios-debug.tar.gz ...`. curl's progress stood at 8% of 29.0 M after 24 minutes, then `curl: (18) Transferred a partial file`.
+- **38344991834** (job 115126468395) failed in "Build unsigned Release for the simulator". During pod install, `curl: (92) HTTP/2 stream 1 was not closed cleanly: INTERNAL_ERROR (err 2)` at 91% of 20.3 M. The build then logged `tar: .../Pods/hermes-engine-artifacts/hermes-ios-0.81.6-release.tar.gz: m: No such file or directory` and `rsync(38654): error: .../hermes.xcframework/ios-arm64_x86_64-simulator/*: (l)stat: No such file or directory`.
+- EVIDENCE CAPTURED for both download failures. That the interrupted download is why the release tarball was missing in 38344991834 is an inference from the order of the lines, NOT VERIFIED.
+- Both passed on attempt 2. Nothing was changed for them.
+
+**Change.** Only `apps/mobile/ios/AthleteKineticsUITests/AthleteKineticsUITests.swift`. The cancel step now calls `cancelFilesSheet()`, which:
+- takes the Cancel or Close from the sheet's bar (`filesSheetBar()`, identifier containing `DocumentManager`) when the bar holds a hittable one, otherwise the earlier lookup;
+- taps only once the control is hittable and its frame is unchanged across two reads 0.5 s apart, within the same 30 s bound as before;
+- prints `files sheet cancel: tapping <type>:'<label>'|'<identifier>' at {{x, y}, {w, h}} found by <lookup> <s> s after RESTORE`;
+- after the tap, when the bar had been up, fails with "the Files sheet was still open 30 s after its Cancel was tapped" (with the sheet inventory), or prints how long the sheet took to close.
+
+The status assertion and its wording are unchanged, and its 30 s bound still runs from the tap. Nothing is tapped twice and no test is skipped. The next occurrence will name, in the annotations alone, the element tapped and whether the sheet stayed open.
+
+**Commands and decisive output.**
+- `npm run typecheck` on Node v24.21.0: exit 0, before each commit. Node 22 failed `npm ci` with `EBADENGINE` (the repo requires `>=24.0.0`), so Node 24.21.0 was fetched from nodejs.org and its SHA-256 checked (`node-v24.21.0-linux-x64.tar.xz: OK`).
+- `npm run verify:native-config`: exit 0, `NATIVE CONFIG VERIFIED (static contract; native build evidence comes from the macOS CI job)`, including `PASS  every UI test in the suite is run by CI, none skipped`.
+
+**Not verified.**
+- The Swift has not been compiled or run; this container has no Swift toolchain. The first CI run of this branch is its first compile.
+- Which element the failed taps reached, and their timing, as above.
+- Whether the change removes the failure: it occurred in 2 of 28 Xcode 27 jobs that reached the step, so a single green run shows little.
+
+**Not done, and why.**
+- **CodeRabbit command-line review before pushing.** The command given is a Windows install that this container lacks, and `cli.coderabbit.ai` is refused by the same network policy, so it could not be installed. Raised with the owner, whose answer through the question card was "Push + draft PR (Recommended)": push the branch and open a draft pull request against `master`, have CodeRabbit's GitHub app review it there, and act on its findings before the pull request leaves draft. This departs from the rule of a command-line review before pushing, by the owner's decision.
+
+**Judgment calls.**
+- No retry of the Cancel tap, following Entry 0202 on failure 5. A printed single re-tap is the owner's call.
+- The sheet's bar is preferred, with the earlier lookup kept as the fallback. The Xcode 26 row's bar identifier is not in any annotation read, and a bar-only lookup could fail where the old one passed.
+- The model co-author trailer was left off the commits under the owner's rule against model identifiers; a session-link trailer was kept.
+- No handover file and no `DEVIATION_LOG.md` entry: a test-harness change inside the existing architecture.
+
+**For the owner.**
+- The hermes-engine tarball download from `repo1.maven.org` failed in two Xcode 27 jobs on 2026-10-13. Caching that tarball between runs would remove this class of failure; no change was made here.
+- In run 38345092343 attempt 1, the Xcode 26 iOS job also failed, in `test1`, with "the Workout screen marker (session-screen-shown) did not appear within 30 s".
+
+**After the pull request was opened (pull request 77).**
+- **CI on `1a3f7de`:** all four checks succeeded. The Swift compiled on both iOS rows, and `test4` passed on both. The new lines read, Xcode 26 row (job 116638056643): `files sheet cancel: tapping 9:'Cancel'|'' at {{299, 82}, {36, 36}} found by the sheet's bar 15.8 s after RESTORE`, `files sheet closed 2.6 s after Cancel`. Xcode 27 row (job 116638056517): `... at {{299, 72}, {36, 36}} found by the sheet's bar 14.2 s after RESTORE`, `files sheet closed 2.4 s after Cancel`. On both rows the control was a Button in the sheet's bar. The fallback lookup was not used. One passing run per row says nothing about the 2-in-28 failure rate.
+- **CodeRabbit (requested on the draft with `@coderabbitai review`):** one minor finding and one trivial nit, both fixed in `d2859c5`.
+  - The minor finding: when no sheet bar is found, nothing confirmed the sheet closed. Now the tapped control must disappear.
+  - The nit: the settled check now also compares the element's type, identifier and label.
+  - Still no retry and no new bound. `npm run typecheck` exit 0; `verify:native-config` exit 0.
+ In 38344991834 attempt 1 it failed in `test1` with "the Progress screen marker (progress-screen) did not appear within 30 s". Neither was investigated here.

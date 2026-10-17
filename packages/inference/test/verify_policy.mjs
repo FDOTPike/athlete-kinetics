@@ -469,5 +469,16 @@ const readinessCase = schema004.slice(schema004.indexOf('round(CASE'), schema004
 check('004 schema readiness excludes load component from readiness_score calculation',
   !readinessCase.includes('load_component'));
 
+// e1RM qualifying effort floor (6.0): the constant is not exported from e1rm.ts,
+// so pin the registry entry by behaviour on either side of the floor.
+const e1rm = require('./.build/e1rm.js');
+const { targetPct } = require('./.build/blockGenerator.js');
+check('e1RM RPE floor is 6.0: estimateOneRepMax returns null below 6 and an estimate at 6.0',
+  e1rm.estimateOneRepMax(100, 5, 5.5) === null &&
+  e1rm.estimateOneRepMax(100, 5, 5.9) === null &&
+  e1rm.estimateOneRepMax(100, 5, 5.99) === null &&
+  e1rm.estimateOneRepMax(100, 5, 6.0) !== null &&
+  Math.abs(e1rm.estimateOneRepMax(100, 5, 6.0) - 100 / targetPct(5, 6.0)) < 1e-9);
+
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);
