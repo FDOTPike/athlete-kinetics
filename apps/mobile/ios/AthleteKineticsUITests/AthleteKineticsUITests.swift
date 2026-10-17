@@ -290,11 +290,11 @@ final class AthleteKineticsUITests: XCTestCase {
     for _ in 1...7 { centre.tap(); times.append(Date()) }
     let gaps = zip(times.dropFirst(), times).map { $0.timeIntervalSince($1) }
     log("BUILD-TAPS at (\(Int(frame.midX)), \(Int(frame.midY))): gaps \(gaps.map { String(format: "%.2f", $0) }.joined(separator: "/")) s, seven taps in \(String(format: "%.2f", times[6].timeIntervalSince(times[0]))) s")
-    if let slowest = gaps.indices.max(by: { gaps[$0] < gaps[$1] }), gaps[slowest] >= 5 {
-      XCTFail("tap \(slowest + 2) came \(String(format: "%.1f", gaps[slowest])) s after tap \(slowest + 1), beyond ProfileScreen.recordBuildTap's 5 s reset")
-      return
-    }
-    wait(element("advanced-athlete-manager"), "the advanced athlete manager after the seven-tap gesture")
+    // The gaps are when each tap() call returned, not when the app took the
+    // event, so they explain a failure rather than decide one.
+    let slowest = String(format: "%.1f", gaps.max() ?? 0)
+    wait(element("advanced-athlete-manager"),
+         "the advanced athlete manager after the seven-tap gesture (slowest gap \(slowest) s; the count resets after 5 s)")
   }
 
   /// Expands Coach Mode and returns its label (with the athlete count).
