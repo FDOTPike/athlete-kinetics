@@ -186,6 +186,16 @@ describe('what the fingers do', () => {
   });
 });
 
-test('only finger-curls and front-squat-clean-grip have a close-up', () => {
-  expect(Object.keys(CHAIN_MOVEMENTS).filter((slug) => CHAIN_MOVEMENTS[slug].closeUp !== undefined)).toEqual(['finger-curls', 'front-squat-clean-grip']);
+test('only approved grip-detail movements have a close-up', () => {
+  expect(Object.keys(CHAIN_MOVEMENTS).filter((slug) => CHAIN_MOVEMENTS[slug].closeUp !== undefined)).toEqual([
+    'finger-curls',
+    'front-squat-clean-grip',
+    'chin-up',
+    'pull-up',
+    'v-bar-pulldown',
+    'full-range-of-motion-lat-pulldown',
+    'gorilla-chin-crunch',
+    'hanging-leg-raise',
+  ]);
 });
+

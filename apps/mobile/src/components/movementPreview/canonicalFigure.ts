@@ -1343,7 +1343,16 @@ export interface ChainMovement {
    * `open` fix the panel expansion and finger opening across all phases when a
    * movement holds a constant finger grip (such as a clean-grip front rack).
    */
-  closeUp?: { at: ChainPoint; r: number; scale: number; zoom?: number; open?: number };
+  closeUp?: {
+    at: ChainPoint;
+    r: number;
+    scale: number;
+    zoom?: number;
+    open?: number;
+    palm?: 'underhand' | 'overhand' | 'neutral' | 'turn';
+  };
+  /** Weight stack column for a cable pulldown station (`x` position, resting stack top `baseTop`, minimum lifted clearance `minClearance`, and travel `stroke`). */
+  weightStack?: { x: number; baseTop: number; minClearance: number; stroke: number };
   /** External load hanging centrally from a belt at the waist/hips (`drop` units below hip, disc radius `r`). */
   waistLoad?: { drop: number; r?: number };
 }
@@ -4658,7 +4667,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       {
         at: [-4, CHAIN_THIGH_HALF + 0.05], trunk: 90, head: 90,
         thigh: [0, 35], shin: [-1.84, 35], foot: [80, 28],
-        upperArm: [80, 146], forearm: [68, -10],
+        upperArm: [80, 138], forearm: [68, -10],
         farUpperArm: [-28, 32], farForearm: [-8, 20],
       },
       {
@@ -4685,12 +4694,12 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       {
         at: [-1.4, 41.6], trunk: 90, head: 90,
         thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 10,
-        upperArm: [80, 142], forearm: [80, -10],
+        upperArm: [80, 136], forearm: [80, -10],
       },
       {
         at: [0, CHAIN_STANDING_HIP - 0.075], trunk: 90, head: 90,
         thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 4,
-        upperArm: [80, 142], forearm: [80, -10],
+        upperArm: [80, 136], forearm: [80, -10],
       },
       {
         at: [0, CHAIN_STANDING_HIP - 0.075], trunk: 90, head: 90,
@@ -4721,7 +4730,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
         ankle: [0, CHAIN_ANKLE_HEIGHT, 12.0], farAnkle: [-0.8, CHAIN_ANKLE_HEIGHT, -12.0],
         foot: [0, -18], kneeOut: 6,
         upperArm: -60, forearm: 80,
-        wrist: [2.64, 72.3, CHAIN_SHOULDER_HALF], farWrist: [1.6, 49.8, -CHAIN_SHOULDER_HALF],
+        wrist: [2.64, 76.6, CHAIN_SHOULDER_HALF], farWrist: [1.6, 49.8, -CHAIN_SHOULDER_HALF],
       },
       {
         at: [-15.2, 37.5], trunk: 42, head: [90, 20],
@@ -4909,13 +4918,13 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     poses: [
       {
         at: [0.68, 55.74], trunk: 93, head: 91,
-        thigh: [-91, 24], shin: [-93, 12], foot: 0,
+        thigh: [-91, 25], shin: [-93, 12], foot: 0,
         upperArm: 90, forearm: 90, hand: [20, 0],
         wrist: [-3.76, 103.63, 13.5], farWrist: [-3.76, 103.63, -13.5],
       },
       {
-        at: [1.67, 79.2], trunk: 103, head: 101,
-        thigh: [-85, 24], shin: [-92, 12], foot: 0,
+        at: [1.65, 78.35], trunk: 90.5, head: 90,
+        thigh: [-99, 25], shin: [-103, 12], foot: 0,
         upperArm: 90, forearm: 90, hand: [20, 0],
         wrist: [-3.76, 103.63, 13.5], farWrist: [-3.76, 103.63, -13.5],
       },
@@ -4931,6 +4940,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     originX: 48,
     feet: 'free',
     elbowPole: [-65, 10],
+    closeUp: { at: [-30, 88], r: 12, scale: 4.0, zoom: 1, open: 0, palm: 'underhand' },
     equipment: [
       { kind: 'frame', a: [0, 0.5, -24], b: [0, 106, -24] },
       { kind: 'frame', a: [0, 0.5, 24], b: [0, 106, 24] },
@@ -4959,7 +4969,8 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     yawDeg: 32,
     originX: 48,
     feet: 'free',
-    elbowPole: [-95, 38],
+    elbowPole: [-129, 44],
+    closeUp: { at: [-30, 88], r: 12, scale: 4.0, zoom: 1, open: 0, palm: 'overhand' },
     equipment: [
       { kind: 'frame', a: [0, 0.5, -24], b: [0, 106, -24] },
       { kind: 'frame', a: [0, 0.5, 24], b: [0, 106, 24] },
@@ -4973,8 +4984,8 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
         wrist: [-3.76, 103.63, 14.5], farWrist: [-3.76, 103.63, -14.5],
       },
       {
-        at: [2.15, 79.4], trunk: 104, head: 102,
-        thigh: -84, shin: -92, foot: 0,
+        at: [1.55, 78.32], trunk: 94, head: 93,
+        thigh: -92, shin: -96, foot: 0,
         upperArm: 90, forearm: 90, hand: [20, 0],
         wrist: [-3.76, 103.63, 14.5], farWrist: [-3.76, 103.63, -14.5],
       },
@@ -4989,6 +5000,8 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     originX: 40,
     implement: 'vBar',
     elbowPole: [-125, 12],
+    closeUp: { at: [-26, 68], r: 12, scale: 4.0, zoom: 1, open: 0, palm: 'neutral' },
+    weightStack: { x: 30, baseTop: 10.5, minClearance: 4.5, stroke: 24 },
     lines: [{ from: PULLDOWN.pulley, to: 'midGrip' }],
     equipment: [
       { kind: 'frame', a: [PULLDOWN.pulley[0], 0.5], b: PULLDOWN.pulley },
@@ -5020,6 +5033,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     originX: 50,
     implement: 'handles',
     farArmOver: true,
+    closeUp: { at: [-34, 68], r: 12, scale: 4.0, zoom: 1, open: 0, palm: 'turn' },
     lines: [
       { from: [0, 92, -38], to: 'nearGrip', depth: 'far' },
       { from: [0, 92, 38], to: 'farGrip' },
@@ -5036,11 +5050,13 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
         at: [0, CHAIN_SEATED_HIP], trunk: 94, head: 94, thigh: [0, 10], shin: -90,
         upperArm: [86, -28], forearm: [86, -28],
         farUpperArm: [80, -28], farForearm: [80, -28],
+        hand: [0, 0],
       },
       {
         at: [0, CHAIN_SEATED_HIP], trunk: 94, head: 94, thigh: [0, 10], shin: -90,
         upperArm: [86, 152], forearm: [86, 62],
         farUpperArm: [80, 152], farForearm: [80, 62],
+        hand: [0, -90],
       },
     ],
   },
@@ -5065,7 +5081,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
           CHAIN_ANKLE_HEIGHT - CHAIN_THIGH * Math.sin(chainRad(-84)) - CHAIN_SHIN * Math.sin(chainRad(-96)),
         ],
         trunk: 78, head: 84, thigh: -84, shin: -96,
-        upperArm: [-5, 0], forearm: [7, 0],
+        upperArm: [-5, -6], forearm: [7, -6],
       },
       {
         at: [
@@ -5073,7 +5089,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
           CHAIN_ANKLE_HEIGHT - CHAIN_THIGH * Math.sin(chainRad(-84)) - CHAIN_SHIN * Math.sin(chainRad(-96)),
         ],
         trunk: 78, head: 84, thigh: -84, shin: -96,
-        upperArm: [-89, 0], forearm: [-77, 0],
+        upperArm: [-95, -6], forearm: [-83, -6],
       },
     ],
   },
@@ -5090,6 +5106,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     spine: 'lower',
     trunkAt: 'neck',
     elbowPole: [-65, 16],
+    closeUp: { at: [-30, 88], r: 12, scale: 4.0, zoom: 1, open: 0, palm: 'underhand' },
     equipment: [
       { kind: 'frame', a: [0, 0.5, -24], b: [0, 106, -24] },
       { kind: 'frame', a: [0, 0.5, 24], b: [0, 106, 24] },
@@ -5103,14 +5120,14 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
         wrist: [3.76, 103.63, 11.5], farWrist: [3.76, 103.63, -11.5],
       },
       {
-        at: [-1.82, 65.0], trunk: 96.5, curl: 13, head: 93.5,
-        thigh: -27, shin: -157.5, foot: -67.5,
+        at: [-2.15, 65.0], trunk: 96.5, curl: 13, head: 93.5,
+        thigh: -28, shin: -133, foot: -43,
         upperArm: 90, forearm: 90, hand: [160, 0],
         wrist: [3.76, 103.63, 11.5], farWrist: [3.76, 103.63, -11.5],
       },
       {
-        at: [-0.22, 74.4], trunk: 100, curl: 26, head: 96,
-        thigh: 36, shin: -135, foot: -45,
+        at: [-1.15, 74.4], trunk: 100, curl: 26, head: 96,
+        thigh: 34, shin: -86, foot: 4,
         upperArm: 90, forearm: 90, hand: [160, 0],
         wrist: [3.76, 103.63, 11.5], farWrist: [3.76, 103.63, -11.5],
       },
@@ -5127,6 +5144,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     spine: 'lower',
     trunkAt: 'neck',
     elbowPole: [-90, 35],
+    closeUp: { at: [-30, 88], r: 12, scale: 4.0, zoom: 1, open: 0, palm: 'overhand' },
     equipment: [
       { kind: 'frame', a: [0, 0.5, -24], b: [0, 106, -24] },
       { kind: 'frame', a: [0, 0.5, 24], b: [0, 106, 24] },
@@ -5777,7 +5795,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       {
         at: [-0.4, 46.50], trunk: 89, head: 90,
         thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 2,
-        upperArm: [-84, 8], forearm: [82, -22],
+        upperArm: [-84, -10], forearm: [82, -22],
         farUpperArm: [-88, 10], farForearm: [-84, 6],
       },
     ],
@@ -5806,7 +5824,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       {
         at: [-8.0, 10.0], trunk: 132, twist: -14, head: 112,
         thigh: 40, shin: -52, foot: 0,
-        farThigh: [14, 8], farShin: [16, 8], farFoot: 75,
+        farThigh: [14, 72], farShin: [16, 72], farFoot: 75,
         upperArm: [90, 0], forearm: [90, 0],
         farUpperArm: [-78, 18], farForearm: [-68, 12],
       },
@@ -6107,6 +6125,21 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters, tu
       ...(movement.waistLoad !== undefined
         ? { waistLoad: [hip[0], hip[1] - movement.waistLoad.drop, 0] as ChainVec }
         : {}),
+      ...(movement.weightStack !== undefined
+        ? (() => {
+            const ws = movement.weightStack;
+            const liftedBottom = ws.baseTop + ws.minClearance + ws.stroke * Math.max(0, Math.min(1, ph));
+            return {
+              weightStack: {
+                x: ws.x,
+                baseTop: ws.baseTop,
+                liftedBottom,
+                liftedTop: liftedBottom + 8,
+                clearance: liftedBottom - ws.baseTop,
+              },
+            };
+          })()
+        : {}),
       ...(movement.implement === 'kettlebell'
         ? { kettlebell: { grip: bellGrip, body: bellBody, side: bellSide } }
         : {}),
@@ -6351,19 +6384,113 @@ function layoutChainExtras(
     groups.mid.push({ kind: 'circle', cx: loadPt[0], cy: loadPt[1], r, fill: 'textMid', stroke: 'ink1', strokeWidth: 1, opacity: 1 });
     groups.mid.push({ kind: 'circle', cx: loadPt[0], cy: loadPt[1], r: 1.2, fill: 'ink1', opacity: 1 });
   }
+  if (w.weightStack !== undefined) {
+    const ws = w.weightStack;
+    const topP = project([ws.x, 92, 0]);
+    const botP = project([ws.x, 1.5, 0]);
+    const baseTopP = project([ws.x, ws.baseTop, 0]);
+    const liftBotP = project([ws.x, ws.liftedBottom, 0]);
+    const liftTopP = project([ws.x, ws.liftedTop, 0]);
+    const pulleyEq = (movement.equipment ?? []).find((s) => s.kind === 'pulley');
+    if (pulleyEq !== undefined && 'at' in pulleyEq) {
+      const pulleyP = project(chainWorld(pulleyEq.at));
+      groups.behind.push(line(pulleyP, topP, 1.6, 'textLow', 0.75));
+    }
+    groups.behind.push(line([topP[0] - 1.8, topP[1]], [botP[0] - 1.8, botP[1]], 1.2, 'textLow', 0.75));
+    groups.behind.push(line([topP[0] + 1.8, topP[1]], [botP[0] + 1.8, botP[1]], 1.2, 'textLow', 0.75));
+    groups.behind.push(line(topP, liftTopP, 1.4, 'textMid', 1));
+    groups.mid.push({
+      kind: 'rect',
+      x: topP[0] - 3.8,
+      y: baseTopP[1],
+      w: 7.6,
+      h: Math.max(2, botP[1] - baseTopP[1]),
+      rx: 0.8,
+      fill: 'textLow',
+      stroke: 'ink1',
+      strokeWidth: 0.8,
+      opacity: 0.9,
+    });
+    groups.mid.push({
+      kind: 'rect',
+      x: topP[0] - 3.8,
+      y: liftTopP[1],
+      w: 7.6,
+      h: Math.max(2, liftBotP[1] - liftTopP[1]),
+      rx: 0.8,
+      fill: 'textHi',
+      stroke: 'ink1',
+      strokeWidth: 0.8,
+      opacity: 1,
+    });
+  }
   const panel = handCloseUp(figure);
   if (panel !== null) {
     // Back to front: the line from the real hand, the panel that hides whatever
-    // is behind it, the wrist and palm, the fingers, and the bar they hold.
+    // is behind it, and either the two-hand neutral V-bar view, the turning
+    // D-handle palm view, or the profile hand with wrist, palm, fingers, and bar.
     groups.front.push(line(figure.grip.near, panel.centre, 0.8, 'textLow', 0.75));
     groups.front.push({ kind: 'circle', cx: panel.centre[0], cy: panel.centre[1], r: panel.r, fill: 'ink1', stroke: 'textLow', strokeWidth: 1.2, opacity: 1 });
-    groups.front.push(line(panel.stub, panel.wrist, CLOSE_UP_HAND.wristHalf * 2 * panel.scale, 'textHi', 1));
-    groups.front.push(line(panel.wrist, panel.knuckle, CLOSE_UP_HAND.palmHalf * 2 * panel.scale, 'textHi', 1));
-    groups.front.push(line(panel.thumb[0], panel.thumb[1], CLOSE_UP_HAND.fingerHalf * 2 * panel.scale, 'textHi', 1));
-    for (let i = 0; i < 3; i++) {
-      groups.front.push(line(panel.finger[i], panel.finger[i + 1], CLOSE_UP_HAND.fingerHalf * 2 * panel.scale, 'textHi', 1));
+    const [cx, cy] = panel.centre;
+    if (panel.grip === 'neutral') {
+      // Neutral V-bar close-up: V-bar branches angled down from the central swivel,
+      // gripped from the outside by both hands with their inner palms facing each other.
+      groups.front.push(line([cx, cy - 8.2], [cx, cy - 5.2], 1.4, 'textMid', 1));
+      groups.front.push(line([cx, cy - 5.2], [cx - 3.6, cy + 4.2], 1.8, 'textMid', 1));
+      groups.front.push(line([cx, cy - 5.2], [cx + 3.6, cy + 4.2], 1.8, 'textMid', 1));
+      // Left hand: outer dorsal back, inner palm pad facing right, and fingers wrapped inward
+      groups.front.push(line([panel.leftDorsalX, cy - 1.4], [panel.leftDorsalX, cy + 3.8], 2.0, 'textHi', 1));
+      groups.front.push(line([panel.leftPalmX, cy - 1.2], [panel.leftPalmX, cy + 3.6], 1.6, 'textMid', 1));
+      groups.front.push(line([panel.leftDorsalX + 0.4, cy - 1.8], [cx - 2.2, cy - 2.4], 1.4, 'textHi', 1));
+      for (const dy of [-0.4, 1.2, 2.8]) {
+        groups.front.push(line([panel.leftPalmX, cy + dy], [cx - 1.9, cy + dy], 1.3, 'textHi', 1));
+      }
+      // Right hand: outer dorsal back, inner palm pad facing left, and fingers wrapped inward
+      groups.front.push(line([panel.rightDorsalX, cy - 1.4], [panel.rightDorsalX, cy + 3.8], 2.0, 'textHi', 1));
+      groups.front.push(line([panel.rightPalmX, cy - 1.2], [panel.rightPalmX, cy + 3.6], 1.6, 'textMid', 1));
+      groups.front.push(line([panel.rightDorsalX - 0.4, cy - 1.8], [cx + 2.2, cy - 2.4], 1.4, 'textHi', 1));
+      for (const dy of [-0.4, 1.2, 2.8]) {
+        groups.front.push(line([panel.rightPalmX, cy + dy], [cx + 1.9, cy + dy], 1.3, 'textHi', 1));
+      }
+    } else if (panel.grip === 'turn') {
+      // Turning D-handle close-up: at palmYaw = 0 (u = 0) the broad inner palm faces
+      // forward at the viewer with the D-handle across it; at palmYaw = 90 (u = 1)
+      // the hand has turned 90 degrees so the dorsal back is on the outside (right)
+      // and the palm and curled fingers face inward (left) toward the opposite palm.
+      const u = Math.max(0, Math.min(1, panel.palmYaw / 90));
+      const halfW = 4.0 * (1 - 0.75 * u);
+      const wristX = cx + 1.4 * u;
+      groups.front.push(line([cx, cy - 8.4], [cx, cy - 4.8], 1.4, 'textMid', 1));
+      groups.front.push(line([cx, cy - 4.8], [cx - halfW, cy - 1.2], 1.3, 'textLow', 0.9));
+      groups.front.push(line([cx, cy - 4.8], [cx + halfW, cy - 1.2], 1.3, 'textLow', 0.9));
+      groups.front.push(line([cx - halfW - 0.6, cy - 1.2], [cx + halfW + 0.6, cy - 1.2], 2.0, 'textMid', 1));
+      // Wrist and outer dorsal edge
+      groups.front.push(line([wristX, cy + 7.2], [wristX, cy + 4.0], 3.2 - 0.8 * u, 'textHi', 1));
+      groups.front.push(line([cx + 2.6 * u, cy + 4.0], [cx + 2.6 * u, cy - 0.6], 4.6 - 2.2 * u, 'textHi', 1));
+      // Inner palm pad (broad front pad at u = 0, shifting to the inner/left edge at u = 1)
+      groups.front.push(line([cx - 1.4 * u, cy + 3.6], [cx - 1.4 * u, cy - 0.4], 3.8 - 2.0 * u, 'textMid', 1));
+      // Thumb and fingers curling over the handle bar
+      groups.front.push(line([cx - 2.8 * (1 - 0.5 * u), cy + 2.2], [cx - 3.2 * (1 - 0.4 * u), cy - 0.8], 1.5, 'textHi', 1));
+      for (const k of [-1.5, -0.5, 0.5, 1.5]) {
+        const fx0 = cx + k * 1.4 * (1 - u) + 1.0 * u;
+        const fx1 = cx + k * 1.4 * (1 - u) - 2.0 * u;
+        const fy0 = cy - 0.6 + k * 0.9 * u;
+        const fy1 = cy - 2.4 + k * 0.9 * u;
+        groups.front.push(line([fx0, fy0], [fx1, fy1], 1.3, 'textHi', 1));
+      }
+    } else {
+      groups.front.push(line(panel.stub, panel.wrist, CLOSE_UP_HAND.wristHalf * 2 * panel.scale, 'textHi', 1));
+      groups.front.push(line(panel.wrist, panel.knuckle, CLOSE_UP_HAND.palmHalf * 2 * panel.scale, 'textHi', 1));
+      if (panel.grip === 'underhand' || panel.grip === 'overhand') {
+        const palmShift = panel.grip === 'underhand' ? -0.9 : 0.9;
+        groups.front.push(line([panel.wrist[0] + palmShift, panel.wrist[1]], [panel.knuckle[0] + palmShift, panel.knuckle[1]], 1.4, 'textMid', 1));
+      }
+      groups.front.push(line(panel.thumb[0], panel.thumb[1], CLOSE_UP_HAND.fingerHalf * 2 * panel.scale, 'textHi', 1));
+      for (let i = 0; i < 3; i++) {
+        groups.front.push(line(panel.finger[i], panel.finger[i + 1], CLOSE_UP_HAND.fingerHalf * 2 * panel.scale, 'textHi', 1));
+      }
+      groups.front.push({ kind: 'circle', cx: panel.bar[0], cy: panel.bar[1], r: CLOSE_UP_HAND.bar * panel.scale, fill: 'textMid', stroke: 'ink1', strokeWidth: 0.8, opacity: 1 });
     }
-    groups.front.push({ kind: 'circle', cx: panel.bar[0], cy: panel.bar[1], r: CLOSE_UP_HAND.bar * panel.scale, fill: 'textMid', stroke: 'ink1', strokeWidth: 0.8, opacity: 1 });
   }
   return { ...groups, far, lines, near };
 }
@@ -6442,19 +6569,32 @@ export function handCloseUp(figure: ReturnType<typeof chainGeometry>) {
   const target = figure.project(chainWorld(closeUp.at));
   const centre: CanonicalPoint = [hand[0] + (target[0] - hand[0]) * zoom, hand[1] + (target[1] - hand[1]) * zoom];
   const scale = closeUp.scale * zoom;
-  // The hand is drawn the way the figure's own forearm points, with the palm on the side a palms-up grip puts it.
+  // The hand is drawn the way the figure's own forearm points, or vertical to
+  // an overhead bar when `closeUp.palm` names an explicit grip orientation.
   const j = figure.joints;
   const length = Math.hypot(j.wr[0] - j.el[0], j.wr[1] - j.el[1]) || 1;
-  const along: CanonicalPoint = [(j.wr[0] - j.el[0]) / length, (j.wr[1] - j.el[1]) / length];
-  const palmSide: CanonicalPoint = along[0] < 0 ? [-along[1], along[0]] : [along[1], -along[0]];
+  const forearmAlong: CanonicalPoint = [(j.wr[0] - j.el[0]) / length, (j.wr[1] - j.el[1]) / length];
+  const along: CanonicalPoint = closeUp.palm !== undefined ? [0, -1] : forearmAlong;
+  const palmSide: CanonicalPoint = closeUp.palm === 'underhand' ? [-1, 0]
+    : closeUp.palm === 'overhand' ? [1, 0]
+      : along[0] < 0 ? [-along[1], along[0]] : [along[1], -along[0]];
   const place = (q: readonly [number, number]): CanonicalPoint => [
     centre[0] + (along[0] * (q[0] + CLOSE_UP_KNUCKLE[0]) + palmSide[0] * (q[1] + CLOSE_UP_KNUCKLE[1])) * scale,
     centre[1] + (along[1] * (q[0] + CLOSE_UP_KNUCKLE[0]) + palmSide[1] * (q[1] + CLOSE_UP_KNUCKLE[1])) * scale,
   ];
   const finger = closeUpFinger(open);
   const bar = closeUpBar(open);
+  const palmYaw = figure.angles.hand !== undefined ? -figure.angles.hand[1] : 0;
   return {
     zoom, open, centre, r: closeUp.r * zoom, scale,
+    grip: closeUp.palm ?? ('supinated' as const),
+    palmsFacingEachOther: closeUp.palm === 'neutral',
+    leftDorsalX: centre[0] - 5.4,
+    leftPalmX: centre[0] - 3.8,
+    rightPalmX: centre[0] + 3.8,
+    rightDorsalX: centre[0] + 5.4,
+    palmYaw,
+    palmFacingViewer: palmYaw < 45,
     /** The hand model before it is placed: the finger's points and the bar, from the knuckle. */
     model: { finger, bar },
     stub: place([-CLOSE_UP_HAND.palm - CLOSE_UP_HAND.stub, 0]),

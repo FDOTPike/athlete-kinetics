@@ -125,6 +125,7 @@ describe('MOV-A07 other overhead work: physics, joint angles, painted contacts, 
     // Rack start at shoulder on forearm -> press UP and OUT to locked elbow overhead
     const rackElbowDeg = deg3D(start.world.near.shoulder, start.world.near.elbow, start.world.near.wrist);
     const lockElbowDeg = deg3D(top.world.near.shoulder, top.world.near.elbow, top.world.near.wrist);
+    expect(rackElbowDeg).toBeGreaterThanOrEqual(30);
     expect(rackElbowDeg).toBeLessThanOrEqual(75);
     expect(dist3(start.world.near.wrist, start.world.near.shoulder)).toBeLessThanOrEqual(9.5);
     expect(lockElbowDeg).toBeGreaterThanOrEqual(176);
@@ -168,6 +169,8 @@ describe('MOV-A07 other overhead work: physics, joint angles, painted contacts, 
     expect(trunkDegFromHorizontal2D(lockout.joints)).toBeGreaterThanOrEqual(88);
 
     // Bells stay racked during the dip (ph=1 -> ph=0), then legs extend (ph=0 -> ph=1) and arms finish overhead (ph=1 -> ph=2)
+    expect(deg3D(rack.world.near.shoulder, rack.world.near.elbow, rack.world.near.wrist)).toBeGreaterThanOrEqual(30);
+    expect(deg3D(dip.world.near.shoulder, dip.world.near.elbow, dip.world.near.wrist)).toBeGreaterThanOrEqual(30);
     expect(dist3(rack.world.near.wrist, rack.world.near.shoulder)).toBeLessThanOrEqual(9.5);
     expect(dist3(dip.world.near.wrist, dip.world.near.shoulder)).toBeLessThanOrEqual(9.5);
     expect(deg3D(lockout.world.near.shoulder, lockout.world.near.elbow, lockout.world.near.wrist)).toBeGreaterThanOrEqual(176);
@@ -205,6 +208,7 @@ describe('MOV-A07 other overhead work: physics, joint angles, painted contacts, 
     expect(deg3D(setup.world.far.hipJoint, setup.world.far.knee, setup.world.far.ankle)).toBeGreaterThanOrEqual(172);
 
     // Setup -> Wedge: hips shift away and descend, torso wedges under the bell while the arm straightens to lockout and head turns toward the handle
+    expect(deg3D(setup.world.near.shoulder, setup.world.near.elbow, setup.world.near.wrist)).toBeGreaterThanOrEqual(30);
     expect(deg3D(setup.world.near.shoulder, setup.world.near.elbow, setup.world.near.wrist)).toBeLessThanOrEqual(65);
     expect(wedge.world.hip[0]).toBeLessThan(setup.world.hip[0] - 6);
     expect(wedge.world.hip[1]).toBeLessThan(setup.world.hip[1] - 4);

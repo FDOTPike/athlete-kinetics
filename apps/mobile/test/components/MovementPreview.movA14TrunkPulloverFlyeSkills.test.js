@@ -420,8 +420,9 @@ describe('MOV-A14 trunk, pullovers, flyes and kettlebell skills (33, 137, 119, 2
     expect(floorPose.kettlebell.body[0]).toBeLessThanOrEqual(floorPose.near.toe[0] + 2);
     expect(Math.abs(floorPose.near.shoulder[0] - floorPose.kettlebell.grip[0])).toBeLessThan(2.5);
 
-    // Rack finish: standing tall (knees >= 172 deg) with elbow tucked below and close to the wrist/bell
+    // Rack finish: standing tall (knees >= 172 deg) with elbow tucked below and close to the wrist/bell, and rack elbow >= 30 deg
     expect(jointAngleDeg(rackPose.near.hipJoint, rackPose.near.knee, rackPose.near.ankle)).toBeGreaterThanOrEqual(172);
+    expect(jointAngleDeg(rackPose.near.shoulder, rackPose.near.elbow, rackPose.near.wrist)).toBeGreaterThanOrEqual(30);
     expect(rackPose.near.elbow[1]).toBeLessThan(rackPose.near.wrist[1] - 8);
     expect(rackPose.kettlebell.body[1] - floorPose.kettlebell.body[1]).toBeGreaterThan(50);
 
@@ -429,11 +430,12 @@ describe('MOV-A14 trunk, pullovers, flyes and kettlebell skills (33, 137, 119, 2
     expect(midPull.kettlebell.body[1]).toBeGreaterThan(floorPose.kettlebell.body[1] + 20);
     for (const t of ticks) {
       const w = at(t).figure.world;
+      expect(jointAngleDeg(w.near.shoulder, w.near.elbow, w.near.wrist)).toBeGreaterThanOrEqual(30);
       expect(Math.abs(w.kettlebell.body[0] - floorPose.kettlebell.body[0])).toBeLessThan(3.5);
     }
   });
 
-  test('231 Kettlebell Turkish Get-Up (Lunge style): 7 keyframes from supine -> seated -> one knee -> standing and reverse, with the bell arm locked (>= 172 deg) and vertical over the shoulder on every tick', () => {
+  test('231 Kettlebell Turkish Get-Up (Lunge style): 7 keyframes from supine -> seated -> one knee -> standing and reverse, with the bell arm locked (>= 172 deg) and vertical over the shoulder and both knees >= 35 deg on every tick', () => {
     const { entry, ticks, at, atPhase } = sampleEntry(231);
     expect(entry.frames.length).toBe(7);
     expect(entry.frames.map((f) => f.joints.ph)).toEqual([0, 1, 2, 4, 2, 1, 0]);
@@ -452,10 +454,12 @@ describe('MOV-A14 trunk, pullovers, flyes and kettlebell skills (33, 137, 119, 2
     expect(jointAngleDeg(standing.near.hipJoint, standing.near.knee, standing.near.ankle)).toBeGreaterThanOrEqual(172);
     expect(jointAngleDeg(standing.far.hipJoint, standing.far.knee, standing.far.ankle)).toBeGreaterThanOrEqual(172);
 
-    // Across every 33 ms tick, the working kettlebell arm stays locked (>= 172 deg) and vertical over the shoulder
+    // Across every 33 ms tick, the working kettlebell arm stays locked (>= 172 deg) and vertical over the shoulder, and neither knee ever closes past 35 deg in transit
     for (const t of ticks) {
       const w = at(t).figure.world;
       expect(jointAngleDeg(w.near.shoulder, w.near.elbow, w.near.wrist)).toBeGreaterThanOrEqual(172);
+      expect(jointAngleDeg(w.near.hipJoint, w.near.knee, w.near.ankle)).toBeGreaterThanOrEqual(35);
+      expect(jointAngleDeg(w.far.hipJoint, w.far.knee, w.far.ankle)).toBeGreaterThanOrEqual(35);
       expect(Math.abs(w.near.wrist[0] - w.near.shoulder[0])).toBeLessThan(0.05);
       expect(Math.abs(w.near.wrist[2] - w.near.shoulder[2])).toBeLessThan(0.05);
       expect(w.near.wrist[1] - w.near.shoulder[1]).toBeCloseTo(24.5, 2);

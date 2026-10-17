@@ -165,8 +165,9 @@ describe('MOV-A10 vertical pulls and hanging: physics, CoM under grip, cable ten
     const start = rig.chainGeometry(slug, 0, BODY);
     const top = rig.chainGeometry(slug, 1, BODY);
 
-    // Controlled full hang at start -> elbows driven down at top to bring chest toward the bar
+    // Controlled full hang at start -> elbows driven down at top (>= 30 deg) to bring chest toward the bar
     expect(deg3D(start.world.near.shoulder, start.world.near.elbow, start.world.near.wrist)).toBeGreaterThanOrEqual(175);
+    expect(deg3D(top.world.near.shoulder, top.world.near.elbow, top.world.near.wrist)).toBeGreaterThanOrEqual(30);
     expect(top.world.near.elbow[1]).toBeLessThan(top.world.near.shoulder[1] - 9);
     expect(top.world.neck[1]).toBeGreaterThan(101.5);
     expect(top.world.head[1] - BODY.hr).toBeGreaterThan(BAR_Y);
@@ -182,6 +183,7 @@ describe('MOV-A10 vertical pulls and hanging: physics, CoM under grip, cable ten
       const p = rig.poseAtTime(poses, t, ds);
       const g = rig.chainGeometry(slug, p.ph, BODY);
       const w = g.world;
+      expect(deg3D(w.near.shoulder, w.near.elbow, w.near.wrist)).toBeGreaterThanOrEqual(30);
       expect(w.waistLoad).toBeDefined();
       // Hangs centrally under the hips (z = 0, x = hip[0]) and stays quiet (no horizontal swing)
       expect(w.waistLoad[2]).toBe(0);
@@ -205,13 +207,13 @@ describe('MOV-A10 vertical pulls and hanging: physics, CoM under grip, cable ten
       expect(farThighClearance).toBeGreaterThan(1.0);
     }
 
-    // Controlled return to long arms
+    // Controlled return to long arms with no unsourced top hold
     const pullMs = ds[0] + ds[1];
-    const lowerMs = ds[3];
+    const lowerMs = ds[2] + ds[3];
     expect(lowerMs).toBeGreaterThanOrEqual(1.3 * pullMs);
   });
 
-  test('13 Chin-up and 71 Pull-Up satisfy their full-hang, chest-to-bar, and chin-without-reaching bounds while visibly distinguishing underhand shoulder-width vs overhand wider grip', () => {
+  test('13 Chin-up and 71 Pull-Up satisfy their full-hang, chest-to-bar, and chin-without-reaching bounds while visibly distinguishing underhand shoulder-width vs overhand wider grip in both wrist geometry and magnified hand close-ups', () => {
     // 13 Chin-up quotes (ALL_300_MOTION_MAP.json:2204-2205):
     // "Take an underhand grip around shoulder width and begin from a controlled full hang. Drive the elbows down to bring the upper chest toward the bar without reaching with the chin. Lower to long arms; if the bottom range disappears, finish the set or use assistance."
     // "Drive the elbows toward the ribs. Bring the upper chest to the bar. Own the full return to long arms."
@@ -237,9 +239,11 @@ describe('MOV-A10 vertical pulls and hanging: physics, CoM under grip, cable ten
     const pull0 = rig.chainGeometry(s71, 0, BODY);
     const pull1 = rig.chainGeometry(s71, 1, BODY);
 
-    // Both start from a full dead hang (elbow >= 175 deg) and pull upper chest to the bar with chin clearing the bar
+    // Both start from a full dead hang (elbow >= 175 deg) and pull upper chest to the bar with chin clearing the bar and top elbow >= 30 deg
     expect(deg3D(chin0.world.near.shoulder, chin0.world.near.elbow, chin0.world.near.wrist)).toBeGreaterThanOrEqual(175);
     expect(deg3D(pull0.world.near.shoulder, pull0.world.near.elbow, pull0.world.near.wrist)).toBeGreaterThanOrEqual(175);
+    expect(deg3D(chin1.world.near.shoulder, chin1.world.near.elbow, chin1.world.near.wrist)).toBeGreaterThanOrEqual(30);
+    expect(deg3D(pull1.world.near.shoulder, pull1.world.near.elbow, pull1.world.near.wrist)).toBeGreaterThanOrEqual(30);
     expect(chin1.world.neck[1]).toBeGreaterThan(101.5);
     expect(pull1.world.neck[1]).toBeGreaterThan(101.5);
     expect(chin1.world.head[1] - BODY.hr).toBeGreaterThan(BAR_Y);
@@ -257,19 +261,29 @@ describe('MOV-A10 vertical pulls and hanging: physics, CoM under grip, cable ten
     // 2. Underhand vs overhand wrist position relative to the bar at x = 0:
     expect(chin0.world.near.wrist[0]).toBeGreaterThan(BAR_X + 3.0);
     expect(pull0.world.near.wrist[0]).toBeLessThan(BAR_X - 3.0);
-    // 3. Elbow path at the top: 13 drives elbows down in front toward ribs (x > 0); 71 drives elbows down, wider, and back (x < -3)
+    // 3. Magnified hand close-up panel makes underhand vs overhand palm and finger wrap directly readable:
+    const chinPanel = rig.handCloseUp(chin0);
+    const pullPanel = rig.handCloseUp(pull0);
+    expect(chinPanel).not.toBeNull();
+    expect(pullPanel).not.toBeNull();
+    expect(chinPanel.grip).toBe('underhand');
+    expect(pullPanel.grip).toBe('overhand');
+    expect(chinPanel.bar[0]).toBeLessThan(chinPanel.knuckle[0]);
+    expect(pullPanel.bar[0]).toBeGreaterThan(pullPanel.knuckle[0]);
+    // 4. Elbow path at the top: 13 drives elbows down in front toward ribs (x > 0); 71 drives elbows down, wider, and back (x < -3)
     expect(chin1.world.near.elbow[0]).toBeGreaterThan(0);
     expect(pull1.world.near.elbow[0]).toBeLessThan(-3);
     expect(pull1.world.near.elbow[2] - chin1.world.near.elbow[2]).toBeGreaterThanOrEqual(3.5);
   });
 
-  test('108 V-Bar Pulldown locks thighs under the pad, holds a small tall-chest lean back, pulls the neutral V-bar to the upper chest, pauses, and returns to full overhead reach with monotonic cable lengthening', () => {
+  test('108 V-Bar Pulldown locks thighs under the pad, shows a readable palm-facing-palm neutral V-bar close-up, pulls to the upper chest and pauses, and returns to full overhead reach without letting the weight stack settle', () => {
     // Quotes (ALL_300_MOTION_MAP.json:8623-8624):
     // "Lock the thighs under the pad, take the neutral V-bar, and lean back only enough to keep the chest tall beneath the cable. Pull the elbows down and back until the handle reaches the upper chest, then pause without turning the rep into a row. Return to a full overhead reach without letting the stack settle; if the biceps burn first, soften the hands and lead harder with the elbows."
     // "Show the chest to the handle. Drive the elbows down and back. Reach fully at the top."
     const row = rowFor(108);
     expect(row.source.instructions).toContain('Lock the thighs under the pad, take the neutral V-bar, and lean back only enough to keep the chest tall beneath the cable.');
     expect(row.source.instructions).toContain('Pull the elbows down and back until the handle reaches the upper chest, then pause without turning the rep into a row.');
+    expect(row.source.instructions).toContain('Return to a full overhead reach without letting the stack settle; if the biceps burn first, soften the hands and lead harder with the elbows.');
     expect(row.source.cues).toContain('Show the chest to the handle. Drive the elbows down and back. Reach fully at the top.');
 
     const e = entryFor(108);
@@ -294,9 +308,16 @@ describe('MOV-A10 vertical pulls and hanging: physics, CoM under grip, cable ten
     expect(direction2D(start.world.hip, start.world.neck)).toBeGreaterThanOrEqual(95);
     expect(direction2D(start.world.hip, start.world.neck)).toBeLessThanOrEqual(105);
 
-    // Neutral close V-bar grip, full overhead reach at start, handle to upper chest at bottom with elbows down and back
+    // Neutral close V-bar grip with magnified close-up showing palms facing each other
     expect(start.world.near.hold[2]).toBeCloseTo(3, 5);
     expect(start.world.far.hold[2]).toBeCloseTo(-3, 5);
+    const vPanel = rig.handCloseUp(start);
+    expect(vPanel).not.toBeNull();
+    expect(vPanel.grip).toBe('neutral');
+    expect(vPanel.palmsFacingEachOther).toBe(true);
+    expect(vPanel.leftPalmX).toBeGreaterThan(vPanel.leftDorsalX);
+    expect(vPanel.rightPalmX).toBeLessThan(vPanel.rightDorsalX);
+
     expect(deg3D(start.world.near.shoulder, start.world.near.elbow, start.world.near.wrist)).toBeGreaterThanOrEqual(174);
     const touch = onTrunk(end.world, end.world.near.hold);
     expect(touch.along).toBeGreaterThanOrEqual((2 / 3) * TRUNK);
@@ -305,27 +326,45 @@ describe('MOV-A10 vertical pulls and hanging: physics, CoM under grip, cable ten
     expect(end.world.near.elbow[1]).toBeLessThan(end.world.near.shoulder[1] - 8);
     expect(onTrunk(end.world, end.world.near.elbow).front).toBeLessThanOrEqual(3);
 
-    // Pause at chest and monotonic cable lengthening on the working half
+    // Pause at chest (source-mandated) and monotonic cable lengthening on the working half
     const ds = e.segmentDurationsMs;
     const pullMs = ds[0] + ds[1];
     const pauseMs = ds[2];
-    const returnMs = ds[3];
+    const returnMs = ds[3] + ds[4];
     expect(pauseMs).toBeGreaterThanOrEqual(400);
     expect(returnMs).toBeGreaterThanOrEqual(1.3 * pullMs);
 
     const pulley = [...eq.find((s) => s.kind === 'pulley').at, 0];
     const poses = e.frames.map((f) => f.joints);
     const workingLengths = [];
-    for (let t = 0; t <= pullMs; t += 33) {
+    const total = ds.reduce((a, b) => a + b, 0);
+    expect(start.world.weightStack).toBeDefined();
+    expect(end.world.weightStack.liftedBottom - start.world.weightStack.liftedBottom).toBeGreaterThanOrEqual(20);
+
+    for (let t = 0; t <= total; t += 33) {
       const p = rig.poseAtTime(poses, t, ds);
-      const w = rig.chainGeometry(slug, p.ph, BODY).world;
-      const mid = [(w.near.hold[0] + w.far.hold[0]) / 2, (w.near.hold[1] + w.far.hold[1]) / 2, 0];
-      workingLengths.push(dist3(pulley, mid));
+      const g = rig.chainGeometry(slug, p.ph, BODY);
+      const w = g.world;
+      // Weight stack stays lifted throughout the return and never settles onto the resting stack
+      expect(w.weightStack).toBeDefined();
+      expect(w.weightStack.clearance).toBeGreaterThanOrEqual(4.0);
+      const prims = rig.layoutCanonicalFigure(p, { view: e.view, assetKey: e.assetKey, body: BODY });
+      const stackRects = prims.filter((pr) => pr.kind === 'rect' && pr.w >= 6);
+      expect(stackRects).toHaveLength(2);
+      const sortedByY = [...stackRects].sort((a, b) => a.y - b.y);
+      const liftedRect = sortedByY[0];
+      const baseRect = sortedByY[1];
+      expect(baseRect.y - (liftedRect.y + liftedRect.h)).toBeGreaterThanOrEqual(4.0);
+
+      if (t <= pullMs) {
+        const mid = [(w.near.hold[0] + w.far.hold[0]) / 2, (w.near.hold[1] + w.far.hold[1]) / 2, 0];
+        workingLengths.push(dist3(pulley, mid));
+      }
     }
     expectOnlyGrows(workingLengths, 20);
   });
 
-  test('209 Full Range-Of-Motion Lat Pulldown sits between two high pulleys with arms crossed overhead, pulls down in a wide arc to the bottom, and returns slowly with monotonic cable lengthening on both cables', () => {
+  test('209 Full Range-Of-Motion Lat Pulldown sits between two high pulleys with arms crossed overhead and palms facing forward, turns the hands 90 degrees so the palms face each other at the bottom, and returns slowly with monotonic cable lengthening', () => {
     // Quotes (ALL_300_MOTION_MAP.json:15440-15441):
     // "Sit on a high bench or stand between two high pulleys and take the opposite handle in each hand so the arms are crossed overhead with the palms facing forward. With the chest up, pull the handles down in an arc, turning the hands so the palms face each other at the bottom. Return slowly along the same arc until the arms are crossed overhead again."
     // "Chest up. Pull the elbows down and in. Return slowly to a full stretch."
@@ -340,6 +379,9 @@ describe('MOV-A10 vertical pulls and hanging: physics, CoM under grip, cable ten
     const mid = rig.chainGeometry(slug, 0.5, BODY);
     const bottom = rig.chainGeometry(slug, 1, BODY);
 
+    // First caption states palms facing forward
+    expect(e.frames[0].caption.toLowerCase()).toContain('palms facing forward');
+
     // Seated on a high bench between two high pulleys
     const pulleys = start.movement.equipment.filter((s) => s.kind === 'pulley');
     expect(pulleys).toHaveLength(2);
@@ -352,15 +394,30 @@ describe('MOV-A10 vertical pulls and hanging: physics, CoM under grip, cable ten
     expect(start.world.near.wrist[1]).toBeGreaterThan(start.world.head[1] + BODY.hr);
     expect(deg3D(start.world.near.shoulder, start.world.near.elbow, start.world.near.wrist)).toBeGreaterThanOrEqual(175);
 
+    // Hand orientation in poses turns 90 deg from forward at start ([0, 0]) to facing each other at bottom ([0, -90]), and close-up panel shows the turn
+    expect(start.angles.hand).toEqual([0, 0]);
+    expect(bottom.angles.hand).toEqual([0, -90]);
+    expect(start.world.near.grip[0] - start.world.near.wrist[0]).toBeGreaterThan(3.5);
+    expect(bottom.world.near.grip[2] - bottom.world.near.wrist[2]).toBeLessThan(-3.5);
+    expect(bottom.world.far.grip[2] - bottom.world.far.wrist[2]).toBeGreaterThan(3.5);
+    const startPanel = rig.handCloseUp(start);
+    const bottomPanel = rig.handCloseUp(bottom);
+    expect(startPanel).not.toBeNull();
+    expect(bottomPanel).not.toBeNull();
+    expect(startPanel.palmYaw).toBeCloseTo(0, 5);
+    expect(bottomPanel.palmYaw).toBeCloseTo(90, 5);
+    expect(startPanel.palmFacingViewer).toBe(true);
+    expect(bottomPanel.palmFacingViewer).toBe(false);
+
     // Sweeps out in a wide arc at mid-rep, then drives elbows down and in at the bottom
     expect(mid.world.near.wrist[2]).toBeGreaterThan(start.world.near.shoulder[2] + 10);
     expect(bottom.world.near.elbow[1]).toBeLessThan(bottom.world.near.shoulder[1] - 8);
     expect(bottom.world.near.elbow[2]).toBeLessThan(mid.world.near.wrist[2] - 5);
 
-    // Both opposite cables monotonically lengthen on every tick of the working half
+    // Both opposite cables monotonically lengthen on every tick of the working half, with no unsourced bottom hold
     const ds = e.segmentDurationsMs;
     const pullMs = ds[0] + ds[1];
-    const returnMs = ds[3];
+    const returnMs = ds[2] + ds[3];
     expect(returnMs).toBeGreaterThanOrEqual(1.4 * pullMs);
 
     const poses = e.frames.map((f) => f.joints);
@@ -381,7 +438,7 @@ describe('MOV-A10 vertical pulls and hanging: physics, CoM under grip, cable ten
     expectOnlyGrows(farLengths, 30);
   });
 
-  test('77 Straight-Arm Pulldown stands with a small braced hinge facing a high cable, starts with arms at shoulder height, keeps a fixed soft elbow angle throughout, and arcs down to the thighs', () => {
+  test('77 Straight-Arm Pulldown stands with a small braced hinge facing a high cable, starts with arms at shoulder height, keeps a fixed soft elbow angle throughout, and arcs down until the hands make painted contact with the thighs', () => {
     // Quotes (ALL_300_MOTION_MAP.json:6545-6546):
     // "Stand facing a high cable with a straight bar or rope, arms extended in front of you at shoulder height. Keeping a slight elbow bend, pull the attachment down in an arc until your hands reach your thighs. Return under control to shoulder height."
     // "Keep the arms long with one soft elbow angle. Lead the arc with the elbows and let the hands stay quiet. Hold a small, braced hinge."
@@ -400,16 +457,29 @@ describe('MOV-A10 vertical pulls and hanging: physics, CoM under grip, cable ten
     expect(trunkDeg).toBeGreaterThanOrEqual(74);
     expect(trunkDeg).toBeLessThanOrEqual(84);
 
-    // Starts with arms extended in front at shoulder height, arcs down until hands reach the thighs
+    // Starts with arms extended in front at shoulder height, arcs down until hands reach the thighs (painted contact within 0.5 units)
     expect(Math.abs(start.world.near.wrist[1] - start.world.near.shoulder[1])).toBeLessThanOrEqual(2);
     expect(start.world.near.wrist[0]).toBeGreaterThan(start.world.near.shoulder[0] + 20);
     expect(end.world.near.wrist[1]).toBeLessThanOrEqual(end.world.hip[1]);
-    expect(Math.hypot(end.world.near.wrist[0] - end.world.hip[0], end.world.near.wrist[1] - end.world.hip[1])).toBeLessThanOrEqual(9);
+    const handAndThighRadii = BODY.lw * 0.44 + THIGH_HALF;
+    const paintedDistToThigh = segPointDist2D(
+      end.joints.nLeg[0], end.joints.nLeg[1],
+      end.joints.kn[0], end.joints.kn[1],
+      end.grip.near[0], end.grip.near[1],
+    );
+    expect(Math.abs(paintedDistToThigh - handAndThighRadii)).toBeLessThanOrEqual(0.5);
+    const worldSagDistToThigh = segPointDist2D(
+      end.world.near.hipJoint[0], end.world.near.hipJoint[1],
+      end.world.near.knee[0], end.world.near.knee[1],
+      end.world.near.grip[0], end.world.near.grip[1],
+    );
+    expect(Math.abs(worldSagDistToThigh - handAndThighRadii)).toBeLessThanOrEqual(0.5);
     // Not a pushdown: elbow itself travels through a large shoulder arc
     expect(dist3(start.world.near.elbow, end.world.near.elbow)).toBeGreaterThan(15);
 
-    // One fixed soft elbow angle (165..172 deg) across every 33 ms tick, and monotonic cable lengthening
+    // One fixed soft elbow angle (165..172 deg) and constant bar hand spacing across every 33 ms tick, plus monotonic cable lengthening
     const startElbowDeg = deg3D(start.world.near.shoulder, start.world.near.elbow, start.world.near.wrist);
+    const startHandSpan = dist3(start.world.near.grip, start.world.far.grip);
     expect(startElbowDeg).toBeGreaterThanOrEqual(165);
     expect(startElbowDeg).toBeLessThanOrEqual(172);
 
@@ -425,6 +495,7 @@ describe('MOV-A10 vertical pulls and hanging: physics, CoM under grip, cable ten
       const w = rig.chainGeometry(slug, p.ph, BODY).world;
       const elbowDeg = deg3D(w.near.shoulder, w.near.elbow, w.near.wrist);
       expect(Math.abs(elbowDeg - startElbowDeg)).toBeLessThan(0.05);
+      expect(Math.abs(dist3(w.near.grip, w.far.grip) - startHandSpan)).toBeLessThan(1e-6);
       expect(dist3(w.hip, start.world.hip)).toBeLessThan(0.01);
       if (t <= pullMs) {
         const mid = [(w.near.hold[0] + w.far.hold[0]) / 2, (w.near.hold[1] + w.far.hold[1]) / 2, 0];
@@ -434,7 +505,7 @@ describe('MOV-A10 vertical pulls and hanging: physics, CoM under grip, cable ten
     expectOnlyGrows(workingLengths, 25);
   });
 
-  test('211 Gorilla Chin/Crunch hangs with an underhand grip and level shins, pulls up while drawing the knees up together, and finishes with knees at chest height and nose level with the bar', () => {
+  test('211 Gorilla Chin/Crunch hangs with a readable underhand grip and level shins, pulls up while drawing the knees to chest height with internal knee angle >= 35 deg and the shin outline clear of the thigh outline on every tick', () => {
     // Quotes (ALL_300_MOTION_MAP.json:15576-15577):
     // "Hang from a bar with an underhand grip slightly wider than the shoulders and bend the knees so the shins are level with the floor. Pull yourself up while drawing the knees up, finishing with the knees at chest height and the nose level with the bar. Lower slowly to a full hang with the knees bent as at the start."
     // "Pull and crunch together. Knees to the chest. Lower slowly to a full hang."
@@ -449,9 +520,13 @@ describe('MOV-A10 vertical pulls and hanging: physics, CoM under grip, cable ten
     const mid = rig.chainGeometry(slug, 1, BODY);
     const top = rig.chainGeometry(slug, 2, BODY);
 
-    // Underhand grip slightly wider than shoulders, starting from a full hang with knees bent and shins level with the floor
+    // Underhand grip slightly wider than shoulders (readable in magnified hand close-up), starting from a full hang with knees bent and shins level with the floor
     expect(start.world.near.wrist[0]).toBeGreaterThan(BAR_X + 3.0);
     expect(start.world.near.grip[2]).toBeGreaterThan(start.world.near.shoulder[2] + 1.5);
+    const panel = rig.handCloseUp(start);
+    expect(panel).not.toBeNull();
+    expect(panel.grip).toBe('underhand');
+    expect(panel.bar[0]).toBeLessThan(panel.knuckle[0]);
     expect(deg3D(start.world.near.shoulder, start.world.near.elbow, start.world.near.wrist)).toBeGreaterThanOrEqual(174);
     expect(Math.abs(start.world.near.ankle[1] - start.world.near.knee[1])).toBeLessThan(0.5);
 
@@ -466,13 +541,31 @@ describe('MOV-A10 vertical pulls and hanging: physics, CoM under grip, cable ten
     expect(top.world.near.knee[1]).toBeLessThan(top.world.neck[1]);
     expect(Math.abs(top.world.head[1] - BAR_Y)).toBeLessThanOrEqual(1.5);
 
+    // Every tick keeps internal knee angle >= 35 deg and painted shin outline clear of the thigh outline
     const ds = e.segmentDurationsMs;
+    const total = ds.reduce((a, b) => a + b, 0);
+    const poses = e.frames.map((f) => f.joints);
+    const shinHalf = (BODY.lw * 0.9) / 2;
+    for (let t = 0; t <= total; t += 33) {
+      const p = rig.poseAtTime(poses, t, ds);
+      const g = rig.chainGeometry(slug, p.ph, BODY);
+      const w = g.world;
+      expect(deg3D(w.near.hipJoint, w.near.knee, w.near.ankle)).toBeGreaterThanOrEqual(35);
+      expect(deg3D(w.far.hipJoint, w.far.knee, w.far.ankle)).toBeGreaterThanOrEqual(35);
+      const j = g.joints;
+      const shinMid = [(j.kn[0] + j.an[0]) / 2, (j.kn[1] + j.an[1]) / 2];
+      const midDist = segPointDist2D(j.nLeg[0], j.nLeg[1], j.kn[0], j.kn[1], shinMid[0], shinMid[1]);
+      const ankleDist = segPointDist2D(j.nLeg[0], j.nLeg[1], j.kn[0], j.kn[1], j.an[0], j.an[1]);
+      expect(midDist).toBeGreaterThan(THIGH_HALF + shinHalf);
+      expect(ankleDist).toBeGreaterThan(THIGH_HALF + shinHalf);
+    }
+
     const pullMs = ds[0] + ds[1];
-    const lowerMs = ds[3];
+    const lowerMs = ds[2] + ds[3];
     expect(lowerMs).toBeGreaterThanOrEqual(1.3 * pullMs);
   });
 
-  test('64 Hanging Leg Raise hangs with an overhand grip and straight arms and legs, curls the pelvis up to raise the legs above parallel, and lowers slowly to a dead-still hang', () => {
+  test('64 Hanging Leg Raise hangs with a readable overhand grip and straight arms and legs, curls the pelvis up to raise the legs above parallel, and lowers slowly to a dead-still hang', () => {
     // Quotes (ALL_300_MOTION_MAP.json:5666-5667):
     // "Hang from a pull-up bar with an overhand grip, arms and legs straight. Raise your legs until they are at least parallel to the floor, higher if you can keep control. Lower slowly back to a dead hang. Bend your knees to make it easier."
     // "Curl the pelvis up towards the ribs. Dead-still hang between reps. Slow on the way down."
@@ -486,8 +579,12 @@ describe('MOV-A10 vertical pulls and hanging: physics, CoM under grip, cable ten
     const start = rig.chainGeometry(slug, 0, BODY);
     const top = rig.chainGeometry(slug, rig.CHAIN_MOVEMENTS[slug].poses.length - 1, BODY);
 
-    // Overhand grip, arms and legs kept straight across every 33 ms tick
+    // Overhand grip (readable in magnified hand close-up), arms and legs kept straight across every 33 ms tick
     expect(start.world.near.wrist[0]).toBeLessThan(BAR_X - 3.0);
+    const panel = rig.handCloseUp(start);
+    expect(panel).not.toBeNull();
+    expect(panel.grip).toBe('overhand');
+    expect(panel.bar[0]).toBeGreaterThan(panel.knuckle[0]);
     const ds = e.segmentDurationsMs;
     const total = ds.reduce((a, b) => a + b, 0);
     const poses = e.frames.map((f) => f.joints);
@@ -505,9 +602,25 @@ describe('MOV-A10 vertical pulls and hanging: physics, CoM under grip, cable ten
 
     // Slow lower and dead-still hang between reps
     const raiseMs = ds[0] + ds[1];
-    const lowerMs = ds[3] + ds[4];
-    const deadStillHangMs = ds[5];
+    const lowerMs = ds[2] + ds[3];
+    const deadStillHangMs = ds[4];
     expect(lowerMs).toBeGreaterThanOrEqual(1.3 * raiseMs);
     expect(deadStillHangMs).toBeGreaterThanOrEqual(400);
+  });
+
+  test('unsourced hold captions and held segments are absent from 6, 13, 71, 209, 77, and 211; only 108 (chest pause) and 64 (dead-still hang) retain source-mandated pauses', () => {
+    for (const id of [6, 13, 71, 209, 77, 211]) {
+      const e = entryFor(id);
+      for (let i = 0; i < e.frames.length - 1; i++) {
+        expect(e.frames[i].joints.ph).not.toBe(e.frames[i + 1].joints.ph);
+      }
+      for (const f of e.frames) {
+        expect(f.caption).not.toMatch(/\b(hold|pause)\b/i);
+      }
+    }
+    const e64 = entryFor(64);
+    for (const f of e64.frames) {
+      expect(f.caption).not.toMatch(/\bhold\b/i);
+    }
   });
 });
