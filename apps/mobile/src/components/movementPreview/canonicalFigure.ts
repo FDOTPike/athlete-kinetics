@@ -1298,6 +1298,10 @@ export interface ChainMovement {
   plateRadius?: number;
   /** Whether a held barbell wears a thick pad around the middle of its shaft (as in a Barbell Hip Thrust). */
   barPad?: boolean;
+  /** Boards banded to the chest for a Board Press: position along the spine from neck to hip (0..1), length along the chest, and board stack height. */
+  chestBoard?: { along: number; length: number; height: number };
+  /** Whether a held kettlebell starts with the palm facing in at phase 0 and turns 90 degrees as the arm presses to phase 1. */
+  kettlebellTurn?: boolean;
   /** For 'longBar': the point on the floor the bar's far end is braced at, and the bar's whole length from there. */
   barAnchor?: ChainPoint;
   barLength?: number;
@@ -4634,6 +4638,340 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       },
     ],
   },
+  // Family 34 (MOV-A05): horizontal, incline, decline, floor, board, pin, and cable presses.
+  // 3 Competition Bench:
+  // "Plant the feet and pin the upper back to the bench before taking a secure competition-width
+  // grip. Unrack to straight arms, settle the bar, then lower to the same chest touch point with
+  // stacked forearms. Hold the competition pause before pressing back to lockout."
+  'competition-bench': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 48,
+    implement: 'bar',
+    footSpread: 5.2,
+    elbowPole: [-24.4, 24.2],
+    equipment: chainFlatBench(-18, 13, 18.0),
+    poses: [
+      {
+        at: [10, 23.89], trunk: 174.53, curl: -8, head: 178,
+        thigh: 0, shin: -90, ankle: [22, CHAIN_ANKLE_HEIGHT],
+        upperArm: 90, forearm: 90,
+        wrist: [-12.97, 48.41, 14.5], farWrist: [-12.97, 48.41, -14.5],
+      },
+      {
+        at: [10, 23.89], trunk: 174.53, curl: -8, head: 178,
+        thigh: 0, shin: -90, ankle: [22, CHAIN_ANKLE_HEIGHT],
+        upperArm: 0, forearm: 90,
+        wrist: [-3.58, 31.8, 14.5], farWrist: [-3.58, 31.8, -14.5],
+      },
+    ],
+  },
+  // 43 Close-Grip Bench Press:
+  // "Lie on a bench and grip the bar at about shoulder width, not narrower. Unrack and lower the
+  // bar to your lower chest, elbows staying close to your sides. Press back up to straight arms."
+  'close-grip-bench-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 48,
+    implement: 'bar',
+    footSpread: 4.5,
+    elbowPole: [-22.1, 0.1],
+    equipment: chainFlatBench(-18, 13, 18.0),
+    poses: [
+      {
+        at: [10, 23.90], trunk: 175.55, curl: -6, head: 178,
+        thigh: 0, shin: -90, ankle: [22, CHAIN_ANKLE_HEIGHT],
+        upperArm: 90, forearm: 90,
+        wrist: [-12.48, 48.92, 9.4], farWrist: [-12.48, 48.92, -9.4],
+      },
+      {
+        at: [10, 23.90], trunk: 175.55, curl: -6, head: 178,
+        thigh: 0, shin: -90, ankle: [22, CHAIN_ANKLE_HEIGHT],
+        upperArm: 0, forearm: 90,
+        wrist: [-2.4, 31.8, 9.4], farWrist: [-2.4, 31.8, -9.4],
+      },
+    ],
+  },
+  // 45 Decline Bench Press:
+  // "Hook your legs into the decline bench and take the bar just wider than shoulder width. Lower
+  // to the lower line of your chest — the decline shortens the stroke, so expect to touch sooner
+  // than on flat. Press back to lockout over your eyes."
+  'decline-bench-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 48,
+    implement: 'bar',
+    feet: 'free',
+    elbowPole: [-9.3, 11.1],
+    equipment: [
+      { kind: 'slab', a: [-20.72, 7.82], b: [9.24, 18.38] },
+      { kind: 'post', at: [-16, 7.5] },
+      { kind: 'post', at: [7, 16.5] },
+      { kind: 'post', at: [24.2, 31.0] },
+      { kind: 'frame', a: [9.24, 18.38], b: [24.2, 31.0] },
+      { kind: 'frame', a: [24.2, 31.0], b: [40.5, 19.0] },
+      { kind: 'roller', at: [24.2, 31.0] },
+      { kind: 'roller', at: [40.5, 19.0] },
+    ],
+    poses: [
+      {
+        at: [4, 25.0], trunk: 198, head: 190,
+        thigh: [24, 6], shin: [-50, 4], foot: 30,
+        upperArm: 90, forearm: 90,
+        wrist: [-25.4, 41.04, 11.8], farWrist: [-25.4, 41.04, -11.8],
+      },
+      {
+        at: [4, 25.0], trunk: 198, head: 190,
+        thigh: [24, 6], shin: [-50, 4], foot: 30,
+        upperArm: 0, forearm: 90,
+        wrist: [-6.72, 27.6, 11.8], farWrist: [-6.72, 27.6, -11.8],
+      },
+    ],
+  },
+  // 102 Decline Dumbbell Bench Press:
+  // "Secure the legs in a decline bench, sit with the dumbbells on the thighs, then lie back and
+  // bring the bells to the chest before pressing them into position. Lower toward the lower chest
+  // with the forearms vertical and the shoulder blades pinned into the pad. Press up and slightly
+  // inward"
+  'decline-dumbbell-bench-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 48,
+    implement: 'bells',
+    feet: 'free',
+    elbowPole: [-20.2, 19.2],
+    equipment: [
+      { kind: 'slab', a: [-20.72, 7.82], b: [9.24, 18.38] },
+      { kind: 'post', at: [-16, 7.5] },
+      { kind: 'post', at: [7, 16.5] },
+      { kind: 'post', at: [24.2, 31.0] },
+      { kind: 'frame', a: [9.24, 18.38], b: [24.2, 31.0] },
+      { kind: 'frame', a: [24.2, 31.0], b: [40.5, 19.0] },
+      { kind: 'roller', at: [24.2, 31.0] },
+      { kind: 'roller', at: [40.5, 19.0] },
+    ],
+    poses: [
+      {
+        at: [4, 25.0], trunk: 198, head: 190,
+        thigh: [24, 6], shin: [-50, 4], foot: 30,
+        upperArm: 90, forearm: 90,
+        wrist: [-20.83, 41.91, 7.5], farWrist: [-20.83, 41.91, -7.5],
+      },
+      {
+        at: [4, 25.0], trunk: 198, head: 190,
+        thigh: [24, 6], shin: [-50, 4], foot: 30,
+        upperArm: 0, forearm: 90,
+        wrist: [-7.75, 25.5, 13.5], farWrist: [-7.75, 25.5, -13.5],
+      },
+    ],
+  },
+  // 65 Incline Dumbbell Press:
+  // "Set the bench between 30 and 45 degrees — lower hits more chest, higher bleeds into
+  // shoulders. Kick the dumbbells up off your knees one at a time and start from the top. Lower to
+  // a deep stretch just outside your chest with your elbows about 45 degrees from your sides, then
+  // press up and slightly back so the dumbbells finish over your face, not your belly."
+  'incline-dumbbell-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 48,
+    implement: 'bells',
+    footSpread: 4.8,
+    elbowPole: [-45.9, 34.9],
+    equipment: [
+      { kind: 'slab', a: [-27.01, 30.3], b: [0.32, 12.19] },
+      { kind: 'slab', a: [-1, 15.54], b: [14, 15.54] },
+      { kind: 'post', at: [-18, 22] },
+      { kind: 'post', at: [10, 13.5] },
+    ],
+    poses: [
+      {
+        at: [4, 19.6], trunk: 145, head: 152,
+        thigh: 0, shin: -90, ankle: [22, CHAIN_ANKLE_HEIGHT],
+        upperArm: 90, forearm: 90,
+        wrist: [-21.5, 57.06, 7.5], farWrist: [-21.5, 57.06, -7.5],
+      },
+      {
+        at: [4, 19.6], trunk: 145, head: 152,
+        thigh: 0, shin: -90, ankle: [22, CHAIN_ANKLE_HEIGHT],
+        upperArm: 0, forearm: 90,
+        wrist: [-8.52, 38.0, 16.53], farWrist: [-8.52, 38.0, -16.53],
+      },
+    ],
+  },
+  // 151 Board Press:
+  // "Lie on the bench and band the boards securely to the chest; confirm they remain fixed before
+  // unracking... Set the feet, arch the back, and retract the shoulder blades, then take the bar
+  // out of the rack without protracting the shoulders. Lower the bar under control until it settles
+  // on the boards. Drive the bar up with force, keeping the elbows tucked until lockout."
+  'board-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 48,
+    implement: 'bar',
+    footSpread: 5.2,
+    elbowPole: [-3.6, 11.1],
+    chestBoard: { along: 0.25, length: 10.0, height: 4.2 },
+    equipment: chainFlatBench(-18, 13, 18.0),
+    poses: [
+      {
+        at: [10, 23.84], trunk: 170.48, curl: -16, head: 176,
+        thigh: 0, shin: -90, ankle: [21, CHAIN_ANKLE_HEIGHT],
+        upperArm: 90, forearm: 90,
+        wrist: [-12.91, 48.8, 11.8], farWrist: [-12.91, 48.8, -11.8],
+      },
+      {
+        at: [10, 23.84], trunk: 170.48, curl: -16, head: 176,
+        thigh: 0, shin: -90, ankle: [21, CHAIN_ANKLE_HEIGHT],
+        upperArm: 0, forearm: 90,
+        wrist: [-1.67, 35.7, 11.8], farWrist: [-1.67, 35.7, -11.8],
+      },
+    ],
+  },
+  // 252 Pin Presses:
+  // "Set a bench inside a rack with the pins at the chosen height and the bar resting on them, then
+  // lie back with the bar above your usual touch point, shoulder blades pulled together and feet
+  // set. From a full pause on the pins, drive the bar up to straight arms, keeping the bar, wrists
+  // and elbows in line. Lower the bar back to the pins and let it settle before the next
+  // repetition."
+  'pin-presses': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 48,
+    implement: 'bar',
+    footSpread: 4.8,
+    elbowPole: [1.4, 13.0],
+    equipment: [
+      ...chainFlatBench(-18, 13, 18.0),
+      { kind: 'frame', a: [-17, 0.5, -15.5], b: [-17, 74, -15.5], layer: 'behind' },
+      { kind: 'frame', a: [12, 0.5, -15.5], b: [12, 74, -15.5], layer: 'behind' },
+      { kind: 'frame', a: [-17, 35.2, -15.5], b: [12, 35.2, -15.5], layer: 'behind' },
+      { kind: 'frame', a: [-9.0, 0.5, 9.5], b: [-9.0, 35.2, 9.5], layer: 'front' },
+      { kind: 'frame', a: [5.0, 0.5, 9.5], b: [5.0, 35.2, 9.5], layer: 'front' },
+      { kind: 'frame', a: [-9.0, 35.2, 9.5], b: [5.0, 35.2, 9.5], layer: 'front' },
+    ],
+    poses: [
+      {
+        at: [10, 23.90], trunk: 175.55, curl: -6, head: 178,
+        thigh: 0, shin: -90, ankle: [22, CHAIN_ANKLE_HEIGHT],
+        upperArm: 0, forearm: 90,
+        wrist: [-1.81, 36.8, 12.2], farWrist: [-1.81, 36.8, -12.2],
+      },
+      {
+        at: [10, 23.90], trunk: 175.55, curl: -6, head: 178,
+        thigh: 0, shin: -90, ankle: [22, CHAIN_ANKLE_HEIGHT],
+        upperArm: 90, forearm: 90,
+        wrist: [-12.98, 48.79, 12.2], farWrist: [-12.98, 48.79, -12.2],
+      },
+    ],
+  },
+  // 203 Floor Press:
+  // "Lie on the floor with your head inside a rack, the bar set on low hooks, shoulder blades
+  // pulled together, and lift the bar off with straight arms. Lower the bar toward the lower chest
+  // with the elbows tucked until the upper arms rest on the floor, and pause. Press the bar back
+  // up, keeping the bar, wrists and elbows in line."
+  'floor-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 48,
+    implement: 'bar',
+    footSpread: 4.2,
+    kneePole: 90,
+    elbowPole: [-24.3, 14.9],
+    equipment: [
+      { kind: 'frame', a: [-23.5, 0.5, -15.5], b: [-23.5, 48, -15.5], layer: 'behind' },
+      { kind: 'frame', a: [-23.5, 29.5, -15.5], b: [-19.5, 29.5, -15.5], layer: 'behind' },
+      { kind: 'frame', a: [-23.5, 0.5, 15.5], b: [-23.5, 48, 15.5], layer: 'front' },
+      { kind: 'frame', a: [-23.5, 29.5, 15.5], b: [-19.5, 29.5, 15.5], layer: 'front' },
+    ],
+    poses: [
+      {
+        at: [10, 5.91], trunk: 176.56, curl: -4, head: 178,
+        thigh: 42, shin: -52, ankle: [38, CHAIN_ANKLE_HEIGHT],
+        upperArm: 90, forearm: 90,
+        wrist: [-12.99, 30.74, 12.6], farWrist: [-12.99, 30.74, -12.6],
+      },
+      {
+        at: [10, 5.91], trunk: 176.56, curl: -4, head: 178,
+        thigh: 42, shin: -52, ankle: [38, CHAIN_ANKLE_HEIGHT],
+        upperArm: 0, forearm: 90,
+        wrist: [-2.98, 13.54, 12.6], farWrist: [-2.98, 13.54, -12.6],
+      },
+    ],
+  },
+  // 249 One-Arm Kettlebell Floor Press:
+  // "Lie on the floor holding a kettlebell in one hand with that upper arm resting on the floor
+  // and the palm facing in. Press the kettlebell straight up until the arm is straight, letting
+  // the wrist turn as it rises. Lower it slowly until the upper arm rests on the floor again."
+  'one-arm-kettlebell-floor-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 48,
+    implement: 'kettlebell',
+    kettlebellTurn: true,
+    footSpread: 4.2,
+    kneePole: 90,
+    elbowPole: [-24.0, 12.1],
+    poses: [
+      {
+        at: [10, 5.91], trunk: 176.56, curl: -4, head: 178,
+        thigh: 42, shin: -52, ankle: [38, CHAIN_ANKLE_HEIGHT],
+        upperArm: 0, forearm: 90,
+        wrist: [-2.82, 13.54, 12.0], farWrist: [4.5, 9.5, -26.5],
+      },
+      {
+        at: [10, 5.91], trunk: 176.56, curl: -4, head: 178,
+        thigh: 42, shin: -52, ankle: [38, CHAIN_ANKLE_HEIGHT],
+        upperArm: 90, forearm: 90,
+        wrist: [-12.5, 31.83, 9.4], farWrist: [4.5, 9.5, -26.5],
+      },
+    ],
+  },
+  // 83 Cable Chest Press:
+  // "Set two handles at chest height, face away, and take a staggered stance. Press both handles
+  // forward until your arms are long, letting them drift together at the end. Return under control
+  // — the cable pulls backward the entire rep, so the squeeze at lockout is real work here."
+  'cable-chest-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 55,
+    pitchDeg: 15,
+    originX: 50,
+    implement: 'handles',
+    elbowPole: [-90, 70],
+    equipment: [
+      { kind: 'frame', a: [-26, 0.5, 24], b: [-26, 78, 24] },
+      { kind: 'frame', a: [-26, 0.5, -24], b: [-26, 78, -24] },
+      { kind: 'pulley', at: STANDING_PRESS_PULLEYS[0] },
+      { kind: 'pulley', at: STANDING_PRESS_PULLEYS[1] },
+    ],
+    lines: [
+      { from: STANDING_PRESS_PULLEYS[0], to: 'nearGrip' },
+      { from: STANDING_PRESS_PULLEYS[1], to: 'farGrip', depth: 'far' },
+    ],
+    poses: [
+      {
+        at: STANDING_PRESS_HIP, trunk: 84, head: 86,
+        thigh: -90, shin: -90, ankle: [-10, CHAIN_ANKLE_HEIGHT], farAnkle: [10, CHAIN_ANKLE_HEIGHT],
+        upperArm: 0, forearm: 0,
+        wrist: [8.0, 64.5, 19.5], farWrist: [8.0, 64.5, -19.5],
+      },
+      {
+        at: STANDING_PRESS_HIP, trunk: 84, head: 86,
+        thigh: -90, shin: -90, ankle: [-10, CHAIN_ANKLE_HEIGHT], farAnkle: [10, CHAIN_ANKLE_HEIGHT],
+        upperArm: 0, forearm: 0,
+        wrist: [25.25, 64.5, 1.5], farWrist: [25.25, 64.5, -1.5],
+      },
+    ],
+  },
   // chain movements are added above this line
 };
 
@@ -5094,8 +5432,15 @@ function layoutChainExtras(
       far.push({ kind: 'circle', cx: fc[0], cy: fc[1], r: KETTLEBELL_RADIUS, fill: farColor, stroke: 'ink1', strokeWidth: 1, opacity: farOpacity });
       far.push(line(fa, fb, 2.2, farColor, farOpacity));
     }
-    const a = project(chainAdd(w.near.hold, [0, 0, 1], -2.6)), b = project(chainAdd(w.near.hold, [0, 0, 1], 2.6));
-    const c = project(chainAdd(w.near.hold, KETTLEBELL_REST, 1));
+    const turnT = movement.kettlebellTurn ? Math.max(0, Math.min(1, figure.ph)) : 1;
+    const hAxis: ChainVec = movement.kettlebellTurn
+      ? [Math.cos(turnT * Math.PI / 2), 0, Math.sin(turnT * Math.PI / 2)]
+      : [0, 0, 1];
+    const kbRest: ChainVec = movement.kettlebellTurn
+      ? [-1.8 * turnT, -2.2, 2.2 * (1 - turnT) + 1.4 * turnT]
+      : KETTLEBELL_REST;
+    const a = project(chainAdd(w.near.hold, hAxis, -2.6)), b = project(chainAdd(w.near.hold, hAxis, 2.6));
+    const c = project(chainAdd(w.near.hold, kbRest, 1));
     near.push({ kind: 'circle', cx: c[0], cy: c[1], r: KETTLEBELL_RADIUS, fill: 'textHi', stroke: 'ink1', strokeWidth: 1, opacity: 1 });
     near.push(line(a, b, 2.2, 'textHi', 1));
   } else if (kind === 'handle' || kind === 'handles' || kind === 'rope') {
@@ -5947,6 +6292,39 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
       thickness, 'textLow', 1,
     ));
   }
+  if (chain && chain.movement.chestBoard) {
+    const b = chain.movement.chestBoard;
+    const bi = Math.max(0, Math.min(slices, Math.round(b.along * slices)));
+    const bt = bi / slices;
+    const here = curledSpine ? curledSpine[bi] : at(bt);
+    const before = curledSpine ? curledSpine[Math.max(0, bi - 1)] : j.nk;
+    const after = curledSpine ? curledSpine[Math.min(slices, bi + 1)] : j.hp;
+    const run = Math.hypot(after[0] - before[0], after[1] - before[1]) || 1;
+    const bAxis: CanonicalPoint = [(after[0] - before[0]) / run, (after[1] - before[1]) / run];
+    const across: CanonicalPoint = [-(after[1] - before[1]) / run, (after[0] - before[0]) / run];
+    const upNormal: CanonicalPoint = across[1] <= 0 ? across : [-across[0], -across[1]];
+    const half = !front
+      ? sw + (Math.min(hw, sw * 0.9) - sw) * bt
+      : bt <= 0.56 ? sw + (waistWidth - sw) * (bt / 0.56) : waistWidth + (hw - waistWidth) * ((bt - 0.56) / 0.44);
+    const boardCenter: CanonicalPoint = [
+      here[0] + upNormal[0] * (half + b.height / 2),
+      here[1] + upNormal[1] * (half + b.height / 2),
+    ];
+    const halfLen = b.length / 2;
+    prims.push(bone(
+      [boardCenter[0] - bAxis[0] * halfLen, boardCenter[1] - bAxis[1] * halfLen],
+      [boardCenter[0] + bAxis[0] * halfLen, boardCenter[1] + bAxis[1] * halfLen],
+      b.height, 'textMid', 1,
+    ));
+    for (const sOff of [-halfLen * 0.45, halfLen * 0.45]) {
+      const sc: CanonicalPoint = [here[0] + bAxis[0] * sOff, here[1] + bAxis[1] * sOff];
+      prims.push(bone(
+        [sc[0] - upNormal[0] * half, sc[1] - upNormal[1] * half],
+        [sc[0] + upNormal[0] * (half + b.height), sc[1] + upNormal[1] * (half + b.height)],
+        1.1, 'ink1', 0.85,
+      ));
+    }
+  }
 
   // B1-113: the near cable passes behind the near leg, never over it.
   if (cableDraw) prims.push(...cableDraw.nearCable);
@@ -6339,6 +6717,17 @@ export const EQUIPMENT_BY_SLUG: Record<string, string> = {
   // Family 38: the incline shoulder raises.
   'barbell-incline-shoulder-raise': 'barbell',
   'dumbbell-incline-shoulder-raise': 'dumbbells',
+  // Family 34 (MOV-A05): the horizontal, incline, decline, floor, board, pin, and cable presses.
+  'competition-bench': 'barbell',
+  'close-grip-bench-press': 'barbell',
+  'decline-bench-press': 'barbell',
+  'decline-dumbbell-bench-press': 'dumbbells',
+  'incline-dumbbell-press': 'dumbbells',
+  'board-press': 'barbell',
+  'pin-presses': 'barbell',
+  'floor-press': 'barbell',
+  'one-arm-kettlebell-floor-press': 'kettlebell',
+  'cable-chest-press': 'cable_machine',
 };
 
 /**
