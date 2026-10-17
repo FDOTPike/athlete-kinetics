@@ -208,9 +208,10 @@ describe('MOV-A01 per-movement source-bound biomechanics', () => {
     }
   });
 
-  test('123 Narrow Stance Squats: stance narrower than shoulder width, knees travel forward over toes into a deep squat', () => {
+  test('123 Narrow Stance Squats: stance narrower than shoulder width, toes turned slightly out, knees travel forward over toes into a deep squat', () => {
     const row = rowFor(123);
     expect(row.source.instructions).toContain('stance narrower than shoulder width');
+    expect(row.source.instructions).toContain('with the toes turned slightly out');
     expect(row.source.instructions).toContain('let the knees travel forward as the hips sit down');
     expect(row.source.cues).toContain('Send the knees forward over the toes');
 
@@ -224,6 +225,15 @@ describe('MOV-A01 per-movement source-bound biomechanics', () => {
     const compAnkleSpanZ = compTop.world.near.ankle[2] - compTop.world.far.ankle[2];
     expect(narrowAnkleSpanZ).toBeLessThan(shoulderSpanZ - 6);
     expect(narrowAnkleSpanZ).toBeLessThan(compAnkleSpanZ - 10);
+
+    // Planted feet turn slightly outward (near +Z, far -Z) and knees track outward along the toe direction.
+    const nearToeYaw = (Math.atan2(top.world.near.toe[2] - top.world.near.ankle[2], top.world.near.toe[0] - top.world.near.ankle[0]) * 180) / Math.PI;
+    const farToeYaw = (Math.atan2(-(top.world.far.toe[2] - top.world.far.ankle[2]), top.world.far.toe[0] - top.world.far.ankle[0]) * 180) / Math.PI;
+    const nearKneeYaw = (Math.atan2(bottom.world.near.knee[2] - bottom.world.near.ankle[2], bottom.world.near.knee[0] - bottom.world.near.ankle[0]) * 180) / Math.PI;
+    expect(nearToeYaw).toBeGreaterThanOrEqual(15);
+    expect(nearToeYaw).toBeLessThanOrEqual(30);
+    expect(farToeYaw).toBeCloseTo(nearToeYaw, 5);
+    expect(Math.abs(nearKneeYaw - nearToeYaw)).toBeLessThanOrEqual(8);
 
     // Deep squat with knees travelling well forward over the toes.
     expect(bottom.world.near.knee[0]).toBeGreaterThan(bottom.world.near.toe[0] + 9);
@@ -255,9 +265,10 @@ describe('MOV-A01 per-movement source-bound biomechanics', () => {
     expect(lenTop).toBeGreaterThan(lenBottom + 18);
   });
 
-  test('299 Wide Stance Barbell Squat: stance wider than the shoulders, knees pushed out, thighs just below level with floor', () => {
+  test('299 Wide Stance Barbell Squat: stance wider than the shoulders, toes turned slightly out, knees pushed out, thighs just below level with floor', () => {
     const row = rowFor(299);
     expect(row.source.instructions).toContain('stance wider than the shoulders');
+    expect(row.source.instructions).toContain('with the toes turned slightly out');
     expect(row.source.instructions).toContain('until the thighs are just below level with the floor');
 
     const top = chainGeometry('wide-stance-barbell-squat', 0, BODY);
@@ -269,6 +280,15 @@ describe('MOV-A01 per-movement source-bound biomechanics', () => {
     const compAnkleSpanZ = compTop.world.near.ankle[2] - compTop.world.far.ankle[2];
     expect(wideAnkleSpanZ).toBeGreaterThan(shoulderSpanZ + 9);
     expect(wideAnkleSpanZ).toBeGreaterThan(compAnkleSpanZ + 5);
+
+    // Planted feet turn outward (near +Z, far -Z) and knees track outward along the toe direction.
+    const nearToeYaw = (Math.atan2(top.world.near.toe[2] - top.world.near.ankle[2], top.world.near.toe[0] - top.world.near.ankle[0]) * 180) / Math.PI;
+    const farToeYaw = (Math.atan2(-(top.world.far.toe[2] - top.world.far.ankle[2]), top.world.far.toe[0] - top.world.far.ankle[0]) * 180) / Math.PI;
+    const nearKneeYaw = (Math.atan2(bottom.world.near.knee[2] - bottom.world.near.hipJoint[2], bottom.world.near.knee[0] - bottom.world.near.hipJoint[0]) * 180) / Math.PI;
+    expect(nearToeYaw).toBeGreaterThanOrEqual(20);
+    expect(nearToeYaw).toBeLessThanOrEqual(35);
+    expect(farToeYaw).toBeCloseTo(nearToeYaw, 5);
+    expect(Math.abs(nearKneeYaw - nearToeYaw)).toBeLessThanOrEqual(10);
 
     // Thighs just below level with the floor at the bottom.
     expect(bottom.world.hip[1]).toBeLessThan(bottom.world.near.knee[1]);

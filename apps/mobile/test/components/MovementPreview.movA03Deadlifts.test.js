@@ -90,6 +90,12 @@ describe('MOV-A03 floor and sumo deadlifts: batch-wide floor plates, straight ar
       expect(includedAngleDeg(fig.world.far.shoulder, fig.world.far.elbow, fig.world.far.wrist)).toBeCloseTo(180, 3);
     }
 
+    // Full standing lockout at the top (ph = 1): knees locked out (>= 172 deg) and hips extended under shoulders.
+    const topFig = chainGeometry(slug, 1, BODY);
+    expect(includedAngleDeg(topFig.world.near.hipJoint, topFig.world.near.knee, topFig.world.near.ankle)).toBeGreaterThanOrEqual(172);
+    expect(includedAngleDeg(topFig.world.far.hipJoint, topFig.world.far.knee, topFig.world.far.ankle)).toBeGreaterThanOrEqual(172);
+    expect(Math.abs(topFig.world.hip[0] - topFig.world.neck[0])).toBeLessThanOrEqual(0.5);
+
     const total = entry.segmentDurationsMs.reduce((a, b) => a + b, 0);
     for (let t = 0; t <= total; t += 33) {
       const pose = poseAtTime(entry.frames.map((f) => f.joints), t, entry.segmentDurationsMs);
@@ -123,17 +129,24 @@ describe('MOV-A03 floor and sumo deadlifts: batch-wide floor plates, straight ar
     }
   });
 
-  test('sumo start trunk is at least 45 deg from horizontal and at least 10 deg more upright than conventional start, while deficit start has deeper knee and hip bend', () => {
+  test('conventional floor deadlifts start with arms near vertical, shins brought to the bar, and hips above knees, while sumo start trunk is at least 45 deg and deficit has deeper bend', () => {
     const trunkAngleFromHorizontal = (id) => {
       const j = chainGeometry(slugOf(entryById(id)), 0, BODY).joints;
       return (Math.atan2(j.hp[1] - j.nk[1], j.nk[0] - j.hp[0]) * 180) / Math.PI;
     };
-    const convTrunk = trunkAngleFromHorizontal(2);
-    expect(convTrunk).toBeGreaterThanOrEqual(18);
-    expect(convTrunk).toBeLessThanOrEqual(22);
-    for (const id of [176, 257]) {
-      expect(trunkAngleFromHorizontal(id)).toBeCloseTo(convTrunk, 5);
+    for (const id of [2, 176, 257]) {
+      const floor = chainGeometry(slugOf(entryById(id)), 0, BODY);
+      const j0 = floor.joints;
+      const armDegFromVertical = Math.abs((Math.atan2(j0.nk[0] - j0.wr[0], j0.wr[1] - j0.nk[1]) * 180) / Math.PI);
+      const barFloorX = (floor.world.near.hold[0] + floor.world.far.hold[0]) / 2;
+      const shinFrac = (CHAIN_FLOOR_BAR_HEIGHT - floor.world.near.ankle[1]) / (floor.world.near.knee[1] - floor.world.near.ankle[1]);
+      const shinXAtBar = floor.world.near.ankle[0] + shinFrac * (floor.world.near.knee[0] - floor.world.near.ankle[0]);
+      expect(armDegFromVertical).toBeLessThanOrEqual(10);
+      expect(barFloorX - shinXAtBar).toBeGreaterThan(0);
+      expect(barFloorX - shinXAtBar).toBeLessThanOrEqual(2.5);
+      expect(floor.world.hip[1]).toBeGreaterThan(floor.world.near.knee[1] + 1.0);
     }
+    const convTrunk = trunkAngleFromHorizontal(2);
     const defTrunk = trunkAngleFromHorizontal(46);
     expect(defTrunk).toBeLessThan(convTrunk - 4);
     for (const id of SUMO_IDS) {

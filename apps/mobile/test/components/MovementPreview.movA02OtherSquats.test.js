@@ -250,14 +250,25 @@ describe('MOV-A02 per-movement source-bound biomechanics', () => {
     }
   };
 
-  test('140 Barbell Squat To A Bench: bar on upper back, bench behind, hips lightly touch bench and stand without resting', () => {
+  test('140 Barbell Squat To A Bench: bar on upper back, toes turned out with knees tracking toes, bench behind, hips lightly touch bench and stand without resting', () => {
     const row = rowFor(140);
     expect(row.source.instructions).toContain('until you lightly touch the bench');
     expect(row.source.instructions).toContain('without resting on the bench');
+    expect(row.source.cues).toContain('knees in line with the toes');
 
     const entry = entryFor(140);
     const boxEntry = entryFor(38);
+    const top = chainGeometry('barbell-squat-to-a-bench', 0, BODY);
     const bottom = chainGeometry('barbell-squat-to-a-bench', 1, BODY);
+
+    // Planted feet turn outward and knees track in line with the toes at the bottom.
+    const nearToeYaw = (Math.atan2(top.world.near.toe[2] - top.world.near.ankle[2], top.world.near.toe[0] - top.world.near.ankle[0]) * 180) / Math.PI;
+    const farToeYaw = (Math.atan2(-(top.world.far.toe[2] - top.world.far.ankle[2]), top.world.far.toe[0] - top.world.far.ankle[0]) * 180) / Math.PI;
+    const nearKneeYaw = (Math.atan2(bottom.world.near.knee[2] - bottom.world.near.hipJoint[2], bottom.world.near.knee[0] - bottom.world.near.hipJoint[0]) * 180) / Math.PI;
+    expect(nearToeYaw).toBeGreaterThanOrEqual(15);
+    expect(nearToeYaw).toBeLessThanOrEqual(30);
+    expect(farToeYaw).toBeCloseTo(nearToeYaw, 5);
+    expect(Math.abs(nearKneeYaw - nearToeYaw)).toBeLessThanOrEqual(8);
 
     // Painted underside of the hips and thighs lightly touches the painted bench top (gap within 0.5 units, no penetration).
     expectPaintedBenchContact(entry);
@@ -277,15 +288,25 @@ describe('MOV-A02 per-movement source-bound biomechanics', () => {
     expect(bottomFrames38).toHaveLength(2);
   });
 
-  test('192 Dumbbell Squat To A Bench: dumbbells held at the sides with arms long, hips lightly touch bench without resting', () => {
+  test('192 Dumbbell Squat To A Bench: dumbbells held at the sides with arms long, toes slightly turned out, hips lightly touch bench without resting', () => {
     const row = rowFor(192);
     expect(row.source.instructions).toContain('with a dumbbell in each hand at your sides');
+    expect(row.source.instructions).toContain('and toes turned slightly out');
     expect(row.source.instructions).toContain('until you lightly touch the bench');
     expect(row.source.instructions).toContain('without resting on the bench');
 
     const entry = entryFor(192);
     const top = chainGeometry('dumbbell-squat-to-a-bench', 0, BODY);
     const bottom = chainGeometry('dumbbell-squat-to-a-bench', 1, BODY);
+
+    // Planted feet turn slightly outward and knees track in line with the toes at the bottom.
+    const nearToeYaw = (Math.atan2(top.world.near.toe[2] - top.world.near.ankle[2], top.world.near.toe[0] - top.world.near.ankle[0]) * 180) / Math.PI;
+    const farToeYaw = (Math.atan2(-(top.world.far.toe[2] - top.world.far.ankle[2]), top.world.far.toe[0] - top.world.far.ankle[0]) * 180) / Math.PI;
+    const nearKneeYaw = (Math.atan2(bottom.world.near.knee[2] - bottom.world.near.hipJoint[2], bottom.world.near.knee[0] - bottom.world.near.hipJoint[0]) * 180) / Math.PI;
+    expect(nearToeYaw).toBeGreaterThanOrEqual(15);
+    expect(nearToeYaw).toBeLessThanOrEqual(30);
+    expect(farToeYaw).toBeCloseTo(nearToeYaw, 5);
+    expect(Math.abs(nearKneeYaw - nearToeYaw)).toBeLessThanOrEqual(8);
 
     // Arms hang long at the sides (wrists well below elbows and shoulders, and at/below hip height).
     for (const fig of [top, bottom]) {
@@ -298,13 +319,14 @@ describe('MOV-A02 per-movement source-bound biomechanics', () => {
     expect(entry.frames.filter((f) => f.joints.ph === 1)).toHaveLength(1);
   });
 
-  test('81 Zercher Squat: bar cradled in elbow crooks, hands clasped at chest, elbows ride inside knees at bottom', () => {
+  test('81 Zercher Squat: bar cradled in elbow crooks, hands clasped at chest in painted contact, elbows ride inside knees at bottom', () => {
     const row = rowFor(81);
     expect(row.source.instructions).toContain('Cradle the bar in the crooks of the elbows, clasp the hands');
     expect(row.source.cues).toContain('Elbows ride inside the knees at the bottom');
 
     const top = chainGeometry('zercher-squat', 0, BODY);
     const bottom = chainGeometry('zercher-squat', 1, BODY);
+    const handDiameter = 2 * (BODY.lw * 0.44);
 
     for (const fig of [top, bottom]) {
       // Bar sits in the elbow crooks, never rolling down toward the wrists.
@@ -315,10 +337,10 @@ describe('MOV-A02 per-movement source-bound biomechanics', () => {
         (fig.world.near.elbowCrook[2] + fig.world.far.elbowCrook[2]) / 2,
       ];
       expect(dist3(bar, crookMid)).toBeLessThan(1e-5);
-      // Forearms angled up and inward so clasped hands sit above the elbows in front of the chest.
-      expect(fig.world.near.wrist[1]).toBeGreaterThan(fig.world.near.elbow[1] + 8);
-      expect(dist3(fig.world.near.wrist, fig.world.far.wrist)).toBeLessThan(dist3(fig.world.near.elbow, fig.world.far.elbow) - 6.5);
-      expect(dist2(fig.grip.near, fig.grip.far)).toBeLessThan(5.0);
+      // Forearms angled up and inward so clasped hands meet at the midline in front of the chest (painted hand contact, zero gap).
+      expect(fig.world.near.wrist[1]).toBeGreaterThan(fig.world.near.elbow[1] + 6);
+      expect(dist3(fig.world.near.wrist, fig.world.far.wrist)).toBeLessThanOrEqual(handDiameter);
+      expect(dist2(fig.grip.near, fig.grip.far)).toBeLessThanOrEqual(handDiameter);
     }
 
     // Elbows ride inside the knees at the bottom (smaller lateral |Z| than the abducted knees).

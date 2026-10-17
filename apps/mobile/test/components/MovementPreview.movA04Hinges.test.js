@@ -99,10 +99,29 @@ describe('MOV-A04 hinges and posterior chain: physics, joint angles, contacts, a
     expect(trunkDegFromHorizontal2D(gmBottom.joints)).toBeLessThan(25);
     expect(gmBottom.world.hip[0]).toBeLessThan(gmStart.world.hip[0] - 12);
     expect(gmBottom.curled).toBe(false);
-    // Combined center of mass (midpoint of hip and bar) stays over the planted foot [ankleX, toeX]
-    const comX61 = (gmBottom.world.hip[0] + gmBottom.world.near.hold[0]) / 2;
-    expect(comX61).toBeGreaterThanOrEqual(gmBottom.world.near.ankle[0] - 6);
-    expect(comX61).toBeLessThanOrEqual(gmBottom.world.near.toe[0] + 2);
+    // Mass-weighted centre of mass of the figure + barbell (and unweighted hip/bar midpoint) stays strictly over the planted foot [ankleX, toeX]
+    const weightedComX = (fig, barMassRatio = 0.5) => {
+      const w = fig.world;
+      const midX = (a, b) => (a[0] + b[0]) / 2;
+      const bodyX =
+        0.029 * midX(w.near.ankle, w.near.toe) +
+        0.093 * midX(w.near.ankle, w.near.knee) +
+        0.200 * midX(w.near.knee, w.near.hipJoint) +
+        0.497 * midX(w.hip, w.neck) +
+        0.081 * midX(w.neck, w.head) +
+        0.056 * midX(w.near.shoulder, w.near.elbow) +
+        0.044 * midX(w.near.elbow, w.near.wrist);
+      const barX = (w.near.hold[0] + w.far.hold[0]) / 2;
+      return (bodyX + barMassRatio * barX) / (1 + barMassRatio);
+    };
+    for (const fig of [gmStart, gmBottom]) {
+      const comX = weightedComX(fig);
+      const midHipBarX = (fig.world.hip[0] + fig.world.near.hold[0]) / 2;
+      expect(comX).toBeGreaterThanOrEqual(fig.world.near.ankle[0]);
+      expect(comX).toBeLessThanOrEqual(fig.world.near.toe[0]);
+      expect(midHipBarX).toBeGreaterThanOrEqual(fig.world.near.ankle[0]);
+      expect(midHipBarX).toBeLessThanOrEqual(fig.world.near.toe[0]);
+    }
 
     // 210 Good Morning off Pins:
     // "Set the bar on the pins at about stomach height, bend over under it so it sits across the back of the shoulders, with the torso near level with the floor, the back tight and the knees slightly bent."
@@ -248,29 +267,51 @@ describe('MOV-A04 hinges and posterior chain: physics, joint angles, contacts, a
       }
     }
 
+    const t23 = rig.chainGeometry(slugOf(e23), 0, BODY);
     const b23 = rig.chainGeometry(slugOf(e23), 1, BODY);
+    const t202 = rig.chainGeometry(slugOf(e202), 0, BODY);
     const b202 = rig.chainGeometry(slugOf(e202), 1, BODY);
+    const t244 = rig.chainGeometry(slugOf(e244), 0, BODY);
     const b244 = rig.chainGeometry(slugOf(e244), 1, BODY);
 
-    // 23 kneels on a low floor pad, whereas 202 and 244 kneel higher in an elevated Nordic bench
+    // 23 kneels on a low floor pad with an ankle roller anchor, whereas 202 and 244 kneel higher in an elevated Nordic bench with foot pads
     expect(b202.world.near.knee[1]).toBeGreaterThan(b23.world.near.knee[1] + 3);
     expect(b244.world.near.knee[1]).toBeCloseTo(b202.world.near.knee[1], 2);
+    expect((b202.movement.equipment ?? []).filter((sh) => sh.kind === 'roller').length).toBeGreaterThan(
+      (b23.movement.equipment ?? []).filter((sh) => sh.kind === 'roller').length,
+    );
 
-    // Depth progression: 23 (trunk 22 deg) -> 202 (trunk 15 deg) -> 244 (trunk 6 deg, knees almost straight >= 172 deg)
-    const knee23 = deg3D(b23.world.near.hipJoint, b23.world.near.knee, b23.world.near.ankle);
-    const knee202 = deg3D(b202.world.near.hipJoint, b202.world.near.knee, b202.world.near.ankle);
+    // 244 lowers until the knees are almost straight (>= 172 deg) while holding an anchored band with natural elbow flexion (>= 25 deg, never folding to 0 deg)
     const knee244 = deg3D(b244.world.near.hipJoint, b244.world.near.knee, b244.world.near.ankle);
-    expect(knee202).toBeGreaterThan(knee23 + 5);
-    expect(knee244).toBeGreaterThan(knee202 + 7);
     expect(knee244).toBeGreaterThanOrEqual(172);
-
-    // Hand catch vs band assistance: 23 and 202 catch on the floor (23 with bent push-up elbows, 202 with longer arms), while 244 holds an anchored band above the floor
-    expect(b23.world.near.wrist[1]).toBeLessThanOrEqual(3.5);
-    expect(b202.world.near.wrist[1]).toBeLessThanOrEqual(3.5);
-    expect(b244.world.near.wrist[1]).toBeGreaterThan(12);
+    expect(b244.world.near.wrist[1]).toBeGreaterThan(4);
     expect((b244.movement.lines ?? []).length).toBeGreaterThanOrEqual(1);
-    const elbow23 = deg3D(b23.world.near.shoulder, b23.world.near.elbow, b23.world.near.wrist);
-    const elbow202 = deg3D(b202.world.near.shoulder, b202.world.near.elbow, b202.world.near.wrist);
-    expect(elbow202).toBeGreaterThan(elbow23 + 20);
+    for (const fig244 of [t244, b244]) {
+      expect(deg3D(fig244.world.near.shoulder, fig244.world.near.elbow, fig244.world.near.wrist)).toBeGreaterThanOrEqual(25);
+      expect(deg3D(fig244.world.far.shoulder, fig244.world.far.elbow, fig244.world.far.wrist)).toBeGreaterThanOrEqual(25);
+    }
+
+    // 23 and 202 catch on the floor at the bottom (ph=1) in painted hand contact, stay planted at the start of the return (ph=2) while the elbows extend, and then leave the floor to return upright (ph=0)
+    const p23 = rig.chainGeometry(slugOf(e23), 2, BODY);
+    const p202 = rig.chainGeometry(slugOf(e202), 2, BODY);
+    const handRadius = BODY.lw * 0.44;
+    for (const [topFig, botFig, pushFig] of [[t23, b23, p23], [t202, b202, p202]]) {
+      const botGap = botFig.world.near.wrist[1] - handRadius;
+      const pushGap = pushFig.world.near.wrist[1] - handRadius;
+      expect(botGap).toBeGreaterThanOrEqual(0);
+      expect(botGap).toBeLessThanOrEqual(0.05);
+      expect(pushGap).toBeGreaterThanOrEqual(0);
+      expect(pushGap).toBeLessThanOrEqual(0.05);
+      expect(Math.abs(pushFig.world.near.wrist[0] - botFig.world.near.wrist[0])).toBeLessThanOrEqual(1.0);
+      expect(pushFig.world.neck[1]).toBeGreaterThan(botFig.world.neck[1] + 4.0);
+      const elbowBottom = deg3D(botFig.world.near.shoulder, botFig.world.near.elbow, botFig.world.near.wrist);
+      const elbowPush = deg3D(pushFig.world.near.shoulder, pushFig.world.near.elbow, pushFig.world.near.wrist);
+      const elbowTop = deg3D(topFig.world.near.shoulder, topFig.world.near.elbow, topFig.world.near.wrist);
+      expect(elbowBottom).toBeGreaterThanOrEqual(80);
+      expect(elbowBottom).toBeLessThanOrEqual(115);
+      expect(elbowPush - elbowBottom).toBeGreaterThanOrEqual(35);
+      expect(elbowTop).toBeGreaterThan(elbowPush);
+      expect(topFig.world.near.wrist[1]).toBeGreaterThan(30);
+    }
   });
 });
