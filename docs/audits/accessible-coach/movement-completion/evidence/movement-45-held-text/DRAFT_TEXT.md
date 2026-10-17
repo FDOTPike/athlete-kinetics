@@ -57,7 +57,7 @@ This document records the source-bound draft descriptions (`instructions`, `cues
   3. `"With your back, shoulders, and core tight, push your knees and butt out and you begin your descent. Sit back with your hips until you are seated on the box. Ideally, your shins should be perpendicular to the ground. Pause when you reach the box, and relax the hip flexors. Never bounce off of a box."`
   4. `"Keeping the weight on your heels and pushing your feet and knees out, drive upward off of the box as you lead the movement with your head. Continue upward, maintaining tightness head to toe. Use care to return the barbell to the rack."`
 - **Photographs**:
-  - `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Box_Squat_with_Bands/0.jpg`: Side view of the athlete standing tall inside a power rack with a barbell across the back of the shoulders and a wooden box directly behind him. Resistance bands run straight down from each barbell sleeve to the bottom base rail of the power rack at floor level.
+  - `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Box_Squat_with_Bands/0.jpg`: Side view of the athlete standing tall inside a power rack with a barbell across the back of the shoulders and a wooden box directly behind the athlete. Resistance bands run straight down from each barbell sleeve to the bottom base rail of the power rack at floor level.
   - `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Box_Squat_with_Bands/1.jpg`: The athlete sits back onto the box with the thighs parallel to the floor, shins near vertical (perpendicular to the floor), back braced and head facing forward, while the bands remain taut between the barbell sleeves and the floor base of the rack.
 
 ### Resolution of Hold Reasons & Choices
@@ -134,7 +134,7 @@ This document records the source-bound draft descriptions (`instructions`, `cues
   6. `"Repeat for the recommended amount of repetitions."`
 - **Photographs**:
   - `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Front_Barbell_Squat_To_A_Bench/0.jpg`: Rear-oblique view of the athlete standing tall inside a squat rack in a shoulder-width stance in front of a knee-high bench/stool. The barbell rests on top of the front deltoids with the arms crossed in front grasping the bar and the upper arms held slightly above parallel to the floor.
-  - `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Front_Barbell_Squat_To_A_Bench/1.jpg`: The athlete squats down with an upright back and high elbows until his glutes touch the top of the bench at roughly parallel thigh depth, with the knees tracking in line with the toes, ready to drive back up through the heels.
+  - `https://raw.githubusercontent.com/yuhonas/free-exercise-db/main/exercises/Front_Barbell_Squat_To_A_Bench/1.jpg`: The athlete squats down with an upright back and high elbows until the athlete's glutes touch the top of the bench at roughly parallel thigh depth, with the knees tracking in line with the toes, ready to drive back up through the heels.
 
 ### Resolution of Hold Reasons & Choices
 - **Front rack resolved**: Settled by sentence 1 (`"bring your arms up under the bar while keeping the elbows high and the upper arm slightly above parallel to the floor. Rest the bar on top of the deltoids and cross your arms while grasping the bar for total control"`) and both photographs (`0.jpg`, `1.jpg`): a cross-arm front rack across the top of the front shoulders with the upper arms slightly above parallel to the floor.
@@ -142,13 +142,14 @@ This document records the source-bound draft descriptions (`instructions`, `cues
 - **Marked as a choice**:
   1. **Bench height (a choice)**: Sentence 1 says `"set a flat bench behind you"` without specifying a numeric height, while `1.jpg` shows a standard knee-high bench where the thighs reach roughly parallel to the floor when the glutes touch it. Setting a flat bench behind the athlete at parallel-squat height is marked as **a choice**.
   2. **Brief touch without unloading (a choice)**: Because sentences 4–5 say `"until you touch the bench with your glutes"` and `"Begin to raise the bar"`, touching the bench lightly with the glutes under control without sitting and relaxing on it before driving up is marked as **a choice**.
+  3. **Omitting the dated knee-past-toes tip (a choice)**: Sentence 4's Tip claims that if the knees pass a vertical line from the toes `"you are placing undue stress on the knee and the exercise has been performed incorrectly"`. Because in an upright front squat to a bench the knees normally travel forward over the toes while tracking in the direction of the toes, that dated prohibition is deliberately left out of the draft instructions, and `"knees in line with the toes"` is kept as the direction the knees track.
 
 ### Draft Description (Authority for `205`)
 - **Basis**: `Draft written from the public-domain free-exercise-db entry (Front_Barbell_Squat_To_A_Bench) and its two photographs, awaiting the owner. The catalogue's own text for this movement is a placeholder on a source hold.`
 - **Instructions**:
-  `Set a flat bench behind you inside a squat rack, rest a barbell across the top of your front shoulders with your arms crossed to grasp the bar and your upper arms slightly above parallel to the floor, and step back into a shoulder-width stance with the toes slightly pointed out. Keeping your head up, your back straight, and your elbows high, bend the knees to lower slowly until your glutes touch the bench without knees passing the toes. Do not sit back and relax on the bench. Push the floor through your heels to straighten the legs and return to standing tall.`
+  `Set a flat bench behind you inside a squat rack, rest a barbell across the top of your front shoulders with your arms crossed to grasp the bar and your upper arms slightly above parallel to the floor, and step back into a shoulder-width stance with the toes slightly pointed out. Keeping your head up, your back straight, and your elbows high, bend the knees in line with the toes to lower slowly until your glutes touch the bench. Do not sit back and relax on the bench. Push the floor through your heels to straighten the legs and return to standing tall.`
 - **Cues**:
-  `Elbows high, upper arms slightly above parallel. Lower slowly with a straight back until your glutes touch the bench. Drive through your heels to stand right back up.`
+  `Elbows high, upper arms slightly above parallel. Lower slowly with a straight back and knees in line with the toes until your glutes touch the bench. Drive through your heels to stand right back up.`
 - **Coaching Intent**:
   `Train the quadriceps and glutes with a cross-arm front squat to a controlled touch on a bench behind you.`
 
