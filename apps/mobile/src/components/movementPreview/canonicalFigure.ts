@@ -5381,7 +5381,7 @@ function layoutChainExtras(
       color: ColorRole, opacity: number, out: FigurePrim[],
       palmDir?: ChainVec, handleAxis?: ChainVec,
     ): void => {
-      const axis: ChainVec = handleAxis ?? [0, 0, side];
+      const axis: ChainVec = handleAxis ?? [0, 0, 1];
       const rest: ChainVec = palmDir !== undefined && handleAxis !== undefined
         ? [KETTLEBELL_REST[0] * palmDir[0] + KETTLEBELL_REST[2] * handleAxis[0], KETTLEBELL_REST[1], KETTLEBELL_REST[0] * palmDir[2] + KETTLEBELL_REST[2] * handleAxis[2]]
         : [KETTLEBELL_REST[0], KETTLEBELL_REST[1], side * KETTLEBELL_REST[2]];
