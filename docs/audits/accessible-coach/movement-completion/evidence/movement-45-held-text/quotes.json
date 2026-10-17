@@ -1,0 +1,137 @@
+{
+  "sourceCommit": "90c3838817662169dcfbea15e12ca8694181c198",
+  "bounds": [
+    {
+      "id": 145,
+      "quote": "Reach into the start, then drive the elbows back until the upper back finishes the pull.",
+      "bound": "DRAFT_TEXT.md (line 37: 'hook a double handle under the bar just behind the plates, and hold it with both hands, palms facing each other and arms straight. Keeping the torso still and the elbows tucked in close to your sides, pull the bar straight up until the plates touch your lower chest and hold for a second.'): barAnchor at [-20, 1.5], rigid 5.00-unit 3D double-handle grip span with palmYaw = 90 and farPalmYaw = 90, elbow angle opens to 172.89 deg at bottom (plates clear of floor) and pulls to 90.85 deg at top with hold rising from y = 26.80 to y = 36.63 at the lower chest and a 1000 ms top hold before a 1500 ms slow lower."
+    },
+    {
+      "id": 145,
+      "quote": "Set the torso before the pull. Lead with the elbows. Pause with the upper back engaged.",
+      "bound": "DRAFT_TEXT.md (line 39: 'Back flat, torso still. Pull with the elbows tucked in until the plates touch the lower chest. Hold for a second, then lower slowly without touching the floor.'): uncurled flat spine (curled = false) held stationary at 24.00 deg above horizontal from start to top (hip and neck displacement 0.000 units across all ticks) with straddled feet (ankle z = +/-8.30) and knees slightly bent at 124.98 deg."
+    },
+    {
+      "id": 153,
+      "quote": "Set up Box Squat with Bands with bands, barbell, dumbbells, squat rack and choose a load or range you can control.",
+      "bound": "DRAFT_TEXT.md (line 74: 'Set a parallel-height box behind you inside a power rack and loop a band from each sleeve of a barbell down to the base of the rack or heavy dumbbells secured on the floor.'): two band lines run from nearBarEnd and farBarEnd down to floor anchors [-4, 1.2, +/-16.5] on the power rack base inside the rack frame, with a parallel-height box at y = 20.2 behind the athlete."
+    },
+    {
+      "id": 153,
+      "quote": "Sit between the hips under control, keep pressure through the whole foot, and stand through the same path.",
+      "bound": "DRAFT_TEXT.md (line 74: 'Push your hips back and knees out to sit back under control until you are seated on the box with your thighs parallel to the floor and your shins perpendicular to the ground. Pause on the box without bouncing, then drive upward off the box through your heels to stand tall.'): hip sits back from [1.8, 45.620] to [-16.8, 23.032] so the painted thigh bottom lands flush on the box top at y = 20.200 with shins at 85.59 deg from horizontal (knee angle 79.08 deg) and pauses seated for 550 ms before driving up."
+    },
+    {
+      "id": 165,
+      "quote": "Rise through the ball of the working foot, pause at the top, and lower the heel under control.",
+      "bound": "DRAFT_TEXT.md (line 111: 'Place a dumbbell on the floor in front of a sturdy bar or upright, hold the support with both hands for balance, and stand with the ball of one foot on the dumbbell handle and the other foot lifted clear of the floor. Lower the working heel toward the floor with the knee straight to get a full stretch of the calf. Lift the heel to roll the foot up over the top of the handle into a full calf extension, contract the calf hard at the top, and hold for a second.'): working toe rooted at y = 6.568 (painted sole bottom y = 4.600 on top of the floor dumbbell handle at y = 4.600), working ankle travels from y = 4.372 in the stretch (foot pitch +24 deg) to y = 10.319 at full extension (foot pitch -44 deg) with a 1000 ms top hold and 1300 ms controlled lower."
+    },
+    {
+      "id": 165,
+      "quote": "Keep pressure through the ball of the foot. Rise as tall as the ankle allows. Lower through a controlled stretch.",
+      "bound": "DRAFT_TEXT.md (line 113: 'Hold a sturdy support for balance. Rise over the handle into full extension and hold for a second. Lower the heel under control into a stretch.'): working knee stays straight at 180.00 deg throughout, non-working foot stays lifted clear of the floor (farToe y = 9.491), and both hands rest on the support bar at x = 14, y = 64.212."
+    },
+    {
+      "id": 205,
+      "quote": "Set up Front Barbell Squat To A Bench with barbell, bench, squat rack and choose a load or range you can control.",
+      "bound": "DRAFT_TEXT.md (line 150: 'Set a flat bench behind you inside a squat rack, rest a barbell across the top of your front shoulders with your arms crossed to grasp the bar and your upper arms slightly above parallel to the floor, and step back into a shoulder-width stance with the toes slightly pointed out.'): cross-arm front rack holds the barbell across the front shoulders with upper arms pitched +8.00 deg above horizontal at the top and forearms crossed in front (-168 deg / -42 deg)."
+    },
+    {
+      "id": 205,
+      "quote": "Brace before the descent. Keep pressure through the whole foot. Drive the floor away to stand.",
+      "bound": "DRAFT_TEXT.md (line 150: 'Keeping your head up, your back straight, and your elbows high, bend the knees in line with the toes to lower slowly until your glutes touch the bench. Do not sit back and relax on the bench. Push the floor through your heels to straighten the legs and return to standing tall.'): upright straight torso (89 deg to 72 deg), knees track forward over and in line with the toes (knee x = 9.69 > toe x = 5.40, knee angle 65.23 deg), and painted glute/thigh bottom touches the bench top at y = 20.200 at phase 1 without a seated hold (phases [0, 0.5, 1, 0.5, 0], segments [750, 750, 600, 600])."
+    },
+    {
+      "id": 250,
+      "quote": "Soften the knees, send the hips back until the posterior chain loads, and stand by driving the hips through.",
+      "bound": "DRAFT_TEXT.md (line 216: 'Stand with your feet slightly wider than your hips, soften the knees and push the hips back with a flat back to take a kettlebell in one hand with an overhand grip, and hike the bell back between your upper thighs with the free arm swinging back beside your hip. Immediately drive the hips and knees forward to stand tall, letting the kettlebell swing forward and up on a long, straight arm until it floats to chest or shoulder height with your shoulders square.'): bottom hinge at trunk = 30.00 deg hikes the kettlebell between the upper thighs (wrist y = 32.92) with free arm back (farWrist x = -9.48); hip snap drives trunk to 78.00 deg at phase 1 and 90.00 deg at phase 2 (top knee angle 177.12 deg) while the straight working arm (elbow 180.00 deg) carries the bell on a circular arc to shoulder height (wrist y = 71.35 vs shoulder y = 70.50)."
+    },
+    {
+      "id": 250,
+      "quote": "Set the ribs down and brace first. Send the hips back into the load. Finish tall through the glutes.",
+      "bound": "DRAFT_TEXT.md (line 218: 'Hike the bell high between your thighs with a flat back. Snap the hips to stand tall and let the bell float to shoulder height on a long arm. Keep your shoulders square and hinge only as the bell drops back between your legs.'): on the downswing from phase 2 to phase 1 the torso stays tall (90.00 deg to 78.00 deg) as the hand drops back to the thighs before hinging from 78.00 deg to 30.00 deg into phase 0."
+    }
+  ],
+  "fileQuotes": [
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/evidence/movement-45-held-text/DRAFT_TEXT.md",
+      "line": 37,
+      "quote": "Anchor one end of a barbell on the floor in a corner or landmine pivot so it cannot slide backward, load the other end with plates, and straddle the bar with the feet shoulder-width apart and the knees slightly bent."
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/evidence/movement-45-held-text/DRAFT_TEXT.md",
+      "line": 74,
+      "quote": "Set a parallel-height box behind you inside a power rack and loop a band from each sleeve of a barbell down to the base of the rack or heavy dumbbells secured on the floor."
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/evidence/movement-45-held-text/DRAFT_TEXT.md",
+      "line": 111,
+      "quote": "Place a dumbbell on the floor in front of a sturdy bar or upright, hold the support with both hands for balance, and stand with the ball of one foot on the dumbbell handle and the other foot lifted clear of the floor."
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/evidence/movement-45-held-text/DRAFT_TEXT.md",
+      "line": 145,
+      "quote": "Because in an upright front squat to a bench the knees normally travel forward over the toes while tracking in the direction of the toes, that dated prohibition is deliberately left out of the draft instructions, and `\"knees in line with the toes\"` is kept as the direction the knees track."
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/evidence/movement-45-held-text/DRAFT_TEXT.md",
+      "line": 150,
+      "quote": "Keeping your head up, your back straight, and your elbows high, bend the knees in line with the toes to lower slowly until your glutes touch the bench. Do not sit back and relax on the bench."
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/evidence/movement-45-held-text/DRAFT_TEXT.md",
+      "line": 216,
+      "quote": "Immediately drive the hips and knees forward to stand tall, letting the kettlebell swing forward and up on a long, straight arm until it floats to chest or shoulder height with your shoulders square."
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5383,
+      "quote": "'bent-over-two-arm-long-bar-row': {"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5423,
+      "quote": "'box-squat-with-bands': {"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5465,
+      "quote": "'calf-raise-on-a-dumbbell': {"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5506,
+      "quote": "'front-barbell-squat-to-a-bench': {"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5540,
+      "quote": "'one-arm-kettlebell-swings': {"
+    },
+    {
+      "file": "tools/rendering/chain_motion_specs.mjs",
+      "line": 2610,
+      "quote": "basis: 'Draft written from the public-domain free-exercise-db entry (Bent_Over_Two-Arm_Long_Bar_Row) and its two photographs, awaiting the owner. The catalogue\\'s own text for this movement is a placeholder on a source hold.',"
+    },
+    {
+      "file": "tools/rendering/chain_motion_specs.mjs",
+      "line": 2632,
+      "quote": "basis: 'Draft written from the public-domain free-exercise-db entry (Box_Squat_with_Bands) and its two photographs, awaiting the owner. The catalogue\\'s own text for this movement is a placeholder on a source hold.',"
+    },
+    {
+      "file": "tools/rendering/chain_motion_specs.mjs",
+      "line": 2654,
+      "quote": "basis: 'Draft written from the public-domain free-exercise-db entry (Calf_Raise_On_A_Dumbbell) and its two photographs, awaiting the owner. The catalogue\\'s own text for this movement is a placeholder on a source hold.',"
+    },
+    {
+      "file": "tools/rendering/chain_motion_specs.mjs",
+      "line": 2676,
+      "quote": "basis: 'Draft written from the public-domain free-exercise-db entry (Front_Barbell_Squat_To_A_Bench) and its two photographs, awaiting the owner. The catalogue\\'s own text for this movement is a placeholder on a source hold.',"
+    },
+    {
+      "file": "tools/rendering/chain_motion_specs.mjs",
+      "line": 2698,
+      "quote": "basis: 'Draft written from the public-domain free-exercise-db entry (One-Arm_Kettlebell_Swings, whose instructions array is empty, supplemented by its two photographs 0.jpg and 1.jpg, the companion One-Arm_Kettlebell_Snatch hike/drive sentences in free-exercise-db, and the catalogue\\'s Kettlebell Swing), awaiting the owner. The catalogue\\'s own text for this movement is a placeholder on a source hold.',"
+    }
+  ]
+}
