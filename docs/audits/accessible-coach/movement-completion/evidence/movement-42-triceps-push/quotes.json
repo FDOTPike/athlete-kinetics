@@ -1,0 +1,157 @@
+{
+  "sourceCommit": "7022cb94bd4c3df0d366393633179835fc164b86",
+  "bounds": [
+    {
+      "id": 91,
+      "quote": "Lie on a bench with dumbbells pressed over your chest, palms facing each other.",
+      "bound": "Supine on a flat bench with neck and hip at y = 26.64 (pad top 22.0 + 4.64 back half-thickness), hammer dumbbells ('implement: hammer') with shaft perpendicular to forearm (along dot product < 1e-6), straight long arms at start (3D elbow angle = 180.00 deg >= 172 deg).",
+      "test": "apps/mobile/test/components/MovementPreview.movA12TricepsPush.test.js:112"
+    },
+    {
+      "id": 91,
+      "quote": "Keeping your upper arms still and angled slightly back over your head, bend the elbows and lower the dumbbells beside your ears. Press back to long arms along the same path.",
+      "bound": "Upper arms frozen at 104 deg (14 deg past vertical toward the head) with elbow drift 0.00 across every 33 ms tick; forearms hinge from 104 deg to 236 deg so the dumbbells lower beside the ears (3D elbow angle = 48.00 deg <= 75 deg, |wrist.x - head.x| = 0.07 <= 6.2, |wrist.y - head.y| = 1.98 <= 6.2, |wrist.z| = 9.384 > 8.7); controlled lowering 1300 ms vs 900 ms press up.",
+      "test": "apps/mobile/test/components/MovementPreview.movA12TricepsPush.test.js:132"
+    },
+    {
+      "id": 242,
+      "quote": "Lie on a flat bench holding an EZ bar or a straight bar with a medium overhand grip, arms straight above the chest and elbows tucked in.",
+      "bound": "Supine on a flat bench holding an EZ bar ('implement: ez') with rigid grip span 18.77 units (maxSpanDrift = 0.00 across every 33 ms tick), elbows tucked in at z = +/-9.384 matching shoulder Z, and straight arms above the chest at start (3D elbow angle = 180.00 deg >= 172 deg, upper-arm angle = 90.00 deg).",
+      "test": "apps/mobile/test/components/MovementPreview.movA12TricepsPush.test.js:172"
+    },
+    {
+      "id": 242,
+      "quote": "Keeping the upper arms and elbows still, bend the elbows to lower the bar until it is just above the forehead. Straighten the elbows to return the bar above the chest.",
+      "bound": "Upper arms and tucked elbows remain stationary (drift 0.00 across every 33 ms tick); forearms bend to 195 deg so the bar stops just above the forehead (2.11 units from forehead point, wrist.y = 35.75 > head.y + hr + 2.0, and 9.48 units higher than beside-the-ears movement 91; 3D bar-to-head clearance >= 9.75 >= 7.0); controlled lowering 1300 ms vs 900 ms return.",
+      "test": "apps/mobile/test/components/MovementPreview.movA12TricepsPush.test.js:196"
+    },
+    {
+      "id": 215,
+      "quote": "Lie back on an incline bench holding a barbell overhead with an overhand grip slightly narrower than the shoulders, arms straight and in line with the torso.",
+      "bound": "Reclined on a 128 deg incline bench with backrest and seat slabs supporting the torso (offPad - 2 = 4.64 = BACK_HALF), holding a barbell with a rigid narrower-than-shoulders grip (16.81 units < 18.77 shoulder width, maxSpanDrift = 0.00), arms straight (3D elbow angle = 180.00 deg >= 172 deg) and in line with the 128 deg torso.",
+      "test": "apps/mobile/test/components/MovementPreview.movA12TricepsPush.test.js:220"
+    },
+    {
+      "id": 215,
+      "quote": "Keeping the upper arms still and close to the head, bend the elbows to lower the bar behind the head. Straighten the elbows to return the bar overhead and pause.",
+      "bound": "Upper arms stay frozen close to the head (elbow-to-head distance 6.08 <= 6.5, elbow drift 0.00 across every 33 ms tick) while forearms lower behind the head to [222, -4.5] (3D elbow angle = 86.09 deg <= 95 deg, wrist.x = 22.25 < head.x - hr - 5, 3D bar-to-head clearance >= 14.72 >= 7.0); lowers slowly (1400 ms vs 800 ms) and pauses 550 ms overhead.",
+      "test": "apps/mobile/test/components/MovementPreview.movA12TricepsPush.test.js:251"
+    },
+    {
+      "id": 233,
+      "quote": "Place a bench sideways in front of a high pulley, kneel facing away from the machine and rest the head and the backs of the upper arms on the bench, holding the straight bar with a narrow overhand grip and the elbows bent.",
+      "bound": "High pulley at [8, 78] behind the kneeling athlete (knees at x = 14, y = 2.01), flat bench at x = 60..79 (top = 24.5) supporting the head and backs of the upper arms (shoulder.y - armRadius = 24.66, elbow.y - armRadius = 24.66), narrow overhand grip on straight cableBar (span = 15.73 units, maxSpanDrift = 0.00), elbows bent at start (3D elbow angle = 77.09 deg <= 85 deg).",
+      "test": "apps/mobile/test/components/MovementPreview.movA12TricepsPush.test.js:276"
+    },
+    {
+      "id": 233,
+      "quote": "Keeping the upper arms on the bench and close to the head, straighten the elbows until the arms are level with the floor. Pause, then let the elbows bend slowly back to the start.",
+      "bound": "Upper arms stay pinned on the bench (elbow drift 0.00 across every 33 ms tick) while forearms extend to [0, -7] level with the floor (3D elbow angle = 180.00 deg >= 172 deg, |wrist.y - shoulder.y| = 0.00 <= 0.5, cable lengthens monotonically by +13.71 units, 3D bar-to-head clearance >= 12.20 >= 7.0), pause 550 ms at full extension, and return slowly (1400 ms vs 800 ms).",
+      "test": "apps/mobile/test/components/MovementPreview.movA12TricepsPush.test.js:310"
+    },
+    {
+      "id": 177,
+      "quote": "Secure the legs on a decline bench, lie back and hold the bar over the chest with a grip slightly narrower than shoulder width and the arms straight. Lower the bar to the lower chest with the elbows in and press it back up.",
+      "bound": "Decline bench at 160 deg (-20 deg decline) with ankle roller securing the ankles and backrest supporting the torso; rigid narrower-than-shoulder grip (16.81 units < 18.77, maxSpanDrift = 0.00); lockout has straight arms (3D elbow angle = 180.00 deg >= 172 deg); close-grip press lowers the bar to the lower chest (upperArm [-15, -4.5], forearm [115, -4.5], elbow travel 21.57 units).",
+      "test": "apps/mobile/test/components/MovementPreview.movA12TricepsPush.test.js:345"
+    },
+    {
+      "id": 177,
+      "quote": "Then, keeping the upper arms still, bend the elbows to lower the bar toward the forehead and straighten them again. Alternate one press and one extension for the set.",
+      "bound": "Cycle [1, 0, 1, 2, 1] alternates one close-grip press (1 -> 0 -> 1) and one skull crusher extension (1 -> 2 -> 1); throughout the extension half (t >= 1700 ms) upper arms stay completely still (elbow drift 0.00) while the bar lowers toward the forehead (3.55 units from forehead point, 3D bar-to-head clearance >= 8.00 >= 7.0); both eccentric phases are slower than their concentric returns (1000 ms vs 700 ms).",
+      "test": "apps/mobile/test/components/MovementPreview.movA12TricepsPush.test.js:379"
+    },
+    {
+      "id": 47,
+      "quote": "Support yourself on parallel bars with arms straight. Bend your elbows and lower your body until your upper arms are about parallel to the floor. Press back up to straight arms.",
+      "bound": "Two parallel bars drawn at y = 46 (top surface 48.0) and z = +/-9.384 with hands planted on the bars (wrist drift 0.00 across every 33 ms tick) and feet suspended off the floor (ankle.y >= 16.57 > 10); straight-arm lockout at top (3D elbow angle = 175.87 deg >= 172 deg) with shoulders packed; lowers body by 12.01 units until upper arms are horizontal (|shoulder.y - elbow.y| = 0.00 <= 0.5, 3D elbow angle = 88.38 deg).",
+      "test": "apps/mobile/test/components/MovementPreview.movA12TricepsPush.test.js:403"
+    },
+    {
+      "id": 47,
+      "quote": "Shoulders down, away from the ears. Lower to a stretch you can press out of. Lock out tall, shoulders packed.",
+      "bound": "Shoulders stay packed (shrug = 0) and hands remain fixed on the parallel bars while the body lowers into the bottom stretch and presses back to tall 175.87 deg lockout across [0, 0.5, 1, 0.5, 0].",
+      "test": "apps/mobile/test/components/MovementPreview.movA12TricepsPush.test.js:418"
+    },
+    {
+      "id": 170,
+      "quote": "Stand a dumbbell on its end, place both hands on the top of it and set a push-up position on the toes with the arms straight and the body rigid.",
+      "bound": "Vertical end-standing dumbbell drawn on the floor at x = 72.5..79.5 with top plate surface at y = 9.6; both hands placed together on top of the upper plate (grip span 3.60 units <= 5.0, wrist.y - HAND_HALF = 9.60); straight arms at top (3D elbow angle = 174.90 deg >= 172 deg) and rigid straight body line (knee angle 180.00 deg, hip-to-spine angle 180.00 deg across every 33 ms tick).",
+      "test": "apps/mobile/test/components/MovementPreview.movA12TricepsPush.test.js:441"
+    },
+    {
+      "id": 170,
+      "quote": "Bend the elbows, keeping them close to the body, to lower the chest toward the hands. Press back up until the arms are straight.",
+      "bound": "Chest lowers by 11.17 units toward the hands on top of the dumbbell with elbows tucked close to the ribs (|elbow.z| = 9.48 <= 10.88, 3D elbow angle = 57.28 deg <= 105 deg) while hands and toes remain stationary (drift 0.00), then presses back up to straight arms (174.90 deg).",
+      "test": "apps/mobile/test/components/MovementPreview.movA12TricepsPush.test.js:467"
+    },
+    {
+      "id": 166,
+      "quote": "Start in a push-up position with the hands about shoulder-width apart and the body in a straight line. Lower the chest toward the floor, then push up fast enough for the hands to leave the floor and land a short step to one side, turning the body slightly.",
+      "bound": "Starts in a push-up position with hands shoulder-width apart on the floor (span = 18.77 units, wrist.y = 2.35, 3D elbow angle = 175.30 deg >= 172 deg); lowers chest by 10.75 units (elbow angle = 65.98 deg), then pushes up fast (320 ms vs 520 ms lower) into flight where both hands leave the floor (wrist.y = 8.40 > 7.35) and land a short step laterally (step distance 8.85 units >= 6, body yaw turns by 16.00 deg >= 12 deg).",
+      "test": "apps/mobile/test/components/MovementPreview.movA12TricepsPush.test.js:492"
+    },
+    {
+      "id": 166,
+      "quote": "Land with soft elbows, reset the straight body line and repeat, working around the circle until you are back where you started.",
+      "bound": "Lands at ph = 3 with soft bent elbows (3D elbow angle = 126.13 deg in [115, 158]), resets to straight arms at ph = 4 (3D elbow angle = 175.30 deg >= 172 deg), and maintains a rigid straight body line (knee angle 180.00 deg, hip-to-spine angle 180.00 deg) at every 33 ms tick around the cycle.",
+      "test": "apps/mobile/test/components/MovementPreview.movA12TricepsPush.test.js:520"
+    }
+  ],
+  "fileQuotes": [
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5113,
+      "endLine": 5132,
+      "text": "'lying-dumbbell-triceps-extension': {"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5137,
+      "endLine": 5156,
+      "text": "'lying-triceps-press': {"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5162,
+      "endLine": 5181,
+      "text": "'incline-barbell-triceps-extension': {"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5187,
+      "endLine": 5212,
+      "text": "'kneeling-cable-triceps-extension': {"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5218,
+      "endLine": 5233,
+      "text": "'decline-close-grip-bench-to-skull-crusher': {"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5237,
+      "endLine": 5269,
+      "text": "'dip': {"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5274,
+      "endLine": 5304,
+      "text": "'close-grip-push-up-off-of-a-dumbbell': {"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5310,
+      "endLine": 5361,
+      "text": "'clock-push-up': (() => {"
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA12TricepsPush.test.js",
+      "line": 68,
+      "endLine": 110,
+      "text": "describe('MOV-A12 triceps extensions, dip, and push-ups: universal physics, rigid bar grip, and head clearance'"
+    }
+  ]
+}
