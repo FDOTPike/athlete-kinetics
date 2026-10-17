@@ -99,35 +99,87 @@ describe('MOV-A05 horizontal, incline, decline, floor, board, pin, and cable pre
     expect(e3.segmentDurationsMs[1]).toBeGreaterThan(e43.segmentDurationsMs[1] + 250);
   });
 
-  test('45 Decline Bench Press and 102 Decline Dumbbell Bench Press hook legs into a head-lower decline bench with zero painted torso-to-pad gap, vertical forearms at bottom, and distinct barbell vs inward-converging dumbbell paths', () => {
+  test('45 Decline Bench Press and 102 Decline Dumbbell Bench Press hook legs into a head-lower decline bench with zero painted torso-to-pad and leg-to-roller gap, vertical forearms at bottom, and distinct barbell vs inward-converging dumbbell paths', () => {
     // Quotes:
-    // 45: "Hook your legs into the decline bench and take the bar just wider than shoulder width. Lower to the lower line of your chest — the decline shortens the stroke, so expect to touch sooner than on flat. Press back to lockout over your eyes."
+    // 45: "Hook your legs into the decline bench and take the bar just wider than shoulder width. Lower to the lower line of your chest — the decline shortens the stroke, so expect to touch sooner than on flat. Press back to lockout over your eyes." / "Decline barbell bench press works the lower sternal head of the pectoralis major along with the anterior deltoids and triceps. Have a spotter for the unrack and keep the legs hooked securely on the decline pad throughout the set."
     // 102: "Secure the legs in a decline bench, sit with the dumbbells on the thighs, then lie back and bring the bells to the chest before pressing them into position. Lower toward the lower chest with the forearms vertical and the shoulder blades pinned into the pad. Press up and slightly inward"
     const e3 = entryFor(3);
     const e45 = entryFor(45);
     const e102 = entryFor(102);
     const top3 = rig.chainGeometry(slugOf(e3), 0, BODY);
-    const bot3 = rig.chainGeometry(slugOf(e3), 1, BODY);
     const top45 = rig.chainGeometry(slugOf(e45), 0, BODY);
     const bot45 = rig.chainGeometry(slugOf(e45), 1, BODY);
     const top102 = rig.chainGeometry(slugOf(e102), 0, BODY);
     const bot102 = rig.chainGeometry(slugOf(e102), 1, BODY);
 
-    for (const [gTop, gBot] of [[top45, bot45], [top102, bot102]]) {
+    const pointToSegDist2D = (px, py, x1, y1, x2, y2) => {
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const l2 = dx * dx + dy * dy || 1;
+      const t = Math.max(0, Math.min(1, ((px - x1) * dx + (py - y1) * dy) / l2));
+      return Math.hypot(px - (x1 + t * dx), py - (y1 + t * dy));
+    };
+
+    for (const [e, gTop, gBot] of [[e45, top45, bot45], [e102, top102, bot102]]) {
       // Head/shoulders lower than hips on the decline bench, knees elevated over leg rollers, feet hooked above the floor
       expect(gTop.world.neck[1]).toBeLessThan(gTop.world.hip[1] - 6);
       expect(gTop.world.near.knee[1]).toBeGreaterThan(gTop.world.hip[1] + 6);
       expect(gTop.world.near.ankle[1]).toBeGreaterThan(15);
       // Forearms vertical at the bottom of the stroke (<= 1.0 deg from vertical)
       expect(forearmDegFromVertical3D(gBot.world.near.elbow, gBot.world.near.hold)).toBeLessThanOrEqual(1.0);
+
+      // Apparatus-bound check on movement.equipment rollers (knee roller + ankle roller)
+      const equipRollers = (gTop.movement.equipment ?? []).filter((sh) => sh.kind === 'roller');
+      expect(equipRollers.length).toBe(2);
+      const [kneeRoller3D, ankleRoller3D] = equipRollers;
+      expect(Math.hypot(gTop.world.near.knee[0] - kneeRoller3D.at[0], gTop.world.near.knee[1] - kneeRoller3D.at[1])).toBeLessThanOrEqual(4.5);
+      expect(Math.hypot(gTop.world.near.ankle[0] - ankleRoller3D.at[0], gTop.world.near.ankle[1] - ankleRoller3D.at[1])).toBeLessThanOrEqual(5.5);
+
+      // Painted contact between the hooked legs and the two painted rollers, plus painted torso-to-pad contact
+      const prims = rig.layoutCanonicalFigure({ ...e.frames[1].joints, ph: 1 }, { view: e.view, assetKey: e.assetKey, body: BODY });
+      const paintedRollers = prims.filter((p) => p.kind === 'circle' && p.r === 2.6 && p.fill === 'textMid');
+      expect(paintedRollers.length).toBe(2);
+      const [kneeRollerPrim, ankleRollerPrim] = paintedRollers;
+      const nearThigh = prims.find((p) => p.kind === 'bone' && p.color === 'textHi' && Math.abs(p.w - BODY.lw * 1.18) < 1e-6);
+      const nearShin = prims.find((p) => p.kind === 'bone' && p.color === 'textHi' && Math.abs(p.w - BODY.lw * 0.9) < 1e-6);
+      const nearFoot = prims.find((p) => p.kind === 'bone' && p.color === 'textHi' && Math.abs(p.w - gTop.footWidth) < 1e-6);
+      expect(nearThigh).toBeDefined();
+      expect(nearShin).toBeDefined();
+      expect(nearFoot).toBeDefined();
+      const kneeDist = Math.min(
+        pointToSegDist2D(kneeRollerPrim.cx, kneeRollerPrim.cy, nearThigh.x1, nearThigh.y1, nearThigh.x2, nearThigh.y2) - nearThigh.w / 2 - kneeRollerPrim.r,
+        pointToSegDist2D(kneeRollerPrim.cx, kneeRollerPrim.cy, nearShin.x1, nearShin.y1, nearShin.x2, nearShin.y2) - nearShin.w / 2 - kneeRollerPrim.r,
+      );
+      const ankleDist = pointToSegDist2D(ankleRollerPrim.cx, ankleRollerPrim.cy, nearFoot.x1, nearFoot.y1, nearFoot.x2, nearFoot.y2) - nearFoot.w / 2 - ankleRollerPrim.r;
+      expect(kneeDist).toBeLessThanOrEqual(0);
+      expect(ankleDist).toBeLessThanOrEqual(0);
+
+      // Painted decline pad slab touches the back surface of both upper back (slice 0) and hip/glute (slice 32)
+      const declinePadPrim = prims.find((p) => p.kind === 'bone' && p.color === 'textMid' && Math.abs(p.w - 4) < 1e-6 && Math.hypot(p.x2 - p.x1, p.y2 - p.y1) > 25);
+      expect(declinePadPrim).toBeDefined();
+      const slices = torsoSlicesOf(prims);
+      for (const s of [slices[0], slices[32]]) {
+        const d1 = pointToSegDist2D(s.x1, s.y1, declinePadPrim.x1, declinePadPrim.y1, declinePadPrim.x2, declinePadPrim.y2);
+        const d2 = pointToSegDist2D(s.x2, s.y2, declinePadPrim.x1, declinePadPrim.y1, declinePadPrim.x2, declinePadPrim.y2);
+        const gap = Math.min(d1, d2) - s.w / 2 - declinePadPrim.w / 2;
+        expect(Math.abs(gap)).toBeLessThanOrEqual(0.05);
+      }
     }
+
+    // Source-faithful first captions for 45 and 102
+    expect(e45.frames[0].caption).toBe(
+      'Hook your legs into the decline bench, take the bar just wider than shoulder width, and have a spotter for the unrack to lockout over your eyes.',
+    );
+    expect(e102.frames[0].caption).toBe(
+      'Secure the legs in a decline bench, sit with the dumbbells on the thighs, then lie back and bring the bells to the chest before pressing them into position.',
+    );
 
     // 45: Barbell grip just wider than shoulder width (11.0..12.5), shorter stroke than flat Competition Bench, lockout over the eyes
     expect(top45.movement.implement).toBe('bar');
     expect(bot45.world.near.hold[2]).toBeGreaterThanOrEqual(11.0);
     expect(bot45.world.near.hold[2]).toBeLessThanOrEqual(12.5);
     const stroke45 = top45.world.near.hold[1] - bot45.world.near.hold[1];
-    const stroke3 = top3.world.near.hold[1] - bot3.world.near.hold[1];
+    const stroke3 = top3.world.near.hold[1] - rig.chainGeometry(slugOf(e3), 1, BODY).world.near.hold[1];
     expect(stroke45).toBeLessThan(stroke3 - 2.0);
     expect(Math.abs(top45.world.near.hold[0] - top45.world.head[0])).toBeLessThanOrEqual(2.5);
 
@@ -144,12 +196,52 @@ describe('MOV-A05 horizontal, incline, decline, floor, board, pin, and cable pre
     const top = rig.chainGeometry(slug, 0, BODY);
     const bot = rig.chainGeometry(slug, 1, BODY);
 
-    // Bench angle between 30 and 45 degrees from horizontal
+    // Bench angle between 30 and 45 degrees measured from both the torso and the inclined slab in movement.equipment
     const dx = top.world.hip[0] - top.world.neck[0];
     const dy = top.world.neck[1] - top.world.hip[1];
     const inclineDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
     expect(inclineDeg).toBeGreaterThanOrEqual(30);
     expect(inclineDeg).toBeLessThanOrEqual(45);
+
+    const inclinedSlabs = (top.movement.equipment ?? []).filter(
+      (sh) => sh.kind === 'slab' && Math.abs(sh.a[1] - sh.b[1]) > 1,
+    );
+    expect(inclinedSlabs.length).toBe(1);
+    const backrestSlab = inclinedSlabs[0];
+    const slabAngleDeg =
+      (Math.atan2(
+        Math.abs(backrestSlab.b[1] - backrestSlab.a[1]),
+        Math.abs(backrestSlab.b[0] - backrestSlab.a[0]),
+      ) *
+        180) /
+      Math.PI;
+    expect(slabAngleDeg).toBeGreaterThanOrEqual(30);
+    expect(slabAngleDeg).toBeLessThanOrEqual(45);
+
+    // Painted backrest slab angle in [30, 45] and zero-gap contact with painted torso slices 0 and 32
+    const primsBot = rig.layoutCanonicalFigure({ ...e.frames[1].joints, ph: 1 }, { view: e.view, assetKey: e.assetKey, body: BODY });
+    const backrestPrim = primsBot.find((p) => p.kind === 'bone' && p.color === 'textMid' && Math.abs(p.w - 4) < 1e-6 && Math.abs(p.y1 - p.y2) > 5);
+    expect(backrestPrim).toBeDefined();
+    const projBackrestDeg = (Math.atan2(Math.abs(backrestPrim.y2 - backrestPrim.y1), Math.abs(backrestPrim.x2 - backrestPrim.x1)) * 180) / Math.PI;
+    expect(projBackrestDeg).toBeGreaterThanOrEqual(30);
+    expect(projBackrestDeg).toBeLessThanOrEqual(45);
+    const slices65 = torsoSlicesOf(primsBot);
+    const segDist = (px, py) => {
+      const bdx = backrestPrim.x2 - backrestPrim.x1;
+      const bdy = backrestPrim.y2 - backrestPrim.y1;
+      const bl2 = bdx * bdx + bdy * bdy || 1;
+      const t = Math.max(0, Math.min(1, ((px - backrestPrim.x1) * bdx + (py - backrestPrim.y1) * bdy) / bl2));
+      return Math.hypot(px - (backrestPrim.x1 + t * bdx), py - (backrestPrim.y1 + t * bdy));
+    };
+    for (const s of [slices65[0], slices65[32]]) {
+      const dist = Math.min(segDist(s.x1, s.y1), segDist(s.x2, s.y2));
+      expect(Math.abs(dist - (s.w / 2 + backrestPrim.w / 2))).toBeLessThanOrEqual(0.05);
+    }
+
+    // First caption includes the source's "kick the dumbbells up off your knees one at a time"
+    expect(e.frames[0].caption).toBe(
+      'Set the bench between 30 and 45 degrees, kick the dumbbells up off your knees one at a time, and start from the top.',
+    );
 
     // Feet planted on the floor
     expect(Math.abs(top.world.near.ankle[1] - rig.CHAIN_ANKLE_HEIGHT)).toBeLessThan(0.05);
@@ -204,12 +296,16 @@ describe('MOV-A05 horizontal, incline, decline, floor, board, pin, and cable pre
     expect(Math.abs(barBotY151 - boardTopY)).toBeLessThanOrEqual(0.15);
 
     // 252 Pin Presses: starts at the bottom on the pins (ph = 0) above the chest, drives up to straight arms (ph = 1)
-    // keeping bar, wrists, and elbows in line, and lowers back to settle on the pins.
+    // keeping bar, wrists, and elbows in line with a brief top turnaround (<= 200 ms, no lockout hold in caption),
+    // and lowers back to settle on the pins (>= 800 ms pause on pins).
     expect(bot252.movement.chestBoard).toBeUndefined();
     expect(bot252.world.near.hold[1]).toBeLessThan(top252.world.near.hold[1] - 11.0);
     expect(deg3D(top252.world.near.shoulder, top252.world.near.elbow, top252.world.near.hold)).toBeGreaterThanOrEqual(172);
     expect(forearmDegFromVertical3D(bot252.world.near.elbow, bot252.world.near.hold)).toBeLessThanOrEqual(1.0);
+    expect(e252.segmentDurationsMs[1]).toBeLessThanOrEqual(200);
     expect(e252.segmentDurationsMs[3]).toBeGreaterThanOrEqual(800);
+    expect(e252.frames[2].caption).toBe('Reach straight arms at the top with the bar, wrists and elbows in line.');
+    expect(e252.frames[2].caption.toLowerCase()).not.toContain('hold lockout');
     // Safety pins sit tangent to the bottom of the barbell (y = hold.y - 1.6 = 35.2) well above the chest
     const pins252 = (bot252.movement.equipment ?? []).filter(
       (sh) => sh.kind === 'frame' && Math.abs(sh.a[1] - sh.b[1]) < 0.01 && sh.a[1] >= 30 && sh.a[1] <= 40,
@@ -241,18 +337,29 @@ describe('MOV-A05 horizontal, incline, decline, floor, board, pin, and cable pre
     expect(Math.abs(Math.max(slices203[0].y1, slices203[0].y2) + slices203[0].w / 2 - 96.9)).toBeLessThanOrEqual(0.05);
     expect(Math.abs(Math.max(slices203[32].y1, slices203[32].y2) + slices203[32].w / 2 - 96.9)).toBeLessThanOrEqual(0.05);
 
-    // 249 One-Arm Kettlebell Floor Press: starts at the bottom (ph = 0) with upper arm resting on the floor and palm facing in,
-    // presses straight up to lockout over the shoulder while turning the wrist, and lowers slowly (lowering > pressing duration).
+    // 249 One-Arm Kettlebell Floor Press: starts at the bottom (ph = 0) with upper arm resting on the floor angled out
+    // from the trunk (>= 40 deg in the floor plane) and palm facing in, presses straight up (horizontal travel along
+    // the trunk <= 3 units) to lockout over the shoulder while turning the wrist, and lowers slowly.
     expect(bot249.movement.implement).toBe('kettlebell');
     expect(bot249.movement.kettlebellTurn).toBe(true);
     expect(Math.abs(bot249.world.near.elbow[1] - (BODY.lw * 0.88) / 2)).toBeLessThanOrEqual(0.05);
     expect(forearmDegFromVertical3D(bot249.world.near.elbow, bot249.world.near.hold)).toBeLessThanOrEqual(1.0);
+    const upperArmFloorAngleDeg =
+      (Math.atan2(
+        Math.abs(bot249.world.near.elbow[2] - bot249.world.near.shoulder[2]),
+        Math.abs(bot249.world.near.elbow[0] - bot249.world.near.shoulder[0]),
+      ) *
+        180) /
+      Math.PI;
+    expect(upperArmFloorAngleDeg).toBeGreaterThanOrEqual(40);
+    expect(upperArmFloorAngleDeg).toBeLessThanOrEqual(70);
     expect(deg3D(top249.world.near.shoulder, top249.world.near.elbow, top249.world.near.hold)).toBeGreaterThanOrEqual(172);
     expect(Math.abs(top249.world.near.hold[0] - top249.world.near.shoulder[0])).toBeLessThanOrEqual(2.0);
+    expect(Math.abs(top249.world.near.hold[0] - bot249.world.near.hold[0])).toBeLessThanOrEqual(3.0);
     expect(e249.segmentDurationsMs[2]).toBeGreaterThan(e249.segmentDurationsMs[0] + 400);
   });
 
-  test('83 Cable Chest Press stands in a staggered stance facing away from chest-height pulleys, presses both handles forward until hands drift together at full reach, and returns slowly under cable tension', () => {
+  test('83 Cable Chest Press stands in a staggered stance facing away from chest-height pulleys with both pulleys and cables visible in the projection, presses both handles forward until hands drift together at full reach, and returns slowly under cable tension', () => {
     // Quotes:
     // "Set two handles at chest height, face away, and take a staggered stance. Press both handles forward until your arms are long, letting them drift together at the end. Return under control — the cable pulls backward the entire rep, so the squeeze at lockout is real work here."
     // "Brace into the staggered stance. Press to a full reach, hands finishing together. Ride the cables back slow."
@@ -268,7 +375,7 @@ describe('MOV-A05 horizontal, incline, decline, floor, board, pin, and cable pre
     expect(Math.hypot(reach.world.near.ankle[0] - start.world.near.ankle[0], reach.world.near.ankle[1] - start.world.near.ankle[1])).toBeLessThan(0.01);
     expect(Math.hypot(reach.world.far.ankle[0] - start.world.far.ankle[0], reach.world.far.ankle[1] - start.world.far.ankle[1])).toBeLessThan(0.01);
 
-    // Dual cables from chest-height pulleys behind the lifter
+    // Dual cables from chest-height pulleys behind the lifter, both visible clear of the painted torso silhouette
     expect(start.movement.implement).toBe('handles');
     expect((start.movement.lines ?? []).length).toBe(2);
     const pulleys = (start.movement.equipment ?? []).filter((sh) => sh.kind === 'pulley');
@@ -276,6 +383,17 @@ describe('MOV-A05 horizontal, incline, decline, floor, board, pin, and cable pre
     expect(pulleys[0].at[0]).toBeLessThan(start.world.neck[0] - 20);
     expect(pulleys[0].at[1]).toBeGreaterThanOrEqual(58);
     expect(pulleys[0].at[1]).toBeLessThanOrEqual(66);
+
+    for (const ph of [0, 1]) {
+      const prims = rig.layoutCanonicalFigure({ ...e.frames[0].joints, ph }, { view: e.view, assetKey: e.assetKey, body: BODY });
+      const paintedPulleys = prims.filter((p) => p.kind === 'circle' && p.r === 2.2 && p.stroke === 'textLow');
+      const paintedCables = prims.filter((p) => p.kind === 'bone' && p.color === 'textMid' && Math.abs(p.w - 1.4) < 1e-6);
+      const slices = torsoSlicesOf(prims);
+      const torsoMinX = Math.min(...slices.map((s) => Math.min(s.x1, s.x2) - s.w / 2));
+      expect(paintedPulleys.length).toBe(2);
+      expect(paintedCables.length).toBe(2);
+      expect(Math.max(paintedPulleys[0].cx, paintedPulleys[1].cx) + paintedPulleys[0].r).toBeLessThan(torsoMinX - 2.0);
+    }
 
     // Presses forward to long arms with hands drifting together at full reach
     expect(reach.world.near.hold[0] - start.world.near.hold[0]).toBeGreaterThanOrEqual(12);

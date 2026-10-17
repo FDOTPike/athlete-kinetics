@@ -4148,7 +4148,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       {
         at: [-1.8, 70.62], trunk: 90, head: 90, shrug: 0, thigh: -90, shin: -90,
         ankle: [-2.0, CHAIN_ANKLE_HEIGHT], kneeOut: 4,
-        upperArm: [-85, 8], forearm: [-85, 8],
+        upperArm: [-85, -1.4], forearm: [-85, -1.4],
       },
     ],
   },
@@ -4183,7 +4183,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       {
         at: [-2.5, 70.62 + 3.3], trunk: 90, head: 90, shrug: 0, thigh: -90, shin: -90,
         ankle: [-2.7, CHAIN_ANKLE_HEIGHT + 3.3], foot: 0, kneeOut: 4,
-        upperArm: [-85, 8], forearm: [-85, 8],
+        upperArm: [-85, -1.4], forearm: [-85, -1.4],
       },
     ],
   },
@@ -4218,7 +4218,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       {
         at: [-1.8, 70.62], trunk: 90, head: 90, shrug: 0, thigh: -90, shin: -90,
         ankle: [-2.0, CHAIN_ANKLE_HEIGHT], kneeOut: 4,
-        upperArm: [-85, 8], forearm: [-85, 8],
+        upperArm: [-85, -1.4], forearm: [-85, -1.4],
       },
     ],
   },
@@ -4260,7 +4260,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       {
         at: [-1.8, 70.62], trunk: 90, head: 90, shrug: 0, thigh: -90, shin: -90,
         ankle: [-2.0, CHAIN_ANKLE_HEIGHT], kneeOut: 4,
-        upperArm: [-85, 8], forearm: [-85, 8],
+        upperArm: [-85, -1.4], forearm: [-85, -1.4],
       },
     ],
   },
@@ -4925,25 +4925,25 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
   'one-arm-kettlebell-floor-press': {
     root: 'hip',
     view: 'oblique',
-    yawDeg: 28,
+    yawDeg: 16,
     originX: 48,
     implement: 'kettlebell',
     kettlebellTurn: true,
     footSpread: 4.2,
     kneePole: 90,
-    elbowPole: [-21.1, 12.1],
+    elbowPole: [-75.964, 30.19],
     poses: [
       {
-        at: [10, 5.913], trunk: 176.56, curl: -4, head: 178,
+        at: [10, 5.915], trunk: 176.56, curl: -4, head: 178,
         thigh: 42, shin: -52, ankle: [38, CHAIN_ANKLE_HEIGHT],
         upperArm: 0, forearm: 90,
-        wrist: [-2.59, 14.112, 12.0], farWrist: [-2.59, 14.112, -12.0],
+        wrist: [-9.488, 14.113, 20.182], farWrist: [-9.488, 14.113, -20.182],
       },
       {
-        at: [10, 5.913], trunk: 176.56, curl: -4, head: 178,
+        at: [10, 5.915], trunk: 176.56, curl: -4, head: 178,
         thigh: 42, shin: -52, ankle: [38, CHAIN_ANKLE_HEIGHT],
         upperArm: 90, forearm: 90,
-        wrist: [-12.99, 30.95, 9.4], farWrist: [-2.59, 14.112, -12.0],
+        wrist: [-12.19, 30.94, 9.384], farWrist: [-9.488, 14.113, -20.182],
       },
     ],
   },
@@ -4954,7 +4954,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
   'cable-chest-press': {
     root: 'hip',
     view: 'oblique',
-    yawDeg: 55,
+    yawDeg: 30,
     pitchDeg: 15,
     originX: 50,
     implement: 'handles',

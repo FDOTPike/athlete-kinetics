@@ -2273,7 +2273,7 @@ export const CHAIN_SPECS = [
     phases: [0, 1, 1, 0, 0],
     segments: [1200, 450, 950, 450],
     captions: [
-      'Hook your legs into the decline bench, take the bar just wider than shoulder width, and hold lockout over your eyes.',
+      'Hook your legs into the decline bench, take the bar just wider than shoulder width, and have a spotter for the unrack to lockout over your eyes.',
       'Lower to the lower line of your chest with the wrists stacked and bar over the forearm bones.',
       'Touch at the natural end of the shorter decline stroke at the lower chest.',
       'Press back to lockout over your eyes.',
@@ -2290,7 +2290,7 @@ export const CHAIN_SPECS = [
     phases: [0, 1, 1, 0, 0],
     segments: [1250, 450, 950, 450],
     captions: [
-      'Secure the legs in a decline bench, lie back with the shoulder blades pinned into the pad, and press the dumbbells into position.',
+      'Secure the legs in a decline bench, sit with the dumbbells on the thighs, then lie back and bring the bells to the chest before pressing them into position.',
       'Lower toward the lower chest with the forearms vertical and the shoulder blades pinned into the pad.',
       'Reach the bottom at the sides of the lower chest with the wrists stacked over the elbows.',
       'Press up and slightly inward to the top.',
@@ -2307,7 +2307,7 @@ export const CHAIN_SPECS = [
     phases: [0, 1, 1, 0, 0],
     segments: [1250, 450, 950, 450],
     captions: [
-      'Set the bench between 30 and 45 degrees, plant the feet, and start from the top with the dumbbells over your face.',
+      'Set the bench between 30 and 45 degrees, kick the dumbbells up off your knees one at a time, and start from the top.',
       'Lower to a deep stretch just outside your chest with your elbows about 45 degrees from your sides.',
       'Earn the stretch at the bottom just outside the chest with vertical forearms and 45-degree elbows.',
       'Press up and slightly back so the dumbbells finish over your face, not your belly.',
@@ -2339,11 +2339,11 @@ export const CHAIN_SPECS = [
     view: 'side',
     equipment: 'barbell, bench, squat_rack',
     phases: [0, 1, 1, 0, 0],
-    segments: [900, 450, 1200, 850],
+    segments: [900, 200, 1200, 850],
     captions: [
       'Set a bench inside a rack with the pins at the chosen height above your usual touch point and the bar resting on them, shoulder blades pulled together and feet set.',
       'From a full pause on the pins, drive the bar up to straight arms, keeping the bar, wrists and elbows in line.',
-      'Hold lockout with straight arms above the shoulders.',
+      'Reach straight arms at the top with the bar, wrists and elbows in line.',
       'Lower the bar back to the pins and let it settle before the next repetition.',
       'Shoulder blades pulled together, drive from a full pause on the pins, and settle the bar on the pins each time.',
     ],
@@ -2381,7 +2381,7 @@ export const CHAIN_SPECS = [
       'Lower the kettlebell slowly until the upper arm rests on the floor again.',
       'Wrist stacked over the elbow, press straight up letting the wrist turn, and lower slowly until the upper arm rests on the floor.',
     ],
-    reason: 'Source-bound draft, drawn from a 3D model turned 28 degrees so the single kettlebell in the working near hand, the palm-in bottom orientation with the upper arm resting flat on the floor, the straight vertical press path as the wrist turns 90 degrees, and the slower 1450 ms lowering phase all read clearly.',
+    reason: 'Source-bound draft, drawn from a 3D model turned 16 degrees so the single kettlebell in the working near hand, the palm-in bottom orientation with the upper arm angled out from the trunk and resting flat on the floor, the straight vertical press path over the shoulder as the wrist turns 90 degrees, and the slower 1450 ms lowering phase all read clearly.',
     summary: 'Lying on the floor with one upper arm resting on the ground and the palm facing in holding a kettlebell, press the kettlebell straight up while letting the wrist turn, then lower it slowly until the upper arm rests on the floor again.',
   },
   {
@@ -2398,7 +2398,7 @@ export const CHAIN_SPECS = [
       'Return slowly under control as the cables pull backward.',
       'Brace into the staggered stance, press to a full reach with the hands finishing together, and ride the cables back slow.',
     ],
-    reason: 'Source-bound draft, drawn from a 3D model turned 55 degrees with a 15-degree downward pitch so both chest-height pulleys behind the lifter, both cables, the staggered stance, and the hands drifting together at full forward reach all read without overlapping.',
+    reason: 'Source-bound draft, drawn from a 3D model turned 30 degrees with a 15-degree downward pitch so both chest-height pulleys behind the lifter, both cables, the staggered stance, and the hands drifting together at full forward reach all read without overlapping.',
     summary: 'Facing away from two chest-height pulleys in a staggered stance, press both handles forward until your arms are long and your hands drift together, then return slowly under control against the cable pull.',
   },
 ];
