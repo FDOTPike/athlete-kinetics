@@ -5106,6 +5106,259 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       },
     ],
   },
+  // Lying Dumbbell Triceps Extension: supine on a flat bench with dumbbells
+  // pressed over the chest and palms facing each other; upper arms stay frozen
+  // and angled slightly back over the head while the elbows bend to lower the
+  // dumbbells beside the ears and press back to long arms.
+  'lying-dumbbell-triceps-extension': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 22,
+    originX: 16,
+    implement: 'hammer',
+    farArmOver: true,
+    nearArmOverHead: true,
+    equipment: chainFlatBench(20, 66, CABLE_LYING_BENCH_TOP),
+    poses: [
+      {
+        at: [62, CABLE_LYING_BENCH_TOP + CHAIN_BACK_HALF], trunk: 180, thigh: 0, shin: -90,
+        ankle: [84, CHAIN_ANKLE_HEIGHT], upperArm: [104, 0], forearm: [104, 0],
+      },
+      {
+        at: [62, CABLE_LYING_BENCH_TOP + CHAIN_BACK_HALF], trunk: 180, thigh: 0, shin: -90,
+        ankle: [84, CHAIN_ANKLE_HEIGHT], upperArm: [104, 0], forearm: [236, 0],
+      },
+    ],
+  },
+  // Lying Triceps Press: supine on a flat bench holding an EZ bar with a
+  // medium overhand grip, arms straight above the chest and elbows tucked in;
+  // upper arms and elbows stay still while the bar lowers until just above the
+  // forehead and returns above the chest.
+  'lying-triceps-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 22,
+    originX: 16,
+    implement: 'ez',
+    farArmOver: true,
+    nearArmOverHead: true,
+    equipment: chainFlatBench(20, 66, CABLE_LYING_BENCH_TOP),
+    poses: [
+      {
+        at: [62, CABLE_LYING_BENCH_TOP + CHAIN_BACK_HALF], trunk: 180, thigh: 0, shin: -90,
+        ankle: [84, CHAIN_ANKLE_HEIGHT], upperArm: [90, 0], forearm: [90, 0],
+      },
+      {
+        at: [62, CABLE_LYING_BENCH_TOP + CHAIN_BACK_HALF], trunk: 180, thigh: 0, shin: -90,
+        ankle: [84, CHAIN_ANKLE_HEIGHT], upperArm: [90, 0], forearm: [195, 0],
+      },
+    ],
+  },
+  // Incline Barbell Triceps Extension: reclined on an incline bench holding a
+  // barbell overhead with an overhand grip slightly narrower than the
+  // shoulders, arms straight and in line with the torso; upper arms stay still
+  // and close to the head while the elbows bend to lower the bar behind the
+  // head, then straighten overhead and pause.
+  'incline-barbell-triceps-extension': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 18,
+    originX: 16,
+    implement: 'bar',
+    farArmOver: true,
+    nearArmOverHead: true,
+    equipment: chainInclineBench([52, CHAIN_SEATED_HIP], 128),
+    poses: [
+      {
+        at: [52, CHAIN_SEATED_HIP], trunk: 128, head: 112, thigh: 0, shin: -90,
+        upperArm: [128, -4.5], forearm: [128, -4.5],
+      },
+      {
+        at: [52, CHAIN_SEATED_HIP], trunk: 128, head: 112, thigh: 0, shin: -90,
+        upperArm: [128, -4.5], forearm: [222, -4.5],
+      },
+    ],
+  },
+  // Kneeling Cable Triceps Extension: kneeling facing away from a high pulley
+  // with the head and the backs of the upper arms resting on a bench placed
+  // sideways in front of the machine, holding the straight bar with a narrow
+  // overhand grip; straightens the elbows until the arms are level with the
+  // floor, pauses, and lets the elbows bend slowly back to the start.
+  'kneeling-cable-triceps-extension': {
+    root: 'ankle',
+    view: 'oblique',
+    yawDeg: 18,
+    originX: 8,
+    feet: 'free',
+    implement: 'cableBar',
+    farArmOver: true,
+    nearArmOverHead: true,
+    lines: [{ from: [8, 78], to: 'midGrip' }],
+    equipment: [
+      { kind: 'frame', a: [8, 0.5], b: [8, 84] },
+      { kind: 'pulley', at: [8, 78] },
+      ...chainFlatBench(60, 79, 24.5),
+    ],
+    poses: [
+      {
+        at: [14, CHAIN_KNEELING_KNEE], thigh: -98, shin: 180, foot: 180,
+        trunk: 4, head: -4, upperArm: [0, -7], forearm: [104, -7],
+      },
+      {
+        at: [14, CHAIN_KNEELING_KNEE], thigh: -98, shin: 180, foot: 180,
+        trunk: 4, head: -4, upperArm: [0, -7], forearm: [0, -7],
+      },
+    ],
+  },
+  // Decline Close-Grip Bench To Skull Crusher: legs secured on a decline
+  // bench, holding a barbell over the chest with a grip slightly narrower than
+  // shoulder width; lowers the bar to the lower chest with the elbows in and
+  // presses back up, then keeps the upper arms still and bends the elbows to
+  // lower the bar toward the forehead and straightens them again.
+  'decline-close-grip-bench-to-skull-crusher': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 18,
+    originX: 16,
+    feet: 'free',
+    implement: 'bar',
+    farArmOver: true,
+    nearArmOverHead: true,
+    equipment: chainDeclineBench(DECLINE_EXTENSION_HIP, DECLINE_EXTENSION_DEG, DECLINE_EXTENSION_ANKLE),
+    poses: [
+      { ...DECLINE_EXTENSION_BODY, upperArm: [-15, -4.5], forearm: [115, -4.5] },
+      { ...DECLINE_EXTENSION_BODY, upperArm: [105, -4.5], forearm: [105, -4.5] },
+      { ...DECLINE_EXTENSION_BODY, upperArm: [105, -4.5], forearm: [222, -4.5] },
+    ],
+  },
+  // Dip: supported on parallel bars with straight arms and shoulders packed
+  // down; bends the elbows and lowers the body until the upper arms are about
+  // parallel to the floor, then presses back up to straight arms.
+  'dip': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 50,
+    feet: 'free',
+    farArmOver: true,
+    elbowPole: 180,
+    equipment: [
+      { kind: 'post', at: [-10, 44, -CHAIN_SHOULDER_HALF] },
+      { kind: 'post', at: [10, 44, -CHAIN_SHOULDER_HALF] },
+      { kind: 'slab', a: [-14, 46, -CHAIN_SHOULDER_HALF], b: [14, 46, -CHAIN_SHOULDER_HALF], layer: 'behind' },
+      { kind: 'post', at: [-10, 44, CHAIN_SHOULDER_HALF] },
+      { kind: 'post', at: [10, 44, CHAIN_SHOULDER_HALF] },
+      { kind: 'slab', a: [-14, 46, CHAIN_SHOULDER_HALF], b: [14, 46, CHAIN_SHOULDER_HALF], layer: 'front' },
+    ],
+    poses: [
+      {
+        at: [-3.34, 50.93], trunk: 82, head: 86,
+        thigh: -92, shin: -168, foot: -160,
+        upperArm: -90, forearm: -90,
+        wrist: [0, 48 + CHAIN_HAND_REST, CHAIN_SHOULDER_HALF],
+        farWrist: [0, 48 + CHAIN_HAND_REST, -CHAIN_SHOULDER_HALF],
+      },
+      {
+        at: [6.69, 38.92], trunk: 76, head: 84,
+        thigh: -92, shin: -168, foot: -160,
+        upperArm: 180, forearm: -90,
+        wrist: [0, 48 + CHAIN_HAND_REST, CHAIN_SHOULDER_HALF],
+        farWrist: [0, 48 + CHAIN_HAND_REST, -CHAIN_SHOULDER_HALF],
+      },
+    ],
+  },
+  // Close-Grip Push-Up off of a Dumbbell: a dumbbell stood vertically on its
+  // end on the floor with both hands placed together on top of it, body rigid
+  // in a push-up position on the toes; bends the elbows close to the ribs to
+  // lower the chest toward the hands and presses back up to straight arms.
+  'close-grip-push-up-off-of-a-dumbbell': {
+    root: 'ankle',
+    view: 'oblique',
+    yawDeg: 24,
+    originX: 8,
+    feet: 'free',
+    farArmOver: true,
+    elbowPole: [180, 6],
+    footSpread: 2,
+    equipment: [
+      { kind: 'slab', a: [72.5, 2.0], b: [79.5, 2.0] },
+      { kind: 'box', a: [74.8, 2.0], b: [77.2, 7.6] },
+      { kind: 'slab', a: [72.5, 7.6], b: [79.5, 7.6] },
+    ],
+    poses: [
+      {
+        at: [14, SIDE_PLANK_ANKLE[1]], trunk: 24.16, head: 28.16,
+        thigh: 204.16, shin: 204.16, foot: -70,
+        upperArm: -90, forearm: -90,
+        wrist: [76.0, 9.6 + CHAIN_HAND_REST, 1.8],
+        farWrist: [76.0, 9.6 + CHAIN_HAND_REST, -1.8],
+      },
+      {
+        at: [14, SIDE_PLANK_ANKLE[1]], trunk: 10.0, head: 14.0,
+        thigh: 190.0, shin: 190.0, foot: -70,
+        upperArm: -90, forearm: -90,
+        wrist: [76.0, 9.6 + CHAIN_HAND_REST, 1.8],
+        farWrist: [76.0, 9.6 + CHAIN_HAND_REST, -1.8],
+      },
+    ],
+  },
+  // Clock Push-Up: starts in a push-up position with hands about shoulder-width
+  // apart and the body in one straight line; lowers the chest toward the floor,
+  // pushes up fast enough for both hands to leave the floor and land a short
+  // step to one side turning the body slightly, lands with soft bent elbows,
+  // and resets the straight arms and straight body line.
+  'clock-push-up': (() => {
+    const poseAt = (pitchDeg: number, trunkO: number, handO: number, handY: number): ChainPose => {
+      const p = chainRad(pitchDeg), o = chainRad(trunkO), ho = chainRad(handO);
+      const pTop = chainRad(16.65);
+      const legLen = CHAIN_THIGH + CHAIN_SHIN;
+      const hipX = 14 + legLen * Math.cos(p) * Math.cos(o);
+      const hipY = SIDE_PLANK_ANKLE[1] + 0.35 + legLen * Math.sin(p) * Math.cos(o);
+      const hipZ = legLen * Math.sin(o);
+      const topAxis = chainUnit([16.65, handO], 1);
+      const topLine = chainAcross(topAxis);
+      const topFwd = chainCross(topAxis, topLine);
+      const twTop = -Math.atan(Math.tan(pTop) * Math.sin(ho));
+      const shAxX = topLine[0] * Math.cos(twTop) + topFwd[0] * Math.sin(twTop);
+      const shAxZ = topLine[2] * Math.cos(twTop) + topFwd[2] * Math.sin(twTop);
+      const handX = 14 + SIDE_PLANK_BODY * Math.cos(pTop) * Math.cos(ho);
+      const handZ = SIDE_PLANK_BODY * Math.sin(ho);
+      const twist = -Math.atan(Math.tan(p) * Math.sin(o)) * 180 / Math.PI;
+      return {
+        at: [hipX, hipY, hipZ],
+        trunk: [pitchDeg, trunkO],
+        head: [pitchDeg + 4, trunkO],
+        twist,
+        thigh: [pitchDeg + 180, -trunkO],
+        shin: [pitchDeg + 180, -trunkO],
+        farThigh: [pitchDeg + 180, trunkO],
+        farShin: [pitchDeg + 180, trunkO],
+        foot: -70,
+        upperArm: -90,
+        forearm: -90,
+        wrist: [handX + shAxX * CHAIN_SHOULDER_HALF, handY, handZ + shAxZ * CHAIN_SHOULDER_HALF],
+        farWrist: [handX - shAxX * CHAIN_SHOULDER_HALF, handY, handZ - shAxZ * CHAIN_SHOULDER_HALF],
+      };
+    };
+    return {
+      root: 'hip',
+      view: 'oblique',
+      yawDeg: 32,
+      originX: 12,
+      feet: 'free',
+      cycle: true,
+      farArmOver: true,
+      elbowPole: [180, 18],
+      poses: [
+        poseAt(16.65, -8, -8, 2.35),
+        poseAt(7.0, -8, -8, 2.35),
+        poseAt(20.6, 0, 0, 8.4),
+        poseAt(14.5, 8, 8, 2.35),
+        poseAt(16.65, 8, 8, 2.35),
+        poseAt(20.6, 0, 0, 8.4),
+      ],
+    };
+  })(),
   // chain movements are added above this line
 };
 

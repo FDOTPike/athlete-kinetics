@@ -109,6 +109,14 @@ const LEGACY_FAMILY_KEYS = {
   188: 'rear-delt@supine',
   241: 'rear-delt@supine',
   265: 'rear-delt@bent-over',
+  91: 'elbow-extension@supine',
+  242: 'elbow-extension@supine',
+  215: 'elbow-extension@incline',
+  233: 'elbow-extension@supine',
+  177: 'elbow-extension@decline',
+  47: 'dip@seated-supported',
+  170: 'push-up@floor',
+  166: 'push-up@floor',
 };
 
 const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));

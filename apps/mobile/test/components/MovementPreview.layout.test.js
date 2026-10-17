@@ -51,7 +51,8 @@ test('every canonical movement, both bodies, every keyframe: no duplicate primit
   // MOV-A04 adds 9 hinges and posterior-chain movements (288, 61, 210, 271, 94, 35, 23, 202, 244), making 207.
   // MOV-A06 adds 7 standing overhead presses (4, 31, 41, 129, 189, 228, 230), making 214.
   // MOV-A09 adds 7 rows and rear raises (93, 195, 296, 243, 188, 241, 265), making 221.
-  expect(CANONICAL.length).toBe(221);
+  // MOV-A12 adds 8 triceps extensions, dips and push-ups (91, 242, 215, 233, 177, 47, 170, 166), making 229.
+  expect(CANONICAL.length).toBe(229);
   for (const entry of CANONICAL) {
     for (const bodyName of ['neutral']) {
       for (const frame of entry.frames) {
