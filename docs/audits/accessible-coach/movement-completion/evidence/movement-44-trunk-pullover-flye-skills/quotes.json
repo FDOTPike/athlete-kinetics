@@ -1,0 +1,210 @@
+{
+  "bounds": [
+    {
+      "id": 33,
+      "quote": "Kneel behind a loaded barbell with small plates and grip it at shoulder width.",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:93",
+      "bound": "w.near.knee[1] = 2.842 (on floor), plateBottoms max = 96.9 (FLOOR), and 3D hand-to-hand distance = 15.86 constant across every tick"
+    },
+    {
+      "id": 33,
+      "quote": "Brace hard and roll the bar forward as far as you can without your hips sagging.",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:99",
+      "bound": "forward wrist travel = 27.63 > 26, 3D elbow angle = 180.00 deg >= 172 deg, and w.hip[1] >= lineY + 1.0 with curl >= 10 across every tick"
+    },
+    {
+      "id": 137,
+      "quote": "Place a loaded barbell on the floor at the end of a bench, kneel on the bench and grip the bar with the hands about shoulder-width apart.",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:132",
+      "bound": "w.near.knee[1] = 11.842 on bench (9.000 units above 33 floor-kneeling knee at 2.842) while barbell plates roll on FLOOR = 96.9 ahead of bench end (wrist[0] > -6)"
+    },
+    {
+      "id": 137,
+      "quote": "With the arms straight, let the hips extend and roll the bar forward until the arms are reaching overhead as far as you can control.",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:141",
+      "bound": "3D elbow angle = 180.00 deg >= 172 deg across every tick, forward wrist travel = 24.81 > 22, and hip angle extends by +38.28 deg > 25 deg without sagging below knee-to-shoulder line"
+    },
+    {
+      "id": 119,
+      "quote": "Secure the legs on a decline bench and lie back with the fingertips resting lightly beside the temples.",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:174",
+      "bound": "chainDeclineBench ankle roller secures ankles while dist(w.near.grip, w.head) = 6.35 < 9.6 across every tick"
+    },
+    {
+      "id": 119,
+      "quote": "Press the lower back into the pad and curl the shoulder blades up, bringing the ribs toward the pelvis without sitting tall.",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:181",
+      "bound": "movement.spine = \"upper\", lower spine indices 0..12 drift = 0.000000 (< 1e-6) on every tick, and upper spine curls 58 deg shortening neck-to-hip distance by 3.74 units"
+    },
+    {
+      "id": 204,
+      "quote": "Lie on your back with the soles of the feet together and the knees dropped out to the sides, arms crossed over the chest.",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:204",
+      "bound": "view = \"oblique\" (yawDeg 38), |near.ankle[2] - far.ankle[2]| = 3.20 <= 3.6, near.knee[2] - far.knee[2] = 30.80 > 30, and projected knee separation |kn[0] - kf[0]| = 20.60 > 15"
+    },
+    {
+      "id": 204,
+      "quote": "Flatten the lower back to the floor and curl the head and shoulders up a short way. Pause, then lower slowly to the floor.",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:212",
+      "bound": "lower spine indices 0..12 stay at y = 3.500 (CHAIN_LYING_HEIGHT) with 0.000000 drift, top curl = 40 deg (neck rise 8.35 units), 450 ms top pause, and 1300 ms slow lower vs 900 ms curl"
+    },
+    {
+      "id": 149,
+      "quote": "Lie perpendicular across a flat bench with only the shoulders on the surface, hips low and feet flat on the floor.",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:240",
+      "bound": "neck[0] = -17.0 on perpendicular bench [-24, -10] at y = 21.50, hip[0] = 10.69 ahead of bench at y = 13.78 (< neck[1] - 5), and ankles flat on floor at y = 2.16"
+    },
+    {
+      "id": 149,
+      "quote": "Hold one dumbbell over the chest with both palms pressed against the underside and the elbows bent. Keeping that elbow bend fixed, lower the dumbbell in an arc behind the head",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:262",
+      "bound": "dist(near.hold, far.hold) = 1.15 < 3.5 under single dumbbell and 3D elbow angle stays fixed at 132.56 deg (max variation 0.000000 deg < 0.05 deg) across every tick"
+    },
+    {
+      "id": 289,
+      "quote": "Lie perpendicular across a flat bench with only the shoulders on the surface, hips low and feet flat on the floor.",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:240",
+      "bound": "neck[0] = -17.0 on perpendicular bench [-24, -10] at y = 21.50, hip[0] = 10.69 at y = 13.78 (< neck[1] - 5), and ankles flat on floor at y = 2.16"
+    },
+    {
+      "id": 289,
+      "quote": "Keeping the arms straight, lower the dumbbell in a wide arc behind the head until you feel a stretch across the chest.",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:273",
+      "bound": "3D elbow angle = 180.00 deg >= 172 deg across every tick and stretch wrist reaches x = -39.14 behind head (3.54 units wider than 149 bent-arm stretch at x = -35.60)"
+    },
+    {
+      "id": 148,
+      "quote": "Lie on a flat bench holding a barbell with a shoulder-width grip over the chest, elbows bent.",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:283",
+      "bound": "lies lengthwise along flat bench [-20, 12] with hip[1] = neck[1] = 21.50 (7.72 units higher than 149 dropped hip) and rigid barbell 3D hand-to-hand distance = 16.39 > 15 across every tick"
+    },
+    {
+      "id": 148,
+      "quote": "Keeping the same bend in the elbows, lower the bar in an arc behind the head until you feel a stretch across the chest. Pull the bar back along the same arc to the start and pause over the chest.",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:301",
+      "bound": "3D elbow angle stays fixed at 132.16 deg (variation < 0.05 deg), stretch wrist reaches x = -32.26 behind head (head[0] = -25.00), and frames 2..3 pause at ph = 0 over the chest"
+    },
+    {
+      "id": 201,
+      "quote": "Set a flat bench between two low pulleys so the pulleys line up with the chest, lie back and hold a handle in each hand, arms out to the sides with a slight bend in the elbows.",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:315",
+      "bound": "hip[1] = neck[1] = 21.50 on flat bench between low pulleys [-16, 4.5, +/-32], grip Z span sweeps from 66.26 (> 55) to 1.00 (< 8) at y = 45.23 above chest with constant 156.00 deg elbow angle"
+    },
+    {
+      "id": 201,
+      "quote": "Keeping that elbow bend fixed, bring the hands together in an arc until they meet above the chest. Pause, then lower the arms slowly back out to the sides.",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:330",
+      "bound": "frames 1..2 pause at ph = 1 for 450 ms, opening segment duration = 1500 ms > 1000 ms closing segment, and each 3D cable length strictly increases by +29.21 units on the working closing half"
+    },
+    {
+      "id": 217,
+      "quote": "Set an incline bench between two low pulleys, lie back with a handle in each hand and bring the hands together at arm's length above the face.",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:362",
+      "bound": "35-degree incline bench (trunk 145 deg, neck[1] - hip[1] = 13.77 > 12) between low pulleys [-13.66, 4.5, +/-32], starting at ph = 0 with grip Z span = 1.00 (< 8) and grip[1] - head[1] = 19.31 > 15"
+    },
+    {
+      "id": 217,
+      "quote": "With a slight, fixed bend in the elbows, lower the arms out to the sides in a wide arc until you feel a stretch across the chest. Bring the hands back together along the same arc and pause.",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:374",
+      "bound": "constant 156.00 deg elbow angle across every tick, slow 1500 ms open to Z span = 66.26 (> 55), 1000 ms close with cables lengthening by +29.21 units, and 450 ms top pause at ph = 0"
+    },
+    {
+      "id": 121,
+      "quote": "Set one kettlebell between the feet, hinge back, and take the handle with the shoulder packed over the bell. Drive the floor away and extend the hips to guide the bell close into the rack rather than looping it around the wrist.",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:411",
+      "bound": "floor kettlebell.body[1] = 4.66 < 5.0 between ankles with |shoulder[0] - grip[0]| = 0.48 < 2.5, and bell path stays within |body[0] - x0| <= 1.87 < 3.5 across every tick"
+    },
+    {
+      "id": 121,
+      "quote": "Zip the bell close to the body. Receive it softly with the elbow tucked.",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:424",
+      "bound": "standing rack knee angle = 174.21 deg >= 172 deg, tucked rack elbow[1] = 44.87 < wrist[1] - 8 (56.69), vertical bell rise = +52.83 units, and reverses to ph = 0 between the feet"
+    },
+    {
+      "id": 231,
+      "quote": "Lie on your back and press the kettlebell to a locked-out arm, then bend the knee on the same side. Keeping the arm locked out, pivot to the opposite side and use the free hand to drive forward and push up to a seated position, then to one knee.",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:436",
+      "bound": "7 keyframes [0, 1, 2, 4, 2, 1, 0] rising from supine (hip[1] = 3.50) -> forearm/hand prop (neck[1] = 27.85) -> half-kneeling lunge (far.knee[1] = 3.64 < 4.0) -> standing (hip[1] = 47.15)"
+    },
+    {
+      "id": 231,
+      "quote": "Looking up at the kettlebell, stand up from the one-knee position. Reverse the same sequence back to the floor. Keep the arm locked out the whole time.",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:452",
+      "bound": "standing near/far knee angles = 176.00 deg >= 172 deg, and working kettlebell arm stays locked at 180.00 deg (>= 172 deg) and vertical over shoulder (|wrist[0] - shoulder[0]| = 0.00, wrist[1] - shoulder[1] = 24.50) across every tick"
+    }
+  ],
+  "fileQuotes": [
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5479,
+      "endLine": 5486,
+      "text": "  'barbell-ab-rollout': {\n    root: 'ankle',\n    view: 'oblique',\n    yawDeg: 14,\n    originX: 48,\n    feet: 'free',\n    implement: 'bar',"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5518,
+      "endLine": 5526,
+      "text": "  'barbell-rollout-from-bench': {\n    root: 'ankle',\n    view: 'oblique',\n    yawDeg: 14,\n    originX: 52,\n    feet: 'free',\n    implement: 'bar',\n    equipment: chainFlatBench(-46, -18, 9.0),"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5557,
+      "endLine": 5567,
+      "text": "  'decline-crunch': {\n    root: 'hip',\n    spine: 'upper',\n    feet: 'free',\n    armsFollowTrunk: true,\n    nearArmOverHead: true,\n    equipment: chainDeclineBench(DECLINE_EXTENSION_HIP, DECLINE_EXTENSION_DEG, DECLINE_EXTENSION_ANKLE),\n    poses: [\n      { ...DECLINE_EXTENSION_BODY, curl: 0, ...HANDS_BY_EARS },\n      { ...DECLINE_EXTENSION_BODY, curl: 58, ...HANDS_BY_EARS },\n    ],"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5572,
+      "endLine": 5580,
+      "text": "  'frog-sit-ups': {\n    root: 'hip',\n    view: 'oblique',\n    yawDeg: 38,\n    originX: 48,\n    spine: 'upper',\n    feet: 'free',\n    kneePole: [52, 64],\n    armsFollowTrunk: true,"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5602,
+      "endLine": 5612,
+      "text": "  'bent-arm-dumbbell-pullover': {\n    root: 'neck',\n    view: 'oblique',\n    yawDeg: 18,\n    originX: 54,\n    kneePole: 90,\n    implement: 'bell',\n    bellAxis: [1, 0, 0],\n    nearArmOverHead: true,\n    farArmOver: true,\n    equipment: chainFlatBench(-24, -10, 18.0),"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5629,
+      "endLine": 5639,
+      "text": "  'straight-arm-dumbbell-pullover': {\n    root: 'neck',\n    view: 'oblique',\n    yawDeg: 18,\n    originX: 54,\n    kneePole: 90,\n    implement: 'bell',\n    bellAxis: [1, 0, 0],\n    nearArmOverHead: true,\n    farArmOver: true,\n    equipment: chainFlatBench(-24, -10, 18.0),"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5656,
+      "endLine": 5665,
+      "text": "  'bent-arm-barbell-pullover': {\n    root: 'hip',\n    view: 'oblique',\n    yawDeg: 18,\n    originX: 54,\n    kneePole: 90,\n    implement: 'bar',\n    nearArmOverHead: true,\n    farArmOver: true,\n    equipment: chainFlatBench(-20, 12, 18.0),"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5682,
+      "endLine": 5694,
+      "text": "  'flat-bench-cable-flyes': {\n    root: 'hip',\n    view: 'oblique',\n    yawDeg: 42,\n    originX: 52,\n    kneePole: 90,\n    implement: 'handles',\n    nearArmOverHead: true,\n    farArmOver: true,\n    lines: [\n      { from: [-16, 4.5, 32], to: 'nearGrip' },\n      { from: [-16, 4.5, -32], to: 'farGrip', depth: 'far' },\n    ],"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5719,
+      "endLine": 5731,
+      "text": "  'incline-cable-flye': {\n    root: 'hip',\n    view: 'oblique',\n    yawDeg: 42,\n    originX: 52,\n    kneePole: 90,\n    implement: 'handles',\n    nearArmOverHead: true,\n    farArmOver: true,\n    lines: [\n      { from: [-13.66, 4.5, 32], to: 'nearGrip' },\n      { from: [-13.66, 4.5, -32], to: 'farGrip', depth: 'far' },\n    ],"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5756,
+      "endLine": 5763,
+      "text": "  'kettlebell-dead-clean': {\n    root: 'hip',\n    view: 'oblique',\n    yawDeg: 28,\n    originX: 50,\n    footSpread: 3.0,\n    implement: 'kettlebell',\n    farArmOver: true,"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5789,
+      "endLine": 5797,
+      "text": "  'kettlebell-turkish-get-up-lunge-style': {\n    root: 'hip',\n    view: 'oblique',\n    yawDeg: 24,\n    originX: 48,\n    feet: 'free',\n    implement: 'kettlebell',\n    nearArmOverHead: true,\n    farArmOver: true,"
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js",
+      "line": 78,
+      "endLine": 91,
+      "text": "  test('every barbell movement in MOV-A14 (33, 137, 148) keeps a rigid bar with constant 3D hand-to-hand distance across every tick', () => {"
+    }
+  ]
+}

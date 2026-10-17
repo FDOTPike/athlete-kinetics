@@ -1,0 +1,21 @@
+source commit: ae2415a5d4c8008a9418f7dce93bfe20affed7ad
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with probe-019668f6c9bf55dfb9fe272870cbf732adf5a16f.json
+
+movements measured: 243 (baseline 232)
+added: 33 Barbell Ab Rollout; 137 Barbell Rollout from Bench; 119 Decline Crunch; 204 Frog Sit-Ups; 149 Bent-Arm Dumbbell Pullover; 289 Straight-Arm Dumbbell Pullover; 148 Bent-Arm Barbell Pullover; 201 Flat Bench Cable Flyes; 217 Incline Cable Flye; 121 Kettlebell Dead Clean; 231 Kettlebell Turkish Get-Up (Lunge style)
+removed: none
+changed, expected: none
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  33 Barbell Ab Rollout: drawn 36408d9f882bb1283ba3438f4e5dc33229021a723948f36a0cb0444388394c36 captions 8cbfe279b88b154f7bb4861b2f6ee5ac66581d2305f20b436a7a4a5304aaaea7 stage 240.00x90.81 cycle 3150 ms
+  137 Barbell Rollout from Bench: drawn 872dcbddfffdd11dde1dba9bde405e17f58992aebf66feaaf4489d40ec6abd04 captions c4cc1eff8626b59c2355b09d1c425d00892f5ca67b926fc5091fefe1649e3c05 stage 240.00x101.62 cycle 3150 ms
+  119 Decline Crunch: drawn 03c848437e53e2c29794dde480a2f2cbeb9fe0ffc0cdc712e384f3cc97147313 captions 4ae24498ce9f888ac61c6b7f17f37fd51418f2d2eb2ecfbdb3d29273489a3ec8 stage 240.00x173.16 cycle 3050 ms
+  204 Frog Sit-Ups: drawn 0edd558eb8e5f110ff397acdd0adf14e6e9351c1faeec1424ec53f1c23c50a6d captions 680f01c8eb00cffee65df994fc8c7adb97d0254a503dde7b80dc0832793b7d69 stage 240.00x104.35 cycle 3050 ms
+  149 Bent-Arm Dumbbell Pullover: drawn 7af9150b1e309d04b8415322c5458843b9f40bca5284e2d7c30fae1dba018e51 captions 59f09b26a8150c18467a8780fae4ef409ae714c3a745898bb615822112837e7b stage 240.00x169.23 cycle 3000 ms
+  289 Straight-Arm Dumbbell Pullover: drawn cf088a5bed6a16ba97f1b3a17d1727e6fff177ce30689522a0f0b9c04dbbbc09 captions 4d10640ac61018f0446f2218538a74caf8f8d4dae57751094defe1f3817d737b stage 240.00x171.85 cycle 3000 ms
+  148 Bent-Arm Barbell Pullover: drawn 6717204299f798bfbf2a15aa36a17172ce6c4d10047887e516f3148112162e53 captions 350a7344c60c8b775d75bfcba344578db748019422d4759694ba57337db6d7be stage 240.00x152.97 cycle 3000 ms
+  201 Flat Bench Cable Flyes: drawn b0c12ea16534fdbf1ab29b0026f8c071fcb97ab7e9b68da633b4cc9f7e3a5f54 captions d924bd37d84321c01191cce7259198581f59296cd8a611dd09ff4f352c1686c6 stage 240.00x190.68 cycle 3300 ms
+  217 Incline Cable Flye: drawn 6df7d2bc7372b5aa2a4d51d081611361c8caca4b9290d29169545ea657b4f16d captions cebbd2804ff28e23f4ef09b3b7ec67111ce8f052c3c0a9bf610fc847678ff315 stage 233.33x240.00 cycle 3300 ms
+  121 Kettlebell Dead Clean: drawn b71f1bda2b5249700d1402a78cd5f8812670aeb8ff92efde5706db0529fa076d captions b2b2e7b85a7350334f06309254860c76ae0231f0403b12f945e02c7e89e7f003 stage 117.39x240.00 cycle 3400 ms
+  231 Kettlebell Turkish Get-Up (Lunge style): drawn d09140c9478815d50044129b425c9e08c88dc16f73411be0f4939c2b14df6008 captions b087f3dd8b828bfda4541403b578950116ad380d270eb04fa672d15494ad08ea stage 221.54x240.00 cycle 7200 ms
+exit code: 0 (probe run exit 0)
