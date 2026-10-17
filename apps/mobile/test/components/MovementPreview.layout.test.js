@@ -52,7 +52,8 @@ test('every canonical movement, both bodies, every keyframe: no duplicate primit
   // MOV-A07 adds 7 other overhead work movements (229, 85, 112, 101, 58, 63, 69), making 214.
   // MOV-A10 adds 8 vertical pull and hanging movements (6, 13, 71, 108, 209, 77, 211, 64), making 222.
   // MOV-A13 adds 8 single-leg and calf raise movements (18, 36, 56, 136, 194, 239, 67, 96), making 230.
-  expect(CANONICAL.length).toBe(230);
+  // MOV-A14 adds 11 trunk, pullover, flye, and kettlebell skill movements (33, 137, 119, 204, 149, 289, 148, 201, 217, 121, 231), making 241.
+  expect(CANONICAL.length).toBe(241);
   for (const entry of CANONICAL) {
     for (const bodyName of ['neutral']) {
       for (const frame of entry.frames) {

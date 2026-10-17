@@ -125,6 +125,10 @@ const LEGACY_FAMILY_KEYS = {
   149: 'horizontal-pull@supine',
   289: 'horizontal-pull@supine',
   148: 'horizontal-pull@supine',
+  201: 'flye@supine',
+  217: 'flye@incline',
+  121: 'hip-hinge@standing',
+  231: 'trunk-flex@standing',
 };
 
 const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));

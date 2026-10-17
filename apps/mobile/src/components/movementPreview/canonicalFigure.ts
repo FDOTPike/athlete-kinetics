@@ -5485,27 +5485,27 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     implement: 'bar',
     poses: [
       {
-        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 17.19, curl: 16, head: 2,
+        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 17.56, curl: 16, head: 2,
         thigh: -92, shin: 180, foot: 180,
         upperArm: [-78, 10], forearm: [-78, 10],
       },
       {
-        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 15.13, curl: 15, head: 2,
+        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 15.49, curl: 15, head: 2,
         thigh: -105, shin: 180, foot: 180,
         upperArm: [-67, 10], forearm: [-67, 10],
       },
       {
-        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 13.75, curl: 14, head: 2,
+        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 14.11, curl: 14, head: 2,
         thigh: -118, shin: 180, foot: 180,
         upperArm: [-56, 10], forearm: [-56, 10],
       },
       {
-        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 12.31, curl: 13, head: 2,
+        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 12.68, curl: 13, head: 2,
         thigh: -131, shin: 180, foot: 180,
         upperArm: [-44, 10], forearm: [-44, 10],
       },
       {
-        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 10.32, curl: 12, head: 0,
+        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 10.68, curl: 12, head: 0,
         thigh: -144, shin: 180, foot: 180,
         upperArm: [-31, 10], forearm: [-31, 10],
       },
@@ -5525,27 +5525,27 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     equipment: chainFlatBench(-46, -18, 9.0),
     poses: [
       {
-        at: [-44.25, 9.0 + CHAIN_KNEELING_KNEE], trunk: -1.91, curl: 14, head: -14,
+        at: [-44.25, 9.0 + CHAIN_KNEELING_KNEE], trunk: -1.55, curl: 14, head: -14,
         thigh: -108, shin: 180, foot: 180,
         upperArm: [-84, 10], forearm: [-84, 10],
       },
       {
-        at: [-44.25, 9.0 + CHAIN_KNEELING_KNEE], trunk: -0.24, curl: 13, head: -10,
+        at: [-44.25, 9.0 + CHAIN_KNEELING_KNEE], trunk: 0.15, curl: 13, head: -10,
         thigh: -119, shin: 180, foot: 180,
         upperArm: [-74, 10], forearm: [-74, 10],
       },
       {
-        at: [-44.25, 9.0 + CHAIN_KNEELING_KNEE], trunk: 1.00, curl: 12, head: -6,
+        at: [-44.25, 9.0 + CHAIN_KNEELING_KNEE], trunk: 1.36, curl: 12, head: -6,
         thigh: -130, shin: 180, foot: 180,
         upperArm: [-63, 10], forearm: [-63, 10],
       },
       {
-        at: [-44.25, 9.0 + CHAIN_KNEELING_KNEE], trunk: 1.21, curl: 11, head: -4,
+        at: [-44.25, 9.0 + CHAIN_KNEELING_KNEE], trunk: 1.59, curl: 11, head: -4,
         thigh: -141, shin: 180, foot: 180,
         upperArm: [-51, 10], forearm: [-51, 10],
       },
       {
-        at: [-44.25, 9.0 + CHAIN_KNEELING_KNEE], trunk: -0.11, curl: 10, head: -6,
+        at: [-44.25, 9.0 + CHAIN_KNEELING_KNEE], trunk: 0.25, curl: 10, head: -6,
         thigh: -152, shin: 180, foot: 180,
         upperArm: [-38, 10], forearm: [-38, 10],
       },
@@ -5563,7 +5563,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     equipment: chainDeclineBench(DECLINE_EXTENSION_HIP, DECLINE_EXTENSION_DEG, DECLINE_EXTENSION_ANKLE),
     poses: [
       { ...DECLINE_EXTENSION_BODY, curl: 0, ...HANDS_BY_EARS },
-      { ...DECLINE_EXTENSION_BODY, curl: 44, ...HANDS_BY_EARS },
+      { ...DECLINE_EXTENSION_BODY, curl: 58, upperArm: -18, forearm: 142 },
     ],
   },
   // 204 Frog Sit-Ups: lie on the back with the soles of the feet together and
@@ -5587,7 +5587,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
         upperArm: [-70, -18], forearm: [92, -24],
       },
       {
-        at: [-10, CHAIN_LYING_HEIGHT], trunk: 180, curl: 36,
+        at: [-10, CHAIN_LYING_HEIGHT], trunk: 180, curl: 40,
         thigh: 0, shin: 0,
         ankle: [16.0, CHAIN_ANKLE_HEIGHT, 1.6], farAnkle: [16.0, CHAIN_ANKLE_HEIGHT, -1.6],
         foot: [0, -16], farFoot: [0, -16],
@@ -5614,12 +5614,12 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       {
         at: [-17.0, 18.0 + CHAIN_BACK_HALF], trunk: 164, head: 180,
         thigh: 0, shin: -90, ankle: [23.0, CHAIN_ANKLE_HEIGHT],
-        upperArm: [78, -9.3], forearm: [126, -9.3],
+        upperArm: [78, -24], forearm: [126, -24],
       },
       {
         at: [-17.0, 18.0 + CHAIN_BACK_HALF], trunk: 164, head: 180,
         thigh: 0, shin: -90, ankle: [23.0, CHAIN_ANKLE_HEIGHT],
-        upperArm: [142, -9.3], forearm: [190, -9.3],
+        upperArm: [134, -24], forearm: [182, -24],
       },
     ],
   },
@@ -5641,12 +5641,12 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       {
         at: [-17.0, 18.0 + CHAIN_BACK_HALF], trunk: 164, head: 180,
         thigh: 0, shin: -90, ankle: [23.0, CHAIN_ANKLE_HEIGHT],
-        upperArm: [88, -9.3], forearm: [88, -9.3],
+        upperArm: [88, -22.5], forearm: [88, -22.5],
       },
       {
         at: [-17.0, 18.0 + CHAIN_BACK_HALF], trunk: 164, head: 180,
         thigh: 0, shin: -90, ankle: [23.0, CHAIN_ANKLE_HEIGHT],
-        upperArm: [168, -9.3], forearm: [168, -9.3],
+        upperArm: [168, -22.5], forearm: [168, -22.5],
       },
     ],
   },
@@ -5673,6 +5673,163 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
         at: [8.0, 18.0 + CHAIN_BACK_HALF], trunk: 180, head: 180,
         thigh: 0, shin: -90, ankle: [25.0, CHAIN_ANKLE_HEIGHT],
         upperArm: [148, 12], forearm: [196, 12],
+      },
+    ],
+  },
+  // 201 Flat Bench Cable Flyes: lie on a flat bench centered between two low
+  // pulleys holding a D-handle in each hand, begin with the arms wide in a soft
+  // elbow bend and sweep the hands together in a wide arc above the chest.
+  'flat-bench-cable-flyes': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 42,
+    originX: 52,
+    kneePole: 90,
+    implement: 'handles',
+    nearArmOverHead: true,
+    farArmOver: true,
+    lines: [
+      { from: [-16, 4.5, 32], to: 'nearGrip' },
+      { from: [-16, 4.5, -32], to: 'farGrip', depth: 'far' },
+    ],
+    equipment: [
+      ...chainFlatBench(-20, 12, 18.0),
+      { kind: 'frame', a: [-16, 0.5, 32], b: [-16, 14, 32] },
+      { kind: 'frame', a: [-16, 0.5, -32], b: [-16, 14, -32] },
+      { kind: 'pulley', at: [-16, 4.5, 32] },
+      { kind: 'pulley', at: [-16, 4.5, -32] },
+    ],
+    poses: [
+      {
+        at: [8.0, 18.0 + CHAIN_BACK_HALF], trunk: 180, head: 180,
+        thigh: 0, shin: -90, ankle: [25.0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [90, 94], forearm: [90, 70],
+      },
+      {
+        at: [8.0, 18.0 + CHAIN_BACK_HALF], trunk: 180, head: 180,
+        thigh: 0, shin: -90, ankle: [25.0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [90, -10], forearm: [90, -34],
+      },
+    ],
+  },
+  // 217 Incline Cable Flye: lie on an incline bench (35 degrees) centered
+  // between two low pulleys holding a D-handle in each hand, begin with the
+  // hands together above the face, open the arms wide in a broad arc with a
+  // fixed slight bend in the elbows, and sweep the hands back together.
+  'incline-cable-flye': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 42,
+    originX: 52,
+    kneePole: 90,
+    implement: 'handles',
+    nearArmOverHead: true,
+    farArmOver: true,
+    lines: [
+      { from: [-13.66, 4.5, 32], to: 'nearGrip' },
+      { from: [-13.66, 4.5, -32], to: 'farGrip', depth: 'far' },
+    ],
+    equipment: [
+      ...chainInclineBench([6.0, CHAIN_SEATED_HIP], 145),
+      { kind: 'frame', a: [-13.66, 0.5, 32], b: [-13.66, 14, 32] },
+      { kind: 'frame', a: [-13.66, 0.5, -32], b: [-13.66, 14, -32] },
+      { kind: 'pulley', at: [-13.66, 4.5, 32] },
+      { kind: 'pulley', at: [-13.66, 4.5, -32] },
+    ],
+    poses: [
+      {
+        at: [6.0, CHAIN_SEATED_HIP], trunk: 145, head: 145,
+        thigh: 0, shin: -90, ankle: [22.0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [90, -10], forearm: [90, -34],
+      },
+      {
+        at: [6.0, CHAIN_SEATED_HIP], trunk: 145, head: 145,
+        thigh: 0, shin: -90, ankle: [22.0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [90, 94], forearm: [90, 70],
+      },
+    ],
+  },
+  // 121 Kettlebell Dead Clean: stand over a kettlebell set between the ankles
+  // with hips back and a long spine, drive the floor away to pull the bell from
+  // a dead stop up the body and spiral the hand around the handle into a tight
+  // front rack at the shoulder, then set it back on the floor between the feet.
+  'kettlebell-dead-clean': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 50,
+    footSpread: 3.0,
+    implement: 'kettlebell',
+    farArmOver: true,
+    poses: [
+      {
+        at: [-18.5, 19.7], trunk: 28, head: 44,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 12,
+        upperArm: [-91.2, -22], forearm: [-91.2, -22],
+        farUpperArm: [-120, 14], farForearm: [-100, 10],
+      },
+      {
+        at: [-8.5, 36.5], trunk: 68, head: 78,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 8,
+        upperArm: [-146, -14], forearm: [-8, -22],
+        farUpperArm: [-98, 12], farForearm: [-88, 8],
+      },
+      {
+        at: [-0.8, 46.2], trunk: 89, head: 90,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 2,
+        upperArm: [-84, 8], forearm: [82, -22],
+        farUpperArm: [-88, 10], farForearm: [-84, 6],
+      },
+    ],
+  },
+  // 231 Kettlebell Turkish Get-Up (Lunge style): lie on the back with one
+  // kettlebell locked out overhead and the same-side knee bent, roll onto the
+  // opposite forearm and hand, sweep the straight leg back into a half-kneeling
+  // lunge beneath the vertical arm, stand tall, and reverse step by step.
+  'kettlebell-turkish-get-up-lunge-style': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 24,
+    originX: 48,
+    feet: 'free',
+    implement: 'kettlebell',
+    nearArmOverHead: true,
+    farArmOver: true,
+    poses: [
+      {
+        at: [-14.0, CHAIN_LYING_HEIGHT], trunk: 180, twist: 0, head: 155,
+        thigh: 48, shin: -56, foot: 0,
+        farThigh: [12, 8], farShin: [14, 8], farFoot: 75,
+        upperArm: [90, 0], forearm: [90, 0],
+        farUpperArm: [12, 32], farForearm: [16, 24],
+      },
+      {
+        at: [-8.0, 10.0], trunk: 132, twist: -14, head: 112,
+        thigh: 40, shin: -52, foot: 0,
+        farThigh: [14, 8], farShin: [16, 8], farFoot: 75,
+        upperArm: [90, 0], forearm: [90, 0],
+        farUpperArm: [-78, 18], farForearm: [-68, 12],
+      },
+      {
+        at: [2.0, 25.4], trunk: 86, twist: 0, head: 106,
+        thigh: 0, shin: -88, foot: 0,
+        farThigh: [-78, 0], farShin: [176, 0], farFoot: 45,
+        upperArm: [90, 0], forearm: [90, 0],
+        farUpperArm: [-82, 12], farForearm: [-76, 8],
+      },
+      {
+        at: [6.0, 43.2], trunk: 88, twist: 0, head: 106,
+        thigh: -42, shin: -74, foot: 0,
+        farThigh: [-74, 0], farShin: [224, 0], farFoot: 15,
+        upperArm: [90, 0], forearm: [90, 0],
+        farUpperArm: [-84, 10], farForearm: [-80, 7],
+      },
+      {
+        at: [10.0, 47.15], trunk: 89, twist: 0, head: 106,
+        thigh: -88, shin: -92, foot: 0,
+        farThigh: [-88, 0], farShin: [268, 0], farFoot: 0,
+        upperArm: [90, 0], forearm: [90, 0],
+        farUpperArm: [-86, 8], farForearm: [-84, 6],
       },
     ],
   },
@@ -7448,7 +7605,7 @@ export const EQUIPMENT_BY_SLUG: Record<string, string> = {
   'lunge-pass-through': 'kettlebell',
   'kettlebell-pistol-squat': 'kettlebell',
   'standing-barbell-calf-raise': 'barbell',
-  // MOV-A14: trunk and pullovers.
+  // MOV-A14: trunk, pullovers, flyes, and kettlebell skills.
   'barbell-ab-rollout': 'barbell',
   'barbell-rollout-from-bench': 'barbell',
   'decline-crunch': 'bench',
@@ -7456,6 +7613,10 @@ export const EQUIPMENT_BY_SLUG: Record<string, string> = {
   'bent-arm-dumbbell-pullover': 'dumbbells',
   'straight-arm-dumbbell-pullover': 'dumbbells',
   'bent-arm-barbell-pullover': 'barbell',
+  'flat-bench-cable-flyes': 'cable_machine',
+  'incline-cable-flye': 'cable_machine',
+  'kettlebell-dead-clean': 'kettlebell',
+  'kettlebell-turkish-get-up-lunge-style': 'kettlebell',
 };
 
 /**
