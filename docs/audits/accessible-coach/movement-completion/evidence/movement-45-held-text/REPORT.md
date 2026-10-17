@@ -2,7 +2,7 @@
 
 - **Work order**: `MOV-A15`
 - **Branch**: `movement/50-held-text-2026-10-18` (branched from `181dc051da6744c9bb6975f25a6961dce429165d`)
-- **Source commit**: `90c3838817662169dcfbea15e12ca8694181c198`
+- **Source commit**: `5ebb8f12a7e06f246cae79d1fbbb6e7d3b9dfa9f`
 - **Baseline probe**: `probe-c9d0f25faf35617b4189e385a839819751249205.json` (`231` measured movements; `236` measured after adding the `5` held-text movements)
 - **Batch IDs**: `145`, `153`, `165`, `205`, `250` (`allowedChanged`: `[]`)
 - **Status**: `EVIDENCE CAPTURED`
@@ -23,28 +23,28 @@ All five movements (`145`, `153`, `165`, `205`, `250`) have their source-bound d
 
 ---
 
-## 2. Gate Execution Summary (`90c3838817662169dcfbea15e12ca8694181c198`)
+## 2. Gate Execution Summary (`5ebb8f12a7e06f246cae79d1fbbb6e7d3b9dfa9f`)
 
 - **`typecheck.log`**:
-  - `source commit: 90c3838817662169dcfbea15e12ca8694181c198`
+  - `source commit: 5ebb8f12a7e06f246cae79d1fbbb6e7d3b9dfa9f`
   - `exit code: 0`
 - **`jest-movement-preview.log`**:
-  - `source commit: 90c3838817662169dcfbea15e12ca8694181c198`
+  - `source commit: 5ebb8f12a7e06f246cae79d1fbbb6e7d3b9dfa9f`
   - `Test Suites: 64 passed, 64 total`
   - `Tests:       3698 passed, 3698 total`
   - `exit code: 0`
 - **`storage-guard.log`**:
-  - `source commit: 90c3838817662169dcfbea15e12ca8694181c198`
+  - `source commit: 5ebb8f12a7e06f246cae79d1fbbb6e7d3b9dfa9f`
   - `"records": 242, "families": 75, "rawBytes": 703927, "gzipBytes": 116733`
   - `"largestFamily": { "file": "hip-hinge__standing.json", "rawBytes": 63217 }`
   - `"pass": true`
   - `exit code: 0`
 - **`evidence-gate.log`**:
-  - `source commit: 90c3838817662169dcfbea15e12ca8694181c198`
+  - `source commit: 5ebb8f12a7e06f246cae79d1fbbb6e7d3b9dfa9f`
   - `PASS — clean evidence passes and all 19 injected defects are rejected by their own check.`
   - `exit code: 0`
 - **`rendered-output-probe.log`**:
-  - `source commit: 90c3838817662169dcfbea15e12ca8694181c198`
+  - `source commit: 5ebb8f12a7e06f246cae79d1fbbb6e7d3b9dfa9f`
   - `movements measured: 236 (baseline 231)`
   - `added: 145 Bent Over Two-Arm Long Bar Row; 153 Box Squat with Bands; 165 Calf Raise On A Dumbbell; 205 Front Barbell Squat To A Bench; 250 One-Arm Kettlebell Swings`
   - `removed: none`
