@@ -186,7 +186,7 @@ describe('what the fingers do', () => {
   });
 });
 
-test('only finger-curls, front-squat-clean-grip, and the standing overhead press close-up movements have a close-up', () => {
+test('only finger-curls, front-squat-clean-grip, and the approved grip close-up movements have a close-up', () => {
   expect(Object.keys(CHAIN_MOVEMENTS).filter((slug) => CHAIN_MOVEMENTS[slug].closeUp !== undefined)).toEqual([
     'finger-curls',
     'front-squat-clean-grip',
@@ -195,5 +195,8 @@ test('only finger-curls, front-squat-clean-grip, and the standing overhead press
     'alternating-kettlebell-press',
     'dumbbell-one-arm-shoulder-press',
     'kettlebell-arnold-press',
+    'upright-cable-row',
+    'dumbbell-lying-rear-lateral-raise',
+    'lying-rear-delt-raise',
   ]);
 });

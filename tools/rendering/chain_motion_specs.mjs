@@ -2366,7 +2366,7 @@ export const CHAIN_SPECS = [
       'Row the other side to your ribs, pulling with the elbow and staying quiet everywhere else.',
       'Place the dumbbell down on the floor with the feet wide for a stable base.',
     ],
-    reason: 'Source-bound draft, drawn from a 3D model turned 28 degrees so both floor dumbbells under the hands, the feet set wider than usual, the straight braced plank line, and the alternating row of each dumbbell to the ribs without hip twist all read clearly: starting in a push-up plank with a hand on each dumbbell and feet wider than usual, rowing one dumbbell to the ribs while the rest of the body stays a statue with hips square to the floor, placing it down, and rowing the other side.',
+    reason: 'Source-bound draft, drawn from a 3D model turned 38 degrees so both floor dumbbells under the hands, the feet set wider than usual, the straight braced plank line, and the alternating row of each dumbbell to the ribs without hip twist all read clearly: starting in a push-up plank with a hand on each dumbbell and feet wider than usual, rowing one dumbbell to the ribs while the rest of the body stays a statue with hips square to the floor, placing it down, and rowing the other side.',
     summary: 'In a push-up plank with a hand on each dumbbell and feet wider than usual, row one dumbbell to your ribs while keeping the hips square to the floor, place it down, and row the other side.',
   },
   {
@@ -2417,7 +2417,7 @@ export const CHAIN_SPECS = [
       'Lower under control while letting the chest stay on the bench.',
       'Return under control with the arms hanging straight; when the elbows bend to move the load, reduce the weight.',
     ],
-    reason: 'Source-bound draft, drawn from a 3D model turned 36 degrees so the incline bench under the chest, the dumbbells held in straight hanging arms throughout, and the dorsal retraction of the shoulder blades back and together all read clearly: lying chest-down on an incline bench with the arms hanging straight, pulling the shoulder blades back and together without bending the elbows, pausing at the top, and lowering under control.',
+    reason: 'Source-bound draft, drawn from a 3D model turned 58 degrees so the incline bench under the chest, the dumbbells held in straight hanging arms throughout, and the dorsal retraction of the shoulder blades back and together all read clearly: lying chest-down on an incline bench with the arms hanging straight, pulling the shoulder blades back and together without bending the elbows, pausing at the top, and lowering under control.',
     summary: 'Lying chest-down on an incline bench holding a dumbbell in each hand with the arms hanging straight, pull the shoulder blades back and together without bending the elbows, pause at the top, and lower under control.',
   },
   {
