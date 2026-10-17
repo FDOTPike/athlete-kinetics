@@ -4634,6 +4634,236 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       },
     ],
   },
+  // Kettlebell Seated Press (id 229): seated directly on the floor with legs
+  // spread comfortably wide and settled; one kettlebell cleaned to the shoulder
+  // resting on the forearm, pressed up and out to a locked elbow overhead, and
+  // lowered back to the rack position under control.
+  'kettlebell-seated-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 45,
+    originX: 48,
+    feet: 'free',
+    implement: 'kettlebell',
+    nearArmOverHead: true,
+    farArmOver: true,
+    poses: [
+      {
+        at: [-8, CHAIN_THIGH_HALF + 0.05], trunk: 90, head: 90,
+        thigh: [0, 19.5], shin: [-1.84, 19.5], foot: [80, 16],
+        upperArm: [80, 146], forearm: [68, -10],
+        farUpperArm: [-28, 32], farForearm: [-8, 20],
+      },
+      {
+        at: [-8, CHAIN_THIGH_HALF + 0.05], trunk: 90, head: 90,
+        thigh: [0, 19.5], shin: [-1.84, 19.5], foot: [80, 16],
+        upperArm: [90, 32], forearm: [90, 32],
+        farUpperArm: [-28, 32], farForearm: [-8, 20],
+      },
+    ],
+  },
+  // Double Kettlebell Push Press (id 85): two kettlebells in the rack; a
+  // shallow, fast knee dip with a vertical torso, then a hard leg drive that
+  // carries both bells to locked arms overhead before lowering back to the rack.
+  'double-kettlebell-push-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 50,
+    footSpread: 2.5,
+    implement: 'kettlebells',
+    nearArmOverHead: true,
+    farArmOver: true,
+    poses: [
+      {
+        at: [-1.4, 41.6], trunk: 90, head: 90,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 10,
+        upperArm: [80, 142], forearm: [80, -10],
+      },
+      {
+        at: [0, CHAIN_STANDING_HIP - 0.075], trunk: 90, head: 90,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 4,
+        upperArm: [80, 142], forearm: [80, -10],
+      },
+      {
+        at: [0, CHAIN_STANDING_HIP - 0.075], trunk: 90, head: 90,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 4,
+        upperArm: [90, 12], forearm: [90, 12],
+      },
+    ],
+  },
+  // Bent Press (id 112): one kettlebell at the shoulder, feet wider than the
+  // hips and turned slightly away from the loaded side; hips shift away and the
+  // torso wedges under the bell while the arm straightens with eyes on the
+  // handle and the bell stacked over its base, then stand tall under the locked arm.
+  'bent-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 32,
+    originX: 52,
+    feet: 'free',
+    elbowPole: [-90, 35],
+    implement: 'kettlebell',
+    nearArmOverHead: true,
+    farArmOver: true,
+    poses: [
+      {
+        at: [0, 44.5], trunk: 89, head: 90,
+        thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT, 12.0], farAnkle: [-4.0, CHAIN_ANKLE_HEIGHT, -12.0],
+        foot: [0, -18], kneeOut: 8,
+        upperArm: -60, forearm: 80,
+        wrist: [2.64, 70.5, CHAIN_SHOULDER_HALF], farWrist: [2.0, 48.0, -CHAIN_SHOULDER_HALF],
+      },
+      {
+        at: [-15.2, 37.5], trunk: 42, head: 86,
+        thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT, 12.0], farAnkle: [-4.0, CHAIN_ANKLE_HEIGHT, -12.0],
+        foot: [0, -18], kneeOut: 10,
+        upperArm: 90, forearm: 90,
+        wrist: [2.64, 78.045, CHAIN_SHOULDER_HALF], farWrist: [-4.0, 34.0, -CHAIN_SHOULDER_HALF],
+      },
+      {
+        at: [0, 44.5], trunk: 89, head: 90,
+        thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT, 12.0], farAnkle: [-4.0, CHAIN_ANKLE_HEIGHT, -12.0],
+        foot: [0, -18], kneeOut: 8,
+        upperArm: 90, forearm: 90,
+        wrist: [2.64, 92.89, CHAIN_SHOULDER_HALF], farWrist: [2.0, 48.0, -CHAIN_SHOULDER_HALF],
+      },
+    ],
+  },
+  // Cuban Press (id 101): standing with light dumbbells; raise the elbows wide
+  // to shoulder height with forearms hanging below them, hold the upper arms
+  // fixed while rotating the forearms up until wrists stack over the elbows,
+  // press to a tall overhead finish, and reverse every stage under control.
+  'cuban-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 38,
+    originX: 50,
+    footSpread: 2.0,
+    implement: 'bells',
+    nearArmOverHead: true,
+    farArmOver: true,
+    poses: [
+      {
+        at: [0, CHAIN_STANDING_HIP - 0.08], trunk: 90, head: 90,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [-85, 14], forearm: [-85, 14],
+      },
+      {
+        at: [0, CHAIN_STANDING_HIP - 0.08], trunk: 90, head: 90,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [0, 90], forearm: [-90, 0],
+      },
+      {
+        at: [0, CHAIN_STANDING_HIP - 0.08], trunk: 90, head: 90,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [0, 90], forearm: [90, 0],
+      },
+      {
+        at: [0, CHAIN_STANDING_HIP - 0.08], trunk: 90, head: 90,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [90, 12], forearm: [90, 12],
+      },
+    ],
+  },
+  // Eccentric Wall Handstand Push-Up (id 58): kick up to the wall with hands
+  // just outside shoulder width and a padded target beneath the head; brace in
+  // one vertical line and lower for up to five seconds until the head meets the
+  // pad softly, then exit through the rehearsed clear side.
+  'eccentric-wall-handstand-push-up': {
+    root: 'neck',
+    view: 'oblique',
+    yawDeg: 20,
+    originX: 50,
+    feet: 'free',
+    elbowPole: [-140, 35],
+    equipment: [
+      { kind: 'slab', a: [-7.02, 2.0], b: [-7.02, 95.0], layer: 'behind' },
+      { kind: 'slab', a: [-3.5, 2.0], b: [7.5, 2.0], layer: 'behind' },
+    ],
+    poses: [
+      {
+        at: [0, 26.59], trunk: -90, head: -90,
+        thigh: 90, shin: 90, foot: 0,
+        upperArm: -90, forearm: -90,
+        wrist: [1.0, CHAIN_HAND_REST, 11.2], farWrist: [1.0, CHAIN_HAND_REST, -11.2],
+      },
+      {
+        at: [0, 19.3], trunk: -90, head: -90,
+        thigh: 90, shin: 90, foot: 0,
+        upperArm: -90, forearm: -90,
+        wrist: [1.0, CHAIN_HAND_REST, 11.2], farWrist: [1.0, CHAIN_HAND_REST, -11.2],
+      },
+      {
+        at: [0, 19.3], trunk: -90, head: -90,
+        thigh: 90, shin: 90, foot: 0,
+        farThigh: [58, -26], farShin: [36, -26], farFoot: 0,
+        upperArm: -90, forearm: -90,
+        wrist: [1.0, CHAIN_HAND_REST, 11.2], farWrist: [1.0, CHAIN_HAND_REST, -11.2],
+      },
+    ],
+  },
+  // Handstand Push-Up (id 63): kick up to the wall with hands just outside
+  // shoulder width and a padded target beneath the head; brace in one vertical
+  // line, lower until the head meets the pad softly, and press back to straight arms.
+  'handstand-push-up': {
+    root: 'neck',
+    view: 'oblique',
+    yawDeg: 20,
+    originX: 50,
+    feet: 'free',
+    elbowPole: [-140, 35],
+    equipment: [
+      { kind: 'slab', a: [-7.02, 2.0], b: [-7.02, 95.0], layer: 'behind' },
+      { kind: 'slab', a: [-3.5, 2.0], b: [7.5, 2.0], layer: 'behind' },
+    ],
+    poses: [
+      {
+        at: [0, 26.59], trunk: -90, head: -90,
+        thigh: 90, shin: 90, foot: 0,
+        upperArm: -90, forearm: -90,
+        wrist: [1.0, CHAIN_HAND_REST, 11.2], farWrist: [1.0, CHAIN_HAND_REST, -11.2],
+      },
+      {
+        at: [0, 19.3], trunk: -90, head: -90,
+        thigh: 90, shin: 90, foot: 0,
+        upperArm: -90, forearm: -90,
+        wrist: [1.0, CHAIN_HAND_REST, 11.2], farWrist: [1.0, CHAIN_HAND_REST, -11.2],
+      },
+    ],
+  },
+  // Pike Push-Up (id 69): feet walked in and hips lifted high in an inverted V;
+  // elbows bend and track at about 45 degrees to lower the top of the head
+  // toward a spot just ahead of the hands, then press back to long arms without
+  // the hips drifting forward.
+  'pike-push-up': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 22,
+    originX: 50,
+    feet: 'free',
+    elbowPole: [-135, 45],
+    kneePole: -45,
+    poses: [
+      {
+        at: [-0.5, 40.8], trunk: -40, head: -40,
+        thigh: -115, shin: -115, foot: 0,
+        ankle: [-21.8, CHAIN_ANKLE_HEIGHT, 6.8], farAnkle: [-21.8, CHAIN_ANKLE_HEIGHT, -6.8],
+        upperArm: -80, forearm: -80,
+        wrist: [11.0, CHAIN_HAND_REST, 9.6], farWrist: [11.0, CHAIN_HAND_REST, -9.6],
+      },
+      {
+        at: [-0.5, 38.6], trunk: -62, head: -62,
+        thigh: -115, shin: -115, foot: 0,
+        ankle: [-21.8, CHAIN_ANKLE_HEIGHT, 6.8], farAnkle: [-21.8, CHAIN_ANKLE_HEIGHT, -6.8],
+        upperArm: -80, forearm: -80,
+        wrist: [11.0, CHAIN_HAND_REST, 9.6], farWrist: [11.0, CHAIN_HAND_REST, -9.6],
+      },
+    ],
+  },
   // chain movements are added above this line
 };
 

@@ -49,7 +49,8 @@ test('every canonical movement, both bodies, every keyframe: no duplicate primit
   // MOV-A02 adds 8 other squats (140, 192, 81, 98, 120, 235, 105, 48), making 191.
   // MOV-A03 adds 7 floor and sumo deadlifts (2, 46, 176, 257, 78, 258, 290), making 198.
   // MOV-A04 adds 9 hinges and posterior-chain movements (288, 61, 210, 271, 94, 35, 23, 202, 244), making 207.
-  expect(CANONICAL.length).toBe(207);
+  // MOV-A07 adds 7 other overhead work movements (229, 85, 112, 101, 58, 63, 69), making 214.
+  expect(CANONICAL.length).toBe(214);
   for (const entry of CANONICAL) {
     for (const bodyName of ['neutral']) {
       for (const frame of entry.frames) {
