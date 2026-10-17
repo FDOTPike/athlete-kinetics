@@ -4579,12 +4579,12 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       {
         at: [10, 6.8], trunk: 17, head: 23,
         thigh: -163, shin: 180, foot: -56,
-        upperArm: -133, forearm: -49.08,
+        upperArm: -133, forearm: -49.07,
       },
       {
         at: [10, 6.8], trunk: 23, head: 29,
         thigh: -157, shin: 180, foot: -56,
-        upperArm: -108, forearm: -64.91,
+        upperArm: -115, forearm: -63.5,
       },
     ],
   },
@@ -4611,12 +4611,12 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       {
         at: [10, 10.5], trunk: 11, head: 17,
         thigh: -169, shin: 180, foot: -90,
-        upperArm: -135, forearm: -44.23,
+        upperArm: -135, forearm: -44.24,
       },
       {
         at: [10, 10.5], trunk: 18, head: 24,
         thigh: -162, shin: 180, foot: -90,
-        upperArm: -110, forearm: -65.63,
+        upperArm: -116, forearm: -61.5,
       },
     ],
   },
