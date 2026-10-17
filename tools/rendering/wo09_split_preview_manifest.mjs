@@ -102,6 +102,14 @@ const LEGACY_FAMILY_KEYS = {
   58: 'vertical-press@standing',
   63: 'vertical-press@standing',
   69: 'vertical-press@standing',
+  6: 'vertical-pull@standing',
+  13: 'vertical-pull@standing',
+  71: 'vertical-pull@standing',
+  108: 'vertical-pull@standing',
+  209: 'vertical-pull@standing',
+  77: 'straight-arm-pulldown@standing',
+  211: 'trunk-flex@standing',
+  64: 'trunk-flex@standing',
 };
 
 const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
