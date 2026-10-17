@@ -94,8 +94,13 @@ describe('MOV-A07 other overhead work: physics, joint angles, painted contacts, 
       expect(FLOOR - underside).toBeLessThanOrEqual(0.5);
     }
 
-    // Legs spread comfortably wide across Z and kept settled throughout
-    expect(start.world.near.ankle[2] - start.world.far.ankle[2]).toBeGreaterThanOrEqual(40);
+    // Legs spread comfortably wide across Z and in the 2D card projection, with straight knees (>= 172 deg), kept settled throughout
+    expect(start.world.near.ankle[2] - start.world.far.ankle[2]).toBeGreaterThanOrEqual(60);
+    expect(deg3D(start.world.near.hipJoint, start.world.near.knee, start.world.near.ankle)).toBeGreaterThanOrEqual(172);
+    expect(deg3D(start.world.far.hipJoint, start.world.far.knee, start.world.far.ankle)).toBeGreaterThanOrEqual(172);
+    expect(start.joints.an[0]).toBeLessThan(start.joints.nLeg[0] - 10);
+    expect(start.joints.af[0]).toBeGreaterThan(start.joints.fLeg[0] + 25);
+    expect(start.joints.af[0] - start.joints.an[0]).toBeGreaterThanOrEqual(55);
     const ds = e.segmentDurationsMs;
     const total = ds.reduce((a, b) => a + b, 0);
     const poses = e.frames.map((f) => f.joints);
@@ -192,12 +197,14 @@ describe('MOV-A07 other overhead work: physics, joint angles, painted contacts, 
     const wedge = rig.chainGeometry(slug, 1, BODY);
     const stand = rig.chainGeometry(slug, 2, BODY);
 
-    // One bell at shoulder, feet wider than the hips and turned slightly away from the loaded near side
+    // One bell at shoulder, feet wider than the hips and turned slightly away from the loaded near side, standing tall (>= 172 deg knees)
     expect(setup.movement.implement).toBe('kettlebell');
     expect(setup.world.near.ankle[2] - setup.world.far.ankle[2]).toBeGreaterThanOrEqual(22);
     expect(setup.angles.foot[1]).toBeLessThanOrEqual(-12);
+    expect(deg3D(setup.world.near.hipJoint, setup.world.near.knee, setup.world.near.ankle)).toBeGreaterThanOrEqual(172);
+    expect(deg3D(setup.world.far.hipJoint, setup.world.far.knee, setup.world.far.ankle)).toBeGreaterThanOrEqual(172);
 
-    // Setup -> Wedge: hips shift away and descend, torso wedges under the bell while the arm straightens to lockout
+    // Setup -> Wedge: hips shift away and descend, torso wedges under the bell while the arm straightens to lockout and head turns toward the handle
     expect(deg3D(setup.world.near.shoulder, setup.world.near.elbow, setup.world.near.wrist)).toBeLessThanOrEqual(65);
     expect(wedge.world.hip[0]).toBeLessThan(setup.world.hip[0] - 6);
     expect(wedge.world.hip[1]).toBeLessThan(setup.world.hip[1] - 4);
@@ -205,16 +212,24 @@ describe('MOV-A07 other overhead work: physics, joint angles, painted contacts, 
     expect(wedge.world.near.shoulder[1]).toBeLessThan(setup.world.near.shoulder[1] - 14);
     expect(deg3D(wedge.world.near.shoulder, wedge.world.near.elbow, wedge.world.near.wrist)).toBeGreaterThanOrEqual(176);
     expect(wedge.world.head[1]).toBeGreaterThan(wedge.world.neck[1] + 5);
+    expect(deg3D(wedge.world.head, wedge.world.neck, wedge.world.near.hold)).toBeLessThanOrEqual(5);
+    expect(wedge.joints.hd[0]).toBeLessThan(wedge.joints.nk[0]);
 
-    // Wedge -> Stand tall: arm stays locked overhead while feet drive through the floor to stand tall
+    // Wedge -> Stand tall: arm stays locked overhead while feet drive through the floor to stand tall (knees >= 172 deg)
     expect(deg3D(stand.world.near.shoulder, stand.world.near.elbow, stand.world.near.wrist)).toBeGreaterThanOrEqual(176);
+    expect(deg3D(stand.world.near.hipJoint, stand.world.near.knee, stand.world.near.ankle)).toBeGreaterThanOrEqual(172);
+    expect(deg3D(stand.world.far.hipJoint, stand.world.far.knee, stand.world.far.ankle)).toBeGreaterThanOrEqual(172);
     expect(trunkDegFromHorizontal2D(stand.joints)).toBeGreaterThanOrEqual(85);
     expect(stand.world.near.hold[1]).toBeGreaterThan(wedge.world.near.hold[1] + 14);
 
-    // Bell stays stacked over its base and never travels sideways across any 33 ms tick
+    // No second wedge caption, and after ph = 2 is reached the return stays standing tall (trunk >= 85 deg, knees >= 172 deg)
+    for (const f of e.frames.slice(3)) {
+      expect(f.caption.toLowerCase()).not.toContain('wedge');
+    }
     const ds = e.segmentDurationsMs;
     const total = ds.reduce((a, b) => a + b, 0);
     const poses = e.frames.map((f) => f.joints);
+    const standTime = ds[0] + ds[1];
     for (let t = 0; t <= total; t += 33) {
       const p = rig.poseAtTime(poses, t, ds);
       const g = rig.chainGeometry(slug, p.ph, BODY);
@@ -223,6 +238,11 @@ describe('MOV-A07 other overhead work: physics, joint angles, painted contacts, 
       expect(Math.abs(g.hold.near[0] - setup.hold.near[0])).toBeLessThanOrEqual(1.2);
       expect(dist3(g.world.near.ankle, setup.world.near.ankle)).toBeLessThan(0.01);
       expect(dist3(g.world.far.ankle, setup.world.far.ankle)).toBeLessThan(0.01);
+      if (t >= standTime) {
+        expect(trunkDegFromHorizontal2D(g.joints)).toBeGreaterThanOrEqual(85);
+        expect(deg3D(g.world.near.hipJoint, g.world.near.knee, g.world.near.ankle)).toBeGreaterThanOrEqual(172);
+        expect(deg3D(g.world.far.hipJoint, g.world.far.knee, g.world.far.ankle)).toBeGreaterThanOrEqual(172);
+      }
     }
   });
 
@@ -281,7 +301,7 @@ describe('MOV-A07 other overhead work: physics, joint angles, painted contacts, 
     }
   });
 
-  test('58 Eccentric Wall Handstand Push-Up and 63 Handstand Push-Up draw the wall, pad, and floor hands, maintain painted wall and pad contacts, and differ by the 5-second eccentric-only exit versus full press', () => {
+  test('58 Eccentric Wall Handstand Push-Up and 63 Handstand Push-Up draw the wall, pad, and floor hands, maintain painted wall and pad contacts, and differ by the 5-second eccentric-only exit to the floor and kick-up versus full press', () => {
     // Quotes:
     // 58: "Clear the floor, place a firm padded target beneath the head, and kick to the wall with the hands just outside shoulder width."
     // 58: "Brace into a vertical line and lower for up to five seconds until the head meets the pad softly. Exit through the rehearsed clear side, reset, and kick back up; the controlled lowering is the full rep."
@@ -300,12 +320,12 @@ describe('MOV-A07 other overhead work: physics, joint angles, painted contacts, 
       const top = rig.chainGeometry(slug, 0, BODY);
       const bottom = rig.chainGeometry(slug, 1, BODY);
 
-      // Upside-down vertical line at ph=0 and ph=1, hands just outside shoulder width
-      expect(top.world.ankle ? top.world.near.ankle[1] : top.world.near.ankle[1]).toBeGreaterThan(top.world.hip[1] + 40);
+      // Upside-down vertical line at ph=0 and ph=1, hands just outside shoulder width, straight arms at top (>= 172 deg)
+      expect(top.world.near.ankle[1]).toBeGreaterThan(top.world.hip[1] + 40);
       expect(top.world.hip[1]).toBeGreaterThan(top.world.neck[1] + 22);
       expect(top.world.neck[1]).toBeGreaterThan(top.world.head[1] + 8);
       expect(top.world.near.wrist[2] - top.world.far.wrist[2]).toBeGreaterThan(top.world.near.shoulder[2] - top.world.far.shoulder[2] + 2.0);
-      expect(deg3D(top.world.near.shoulder, top.world.near.elbow, top.world.near.wrist)).toBeGreaterThanOrEqual(170);
+      expect(deg3D(top.world.near.shoulder, top.world.near.elbow, top.world.near.wrist)).toBeGreaterThanOrEqual(172);
       expect(deg3D(bottom.world.near.shoulder, bottom.world.near.elbow, bottom.world.near.wrist)).toBeLessThanOrEqual(98);
 
       // Painted head-to-pad contact at bottom (ph=1)
@@ -326,10 +346,11 @@ describe('MOV-A07 other overhead work: physics, joint angles, painted contacts, 
       expect(headPadGap).toBeGreaterThanOrEqual(0);
       expect(headPadGap).toBeLessThanOrEqual(0.5);
 
-      // Across every 33 ms tick: painted hands rest on FLOOR = 96.9 and painted near heel contacts the painted wall face
+      // Across every 33 ms tick: painted hands rest on FLOOR = 96.9; while on the wall (all ticks for 63, eccentric lowering for 58), painted near heel contacts the painted wall face
       const wallRightFaceX = wallSlab.x1 + wallSlab.w / 2;
       const ds = e.segmentDurationsMs;
       const total = ds.reduce((a, b) => a + b, 0);
+      const wallPhaseEnd = e.movementId === 58 ? ds[0] : total;
       const poses = e.frames.map((f) => f.joints);
       for (let t = 0; t <= total; t += 33) {
         const p = rig.poseAtTime(poses, t, ds);
@@ -342,26 +363,54 @@ describe('MOV-A07 other overhead work: physics, joint angles, painted contacts, 
         expect(FLOOR - (farHand.cy + farHand.r)).toBeGreaterThanOrEqual(0);
         expect(FLOOR - (farHand.cy + farHand.r)).toBeLessThanOrEqual(0.5);
 
-        const nearShin = prims.find((pr) => pr.kind === 'bone' && pr.color === 'textHi' && Math.abs(pr.w - BODY.lw * 0.9) < 1e-6);
-        const heelLeftEdgeX = Math.min(nearShin.x1, nearShin.x2) - nearShin.w / 2;
-        const wallGap = heelLeftEdgeX - wallRightFaceX;
-        expect(wallGap).toBeGreaterThanOrEqual(0);
-        expect(wallGap).toBeLessThanOrEqual(0.6);
+        if (t <= wallPhaseEnd) {
+          const nearShin = prims.find((pr) => pr.kind === 'bone' && pr.color === 'textHi' && Math.abs(pr.w - BODY.lw * 0.9) < 1e-6);
+          const heelLeftEdgeX = Math.min(nearShin.x1, nearShin.x2) - nearShin.w / 2;
+          const wallGap = heelLeftEdgeX - wallRightFaceX;
+          expect(wallGap).toBeGreaterThanOrEqual(0);
+          expect(wallGap).toBeLessThanOrEqual(0.6);
+        }
       }
     }
 
-    // 58 lowers for up to five seconds (4000..5000 ms) and exits through the clear side (ph=2) without pressing back up;
-    // 63 lowers at normal tempo (< 2000 ms) and presses straight back to locked arms (phases [0, 1, 1, 0, 0]).
+    // 58 lowers for up to five seconds (4000..5000 ms), then exits to the floor on the clear side without extending the arms while inverted, resets, and kicks back up;
+    // 63 lowers at normal tempo (< 2000 ms), presses straight back to locked arms (phases [0, 1, 1, 0, 0]), and instructs the post-set exit in the last caption.
     expect(e58.segmentDurationsMs[0]).toBeGreaterThanOrEqual(4000);
     expect(e58.segmentDurationsMs[0]).toBeLessThanOrEqual(5000);
     expect(e63.segmentDurationsMs[0]).toBeLessThanOrEqual(2000);
     expect(e58.segmentDurationsMs[0]).toBeGreaterThanOrEqual(e63.segmentDurationsMs[0] * 2.5);
 
-    expect(e58.frames.map((f) => f.joints.ph)).toEqual([0, 1, 2, 2, 0]);
     expect(e63.frames.map((f) => f.joints.ph)).toEqual([0, 1, 1, 0, 0]);
-    const exit58 = rig.chainGeometry(slugOf(e58), 2, BODY);
-    const bot58 = rig.chainGeometry(slugOf(e58), 1, BODY);
-    expect(dist3(exit58.world.far.ankle, bot58.world.far.ankle)).toBeGreaterThan(15);
+    expect(e63.frames.at(-1).caption).toContain('exit through');
+    expect(e63.frames.at(-1).caption).not.toContain(' or ');
+
+    const slug58 = slugOf(e58);
+    const ds58 = e58.segmentDurationsMs;
+    const total58 = ds58.reduce((a, b) => a + b, 0);
+    const poses58 = e58.frames.map((f) => f.joints);
+    let prevElbow58 = null;
+    let minAnkleY58 = Infinity;
+    let maxAnkleClearX58 = -Infinity;
+    for (let t = 0; t <= total58; t += 33) {
+      const p = rig.poseAtTime(poses58, t, ds58);
+      const g = rig.chainGeometry(slug58, p.ph, BODY);
+      const elbow = deg3D(g.world.near.shoulder, g.world.near.elbow, g.world.near.wrist);
+      const feetAboveHands = g.world.near.ankle[1] > g.world.near.wrist[1] + 5 && g.world.far.ankle[1] > g.world.far.wrist[1] + 5;
+      if (t > ds58[0] && prevElbow58 !== null && feetAboveHands) {
+        expect(elbow).toBeLessThanOrEqual(prevElbow58 + 1e-4);
+      }
+      prevElbow58 = elbow;
+      if (t > ds58[0]) {
+        minAnkleY58 = Math.min(minAnkleY58, g.world.near.ankle[1], g.world.far.ankle[1]);
+        maxAnkleClearX58 = Math.max(maxAnkleClearX58, g.world.near.ankle[0]);
+      }
+    }
+    // Both feet reach the floor on the clear side during the exit
+    const exitLanding = rig.chainGeometry(slug58, 3, BODY);
+    expect(exitLanding.world.near.ankle[1]).toBeLessThanOrEqual(2.5);
+    expect(exitLanding.world.far.ankle[1]).toBeLessThanOrEqual(2.5);
+    expect(minAnkleY58).toBeLessThanOrEqual(2.5);
+    expect(maxAnkleClearX58).toBeGreaterThan(25);
   });
 
   test('69 Pike Push-Up holds high hips in an inverted V, tracks elbows at about 45 degrees to lower the head just ahead of the hands, and presses back without the hips drifting forward', () => {
@@ -385,9 +434,10 @@ describe('MOV-A07 other overhead work: physics, joint angles, painted contacts, 
     expect(deg3D(top.world.neck, top.world.hip, top.world.near.ankle)).toBeLessThanOrEqual(105);
     expect(deg3D(bottom.world.neck, bottom.world.hip, bottom.world.near.ankle)).toBeLessThanOrEqual(105);
 
-    // Head lowers toward a spot just ahead of the hands, while elbows bend and track at ~45 degrees
-    expect(deg3D(top.world.near.shoulder, top.world.near.elbow, top.world.near.wrist)).toBeGreaterThanOrEqual(158);
+    // Head lowers toward a spot just ahead of the hands, while elbows bend from straight arms (>= 172 deg) and track at ~45 degrees
+    expect(deg3D(top.world.near.shoulder, top.world.near.elbow, top.world.near.wrist)).toBeGreaterThanOrEqual(172);
     expect(deg3D(bottom.world.near.shoulder, bottom.world.near.elbow, bottom.world.near.wrist)).toBeLessThanOrEqual(95);
+    expect(e.frames[1].caption).toContain('track back at about 45 degrees');
     expect(bottom.world.head[1]).toBeLessThanOrEqual(9.5);
     expect(bottom.world.head[0]).toBeGreaterThan(bottom.world.near.wrist[0] + 2.0);
     expect(bottom.world.head[0]).toBeLessThan(bottom.world.near.wrist[0] + 7.5);

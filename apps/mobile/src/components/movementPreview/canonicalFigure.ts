@@ -4644,23 +4644,23 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
   'kettlebell-seated-press': {
     root: 'hip',
     view: 'oblique',
-    yawDeg: 45,
-    originX: 48,
+    yawDeg: 72,
+    originX: 44,
     feet: 'free',
     implement: 'kettlebell',
     nearArmOverHead: true,
     farArmOver: true,
     poses: [
       {
-        at: [-8, CHAIN_THIGH_HALF + 0.05], trunk: 90, head: 90,
-        thigh: [0, 19.5], shin: [-1.84, 19.5], foot: [80, 16],
+        at: [-4, CHAIN_THIGH_HALF + 0.05], trunk: 90, head: 90,
+        thigh: [0, 35], shin: [-1.84, 35], foot: [80, 28],
         upperArm: [80, 146], forearm: [68, -10],
         farUpperArm: [-28, 32], farForearm: [-8, 20],
       },
       {
-        at: [-8, CHAIN_THIGH_HALF + 0.05], trunk: 90, head: 90,
-        thigh: [0, 19.5], shin: [-1.84, 19.5], foot: [80, 16],
-        upperArm: [90, 32], forearm: [90, 32],
+        at: [-4, CHAIN_THIGH_HALF + 0.05], trunk: 90, head: 90,
+        thigh: [0, 35], shin: [-1.84, 35], foot: [80, 28],
+        upperArm: [90, 24], forearm: [90, 24],
         farUpperArm: [-28, 32], farForearm: [-8, 20],
       },
     ],
@@ -4704,6 +4704,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     view: 'oblique',
     yawDeg: 32,
     originX: 52,
+    cycle: true,
     feet: 'free',
     elbowPole: [-90, 35],
     implement: 'kettlebell',
@@ -4711,28 +4712,28 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     farArmOver: true,
     poses: [
       {
-        at: [0, 44.5], trunk: 89, head: 90,
+        at: [-0.4, 46.3], trunk: 89, head: [90, 0],
         thigh: -90, shin: -90,
-        ankle: [0, CHAIN_ANKLE_HEIGHT, 12.0], farAnkle: [-4.0, CHAIN_ANKLE_HEIGHT, -12.0],
-        foot: [0, -18], kneeOut: 8,
+        ankle: [0, CHAIN_ANKLE_HEIGHT, 12.0], farAnkle: [-0.8, CHAIN_ANKLE_HEIGHT, -12.0],
+        foot: [0, -18], kneeOut: 6,
         upperArm: -60, forearm: 80,
-        wrist: [2.64, 70.5, CHAIN_SHOULDER_HALF], farWrist: [2.0, 48.0, -CHAIN_SHOULDER_HALF],
+        wrist: [2.64, 72.3, CHAIN_SHOULDER_HALF], farWrist: [1.6, 49.8, -CHAIN_SHOULDER_HALF],
       },
       {
-        at: [-15.2, 37.5], trunk: 42, head: 86,
+        at: [-15.2, 37.5], trunk: 42, head: [90, 20],
         thigh: -90, shin: -90,
-        ankle: [0, CHAIN_ANKLE_HEIGHT, 12.0], farAnkle: [-4.0, CHAIN_ANKLE_HEIGHT, -12.0],
+        ankle: [0, CHAIN_ANKLE_HEIGHT, 12.0], farAnkle: [-0.8, CHAIN_ANKLE_HEIGHT, -12.0],
         foot: [0, -18], kneeOut: 10,
         upperArm: 90, forearm: 90,
         wrist: [2.64, 78.045, CHAIN_SHOULDER_HALF], farWrist: [-4.0, 34.0, -CHAIN_SHOULDER_HALF],
       },
       {
-        at: [0, 44.5], trunk: 89, head: 90,
+        at: [-0.4, 46.3], trunk: 89, head: [90, 0],
         thigh: -90, shin: -90,
-        ankle: [0, CHAIN_ANKLE_HEIGHT, 12.0], farAnkle: [-4.0, CHAIN_ANKLE_HEIGHT, -12.0],
-        foot: [0, -18], kneeOut: 8,
+        ankle: [0, CHAIN_ANKLE_HEIGHT, 12.0], farAnkle: [-0.8, CHAIN_ANKLE_HEIGHT, -12.0],
+        foot: [0, -18], kneeOut: 6,
         upperArm: 90, forearm: 90,
-        wrist: [2.64, 92.89, CHAIN_SHOULDER_HALF], farWrist: [2.0, 48.0, -CHAIN_SHOULDER_HALF],
+        wrist: [2.64, 94.65, CHAIN_SHOULDER_HALF], farWrist: [1.6, 49.8, -CHAIN_SHOULDER_HALF],
       },
     ],
   },
@@ -4775,12 +4776,13 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
   // Eccentric Wall Handstand Push-Up (id 58): kick up to the wall with hands
   // just outside shoulder width and a padded target beneath the head; brace in
   // one vertical line and lower for up to five seconds until the head meets the
-  // pad softly, then exit through the rehearsed clear side.
+  // pad softly, then exit through the rehearsed clear side, reset on the floor, and kick back up.
   'eccentric-wall-handstand-push-up': {
     root: 'neck',
     view: 'oblique',
     yawDeg: 20,
-    originX: 50,
+    originX: 46,
+    cycle: true,
     feet: 'free',
     elbowPole: [-140, 35],
     equipment: [
@@ -4801,9 +4803,26 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
         wrist: [1.0, CHAIN_HAND_REST, 11.2], farWrist: [1.0, CHAIN_HAND_REST, -11.2],
       },
       {
-        at: [0, 19.3], trunk: -90, head: -90,
-        thigh: 90, shin: 90, foot: 0,
-        farThigh: [58, -26], farShin: [36, -26], farFoot: 0,
+        at: [0, 19.3], trunk: -114, head: -100,
+        thigh: 18, shin: 0, foot: 0,
+        upperArm: -90, forearm: -90,
+        wrist: [1.0, CHAIN_HAND_REST, 11.2], farWrist: [1.0, CHAIN_HAND_REST, -11.2],
+      },
+      {
+        at: [0, 19.3], trunk: -138, head: -115,
+        thigh: -48.07, shin: -48.07, foot: 0,
+        upperArm: -90, forearm: -90,
+        wrist: [1.0, CHAIN_HAND_REST, 11.2], farWrist: [1.0, CHAIN_HAND_REST, -11.2],
+      },
+      {
+        at: [0, 26.59], trunk: -158.5, head: -125,
+        thigh: -48.07, shin: -48.07, foot: 0,
+        upperArm: -90, forearm: -90,
+        wrist: [1.0, CHAIN_HAND_REST, 11.2], farWrist: [1.0, CHAIN_HAND_REST, -11.2],
+      },
+      {
+        at: [0, 26.59], trunk: -118, head: -102,
+        thigh: 18, shin: 18, foot: 0,
         upperArm: -90, forearm: -90,
         wrist: [1.0, CHAIN_HAND_REST, 11.2], farWrist: [1.0, CHAIN_HAND_REST, -11.2],
       },
@@ -4852,7 +4871,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     kneePole: -45,
     poses: [
       {
-        at: [-0.5, 40.8], trunk: -40, head: -40,
+        at: [-0.5, 40.8], trunk: -39.2, head: -39.2,
         thigh: -115, shin: -115, foot: 0,
         ankle: [-21.8, CHAIN_ANKLE_HEIGHT, 6.8], farAnkle: [-21.8, CHAIN_ANKLE_HEIGHT, -6.8],
         upperArm: -80, forearm: -80,
