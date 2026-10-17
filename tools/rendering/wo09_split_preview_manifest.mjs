@@ -117,6 +117,11 @@ const LEGACY_FAMILY_KEYS = {
   47: 'dip@seated-supported',
   170: 'push-up@floor',
   166: 'push-up@floor',
+  145: 'horizontal-pull@bent-over',
+  153: 'squat@standing',
+  165: 'calf-raise@standing',
+  205: 'squat@standing',
+  250: 'hip-hinge@standing',
 };
 
 const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
