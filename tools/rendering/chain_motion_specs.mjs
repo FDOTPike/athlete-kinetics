@@ -2189,12 +2189,12 @@ export const CHAIN_SPECS = [
     captions: [
       'Kneel on a soft pad with the ankles secured beneath an immovable anchor, holding one line from knees to head with the hips extended.',
       'Lower that straight line from the knees as slowly as possible.',
-      'Catch the floor with the hands in a push-up position when you can no longer hold.',
+      'Catch with the hands.',
       'Pull back up with the hamstrings, using only as much push from the hands as needed.',
       'One line from knees to head, lower as slowly as you can, keep the hips extended, and use only the hand push you need.',
     ],
-    reason: 'Source-bound side-view draft: kneeling on a soft floor pad with the ankles secured beneath an immovable floor anchor, holding one straight line from knees to head with the hips extended, lowering that line slowly until the hands catch the floor in a push-up position, and pulling back up with the hamstrings.',
-    summary: 'Kneeling on a soft pad with the ankles secured beneath an anchor, hold one line from knees to head and lower as slowly as possible, catch on the floor in a push-up position, and pull back up with the hamstrings.',
+    reason: 'Source-bound side-view draft: kneeling on a soft floor pad with the ankles secured beneath an immovable floor anchor, holding one straight line from knees to head with the hips extended, lowering that line slowly until the hands catch the floor, and pulling back up with the hamstrings.',
+    summary: 'Kneeling on a soft pad with the ankles secured beneath an anchor, hold one line from knees to head and lower as slowly as possible, catch with the hands, and pull back up with the hamstrings.',
   },
   {
     id: 202,
@@ -2381,7 +2381,7 @@ export const CHAIN_SPECS = [
       'Lower the kettlebell slowly until the upper arm rests on the floor again.',
       'Wrist stacked over the elbow, press straight up, lower until the arm rests on the floor, and change arms after the repetitions.',
     ],
-    reason: 'Source-bound draft, drawn from a 3D model turned 45 degrees the other way so that any drift of the bell along or across the trunk would show: the single kettlebell in the working near hand, the palm-in bottom with the upper arm resting on the floor 45 degrees out from the trunk and the wrist stacked over the elbow, the bell rising straight up as the wrist turns until the arm is straight, and the slower 1450 ms lowering phase.',
+    reason: 'Source-bound draft, drawn from a 3D model turned 45 degrees the other way so that any drift of the bell along or across the trunk would show: the single kettlebell in the working near hand, the palm-in bottom with the upper arm resting on the floor 45 degrees out from the trunk and the wrist stacked over the elbow, the bell rising from over the elbow to over the shoulder as the wrist turns until the arm is straight and vertical, and the slower 1450 ms lowering phase.',
     summary: 'Lying on the floor with one upper arm resting on the ground and the palm facing in holding a kettlebell, press the kettlebell straight up while letting the wrist turn, then lower it slowly until the upper arm rests on the floor again.',
   },
   {
@@ -2415,7 +2415,7 @@ export const CHAIN_SPECS = [
       'Lower to long arms without changing the torso angle.',
       'Brace the hinge before the pull and hold one torso angle for the set.',
     ],
-    reason: 'Source-bound draft, drawn from a 3D model turned 28 degrees so the grip just outside the legs, the soft knees, the bar hanging plumb beneath the shoulders in straight arms, the elbows driving behind the trunk as the bar rows to the lower ribs, and the unchanging torso angle all read clearly.',
+    reason: 'Source-bound draft, drawn from a 3D model turned 28 degrees so the grip just outside the legs, the soft knees, the bar hanging plumb beneath the shoulders over the mid-foot in straight arms, the elbows driving behind the trunk as the bar rows to the lower ribs, and the unchanging torso angle all read clearly.',
     summary: 'Hinged over soft knees with the bar hanging beneath the shoulders just outside the legs, drive the elbows back to row toward the lower ribs, then lower to long arms without changing the torso angle.',
   },
   {
@@ -2443,7 +2443,7 @@ export const CHAIN_SPECS = [
     phases: [0, 1, 1, 0, 0],
     segments: [1100, 800, 1700, 500],
     captions: [
-      'Take an underhand grip just outside the thighs, soften the knees, and hinge until the bar hangs below the shoulders with the torso braced.',
+      'Take an underhand grip just outside the thighs, soften the knees, and hinge until the bar hangs below them with the torso braced.',
       'Pull the elbows back and row the bar toward the lower ribs.',
       'Hold the top long enough to feel the shoulder blades finish.',
       'Lower to long arms without changing the hinge.',
@@ -2483,7 +2483,7 @@ export const CHAIN_SPECS = [
       'Let the bar stretch your lats at the bottom of the rep with the plates floating.',
       'Lock your hinge angle and defend it all set.',
     ],
-    reason: 'Source-bound draft, drawn from a 3D model turned 28 degrees so the feet straddling the anchored landmine bar, the rear pivot on the floor, the 45-degree hinge, the neutral grip on the handle, the plates floating off the floor at full stretch, and the pull to the chest with elbows driven up and back all read clearly.',
+    reason: 'Source-bound draft, drawn from a 3D model turned 28 degrees, with a close-up of the near hand showing the neutral grip with the handle across the fist, so the feet straddling the anchored landmine bar, the rear pivot on the floor, the 45-degree hinge, the neutral grip on the handle, the plates floating off the floor at full stretch, and the pull to the chest with elbows driven up and back all read clearly.',
     summary: 'Straddling an anchored bar in a 45-degree hinge with a neutral grip on the handle, pull the plates to your chest by driving the elbows up and back, then lower to a full stretch with the plates floating off the floor.',
   },
   {
@@ -2500,7 +2500,7 @@ export const CHAIN_SPECS = [
       'Row the other side toward the lower ribs while the first kettlebell stays on the floor.',
       'Lower it under control to the floor with the hips back and the back flat.',
     ],
-    reason: 'Source-bound draft, drawn from a 3D model turned 28 degrees so both kettlebells resting on the floor beneath the shoulders, the flat hinged back, one kettlebell rowing to the lower ribs while the other stays on the floor in a straight arm, and the alternating repetition on the other side all read clearly.',
+    reason: 'Source-bound draft, drawn from a 3D model turned 50 degrees so the row on the far side is not hidden behind the trunk, with the knees softly bent and the centre of mass of the body over the feet: both kettlebells resting on the floor beneath the shoulders, the flat hinged back, one kettlebell rowing to the lower ribs while the other stays on the floor in a straight arm, and the alternating repetition on the other side all read clearly.',
     summary: 'Standing over two kettlebells on the floor with the knees slightly bent, hips back, and back flat, row one kettlebell toward the lower ribs while the other stays on the floor, lower under control, then row the other side.',
   },
   {
@@ -2517,7 +2517,7 @@ export const CHAIN_SPECS = [
       'Lower along the same contact path.',
       'Keep the bar touching the torso and lower along the same line.',
     ],
-    reason: 'Source-bound draft, drawn from a 3D model turned 35 degrees so the shoulder-width underhand grip on the rigid barbell, the bar staying in continuous contact with the front of the torso as it drags straight up, the elbows travelling back behind the ribs, and the slower lowering along the same vertical contact path all read clearly.',
+    reason: 'Source-bound draft, drawn from a 3D model turned 35 degrees, with a close-up of the near hand showing the underhand grip, so the bar starting against the front of the thighs, the shoulder-width underhand grip on the rigid barbell, the bar staying in continuous contact with the front of the torso as it drags straight up, the elbows travelling back behind the ribs, and the slower lowering along the same vertical contact path all read clearly.',
     summary: 'Standing tall with a barbell against the thighs in a shoulder-width underhand grip, drag the bar straight up the torso while letting the elbows travel back behind the ribs, then lower along the same contact path.',
   },
   {
@@ -2586,7 +2586,7 @@ export const CHAIN_SPECS = [
       'Straighten the arms slowly.',
       'Upper arms stay level with the floor.',
     ],
-    reason: 'Source-bound front-view draft: standing centered between two high pulleys with both cables shown, upper arms held out to the sides level with the floor and stationary while the hands curl the handles in toward the ears with palms facing in, pause to squeeze, and straighten slowly.',
+    reason: 'Source-bound front-view draft, with a close-up of the near hand showing the palms facing you: standing centered between two high pulleys with both cables shown, upper arms held out to the sides level with the floor and stationary while the hands curl the handles in toward the ears with palms facing in, pause to squeeze, and straighten slowly.',
     summary: 'Standing between two high pulleys with the upper arms out to the sides at shoulder height and palms facing in, curl the handles in toward the ears while keeping the upper arms still, squeeze, then straighten slowly.',
   },
   {
@@ -2603,7 +2603,7 @@ export const CHAIN_SPECS = [
       'Lower the bar slowly to the start.',
       'Elbows stay close to the body and upper arms stay still.',
     ],
-    reason: 'Source-bound side-view draft: lying on the back facing a low pulley with straight legs and the feet braced against the machine base, holding the cable bar in a shoulder-width underhand grip with the upper arms still and close to the torso while curling the bar toward the chest, squeezing, and lowering slowly.',
+    reason: 'Source-bound side-view draft, with a close-up of the near hand showing the underhand grip: lying on the back facing a low pulley with straight legs and the feet braced against the machine base, holding the cable bar in a shoulder-width underhand grip with the upper arms still and close to the torso while curling the bar toward the chest, squeezing, and lowering slowly.',
     summary: 'Lying on your back with straight legs and feet braced against a low-pulley machine base, curl the bar with a shoulder-width underhand grip toward the chest while keeping the upper arms still beside the body, squeeze, then lower slowly.',
   },
   {

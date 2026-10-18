@@ -187,10 +187,16 @@ describe('what the fingers do', () => {
 });
 
 // MOV-A08 adds reverse-grip-bent-over-rows (107) with a close-up of the underhand grip.
-test('only finger-curls, front-squat-clean-grip, and reverse-grip-bent-over-rows have a close-up', () => {
+// MOV-S1-R3 adds t-bar-row (79, the neutral grip), drag-curl (184, underhand), high-cable-curls (213, palms
+// facing you) and lying-cable-curl (240, the shoulder-width underhand grip).
+test('only finger-curls, front-squat-clean-grip, reverse-grip-bent-over-rows, and the four MOV-S1-R3 grips have a close-up', () => {
   expect(Object.keys(CHAIN_MOVEMENTS).filter((slug) => CHAIN_MOVEMENTS[slug].closeUp !== undefined)).toEqual([
     'finger-curls',
     'front-squat-clean-grip',
     'reverse-grip-bent-over-rows',
+    't-bar-row',
+    'drag-curl',
+    'high-cable-curls',
+    'lying-cable-curl',
   ]);
 });

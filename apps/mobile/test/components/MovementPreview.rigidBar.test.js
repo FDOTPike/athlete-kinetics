@@ -34,7 +34,8 @@ const BAR_HALF_WIDTH = 1.6 / 2; // 0.8
 const MIN_SHIN_AXIS_DIST = SHIN_HALF_WIDTH + BAR_HALF_WIDTH; // 2.96
 const MIN_THIGH_AXIS_DIST = THIGH_HALF_WIDTH + BAR_HALF_WIDTH; // 3.632
 const MAX_CLOSE_SURFACE_GAP = 1.5;
-const CLOSE_TO_LEGS_IDS = new Set([2, 46, 176, 257, 78, 258, 290, 98]);
+// MOV-S1-R3 adds 288 ("Hips back, bar close to the legs.").
+const CLOSE_TO_LEGS_IDS = new Set([2, 46, 176, 257, 78, 258, 290, 98, 288]);
 
 function segSegDist3D(p1, q1, p2, q2) {
   const d1 = [q1[0] - p1[0], q1[1] - p1[1], q1[2] - p1[2]];

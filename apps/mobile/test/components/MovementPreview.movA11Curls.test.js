@@ -76,6 +76,22 @@ const figureAt = (entry, t) => {
 
 const MOV_A11_IDS = [184, 281, 109, 190, 213, 240, 259];
 
+// MOV-S1-R3: painted widths for contact, and the grip shown in a close-up of
+// the near hand (the palm's side is where the fingers close round the bar).
+const THIGH_HALF = (BODY.lw * 1.18) / 2;
+const BAR_HALF = 0.8;
+const TRUNK_SLICE_HALF = ((24 / 32) * 1.6) / 2;
+// The trunk's painted front tapers from the chest half-depth at the shoulders to
+// the hips' (BODY.hw * 0.58) at the hip.
+const trunkFrontAt = (along) => BODY.hw * 0.58 + (BACK_HALF - BODY.hw * 0.58) * Math.max(0, Math.min(1, along / 24));
+const expectClosedGripPanel = (g) => {
+  const panel = rig.handCloseUp(g);
+  expect(panel).not.toBeNull();
+  expect(panel.zoom).toBe(1);
+  expect(panel.open).toBe(0);
+  return panel;
+};
+
 describe('MOV-A11 curls invariants across every 33 ms tick', () => {
   test.each(MOV_A11_IDS)(
     'movement %i is a pending draft that closes its loop and lowers slower than it curls',
@@ -108,22 +124,33 @@ describe('MOV-A11 curls invariants across every 33 ms tick', () => {
 
     const startSpan = dist3D(f0.g.world.near.wrist, f0.g.world.far.wrist);
     expect(startSpan).toBeCloseTo(2 * SHOULDER_HALF, 4);
-    expect(Math.abs(f0.g.world.near.wrist[1] - f0.g.world.hip[1])).toBeLessThanOrEqual(1.5);
 
-    // Bar-to-torso contact at EVERY 33 ms tick, and identical vertical contact line up and down.
-    const torsoFrontX = f0.g.world.hip[0] + BACK_HALF;
-    const startBarX = f0.g.world.near.wrist[0];
+    // MOV-S1-R3: the bar starts against the front of the thighs ("holding a barbell against the front of the
+    // thighs"): below the trunk's painted bottom edge, its painted edge on the thighs' painted front.
+    expect(f0.g.world.near.wrist[1]).toBeLessThanOrEqual(f0.g.world.hip[1] - TRUNK_SLICE_HALF - BAR_HALF);
+    expect(Math.abs(f0.g.world.near.wrist[0] - (f0.g.world.near.hipJoint[0] + THIGH_HALF + BAR_HALF))).toBeLessThanOrEqual(0.05);
+
+    // At every 33 ms tick the bar touches the body ("Keep the bar touching the torso"): the thighs' front below
+    // the trunk, the trunk's painted front above its bottom edge, never inside either and never more than 0.3 off.
     for (const t of ticks) {
       const { g } = figureAt(entry, t);
       expect(dist3D(g.world.near.wrist, g.world.far.wrist)).toBeCloseTo(startSpan, 5);
-      // Touching the front of the torso at every tick (centre within 0.5 units of front trunk skin).
-      expect(g.world.near.wrist[0] - torsoFrontX).toBeGreaterThanOrEqual(0);
-      expect(g.world.near.wrist[0] - torsoFrontX).toBeLessThanOrEqual(0.5);
-      expect(g.world.far.wrist[0] - torsoFrontX).toBeGreaterThanOrEqual(0);
-      expect(g.world.far.wrist[0] - torsoFrontX).toBeLessThanOrEqual(0.5);
-      // Straight vertical drag path: x does not drift at any tick.
-      expect(Math.abs(g.world.near.wrist[0] - startBarX)).toBeLessThan(1e-6);
-      expect(Math.abs(g.world.far.wrist[0] - startBarX)).toBeLessThan(1e-6);
+      for (const side of ['near', 'far']) {
+        const bar = g.world[side].wrist;
+        const along = bar[1] - g.world.hip[1];
+        const surface = along >= TRUNK_SLICE_HALF + BAR_HALF
+          ? g.world.hip[0] + trunkFrontAt(along)
+          : along <= -(TRUNK_SLICE_HALF + BAR_HALF)
+            ? g.world[side].hipJoint[0] + THIGH_HALF
+            : null;
+        if (surface === null) {
+          // Crossing the hip crease: in front of both the thigh and the trunk's bottom edge.
+          expect(bar[0] - g.world.hip[0]).toBeGreaterThanOrEqual(THIGH_HALF + BAR_HALF - 0.05);
+          continue;
+        }
+        expect(bar[0] - (surface + BAR_HALF)).toBeGreaterThanOrEqual(-0.05);
+        expect(bar[0] - (surface + BAR_HALF)).toBeLessThanOrEqual(0.3);
+      }
     }
 
     // Bar rises straight up the torso while elbows travel BACK behind the ribs.
@@ -134,6 +161,10 @@ describe('MOV-A11 curls invariants across every 33 ms tick', () => {
 
     // Underhand palm wrap is drawn at the hands.
     expect(f0.prims.some((p) => p.kind === 'bone' && p.w === 2.2 && p.color === 'textHi')).toBe(true);
+
+    // MOV-S1-R3: the underhand grip is shown in a close-up: with the arm hanging, the palm faces forward.
+    const panel = expectClosedGripPanel(f0.g);
+    expect(panel.palmSide[0]).toBeGreaterThan(0.9);
   });
 
   test('281 Standing Dumbbell Reverse Curl: palms facing down throughout, upper arms still, curl to shoulder height, pause, slow lower to straight arms (>= 172 deg)', () => {
@@ -340,6 +371,15 @@ describe('MOV-A11 curls invariants across every 33 ms tick', () => {
     expect(Math.abs(fTop.g.world.far.wrist[2])).toBeLessThanOrEqual(SHOULDER_HALF + 4);
     expect(Math.abs(fTop.g.world.near.wrist[1] - fTop.g.world.head[1])).toBeLessThanOrEqual(3.5);
     expect(deg3D(fTop.g.world.near.shoulder, fTop.g.world.near.elbow, fTop.g.world.near.wrist)).toBeLessThanOrEqual(45);
+
+    // MOV-S1-R3: "palms facing you" is shown in a close-up of the near hand: palm up with the arm reaching out to
+    // the pulley, and facing the head at the top of the curl.
+    const panel0 = expectClosedGripPanel(f0.g);
+    expect(panel0.palmSide[1]).toBeLessThan(-0.9);
+    const panelTop = expectClosedGripPanel(fTop.g);
+    const toHead = [fTop.g.joints.hd[0] - fTop.g.grip.near[0], fTop.g.joints.hd[1] - fTop.g.grip.near[1]];
+    const toHeadLen = Math.hypot(...toHead);
+    expect((panelTop.palmSide[0] * toHead[0] + panelTop.palmSide[1] * toHead[1]) / toHeadLen).toBeGreaterThan(0.5);
   });
 
   test('240 Lying Cable Curl: lying on back facing low pulley, feet braced against machine base, legs straight (>= 172 deg), shoulder-width underhand bar grip, upper arms still & elbows close to body, curl toward chest, slow lower', () => {
@@ -388,6 +428,11 @@ describe('MOV-A11 curls invariants across every 33 ms tick', () => {
     // Curled toward the chest at top.
     expect(deg3D(fTop.g.world.near.shoulder, fTop.g.world.near.elbow, fTop.g.world.near.wrist)).toBeLessThanOrEqual(50);
     expect(Math.abs(fTop.g.world.near.wrist[0] - fTop.g.world.neck[0])).toBeLessThanOrEqual(6);
+
+    // MOV-S1-R3: the underhand grip is shown in a close-up of the near hand: lying with the arms reaching toward
+    // the pulley, the palm faces up.
+    const panel = expectClosedGripPanel(f0.g);
+    expect(panel.palmSide[1]).toBeLessThan(-0.9);
   });
 
   test('259 Reverse Barbell Preacher Curls: EZ bar in shoulder-width palms-down grip, upper arms on preacher pad in painted contact, arms extended (>= 172 deg), curl to shoulder height, slow lower', () => {

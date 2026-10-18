@@ -243,6 +243,13 @@ describe('MOV-A04 hinges and posterior chain: physics, joint angles, contacts, a
     const e202 = entryFor(202);
     const e244 = entryFor(244);
 
+    // MOV-S1-R3: the catch caption keeps to the text ("Catch with the hands and use only enough push to return"):
+    // no push-up position and no "when you can no longer hold".
+    for (const f of e23.frames) {
+      expect(f.caption.toLowerCase()).not.toContain('push-up position');
+      expect(f.caption.toLowerCase()).not.toContain('no longer hold');
+    }
+
     for (const e of [e23, e202, e244]) {
       const slug = slugOf(e);
       const start = rig.chainGeometry(slug, 0, BODY);

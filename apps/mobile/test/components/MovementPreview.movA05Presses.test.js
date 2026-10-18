@@ -339,8 +339,8 @@ describe('MOV-A05 horizontal, incline, decline, floor, board, pin, and cable pre
     expect(Math.abs(Math.max(slices203[32].y1, slices203[32].y2) + slices203[32].w / 2 - 96.9)).toBeLessThanOrEqual(0.05);
 
     // 249 One-Arm Kettlebell Floor Press: starts at the bottom (ph = 0) with that upper arm resting on the floor,
-    // 30 to 50 deg out from the trunk in the floor plane, and the wrist stacked over the elbow ("Wrist stacked over
-    // the elbow."); presses the bell straight up ("Press straight up.") until the arm is straight, and lowers slowly.
+    // 30 to 45 deg out from the trunk in the floor plane, and the wrist stacked over the elbow ("Wrist stacked over
+    // the elbow."); presses until the arm is straight and vertical over the shoulder, and lowers slowly.
     expect(bot249.movement.implement).toBe('kettlebell');
     expect(bot249.movement.kettlebellTurn).toBe(true);
     expect(Math.abs(bot249.world.near.elbow[1] - (BODY.lw * 0.88) / 2)).toBeLessThanOrEqual(0.05);
@@ -358,37 +358,53 @@ describe('MOV-A05 horizontal, incline, decline, floor, board, pin, and cable pre
       ) *
         180) /
       Math.PI;
+    // MOV-S1-R3: upper arm 30 to 45 degrees out from the trunk on the floor (the orchestrator's correction).
     expect(upperArmFloorAngleDeg).toBeGreaterThanOrEqual(30);
-    expect(upperArmFloorAngleDeg).toBeLessThanOrEqual(50);
+    expect(upperArmFloorAngleDeg).toBeLessThanOrEqual(45);
     expect(deg3D(top249.world.near.shoulder, top249.world.near.elbow, top249.world.near.hold)).toBeGreaterThanOrEqual(172);
     expect(e249.segmentDurationsMs[2]).toBeGreaterThan(e249.segmentDurationsMs[0] + 400);
 
-    // MOV-A05-R2: the painted bell's centre moves straight up. At every 33 ms tick its horizontal offset from where it
-    // started (headward and sideways together, world x and z) is at most 3 units, and over the press its horizontal
-    // path is at most 3 units long; the elbow never sinks into the floor.
+    // The press locks out with the arm vertical and the bell stacked over the shoulder: the shoulder-to-wrist line
+    // within 5 degrees of vertical, the hand within 1 unit and the painted bell within 2.5 units (it rests on the
+    // back of the turned wrist) of directly over the shoulder.
+    const sh = top249.world.near.shoulder;
+    const wr = top249.world.near.wrist;
+    expect((Math.atan2(Math.hypot(wr[0] - sh[0], wr[2] - sh[2]), wr[1] - sh[1]) * 180) / Math.PI).toBeLessThanOrEqual(5);
+    expect(Math.hypot(wr[0] - sh[0], wr[2] - sh[2])).toBeLessThanOrEqual(1.0);
+    const bellStart = rig.chainKettlebellCentre(bot249);
+    const bellTop = rig.chainKettlebellCentre(top249);
+    expect(Math.hypot(bellTop[0] - sh[0], bellTop[2] - sh[2])).toBeLessThanOrEqual(2.5);
+    // It starts over the elbow (wrist stacked over the elbow, the bell beside the wrist) ...
+    const el0 = bot249.world.near.elbow;
+    expect(Math.hypot(bellStart[0] - el0[0], bellStart[2] - el0[2])).toBeLessThanOrEqual(2.5);
+    expect(bellTop[1] - bellStart[1]).toBeGreaterThan(12.0);
+    // ... and travels from over the elbow to over the shoulder: the elbow's own offset is anatomy, not drift. The
+    // headward travel beyond the elbow's headward offset is at most 3 units, and at every 33 ms tick the bell's
+    // centre stays within 3 units (floor plane) of the straight line from its start to its lockout, rising all the
+    // way up; the elbow never sinks into the floor.
+    const headward = (bellStart[0] - bellTop[0]) - (el0[0] - bot249.world.near.shoulder[0]);
+    expect(headward).toBeLessThanOrEqual(3.0);
     const ds249 = e249.segmentDurationsMs;
     const total249 = ds249.reduce((a, b) => a + b, 0);
     const poses249 = e249.frames.map((f) => f.joints);
-    const bellStart = rig.chainKettlebellCentre(bot249);
-    let pressPath = 0;
-    let prevBell = null;
+    const line = [bellTop[0] - bellStart[0], bellTop[2] - bellStart[2]];
+    const lineLen2 = line[0] ** 2 + line[1] ** 2;
+    let prevY = -Infinity;
     for (let t = 0; t <= total249; t += 33) {
       const p = rig.poseAtTime(poses249, t, ds249);
       const g = rig.chainGeometry(slugOf(e249), p.ph, BODY);
       const bell = rig.chainKettlebellCentre(g);
-      expect(Math.hypot(bell[0] - bellStart[0], bell[2] - bellStart[2])).toBeLessThanOrEqual(3.0);
-      expect(bell[1]).toBeGreaterThanOrEqual(bellStart[1] - 1e-6);
+      const rel = [bell[0] - bellStart[0], bell[2] - bellStart[2]];
+      const u = Math.max(0, Math.min(1, (rel[0] * line[0] + rel[1] * line[1]) / lineLen2));
+      expect(Math.hypot(rel[0] - u * line[0], rel[1] - u * line[1])).toBeLessThanOrEqual(3.0);
       expect(g.world.near.elbow[1]).toBeGreaterThanOrEqual((BODY.lw * 0.88) / 2 - 0.05);
       if (t <= ds249[0]) {
-        if (prevBell) pressPath += Math.hypot(bell[0] - prevBell[0], bell[2] - prevBell[2]);
-        prevBell = bell;
+        expect(bell[1]).toBeGreaterThanOrEqual(prevY - 1e-9);
+        prevY = bell[1];
       }
     }
-    expect(pressPath).toBeLessThanOrEqual(3.0);
-    const bellTop = rig.chainKettlebellCentre(top249);
-    expect(bellTop[1] - bellStart[1]).toBeGreaterThan(12.0);
 
-    // The view shows any drift: a horizontal step of the bell toward the shoulder, along the trunk, or across it
+    // The view shows the path: a horizontal step of the bell toward the shoulder, along the trunk, or across it
     // moves the painted bell sideways on screen by at least 0.9, 0.6 and 0.6 of its length.
     const screenShift = (dx, dz) => {
       const a = bot249.project(bellStart);

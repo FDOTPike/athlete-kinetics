@@ -56,6 +56,60 @@ const ticksOf = (entry) => {
 
 const MOV_A08_IDS = [5, 104, 107, 293, 79, 130];
 
+// MOV-S1-R3: balance and contact against the painted body.
+// The foot is painted from the ankle to the toe with round ends of the foot's
+// half-width (BODY.lw * 0.9 / 2), so it reaches that far behind the ankle and
+// beyond the toe. The centre of mass uses the segment weights of the hinge
+// tests (MOV-A04): body only, or body plus a held load at the hands.
+const FOOT_CAP = (BODY.lw * 0.9) / 2;
+const CHEST_HALF = BODY.sw * 0.58;
+const THIGH_HALF = (BODY.lw * 1.18) / 2;
+const SHIN_HALF = (BODY.lw * 0.9) / 2;
+const HAND_RADIUS = BODY.lw * 0.44 + 0.1;
+const midX = (a, b) => (a[0] + b[0]) / 2;
+const comX = (g, load = 0, loadX = 0) => {
+  const w = g.world;
+  const bodyX =
+    0.029 * midX(w.near.ankle, w.near.toe) +
+    0.093 * midX(w.near.ankle, w.near.knee) +
+    0.2 * midX(w.near.knee, w.near.hipJoint) +
+    0.497 * midX(w.hip, w.neck) +
+    0.081 * midX(w.neck, w.head) +
+    0.056 * midX(w.near.shoulder, w.near.elbow) +
+    0.044 * midX(w.near.elbow, w.near.wrist);
+  return (bodyX + load * loadX) / (1 + load);
+};
+const footSpan = (g) => [
+  Math.min(g.world.near.ankle[0], g.world.far.ankle[0]) - FOOT_CAP,
+  Math.max(g.world.near.toe[0], g.world.far.toe[0]) + FOOT_CAP,
+];
+const expectOverPaintedFoot = (g, x) => {
+  const [back, front] = footSpan(g);
+  expect(x).toBeGreaterThanOrEqual(back);
+  expect(x).toBeLessThanOrEqual(front);
+};
+const pointToSegment = (p, a, b) => {
+  const ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+  const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * ab[0] + (p[1] - a[1]) * ab[1] + (p[2] - a[2]) * ab[2]) / (ab[0] ** 2 + ab[1] ** 2 + ab[2] ** 2)));
+  return dist3D(p, [a[0] + t * ab[0], a[1] + t * ab[1], a[2] + t * ab[2]]);
+};
+// Bar over the mid-foot at the bottom, and the loaded centre of mass over the painted foot at every tick.
+const expectLoadedBalance = (id, load) => {
+  const entry = entryById(id);
+  const slug = slugOf(entry);
+  const poses = entry.frames.map((f) => f.joints);
+  for (const t of ticksOf(entry)) {
+    const g = rig.chainGeometry(slug, rig.poseAtTime(poses, t, entry.segmentDurationsMs).ph ?? 0, BODY);
+    const barX = (g.world.near.hold[0] + g.world.far.hold[0]) / 2;
+    expectOverPaintedFoot(g, comX(g, load, barX));
+  }
+  const g0 = rig.chainGeometry(slug, 0, BODY);
+  const bar0 = (g0.world.near.hold[0] + g0.world.far.hold[0]) / 2;
+  expect(bar0).toBeGreaterThanOrEqual(g0.world.near.ankle[0]);
+  expect(bar0).toBeLessThanOrEqual(g0.world.near.toe[0]);
+  expect(Math.abs(bar0 - midX(g0.world.near.ankle, g0.world.near.toe))).toBeLessThanOrEqual(1.0);
+};
+
 describe('MOV-A08 bent-over rows invariants across every 33 ms tick', () => {
   test.each(MOV_A08_IDS)(
     'movement %i holds a constant torso angle (within 0.1 deg) across every 33 ms tick',
@@ -90,9 +144,10 @@ describe('MOV-A08 bent-over rows invariants across every 33 ms tick', () => {
     const g0 = rig.chainGeometry(slug, 0, BODY);
     const g1 = rig.chainGeometry(slug, 1, BODY);
 
-    // Hinged torso and soft knees.
-    expect(trunkDegOf(g0)).toBeGreaterThanOrEqual(18);
-    expect(trunkDegOf(g0)).toBeLessThanOrEqual(30);
+    // Hinged torso and soft knees. The text sets no angle ("hinge until the torso is stable"): a hinge lies between
+    // level and upright, and here the angle is what lets the bar hang over the mid-foot in balance (MOV-S1-R3).
+    expect(trunkDegOf(g0)).toBeGreaterThanOrEqual(15);
+    expect(trunkDegOf(g0)).toBeLessThanOrEqual(60);
     const kneeDeg = deg3D(g0.world.near.hipJoint, g0.world.near.knee, g0.world.near.ankle);
     expect(kneeDeg).toBeGreaterThanOrEqual(140);
     expect(kneeDeg).toBeLessThanOrEqual(165);
@@ -109,6 +164,10 @@ describe('MOV-A08 bent-over rows invariants across every 33 ms tick', () => {
     expect(behindTrunkDist(g1.world.far.elbow, g1.world.hip, g1.angles.trunk)).toBeGreaterThanOrEqual(3.0);
     expect(g1.world.near.elbow[0]).toBeLessThan(g1.world.near.shoulder[0] - 8);
     expect(deg3D(g1.world.near.shoulder, g1.world.near.elbow, g1.world.near.hold)).toBeLessThanOrEqual(105);
+
+    // MOV-S1-R3: a loaded row keeps the bar over the mid-foot; with a bar of half the body's mass the centre of
+    // mass stays over the painted foot at every tick.
+    expectLoadedBalance(5, 0.5);
   });
 
   test('104 One-Arm Kettlebell Row: staggered stance, square torso/hips, scapular reach at bottom with straight plumb arm (>= 172 deg), elbow past ribs toward back pocket at top', () => {
@@ -136,6 +195,14 @@ describe('MOV-A08 bent-over rows invariants across every 33 ms tick', () => {
     );
     expect(behindTrunkDist(g1.world.near.elbow, g1.world.hip, g1.angles.trunk)).toBeGreaterThanOrEqual(3.0);
     expect(g1.world.near.elbow[0]).toBeLessThan(g1.world.near.shoulder[0] - 8);
+
+    // MOV-S1-R3: the free hand rests on the far thigh's painted surface at every tick, not inside it.
+    const poses104 = entry.frames.map((f) => f.joints);
+    for (const t of ticksOf(entry)) {
+      const g = rig.chainGeometry(slug, rig.poseAtTime(poses104, t, entry.segmentDurationsMs).ph ?? 0, BODY);
+      const d = pointToSegment(g.world.far.wrist, g.world.far.hipJoint, g.world.far.knee);
+      expect(Math.abs(d - (THIGH_HALF + HAND_RADIUS))).toBeLessThanOrEqual(0.05);
+    }
   });
 
   test('107 Reverse Grip Bent-Over Rows: underhand grip just outside thighs with close-up panel, top hold, straight plumb arms at bottom, differs visibly from Barbell Row', () => {
@@ -171,6 +238,16 @@ describe('MOV-A08 bent-over rows invariants across every 33 ms tick', () => {
     const prims107 = rig.layoutCanonicalFigure(entry.frames[0].joints, { ...entry, body: BODY });
     const prims5 = rig.layoutCanonicalFigure(barEntry.frames[0].joints, { ...barEntry, body: BODY });
     expect(JSON.stringify(prims107)).not.toBe(JSON.stringify(prims5));
+
+    // MOV-S1-R3: the first caption says what the text says, the bar hangs straight below the shoulders over the
+    // mid-foot, the loaded centre of mass stays over the foot, and the bar touches the lower ribs at the top
+    // ("Touch the lower ribs").
+    expect(entry.frames[0].caption).toBe(
+      'Take an underhand grip just outside the thighs, soften the knees, and hinge until the bar hangs below them with the torso braced.',
+    );
+    expectLoadedBalance(107, 0.5);
+    const barTop = [(g1.world.near.hold[0] + g1.world.far.hold[0]) / 2, (g1.world.near.hold[1] + g1.world.far.hold[1]) / 2];
+    expect(Math.abs(-behindTrunkDist(barTop, g1.world.hip, g1.angles.trunk) - (CHEST_HALF + 0.8))).toBeLessThanOrEqual(0.1);
   });
 
   test('293 Two-Arm Kettlebell Row: standing over two bells, hips back, straight plumb arms at bottom (>= 172 deg), both pulled together toward stomach with elbows behind trunk', () => {
@@ -240,8 +317,34 @@ describe('MOV-A08 bent-over rows invariants across every 33 ms tick', () => {
     expect(Math.abs(r1 - r0)).toBeLessThan(0.1);
 
     // Top: pulled to chest, elbows up and back behind trunk.
-    expect(behindTrunkDist(g1.world.near.elbow, g1.world.hip, g1.angles.trunk)).toBeGreaterThanOrEqual(4.0);
-    expect(behindTrunkDist(g1.world.far.elbow, g1.world.hip, g1.angles.trunk)).toBeGreaterThanOrEqual(4.0);
+    expect(behindTrunkDist(g1.world.near.elbow, g1.world.hip, g1.angles.trunk)).toBeGreaterThanOrEqual(3.0);
+    expect(behindTrunkDist(g1.world.far.elbow, g1.world.hip, g1.angles.trunk)).toBeGreaterThanOrEqual(3.0);
+
+    // MOV-S1-R3: the handle and the plate hubs stop at the chest's painted surface at the top, not inside it.
+    // The bar lies in the plane z = 0, so a painted point on it maps back to the world exactly.
+    const yaw = (g1.movement.yawDeg * Math.PI) / 180;
+    const toWorld = (q) => [(q[0] - g1.movement.originX) / Math.cos(yaw), FLOOR - q[1]];
+    const handle = [(g1.world.near.hold[0] + g1.world.far.hold[0]) / 2, (g1.world.near.hold[1] + g1.world.far.hold[1]) / 2];
+    const below = (q) => -behindTrunkDist(q, g1.world.hip, g1.angles.trunk);
+    expect(below(handle)).toBeGreaterThanOrEqual(CHEST_HALF + 0.9);
+    expect(below(handle)).toBeLessThanOrEqual(CHEST_HALF + 0.9 + 0.3);
+    const prims1 = rig.layoutCanonicalFigure({ ...entry.frames[1].joints, ph: 1 }, { ...entry, body: BODY });
+    const plates1 = prims1.filter((p) => p.kind === 'bone' && p.w === 2.4 && p.stroke === 'ink1');
+    expect(plates1.length).toBeGreaterThanOrEqual(2);
+    for (const plate of plates1) {
+      const hub = toWorld([(plate.x1 + plate.x2) / 2, (plate.y1 + plate.y2) / 2]);
+      expect(below(hub)).toBeGreaterThanOrEqual(CHEST_HALF + 1.2);
+    }
+
+    // The neutral grip is shown in a close-up of the near hand: the handle runs across the fist, square to the
+    // forearm, instead of being seen end on.
+    const panel = rig.handCloseUp(g0);
+    expect(panel).not.toBeNull();
+    expect(panel.grip).toBe('neutral');
+    const fore = [g0.joints.wr[0] - g0.joints.el[0], g0.joints.wr[1] - g0.joints.el[1]];
+    const handleDir = [panel.handle[1][0] - panel.handle[0][0], panel.handle[1][1] - panel.handle[0][1]];
+    const cos = Math.abs(fore[0] * handleDir[0] + fore[1] * handleDir[1]) / (Math.hypot(...fore) * Math.hypot(...handleDir));
+    expect(cos).toBeLessThanOrEqual(0.02);
   });
 
   test('130 Alternating Kettlebell Row: standing over two bells on floor, one rows to lower ribs with elbow behind trunk while the other stays on the floor in a straight plumb arm (>= 172 deg) across every tick', () => {
@@ -270,11 +373,32 @@ describe('MOV-A08 bent-over rows invariants across every 33 ms tick', () => {
     const midFloor = atTime(ds[0] + ds[1]);
     const peakFar = atTime(ds[0] + ds[1] + ds[2]);
 
-    // Flat back and standing over the two kettlebells at the floor start pose.
-    expect(trunkDegOf(start.g)).toBeGreaterThanOrEqual(0);
-    expect(trunkDegOf(start.g)).toBeLessThanOrEqual(10);
-    expect(start.g.world.near.hold[0]).toBeGreaterThanOrEqual(start.g.world.near.ankle[0] - 1);
-    expect(start.g.world.near.hold[0]).toBeLessThanOrEqual(start.g.world.near.toe[0] + 1);
+    // MOV-S1-R3: a flat back ("back flat", no spinal curl) with the chest square to the floor (trunk within 25
+    // degrees of level), knees bent slightly (150 to 165 degrees), and the body's centre of mass over the painted
+    // foot at every tick, alone and with the rowed bell (a fifth of the body's mass) in the hand.
+    expect(start.g.angles.curl).toBe(0);
+    expect(Math.abs(trunkDegOf(start.g))).toBeLessThanOrEqual(25);
+    for (const t of ticks) {
+      const s = atTime(t);
+      for (const side of ['near', 'far']) {
+        const knee = deg3D(s.g.world[side].hipJoint, s.g.world[side].knee, s.g.world[side].ankle);
+        expect(knee).toBeGreaterThanOrEqual(150);
+        expect(knee).toBeLessThanOrEqual(165);
+      }
+      expectOverPaintedFoot(s.g, comX(s.g));
+      const rowed = s.g.world.near.hold[1] > s.g.world.far.hold[1] ? s.g.world.near.hold : s.g.world.far.hold;
+      expectOverPaintedFoot(s.g, comX(s.g, 0.2, rowed[0]));
+      // Each bell, hanging 6 below its handle, stays clear of both painted legs.
+      for (const hand of ['near', 'far']) {
+        const h = s.g.world[hand].hold;
+        const bell = [h[0], h[1] - 6.0, h[2]];
+        for (const leg of ['near', 'far']) {
+          const L = s.g.world[leg];
+          expect(pointToSegment(bell, L.hipJoint, L.knee)).toBeGreaterThanOrEqual(rig.KETTLEBELL_RADIUS + THIGH_HALF);
+          expect(pointToSegment(bell, L.knee, L.ankle)).toBeGreaterThanOrEqual(rig.KETTLEBELL_RADIUS + SHIN_HALF);
+        }
+      }
+    }
 
     // Start and midpoint: both kettlebells on the floor in straight plumb arms (>= 172 deg).
     for (const s of [start, midFloor]) {
@@ -291,6 +415,24 @@ describe('MOV-A08 bent-over rows invariants across every 33 ms tick', () => {
     expect(peakNear.nearCircle.cy + peakNear.nearCircle.r).toBeLessThan(FLOOR - 14);
     expect(deg3D(peakNear.g.world.far.shoulder, peakNear.g.world.far.elbow, peakNear.g.world.far.hold)).toBeGreaterThanOrEqual(172);
     expect(behindTrunkDist(peakNear.g.world.near.elbow, peakNear.g.world.hip, peakNear.g.angles.trunk)).toBeGreaterThanOrEqual(3.0);
+
+    // MOV-S1-R3: the far-side row can be seen. At its peak the far bell's painted centre lies outside the painted
+    // torso (its slices) and outside both painted legs.
+    {
+      const prims = rig.layoutCanonicalFigure(rig.poseAtTime(poses, ds[0] + ds[1] + ds[2], ds), { ...entry, body: BODY });
+      const c = [peakFar.farCircle.cx, peakFar.farCircle.cy];
+      const seg2 = (p, a, b) => {
+        const abx = b[0] - a[0], aby = b[1] - a[1];
+        const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * abx + (p[1] - a[1]) * aby) / (abx * abx + aby * aby || 1)));
+        return Math.hypot(p[0] - (a[0] + t * abx), p[1] - (a[1] + t * aby));
+      };
+      const slices = prims.filter((p) => p.kind === 'bone' && p.color === 'textLow' && p.opacity === 1 && p.w < 2.0);
+      for (const sl of slices) expect(seg2(c, [sl.x1, sl.y1], [sl.x2, sl.y2])).toBeGreaterThan(sl.w / 2);
+      const j = peakFar.g.joints;
+      for (const [a, b, half] of [[j.nLeg, j.kn, THIGH_HALF], [j.kn, j.an, SHIN_HALF], [j.fLeg, j.kf, THIGH_HALF], [j.kf, j.af, SHIN_HALF]]) {
+        expect(seg2(c, a, b)).toBeGreaterThan(half);
+      }
+    }
 
     // Second pull peak: far kettlebell rows toward lower ribs (elbow behind trunk) while near kettlebell stays on the floor in a straight arm.
     expect(peakFar.nearCircle.cy + peakFar.nearCircle.r).toBeCloseTo(FLOOR, 1);

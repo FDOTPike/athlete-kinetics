@@ -422,6 +422,15 @@ describe('MOV-A02 per-movement source-bound biomechanics', () => {
       expect(fig.world.near.wrist[1]).toBeLessThan(fig.world.near.shoulder[1] - 21);
       expect(elbowAngleDeg(fig.world.near)).toBeCloseTo(180, 5);
     }
+
+    // MOV-S1-R3: "stand about hip width, then squat down and take a shoulder-width grip". The ankles are as far
+    // apart as the hip joints (within a sixth), and the hands as far apart as the shoulders (within 0.5).
+    const hipSpan = floor.world.near.hipJoint[2] - floor.world.far.hipJoint[2];
+    const ankleSpan = floor.world.near.ankle[2] - floor.world.far.ankle[2];
+    const shoulderSpan = floor.world.near.shoulder[2] - floor.world.far.shoulder[2];
+    const gripSpan = floor.world.near.wrist[2] - floor.world.far.wrist[2];
+    expect(Math.abs(ankleSpan - hipSpan)).toBeLessThanOrEqual(hipSpan / 6);
+    expect(Math.abs(gripSpan - shoulderSpan)).toBeLessThanOrEqual(0.5);
   });
 
   test('120 Jefferson Squats: straddling the bar with one hand in front and one behind, bar travels straight up between the legs', () => {

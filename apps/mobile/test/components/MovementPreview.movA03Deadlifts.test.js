@@ -151,7 +151,10 @@ describe('MOV-A03 floor and sumo deadlifts: batch-wide floor plates, straight ar
     expect(defTrunk).toBeLessThan(convTrunk - 4);
     for (const id of SUMO_IDS) {
       const sumoTrunk = trunkAngleFromHorizontal(id);
-      expect(sumoTrunk).toBeGreaterThanOrEqual(42);
+      // MOV-S1-R3: the sumo start keeps the chest up ("Chest up before you pull"), 45 degrees as MOV-A03-R1 set.
+      // 258 and 290 have their own copies of the pose table and are outside MOV-S1-R3's allowed changes; they keep
+      // the 42 the last round set until they are redrawn the same way.
+      expect(sumoTrunk).toBeGreaterThanOrEqual(id === 78 ? 45 : 42);
       expect(sumoTrunk - convTrunk).toBeGreaterThanOrEqual(10);
     }
   });
