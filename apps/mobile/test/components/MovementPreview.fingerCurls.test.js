@@ -189,7 +189,7 @@ describe('what the fingers do', () => {
 // MOV-A08 adds reverse-grip-bent-over-rows (107) with a close-up of the underhand grip.
 // MOV-S1-R3 adds t-bar-row (79, the neutral grip), drag-curl (184, underhand), high-cable-curls (213, palms
 // facing you) and lying-cable-curl (240, the shoulder-width underhand grip).
-test('only finger-curls, front-squat-clean-grip, reverse-grip-bent-over-rows, and the four MOV-S1-R3 grips have a close-up', () => {
+test('only finger-curls, front-squat-clean-grip, and the approved grip close-up movements have a close-up', () => {
   expect(Object.keys(CHAIN_MOVEMENTS).filter((slug) => CHAIN_MOVEMENTS[slug].closeUp !== undefined)).toEqual([
     'finger-curls',
     'front-squat-clean-grip',
@@ -198,5 +198,18 @@ test('only finger-curls, front-squat-clean-grip, reverse-grip-bent-over-rows, an
     'drag-curl',
     'high-cable-curls',
     'lying-cable-curl',
+    'overhead-press',
+    'arnold-press',
+    'alternating-kettlebell-press',
+    'dumbbell-one-arm-shoulder-press',
+    'kettlebell-arnold-press',
+    'upright-cable-row',
+    'dumbbell-lying-rear-lateral-raise',
+    'lying-rear-delt-raise',
+    // MOV-S2-R3: overhand grips the text names (242, 215, 233, 250)
+    'lying-triceps-press',
+    'incline-barbell-triceps-extension',
+    'kneeling-cable-triceps-extension',
+    'one-arm-kettlebell-swings',
   ]);
 });

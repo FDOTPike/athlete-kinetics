@@ -1,0 +1,180 @@
+{
+  "bounds": [
+    {
+      "id": 4,
+      "quote": "Set the bar across the front shoulders with a full grip and the forearms close to vertical.",
+      "bound": "Bar starts across the front shoulders (neck x + 1.5 < bar x <= neck x + 4.0, |bar y - neck y| <= 1.5) with both forearms within 10 degrees of vertical, and no elbow closes past 30 degrees (internal) with the wrist at least 3.84 (upper-arm plus forearm painted radii) from the upper-arm centreline at every 33 ms tick",
+      "test": "apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:242-246, apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:127-130"
+    },
+    {
+      "id": 4,
+      "quote": "Press close past the face, move the head through to a tall lockout, and lower along the same path.",
+      "bound": "At every 33 ms tick the head clears the bar in 3D by >= BODY.hr + 0.8; the closest point of the drawn bar segment (between its painted ends, not its midpoint) clears the head ring's painted outer edge (r + strokeWidth / 2) by >= 0.8; the bar is seen end on at every tick, its plate painted after the head, and its painted sleeve end clear of the head ring",
+      "test": "apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:230-233"
+    },
+    {
+      "id": 4,
+      "quote": "Stand with balanced feet and brace before the bar leaves the shoulders.",
+      "bound": "Centre of mass of body (Winter segment fractions) plus a load of 0 or 0.25 body mass per hand stays over the painted feet at every 33 ms tick, and the bar stays within 2.0 of mid-foot and between ankle and toe",
+      "test": "apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:136-140, apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:143-145"
+    },
+    {
+      "id": 31,
+      "quote": "Sit or stand holding dumbbells at shoulder height with palms facing you.",
+      "bound": "Dumbbells start within 2.0 of shoulder height; no elbow closes past 30 degrees and the wrist stays >= 3.84 from the upper-arm centreline at every 33 ms tick",
+      "test": "apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:275-277, apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:127-130"
+    },
+    {
+      "id": 31,
+      "quote": "Elbows tight, core tension.",
+      "bound": "Both elbows start more than 5.0 in front of their shoulders",
+      "test": "apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:275-277"
+    },
+    {
+      "id": 31,
+      "quote": "Press up while rotating your palms to face forward at the top.",
+      "bound": "Close-up at the start (palms toward you) draws the back of the hand as a darker (textMid) block painted over the handle with four knuckles above it and no fingers in front; at the top (palms forward) a light (textHi) palm painted behind the handle with four fingers crossing it; the thumb is on opposite sides",
+      "test": "apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:341-343, apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:351-352, apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:361-361"
+    },
+    {
+      "id": 41,
+      "quote": "Set a low pulley and bring the handle to shoulder height, standing tall.",
+      "bound": "Handle starts within 2.0 of shoulder height and presses to >= 176 degrees; no elbow closes past 30 degrees with the wrist >= 3.84 from the upper-arm centreline; body centre of mass over the painted feet",
+      "test": "apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:381-382, apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:127-130, apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:136-140"
+    },
+    {
+      "id": 129,
+      "quote": "Clean two kettlebells to the shoulders and stand tall with the palms facing in.",
+      "bound": "Both bells within 2.0 of shoulder height with palmYaw 90 at the rack; no elbow closes past 30 degrees with the wrist >= 3.84 from the upper-arm centreline; centre of mass with 0 or 0.25 body mass per hand over the painted feet at every 33 ms tick",
+      "test": "apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:424-426, apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:127-130, apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:136-140"
+    },
+    {
+      "id": 189,
+      "quote": "bring one dumbbell to shoulder height with the palm facing forward",
+      "bound": "Dumbbell starts within 2.0 of shoulder height; no elbow closes past 30 degrees with the wrist >= 3.84 from the upper-arm centreline at every 33 ms tick",
+      "test": "apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:538-538, apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:127-130"
+    },
+    {
+      "id": 228,
+      "quote": "Clean a kettlebell to the shoulder and stand tall with the palm facing in.",
+      "bound": "Bell starts within 2.0 of shoulder height with palmYaw 90; no elbow closes past 30 degrees with the wrist >= 3.84 from the upper-arm centreline at every 33 ms tick",
+      "test": "apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:552-553, apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:127-130"
+    },
+    {
+      "id": 230,
+      "quote": "Clean two kettlebells to the shoulders and stand tall.",
+      "bound": "No elbow closes past 30 degrees with the wrist >= 3.84 from the upper-arm centreline; centre of mass with 0 or 0.25 body mass per hand over the painted feet at every 33 ms tick",
+      "test": "apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:127-130, apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:136-140"
+    },
+    {
+      "id": 230,
+      "quote": "keep alternating for the same number of repetitions on each side",
+      "bound": "Equal count of lockout intervals per side over the cycle",
+      "test": "apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:502-502"
+    }
+  ],
+  "fileQuotes": [
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 1315,
+      "endLine": 1315,
+      "text": "  endOnPlateTone?: ColorRole;"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4665,
+      "endLine": 4671,
+      "text": "  'overhead-press': {\n    root: 'hip',\n    view: 'oblique',\n    yawDeg: 3,\n    originX: 58,\n    implement: 'bar',\n    endOnPlateTone: 'textMid',"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4681,
+      "endLine": 4684,
+      "text": "        at: [0.7, 46.5], trunk: 90, head: 122,\n        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],\n        upperArm: -90, forearm: 90,\n        wrist: [4.65, 71.8, 15.2], farWrist: [4.65, 71.8, -15.2],"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4687,
+      "endLine": 4690,
+      "text": "        at: [-1.0, 46.5], trunk: 90, head: 128,\n        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],\n        upperArm: 90, forearm: 90,\n        wrist: [4.6, 86.2, 15.2], farWrist: [4.6, 86.2, -15.2],"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4696,
+      "endLine": 4696,
+      "text": "        wrist: [2.7, 94.26, 15.2], farWrist: [2.7, 94.26, -15.2],"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4720,
+      "endLine": 4720,
+      "text": "        upperArm: [117, 184], forearm: [80, 0],"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4755,
+      "endLine": 4755,
+      "text": "        upperArm: [96, 148], forearm: [90, 8],"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4827,
+      "endLine": 4827,
+      "text": "        upperArm: [90, 147], forearm: [90, 8],"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4860,
+      "endLine": 4862,
+      "text": "        upperArm: [113, 162], forearm: [86, 6],\n        farUpperArm: [-90, 8], farForearm: [-82, -12],\n        palmYaw: 90, farPalmYaw: 90,"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 6061,
+      "endLine": 6061,
+      "text": "      if (kind === 'bar' && movement.endOnPlateTone !== undefined) {"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 6254,
+      "endLine": 6254,
+      "text": "            const back: FigurePrim = { ...line([cx, cy + 3.0], [cx, cy - 2.4], 7.0, 'textMid', 1), stroke: 'ink1', strokeWidth: 0.6 };"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 6247,
+      "endLine": 6247,
+      "text": "            const palm: FigurePrim = { ...line([cx, cy + 3.0], [cx, cy - 0.4], 7.0, 'textHi', 1), stroke: 'ink1', strokeWidth: 0.6 };"
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js",
+      "line": 71,
+      "endLine": 71,
+      "text": "const HEAVY_LOAD_PER_HAND = 0.25;"
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js",
+      "line": 230,
+      "endLine": 233,
+      "text": "    expect(minClear3D).toBeGreaterThanOrEqual(BODY.hr + barRadius);\n    expect(minClear2DDrawnBar).toBeGreaterThanOrEqual(barRadius);\n    expect(endOnTicks).toBe(ticks.length);\n    expect(minEndClear2D).toBeGreaterThanOrEqual(0);"
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js",
+      "line": 127,
+      "endLine": 130,
+      "text": "      for (const s of [g.world.near, g.world.far]) {\n        expect(deg3D(s.shoulder, s.elbow, s.wrist)).toBeGreaterThanOrEqual(30);\n        expect(segDist3D(s.shoulder, s.elbow, s.wrist)).toBeGreaterThanOrEqual(UPPER_ARM_AND_FOREARM_RADII);\n      }"
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.jointLimits.test.js",
+      "line": 71,
+      "endLine": 76,
+      "text": "      expect(minNearKnee).toBeGreaterThanOrEqual(35);\n      expect(minFarKnee).toBeGreaterThanOrEqual(35);\n      expect(minNearElbow).toBeGreaterThanOrEqual(30);\n      expect(minFarElbow).toBeGreaterThanOrEqual(30);\n      expect(minNearForearmClear).toBeGreaterThanOrEqual(FOREARM_UPPER_ARM_PAINTED_RADII);\n      expect(minFarForearmClear).toBeGreaterThanOrEqual(FOREARM_UPPER_ARM_PAINTED_RADII);"
+    },
+    {
+      "file": "tools/rendering/chain_motion_specs.mjs",
+      "line": 2247,
+      "endLine": 2247,
+      "text": "drawn from a 3D model turned 3 degrees, nearly side on, so the bar is seen end on as its plate"
+    }
+  ]
+}
