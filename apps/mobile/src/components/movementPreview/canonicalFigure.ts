@@ -3742,6 +3742,11 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
   // Front Squat (id 8): bar resting across the front of the shoulders with a
   // secure grip slightly wider than shoulder-width and elbows pointing forward,
   // upright torso into a full squat.
+  // MOV-A05-R2: the bar rests on the painted shoulders in front of the neck
+  // (the same place relative to the trunk in both poses), the upper arms stay
+  // level and pointing forward, and the hands sit far enough out along the bar
+  // that each elbow opens to 34 degrees instead of folding the forearm into
+  // the upper arm.
   'front-squat': {
     root: 'hip',
     view: 'oblique',
@@ -3760,18 +3765,21 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       {
         at: [0.0, 46.10], trunk: 89, thigh: -90, shin: -90,
         ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 10,
-        upperArm: [3, -8], forearm: [-177, 25],
+        upperArm: [1, -0.82], forearm: [173.076, 33.82],
       },
       {
         at: [-10.4, 18.8], trunk: 68, thigh: -90, shin: -90,
         ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 14,
-        upperArm: [24, -8], forearm: [-156, 25],
+        upperArm: [22, -3.58], forearm: [199.942, 37.351],
       },
     ],
   },
   // Front Squat (Clean Grip) (id 208): rack set just below shoulder height,
   // hands just outside the shoulders with fingertips under the bar (shown in
   // closeUp) and elbows high with chest up.
+  // MOV-A05-R2: the bar rests on the painted shoulders in front of the neck,
+  // the elbows sit 6 degrees above level, and each elbow opens to at least
+  // 32 degrees.
   'front-squat-clean-grip': {
     root: 'hip',
     view: 'oblique',
@@ -3791,12 +3799,12 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       {
         at: [0.0, 46.08], trunk: 90, thigh: -90, shin: -90,
         ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 10,
-        upperArm: [8, -4], forearm: [-150, 14], hand: [100, -4],
+        upperArm: [6.038, -6.446], forearm: [-157.156, 34.997], hand: [100, -4],
       },
       {
         at: [-9.6, 18.2], trunk: 72, thigh: -90, shin: -90,
         ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 16,
-        upperArm: [26, -4], forearm: [-132, 14], hand: [100, -4],
+        upperArm: [24.03, -5.709], forearm: [-133.853, 34.07], hand: [100, -4],
       },
     ],
   },
@@ -5059,28 +5067,34 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
   // "Lie on the floor holding a kettlebell in one hand with that upper arm resting on the floor
   // and the palm facing in. Press the kettlebell straight up until the arm is straight, letting
   // the wrist turn as it rises. Lower it slowly until the upper arm rests on the floor again."
+  // MOV-A05-R2: the upper arm rests on the floor 45 degrees out from the trunk,
+  // the wrist stacked over the elbow; the bell's centre rises straight up
+  // (2.4 units of drift toward the shoulder in all, the turn of the bell
+  // included), so the straight arm finishes over the bell's start, not over
+  // the shoulder. Turned 45 degrees the other way so that any drift along or
+  // across the trunk would show on screen. The free arm lies on the floor.
   'one-arm-kettlebell-floor-press': {
     root: 'hip',
     view: 'oblique',
-    yawDeg: 16,
+    yawDeg: -45,
     originX: 48,
     implement: 'kettlebell',
     kettlebellTurn: true,
     footSpread: 4.2,
     kneePole: 90,
-    elbowPole: [-75.964, 30.19],
+    elbowPole: [-28.03, 41.432],
     poses: [
       {
         at: [10, 5.915], trunk: 176.56, curl: -4, head: 178,
         thigh: 42, shin: -52, ankle: [38, CHAIN_ANKLE_HEIGHT],
         upperArm: 0, forearm: 90,
-        wrist: [-9.488, 14.113, 20.182], farWrist: [-9.488, 14.113, -20.182],
+        wrist: [-5.716, 14.112, 17.656], farWrist: [5.560, 2.116, -21.760],
       },
       {
         at: [10, 5.915], trunk: 176.56, curl: -4, head: 178,
         thigh: 42, shin: -52, ankle: [38, CHAIN_ANKLE_HEIGHT],
         upperArm: 90, forearm: 90,
-        wrist: [-12.19, 30.94, 9.384], farWrist: [-9.488, 14.113, -20.182],
+        wrist: [-5.404, 28.293, 16.572], farWrist: [5.560, 2.116, -21.760],
       },
     ],
   },
@@ -5804,6 +5818,22 @@ export function trunkCentreline(pose: CanonicalPose, opts: FigureOptions): Canon
   return [joints.nk, joints.hp];
 }
 
+/**
+ * Where the near hand's kettlebell is painted, in world units: the round bell
+ * resting on the back of the wrist, or hanging under the handle in a row.
+ * With `kettlebellTurn` the bell goes round with the wrist as the arm rises.
+ */
+export function chainKettlebellCentre(figure: ReturnType<typeof chainGeometry>): readonly [number, number, number] {
+  const movement = figure.movement;
+  const turnT = movement.kettlebellTurn ? Math.max(0, Math.min(1, figure.ph)) : 1;
+  const kbRest: ChainVec = movement.kettlebellBelow
+    ? [0, -6.0, 0]
+    : movement.kettlebellTurn
+      ? [-1.8 * turnT, -2.2, 2.2 * (1 - turnT) + 1.4 * turnT]
+      : KETTLEBELL_REST;
+  return chainAdd(figure.world.near.hold, kbRest, 1);
+}
+
 /** A chain movement's equipment, lines and held implement, grouped by where they are painted. */
 function layoutChainExtras(
   figure: ReturnType<typeof chainGeometry>, body: BodyParameters, farColor: ColorRole, farOpacity: number,
@@ -6022,13 +6052,8 @@ function layoutChainExtras(
     const hAxis: ChainVec = movement.kettlebellTurn
       ? [Math.cos(turnT * Math.PI / 2), 0, Math.sin(turnT * Math.PI / 2)]
       : [0, 0, 1];
-    const kbRest: ChainVec = movement.kettlebellBelow
-      ? [0, -6.0, 0]
-      : movement.kettlebellTurn
-        ? [-1.8 * turnT, -2.2, 2.2 * (1 - turnT) + 1.4 * turnT]
-        : KETTLEBELL_REST;
     const a = project(chainAdd(w.near.hold, hAxis, -2.6)), b = project(chainAdd(w.near.hold, hAxis, 2.6));
-    const c = project(chainAdd(w.near.hold, kbRest, 1));
+    const c = project(chainKettlebellCentre(figure));
     near.push({ kind: 'circle', cx: c[0], cy: c[1], r: KETTLEBELL_RADIUS, fill: 'textHi', stroke: 'ink1', strokeWidth: 1, opacity: 1 });
     near.push(line(a, b, 2.2, 'textHi', 1));
   } else if (kind === 'handle' || kind === 'handles' || kind === 'rope') {

@@ -253,9 +253,10 @@ describe('MOV-A05 horizontal, incline, decline, floor, board, pin, and cable pre
     expect(Math.abs(top.world.near.hold[0] - top.world.head[0])).toBeLessThanOrEqual(2.5);
     expect(Math.abs(top.world.near.hold[0] - top.world.hip[0])).toBeGreaterThan(15);
 
-    // Bottom stretch is outside the chest (hold.z > shoulder.z + 5) with vertical forearms and ~45 deg elbow tuck
+    // Bottom stretch is outside the chest (hold.z > shoulder.z + 5) with a ~45 deg elbow tuck. The text sets no
+    // forearm angle, so none is bound and no caption adds one (MOV-A05-R2).
     expect(bot.world.near.hold[2]).toBeGreaterThan(bot.world.near.shoulder[2] + 5.0);
-    expect(forearmDegFromVertical3D(bot.world.near.elbow, bot.world.near.hold)).toBeLessThanOrEqual(1.0);
+    for (const f of e.frames) expect(f.caption.toLowerCase()).not.toContain('vertical forearm');
     const elbowTuckDeg = (Math.atan2(bot.world.near.elbow[2] - bot.world.near.shoulder[2], bot.world.near.elbow[0] - bot.world.near.shoulder[0]) * 180) / Math.PI;
     expect(elbowTuckDeg).toBeGreaterThanOrEqual(42);
     expect(elbowTuckDeg).toBeLessThanOrEqual(48);
@@ -337,26 +338,74 @@ describe('MOV-A05 horizontal, incline, decline, floor, board, pin, and cable pre
     expect(Math.abs(Math.max(slices203[0].y1, slices203[0].y2) + slices203[0].w / 2 - 96.9)).toBeLessThanOrEqual(0.05);
     expect(Math.abs(Math.max(slices203[32].y1, slices203[32].y2) + slices203[32].w / 2 - 96.9)).toBeLessThanOrEqual(0.05);
 
-    // 249 One-Arm Kettlebell Floor Press: starts at the bottom (ph = 0) with upper arm resting on the floor angled out
-    // from the trunk (>= 40 deg in the floor plane) and palm facing in, presses straight up (horizontal travel along
-    // the trunk <= 3 units) to lockout over the shoulder while turning the wrist, and lowers slowly.
+    // 249 One-Arm Kettlebell Floor Press: starts at the bottom (ph = 0) with that upper arm resting on the floor,
+    // 30 to 50 deg out from the trunk in the floor plane, and the wrist stacked over the elbow ("Wrist stacked over
+    // the elbow."); presses the bell straight up ("Press straight up.") until the arm is straight, and lowers slowly.
     expect(bot249.movement.implement).toBe('kettlebell');
     expect(bot249.movement.kettlebellTurn).toBe(true);
     expect(Math.abs(bot249.world.near.elbow[1] - (BODY.lw * 0.88) / 2)).toBeLessThanOrEqual(0.05);
     expect(forearmDegFromVertical3D(bot249.world.near.elbow, bot249.world.near.hold)).toBeLessThanOrEqual(1.0);
+    // The angle between the upper arm and the trunk's line toward the hips, measured in the floor plane.
+    const trunkToHips = [bot249.world.hip[0] - bot249.world.neck[0], bot249.world.hip[2] - bot249.world.neck[2]];
+    const armOnFloor = [
+      bot249.world.near.elbow[0] - bot249.world.near.shoulder[0],
+      bot249.world.near.elbow[2] - bot249.world.near.shoulder[2],
+    ];
     const upperArmFloorAngleDeg =
-      (Math.atan2(
-        Math.abs(bot249.world.near.elbow[2] - bot249.world.near.shoulder[2]),
-        Math.abs(bot249.world.near.elbow[0] - bot249.world.near.shoulder[0]),
+      (Math.acos(
+        (trunkToHips[0] * armOnFloor[0] + trunkToHips[1] * armOnFloor[1]) /
+          (Math.hypot(...trunkToHips) * Math.hypot(...armOnFloor)),
       ) *
         180) /
       Math.PI;
-    expect(upperArmFloorAngleDeg).toBeGreaterThanOrEqual(40);
-    expect(upperArmFloorAngleDeg).toBeLessThanOrEqual(70);
+    expect(upperArmFloorAngleDeg).toBeGreaterThanOrEqual(30);
+    expect(upperArmFloorAngleDeg).toBeLessThanOrEqual(50);
     expect(deg3D(top249.world.near.shoulder, top249.world.near.elbow, top249.world.near.hold)).toBeGreaterThanOrEqual(172);
-    expect(Math.abs(top249.world.near.hold[0] - top249.world.near.shoulder[0])).toBeLessThanOrEqual(2.0);
-    expect(Math.abs(top249.world.near.hold[0] - bot249.world.near.hold[0])).toBeLessThanOrEqual(3.0);
     expect(e249.segmentDurationsMs[2]).toBeGreaterThan(e249.segmentDurationsMs[0] + 400);
+
+    // MOV-A05-R2: the painted bell's centre moves straight up. At every 33 ms tick its horizontal offset from where it
+    // started (headward and sideways together, world x and z) is at most 3 units, and over the press its horizontal
+    // path is at most 3 units long; the elbow never sinks into the floor.
+    const ds249 = e249.segmentDurationsMs;
+    const total249 = ds249.reduce((a, b) => a + b, 0);
+    const poses249 = e249.frames.map((f) => f.joints);
+    const bellStart = rig.chainKettlebellCentre(bot249);
+    let pressPath = 0;
+    let prevBell = null;
+    for (let t = 0; t <= total249; t += 33) {
+      const p = rig.poseAtTime(poses249, t, ds249);
+      const g = rig.chainGeometry(slugOf(e249), p.ph, BODY);
+      const bell = rig.chainKettlebellCentre(g);
+      expect(Math.hypot(bell[0] - bellStart[0], bell[2] - bellStart[2])).toBeLessThanOrEqual(3.0);
+      expect(bell[1]).toBeGreaterThanOrEqual(bellStart[1] - 1e-6);
+      expect(g.world.near.elbow[1]).toBeGreaterThanOrEqual((BODY.lw * 0.88) / 2 - 0.05);
+      if (t <= ds249[0]) {
+        if (prevBell) pressPath += Math.hypot(bell[0] - prevBell[0], bell[2] - prevBell[2]);
+        prevBell = bell;
+      }
+    }
+    expect(pressPath).toBeLessThanOrEqual(3.0);
+    const bellTop = rig.chainKettlebellCentre(top249);
+    expect(bellTop[1] - bellStart[1]).toBeGreaterThan(12.0);
+
+    // The view shows any drift: a horizontal step of the bell toward the shoulder, along the trunk, or across it
+    // moves the painted bell sideways on screen by at least 0.9, 0.6 and 0.6 of its length.
+    const screenShift = (dx, dz) => {
+      const a = bot249.project(bellStart);
+      const b = bot249.project([bellStart[0] + dx, bellStart[1], bellStart[2] + dz]);
+      return Math.abs(b[0] - a[0]);
+    };
+    const toShoulder = [bot249.world.near.shoulder[0] - bellStart[0], bot249.world.near.shoulder[2] - bellStart[2]];
+    const toShoulderLen = Math.hypot(...toShoulder);
+    expect(screenShift(toShoulder[0] / toShoulderLen, toShoulder[1] / toShoulderLen)).toBeGreaterThanOrEqual(0.9);
+    expect(screenShift(1, 0)).toBeGreaterThanOrEqual(0.6);
+    expect(screenShift(0, 1)).toBeGreaterThanOrEqual(0.6);
+
+    // No hold the text does not give: the top is an ordinary turnaround, and the last caption says to change arms
+    // ("Complete the repetitions, then change arms.").
+    expect(ds249[1]).toBeLessThanOrEqual(200);
+    for (const f of e249.frames) expect(f.caption.toLowerCase()).not.toMatch(/\bhold\b/);
+    expect(e249.frames[e249.frames.length - 1].caption.toLowerCase()).toContain('change arms');
   });
 
   test('83 Cable Chest Press stands in a staggered stance facing away from chest-height pulleys with both pulleys and cables visible in the projection, presses both handles forward until hands drift together at full reach, and returns slowly under cable tension', () => {

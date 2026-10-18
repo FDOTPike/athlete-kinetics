@@ -35,6 +35,50 @@ const barMidWorld = (fig) => [
   (fig.world.near.hold[2] + fig.world.far.hold[2]) / 2,
 ];
 
+// MOV-A05-R2: the front rack measured against the painted body, not joint
+// centres. The bar (painted 1.6 wide) runs across the body along z, so in the
+// x-y plane it is a disc of radius 0.8. It rests on the painted shoulder
+// girdle (the bone from the neck out to each shoulder, as wide as the upper
+// arm), stays in front of the painted neck (from the neck point toward the
+// head, BODY.lw * 0.74 wide) and above the painted top of the trunk (its
+// first slice is centred on the neck point and 24 / 32 * 1.6 = 1.2 thick).
+const BAR_HALF = 0.8;
+const GIRDLE_HALF = (BODY.lw * 0.88) / 2;
+const NECK_HALF = (BODY.lw * 0.74) / 2;
+const TRUNK_TOP_ABOVE_NECK = ((24 / 32) * 1.6) / 2;
+const UPPER_ARM_HALF = (BODY.lw * 0.88) / 2;
+const FOREARM_HALF = (BODY.lw * 0.72) / 2;
+const rackContact = (fig) => {
+  const bar = barMidWorld(fig);
+  const rel = [bar[0] - fig.world.neck[0], bar[1] - fig.world.neck[1]];
+  const trunkRad = (fig.angles.trunk[0] * Math.PI) / 180;
+  const along = [Math.cos(trunkRad), Math.sin(trunkRad)];
+  const ahead = [Math.sin(trunkRad), -Math.cos(trunkRad)];
+  return {
+    girdleGap: Math.hypot(rel[0], rel[1]) - (GIRDLE_HALF + BAR_HALF),
+    neckClearance: rel[0] * ahead[0] + rel[1] * ahead[1] - (NECK_HALF + BAR_HALF),
+    trunkTopClearance: rel[0] * along[0] + rel[1] * along[1] - (TRUNK_TOP_ABOVE_NECK + BAR_HALF),
+  };
+};
+const internalDeg = (a, b, c) => {
+  const u = [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+  const v = [c[0] - b[0], c[1] - b[1], c[2] - b[2]];
+  return (Math.acos((u[0] * v[0] + u[1] * v[1] + u[2] * v[2]) / (Math.hypot(...u) * Math.hypot(...v))) * 180) / Math.PI;
+};
+const pointToSegment3 = (p, a, b) => {
+  const ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+  const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * ab[0] + (p[1] - a[1]) * ab[1] + (p[2] - a[2]) * ab[2]) / (ab[0] ** 2 + ab[1] ** 2 + ab[2] ** 2)));
+  return dist3(p, [a[0] + t * ab[0], a[1] + t * ab[1], a[2] + t * ab[2]]);
+};
+// Elbows at least 30 degrees (internal) and the forearm's painted outline at
+// the wrist clear of the upper arm's painted outline, on both arms.
+const expectOpenRackElbows = (fig) => {
+  for (const side of [fig.world.near, fig.world.far]) {
+    expect(internalDeg(side.shoulder, side.elbow, side.wrist)).toBeGreaterThanOrEqual(30);
+    expect(pointToSegment3(side.wrist, side.shoulder, side.elbow)).toBeGreaterThanOrEqual(UPPER_ARM_HALF + FOREARM_HALF);
+  }
+};
+
 describe('MOV-A01 chain kit additions: footSpread, kneeOut, nearBarEnd / farBarEnd', () => {
   test('footSpread shifts planted near and far ankles symmetrically in world Z without altering bone lengths', () => {
     const hipWidthZ = 2 * BODY.hw * 0.8;
@@ -315,7 +359,12 @@ describe('MOV-A01 per-movement source-bound biomechanics', () => {
       const fig = chainGeometry('front-squat', p.ph, BODY);
       const bar = barMidWorld(fig);
       expect(bar[0]).toBeGreaterThan(fig.world.neck[0] + 1.0);
-      expect(Math.hypot(bar[0] - fig.world.neck[0], bar[1] - fig.world.neck[1])).toBeLessThanOrEqual(2.5);
+      // MOV-A05-R2: the bar rests on the painted shoulders, in front of the neck and above the trunk.
+      const rack = rackContact(fig);
+      expect(Math.abs(rack.girdleGap)).toBeLessThanOrEqual(0.1);
+      expect(rack.neckClearance).toBeGreaterThanOrEqual(-0.05);
+      expect(rack.trunkTopClearance).toBeGreaterThanOrEqual(-0.05);
+      expectOpenRackElbows(fig);
 
       const dx = fig.world.near.elbow[0] - fig.world.near.shoulder[0];
       const dy = fig.world.near.elbow[1] - fig.world.near.shoulder[1];
@@ -360,7 +409,12 @@ describe('MOV-A01 per-movement source-bound biomechanics', () => {
       const stdFig = chainGeometry('front-squat', p.ph, BODY);
       const bar = barMidWorld(cleanFig);
       expect(bar[0]).toBeGreaterThan(cleanFig.world.neck[0] + 1.0);
-      expect(Math.hypot(bar[0] - cleanFig.world.neck[0], bar[1] - cleanFig.world.neck[1])).toBeLessThanOrEqual(2.5);
+      // MOV-A05-R2: the bar rests on the painted shoulders, in front of the neck and above the trunk.
+      const rack = rackContact(cleanFig);
+      expect(Math.abs(rack.girdleGap)).toBeLessThanOrEqual(0.1);
+      expect(rack.neckClearance).toBeGreaterThanOrEqual(-0.05);
+      expect(rack.trunkTopClearance).toBeGreaterThanOrEqual(-0.05);
+      expectOpenRackElbows(cleanFig);
 
       const cleanDx = cleanFig.world.near.elbow[0] - cleanFig.world.near.shoulder[0];
       const cleanDy = cleanFig.world.near.elbow[1] - cleanFig.world.near.shoulder[1];

@@ -345,6 +345,24 @@ describe('MOV-A02 per-movement source-bound biomechanics', () => {
 
     // Elbows ride inside the knees at the bottom (smaller lateral |Z| than the abducted knees).
     expect(Math.abs(bottom.world.near.elbow[2])).toBeLessThan(Math.abs(bottom.world.near.knee[2]) - 3.5);
+
+    // MOV-A05-R2: at every 33 ms tick both elbows stay open to at least 30 degrees (internal) and the
+    // forearm's painted outline at the wrist stays clear of the upper arm's painted outline.
+    const entry = entryFor(81);
+    const total = entry.segmentDurationsMs.reduce((a, b) => a + b, 0);
+    const toSegment3 = (p, a, b) => {
+      const ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+      const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * ab[0] + (p[1] - a[1]) * ab[1] + (p[2] - a[2]) * ab[2]) / (ab[0] ** 2 + ab[1] ** 2 + ab[2] ** 2)));
+      return dist3(p, [a[0] + t * ab[0], a[1] + t * ab[1], a[2] + t * ab[2]]);
+    };
+    for (let t = 0; t <= total; t += 33) {
+      const p = poseAtTime(entry.frames.map((f) => f.joints), t, entry.segmentDurationsMs);
+      const fig = chainGeometry('zercher-squat', p.ph, BODY);
+      for (const side of [fig.world.near, fig.world.far]) {
+        expect(elbowAngleDeg(side)).toBeGreaterThanOrEqual(30);
+        expect(toSegment3(side.wrist, side.shoulder, side.elbow)).toBeGreaterThanOrEqual((BODY.lw * 0.88) / 2 + (BODY.lw * 0.72) / 2);
+      }
+    }
   });
 
   test('98 Barbell Hack Squat: starts from the floor with bar behind the calves and skims up behind the legs to standing', () => {

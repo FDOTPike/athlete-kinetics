@@ -2309,7 +2309,7 @@ export const CHAIN_SPECS = [
     captions: [
       'Set the bench between 30 and 45 degrees, kick the dumbbells up off your knees one at a time, and start from the top.',
       'Lower to a deep stretch just outside your chest with your elbows about 45 degrees from your sides.',
-      'Earn the stretch at the bottom just outside the chest with vertical forearms and 45-degree elbows.',
+      'Earn the stretch at the bottom just outside your chest.',
       'Press up and slightly back so the dumbbells finish over your face, not your belly.',
       'Feet planted, upper back tight on the incline bench, earn the stretch at the bottom, and press up and slightly back over the face.',
     ],
@@ -2373,15 +2373,15 @@ export const CHAIN_SPECS = [
     view: 'side',
     equipment: 'kettlebell',
     phases: [0, 1, 1, 0, 0],
-    segments: [950, 400, 1450, 500],
+    segments: [950, 200, 1450, 500],
     captions: [
       'Lie on the floor holding a kettlebell in one hand with that upper arm resting on the floor and the palm facing inward.',
       'Press the kettlebell straight up until the arm is straight, letting the wrist turn as it rises.',
-      'Hold the straight-arm lockout overhead with the wrist turned.',
+      'The arm is straight and the wrist has turned.',
       'Lower the kettlebell slowly until the upper arm rests on the floor again.',
-      'Wrist stacked over the elbow, press straight up letting the wrist turn, and lower slowly until the upper arm rests on the floor.',
+      'Wrist stacked over the elbow, press straight up, lower until the arm rests on the floor, and change arms after the repetitions.',
     ],
-    reason: 'Source-bound draft, drawn from a 3D model turned 16 degrees so the single kettlebell in the working near hand, the palm-in bottom orientation with the upper arm angled out from the trunk and resting flat on the floor, the straight vertical press path over the shoulder as the wrist turns 90 degrees, and the slower 1450 ms lowering phase all read clearly.',
+    reason: 'Source-bound draft, drawn from a 3D model turned 45 degrees the other way so that any drift of the bell along or across the trunk would show: the single kettlebell in the working near hand, the palm-in bottom with the upper arm resting on the floor 45 degrees out from the trunk and the wrist stacked over the elbow, the bell rising straight up as the wrist turns until the arm is straight, and the slower 1450 ms lowering phase.',
     summary: 'Lying on the floor with one upper arm resting on the ground and the palm facing in holding a kettlebell, press the kettlebell straight up while letting the wrist turn, then lower it slowly until the upper arm rests on the floor again.',
   },
   {
