@@ -651,3 +651,33 @@ Authority: proposed on 2026-10-13 after the owner deferred the choice; it
 takes effect, and is ratified, by the owner's merge of the pull request that
 adds this entry. Machine-checked in verify:semantic, with fixed inputs and
 through the live embedder, including the known price.
+
+## 2026-10-13 — A suspension also withholds the autopilot's effort raise (exception to 058)
+
+Migration 058's header says of a suspension: "It freezes the macro position.
+That is all", and that it "adds no modifier of its own" to the safety
+machinery. From this change a block GENERATED while a suspension is open is
+also denied the autopilot's positive RPE grant.
+
+Why: the 2.5 ceiling on effort raises per macro-cycle
+(`MAX_MACROCYCLE_RPE_RAISE`, frozen in the calibration registry) is enforced
+by macro position, and a block generated during an episode consumes no
+position (S6(b)). Each such block was therefore offered the frozen position's
+half point again; six at one position summed to 3.0. The two rules were
+ratified a month apart and nothing tested them together.
+
+Scope: the positive RPE grant only. Cuts, the autopilot's set corrections,
+substitution, the rehab effort ceiling and halts are unchanged (the session-time
+fit follows the effort targets actually planned, as it always has, so a session
+at its limit may keep a set a raised target's longer rest would have trimmed); training continues; the position is
+frozen and resumed exactly as before; no constant, migration or storage
+changes. 058 is shipped and is not edited. The gate sits at block generation
+in the store (one read of the open episode, one typed input to the generator),
+not in the suspension path.
+
+Authority: proposed on 2026-10-13 after the owner deferred the choice; it
+takes effect, and is ratified, by the owner's merge of the pull request that
+adds this entry. Rationale and the options not taken:
+`docs/decisions/SUSPENSION_RPE_RAISE_2026-10-13.md`. Machine-checked in
+verify:autopilot, verify:blocks, verify:store and
+`SuspensionRpeRaise.test.js`.
