@@ -1,0 +1,18 @@
+source commit: 7022cb94bd4c3df0d366393633179835fc164b86
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with probe-fc3fcf3ce0eee1cbf916188e3b13f377d9a66f08.json
+
+movements measured: 231 (baseline 223)
+added: 91 Lying Dumbbell Triceps Extension; 242 Lying Triceps Press; 215 Incline Barbell Triceps Extension; 233 Kneeling Cable Triceps Extension; 177 Decline Close-Grip Bench To Skull Crusher; 47 Dip; 170 Close-Grip Push-Up off of a Dumbbell; 166 Clock Push-Up
+removed: none
+changed, expected: none
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  91 Lying Dumbbell Triceps Extension: drawn 23e2ffe9d9312629c69dd393eca8c97ddab9dac93f33187432a54327b59f3543 captions d35d17a7f82bcd11a5faceb0052f997c1ed05bedfba5fffade1939dc81302cc3 stage 240.00x178.54 cycle 2200 ms
+  242 Lying Triceps Press: drawn 2986e7b4f7ab380aa7f6d85f882622c7e55c8dd9589678c0fde9ab63b13346a5 captions ba0f650475133c0ace9ce6e1e179868d81bc02480e84bb44b7403540cfa09b45 stage 240.00x174.29 cycle 2200 ms
+  215 Incline Barbell Triceps Extension: drawn 5dd74bb36ad0fb92f69743f2748d4634b2452e8338eedf0a7d85582701a83cee captions f4dc424fe7649bc2afce7aa56031d713ea39e2359751abe73e17b5aae4988860 stage 240.00x219.76 cycle 2750 ms
+  233 Kneeling Cable Triceps Extension: drawn b56ae69e50038f5abe057682ee548bd031e407ff056abcd1f0a89ad1337eca18 captions d71f832be484b58735f708c2fb1185825adc504cb14d4939ed442d854135ef89 stage 240.00x240.00 cycle 2750 ms
+  177 Decline Close-Grip Bench To Skull Crusher: drawn 889a8d9485d77da3f5f3020cc73fda42daac7785b560c52a0936a5fe74dec78b captions c3ea88bd2505ad0fb3ebd06ca5584a547b1e9f6d556df6ef6b93e7d17821f1c4 stage 240.00x177.27 cycle 3400 ms
+  47 Dip: drawn fd8b4937cea5e1e9df4feb8dcd01b447cfa659bfaf2c86abf23ec5ce827e510f captions 21a23a8c526850fbcde50bb3fa311863c50ba0897ba1df28632df3588a4b94b5 stage 143.51x240.00 cycle 2100 ms
+  170 Close-Grip Push-Up off of a Dumbbell: drawn 210e1f05be68c2c9450dea1457dee648dbc496a12d356c0f07dce1c503bdf035 captions 7fa3581f80f9e2bbdfb68040a07b8dc7e1514acfbbd4d49e4f520f0d7130dbdc stage 240.00x141.82 cycle 2100 ms
+  166 Clock Push-Up: drawn 86631559891e69fa2ceff0d99e1e9e110200261655ae7bd8135459e7354a9881 captions a6582bf21a6d98adbe6b9494dceb447d3526d54c4aa81f99a340893f8cebe4cf stage 240.00x128.00 cycle 2740 ms
+exit code: 0 (probe run exit 0)

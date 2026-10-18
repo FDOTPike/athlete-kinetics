@@ -1,0 +1,77 @@
+{
+  "bounds": [],
+  "fileQuotes": [
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4149,
+      "endLine": 4152,
+      "text": "        at: [-1.8, 70.62], trunk: 90, head: 90, shrug: 0, thigh: -90, shin: -90,\n        ankle: [-2.0, CHAIN_ANKLE_HEIGHT], kneeOut: 4,\n        upperArm: [-85, 8], forearm: [-85, 8],"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 3657,
+      "endLine": 3660,
+      "text": "        at: [-0.2, 46.45], trunk: 86, thigh: -90, shin: -90,\n        ankle: [-2, CHAIN_ANKLE_HEIGHT], foot: [0, 15.5], kneeOut: 4,\n        upperArm: [-102, 22], forearm: [88, 12],"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 3720,
+      "endLine": 3723,
+      "text": "        at: [-0.2, 45.30], trunk: 86, thigh: -90, shin: -90,\n        ankle: [-2, CHAIN_ANKLE_HEIGHT], foot: [0, 28], kneeOut: 14,\n        upperArm: [-102, 22], forearm: [88, 12],"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 3910,
+      "endLine": 3913,
+      "text": "        at: [0.2, 45.75], trunk: 86, thigh: -90, shin: -90,\n        ankle: [0, CHAIN_ANKLE_HEIGHT], foot: [0, 22], kneeOut: 10,\n        upperArm: [-102, 22], forearm: [88, 12],"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 3968,
+      "endLine": 3975,
+      "text": "        at: [-3.0, 45.95], trunk: 88, thigh: -90, shin: -90,\n        ankle: [-3.0, CHAIN_ANKLE_HEIGHT], kneeOut: 14,\n        upperArm: [-64, 4], forearm: [98, -44],\n      },\n      {\n        at: [-13.2, 19.6], trunk: 68, thigh: -90, shin: -90,\n        ankle: [-3.0, CHAIN_ANKLE_HEIGHT], kneeOut: 28,\n        upperArm: [-58, 4], forearm: [102, -44],"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4424,
+      "endLine": 4431,
+      "text": "        at: [4, CHAIN_ANKLE_HEIGHT], trunk: 88, head: 90,\n        thigh: -82, shin: -104,\n        upperArm: [-102, 22], forearm: [88, 12],\n      },\n      {\n        at: [4, CHAIN_ANKLE_HEIGHT], trunk: 14, head: 28,\n        thigh: -58, shin: -91,\n        upperArm: [-102, 22], forearm: [88, 12],"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4580,
+      "endLine": 4587,
+      "text": "        at: [10, 6.8], trunk: 17, head: 23,\n        thigh: -163, shin: 180, foot: -56,\n        upperArm: -133, forearm: -49.07,\n      },\n      {\n        at: [10, 6.8], trunk: 23, head: 29,\n        thigh: -157, shin: 180, foot: -56,\n        upperArm: -115, forearm: -63.5,"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4612,
+      "endLine": 4619,
+      "text": "        at: [10, 10.5], trunk: 11, head: 17,\n        thigh: -169, shin: 180, foot: -90,\n        upperArm: -135, forearm: -44.24,\n      },\n      {\n        at: [10, 10.5], trunk: 18, head: 24,\n        thigh: -162, shin: 180, foot: -90,\n        upperArm: -116, forearm: -61.5,"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4642,
+      "endLine": 4649,
+      "text": "        at: [14, 10.5], trunk: 90, head: 90,\n        thigh: -90, shin: 180, foot: -90,\n        upperArm: -60, forearm: 65,\n      },\n      {\n        at: [14, 10.5], trunk: 6, head: 14,\n        thigh: -174, shin: 180, foot: -90,\n        upperArm: -60, forearm: 65,"
+    },
+    {
+      "file": "tools/rendering/chain_motion_specs.mjs",
+      "line": 1920,
+      "endLine": 1920,
+      "text": "      'Sit the hips back toward the heels only as far as the trunk stays braced, and shorten the range if the ribs flare.',"
+    },
+    {
+      "file": "tools/rendering/chain_motion_specs.mjs",
+      "line": 2159,
+      "endLine": 2159,
+      "text": "      'Drive the hips through to stand tall.',"
+    },
+    {
+      "file": "tools/rendering/chain_motion_specs.mjs",
+      "line": 2173,
+      "endLine": 2175,
+      "text": "      'Sit with your upper back against a bench, feet planted, and a padded bar over your hips.',\n      'Drive through your heels until your thighs and torso are level with the floor, finishing flat like a tabletop.',\n      'Tuck the pelvis and pause a full beat at the top in one straight line from knee to shoulder with vertical shins.',"
+    }
+  ]
+}

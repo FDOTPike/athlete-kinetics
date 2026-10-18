@@ -1,0 +1,18 @@
+source commit: f6a16914161cdd00d44301b01702e2929f18e99b
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with probe-fc22d196e2b9d3a0a601089f68f169486b43f275.json
+
+movements measured: 193 (baseline 185)
+added: 140 Barbell Squat To A Bench; 192 Dumbbell Squat To A Bench; 81 Zercher Squat; 98 Barbell Hack Squat; 120 Jefferson Squats; 235 Kneeling Squat; 105 One-Arm Overhead Kettlebell Squat; 48 Double Kettlebell Front Squat
+removed: none
+changed, expected: none
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  140 Barbell Squat To A Bench: drawn e515f9afbceaa650fef91742d853bdabac843c91e28b1224547ca468e1d33582 captions 6fab663c841f319402bbf89bb0172c0f1b794b393d4eadc834d7e41807d01966 stage 156.52x240.00 cycle 2600 ms
+  192 Dumbbell Squat To A Bench: drawn 581f42033a026b6fad535c347d4e94f6810d8396e750fa1982d695af19afaa97 captions 35bc2e8b3302c5144ec805f85726d272f42f32e1051699289896e9d2b5b36fc2 stage 149.68x240.00 cycle 2600 ms
+  81 Zercher Squat: drawn 688f8191c81d5ad5404ace18441e7c41765950f6a09a5aeff9e6e0aefdda3ceb captions e3f5d3c0a88fb6f939edeb0666c3f62dbc3a882289869349f5edbfd8be526de4 stage 116.13x240.00 cycle 3500 ms
+  98 Barbell Hack Squat: drawn e093715e3719d9b09296792cd63bbce221ee301ed1bb4037895cf0ce57a01244 captions b02aee67082836f69d640dcd1eee7586a641c687399589ff2b1e39a50b7ed06e stage 134.51x240.00 cycle 3450 ms
+  120 Jefferson Squats: drawn a44bfdb7067d7154ca7634c4bf86ef39245fcd32ad2ba23e79b9dc6120667326 captions 4900cca1be967e0803dab37e42da43c5b8c430e608026ddd76eb85b9bde64595 stage 136.00x240.00 cycle 3450 ms
+  235 Kneeling Squat: drawn 2ea206e9637abaffba7e0b618e9ccbf6095c9db7e3f3b7ba247d1d1ffd83eee8 captions f7de09b2b364b8a61b0e79a012d3ece1d65875b7c0e7cbfe956b1d8cd27a8487 stage 163.33x240.00 cycle 3400 ms
+  105 One-Arm Overhead Kettlebell Squat: drawn ab2a0b311a40ca2118066cd3b5ee64285045d86a0b93eafd18a114d4cee98871 captions 980bf4090b4c3358e3459f6804fb97d1fb42cbff2c1a4b2338fab559377db744 stage 123.50x240.00 cycle 3600 ms
+  48 Double Kettlebell Front Squat: drawn 748dc0ef9d6ff47aa94e3eff8254706558f5c985fccd506badd0b760e5fbc59b captions 726f12d2de50e0ca6192e0f1fc9297ce4fc184b31abb00c71e10551cb4b7a1b1 stage 112.17x240.00 cycle 3400 ms
+exit code: 0 (probe run exit 0)

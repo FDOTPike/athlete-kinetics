@@ -1,0 +1,144 @@
+{
+  "bounds": [
+    {
+      "id": 2,
+      "quote": "Pull the slack out first.",
+      "bound": "Preload phase (ph = 0 -> 0.2, 0..250 ms) keeps the bar on the floor at Y = 9.5 while the hips wedge down (> 1.5 units) and the trunk angle rises (> 2 deg) before lift-off.",
+      "test": "apps/mobile/test/components/MovementPreview.movA03Deadlifts.test.js :: 2 Deadlift: bar over mid-foot, slack pulled out before lift-off, shins brought to the bar without penetration, flat braced back, bar stays close to legs to standing tall"
+    },
+    {
+      "id": 2,
+      "quote": "Keep the bar close to the legs.",
+      "bound": "3D bar-axis-to-shin centreline distance >= 2.96 and <= 4.46 beside shins; bar-axis-to-thigh centreline distance >= 3.632 and <= 5.132 beside thighs across every 33 ms tick.",
+      "test": "apps/mobile/test/components/MovementPreview.rigidBar.test.js :: movement 2 (deadlift) clears both shins (>= 2.96) and both thighs (>= 3.632) at every 33 ms tick, and stays within 1.5 surface units where the text keeps the bar close to the legs"
+    },
+    {
+      "id": 46,
+      "quote": "Pull the slack out before the bar breaks the floor.",
+      "bound": "Preload phase (ph = 0 -> 0.2, 0..250 ms) keeps the bar at Y = 9.5 on the floor while the hips wedge down (> 1.5 units) and trunk angle rises (> 2 deg) before lift-off.",
+      "test": "apps/mobile/test/components/MovementPreview.movA03Deadlifts.test.js :: 46 Deficit Deadlift: standing on a low platform with slack-pull preload, more knee and hip bend, flat back, and longer pull range than Deadlift"
+    },
+    {
+      "id": 46,
+      "quote": "the deficit forces more knee and hip bend, so brace before you even reach for the bar.",
+      "bound": "Deficit knee angle < Deadlift knee angle - 4.0 deg and Deficit hip angle < Deadlift hip angle - 4.0 deg; 3D bar axis clears shins (>= 2.96) and thighs (>= 3.632) within 1.5 surface units at every 33 ms tick.",
+      "test": "apps/mobile/test/components/MovementPreview.movA03Deadlifts.test.js :: 46 Deficit Deadlift: standing on a low platform with slack-pull preload, more knee and hip bend, flat back, and longer pull range than Deadlift"
+    },
+    {
+      "id": 176,
+      "quote": "Bar stays against the legs.",
+      "bound": "3D bar-axis-to-shin centreline distance in [2.96, 4.46] beside shins and bar-axis-to-thigh centreline distance in [3.632, 5.132] beside thighs across every 33 ms tick.",
+      "test": "apps/mobile/test/components/MovementPreview.rigidBar.test.js :: movement 176 (deadlift-with-bands) clears both shins (>= 2.96) and both thighs (>= 3.632) at every 33 ms tick, and stays within 1.5 surface units where the text keeps the bar close to the legs"
+    },
+    {
+      "id": 176,
+      "quote": "Loop the bands over the bar and anchor them under the feet",
+      "bound": "Near and far band lines connect foot anchors to bar ends and stretch monotonically to standing lockout.",
+      "test": "apps/mobile/test/components/MovementPreview.movA03Deadlifts.test.js :: 176 Deadlift with Bands: bands looped over bar ends and anchored under the feet, grip outside legs, stretching to lockout"
+    },
+    {
+      "id": 257,
+      "quote": "Bar stays against the legs.",
+      "bound": "3D bar-axis-to-shin centreline distance in [2.96, 4.46] beside shins and bar-axis-to-thigh centreline distance in [3.632, 5.132] beside thighs across every 33 ms tick.",
+      "test": "apps/mobile/test/components/MovementPreview.rigidBar.test.js :: movement 257 (reverse-band-deadlift) clears both shins (>= 2.96) and both thighs (>= 3.632) at every 33 ms tick, and stays within 1.5 surface units where the text keeps the bar close to the legs"
+    },
+    {
+      "id": 257,
+      "quote": "Inside a rack, hang bands from the top and loop them around the bar",
+      "bound": "6-beam 3D rack frame with overhead bands attached to nearBarEnd and farBarEnd shortening as the bar rises.",
+      "test": "apps/mobile/test/components/MovementPreview.movA03Deadlifts.test.js :: 257 Reverse Band Deadlift: inside a rack with bands hung from the top and looped around the bar ends, hip-width stance and shoulder-width grip"
+    },
+    {
+      "id": 78,
+      "quote": "keeping the bar against your legs until you stand tall.",
+      "bound": "3D bar-axis-to-shin centreline distance in [2.96, 4.46] beside shins and bar-axis-to-thigh centreline distance in [3.632, 5.132] beside thighs across every 33 ms tick.",
+      "test": "apps/mobile/test/components/MovementPreview.rigidBar.test.js :: movement 78 (sumo-deadlift) clears both shins (>= 2.96) and both thighs (>= 3.632) at every 33 ms tick, and stays within 1.5 surface units where the text keeps the bar close to the legs"
+    },
+    {
+      "id": 78,
+      "quote": "Stand with a wide stance, toes pointed out, bar over mid-foot. Grip the bar inside your knees with straight arms.",
+      "bound": "Wide sumo ankle span (50.0 units), 38 deg foot turn-out, hands inside knees (gripSpan < kneeSpan - 12).",
+      "test": "apps/mobile/test/components/MovementPreview.movA03Deadlifts.test.js :: 78 Sumo Deadlift: wide stance, toes pointed out, straight arms gripping inside the knees, knees tracking over toes, upright chest"
+    },
+    {
+      "id": 258,
+      "quote": "As the bar passes the knees, bring the hips to the bar and stand tall.",
+      "bound": "3D bar-axis-to-shin centreline distance in [2.96, 4.46] beside shins and bar-axis-to-thigh centreline distance in [3.632, 5.132] beside thighs across every 33 ms tick.",
+      "test": "apps/mobile/test/components/MovementPreview.rigidBar.test.js :: movement 258 (reverse-band-sumo-deadlift) clears both shins (>= 2.96) and both thighs (>= 3.632) at every 33 ms tick, and stays within 1.5 surface units where the text keeps the bar close to the legs"
+    },
+    {
+      "id": 258,
+      "quote": "set the feet wide with the bar over the middle of the feet and grip it with the arms inside the legs.",
+      "bound": "Wide sumo stance inside a 6-beam rack frame with bands hung from overhead to the bar ends and grip inside the knees.",
+      "test": "apps/mobile/test/components/MovementPreview.movA03Deadlifts.test.js :: 258 Reverse Band Sumo Deadlift: wide sumo stance and inside-leg grip inside a rack with bands hung from the top to the bar ends"
+    },
+    {
+      "id": 290,
+      "quote": "As the bar passes the knees, bring the hips to the bar and stand tall against the band tension.",
+      "bound": "3D bar-axis-to-shin centreline distance in [2.96, 4.46] beside shins and bar-axis-to-thigh centreline distance in [3.632, 5.132] beside thighs across every 33 ms tick.",
+      "test": "apps/mobile/test/components/MovementPreview.rigidBar.test.js :: movement 290 (sumo-deadlift-with-bands) clears both shins (>= 2.96) and both thighs (>= 3.632) at every 33 ms tick, and stays within 1.5 surface units where the text keeps the bar close to the legs"
+    },
+    {
+      "id": 290,
+      "quote": "Loop short bands over the bar and stand on them, feet set wide with the bar over the middle of the feet, and grip the bar with the arms inside the legs.",
+      "bound": "Bands connect wide sumo feet (nearFoot, farFoot) to bar ends while hands grip inside the knees.",
+      "test": "apps/mobile/test/components/MovementPreview.movA03Deadlifts.test.js :: 290 Sumo Deadlift with Bands: short bands looped over the bar ends and stood on with wide sumo feet, gripping inside the legs"
+    },
+    {
+      "id": 98,
+      "quote": "Keep the bar close behind the legs.",
+      "bound": "Bar remains behind the ankles, knees, and hips throughout the pull, clearing both shins (>= 2.96) and both thighs (>= 3.632) with surface gap <= 1.5 units across every 33 ms tick.",
+      "test": "apps/mobile/test/components/MovementPreview.rigidBar.test.js :: movement 98 (barbell-hack-squat) clears both shins (>= 2.96) and both thighs (>= 3.632) at every 33 ms tick, and stays within 1.5 surface units where the text keeps the bar close to the legs"
+    },
+    {
+      "id": 98,
+      "quote": "letting the bar skim up behind the legs as the hips and knees straighten together.",
+      "bound": "Bar starts on the floor at Y = 9.5 behind the calves and skims up behind the legs as knees and hips extend together to lockout.",
+      "test": "apps/mobile/test/components/MovementPreview.movA02OtherSquats.test.js :: 98 Barbell Hack Squat: floor plates start on the floor behind calves and skim up behind the legs"
+    },
+    {
+      "id": 288,
+      "quote": "Hips back, bar close to the legs.",
+      "bound": "Hips push back while knees stay softly bent (~159 deg) and the bar hangs plumb under the shoulders, clearing shins (>= 2.96) and thighs (>= 3.632) across every 33 ms tick.",
+      "test": "apps/mobile/test/components/MovementPreview.rigidBar.test.js :: movement 288 (stiff-legged-barbell-deadlift) clears both shins (>= 2.96) and both thighs (>= 3.632) at every 33 ms tick, and stays within 1.5 surface units where the text keeps the bar close to the legs"
+    },
+    {
+      "id": 288,
+      "quote": "Keeping the knees at that angle and the back straight, push the hips back to lower the bar toward the top of the feet",
+      "bound": "Knee angle stays fixed within 2 deg from top to bottom while the straight trunk hinges to 5 deg and the bar lowers just above the feet.",
+      "test": "apps/mobile/test/components/MovementPreview.movA04Hinges.test.js :: 288 Stiff-Legged Barbell Deadlift: knees stay softly bent at constant angle (< 3 deg change) while hips push back and bar hangs plumb from shoulders toward top of feet"
+    },
+    {
+      "id": 23,
+      "quote": "Catch with the hands and use only enough push to return",
+      "bound": "Both hands stay planted on the floor (painted gap 0.00 <= 0.2, horizontal drift 0.00 <= 0.3) across every 33 ms tick of the push (3100..3600 ms) while the elbows extend by >= 30 deg, and only then leave the floor.",
+      "test": "apps/mobile/test/components/MovementPreview.movA04Hinges.test.js :: 23 Nordic Curl, 202 Floor Glute-Ham Raise, 244 Natural Glute Ham Raise: kneeling ankle anchor, one straight knee-hip-shoulder line, slow eccentric (>= 2x return), and distinct bottom catch / band assistance"
+    },
+    {
+      "id": 202,
+      "quote": "Bring the hands to the floor to catch, then push lightly off the floor to help yourself back up.",
+      "bound": "Both hands stay planted on the floor (painted gap 0.00 <= 0.2, horizontal drift 0.00 <= 0.3) across every 33 ms tick of the push (3100..3600 ms) while the elbows extend by >= 30 deg, and only then leave the floor.",
+      "test": "apps/mobile/test/components/MovementPreview.movA04Hinges.test.js :: 23 Nordic Curl, 202 Floor Glute-Ham Raise, 244 Natural Glute Ham Raise: kneeling ankle anchor, one straight knee-hip-shoulder line, slow eccentric (>= 2x return), and distinct bottom catch / band assistance"
+    },
+    {
+      "id": 140,
+      "quote": "Chest up, knees in line with the toes.",
+      "bound": "At the bottom touch on the bench, the 3D ankle-to-knee ray direction in the horizontal plane matches the 22.00 deg foot yaw within 0.01 deg (0.00 deg difference).",
+      "test": "apps/mobile/test/components/MovementPreview.movA02OtherSquats.test.js :: 140 Barbell Squat To A Bench vs 192 Dumbbell Squat To A Bench: light touch on flat bench behind without sitting/resting, barbell on upper back inside rack vs dumbbells at sides"
+    }
+  ],
+  "fileQuotes": [
+    {
+      "file": "apps/mobile/test/components/MovementPreview.rigidBar.test.js",
+      "line": 147,
+      "endLine": 154,
+      "text": "        for (const side of ['near', 'far']) {\n          const limb = gt.world[side];\n          const dShin = segSegDist3D(bNear, bFar, limb.ankle, limb.knee);\n          const dThigh = segSegDist3D(bNear, bFar, limb.knee, limb.hipJoint);\n\n          expect(dShin).toBeGreaterThanOrEqual(MIN_SHIN_AXIS_DIST);\n          expect(dThigh).toBeGreaterThanOrEqual(MIN_THIGH_AXIS_DIST);"
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA04Hinges.test.js",
+      "line": 323,
+      "endLine": 333,
+      "text": "      for (let t = pushStartMs; t <= pushEndMs; t += 33) {\n        const pt = rig.poseAtTime(poses, t, ds);\n        const gt = rig.chainGeometry(slug, pt.ph, BODY);\n        for (const side of ['near', 'far']) {\n          const gap = gt.world[side].wrist[1] - handRadius;\n          const drift = Math.abs(gt.world[side].wrist[0] - botFig.world[side].wrist[0]);\n          expect(gap).toBeGreaterThanOrEqual(0);\n          expect(gap).toBeLessThanOrEqual(0.2);\n          expect(drift).toBeLessThanOrEqual(0.3);\n        }"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+source commit: fc22d196e2b9d3a0a601089f68f169486b43f275
+command: npm run typecheck
+
+
+> athlete-kinetics@0.1.0 typecheck
+> tsc -p apps/mobile/tsconfig.json
+
+exit code: 0

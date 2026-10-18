@@ -1,0 +1,23 @@
+source commit: 75c793807058421ee45e2e07c15cbb190b13a546
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with probe-ae2415a5d4c8008a9418f7dce93bfe20affed7ad.json
+
+movements measured: 243 (baseline 243)
+added: none
+removed: none
+changed, expected: 229 Kettlebell Seated Press; 85 Double Kettlebell Push Press; 112 Bent Press; 6 Weighted Pull-up; 13 Chin-up; 71 Pull-Up; 108 V-Bar Pulldown; 209 Full Range-Of-Motion Lat Pulldown; 77 Straight-Arm Pulldown; 211 Gorilla Chin/Crunch; 64 Hanging Leg Raise; 121 Kettlebell Dead Clean; 231 Kettlebell Turkish Get-Up (Lunge style)
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  229 Kettlebell Seated Press: drawn ae1a0d12ea4e28c136c5346dec8fcdd908d2ca55773f4196b0b1d5a4dbd2c4a8 captions ac8f1471d34901d48c8db2f0a229b7a843337015c9fc6b9c77d91ba49293dd62 stage 240.00x169.76 cycle 3600 ms
+  85 Double Kettlebell Push Press: drawn b5428e7a4da42007c2624d08ed48672d3f0ced976049aedaabd392a2dce502c8 captions 72dadfe6096e103e7cb8f1b402d7ed318e40ea4b0b90cd776e49b4cfa2060d43 stage 90.87x240.00 cycle 2900 ms
+  112 Bent Press: drawn 9f904eb58e95eaf73dd4b0e4a83b4cc1a8dbe3ec7e8a582e2d6af7df27dd7f3f captions 3dd5e7dace27bad0b5e5958bd2e073a807253a729acde53cb429ff1d1ef3b071 stage 90.87x240.00 cycle 4450 ms
+  6 Weighted Pull-up: drawn eebfd90bdea2291a01cc4e8eef2e303d1dc04a629093a45c014e262bf50e0f9e captions 90eb0cf1cc58e399062b8cf8624441a01babed9618ae239b0860437ef1049fb9 stage 90.24x240.00 cycle 2600 ms
+  13 Chin-up: drawn 27cfd03783ce6feb0bb7f6e8f0527f5d9a0a8a6bc3bbd10644fcbcc7d94fb10a captions 612e813cbdca552ec99943a9bd02988c4c2c1b86c8bdac8f8fcb8b4f7396c3d1 stage 117.12x240.00 cycle 2600 ms
+  71 Pull-Up: drawn f08ff20c253286bfca68f29d0c427ea9d392bb6a523b9aaeb02e2847021a91dd captions 6c0e810333e4d254b13ef8e72e713d5ad974f0f33b7d9c11dd94c89f04e04435 stage 111.36x240.00 cycle 2600 ms
+  108 V-Bar Pulldown: drawn 51c23ae0c6e07e40455442263332e7a749971c91560b9c64ea531a00263f66cf captions 48a0c89b7a85b0df7eb8d5d9d248bb991c18987b4e07978c8a2ac6b5bf9fdbfa stage 160.00x240.00 cycle 3100 ms
+  209 Full Range-Of-Motion Lat Pulldown: drawn c632e49f97bc917e4f3e1cabc2a8ae943b705275dc9aa9601ac4b21f871872be captions 52cb90c916a7acec1d830ddd8509d61d68eb90097bcae6b54d7b242b78da7a7e stage 192.94x240.00 cycle 2950 ms
+  77 Straight-Arm Pulldown: drawn becbd9987cb330853b86bf91090d191aa37b6e1dc21d669edf1a2811a5ff3f36 captions 738f206330c7983a47ab7f59fd39a05ad92a0c8474a247313d86ac6292121a5f stage 115.29x240.00 cycle 2650 ms
+  211 Gorilla Chin/Crunch: drawn 44abda55e214d75033fad5e2d5e26e5c8f2d176ff6b4943b2284262a01f5ba0b captions 5812a578a6f049cd1a5dfafad7e52df13b0ce1c7cf804b3a1b1ebd4b3fb1f88f stage 142.00x240.00 cycle 2850 ms
+  64 Hanging Leg Raise: drawn 1d05b3489226459b4b626227cb4acc93843081edd44b3f711e0ad675cb51eeaf captions 8137a1074fd46864a55497399443e4048ab3054730c7beaca08c54b655fd6e10 stage 173.22x240.00 cycle 4050 ms
+  121 Kettlebell Dead Clean: drawn 2362ee93191fc626efd3ab9ddd5e84bcf1fb5946ee8edaf44cf475330ab380ff captions b2b2e7b85a7350334f06309254860c76ae0231f0403b12f945e02c7e89e7f003 stage 117.39x240.00 cycle 3400 ms
+  231 Kettlebell Turkish Get-Up (Lunge style): drawn 13980face69512c34ef5c94db913e35887a003969d77023b693a0d5c9d99fb23 captions b087f3dd8b828bfda4541403b578950116ad380d270eb04fa672d15494ad08ea stage 216.92x240.00 cycle 7200 ms
+exit code: 0 (probe run exit 0)

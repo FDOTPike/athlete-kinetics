@@ -1,0 +1,16 @@
+source commit: 4bf7490f85b5cee750abb40d30e234d470643844
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with probe-38134f313676d1721c940c5fe5461f42837b03bd.json
+
+movements measured: 225 (baseline 219)
+added: 5 Barbell Row; 104 One-Arm Kettlebell Row; 107 Reverse Grip Bent-Over Rows; 293 Two-Arm Kettlebell Row; 79 T-Bar Row; 130 Alternating Kettlebell Row
+removed: none
+changed, expected: none
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  5 Barbell Row: drawn ca8b842f96df0e10d1c6f58a5f5b797cf9ca725d500d1f2f62a891145338f73f captions 003d620ca8d6f8d04ab66b2b13710f559581ae42a9dd8b467a9d269e212524aa stage 160.00x240.00 cycle 3350 ms
+  104 One-Arm Kettlebell Row: drawn b323921dd96aaefcfeedf71ca80e9d1d57a32b5cce63eb3a9a822fa77c69be76 captions 63e25b9b2328c93327376218cfe0d75ae6accd1a8f3746ff4167d43f6bffb083 stage 176.47x240.00 cycle 3500 ms
+  107 Reverse Grip Bent-Over Rows: drawn f72dd280f2b86fd1a91abe73d2632bbcb73dec3718f60dccc071809352b2a9de captions 5de686db7b00342571348b45b7335024157327485818d0bf2f9b4cd3e29c6221 stage 157.42x240.00 cycle 4100 ms
+  293 Two-Arm Kettlebell Row: drawn 9dc0dbe2a0a0fa1a2c372cc6c5930ac631d32507aa97569ecfc8d301de526e5a captions 3ca75e6a50de4007b36cec3326c60413ff86d9a94782f3a0d1e73c11b48979f2 stage 163.64x240.00 cycle 3750 ms
+  79 T-Bar Row: drawn f97cb29d383f5adeb83b7b4efd775d41c27927ec2bd644303aefa2a833c68fe1 captions 81d1f5aeb6bd56f4b62c8c61a367c8cba1876dc6c1bd3bc788aaed61dc734242 stage 194.43x240.00 cycle 3550 ms
+  130 Alternating Kettlebell Row: drawn 7d6c6b952988d34631aaa38f64805129546bb2dcb512c8f67b4333fe9dbc616c captions cdeebd5591078246c0e0276dd1f7bf6f116c316950bbc6a2a3026fa72e5287c9 stage 230.40x240.00 cycle 4500 ms
+exit code: 0 (probe run exit 0)
