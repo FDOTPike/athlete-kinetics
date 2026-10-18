@@ -15,6 +15,7 @@ import {
   CANONICAL_BODY_PARAMETERS,
   CHAIN_MOVEMENTS,
   chainGeometry,
+  handCloseUp,
   layoutCanonicalFigure,
   poseAtTime,
 } from '../../src/components/movementPreview/canonicalFigure';
@@ -51,6 +52,26 @@ function pointToSegmentDist2D(p, a, b) {
   const len2 = ux * ux + uy * uy || 1;
   const t = Math.max(0, Math.min(1, ((p[0] - a[0]) * ux + (p[1] - a[1]) * uy) / len2));
   return Math.hypot(p[0] - (a[0] + ux * t), p[1] - (a[1] + uy * t));
+}
+
+// Fore-aft position of the whole system's centre of mass: the body from the
+// world joints with Winter's segment mass fractions and centre positions
+// (head and neck 0.081 at the head; trunk 0.497 half-way up the spine; upper
+// arm 0.028 at 0.436, forearm 0.016 at 0.430, hand 0.006 at the wrist; thigh
+// 0.100 at 0.433, shank 0.0465 at 0.433, foot 0.0145 half-way along), plus a
+// load of `loadPerHand` body masses at each hand's hold.
+const lerp3 = (a, b, k) => a.map((v, i) => v + (b[i] - v) * k);
+function systemComX(w, loadPerHand) {
+  const parts = [[0.081, w.head], [0.497, lerp3(w.hip, w.neck, 0.5)]];
+  for (const s of [w.near, w.far]) {
+    parts.push(
+      [0.028, lerp3(s.shoulder, s.elbow, 0.436)], [0.016, lerp3(s.elbow, s.wrist, 0.43)], [0.006, s.wrist],
+      [0.1, lerp3(s.hipJoint, s.knee, 0.433)], [0.0465, lerp3(s.knee, s.ankle, 0.433)], [0.0145, lerp3(s.ankle, s.toe ?? s.ankle, 0.5)],
+      [loadPerHand, s.hold],
+    );
+  }
+  const mass = parts.reduce((sum, [m]) => sum + m, 0);
+  return parts.reduce((sum, [m, p]) => sum + m * p[0], 0) / mass;
 }
 
 function entryFor(id) {
@@ -153,10 +174,10 @@ describe('145 Bent Over Two-Arm Long Bar Row', () => {
       expect(figure.angles.trunk[0]).toBeLessThanOrEqual(24);
       expect(distance(w.hip, start.figure.world.hip)).toBeLessThan(1e-6);
       expect(distance(w.neck, start.figure.world.neck)).toBeLessThan(1e-6);
-      // Slight fixed knee bend.
+      // Slight fixed knee bend: "knees slightly bent", about 20 to 30 degrees of bend.
       const kneeDeg = jointAngleDeg(w.near.hipJoint, w.near.knee, w.near.ankle);
-      expect(kneeDeg).toBeGreaterThanOrEqual(120);
-      expect(kneeDeg).toBeLessThanOrEqual(155);
+      expect(kneeDeg).toBeGreaterThanOrEqual(148);
+      expect(kneeDeg).toBeLessThanOrEqual(162);
       // Palms facing each other on a rigid double handle.
       expect(figure.angles.palmYaw).toBe(90);
       expect(figure.angles.farPalmYaw).toBe(90);
@@ -231,6 +252,13 @@ describe('153 Box Squat with Bands', () => {
     const start = at(0);
     const gripSpan3D = distance(start.figure.world.near.hold, start.figure.world.far.hold);
     const gripSpan2D = distance(start.figure.hold.near, start.figure.hold.far);
+
+    // "a shoulder-width to slightly wider stance": the ankles are between 0.95 and
+    // 1.25 times the shoulder span apart (shoulder joints 2 * sw * 0.92 apart).
+    const shoulderSpan = 2 * BODY.sw * 0.92;
+    const stance = Math.abs(start.figure.world.near.ankle[2] - start.figure.world.far.ankle[2]);
+    expect(stance).toBeGreaterThanOrEqual(0.95 * shoulderSpan);
+    expect(stance).toBeLessThanOrEqual(1.25 * shoulderSpan);
 
     // Rigid bar across the shoulders, clear of the head on every tick.
     for (const t of ticks) {
@@ -412,6 +440,13 @@ describe('205 Front Barbell Squat To A Bench', () => {
       const upperPitchDeg = (Math.atan2(upperDy, upperDx) * 180) / Math.PI;
       expect(upperPitchDeg).toBeGreaterThan(1.5);
       expect(upperPitchDeg).toBeLessThan(18);
+      // "Do not sit back and relax on the bench": the bench takes only a light
+      // touch, so the body balances over the feet at every tick. The bar and the
+      // centre of mass of body and bar (a bar of half body mass, a quarter in each
+      // hand) stay within 2 units of the mid-foot, fore and aft.
+      const midFootX = (w.near.ankle[0] + w.near.toe[0]) / 2;
+      expect(Math.abs(w.near.hold[0] - midFootX)).toBeLessThanOrEqual(2.0);
+      expect(Math.abs(systemComX(w, 0.25) - midFootX)).toBeLessThanOrEqual(2.0);
     }
 
     // Bottom touch on the bench (keyframe 3, ph = 1): glutes touch the bench, knees travel forward in line with toes, no seated pause.
@@ -452,14 +487,36 @@ describe('250 One-Arm Kettlebell Swings', () => {
       expect(workingElbowDeg).toBeGreaterThanOrEqual(172);
     }
 
+    // "grip the handle in one hand with an overhand grip": a hand close-up at the
+    // hike shows the back of the hand (palm toward the body), the fingers over
+    // the handle, the handle drawn across the panel and the bell hanging under it.
+    const panel = handCloseUp(hike.figure);
+    expect(panel).not.toBeNull();
+    expect(panel.palmYaw).toBe(180);
+    expect(panel.palmFacingViewer).toBe(false);
+    const discIdx = hike.prims.findIndex((p) => p.kind === 'circle' && p.fill === 'ink1' && p.stroke === 'textLow'
+      && Math.abs(p.cx - panel.centre[0]) < 1e-6 && Math.abs(p.cy - panel.centre[1]) < 1e-6);
+    expect(discIdx).toBeGreaterThanOrEqual(0);
+    const inset = hike.prims.slice(discIdx + 1);
+    const handle = inset.find((p) => p.kind === 'bone' && p.color === 'textHi' && Math.abs(p.w - 2.2) < 1e-6 && Math.abs(p.y1 - p.y2) < 1e-6);
+    const globe = inset.find((p) => p.kind === 'circle' && p.fill === 'textMid' && p.r > 4);
+    expect(handle).toBeDefined();
+    expect(globe).toBeDefined();
+    expect(Math.abs(handle.x2 - handle.x1) / 2).toBeGreaterThan(4);
+    expect(globe.cy - globe.r).toBeGreaterThan(handle.y1);
+    const backOfHand = inset.find((p) => p.kind === 'bone' && p.color === 'textMid' && Math.abs(p.w - 7.0) < 1e-6);
+    expect(backOfHand).toBeDefined();
+
     // Hike start (pose 0): hip hinge (hips high above knees, softened knees), bell hiked behind the hips/upper thighs, free arm swung back beside the hip.
     const hikeKneeDeg = jointAngleDeg(
       hike.figure.world.near.hipJoint,
       hike.figure.world.near.knee,
       hike.figure.world.near.ankle,
     );
-    expect(hikeKneeDeg).toBeGreaterThanOrEqual(120);
-    expect(hikeKneeDeg).toBeLessThanOrEqual(155);
+    // "soften the knees and push the hips back": a hinge with soft knees (about
+    // 150 to 160 degrees), not a squat.
+    expect(hikeKneeDeg).toBeGreaterThanOrEqual(148);
+    expect(hikeKneeDeg).toBeLessThanOrEqual(162);
     expect(hike.figure.world.hip[1]).toBeGreaterThan(hike.figure.world.near.knee[1] + 12);
     expect(hike.figure.angles.trunk[0]).toBeGreaterThanOrEqual(26);
     expect(hike.figure.angles.trunk[0]).toBeLessThanOrEqual(40);

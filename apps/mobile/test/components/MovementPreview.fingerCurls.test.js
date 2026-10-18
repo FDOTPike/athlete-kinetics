@@ -198,5 +198,10 @@ test('only finger-curls, front-squat-clean-grip, and the approved grip close-up 
     'upright-cable-row',
     'dumbbell-lying-rear-lateral-raise',
     'lying-rear-delt-raise',
+    // MOV-S2-R3: overhand grips the text names (242, 215, 233, 250)
+    'lying-triceps-press',
+    'incline-barbell-triceps-extension',
+    'kneeling-cable-triceps-extension',
+    'one-arm-kettlebell-swings',
   ]);
 });

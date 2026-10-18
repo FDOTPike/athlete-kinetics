@@ -65,6 +65,26 @@ const ticksOf = (e) => {
   return [...Array.from({ length: Math.ceil(total / 33) }, (_, i) => i * 33), total];
 };
 
+// Fore-aft position of the whole system's centre of mass: the body from the
+// world joints with Winter's segment mass fractions and centre positions
+// (head and neck 0.081 at the head; trunk 0.497 half-way up the spine; upper
+// arm 0.028 at 0.436, forearm 0.016 at 0.430, hand 0.006 at the wrist; thigh
+// 0.100 at 0.433, shank 0.0465 at 0.433, foot 0.0145 half-way along), plus a
+// load of `loadPerHand` body masses at each hand's hold.
+const lerp3 = (a, b, k) => a.map((v, i) => v + (b[i] - v) * k);
+const systemComX = (w, loadPerHand) => {
+  const parts = [[0.081, w.head], [0.497, lerp3(w.hip, w.neck, 0.5)]];
+  for (const s of [w.near, w.far]) {
+    parts.push(
+      [0.028, lerp3(s.shoulder, s.elbow, 0.436)], [0.016, lerp3(s.elbow, s.wrist, 0.43)], [0.006, s.wrist],
+      [0.1, lerp3(s.hipJoint, s.knee, 0.433)], [0.0465, lerp3(s.knee, s.ankle, 0.433)], [0.0145, lerp3(s.ankle, s.toe ?? s.ankle, 0.5)],
+      [loadPerHand, s.hold],
+    );
+  }
+  const mass = parts.reduce((sum, [m]) => sum + m, 0);
+  return parts.reduce((sum, [m, p]) => sum + m * p[0], 0) / mass;
+};
+
 describe('MOV-A12 triceps extensions, dip, and push-ups: universal physics, rigid bar grip, and head clearance', () => {
   test.each(IDS)('movement %i is authored as pending with >= 5 frames, uncurled spine, and valid primitive layout at every 33 ms tick', (id) => {
     const e = entryFor(id);
@@ -297,8 +317,21 @@ describe('MOV-A12 triceps extensions, dip, and push-ups: universal physics, rigi
     const armRadius = (BODY.lw * 0.88) / 2;
     expect(Math.abs((start.world.near.shoulder[1] - armRadius) - benchTop)).toBeLessThanOrEqual(0.5);
     expect(Math.abs((start.world.near.elbow[1] - armRadius) - benchTop)).toBeLessThanOrEqual(0.5);
-    expect(start.world.head[1] - BODY.hr).toBeLessThanOrEqual(benchTop + 1.5);
-    expect(start.world.head[1]).toBeGreaterThanOrEqual(benchTop);
+    // The head rests on the pad too: the painted underside of the head ring (its
+    // radius plus half its stroke) sits on the pad's top, within 0.5 and never
+    // below it, over the pad, at every 33 ms tick
+    for (const t of ticksOf(e)) {
+      const p = rig.poseAtTime(e.frames.map((f) => f.joints), t, e.segmentDurationsMs);
+      const g = rig.chainGeometry(slug, p.ph, BODY);
+      const prims = rig.layoutCanonicalFigure(p, { view: e.view, assetKey: e.assetKey, body: BODY });
+      const head = prims.find((pr) => pr.kind === 'circle' && pr.stroke === 'textHi' && pr.r >= 5.5);
+      expect(head).toBeDefined();
+      const headUnderside = g.world.head[1] - (head.r + head.strokeWidth / 2);
+      expect(headUnderside).toBeGreaterThanOrEqual(benchTop);
+      expect(headUnderside).toBeLessThanOrEqual(benchTop + 0.5);
+      expect(g.world.head[0]).toBeGreaterThanOrEqual(Math.min(pad.a[0], pad.b[0]));
+      expect(g.world.head[0]).toBeLessThanOrEqual(Math.max(pad.a[0], pad.b[0]));
+    }
     expect(start.world.near.elbow[0]).toBeGreaterThanOrEqual(Math.min(pad.a[0], pad.b[0]));
     expect(start.world.near.elbow[0]).toBeLessThanOrEqual(Math.max(pad.a[0], pad.b[0]));
 
@@ -340,6 +373,38 @@ describe('MOV-A12 triceps extensions, dip, and push-ups: universal physics, rigi
     const returnMs = ds[2] + ds[3];
     expect(pauseMs).toBeGreaterThanOrEqual(500);
     expect(returnMs).toBeGreaterThanOrEqual(1.4 * extendMs);
+  });
+
+  test.each([242, 215, 233])('%i shows its overhand grip in a hand close-up at every 33 ms tick: the palm faces away from the face, so the panel (seen from in front of the hands) shows a light palm behind the bar with four fingers wrapped over it', (id) => {
+    // 242: "holding an EZ bar or a straight bar with a medium overhand grip"
+    // 215: "holding a barbell overhead with an overhand grip slightly narrower than the shoulders"
+    // 233: "holding the straight bar with a narrow overhand grip and the elbows bent"
+    const e = entryFor(id);
+    const slug = slugOf(e);
+    const poses = e.frames.map((f) => f.joints);
+    for (const t of ticksOf(e)) {
+      const p = rig.poseAtTime(poses, t, e.segmentDurationsMs);
+      const g = rig.chainGeometry(slug, p.ph, BODY);
+      const panel = rig.handCloseUp(g);
+      expect(panel).not.toBeNull();
+      expect(panel.palmYaw).toBe(0);
+      expect(panel.palmFacingViewer).toBe(true);
+      const prims = rig.layoutCanonicalFigure(p, { view: e.view, assetKey: e.assetKey, body: BODY });
+      const discIdx = prims.findIndex((pr) => pr.kind === 'circle' && pr.fill === 'ink1' && pr.stroke === 'textLow'
+        && Math.abs(pr.cx - panel.centre[0]) < 1e-6 && Math.abs(pr.cy - panel.centre[1]) < 1e-6);
+      expect(discIdx).toBeGreaterThanOrEqual(0);
+      const after = prims.slice(discIdx + 1).map((pr, i) => ({ pr, i }));
+      const bar = after.find(({ pr }) => pr.kind === 'bone' && pr.color === 'textMid' && Math.abs(pr.w - 2.2) < 1e-6);
+      const palm = after.find(({ pr }) => pr.kind === 'bone' && pr.color === 'textHi' && Math.abs(pr.w - 7.0) < 1e-6);
+      expect(bar).toBeDefined();
+      expect(palm).toBeDefined();
+      // The bar runs across the panel (seen along its length), behind the fingers and in front of the palm
+      expect(Math.abs(bar.pr.x2 - bar.pr.x1) / 2).toBeGreaterThan(6);
+      expect(palm.i).toBeLessThan(bar.i);
+      const wrapped = after.filter(({ pr, i }) => pr.kind === 'bone' && i > bar.i && Math.abs(pr.w - 1.7) < 1e-6
+        && Math.min(pr.y1, pr.y2) - pr.w / 2 < bar.pr.y1 - bar.pr.w / 2 && Math.max(pr.y1, pr.y2) + pr.w / 2 > bar.pr.y1 + bar.pr.w / 2);
+      expect(wrapped).toHaveLength(4);
+    }
   });
 
   test('177 Decline Close-Grip Bench To Skull Crusher secures the legs on a decline bench and alternates one close-grip press to the lower chest with one stationary-upper-arm skull crusher toward the forehead', () => {
@@ -435,6 +500,10 @@ describe('MOV-A12 triceps extensions, dip, and push-ups: universal physics, rigi
       expect(dist(g.world.far.wrist, top.world.far.wrist)).toBeLessThan(0.01);
       expect(g.world.near.ankle[1]).toBeGreaterThan(10);
       expect(g.world.near.toe[1]).toBeGreaterThan(8);
+      // Only the hands hold the body up, so its centre of mass (head, trunk, arms
+      // and legs) stays within 2 units of them fore and aft: a trunk that leans
+      // forward is balanced by the hips and legs swinging back
+      expect(Math.abs(systemComX(g.world, 0) - g.world.near.wrist[0])).toBeLessThanOrEqual(2.0);
     }
   });
 
@@ -513,9 +582,30 @@ describe('MOV-A12 triceps extensions, dip, and push-ups: universal physics, rigi
     expect(deg3D(bottom.world.near.shoulder, bottom.world.near.elbow, bottom.world.near.wrist)).toBeLessThanOrEqual(105);
     expect(bottom.world.near.wrist[1]).toBeLessThanOrEqual(2.5);
 
-    // Flight (ph = 2): push up fast enough for both hands to leave the floor
-    expect(flight.world.near.wrist[1]).toBeGreaterThan(start.world.near.wrist[1] + 5);
-    expect(flight.world.far.wrist[1]).toBeGreaterThan(start.world.far.wrist[1] + 5);
+    // Flight (ph = 2): push up fast enough for both hands to leave the floor,
+    // high enough to read as a flight (7.5 units, about 15 cm, clear of the floor)
+    expect(flight.world.near.wrist[1]).toBeGreaterThan(start.world.near.wrist[1] + 7.5);
+    expect(flight.world.far.wrist[1]).toBeGreaterThan(start.world.far.wrist[1] + 7.5);
+
+    // The hop goes one way round: the body's turn never runs backward from the
+    // start to the reset, there is exactly one flight in the loop (the loop
+    // closes with a reset on the floor, not a hop back), and no caption sends
+    // the athlete back the way they came
+    const yawOf = (g) => (Math.atan2(g.world.neck[2] - g.world.hip[2], g.world.neck[0] - g.world.hip[0]) * 180) / Math.PI;
+    const resetMs = e.segmentDurationsMs.slice(0, 4).reduce((a, b) => a + b, 0);
+    let prevYaw = -Infinity, flights = 0, airborne = false;
+    for (const t of ticksOf(e)) {
+      const g = rig.chainGeometry(slug, rig.poseAtTime(e.frames.map((f) => f.joints), t, e.segmentDurationsMs).ph, BODY);
+      if (t <= resetMs) {
+        expect(yawOf(g)).toBeGreaterThanOrEqual(prevYaw - 1e-6);
+        prevYaw = yawOf(g);
+      }
+      const off = g.world.near.wrist[1] > 2.5 && g.world.far.wrist[1] > 2.5;
+      if (off && !airborne) flights += 1;
+      airborne = off;
+    }
+    expect(flights).toBe(1);
+    for (const frame of e.frames) expect(frame.caption).not.toMatch(/travel back|hop back|go back|way it came/i);
 
     // Soft landing (ph = 3): hands land a short step to one side, turning the body slightly, with soft bent elbows
     expect(land.world.near.wrist[1]).toBeLessThanOrEqual(2.5);

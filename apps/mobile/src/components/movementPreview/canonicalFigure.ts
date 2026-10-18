@@ -1352,8 +1352,10 @@ export interface ChainMovement {
    * many times larger than the figure the hand is drawn. Optional `zoom` and
    * `open` fix the panel expansion and finger opening across all phases when a
    * movement holds a constant finger grip (such as a clean-grip front rack).
+   * `hand: 'near'` keeps the panel on the near hand even when the far hand is
+   * higher (a one-arm lift whose free hand holds nothing).
    */
-  closeUp?: { at: ChainPoint; r: number; scale: number; zoom?: number; open?: number };
+  closeUp?: { at: ChainPoint; r: number; scale: number; zoom?: number; open?: number; hand?: 'near' };
 }
 
 const CHAIN_TRUNK = 24;
@@ -4955,7 +4957,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     ],
   },
   // Elevated Cable Rows: seated on an elevated platform/box atop the row
-  // bench with knees bent on the foot platform, pulling the V-handle from
+  // bench with the knees slightly bent on the foot platform, pulling the V-handle from
   // extended arms to the abdomen while keeping the torso stationary.
   'elevated-cable-rows': {
     root: 'hip',
@@ -4971,24 +4973,24 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     equipment: [
       { kind: 'frame', a: [NECK_ROW_PULLEY[0], 0.5], b: [NECK_ROW_PULLEY[0], 22] },
       { kind: 'pulley', at: NECK_ROW_PULLEY },
-      { kind: 'frame', a: [43.21, 9.56, CHAIN_HIP_HALF], b: [44.94, 19.41, CHAIN_HIP_HALF] },
-      { kind: 'frame', a: [43.21, 9.56, -CHAIN_HIP_HALF], b: [44.94, 19.41, -CHAIN_HIP_HALF] },
-      { kind: 'frame', a: [43.21, 9.56, CHAIN_HIP_HALF], b: [43.21, 9.56, -CHAIN_HIP_HALF] },
-      { kind: 'frame', a: [44.94, 19.41, CHAIN_HIP_HALF], b: [44.94, 19.41, -CHAIN_HIP_HALF] },
+      { kind: 'frame', a: [45.71, 9.56, CHAIN_HIP_HALF], b: [47.44, 19.41, CHAIN_HIP_HALF] },
+      { kind: 'frame', a: [45.71, 9.56, -CHAIN_HIP_HALF], b: [47.44, 19.41, -CHAIN_HIP_HALF] },
+      { kind: 'frame', a: [45.71, 9.56, CHAIN_HIP_HALF], b: [45.71, 9.56, -CHAIN_HIP_HALF] },
+      { kind: 'frame', a: [47.44, 19.41, CHAIN_HIP_HALF], b: [47.44, 19.41, -CHAIN_HIP_HALF] },
       { kind: 'box', a: [-8, 12.2], b: [4, 17.5] },
       ...chainFlatBench(-13, 6, NECK_ROW_SEAT_TOP),
     ],
     poses: [
       {
         at: [0, 17.5 + CHAIN_THIGH_HALF], trunk: 90,
-        thigh: 0, shin: 0, ankle: [41, 13], foot: 80,
+        thigh: 0, shin: 0, ankle: [43.5, 13], foot: 80,
         upperArm: 0, forearm: 0,
         wrist: [21.55, 35.0, V_HANDLE_HALF], farWrist: [21.55, 35.0, -V_HANDLE_HALF],
         palmYaw: 90, farPalmYaw: 90,
       },
       {
         at: [0, 17.5 + CHAIN_THIGH_HALF], trunk: 90,
-        thigh: 0, shin: 0, ankle: [41, 13], foot: 80,
+        thigh: 0, shin: 0, ankle: [43.5, 13], foot: 80,
         upperArm: 0, forearm: 0,
         wrist: [7.5, 31.0, V_HANDLE_HALF], farWrist: [7.5, 31.0, -V_HANDLE_HALF],
         palmYaw: 90, farPalmYaw: 90,
@@ -4998,7 +5000,8 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
   // Upright Cable Row: standing facing a low pulley with a narrow-grip
   // straight bar resting against the thighs on straight arms, pulling the
   // bar vertically toward the chin with the elbows leading high out to the
-  // sides above the hands.
+  // sides above the hands; at the top the hands are just under the chin with
+  // the elbows high and open.
   'upright-cable-row': {
     root: 'hip',
     view: 'oblique',
@@ -5025,8 +5028,8 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       {
         at: [0, CHAIN_STANDING_SHOULDER - CHAIN_TRUNK], trunk: 90, thigh: -90, shin: -90,
         upperArm: -90, forearm: -90,
-        wrist: [5.8, CHAIN_STANDING_SHOULDER - 1.8, 6.8],
-        farWrist: [5.8, CHAIN_STANDING_SHOULDER - 1.8, -6.8],
+        wrist: [6.9, CHAIN_STANDING_SHOULDER + 2.0, 6.8],
+        farWrist: [6.9, CHAIN_STANDING_SHOULDER + 2.0, -6.8],
         palmYaw: 180, farPalmYaw: 180,
       },
     ],
@@ -5171,14 +5174,15 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     farArmOver: true,
     nearArmOverHead: true,
     equipment: chainFlatBench(20, 66, CABLE_LYING_BENCH_TOP),
+    closeUp: { at: [80, 62], r: 12.5, scale: 4.2, zoom: 1 },
     poses: [
       {
         at: [62, CABLE_LYING_BENCH_TOP + CHAIN_BACK_HALF], trunk: 180, thigh: 0, shin: -90,
-        ankle: [84, CHAIN_ANKLE_HEIGHT], upperArm: [90, 0], forearm: [90, 0],
+        ankle: [84, CHAIN_ANKLE_HEIGHT], upperArm: [90, 0], forearm: [90, 0], palmYaw: 0, farPalmYaw: 0,
       },
       {
         at: [62, CABLE_LYING_BENCH_TOP + CHAIN_BACK_HALF], trunk: 180, thigh: 0, shin: -90,
-        ankle: [84, CHAIN_ANKLE_HEIGHT], upperArm: [90, 0], forearm: [195, 0],
+        ankle: [84, CHAIN_ANKLE_HEIGHT], upperArm: [90, 0], forearm: [195, 0], palmYaw: 0, farPalmYaw: 0,
       },
     ],
   },
@@ -5196,14 +5200,15 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     farArmOver: true,
     nearArmOverHead: true,
     equipment: chainInclineBench([52, CHAIN_SEATED_HIP], 128),
+    closeUp: { at: [82, 70], r: 12.5, scale: 4.2, zoom: 1 },
     poses: [
       {
         at: [52, CHAIN_SEATED_HIP], trunk: 128, head: 112, thigh: 0, shin: -90,
-        upperArm: [128, -4.5], forearm: [128, -4.5],
+        upperArm: [128, -4.5], forearm: [128, -4.5], palmYaw: 0, farPalmYaw: 0,
       },
       {
         at: [52, CHAIN_SEATED_HIP], trunk: 128, head: 112, thigh: 0, shin: -90,
-        upperArm: [128, -4.5], forearm: [222, -4.5],
+        upperArm: [128, -4.5], forearm: [222, -4.5], palmYaw: 0, farPalmYaw: 0,
       },
     ],
   },
@@ -5211,7 +5216,9 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
   // with the head and the backs of the upper arms resting on a bench placed
   // sideways in front of the machine, holding the straight bar with a narrow
   // overhand grip; straightens the elbows until the arms are level with the
-  // floor, pauses, and lets the elbows bend slowly back to the start.
+  // floor, pauses, and lets the elbows bend slowly back to the start. The head
+  // rests on the pad beside the upper arms, the bar sits in the hands beyond the
+  // wrists, and the pulley is high enough for the cable to pass over the head.
   'kneeling-cable-triceps-extension': {
     root: 'ankle',
     view: 'oblique',
@@ -5221,20 +5228,21 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     implement: 'cableBar',
     farArmOver: true,
     nearArmOverHead: true,
-    lines: [{ from: [8, 78], to: 'midGrip' }],
+    lines: [{ from: [8, 86], to: 'midGrip' }],
     equipment: [
-      { kind: 'frame', a: [8, 0.5], b: [8, 84] },
-      { kind: 'pulley', at: [8, 78] },
+      { kind: 'frame', a: [8, 0.5], b: [8, 92] },
+      { kind: 'pulley', at: [8, 86] },
       ...chainFlatBench(60, 79, 24.5),
     ],
+    closeUp: { at: [36, 72], r: 12.5, scale: 4.2, zoom: 1 },
     poses: [
       {
         at: [14, CHAIN_KNEELING_KNEE], thigh: -98, shin: 180, foot: 180,
-        trunk: 4, head: -4, upperArm: [0, -7], forearm: [104, -7],
+        trunk: 4, head: 38, upperArm: [0, -7], forearm: [104, -7], hand: [104, -7], palmYaw: 0, farPalmYaw: 0,
       },
       {
         at: [14, CHAIN_KNEELING_KNEE], thigh: -98, shin: 180, foot: 180,
-        trunk: 4, head: -4, upperArm: [0, -7], forearm: [0, -7],
+        trunk: 4, head: 38, upperArm: [0, -7], forearm: [0, -7], hand: [0, -7], palmYaw: 0, farPalmYaw: 0,
       },
     ],
   },
@@ -5261,7 +5269,10 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
   },
   // Dip: supported on parallel bars with straight arms and shoulders packed
   // down; bends the elbows and lowers the body until the upper arms are about
-  // parallel to the floor, then presses back up to straight arms.
+  // parallel to the floor, then presses back up to straight arms. Only the hands
+  // hold the body up, so as the trunk leans slightly forward at the bottom (the
+  // forearms tilt with the elbows a little behind the wrists) the hips and the
+  // bent legs swing back to keep the centre of mass over the hands.
   'dip': {
     root: 'hip',
     view: 'oblique',
@@ -5280,15 +5291,15 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     ],
     poses: [
       {
-        at: [-3.34, 50.93], trunk: 82, head: 86,
-        thigh: -92, shin: -168, foot: -160,
+        at: [-0.256, 50.695], trunk: 87, head: 88,
+        thigh: -92, shin: -136, foot: -128,
         upperArm: -90, forearm: -90,
         wrist: [0, 48 + CHAIN_HAND_REST, CHAIN_SHOULDER_HALF],
         farWrist: [0, 48 + CHAIN_HAND_REST, -CHAIN_SHOULDER_HALF],
       },
       {
-        at: [6.69, 38.92], trunk: 76, head: 84,
-        thigh: -92, shin: -168, foot: -160,
+        at: [1.581, 39.111], trunk: 71, head: 80,
+        thigh: -119, shin: -160, foot: -152,
         upperArm: 180, forearm: -90,
         wrist: [0, 48 + CHAIN_HAND_REST, CHAIN_SHOULDER_HALF],
         farWrist: [0, 48 + CHAIN_HAND_REST, -CHAIN_SHOULDER_HALF],
@@ -5334,7 +5345,8 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
   // apart and the body in one straight line; lowers the chest toward the floor,
   // pushes up fast enough for both hands to leave the floor and land a short
   // step to one side turning the body slightly, lands with soft bent elbows,
-  // and resets the straight arms and straight body line.
+  // and resets the straight arms and straight body line. The one hop goes one
+  // way round; the loop then returns to the start as a reset on the floor.
   'clock-push-up': (() => {
     const poseAt = (pitchDeg: number, trunkO: number, handO: number, handY: number): ChainPose => {
       const p = chainRad(pitchDeg), o = chainRad(trunkO), ho = chainRad(handO);
@@ -5380,10 +5392,11 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       poses: [
         poseAt(16.65, -8, -8, 2.35),
         poseAt(7.0, -8, -8, 2.35),
-        poseAt(20.6, 0, 0, 8.4),
+        poseAt(23.0, 0, 0, 11.4),
         poseAt(14.5, 8, 8, 2.35),
         poseAt(16.65, 8, 8, 2.35),
-        poseAt(20.6, 0, 0, 8.4),
+        // The loop's return to the start, on the floor with the elbows a little soft.
+        poseAt(14.5, 0, 0, 2.35),
       ],
     };
   })(),
@@ -5410,26 +5423,27 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     ],
     poses: [
       {
-        at: [0, 40.5], trunk: 24, head: 30,
+        at: [0, 44.5], trunk: 24, head: 30,
         thigh: -90, shin: -90, ankle: [9, CHAIN_ANKLE_HEIGHT],
         upperArm: -90, forearm: -90,
-        wrist: [21.60, 26.80, V_HANDLE_HALF],
-        farWrist: [21.60, 26.80, -V_HANDLE_HALF],
+        wrist: [21.60, 30.80, V_HANDLE_HALF],
+        farWrist: [21.60, 30.80, -V_HANDLE_HALF],
         palmYaw: 90, farPalmYaw: 90,
       },
       {
-        at: [0, 40.5], trunk: 24, head: 30,
+        at: [0, 44.5], trunk: 24, head: 30,
         thigh: -90, shin: -90, ankle: [9, CHAIN_ANKLE_HEIGHT],
         upperArm: -90, forearm: -90,
-        wrist: [13.47, 36.63, V_HANDLE_HALF],
-        farWrist: [13.47, 36.63, -V_HANDLE_HALF],
+        wrist: [13.47, 40.63, V_HANDLE_HALF],
+        farWrist: [13.47, 40.63, -V_HANDLE_HALF],
         palmYaw: 90, farPalmYaw: 90,
       },
     ],
   },
   // Box Squat with Bands (id 153): parallel-height box behind the athlete
   // inside a power rack with downward bands looped from each barbell sleeve to
-  // floor anchors on the rack base; sits hips back and knees out onto the box
+  // floor anchors on the rack base; from a shoulder-width to slightly wider
+  // stance, sits hips back and knees out onto the box
   // with vertical shins, pauses seated on the box without bouncing, and drives
   // upward through the heels against the bands.
   'box-squat-with-bands': {
@@ -5439,7 +5453,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     originX: 50,
     implement: 'bar',
     armsFollowTrunk: true,
-    footSpread: 9.2,
+    footSpread: 3.6,
     lines: [
       { from: [-4, 1.2, 16.5], to: 'nearBarEnd' },
       { from: [-4, 1.2, -16.5], to: 'farBarEnd', depth: 'far' },
@@ -5457,7 +5471,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     ],
     poses: [
       {
-        at: [1.8, 45.62], trunk: 86, head: 90, thigh: -90, shin: -90,
+        at: [1.8, 46.43], trunk: 86, head: 90, thigh: -90, shin: -90,
         ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 10,
         upperArm: [-102, 22], forearm: [88, 12],
       },
@@ -5526,7 +5540,9 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
   // with arms crossed to grasp the bar and upper arms slightly above parallel
   // to the floor; lowers slowly with a straight upright back and knees in line
   // with the toes until the glutes touch the bench, then drives right back up
-  // through the heels without sitting back and relaxing on the bench.
+  // through the heels without sitting back and relaxing on the bench: the
+  // knees travel forward over the toes so the bar and the centre of mass stay
+  // over the mid-foot at the light touch.
   'front-barbell-squat-to-a-bench': {
     root: 'hip',
     view: 'oblique',
@@ -5536,7 +5552,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     armsFollowTrunk: true,
     footSpread: 4.8,
     equipment: [
-      ...chainFlatBench(-34, -10, 20.2),
+      ...chainFlatBench(-30, -5, 20.2),
       { kind: 'frame', a: [14, 0.5, 16], b: [14, 78, 16] },
       { kind: 'frame', a: [14, 0.5, -16], b: [14, 78, -16] },
       { kind: 'frame', a: [14, 66, 16], b: [10.5, 66, 16] },
@@ -5549,7 +5565,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
         upperArm: [9, -28], forearm: [-168, -42],
       },
       {
-        at: [-10.8, 23.032], trunk: 72, head: 90, thigh: -90, shin: -90,
+        at: [-6.8, 23.032], trunk: 71, head: 90, thigh: -90, shin: -90,
         ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 16,
         upperArm: [27, -28], forearm: [-150, -42],
       },
@@ -5558,7 +5574,8 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
   // One-Arm Kettlebell Swings (id 250): feet slightly wider than the hips,
   // kettlebell held in one hand with an overhand grip on a long straight arm;
   // hikes the bell back between the upper thighs in a flat-backed hip hinge
-  // with the free arm swinging back beside the hip, snaps the hips and knees
+  // with soft knees (not a squat) and the free arm swinging back beside the
+  // hip, the close-up staying on the working hand, snaps the hips and knees
   // forward to stand tall as the bell floats to shoulder height, and stays
   // tall until the bell drops back to the thighs to hinge into the next rep.
   'one-arm-kettlebell-swings': {
@@ -5569,11 +5586,12 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     implement: 'kettlebell',
     farArmOver: true,
     footSpread: 3.6,
+    closeUp: { at: [-30, 66], r: 12.5, scale: 4.2, zoom: 1, hand: 'near' },
     poses: [
       {
-        at: [-8.5, 39.8], trunk: 30, head: 36, thigh: -90, shin: -90,
+        at: [-8.5, 44.7], trunk: 30, head: 36, thigh: -90, shin: -90,
         ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 12,
-        upperArm: [-128, -12], forearm: [-128, -12],
+        upperArm: [-135, -12], forearm: [-135, -12],
         farUpperArm: [-158, 8], farForearm: [-150, 8],
         palmYaw: 180, farPalmYaw: 90,
       },
@@ -6176,7 +6194,23 @@ function layoutChainExtras(
         const innerPalm = line([cx + pDx * 0.9, cy - 2.4], [cx + pDx * 0.9, cy + 1.2], 3.6, 'textMid', 1);
         groups.front.push(line(panel.hand ?? figure.grip.near, panel.centre, 0.8, 'textLow', 0.75));
         groups.front.push({ kind: 'circle', cx, cy, r: panel.r, fill: 'ink1', stroke: 'textLow', strokeWidth: 1.2, opacity: 1 });
-        if (kind === 'cableBar') {
+        if ((kind === 'bar' || kind === 'ez' || kind === 'cableBar') && facing) {
+          // A bar in a hand turned down, palm toward the viewer: the light palm
+          // behind the bar, drawn along its projected direction, and the four
+          // fingers wrapped over it, as in the upright hand turned over.
+          const bHalf = Math.max(2.0, Math.abs(hDx) * 8.5);
+          const barLine: FigurePrim = line([cx - bHalf, cy + 1.8], [cx + bHalf, cy + 1.8], 2.2, 'textMid', 1);
+          const palm: FigurePrim = { ...line([cx, cy - 3.0], [cx, cy + 0.4], 7.0, 'textHi', 1), stroke: 'ink1', strokeWidth: 0.6 };
+          const wrapped: FigurePrim[] = [-2.55, -0.85, 0.85, 2.55].map((off) => ({
+            ...line([cx + off * fSpread, cy + 4.1], [cx + off * fSpread, cy - 0.1], 1.7, 'textHi', 1),
+            stroke: 'ink1', strokeWidth: 0.5,
+          }));
+          const downThumb: FigurePrim = {
+            ...line([cx + thumbSide * 2.2, cy - 1.4], [cx + thumbSide * 3.8 + pDx * 1.4, cy + 1.2], 2.0, 'textHi', 1),
+            stroke: 'ink1', strokeWidth: 0.6,
+          };
+          groups.front.push(wristBase, palm, barLine, ...wrapped, downThumb);
+        } else if (kind === 'cableBar') {
           const barShaft: FigurePrim = { ...line([cx - 7.6, cy + 1.8], [cx + 7.6, cy + 1.8], 2.2, 'textMid', 1), stroke: 'ink1', strokeWidth: 0.6 };
           const cableStub: FigurePrim = line([cx, cy + 1.8], [cx, cy + 9.2], 1.4, 'textMid', 1);
           const overhandFingers: FigurePrim[] = [-2.1, -0.7, 0.7, 2.1].map((off) => ({
@@ -6188,12 +6222,33 @@ function layoutChainExtras(
             stroke: 'ink1', strokeWidth: 0.6,
           };
           groups.front.push(cableStub, barShaft, innerPalm, wristBase, dorsal, overhandThumb, ...overhandFingers);
+        } else if (kind === 'kettlebell' || kind === 'kettlebells') {
+          // A kettlebell hanging from an overhand hand: the handle across the
+          // panel along its projected direction, the bell under it, and the back
+          // of the hand (or the palm) with the fingers wrapped over the handle.
+          const hHalf = Math.max(2.0, Math.abs(hDx) * 5.4);
+          const handle: FigurePrim = { ...line([cx - hHalf, cy + 1.8], [cx + hHalf, cy + 1.8], 2.2, 'textHi', 1), stroke: 'ink1', strokeWidth: 0.6 };
+          const globe: FigurePrim = { kind: 'circle', cx, cy: cy + 8.6, r: 5.2, fill: 'textMid', stroke: 'ink1', strokeWidth: 1.0, opacity: 1 };
+          const hand: FigurePrim = { ...line([cx, cy - 3.0], [cx, cy + 0.6], 7.0, facing ? 'textHi' : 'textMid', 1), stroke: 'ink1', strokeWidth: 0.6 };
+          const wrist: FigurePrim = { ...wristBase, color: facing ? 'textHi' : 'textMid' };
+          const overFingers: FigurePrim[] = [-2.55, -0.85, 0.85, 2.55].map((off) => ({
+            ...line([cx + off * fSpread, cy + 0.2], [cx + off * fSpread, cy + 3.4], 1.6, 'textHi', 1),
+            stroke: 'ink1', strokeWidth: 0.5,
+          }));
+          groups.front.push(globe, handle, wrist, hand, ...overFingers);
         } else {
-          const hHalf = 5.4;
+          // The dumbbell's handle runs along its real projected direction, so a
+          // palm facing the torso (handle head to foot) is seen nearly end on and
+          // its plates show their faces; a palm facing back shows the handle across.
+          const hHalf = Math.max(0.9, Math.abs(hDx) * 5.4);
           const dirSign = hDx >= 0 ? 1 : -1;
           const farPlateX = cx - dirSign * hHalf, nearPlateX = cx + dirSign * hHalf;
-          const farPlate: FigurePrim = { ...line([farPlateX, cy - 1.6], [farPlateX, cy + 5.2], 3.2, 'textHi', 1), stroke: 'ink1', strokeWidth: 0.8 };
-          const nearPlate: FigurePrim = { ...line([nearPlateX, cy - 1.6], [nearPlateX, cy + 5.2], 3.2, 'textHi', 1), stroke: 'ink1', strokeWidth: 0.8 };
+          const faceHalf = 3.4 * Math.sqrt(Math.max(0, 1 - hDx * hDx)) + 0.8 * Math.abs(hDx);
+          const plateAt = (x: number): FigurePrim => ({
+            kind: 'rect', x: x - faceHalf, y: cy - 1.6, w: 2 * faceHalf, h: 6.8, rx: Math.min(faceHalf, 3.4),
+            fill: 'textHi', stroke: 'ink1', strokeWidth: 0.8, opacity: 1,
+          });
+          const farPlate = plateAt(farPlateX), nearPlate = plateAt(nearPlateX);
           const shaft: FigurePrim = line([cx - hHalf, cy + 1.8], [cx + hHalf, cy + 1.8], 2.2, 'textMid', 1);
           const thumb: FigurePrim = {
             ...line([cx + dirSign * 2.0, cy - 1.0], [cx + dirSign * 3.2, cy + 1.6], 2.0, 'textHi', 1),
@@ -6229,6 +6284,28 @@ function layoutChainExtras(
             groups.front.push(globe, postL, postR, wristBase, dorsal, innerPalm, handleBar, ...fingers, thumb);
           } else {
             groups.front.push(innerPalm, wristBase, dorsal, postL, postR, handleBar, ...fingers, thumb, globe);
+          }
+        } else if (kind === 'bar' || kind === 'ez' || kind === 'cableBar') {
+          // A bar in an upright hand, drawn along its projected direction, with
+          // the palm and the back of the hand told apart as for a dumbbell: a
+          // light palm behind the bar with four fingers wrapped over it, or a
+          // darker back of the hand over the bar with the knuckles above it.
+          const bHalf = Math.max(2.0, Math.abs(hDx) * 8.5);
+          const barLine: FigurePrim = line([cx - bHalf, cy - 1.8], [cx + bHalf, cy - 1.8], 2.2, 'textMid', 1);
+          const barFingers = [-2.55, -0.85, 0.85, 2.55];
+          if (facing) {
+            const palm: FigurePrim = { ...line([cx, cy + 3.0], [cx, cy - 0.4], 7.0, 'textHi', 1), stroke: 'ink1', strokeWidth: 0.6 };
+            const wrapped: FigurePrim[] = barFingers.map((off) => ({
+              ...line([cx + off * fSpread, cy - 4.1], [cx + off * fSpread, cy + 0.1], 1.7, 'textHi', 1),
+              stroke: 'ink1', strokeWidth: 0.5,
+            }));
+            groups.front.push(wristBase, palm, barLine, ...wrapped, thumb);
+          } else {
+            const back: FigurePrim = { ...line([cx, cy + 3.0], [cx, cy - 2.4], 7.0, 'textMid', 1), stroke: 'ink1', strokeWidth: 0.6 };
+            const knuckles: FigurePrim[] = barFingers.map((off) => ({
+              kind: 'circle', cx: cx + off * fSpread, cy: cy - 3.9, r: 1.05, fill: 'textHi', stroke: 'ink1', strokeWidth: 0.45, opacity: 1,
+            }));
+            groups.front.push(barLine, { ...wristBase, color: 'textMid' }, back, thumb, ...knuckles);
           }
         } else {
           const hHalf = Math.max(1.8, Math.abs(hDx) * 6.8);
@@ -6397,7 +6474,8 @@ export function handCloseUp(figure: ReturnType<typeof chainGeometry>) {
   const zoom = closeUp.zoom ?? Math.max(0, Math.min(1, figure.ph));
   const open = closeUp.open ?? Math.max(0, Math.min(1, figure.ph - 1));
   if (zoom < 1e-6) return null;
-  const useFar = figure.world.far.palmDir !== undefined
+  const useFar = closeUp.hand !== 'near'
+    && figure.world.far.palmDir !== undefined
     && figure.world.far.handleAxis !== undefined
     && figure.world.far.hold[1] > figure.world.near.hold[1] + 1;
   const hand = useFar ? figure.grip.far : figure.grip.near;

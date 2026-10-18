@@ -214,10 +214,11 @@ describe('MOV-A09 rows and rear raises: source-bound geometry & physics invarian
     // Knees slightly bent (both near and far legs)
     const nearKneeDeg = deg3D(reach.world.near.hipJoint, reach.world.near.knee, reach.world.near.ankle);
     const farKneeDeg = deg3D(reach.world.far.hipJoint, reach.world.far.knee, reach.world.far.ankle);
-    expect(nearKneeDeg).toBeGreaterThanOrEqual(130);
-    expect(nearKneeDeg).toBeLessThanOrEqual(168);
-    expect(farKneeDeg).toBeGreaterThanOrEqual(130);
-    expect(farKneeDeg).toBeLessThanOrEqual(168);
+    // "slightly bent": about 160 to 170 degrees, not a clearly bent knee
+    expect(nearKneeDeg).toBeGreaterThanOrEqual(158);
+    expect(nearKneeDeg).toBeLessThanOrEqual(172);
+    expect(farKneeDeg).toBeGreaterThanOrEqual(158);
+    expect(farKneeDeg).toBeLessThanOrEqual(172);
 
     // Single short rigid V-handle held by both hands (palms facing), connected to ONE cable from the pulley
     expect(reach.movement.implement).toBe('vHandle');
@@ -346,8 +347,16 @@ describe('MOV-A09 rows and rear raises: source-bound geometry & physics invarian
     expect(deg3D(bottom.world.near.shoulder, bottom.world.near.elbow, bottom.world.near.wrist)).toBeGreaterThanOrEqual(172);
     expect(deg3D(bottom.world.far.shoulder, bottom.world.far.elbow, bottom.world.far.wrist)).toBeGreaterThanOrEqual(172);
 
-    // Lifted close to the body toward the chin, elbows up and out and higher than the hands
-    expect(top.world.neck[1] - top.world.near.hold[1]).toBeLessThanOrEqual(2.0);
+    // Lifted close to the body toward the chin, elbows up and out and higher than the hands:
+    // the hands come within 2.5 below the chin (the underside of the head, its
+    // centre less its radius) and no higher than it, and the elbows stay open to
+    // at least 35 degrees, not folded shut
+    const chinY = top.world.head[1] - BODY.hr;
+    for (const s of [top.world.near, top.world.far]) {
+      expect(s.hold[1]).toBeGreaterThanOrEqual(chinY - 2.5);
+      expect(s.hold[1]).toBeLessThanOrEqual(chinY);
+      expect(deg3D(s.shoulder, s.elbow, s.wrist)).toBeGreaterThanOrEqual(35);
+    }
     expect(top.world.near.elbow[1]).toBeGreaterThan(top.world.near.wrist[1] + 4.0);
     expect(top.world.far.elbow[1]).toBeGreaterThan(top.world.far.wrist[1] + 4.0);
     expect(top.joints.el[1]).toBeLessThan(top.joints.wr[1] - 3.0);
@@ -470,6 +479,29 @@ describe('MOV-A09 rows and rear raises: source-bound geometry & physics invarian
       expect(topPanel).not.toBeNull();
       expect(lowPanel.palmYaw).toBe(90);
       expect(topPanel.palmYaw).toBe(90);
+
+      // What the close-up DRAWS: the handle runs along its real projected
+      // direction. With the palm toward the torso the handle runs head-to-foot,
+      // which the panel sees nearly end on: the drawn shaft is as long as the
+      // projection makes it (5.4 * |handleScreenDir x| each side, here under 2),
+      // horizontal like its projected direction, and the plates show their faces
+      // (wide rounded plates rather than thin edges)
+      for (const [frame, panel] of [[entry.frames[0], lowPanel], [entry.frames.find((f) => f.joints.ph === 1), topPanel]]) {
+        const prims = rig.layoutCanonicalFigure(frame.joints, { ...entry, body: BODY });
+        const discIdx = prims.findIndex((pr) => pr.kind === 'circle' && pr.fill === 'ink1' && pr.stroke === 'textLow'
+          && Math.abs(pr.cx - panel.centre[0]) < 1e-6 && Math.abs(pr.cy - panel.centre[1]) < 1e-6);
+        expect(discIdx).toBeGreaterThanOrEqual(0);
+        const inside = prims.slice(discIdx + 1).filter((pr) => pr.kind !== 'circle' || Math.hypot(pr.cx - panel.centre[0], pr.cy - panel.centre[1]) < panel.r);
+        const shaft = inside.find((pr) => pr.kind === 'bone' && pr.color === 'textMid' && Math.abs(pr.w - 2.2) < 1e-6);
+        expect(shaft).toBeDefined();
+        const half = Math.hypot(shaft.x2 - shaft.x1, shaft.y2 - shaft.y1) / 2;
+        expect(half).toBeCloseTo(5.4 * Math.abs(panel.handleScreenDir[0]), 6);
+        expect(half).toBeLessThan(2.0);
+        expect(Math.abs(shaft.y2 - shaft.y1)).toBeLessThan(1e-6);
+        const plates = inside.filter((pr) => pr.kind === 'rect' && pr.fill === 'textHi');
+        expect(plates).toHaveLength(2);
+        for (const plate of plates) expect(plate.w).toBeGreaterThan(5.5);
+      }
 
       // At the top, elbows reach shoulder height and arms are roughly parallel to the floor
       expect(Math.abs(top.world.near.elbow[1] - top.world.near.shoulder[1])).toBeLessThanOrEqual(1.0);
