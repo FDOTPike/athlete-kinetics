@@ -208,10 +208,19 @@ describe('145 Bent Over Two-Arm Long Bar Row', () => {
 });
 
 describe('153 Box Squat with Bands', () => {
-  test('squats inside a power rack with downward bands on the bar sleeves, sits back onto a parallel box with vertical shins and a seated pause, then drives up', () => {
-    const { movement, ticks, keyframeTimes, segments, at } = samplerFor(153);
+  test('squats inside a power rack with downward bands on the bar sleeves, sits back onto a parallel box with shins approximately vertical, feet planted, and trunk braced through the descent, pause, and drive up', () => {
+    const { entry, movement, ticks, keyframeTimes, segments, at } = samplerFor(153);
     expect(movement.implement).toBe('bar');
     expect(movement.lines).toHaveLength(2);
+
+    // MOV-A15-R1 text requirements: trunk braced through descent/pause/drive, shins approximately vertical with feet planted, stance width in instructions, whole-foot pressure with heel cue.
+    expect(entry.instructions).toMatch(/shoulder-width to slightly wider stance/);
+    expect(entry.instructions).toMatch(/shins approximately vertical, feet planted/);
+    expect(entry.instructions).not.toMatch(/perpendicular/);
+    expect(entry.instructions).toMatch(/whole-foot pressure/);
+    expect(entry.cues).toMatch(/trunk braced through the descent, the seated pause and the drive up/);
+    expect(entry.cues).toMatch(/shins approximately vertical, feet planted/);
+    expect(entry.cues).toMatch(/whole foot/);
 
     const boxSpec = movement.equipment.find((e) => e.kind === 'box');
     expect(boxSpec).toBeDefined();
@@ -240,7 +249,7 @@ describe('153 Box Squat with Bands', () => {
     );
     expect(standKneeDeg).toBeGreaterThanOrEqual(172);
 
-    // Seated pose on the box (keyframes 2 and 3): hips sit back onto the box, thighs parallel, shins perpendicular.
+    // Seated pose on the box (keyframes 2 and 3): hips sit back onto the box, thighs parallel, shins approximately vertical.
     const seated1 = at(keyframeTimes[1]);
     const seated2 = at(keyframeTimes[2]);
     expect(seated1.figure.world.hip[0]).toBeLessThan(start.figure.world.hip[0] - 16);
@@ -248,7 +257,7 @@ describe('153 Box Squat with Bands', () => {
     expect(seated1.figure.world.hip[0]).toBeLessThanOrEqual(boxMaxX - 2);
     // Painted contact of the glutes/thigh underside with the top of the box.
     expect(seated1.figure.world.hip[1] - THIGH_HALF).toBeCloseTo(boxTopWorld, 1);
-    // Thighs parallel to the floor and shins vertical.
+    // Thighs parallel to the floor and shins approximately vertical.
     expect(Math.abs(seated1.figure.world.near.knee[1] - seated1.figure.world.near.hipJoint[1])).toBeLessThan(3.0);
     expect(Math.abs(seated1.figure.world.near.knee[0] - seated1.figure.world.near.ankle[0])).toBeLessThan(3.5);
     // Knees pushed out wider at the bottom than at standing.
@@ -269,20 +278,61 @@ describe('153 Box Squat with Bands', () => {
 });
 
 describe('165 Calf Raise On A Dumbbell', () => {
-  test('stands with the ball of one foot on a floor dumbbell handle, the other foot lifted clear, both hands on a sturdy support, and rises from a heel stretch into full extension', () => {
-    const { movement, ticks, keyframeTimes, segments, at } = samplerFor(165);
-    // Dumbbell on the floor (handle + two plates) and sturdy support in front.
+  test('teaches and draws a flat-bottomed hexagonal dumbbell that cannot roll and stays stationary on the floor while the ankle lowers and rises', () => {
+    const { entry, movement, ticks, keyframeTimes, segments, at } = samplerFor(165);
+
+    // MOV-A15-R1 text requirements: non-rolling dumbbell (hexagonal heads, or wedged), stability check, fixed support, dumbbell stays still while ankle moves.
+    expect(entry.instructions).toMatch(/dumbbell that cannot roll \(hexagonal heads, or wedged\)/);
+    expect(entry.instructions).toMatch(/check it is stable before stepping on/);
+    expect(entry.instructions).toMatch(/support that cannot move/);
+    expect(entry.instructions).toMatch(/dumbbell stays still/);
+    expect(entry.cues).toMatch(/Use a dumbbell that cannot roll, check it is stable before stepping on, and hold a support that cannot move/);
+    expect(entry.cues).toMatch(/Keep the dumbbell still while the ankle lowers and rises/);
+
+    // Dumbbell on the floor: handle slab + two flat-bottomed hexagonal heads (each head has 6 hexagonal perimeter edges + a flat-bottomed core box).
     const boxPlates = movement.equipment.filter((e) => e.kind === 'box');
     const handleSlabs = movement.equipment.filter((e) => e.kind === 'slab');
+    const hexEdges = movement.equipment.filter(
+      (e) => e.kind === 'frame' && Math.max(e.a[1], e.b[1]) <= 7.0 && (e.a[2] === 0.6 || e.a[2] === 13.0),
+    );
     expect(boxPlates.length).toBeGreaterThanOrEqual(2);
     expect(handleSlabs.length).toBeGreaterThanOrEqual(2);
+    expect(hexEdges.length).toBe(12);
+
+    // Each hexagonal head has a flat bottom edge on the floor (y = 0.5), a flat top edge (y = 6.1), and angled side facets reaching wider than the flat top/bottom edges.
+    for (const z of [0.6, 13.0]) {
+      const headEdges = hexEdges.filter((e) => e.a[2] === z && e.b[2] === z);
+      expect(headEdges).toHaveLength(6);
+      const flatBottom = headEdges.find((e) => e.a[1] === 0.5 && e.b[1] === 0.5);
+      const flatTop = headEdges.find((e) => e.a[1] === 6.1 && e.b[1] === 6.1);
+      const angledSides = headEdges.filter((e) => e.a[1] !== e.b[1]);
+      expect(flatBottom).toBeDefined();
+      expect(flatTop).toBeDefined();
+      expect(angledSides).toHaveLength(4);
+      const flatHalfWidth = Math.max(Math.abs(flatBottom.a[0]), Math.abs(flatBottom.b[0]));
+      const apexHalfWidth = Math.max(...angledSides.flatMap((e) => [Math.abs(e.a[0]), Math.abs(e.b[0])]));
+      expect(apexHalfWidth).toBeGreaterThan(flatHalfWidth + 1.0);
+    }
 
     const start = at(0);
     const gripSpan3D = distance(start.figure.world.near.hold, start.figure.world.far.hold);
+    // Capture the rendered floor-dumbbell primitives at t = 0 and verify they do not move on any tick.
+    const dumbbellPrimsOf = (prims) =>
+      prims.filter(
+        (p) =>
+          p.kind === 'rect' ||
+          (p.kind === 'bone' && p.color === 'textMid' && p.w === 4 && Math.max(p.y1, p.y2) > FLOOR - 8) ||
+          (p.kind === 'bone' && p.color === 'textLow' && p.w === 1.6 && Math.min(p.y1, p.y2) > FLOOR - 8),
+      );
+    const startDumbbellPrims = dumbbellPrimsOf(start.prims);
+    expect(startDumbbellPrims.length).toBe(15); // 2 hex-head core rects + 1 handle slab + 12 hex-head facet bones
 
     for (const t of ticks) {
-      const { figure } = at(t);
+      const { figure, prims } = at(t);
       const w = figure.world;
+      // Stationary dumbbell: every rendered primitive of the floor dumbbell is byte-identical across all ticks.
+      const tickDumbbellPrims = dumbbellPrimsOf(prims);
+      expect(tickDumbbellPrims).toEqual(startDumbbellPrims);
       // Working knee stays straight (>= 172 deg) throughout the cycle.
       const workingKneeDeg = jointAngleDeg(w.near.hipJoint, w.near.knee, w.near.ankle);
       expect(workingKneeDeg).toBeGreaterThanOrEqual(172);
@@ -313,9 +363,15 @@ describe('165 Calf Raise On A Dumbbell', () => {
 });
 
 describe('205 Front Barbell Squat To A Bench', () => {
-  test('holds the barbell on the front shoulders with crossed forearms and elbows high, lowers with a straight upright back and knees in line with the toes to a light touch on the bench, and stands right back up', () => {
-    const { movement, ticks, keyframeTimes, at } = samplerFor(205);
+  test('holds the barbell on the front shoulders with crossed forearms and elbows high, lowers with a straight upright back and knees tracking with the toes over a whole foot to a light touch at about thighs parallel, and stands right back up', () => {
+    const { entry, movement, ticks, keyframeTimes, at } = samplerFor(205);
     expect(movement.implement).toBe('bar');
+
+    // MOV-A15-R1 text requirements: bench height carried into instructions and knees tracking with toes over a whole foot.
+    expect(entry.instructions).toContain('a stable bench set so the glutes touch it lightly at about thighs parallel');
+    expect(entry.instructions).toMatch(/knees tracking with the toes over a whole foot/);
+    expect(entry.cues).toMatch(/knees tracking with the toes over a whole foot/);
+    expect(entry.cues).toMatch(/about thighs parallel/);
 
     // Flat bench slab behind the lifter at parallel height.
     const benchSlab = movement.equipment.find((e) => e.kind === 'slab');
@@ -370,9 +426,16 @@ describe('205 Front Barbell Squat To A Bench', () => {
 });
 
 describe('250 One-Arm Kettlebell Swings', () => {
-  test('hikes the kettlebell back between the upper thighs in a flat-backed hip hinge with the free arm back, snaps the hips to float the bell to shoulder height on a long straight arm, and hinges only as the bell drops back', () => {
-    const { movement, ticks, keyframeTimes, segments, at } = samplerFor(250);
+  test('starts from the floor a short step ahead of the feet, hikes the kettlebell back between the thighs, snaps the hips to chest to shoulder height with the arm following the hip drive, and parks it under control before changing arms', () => {
+    const { entry, movement, ticks, keyframeTimes, segments, at } = samplerFor(250);
     expect(movement.implement).toBe('kettlebell');
+
+    // MOV-A15-R1 text requirements: floor start a short step ahead, identical endpoint phrase in instructions and cues, and controlled park before changing arms in the last caption.
+    expect(entry.instructions).toMatch(/on the floor a short step ahead of your feet/);
+    expect(entry.instructions).toContain('chest to shoulder height, the arm following the hip drive');
+    expect(entry.cues).toContain('chest to shoulder height, the arm following the hip drive');
+    expect(entry.instructions).toMatch(/park the bell under control on the floor ahead of your feet at the end of the set before changing arms/);
+    expect(entry.frames.at(-1).caption).toMatch(/park the bell under control on the floor ahead of your feet at the end of the set before changing arms/);
 
     const hike = at(0);
     const passUp = at(keyframeTimes[1]);

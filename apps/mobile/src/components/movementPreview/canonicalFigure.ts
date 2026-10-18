@@ -5456,12 +5456,12 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       },
     ],
   },
-  // Calf Raise On A Dumbbell (id 165): dumbbell on the floor in front of a
-  // sturdy bar/upright support held with both hands for balance; stands with
-  // the ball of one foot on the dumbbell handle and the other foot lifted
-  // clear of the floor, lowers the working heel toward the floor with a
-  // straight knee for a full stretch, and rises over the handle into full
-  // calf extension for a one-second hold.
+  // Calf Raise On A Dumbbell (id 165): non-rolling dumbbell with flat-bottomed
+  // hexagonal heads on the floor in front of a sturdy support that cannot move,
+  // held with both hands for balance; stands with the ball of one foot on the
+  // dumbbell handle and the other foot lifted clear of the floor, keeps the
+  // dumbbell still and the working knee straight to lower the heel into a
+  // stretch, and rises into full calf extension for a one-second hold.
   'calf-raise-on-a-dumbbell': {
     root: 'toe',
     view: 'oblique',
@@ -5474,9 +5474,21 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       { kind: 'frame', a: [14, 0.5, -12], b: [14, 76, -12] },
       { kind: 'frame', a: [14, 0.5, 12], b: [14, 76, 12] },
       { kind: 'slab', a: [14, 60, -12], b: [14, 60, 12] },
-      { kind: 'box', a: [-1.1, 0.5, 0.6], b: [1.1, 6.8, 0.6] },
+      { kind: 'box', a: [-1.8, 0.5, 0.6], b: [1.8, 6.1, 0.6] },
+      { kind: 'frame', a: [-1.8, 0.5, 0.6], b: [1.8, 0.5, 0.6] },
+      { kind: 'frame', a: [1.8, 0.5, 0.6], b: [3.2, 3.3, 0.6] },
+      { kind: 'frame', a: [3.2, 3.3, 0.6], b: [1.8, 6.1, 0.6] },
+      { kind: 'frame', a: [1.8, 6.1, 0.6], b: [-1.8, 6.1, 0.6] },
+      { kind: 'frame', a: [-1.8, 6.1, 0.6], b: [-3.2, 3.3, 0.6] },
+      { kind: 'frame', a: [-3.2, 3.3, 0.6], b: [-1.8, 0.5, 0.6] },
       { kind: 'slab', a: [0, 2.6, 1.2], b: [0, 2.6, 12.4] },
-      { kind: 'box', a: [-1.1, 0.5, 13.0], b: [1.1, 6.8, 13.0] },
+      { kind: 'box', a: [-1.8, 0.5, 13.0], b: [1.8, 6.1, 13.0] },
+      { kind: 'frame', a: [-1.8, 0.5, 13.0], b: [1.8, 0.5, 13.0] },
+      { kind: 'frame', a: [1.8, 0.5, 13.0], b: [3.2, 3.3, 13.0] },
+      { kind: 'frame', a: [3.2, 3.3, 13.0], b: [1.8, 6.1, 13.0] },
+      { kind: 'frame', a: [1.8, 6.1, 13.0], b: [-1.8, 6.1, 13.0] },
+      { kind: 'frame', a: [-1.8, 6.1, 13.0], b: [-3.2, 3.3, 13.0] },
+      { kind: 'frame', a: [-3.2, 3.3, 13.0], b: [-1.8, 0.5, 13.0] },
     ],
     poses: [
       {
