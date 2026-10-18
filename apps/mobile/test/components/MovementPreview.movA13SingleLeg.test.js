@@ -296,7 +296,7 @@ describe('MOV-A13 single-leg batch (18, 36, 56, 136, 194, 239, 67, 96)', () => {
     expect(farBack.world.far.ankle[0]).toBeLessThan(-15);
     expect(farBack.world.near.ankle[1]).toBeCloseTo(6 + ANKLE_Y, 6);
     expect(farBack.world.far.knee[1]).toBeCloseTo(KNEELING_KNEE_Y, 2);
-    const tFarBot = entry.segmentDurationsMs.slice(0, 4).reduce((a, b) => a + b, 0);
+    const tFarBot = entry.segmentDurationsMs.slice(0, 3).reduce((a, b) => a + b, 0);
     const sFarBot = at(tFarBot);
     const farThighBone = sFarBot.prims.find(
       (p) => p.kind === 'bone' && p.x1 === sFarBot.joints.fLeg[0] && p.y1 === sFarBot.joints.fLeg[1] && p.x2 === sFarBot.joints.kf[0] && p.y2 === sFarBot.joints.kf[1],
@@ -451,10 +451,213 @@ describe('MOV-A13 single-leg batch (18, 36, 56, 136, 194, 239, 67, 96)', () => {
       expect(deg3D(w.near.hipJoint, w.near.knee, w.near.ankle)).toBeGreaterThanOrEqual(172);
       expect(deg3D(w.far.hipJoint, w.far.knee, w.far.ankle)).toBeGreaterThanOrEqual(172);
       expect(s.figure.angles.trunk[0]).toBeGreaterThanOrEqual(88);
+      // MOV-S3-R3: "place the balls of the feet on a stable low block with the heels free".
+      // The only support is the part of the foot on the block, from the block's rear edge
+      // to the ball of the foot; the loaded centre of mass (and the unloaded one) stays over it.
       const loadPt = lerp3(w.near.hold, w.far.hold, 0.5);
       const comWithBar = centreOfMass3D(w, loadPt, 0.40);
-      expect(comWithBar[0]).toBeGreaterThanOrEqual(w.near.ankle[0] - 1.5);
-      expect(comWithBar[0]).toBeLessThanOrEqual(w.near.toe[0] + 1.5);
+      const comUnloaded = centreOfMass3D(w, null, 0);
+      for (const com of [comWithBar, comUnloaded]) {
+        expect(com[0]).toBeGreaterThanOrEqual(BLOCK_96.rear);
+        expect(com[0]).toBeLessThanOrEqual(Math.min(w.near.toe[0], w.far.toe[0], BLOCK_96.front));
+      }
+      // The heels are free: the ankles stay behind the block's rear edge by more than the heel's painted radius.
+      expect(w.near.ankle[0]).toBeLessThan(BLOCK_96.rear - SHIN_HALF);
+      expect(w.far.ankle[0]).toBeLessThan(BLOCK_96.rear - SHIN_HALF);
     }
+  });
+});
+
+const SHIN_HALF = (BODY.lw * 0.9) / 2;
+const FOOT_HALF = (BODY.lw * 0.82) / 2;
+const FORE_HALF = (BODY.lw * 0.72) / 2;
+const UPPER_HALF = (BODY.lw * 0.88) / 2;
+const HAND_R = BODY.lw * 0.44;
+const BELL_R = 4.6;
+const BOX_STROKE_HALF = 0.6;
+const BLOCK_96 = (() => {
+  const box = rig.CHAIN_MOVEMENTS['standing-barbell-calf-raise'].equipment.find((s) => s.kind === 'box');
+  return { rear: Math.min(box.a[0], box.b[0]), front: Math.max(box.a[0], box.b[0]), top: Math.max(box.a[1], box.b[1]) };
+})();
+
+/** Closest distance from point p to segment ab, in 3D. */
+function pointSegment3(p, a, b) {
+  const ab = [b[0] - a[0], b[1] - a[1], (b[2] ?? 0) - (a[2] ?? 0)];
+  const ap = [p[0] - a[0], p[1] - a[1], (p[2] ?? 0) - (a[2] ?? 0)];
+  const d = ab[0] * ab[0] + ab[1] * ab[1] + ab[2] * ab[2] || 1;
+  const t = Math.max(0, Math.min(1, (ap[0] * ab[0] + ap[1] * ab[1] + ap[2] * ab[2]) / d));
+  return Math.hypot(ap[0] - ab[0] * t, ap[1] - ab[1] * t, ap[2] - ab[2] * t);
+}
+
+/** Closest distance between segments ab and cd, in 3D (dense sampling of ab against exact point-segment distance). */
+function segmentSegment3(a, b, c, d) {
+  let best = Infinity;
+  for (let i = 0; i <= 64; i++) {
+    const s = i / 64;
+    best = Math.min(best, pointSegment3(lerp3(a, b, s), c, d));
+  }
+  return best;
+}
+
+/** Closest distance in the side plane (x, y) from segment ab to an axis-aligned rectangle; 0 when they touch or cross. */
+function segmentRect2(a, b, rect) {
+  const inside = (p) => p[0] >= rect.x0 && p[0] <= rect.x1 && p[1] >= rect.y0 && p[1] <= rect.y1;
+  let best = Infinity;
+  for (let i = 0; i <= 200; i++) {
+    const p = [a[0] + (b[0] - a[0]) * (i / 200), a[1] + (b[1] - a[1]) * (i / 200)];
+    if (inside(p)) return 0;
+    const dx = Math.max(rect.x0 - p[0], 0, p[0] - rect.x1);
+    const dy = Math.max(rect.y0 - p[1], 0, p[1] - rect.y1);
+    best = Math.min(best, Math.hypot(dx, dy));
+  }
+  return best;
+}
+
+const PAUSE_WORDS = /\b(pause|paused|pausing|briefly)\b|\bhold(?!\s+(a|one)\s)/i;
+
+describe('MOV-S3-R3 repairs to MOV-A13 (194, 239, 96, 136; hold captions 18, 36, 136, 67, 194)', () => {
+  test.each([18, 36, 136, 67, 194])(
+    '%i: no caption adds a hold the text does not give, and no dwell inside the cycle lasts longer than 150 ms',
+    (id) => {
+      const entry = entryFor(id);
+      const row = rowFor(id);
+      expect(`${row.source.instructions} ${row.source.cues}`).not.toMatch(/\b(pause|briefly)\b/i);
+      for (const f of entry.frames) expect(f.caption).not.toMatch(PAUSE_WORDS);
+      const phs = entry.frames.map((f) => f.joints.ph);
+      for (let i = 0; i < phs.length - 2; i++) {
+        if (phs[i] === phs[i + 1]) expect(entry.segmentDurationsMs[i]).toBeLessThanOrEqual(150);
+      }
+    },
+  );
+
+  test('194 Elevated Back Lunge: "Step back off the platform with one leg" — no leg segment off the platform is drawn through it at any tick (painted radii against the platform\'s painted outline)', () => {
+    const entry = entryFor(194);
+    const { samples } = sampleCycle(entry);
+    const box = rig.CHAIN_MOVEMENTS['elevated-back-lunge'].equipment.find((s) => s.kind === 'box');
+    const rect = {
+      x0: Math.min(box.a[0], box.b[0]) - BOX_STROKE_HALF,
+      x1: Math.max(box.a[0], box.b[0]) + BOX_STROKE_HALF,
+      y0: Math.min(box.a[1], box.b[1]) - BOX_STROKE_HALF,
+      y1: Math.max(box.a[1], box.b[1]) + BOX_STROKE_HALF,
+    };
+    const top = Math.max(box.a[1], box.b[1]);
+    // The platform itself, without its outline: a foot just lifting off its top may touch it but never sink into it.
+    const solid = { x0: Math.min(box.a[0], box.b[0]), x1: Math.max(box.a[0], box.b[0]), y0: Math.min(box.a[1], box.b[1]), y1: top };
+    let sawStepping = 0;
+    for (const s of samples) {
+      const w = s.figure.world;
+      for (const side of ['near', 'far']) {
+        const leg = w[side];
+        const planted = Math.abs(leg.ankle[1] - (top + ANKLE_Y)) < 1e-6 && leg.ankle[0] > rect.x0 && leg.ankle[0] < rect.x1;
+        // Thighs and knees never touch the platform's painted outline.
+        expect(segmentRect2(leg.hipJoint, leg.knee, rect)).toBeGreaterThanOrEqual(THIGH_HALF);
+        if (!planted) {
+          sawStepping += 1;
+          // Above the platform the stepping foot is lifted off its top; once the ankle is behind it, the shin and foot clear its painted outline.
+          const over = leg.ankle[0] >= solid.x0;
+          const against = over ? solid : rect;
+          const give = over ? 0.05 : 0;
+          expect(segmentRect2(leg.knee, leg.ankle, against)).toBeGreaterThanOrEqual(SHIN_HALF - give);
+          expect(segmentRect2(leg.ankle, leg.toe, against)).toBeGreaterThanOrEqual(FOOT_HALF - give);
+        }
+      }
+    }
+    expect(sawStepping).toBeGreaterThan(samples.length / 2);
+  });
+
+  test('239 Lunge Pass Through: "Pass the bell under the front thigh" — the bell\'s painted outline clears both thighs and both shins at every tick, it is always in a hand, and it passes directly under the front thigh in each lunge', () => {
+    const entry = entryFor(239);
+    const { samples } = sampleCycle(entry);
+    const ds = entry.segmentDurationsMs;
+    const tStand2 = ds.slice(0, 3).reduce((a, b) => a + b, 0);
+    let underFar = false;
+    let underNear = false;
+    for (const s of samples) {
+      const w = s.figure.world;
+      const bell = w.kettlebell.body;
+      for (const side of ['near', 'far']) {
+        const leg = w[side];
+        expect(pointSegment3(bell, leg.hipJoint, leg.knee)).toBeGreaterThanOrEqual(BELL_R + THIGH_HALF);
+        expect(pointSegment3(bell, leg.knee, leg.ankle)).toBeGreaterThanOrEqual(BELL_R + SHIN_HALF);
+      }
+      // The handle is in a hand: it never hangs between two hands that are apart.
+      expect(Math.min(dist3(w.kettlebell.grip, w.near.hold), dist3(w.kettlebell.grip, w.far.hold))).toBeLessThan(1.0);
+      // Directly under a thigh: within that thigh's forward span, on its axis across the body, and below it.
+      const under = (leg) => {
+        const lo = Math.min(leg.hipJoint[0], leg.knee[0]);
+        const hi = Math.max(leg.hipJoint[0], leg.knee[0]);
+        if (bell[0] < lo || bell[0] > hi) return false;
+        const u = (bell[0] - leg.hipJoint[0]) / ((leg.knee[0] - leg.hipJoint[0]) || 1);
+        const axis = lerp3(leg.hipJoint, leg.knee, u);
+        return Math.abs(bell[2] - axis[2]) < 1.0 && bell[1] < axis[1];
+      };
+      if (s.t <= tStand2 && w.far.ankle[0] > w.near.ankle[0] + 20 && under(w.far)) underFar = true;
+      if (s.t >= tStand2 && w.near.ankle[0] > w.far.ankle[0] + 20 && under(w.near)) underNear = true;
+    }
+    expect(underFar).toBe(true);
+    expect(underNear).toBe(true);
+  });
+
+  test('239 Lunge Pass Through: "Step forward with the opposite foot" — the front foot steps forward while the rear foot stays planted (its toe within 0.5 of where it stood)', () => {
+    const entry = entryFor(239);
+    const { samples } = sampleCycle(entry);
+    const ds = entry.segmentDurationsMs;
+    const tStand2 = ds.slice(0, 3).reduce((a, b) => a + b, 0);
+    const p0 = rig.chainGeometry('lunge-pass-through', 0, BODY).world;
+    const p3 = rig.chainGeometry('lunge-pass-through', 3, BODY).world;
+    expect(rig.chainGeometry('lunge-pass-through', 1, BODY).world.far.ankle[0] - p0.far.ankle[0]).toBeGreaterThan(20);
+    expect(rig.chainGeometry('lunge-pass-through', 4, BODY).world.near.ankle[0] - p3.near.ankle[0]).toBeGreaterThan(20);
+    for (const s of samples) {
+      const w = s.figure.world;
+      const rear = s.t <= tStand2 ? 'near' : 'far';
+      const stood = s.t <= tStand2 ? p0[rear].toe : p3[rear].toe;
+      expect(Math.abs(w[rear].toe[0] - stood[0])).toBeLessThanOrEqual(0.5);
+      expect(Math.abs(w[rear].toe[1] - stood[1])).toBeLessThanOrEqual(0.5);
+    }
+  });
+
+  test('136 Barbell Lunge: "Step forward with one leg" — the rear foot stays planted (its toe within 0.5 of where it stood) while the front foot steps', () => {
+    const entry = entryFor(136);
+    const { samples } = sampleCycle(entry);
+    const stand = rig.chainGeometry('barbell-lunge', 0, BODY).world;
+    for (const s of samples) {
+      const w = s.figure.world;
+      expect(Math.abs(w.far.toe[0] - stand.far.toe[0])).toBeLessThanOrEqual(0.5);
+      expect(Math.abs(w.far.toe[1] - stand.far.toe[1])).toBeLessThanOrEqual(0.5);
+    }
+  });
+
+  test('96 Standing Barbell Calf Raise: "Lower into an owned stretch, pause, then rise as high as balance allows" — the heel joint drops below the block top at the stretch, and a magnified close-up of the foot on the edge of the block makes the dip and the rise readable', () => {
+    const slug = 'standing-barbell-calf-raise';
+    const stretch = rig.chainGeometry(slug, 1, BODY);
+    const peak = rig.chainGeometry(slug, 2, BODY);
+    // World: the heel joint itself is below the surface the ball of the foot rests on.
+    expect(stretch.world.near.ankle[1]).toBeLessThan(BLOCK_96.top);
+    expect(peak.world.near.ankle[1] - SHIN_HALF).toBeGreaterThan(BLOCK_96.top);
+    // The close-up: the foot and the block's rear top corner, magnified at least two times.
+    const entry = entryFor(96);
+    const { samples } = sampleCycle(entry);
+    for (const s of samples) {
+      const panel = rig.footCloseUp(s.figure);
+      expect(panel).not.toBeNull();
+      expect(panel.scale).toBeGreaterThanOrEqual(2);
+      // It is the figure's own foot: every placed point is the world point, relative to the corner, times the scale (y up in the world, down on the page).
+      const w = s.figure.world.near;
+      for (const [placed, world] of [[panel.heel, w.ankle], [panel.ball, w.toe]]) {
+        expect(placed[0]).toBeCloseTo(panel.corner[0] + (world[0] - BLOCK_96.rear) * panel.scale, 6);
+        expect(placed[1]).toBeCloseTo(panel.corner[1] - (world[1] - BLOCK_96.top) * panel.scale, 6);
+      }
+      // Everything drawn in the panel stays inside its circle.
+      for (const p of panel.prims) {
+        const ends = p.kind === 'bone' ? [[p.x1, p.y1], [p.x2, p.y2]] : p.kind === 'rect' ? [[p.x, p.y], [p.x + p.w, p.y], [p.x, p.y + p.h], [p.x + p.w, p.y + p.h]] : [[p.cx, p.cy]];
+        const reach = p.kind === 'bone' ? p.w / 2 : p.kind === 'circle' ? p.r : 0;
+        for (const e of ends) expect(Math.hypot(e[0] - panel.centre[0], e[1] - panel.centre[1]) + reach).toBeLessThanOrEqual(panel.r + 1e-6);
+      }
+    }
+    const low = rig.footCloseUp(stretch);
+    const high = rig.footCloseUp(peak);
+    // At the stretch the magnified heel's lowest point is at least 5 page units under the magnified block top; at the top it is above it.
+    expect(low.heel[1] + low.heelR - low.corner[1]).toBeGreaterThanOrEqual(5.0);
+    expect(high.heel[1] + high.heelR).toBeLessThan(high.corner[1]);
   });
 });

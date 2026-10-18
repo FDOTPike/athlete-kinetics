@@ -435,22 +435,24 @@ describe('MOV-A14 trunk, pullovers, flyes and kettlebell skills (33, 137, 119, 2
     }
   });
 
-  test('231 Kettlebell Turkish Get-Up (Lunge style): 7 keyframes from supine -> seated -> one knee -> standing and reverse, with the bell arm locked (>= 172 deg) and vertical over the shoulder and both knees >= 35 deg on every tick', () => {
+  test('231 Kettlebell Turkish Get-Up (Lunge style): 9 keyframes from supine -> seated -> one knee (hand down) -> one knee (upright) -> standing and back, with the bell arm locked (>= 172 deg) and vertical over the shoulder and both knees >= 35 deg on every tick', () => {
     const { entry, ticks, at, atPhase } = sampleEntry(231);
-    expect(entry.frames.length).toBe(7);
-    expect(entry.frames.map((f) => f.joints.ph)).toEqual([0, 1, 2, 4, 2, 1, 0]);
+    expect(entry.frames.length).toBe(9);
+    expect(entry.frames.map((f) => f.joints.ph)).toEqual([0, 1, 2, 3, 4, 3, 2, 1, 0]);
 
     const supine = atPhase(0).figure.world;
     const seated = atPhase(1).figure.world;
     const kneeling = atPhase(2).figure.world;
+    const halfKneel = atPhase(3).figure.world;
     const standing = atPhase(4).figure.world;
 
     // Progressive rise of the torso and shoulder from supine -> seated -> one knee -> standing
-    expect(supine.hip[1]).toBeCloseTo(CHAIN_LYING_HEIGHT, 2);
+    expect(supine.hip[1]).toBeLessThan(CHAIN_LYING_HEIGHT + 0.5);
     expect(seated.neck[1]).toBeGreaterThan(supine.neck[1] + 12);
     expect(kneeling.hip[1]).toBeGreaterThan(seated.hip[1] + 15);
     expect(kneeling.far.knee[1]).toBeLessThan(4.0);
-    expect(standing.hip[1]).toBeGreaterThan(kneeling.hip[1] + 18);
+    expect(halfKneel.far.knee[1]).toBeLessThan(4.0);
+    expect(standing.hip[1]).toBeGreaterThan(halfKneel.hip[1] + 18);
     expect(jointAngleDeg(standing.near.hipJoint, standing.near.knee, standing.near.ankle)).toBeGreaterThanOrEqual(172);
     expect(jointAngleDeg(standing.far.hipJoint, standing.far.knee, standing.far.ankle)).toBeGreaterThanOrEqual(172);
 
@@ -465,5 +467,207 @@ describe('MOV-A14 trunk, pullovers, flyes and kettlebell skills (33, 137, 119, 2
       expect(w.near.wrist[1] - w.near.shoulder[1]).toBeCloseTo(24.5, 2);
       expect(Math.abs(w.kettlebell.grip[0] - w.near.shoulder[0])).toBeLessThan(0.05);
     }
+  });
+});
+
+const THIGH_HALF = (BODY.lw * 1.18) / 2;
+const HAND_R = BODY.lw * 0.44;
+const PAUSE_WORDS = /\b(pause|paused|pausing|briefly)\b|\bhold(?!\s+(a|one)\s)/i;
+const textOf = (id) => `${catById(id).source.instructions} ${catById(id).source.cues}`;
+
+/** Closest distance between two segments in the drawing plane. */
+function segSeg2(a, b, c, d) {
+  const ps = (p, q, r) => {
+    const qx = r[0] - q[0], qy = r[1] - q[1];
+    const t = Math.max(0, Math.min(1, ((p[0] - q[0]) * qx + (p[1] - q[1]) * qy) / (qx * qx + qy * qy || 1)));
+    return Math.hypot(p[0] - q[0] - qx * t, p[1] - q[1] - qy * t);
+  };
+  const cross = (o, p, q) => (p[0] - o[0]) * (q[1] - o[1]) - (p[1] - o[1]) * (q[0] - o[0]);
+  const d1 = cross(a, b, c), d2 = cross(a, b, d), d3 = cross(c, d, a), d4 = cross(c, d, b);
+  if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) return 0;
+  return Math.min(ps(a, c, d), ps(b, c, d), ps(c, a, b), ps(d, a, b));
+}
+
+/** The painted torso slices: the trunk's own bones, with where each sits from the neck (0) to the hip (1). */
+function torsoSlices(prims, joints) {
+  const L = Math.hypot(joints.hp[0] - joints.nk[0], joints.hp[1] - joints.nk[1]) || 1;
+  return prims
+    .filter((p) => p.kind === 'bone' && p.color === 'textLow' && p.opacity === 1 && p.w < 1.5)
+    .map((p) => {
+      const c = [(p.x1 + p.x2) / 2, (p.y1 + p.y2) / 2];
+      const along = ((c[0] - joints.nk[0]) * (joints.hp[0] - joints.nk[0]) + (c[1] - joints.nk[1]) * (joints.hp[1] - joints.nk[1])) / (L * L);
+      return { p, along, bottom: FLOOR - (Math.max(p.y1, p.y2) + p.w / 2) };
+    })
+    .filter((x) => x.along > -0.1 && x.along < 1.1);
+}
+const boneBetween = (prims, a, b) => prims.find((p) => p.kind === 'bone' && p.x1 === a[0] && p.y1 === a[1] && p.x2 === b[0] && p.y2 === b[1]);
+const boneBottom = (p) => FLOOR - (Math.max(p.y1, p.y2) + p.w / 2);
+const inContact = (bottom) => bottom >= -0.05 && bottom <= 0.5;
+
+describe('MOV-S3-R3 repairs to MOV-A14 (231, 121, 33, 137, 149, 289, 148, 201, 217)', () => {
+  test.each([33, 137])('%i: no caption adds a hold the text does not give, and no dwell inside the cycle lasts longer than 150 ms', (id) => {
+    const { entry } = sampleEntry(id);
+    expect(textOf(id)).not.toMatch(/\b(pause|briefly)\b/i);
+    for (const f of entry.frames) expect(f.caption).not.toMatch(PAUSE_WORDS);
+    const phs = entry.frames.map((f) => f.joints.ph);
+    for (let i = 0; i < phs.length - 2; i++) {
+      if (phs[i] === phs[i + 1]) expect(entry.segmentDurationsMs[i]).toBeLessThanOrEqual(150);
+    }
+  });
+
+  test('33 Barbell Ab Rollout: "Pull the bar back to your knees" — at the start and the finish the bar is back in front of the knees (within 10 units of them) without touching them', () => {
+    const { entry, at } = sampleEntry(33);
+    const total = entry.segmentDurationsMs.reduce((a, b) => a + b, 0);
+    for (const t of [0, total]) {
+      const w = at(t).figure.world;
+      const bar = [(w.near.wrist[0] + w.far.wrist[0]) / 2, (w.near.wrist[1] + w.far.wrist[1]) / 2];
+      expect(bar[0] - w.near.knee[0]).toBeLessThanOrEqual(10);
+      // The shaft (painted radius 0.8) passes in front of the knees, clear of them.
+      expect(Math.hypot(bar[0] - w.near.knee[0], bar[1] - w.near.knee[1])).toBeGreaterThanOrEqual(0.8 + THIGH_HALF);
+      expect(bar[0]).toBeGreaterThan(w.near.knee[0]);
+    }
+  });
+
+  test.each([
+    [33, '"grip it at shoulder width"'],
+    [137, '"grip the bar with the hands about shoulder-width apart"'],
+    [148, '"holding a barbell with a shoulder-width grip"'],
+  ])('%i: %s — each hand is in line with its own shoulder across the body (within 1.0) at every tick', (id) => {
+    const { ticks, at } = sampleEntry(id);
+    for (const t of ticks) {
+      const w = at(t).figure.world;
+      expect(Math.abs(w.near.wrist[2] - w.near.shoulder[2])).toBeLessThanOrEqual(1.0);
+      expect(Math.abs(w.far.wrist[2] - w.far.shoulder[2])).toBeLessThanOrEqual(1.0);
+    }
+  });
+
+  test.each([149, 289])('%i: "only the shoulders on the surface" — the painted trunk rests on the bench (never drawn through its top or its end) and the shoulders touch it (within 0.5) at every tick', (id) => {
+    const { ticks, at } = sampleEntry(id);
+    for (const t of ticks) {
+      const { prims, joints } = at(t);
+      const slab = prims.find((p) => p.kind === 'bone' && p.color === 'textMid' && p.w === 4);
+      expect(slab).toBeDefined();
+      const slices = torsoSlices(prims, joints);
+      expect(slices.length).toBeGreaterThanOrEqual(30);
+      let shoulderGap = Infinity;
+      for (const { p, along } of slices) {
+        const gap = segSeg2([p.x1, p.y1], [p.x2, p.y2], [slab.x1, slab.y1], [slab.x2, slab.y2]) - p.w / 2 - slab.w / 2;
+        expect(gap).toBeGreaterThanOrEqual(-0.05);
+        if (along <= 0.25) shoulderGap = Math.min(shoulderGap, gap);
+      }
+      expect(shoulderGap).toBeLessThanOrEqual(0.5);
+    }
+  });
+
+  test.each([
+    [149, '"Hold one dumbbell over the chest"'],
+    [148, '"holding a barbell with a shoulder-width grip over the chest"'],
+  ])('%i: %s — the start is over the chest: on the hip side of the shoulders, no further down the trunk than its middle', (id) => {
+    const { entry, atPhase } = sampleEntry(id);
+    const w = atPhase(0).figure.world;
+    const axis = [w.hip[0] - w.neck[0], w.hip[1] - w.neck[1]];
+    const L = Math.hypot(axis[0], axis[1]);
+    const held = [(w.near.hold[0] + w.far.hold[0]) / 2, (w.near.hold[1] + w.far.hold[1]) / 2];
+    const along = ((held[0] - w.neck[0]) * axis[0] + (held[1] - w.neck[1]) * axis[1]) / L;
+    expect(along).toBeGreaterThan(0);
+    expect(along).toBeLessThanOrEqual(L / 2);
+    expect(entry.frames[0].joints.ph).toBe(0);
+  });
+
+  test('201 Flat Bench Cable Flyes: "so the pulleys line up with the chest" and "Hands meet above the chest" — both pulleys and the meeting point are on the hip side of the shoulders, no further down the trunk than its middle', () => {
+    const { movement, atPhase } = sampleEntry(201);
+    const closed = atPhase(1).figure.world;
+    const axis = [closed.hip[0] - closed.neck[0], closed.hip[1] - closed.neck[1]];
+    const L = Math.hypot(axis[0], axis[1]);
+    const alongOf = (x, y) => ((x - closed.neck[0]) * axis[0] + (y - closed.neck[1]) * axis[1]) / L;
+    for (const line of movement.lines) {
+      const a = alongOf(line.from[0], closed.neck[1]);
+      expect(a).toBeGreaterThan(0);
+      expect(a).toBeLessThanOrEqual(L / 2);
+    }
+    const meet = alongOf((closed.near.grip[0] + closed.far.grip[0]) / 2, closed.neck[1]);
+    expect(meet).toBeGreaterThan(0);
+    expect(meet).toBeLessThanOrEqual(L / 2);
+  });
+
+  test('217 Incline Cable Flye: the captions and summary keep to the text (no bench angle, no "upper" chest)', () => {
+    const { entry } = sampleEntry(217);
+    for (const said of [...entry.frames.map((f) => f.caption), entry.summary]) {
+      expect(said).not.toMatch(/\bdegrees?\b|\b\d+\s*to\s*\d+\b|upper chest/i);
+    }
+  });
+
+  test('121 Kettlebell Dead Clean: "the hand travelled around the bell instead of the bell rolling around the hand" is the fault — no caption instructs it, no caption adds a hold, and the rack is not held', () => {
+    const { entry } = sampleEntry(121);
+    for (const said of [...entry.frames.map((f) => f.caption), entry.summary]) {
+      expect(said).not.toMatch(/spiral|hand around|around the handle/i);
+      expect(said).not.toMatch(PAUSE_WORDS);
+    }
+    const phs = entry.frames.map((f) => f.joints.ph);
+    for (let i = 0; i < phs.length - 1; i++) expect(phs[i + 1]).not.toBe(phs[i]);
+  });
+
+  test('231 Kettlebell Turkish Get-Up: "push up to a seated position, then to one knee" — what bears weight at each stage is in painted contact with the floor (within 0.5) at every tick, nothing is painted below the floor, and neither foot is bent past its range', () => {
+    const { entry, ticks, at, atPhase } = sampleEntry(231);
+    expect(textOf(231)).not.toMatch(/\bpause\b/i);
+    for (const f of entry.frames) expect(f.caption).not.toMatch(PAUSE_WORDS);
+    const E = 1e-9;
+    const seen = { lying: 0, sweep: 0, kneel: 0, rise: 0 };
+    for (const t of ticks) {
+      const { figure, prims, joints, pose } = at(t);
+      const w = figure.world;
+      const ph = pose.ph;
+      // Nothing painted below the floor.
+      for (const p of prims) {
+        const low = p.kind === 'bone' ? Math.max(p.y1, p.y2) + p.w / 2 : p.kind === 'circle' ? p.cy + p.r : p.y + p.h;
+        expect(FLOOR - low).toBeGreaterThanOrEqual(-0.05);
+      }
+      const slices = torsoSlices(prims, joints);
+      const pelvis = Math.min(...slices.filter((s) => s.along >= 0.75).map((s) => s.bottom));
+      const back = Math.min(...slices.filter((s) => s.along <= 0.5).map((s) => s.bottom));
+      const handDot = prims.find((p) => p.kind === 'circle' && p.cx === figure.grip.far[0] && p.cy === figure.grip.far[1] && Math.abs(p.r - HAND_R) < 1e-9);
+      const forearm = boneBetween(prims, joints.ef, joints.wf);
+      const hand = Math.min(FLOOR - (handDot.cy + handDot.r), boneBottom(forearm));
+      const footOf = (an, kn, toe) => Math.min(boneBottom(boneBetween(prims, an, toe)), boneBottom(boneBetween(prims, kn, an)));
+      const nearFoot = footOf(joints.an, joints.kn, figure.toe.near);
+      const farFoot = footOf(joints.af, joints.kf, figure.toe.far);
+      const farKnee = boneBottom(boneBetween(prims, joints.fLeg, joints.kf));
+      if (ph <= 1 + E) {
+        seen.lying += 1;
+        expect(inContact(pelvis)).toBe(true);
+        expect(inContact(hand)).toBe(true);
+        expect(inContact(nearFoot)).toBe(true);
+        if (ph < E) expect(inContact(back)).toBe(true);
+      }
+      if (ph >= 1 - E && ph <= 2 + E) {
+        seen.sweep += 1;
+        expect(inContact(hand)).toBe(true);
+        expect(inContact(nearFoot)).toBe(true);
+        expect(inContact(farFoot) || inContact(farKnee)).toBe(true);
+      }
+      if (ph >= 2 - E && ph <= 3 + E) {
+        seen.kneel += 1;
+        expect(inContact(farKnee)).toBe(true);
+        expect(inContact(nearFoot)).toBe(true);
+        if (ph < 2 + E) expect(inContact(hand)).toBe(true);
+      }
+      if (ph >= 3 - E) {
+        seen.rise += 1;
+        expect(inContact(nearFoot)).toBe(true);
+        if (ph > 4 - E) expect(inContact(farFoot)).toBe(true);
+      }
+      // Feet: the knee-ankle-toe angle stays within what an ankle can do (about 20 degrees past a right angle bent up; pointed no further than 150).
+      for (const side of ['near', 'far']) {
+        const a = jointAngleDeg(w[side].knee, w[side].ankle, w[side].toe);
+        expect(a).toBeGreaterThanOrEqual(70);
+        expect(a).toBeLessThanOrEqual(150);
+      }
+    }
+    for (const k of Object.keys(seen)) expect(seen[k]).toBeGreaterThan(0);
+    // The seated stage: the pelvis on the floor with the trunk raised at least 45 degrees, the far knee not yet down.
+    const sw = atPhase(1).figure.world;
+    const rise = (Math.atan2(sw.neck[1] - sw.hip[1], Math.hypot(sw.neck[0] - sw.hip[0], sw.neck[2] - sw.hip[2])) * 180) / Math.PI;
+    expect(rise).toBeGreaterThanOrEqual(45);
+    expect(sw.far.knee[1]).toBeGreaterThan(5);
   });
 });

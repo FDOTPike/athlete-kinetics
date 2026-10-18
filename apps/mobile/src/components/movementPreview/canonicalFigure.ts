@@ -1220,12 +1220,35 @@ export interface ChainPose {
   /** An ankle position the legs are solved to, in place of the leg directions (feet planted). */
   ankle?: ChainPoint;
   farAnkle?: ChainPoint;
+  /**
+   * How far the solved ankle's path rises above the straight line on the way
+   * from this pose to the next, at half-way (a foot lifted to step, not slid).
+   */
+  ankleArc?: number;
+  farAnkleArc?: number;
+  /** How far the root's path rises above the straight line on the way to the next pose, at half-way (hips lifted into a bridge). */
+  atArc?: number;
+  /** How far the trunk swings past its straight blend on the way to the next pose, at half-way, in degrees (shoulders lowered toward a hand while the hips bridge). */
+  trunkArc?: number;
   /** Lateral offset of each planted ankle from hip width, in world Z units. */
   footSpread?: number;
   /** Lateral out-angle (degrees) added to the solved knee pole so knees track outward. */
   kneeOut?: number;
   /** Which hand holds a single kettlebell (+1 near, 0 centred between both hands, -1 far). */
   bellSide?: number;
+  /**
+   * The stretch of the way to the next pose, as fractions, over which the bell
+   * changes to the next pose's hand: before it the bell stays in this pose's
+   * hand, after it in the next. A hand-to-hand pass while the hands are together.
+   */
+  bellPass?: readonly [number, number];
+  /**
+   * How far the solved hand's path bows from the straight line on the way to
+   * the next pose, at half-way: upward by a number (negative dips it), or by a
+   * [forward, up, across] offset (a hand carried around a leg rather than through it).
+   */
+  wristArc?: number | ChainVec;
+  farWristArc?: number | ChainVec;
 }
 
 /** Where a piece of equipment is painted: behind the figure, between the far limbs and the trunk, or in front of everything. */
@@ -1351,6 +1374,15 @@ export interface ChainMovement {
     open?: number;
     palm?: 'underhand' | 'overhand' | 'neutral' | 'turn';
   };
+  /**
+   * A magnified side view of the near foot on the edge it stands on, in a
+   * round panel, for a movement whose range is in the ankle (a heel dropping
+   * below a block and rising above it). `at` is the panel's centre, `r` its
+   * radius and `scale` how many times larger than the figure it is drawn;
+   * `edge` is the block's rear top corner and `focus` the point of the scene
+   * placed at the panel's centre.
+   */
+  footCloseUp?: { at: ChainPoint; r: number; scale: number; edge: ChainPoint; focus: ChainPoint };
   /** Weight stack column for a cable pulldown station (`x` position, resting stack top `baseTop`, minimum lifted clearance `minClearance`, and travel `stroke`). */
   weightStack?: { x: number; baseTop: number; minClearance: number; stroke: number };
   /** External load hanging centrally from a belt at the waist/hips (`drop` units below hip, disc radius `r`). */
@@ -1538,6 +1570,12 @@ const CONCENTRATION_BODY = {
  * painted below the floor.
  */
 export const CHAIN_LYING_HEIGHT = CHAIN_BACK_HALF + 0.6;
+/**
+ * How far a cross-bench pullover's neck sits above a back laid flat on the
+ * bench: the trunk slopes down to the hips, so it rests on the bench's front
+ * edge, under the shoulder blades, rather than flat along its top.
+ */
+const PULLOVER_BENCH_LIFT = 1.4;
 /** Arms lying on the floor beside the body, pointing at the feet, palms down. */
 const ARMS_BESIDE = { upperArm: -8, forearm: -12 } as const;
 /** The low pulley beyond the feet for the Cable Reverse Crunch. */
@@ -5297,20 +5335,21 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     ],
     poses: [
       {
+        // The front foot is lifted on its way forward; the rear foot's ball stays where it stood.
         at: [-6.2, 46.60], trunk: 89, head: 90, thigh: -90, shin: -90,
-        ankle: [-6.0, CHAIN_ANKLE_HEIGHT], farAnkle: [-6.0, CHAIN_ANKLE_HEIGHT],
+        ankle: [-6.0, CHAIN_ANKLE_HEIGHT], farAnkle: [-6.0, CHAIN_ANKLE_HEIGHT], ankleArc: 5,
         foot: 0, farFoot: 0,
         upperArm: [-102, 22], forearm: [88, 12],
       },
       {
-        at: [0.0, 41.20], trunk: 89, head: 90, thigh: -90, shin: -90,
-        ankle: [16.5, CHAIN_ANKLE_HEIGHT], farAnkle: [-15.5, 5.21],
+        at: [10.44, 41.20], trunk: 89, head: 90, thigh: -90, shin: -90,
+        ankle: [26.94, CHAIN_ANKLE_HEIGHT], farAnkle: [-5.06, 5.21],
         foot: 0, farFoot: -34.4,
         upperArm: [-102, 22], forearm: [88, 12],
       },
       {
-        at: [0.0, 24.80], trunk: 89, head: 90, thigh: -90, shin: -90,
-        ankle: [16.5, CHAIN_ANKLE_HEIGHT], farAnkle: [-15.5, 5.21],
+        at: [10.44, 24.80], trunk: 89, head: 90, thigh: -90, shin: -90,
+        ankle: [26.94, CHAIN_ANKLE_HEIGHT], farAnkle: [-5.06, 5.21],
         foot: 0, farFoot: -34.4,
         upperArm: [-102, 22], forearm: [88, 12],
       },
@@ -5329,37 +5368,41 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     kneePole: 0,
     implement: 'bar',
     armsFollowTrunk: true,
+    // The platform starts just behind the heels; the stepping foot is lifted
+    // off its edge and the back knee lands well behind it.
     equipment: [
-      { kind: 'box', a: [4, 0.5], b: [20, 6.0] },
+      { kind: 'box', a: [6, 0.5], b: [22, 6.0] },
       { kind: 'frame', a: [24, 0.5, 11], b: [24, 82, 11] },
       { kind: 'frame', a: [24, 0.5, -11], b: [24, 82, -11] },
     ],
     poses: [
       {
-        at: [-3.5, 23.92], trunk: 86, head: 90, thigh: -90, shin: -90,
-        ankle: [-18.5, 5.21], farAnkle: [10.0, 6.0 + CHAIN_ANKLE_HEIGHT],
+        at: [-6.0, 24.40], trunk: 86, head: 90, thigh: -90, shin: -90,
+        ankle: [-33.63, 5.21], farAnkle: [10.0, 6.0 + CHAIN_ANKLE_HEIGHT], ankleArc: 6,
         foot: -34.4, farFoot: 0,
         upperArm: [-102, 22], forearm: [88, 12],
       },
       {
         at: [9.8, 52.60], trunk: 89, head: 90, thigh: -90, shin: -90,
-        ankle: [10.0, 6.0 + CHAIN_ANKLE_HEIGHT], farAnkle: [10.0, 6.0 + CHAIN_ANKLE_HEIGHT],
+        ankle: [10.0, 6.0 + CHAIN_ANKLE_HEIGHT], farAnkle: [10.0, 6.0 + CHAIN_ANKLE_HEIGHT], farAnkleArc: 6,
         foot: 0, farFoot: 0,
         upperArm: [-102, 22], forearm: [88, 12],
       },
       {
-        at: [-3.5, 23.92], trunk: 86, head: 90, thigh: -90, shin: -90,
-        ankle: [10.0, 6.0 + CHAIN_ANKLE_HEIGHT], farAnkle: [-18.5, 5.21],
+        at: [-6.0, 24.40], trunk: 86, head: 90, thigh: -90, shin: -90,
+        ankle: [10.0, 6.0 + CHAIN_ANKLE_HEIGHT], farAnkle: [-33.63, 5.21],
         foot: 0, farFoot: -34.4,
         upperArm: [-102, 22], forearm: [88, 12],
       },
     ],
   },
-  // 239 Lunge Pass Through: stand holding a kettlebell in one hand at your
-  // side, step the same-side leg back into a reverse lunge, pass the kettlebell
-  // under the front thigh from the inside to the opposite hand at the bottom,
-  // and drive through the front heel to return to standing with the bell in the
-  // new hand before repeating on the other side.
+  // 239 Lunge Pass Through: stand holding a kettlebell in one hand, step
+  // forward with the opposite foot and lower the back knee toward the floor,
+  // pass the kettlebell under the front thigh to the other hand, and push
+  // through the front heel to return to standing before repeating on the
+  // other side. The bell is always in a hand: the carrying hand brings it
+  // between the legs, the other hand meets it there and takes it, then swings
+  // it down under the front thigh and out, clear of both legs at every tick.
   'lunge-pass-through': {
     root: 'hip',
     view: 'oblique',
@@ -5371,54 +5414,62 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     implement: 'kettlebell',
     kettlebellHang: true,
     farArmOver: true,
+    // A forward lunge: the front foot is lifted and stepped forward, and the
+    // rear foot's ball stays where it stood while its heel rises.
     poses: [
       {
+        // Standing, the bell in the near hand beside the near thigh; it is carried forward and in around that thigh.
         at: [-4.2, 46.60], trunk: 89, head: 90, thigh: -90, shin: -90,
-        ankle: [-4.0, CHAIN_ANKLE_HEIGHT], farAnkle: [-4.0, CHAIN_ANKLE_HEIGHT],
+        ankle: [-4.0, CHAIN_ANKLE_HEIGHT], farAnkle: [-4.0, CHAIN_ANKLE_HEIGHT], farAnkleArc: 5,
         foot: 0, farFoot: 0,
-        upperArm: [-88, 12], forearm: [-86, 10],
-        farUpperArm: [-88, 10], farForearm: [-86, 8],
+        upperArm: [-90, 0], forearm: [-90, 0],
+        wrist: [-3.6, 46.8, 14.4], farWrist: [-3.6, 46.8, -14.4], wristArc: [5, 0, 5],
         bellSide: 1,
       },
       {
-        at: [-2.5, 23.60], trunk: 76, head: 88, thigh: -90, shin: -90,
-        ankle: [-16.5, 6.20], farAnkle: [11.5, CHAIN_ANKLE_HEIGHT],
+        // Bottom of the first lunge: both hands meet on the handle between the legs, and the far hand takes it.
+        at: [11.65, 23.60], trunk: 76, head: 88, thigh: -90, shin: -90, twist: -25, shrug: -3,
+        ankle: [-2.35, 6.20], farAnkle: [25.65, CHAIN_ANKLE_HEIGHT],
         foot: -46, farFoot: 0,
-        upperArm: [-84, -14], forearm: [-84, -20],
-        farUpperArm: [-84, -14], farForearm: [-84, -20],
-        bellSide: 0.45,
+        upperArm: [-90, 0], forearm: [-90, 0],
+        wrist: [21, 24.5, 2], farWrist: [21, 24.5, 1.2], farWristArc: -2,
+        bellSide: 1, bellPass: [0, 0.02],
       },
       {
-        at: [-2.5, 23.60], trunk: 76, head: 88, thigh: -90, shin: -90,
-        ankle: [-16.5, 6.20], farAnkle: [11.5, CHAIN_ANKLE_HEIGHT],
+        // The far hand has swung the bell down under the front thigh, leaning toward that leg to reach it.
+        at: [11.65, 23.60], trunk: 76, head: 88, thigh: -90, shin: -90, sideCurl: -25, shrug: -3,
+        ankle: [-2.35, 6.20], farAnkle: [25.65, CHAIN_ANKLE_HEIGHT], farAnkleArc: 5,
         foot: -46, farFoot: 0,
-        upperArm: [-84, 6], forearm: [-82, 8],
-        farUpperArm: [-82, 14], farForearm: [-80, 16],
-        bellSide: -0.85,
-      },
-      {
-        at: [-4.2, 46.60], trunk: 89, head: 90, thigh: -90, shin: -90,
-        ankle: [-4.0, CHAIN_ANKLE_HEIGHT], farAnkle: [-4.0, CHAIN_ANKLE_HEIGHT],
-        foot: 0, farFoot: 0,
-        upperArm: [-88, 10], forearm: [-86, 8],
-        farUpperArm: [-88, 12], farForearm: [-86, 10],
+        upperArm: [-90, 0], forearm: [-90, 0],
+        wrist: [17.5, 25.5, 11], farWrist: [19, 20.3, -7.3], farWristArc: [0, 0, -6],
         bellSide: -1,
       },
       {
-        at: [-2.5, 23.60], trunk: 76, head: 88, thigh: -90, shin: -90,
-        ankle: [11.5, CHAIN_ANKLE_HEIGHT], farAnkle: [-16.5, 6.20],
-        foot: 0, farFoot: -46,
-        upperArm: [-84, -14], forearm: [-84, -20],
-        farUpperArm: [-84, -14], farForearm: [-84, -20],
-        bellSide: -0.45,
+        // Standing, the bell in the far hand; it is carried forward and in around the far thigh.
+        at: [-4.2, 46.60], trunk: 89, head: 90, thigh: -90, shin: -90,
+        ankle: [-4.0, CHAIN_ANKLE_HEIGHT], farAnkle: [-4.0, CHAIN_ANKLE_HEIGHT], ankleArc: 5,
+        foot: 0, farFoot: 0,
+        upperArm: [-90, 0], forearm: [-90, 0],
+        wrist: [-3.6, 46.8, 14.4], farWrist: [-3.6, 46.8, -14.4], farWristArc: [5, 0, -5],
+        bellSide: -1,
       },
       {
-        at: [-2.5, 23.60], trunk: 76, head: 88, thigh: -90, shin: -90,
-        ankle: [11.5, CHAIN_ANKLE_HEIGHT], farAnkle: [-16.5, 6.20],
+        // Bottom of the second lunge: the hands meet between the legs and the near hand takes the bell.
+        at: [11.65, 23.60], trunk: 76, head: 88, thigh: -90, shin: -90, twist: 25, shrug: -3,
+        ankle: [25.65, CHAIN_ANKLE_HEIGHT], farAnkle: [-2.35, 6.20],
         foot: 0, farFoot: -46,
-        upperArm: [-82, 14], forearm: [-80, 16],
-        farUpperArm: [-84, 6], farForearm: [-82, 8],
-        bellSide: 0.85,
+        upperArm: [-90, 0], forearm: [-90, 0],
+        wrist: [21, 24.5, -1.2], farWrist: [21, 24.5, -2], wristArc: -2,
+        bellSide: -1, bellPass: [0, 0.02],
+      },
+      {
+        // The near hand has swung the bell down under the front thigh and carries it out to stand.
+        at: [11.65, 23.60], trunk: 76, head: 88, thigh: -90, shin: -90, sideCurl: 25, shrug: -3,
+        ankle: [25.65, CHAIN_ANKLE_HEIGHT], farAnkle: [-2.35, 6.20], ankleArc: 5,
+        foot: 0, farFoot: -46,
+        upperArm: [-90, 0], forearm: [-90, 0],
+        wrist: [19, 20.3, 7.3], farWrist: [17.5, 25.5, -11], wristArc: [0, 0, 6],
+        bellSide: 1,
       },
     ],
   },
@@ -5472,21 +5523,26 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     feet: 'free',
     implement: 'bar',
     armsFollowTrunk: true,
-    equipment: [{ kind: 'box', a: [2.2, 0.5], b: [8.8, 6.0] }],
+    // Only the ball of the foot is on the block, 1.6 in from its rear edge, so
+    // the heels are free at every tick. The body leans just far enough from
+    // the ankles that the centre of mass, with the bar and without it, stays
+    // over that strip of the foot; the dip and the rise are shown magnified.
+    equipment: [{ kind: 'box', a: [3.8, 0.5], b: [10.4, 6.0] }],
+    footCloseUp: { at: [33.6, 36.9], r: 16, scale: 2, edge: [3.8, 6.0], focus: [2.6, 9.75] },
     poses: [
       {
-        at: [5.4, 6.0 + CHAIN_FOREFOOT_HEIGHT], trunk: 89, head: 90,
-        thigh: -89, shin: -90, foot: 0,
+        at: [5.4, 6.0 + CHAIN_FOREFOOT_HEIGHT], trunk: 88, head: 90,
+        thigh: -96.11, shin: -97.11, foot: 0,
         upperArm: [-102, 22], forearm: [88, 12],
       },
       {
-        at: [5.4, 6.0 + CHAIN_FOREFOOT_HEIGHT], trunk: 89, head: 90,
-        thigh: -89, shin: -90, foot: 28,
+        at: [5.4, 6.0 + CHAIN_FOREFOOT_HEIGHT], trunk: 88, head: 90,
+        thigh: -95.85, shin: -96.85, foot: 28,
         upperArm: [-102, 22], forearm: [88, 12],
       },
       {
-        at: [5.4, 6.0 + CHAIN_FOREFOOT_HEIGHT], trunk: 89, head: 90,
-        thigh: -89, shin: -90, foot: -42,
+        at: [5.4, 6.0 + CHAIN_FOREFOOT_HEIGHT], trunk: 88, head: 90,
+        thigh: -94.76, shin: -95.76, foot: -42,
         upperArm: [-102, 22], forearm: [88, 12],
       },
     ],
@@ -5501,31 +5557,54 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     originX: 48,
     feet: 'free',
     implement: 'bar',
+    // From the bar just in front of the knees with the hips sat back, out to
+    // full reach: each pose puts the straight-armed, shoulder-width grip on the
+    // floor, close enough together that the plates never leave it in between.
     poses: [
       {
-        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 17.56, curl: 16, head: 2,
+        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 23.94, curl: 16, head: 2,
+        thigh: -62, shin: 180, foot: 180,
+        upperArm: [-105.52, 0], forearm: [-105.52, 0],
+      },
+      {
+        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 21.48, curl: 15.5, head: 2,
+        thigh: -72.28, shin: 180, foot: 180,
+        upperArm: [-97.91, 0], forearm: [-97.91, 0],
+      },
+      {
+        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 19.72, curl: 15, head: 2,
+        thigh: -82.19, shin: 180, foot: 180,
+        upperArm: [-90.4, 0], forearm: [-90.4, 0],
+      },
+      {
+        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 18.56, curl: 14.5, head: 2,
         thigh: -92, shin: 180, foot: 180,
-        upperArm: [-78, 10], forearm: [-78, 10],
+        upperArm: [-83.08, 0], forearm: [-83.08, 0],
       },
       {
-        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 15.49, curl: 15, head: 2,
-        thigh: -105, shin: 180, foot: 180,
-        upperArm: [-67, 10], forearm: [-67, 10],
+        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 17.96, curl: 14, head: 2,
+        thigh: -101.91, shin: 180, foot: 180,
+        upperArm: [-75.45, 0], forearm: [-75.45, 0],
       },
       {
-        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 14.11, curl: 14, head: 2,
-        thigh: -118, shin: 180, foot: 180,
-        upperArm: [-56, 10], forearm: [-56, 10],
+        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 16.43, curl: 13.5, head: 2,
+        thigh: -110, shin: 180, foot: 180,
+        upperArm: [-65.69, 0], forearm: [-65.69, 0],
       },
       {
-        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 12.68, curl: 13, head: 2,
+        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 15.41, curl: 13, head: 1,
+        thigh: -120, shin: 180, foot: 180,
+        upperArm: [-56.24, 0], forearm: [-56.24, 0],
+      },
+      {
+        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 14.14, curl: 12.5, head: 1,
         thigh: -131, shin: 180, foot: 180,
-        upperArm: [-44, 10], forearm: [-44, 10],
+        upperArm: [-45.49, 0], forearm: [-45.49, 0],
       },
       {
-        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 10.68, curl: 12, head: 0,
+        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 12.35, curl: 12, head: 0,
         thigh: -144, shin: 180, foot: 180,
-        upperArm: [-31, 10], forearm: [-31, 10],
+        upperArm: [-32.38, 0], forearm: [-32.38, 0],
       },
     ],
   },
@@ -5543,29 +5622,29 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     equipment: chainFlatBench(-46, -18, 9.0),
     poses: [
       {
-        at: [-44.25, 9.0 + CHAIN_KNEELING_KNEE], trunk: -1.55, curl: 14, head: -14,
+        at: [-44.25, 9.0 + CHAIN_KNEELING_KNEE], trunk: -0.63, curl: 14, head: -14,
         thigh: -108, shin: 180, foot: 180,
-        upperArm: [-84, 10], forearm: [-84, 10],
+        upperArm: [-84.22, 0], forearm: [-84.22, 0],
       },
       {
-        at: [-44.25, 9.0 + CHAIN_KNEELING_KNEE], trunk: 0.15, curl: 13, head: -10,
+        at: [-44.25, 9.0 + CHAIN_KNEELING_KNEE], trunk: 0.95, curl: 13, head: -10,
         thigh: -119, shin: 180, foot: 180,
-        upperArm: [-74, 10], forearm: [-74, 10],
+        upperArm: [-73.88, 0], forearm: [-73.88, 0],
       },
       {
-        at: [-44.25, 9.0 + CHAIN_KNEELING_KNEE], trunk: 1.36, curl: 12, head: -6,
+        at: [-44.25, 9.0 + CHAIN_KNEELING_KNEE], trunk: 1.93, curl: 12, head: -6,
         thigh: -130, shin: 180, foot: 180,
-        upperArm: [-63, 10], forearm: [-63, 10],
+        upperArm: [-62.51, 0], forearm: [-62.51, 0],
       },
       {
-        at: [-44.25, 9.0 + CHAIN_KNEELING_KNEE], trunk: 1.59, curl: 11, head: -4,
-        thigh: -141, shin: 180, foot: 180,
-        upperArm: [-51, 10], forearm: [-51, 10],
+        at: [-44.25, 9.0 + CHAIN_KNEELING_KNEE], trunk: 2.07, curl: 11, head: -4,
+        thigh: -140.44, shin: 180, foot: 180,
+        upperArm: [-51.34, 0], forearm: [-51.34, 0],
       },
       {
-        at: [-44.25, 9.0 + CHAIN_KNEELING_KNEE], trunk: 0.25, curl: 10, head: -6,
+        at: [-44.25, 9.0 + CHAIN_KNEELING_KNEE], trunk: 1.81, curl: 10, head: -6,
         thigh: -152, shin: 180, foot: 180,
-        upperArm: [-38, 10], forearm: [-38, 10],
+        upperArm: [-39.25, 0], forearm: [-39.25, 0],
       },
     ],
   },
@@ -5627,15 +5706,17 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     bellAxis: [1, 0, 0],
     nearArmOverHead: true,
     farArmOver: true,
-    equipment: chainFlatBench(-24, -10, 18.0),
+    // The bench's front edge sits under the shoulder blades, and the rigid
+    // trunk rests on that edge, sloping down to the low hips.
+    equipment: chainFlatBench(-29, -15, 18.0),
     poses: [
       {
-        at: [-17.0, 18.0 + CHAIN_BACK_HALF], trunk: 164, head: 180,
+        at: [-17.0, 18.0 + CHAIN_BACK_HALF + PULLOVER_BENCH_LIFT], trunk: 164, head: 180,
         thigh: 0, shin: -90, ankle: [23.0, CHAIN_ANKLE_HEIGHT],
-        upperArm: [78, -24], forearm: [126, -24],
+        upperArm: [36, -24], forearm: [84, -24],
       },
       {
-        at: [-17.0, 18.0 + CHAIN_BACK_HALF], trunk: 164, head: 180,
+        at: [-17.0, 18.0 + CHAIN_BACK_HALF + PULLOVER_BENCH_LIFT], trunk: 164, head: 180,
         thigh: 0, shin: -90, ankle: [23.0, CHAIN_ANKLE_HEIGHT],
         upperArm: [134, -24], forearm: [182, -24],
       },
@@ -5654,15 +5735,17 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     bellAxis: [1, 0, 0],
     nearArmOverHead: true,
     farArmOver: true,
-    equipment: chainFlatBench(-24, -10, 18.0),
+    // The bench's front edge sits under the shoulder blades, and the rigid
+    // trunk rests on that edge, sloping down to the low hips.
+    equipment: chainFlatBench(-29, -15, 18.0),
     poses: [
       {
-        at: [-17.0, 18.0 + CHAIN_BACK_HALF], trunk: 164, head: 180,
+        at: [-17.0, 18.0 + CHAIN_BACK_HALF + PULLOVER_BENCH_LIFT], trunk: 164, head: 180,
         thigh: 0, shin: -90, ankle: [23.0, CHAIN_ANKLE_HEIGHT],
-        upperArm: [88, -22.5], forearm: [88, -22.5],
+        upperArm: [61, -22.5], forearm: [61, -22.5],
       },
       {
-        at: [-17.0, 18.0 + CHAIN_BACK_HALF], trunk: 164, head: 180,
+        at: [-17.0, 18.0 + CHAIN_BACK_HALF + PULLOVER_BENCH_LIFT], trunk: 164, head: 180,
         thigh: 0, shin: -90, ankle: [23.0, CHAIN_ANKLE_HEIGHT],
         upperArm: [168, -22.5], forearm: [168, -22.5],
       },
@@ -5685,12 +5768,12 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       {
         at: [8.0, 18.0 + CHAIN_BACK_HALF], trunk: 180, head: 180,
         thigh: 0, shin: -90, ankle: [25.0, CHAIN_ANKLE_HEIGHT],
-        upperArm: [78, 12], forearm: [126, 12],
+        upperArm: [52, 0], forearm: [100, 0],
       },
       {
         at: [8.0, 18.0 + CHAIN_BACK_HALF], trunk: 180, head: 180,
         thigh: 0, shin: -90, ankle: [25.0, CHAIN_ANKLE_HEIGHT],
-        upperArm: [148, 12], forearm: [196, 12],
+        upperArm: [148, 0], forearm: [196, 0],
       },
     ],
   },
@@ -5706,27 +5789,29 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     implement: 'handles',
     nearArmOverHead: true,
     farArmOver: true,
+    // The pulleys line up with the chest, and the arms sweep in the chest's
+    // plane, so the hands meet above it rather than above the shoulders.
     lines: [
-      { from: [-16, 4.5, 32], to: 'nearGrip' },
-      { from: [-16, 4.5, -32], to: 'farGrip', depth: 'far' },
+      { from: [-10, 4.5, 32], to: 'nearGrip' },
+      { from: [-10, 4.5, -32], to: 'farGrip', depth: 'far' },
     ],
     equipment: [
       ...chainFlatBench(-20, 12, 18.0),
-      { kind: 'frame', a: [-16, 0.5, 32], b: [-16, 14, 32] },
-      { kind: 'frame', a: [-16, 0.5, -32], b: [-16, 14, -32] },
-      { kind: 'pulley', at: [-16, 4.5, 32] },
-      { kind: 'pulley', at: [-16, 4.5, -32] },
+      { kind: 'frame', a: [-10, 0.5, 32], b: [-10, 14, 32] },
+      { kind: 'frame', a: [-10, 0.5, -32], b: [-10, 14, -32] },
+      { kind: 'pulley', at: [-10, 4.5, 32] },
+      { kind: 'pulley', at: [-10, 4.5, -32] },
     ],
     poses: [
       {
         at: [8.0, 18.0 + CHAIN_BACK_HALF], trunk: 180, head: 180,
         thigh: 0, shin: -90, ankle: [25.0, CHAIN_ANKLE_HEIGHT],
-        upperArm: [90, 94], forearm: [90, 70],
+        upperArm: [83, 94], forearm: [83, 70],
       },
       {
         at: [8.0, 18.0 + CHAIN_BACK_HALF], trunk: 180, head: 180,
         thigh: 0, shin: -90, ankle: [25.0, CHAIN_ANKLE_HEIGHT],
-        upperArm: [90, -10], forearm: [90, -34],
+        upperArm: [83, -10], forearm: [83, -34],
       },
     ],
   },
@@ -5769,8 +5854,8 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
   },
   // 121 Kettlebell Dead Clean: stand over a kettlebell set between the ankles
   // with hips back and a long spine, drive the floor away to pull the bell from
-  // a dead stop up the body and spiral the hand around the handle into a tight
-  // front rack at the shoulder, then set it back on the floor between the feet.
+  // a dead stop close up the body, receiving it softly in the rack with the
+  // elbow tucked, then set it back on the floor between the feet.
   'kettlebell-dead-clean': {
     root: 'hip',
     view: 'oblique',
@@ -5801,9 +5886,12 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     ],
   },
   // 231 Kettlebell Turkish Get-Up (Lunge style): lie on the back with one
-  // kettlebell locked out overhead and the same-side knee bent, roll onto the
-  // opposite forearm and hand, sweep the straight leg back into a half-kneeling
-  // lunge beneath the vertical arm, stand tall, and reverse step by step.
+  // kettlebell locked out overhead and the same-side knee bent, push up on the
+  // free hand to a seated position, bridge the hips and sweep the straight leg
+  // back under them to one knee, lift the trunk upright, stand, and reverse.
+  // The bell arm stays vertical over its shoulder throughout. Whatever bears
+  // weight is on the floor at every tick: the near foot never moves, and the
+  // free hand stays planted from lying until the trunk lifts off it.
   'kettlebell-turkish-get-up-lunge-style': {
     root: 'hip',
     view: 'oblique',
@@ -5813,41 +5901,52 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     implement: 'kettlebell',
     nearArmOverHead: true,
     farArmOver: true,
+    // The free elbow bends out to the side; each knee bends forward of its leg's line.
+    elbowPole: [0, 90],
+    kneePole: 0,
     poses: [
       {
-        at: [-14.0, CHAIN_LYING_HEIGHT], trunk: 180, twist: 0, head: 155,
-        thigh: 48, shin: -56, foot: 0,
-        farThigh: [12, 8], farShin: [14, 8], farFoot: 75,
+        // Lying: back and pelvis on the floor, the far leg long on it, the free hand out at the side.
+        at: [-11, 6.30, 0], atArc: 0.5, trunk: 179, head: 155,
+        thigh: 0, shin: 0, ankle: [5, CHAIN_ANKLE_HEIGHT, 6.8], foot: 0,
+        farThigh: 0, farShin: 0, farAnkle: [32.4, 2.4, -6.8], farFoot: 70,
         upperArm: [90, 0], forearm: [90, 0],
-        farUpperArm: [12, 32], farForearm: [16, 24],
+        farUpperArm: 0, farForearm: 0, farWrist: [-24, 2.25, -23],
       },
       {
-        at: [-8.0, 10.0], trunk: 132, twist: -14, head: 112,
-        thigh: 40, shin: -52, foot: 0,
-        farThigh: [14, 72], farShin: [16, 72], farFoot: 75,
+        // Seated on the pelvis, side-bent onto the free hand with that shoulder packed down,
+        // the far knee bent with its foot down. On to the knee: the hips bridge and the trunk
+        // hinges forward over the hand while the far foot slides back on its toes.
+        at: [-11, 3.24, 0], atArc: 4.5, trunk: 120, trunkArc: -60, sideCurl: -60, shrug: -4, head: 112,
+        thigh: 0, shin: 0, ankle: [5, CHAIN_ANKLE_HEIGHT, 6.8], foot: 0,
+        farThigh: 0, farShin: 0, farAnkle: [16, 3.1, -6.8], farAnkleArc: 2.08, farFoot: -10,
         upperArm: [90, 0], forearm: [90, 0],
-        farUpperArm: [-78, 18], farForearm: [-68, 12],
+        farUpperArm: 0, farForearm: 0, farWrist: [-24, 2.25, -23],
       },
       {
-        at: [2.0, 25.4], trunk: 86, twist: 0, head: 106,
-        thigh: 0, shin: -88, foot: 0,
-        farThigh: [-78, 0], farShin: [176, 0], farFoot: 45,
+        // One knee down with the hand still on the floor: the trunk, hinged slightly forward,
+        // tips sideways over the hand (hips and all) so the straight arm reaches the floor.
+        at: [-26.768, 27.511, -3.4], atArc: 1.5, trunk: [80, -60], sideCurl: -30, shrug: -2, head: [90, -60],
+        thigh: 0, shin: 0, ankle: [5, CHAIN_ANKLE_HEIGHT, 6.8], foot: 0,
+        farThigh: 0, farShin: 0, farAnkle: [-37.888, 6.84, -6.8], farFoot: -120,
         upperArm: [90, 0], forearm: [90, 0],
-        farUpperArm: [-82, 12], farForearm: [-76, 8],
+        farUpperArm: 0, farForearm: 0, farWrist: [-24, 2.25, -23],
       },
       {
-        at: [6.0, 43.2], trunk: 88, twist: 0, head: 106,
-        thigh: -42, shin: -74, foot: 0,
-        farThigh: [-74, 0], farShin: [224, 0], farFoot: 15,
+        // One knee down, upright; the hips pivot over the planted knee, then rise first as the far foot steps through.
+        at: [-17.939, 25.007, 0], atArc: 4, trunk: 89, head: 106,
+        thigh: 0, shin: 0, ankle: [5, CHAIN_ANKLE_HEIGHT, 6.8], foot: 0,
+        farThigh: 0, farShin: 0, farAnkle: [-37.888, 6.84, -6.8], farAnkleArc: 3, farFoot: -120,
         upperArm: [90, 0], forearm: [90, 0],
-        farUpperArm: [-84, 10], farForearm: [-80, 7],
+        farUpperArm: 0, farForearm: 0, farWrist: [-16.339, 34, -12],
       },
       {
-        at: [10.0, 47.15], trunk: 89, twist: 0, head: 106,
-        thigh: -88, shin: -92, foot: 0,
-        farThigh: [-88, 0], farShin: [268, 0], farFoot: 0,
+        // Standing tall.
+        at: [5, 46.6, 0], trunk: 89, head: 106,
+        thigh: 0, shin: 0, ankle: [5, CHAIN_ANKLE_HEIGHT, 6.8], foot: 0,
+        farThigh: 0, farShin: 0, farAnkle: [5, CHAIN_ANKLE_HEIGHT, -6.8], farFoot: 0,
         upperArm: [90, 0], forearm: [90, 0],
-        farUpperArm: [-86, 8], farForearm: [-84, 6],
+        farUpperArm: 0, farForearm: 0, farWrist: [6.4, 47.5, -11],
       },
     ],
   },
@@ -5898,13 +5997,20 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters, tu
     return x[2] === undefined || y[2] === undefined ? flat : [flat[0], flat[1], x[2] + (y[2] - x[2]) * u];
   };
 
-  const at = point(a.at, b.at, 'at') as ChainPoint;
+  const lifted = (p: ChainPoint | undefined, arc: number | ChainVec | undefined): ChainPoint | undefined => {
+    if (p === undefined || arc === undefined || arc === 0) return p;
+    const k = 4 * u * (1 - u);
+    if (typeof arc === 'number') return p[2] === undefined ? [p[0], p[1] + arc * k] : [p[0], p[1] + arc * k, p[2]];
+    return [p[0] + arc[0] * k, p[1] + arc[1] * k, (p[2] ?? 0) + arc[2] * k];
+  };
+  const at = lifted(point(a.at, b.at, 'at'), a.atArc) as ChainPoint;
   const curl = num(a.curl, b.curl);
   const sideCurl = num(a.sideCurl, b.sideCurl);
   const roll = num(a.roll, b.roll);
   const shrug = num(a.shrug, b.shrug);
   const twist = num(a.twist, b.twist) + roll + turn * (movement.turnWithPhase === true ? Math.max(0, Math.min(1, ph)) : 1);
-  const given = dir(a.trunk, b.trunk);
+  const blended = dir(a.trunk, b.trunk);
+  const given: readonly [number, number] = a.trunkArc === undefined ? blended : [blended[0] + a.trunkArc * 4 * u * (1 - u), blended[1]];
   const thigh = dir(a.thigh, b.thigh);
   const shin = dir(a.shin, b.shin);
   // Arms that follow the trunk turn by however far the top of the spine has left upright.
@@ -5919,18 +6025,21 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters, tu
   const hand = optDir(a.hand, b.hand);
   const foot = optDir(a.foot, b.foot);
   const farFoot = optDir(a.farFoot ?? a.foot, b.farFoot ?? b.foot);
-  const wristTarget = point(a.wrist, b.wrist, 'wrist');
-  const farWristTarget = point(a.farWrist ?? a.wrist, b.farWrist ?? b.wrist, 'farWrist');
-  const ankleTarget = point(a.ankle, b.ankle, 'ankle');
-  const farAnkleTarget = point(a.farAnkle ?? a.ankle, b.farAnkle ?? b.ankle, 'farAnkle');
+  const wristTarget = lifted(point(a.wrist, b.wrist, 'wrist'), a.wristArc);
+  const farWristTarget = lifted(point(a.farWrist ?? a.wrist, b.farWrist ?? b.wrist, 'farWrist'), a.farWristArc);
+  const ankleTarget = lifted(point(a.ankle, b.ankle, 'ankle'), a.ankleArc);
+  const farAnkleTarget = lifted(point(a.farAnkle ?? a.ankle, b.farAnkle ?? b.ankle, 'farAnkle'), a.farAnkleArc);
   const footSpread = a.footSpread !== undefined || b.footSpread !== undefined
     ? num(a.footSpread ?? movement.footSpread, b.footSpread ?? movement.footSpread)
     : (movement.footSpread ?? 0);
   const kneeOut = a.kneeOut !== undefined || b.kneeOut !== undefined
     ? num(a.kneeOut ?? movement.kneeOut, b.kneeOut ?? movement.kneeOut)
     : (movement.kneeOut ?? 0);
+  // A bell passed from hand to hand changes hands only inside `bellPass`, while the hands are together.
+  const passU = a.bellPass === undefined ? u
+    : Math.max(0, Math.min(1, (u - a.bellPass[0]) / Math.max(1e-9, a.bellPass[1] - a.bellPass[0])));
   const bellSide = a.bellSide !== undefined || b.bellSide !== undefined
-    ? num(a.bellSide ?? 1, b.bellSide ?? 1)
+    ? (a.bellSide ?? 1) + ((b.bellSide ?? 1) - (a.bellSide ?? 1)) * passU
     : 1;
 
   // The spine, hip to neck, as a run of short steps. A curl turns each step a
@@ -6492,6 +6601,12 @@ function layoutChainExtras(
       groups.front.push({ kind: 'circle', cx: panel.bar[0], cy: panel.bar[1], r: CLOSE_UP_HAND.bar * panel.scale, fill: 'textMid', stroke: 'ink1', strokeWidth: 0.8, opacity: 1 });
     }
   }
+  const foot = footCloseUp(figure);
+  if (foot !== null) {
+    // The line from the real heel, then the panel over whatever is behind it.
+    groups.front.push(line(figure.joints.an, foot.centre, 0.8, 'textLow', 0.75));
+    groups.front.push(...foot.prims);
+  }
   return { ...groups, far, lines, near };
 }
 
@@ -6604,6 +6719,56 @@ export function handCloseUp(figure: ReturnType<typeof chainGeometry>) {
     finger: finger.map(place),
     bar: place(bar),
   };
+}
+
+/**
+ * The close-up of the near foot on the block's edge at this moment, or null
+ * when the movement has none. The scene is the figure's own foot, seen side
+ * on: each world point is placed relative to the block's rear top corner and
+ * magnified, so the heel's drop below the block top and its rise above it read
+ * at a glance. Everything drawn stays inside the panel's circle.
+ */
+export function footCloseUp(figure: ReturnType<typeof chainGeometry>) {
+  const closeUp = figure.movement.footCloseUp;
+  if (closeUp === undefined) return null;
+  const { r, scale, edge, focus } = closeUp;
+  const centre = figure.project(chainWorld(closeUp.at));
+  const corner: CanonicalPoint = [centre[0] + (edge[0] - focus[0]) * scale, centre[1] - (edge[1] - focus[1]) * scale];
+  const place = (q: readonly number[]): CanonicalPoint => [corner[0] + (q[0] - edge[0]) * scale, corner[1] - (q[1] - edge[1]) * scale];
+  const w = figure.world.near;
+  const heel = place(w.ankle);
+  const ball = place(w.toe ?? w.ankle);
+  const shinHalf = CANONICAL_BODY_PARAMETERS.lw * 0.9 / 2 * scale;
+  const footHalf = figure.footWidth / 2 * scale;
+  const fromCentre = (p: CanonicalPoint): number => Math.hypot(p[0] - centre[0], p[1] - centre[1]);
+  // The shin runs up from the heel toward the knee, as far as the panel shows it.
+  const up = [w.knee[0] - w.ankle[0], w.knee[1] - w.ankle[1]];
+  const upLength = Math.hypot(up[0], up[1]) || 1;
+  const dir: CanonicalPoint = [up[0] / upLength, -up[1] / upLength];
+  const room = r - shinHalf;
+  const off: CanonicalPoint = [heel[0] - centre[0], heel[1] - centre[1]];
+  const b = off[0] * dir[0] + off[1] * dir[1];
+  const reach = Math.max(0, -b + Math.sqrt(Math.max(0, b * b - (off[0] * off[0] + off[1] * off[1] - room * room))));
+  const shinEnd: CanonicalPoint = [heel[0] + dir[0] * reach, heel[1] + dir[1] * reach];
+  // The block: its top and rear face meet at the corner, cut off by the panel.
+  // The block fills as much of the panel below and ahead of its corner as fits.
+  const fits = (x: number, y: number): boolean => fromCentre([x, y]) <= r;
+  let blockW = 10, blockH = 3.5;
+  while (blockW > 0 && !(fits(corner[0] + blockW, corner[1]) && fits(corner[0] + blockW, corner[1] + blockH))) blockW -= 0.25;
+  while (blockH > 0 && !fits(corner[0], corner[1] + blockH)) blockH -= 0.25;
+  if (fromCentre(heel) + shinHalf > r + 1e-9) return null;
+  // A thin line carries the block's top back across the panel, over the foot,
+  // so the heel reads plainly below it at the stretch and above it at the top.
+  const levelHalf = 0.3;
+  const levelReach = Math.sqrt(Math.max(0, (r - levelHalf) ** 2 - (corner[1] - centre[1]) ** 2));
+  const prims: FigurePrim[] = [
+    { kind: 'circle', cx: centre[0], cy: centre[1], r, fill: 'ink1', stroke: 'textLow', strokeWidth: 1.2, opacity: 1 },
+    { kind: 'rect', x: corner[0], y: corner[1], w: blockW, h: blockH, rx: 0, fill: 'line', stroke: 'textLow', strokeWidth: 1.2, opacity: 1 },
+    { kind: 'bone', x1: heel[0], y1: heel[1], x2: shinEnd[0], y2: shinEnd[1], w: shinHalf * 2, color: 'textHi', opacity: 1 },
+    { kind: 'bone', x1: heel[0], y1: heel[1], x2: ball[0], y2: ball[1], w: footHalf * 2, color: 'textHi', opacity: 1 },
+    { kind: 'bone', x1: centre[0] - levelReach, y1: corner[1], x2: corner[0], y2: corner[1], w: levelHalf * 2, color: 'textLow', opacity: 1 },
+  ];
+  return { centre, r, scale, corner, heel, ball, heelR: shinHalf, prims };
 }
 
 /** Small hip arc with fixed soft knee; an actual cuff, not a hand cable. */
