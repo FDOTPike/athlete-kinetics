@@ -568,7 +568,7 @@ export const CHAIN_SPECS = [
       'Lower under control.',
       'Keep the chest on the bench.',
     ],
-    reason: 'Source-bound draft from a 3D model turned 40 degrees: the bench angle is not given by the source, so 45 degrees is a drawing choice; the shoulder blades squeezing together, which this figure has no way to show.',
+    reason: 'Source-bound draft from a 3D model turned 40 degrees: lying chest-down on a 45-degree incline bench with a slight fixed elbow bend, sweeping the arms out to parallel and lowering under control. Not drawn: the bench angle is a drawing choice; the shoulder blades squeezing together, which this figure has no way to show.',
     summary: 'Chest down on an incline bench, sweep the dumbbells out and apart with a slight elbow bend until the arms are parallel to the floor, squeeze the shoulder blades, then lower under control.',
   },
   {

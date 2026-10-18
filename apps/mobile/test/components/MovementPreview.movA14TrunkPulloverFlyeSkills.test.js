@@ -306,9 +306,9 @@ describe('MOV-A14 trunk, pullovers, flyes and kettlebell skills (33, 137, 119, 2
     for (const t of bbAlong.ticks) {
       const w = bbAlong.at(t).figure.world;
       expect(Math.abs(jointAngleDeg(w.near.shoulder, w.near.elbow, w.near.wrist) - elbow0)).toBeLessThan(0.05);
-      // Midpoint of the bar shaft never passes through the head sphere (radius 4.5)
+      // Midpoint of the bar shaft never passes through the head sphere (head radius + bar radius)
       const barMid = [(w.near.hold[0] + w.far.hold[0]) / 2, (w.near.hold[1] + w.far.hold[1]) / 2, 0];
-      expect(dist(barMid, w.head)).toBeGreaterThan(5.5);
+      expect(dist(barMid, w.head)).toBeGreaterThan(BODY.hr + 0.8);
     }
   });
 
