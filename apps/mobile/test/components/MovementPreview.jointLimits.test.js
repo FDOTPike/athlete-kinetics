@@ -10,6 +10,8 @@
  * Stream 2 (MOV-A06, MOV-A09, MOV-A12, MOV-A15): the same knee and elbow
  * limits, and the forearm-to-upper-arm painted clearance stays at least the
  * upper-arm radius plus the forearm radius (3.84) on both arms.
+ *
+ * Stream 3 (MOV-A07, MOV-A10, MOV-A13, MOV-A14): the same knee and elbow limits.
  */
 import * as rig from '../../src/components/movementPreview/canonicalFigure';
 import { previewManifest } from './previewManifest';
@@ -140,6 +142,53 @@ describe('MovementPreview joint limits across stream 2 batches (A06, A09, A12, A
       expect(minFarElbow).toBeGreaterThanOrEqual(30);
       expect(minNearForearmClear).toBeGreaterThanOrEqual(FOREARM_UPPER_ARM_PAINTED_RADII);
       expect(minFarForearmClear).toBeGreaterThanOrEqual(FOREARM_UPPER_ARM_PAINTED_RADII);
+    },
+  );
+});
+
+const STREAM_3_BATCH_IDS = [
+  // MOV-A07
+  229, 85, 112, 101, 58, 63, 69,
+  // MOV-A10
+  6, 13, 71, 108, 209, 77, 211, 64,
+  // MOV-A13
+  18, 36, 56, 136, 194, 239, 67, 96,
+  // MOV-A14
+  33, 137, 119, 204, 149, 289, 148, 201, 217, 121, 231,
+];
+
+describe('MovementPreview joint limits across stream 3 batches (A07, A10, A13, A14)', () => {
+  test.each(STREAM_3_BATCH_IDS)(
+    'movement %i keeps internal knee angle >= 35 deg and internal elbow angle >= 30 deg at every 33 ms tick',
+    (id) => {
+      const entry = previewManifest.entries.find((e) => e.movementId === id);
+      expect(entry).toBeDefined();
+      const slug = entry.assetKey.split('/')[1];
+      expect(rig.CHAIN_MOVEMENTS[slug]).toBeDefined();
+
+      const ds = entry.segmentDurationsMs;
+      const total = ds.reduce((a, b) => a + b, 0);
+      const poses = entry.frames.map((f) => f.joints);
+      const ticks = [...Array.from({ length: Math.ceil(total / 33) }, (_, i) => i * 33), total];
+
+      let minNearKnee = Infinity;
+      let minFarKnee = Infinity;
+      let minNearElbow = Infinity;
+      let minFarElbow = Infinity;
+
+      for (const t of ticks) {
+        const p = rig.poseAtTime(poses, t, ds);
+        const w = rig.chainGeometry(slug, p.ph, BODY, p.tw ?? 0).world;
+        minNearKnee = Math.min(minNearKnee, deg3D(w.near.hipJoint, w.near.knee, w.near.ankle));
+        minFarKnee = Math.min(minFarKnee, deg3D(w.far.hipJoint, w.far.knee, w.far.ankle));
+        minNearElbow = Math.min(minNearElbow, deg3D(w.near.shoulder, w.near.elbow, w.near.wrist));
+        minFarElbow = Math.min(minFarElbow, deg3D(w.far.shoulder, w.far.elbow, w.far.wrist));
+      }
+
+      expect(minNearKnee).toBeGreaterThanOrEqual(35);
+      expect(minFarKnee).toBeGreaterThanOrEqual(35);
+      expect(minNearElbow).toBeGreaterThanOrEqual(30);
+      expect(minFarElbow).toBeGreaterThanOrEqual(30);
     },
   );
 });

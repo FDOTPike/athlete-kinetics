@@ -92,9 +92,9 @@ const LEGACY_FAMILY_KEYS = {
   271: 'hip-hinge@standing',
   94: 'hip-hinge@standing',
   35: 'hip-extension@supine',
-  23: 'hip-hinge@standing',
-  202: 'hip-hinge@standing',
-  244: 'hip-hinge@standing',
+  23: 'hip-extension@standing',
+  202: 'hip-extension@standing',
+  244: 'hip-extension@standing',
   3: 'horizontal-press@supine',
   43: 'horizontal-press@supine',
   45: 'horizontal-press@supine',
@@ -145,6 +145,40 @@ const LEGACY_FAMILY_KEYS = {
   165: 'calf-raise@standing',
   205: 'squat@standing',
   250: 'hip-hinge@standing',
+  229: 'vertical-press@seated',
+  85: 'vertical-press@standing',
+  112: 'vertical-press@standing',
+  101: 'vertical-press@standing',
+  58: 'vertical-press@standing',
+  63: 'vertical-press@standing',
+  69: 'vertical-press@standing',
+  6: 'vertical-pull@standing',
+  13: 'vertical-pull@standing',
+  71: 'vertical-pull@standing',
+  108: 'vertical-pull@standing',
+  209: 'vertical-pull@standing',
+  77: 'straight-arm-pulldown@standing',
+  211: 'trunk-flex@standing',
+  64: 'trunk-flex@standing',
+  18: 'lunge@split-stance',
+  36: 'lunge@standing',
+  56: 'lunge@standing',
+  136: 'lunge@standing',
+  194: 'lunge@reverse',
+  239: 'lunge@reverse',
+  67: 'squat@standing',
+  96: 'calf-raise@standing',
+  33: 'trunk-flex@kneeling',
+  137: 'trunk-flex@kneeling',
+  119: 'trunk-flex@decline',
+  204: 'trunk-flex@supine',
+  149: 'horizontal-pull@supine',
+  289: 'horizontal-pull@supine',
+  148: 'horizontal-pull@supine',
+  201: 'flye@supine',
+  217: 'flye@incline',
+  121: 'hip-hinge@standing',
+  231: 'trunk-flex@standing',
 };
 
 const manifest = JSON.parse(fs.readFileSync(MANIFEST, 'utf8'));
@@ -206,7 +240,11 @@ for (const entry of manifest.entries) {
 // stay on VARIANT entries only - derivation.ts copies a variant's own
 // instructions, cues and reason into the derived preview at runtime. The
 // tests read the metadata through the manifest (see previewManifest.js), the
-// source of truth the owner's compact-format ruling points at.
+// source of truth the owner's compact-format ruling points at. An empty
+// techniqueCitations list is dropped too (manifest.ts reads it as optional),
+// except on a base some variant derives from: derivation.ts needs the base's
+// list to exist before a variant may inherit it.
+const derivationBases = new Set(manifest.entries.map((e) => e.derivesFrom).filter((id) => id !== undefined));
 const project = (entry) => {
   const covered = Array.isArray(entry.frames) && entry.frames.length > 0
     && entry.previewId !== undefined && entry.summary !== undefined;
@@ -216,6 +254,10 @@ const project = (entry) => {
   if (entry.derivesFrom === undefined) {
     delete out.instructions;
     delete out.cues;
+  }
+  if (Array.isArray(entry.techniqueCitations) && entry.techniqueCitations.length === 0
+    && !derivationBases.has(entry.movementId)) {
+    delete out.techniqueCitations;
   }
   return out;
 };

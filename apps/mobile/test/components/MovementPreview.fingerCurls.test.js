@@ -211,5 +211,13 @@ test('only finger-curls, front-squat-clean-grip, and the approved grip close-up 
     'incline-barbell-triceps-extension',
     'kneeling-cable-triceps-extension',
     'one-arm-kettlebell-swings',
+    // MOV-A10: the grips of the vertical pulls and hangs.
+    'chin-up',
+    'pull-up',
+    'v-bar-pulldown',
+    'full-range-of-motion-lat-pulldown',
+    'gorilla-chin-crunch',
+    'hanging-leg-raise',
   ]);
 });
+
