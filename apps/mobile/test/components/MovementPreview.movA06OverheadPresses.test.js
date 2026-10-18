@@ -28,6 +28,48 @@ const deg3D = (a, b, c) => {
   return (Math.acos(Math.max(-1, Math.min(1, (ux * vx + uy * vy + uz * vz) / n))) * 180) / Math.PI;
 };
 
+const segDist3D = (a, b, p) => {
+  const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
+  const lenSq = ux * ux + uy * uy + uz * uz || 1;
+  const k = Math.max(0, Math.min(1, ((p[0] - a[0]) * ux + (p[1] - a[1]) * uy + (p[2] - a[2]) * uz) / lenSq));
+  return Math.hypot(p[0] - (a[0] + ux * k), p[1] - (a[1] + uy * k), p[2] - (a[2] + uz * k));
+};
+
+const segDist2D = (a, b, p) => {
+  const ux = b[0] - a[0], uy = b[1] - a[1];
+  const lenSq = ux * ux + uy * uy || 1;
+  const k = Math.max(0, Math.min(1, ((p[0] - a[0]) * ux + (p[1] - a[1]) * uy) / lenSq));
+  return Math.hypot(p[0] - (a[0] + ux * k), p[1] - (a[1] + uy * k));
+};
+
+// Painted radii of the upper arm and forearm (their bones are drawn lw * 0.88 and lw * 0.72 wide).
+const UPPER_ARM_AND_FOREARM_RADII = (BODY.lw * 0.88) / 2 + (BODY.lw * 0.72) / 2;
+
+// Fore-aft position of the whole system's centre of mass: the body from the
+// world joints with Winter's segment mass fractions and centre positions
+// (head and neck 0.081 at the head; trunk 0.497 half-way up the spine; upper
+// arm 0.028 at 0.436, forearm 0.016 at 0.430, hand 0.006 at the wrist; thigh
+// 0.100 at 0.433, shank 0.0465 at 0.433, foot 0.0145 half-way along), plus a
+// load of `loadPerHand` body masses at each hand's hold.
+const lerp3 = (a, b, k) => a.map((v, i) => v + (b[i] - v) * k);
+const systemComX = (w, loadPerHand) => {
+  const parts = [[0.081, w.head], [0.497, lerp3(w.hip, w.neck, 0.5)]];
+  for (const s of [w.near, w.far]) {
+    parts.push(
+      [0.028, lerp3(s.shoulder, s.elbow, 0.436)], [0.016, lerp3(s.elbow, s.wrist, 0.43)], [0.006, s.wrist],
+      [0.1, lerp3(s.hipJoint, s.knee, 0.433)], [0.0465, lerp3(s.knee, s.ankle, 0.433)], [0.0145, lerp3(s.ankle, s.toe, 0.5)],
+      [loadPerHand, s.hold],
+    );
+  }
+  const mass = parts.reduce((sum, [m]) => sum + m, 0);
+  return parts.reduce((sum, [m, p]) => sum + m * p[0], 0) / mass;
+};
+// A working load of up to a quarter of body mass in each hand (two 20 kg bells,
+// or a 40 kg bar, for an 80 kg athlete). The combined centre lies between the
+// body's own centre and the loads', so the two ends of the range bound every
+// load inside it. The cable handle (41) is pulled by the cable, not weighed.
+const HEAVY_LOAD_PER_HAND = 0.25;
+
 const offVertical3D = (from, to) => {
   const dy = to[1] - from[1];
   const len = dist(from, to) || 1;
@@ -46,7 +88,7 @@ const keyTimesOf = (e) =>
   e.segmentDurationsMs.reduce((times, d) => [...times, times.at(-1) + d], [0]);
 
 describe('MOV-A06 standing overhead presses: universal physics, painted floor contact, mid-foot balance, upright trunk, and depth order', () => {
-  test.each(IDS)('movement %i is authored as pending with >= 5 frames, planted painted floor contact, upright braced trunk, load over mid-foot, and back-to-front depth order at every 33 ms tick', (id) => {
+  test.each(IDS)('movement %i is authored as pending with >= 5 frames, planted painted floor contact, upright braced trunk, the centre of mass with the load over the painted feet, open elbows with the forearm clear of the upper arm, and back-to-front depth order at every 33 ms tick', (id) => {
     const e = entryFor(id);
     expect(e.status).toBe('pending');
     expect(e.frames.length).toBeGreaterThanOrEqual(5);
@@ -79,16 +121,37 @@ describe('MOV-A06 standing overhead presses: universal physics, painted floor co
         expect(paintedSoleY).toBeCloseTo(FLOOR, 5);
       }
 
-      // Bar or bells stay over the foot base at every 33 ms tick, and elbows stay below wrists
-      expect(Math.abs(g.world.near.hold[0] - midFootX)).toBeLessThanOrEqual(2.0);
-      expect(g.world.near.hold[0]).toBeGreaterThanOrEqual(g.world.near.ankle[0]);
-      expect(g.world.near.hold[0]).toBeLessThanOrEqual(g.world.near.toe[0]);
+      // No elbow closes past 30 degrees (internal angle), and the wrist end of the
+      // forearm stays clear of the upper arm by both painted radii, so the forearm
+      // is never drawn through the upper arm at the rack or anywhere else
+      for (const s of [g.world.near, g.world.far]) {
+        expect(deg3D(s.shoulder, s.elbow, s.wrist)).toBeGreaterThanOrEqual(30);
+        expect(segDist3D(s.shoulder, s.elbow, s.wrist)).toBeGreaterThanOrEqual(UPPER_ARM_AND_FOREARM_RADII);
+      }
+
+      // The centre of mass of body and load stays over the painted feet (ankle
+      // to toe, out to the sole's rounded ends) with no load and with a heavy one
+      const baseBack = Math.min(g.world.near.ankle[0], g.world.near.toe[0]) - g.footWidth / 2;
+      const baseFront = Math.max(g.world.near.ankle[0], g.world.near.toe[0]) + g.footWidth / 2;
+      for (const load of [0, id === 41 ? 0 : HEAVY_LOAD_PER_HAND]) {
+        const comX = systemComX(g.world, load);
+        expect(comX).toBeGreaterThanOrEqual(baseBack);
+        expect(comX).toBeLessThanOrEqual(baseFront);
+      }
+
+      // The barbell's path stays over the foot, close to mid-foot, at every tick
+      if (id === 4) {
+        for (const hold of [g.world.near.hold, g.world.far.hold]) {
+          expect(Math.abs(hold[0] - midFootX)).toBeLessThanOrEqual(2.0);
+          expect(hold[0]).toBeGreaterThanOrEqual(g.world.near.ankle[0]);
+          expect(hold[0]).toBeLessThanOrEqual(g.world.near.toe[0]);
+        }
+      }
+
+      // Elbows stay below the wrists they press
       expect(g.world.near.elbow[1]).toBeLessThanOrEqual(g.world.near.wrist[1] - 6);
       expect(g.joints.el[1]).toBeGreaterThanOrEqual(g.joints.wr[1] + 6);
       if ([4, 31, 129, 230].includes(id)) {
-        expect(Math.abs(g.world.far.hold[0] - midFootX)).toBeLessThanOrEqual(2.0);
-        expect(g.world.far.hold[0]).toBeGreaterThanOrEqual(g.world.far.ankle[0]);
-        expect(g.world.far.hold[0]).toBeLessThanOrEqual(g.world.far.toe[0]);
         expect(g.world.far.elbow[1]).toBeLessThanOrEqual(g.world.far.wrist[1] - 6);
         expect(g.joints.ef[1]).toBeGreaterThanOrEqual(g.joints.wf[1] + 6);
       }
@@ -111,7 +174,7 @@ describe('MOV-A06 standing overhead presses: universal physics, painted floor co
     }
   });
 
-  test('4 Overhead Press keeps a rigid fixed grip width, clears the head by at least head radius + bar radius at every 33 ms tick, shows a closed-hand full grip close-up, and finishes stacked over the mid-foot', () => {
+  test('4 Overhead Press keeps a rigid fixed grip width, clears the head in 3D and with the closest point of the drawn bar at every 33 ms tick, shows the bar end on passing in front of the face, shows a closed-hand full grip close-up, and finishes stacked over the mid-foot', () => {
     // Quotes:
     // "Set the bar across the front shoulders with a full grip and the forearms close to vertical. Stand with balanced feet and brace before the bar leaves the shoulders."
     // "Press close past the face, move the head through to a tall lockout, and lower along the same path. If the torso leans into an incline press, reduce the load until the finish stays stacked."
@@ -126,30 +189,48 @@ describe('MOV-A06 standing overhead presses: universal physics, painted floor co
 
     expect(start.movement.implement).toBe('bar');
 
-    // At every 33 ms tick: wrist-to-wrist distance stays within 0.5 units of start, and head clears the bar by >= BODY.hr + barRadius
+    // At every 33 ms tick: wrist-to-wrist distance stays within 0.5 units of start;
+    // the head clears the bar in 3D by >= BODY.hr + barRadius; the closest point of
+    // the DRAWN bar segment (between its painted ends, not its midpoint) clears
+    // the painted head ring's outer edge by the bar's radius; and the bar is seen end on, so the plate and
+    // the bar's end pass in front of the face (painted after the head) with the
+    // painted end itself clear of the head circle.
     const poses = e.frames.map((f) => f.joints);
     const ds = e.segmentDurationsMs;
-    const segDist3D = (a, b, c) => {
-      const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
-      const lenSq = ux * ux + uy * uy + uz * uz || 1;
-      const k = Math.max(0, Math.min(1, ((c[0] - a[0]) * ux + (c[1] - a[1]) * uy + (c[2] - a[2]) * uz) / lenSq));
-      return Math.hypot(c[0] - (a[0] + ux * k), c[1] - (a[1] + uy * k), c[2] - (a[2] + uz * k));
-    };
     let maxSpanDrift = 0;
     let minClear3D = Infinity;
-    let minClear2D = Infinity;
-    for (const t of ticksOf(e)) {
+    let minClear2DDrawnBar = Infinity;
+    let minEndClear2D = Infinity;
+    let endOnTicks = 0;
+    const ticks = ticksOf(e);
+    for (const t of ticks) {
       const p = rig.poseAtTime(poses, t, ds);
       const g = rig.chainGeometry(slug, p.ph, BODY);
       const span = dist(g.world.near.wrist, g.world.far.wrist);
       maxSpanDrift = Math.max(maxSpanDrift, Math.abs(span - startGripSpan));
       minClear3D = Math.min(minClear3D, segDist3D(g.world.near.hold, g.world.far.hold, g.world.head));
-      const barMid2D = [(g.hold.near[0] + g.hold.far[0]) / 2, (g.hold.near[1] + g.hold.far[1]) / 2];
-      minClear2D = Math.min(minClear2D, dist(g.joints.hd, barMid2D));
+      const prims = rig.layoutCanonicalFigure(p, { view: e.view, assetKey: e.assetKey, body: BODY });
+      const headIdx = prims.findIndex((pr) => pr.kind === 'circle' && pr.stroke === 'textHi' && pr.r >= 5.5);
+      const head = prims[headIdx];
+      // The head ring is painted with a stroke centred on its radius: its outer edge is r + strokeWidth / 2
+      const headEdge = head.r + head.strokeWidth / 2;
+      minClear2DDrawnBar = Math.min(minClear2DDrawnBar, segDist2D(g.barEnd.near, g.barEnd.far, [head.cx, head.cy]) - headEdge);
+      const plateIdx = prims.findIndex((pr) => pr.kind === 'circle' && pr.fill === 'textMid' && Math.abs(pr.r - 6.6) < 1e-6);
+      if (plateIdx >= 0) {
+        endOnTicks += 1;
+        const end = prims[plateIdx + 1];
+        expect(end.kind).toBe('circle');
+        expect(end.cx).toBeCloseTo(g.hold.near[0], 6);
+        expect(end.cy).toBeCloseTo(g.hold.near[1], 6);
+        expect(plateIdx).toBeGreaterThan(headIdx);
+        minEndClear2D = Math.min(minEndClear2D, dist([end.cx, end.cy], [head.cx, head.cy]) - end.r - headEdge);
+      }
     }
     expect(maxSpanDrift).toBeLessThanOrEqual(0.5);
     expect(minClear3D).toBeGreaterThanOrEqual(BODY.hr + barRadius);
-    expect(minClear2D).toBeGreaterThanOrEqual(BODY.hr + barRadius);
+    expect(minClear2DDrawnBar).toBeGreaterThanOrEqual(barRadius);
+    expect(endOnTicks).toBe(ticks.length);
+    expect(minEndClear2D).toBeGreaterThanOrEqual(0);
 
     // Closed-hand full grip close-up panel (open = 0 wraps all finger bones around the bar against the palm)
     const startPanel = rig.handCloseUp(start);
@@ -228,6 +309,56 @@ describe('MOV-A06 standing overhead presses: universal physics, painted floor co
     const knuckleIdx = (prims) => prims.findIndex((pr) => pr.kind === 'bone' && pr.color === 'textHi' && Math.abs(pr.w - 2.2) < 1e-6 && pr.stroke === 'ink1');
     expect(knuckleIdx(startPrims)).toBeGreaterThan(shaftIdx(startPrims));
     expect(shaftIdx(topPrims)).toBeGreaterThan(knuckleIdx(topPrims));
+
+    // Inside the close-up the palm and the back of the hand are drawn differently, so
+    // the start (palm toward you) and the top (palm forward) differ at card size:
+    // - back of the hand (start): a darker block painted OVER the middle of the
+    //   handle, hiding it, with a row of four knuckles above the handle and no
+    //   fingertips in front of it;
+    // - palm (top): a light palm painted BEHIND the handle, with four fingers
+    //   wrapped over the handle toward the viewer (painted after it, crossing it);
+    // - and the thumb sits on the opposite side of the hand.
+    const inset = (prims, panel) => {
+      const discIdx = prims.findIndex((pr) => pr.kind === 'circle' && pr.fill === 'ink1' && pr.stroke === 'textLow' && Math.abs(pr.r - panel.r) < 1e-6
+        && Math.abs(pr.cx - panel.centre[0]) < 1e-6 && Math.abs(pr.cy - panel.centre[1]) < 1e-6);
+      expect(discIdx).toBeGreaterThanOrEqual(0);
+      const inside = (pr) => (pr.kind === 'circle'
+        ? dist([pr.cx, pr.cy], panel.centre) < panel.r
+        : dist([pr.x1, pr.y1], panel.centre) < panel.r && dist([pr.x2, pr.y2], panel.centre) < panel.r);
+      return prims.map((pr, i) => ({ pr, i })).filter(({ pr, i }) => i > discIdx && inside(pr));
+    };
+    const handleOf = (items) => items.find(({ pr }) => pr.kind === 'bone' && pr.color === 'textMid' && Math.abs(pr.y1 - pr.y2) < 1e-6 && Math.abs(pr.w - 2.2) < 1e-6);
+    const handBlockOf = (items) => items.find(({ pr }) => pr.kind === 'bone' && Math.abs(pr.w - 7.0) < 1e-6);
+    // Painted extent (round ends included) reaches past both edges of the painted handle
+    const crossesHandle = (pr, handle) => Math.min(pr.y1, pr.y2) - pr.w / 2 < handle.y1 - handle.w / 2
+      && Math.max(pr.y1, pr.y2) + pr.w / 2 > handle.y1 + handle.w / 2;
+    const startInset = inset(startPrims, startPanel);
+    const topInset = inset(topPrims, topPanel);
+
+    const startHandle = handleOf(startInset), startBack = handBlockOf(startInset);
+    expect(startHandle).toBeDefined();
+    expect(startBack).toBeDefined();
+    expect(startBack.pr.color).toBe('textMid');
+    expect(startBack.i).toBeGreaterThan(startHandle.i);
+    expect(crossesHandle(startBack.pr, startHandle.pr)).toBe(true);
+    const knuckles = startInset.filter(({ pr }) => pr.kind === 'circle' && pr.fill === 'textHi' && pr.cy < startHandle.pr.y1 - 1.1);
+    expect(knuckles).toHaveLength(4);
+    expect(startInset.filter(({ pr, i }) => pr.kind === 'bone' && i > startHandle.i && Math.abs(pr.w - 1.7) < 1e-6)).toHaveLength(0);
+
+    const topHandle = handleOf(topInset), topPalm = handBlockOf(topInset);
+    expect(topHandle).toBeDefined();
+    expect(topPalm).toBeDefined();
+    expect(topPalm.pr.color).toBe('textHi');
+    expect(topPalm.i).toBeLessThan(topHandle.i);
+    const wrapped = topInset.filter(({ pr, i }) => pr.kind === 'bone' && i > topHandle.i && Math.abs(pr.w - 1.7) < 1e-6 && crossesHandle(pr, topHandle.pr));
+    expect(wrapped).toHaveLength(4);
+    expect(topInset.filter(({ pr }) => pr.kind === 'circle' && pr.fill === 'textHi' && pr.cy < topHandle.pr.y1 - 1.1)).toHaveLength(0);
+
+    const thumbOf = (items) => items.find(({ pr }) => pr.kind === 'bone' && Math.abs(pr.w - 2.0) < 1e-6 && pr.stroke === 'ink1');
+    const startThumbSide = Math.sign(thumbOf(startInset).pr.x2 - startPanel.centre[0]);
+    const topThumbSide = Math.sign(thumbOf(topInset).pr.x2 - topPanel.centre[0]);
+    expect(startThumbSide).not.toBe(0);
+    expect(topThumbSide).toBe(-startThumbSide);
   });
 
   test('41 Cable Shoulder Press presses one handle from shoulder height to overhead lockout against a low pulley positioned clearly in front of the feet and shins, with the free hand quiet', () => {

@@ -1307,6 +1307,12 @@ export interface ChainMovement {
   plateRadius?: number;
   /** Whether a held barbell wears a thick pad around the middle of its shaft (as in a Barbell Hip Thrust). */
   barPad?: boolean;
+  /**
+   * For a held barbell seen end on: the fill of its plate (the default end-on
+   * barbell is a white disc). A grey plate with a light sleeve end keeps the bar
+   * distinct from the head ring when it passes in front of the face.
+   */
+  endOnPlateTone?: ColorRole;
   /** For 'longBar': the point on the floor the bar's far end is braced at, and the bar's whole length from there. */
   barAnchor?: ChainPoint;
   barLength?: number;
@@ -4651,12 +4657,18 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
   // bar set across the front shoulders with a full grip and the forearms close
   // to vertical. The bar presses close past the face as the head moves through
   // to a tall, stacked lockout overhead, then lowers along the same path.
+  // Seen nearly side on, so the bar is end on: its path rises close in front of
+  // the face rather than being drawn across the head. The grip, a little wider
+  // than the shoulders, opens the rack elbows; the hips sit a little behind
+  // mid-foot, and ease back a little more as the bar passes the face, so the
+  // bar in front stays over the foot until the lockout stacks.
   'overhead-press': {
     root: 'hip',
     view: 'oblique',
-    yawDeg: 18,
+    yawDeg: 3,
     originX: 58,
     implement: 'bar',
+    endOnPlateTone: 'textMid',
     farArmOver: true,
     nearArmOverHead: true,
     elbowPole: [-88, 10],
@@ -4666,22 +4678,22 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
     closeUp: { at: [-38, 65], r: 13.0, scale: 4.4, zoom: 1, open: 0 },
     poses: [
       {
-        at: [1.3, 46.5], trunk: 90, head: 114,
+        at: [0.7, 46.5], trunk: 90, head: 122,
         thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
         upperArm: -90, forearm: 90,
-        wrist: [4.65, 70.4, 12.8], farWrist: [4.65, 70.4, -12.8],
+        wrist: [4.65, 71.8, 15.2], farWrist: [4.65, 71.8, -15.2],
       },
       {
-        at: [1.3, 46.5], trunk: 90, head: 122,
+        at: [-1.0, 46.5], trunk: 90, head: 128,
         thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
         upperArm: 90, forearm: 90,
-        wrist: [4.55, 86.2, 12.8], farWrist: [4.55, 86.2, -12.8],
+        wrist: [4.6, 86.2, 15.2], farWrist: [4.6, 86.2, -15.2],
       },
       {
         at: [2.7, 46.5], trunk: 90, head: 90,
         thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
         upperArm: 90, forearm: 90,
-        wrist: [2.7, 94.72, 12.8], farWrist: [2.7, 94.72, -12.8],
+        wrist: [2.7, 94.26, 15.2], farWrist: [2.7, 94.26, -15.2],
       },
     ],
   },
@@ -4705,7 +4717,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       {
         at: [3.0, 46.5], trunk: 90, head: 90,
         thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
-        upperArm: [115, 165], forearm: [108, -10],
+        upperArm: [117, 184], forearm: [80, 0],
         palmYaw: 180, farPalmYaw: 180,
       },
       {
@@ -4740,7 +4752,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       {
         at: [2.7, 46.5], trunk: 90, head: 90,
         thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
-        upperArm: [96, 158], forearm: [90, 0],
+        upperArm: [96, 148], forearm: [90, 8],
         farUpperArm: [-90, 8], farForearm: [-82, -12],
       },
       {
@@ -4773,20 +4785,20 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
         at: [2.7, 46.5], trunk: 90, head: 90,
         thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
         upperArm: [90, 4], forearm: [90, 4],
-        farUpperArm: [106, 162], farForearm: [98, -6],
+        farUpperArm: [113, 162], farForearm: [86, 6],
         palmYaw: 0, farPalmYaw: 90,
       },
       {
         at: [2.7, 46.5], trunk: 90, head: 90,
         thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
-        upperArm: [106, 162], forearm: [98, -6],
-        farUpperArm: [106, 162], farForearm: [98, -6],
+        upperArm: [113, 162], forearm: [86, 6],
+        farUpperArm: [113, 162], farForearm: [86, 6],
         palmYaw: 90, farPalmYaw: 90,
       },
       {
         at: [2.7, 46.5], trunk: 90, head: 90,
         thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
-        upperArm: [106, 162], forearm: [98, -6],
+        upperArm: [113, 162], forearm: [86, 6],
         farUpperArm: [90, 4], farForearm: [90, 4],
         palmYaw: 90, farPalmYaw: 0,
       },
@@ -4812,7 +4824,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       {
         at: [2.7, 46.5], trunk: 90, head: 90,
         thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
-        upperArm: [90, 158], forearm: [90, 0],
+        upperArm: [90, 147], forearm: [90, 8],
         farUpperArm: [-90, 8], farForearm: [-82, -12],
         palmYaw: 0, farPalmYaw: 0,
       },
@@ -4845,7 +4857,7 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       {
         at: [2.7, 46.5], trunk: 90, head: 90,
         thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
-        upperArm: [106, 162], forearm: [98, -6],
+        upperArm: [113, 162], forearm: [86, 6],
         farUpperArm: [-90, 8], farForearm: [-82, -12],
         palmYaw: 90, farPalmYaw: 90,
       },
@@ -4877,21 +4889,21 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       {
         at: [2.7, 46.5], trunk: 90, head: 90,
         thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
-        upperArm: [106, 162], forearm: [98, -6],
-        farUpperArm: [106, 162], farForearm: [98, -6],
+        upperArm: [113, 162], forearm: [86, 6],
+        farUpperArm: [113, 162], farForearm: [86, 6],
         palmYaw: 90, farPalmYaw: 90,
       },
       {
         at: [2.7, 46.5], trunk: 90, head: 90,
         thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
         upperArm: [90, 4], forearm: [90, 4],
-        farUpperArm: [106, 162], farForearm: [98, -6],
+        farUpperArm: [113, 162], farForearm: [86, 6],
         palmYaw: 0, farPalmYaw: 90,
       },
       {
         at: [2.7, 46.5], trunk: 90, head: 90,
         thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
-        upperArm: [106, 162], forearm: [98, -6],
+        upperArm: [113, 162], forearm: [86, 6],
         farUpperArm: [90, 4], farForearm: [90, 4],
         palmYaw: 90, farPalmYaw: 0,
       },
@@ -6046,7 +6058,13 @@ function layoutChainExtras(
     const length = Math.hypot(q[0] - p[0], q[1] - p[1]);
     if (length < 3) {
       // One bar through both hands, seen end-on at the near hand.
-      if (kind === 'bar') near.push(...layoutEndOnBarbell(q));
+      if (kind === 'bar' && movement.endOnPlateTone !== undefined) {
+        // The plate face, then the sleeve's end (5 cm across) at the bar's axis.
+        near.push(
+          { kind: 'circle', cx: q[0], cy: q[1], r: 6.6, fill: movement.endOnPlateTone, stroke: 'ink1', strokeWidth: 1.0, opacity: 1 },
+          { kind: 'circle', cx: q[0], cy: q[1], r: 1.2, fill: 'textHi', stroke: 'ink1', strokeWidth: 0.6, opacity: 1 },
+        );
+      } else if (kind === 'bar') near.push(...layoutEndOnBarbell(q));
       else if (kind === 'ez') near.push(...layoutEndOnEzBar(q));
       else near.push({ kind: 'circle', cx: q[0], cy: q[1], r: 2.4, fill: 'textHi', stroke: 'ink1', strokeWidth: 1, opacity: 1 });
     } else {
@@ -6219,10 +6237,26 @@ function layoutChainExtras(
           const farPlate: FigurePrim = { ...line([farPlateX, cy - 5.2], [farPlateX, cy + 2.0], 3.2, 'textHi', 1), stroke: 'ink1', strokeWidth: 0.8 };
           const nearPlate: FigurePrim = { ...line([nearPlateX, cy - 5.2], [nearPlateX, cy + 2.0], 3.2, 'textHi', 1), stroke: 'ink1', strokeWidth: 0.8 };
           const shaft: FigurePrim = line([cx - hHalf, cy - 1.8], [cx + hHalf, cy - 1.8], 2.2, 'textMid', 1);
+          // The palm and the back of the hand are drawn differently so they read
+          // apart at card size. Palm side: a light palm behind the handle and four
+          // fingers wrapped over it toward the viewer. Back side: a darker back of
+          // the hand over the middle of the handle, hiding it, with the four
+          // knuckles riding above it.
+          const fingerOffsets = [-2.55, -0.85, 0.85, 2.55];
           if (facing) {
-            groups.front.push(wristBase, dorsal, innerPalm, farPlate, shaft, ...fingers, thumb, nearPlate);
+            const palm: FigurePrim = { ...line([cx, cy + 3.0], [cx, cy - 0.4], 7.0, 'textHi', 1), stroke: 'ink1', strokeWidth: 0.6 };
+            const wrapped: FigurePrim[] = fingerOffsets.map((off) => ({
+              ...line([cx + off * fSpread, cy - 4.1], [cx + off * fSpread, cy + 0.1], 1.7, 'textHi', 1),
+              stroke: 'ink1', strokeWidth: 0.5,
+            }));
+            groups.front.push(wristBase, palm, farPlate, shaft, ...wrapped, thumb, nearPlate);
           } else {
-            groups.front.push(farPlate, shaft, innerPalm, wristBase, dorsal, thumb, ...fingers, nearPlate);
+            const back: FigurePrim = { ...line([cx, cy + 3.0], [cx, cy - 2.4], 7.0, 'textMid', 1), stroke: 'ink1', strokeWidth: 0.6 };
+            const knuckles: FigurePrim[] = fingerOffsets.map((off) => ({
+              kind: 'circle', cx: cx + off * fSpread, cy: cy - 3.9, r: 1.05, fill: 'textHi', stroke: 'ink1', strokeWidth: 0.45, opacity: 1,
+            }));
+            const backWrist: FigurePrim = { ...wristBase, color: 'textMid' };
+            groups.front.push(farPlate, shaft, backWrist, back, thumb, ...knuckles, nearPlate);
           }
         }
       }

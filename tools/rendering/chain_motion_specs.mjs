@@ -2244,7 +2244,7 @@ export const CHAIN_SPECS = [
       'Lower the bar under control along the same vertical path past the face.',
       'Return the bar to the front shoulders with the forearms close to vertical and the trunk braced.',
     ],
-    reason: 'Source-bound draft, drawn from a 3D model turned 18 degrees with a closed-hand full-grip close-up panel so the fixed full grip across the front shoulders, the vertical forearms, the bar path passing close in front of the face without intersecting the head, and the head moving through to a stacked lockout over mid-foot all read clearly: standing tall with balanced feet and a braced trunk, pressing the barbell close past the face, moving the head through to a tall lockout overhead, and lowering along the same path.',
+    reason: 'Source-bound draft, drawn from a 3D model turned 3 degrees, nearly side on, so the bar is seen end on as its plate, with a closed-hand full-grip close-up panel so the fixed full grip across the front shoulders, the vertical forearms, the bar path rising close in front of the face without intersecting the head, and the head moving through to a stacked lockout over mid-foot all read clearly: standing tall with balanced feet and a braced trunk, pressing the barbell close past the face, moving the head through to a tall lockout overhead, and lowering along the same path.',
     summary: 'Standing with balanced feet and a braced trunk, set the bar across the front shoulders with a full grip and near-vertical forearms, press close past the face, move the head through to a tall stacked lockout, and lower along the same path.',
   },
   {
