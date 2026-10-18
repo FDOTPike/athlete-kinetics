@@ -1,0 +1,51 @@
+source commit: ab6f3877ce75ebba62719d3f0a166b148f536008
+command: node --expose-gc tools/rendering/verify_preview_storage.mjs
+
+{
+  "runtime": "v24.11.1",
+  "scope": "Host storage and retained JSON-clone regression only; no native peak memory/frame-timing/4GBphone acceptance",
+  "records": 242,
+  "families": 75,
+  "rawBytes": 705372,
+  "gzipBytes": 117152,
+  "largestFamily": {
+    "file": "hip-hinge__standing.json",
+    "rawBytes": 63490
+  },
+  "singleFamily": {
+    "samples": [
+      145808,
+      149176,
+      149336,
+      149336,
+      149568
+    ],
+    "medianBytes": 149336
+  },
+  "allFamilies": {
+    "samples": [
+      1739304,
+      1738456,
+      1738408,
+      1738408,
+      1738408
+    ],
+    "medianBytes": 1738408
+  },
+  "budgets": {
+    "rawBytes": 1048576,
+    "gzipBytes": 196608,
+    "familyBytes": 65536,
+    "singleFamilyMaxBytes": 262144,
+    "allFamiliesMaxBytes": 2097152
+  },
+  "checks": {
+    "aggregateRaw": true,
+    "aggregateGzip": true,
+    "everyFamily": true,
+    "singleFamilyClone": true,
+    "allFamiliesClone": true
+  },
+  "pass": true
+}
+exit code: 0
