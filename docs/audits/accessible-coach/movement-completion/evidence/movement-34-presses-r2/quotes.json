@@ -1,0 +1,35 @@
+{
+  "bounds": [
+    { "id": 249, "quote": "Press the kettlebell straight up until the arm is straight, letting the wrist turn as it rises.", "test": "MovementPreview.movA05Presses.test.js: 203 Floor Press and 249 One-Arm Kettlebell Floor Press ...", "bound": "painted bell centre within 3 units horizontally (world x and z) of its start at every 33 ms tick; press path <= 3 units; top elbow >= 172 deg" },
+    { "id": 249, "quote": "Wrist stacked over the elbow.", "test": "MovementPreview.movA05Presses.test.js: 203 Floor Press and 249 One-Arm Kettlebell Floor Press ...", "bound": "bottom forearm within 1 deg of vertical" },
+    { "id": 249, "quote": "Lie on the floor holding a kettlebell in one hand with that upper arm resting on the floor and the palm facing in.", "test": "MovementPreview.movA05Presses.test.js: 203 Floor Press and 249 One-Arm Kettlebell Floor Press ...", "bound": "bottom elbow centre at the upper arm's painted half width above the floor (within 0.05) and never below it; upper arm 30 to 50 deg out from the trunk in the floor plane (order MOV-A05-R2)" },
+    { "id": 249, "quote": "Complete the repetitions, then change arms.", "test": "MovementPreview.movA05Presses.test.js: 203 Floor Press and 249 One-Arm Kettlebell Floor Press ...", "bound": "last caption contains 'change arms'; no caption contains 'hold'; top segment <= 200 ms" },
+    { "id": 65, "quote": "Lower to a deep stretch just outside your chest with your elbows about 45 degrees from your sides, then press up and slightly back so the dumbbells finish over your face, not your belly.", "test": "MovementPreview.movA05Presses.test.js: 65 Incline Dumbbell Press ...", "bound": "no forearm-angle bound; no caption contains 'vertical forearm'" },
+    { "id": 8, "quote": "Set the bar across the front of the shoulders with a secure grip and the elbows pointing forward.", "test": "MovementPreview.movA01Squats.test.js: 8 Front Squat ...", "bound": "bar disc rests on the painted shoulder girdle (gap within 0.1), clear of the painted neck and trunk top (>= -0.05) at every tick; both elbows >= 30 deg internal; wrist >= 3.84 (painted halves) from the upper arm" },
+    { "id": 8, "quote": "Drive the elbows forward and high.", "test": "MovementPreview.movA01Squats.test.js: 8 Front Squat ...", "bound": "upper arm within 10 deg of level and more than 12 units forward at every tick (unchanged)" },
+    { "id": 208, "quote": "rest it on the front of the shoulders with the fingertips under the bar and the elbows high", "test": "MovementPreview.movA01Squats.test.js: 208 Front Squat (Clean Grip) ...", "bound": "bar rests on the painted shoulder girdle, clear of the neck and trunk top; both elbows >= 30 deg; wrist clear of the upper arm; elbows at least 1 unit higher than 8 (unchanged)" },
+    { "id": 81, "quote": "Cradle the bar in the crooks of the elbows, clasp the hands, and stand from the rack.", "test": "MovementPreview.movA02OtherSquats.test.js: 81 Zercher Squat ...", "bound": "both elbows >= 30 deg and wrist clear of the upper arm at every 33 ms tick" }
+  ],
+  "fileQuotes": [
+    { "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts", "line": 3768, "endLine": 3768, "text": "        upperArm: [1, -0.82], forearm: [173.076, 33.82]," },
+    { "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts", "line": 3773, "endLine": 3773, "text": "        upperArm: [22, -3.58], forearm: [199.942, 37.351]," },
+    { "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts", "line": 3802, "endLine": 3802, "text": "        upperArm: [6.038, -6.446], forearm: [-157.156, 34.997], hand: [100, -4]," },
+    { "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts", "line": 3807, "endLine": 3807, "text": "        upperArm: [24.03, -5.709], forearm: [-133.853, 34.07], hand: [100, -4]," },
+    { "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts", "line": 5079, "endLine": 5079, "text": "    yawDeg: -45," },
+    { "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts", "line": 5085, "endLine": 5085, "text": "    elbowPole: [-28.03, 41.432]," },
+    { "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts", "line": 5091, "endLine": 5091, "text": "        wrist: [-5.716, 14.112, 17.656], farWrist: [5.560, 2.116, -21.760]," },
+    { "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts", "line": 5097, "endLine": 5097, "text": "        wrist: [-5.404, 28.293, 16.572], farWrist: [5.560, 2.116, -21.760]," },
+    { "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts", "line": 5826, "endLine": 5826, "text": "export function chainKettlebellCentre(figure: ReturnType<typeof chainGeometry>): readonly [number, number, number] {" },
+    { "file": "tools/rendering/chain_motion_specs.mjs", "line": 2312, "endLine": 2312, "text": "      'Earn the stretch at the bottom just outside your chest.'," },
+    { "file": "tools/rendering/chain_motion_specs.mjs", "line": 2376, "endLine": 2376, "text": "    segments: [950, 200, 1450, 500]," },
+    { "file": "tools/rendering/chain_motion_specs.mjs", "line": 2380, "endLine": 2380, "text": "      'The arm is straight and the wrist has turned.'," },
+    { "file": "tools/rendering/chain_motion_specs.mjs", "line": 2382, "endLine": 2382, "text": "      'Wrist stacked over the elbow, press straight up, lower until the arm rests on the floor, and change arms after the repetitions.'," },
+    { "file": "apps/mobile/test/components/MovementPreview.jointLimits.test.js", "line": 14, "endLine": 15, "text": "const MIN_KNEE_DEG = 35;\nconst MIN_ELBOW_DEG = 30;" },
+    { "file": "apps/mobile/test/components/MovementPreview.movA05Presses.test.js", "line": 259, "endLine": 259, "text": "    for (const f of e.frames) expect(f.caption.toLowerCase()).not.toContain('vertical forearm');" },
+    { "file": "apps/mobile/test/components/MovementPreview.movA05Presses.test.js", "line": 361, "endLine": 362, "text": "    expect(upperArmFloorAngleDeg).toBeGreaterThanOrEqual(30);\n    expect(upperArmFloorAngleDeg).toBeLessThanOrEqual(50);" },
+    { "file": "apps/mobile/test/components/MovementPreview.movA05Presses.test.js", "line": 379, "endLine": 379, "text": "      expect(Math.hypot(bell[0] - bellStart[0], bell[2] - bellStart[2])).toBeLessThanOrEqual(3.0);" },
+    { "file": "apps/mobile/test/components/MovementPreview.movA05Presses.test.js", "line": 387, "endLine": 387, "text": "    expect(pressPath).toBeLessThanOrEqual(3.0);" },
+    { "file": "apps/mobile/test/components/MovementPreview.movA01Squats.test.js", "line": 77, "endLine": 78, "text": "    expect(internalDeg(side.shoulder, side.elbow, side.wrist)).toBeGreaterThanOrEqual(30);\n    expect(pointToSegment3(side.wrist, side.shoulder, side.elbow)).toBeGreaterThanOrEqual(UPPER_ARM_HALF + FOREARM_HALF);" },
+    { "file": "apps/mobile/test/components/MovementPreview.movA02OtherSquats.test.js", "line": 362, "endLine": 362, "text": "        expect(elbowAngleDeg(side)).toBeGreaterThanOrEqual(30);" }
+  ]
+}

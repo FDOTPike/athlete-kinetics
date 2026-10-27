@@ -1,0 +1,152 @@
+{
+  "sourceCommit": "30c655bacb95ad20a869bc8e94a45d29149ef66f",
+  "bounds": [
+    {
+      "id": 145,
+      "quote": "Reach into the start, then drive the elbows back until the upper back finishes the pull.",
+      "bound": "DRAFT_TEXT.md (line 37: 'hook a double handle under the bar just behind the plates, and hold it with both hands, palms facing each other and arms straight. Keeping the torso still and the elbows tucked in close to your sides, pull the bar straight up until the plates touch your lower chest and hold for a second.'): barAnchor at [-20, 1.5], rigid 5.00-unit 3D double-handle grip span with palmYaw = 90 and farPalmYaw = 90, elbow angle opens to 172.89 deg at bottom (plates clear of floor) and pulls to 90.85 deg at top with hold rising from y = 26.80 to y = 36.63 at the lower chest and a 1000 ms top hold before a 1500 ms slow lower.",
+      "test": "apps/mobile/test/components/MovementPreview.movA15HeldText.test.js: 145 Bent Over Two-Arm Long Bar Row"
+    },
+    {
+      "id": 145,
+      "quote": "Set the torso before the pull. Lead with the elbows. Pause with the upper back engaged.",
+      "bound": "DRAFT_TEXT.md (line 28: 'reading the catalogue\\'s \"cable_machine\" equipment tag as referring to the double-handle cable attachment hooked under the bar shaft is the chosen interpretation (rather than verified catalogue provenance), and keeping the torso still throughout the pull and return comes from ALL_300_MOTION_MAP.json\\'s quiet-torso constraint (\"Quiet hinged torso\"), not from the two still photographs.'): uncurled flat spine (curled = false) held stationary at 24.00 deg above horizontal from start to top (hip and neck displacement 0.000 units across all ticks) with straddled feet (ankle z = +/-8.30) and knees slightly bent at 124.98 deg.",
+      "test": "apps/mobile/test/components/MovementPreview.movA15HeldText.test.js: 145 Bent Over Two-Arm Long Bar Row"
+    },
+    {
+      "id": 153,
+      "quote": "Set up Box Squat with Bands with bands, barbell, dumbbells, squat rack and choose a load or range you can control.",
+      "bound": "DRAFT_TEXT.md (line 74: 'Set a parallel-height box behind you inside a power rack and loop a band from each sleeve of a barbell down to the base of the rack or heavy dumbbells secured on the floor. Step under the bar to set it across the back of your shoulders, unrack it with your trunk braced and your head facing forward, and stand in front of the box in a shoulder-width to slightly wider stance with your feet planted.'): two band lines run from nearBarEnd and farBarEnd down to floor anchors [-4, 1.2, +/-16.5] on the power rack base inside the rack frame, with a parallel-height box at y = 20.2 behind the athlete and footSpread = 9.2.",
+      "test": "apps/mobile/test/components/MovementPreview.movA15HeldText.test.js: 153 Box Squat with Bands"
+    },
+    {
+      "id": 153,
+      "quote": "Sit between the hips under control, keep pressure through the whole foot, and stand through the same path.",
+      "bound": "DRAFT_TEXT.md (line 74: 'Keeping your trunk braced through the descent, push your hips back and knees out to sit back under control until you are seated on the box with your thighs parallel to the floor and your shins approximately vertical, feet planted. Pause on the box without bouncing while keeping your trunk braced, then drive upward off the box through your heels with whole-foot pressure to stand tall.'): braced uncurled spine (curled = false), hip sits back from [1.8, 45.620] to [-16.8, 23.032] so the painted thigh bottom lands flush on the box top at y = 20.200 with shins approximately vertical at 85.59 deg from horizontal (knee angle 79.08 deg) and feet planted, pausing seated for 550 ms before driving up.",
+      "test": "apps/mobile/test/components/MovementPreview.movA15HeldText.test.js: 153 Box Squat with Bands"
+    },
+    {
+      "id": 165,
+      "quote": "Rise through the ball of the working foot, pause at the top, and lower the heel under control.",
+      "bound": "DRAFT_TEXT.md (line 111: 'Use a dumbbell that cannot roll (hexagonal heads, or wedged) placed on the floor in front of a sturdy support that cannot move, check it is stable before stepping on, hold the support with both hands for balance, and stand with the ball of one foot on the dumbbell handle and the other foot lifted clear of the floor. Keeping the knee straight and the dumbbell still, lower the working heel toward the floor to get a full stretch of the calf. While the dumbbell stays still, lift the heel to rise on the ball of the foot over the handle into a full calf extension, contract the calf hard at the top, and hold for a second.'): stationary floor dumbbell with two 6-sided flat-bottomed hexagonal heads at z = 0.6 and z = 13.0 (flat bottom edges on the floor y = 0.5, flat top edges at y = 6.1, angled side facets reaching x = +/-3.2, handle slab at y = 2.6), working toe rooted at y = 6.568 (painted sole bottom y = 4.600 on top of the handle), and working ankle travelling from y = 4.372 in the stretch (foot pitch +24 deg) to y = 10.319 at full extension (foot pitch -44 deg) with a 1000 ms top hold and 1300 ms controlled lower while the dumbbell never moves.",
+      "test": "apps/mobile/test/components/MovementPreview.movA15HeldText.test.js: 165 Calf Raise On A Dumbbell"
+    },
+    {
+      "id": 165,
+      "quote": "Keep pressure through the ball of the foot. Rise as tall as the ankle allows. Lower through a controlled stretch.",
+      "bound": "DRAFT_TEXT.md (line 113: 'Use a dumbbell that cannot roll, check it is stable before stepping on, and hold a support that cannot move. Keep the dumbbell still while the ankle lowers and rises into full extension and holds for a second. Lower the heel under control into a stretch with the knee straight.'): working knee stays straight at 180.00 deg throughout, non-working foot stays lifted clear of the floor (farToe y = 9.491), both hands rest on the stationary support bar at x = 14, y = 64.212, and all floor dumbbell primitives are phase-invariant.",
+      "test": "apps/mobile/test/components/MovementPreview.movA15HeldText.test.js: 165 Calf Raise On A Dumbbell"
+    },
+    {
+      "id": 205,
+      "quote": "Set up Front Barbell Squat To A Bench with barbell, bench, squat rack and choose a load or range you can control.",
+      "bound": "DRAFT_TEXT.md (line 150: 'Inside a squat rack, place a stable bench set so the glutes touch it lightly at about thighs parallel behind you, rest a barbell across the top of your front shoulders with your arms crossed to grasp the bar and your upper arms slightly above parallel to the floor, and step back into a shoulder-width stance with the toes slightly pointed out.'): cross-arm front rack holds the barbell across the front shoulders with upper arms pitched +8.00 deg above horizontal at the top and forearms crossed in front (-168 deg / -42 deg) in front of the parallel-height bench (y = 20.200).",
+      "test": "apps/mobile/test/components/MovementPreview.movA15HeldText.test.js: 205 Front Barbell Squat To A Bench"
+    },
+    {
+      "id": 205,
+      "quote": "Brace before the descent. Keep pressure through the whole foot. Drive the floor away to stand.",
+      "bound": "DRAFT_TEXT.md (line 150: 'Keeping your head up, your back straight, and your elbows high, bend the knees tracking with the toes over a whole foot to lower slowly until your glutes lightly touch the bench at about thighs parallel. Do not sit back and relax on the bench. Push the floor through your heels over the whole foot to straighten the legs and return to standing tall.'): upright straight torso (89 deg to 72 deg), knees track forward over the toes with whole-foot contact (knee x = 9.69 > toe x = 5.40, knee angle 65.23 deg), and painted glute/thigh bottom lightly touches the bench top at y = 20.200 at phase 1 without a seated hold (phases [0, 0.5, 1, 0.5, 0], segments [750, 750, 600, 600]).",
+      "test": "apps/mobile/test/components/MovementPreview.movA15HeldText.test.js: 205 Front Barbell Squat To A Bench"
+    },
+    {
+      "id": 250,
+      "quote": "Soften the knees, send the hips back until the posterior chain loads, and stand by driving the hips through.",
+      "bound": "DRAFT_TEXT.md (line 217: 'Set a kettlebell on the floor a short step ahead of your feet in a stance slightly wider than your hips, soften the knees and push the hips back with a flat back to grip the handle in one hand with an overhand grip, and hike the bell back between your thighs with the free arm swinging back beside your hip. Immediately drive the hips and knees forward to stand tall, letting the kettlebell swing forward and up on a long, straight arm to chest to shoulder height, the arm following the hip drive while you keep your shoulders square.'): bottom hinge at trunk = 30.00 deg hikes the kettlebell between the upper thighs (wrist y = 32.92) with free arm back (farWrist x = -9.48); hip snap drives trunk to 78.00 deg at phase 1 and 90.00 deg at phase 2 (top knee angle 177.12 deg) while the straight working arm (elbow 180.00 deg) carries the bell on a circular arc to chest to shoulder height (wrist y = 71.35 vs shoulder y = 70.50).",
+      "test": "apps/mobile/test/components/MovementPreview.movA15HeldText.test.js: 250 One-Arm Kettlebell Swings"
+    },
+    {
+      "id": 250,
+      "quote": "Set the ribs down and brace first. Send the hips back into the load. Finish tall through the glutes.",
+      "bound": "DRAFT_TEXT.md (line 219: 'Start with the bell on the floor a short step ahead of the feet and hike it back between the thighs with a flat back. Snap the hips to stand tall so the bell swings to chest to shoulder height, the arm following the hip drive. Keep your shoulders square, hinge as the bell drops back between your thighs, and park it on the floor under control at the end of the set before changing arms.'): on the downswing from phase 2 to phase 1 the torso stays tall (90.00 deg to 78.00 deg) as the hand drops back to the thighs before hinging from 78.00 deg to 30.00 deg into phase 0.",
+      "test": "apps/mobile/test/components/MovementPreview.movA15HeldText.test.js: 250 One-Arm Kettlebell Swings"
+    }
+  ],
+  "fileQuotes": [
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/evidence/movement-45-held-text/DRAFT_TEXT.md",
+      "line": 28,
+      "text": "No cable stack is used; reading the catalogue's `\"cable_machine\"` equipment tag as referring to the double-handle cable attachment hooked under the bar shaft is the chosen interpretation (rather than verified catalogue provenance), and keeping the torso still throughout the pull and return comes from `ALL_300_MOTION_MAP.json`'s quiet-torso constraint (`\"Quiet hinged torso\"`), not from the two still photographs."
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/evidence/movement-45-held-text/DRAFT_TEXT.md",
+      "line": 74,
+      "text": "Keeping your trunk braced through the descent, push your hips back and knees out to sit back under control until you are seated on the box with your thighs parallel to the floor and your shins approximately vertical, feet planted. Pause on the box without bouncing while keeping your trunk braced, then drive upward off the box through your heels with whole-foot pressure to stand tall."
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/evidence/movement-45-held-text/DRAFT_TEXT.md",
+      "line": 111,
+      "text": "Use a dumbbell that cannot roll (hexagonal heads, or wedged) placed on the floor in front of a sturdy support that cannot move, check it is stable before stepping on, hold the support with both hands for balance, and stand with the ball of one foot on the dumbbell handle and the other foot lifted clear of the floor."
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/evidence/movement-45-held-text/DRAFT_TEXT.md",
+      "line": 150,
+      "text": "Inside a squat rack, place a stable bench set so the glutes touch it lightly at about thighs parallel behind you, rest a barbell across the top of your front shoulders with your arms crossed to grasp the bar and your upper arms slightly above parallel to the floor, and step back into a shoulder-width stance with the toes slightly pointed out."
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/evidence/movement-45-held-text/DRAFT_TEXT.md",
+      "line": 217,
+      "text": "Immediately drive the hips and knees forward to stand tall, letting the kettlebell swing forward and up on a long, straight arm to chest to shoulder height, the arm following the hip drive while you keep your shoulders square."
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5383,
+      "text": "'bent-over-two-arm-long-bar-row': {"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5423,
+      "text": "'box-squat-with-bands': {"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5465,
+      "text": "'calf-raise-on-a-dumbbell': {"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5478,
+      "text": "{ kind: 'frame', a: [-1.8, 0.5, 0.6], b: [1.8, 0.5, 0.6] },"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5486,
+      "text": "{ kind: 'frame', a: [-1.8, 0.5, 13.0], b: [1.8, 0.5, 13.0] },"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5518,
+      "text": "'front-barbell-squat-to-a-bench': {"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5552,
+      "text": "'one-arm-kettlebell-swings': {"
+    },
+    {
+      "file": "tools/rendering/chain_motion_specs.mjs",
+      "line": 2610,
+      "text": "basis: 'Draft written from the public-domain free-exercise-db entry (Bent_Over_Two-Arm_Long_Bar_Row) and its two photographs, awaiting the owner. The catalogue\\'s own text for this movement is a placeholder on a source hold.',"
+    },
+    {
+      "file": "tools/rendering/chain_motion_specs.mjs",
+      "line": 2633,
+      "text": "instructions: 'Set a parallel-height box behind you inside a power rack and loop a band from each sleeve of a barbell down to the base of the rack or heavy dumbbells secured on the floor. Step under the bar to set it across the back of your shoulders, unrack it with your trunk braced and your head facing forward, and stand in front of the box in a shoulder-width to slightly wider stance with your feet planted. Keeping your trunk braced through the descent, push your hips back and knees out to sit back under control until you are seated on the box with your thighs parallel to the floor and your shins approximately vertical, feet planted. Pause on the box without bouncing while keeping your trunk braced, then drive upward off the box through your heels with whole-foot pressure to stand tall.',"
+    },
+    {
+      "file": "tools/rendering/chain_motion_specs.mjs",
+      "line": 2655,
+      "text": "instructions: 'Use a dumbbell that cannot roll (hexagonal heads, or wedged) placed on the floor in front of a sturdy support that cannot move, check it is stable before stepping on, hold the support with both hands for balance, and stand with the ball of one foot on the dumbbell handle and the other foot lifted clear of the floor. Keeping the knee straight and the dumbbell still, lower the working heel toward the floor to get a full stretch of the calf. While the dumbbell stays still, lift the heel to rise on the ball of the foot over the handle into a full calf extension, contract the calf hard at the top, and hold for a second. Lower the heel under control back into the stretch while the dumbbell stays still, complete the repetitions, then change legs.',"
+    },
+    {
+      "file": "tools/rendering/chain_motion_specs.mjs",
+      "line": 2677,
+      "text": "instructions: 'Inside a squat rack, place a stable bench set so the glutes touch it lightly at about thighs parallel behind you, rest a barbell across the top of your front shoulders with your arms crossed to grasp the bar and your upper arms slightly above parallel to the floor, and step back into a shoulder-width stance with the toes slightly pointed out. Keeping your head up, your back straight, and your elbows high, bend the knees tracking with the toes over a whole foot to lower slowly until your glutes lightly touch the bench at about thighs parallel. Do not sit back and relax on the bench. Push the floor through your heels over the whole foot to straighten the legs and return to standing tall.',"
+    },
+    {
+      "file": "tools/rendering/chain_motion_specs.mjs",
+      "line": 2699,
+      "text": "instructions: 'Set a kettlebell on the floor a short step ahead of your feet in a stance slightly wider than your hips, soften the knees and push the hips back with a flat back to grip the handle in one hand with an overhand grip, and hike the bell back between your thighs with the free arm swinging back beside your hip. Immediately drive the hips and knees forward to stand tall, letting the kettlebell swing forward and up on a long, straight arm to chest to shoulder height, the arm following the hip drive while you keep your shoulders square. Let the bell drop back down along the same arc and hinge at the hips as your hand passes your thighs to catch the backswing into the next repetition, then park the bell under control on the floor ahead of your feet at the end of the set before changing arms.',"
+    }
+  ]
+}

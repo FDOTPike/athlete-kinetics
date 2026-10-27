@@ -1,0 +1,17 @@
+source commit: 48f191ffd87f0de2a42ddce60ac83085ea324871
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with probe-4bf7490f85b5cee750abb40d30e234d470643844.json
+
+movements measured: 232 (baseline 225)
+added: 184 Drag Curl; 281 Standing Dumbbell Reverse Curl; 109 Zottman Curl; 190 Dumbbell Prone Incline Curl; 213 High Cable Curls; 240 Lying Cable Curl; 259 Reverse Barbell Preacher Curls
+removed: none
+changed, expected: none
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  184 Drag Curl: drawn 690dbbbd59ed6f1b027fbf0d2efdd5b8800481872cd52de0f5c3850fbfa3b9bf captions 79941dc8ccf1695608c9eea9ea63e397257a9b6f1d848cfd89e80aa066fc66f9 stage 104.35x240.00 cycle 3300 ms
+  281 Standing Dumbbell Reverse Curl: drawn 28d93da739a6af2fc81c92dfdd2e9f9223bea7c954cfaa623850f3b6c994dd52 captions 85a187861b4a38c9b62cfefce535f5180e1c3f996cb866f03e38461369c20480 stage 99.13x240.00 cycle 3100 ms
+  109 Zottman Curl: drawn 5ee6c858085b279a894d83bfe38dbe5fd243cef44cedccc205fa5d057b38b435 captions ecb137620ef3e95492a891f8e95d0d7b0df04121cb40319b9231cdca9c4aa886 stage 109.57x240.00 cycle 3400 ms
+  190 Dumbbell Prone Incline Curl: drawn 19ea87e676cae19f587e11f851c4b2f8d90422404bff620d22b92538cdb362b9 captions 0502bf7a5085f0be84fbe001f85ce299e5c65d6fb770a2eec966fdee46f1dd19 stage 205.71x240.00 cycle 3100 ms
+  213 High Cable Curls: drawn ac8f9c090a304efc1a30311fae6254c3c25597fe3bb4d46a366adc17416ffeec captions e9eaffc66d5e222a3f5742f323e19fec94ff1cf4b64eb314f729a0c9da902d6e stage 240.00x240.00 cycle 3100 ms
+  240 Lying Cable Curl: drawn d22284077b5e7c12e9f15615588438d84778c71a77c5c21a17dfa2f1e1f527eb captions 2cad7c5e5192a4b8df5d7745ce2c62e816afb25f8daf3762afa5ffb96fa56d87 stage 240.00x80.84 cycle 3100 ms
+  259 Reverse Barbell Preacher Curls: drawn 2773afb2a4b52862d229f56ed51f6dff75f36dda39bf90cba176b9838d152823 captions 13b92f740f791bf1f2b7c6ef11244b26a984be1b4b8e1d9dc8931c83a1da3964 stage 182.54x240.00 cycle 3100 ms
+exit code: 0 (probe run exit 0)

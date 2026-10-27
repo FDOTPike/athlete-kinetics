@@ -1,0 +1,22 @@
+source commit: 818fc33ecfc1efb7c0a0158bbbb843dbe056d6e9
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with probe-48f191ffd87f0de2a42ddce60ac83085ea324871.json
+
+movements measured: 232 (baseline 232)
+added: none
+removed: none
+changed, expected: 140 Barbell Squat To A Bench; 98 Barbell Hack Squat; 2 Deadlift; 46 Deficit Deadlift; 176 Deadlift with Bands; 257 Reverse Band Deadlift; 78 Sumo Deadlift; 258 Reverse Band Sumo Deadlift; 290 Sumo Deadlift with Bands; 288 Stiff-Legged Barbell Deadlift; 23 Nordic Curl; 202 Floor Glute-Ham Raise
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  140 Barbell Squat To A Bench: drawn 9b9351f9a0fb306f810d891b9e32a66f4d42defc32df99002b1a7317d07f3737 captions 6fab663c841f319402bbf89bb0172c0f1b794b393d4eadc834d7e41807d01966 stage 156.52x240.00 cycle 2600 ms
+  98 Barbell Hack Squat: drawn c514527a8f056cc973481517821ae2241fdd2713b01898c16f61ec3ad75a6d73 captions b02aee67082836f69d640dcd1eee7586a641c687399589ff2b1e39a50b7ed06e stage 134.51x240.00 cycle 3450 ms
+  2 Deadlift: drawn 56ced692890147f8696b47967accc28a7db28c28ca04ecc3bed09e244ad2f07b captions 9d2a8752cf3602407cc76f21e0c7cd02e48d635bf79aec58b6a1daeb4606d673 stage 125.22x240.00 cycle 3600 ms
+  46 Deficit Deadlift: drawn 81310ea8d5b67e889292e8861a2a46ecafb1850f1af075b4b3dece9b7114497c captions cf8a13848ca5d53cecab555f8d4670af6ac3dcccb729976c1798e4da668483cf stage 117.50x240.00 cycle 3650 ms
+  176 Deadlift with Bands: drawn 60bba6d60d01d4e9442d5c5a1f7b82e76c23dca865c1080117593e0565bbbdd4 captions 901139ddb7e017051d3fce3d58e6e39d7d32c65c6cb3c8f06f386358ec31e930 stage 127.83x240.00 cycle 3600 ms
+  257 Reverse Band Deadlift: drawn 1e28d63323526d04af60b0280424007c8b8bfb0eaad67ef3af87505ebefa5f1e captions a863622970652b21647d1ed867aa7e9883aba88aabb5ac02f60cfd8d50e4e2a9 stage 137.87x240.00 cycle 3600 ms
+  78 Sumo Deadlift: drawn cf70ebb6bd9b42c4495dc0e8346c550e41587e5cba7336aaf07efaefc9ea7430 captions 884f8e63d3302543821ec52687c0e388bfe41adf1dfaa7e6e9838acae34ae5f6 stage 142.92x240.00 cycle 3600 ms
+  258 Reverse Band Sumo Deadlift: drawn d703b4093a82cc0e687fec4af86142ea9680b4f2caa16b718c08e81803612ace captions 3f0bdd5f6e2d988c80db718750ab3d945179dad1df3f38409aeddb48d8dc0bf4 stage 148.09x240.00 cycle 3600 ms
+  290 Sumo Deadlift with Bands: drawn 003ceaa647ce6b1cb20ee44fc9669ef36de8d0c772b2de9eb5978c4b57cd4136 captions 6807e113b8542f9f17df932f0ab094a8f4a2ee30be51a93da61e9bdf300e35ed stage 142.92x240.00 cycle 3600 ms
+  288 Stiff-Legged Barbell Deadlift: drawn d76eba97d23ee583b99a56738a90d14fbe7e0711969742ac7d286817f856e6b7 captions 812c979ce75212fe99bd83f82be7f23b66cfa53ac9e7bb334dd5d6e6a655d8b3 stage 137.14x240.00 cycle 3600 ms
+  23 Nordic Curl: drawn 1da3354996e2654b45eb5c32e28c127cc56d41480a61ba0a3c1d405b1bd57cc9 captions 3db62feccb6cbccabbb9fbd7e6a2cd11d2bc7829d7c6aa1bec2b7db810df03b5 stage 240.00x194.04 cycle 4900 ms
+  202 Floor Glute-Ham Raise: drawn 62bf097e616a55fec64bd7462560e627ef54d496ba5bab8306c16cd60bcd0268 captions 0369cfb70cfaa82d317d39f5acbef47839620417d0768b7f7c94a6d22f81f32e stage 240.00x197.50 cycle 4900 ms
+exit code: 0 (probe run exit 0)

@@ -1,0 +1,15 @@
+source commit: 5ebb8f12a7e06f246cae79d1fbbb6e7d3b9dfa9f
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with probe-c9d0f25faf35617b4189e385a839819751249205.json
+
+movements measured: 236 (baseline 231)
+added: 145 Bent Over Two-Arm Long Bar Row; 153 Box Squat with Bands; 165 Calf Raise On A Dumbbell; 205 Front Barbell Squat To A Bench; 250 One-Arm Kettlebell Swings
+removed: none
+changed, expected: none
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  145 Bent Over Two-Arm Long Bar Row: drawn d3a13d62ad668d2e8a52cbd868a9fb7e6c92360fa905d976e4d4133b6b8fd93b captions af885080cb47e3bd28de12175343f1f16703984be91ceefbc11a0d5de9511082 stage 208.70x240.00 cycle 3950 ms
+  153 Box Squat with Bands: drawn 68c939ce6197333ff013bcddc8accffbff42d596efed78f2585b3db6559f355f captions a45c70849fc2a656ed519c4b715a9a2a1d30229bbc68906c516274e1f5006938 stage 130.21x240.00 cycle 3550 ms
+  165 Calf Raise On A Dumbbell: drawn 567352d5d04e970239d287b6dee6eda481a77a2a8a4a3868e4663dcd108e9557 captions 614f097f600be91d1092aa1c7f81e4411ea3717814e8c90e05f558348a58c480 stage 103.53x240.00 cycle 3700 ms
+  205 Front Barbell Squat To A Bench: drawn f304fc4fbb273400cd4d5cdb1a0a6086e7d3105e9efc8f424e54a707f098c51f captions a1715dc3a0d7da8aa1770e4f4a570fd105015ae78696fbe22a3ee77236af1c73 stage 154.84x240.00 cycle 2700 ms
+  250 One-Arm Kettlebell Swings: drawn 44c93bb925628580d5b6f516ae14229abcaba913f21b7fab6aaeb427d5bc622a captions 83591cc1fd225a966d03303297e2e289286ab39a6cbe029aee526c2161471922 stage 122.61x240.00 cycle 1980 ms
+exit code: 0 (probe run exit 0)
