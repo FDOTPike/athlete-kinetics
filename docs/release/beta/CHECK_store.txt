@@ -1,0 +1,9 @@
+Store draft checks
+==================
+SVG XML: 4 valid files
+Short description: 60 / 80 characters
+Branch comparison: Health Connect adapter, Apple Health adapter and Android manifest have no differences between HEAD and origin/master.
+Evidence reference check:
+Checked 57 file:line citations across 6 documents.
+PASS: 57 citations exist and line numbers are in range.
+FAIL: 0
