@@ -1,6 +1,6 @@
 /** Phase 17 utility-first active-session surface. */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING_NOTE, EFFORT_STOP_GUIDANCE, effortCue, mapRirToRpe, RIR_OPTIONS, PREPARATION_STATUS_LABEL, isTerminalPreparationStatus, preparationDoseUnit, type EffortAnswer, type RunnerHaltReason } from '@ak/inference';
 import { formatTeachingOnlyReason, useStore, type LoadSelection, type LoggedSet, type SetLoadShown, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
 import { useSubViewBack } from '../navigation/navigation';
@@ -882,6 +882,19 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
     openSubstitution(currentMovement.movement_id);
   };
 
+  const confirmSkipExercise = (): void => {
+    if (runner?.phase !== 'working' || currentSlot === null) return;
+    Alert.alert('Skip this exercise', 'Skip the remaining sets for this exercise? Sets already logged will be kept.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Skip this exercise', onPress: () => {
+        const latest = useStore.getState();
+        if (latest.session?.sessionId === session?.sessionId
+          && latest.activeSessionPlanSlotId === currentSlot.sessionPlanSlotId
+          && latest.runner?.phase === 'working') latest.runnerSkipSlot();
+      } },
+    ]);
+  };
+
   const submitNiggle = (): void => {
     if (niggleRegion === null) return;
     reportNiggle(niggleRegion, niggleSeverity);
@@ -976,8 +989,8 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
 
         {complete && (
           <View style={styles.completeCard} accessibilityRole="summary">
-            <Text style={styles.completeTitle}>All planned work is logged.</Text>
-            <Text style={styles.completeBody}>Take the win. There is nothing else you need to decide here.</Text>
+            <Text style={styles.completeTitle}>{runner?.skippedSessionPlanSlotIds.length ? 'No exercises remain.' : 'All planned work is logged.'}</Text>
+            <Text style={styles.completeBody}>{runner?.skippedSessionPlanSlotIds.length ? 'Finish this session when you are ready.' : 'Take the win. There is nothing else you need to decide here.'}</Text>
             <CompletedMetrics sets={session.sets} bandLadder={bandLadder} movementsById={byId} onEdit={editSet} />
             <PrimaryButton
               label="Finish session"
@@ -1378,6 +1391,8 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                               ? `Log set ${Math.min(slot.plannedSets, currentLogged + 1)} for ${movement?.name ?? 'movement'}`
                               : `Log set ${Math.min(slot.plannedSets, currentLogged + 1)} for ${movement?.name ?? 'movement'}, unavailable — enter a load first`}
                         />
+
+                        {runner?.phase === 'working' && <QuietAction label="Skip this exercise" onPress={confirmSkipExercise} />}
 
                         {/* Shared Disclosure Primitive */}
                         <Disclosure

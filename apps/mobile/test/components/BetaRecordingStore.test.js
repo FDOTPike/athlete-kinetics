@@ -20,6 +20,10 @@
  *     clears both tables with foreign keys on or off.
  */
 import { readFileSync } from 'node:fs';
+import React from 'react';
+import { Alert } from 'react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import SessionScreen from '../../src/screens/SessionScreen';
 import { join } from 'node:path';
 import { useStore, storableLoadShown } from '../../src/state/useStore';
 import { authorizeAthleteDataBoot } from '../../src/state/dataMaintenanceLock';
@@ -191,6 +195,35 @@ describe('what the load entry was seeded with', () => {
 });
 
 describe('which slots were skipped', () => {
+  test('the screen confirms each explicit exercise skip, then finishing persists exactly those slot ids', () => {
+    const sessionId = startTwoSlotSession();
+    const ids = state().sessionPlan.map((slot) => slot.sessionPlanSlotId).sort((a, b) => a - b);
+    const confirm = jest.spyOn(Alert, 'alert');
+    render(<SessionScreen />);
+    act(() => logOn(state().sessionPlan[0], 0));
+    expect(screen.queryByRole('button', { name: 'Skip this exercise' })).toBeNull();
+    fireEvent.press(screen.getByRole('button', { name: 'Ready now, skip the rest timer' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Skip this exercise' }));
+    expect(state().runner.skippedSessionPlanSlotIds).toEqual([]);
+    act(() => confirm.mock.calls.at(-1)[2].find((button) => button.text === 'Cancel').onPress?.());
+    expect(state().runner.skippedSessionPlanSlotIds).toEqual([]);
+    for (const id of ids) {
+      fireEvent.press(screen.getByRole('button', { name: 'Skip this exercise' }));
+      expect(confirm.mock.calls.at(-1)[0]).toBe('Skip this exercise');
+      act(() => confirm.mock.calls.at(-1)[2].find((button) => button.text === 'Skip this exercise').onPress());
+      expect(state().runner.skippedSessionPlanSlotIds).toContain(id);
+    }
+    expect(screen.queryByRole('button', { name: 'Skip this exercise' })).toBeNull();
+    expect(count('SELECT COUNT(*) AS c FROM session_skipped_slot')).toBe(0);
+    expect(screen.getByText('No exercises remain.')).toBeTruthy();
+    fireEvent.press(screen.getByRole('button', { name: 'Finish completed session' }));
+    expect(state().session).toBeNull();
+    expect(state().lastEndedSessionId).toBe(sessionId);
+    expect(count('SELECT COUNT(*) AS c FROM set_record WHERE session_id = ?', sessionId)).toBe(1);
+    expect(all('SELECT session_plan_slot_id FROM session_skipped_slot ORDER BY 1').map((row) => row.session_plan_slot_id)).toEqual(ids);
+    expect(raw().prepare('SELECT skipped_slot_count FROM session_outcome WHERE session_id = ?').get(sessionId).skipped_slot_count).toBe(ids.length);
+  });
+
   test('finishing a session stores the id of every skipped slot, and their number is the outcome\'s own count', () => {
     const sessionId = startTwoSlotSession();
     const [first] = state().sessionPlan;
