@@ -356,6 +356,11 @@
         "ordinal": 70,
         "file": "071_beta_recording.sql",
         "sha256": "42d51be93dd53ff6a60b6eb9a1c7cf5c72f9e1afb8dfc1a20472d3803f504d0f"
+      },
+      {
+        "ordinal": 71,
+        "file": "072_question_log.sql",
+        "sha256": "854309b3a2007b42d7a83f5b48070980ec572a4b2fa30fa3bedf52d198eee8c2"
       }
     ]
   },

@@ -329,6 +329,7 @@ export const SENTINELS: readonly MigrationSentinel[] = [
   // 071 which planned slots were skipped, and what the load entry was seeded
   // with. Losing either table would make session finalization or set logging
   // fail its write and drop every record already kept.
+  { type: 'table', name: 'question_log' }, // 072
   { type: 'table', name: 'session_skipped_slot' },                            // 071
   { type: 'table', name: 'set_load_shown' },                                  // 071
 ];

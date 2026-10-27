@@ -69,7 +69,7 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '067_sport_and_emphasis.sql',
   '068_movement_content_correction_v2.sql',
   '069_resting_heart_rate.sql',
-  '070_session_feel.sql', '071_beta_recording.sql'];
+  '070_session_feel.sql', '071_beta_recording.sql', '072_question_log.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
@@ -1766,11 +1766,11 @@ console.log('[2u] 057 block_meta phase/index repair + enforcement');
     const db = freshDb();
     runMigrations(db, MIGRATIONS);
     // Slot 004 is the parameterized materialize script, never a migration:
-    // 70 files (slots 001-071, no 004) -> user_version 70. This count is
+    // 71 files (slots 001-072, no 004) -> user_version 71. This count is
     // pinned deliberately so adding a migration is a conscious act, not a
-    // silent one. Re-pinned for 071 (beta recording).
-    check('fresh install reaches user_version 70 (70 files, no slot 004)',
-      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 70,
+    // silent one. Re-pinned for 072 (question log).
+    check('fresh install reaches user_version 71 (71 files, no slot 004)',
+      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 71,
       String(uv(db)));
     const trig = db.raw.prepare(
       `SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'trigger'
@@ -4196,8 +4196,8 @@ const IDX_070 = FILES.indexOf('070_session_feel.sql');
 console.log('[071] beta recording (session_skipped_slot, set_load_shown)');
 const IDX_071 = FILES.indexOf('071_beta_recording.sql');
 {
-  check('071 is appended after 070 and completes the chain',
-    IDX_071 === IDX_070 + 1 && IDX_071 === MIGRATIONS.length - 1 && IDX_071 === 69, `index=${IDX_071}`);
+  check('071 is appended after 070 at its shipped ordinal',
+    IDX_071 === IDX_070 + 1 && IDX_071 === 69, `index=${IDX_071}`);
   const skippedRows = (db) => db.raw.prepare('SELECT * FROM session_skipped_slot ORDER BY session_plan_slot_id').all();
   const shownRows = (db) => db.raw.prepare('SELECT * FROM set_load_shown ORDER BY set_id').all();
   const priorFacts = (db) => JSON.stringify({
@@ -4333,6 +4333,43 @@ const IDX_071 = FILES.indexOf('071_beta_recording.sql');
         && Number(lost.raw.prepare(`SELECT COUNT(*) AS c FROM ${table}`).get().c) === 0
         && Number(lost.raw.prepare(`SELECT COUNT(*) AS c FROM ${other}`).get().c) === 1);
   }
+}
+
+console.log('[072] question log');
+{
+  const index = FILES.indexOf('072_question_log.sql');
+  check('072 is appended after 071 and completes the chain', index === IDX_071 + 1 && index === MIGRATIONS.length - 1 && index === 70);
+  const questions = (db) => db.raw.prepare('SELECT * FROM question_log ORDER BY id').all();
+  const upgraded = freshDb();
+  applyRaw(upgraded, MIGRATIONS, 0, index);
+  upgraded.raw.exec("INSERT INTO session (session_id, session_date, started_at_ms) VALUES (72, '2026-10-28', 1)");
+  const before = upgraded.raw.prepare('SELECT * FROM session').all();
+  runMigrations(upgraded, MIGRATIONS);
+  check('a populated pre-072 install retains its sessions and starts with an empty log',
+    JSON.stringify(upgraded.raw.prepare('SELECT * FROM session').all()) === JSON.stringify(before) && questions(upgraded).length === 0);
+  const insert = upgraded.raw.prepare('INSERT INTO question_log (asked_at, question_text, outcome_kind, glossary_term_id) VALUES (?, ?, ?, ?)');
+  insert.run(1, 'What is effort?', 'card', 'RPE');
+  insert.run(2, 'unrelated', 'none', null);
+  insert.run(3, 'my knee hurts', 'refer', null);
+  check('all three outcomes retain question text and only a card carries a term id', questions(upgraded).length === 3 && questions(upgraded)[0].glossary_term_id === 'RPE');
+  const rejectsQuestion = (args) => { try { insert.run(...args); return false; } catch { return true; } };
+  check('question log rejects invalid text, timestamps, kinds and card identity combinations', [
+    [0, 'question', 'none', null], [1, ' ', 'none', null], [1, 'a'.repeat(301), 'none', null],
+    [1, 'question', 'other', null], [1, 'question', 'card', null], [1, 'question', 'card', ''],
+    [1, 'question', 'none', 'RPE'], [1, 'question', 'refer', 'RPE'],
+  ].every(rejectsQuestion));
+  const kept = JSON.stringify(questions(upgraded));
+  runMigrations(upgraded, MIGRATIONS);
+  upgraded.executeSync(`PRAGMA user_version = ${index};`);
+  runMigrations(upgraded, MIGRATIONS);
+  upgraded.executeSync('PRAGMA user_version = 0;');
+  runMigrations(upgraded, MIGRATIONS);
+  check('questions survive reboot, replay from 072 and a full re-apply', JSON.stringify(questions(upgraded)) === kept);
+  upgraded.raw.exec('DROP TABLE question_log');
+  check('a lost question log is detected', sentinelsMissing(upgraded).includes('question_log'));
+  runMigrations(upgraded, MIGRATIONS);
+  check('self-heal rebuilds the lost log while retaining session data', questions(upgraded).length === 0
+    && sentinelsMissing(upgraded).length === 0 && upgraded.raw.prepare('SELECT COUNT(*) AS c FROM session WHERE session_id = 72').get().c === 1);
 }
 
 // --- one statement per database call ------------------------------------------
