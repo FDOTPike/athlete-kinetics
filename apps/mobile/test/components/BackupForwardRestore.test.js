@@ -702,7 +702,16 @@ describe('every registered pre-upgrade schema restores, not only the first', () 
     const v68 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 68);
     expect(v68.fingerprint).not.toBe(v67.fingerprint);
     expect([v68.migrationSlot, v68.tableCount]).toEqual([69, v67.tableCount + 1]);
-    expect(PRE_UPGRADE.length).toBeGreaterThanOrEqual(5);
+    // 070 adds a table too (session_feel), so v69 has a fingerprint of its own.
+    const v69 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 69);
+    expect(v69.fingerprint).not.toBe(v68.fingerprint);
+    expect([v69.migrationSlot, v69.tableCount]).toEqual([70, v68.tableCount + 1]);
+    // 071 adds two (session_skipped_slot, set_load_shown), so v70 is the current schema with its own fingerprint.
+    const v70 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 70);
+    expect(v70).toBe(CURRENT);
+    expect(v70.fingerprint).not.toBe(v69.fingerprint);
+    expect([v70.migrationSlot, v70.tableCount]).toEqual([71, v69.tableCount + 2]);
+    expect(PRE_UPGRADE.length).toBeGreaterThanOrEqual(7);
   });
 
   test.each(PRE_UPGRADE.map((contract) => [contract.userVersion, contract]))(
@@ -783,7 +792,7 @@ describe('every registered pre-upgrade schema restores, not only the first', () 
   );
 });
 
-test('round trip at the current schema: focus, goals, every revision and measurement, the sport answer, goal exercise, block explanation and resting heart rate survive backup and restore', async () => {
+test('round trip at the current schema: focus, goals, every revision and measurement, the sport answer, goal exercise, block explanation, resting heart rate, session feel, skipped slots and shown loads survive backup and restore', async () => {
   const livePath = join(mockLibraryDir, 'athlete_kinetics.db');
   const db = open(livePath);
   seedFocusAndGoals(db);
@@ -792,7 +801,34 @@ test('round trip at the current schema: focus, goals, every revision and measure
   // Resting HR with no HRV beside it, from each service (069).
   db.exec(`INSERT INTO resting_hr_daily (date, bpm, source, synced_at_ms) VALUES
     ('2026-09-03', 54.5, 'apple_health', 8000), ('2026-09-04', 49, 'health_connect', 8100)`);
+  // 070 and 071: how a finished session went, a slot that was skipped in it, and
+  // what two of its sets were seeded with (a load, and a blank field with an advisory).
+  db.exec(`INSERT INTO session (session_id, micro_cycle_id, session_date, started_at_ms) VALUES (7100, NULL, '2026-09-05', 9000);
+    INSERT INTO session_feel (session_id, feel, reason_tired, recorded_at_ms) VALUES (7100, 'harder', 1, 9500);
+    INSERT INTO session_plan_slot (session_plan_slot_id, session_id, slot_index, movement_id, planned_sets, provenance_kind)
+      VALUES (7101, 7100, 0, 1, 3, 'free_form'), (7102, 7100, 1, 2, 3, 'free_form');
+    INSERT INTO set_record (set_id, session_id, movement_id, set_index, reps, load_kg, rpe, logged_at_ms)
+      VALUES (7101, 7100, 1, 1, 8, 40, 7, 9100), (7102, 7100, 1, 2, 8, 42.5, NULL, 9200);
+    INSERT INTO session_skipped_slot (session_plan_slot_id) VALUES (7102);
+    INSERT INTO set_load_shown (set_id, load_source, shown_load_kg, advisory_kg, advisory_kind)
+      VALUES (7101, 'history', 40, NULL, NULL), (7102, 'manual', NULL, 45, 'onerm');`);
   db.close();
+  const sessionRecords = (file) => {
+    const reader = open(file);
+    try {
+      return JSON.stringify({
+        feel: reader.prepare('SELECT * FROM session_feel ORDER BY session_id').all(),
+        skipped: reader.prepare('SELECT * FROM session_skipped_slot ORDER BY session_plan_slot_id').all(),
+        shown: reader.prepare('SELECT * FROM set_load_shown ORDER BY set_id').all(),
+      });
+    } finally { reader.close(); }
+  };
+  const recordsBefore = sessionRecords(livePath);
+  expect(JSON.parse(recordsBefore)).toMatchObject({
+    feel: [{ session_id: 7100, feel: 'harder' }],
+    skipped: [{ session_plan_slot_id: 7102 }],
+    shown: [{ set_id: 7101, load_source: 'history', shown_load_kg: 40 }, { set_id: 7102, load_source: 'manual', shown_load_kg: null, advisory_kg: 45, advisory_kind: 'onerm' }],
+  });
   const before = {
     athlete: athleteData(livePath), focusGoals: focusGoalRows(livePath), seeds: seedCounts(livePath), sport: sportRows(livePath),
     telemetry: telemetryRows(livePath),
@@ -816,8 +852,10 @@ test('round trip at the current schema: focus, goals, every revision and measure
   const wipe = open(livePath);
   wipe.exec('PRAGMA foreign_keys = ON; DELETE FROM athlete_goal; DELETE FROM athlete_focus;'
     + ' DELETE FROM athlete_sport_profile; DELETE FROM training_block;'
-    + ' DELETE FROM hrv_daily; DELETE FROM resting_hr_daily;');
+    + ' DELETE FROM hrv_daily; DELETE FROM resting_hr_daily; DELETE FROM session WHERE session_id = 7100;');
   wipe.close();
+  // The session's records went with it.
+  expect(JSON.parse(sessionRecords(livePath))).toEqual({ feel: [], skipped: [], shown: [] });
   expect(JSON.parse(telemetryRows(livePath))).toEqual({ hrv: [], restingHr: [] });
   expect(focusGoalRows(livePath)).toBe(NO_FOCUS_OR_GOALS);
   // The goal link and the block explanation went with their parents.
@@ -833,6 +871,7 @@ test('round trip at the current schema: focus, goals, every revision and measure
   expect(focusGoalRows(livePath)).toBe(before.focusGoals);
   expect(sportRows(livePath)).toBe(before.sport);
   expect(telemetryRows(livePath)).toBe(before.telemetry);
+  expect(sessionRecords(livePath)).toBe(recordsBefore);
   expect(athleteData(livePath)).toBe(before.athlete);
   expect(seedCounts(livePath)).toEqual(before.seeds);
   // The restored file is the real current schema again, guards included.

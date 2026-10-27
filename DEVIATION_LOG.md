@@ -603,3 +603,81 @@ dumbbell/cable staples — Romanian Deadlift was proposed and DROPPED by the
 rule's own "no barbell for beginners" clause (verify:library caught the
 contradiction). Enforced in blockGenerator, substitution L1/L2/L3, and the
 SessionScreen picker; machine-checked in verify:blocks + verify:library.
+
+## 2026-10-13 — Systemic language outranks a confident curated match that does not halt
+
+`redFlag.ts` stated two rules: a flag beside a confident match in a curated
+body-state category means the curated entry wins; and systemic language
+(dizziness, faintness, chest symptoms) is a halt, not a floor. When both
+applied and the curated entry only restricted, the code followed the first,
+so a report such as "sore and feeling faint" left without a halt.
+
+Decision: in that one case the systemic halt stands. A curated entry that
+already halts is kept as it is. A pain word gains no such precedence: the pain
+floor still yields to a confident curated match. No keyword, phrase, threshold
+or entry changes.
+
+Known price: the keyword scan's negation check looks one word back, so "not
+feeling dizzy" beside a routine match now halts where it used to restrict, and
+a halt cannot be undone by the severity rating. Repairing the negation check
+would loosen symptom handling and is deliberately not part of this change.
+
+Evidence and its limit.
+
+Verifiable in this repository: `npm run verify:semantic`. On this change it
+passes these checks, and with the rule switched off five of them fail (the
+first, the three live reports and the trade-off):
+- "fixed inputs: systemic language beside EVERY confident curated entry that
+  does not halt is a systemic halt";
+- "systemic language beside a routine match halts: ..." for three reports, each
+  preceded by "precondition: the match alone is confident, curated and does
+  not halt";
+- "a curated match that already halts keeps its own entry and wording", "a
+  pain word beside a confident routine match is still not raised to the pain
+  floor", "a denial the one-word negation check catches is read as it was";
+- "KNOWN TRADE-OFF: a denial two words back ("not feeling dizzy") beside a
+  routine match now halts".
+
+NOT VERIFIED from this repository: on a private benchmark of 378 open notes
+the change was measured to recover two halts and to lose or add nothing else.
+That benchmark and its run record are not part of this repository, so the
+figure cannot be checked here, and nothing here depends on it. It is in any
+case too few notes to qualify by that benchmark's own promotion rule, so this
+change ships outside that route, as an explicit exception.
+
+It carries no clinical claim.
+
+Authority: proposed on 2026-10-13 after the owner deferred the choice; it
+takes effect, and is ratified, by the owner's merge of the pull request that
+adds this entry. Machine-checked in verify:semantic, with fixed inputs and
+through the live embedder, including the known price.
+
+## 2026-10-13 — A suspension also withholds the autopilot's effort raise (exception to 058)
+
+Migration 058's header says of a suspension: "It freezes the macro position.
+That is all", and that it "adds no modifier of its own" to the safety
+machinery. From this change a block GENERATED while a suspension is open is
+also denied the autopilot's positive RPE grant.
+
+Why: the 2.5 ceiling on effort raises per macro-cycle
+(`MAX_MACROCYCLE_RPE_RAISE`, frozen in the calibration registry) is enforced
+by macro position, and a block generated during an episode consumes no
+position (S6(b)). Each such block was therefore offered the frozen position's
+half point again; six at one position summed to 3.0. The two rules were
+ratified a month apart and nothing tested them together.
+
+Scope: the positive RPE grant only. Cuts, the autopilot's set corrections,
+substitution, the rehab effort ceiling and halts are unchanged (the session-time
+fit follows the effort targets actually planned, as it always has, so a session
+at its limit may keep a set a raised target's longer rest would have trimmed); training continues; the position is
+frozen and resumed exactly as before; no constant, migration or storage
+changes. 058 is shipped and is not edited. The gate sits at block generation
+in the store (one read of the open episode, one typed input to the generator),
+not in the suspension path.
+
+Authority: proposed on 2026-10-13 after the owner deferred the choice; it
+takes effect, and is ratified, by the owner's merge of the pull request that
+adds this entry. Rationale and the options not taken:
+`docs/decisions/SUSPENSION_RPE_RAISE_2026-10-13.md`. Machine-checked in
+verify:autopilot, verify:blocks, verify:store and
+`SuspensionRpeRaise.test.js`.

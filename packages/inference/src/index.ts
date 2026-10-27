@@ -84,6 +84,8 @@ export {
   type RankingSlotRole,
 } from './movementRanking';
 export {
+  ADVISORY_KINDS,
+  LOAD_SOURCES,
   defaultLoadPreference,
   resolveLoadSelection,
   transitionLoadPreference,
@@ -375,6 +377,23 @@ export {
   type SessionOutcomeSlotInput,
   type SessionOutcomeTerminal,
 } from './sessionOutcome';
+export {
+  SESSION_FEEL_ENGINE_VERSION,
+  SESSION_FEEL_KINDS,
+  SESSION_FEEL_REASONS,
+  SESSION_FEEL_RPE_DRIFT_THRESHOLD,
+  meanRpeDrift,
+  shouldAskSessionFeel,
+  validateSessionFeel,
+  type SessionFeelDraft,
+  type SessionFeelEffortSet,
+  type SessionFeelKind,
+  type SessionFeelProblem,
+  type SessionFeelPromptInput,
+  type SessionFeelReason,
+  type SessionFeelRecord,
+  type SessionFeelValidation,
+} from './sessionFeel';
 export {
   projectChainsFromGraph,
   type MovementFamilyInput,

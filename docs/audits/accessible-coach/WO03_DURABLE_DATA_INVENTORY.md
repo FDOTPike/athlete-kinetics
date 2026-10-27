@@ -2,7 +2,7 @@
 
 Date: 2026-09-13
 Originally frozen at `87624d9e43189ddd87db317e24d4379ef5a13fae`; updated by the Accessible Coach integration candidate.
-Live chain (release integration, 2026-10-04): migration files through `069`; `004` is a parameterized materializer, not a migration. The migration array therefore has 68 entries and a fully migrated database reports `PRAGMA user_version = 68` (backup contract v68, 118 tables). Slot `064` is the product-ratified neutral activity/support capture contract; it contains no executable clinical limit or screening schema. When first frozen, the chain ended at `064` (`user_version = 63`).
+Live chain (release integration, 2026-10-04): migration files through `070`; `004` is a parameterized materializer, not a migration. The migration array therefore has 69 entries and a fully migrated database reports `PRAGMA user_version = 69` (backup contract v69, 119 tables). Slot `064` is the product-ratified neutral activity/support capture contract; it contains no executable clinical limit or screening schema. When first frozen, the chain ended at `064` (`user_version = 63`).
 
 ## Discovery result and candidate disposition
 
@@ -21,7 +21,7 @@ The candidate closes those gaps with authenticated AES-256-GCM/scrypt containers
 
 `backup_preferences.json` stores only the timestamp of the last portable backup whose OS save action returned success. It is operational UI state, is not athlete data, and is not part of the portable archive. The private `pikeMethods-recovery-current.pmbak`, restore journal, operation markers, rollback copies, and incoming files are recovery machinery rather than portable payload. Temporary plaintext snapshots exist only under narrowly named app-private cache directories (`ak-backup-<32 lowercase hex characters>`) and are cleaned on every reachable path; matching abandoned directories are swept before normal boot. Passwords, derived keys, decrypted archives, and private support prose are never written to diagnostics or metadata.
 
-## Final live durable tables: 118
+## Final live durable tables: 119
 
 The inventory comes from the complete migration chain and the recovery sentinels. Temporary replacement tables and the superseded `user_profile` table are listed separately below.
 
@@ -100,7 +100,7 @@ These tables collectively carry goal/program state, generated schedule, routine 
 
 These tables are athlete-owned health/schedule information. The candidate includes the complete graph inside each physical SQLite snapshot, authenticates it before it becomes shareable, and verifies the real migration-chain schema before restore. Restore preview is generated only after successful authentication and intentionally exposes no support-note prose.
 
-### Native workout history, execution checkpoints, preparation, and outcomes (16)
+### Native workout history, execution checkpoints, preparation, and outcomes (17)
 
 - `session`
 - `set_record`
@@ -116,6 +116,7 @@ These tables are athlete-owned health/schedule information. The candidate includ
 - `session_preparation` — the frozen, versioned movement-preparation protocol of one live session and its truthful outcome (065).
 - `session_preparation_item` — per-item prescribed dose, what was actually performed, substitution and extra-work flag (065). Never a `set_record` row.
 - `session_outcome`
+- `session_feel` — how a finished session went (as planned, harder, easier, stopped early) and why, as tapped by the athlete on the completion screen; one row per session, correctable, never read by an engine (070). The typed note beside it is `session_note`.
 - `capability_session_evidence`
 - `return_checkin_ack`
 
@@ -174,7 +175,7 @@ These rows are bundled/reference data rather than athlete-authored data. The can
 
 ## Non-table schema objects and superseded intermediates
 
-- Views `v_readiness_inputs` and `v_training_daily_all` contain no independent rows. Physical snapshots retain their definitions with the database, while the restore schema contract deliberately fingerprints the 204 durable table/index/trigger objects.
+- Views `v_readiness_inputs` and `v_training_daily_all` contain no independent rows. Physical snapshots retain their definitions with the database, while the restore schema contract deliberately fingerprints the 205 durable table/index/trigger objects.
 - Indexes and triggers are schema/invariant objects, not independent data sets. They are nevertheless included by the physical snapshot and verified exhaustively because omitting or mutating them could weaken restored invariants.
 - `user_profile` is created by 006, copied into `athlete_profile`, and dropped by 007; it is not live.
 - `movement_equipment_v049`, `movement_role_eligibility_v052`, `routine_template_slot_v052`, and `planned_slot_autopilot_061` are migration replacement tables renamed into their final names; their temporary names are not live data classes.
@@ -188,3 +189,16 @@ Migration 064 supplies the shared neutral persistence contract and remains byte-
 ## CSV is not a backup
 
 A future CSV history export may provide readable rows such as date, movement, set, reps/load/time, and effort. It will flatten relationships, omit most classes above, omit registry and preferences, and cannot be restored safely. It must be labelled “Export workout history (CSV)”, never “backup”, and must not be accepted by Restore backup.
+
+## Update 2026-10-13 — migration 071 (beta recording)
+
+Everything above is the inventory as it stood through migration `070` and is left as written. This note records what migration `071` adds; it changes nothing above.
+
+Final live durable tables: 121 (the 119 above, and two more). Migration files now run through `071`; the migration array has 70 entries and a fully migrated database reports `PRAGMA user_version = 70` (backup contract v70). The restore schema contract fingerprints 207 durable table/index/trigger objects.
+
+The two tables belong with "Native workout history, execution checkpoints, preparation, and outcomes", which makes that group 19:
+
+- `session_skipped_slot` — which planned slots the athlete skipped in a finalized session, by slot id; written with the session outcome, whose count alone survived before; no row for sessions finalized earlier; never read by an engine (071).
+- `set_load_shown` — what the load entry was seeded with for a logged set (a load, a blank field or zero) and where the seed came from, with any advisory beside it; no row for a set logged earlier or without a seed; never read by an engine (071).
+
+Both are athlete-owned records and are included in a backup and removed by a training-data reset like the rest of that group.

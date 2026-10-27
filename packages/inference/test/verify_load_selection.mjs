@@ -209,5 +209,42 @@ check('non-beginner hops re-derive a non-explicit (defaulted) value',
   transitionLoadPreference('advanced', 'intermediate', 'manual', false) === 'auto'
     && transitionLoadPreference('intermediate', 'advanced', 'auto', false) === 'manual');
 
+// ---------------------------------------------------------------------------
+// 071 contract mirror: the CHECK domains of set_load_shown are the two lists
+// this module exports, value for value and in the same order. A source or an
+// advisory kind added here without the schema (or the reverse) fails this.
+// ---------------------------------------------------------------------------
+{
+  const { readFileSync } = require('node:fs');
+  const { dirname, join } = require('node:path');
+  const { fileURLToPath } = require('node:url');
+  const { LOAD_SOURCES, ADVISORY_KINDS } = require('./.build/loadSelection.js');
+  const here = dirname(fileURLToPath(import.meta.url));
+  const sql = readFileSync(join(here, '..', '..', 'core-db', 'src', 'schema', '071_beta_recording.sql'), 'utf8');
+  const domain = (column) => {
+    const found = sql.match(new RegExp(column + String.fromCharCode(92) + 's+TEXT[^,]*? IN ' + String.fromCharCode(92) + '(([^)]*)' + String.fromCharCode(92) + ')'));
+    return found === null ? null : found[1].split(',').map((value) => value.trim().replace(/^'|'$/g, ''));
+  };
+  check('071 load_source CHECK domain is exactly LOAD_SOURCES, in order',
+    JSON.stringify(domain('load_source')) === JSON.stringify([...LOAD_SOURCES]) && LOAD_SOURCES.length === 4);
+  check('071 advisory_kind CHECK domain is exactly ADVISORY_KINDS, in order',
+    JSON.stringify(domain('advisory_kind')) === JSON.stringify([...ADVISORY_KINDS]) && ADVISORY_KINDS.length === 3);
+  // Every selection the resolver can return is one the table can hold.
+  let seen = 0;
+  let storable = true;
+  for (const trainingAge of ['beginner', 'intermediate', 'advanced', 'elite']) for (const preference of ['auto', 'manual']) for (const bodyweightMode of [false, true])
+    for (const oneRepMaxKg of [null, 100]) for (const lastLoggedLoadKg of [null, 60]) for (const currentSessionLoadKg of [null, 62.5])
+      for (const overrideLoadKg of [null, 70]) for (const isFirstSet of [true, false]) {
+        const s = resolveLoadSelection({ trainingAge, preference, bodyweightMode, targetReps: 8, targetRpe: 7, oneRepMaxKg, overrideLoadKg, lastLoggedLoadKg, currentSessionLoadKg, isFirstSet });
+        seen += 1;
+        storable = storable && LOAD_SOURCES.includes(s.source)
+          && (s.initialLoadKg === null || (Number.isFinite(s.initialLoadKg) && s.initialLoadKg >= 0))
+          && (s.advisoryKg === null) === (s.advisoryKind === null)
+          && (s.advisoryKind === null || ADVISORY_KINDS.includes(s.advisoryKind))
+          && (s.advisoryKg === null || (Number.isFinite(s.advisoryKg) && s.advisoryKg >= 0));
+      }
+  check("071 every selection the resolver returns satisfies the table's rules", storable && seen === 512, seen + ' selections');
+}
+
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

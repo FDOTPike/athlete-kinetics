@@ -8,7 +8,13 @@
  *
  *   - flags + a confident semantic match in a curated body-state category
  *     (pain/illness/fatigue) -> the curated entry wins (pain-sharp's halt,
- *     pain-mild's calibrated 0.7/7.0 — never degraded to the generic floor);
+ *     pain-mild's calibrated 0.7/7.0 — never degraded to the generic floor),
+ *     with ONE exception: systemic language beside a curated entry that does
+ *     not halt. Then the systemic halt stands (next but one bullet). A sore
+ *     back with dizziness is a halt, not a soreness adjustment. Until
+ *     2026-10-13 the curated entry won here too, so the two rules collided
+ *     and the report left without a halt (decision recorded in
+ *     DEVIATION_LOG.md, 2026-10-13);
  *   - flags + below-gate OR a non-body match (positive/technique/equipment,
  *     i.e. a semantic misfire on a mixed report) -> the red-flag entry fires
  *     as a fully confident deterministic override;
@@ -140,8 +146,22 @@ export function resolveReport(text: string, semantic: TriageResult | null): Reso
   };
   if (!flags.pain && !flags.systemic) return sem;
 
-  // Confident curated body-state match wins (halts included).
+  // Confident curated body-state match wins (halts included)...
   if (sem.confident && sem.entry !== null && CURATED_BODY_CATEGORIES.has(sem.entry.category)) {
+    // ...unless the text also holds systemic language and the match does not
+    // halt. Systemic language is a halt, not a floor: a curated entry that
+    // only restricts must not carry the report past it. A curated entry that
+    // already halts is returned as it is, with its own wording. A pain word
+    // is NOT given this precedence: the pain floor still yields to a
+    // confident curated match, exactly as before.
+    if (flags.systemic && !sem.entry.guardrail.halt) {
+      return {
+        entry: RED_FLAG_SYSTEMIC,
+        similarity: semantic?.similarity ?? null,
+        confident: true,
+        overrideApplied: true,
+      };
+    }
     return sem;
   }
   // Below the gate, or a semantic misfire on a mixed report: deterministic
