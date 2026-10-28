@@ -261,9 +261,37 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
   check('a skipped Health denial tap requires a later tapped and answered attempt before either simulator fallback',
     /var denialTapSkipped = false\s+for attempt in 1\.\.\.2 where !answered \{\s+var denialTapped = false/.test(suite)
       && /\.tap\(\)\s+denialTapped = true\s+log\("health sheet: tapped Don't Allow/.test(suite)
-      && /\} else \{\s+denialTapSkipped = true\s+log\("health sheet disappeared/.test(suite)
+      && /if !denialTapped \{\s+denialTapSkipped = true\s+log\("health sheet disappeared/.test(suite)
       && /if now\.hasPrefix\("Apple Health access requested"\) \{ answered = denialTapped; break \}/.test(suite)
       && /\} else if denialTapSkipped \{\s+XCTFail\("the Health denial tap was skipped and no later attempt completed the denial"\)\s+\} else if healthHint\.exists/.test(suite));
+  const denial = suite.slice(suite.indexOf('if var dontAllow = findHealthSheetButton'), suite.indexOf('// Every change of the wording'));
+  check('Health denial waits within the original sheet deadline, scrolls its own table and taps the element with one re-resolution',
+    denial.includes('let deadline = started.addingTimeInterval(150)')
+      && denial.includes('while Date() < deadline')
+      && denial.includes('dontAllow.exists && dontAllow.isHittable')
+      && denial.includes('timeout: min(5, max(0, deadline.timeIntervalSinceNow))')
+      && /if result == \.completed \{\s+if dontAllow\.exists \{\s+dontAllow\.tap\(\)/.test(denial)
+      && /if resolvedAgain \{ break \}\s+resolvedAgain = true\s+guard let fresh = findHealthSheetButton\("Don’t Allow", timeout: max\(0, deadline.timeIntervalSinceNow\)\) else \{ break \}\s+dontAllow = fresh/.test(denial)
+      && denial.includes('else if scrolls < 3') && denial.includes('app.tables.containing(named).firstMatch')
+      && denial.includes('springboard.tables.containing(named).firstMatch')
+      && /if table\.exists && table\.isHittable \{\s+table\.swipeUp\(velocity: \.slow\)\s+scrolls \+= 1/.test(denial)
+      && !/coordinate\(|snapshot\(/.test(denial)
+      && suite.includes('inApp.exists || app.staticTexts.matching(named).firstMatch.exists')
+      && suite.includes('inSpringboard.exists || springboard.staticTexts.matching(named).firstMatch.exists'));
+  const reveal = suite.slice(suite.indexOf('private func reveal('), suite.indexOf('private func tap('));
+  check('general reveal keeps the passing master app gestures without extra ScrollView queries',
+    reveal.includes('app.swipeUp(velocity: .slow)') && reveal.includes('app.swipeDown(velocity: .slow)')
+      && !reveal.includes('scrollViews'));
+  const workout = suite.slice(suite.indexOf('func test5_workoutLogBackgroundAndRelaunch()'), suite.indexOf('// MARK: - Files'));
+  check('workout load entry requires keyboard dismissal after at most two blur targets and requires selected RIR evidence',
+    /for key in \["Your next step", "session-load-label"\]/.test(workout)
+      && /reveal\(target,[\s\S]*bringClear\(target,[\s\S]*target\.tap\(\)/.test(workout)
+      && workout.includes('predicate: NSPredicate(format: "exists == false"), object: app.keyboards.firstMatch')
+      && workout.includes('XCTWaiter.wait(for: [hidden], timeout: 5) == .completed')
+      && workout.includes('XCTAssertFalse(app.keyboards.firstMatch.exists, "the load number pad did not dismiss after both non-input blur taps")')
+      && /reveal\(reps, "2 clean reps left"\)\s+bringClear\(reps, "2 clean reps left"\)\s+reps\.tap\(\)/.test(workout)
+      && workout.includes('reps.isSelected') && workout.includes('XCTWaiter.wait(for: [selected], timeout: 10)')
+      && !workout.includes('scrollViews.firstMatch.swipeDown'));
   check('a timed-out HealthKit request is accepted only when healthd logged the session timeout',
     suite.includes('HEALTH-TIMEOUT-SHOWN') && runner.includes("grep -q 'AKUI HEALTH-TIMEOUT-SHOWN'")
       && runner.includes("grep -q 'Authorization session timed out'")

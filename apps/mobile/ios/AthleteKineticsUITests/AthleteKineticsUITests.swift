@@ -87,12 +87,10 @@ final class AthleteKineticsUITests: XCTestCase {
   /// Scroll until the element is hittable: down the page first, then back up.
   private func reveal(_ el: XCUIElement, _ what: String, file: StaticString = #filePath, line: UInt = #line) {
     wait(el, what, file: file, line: line)
-    let page = app.scrollViews.firstMatch
-    let surface: XCUIElement = page.exists ? page : app
     var tries = 0
-    while !el.isHittable && tries < 15 { surface.swipeUp(velocity: .slow); tries += 1 }
+    while !el.isHittable && tries < 15 { app.swipeUp(velocity: .slow); tries += 1 }
     tries = 0
-    while !el.isHittable && tries < 30 { surface.swipeDown(velocity: .slow); tries += 1 }
+    while !el.isHittable && tries < 30 { app.swipeDown(velocity: .slow); tries += 1 }
     if !el.isHittable { XCTFail("\(what) never became hittable", file: file, line: line) }
   }
 
@@ -321,9 +319,11 @@ final class AthleteKineticsUITests: XCTestCase {
     let deadline = Date().addingTimeInterval(timeout)
     repeat {
       let inApp = healthPermissionButton(title)
-      if inApp.exists { log("health sheet: in the app"); return inApp }
+      let named = NSPredicate(format: "label IN %@", [title, title.replacingOccurrences(of: "’", with: "'")])
+      // The remote sheet can retain its text while rebuilding the offscreen buttons.
+      if inApp.exists || app.staticTexts.matching(named).firstMatch.exists { log("health sheet: in the app"); return inApp }
       let inSpringboard = healthPermissionButton(title, in: springboard)
-      if inSpringboard.exists { log("health sheet: in SpringBoard"); return inSpringboard }
+      if inSpringboard.exists || springboard.staticTexts.matching(named).firstMatch.exists { log("health sheet: in SpringBoard"); return inSpringboard }
       sleep(1)
     } while Date() < deadline
     return nil
@@ -462,14 +462,40 @@ final class AthleteKineticsUITests: XCTestCase {
       let control = "Choose whether to share sleep and resting heart rate from Apple Health"
       tap(control, "Apple Health CONNECT / TRY AGAIN (attempt \(attempt))")
       let started = Date()
-      if let dontAllow = findHealthSheetButton("Don’t Allow", timeout: 150) {
-        // HealthKit can expire the sheet between queries; tap its captured frame without resolving the button again.
-        if dontAllow.isHittable, let snapshot = try? dontAllow.snapshot() {
-          app.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
-            .withOffset(CGVector(dx: snapshot.frame.midX, dy: snapshot.frame.midY)).tap()
-          denialTapped = true
-          log("health sheet: tapped Don't Allow (attempt \(attempt), after \(Int(Date().timeIntervalSince(started))) s)")
-        } else {
+      if var dontAllow = findHealthSheetButton("Don’t Allow", timeout: 150) {
+        let deadline = started.addingTimeInterval(150)
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let named = NSPredicate(format: "label IN %@", ["Don’t Allow", "Don't Allow"])
+        var scrolls = 0
+        var resolvedAgain = false
+        while Date() < deadline {
+          let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            dontAllow.exists && dontAllow.isHittable
+          }, object: dontAllow)
+          let result = XCTWaiter.wait(for: [ready], timeout: min(5, max(0, deadline.timeIntervalSinceNow)))
+          if result == .completed {
+            if dontAllow.exists {
+              dontAllow.tap()
+              denialTapped = true
+              log("health sheet: tapped Don't Allow (attempt \(attempt), after \(Int(Date().timeIntervalSince(started))) s)")
+              break
+            }
+            if resolvedAgain { break }
+            resolvedAgain = true
+            guard let fresh = findHealthSheetButton("Don’t Allow", timeout: max(0, deadline.timeIntervalSinceNow)) else { break }
+            dontAllow = fresh
+          } else if scrolls < 3 {
+            // Xcode 27's Health table has two pages; its denial action starts below the fold.
+            let inApp = app.tables.containing(named).firstMatch
+            let table = inApp.exists ? inApp : springboard.tables.containing(named).firstMatch
+            if table.exists && table.isHittable {
+              table.swipeUp(velocity: .slow)
+              scrolls += 1
+              log("health sheet: scrolled to the denial action (\(scrolls))")
+            }
+          }
+        }
+        if !denialTapped {
           denialTapSkipped = true
           log("health sheet disappeared or was not hittable before the denial tap (attempt \(attempt))")
         }
@@ -699,13 +725,17 @@ final class AthleteKineticsUITests: XCTestCase {
     log("first set: \(first.label)")
     if first.label.hasSuffix("enter a load first") {
       enterText(into: "session-load-input", "20", submit: false)
-      if app.keyboards.firstMatch.exists {
-        // The timeline dismisses the number pad interactively; a text tap need not blur the input.
-        app.scrollViews.firstMatch.swipeDown(velocity: .slow)
-        let hidden = NSPredicate(format: "exists == false")
-        let dismissed = XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: hidden, object: app.keyboards.firstMatch)], timeout: 10)
-        XCTAssertEqual(dismissed, .completed, "the load number pad did not dismiss after dragging the workout timeline")
+      for key in ["Your next step", "session-load-label"] {
+        if !app.keyboards.firstMatch.exists { break }
+        let target = element(key)
+        reveal(target, "the load blur target (\(key))")
+        bringClear(target, "the load blur target (\(key))")
+        target.tap()
+        log("load number pad: tapped \(key) to blur")
+        let hidden = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.keyboards.firstMatch)
+        if XCTWaiter.wait(for: [hidden], timeout: 5) == .completed { break }
       }
+      XCTAssertFalse(app.keyboards.firstMatch.exists, "the load number pad did not dismiss after both non-input blur taps")
       log("load entered: 20 kg")
     }
     let reps = app.buttons.matching(NSPredicate(format: "label == %@", "2 clean reps left")).firstMatch
