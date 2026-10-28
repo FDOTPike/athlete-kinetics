@@ -131,6 +131,7 @@ export function readZipEntries(path) {
       }
       const method = cd.readUInt16LE(off + 10);
       const compSize = cd.readUInt32LE(off + 20);
+      const uncompSize = cd.readUInt32LE(off + 24);
       const nameLen = cd.readUInt16LE(off + 28);
       const extraLen = cd.readUInt16LE(off + 30);
       const commentLen = cd.readUInt16LE(off + 32);
@@ -143,7 +144,7 @@ export function readZipEntries(path) {
       const lNameLen = lfh.readUInt16LE(26);
       const lExtraLen = lfh.readUInt16LE(28);
       const dataOffset = lfhOffset + 30 + lNameLen + lExtraLen;
-      entries.set(name, { name, method, compSize, dataOffset });
+      entries.set(name, { name, method, compSize, uncompSize, dataOffset });
       off += 46 + nameLen + extraLen + commentLen;
     }
     return { entries, size, centralDirectoryOffset: cdOffset };
