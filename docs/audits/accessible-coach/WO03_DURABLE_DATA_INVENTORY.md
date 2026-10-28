@@ -202,7 +202,7 @@ The two tables belong with "Native workout history, execution checkpoints, prepa
 
 Both are athlete-owned records and are included in a backup and removed by a training-data reset like the rest of that group.
 
-## Correction 2026-10-29 ? distinguish migrations 070 and 071
+## Correction 2026-10-29 — distinguish migrations 070 and 071
 
 The original inventory above is restored to its release-integration record through `069`: 68 migration-array entries, `user_version = 68`, 118 durable tables, 16 native workout/history tables, and 204 fingerprinted table/index/trigger objects. The October 13 note's phrase "Everything above ... through migration `070`" describes an earlier in-place edit, not that restored historical baseline.
 
