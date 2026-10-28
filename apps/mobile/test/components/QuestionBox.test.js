@@ -96,6 +96,16 @@ test('an in-flight question holds its athlete database until the log is written'
   expect(rows()).toEqual([]);
 });
 
+test('reset reports question-only history as cleared and an empty repeat as unchanged', async () => {
+  expect(mockDriver.raw.prepare('SELECT count(*) AS c FROM session').get().c).toBe(0);
+  await state().askQuestion('unrelated');
+  expect(rows()).toHaveLength(1);
+
+  expect(state().resetTrainingData()).toBe(true);
+  expect(rows()).toEqual([]);
+  expect(state().resetTrainingData()).toBe(false);
+});
+
 test('reset invalidates a pending question without blocking subsequent questions', async () => {
   await state().askQuestion('unrelated');
   let finish;

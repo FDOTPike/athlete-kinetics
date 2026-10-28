@@ -7915,7 +7915,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
 
   resetTrainingData: () => {
     const d = getDb();
-    const had = rowsOf<{ c: number }>(d.executeSync('SELECT count(*) AS c FROM session'))[0];
+    const had = rowsOf<{ c: number }>(d.executeSync('SELECT (SELECT count(*) FROM session) + (SELECT count(*) FROM question_log) AS c'))[0];
     d.executeSync('BEGIN');
     try {
       // Children before parents, so it is correct whether or not foreign_keys is
