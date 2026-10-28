@@ -81,6 +81,70 @@ beforeEach(() => {
 afterEach(() => { Platform.OS = originalOs; });
 
 describe('sleep normalization (pure)', () => {
+  test('a 5,000-sample fragmented night keeps interval and source-grouping work bounded', () => {
+    const base = Date.parse('2026-09-30T00:00:00Z');
+    const count = 4999;
+    const samples = [sample(new Date(base).toISOString(), new Date(base + count * 2000).toISOString(), APPLE_SLEEP_VALUE.asleepCore),
+      ...Array.from({ length: count }, (_, i) => sample(new Date(base + i * 2000).toISOString(),
+        new Date(base + i * 2000 + 1000).toISOString(), APPLE_SLEEP_VALUE.asleepDeep))];
+    let work = 0;
+    const iterator = Array.prototype[Symbol.iterator];
+    const flatMap = Array.prototype.flatMap;
+    const iteratorSpy = jest.spyOn(Array.prototype, Symbol.iterator).mockImplementation(function* () {
+      const source = iterator.call(this);
+      for (let step = source.next(); !step.done; step = source.next()) { work += 1; yield step.value; }
+    });
+    const fragmentSpy = jest.spyOn(Array.prototype, 'flatMap').mockImplementation(function (...args) {
+      work += this.length;
+      return flatMap.apply(this, args);
+    });
+    let records;
+    try { records = appleSleepToRecords(samples); }
+    finally { iteratorSpy.mockRestore(); fragmentSpy.mockRestore(); }
+    // Count actual array visits rather than relying on machine-specific timings.
+    expect(work).toBeLessThan(samples.length * 100);
+    expect(records).toEqual([{
+      startTime: new Date(base).toISOString(), endTime: new Date(base + count * 2000).toISOString(),
+      stages: Array.from({ length: count * 2 }, (_, i) => ({
+        startTime: new Date(base + i * 1000).toISOString(), endTime: new Date(base + (i + 1) * 1000).toISOString(),
+        stage: i % 2 === 0 ? 5 : 4,
+      })),
+    }]);
+  });
+
+  test('exported normalizers reject oversized batches instead of reporting partial health data', () => {
+    const sleep = sample('2026-09-30T13:00:00Z', '2026-09-30T14:00:00Z', APPLE_SLEEP_VALUE.asleepCore);
+    expect(appleSleepToRecords(Array(5001).fill(sleep))).toEqual([]);
+    expect(appleRestingHrToRecords(Array(5001).fill({ startDate: sleep.startDate, quantity: 55, sourceId: 'watch' }))).toEqual([]);
+  });
+
+  test('overlapping stage unions agree with a pointwise precedence oracle', () => {
+    const base = Date.parse('2026-09-30T00:00:00Z');
+    const priority = [4, 5, 3, 1, 2]; // deep, REM, core, unspecified, awake
+    const codes = { 4: 5, 5: 6, 3: 4, 1: 2, 2: 1 };
+    let seed = 12345;
+    const next = (limit) => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed % limit; };
+    for (let fixture = 0; fixture < 30; fixture += 1) {
+      const intervals = Array.from({ length: 40 }, () => {
+        const start = next(90);
+        return { start, end: start + 1 + next(100 - start), value: next(6) };
+      });
+      const [record] = appleSleepToRecords(intervals.map(({ start, end, value }) =>
+        sample(new Date(base + start * 1000).toISOString(), new Date(base + end * 1000).toISOString(), value)));
+      const expected = [];
+      for (let second = 0; second < 100; second += 1) {
+        const value = priority.find((v) => intervals.some((iv) => iv.value === v && iv.start <= second && iv.end > second));
+        if (value === undefined) continue;
+        const startTime = new Date(base + second * 1000).toISOString();
+        const endTime = new Date(base + (second + 1) * 1000).toISOString();
+        const last = expected[expected.length - 1];
+        if (last?.stage === codes[value] && last.endTime === startTime) last.endTime = endTime;
+        else expected.push({ startTime, endTime, stage: codes[value] });
+      }
+      expect(record.stages ?? []).toEqual(expected);
+    }
+  });
+
   const night = [
     sample('2026-09-30T13:00:00Z', '2026-09-30T14:00:00Z', APPLE_SLEEP_VALUE.asleepCore),
     sample('2026-09-30T14:00:00Z', '2026-09-30T15:00:00Z', APPLE_SLEEP_VALUE.asleepDeep),
