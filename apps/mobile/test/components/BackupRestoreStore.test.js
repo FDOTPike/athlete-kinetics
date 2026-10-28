@@ -19,6 +19,7 @@ let mockFailIncomingMove = false;
 let mockFailRollbackCopy = false;
 let mockDropRecoveryMove = false;
 let mockFileOps = [];
+let mockIncomingCheckEvaluations = 0;
 const mockKeepLocalCopy = jest.fn(async () => {
   const localPath = `${mockCacheDir}/selected-local.pmbak`;
   require('node:fs').copyFileSync(mockSelectedBackupPath, localPath);
@@ -104,6 +105,10 @@ const mockRestartStore = jest.fn();
 function mockOpenDatabase(options) {
   const path = `${options.location ?? mockLibraryDir}/${options.name}`;
   const raw = new DatabaseSync(path);
+  raw.function('restore_probe', () => {
+    if (path.includes('.ak-incoming-')) mockIncomingCheckEvaluations += 1;
+    return 1;
+  });
   return {
     executeSync(sql) {
       const statement = sql.trim();
@@ -146,6 +151,7 @@ import {
   BACKUP_SCHEMA_TABLE_COUNT,
   BACKUP_SCHEMA_USER_VERSION,
   bytesToBase64,
+  openBackup,
   sealBackup,
 } from '@ak/core-db';
 import { serializeRegistry } from '../../src/state/athleteRegistryCore';
@@ -198,6 +204,7 @@ beforeEach(async () => {
   mockFailRollbackCopy = false;
   mockDropRecoveryMove = false;
   mockFileOps = [];
+  mockIncomingCheckEvaluations = 0;
   mockKeepLocalCopy.mockClear();
   mockSaveDocuments.mockClear();
   mockRoot = mkdtempSync(join(tmpdir(), 'ak-backup-store-'));
@@ -318,6 +325,31 @@ test('real backup store restores exact databases and semantic registry regardles
     && /^.*\/\.ak_restore_applying-[a-f0-9]{32}$/.test(path));
   expect(committedCleanupIndex).toBeLessThan(applyingCleanupIndex);
   expect(journalCleanupIndex).toBeGreaterThan(Math.max(...markerCleanupIndices));
+});
+
+test('an imported CHECK expression is rejected before quick_check can evaluate it', async () => {
+  const opened = await openBackup(readFileSync(mockSelectedBackupPath, 'utf8'), 'restore-password', mockCryptoProvider);
+  expect(opened.ok).toBe(true);
+  const path = join(mockRoot, 'hostile.db');
+  writeFileSync(path, Buffer.from(opened.archive.databases[0].databaseBase64, 'base64'));
+  const db = new DatabaseSync(path);
+  db.function('restore_probe', () => 1);
+  const table = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT GLOB 'sqlite_*'").all()
+    .find(({ name }) => db.prepare(`SELECT COUNT(*) AS count FROM "${name.replaceAll('"', '""')}"`).get().count === 1);
+  expect(table).toBeDefined();
+  db.exec(`ALTER TABLE "${table.name.replaceAll('"', '""')}" ADD COLUMN unsafe_probe INTEGER DEFAULT 1 CHECK(restore_probe())`);
+  db.close();
+  opened.archive.databases[0] = snapshot('default', 'athlete_kinetics.db', new Uint8Array(readFileSync(path)));
+  writeFileSync(mockSelectedBackupPath, await sealBackup(opened.archive, 'restore-password', mockCryptoProvider));
+  mockSelectedSize = statSync(mockSelectedBackupPath).size;
+
+  await useBackupStore.getState().chooseRestore('restore-password');
+  expect(useBackupStore.getState().status).toBe('preview');
+  await useBackupStore.getState().confirmRestore('restore-password');
+  expect(useBackupStore.getState().status).toBe('error');
+  expect(useBackupStore.getState().message).toMatch(/does not match the verified app schema/);
+  expect(mockIncomingCheckEvaluations).toBe(0);
+  expect(mockHashFile(join(mockLibraryDir, 'athlete_kinetics.db'))).toBe(currentHashes.default);
 });
 
 test('resolved native recovery move without a destination fails closed before replacement', async () => {

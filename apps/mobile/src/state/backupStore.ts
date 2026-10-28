@@ -643,15 +643,16 @@ async function verifyStagedDatabase(
 ): Promise<void> {
   const handle = openDatabase(basename(path), dirname(path));
   try {
-    if (!quickCheck(handle)
-      || expected.userVersion !== sourceContract.userVersion
+    if (expected.userVersion !== sourceContract.userVersion
       || oneNumber(handle, 'PRAGMA user_version', 'user_version') !== sourceContract.userVersion
       || oneNumber(handle, "SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'", 'count') !== sourceContract.tableCount) {
       throw new Error('A restored database failed validation. Existing data is unchanged.');
     }
+    // quick_check evaluates stored CHECK expressions, so only run trusted SQL.
     if (!matchesBackupSchemaContract(schemaContract(handle), sourceContract, mobileBackupCrypto)) {
       throw new Error('A restored database does not match the verified app schema. Existing data is unchanged.');
     }
+    if (!quickCheck(handle)) throw new Error('A restored database failed validation. Existing data is unchanged.');
   } finally { handle.close(); }
 }
 
