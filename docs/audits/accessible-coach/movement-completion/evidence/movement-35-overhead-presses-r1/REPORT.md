@@ -59,6 +59,8 @@
     - `expect(maxSpanDrift).toBeLessThanOrEqual(0.5)` failed with `Expected: <= 0.5, Received: 3.9977088757396437` (`Tests: 1 failed, 11 passed, 12 total`).
   - Restored `canonicalFigure.ts` and re-ran `MovementPreview.movA06OverheadPresses.test.js`: `Tests: 12 passed, 12 total`.
 
+**Correction 2026-10-29:** The guard-break line above gives a baseline that conflicts with section 1 and the sealed `quotes.json`, both of which record Pose 1 `farWrist` as `[4.55, 86.2, -12.8]`. A four-unit negative-z perturbation of that quoted baseline would be `[4.55, 86.2, -16.8]`; the edited source from the original guard-break run was not retained, so that hypothetical endpoint is not a newly verified observation. The original perturbation claim and recorded test results are preserved above; the actual baseline used in that run cannot be established from this packet.
+
 ## 4. Commands Run and Decisive Output
 
 1. `typecheck.log`:

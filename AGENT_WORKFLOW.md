@@ -43,6 +43,9 @@ migration.
    model is added to, or swapped in, the runtime without the owner's sign-off
    on measured evidence. Today the only model shipped is the sentence
    embedder.
+   Decision record: [initial ruling](https://github.com/FDOTPike/athlete-kinetics/commit/ed051e0bea97bfb8611a3d93e37d90da00f0dd16)
+   and [owner confirmation of the conditions, 2026-10-09](https://github.com/FDOTPike/athlete-kinetics/commit/265cbd3cfb150e477bf88c212d549c1ad8e40927),
+   incorporated by [PR 60](https://github.com/FDOTPike/athlete-kinetics/pull/60).
 3. **Memory**: hard ceiling 536,870,912 B (512 MiB), preferred operating target
    450,000,000 B — ratified 2026-08-24, one ceiling for every supported Android
    and iOS device. Between target and ceiling requires physical-device evidence

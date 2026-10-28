@@ -42,6 +42,7 @@ final class AthleteKineticsUITests: XCTestCase {
     ]
     return groups.map { kind, query, limit in
       let labels = query.allElementsBoundByIndex.prefix(limit)
+        .compactMap { try? $0.snapshot() }
         .map { el -> String in let l = el.label.isEmpty ? el.identifier : el.label; return String(l.prefix(70)) }
         .filter { !$0.isEmpty }
       return "\(kind)[\(labels.joined(separator: "; "))]"
@@ -86,10 +87,12 @@ final class AthleteKineticsUITests: XCTestCase {
   /// Scroll until the element is hittable: down the page first, then back up.
   private func reveal(_ el: XCUIElement, _ what: String, file: StaticString = #filePath, line: UInt = #line) {
     wait(el, what, file: file, line: line)
+    let page = app.scrollViews.firstMatch
+    let surface: XCUIElement = page.exists ? page : app
     var tries = 0
-    while !el.isHittable && tries < 15 { app.swipeUp(velocity: .slow); tries += 1 }
+    while !el.isHittable && tries < 15 { surface.swipeUp(velocity: .slow); tries += 1 }
     tries = 0
-    while !el.isHittable && tries < 30 { app.swipeDown(velocity: .slow); tries += 1 }
+    while !el.isHittable && tries < 30 { surface.swipeDown(velocity: .slow); tries += 1 }
     if !el.isHittable { XCTFail("\(what) never became hittable", file: file, line: line) }
   }
 
@@ -458,9 +461,14 @@ final class AthleteKineticsUITests: XCTestCase {
       tap(control, "Apple Health CONNECT / TRY AGAIN (attempt \(attempt))")
       let started = Date()
       if let dontAllow = findHealthSheetButton("Don’t Allow", timeout: 150) {
-        log("health sheet shown (attempt \(attempt)) after \(Int(Date().timeIntervalSince(started))) s: allow=\(healthPermissionButton("Allow").exists)")
-        dontAllow.tap()
-        log("health sheet: tapped Don't Allow")
+        // HealthKit can expire the sheet between queries; tap its captured frame without resolving the button again.
+        if dontAllow.isHittable, let snapshot = try? dontAllow.snapshot() {
+          app.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
+            .withOffset(CGVector(dx: snapshot.frame.midX, dy: snapshot.frame.midY)).tap()
+          log("health sheet: tapped Don't Allow (attempt \(attempt), after \(Int(Date().timeIntervalSince(started))) s)")
+        } else {
+          log("health sheet disappeared or was not hittable before the denial tap (attempt \(attempt))")
+        }
       } else {
         log("health sheet not shown within 150 s (attempt \(attempt)); on screen: \(visibleLabels(app).prefix(700))")
       }
@@ -685,12 +693,21 @@ final class AthleteKineticsUITests: XCTestCase {
     log("first set: \(first.label)")
     if first.label.hasSuffix("enter a load first") {
       enterText(into: "session-load-input", "20", submit: false)
-      let title = element("Your next step")
-      if title.exists && title.isHittable { title.tap() } // dismiss the number pad
+      if app.keyboards.firstMatch.exists {
+        // The timeline dismisses the number pad interactively; a text tap need not blur the input.
+        app.scrollViews.firstMatch.swipeDown(velocity: .slow)
+        let hidden = NSPredicate(format: "exists == false")
+        let dismissed = XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: hidden, object: app.keyboards.firstMatch)], timeout: 10)
+        XCTAssertEqual(dismissed, .completed, "the load number pad did not dismiss after dragging the workout timeline")
+      }
       log("load entered: 20 kg")
     }
-    let reps = element("2 clean reps left")
-    if reps.waitForExistence(timeout: 5) { reveal(reps, "2 clean reps left"); reps.tap() }
+    let reps = app.buttons.matching(NSPredicate(format: "label == %@", "2 clean reps left")).firstMatch
+    reveal(reps, "2 clean reps left")
+    bringClear(reps, "2 clean reps left")
+    reps.tap()
+    let selected = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in reps.isSelected }, object: reps)
+    XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 10), .completed, "the effort choice did not become selected")
     let ready = element(labelBeginsWith: "Log set 1 for ")
     reveal(ready, "Log set 1")
     XCTAssertFalse(ready.label.contains("unavailable"), "the first set cannot be logged: \(ready.label)")
@@ -826,8 +843,10 @@ final class AthleteKineticsUITests: XCTestCase {
   private func filesSheetInventory() -> String {
     let bar = app.navigationBars.matching(NSPredicate(format: "identifier CONTAINS 'DocumentManager'")).firstMatch
     let inBar = !bar.exists ? "absent" : bar.descendants(matching: .any).allElementsBoundByIndex.prefix(30)
+      .compactMap { try? $0.snapshot() }
       .map { "\($0.elementType.rawValue):\($0.label.prefix(30))|\($0.identifier.prefix(30))" }.joined(separator: "; ")
     let lastButtons = app.buttons.allElementsBoundByIndex.suffix(20)
+      .compactMap { try? $0.snapshot() }
       .map { String(($0.label.isEmpty ? $0.identifier : $0.label).prefix(30)) }.joined(separator: "; ")
     return "bar[\(inBar)] last buttons[\(lastButtons)]"
   }

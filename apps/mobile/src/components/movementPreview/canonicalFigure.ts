@@ -10408,8 +10408,8 @@ export const EQUIPMENT_BY_SLUG: Record<string, string> = {
   'v-bar-pulldown': 'cable_machine',
   'full-range-of-motion-lat-pulldown': 'cable_machine',
   'straight-arm-pulldown': 'cable_machine',
-  'gorilla-chin-crunch': 'none',
-  'hanging-leg-raise': 'none',
+  'gorilla-chin-crunch': 'pullup_bar',
+  'hanging-leg-raise': 'pullup_bar',
   // MOV-A13: single-leg and calf raises.
   'bulgarian-split-squat': 'bench',
   'barbell-step-up': 'barbell',
