@@ -195,6 +195,36 @@ describe('what the load entry was seeded with', () => {
 });
 
 describe('which slots were skipped', () => {
+  test('a successful skip clears the substitution preview for the skipped slot', () => {
+    startTwoSlotSession();
+    const [first, second] = state().sessionPlan;
+    state().openSubstitution(first.movementId);
+    expect(state().substitution).not.toBeNull();
+
+    state().runnerSkipSlot();
+
+    expect(state().error).toBeNull();
+    expect(state().activeSessionPlanSlotId).toBe(second.sessionPlanSlotId);
+    expect(state().substitution).toBeNull();
+  });
+
+  test('a failed skip preserves the current slot and its substitution preview', () => {
+    const sessionId = startTwoSlotSession();
+    const [first] = state().sessionPlan;
+    state().openSubstitution(first.movementId);
+    const preview = state().substitution;
+    const checkpoint = raw().prepare('SELECT runner_state_json FROM session_runner_checkpoint WHERE session_id = ?').get(sessionId).runner_state_json;
+    expect(preview).not.toBeNull();
+    raw().exec("CREATE TRIGGER refuse_skip BEFORE INSERT ON session_runner_checkpoint BEGIN SELECT RAISE(ABORT, 'checkpoint refused'); END");
+
+    state().runnerSkipSlot();
+
+    expect(state().error).toMatch(/checkpoint refused/);
+    expect(state().activeSessionPlanSlotId).toBe(first.sessionPlanSlotId);
+    expect(state().substitution).toBe(preview);
+    expect(raw().prepare('SELECT runner_state_json FROM session_runner_checkpoint WHERE session_id = ?').get(sessionId).runner_state_json).toBe(checkpoint);
+  });
+
   test('the screen confirms each explicit exercise skip, then finishing persists exactly those slot ids', () => {
     const sessionId = startTwoSlotSession();
     const ids = state().sessionPlan.map((slot) => slot.sessionPlanSlotId).sort((a, b) => a - b);
