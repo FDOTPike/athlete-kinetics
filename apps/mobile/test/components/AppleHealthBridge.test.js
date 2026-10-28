@@ -87,20 +87,39 @@ describe('sleep normalization (pure)', () => {
     const samples = [sample(new Date(base).toISOString(), new Date(base + count * 2000).toISOString(), APPLE_SLEEP_VALUE.asleepCore),
       ...Array.from({ length: count }, (_, i) => sample(new Date(base + i * 2000).toISOString(),
         new Date(base + i * 2000 + 1000).toISOString(), APPLE_SLEEP_VALUE.asleepDeep))];
-    let work = 0;
-    const iterator = Array.prototype[Symbol.iterator];
-    const flatMap = Array.prototype.flatMap;
-    const iteratorSpy = jest.spyOn(Array.prototype, Symbol.iterator).mockImplementation(function* () {
-      const source = iterator.call(this);
-      for (let step = source.next(); !step.done; step = source.next()) { work += 1; yield step.value; }
-    });
-    const fragmentSpy = jest.spyOn(Array.prototype, 'flatMap').mockImplementation(function (...args) {
-      work += this.length;
-      return flatMap.apply(this, args);
-    });
-    let records;
-    try { records = appleSleepToRecords(samples); }
-    finally { iteratorSpy.mockRestore(); fragmentSpy.mockRestore(); }
+    function measure(normalize) {
+      let work = 0;
+      const iterator = Array.prototype[Symbol.iterator];
+      const flatMap = Array.prototype.flatMap;
+      const map = Array.prototype.map;
+      const filter = Array.prototype.filter;
+      const iteratorSpy = jest.spyOn(Array.prototype, Symbol.iterator).mockImplementation(function* () {
+        const source = iterator.call(this);
+        for (let step = source.next(); !step.done; step = source.next()) { work += 1; yield step.value; }
+      });
+      const fragmentSpy = jest.spyOn(Array.prototype, 'flatMap').mockImplementation(function (...args) {
+        work += this.length;
+        return flatMap.apply(this, args);
+      });
+      const mapSpy = jest.spyOn(Array.prototype, 'map').mockImplementation(function (...args) {
+        work += this.length;
+        return map.apply(this, args);
+      });
+      const filterSpy = jest.spyOn(Array.prototype, 'filter').mockImplementation(function (...args) {
+        work += this.length;
+        return filter.apply(this, args);
+      });
+      let records;
+      try { records = normalize(samples); }
+      finally {
+        iteratorSpy.mockRestore();
+        fragmentSpy.mockRestore();
+        mapSpy.mockRestore();
+        filterSpy.mockRestore();
+      }
+      return { records, work };
+    }
+    const { records, work } = measure(appleSleepToRecords);
     // Count actual array visits rather than relying on machine-specific timings.
     expect(work).toBeLessThan(samples.length * 100);
     expect(records).toEqual([{
@@ -110,6 +129,19 @@ describe('sleep normalization (pure)', () => {
         stage: i % 2 === 0 ? 5 : 4,
       })),
     }]);
+    // These mutations keep identical records but re-copy the growing source bucket.
+    for (const method of ['map', 'filter']) {
+      const quadratic = measure((source) => {
+        let bucket = [];
+        for (const item of source) {
+          bucket = bucket[method]((value) => method === 'map' ? value : true);
+          bucket.push(item);
+        }
+        return appleSleepToRecords(bucket);
+      });
+      expect(quadratic.records).toEqual(records);
+      expect(quadratic.work).toBeGreaterThanOrEqual(samples.length * 100);
+    }
   });
 
   test('exported normalizers reject oversized batches instead of reporting partial health data', () => {
