@@ -37,6 +37,9 @@ public final class BoundedBackupCopyTest {
   }
 
   public static void main(String[] args) throws IOException {
+    if (!BoundedBackupCopyTest.class.desiredAssertionStatus()) {
+      throw new IllegalStateException("Run with java -ea; assertions are disabled.");
+    }
     File directory = Files.createTempDirectory("ak-bounded-copy-").toFile();
     File target = new File(directory, "backup.pmbak");
     try {
