@@ -456,7 +456,9 @@ final class AthleteKineticsUITests: XCTestCase {
     // as evidence; the person then taps TRY AGAIN once, as anyone would.
     let healthHint = healthWording()
     var answered = false
+    var denialTapSkipped = false
     for attempt in 1...2 where !answered {
+      var denialTapped = false
       let control = "Choose whether to share sleep and resting heart rate from Apple Health"
       tap(control, "Apple Health CONNECT / TRY AGAIN (attempt \(attempt))")
       let started = Date()
@@ -465,8 +467,10 @@ final class AthleteKineticsUITests: XCTestCase {
         if dontAllow.isHittable, let snapshot = try? dontAllow.snapshot() {
           app.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
             .withOffset(CGVector(dx: snapshot.frame.midX, dy: snapshot.frame.midY)).tap()
+          denialTapped = true
           log("health sheet: tapped Don't Allow (attempt \(attempt), after \(Int(Date().timeIntervalSince(started))) s)")
         } else {
+          denialTapSkipped = true
           log("health sheet disappeared or was not hittable before the denial tap (attempt \(attempt))")
         }
       } else {
@@ -486,7 +490,7 @@ final class AthleteKineticsUITests: XCTestCase {
         for claim in ["Connected", "granted"] where now.contains(claim) {
           XCTFail("the Health wording claimed access ('\(claim)') while the request was open: \(now)")
         }
-        if now.hasPrefix("Apple Health access requested") { answered = true; break }
+        if now.hasPrefix("Apple Health access requested") { answered = denialTapped; break }
         if now.hasPrefix("The Apple Health request did not complete") { break }
         sleep(1)
       }
@@ -508,6 +512,8 @@ final class AthleteKineticsUITests: XCTestCase {
       for claim in ["Connected", "granted"] {
         XCTAssertFalse(hintA.contains(claim), "after a denial the wording claimed access ('\(claim)'): \(hintA)")
       }
+    } else if denialTapSkipped {
+      XCTFail("the Health denial tap was skipped and no later attempt completed the denial")
     } else if healthHint.exists && healthHint.label.hasPrefix("The Apple Health request did not complete") {
       // CI evidence (c5cf82c): healthd failed both requests with "Authorization
       // session timed out" (Code=100) before any sheet appeared; the app showed
