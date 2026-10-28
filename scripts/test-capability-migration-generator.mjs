@@ -158,4 +158,32 @@ check('rejects cycle in prerequisite edges', () => {
   assert.match(errors.join('\n'), /Cycle detected in family "cycle-fam"/);
 });
 
+check('validates the graph INSERT OR IGNORE actually retains', () => {
+  const context = {
+    movementMap: new Map([['Root', 1], ['A', 2], ['B', 3]]),
+    timeLoggingMovements: new Set(),
+    existingFamilies: [1, 2, 3].map((movement_id) => ({ movement_id, family: 'original' })),
+    existingEdges: [
+      { prerequisite_movement_id: 1, movement_id: 2, relationship: 'prerequisite' },
+      { prerequisite_movement_id: 2, movement_id: 3, relationship: 'prerequisite' },
+    ],
+  };
+  const result = validateCapabilityContent({
+    families: [{ movementName: 'A', family: 'hidden' }],
+    edges: [{ prerequisiteMovementName: 'B', movementName: 'A' }],
+  }, context);
+  assert.ok(result.errors.length > 0, 'ignored reassignment hides a reachable cycle');
+});
+
+check('repeated existing edges remain idempotent', () => {
+  const context = {
+    movementMap: new Map([['A', 1], ['B', 2]]), timeLoggingMovements: new Set(),
+    existingFamilies: [1, 2].map((movement_id) => ({ movement_id, family: 'chain' })),
+    existingEdges: [{ prerequisite_movement_id: 1, movement_id: 2, relationship: 'prerequisite' }],
+  };
+  assert.deepEqual(validateCapabilityContent({
+    edges: [{ prerequisiteMovementName: 'A', movementName: 'B' }],
+  }, context).errors, []);
+});
+
 console.log(`Capability content generator tests complete: ${checks} checks passed.`);
