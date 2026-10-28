@@ -44,12 +44,12 @@ jest.mock('@kingstinct/react-native-healthkit', () => ({
   queryCategorySamples: async (identifier, options) => {
     mockHealthKit.queries.push([identifier, options]);
     if (mockHealthKit.fail || mockHealthKit.failSleep) throw new Error('synthetic native failure');
-    return mockHealthKit.samples;
+    return mockHealthKit.samples.slice(0, options.limit);
   },
   queryQuantitySamples: async (identifier, options) => {
     mockHealthKit.queries.push([identifier, options]);
     if (mockHealthKit.fail || mockHealthKit.failRestingHr) throw new Error('synthetic native failure');
-    return mockHealthKit.restingHr;
+    return mockHealthKit.restingHr.slice(0, options.limit);
   },
 }));
 
@@ -311,6 +311,25 @@ describe('bridge contract', () => {
     expect(await bridge.readDaily(7)).toEqual([]);
     expect(await bridge.hasGrantedPermissions()).toBe(false);
     expect(await bridge.requestPermissions()).toBe(false);
+  });
+
+  test.each(['sleep', 'restingHr'])('a truncated %s query is refused without sinking the other type', async (type) => {
+    Platform.OS = 'ios';
+    const bridge = await tryCreateAppleHealthBridge();
+    const sleep = { ...sample('2026-09-30T13:00:00Z', '2026-09-30T20:00:00Z', APPLE_SLEEP_VALUE.asleepCore),
+      sourceRevision: { source: { bundleIdentifier: 'watch' } } };
+    const restingHr = { ...rhr('2026-09-28', 53), sourceRevision: { source: { bundleIdentifier: 'watch' } } };
+    mockHealthKit.samples = type === 'sleep' ? Array(5001).fill(sleep) : [sleep];
+    mockHealthKit.restingHr = type === 'restingHr' ? Array(5001).fill(restingHr) : [restingHr];
+    expect(await bridge.readDaily(7)).toEqual(type === 'sleep'
+      ? [expect.objectContaining({ restingHrBpm: 53, inBedMin: null })]
+      : [expect.objectContaining({ restingHrBpm: null, inBedMin: 420 })]);
+    // A complete batch at the normalizer budget still contributes both types.
+    if (type === 'sleep') mockHealthKit.samples.pop();
+    else mockHealthKit.restingHr.pop();
+    const daily = await bridge.readDaily(7);
+    expect(daily.some((day) => day.inBedMin === 420)).toBe(true);
+    expect(daily.some((day) => day.restingHrBpm === 53)).toBe(true);
   });
 
   test('the production adapter reports an 8 h awake-only night as 0 asleep minutes (no fabricated sleep or HRV)', async () => {

@@ -325,9 +325,10 @@ export async function tryCreateAppleHealthBridge(): Promise<BiometricsBridge | n
           const filter = { date: { startDate, endDate } };
           // Each type is read on its own: a failure (or no data, or no access —
           // HealthKit does not say which) for one never sinks the other.
+          // One extra sample detects truncation while preserving complete batches at the budget.
           const [sleep, restingHr] = await Promise.all([
-            hk.queryCategorySamples(SLEEP, { limit: SAMPLE_LIMIT, ascending: true, filter }).catch(() => []),
-            hk.queryQuantitySamples(RESTING_HR, { limit: SAMPLE_LIMIT, ascending: true, unit: APPLE_RESTING_HR_UNIT, filter })
+            hk.queryCategorySamples(SLEEP, { limit: SAMPLE_LIMIT + 1, ascending: true, filter }).catch(() => []),
+            hk.queryQuantitySamples(RESTING_HR, { limit: SAMPLE_LIMIT + 1, ascending: true, unit: APPLE_RESTING_HR_UNIT, filter })
               .catch(() => []),
           ]);
           return appleHealthDaily(
