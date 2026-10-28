@@ -28,10 +28,6 @@ if [ -z "${ANDROID_HOME:-}" ]; then
   echo "ERROR: ANDROID_HOME is not set" >&2
   exit 2
 fi
-if [ -z "${JAVA_HOME:-}" ]; then
-  echo "ERROR: JAVA_HOME is not set (needed for jar.exe extraction)" >&2
-  exit 2
-fi
 
 # --- resolve exactly one ndkVersion / buildToolsVersion from build.gradle ---
 GRADLE_FILE="$ROOT/apps/mobile/android/build.gradle"
@@ -59,8 +55,7 @@ BUILD_TOOLS_VERSION="$(resolve_single buildToolsVersion)"
 
 READELF="$ANDROID_HOME/ndk/$NDK_VERSION/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-readelf.exe"
 ZIPALIGN="$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION/zipalign.exe"
-JAR="$JAVA_HOME/bin/jar.exe"
-for bin in "$READELF" "$ZIPALIGN" "$JAR"; do
+for bin in "$READELF" "$ZIPALIGN"; do
   if [ ! -x "$bin" ]; then
     echo "ERROR: missing required binary: $bin" >&2
     exit 2
