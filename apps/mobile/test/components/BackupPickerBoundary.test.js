@@ -11,9 +11,10 @@
  *  itself declares, never a MIME string. */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { Platform } from 'react-native';
+import { NativeModules, Platform } from 'react-native';
 
 const mockNative = { pick: jest.fn(), keepLocalCopy: jest.fn() };
+const mockBoundedCopy = jest.fn();
 jest.mock('react-native/Libraries/TurboModule/TurboModuleRegistry', () => {
   const real = jest.requireActual('react-native/Libraries/TurboModule/TurboModuleRegistry');
   return {
@@ -44,6 +45,8 @@ beforeEach(() => {
   os = Platform.OS;
   mockNative.pick.mockReset();
   mockNative.keepLocalCopy.mockReset();
+  mockBoundedCopy.mockReset();
+  NativeModules.AKBackupCopy = { copyBackup: mockBoundedCopy };
   mockFiles.clear();
   mockUnlinked.length = 0;
 });
@@ -128,4 +131,28 @@ test('Android keeps its MIME filter (the Android bridge filters by MIME type)', 
   mockNative.pick.mockRejectedValue(cancelled());
   await store.useBackupStore.getState().chooseRestore('restore-password');
   expect(mockNative.pick.mock.calls[0][0].type).toEqual(['application/octet-stream']);
+});
+
+test('Android uses the bounded app-owned copy even when provider metadata claims a small file', async () => {
+  const { store } = load('android');
+  mockNative.pick.mockResolvedValue([{ uri: 'content://provider/lying-size', name: 'selected.pmbak', size: 64 }]);
+  const path = '/sandbox/Caches/ak-portable-00112233445566778899aabbccddeeff.pmbak';
+  mockBoundedCopy.mockImplementation(async () => {
+    mockFiles.set(path, '{"not":"an encrypted backup"}');
+    return path;
+  });
+  await store.useBackupStore.getState().chooseRestore('restore-password');
+  expect(mockBoundedCopy).toHaveBeenCalledWith('content://provider/lying-size');
+  expect(mockNative.keepLocalCopy).not.toHaveBeenCalled();
+  expect(mockUnlinked).toContain(path);
+  expect(store.useBackupStore.getState()).toMatchObject({ status: 'error', preview: null });
+});
+
+test('Android refuses import when the bounded native module is absent, without an unbounded fallback', async () => {
+  const { store } = load('android');
+  delete NativeModules.AKBackupCopy;
+  mockNative.pick.mockResolvedValue([{ uri: 'content://provider/backup', size: 64 }]);
+  await store.useBackupStore.getState().chooseRestore('restore-password');
+  expect(mockNative.keepLocalCopy).not.toHaveBeenCalled();
+  expect(store.useBackupStore.getState()).toMatchObject({ status: 'error', preview: null });
 });

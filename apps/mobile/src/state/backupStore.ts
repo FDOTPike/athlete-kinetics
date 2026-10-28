@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Platform } from 'react-native';
+import { NativeModules, Platform } from 'react-native';
 import type { DB } from '@op-engineering/op-sqlite';
 import {
   BACKUP_RESTORE_POLICY,
@@ -620,10 +620,14 @@ async function pickerOpen(): Promise<string | null> {
     const [selected] = await picker.pick({
       mode: 'import', type: backupImportTypes(Platform.OS, picker.types.allFiles), allowMultiSelection: false, allowVirtualFiles: false,
     });
-    // The native import path copies before JavaScript regains control. Reject
-    // unknown or oversized provider metadata before asking it to make that
-    // private copy, then retain the post-copy stat as defence in depth.
+    // Metadata is only an early rejection; Android also enforces the byte
+    // limit while reading the provider, before writing private cache storage.
     validatePortableBackupFileSize(selected.size);
+    if (Platform.OS === 'android') {
+      const boundedCopy = NativeModules.AKBackupCopy as { copyBackup(uri: string): Promise<string> } | undefined;
+      if (boundedCopy === undefined) throw new Error('Safe backup import is unavailable. Update the app before restoring.');
+      return await boundedCopy.copyBackup(selected.uri);
+    }
     const [copy] = await picker.keepLocalCopy({
       files: [{ uri: selected.uri, fileName: selected.name ?? 'selected.pmbak' }], destination: 'cachesDirectory',
     });
