@@ -331,7 +331,7 @@ function quickCheck(handle: DB): boolean {
 function schemaContract(handle: DB): BackupSchemaObject[] {
   const objects = rows<{ type: string; name: string; tbl_name: string; sql: string }>(handle.executeSync(
     "SELECT type,name,tbl_name,coalesce(sql,'') AS sql FROM sqlite_master "
-      + "WHERE type IN ('table','index','trigger') AND name NOT LIKE 'sqlite_%' ORDER BY type,name",
+      + "WHERE type IN ('table','index','trigger') AND name NOT GLOB 'sqlite_*' ORDER BY type,name",
   ));
   return objects.map((object): BackupSchemaObject => {
     const columns = object.type !== 'table' ? [] : rows<{
@@ -528,7 +528,7 @@ async function prepareDatabaseSnapshot(
   try {
     if (!quickCheck(snapshotHandle)) throw new Error('A database snapshot did not pass its integrity check. No backup was saved.');
     userVersion = oneNumber(snapshotHandle, 'PRAGMA user_version', 'user_version');
-    tableCount = oneNumber(snapshotHandle, "SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'", 'count');
+    tableCount = oneNumber(snapshotHandle, "SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name NOT GLOB 'sqlite_*'", 'count');
     requireCurrentSchema(snapshotHandle, 'A database snapshot does not match the verified app schema. No backup was saved.');
   } finally { snapshotHandle.close(); }
   if (userVersion !== SCHEMA_VERSION || tableCount !== TABLE_COUNT) throw new Error('A database uses an unsupported schema. Update the app before backing up.');
@@ -645,7 +645,7 @@ async function verifyStagedDatabase(
   try {
     if (expected.userVersion !== sourceContract.userVersion
       || oneNumber(handle, 'PRAGMA user_version', 'user_version') !== sourceContract.userVersion
-      || oneNumber(handle, "SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'", 'count') !== sourceContract.tableCount) {
+      || oneNumber(handle, "SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name NOT GLOB 'sqlite_*'", 'count') !== sourceContract.tableCount) {
       throw new Error('A restored database failed validation. Existing data is unchanged.');
     }
     // quick_check evaluates stored CHECK expressions, so only run trusted SQL.

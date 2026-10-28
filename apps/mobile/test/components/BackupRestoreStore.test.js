@@ -167,7 +167,7 @@ function makeDatabase(path, applicationId) {
   }
   db.exec(`PRAGMA user_version=${BACKUP_SCHEMA_USER_VERSION}; PRAGMA application_id=${applicationId};`);
   assert.equal(db.prepare('PRAGMA quick_check').get().quick_check, 'ok');
-  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").get().count,
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name NOT GLOB 'sqlite_*'").get().count,
     BACKUP_SCHEMA_TABLE_COUNT);
   db.close();
   return new Uint8Array(readFileSync(path));
@@ -350,6 +350,28 @@ test('an imported CHECK expression is rejected before quick_check can evaluate i
   expect(useBackupStore.getState().message).toMatch(/does not match the verified app schema/);
   expect(mockIncomingCheckEvaluations).toBe(0);
   expect(mockHashFile(join(mockLibraryDir, 'athlete_kinetics.db'))).toBe(currentHashes.default);
+});
+
+test('a sqliteX_payload trigger in an authenticated backup is rejected before installation', async () => {
+  const opened = await openBackup(readFileSync(mockSelectedBackupPath, 'utf8'), 'restore-password', mockCryptoProvider);
+  expect(opened.ok).toBe(true);
+  const path = join(mockRoot, 'trigger.db');
+  writeFileSync(path, Buffer.from(opened.archive.databases[0].databaseBase64, 'base64'));
+  const db = new DatabaseSync(path);
+  const { name } = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT GLOB 'sqlite_*' LIMIT 1").get();
+  db.exec(`CREATE TRIGGER sqliteX_payload BEFORE INSERT ON "${name.replaceAll('"', '""')}" BEGIN SELECT RAISE(IGNORE); END`);
+  db.close();
+  opened.archive.databases[0] = snapshot('default', 'athlete_kinetics.db', new Uint8Array(readFileSync(path)));
+  writeFileSync(mockSelectedBackupPath, await sealBackup(opened.archive, 'restore-password', mockCryptoProvider));
+  mockSelectedSize = statSync(mockSelectedBackupPath).size;
+
+  await useBackupStore.getState().chooseRestore('restore-password');
+  expect(useBackupStore.getState().status).toBe('preview');
+  await useBackupStore.getState().confirmRestore('restore-password');
+  expect(useBackupStore.getState().status).toBe('error');
+  expect(useBackupStore.getState().message).toMatch(/does not match the verified app schema/);
+  expect(mockHashFile(join(mockLibraryDir, 'athlete_kinetics.db'))).toBe(currentHashes.default);
+  expect(readFileSync(join(mockDocumentDir, 'coach_athletes.json'), 'utf8')).toBe(serializeRegistry(currentRegistry));
 });
 
 test('resolved native recovery move without a destination fails closed before replacement', async () => {

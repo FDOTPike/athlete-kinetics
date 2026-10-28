@@ -246,7 +246,7 @@ function bootUpgrade(path) {
 }
 
 const open = (path) => new DatabaseSync(path);
-const schemaObjects = (db) => db.prepare("SELECT type,name,tbl_name,coalesce(sql,'') AS sql FROM sqlite_master WHERE type IN ('table','index','trigger') AND name NOT LIKE 'sqlite_%' ORDER BY type,name").all()
+const schemaObjects = (db) => db.prepare("SELECT type,name,tbl_name,coalesce(sql,'') AS sql FROM sqlite_master WHERE type IN ('table','index','trigger') AND name NOT GLOB 'sqlite_*' ORDER BY type,name").all()
   .map((object) => [object.type, object.name, object.tbl_name, object.sql, object.type === 'table'
     ? db.prepare(`PRAGMA table_info("${object.name.replaceAll('"', '""')}")`).all()
       .map((column) => [column.cid, column.name, column.type, column.notnull, column.dflt_value, column.pk]) : []]);

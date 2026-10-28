@@ -260,7 +260,7 @@ function databaseBytes(applicationId) {
     }
     db.exec(`PRAGMA user_version=${BACKUP_SCHEMA_USER_VERSION}; PRAGMA application_id=${applicationId};`);
     assert.equal(db.prepare('PRAGMA quick_check').get().quick_check, 'ok');
-    assert.equal(db.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").get().count,
+    assert.equal(db.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name NOT GLOB 'sqlite_*'").get().count,
       BACKUP_SCHEMA_TABLE_COUNT);
     db.close();
     bytes = new Uint8Array(readFileSync(templatePath));
