@@ -172,7 +172,8 @@ check('validates the graph INSERT OR IGNORE actually retains', () => {
     families: [{ movementName: 'A', family: 'hidden' }],
     edges: [{ prerequisiteMovementName: 'B', movementName: 'A' }],
   }, context);
-  assert.ok(result.errors.length > 0, 'ignored reassignment hides a reachable cycle');
+  assert.ok(result.errors.includes('Cycle detected in family "original" at movement 2'),
+    `expected the retained-family cycle error, got: ${JSON.stringify(result.errors)}`);
 });
 
 check('repeated existing edges remain idempotent', () => {
