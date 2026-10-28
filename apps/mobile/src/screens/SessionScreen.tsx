@@ -1026,7 +1026,8 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
               // Cross-movement rest still belongs to the just-finished slot.
               // Keep it active so the rest controls remain reachable.
               const active = currentSlot?.sessionPlanSlotId === slot.sessionPlanSlotId && (!finished || resting);
-              const selectable = mode === 'self_directed' && !finished && !active && !resting;
+              const skipped = runner?.skippedSessionPlanSlotIds.includes(slot.sessionPlanSlotId) ?? false;
+              const selectable = mode === 'self_directed' && !finished && !active && !resting && !skipped;
 
               if (finished && !active) {
                 const completedSets = session?.sets.filter((set) => sameSlot(set, slot)) ?? [];
