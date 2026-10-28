@@ -24,7 +24,7 @@ import { previewManifest } from './previewManifest';
 const BODY = CANONICAL_BODY_PARAMETERS;
 const FLOOR = 96.9;
 const THIGH_HALF = (BODY.lw * 1.18) / 2;
-const BACK_HALF = (BODY.sw * 0.58) / 2;
+const BACK_HALF = BODY.sw * 0.58;
 const FOOT_HALF = (BODY.lw * 0.82) / 2;
 const HAND_R = BODY.lw * 0.44;
 
@@ -119,7 +119,7 @@ describe('MOV-A15 held-text movements: shared draft-authority and anatomical inv
     expect(turned).not.toBeNull();
     expect(Number(turned[1])).toBe(Math.abs(movement.yawDeg ?? 35));
 
-    // Every caption is grounded in the draft instructions or cues.
+    // Every caption has at least 15 characters and ends with sentence punctuation.
     const authority = `${entry.instructions} ${entry.cues}`.toLowerCase();
     for (const frame of entry.frames) {
       expect(frame.caption.length).toBeGreaterThanOrEqual(15);
@@ -212,15 +212,18 @@ describe('145 Bent Over Two-Arm Long Bar Row', () => {
     expect(Math.abs(top.figure.world.near.elbow[2]) - BODY.sw * 0.92).toBeLessThan(3.0);
 
     const topPlates = top.prims.filter((p) => p.kind === 'bone' && p.w === 2.4 && p.stroke === 'ink1');
-    const chestLineDist = Math.min(
-      ...topPlates.map((pl) =>
-        Math.min(
-          pointToSegmentDist2D([pl.x1, pl.y1], top.figure.joints.nk, top.figure.joints.hp),
-          pointToSegmentDist2D([pl.x2, pl.y2], top.figure.joints.nk, top.figure.joints.hp),
-        ),
-      ),
-    );
-    expect(chestLineDist).toBeLessThanOrEqual(BACK_HALF + 2.2);
+    expect(topPlates.length).toBeGreaterThanOrEqual(2);
+    const yaw = (movement.yawDeg * Math.PI) / 180;
+    const trunk = (top.figure.angles.trunk[0] * Math.PI) / 180;
+    for (const plate of topPlates) {
+      // Compare each painted hub in the bar's sagittal plane, as MOV-A08 does.
+      const x = ((plate.x1 + plate.x2) / 2 - movement.originX) / Math.cos(yaw);
+      const y = FLOOR - (plate.y1 + plate.y2) / 2;
+      const chestLineDist = (x - top.figure.world.hip[0]) * Math.sin(trunk)
+        - (y - top.figure.world.hip[1]) * Math.cos(trunk);
+      expect(chestLineDist).toBeGreaterThanOrEqual(BACK_HALF);
+      expect(chestLineDist).toBeLessThanOrEqual(BACK_HALF + 2.2);
+    }
 
     // Hold for a second at the top, and lower slower than the pull.
     expect(segments[1]).toBeGreaterThanOrEqual(900);

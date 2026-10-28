@@ -95,3 +95,51 @@ test('an in-flight question holds its athlete database until the log is written'
   state().resetTrainingData();
   expect(rows()).toEqual([]);
 });
+
+test('reset reports question-only history as cleared and an empty repeat as unchanged', async () => {
+  expect(mockDriver.raw.prepare('SELECT count(*) AS c FROM session').get().c).toBe(0);
+  await state().askQuestion('unrelated');
+  expect(rows()).toHaveLength(1);
+
+  expect(state().resetTrainingData()).toBe(true);
+  expect(rows()).toEqual([]);
+  expect(state().resetTrainingData()).toBe(false);
+});
+
+test('reset invalidates a pending question without blocking subsequent questions', async () => {
+  await state().askQuestion('unrelated');
+  let finish;
+  state().setEmbedder({ dim: 384, modelId: 'fixture', embed: () => new Promise((resolve) => { finish = resolve; }) });
+  const pending = state().askQuestion('pending question');
+
+  state().resetTrainingData();
+  expect(state().error).toBeNull();
+  expect(rows()).toEqual([]);
+  finish(new Float32Array(384));
+
+  expect(await pending).toBeNull();
+  expect(rows()).toEqual([]);
+  const release = acquireDataMaintenanceLock('test');
+  release();
+  state().setEmbedder(null);
+  expect(await state().askQuestion('a subsequent question')).toEqual({ outcome: 'none', shown: [] });
+  expect(rows().map((row) => row.question_text)).toEqual(['a subsequent question']);
+});
+
+test('a failed reset preserves question history and lets its pending question finish', async () => {
+  await state().askQuestion('unrelated');
+  let finish;
+  state().setEmbedder({ dim: 384, modelId: 'fixture', embed: () => new Promise((resolve) => { finish = resolve; }) });
+  const pending = state().askQuestion('pending question');
+  mockDriver.raw.exec("CREATE TRIGGER refuse_reset BEFORE DELETE ON question_log BEGIN SELECT RAISE(ABORT, 'reset refused'); END");
+
+  expect(state().resetTrainingData()).toBe(false);
+  expect(state().error).toMatch(/reset refused/);
+  expect(rows()).toHaveLength(1);
+  finish(new Float32Array(384));
+
+  expect(await pending).toEqual({ outcome: 'none', shown: [] });
+  expect(rows().map((row) => row.question_text)).toEqual(['unrelated', 'pending question']);
+  const release = acquireDataMaintenanceLock('test');
+  release();
+});
