@@ -364,6 +364,39 @@ const keyOf = (phase, stage) => `${phase}:${stage}`;
  * There is no slack term. Clock alignment is a capture-time responsibility
  * (`logcat -v epoch`), not something to paper over with +/-120 s here.
  */
+export function bindTargetSamples({ samples, markers, segments, packageName }) {
+  const runs = [];
+  for (const sample of samples) {
+    if (!packageName || sample.appName !== packageName || !Number.isInteger(sample.processId)
+        || sample.processId <= 0) throw new Error('Raw memory sample does not identify the target package and PID');
+    const at = sample.captureStartMs ?? Date.parse(sample.atUtc);
+    if (!Number.isFinite(at) || (runs.length && at <= runs.at(-1).starts.at(-1))) {
+      throw new Error('Memory sample timestamps must increase');
+    }
+    let run = runs.at(-1);
+    if (!run || run.pid !== sample.processId) {
+      run = { pid: sample.processId, starts: [] };
+      runs.push(run);
+    }
+    run.starts.push(at);
+  }
+  const boundSegments = [];
+  for (const run of runs) {
+    for (const segment of segments) {
+      const starts = run.starts.filter((t) => t >= segment.startMs && t <= segment.endMs);
+      if (!starts.length) continue;
+      const startMs = starts[0], endMs = starts.at(-1);
+      boundSegments.push({ ...segment, index: boundSegments.length, pid: run.pid,
+        startMs, endMs, spanMs: endMs - startMs, sampleCount: starts.length });
+    }
+  }
+  // Keep wrapper anchors before the first probe, including after a cold restart.
+  const targetMarkers = markers.filter((m) => runs.some((run, i) => m.pid === run.pid
+    && m.tsMs >= (runs[i - 1]?.starts.at(-1) ?? -Infinity)
+    && m.tsMs <= (runs[i + 1]?.starts[0] ?? Infinity)));
+  return { markers: targetMarkers, segments: boundSegments };
+}
+
 export function correlateRequests({ markers, segments }) {
   // Identity is (process, wrapper instance, request id) — NOT request id alone.
   const byRequest = new Map();
@@ -408,6 +441,7 @@ export function correlateRequests({ markers, segments }) {
     const [pidStr, epochStr] = key.split('|');
     const pid = Number(pidStr);
     const wrapperEpoch = Number(epochStr);
+    const processSegments = segments.filter((s) => s.pid === undefined || s.pid === pid);
     const requestId = group[0].requestId;
     const reasons = [];
 
@@ -576,7 +610,7 @@ export function correlateRequests({ markers, segments }) {
           break;
         }
       }
-      const segIdx = ordered.map((m) => segmentIndexFor(segments, m.tsMs));
+      const segIdx = ordered.map((m) => segmentIndexFor(processSegments, m.tsMs));
       const outside = segIdx.filter((v) => v === -1).length;
       if (outside > 0) {
         reasons.push(`${outside} of ${segIdx.length} markers fall outside every continuous sampling segment`);
@@ -600,7 +634,7 @@ export function correlateRequests({ markers, segments }) {
       requestId,
       pid,
       wrapperEpoch,
-      segmentIndex: segmentIndexFor(segments, sessionStart.tsMs),
+      segmentIndex: segmentIndexFor(processSegments, sessionStart.tsMs),
       startMs: sessionStart.tsMs,
       endMs: completion.tsMs,
       totalMs: completion.totalMs,
