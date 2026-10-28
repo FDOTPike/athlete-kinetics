@@ -37,6 +37,18 @@ export function parseArgs(args) {
 function run(exe, args, env = process.env) {
   return execFileSync(exe, args, { env, encoding: 'utf8', timeout: 120000, maxBuffer: 64 * 1024 * 1024, windowsHide: true });
 }
+export function captureEvidence(label, save, adb, env, execute = execFileSync) {
+  save(`${label}-screen.png`, execute('adb', ['exec-out', 'screencap', '-p'], { env, timeout: 30000, maxBuffer: 64 * 1024 * 1024, windowsHide: true }));
+  save(`${label}-ui.xml`, adb(['shell', 'uiautomator', 'dump', '/dev/tty']));
+  let pid;
+  try { pid = adb(['shell', 'pidof', pkg]); }
+  catch (e) {
+    // pidof exits 1 without output when Settings has stopped the app.
+    if (e.status !== 1 || e.signal || String(e.stdout ?? '').trim() || String(e.stderr ?? '').trim()) throw e;
+    pid = 'not running (exit 1)\n';
+  }
+  save(`${label}-pid.txt`, pid);
+}
 async function main(options) {
   if (options.dryRun) {
     console.log(`DRY RUN - no adb, APK access, install, prompts, or device measurements.
@@ -110,11 +122,7 @@ Dry run supplies no physical-device or release-gate evidence.`);
     stopping = true;
     if (watchPromise) { console.log('Draining sampler (up to one 30-second chunk).'); await watchPromise; watchPromise = null; }
   }
-  function capture(label) {
-    save(`${label}-screen.png`, execFileSync('adb', ['exec-out', 'screencap', '-p'], { env, timeout: 30000, windowsHide: true }));
-    save(`${label}-ui.xml`, adb(['shell', 'uiautomator', 'dump', '/dev/tty']));
-    save(`${label}-pid.txt`, adb(['shell', 'pidof', pkg]));
-  }
+  const capture = label => captureEvidence(label, save, adb, env);
   const launch = () => adb(['shell', 'monkey', '-p', pkg, '-c', 'android.intent.category.LAUNCHER', '1']);
   try {
     await ask('Use a test-only QA installation and synthetic athlete data. Install updates any existing QA data. Confirm a saved backup exists if needed; no restore or data clear will run.');

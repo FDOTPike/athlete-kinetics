@@ -1,4 +1,4 @@
-﻿DRY RUN - no adb, APK access, install, prompts, or device measurements.
+DRY RUN - no adb, APK access, install, prompts, or device measurements.
 1. Check adb and aapt; require exactly one authorized USB device.
 2. Check APK package com.pikemethods.training.qa; record SHA-256, badging, device and installed metadata.
 3. Install with adb install -r (no clear/uninstall); launch; pause for sandbox onboarding.

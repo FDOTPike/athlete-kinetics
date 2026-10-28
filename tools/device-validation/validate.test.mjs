@@ -1,6 +1,6 @@
-﻿import assert from 'node:assert/strict';
+import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { memoryBand, parseArgs, selectDevice } from './validate.mjs';
+import { captureEvidence, memoryBand, parseArgs, selectDevice } from './validate.mjs';
 
 test('ceiling boundaries and missing measurements fail closed', () => {
   assert.equal(memoryBand(null), 'NOT MEASURED');
@@ -21,4 +21,31 @@ test('dry-run has no APK dependency; reject unrecognized or missing arguments', 
   assert.throws(() => parseArgs([]));
   assert.throws(() => parseArgs(['--apk']));
   assert.throws(() => parseArgs(['--surprise']));
+});
+
+test('capture accepts large screenshots and a stopped app, but preserves adb failures', () => {
+  const saved = {};
+  const save = (name, data) => { saved[name] = data; };
+  const png = Buffer.alloc(2 * 1024 * 1024, 1);
+  const execute = (exe, args, options) => {
+    assert.equal(exe, 'adb');
+    assert.deepEqual(args, ['exec-out', 'screencap', '-p']);
+    assert.equal(options.maxBuffer, 64 * 1024 * 1024);
+    return png;
+  };
+  const stopped = Object.assign(new Error('pidof exited 1'), { status: 1, stdout: '', stderr: '', signal: null });
+  const adb = args => {
+    if (args.includes('pidof')) throw stopped;
+    return '<hierarchy />';
+  };
+  captureEvidence('denied', save, adb, {}, execute);
+  assert.equal(saved['denied-screen.png'], png);
+  assert.equal(saved['denied-ui.xml'], '<hierarchy />');
+  assert.equal(saved['denied-pid.txt'], 'not running (exit 1)\n');
+  captureEvidence('running', save, () => '1234\n', {}, execute);
+  assert.equal(saved['running-pid.txt'], '1234\n');
+  for (const detail of [{ status: 2 }, { stderr: 'device offline' }, { stdout: 'unexpected' }, { signal: 'SIGTERM' }, { status: null, code: 'ETIMEDOUT' }]) {
+    const failure = Object.assign(new Error('adb failure'), stopped, detail);
+    assert.throws(() => captureEvidence('failed', save, args => { if (args.includes('pidof')) throw failure; return '<hierarchy />'; }, {}, execute), e => e === failure);
+  }
 });

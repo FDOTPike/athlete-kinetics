@@ -8,10 +8,11 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[2]
 os.chdir(ROOT)
 os.environ['GIT_OPTIONAL_LOCKS'] = '0'
+REFERENCE_COMMIT = '26f6557a793f1cafe9f609fb10e015cfc42d22b0'
 cache = {}
 def source(path):
     if path not in cache:
-        cache[path] = subprocess.check_output(['git', 'show', f'origin/master:{path}'], encoding='utf-8')
+        cache[path] = subprocess.check_output(['git', 'show', f'{REFERENCE_COMMIT}:{path}'], encoding='utf-8')
     return cache[path]
 
 files = list(Path('docs/release/beta/plan').glob('*.md')) + list(Path('tools/device-validation').glob('*.md'))
@@ -68,5 +69,13 @@ assert results[4][1]['effort_state']=='unanswered'
 assert results[5][0]['feel'] is None, 'missing feel must remain missing'
 assert results[6][0]['halt']==1
 assert len(results[7])==3
-print(f'EVIDENCE CAPTURED: {count} citation locations exist; all {len(queries)} SQL queries executed against origin/master table definitions.')
-print('Fixture assertions cover date exclusion, empty skipped slot, slot counts, unmapped sets, zero/blank/absent load seeds, missing effort and missing feel.')
+# Old sessions can retain skip counts without any migration-071 identities.
+assert slots[1]['recorded_skip'] == 0
+assert slots[3]['recorded_skip'] == 0
+db.execute('DELETE FROM session_skipped_slot')
+legacy_slots = list(db.execute(queries[1], params))
+assert all(r['recorded_skip'] is None for r in legacy_slots), 'legacy skip identities must stay unknown'
+db.execute('UPDATE session_outcome SET skipped_slot_count = 0')
+assert all(r['recorded_skip'] == 0 for r in db.execute(queries[1], params)), 'zero saved skips establishes no skips'
+print(f'EVIDENCE CAPTURED: {count} citation locations exist; all {len(queries)} SQL queries executed against pinned {REFERENCE_COMMIT} table definitions.')
+print('Fixture assertions cover date exclusion, empty skipped slot, slot counts, unmapped sets, zero/blank/absent load seeds, missing effort, missing feel and legacy unknown skips.')
