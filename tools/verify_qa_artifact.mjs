@@ -37,7 +37,7 @@
  *   node tools/verify_qa_artifact.mjs <apk-path> --fixture-mode   # synthetic only
  */
 import { execFileSync } from 'node:child_process';
-import { closeSync, existsSync, fstatSync, openSync, readFileSync, readSync, readdirSync, realpathSync } from 'node:fs';
+import { closeSync, constants, existsSync, fstatSync, openSync, readFileSync, readSync, readdirSync, realpathSync } from 'node:fs';
 import { dirname, join, relative, isAbsolute } from 'node:path';
 import { createHash } from 'node:crypto';
 import { inflateRawSync } from 'node:zlib';
@@ -511,7 +511,7 @@ export function apksignerVerify(apksignerPath, apkPath) {
  * Fails CLOSED: if git cannot be run, provenance is UNVERIFIED, which is a
  * failure in real-candidate mode, never a pass.
  */
-export function verifyProvenance(manifest, { repoRoot, gitBin = 'git' } = {}) {
+export function verifyProvenance(manifest, { repoRoot = process.cwd(), gitBin = 'git' } = {}) {
   const paths = validateNewFiles(manifest.newFiles);
   if (!paths.ok) return { ok: false, status: 'MISMATCH', problems: paths.problems, filesChecked: 0, observed: {} };
   const problems = [];
@@ -571,7 +571,7 @@ export function verifyProvenance(manifest, { repoRoot, gitBin = 'git' } = {}) {
       continue;
     }
     seen.add(identity);
-    const fd = openSync(canonical, 'r');
+    const fd = openSync(canonical, constants.O_RDONLY | (constants.O_NONBLOCK ?? 0));
     let actual;
     try {
       const stat = fstatSync(fd);

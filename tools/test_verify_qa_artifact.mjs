@@ -15,11 +15,11 @@
  *
  * Run: node tools/test_verify_qa_artifact.mjs [path-to-real-qa-apk]
  */
-import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { closeSync, copyFileSync, ftruncateSync, mkdirSync, mkdtempSync, openSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { execFileSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -680,6 +680,101 @@ async function main() {
         { repoRoot: REPO_ROOT, gitBin: 'definitely-not-git' });
       check('provenance FAILS CLOSED when git cannot be run (UNVERIFIED, never a pass)',
         !noGit.ok && noGit.status === 'UNVERIFIED', noGit.problems.join('; ').slice(0, 70));
+    }
+
+    {
+      const repo = join(scratch, 'provenance-repo');
+      const outside = join(scratch, 'outside');
+      mkdirSync(repo);
+      mkdirSync(outside);
+      const git = (args) => execFileSync('git', args, { cwd: repo, encoding: 'utf8' }).trim();
+      git(['init', '-q']);
+      git(['-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid',
+        '-c', 'commit.gpgsign=false', 'commit', '-qm', 'fixture', '--allow-empty']);
+      const manifest = {
+        head: git(['rev-parse', 'HEAD']), branch: git(['rev-parse', '--abbrev-ref', 'HEAD']),
+        trackedDiffFingerprint: { method: FINGERPRINT_METHOD, value: createHash('sha256').update('').digest('hex') },
+        newFiles: [],
+      };
+      const verifyFiles = (newFiles) => verifyProvenance({ ...manifest, newFiles }, { repoRoot: repo });
+      const content = Buffer.from('provenance fixture');
+      const sha256 = createHash('sha256').update(content).digest('hex');
+      writeFileSync(join(outside, 'file'), content);
+      mkdirSync(join(repo, 'files'));
+      writeFileSync(join(repo, 'files', 'file'), content);
+      symlinkSync(outside, join(repo, 'escape'), process.platform === 'win32' ? 'junction' : 'dir');
+      symlinkSync(join(repo, 'files'), join(repo, 'alias'), process.platform === 'win32' ? 'junction' : 'dir');
+
+      const escape = verifyFiles([{ path: 'escape/file', sha256 }]);
+      check('provenance REJECTS a canonical target outside the repository',
+        !escape.ok && escape.filesChecked === 0 && escape.problems.some((p) => p.includes('escapes the repository')));
+      const alias = verifyFiles([{ path: 'files/file', sha256 }, { path: 'alias/file', sha256 }]);
+      check('provenance REJECTS distinct paths to the same canonical file',
+        !alias.ok && alias.filesChecked === 1 && alias.problems.some((p) => p.includes('repeats a file')));
+
+      const chunk = Buffer.alloc(1024 * 1024);
+      const hash = createHash('sha256');
+      for (let i = 0; i < 256; i += 1) hash.update(chunk);
+      const largeHash = hash.digest('hex');
+      for (const [path, size] of [['large-a', 256 * 1024 * 1024], ['large-b', 256 * 1024 * 1024 + 1]]) {
+        const fd = openSync(join(repo, path), 'w');
+        try { ftruncateSync(fd, size); } finally { closeSync(fd); }
+      }
+      const budget = verifyFiles([{ path: 'large-a', sha256: largeHash }, { path: 'large-b', sha256: largeHash }]);
+      check('provenance REJECTS aggregate content above 512 MiB before hashing the second file',
+        !budget.ok && budget.filesChecked === 1 && budget.problems.length === 1
+          && budget.problems[0] === 'newFiles exceeds regular-file or aggregate byte budget');
+
+      const cwd = process.cwd();
+      try {
+        process.chdir(repo);
+        const clean = verifyProvenance(manifest);
+        check('provenance uses cwd when repoRoot is omitted for an empty newFiles list',
+          clean.ok && clean.filesChecked === 0);
+        const file = verifyProvenance({ ...manifest, newFiles: [{ path: 'files/file', sha256 }] });
+        check('provenance uses cwd for git and file hashing when repoRoot is omitted',
+          file.ok && file.filesChecked === 1);
+      } finally { process.chdir(cwd); }
+
+      // Exercise POSIX open flags on every host, including Windows without FIFOs.
+      const flagsTest = `
+        import assert from 'node:assert/strict';
+        import * as fs from 'node:fs';
+        import { mock } from 'node:test';
+        const nonblock = fs.constants.O_NONBLOCK ?? 2048;
+        let checked = false;
+        mock.module('node:fs', { namedExports: { ...fs,
+          constants: { ...fs.constants, O_NONBLOCK: nonblock },
+          openSync: (path, flags) => {
+            assert.equal(flags & nonblock, nonblock, 'provenance must open without blocking');
+            checked = true;
+            return fs.openSync(path, 'r');
+          },
+          fstatSync: (fd) => ({ ...fs.fstatSync(fd), isFile: () => false }),
+        } });
+        const { verifyProvenance } = await import(${JSON.stringify(pathToFileURL(VERIFIER).href)});
+        const result = verifyProvenance(${JSON.stringify({ ...manifest, newFiles: [{ path: 'files/file', sha256 }] })},
+          { repoRoot: ${JSON.stringify(repo)} });
+        assert.ok(checked);
+        assert.equal(result.ok, false);
+        assert.deepEqual(result.problems, ['newFiles exceeds regular-file or aggregate byte budget']);
+      `;
+      execFileSync(process.execPath, ['--experimental-test-module-mocks', '--input-type=module', '-e', flagsTest],
+        { timeout: 10000, stdio: 'pipe' });
+      check('provenance opens without blocking and rejects a non-regular descriptor', true);
+      if (process.platform !== 'win32') {
+        execFileSync('mkfifo', [join(repo, 'fifo')]);
+        const fifoTest = `
+          import assert from 'node:assert/strict';
+          import { verifyProvenance } from ${JSON.stringify(pathToFileURL(VERIFIER).href)};
+          const result = verifyProvenance(${JSON.stringify({ ...manifest, newFiles: [{ path: 'fifo', sha256 }] })},
+            { repoRoot: ${JSON.stringify(repo)} });
+          assert.equal(result.ok, false);
+          assert.deepEqual(result.problems, ['newFiles exceeds regular-file or aggregate byte budget']);
+        `;
+        execFileSync(process.execPath, ['--input-type=module', '-e', fifoTest], { timeout: 10000, stdio: 'pipe' });
+        check('provenance rejects an actual FIFO with no writer without hanging', true);
+      }
     }
 
     {
