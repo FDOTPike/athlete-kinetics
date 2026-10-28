@@ -31,7 +31,7 @@
  *     unless the achieved cadence actually supports a transient-peak claim.
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, renameSync, unlinkSync } from 'node:fs';
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, writeFileSync, renameSync, unlinkSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import { dirname, join, resolve } from 'node:path';
 import { homedir } from 'node:os';
@@ -59,15 +59,30 @@ let activeRoot;
 function secureDirectory(path) {
   path = resolve(path);
   const parent = dirname(path);
-  if (parent !== path) {
-    // Reject linked ancestors before recursive creation can follow them.
-    for (let p = parent; dirname(p) !== p; p = dirname(p)) {
-      if (existsSync(p) && lstatSync(p).isSymbolicLink()) throw new Error(`Linked evidence directory: ${p}`);
+  const links = new Set();
+  const validateAncestor = (p, target = false) => {
+    if (dirname(p) !== p) validateAncestor(dirname(p), target);
+    let stat;
+    try { stat = lstatSync(p); } catch (e) { if (e.code === 'ENOENT') return; throw e; }
+    if (stat.isSymbolicLink()) {
+      if (!process.getuid || stat.uid !== 0 || links.has(p)) throw new Error(`Linked evidence directory: ${p}`);
+      links.add(p);
+      // System aliases are safe only if their entire target chain is trusted.
+      validateAncestor(resolve(dirname(p), readlinkSync(p)), true);
+      links.delete(p);
+    } else if (target && process.getuid && (!stat.isDirectory()
+        || (stat.uid !== 0 && stat.uid !== process.getuid())
+        || ((stat.mode & 0o022) !== 0 && !(stat.uid === 0 && (stat.mode & 0o1000))))) {
+      throw new Error(`Linked evidence directory: ${p}`);
     }
+  };
+  if (parent !== path) {
+    validateAncestor(parent);
   }
   mkdirSync(path, { recursive: true, mode: 0o700 });
   const stat = lstatSync(path);
-  if (!stat.isDirectory() || stat.isSymbolicLink()
+  if (stat.isSymbolicLink()) throw new Error(`Linked evidence directory: ${path}`);
+  if (!stat.isDirectory()
       || (process.getuid && (stat.uid !== process.getuid() || (stat.mode & 0o077) !== 0))) {
     throw new Error(`Evidence directory must be private and owned by the current user: ${path}`);
   }

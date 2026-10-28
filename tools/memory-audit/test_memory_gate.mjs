@@ -809,7 +809,8 @@ console.log('\n[13] HERMES r4 R4-3 — a deleted tier is a deleted check');
   writeFileSync(log, readFileSync(log, 'utf8').replaceAll('4242 4243', '9999 10000'));
   pkt.binding = computeEvidenceBinding({ evidenceDir: pkt.dir, session: pkt.session });
   const v = verifyEvidencePacket({ sessionPath: sealPacket(pkt), requireManifest: false });
-  check('SEC11: unrelated application lifecycle cannot qualify target memory', !v.ok);
+  check('SEC11: unrelated application lifecycle cannot qualify target memory',
+    !v.ok && v.problems.some((p) => p.startsWith('correlatedRequestCount:')), v.problems.join('; '));
   rmSync(pkt.dir, { recursive: true, force: true });
 }
 
