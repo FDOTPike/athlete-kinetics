@@ -28,6 +28,7 @@ import { join } from 'node:path';
 import { useStore, storableLoadShown } from '../../src/state/useStore';
 import { authorizeAthleteDataBoot } from '../../src/state/dataMaintenanceLock';
 import { makeNodeSqliteDriver } from '../helpers/nodeSqliteOpDriver';
+import { deserializeRunner } from '../../../../packages/inference/src/sessionRunner';
 
 let mockDriver;
 jest.mock('../../src/navigation/navigation', () => ({ useSubViewBack: () => undefined }));
@@ -195,6 +196,60 @@ describe('what the load entry was seeded with', () => {
 });
 
 describe('which slots were skipped', () => {
+  test('the self-directed screen does not offer a skipped slot for selection', () => {
+    const sessionId = startTwoSlotSession();
+    const [first, second] = state().sessionPlan;
+    const nameOf = (slot) => state().movements.find((movement) => movement.movement_id === slot.movementId).name;
+    expect(state().sessionMode).toBe('self_directed');
+    logOn(first, 0);
+    state().skipRunnerRest();
+    render(<SessionScreen />);
+    expect(screen.getByRole('button', { name: `Choose ${nameOf(second)} as the current exercise` })).toBeTruthy();
+    const confirm = jest.spyOn(Alert, 'alert');
+
+    fireEvent.press(screen.getByRole('button', { name: 'Skip this exercise' }));
+    act(() => confirm.mock.calls.at(-1)[2].find((button) => button.text === 'Skip this exercise').onPress());
+
+    expect(state().activeSessionPlanSlotId).toBe(second.sessionPlanSlotId);
+    expect(screen.queryByRole('button', { name: `Choose ${nameOf(first)} as the current exercise` })).toBeNull();
+    const skippedRow = screen.getByLabelText(new RegExp(`^${nameOf(first)}, upcoming,`));
+    expect(skippedRow.props.accessibilityState.disabled).toBe(true);
+    fireEvent.press(skippedRow);
+    expect(state().activeSessionPlanSlotId).toBe(second.sessionPlanSlotId);
+    const checkpoint = deserializeRunner(raw().prepare('SELECT runner_state_json FROM session_runner_checkpoint WHERE session_id = ?').get(sessionId).runner_state_json);
+    expect(checkpoint.skippedSessionPlanSlotIds).toEqual([first.sessionPlanSlotId]);
+  });
+
+  test('a successful skip clears the substitution preview for the skipped slot', () => {
+    startTwoSlotSession();
+    const [first, second] = state().sessionPlan;
+    state().openSubstitution(first.movementId);
+    expect(state().substitution).not.toBeNull();
+
+    state().runnerSkipSlot();
+
+    expect(state().error).toBeNull();
+    expect(state().activeSessionPlanSlotId).toBe(second.sessionPlanSlotId);
+    expect(state().substitution).toBeNull();
+  });
+
+  test('a failed skip preserves the current slot and its substitution preview', () => {
+    const sessionId = startTwoSlotSession();
+    const [first] = state().sessionPlan;
+    state().openSubstitution(first.movementId);
+    const preview = state().substitution;
+    const checkpoint = raw().prepare('SELECT runner_state_json FROM session_runner_checkpoint WHERE session_id = ?').get(sessionId).runner_state_json;
+    expect(preview).not.toBeNull();
+    raw().exec("CREATE TRIGGER refuse_skip BEFORE INSERT ON session_runner_checkpoint BEGIN SELECT RAISE(ABORT, 'checkpoint refused'); END");
+
+    state().runnerSkipSlot();
+
+    expect(state().error).toMatch(/checkpoint refused/);
+    expect(state().activeSessionPlanSlotId).toBe(first.sessionPlanSlotId);
+    expect(state().substitution).toBe(preview);
+    expect(raw().prepare('SELECT runner_state_json FROM session_runner_checkpoint WHERE session_id = ?').get(sessionId).runner_state_json).toBe(checkpoint);
+  });
+
   test('the screen confirms each explicit exercise skip, then finishing persists exactly those slot ids', () => {
     const sessionId = startTwoSlotSession();
     const ids = state().sessionPlan.map((slot) => slot.sessionPlanSlotId).sort((a, b) => a - b);

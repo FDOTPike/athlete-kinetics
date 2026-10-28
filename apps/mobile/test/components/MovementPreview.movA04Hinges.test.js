@@ -32,7 +32,7 @@ const armDegFromVertical2D = (shoulder, wrist) =>
   (Math.abs(Math.atan2(shoulder[0] - wrist[0], wrist[1] - shoulder[1])) * 180) / Math.PI;
 
 describe('MOV-A04 hinges and posterior chain: physics, joint angles, contacts, and family distinctions', () => {
-  test.each(IDS)('movement %i is authored as pending with at least 5 frames and zero head-implement collision across every 33 ms tick', (id) => {
+  test.each(IDS)('movement %i is authored as pending with at least 5 frames and renders more than 20 primitives across every 33 ms tick', (id) => {
     const e = entryFor(id);
     expect(e.status).toBe('pending');
     expect(e.frames.length).toBeGreaterThanOrEqual(5);

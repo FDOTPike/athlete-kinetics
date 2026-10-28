@@ -62,7 +62,7 @@ Tests:       12 failed, 12 total
 
 ## 3. Movement-by-Movement Measurements (`chainGeometry` & Painted Primitives)
 
-| ID | Movement | View / Yaw | Trunk / Spine Angle (Drift) | Knee Angle (3D) | Bottom Arm Angle (3D) | Bottom Plumb `|holdX - shX|` | Top Elbow Behind Trunk | 3D Grip Span |
+| ID | Movement | View / Yaw | Trunk / Spine Angle (Drift) | Knee Angle (3D) | Bottom Arm Angle (3D) | Bottom Plumb `\|holdX - shX\|` | Top Elbow Behind Trunk | 3D Grip Span |
 |---:|---|---|---|---:|---:|---:|---:|---:|
 | `5` | `Barbell Row` | `oblique` (`28°`) | `24.00°` / `24.00°` (`0.0000°`) | `148.17°` | `174.33°` | `0.0000` | `+3.93` | `22.40` (rigid) |
 | `104` | `One-Arm Kettlebell Row` | `oblique` (`28°`) | `24.00°` / `24.00°` (`0.0000°`) | `120.27°` / `137.43°` | `174.33°` | `0.0000` | `+3.65` | unilateral (`9.38` Z) |

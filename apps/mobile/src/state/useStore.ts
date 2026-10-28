@@ -6646,7 +6646,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       set({ error: error instanceof Error ? error.message : String(error) });
       return;
     }
-    set(runnerSelection(nextRunner));
+    set({ ...runnerSelection(nextRunner), substitution: null });
   },
 
   runnerHalt: (reason = 'manual') => {
@@ -7915,7 +7915,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
 
   resetTrainingData: () => {
     const d = getDb();
-    const had = rowsOf<{ c: number }>(d.executeSync('SELECT count(*) AS c FROM session'))[0];
+    const had = rowsOf<{ c: number }>(d.executeSync('SELECT (SELECT count(*) FROM session) + (SELECT count(*) FROM question_log) AS c'))[0];
     d.executeSync('BEGIN');
     try {
       // Children before parents, so it is correct whether or not foreign_keys is
@@ -8039,6 +8039,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       set({ error: e instanceof Error ? e.message : String(e) });
       return false;
     }
+    athleteContextRevision += 1;
     // Reflect the now-empty DB in memory — EVERY derived surface, not just
     // 1RMs (audit B1: stale prescription/session/plan state survived the
     // reset). profileNotes intentionally stay: athlete_profile — including

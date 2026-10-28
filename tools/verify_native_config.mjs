@@ -258,6 +258,12 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
   check('an unanswered HealthKit sheet is accepted only when the app trace proves no answer arrived',
     suite.includes('HEALTH-UNANSWERED') && runner.includes("grep -q 'AKUI HEALTH-UNANSWERED'")
       && runner.includes("request settled") && /code=1\n\s+FAILED=1/.test(runner));
+  check('a skipped Health denial tap requires a later tapped and answered attempt before either simulator fallback',
+    /var denialTapSkipped = false\s+for attempt in 1\.\.\.2 where !answered \{\s+var denialTapped = false/.test(suite)
+      && /\.tap\(\)\s+denialTapped = true\s+log\("health sheet: tapped Don't Allow/.test(suite)
+      && /\} else \{\s+denialTapSkipped = true\s+log\("health sheet disappeared/.test(suite)
+      && /if now\.hasPrefix\("Apple Health access requested"\) \{ answered = denialTapped; break \}/.test(suite)
+      && /\} else if denialTapSkipped \{\s+XCTFail\("the Health denial tap was skipped and no later attempt completed the denial"\)\s+\} else if healthHint\.exists/.test(suite));
   check('a timed-out HealthKit request is accepted only when healthd logged the session timeout',
     suite.includes('HEALTH-TIMEOUT-SHOWN') && runner.includes("grep -q 'AKUI HEALTH-TIMEOUT-SHOWN'")
       && runner.includes("grep -q 'Authorization session timed out'")
