@@ -1,4 +1,4 @@
-# Google Play Data safety ? draft answers
+# Google Play Data safety — draft answers
 
 Scope: the Android release build and this closed beta. Verify the final merged, signed artifact, dependencies, distribution and actual backup handover before submitting. Play's definitions concern off-device collection and certain third-party transfers, not all local storage. The coach will receive athlete backups by explicit athlete action; assess the actual transfer and any intermediaries against the user-initiated-action exception. Do not treat encryption alone as proof that the developer cannot read a file: the coach may receive its password.
 

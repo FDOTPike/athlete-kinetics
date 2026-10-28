@@ -1,4 +1,4 @@
-# Privacy policy ? draft
+# Privacy policy — draft
 
 Effective date: [EFFECTIVE DATE]  
 Contact: [OWNER CONTACT]
@@ -23,7 +23,7 @@ In Coach Mode a coach can keep and switch between several athletes' separate fil
 
 | Claim | Code evidence |
 | --- | --- |
-| Release network permission removed; debug differs | `apps/mobile/android/app/src/main/AndroidManifest.xml:4` |
+| Release network permission removed; debug differs | `apps/mobile/android/app/src/main/AndroidManifest.xml:4-14` |
 | Separate athlete files and local registry | `apps/mobile/src/state/useStore.ts:802`; `apps/mobile/src/state/athleteRegistry.ts:4` |
 | Profile, goals, sessions and sets | `packages/core-db/src/schema/007_program_engine.sql:67`; `packages/core-db/src/schema/066_focus_and_goals.sql:162`; `packages/core-db/src/schema/001_mechanical_input.sql:61` |
 | Symptoms, activity, notes and support information | `packages/core-db/src/schema/005_subjective_report.sql:8`; `packages/core-db/src/schema/064_accessible_coach_support.sql:197` |

@@ -1,8 +1,8 @@
-# Medical disclaimer ? draft
+# Medical disclaimer — draft
 
-**One sentence for listing and onboarding:** pikeMethods provides training guidance, not medical advice or diagnosis; it is not a medical device, so stop if something feels unsafe and seek qualified professional advice when needed.
+**One sentence for listing and onboarding:** pikeMethods provides training guidance, is not a medical device and does not diagnose, treat, cure, or prevent any medical condition; stop if something feels unsafe and consult a qualified healthcare professional for medical advice, diagnosis, or treatment.
 
-**Long form:** pikeMethods provides training guidance and is not a medical device. It does not diagnose conditions or replace advice from a qualified health professional. Stop training if something feels unsafe, follow any halt or restriction shown, and seek qualified professional advice when needed.
+**Long form:** pikeMethods provides training guidance and is not a medical device. It does not diagnose, treat, cure, or prevent any medical condition or replace advice from a qualified healthcare professional. Stop training if something feels unsafe, follow any halt or restriction shown, and consult a qualified healthcare professional for medical advice, diagnosis, or treatment.
 
 **Existing copy checked verbatim:**
 

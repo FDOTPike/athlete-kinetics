@@ -50,7 +50,12 @@ Source: `origin/master:packages/core-db/src/schema/022_set_target.sql:39`, `orig
 SELECT p.session_id, p.session_plan_slot_id, p.movement_id,
        p.provenance_kind, p.planned_sets, p.planned_reps, p.target_rpe,
        d.target_kind, d.target_reps, d.target_seconds,
-       CASE WHEN k.session_plan_slot_id IS NULL THEN 0 ELSE 1 END AS recorded_skip,
+       CASE WHEN k.session_plan_slot_id IS NOT NULL THEN 1
+            WHEN o.skipped_slot_count = (
+              SELECT COUNT(*) FROM session_skipped_slot k2
+              JOIN session_plan_slot p2 USING (session_plan_slot_id)
+              WHERE p2.session_id = p.session_id
+            ) THEN 0 ELSE NULL END AS recorded_skip,
        COUNT(r.set_id) AS logged_sets,
        MAX(p.planned_sets - COUNT(r.set_id), 0) AS missing_sets,
        MAX(COUNT(r.set_id) - p.planned_sets, 0) AS extra_sets
@@ -67,7 +72,7 @@ GROUP BY p.session_plan_slot_id
 ORDER BY p.session_id, p.slot_index;
 ```
 
-Denominator: sum `planned_sets` over eligible finalized slots, also report per-athlete/session/slot distributions. Numerator for capped set completion: sum `MIN(logged_sets, planned_sets)`; extra sets remain separate. Split missing work into recorded-skipped and unskipped slots and by provenance, stopped-safely outcome and training age. A recorded skip can coexist with earlier logged sets. Reconcile skip counts against `session_outcome.skipped_slot_count`; absent rows in older history mean unknown, not no skips (`origin/master:packages/core-db/src/schema/071_beta_recording.sql:18`). No per-slot reason is inferred from session feel.
+Denominator: sum `planned_sets` over eligible finalized slots, also report per-athlete/session/slot distributions. Numerator for capped set completion: sum `MIN(logged_sets, planned_sets)`; extra sets remain separate. Split missing work into recorded-skipped and unskipped slots and by provenance, stopped-safely outcome and training age. A recorded skip can coexist with earlier logged sets. For absent rows, `recorded_skip` is 0 only when all saved skips are accounted for by sidecar rows (including a saved count of zero); otherwise it is NULL (unknown). No migration-071 coverage marker exists in this schema. Reconcile skip counts against `session_outcome.skipped_slot_count`; absent rows in older history mean unknown, not no skips (`origin/master:packages/core-db/src/schema/071_beta_recording.sql:18`). No per-slot reason is inferred from session feel.
 
 Audit unmapped/cross-slot sets before claiming complete coverage:
 
@@ -120,7 +125,7 @@ WHERE s.session_date BETWEEN :start_date AND :end_date
 ORDER BY r.movement_id, s.session_date, r.session_id, r.logged_at_ms, r.set_id;
 ```
 
-Effort coverage: answered sets divided by all logged sets, with unrated counts retained. For repeatability, keep each movement/athlete separate; require an explicit reps dose for the primary analysis and retain unknown/time doses as exclusions. Feed reps/load/RPE into the existing `estimateOneRepMax` function, which rejects unrated, below-RPE-6, nonpositive-load/rep and nonfinite inputs (`origin/master:packages/inference/src/e1rm.ts:82`). Pair adjacent eligible sets in the query order within session, and consecutive comparable sessions separately. Report pair count, absolute/relative differences, effort/rep/load context, equipment changes and within-person spread. Use `bestPerSession` only for a separately labelled session-maximum series, not as every-set repeatability (`origin/master:packages/inference/src/e1rm.ts:100`). No new strength formula, clinical limit or minimal-change threshold is invented.
+Effort coverage: answered sets divided by all logged sets, with unrated counts retained. For repeatability, keep each movement/athlete separate; require an explicit reps dose for the primary analysis and retain unknown/time doses as exclusions. Call the existing `estimateOneRepMax(r.load_kg, r.reps, r.rpe)` function, which rejects unrated, below-RPE-6, nonpositive-load/rep and nonfinite inputs (`origin/master:packages/inference/src/e1rm.ts:82`). Pair adjacent eligible sets in the query order within session, and consecutive comparable sessions separately. Report pair count, absolute/relative differences, effort/rep/load context, equipment changes and within-person spread. Use `bestPerSession` only for a separately labelled session-maximum series, not as every-set repeatability (`origin/master:packages/inference/src/e1rm.ts:100`). No new strength formula, clinical limit or minimal-change threshold is invented.
 
 ### Session feel, reasons and notes
 

@@ -1,4 +1,4 @@
-# Health Connect permissions ? draft
+# Health Connect permissions — draft
 
 Checked the release branch and `origin/master`: both declare and read the same three types. These are optional read permissions; the app works without health access. No oxygen saturation permission is declared and no oxygen saturation record is read by the Health Connect adapter. Historical database tables alone do not establish a Health Connect read.
 

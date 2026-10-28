@@ -1,4 +1,4 @@
-# Store listing ? draft
+# Store listing — draft
 
 **App name:** pikeMethods
 
@@ -12,7 +12,7 @@ Review your training history and adjust your plan as your needs change. Optional
 
 Coach Mode keeps separate athlete files on one device. You can create an encrypted backup and choose where to save it. Your training information stays on your device unless you choose to export it.
 
-pikeMethods provides training guidance, not medical advice or diagnosis; it is not a medical device, so stop if something feels unsafe and seek qualified professional advice when needed.
+pikeMethods provides training guidance, is not a medical device and does not diagnose, treat, cure, or prevent any medical condition; stop if something feels unsafe and consult a qualified healthcare professional for medical advice, diagnosis, or treatment.
 
 **Screenshot shot list:** Capture the real Android release build with fictional data, no personal health details, after branch integration and owner review.
 
