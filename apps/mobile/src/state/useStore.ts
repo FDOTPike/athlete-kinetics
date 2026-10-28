@@ -8039,6 +8039,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       set({ error: e instanceof Error ? e.message : String(e) });
       return false;
     }
+    athleteContextRevision += 1;
     // Reflect the now-empty DB in memory — EVERY derived surface, not just
     // 1RMs (audit B1: stale prescription/session/plan state survived the
     // reset). profileNotes intentionally stay: athlete_profile — including
