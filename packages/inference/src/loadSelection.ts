@@ -34,8 +34,13 @@ import { targetLoadKg } from './blockGenerator';
 import type { TrainingAge } from './types';
 
 export type LoadPreference = 'auto' | 'manual';
-export type LoadSource = 'seeded' | 'history' | 'derived' | 'manual';
-export type AdvisoryKind = 'apre' | 'onerm' | 'history';
+/** Runtime lists of the two domains, so that the CHECKs of migration 071
+ *  can be machine-checked against them. The types are derived from the lists:
+ *  one definition, no drift. */
+export const LOAD_SOURCES = ['seeded', 'history', 'derived', 'manual'] as const;
+export const ADVISORY_KINDS = ['apre', 'onerm', 'history'] as const;
+export type LoadSource = (typeof LOAD_SOURCES)[number];
+export type AdvisoryKind = (typeof ADVISORY_KINDS)[number];
 
 export interface LoadSelectionInput {
   trainingAge: TrainingAge;

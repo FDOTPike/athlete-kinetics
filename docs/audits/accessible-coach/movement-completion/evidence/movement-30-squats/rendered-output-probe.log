@@ -1,0 +1,19 @@
+source commit: 9bbe6f1e08a77ebf89da65548f18f0e3284d9c70
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with baseline-614f7326.json
+
+movements measured: 185 (baseline 176)
+added: 1 Competition Squat; 123 Narrow Stance Squats; 277 Squat with Bands; 299 Wide Stance Barbell Squat; 8 Front Squat; 208 Front Squat (Clean Grip); 38 Box Squat; 256 Reverse Band Box Squat; 275 Speed Box Squat
+removed: none
+changed, expected: none
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  1 Competition Squat: drawn 36239389856a68c3adc4a39689c2f7ca988726094b9ecd7e3aad3156fb108007 captions 3ca5f52e75df0c8356d3bc27db4e47b2a2b63d0bb67481bebc097db8ffaa4be3 stage 123.87x240.00 cycle 3500 ms
+  123 Narrow Stance Squats: drawn 0f917b23be9b162f709a599746846bc15c745187af42288f2e6b2618191393b7 captions 6d668b05a56ab53f53f3bd17468ef040529034f562efa169fba9eedbae72325b stage 121.29x240.00 cycle 3350 ms
+  277 Squat with Bands: drawn ddf81b58e63f0d77b7b82ea29413047d5854efc1aec8d6e1df511fcb05096d82 captions fa04bff847d1d7f5fb4bca8bb31b0e47e236a5ab083f5f3ec10e62b85e620292 stage 122.61x240.00 cycle 3250 ms
+  299 Wide Stance Barbell Squat: drawn 390d9ca996247a61fada784bc874c8bd156ffd2886bc66f149375a91ce811de7 captions bc9f283bcbc90706218b0353c51dbac879ec4d6c83af3618873e3e2f022d7505 stage 125.22x240.00 cycle 3500 ms
+  8 Front Squat: drawn faeb1ae4730c3bc8d1756a52c81f39347c4f23845a68ea51294091fbe280074d captions 40f3e61950f7254d23119a7ca097830adcd5ef2290afe21867b3b0de2191d8df stage 116.13x240.00 cycle 3500 ms
+  208 Front Squat (Clean Grip): drawn 7b35d8dd061cd33a9a2d51b75ef775e8166fe01870665e6f069ce01490056be1 captions a4e23cc18ed2a82dc5b65132727cdc95e497d373defb5680c3ce1c98fa45d2bb stage 116.13x240.00 cycle 3500 ms
+  38 Box Squat: drawn a20f6231456d97fcf47993dc9c13c2789e6fc83df1f20ad60c4a08c30503ae04 captions 16c0df06db5ddf310e80a9dea5ece496f28a92efff6b1391712a9cbbe6490482 stage 127.83x240.00 cycle 3500 ms
+  256 Reverse Band Box Squat: drawn 1953e222334ac3e9790f5bc3d3ec9394a9ce111f6fb99ec1b56394eb7f6ec16c captions df39a5573604ed37aeeb529eb9819daeaf7ff25c147b98368948a12a9b27233a stage 125.11x240.00 cycle 3550 ms
+  275 Speed Box Squat: drawn 17b5d517cc1897e163f3599a853b44930c4403103eb1f9433e810150cdb24c50 captions 78da34aaf7427180fb57855b73040707e89a1199e641f41844773f582f91074b stage 130.43x240.00 cycle 2800 ms
+exit code: 0 (probe run exit 0)

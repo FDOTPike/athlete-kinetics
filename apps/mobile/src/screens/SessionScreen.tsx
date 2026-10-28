@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING_NOTE, EFFORT_STOP_GUIDANCE, effortCue, mapRirToRpe, RIR_OPTIONS, PREPARATION_STATUS_LABEL, isTerminalPreparationStatus, preparationDoseUnit, type EffortAnswer, type RunnerHaltReason } from '@ak/inference';
-import { formatTeachingOnlyReason, useStore, type LoadSelection, type LoggedSet, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
+import { formatTeachingOnlyReason, useStore, type LoadSelection, type LoggedSet, type SetLoadShown, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
 import { useSubViewBack } from '../navigation/navigation';
 import { buildSessionSummary, NO_NEXT_SESSION_TEXT } from '../state/sessionSummary';
 import { SUPPORT_HELD_MESSAGE, SUPPORT_UNAVAILABLE_MESSAGE } from '../state/healthSupportStore';
@@ -17,9 +17,11 @@ import {
   Chip,
   Stepper,
   RestTimerCard,
+  QuietAction,
 } from '../components/ui';
 import { PreparationPanel } from '../components/PreparationPanel';
 import { MovementPreview } from '../components/movementPreview/MovementPreview';
+import { SessionFeelPanel, describeSessionFeel } from '../components/SessionFeelPanel';
 
 
 type SessionMode = 'guided' | 'self_directed';
@@ -280,6 +282,11 @@ export interface SessionScreenProps {
   onReturnToToday?: () => void;
 }
 
+/**
+ * The workout surface: the idle start view, the live session, and the
+ * completion screen shown after a session ends (its saved outcome, the
+ * summary of what was done, and the optional record of how it went).
+ */
 export default function SessionScreen({ onReturnToToday }: SessionScreenProps = {}): React.JSX.Element {
   const state = useStore((s) => s);
   const {
@@ -326,6 +333,12 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
   const [directRpe, setDirectRpe] = useState<number | null>(null);
   const [directEntryOpen, setDirectEntryOpen] = useState(false);
   const lastSetKeyRef = useRef<string | null>(null);
+  // 071: what the current load draft was seeded with. Written by the one-time
+  // draft initializer and by nothing else, so a rerender or a new advisory
+  // cannot change what is recorded beside the set that is then logged. It is
+  // held with the slot and set it was seeded for, and passed only with that
+  // set: a seed that belongs to another slot is never recorded beside this one.
+  const loadShownRef = useRef<{ slotId: number; logged: number; seed: SetLoadShown } | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [niggleRegion, setNiggleRegion] = useState<string | null>(null);
@@ -333,9 +346,15 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
   const [bandLevel, setBandLevel] = useState<number | null>(null);
   const advancedRest = useRef<string | null>(null);
 
-  const hasSubView = detailsOpen || safetyOpen || niggleRegion !== null || substitution !== null;
+  // Session feel (070): the sub-view that records how the ended session went.
+  const [feelOpen, setFeelOpen] = useState(false);
+  const [feelRevision, setFeelRevision] = useState(0);
+  useEffect(() => { setFeelOpen(false); }, [lastEndedSessionId]);
+
+  const hasSubView = feelOpen || detailsOpen || safetyOpen || niggleRegion !== null || substitution !== null;
   useSubViewBack(hasSubView, () => {
-    if (detailsOpen) setDetailsOpen(false);
+    if (feelOpen) setFeelOpen(false);
+    else if (detailsOpen) setDetailsOpen(false);
     else if (safetyOpen) setSafetyOpen(false);
     else if (niggleRegion !== null) setNiggleRegion(null);
     else if (substitution !== null) closeSubstitution();
@@ -377,6 +396,20 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
       return null;
     }
   }, [lastEndedSessionId, loadSessionSummaryFacts, summaryBlockSessions, summaryToday]);
+
+  // Session feel (070): whether to ask how the ended session went, and what is
+  // already saved. Component tests drive this screen with partial store states,
+  // so an absent loader reads as "nothing to ask". Re-read after each save.
+  const loadSessionFeel = state.loadSessionFeel;
+  const sessionFeel = useMemo(() => {
+    if (lastEndedSessionId == null || typeof loadSessionFeel !== 'function') return null;
+    try {
+      return loadSessionFeel(lastEndedSessionId);
+    } catch {
+      // Like the summary, this must never block the completion screen.
+      return null;
+    }
+  }, [lastEndedSessionId, loadSessionFeel, feelRevision]);
 
   // What was recorded for the just-ended session's preparation. null means
   // nothing was recorded (a session from before preparation existed); the
@@ -484,14 +517,27 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
     // resolver's output is intentionally NOT a dependency: rerenders,
     // preference hydration, and evidence refreshes must never overwrite a
     // draft the athlete has already entered.
-    const initial = state.resolveSlotLoad({
+    const seed = state.resolveSlotLoad({
       movementId: currentSlot.movementId,
       bodyweightMode,
       targetReps: target.kind === 'reps' ? target.reps : null,
       targetRpe: stableTargetRpe,
       overrideLoadKg: currentSlot.overrideLoadKg,
       sessionPlanSlotId: currentSlot.sessionPlanSlotId,
-    }).initialLoadKg;
+    });
+    const initial = seed.initialLoadKg;
+    // The record holds the number the field showed (one decimal), not the
+    // resolver's unrounded value; null stays null (a blank field).
+    loadShownRef.current = {
+      slotId: currentSlot.sessionPlanSlotId,
+      logged: currentLogged,
+      seed: {
+        source: seed.source,
+        shownLoadKg: initial === null ? null : Number(initial.toFixed(1)),
+        advisoryKg: seed.advisoryKg,
+        advisoryKind: seed.advisoryKind,
+      },
+    };
     setLoadText(initial === null ? '' : initial.toFixed(1));
     setLoadInvalid(false);
   }, [
@@ -542,6 +588,39 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
     // must not be relabelled as a recorded session. The known kinds keep
     // their existing honest copy.
     const displayMsg = outcomeCopy[outcome.kind] ?? 'Outcome unavailable';
+
+    if (feelOpen && sessionFeel !== null) {
+      // A session that went to plan is not asked anything, so its note may be
+      // saved on its own. Once an answer exists, or the question was asked,
+      // a save carries an answer.
+      const answerOptional = !sessionFeel.ask && sessionFeel.saved === null;
+      return (
+        <SessionFeelPanel
+          saved={sessionFeel.saved}
+          note={sessionFeel.note}
+          answerOptional={answerOptional}
+          onSave={(draft, noteText) => {
+            if (answerOptional && draft.feel === null) {
+              if (noteText.trim().length === 0) return 'nothing_to_save';
+              try {
+                // The note alone: session_note, stored as typed, never interpreted.
+                state.saveSessionNote(noteText);
+              } catch {
+                return 'not_saved';
+              }
+              setFeelRevision((revision) => revision + 1);
+              return null;
+            }
+            // A record only: this writes session_feel and session_note, and
+            // nothing that a prescription, block or progression reads.
+            const result = state.saveSessionFeel(draft, noteText);
+            if (result === null) setFeelRevision((revision) => revision + 1);
+            return result;
+          }}
+          onClose={() => setFeelOpen(false)}
+        />
+      );
+    }
 
     return (
       <View style={styles.outcomeContainer}>
@@ -599,6 +678,37 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
         </View>
 
         <View style={styles.outcomeFooter}>
+          {sessionFeel !== null && (
+            <View style={styles.feelBlock} testID="session-feel-summary">
+              {sessionFeel.saved !== null ? (
+                <>
+                  <Text style={styles.summaryLine} testID="session-feel-saved">
+                    {`How it went: ${describeSessionFeel(sessionFeel.saved)}`}
+                  </Text>
+                  {sessionFeel.note !== null && <Text style={styles.summaryComparison}>Your note is saved with this session.</Text>}
+                  <QuietAction label="Change" onPress={() => setFeelOpen(true)} accessibilityLabel="Change how this session went" testID="session-feel-change" />
+                </>
+              ) : sessionFeel.ask ? (
+                <>
+                  <Text style={styles.summaryLine} testID="session-feel-ask">This session went differently from the plan.</Text>
+                  <SecondaryButton
+                    label="Record how it went"
+                    onPress={() => setFeelOpen(true)}
+                    accessibilityLabel="Record how this session went"
+                    testID="session-feel-open"
+                    style={{ alignSelf: 'stretch' }}
+                  />
+                </>
+              ) : sessionFeel.note !== null ? (
+                <>
+                  <Text style={styles.summaryComparison} testID="session-feel-note-saved">Your note is saved with this session.</Text>
+                  <QuietAction label="Edit note" onPress={() => setFeelOpen(true)} accessibilityLabel="Edit the note about this session" testID="session-feel-note-open" />
+                </>
+              ) : (
+                <QuietAction label="Add a note about this session" onPress={() => setFeelOpen(true)} accessibilityLabel="Add a note about this session" testID="session-feel-note-open" />
+              )}
+            </View>
+          )}
           <SecondaryButton
             label="Back to Today"
             onPress={() => {
@@ -747,7 +857,11 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
     }
     const safeLoad = parsed;
     const metrics = target.kind === 'time' ? { timeS: Math.round(clamp(seconds, 1, 3600)), ...(bandLevel === null ? {} : { bandLevel }) } : bandLevel === null ? undefined : { bandLevel };
-    logSet(currentMovement.movement_id, target.kind === 'time' ? 1 : Math.round(clamp(reps, 1, 50)), safeLoad, safeRpe, undefined, undefined, undefined, metrics, currentSlot.sessionPlanSlotId);
+    // No seed is better than another set's seed: if the draft was not initialized for exactly this
+    // slot and set (a press landing before the initializer has run), nothing is recorded as shown.
+    const held = loadShownRef.current;
+    const seededForThisSet = held !== null && held.slotId === currentSlot.sessionPlanSlotId && held.logged === currentLogged ? held.seed : null;
+    logSet(currentMovement.movement_id, target.kind === 'time' ? 1 : Math.round(clamp(reps, 1, 50)), safeLoad, safeRpe, undefined, undefined, undefined, metrics, currentSlot.sessionPlanSlotId, seededForThisSet);
     if (runner === null) {
       if (uiPreferences.restTimerEnabled) setLocalRest({
         startedAtMs: Date.now(),
@@ -2021,6 +2135,10 @@ const styles = StyleSheet.create({
   },
   outcomeFooter: {
     paddingBottom: theme.space[4],
+  },
+  feelBlock: {
+    gap: theme.space[2],
+    marginBottom: theme.space[4],
   },
   teachingOnlyOption: {
     ...theme.font.label,

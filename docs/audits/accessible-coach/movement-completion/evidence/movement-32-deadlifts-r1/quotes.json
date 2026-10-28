@@ -1,0 +1,144 @@
+{
+  "bounds": [
+    {
+      "id": 2,
+      "quote": "Stand with the bar over mid-foot and take a secure grip without rolling it away. Bring the shins to the bar, set the trunk, and pull the slack out before the plates leave the floor.",
+      "test": "apps/mobile/test/components/MovementPreview.movA03Deadlifts.test.js :: 2 Deadlift: bar over mid-foot, shins brought to the bar, flat braced back, bar stays close to legs to standing tall",
+      "bound": "at ph = 0, bar world Y = 9.500000 (CHAIN_FLOOR_BAR_HEIGHT) with plateRadius = 8.3 (CHAIN_FLOOR_PLATE) so painted plate bottom = 96.900000 = CHAIN_FLOOR (0.000000 gap); arms hang within 10 deg of vertical (nk->wr = 8.75 deg, nArm->wr = 0.11 deg); shoulder-to-bar horizontal distance nk[0] - wr[0] = 3.77 screen units (nk[0] - barMidX = 0.20); shins at bar (barToShinWorldX = 1.50 <= 2.5); hip above knee by 2.24 units; trunk angle = 19.58 deg from horizontal (18.00 deg in 3D)"
+    },
+    {
+      "id": 2,
+      "quote": "Push the floor away and stand tall with the bar close; if it swings forward, reset the start or reduce the load.",
+      "test": "apps/mobile/test/components/MovementPreview.movA03Deadlifts.test.js :: 2 Deadlift: bar over mid-foot, shins brought to the bar, flat braced back, bar stays close to legs to standing tall",
+      "bound": "across ph in [0, 0.25, 0.5, 0.75, 1], bar stays over mid-foot (|barX - midFootX| <= 1.0) with barAt = \"front\" keeping both bar halves visible in front of the legs; at ph = 1, bar rises 35.91 units to Y = 45.41 with trunk = 89 deg and straight arms (180.0 deg elbow angle)"
+    },
+    {
+      "id": 46,
+      "quote": "Stand on a plate or low platform, one to three inches, bar over mid-foot. Set up as for a conventional deadlift — the deficit forces more knee and hip bend, so brace before you even reach for the bar.",
+      "test": "apps/mobile/test/components/MovementPreview.movA03Deadlifts.test.js :: 46 Deficit Deadlift: standing on a low platform with more knee and hip bend, flat back, and longer pull range than Deadlift",
+      "bound": "platform box (a = [-11.5, 3.3], b = [6.5, 0.6]) elevates ankle Y to 5.46 (+3.30 units above Deadlift ankle Y = 2.16) while plates touch CHAIN_FLOOR = 96.900000; arms hang within 10 deg of vertical (nk->wr = 8.75 deg, nArm->wr = 0.11 deg) with nk[0] - wr[0] = 3.77 (nk[0] - barMidX = 0.20) and hip above knee by 0.81 units; knee bend at ph = 0 is 87.35 deg (4.52 deg deeper than Deadlift 91.87 deg) and hip bend is 23.68 deg (4.91 deg deeper than Deadlift 28.59 deg), with trunk angle = 14.72 deg from horizontal (13.50 deg in 3D)"
+    },
+    {
+      "id": 46,
+      "quote": "Pull to lockout, fighting hardest through the longer bottom range.",
+      "test": "apps/mobile/test/components/MovementPreview.movA03Deadlifts.test.js :: 46 Deficit Deadlift: standing on a low platform with more knee and hip bend, flat back, and longer pull range than Deadlift",
+      "bound": "bar-to-ankle vertical distance at ph = 0 is 4.04 units (3.30 units lower relative to the feet than Deadlift at 7.34), and total pull travel from ph = 0 (Y = 9.50) to lockout ph = 1 (Y = 48.71) is 39.21 units (+3.30 units longer than Deadlift 35.91)"
+    },
+    {
+      "id": 176,
+      "quote": "Loop the bands over the bar and anchor them under the feet or to a secure base, then stand with the bar over the middle of the feet and grip it just outside the legs.",
+      "test": "apps/mobile/test/components/MovementPreview.movA03Deadlifts.test.js :: 176 Deadlift with Bands: bands looped over bar ends and anchored under the feet, grip outside legs, stretching to lockout",
+      "bound": "twin bands anchor under nearFoot and farFoot and loop to nearBarEnd and farBarEnd; at ph = 0, arms hang within 10 deg of vertical (nk->wr = 8.75 deg, nArm->wr = 0.11 deg), nk[0] - wr[0] = 3.77 (nk[0] - barMidX = 0.20), hip above knee by 2.24 units, trunk = 19.58 deg from horizontal, and wristSpanZ = 18.68 > ankleSpanZ = 11.20 + 6"
+    },
+    {
+      "id": 176,
+      "quote": "As the bar passes the knees, bring the hips forward to stand tall against the band tension. Lower by pushing the hips back and guiding the bar down the legs to the floor.",
+      "test": "apps/mobile/test/components/MovementPreview.movA03Deadlifts.test.js :: 176 Deadlift with Bands: bands looped over bar ends and anchored under the feet, grip outside legs, stretching to lockout",
+      "bound": "2D rendered band length stretches by > 28 box units from ph = 0 (floor) to ph = 1 (standing lockout) while hips travel forward > 12 units, then returns the plates to the floor line (96.900000 = CHAIN_FLOOR) at the final keyframe"
+    },
+    {
+      "id": 257,
+      "quote": "Inside a rack, hang bands from the top and loop them around the bar, then stand with the bar over the middle of the feet, hip-width apart, and grip it at shoulder width.",
+      "test": "apps/mobile/test/components/MovementPreview.movA03Deadlifts.test.js :: 257 Reverse Band Deadlift: inside a rack with bands hung from the top to the bar ends, hip-width stance and shoulder-width grip",
+      "bound": "power rack frame surrounds the lifter and twin bands hang from the top crossbars ([0, 86, 17.5] and [0, 86, -17.5], Y >= 80) to nearBarEnd and farBarEnd; at ph = 0, arms hang within 10 deg of vertical (nk->wr = 8.75 deg, nArm->wr = 0.11 deg), nk[0] - wr[0] = 3.77 (nk[0] - barMidX = 0.20), hip above knee by 2.24 units, trunk = 19.58 deg from horizontal, hip-width ankleSpanZ = 11.20, and shoulder-width wristSpanZ = 18.68 > ankleSpanZ + 6"
+    },
+    {
+      "id": 257,
+      "quote": "As the bar passes the knees, bring the hips forward to stand tall. Lower by pushing the hips back and guiding the bar to the floor.",
+      "test": "apps/mobile/test/components/MovementPreview.movA03Deadlifts.test.js :: 257 Reverse Band Deadlift: inside a rack with bands hung from the top to the bar ends, hip-width stance and shoulder-width grip",
+      "bound": "overhead band length is longest at the floor (ph = 0, where the bands help most) and shortens by > 28 box units at standing lockout (ph = 1), before lowering the plates back to CHAIN_FLOOR (96.900000)"
+    },
+    {
+      "id": 78,
+      "quote": "Stand with a wide stance, toes pointed out, bar over mid-foot. Grip the bar inside your knees with straight arms.",
+      "test": "apps/mobile/test/components/MovementPreview.movA03Deadlifts.test.js :: 78 Sumo Deadlift: wide stance with toes pointed out, straight arms gripping inside the knees in 3D and 2D, bar over mid-foot",
+      "bound": "wide sumo ankleSpanZ = 50.00 (> 2 * Deadlift 11.20) with toes turned out (foot = [0, 38], 38 deg >= 32 deg); straight arms (180.0 deg elbow angle, reach 24.50) hang within 10 deg of vertical (nk->wr = 8.50 deg, nArm->wr = 9.77 deg) with nk[0] - wr[0] = 3.76 (nk[0] - barMidX = 0.61), hip above knee by 0.62 units, chest-up trunk = 45.55 deg from horizontal in 2D (35.30 deg in 3D, +25.97 deg more upright than Deadlift 19.58 deg), and grip inside the knees in both 3D (wristSpanZ = 7.45 < kneeSpanZ = 27.60 - 14) and 2D projected X at yawDeg = 46 (near knee X = 42.63 < near wrist X = 46.85 - 4.0)"
+    },
+    {
+      "id": 78,
+      "quote": "Brace, then drive the floor away, keeping the bar against your legs until you stand tall. Push your hips back and bend your knees to return the bar to the floor.",
+      "test": "apps/mobile/test/components/MovementPreview.movA03Deadlifts.test.js :: 78 Sumo Deadlift: wide stance with toes pointed out, straight arms gripping inside the knees in 3D and 2D, bar over mid-foot",
+      "bound": "bar rises from Y = 9.50 at ph = 0 (plates touching CHAIN_FLOOR = 96.900000) to Y = 42.10 at ph = 1 (+32.60 units > 32, trunk = 89 deg) with barAt = \"front\" keeping the shaft continuously visible in front of both legs and every leg segment holding its exact 22.25 length on every tick, then returns to ph = 0 at the final keyframe"
+    },
+    {
+      "id": 258,
+      "quote": "Inside a rack, hang bands from the top and loop them around the bar, then set the feet wide with the bar over the middle of the feet and grip it with the arms inside the legs.",
+      "test": "apps/mobile/test/components/MovementPreview.movA03Deadlifts.test.js :: 258 Reverse Band Sumo Deadlift: sumo wide stance and inside-knee grip inside a rack with bands hung from the top",
+      "bound": "power rack frame with twin overhead bands hung from [0, 86, 22.0] and [0, 86, -22.0] to the bar ends; wide sumo ankleSpanZ = 50.00 with toes out 38 deg, chest-up trunk = 45.55 deg from horizontal in 2D (35.30 deg in 3D), arms within 10 deg of vertical (nk->wr = 8.50 deg, nArm->wr = 9.77 deg), nk[0] - wr[0] = 3.76, hip above knee by 0.62 units, wristSpanZ = 7.45 < kneeSpanZ - 14, and 2D projected near wrist inside near knee (knee X = 42.63 < wrist X = 46.85 - 4.0)"
+    },
+    {
+      "id": 258,
+      "quote": "As the bar passes the knees, bring the hips to the bar and stand tall. Lower by pushing the hips back and controlling the bar to the floor.",
+      "test": "apps/mobile/test/components/MovementPreview.movA03Deadlifts.test.js :: 258 Reverse Band Sumo Deadlift: sumo wide stance and inside-knee grip inside a rack with bands hung from the top",
+      "bound": "overhead bands shorten by > 28 box units from floor (ph = 0) to standing lockout (ph = 1) while hips travel forward > 10 units to the bar, then return the floor-sized plates to CHAIN_FLOOR (96.900000) at the final keyframe"
+    },
+    {
+      "id": 290,
+      "quote": "Loop short bands over the bar and stand on them, feet set wide with the bar over the middle of the feet, and grip the bar with the arms inside the legs.",
+      "test": "apps/mobile/test/components/MovementPreview.movA03Deadlifts.test.js :: 290 Sumo Deadlift with Bands: short bands anchored under wide sumo feet, arms inside legs, stretching to lockout",
+      "bound": "short bands anchor under nearFoot and farFoot and loop to nearBarEnd and farBarEnd; ankleSpanZ = 50.00, chest-up trunk = 45.55 deg from horizontal in 2D (35.30 deg in 3D), arms within 10 deg of vertical (nk->wr = 8.50 deg, nArm->wr = 9.77 deg), nk[0] - wr[0] = 3.76, hip above knee by 0.62 units, wristSpanZ = 7.45 < kneeSpanZ - 14, and 2D projected near wrist sits inside near knee (knee X = 42.63 < wrist X = 46.85 - 4.0)"
+    },
+    {
+      "id": 290,
+      "quote": "As the bar passes the knees, bring the hips to the bar and stand tall against the band tension. Lower by pushing the hips back and controlling the bar to the floor.",
+      "test": "apps/mobile/test/components/MovementPreview.movA03Deadlifts.test.js :: 290 Sumo Deadlift with Bands: short bands anchored under wide sumo feet, arms inside legs, stretching to lockout",
+      "bound": "2D rendered floor-anchored band length stretches by > 28 box units from ph = 0 to ph = 1 while hips travel forward > 10 units to the bar, then lowers the plates back to CHAIN_FLOOR (96.900000) at the final keyframe"
+    }
+  ],
+  "fileQuotes": [
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 1448,
+      "endLine": 1449,
+      "text": "        \"instructions\": \"Stand with the bar over mid-foot and take a secure grip without rolling it away. Bring the shins to the bar, set the trunk, and pull the slack out before the plates leave the floor. Push the floor away and stand tall with the bar close; if it swings forward, reset the start or reduce the load.\",\n        \"cues\": \"Pull the slack out first. Push the floor away. Keep the bar close to the legs.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 4443,
+      "endLine": 4444,
+      "text": "        \"instructions\": \"Stand on a plate or low platform, one to three inches, bar over mid-foot. Set up as for a conventional deadlift — the deficit forces more knee and hip bend, so brace before you even reach for the bar. Pull to lockout, fighting hardest through the longer bottom range. Earn a flat back at this depth before loading heavy; the deficit exposes mobility you can hide on a normal pull.\",\n        \"cues\": \"Earn the extra range with a flat back. Pull the slack out before the bar breaks the floor. Keep the deficit small — three inches is plenty.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 13232,
+      "endLine": 13233,
+      "text": "        \"instructions\": \"Loop the bands over the bar and anchor them under the feet or to a secure base, then stand with the bar over the middle of the feet and grip it just outside the legs. Take a breath, bring the shins to the bar with the chest up and the back flat, and drive through the feet to lift the bar. As the bar passes the knees, bring the hips forward to stand tall against the band tension. Lower by pushing the hips back and guiding the bar down the legs to the floor.\",\n        \"cues\": \"Chest up, back flat. Bar stays against the legs. Stand tall into the bands.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 18667,
+      "endLine": 18668,
+      "text": "        \"instructions\": \"Inside a rack, hang bands from the top and loop them around the bar, then stand with the bar over the middle of the feet, hip-width apart, and grip it at shoulder width. Take a breath, bring the shins to the bar with the chest up and the back flat, and drive through the feet to lift the bar. As the bar passes the knees, bring the hips forward to stand tall. Lower by pushing the hips back and guiding the bar to the floor.\",\n        \"cues\": \"Chest up, back flat. Bar stays against the legs. Hips forward to stand tall.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 6609,
+      "endLine": 6610,
+      "text": "        \"instructions\": \"Stand with a wide stance, toes pointed out, bar over mid-foot. Grip the bar inside your knees with straight arms. Brace, then drive the floor away, keeping the bar against your legs until you stand tall. Push your hips back and bend your knees to return the bar to the floor.\",\n        \"cues\": \"Knees track over toes. Chest up before you pull. Push the floor apart with your feet.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 18740,
+      "endLine": 18741,
+      "text": "        \"instructions\": \"Inside a rack, hang bands from the top and loop them around the bar, then set the feet wide with the bar over the middle of the feet and grip it with the arms inside the legs. Take a breath, lower the hips with the chest up, and drive through the floor, spreading it apart with the feet. As the bar passes the knees, bring the hips to the bar and stand tall. Lower by pushing the hips back and controlling the bar to the floor.\",\n        \"cues\": \"Chest up, arms straight. Push the knees out over the feet. Hips to the bar to finish.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 20898,
+      "endLine": 20899,
+      "text": "        \"instructions\": \"Loop short bands over the bar and stand on them, feet set wide with the bar over the middle of the feet, and grip the bar with the arms inside the legs. Take a breath, lower the hips with the chest up, and drive through the floor, spreading it apart with the feet. As the bar passes the knees, bring the hips to the bar and stand tall against the band tension. Lower by pushing the hips back and controlling the bar to the floor.\",\n        \"cues\": \"Chest up, arms straight. Push the knees out over the feet. Hips to the bar to finish.\","
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 1295,
+      "endLine": 1296,
+      "text": "  /** Where a held bar rests on the figure: across the hands by default, cradled in the elbow crooks ('elbows'), held in the hands with its far half behind the legs ('behind'), or held in front of both legs ('front'). */\n  barAt?: 'hands' | 'elbows' | 'behind' | 'front';"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4787,
+      "endLine": 4789,
+      "text": "      const whole = figure.view === 'front';\n      const farGroup = whole || movement.barAt === 'front' ? near : movement.barAt === 'behind' ? groups.behind : far;\n      const farTone: ColorRole = whole ? 'textHi' : farColor;"
+    }
+  ]
+}

@@ -1,0 +1,304 @@
+# yaml-language-server: $schema=https://www.coderabbit.ai/integrations/schema.v2.json
+#
+# CodeRabbit review configuration for pikeMethods (Athlete Kinetics).
+#
+# What this file does
+#   It tells CodeRabbit how to review pull requests here: which files to skip,
+#   what to look for in each part of the repository, and four pass/fail checks
+#   shown on every pull request.
+#
+# What it does not do
+#   It enforces nothing. Everything below is an instruction to an AI reviewer.
+#   The verification suite (`npm run verify:ci`) and CI are still the only
+#   gates. AGENT_WORKFLOW.md is still the authority: where this file and
+#   AGENT_WORKFLOW.md disagree, AGENT_WORKFLOW.md is right and this file is
+#   out of date.
+#
+# When it applies
+#   CodeRabbit reads this file from the branch under review. A pull request is
+#   reviewed with these rules only if its branch contains this file.
+#   Comment `@coderabbitai configuration` on a pull request to see the settings
+#   CodeRabbit used for it and where each one came from.
+#
+# How to change it
+#   In a pull request, like any other file. Check it first with
+#   `coderabbit config validate .coderabbit.yaml`. That command rejects a wrong
+#   value but accepts a misspelled setting name, so check new names against
+#   https://docs.coderabbit.ai/reference/configuration
+
+# Settings not written in this file keep coming from the CodeRabbit dashboard
+# (repository settings, then organisation settings). CodeRabbit's documentation
+# says that without inheritance only the highest-priority source is used, and
+# a file in the repository ranks above the dashboard.
+inheritance: true
+
+tone_instructions: >-
+  Be direct and specific: say what breaks, where, and how to check it. No
+  praise or filler. If a fix needs a new number, new user-facing wording or a
+  policy choice, state the problem and leave the choice to the owner.
+
+reviews:
+  # The profile already in use. The rules below add strictness where it matters.
+  profile: chill
+
+  # List the files that were skipped and the extra context used, so a review
+  # states what it did not look at.
+  review_details: true
+
+  # Reviewer suggestions are drawn from commit authors, and this repository
+  # has one owner.
+  suggested_reviewers: false
+
+  auto_review:
+    enabled: true
+    # Draft pull requests are reviewed on request: comment `@coderabbitai review`.
+    drafts: false
+    # Review pull requests whatever branch they target. Most work here is
+    # stacked on a branch other than master, and until now each of those pull
+    # requests needed a manual `@coderabbitai review` comment.
+    base_branches:
+      - ".*"
+
+  # Files left out of review. Each is generated or vendored, so there is
+  # nothing in it a reviewer can act on, and each one counts towards the limit
+  # on files per review. CodeRabbit already skips images, fonts, lock files,
+  # archives and logs.
+  path_filters:
+    # Rendered movement sheets (51 of the 76 files reviewed on pull request 34).
+    - "!acceptance-evidence/**/*.html"
+    # Embedding vectors written by `npm run embed:codebase`; verify:semantic
+    # checks them against the phrase codebase.
+    - "!packages/inference/assets/phrase-codebase.vectors.json"
+    # The embedding model's tokenizer vocabulary, pinned and hash-verified.
+    - "!packages/inference/assets/minilm/**"
+
+  # What to look for, by area. A file can match more than one entry. The
+  # narrow entries come first and each stands on its own, because CodeRabbit's
+  # documentation does not say how overlapping entries combine.
+  path_instructions:
+    - path: "packages/core-db/src/{schema/**,migrations.ts,migrationRunner.ts}"
+      instructions: |-
+        The migration chain (AGENT_WORKFLOW.md section 1 rule 5, and section 4).
+
+        - A migration file that exists on the base branch has shipped and is frozen. Flag any edit, rename or deletion of one, including comments and whitespace. A correction ships as a new file with the next number.
+        - 004_*.sql is the daily upsert run by the data layer. It is not in the chain and is not frozen; review a change to it as code.
+        - The MIGRATIONS array in migrations.ts is append-only: a device's user_version is its index into that array. Flag an entry inserted before the end, removed or reordered.
+        - Self-heal re-applies every migration, so each one must give the same result on every run. Flag CREATE without IF NOT EXISTS (a trigger or view may DROP then CREATE instead), INSERT without OR IGNORE, and an UPDATE or DELETE whose effect depends on how many times it has run.
+        - New tables are STRICT.
+        - A table created by a new migration needs a sentinel in migrationRunner.ts and a poison case in packages/core-db/test/verify_migrations.mjs. Flag a new table without them.
+        - This is SQLite on a phone with one writer. Do not give PostgreSQL advice (lock levels, concurrent index builds, zero-downtime rollouts).
+
+    - path: "packages/core-db/test/fixtures/lineage/**"
+      instructions: |-
+        Byte-exact copies of migrations that shipped on an earlier lineage, pinned by digest. Any change to these files is a defect. Say so and stop.
+
+    - path: "packages/core-db/staging/**"
+      instructions: |-
+        Source data for the movement library and coaching content (AGENT_WORKFLOW.md section 5). Review only the records this diff adds or changes.
+
+        - A curated movement record in movement_import.json (curated: true) has: 2 to 4 plain-language steps in instructions_raw; 1 to 3 cues, each a positive command with one job (a cue says what to do, not what to avoid); one YouTube link in video_placeholder_uri of the form https://www.youtube.com/watch?v=<11 characters>; and a difficulty_rating of Beginner, Intermediate or Advanced.
+        - The implement named first in supported_prefixes must be among the equipment that scripts/generate-batch-migration.mjs assigns to the movement.
+        - In every staging file: no medical or performance claims (cure, heal, guarantee, prevent injury, pain-free, burns fat and similar).
+        - You cannot check that a video exists or shows the movement. Check the shape of the link only, and say that its content was not verified.
+        - The wording is the owner's coaching voice. Flag a broken rule; do not rewrite the text.
+        - A change to the beginner whitelist, to a progression chain, or to the first 30 shipped movements is an owner decision.
+
+    - path: "packages/inference/assets/phrase-codebase.json"
+      instructions: |-
+        The phrase codebase: the phrases an athlete's note is matched against, and the guardrail each one triggers. A person reviews every entry.
+
+        - Flag as an owner decision any change that removes a halt phrase or makes a phrase's guardrail less conservative.
+        - Do not propose new or reworded phrases.
+        - The vectors file is generated from this file and is not shown to you. verify:semantic checks that the two agree, so do not report it as missing or stale.
+
+    - path: "packages/inference/src/**"
+      instructions: |-
+        The decision engines (AGENT_WORKFLOW.md section 1 rules 2 to 4, and section 6).
+
+        - Prescriptions, blocks, progression, substitution and triage are pure functions of their inputs. In code that computes them, flag Math.random, clock reads (Date.now, or new Date() with no argument), timers, environment or file reads, and module-level state that changes between calls. Time is passed in. The lifecycle timestamps in semantic/onnxEmbedder.ts are telemetry and are not a decision input.
+        - Safety direction. A subjective report may only make a session more conservative, and a halt (sharp pain, dizziness, chest symptoms) ends it. Flag any change that lets a report raise load, sets or the effort cap, or that removes, narrows or delays a halt.
+        - Tier law. A beginner is given only Beginner movements or the ratified beginner whitelist: in block generation, in every substitution layer, and in the picker. Flag any path that fills from a higher tier.
+        - Models. The sentence embedder is the only model in the app. A model may read the athlete's free-text report as one input to the guardrails. It never writes a prescription, a block or a cue. Flag a new model, a swapped model, generated text that reaches the athlete, or a model output that sets a consequence directly. Each needs the owner's sign-off on measured evidence.
+        - Numbers. A new coefficient, threshold, multiplier, cap or default comes from a spec, a ratified decision or an existing constant, and the pull request should say which. Flag one that does not as an owner decision; do not propose a value.
+        - Types. Flag new uses of `any`, and casts that hide a missing case.
+        - Memory. Reference data is loaded once. Flag repeated loading, and large allocations on per-set or per-render paths.
+
+    - path: "packages/biometrics/src/**"
+      instructions: |-
+        The health data bridges (Apple Health and Health Connect).
+
+        - Read-only. Flag any write to a health store. A new data type or permission scope is an owner decision.
+        - Permission is requested only after an explicit tap. Flag a request made at launch or in the background.
+        - The app never says access was granted when the platform did not confirm it. Flag state or wording that assumes a grant.
+        - An unavailable or failing bridge resolves to "unavailable", and the coach carries on with training data. Flag a failure that can throw into the store or block the app.
+
+    - path: "{apps/mobile/src/state/backup*.ts,apps/mobile/src/state/deviceBackupPolicy.ts,packages/core-db/src/backup/**}"
+      instructions: |-
+        Encrypted backup and restore, and the device-backup policy. Treat every change here as security-critical.
+
+        - Flag a weaker key-derivation setting, cipher, authentication step or password rule; a random value that does not come from the native secure generator; and a password, key or unencrypted snapshot that reaches a log, persisted state or disk.
+        - Flag a restore path that can leave data partly replaced, or that reports a step as done before it was verified.
+        - Flag a change to the backup file format without a version change and a way to read existing backups.
+        - Flag anything that turns device or cloud backup of app data back on.
+        - Flag network access, new uses of `any`, and user-facing text that states something the app did not verify.
+        - Do not recommend a different algorithm or parameter. That is an owner decision; see docs/decisions/WO03_ENCRYPTED_BACKUP_AND_RESTORE.md.
+
+    - path: "apps/mobile/src/components/movementPreview/**"
+      instructions: |-
+        Movement previews. They stay hidden from athletes until the owner has reviewed the technique from rendered images.
+
+        - Flag a change that marks a movement as covered, marks the technique review as approved, or bypasses the status check, unless the pull request cites the owner's recorded acceptance for those movements.
+        - Do not judge technique from coordinates. When the pull request makes a claim about technique, say whether rendered-image evidence for it is in the pull request.
+        - Flag network access and new uses of `any`.
+
+    - path: "apps/mobile/src/**"
+      instructions: |-
+        The app (AGENT_WORKFLOW.md section 1 rule 1, and section 7).
+
+        - Offline. Flag fetch, XMLHttpRequest, WebSocket, any HTTP, analytics, telemetry or crash-reporting library, embedded web views, and remote images or fonts. A video link is shown as text and opened by the operating system (Linking.openURL); that is allowed.
+        - Accessibility. Every control has an accessibility role and label, touch targets are at least 56 pt, and text follows the system text size. Flag a new control without a role or label, and a label that no longer matches what the control does.
+        - Each athlete has a separate database, and one athlete's data never reaches another's session. Flag a query, cache or module-level value that can survive an athlete switch.
+        - Writes that belong together are in one transaction. Flag a multi-step write that can stop half-way and leave the data inconsistent.
+        - User-facing text. Flag medical or performance claims, and text that states something the app did not verify. The wording is the owner's: describe the problem and do not write replacement copy.
+        - Appearance is frozen until the owner's design lands. Flag a colour, typography or layout change that a functional fix does not need.
+        - Flag new uses of `any`.
+
+    - path: "{apps/mobile/test/**,packages/*/test/**,test/**,apps/mobile/ios/AthleteKineticsUITests/**}"
+      instructions: |-
+        Tests and verifiers. The gates are this project's evidence, so a weaker gate is a defect even when every run is green.
+
+        - Flag skipped, focused, disabled or pending tests (.skip, .only, xit, xdescribe, it.todo, XCTSkip), and an early return that skips the assertions.
+        - Flag an assertion that cannot fail: both sides computed from the same input; a check reached only when the code under test already succeeded; a catch that swallows the failure; a loop over a list that may be empty.
+        - Flag an expected value, count, hash or tolerance changed together with the code it checks, unless the pull request says why. A new migration legitimately moves the chain counts.
+        - Flag a retry, a longer timeout or a broader match added without evidence of the failure it answers, and any retry that the test's output does not report.
+        - A verifier fails closed: a missing file, an empty result, or input it could not parse is a failure, not a skip.
+        - A negative control or mutation check restores the file it changed on every exit path, and tells "the gate failed for the intended reason" apart from any other failure.
+        - A test asserts the rule, not a detail of the current implementation.
+
+    - path: "{package.json,.npmrc,scripts/fetch-embedder.mjs,scripts/embedder-integrity.mjs,scripts/stage-native-embedder.mjs}"
+      instructions: |-
+        Dependencies and the model download.
+
+        - npm ci refuses install scripts that have not been reviewed (.npmrc, and allowScripts in package.json). Flag a new allowScripts entry, a removed strict-allow-scripts or engine-strict line, and a lower engines floor.
+        - Flag a new runtime dependency, and say what it adds to the app and whether it can reach the network. Flag a loosened version range on a native binding.
+        - The embedding model is fetched at a pinned revision and checked by SHA-256. Flag a changed revision or hash without the evidence for the new value, and any path that installs a file before it is verified.
+        - Flag a script removed from the verify:ci chain.
+
+    - path: "{**/HANDOVER_*.md,DEVIATION_LOG.md,MASTER_AUDIT_SYNTHESIS.md,docs/audits/**,acceptance-evidence/**}"
+      instructions: |-
+        Dated records and evidence. Each file records what was seen on a date, and many are pinned by hash. A record is corrected by adding a dated note, never by rewriting it.
+
+        - Do not comment on style, grammar, formatting or structure, and do not offer committable suggestions.
+        - Flag a claim that the code or the CI result in this pull request contradicts; "pass", "complete" or "verified" with no artifact or command output that shows it; a figure that differs between two places; an artifact named for a step the record does not show happened; and a table that cannot render because a cell is malformed.
+        - If the diff changes or removes text that already exists on the base branch, that is the finding. Say which lines.
+        - For a record added in this pull request, say what it should state and why. For an older record, ask for a dated correction.
+        - Captured command output and logs are evidence. Never ask for them to be edited.
+        - Flag credentials and tokens, and personal details of private individuals.
+
+    - path: "{tools/**,scripts/**}"
+      instructions: |-
+        Verification tools, generators and release scripts.
+
+        - A verifier fails closed. Flag a check that passes when its input is missing, empty or unreadable, and an exit code that hides a failure.
+        - A generator refuses to overwrite a migration, or any other shipped file, that already exists on the base branch.
+        - The only network step in verification is the pinned embedder fetch (npm run fetch:embedder). Flag any other download, upload or call to a remote service.
+        - Evidence tooling records what was measured. Flag output that states a pass count, a ceiling or a result the script did not compute, and a value the tool wrote that is later presented as an observation of the app.
+        - Memory limits are the ratified figures in AGENT_WORKFLOW.md section 1 rule 3. A different ceiling or target is an owner decision.
+
+    - path: ".github/workflows/**"
+      instructions: |-
+        Continuous integration. The jobs fail closed and never publish.
+
+        - Flag continue-on-error, "|| true", and any condition that lets a failing verification or test step pass or be skipped.
+        - Flag a removed job, step or test. tools/verify_ci_structure.mjs asserts the shape the workflow must keep.
+        - Flag a step that publishes to a store, signs with a real identity, or needs an Apple team, certificate or provisioning profile. None is set up, and the iOS job builds unsigned for the simulator only.
+        - Flag a secret printed to the log or passed to a step that does not need it, and wider workflow permissions.
+        - Flag a new download other than dependency install and the pinned embedder fetch. A new third-party action is an owner decision.
+
+    - path: "{apps/mobile/android/**,apps/mobile/ios/**}"
+      instructions: |-
+        The native projects.
+
+        - Release builds have no internet permission: the main Android manifest removes android.permission.INTERNET, and only the debug manifest declares it. Flag any change to that, and cleartext traffic in a release build.
+        - A new permission, entitlement, Health data type or privacy-manifest entry is an owner decision. Flag anything that turns device backup of app data on.
+        - The iOS bundle identifier is com.pikemethods.training. No Apple development team, certificate or provisioning profile exists. Flag a team identifier, a signing identity, a profile, or a keystore other than the public React Native debug keystore.
+        - Flag a new native dependency or autolinked module. tools/verify_native_config.mjs checks what is allowed.
+
+    - path: "PROMPT_LEDGER.md"
+      instructions: |-
+        The prompt ledger: an append-only record of each prompt as it was received, and of what was done. Do not review the text of a quoted prompt. It is a record, not a draft.
+
+        Flag only:
+        - an existing entry that is edited, deleted or renumbered (adding to an entry's own Output section is allowed);
+        - a new entry whose number is already used in the file;
+        - credentials or tokens;
+        - personal details of anyone other than the owner (a real name beside an account handle, contact details);
+        - an Output section that claims a result the pull request does not show.
+
+    - path: "{README.md,AGENT_WORKFLOW.md,RELEASE_READINESS.md}"
+      instructions: |-
+        Living documents. They must be true after this pull request merges.
+
+        - Flag a command, gate list, count, ceiling or file path that this pull request makes stale, whether the stale text is in the diff or not.
+        - Section 1 of AGENT_WORKFLOW.md is the owner's ruling. A change to it needs the owner's recorded decision, cited in the pull request.
+        - Flag an overstated status: "done", "verified" or "ready" for something the repository does not show.
+
+    # Every file. Kept last: see the note above this list.
+    - path: "**/*"
+      instructions: |-
+        How findings are handled in this repository. Every finding gets one of three replies: fixed (with the commit), not a defect, or owner decision. Write each finding so the right reply is obvious.
+
+        - Check before you report. Confirm the problem against the code in this pull request or on the base branch, and cite the file and line.
+        - Owner decisions. When the remedy needs a new number, threshold or default, new or changed user-facing wording, a change in appearance, or a change to a ratified ruling, describe the problem and say "owner decision". Do not supply the value or the wording, and do not offer a committable suggestion for it.
+        - Ratified behaviour is not a defect. Before calling behaviour wrong, look in DEVIATION_LOG.md and docs/decisions/. If a ruling covers it, say so and stop.
+        - Stay inside the change. Do not ask for refactors, renames or style changes in lines this pull request did not touch.
+        - The repository is public. Flag credentials, tokens and signing material; health or training data of a real, identifiable person; and personal details of private individuals (a real name beside an account handle, an email address, a phone number). The file apps/mobile/android/app/debug.keystore is the public React Native debug keystore and is expected.
+        - In code, tests, scripts and workflows, flag text that credits an AI model or assistant as the author (a model name and version in a comment, or a "generated by" line). The name and hashes of the pinned sentence-embedding model are product data, not authorship.
+
+  pre_merge_checks:
+    # Docstring coverage is not a standard in this repository. The default
+    # check warned on pull request 43 (75% against an 80% threshold).
+    docstrings:
+      mode: "off"
+
+    # Pass/fail checks shown in each pull request's walkthrough. They are in
+    # warning mode: they report and do not block. CodeRabbit recommends
+    # starting there and moving a check to "error" once it has proved
+    # reliable.
+    custom_checks:
+      - name: "Frozen migration chain"
+        mode: warning
+        instructions: |-
+          Decide from the diff only. FAIL if the pull request modifies, renames or deletes any file that exists on the base branch under packages/core-db/src/schema/ (except 004_*.sql, the daily upsert, which is not in the chain) or packages/core-db/test/fixtures/lineage/. FAIL if it changes packages/core-db/src/migrations.ts in any way other than adding import lines and appending entries to the end of the MIGRATIONS array (no removal, no insertion before the end, no reordering). PASS if the pull request only adds new migration files and appends them, or does not touch these paths.
+
+      - name: "No skipped or weakened tests"
+        mode: warning
+        instructions: |-
+          FAIL if lines added by the pull request skip, focus or disable a test (.skip, .only, xit, xdescribe, it.todo, test.todo, XCTSkip, or skipped = "YES" in an Xcode scheme); add continue-on-error or "|| true" to a verification or test step; remove a script from the verify:ci chain in package.json; remove a test name from the TESTS list in tools/ios_ui_tests.sh; or delete a test or verifier file without adding one that covers the same behaviour. PASS otherwise. A changed expected value is not a failure of this check by itself.
+
+      - name: "Offline runtime"
+        mode: warning
+        instructions: |-
+          FAIL if lines added under apps/mobile/src/, packages/core-db/src/, packages/inference/src/ or packages/biometrics/src/ call fetch, XMLHttpRequest or WebSocket; import an HTTP, analytics, telemetry, crash-reporting or remote-configuration library; or render a web view. FAIL if the pull request lets android.permission.INTERNET into a release build (apps/mobile/android/app/src/main/AndroidManifest.xml must keep removing it) or enables cleartext traffic for release. PASS otherwise. Opening a link with Linking.openURL passes. Development scripts under scripts/ and tools/ are outside this check.
+
+      - name: "Dated records are append-only"
+        mode: warning
+        instructions: |-
+          FAIL if the pull request changes or deletes lines that exist on the base branch in a HANDOVER_*.md file, in DEVIATION_LOG.md, or in a file under docs/audits/ or acceptance-evidence/, unless the pull request description names the file and gives the reason (for example a re-seal the owner approved). In PROMPT_LEDGER.md, FAIL if an existing entry's Input section is changed, or an existing entry is deleted or renumbered; adding text to an entry's own Output section is allowed. PASS if these files are only added to, or are not touched.
+
+  finishing_touches:
+    # Goes with the docstring check above: no offer to generate docstrings.
+    docstrings:
+      enabled: false
+
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    # Read these as the project's standards for every file. CodeRabbit already
+    # picks up files named AGENTS.md, CLAUDE.md and similar; this repository's
+    # rules live under other names.
+    filePatterns:
+      - files: "AGENT_WORKFLOW.md"
+        applyTo: "**/*"
+      - files: ".agents/rules/coding-rules-general.md"
+        applyTo: "**/*"

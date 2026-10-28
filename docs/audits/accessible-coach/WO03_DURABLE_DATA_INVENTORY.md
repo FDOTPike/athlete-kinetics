@@ -188,3 +188,22 @@ Migration 064 supplies the shared neutral persistence contract and remains byte-
 ## CSV is not a backup
 
 A future CSV history export may provide readable rows such as date, movement, set, reps/load/time, and effort. It will flatten relationships, omit most classes above, omit registry and preferences, and cannot be restored safely. It must be labelled “Export workout history (CSV)”, never “backup”, and must not be accepted by Restore backup.
+
+## Update 2026-10-13 — migration 071 (beta recording)
+
+Everything above is the inventory as it stood through migration `070` and is left as written. This note records what migration `071` adds; it changes nothing above.
+
+Final live durable tables: 121 (the 119 above, and two more). Migration files now run through `071`; the migration array has 70 entries and a fully migrated database reports `PRAGMA user_version = 70` (backup contract v70). The restore schema contract fingerprints 207 durable table/index/trigger objects.
+
+The two tables belong with "Native workout history, execution checkpoints, preparation, and outcomes", which makes that group 19:
+
+- `session_skipped_slot` — which planned slots the athlete skipped in a finalized session, by slot id; written with the session outcome, whose count alone survived before; no row for sessions finalized earlier; never read by an engine (071).
+- `set_load_shown` — what the load entry was seeded with for a logged set (a load, a blank field or zero) and where the seed came from, with any advisory beside it; no row for a set logged earlier or without a seed; never read by an engine (071).
+
+Both are athlete-owned records and are included in a backup and removed by a training-data reset like the rest of that group.
+
+## Correction 2026-10-29 — distinguish migrations 070 and 071
+
+The original inventory above is restored to its release-integration record through `069`: 68 migration-array entries, `user_version = 68`, 118 durable tables, 16 native workout/history tables, and 204 fingerprinted table/index/trigger objects. The October 13 note's phrase "Everything above ... through migration `070`" describes an earlier in-place edit, not that restored historical baseline.
+
+Migration `070` adds `session_feel` to the native workout/history group: 69 array entries, `user_version = 69`, backup contract v69, 119 tables, 17 in that group, and 205 fingerprinted objects. Migration `071` adds `session_skipped_slot` and `set_load_shown`: 70 array entries, `user_version = 70`, backup contract v70, **121 durable tables**, 19 in that group, and **207 fingerprinted objects**. All three additions are athlete-owned backup/reset data and are never engine inputs.

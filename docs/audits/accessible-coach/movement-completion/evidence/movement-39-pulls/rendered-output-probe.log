@@ -1,0 +1,18 @@
+source commit: 225cd4c2b7541914b898ef18c4eef3f803c83dc9
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with probe-14af98271e0283abd8a190e5516c0fd89ea3149b.json
+
+movements measured: 224 (baseline 216)
+added: 6 Weighted Pull-up; 13 Chin-up; 71 Pull-Up; 108 V-Bar Pulldown; 209 Full Range-Of-Motion Lat Pulldown; 77 Straight-Arm Pulldown; 211 Gorilla Chin/Crunch; 64 Hanging Leg Raise
+removed: none
+changed, expected: none
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  6 Weighted Pull-up: drawn 68dd25248fdcfb534f5d48dff00a5dfa5407e165395202517b072ad1708c1d54 captions a29bdcc0fbc26de5384daef02ac45a819e99d0c482879af7c7d3163af29a412a stage 94.08x240.00 cycle 3450 ms
+  13 Chin-up: drawn 90e7158a7abd5fb4183e1e1a14e25e9609aeb57c53bf78e3fd71f14dfab74adc captions 6be7100133a473c3355780458d3ca0f16296a59b8604578ea88c51c02de96547 stage 71.04x240.00 cycle 3450 ms
+  71 Pull-Up: drawn 6007c0f6fee2e21a3fa3b08beac173bf1a7f90231a60a1a3f8fe12805c4e0e6e captions b3d14aca123bf3137fbfd20a03b7e2f94dd92c478ddaf49a3e7106748f7d7173 stage 72.96x240.00 cycle 3450 ms
+  108 V-Bar Pulldown: drawn 7842320de4b7bc2f37cf1c566ae651ea18e1aa8c41e1bd0dd3368e8e52fbc1aa captions c3063f709a9820e1a5fe5e46f6928a102453cbf94b7f30cadea5b485a1ada86b stage 110.59x240.00 cycle 3550 ms
+  209 Full Range-Of-Motion Lat Pulldown: drawn 8a06ad8425eeed5215675b982b568c14b1c8901f10929b440b08bdbe7a4e6e2c captions fe75c954c593593a05ecba565c673a179ee2221db509a6e0b10deb5432ab1fc1 stage 192.94x240.00 cycle 3800 ms
+  77 Straight-Arm Pulldown: drawn b0849c69f8f375ce30c060e7a446ffd66722696bf423a51b0f90ef21f4ba262f captions 1b6497db2360984511b72f36888f5d47454c4a62667a1db3bb9a53708fdbf879 stage 115.29x240.00 cycle 3500 ms
+  211 Gorilla Chin/Crunch: drawn 1ec86d651cb2d8da222eadf1d2c92c6b200bd874d99d3cbfb426b5dfcb01d54f captions 3de69208a531f1cfbbdac9f7b587831b65965088a691146f95e3f7debb4d4086 stage 110.00x240.00 cycle 3700 ms
+  64 Hanging Leg Raise: drawn 187ecee1dd60565e78396856f49bc3580fe2849336503d9e2e31082dbe5e7efd captions 705243bd907a2c41758204206900a76a045450bc23ba8f03d68da01999560305 stage 123.13x240.00 cycle 4450 ms
+exit code: 0 (probe run exit 0)

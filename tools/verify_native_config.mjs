@@ -110,6 +110,17 @@ console.log('[N3] Info.plist privacy and presentation');
   check('display name is the product name, not the scaffold', plist.get('CFBundleDisplayName') === 'pikeMethods');
   const fonts = String(plist.get('UIAppFonts') ?? '');
   check('UIAppFonts registers the Archivo variable font', fonts.includes('Archivo-VariableFont_wdth,wght.ttf'));
+  // The iOS 27 SDK stops an app at launch unless it uses the UIScene life
+  // cycle: the manifest names the scene delegate, and the window is made for
+  // the scene there, not for the screen in the app delegate.
+  const appDelegate = read('apps/mobile/ios/AthleteKinetics/AppDelegate.swift');
+  const sceneBody = appDelegate.match(/^class SceneDelegate: UIResponder, UIWindowSceneDelegate \{\n([\s\S]*?)\n^\}$/m)?.[1] ?? '';
+  check('the app adopts the UIScene life cycle: one scene, its delegate named in Info.plist',
+    /<key>UIApplicationSceneManifest<\/key>\s*<dict>\s*<key>UIApplicationSupportsMultipleScenes<\/key>\s*<false\/>/.test(plistXml)
+      && /<key>UIWindowSceneSessionRoleApplication<\/key>\s*<array>\s*<dict>\s*<key>UISceneConfigurationName<\/key>\s*<string>[^<]+<\/string>\s*<key>UISceneDelegateClassName<\/key>\s*<string>\$\(PRODUCT_MODULE_NAME\)\.SceneDelegate<\/string>\s*<\/dict>\s*<\/array>/.test(plistXml));
+  check('React Native starts in a window made for the scene, and no window is made for the screen',
+    sceneBody.includes('UIWindow(windowScene: windowScene)') && /factory\.startReactNative\(\s*withModuleName:/.test(sceneBody)
+      && sceneBody.includes('appDelegate.window = window') && !appDelegate.includes('UIWindow(frame:'));
   const launch = read('apps/mobile/ios/AthleteKinetics/LaunchScreen.storyboard');
   check('launch screen carries no scaffold text', !/AthleteKinetics|Powered by React Native/.test(launch));
 }
@@ -194,6 +205,23 @@ console.log('[N9] Xcode 26 / fmt consteval compatibility');
   check('the Podfile post_install makes glog\'s namespace-included headers textual (Swift/C++ interop)',
     /make_glog_namespace_headers_textual!\(installer\)/.test(podfile)
       && /textual = %w\[log_severity\.h vlog_is_on\.h\]/.test(podfile));
+  // Xcode 27 refuses a pod target below iOS 15.0 (issue #38).
+  check('the Podfile post_install raises pod deployment targets below the app minimum, and lowers none',
+    /^\s+raise_pod_deployment_targets!\(installer\)$/m.test(podfile)
+      && /Gem::Version\.new\(current\) < minimum/.test(podfile)
+      && podfile.includes("config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = min_ios_version_supported"));
+  // Xcode 27 builds with explicit modules; the pinned Apple Health binding
+  // (16.0.0) needs its core's private module on the dependents' include path.
+  // Read from the helper's own body, in order: the version guard returns
+  // before the dependents are selected and before any include path is set.
+  const exposeBody = podfile.match(/^def expose_healthkit_core_private_module!\(installer\)\n([\s\S]*?)\n^end$/m)?.[1] ?? '';
+  const exposeGuard = exposeBody.search(/unless version == '16\.0\.0'\n[^\n]*\n\s+return\n\s+end\n/);
+  const exposeSelect = exposeBody.indexOf("dependency.pod_name == 'ReactNativeHealthkitCore'");
+  const exposeSet = exposeBody.indexOf("config.build_settings['SWIFT_INCLUDE_PATHS'] = \"#{current} #{include_path}\"");
+  check('the Podfile post_install makes the Apple Health core\'s private module resolvable for its dependents (16.0.0 only)',
+    /^\s+expose_healthkit_core_private_module!\(installer\)$/m.test(podfile)
+      && exposeGuard !== -1 && exposeGuard < exposeSelect && exposeSelect < exposeSet,
+    `guard@${exposeGuard} select@${exposeSelect} set@${exposeSet}`);
   if (fmtVersion !== undefined) {
     check('the installed React Native still pins the fmt version the patch is written for', fmtVersion === '11.0.2', fmtVersion);
   }
@@ -230,6 +258,40 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
   check('an unanswered HealthKit sheet is accepted only when the app trace proves no answer arrived',
     suite.includes('HEALTH-UNANSWERED') && runner.includes("grep -q 'AKUI HEALTH-UNANSWERED'")
       && runner.includes("request settled") && /code=1\n\s+FAILED=1/.test(runner));
+  check('a skipped Health denial tap requires a later tapped and answered attempt before either simulator fallback',
+    /var denialTapSkipped = false\s+for attempt in 1\.\.\.2 where !answered \{\s+var denialTapped = false/.test(suite)
+      && /\.tap\(\)\s+denialTapped = true\s+log\("health sheet: tapped Don't Allow/.test(suite)
+      && /if !denialTapped \{\s+denialTapSkipped = true\s+log\("health sheet disappeared/.test(suite)
+      && /if now\.hasPrefix\("Apple Health access requested"\) \{ answered = denialTapped; break \}/.test(suite)
+      && /\} else if denialTapSkipped \{\s+XCTFail\("the Health denial tap was skipped and no later attempt completed the denial"\)\s+\} else if healthHint\.exists/.test(suite));
+  const denial = suite.slice(suite.indexOf('if var dontAllow = findHealthSheetButton'), suite.indexOf('// Every change of the wording'));
+  check('Health denial waits within the original sheet deadline, scrolls its own table and taps the element with one re-resolution',
+    denial.includes('let deadline = started.addingTimeInterval(150)')
+      && denial.includes('while Date() < deadline')
+      && denial.includes('dontAllow.exists && dontAllow.isHittable')
+      && denial.includes('timeout: min(5, max(0, deadline.timeIntervalSinceNow))')
+      && /if result == \.completed \{\s+if dontAllow\.exists \{\s+dontAllow\.tap\(\)/.test(denial)
+      && /if resolvedAgain \{ break \}\s+resolvedAgain = true\s+guard let fresh = findHealthSheetButton\("Don’t Allow", timeout: max\(0, deadline.timeIntervalSinceNow\)\) else \{ break \}\s+dontAllow = fresh/.test(denial)
+      && denial.includes('else if scrolls < 3') && denial.includes('app.tables.containing(named).firstMatch')
+      && denial.includes('springboard.tables.containing(named).firstMatch')
+      && /if table\.exists && table\.isHittable \{\s+table\.swipeUp\(velocity: \.slow\)\s+scrolls \+= 1/.test(denial)
+      && !/coordinate\(|snapshot\(/.test(denial)
+      && suite.includes('inApp.exists || app.staticTexts.matching(named).firstMatch.exists')
+      && suite.includes('inSpringboard.exists || springboard.staticTexts.matching(named).firstMatch.exists'));
+  const reveal = suite.slice(suite.indexOf('private func reveal('), suite.indexOf('private func tap('));
+  check('general reveal keeps the passing master app gestures without extra ScrollView queries',
+    reveal.includes('app.swipeUp(velocity: .slow)') && reveal.includes('app.swipeDown(velocity: .slow)')
+      && !reveal.includes('scrollViews'));
+  const workout = suite.slice(suite.indexOf('func test5_workoutLogBackgroundAndRelaunch()'), suite.indexOf('// MARK: - Files'));
+  check('workout load entry requires keyboard dismissal after at most two blur targets and requires selected RIR evidence',
+    /for key in \["Your next step", "session-load-label"\]/.test(workout)
+      && /reveal\(target,[\s\S]*bringClear\(target,[\s\S]*target\.tap\(\)/.test(workout)
+      && workout.includes('predicate: NSPredicate(format: "exists == false"), object: app.keyboards.firstMatch')
+      && workout.includes('XCTWaiter.wait(for: [hidden], timeout: 5) == .completed')
+      && workout.includes('XCTAssertFalse(app.keyboards.firstMatch.exists, "the load number pad did not dismiss after both non-input blur taps")')
+      && /reveal\(reps, "2 clean reps left"\)\s+bringClear\(reps, "2 clean reps left"\)\s+reps\.tap\(\)/.test(workout)
+      && workout.includes('reps.isSelected') && workout.includes('XCTWaiter.wait(for: [selected], timeout: 10)')
+      && !workout.includes('scrollViews.firstMatch.swipeDown'));
   check('a timed-out HealthKit request is accepted only when healthd logged the session timeout',
     suite.includes('HEALTH-TIMEOUT-SHOWN') && runner.includes("grep -q 'AKUI HEALTH-TIMEOUT-SHOWN'")
       && runner.includes("grep -q 'Authorization session timed out'")

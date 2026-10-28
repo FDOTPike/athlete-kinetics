@@ -42,6 +42,7 @@ final class AthleteKineticsUITests: XCTestCase {
     ]
     return groups.map { kind, query, limit in
       let labels = query.allElementsBoundByIndex.prefix(limit)
+        .compactMap { try? $0.snapshot() }
         .map { el -> String in let l = el.label.isEmpty ? el.identifier : el.label; return String(l.prefix(70)) }
         .filter { !$0.isEmpty }
       return "\(kind)[\(labels.joined(separator: "; "))]"
@@ -99,12 +100,72 @@ final class AthleteKineticsUITests: XCTestCase {
     el.tap()
   }
 
+  /// Whether the field, or an element inside it, holds keyboard focus: the
+  /// condition XCTest requires before it types. XCTest offers the attribute
+  /// to key-value coding only.
+  private func holdsKeyboardFocus(_ el: XCUIElement) -> Bool {
+    if (el.value(forKey: "hasKeyboardFocus") as? Bool) == true { return true }
+    return el.descendants(matching: .any).matching(NSPredicate(format: "hasKeyboardFocus == true")).firstMatch.exists
+  }
+
+  /// Scrolls until the whole element lies on the page's visible band: below
+  /// the top header and above the primary tabs, where a tap at its centre
+  /// lands on it. XCTest reports an element hittable when any sliver of it
+  /// shows (CI evidence b99d0cb, run 37386116975: the backup password field
+  /// was "hittable" with 1.2 pt of its 54 pt above the tabs, the tap went to
+  /// that sliver's corner at (18.0, 796.8), and the field never took focus).
+  /// Every drag is recorded.
+  private func bringClear(_ el: XCUIElement, _ what: String) {
+    for nudge in 1...6 {
+      let screen = app.frame
+      let header = element("shell-top-header")
+      let tabs = element("shell-primary-tabs")
+      let top = header.exists ? header.frame.maxY : screen.minY
+      let bottom = tabs.exists ? tabs.frame.minY : screen.maxY
+      let frame = el.frame
+      if frame.minY >= top && frame.maxY <= bottom { return }
+      // Drag the page towards centring the element in the band; the drag
+      // itself stays inside the band and ends held, so nothing coasts.
+      let centre = (top + bottom) / 2
+      let reach = (bottom - top) * 0.4
+      let distance = max(-reach, min(reach, frame.midY - centre))
+      log("REVEAL-NUDGE \(what): y \(Int(frame.minY))-\(Int(frame.maxY)) is not inside the visible band \(Int(top))-\(Int(bottom)); dragging the page \(Int(distance)) pt (nudge \(nudge))")
+      let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
+        .withOffset(CGVector(dx: screen.midX, dy: centre + distance / 2))
+      from.press(forDuration: 0.1, thenDragTo: from.withOffset(CGVector(dx: 0, dy: -distance)),
+                 withVelocity: .slow, thenHoldForDuration: 0.3)
+    }
+  }
+
+  /// Taps the field until it holds keyboard focus, as a person does when a
+  /// tap is not taken; typing into an unfocused field fails the test (CI
+  /// evidence b99d0cb: the backup password field, just scrolled into view,
+  /// had no keyboard focus when typing began). The field is first brought
+  /// clear of the page's edges, since a tap on a sliver of it is not taken.
+  /// Every further tap is recorded.
+  private func focus(_ el: XCUIElement, _ what: String, file: StaticString = #filePath, line: UInt = #line) {
+    for attempt in 1...3 {
+      if attempt > 1 {
+        log("FOCUS-RETRY \(what): no keyboard focus 5 s after tap \(attempt - 1); tapping again")
+        reveal(el, what, file: file, line: line)
+      }
+      bringClear(el, what)
+      el.tap()
+      let deadline = Date().addingTimeInterval(5)
+      while Date() < deadline {
+        if holdsKeyboardFocus(el) { return }
+        usleep(250_000)
+      }
+    }
+    XCTFail("\(what) did not take keyboard focus after 3 taps", file: file, line: line)
+  }
+
   /// Replaces the field's text, then submits (single-line fields blur on
   /// return, so the keyboard never covers the next control).
   private func enterText(into key: String, _ text: String, submit: Bool = true) {
     let el = element(key)
     reveal(el, key)
-    el.tap()
+    focus(el, key)
     let existing = (el.value as? String) ?? ""
     if !existing.isEmpty {
       el.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: existing.count))
@@ -130,11 +191,35 @@ final class AthleteKineticsUITests: XCTestCase {
     wait(element("shell-root"), "the app shell", timeout: 90)
   }
 
+  /// The onboarding screen now showing: its first text after the wordmark
+  /// (every step opens with its own heading), or nil while none is readable.
+  private func onboardingHeading() -> String? {
+    currentLabel(app.staticTexts.matching(
+      NSPredicate(format: "label != '' AND NOT (label ==[c] %@)", "pikemethods")).firstMatch)
+  }
+
   /// The default eight-screen onboarding, through the real UI.
   private func completeOnboarding(_ who: String, createProgram: Bool = false) {
     wait(element("Next"), "onboarding (\(who))", timeout: 60)
     log("onboarding started (\(who)): progress=\(element(labelBeginsWith: "Step ").exists ? element(labelBeginsWith: "Step ").label : "-")")
-    for step in 1...6 { tap("Next", "Next (step \(step), \(who))") }
+    // Each Next must change the screen. CI evidence (run 37877632952, test1):
+    // six taps were sent to the centre of Next (359.5, 818.0), yet onboarding
+    // stood one screen short, and the failure surfaced two steps later with no
+    // record of which tap had not been taken. The tap that leaves the screen
+    // unchanged now fails by name; it is not repeated.
+    for step in 1...6 {
+      let before = onboardingHeading()
+      tap("Next", "Next (step \(step), \(who))")
+      let deadline = Date().addingTimeInterval(30)
+      var now = onboardingHeading()
+      while (now == nil || now == before) && Date() < deadline {
+        usleep(500_000)
+        now = onboardingHeading()
+      }
+      if now == nil || now == before {
+        XCTFail("Next (step \(step), \(who)) did not change the onboarding screen within 30 s; it still shows: \(before ?? "<no heading>")")
+      }
+    }
     tap("No, nothing to note")
     tap("Next", "Next to review (\(who))")
     tap("START TRAINING")
@@ -192,8 +277,25 @@ final class AthleteKineticsUITests: XCTestCase {
     var tries = 0
     while !build.isHittable && tries < 40 { app.swipeUp(); tries += 1 }
     reveal(build, "the build label")
-    for _ in 1...7 { build.tap() }
-    wait(element("advanced-athlete-manager"), "the advanced athlete manager after the seven-tap gesture")
+    bringClear(build, "the build label")
+    // ProfileScreen.recordBuildTap forgets the count after 5 s without a tap.
+    // build.tap() looks the label up in the whole element tree again before
+    // every tap, and on a slow runner each look-up took 5-10 s (CI run
+    // 38873157462, test4 after the restore: gaps of 6.9, 6.7, 5.9 and 9.3 s),
+    // so the gesture never reached seven. The label is found once and the
+    // seven taps go to its centre; each gap is recorded.
+    let frame = build.frame
+    let centre = app.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
+      .withOffset(CGVector(dx: frame.midX, dy: frame.midY))
+    var times: [Date] = []
+    for _ in 1...7 { centre.tap(); times.append(Date()) }
+    let gaps = zip(times.dropFirst(), times).map { $0.timeIntervalSince($1) }
+    log("BUILD-TAPS at (\(Int(frame.midX)), \(Int(frame.midY))): gaps \(gaps.map { String(format: "%.2f", $0) }.joined(separator: "/")) s, seven taps in \(String(format: "%.2f", times[6].timeIntervalSince(times[0]))) s")
+    // The gaps are when each tap() call returned, not when the app took the
+    // event, so they explain a failure rather than decide one.
+    let slowest = String(format: "%.1f", gaps.max() ?? 0)
+    wait(element("advanced-athlete-manager"),
+         "the advanced athlete manager after the seven-tap gesture (slowest gap \(slowest) s; the count resets after 5 s)")
   }
 
   /// Expands Coach Mode and returns its label (with the athlete count).
@@ -217,9 +319,15 @@ final class AthleteKineticsUITests: XCTestCase {
     let deadline = Date().addingTimeInterval(timeout)
     repeat {
       let inApp = healthPermissionButton(title)
-      if inApp.exists { log("health sheet: in the app"); return inApp }
+      let named = NSPredicate(format: "label IN %@", [title, title.replacingOccurrences(of: "’", with: "'")])
+      // The remote sheet can retain its text while rebuilding the offscreen buttons.
+      // Evidence: CI run 40731107914, job 122977480835 (Xcode 27), artifact
+      // athlete-kinetics-ios-simulator-unsigned-xcode27, XCTest runner log at 18:22:02.810:
+      // the Don't Allow button node is absent, its static text remains, and the table has two pages.
+      // A dismissed sheet leaves no text behind, so the "sheet stayed open" checks stay truthful.
+      if inApp.exists || app.staticTexts.matching(named).firstMatch.exists { log("health sheet: in the app"); return inApp }
       let inSpringboard = healthPermissionButton(title, in: springboard)
-      if inSpringboard.exists { log("health sheet: in SpringBoard"); return inSpringboard }
+      if inSpringboard.exists || springboard.staticTexts.matching(named).firstMatch.exists { log("health sheet: in SpringBoard"); return inSpringboard }
       sleep(1)
     } while Date() < deadline
     return nil
@@ -244,9 +352,11 @@ final class AthleteKineticsUITests: XCTestCase {
       wait(element(marker), "the \(screen) screen marker (\(marker))")
       // Today and Plan share a screen marker, so the marker alone does not
       // prove the switch has rendered; the selected state must follow.
+      // One lookup on the 300-movement Library took 9.5 s on a loaded runner
+      // (CI evidence 31e8bc4), so a 10 s bound allowed a single reading.
       let selected = XCTWaiter.wait(for: [XCTNSPredicateExpectation(
-        predicate: NSPredicate(format: "isSelected == true"), object: element(key))], timeout: 10)
-      XCTAssertEqual(selected, .completed, "\(screen) control is not marked selected within 10 s of tapping it")
+        predicate: NSPredicate(format: "isSelected == true"), object: element(key))], timeout: 30)
+      XCTAssertEqual(selected, .completed, "\(screen) control is not marked selected within 30 s of tapping it")
       log("visited \(screen)")
       guard #available(iOS 17.0, *) else {
         XCTFail("the accessibility audit needs iOS 17+; this runtime is older")
@@ -260,25 +370,42 @@ final class AthleteKineticsUITests: XCTestCase {
   @available(iOS 17.0, *)
   private func audit(_ screen: String) -> [String] {
     var issues: [String] = []
-    do {
-      try app.performAccessibilityAudit(for: .all) { issue in
-        let who = issue.element.map { "\($0.elementType.rawValue)|\($0.identifier)|\($0.label.prefix(80))" } ?? "-"
-        // React Native text fields scale their font with the person's text
-        // size through RN's own font multiplier, not UIKit's
-        // adjustsFontForContentSizeCategory, which is what this audit reads.
-        // test2 MEASURES that a text field grows at AX XXXL; only this exact
-        // pairing (Dynamic Type x text field) is classified, and it is still
-        // reported. Everything else fails the test.
-        let fieldTypes: [XCUIElement.ElementType] = [.textField, .secureTextField, .searchField]
-        if issue.auditType == .dynamicType, let el = issue.element, fieldTypes.contains(el.elementType) {
-          self.log("A11Y-MEASURED \(screen) [dynamicType] RN text field \(el.label.prefix(60)): scaling measured in test2")
-          return true
+    // CI evidence (02e775f, run 37603984164 attempt 1): the Ready audit ended
+    // with "Audit failed to complete in time" (code -56) after 18 s. The app
+    // had done the same work as in a passing audit (318 log lines, 13 trait
+    // updates) within 1.5 s and then sat idle: the audit's result never came
+    // back from outside the app. An audit that does not complete has examined
+    // nothing, so it is run once more and the repeat is recorded; issues
+    // already reported are kept, and a second failure to complete fails the
+    // test like any other.
+    for attempt in 1...2 {
+      do {
+        try app.performAccessibilityAudit(for: .all) { issue in
+          let who = issue.element.map { "\($0.elementType.rawValue)|\($0.identifier)|\($0.label.prefix(80))" } ?? "-"
+          // React Native text fields scale their font with the person's text
+          // size through RN's own font multiplier, not UIKit's
+          // adjustsFontForContentSizeCategory, which is what this audit reads.
+          // test2 MEASURES that a text field grows at AX XXXL; only this exact
+          // pairing (Dynamic Type x text field) is classified, and it is still
+          // reported. Everything else fails the test.
+          let fieldTypes: [XCUIElement.ElementType] = [.textField, .secureTextField, .searchField]
+          if issue.auditType == .dynamicType, let el = issue.element, fieldTypes.contains(el.elementType) {
+            self.log("A11Y-MEASURED \(screen) [dynamicType] RN text field \(el.label.prefix(60)): scaling measured in test2")
+            return true
+          }
+          issues.append("\(screen) [\(issue.auditType.rawValue)] \(issue.compactDescription) @ \(who)")
+          return true // collect every issue; the caller fails the test if any exist
         }
-        issues.append("\(screen) [\(issue.auditType.rawValue)] \(issue.compactDescription) @ \(who)")
-        return true // collect every issue; the caller fails the test if any exist
+        break
+      } catch {
+        let failure = error as NSError
+        if attempt == 1 && failure.domain == "com.apple.xcode.xctest.accessibilityAudit" && failure.code == -56 {
+          log("AUDIT-RETRY \(screen): the audit did not complete in time (code -56); running it once more")
+          continue
+        }
+        issues.append("\(screen) audit did not complete: \(error)")
+        break
       }
-    } catch {
-      issues.append("\(screen) audit did not complete: \(error)")
     }
     for issue in issues { log("A11Y \(issue)") }
     log("a11y \(screen): \(issues.count) issue(s)")
@@ -319,7 +446,13 @@ final class AthleteKineticsUITests: XCTestCase {
     completeOnboarding("athlete A")
     openProfile()
     let idle = element(labelBeginsWith: "Apple Health is available.")
-    wait(idle, "the Apple Health 'available' wording before any request")
+    // CI evidence c3e7de5 (Xcode 27 row, iOS 27.0 simulator): 30 s after the
+    // Profile opened the app still read "Checking Apple Health…"; the same
+    // test had the wording in time on the run before. The wording must still
+    // appear; the time it took is recorded and the bound is 2 minutes.
+    let idleStart = Date()
+    wait(idle, "the Apple Health 'available' wording before any request", timeout: 120)
+    log("health availability shown after \(Int(Date().timeIntervalSince(idleStart))) s")
     // CI evidence (5bdc452): the simulator's HealthKit sheet service can start
     // slower than HealthKit's own 10 s authorization session; HealthKit then
     // fails the request ("Authorization session timed out") and the app shows
@@ -327,14 +460,49 @@ final class AthleteKineticsUITests: XCTestCase {
     // as evidence; the person then taps TRY AGAIN once, as anyone would.
     let healthHint = healthWording()
     var answered = false
+    var denialTapSkipped = false
     for attempt in 1...2 where !answered {
+      var denialTapped = false
       let control = "Choose whether to share sleep and resting heart rate from Apple Health"
       tap(control, "Apple Health CONNECT / TRY AGAIN (attempt \(attempt))")
       let started = Date()
-      if let dontAllow = findHealthSheetButton("Don’t Allow", timeout: 150) {
-        log("health sheet shown (attempt \(attempt)) after \(Int(Date().timeIntervalSince(started))) s: allow=\(healthPermissionButton("Allow").exists)")
-        dontAllow.tap()
-        log("health sheet: tapped Don't Allow")
+      if var dontAllow = findHealthSheetButton("Don’t Allow", timeout: 150) {
+        let deadline = started.addingTimeInterval(150)
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        let named = NSPredicate(format: "label IN %@", ["Don’t Allow", "Don't Allow"])
+        var scrolls = 0
+        var resolvedAgain = false
+        while Date() < deadline {
+          let ready = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in
+            dontAllow.exists && dontAllow.isHittable
+          }, object: dontAllow)
+          let result = XCTWaiter.wait(for: [ready], timeout: min(5, max(0, deadline.timeIntervalSinceNow)))
+          if result == .completed {
+            if dontAllow.exists {
+              dontAllow.tap()
+              denialTapped = true
+              log("health sheet: tapped Don't Allow (attempt \(attempt), after \(Int(Date().timeIntervalSince(started))) s)")
+              break
+            }
+            if resolvedAgain { break }
+            resolvedAgain = true
+            guard let fresh = findHealthSheetButton("Don’t Allow", timeout: max(0, deadline.timeIntervalSinceNow)) else { break }
+            dontAllow = fresh
+          } else if scrolls < 3 {
+            // Xcode 27's Health table has two pages; its denial action starts below the fold.
+            let inApp = app.tables.containing(named).firstMatch
+            let table = inApp.exists ? inApp : springboard.tables.containing(named).firstMatch
+            if table.exists && table.isHittable {
+              table.swipeUp(velocity: .slow)
+              scrolls += 1
+              log("health sheet: scrolled to the denial action (\(scrolls))")
+            }
+          }
+        }
+        if !denialTapped {
+          denialTapSkipped = true
+          log("health sheet disappeared or was not hittable before the denial tap (attempt \(attempt))")
+        }
       } else {
         log("health sheet not shown within 150 s (attempt \(attempt)); on screen: \(visibleLabels(app).prefix(700))")
       }
@@ -352,7 +520,7 @@ final class AthleteKineticsUITests: XCTestCase {
         for claim in ["Connected", "granted"] where now.contains(claim) {
           XCTFail("the Health wording claimed access ('\(claim)') while the request was open: \(now)")
         }
-        if now.hasPrefix("Apple Health access requested") { answered = true; break }
+        if now.hasPrefix("Apple Health access requested") { answered = denialTapped; break }
         if now.hasPrefix("The Apple Health request did not complete") { break }
         sleep(1)
       }
@@ -374,6 +542,8 @@ final class AthleteKineticsUITests: XCTestCase {
       for claim in ["Connected", "granted"] {
         XCTAssertFalse(hintA.contains(claim), "after a denial the wording claimed access ('\(claim)'): \(hintA)")
       }
+    } else if denialTapSkipped {
+      XCTFail("the Health denial tap was skipped and no later attempt completed the denial")
     } else if healthHint.exists && healthHint.label.hasPrefix("The Apple Health request did not complete") {
       // CI evidence (c5cf82c): healthd failed both requests with "Authorization
       // session timed out" (Code=100) before any sheet appeared; the app showed
@@ -390,18 +560,23 @@ final class AthleteKineticsUITests: XCTestCase {
     // appeared, the same steps passed. The stuck system authorization view is
     // recorded and cleared by relaunching the app (data persists on disk). The
     // same sequence on a physical device is an owner check.
+    // CI evidence (31e8bc4, iOS 27): the app was still hittable here, and the
+    // sheet for this one request (the app's trace shows a single "request
+    // start") came up 12.5 minutes later, over the athlete switcher. An
+    // unanswered request is therefore always ended by the relaunch, and
+    // tools/ios_ui_tests.sh requires the trace to show one request only.
     if !answered {
       let header = element("header-athlete")
       if header.exists && !header.isHittable {
         log("HEALTH-VIEW-STUCK the app was not hittable after the unanswered Health request; relaunching")
-        app.terminate()
-        launch(["-AKUITestTrace", "1"])
-        // The relaunch opens on Today; the steps below start from Profile.
-        openProfile()
-        log("after relaunch: Profile hittable=\(element("athlete-screen-shown").exists && element("header-athlete").isHittable)")
       } else {
-        log("app hittable after the Health request: \(header.exists ? "yes" : "header absent")")
+        log("app hittable after the Health request: \(header.exists ? "yes" : "header absent"); relaunching to end the unanswered request")
       }
+      app.terminate()
+      launch(["-AKUITestTrace", "1"])
+      // The relaunch opens on Today; the steps below start from Profile.
+      openProfile()
+      log("after relaunch: Profile hittable=\(element("athlete-screen-shown").exists && element("header-athlete").isHittable)")
     }
 
     let before = expandCoachMode()
@@ -472,11 +647,10 @@ final class AthleteKineticsUITests: XCTestCase {
     // Restore. First the person backs out of the Files sheet: nothing changes.
     enterText(into: "Backup password, at least 12 characters", password)
     tap("choose-restore-button", "RESTORE ENCRYPTED BACKUP")
-    let cancel = app.buttons["Cancel"]
-    wait(cancel, "the Files sheet's Cancel", timeout: 30)
-    cancel.tap()
+    let cancelled = cancelFilesSheet()
     settledLabel(element("backup-status-message"), beginsWith: "Restore cancelled. Your data is unchanged.",
-                 "status after cancelling the Files sheet", timeout: 30)
+                 "status after cancelling the Files sheet",
+                 timeout: max(1, 30 - Date().timeIntervalSince(cancelled)))
     // Then the same password, the saved .pmbak picked in Files, preview, confirm.
     tap("choose-restore-button", "RESTORE ENCRYPTED BACKUP")
     pickBackupInFiles()
@@ -555,12 +729,25 @@ final class AthleteKineticsUITests: XCTestCase {
     log("first set: \(first.label)")
     if first.label.hasSuffix("enter a load first") {
       enterText(into: "session-load-input", "20", submit: false)
-      let title = element("Your next step")
-      if title.exists && title.isHittable { title.tap() } // dismiss the number pad
+      for key in ["Your next step", "session-load-label"] {
+        if !app.keyboards.firstMatch.exists { break }
+        let target = element(key)
+        reveal(target, "the load blur target (\(key))")
+        bringClear(target, "the load blur target (\(key))")
+        target.tap()
+        log("load number pad: tapped \(key) to blur")
+        let hidden = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.keyboards.firstMatch)
+        if XCTWaiter.wait(for: [hidden], timeout: 5) == .completed { break }
+      }
+      XCTAssertFalse(app.keyboards.firstMatch.exists, "the load number pad did not dismiss after both non-input blur taps")
       log("load entered: 20 kg")
     }
-    let reps = element("2 clean reps left")
-    if reps.waitForExistence(timeout: 5) { reveal(reps, "2 clean reps left"); reps.tap() }
+    let reps = app.buttons.matching(NSPredicate(format: "label == %@", "2 clean reps left")).firstMatch
+    reveal(reps, "2 clean reps left")
+    bringClear(reps, "2 clean reps left")
+    reps.tap()
+    let selected = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in reps.isSelected }, object: reps)
+    XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 10), .completed, "the effort choice did not become selected")
     let ready = element(labelBeginsWith: "Log set 1 for ")
     reveal(ready, "Log set 1")
     XCTAssertFalse(ready.label.contains("unavailable"), "the first set cannot be logged: \(ready.label)")
@@ -601,6 +788,111 @@ final class AthleteKineticsUITests: XCTestCase {
 
   // MARK: - Files
 
+  /// A control of the Files sheet by its visible name. Up to iOS 26 these are
+  /// buttons; on iOS 27 "Save" was on screen with no Button of that name (CI
+  /// evidence 3f126c3), so a button is preferred and any element carrying the
+  /// name is accepted.
+  private func filesControl(_ names: [String]) -> XCUIElement {
+    let named = NSPredicate(format: "label IN %@ OR identifier IN %@", names, names)
+    let button = app.buttons.matching(named).firstMatch
+    return button.exists ? button : app.descendants(matching: .any).matching(named).firstMatch
+  }
+
+  /// The Files sheet's own navigation bar ("FullDocumentManagerViewController
+  /// NavigationBar" on iOS 27), or an element that does not exist while no
+  /// sheet is up.
+  private func filesSheetBar() -> XCUIElement {
+    app.navigationBars.matching(NSPredicate(format: "identifier CONTAINS 'DocumentManager'")).firstMatch
+  }
+
+  /// Backs out of the Files import sheet with its own Cancel (or Close) and
+  /// returns when the tap was made. CI evidence (Xcode 27, runs 38299228248
+  /// and 38345092343): 30 s after the tap the app's tree still held the
+  /// sheet's bar and the saved .pmbak's row, and the status still read
+  /// "Opening encrypted backup…", which the app sets before it presents the
+  /// sheet. The tap had not closed the sheet. The control used to be chosen
+  /// at the instant RESTORE had been tapped (a Button of that name if one
+  /// existed then, otherwise any element of the app carrying the name) and
+  /// tapped as soon as it existed. It is now taken from the sheet's bar when
+  /// the bar holds a hittable one (otherwise as before), tapped only once it
+  /// is hittable and has stopped moving, recorded with its type, identifier
+  /// and frame, and the sheet must then close: its bar must go, or, when no
+  /// bar was found, the tapped control must go. Nothing is tapped twice.
+  @discardableResult
+  private func cancelFilesSheet(file: StaticString = #filePath, line: UInt = #line) -> Date {
+    let names = ["Cancel", "Close"]
+    let named = NSPredicate(format: "label IN %@ OR identifier IN %@", names, names)
+    let opened = Date()
+    var found: XCUIElement?
+    var inBar = false
+    var lastFrame = CGRect.null
+    var lastIdentity = ""
+    while Date().timeIntervalSince(opened) < 30 {
+      // The first hittable of: a button in the sheet's bar, any element in
+      // that bar, then the earlier lookup over the whole app.
+      let bar = filesSheetBar()
+      let choices: [(XCUIElement, Bool)] = [
+        (bar.buttons.matching(named).firstMatch, true),
+        (bar.descendants(matching: .any).matching(named).firstMatch, true),
+        (filesControl(names), false),
+      ]
+      if let choice = choices.first(where: { $0.0.exists && $0.0.isHittable }) {
+        let (candidate, fromBar) = choice
+        // Settled: the same element (type, identifier, label, lookup) at the
+        // same frame on two reads half a second apart, so the tap is not
+        // aimed at a sheet still sliding in.
+        let frame = candidate.frame
+        let identity = "\(candidate.elementType.rawValue)|\(candidate.identifier)|\(candidate.label)|\(fromBar)"
+        if frame == lastFrame && identity == lastIdentity { found = candidate; inBar = fromBar; break }
+        lastFrame = frame
+        lastIdentity = identity
+      } else {
+        lastFrame = .null
+        lastIdentity = ""
+      }
+      usleep(500_000)
+    }
+    guard let cancel = found else {
+      log("files sheet without Cancel: \(filesSheetInventory())")
+      XCTFail("the Files sheet's Cancel was not on screen and still within 30 s", file: file, line: line)
+      return Date()
+    }
+    let shown = Date().timeIntervalSince(opened)
+    let barWasUp = filesSheetBar().exists
+    let f = cancel.frame
+    log("files sheet cancel: tapping \(cancel.elementType.rawValue):'\(cancel.label)'|'\(cancel.identifier)' at {{\(Int(f.minX)), \(Int(f.minY))}, {\(Int(f.width)), \(Int(f.height))}} found by \(inBar ? "the sheet's bar" : "the whole-app lookup") \(String(format: "%.1f", shown)) s after RESTORE")
+    cancel.tap()
+    let tapped = Date()
+    // Closed: the sheet's bar is gone, or, when no bar was found, the
+    // tapped control (part of the sheet) is gone.
+    let signal = barWasUp ? "its bar" : "the tapped control"
+    let stillOpen = { barWasUp ? self.filesSheetBar().exists : cancel.exists }
+    let deadline = tapped.addingTimeInterval(30)
+    while stillOpen() && Date() < deadline { usleep(250_000) }
+    if stillOpen() {
+      log("files sheet still open after Cancel (\(signal) still on screen): \(filesSheetInventory())")
+      XCTFail("the Files sheet was still open 30 s after its Cancel was tapped (\(signal) still on screen)", file: file, line: line)
+    } else {
+      log("files sheet closed \(String(format: "%.1f", Date().timeIntervalSince(tapped))) s after Cancel (\(signal) gone)")
+    }
+    return tapped
+  }
+
+  /// What the Files sheet exposes: the elements of its bar by type, label and
+  /// identifier, and the last buttons in the tree (the sheet's follow the app's).
+  private func filesSheetInventory() -> String {
+    let bar = app.navigationBars.matching(NSPredicate(format: "identifier CONTAINS 'DocumentManager'")).firstMatch
+    let inBar = !bar.exists ? "absent" : bar.descendants(matching: .any).allElementsBoundByIndex.prefix(30)
+      .compactMap { try? $0.snapshot() }
+      .map { "\($0.elementType.rawValue):\($0.label.prefix(30))|\($0.identifier.prefix(30))" }.joined(separator: "; ")
+    let lastButtons = app.buttons.allElementsBoundByIndex.suffix(20)
+      .compactMap { try? $0.snapshot() }
+      .map { String(($0.label.isEmpty ? $0.identifier : $0.label).prefix(30)) }.joined(separator: "; ")
+    return "bar[\(inBar)] last buttons[\(lastButtons)]"
+  }
+
+  /// Brings the Files sheet to its local location (Browse, then On My iPhone),
+  /// so the backup is saved to and picked from the simulator itself.
   private func onMyIPhone() {
     let browse = app.buttons.matching(identifier: "Browse").firstMatch
     if browse.waitForExistence(timeout: 10) && !browse.isSelected { browse.tap() }
@@ -615,14 +907,18 @@ final class AthleteKineticsUITests: XCTestCase {
     }
   }
 
+  /// Waits for the Files export sheet, then saves the backup in On My iPhone
+  /// with the sheet's own Save (or Move, Done, Open) control. Fails when the
+  /// sheet offers no enabled action.
   private func saveInFiles() {
     // Encrypting the snapshot (scrypt) precedes the sheet: wait for the sheet
-    // or a final status, up to 3 minutes, recording the status as it goes.
+    // or a final status, up to 5 minutes (150 s was measured on CI, c3e7de5),
+    // recording the status as it goes.
     let status = element("backup-status-message")
-    let deadline = Date().addingTimeInterval(180)
+    let deadline = Date().addingTimeInterval(300)
     var lastStatus = ""
     while Date() < deadline {
-      if ["Save", "Move", "Done", "Open", "Cancel"].contains(where: { app.buttons[$0].exists }) { break }
+      if filesControl(["Save", "Move", "Done", "Open", "Cancel"]).exists { break }
       if status.exists && status.label != lastStatus {
         lastStatus = status.label
         log("backup status while waiting for the Files sheet: \(lastStatus.prefix(160))")
@@ -633,17 +929,19 @@ final class AthleteKineticsUITests: XCTestCase {
     // UIDocumentPickerViewController (export, as a copy) into On My iPhone.
     onMyIPhone()
     for name in ["Save", "Move", "Done", "Open"] {
-      let b = app.buttons[name]
+      let b = filesControl([name])
       if b.waitForExistence(timeout: 5) && b.isEnabled {
         b.tap()
         log("files export: \(name)")
         return
       }
     }
-    log("files export: no enabled action; status=\(element("backup-status-message").exists ? element("backup-status-message").label : "-"); app{\(visibleLabels(app))}")
+    log("files sheet without an enabled Save/Move action: \(filesSheetInventory()); status=\(element("backup-status-message").exists ? element("backup-status-message").label : "-")")
     XCTFail("the Files export sheet had no enabled Save/Move action")
   }
 
+  /// Picks the saved backup (not a recovery copy) in the Files import sheet
+  /// and waits for the app to show its restore preview.
   private func pickBackupInFiles() {
     onMyIPhone()
     let file = app.descendants(matching: .any)
@@ -651,8 +949,41 @@ final class AthleteKineticsUITests: XCTestCase {
     wait(file, "the saved backup file in Files", timeout: 30)
     log("files import: picking \(file.label)")
     file.tap()
-    let open = app.buttons["Open"]
+    let open = filesControl(["Open"])
     if open.waitForExistence(timeout: 5) && open.isEnabled { open.tap() }
-    wait(element("restore-preview"), "the restore preview", timeout: 120)
+    // Opening the backup derives its key (scrypt in JavaScript on Hermes)
+    // before the preview can show. CI evidence (run 37877676636): at the old
+    // 120 s bound the status still read "Opening encrypted backup…", and the
+    // preview was on screen by the failure screenshot 35 s later, 131 to
+    // 166 s after the pick; passing runs took 110 to 134 s. The wait now
+    // follows the app's own status: it lasts while the app says it is opening
+    // (or the Files sheet still covers it), ends at once on any other settled
+    // status, and stops at 300 s. The time taken is recorded on every run.
+    let preview = element("restore-preview")
+    let status = element("backup-status-message")
+    let started = Date()
+    var lastStatus = ""
+    var unexpected = 0
+    while !preview.exists {
+      let waited = Int(Date().timeIntervalSince(started))
+      let now = currentLabel(status) ?? "<absent>"
+      if now != lastStatus {
+        log("restore preview t=\(waited)s: \(now.prefix(120))")
+        lastStatus = now
+      }
+      let inProgress = now == "<absent>" || now.hasPrefix("Opening encrypted backup") || now.hasPrefix("Review this backup")
+      // Read twice, 2 s apart, before it counts: one read can catch a redraw.
+      unexpected = inProgress ? 0 : unexpected + 1
+      if unexpected >= 2 && !preview.exists {
+        XCTFail("the backup did not open: no restore preview, and the status read: \(now)")
+        return
+      }
+      if waited >= 300 {
+        XCTFail("the restore preview did not appear within 300 s; the status read: \(now)")
+        return
+      }
+      sleep(2)
+    }
+    log("restore preview shown \(Int(Date().timeIntervalSince(started))) s after the pick")
   }
 }

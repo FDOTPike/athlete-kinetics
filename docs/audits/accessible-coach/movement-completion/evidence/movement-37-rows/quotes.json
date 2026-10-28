@@ -1,0 +1,120 @@
+{
+  "bounds": [
+    {
+      "id": 5,
+      "quote": "Stand holding the bar just outside the legs, then soften the knees and hinge until the torso is stable. Let the bar hang beneath the shoulders with the trunk braced and the neck long. Drive the elbows back to row toward the lower ribs, then lower to long arms without changing the torso angle.",
+      "test": "apps/mobile/test/components/MovementPreview.movA08Rows.test.js :: 5 Barbell Row: hinged over soft knees, bar hangs plumb under shoulders in straight arms (>= 172 deg), elbows drive behind trunk at top",
+      "bound": "hands hold the bar just outside the legs at hold Z = ±11.20 (> ankle Z ±6.80 + 3.0); knees are softened at 148.17 deg (inside [140, 165] deg) with the torso hinged at 24.00 deg and neck long at 32.00 deg; at ph = 0 the bar hangs plumb beneath the shoulders (|nearHold X 21.93 - nearShoulder X 21.93| = 0.00 <= 0.50) in straight arms (elbowDeg3D = 174.33 deg >= 172 deg); at ph = 1 the elbows drive behind the trunk by +3.93 units (>= 3.0) to row the bar to the lower ribs ([12.06, 41.69, ±11.20], elbowDeg3D = 80.58 deg)"
+    },
+    {
+      "id": 5,
+      "quote": "Brace the hinge before the pull. Drive the elbows behind you. Hold one torso angle for the set.",
+      "test": "apps/mobile/test/components/MovementPreview.movA08Rows.test.js :: movement 5 holds a constant torso angle (within 0.1 deg) across every 33 ms tick",
+      "bound": "across all 103 ticks of the 3350 ms cycle, trunk angle stays at 24.00 deg (0.0000 deg drift <= 0.1 deg) and spine angle from hip [0.00, 44.20] to neck [21.93, 53.96] stays at 24.00 deg (0.0000 deg drift <= 0.1 deg), while 3D wrist-to-wrist span stays rigid at 22.40 units"
+    },
+    {
+      "id": 104,
+      "quote": "Take a staggered stance, hinge until the torso is long and stable, and let the kettlebell hang beneath one shoulder. Row the bell toward the back pocket by driving the elbow past the ribs while the hips stay square to the floor. Lower until the shoulder blade reaches naturally; if the torso opens to finish the pull, the bell is heavier than the row you intended.",
+      "test": "apps/mobile/test/components/MovementPreview.movA08Rows.test.js :: 104 One-Arm Kettlebell Row: staggered stance, square torso/hips, scapular reach at bottom with straight plumb arm (>= 172 deg), elbow past ribs toward back pocket at top",
+      "bound": "staggered stance plants nearAnkle at [-5.00, 2.16, 6.80] and farAnkle at [18.00, 2.16, -6.80] (23.00 units stagger >= 18) with far hand braced on the lead thigh at [15.80, 28.20, -6.80]; torso is hinged at 24.00 deg with square hips and shoulders (twist = 0, roll = 0 across all 108 ticks); at ph = 0 the working near shoulder blade reaches naturally downward by 1.80 units (nearShoulder Y = 48.16 vs 49.96 at ph = 1) with the kettlebell hanging plumb beneath the shoulder (nearHold = [23.43, 23.69, 9.38], |dx| = 0.00 <= 0.50, elbowDeg3D = 174.33 deg >= 172 deg); at ph = 1 the bell rows toward the back pocket (nearHold = [9.05, 36.77, 9.38], 7.55 units ahead of hip X = 1.50 vs 12.06 units in Barbell Row) with nearElbow = [11.12, 48.48, 10.99] driven +3.65 units behind the trunk (>= 3.0)"
+    },
+    {
+      "id": 104,
+      "quote": "Set a long, square torso. Drive the elbow toward the back pocket. Reach the shoulder blade at the bottom.",
+      "test": "apps/mobile/test/components/MovementPreview.movA08Rows.test.js :: movement 104 holds a constant torso angle (within 0.1 deg) across every 33 ms tick",
+      "bound": "across all 108 ticks of the 3500 ms cycle, trunk and spine angles stay constant at 24.00 deg (0.0000 deg drift <= 0.1 deg) with twist = 0 and roll = 0, while nearReach lowers the working shoulder by 1.80 units at ph = 0"
+    },
+    {
+      "id": 107,
+      "quote": "Take an underhand grip just outside the thighs, soften the knees, and hinge until the bar hangs below them with the torso braced. Pull the elbows back and row the bar toward the lower ribs, holding the top long enough to feel the shoulder blades finish. Lower to long arms without changing the hinge; if the torso rises on every pull, the bar is borrowing range from the hips.",
+      "test": "apps/mobile/test/components/MovementPreview.movA08Rows.test.js :: 107 Reverse Grip Bent-Over Rows: underhand grip just outside thighs with close-up panel, top hold, straight plumb arms at bottom, differs visibly from Barbell Row",
+      "bound": "underhand grip sits just outside the thighs at hold Z = ±9.40 (> hipJoint Z 6.08 + 2.0, and 1.80 units narrower per side than Barbell Row ±11.20, 3D wrist-to-wrist span 18.80 units across all 126 ticks) with a close-up inset panel (open = 0) showing the closed palms-up grip wrapped around the bar; at ph = 0 the bar hangs plumb beneath the shoulders (hold = [21.93, 29.49, ±9.40], |dx| = 0.00 <= 0.50, elbowDeg3D = 174.33 deg >= 172 deg) over softened knees (148.17 deg); at ph = 1 the bar rows to the lower ribs ([12.06, 41.69, ±9.40], elbowDeg3D = 79.94 deg) with elbows tucked closer and driven +4.47 units behind the trunk (>= 3.0), holding the top for 800 ms (>= 700 ms, +550 ms longer than Barbell Row's 250 ms top segment)"
+    },
+    {
+      "id": 107,
+      "quote": "Brace the hinge before the pull. Drive the elbows behind you. Touch the lower ribs and own the way down.",
+      "test": "apps/mobile/test/components/MovementPreview.movA08Rows.test.js :: movement 107 holds a constant torso angle (within 0.1 deg) across every 33 ms tick",
+      "bound": "across all 126 ticks of the 4100 ms cycle (segmentDurationsMs = [1100, 800, 1700, 500]), trunk and spine angles remain fixed at 24.00 deg (0.0000 deg drift <= 0.1 deg)"
+    },
+    {
+      "id": 293,
+      "quote": "Stand over two kettlebells, bend the knees slightly, push the hips back and take a handle in each hand with the back straight. Pull both kettlebells toward the stomach, drawing the shoulder blades together. Lower them under control until the arms are straight.",
+      "test": "apps/mobile/test/components/MovementPreview.movA08Rows.test.js :: 293 Two-Arm Kettlebell Row: standing over two bells, hips back, straight plumb arms at bottom (>= 172 deg), both pulled together toward stomach with elbows behind trunk",
+      "bound": "stands over two kettlebells (implement === \"kettlebells\", kettlebellBelow === true) with ankles at X = 15.50, toes at X = 20.90, knees slightly bent at 140.42 deg, hips pushed back 17.50 units behind the ankles to hip = [-2.00, 40.20, 0.00], and straight back at 22.00 deg; at ph = 0 both kettlebells hang plumb beneath the shoulders over the feet at hold = [20.25, 24.73, ±8.60] (|dx| = 0.00 <= 0.50, elbowDeg3D = 174.33 deg >= 172 deg); at ph = 1 both kettlebells pull together toward the stomach at hold = [8.43, 37.08, ±8.60] (|nearHold X - farHold X| = 0.00, |nearHold Y - farHold Y| = 0.00) with elbows driven +4.17 units behind the trunk (>= 3.0), then lower under control in 1800 ms (> 1100 ms pull)"
+    },
+    {
+      "id": 293,
+      "quote": "Hips back, back straight. Pull the elbows toward the hips. Lower under control.",
+      "test": "apps/mobile/test/components/MovementPreview.movA08Rows.test.js :: movement 293 holds a constant torso angle (within 0.1 deg) across every 33 ms tick",
+      "bound": "across all 115 ticks of the 3750 ms cycle (segmentDurationsMs = [1100, 350, 1800, 500]), trunk and spine angles stay fixed at 22.00 deg (0.0000 deg drift <= 0.1 deg) with hips pushed back at X = -2.00"
+    },
+    {
+      "id": 79,
+      "quote": "Straddle the bar, hinge to about 45 degrees, and take the handle with a neutral grip. Pull the plates to your chest, driving the elbows up and back, and let the bar stretch your lats at the bottom of every rep. Hold your hinge angle — every degree you stand up as the set gets hard is range you stole from your back.",
+      "test": "apps/mobile/test/components/MovementPreview.movA08Rows.test.js :: 79 T-Bar Row: straddling anchored landmine bar, 45 deg hinge, neutral grip, plates off floor at bottom in straight plumb arms (>= 172 deg), pulled to chest with elbows behind trunk",
+      "bound": "feet straddle the anchored bar along Z = 0 with nearAnkle = [8.00, 2.16, 12.00] and farAnkle = [8.00, 2.16, -12.00] (|Z| = 12.00 > 9.0); torso hinges at 45.00 deg (0.0000 deg drift across all 109 ticks); hands take a neutral grip on the handle at hold Z = ±3.20 (rigid 3D wrist-to-wrist span 6.40 units across every tick); bar pivots from floor landmine anchor [-32.00, 2.60, 0.00] at constant radius 57.52 units; at ph = 0 the bar stretches the lats with hands plumb beneath the shoulders ([14.97, 35.79, ±3.20], elbowDeg3D = 174.33 deg >= 172 deg) and painted plates floating well off the floor (plate bottom Y <= 63.16 < FLOOR 96.90 - 15); at ph = 1 the plates pull to the chest ([6.11, 45.68, ±3.20], elbowDeg3D = 91.29 deg) with elbows driven up and back +5.81 units behind the trunk (>= 4.0)"
+    },
+    {
+      "id": 79,
+      "quote": "Lock your hinge angle and defend it all set. Pull with the elbows to the chest. Full stretch at the bottom, plates floating.",
+      "test": "apps/mobile/test/components/MovementPreview.movA08Rows.test.js :: movement 79 holds a constant torso angle (within 0.1 deg) across every 33 ms tick",
+      "bound": "across all 109 ticks of the 3550 ms cycle, trunk and spine angles remain locked at 45.00 deg (0.0000 deg drift <= 0.1 deg), with straight-arm bottom stretch (174.33 deg) and plates floating 33.74 units above the floor line"
+    },
+    {
+      "id": 130,
+      "quote": "Stand over two kettlebells, bend the knees slightly, push the hips back and take a handle in each hand with the back flat. Pull one kettlebell toward the lower ribs, drawing that shoulder blade back, while the other hand holds its kettlebell on the floor. Lower it under control to the floor, then row the other side.",
+      "test": "apps/mobile/test/components/MovementPreview.movA08Rows.test.js :: 130 Alternating Kettlebell Row: standing over two bells on floor, one rows to lower ribs with elbow behind trunk while the other stays on the floor in a straight plumb arm (>= 172 deg) across every tick",
+      "bound": "stands over two kettlebells on the floor (ankles at X = 14.00, toes at X = 19.40, floor hold X = 15.47) with knees bent at 121.46 deg, hips pushed back 22.50 units to [-8.50, 33.79, 0.00], and flat back at 3.00 deg; at the floor rest pose (ph = 1, t = 0 ms and t = 2250 ms) both kettlebells rest on the floor (painted circle bottom = 96.90 == FLOOR) in straight plumb arms (elbowDeg3D = 174.13 deg >= 172 deg); during the first half (t = 0..2250 ms, peak at ph = 0, t = 950 ms) the near kettlebell rows to the lower ribs (hold = [1.33, 27.80, 8.40], nearBehindTrunk = +4.51 >= 3.0) while the far kettlebell stays on the floor (bottom = 96.90, farElbowDeg3D = 174.13 deg >= 172 deg) on every tick; during the second half (t = 2250..4500 ms, peak at ph = 2, t = 3200 ms) the far kettlebell rows to the lower ribs (hold = [1.33, 27.80, -8.40], farBehindTrunk = +4.51 >= 3.0) while the near kettlebell stays on the floor (bottom = 96.90, nearElbowDeg3D = 174.13 deg >= 172 deg) on every tick"
+    },
+    {
+      "id": 130,
+      "quote": "Hips back, back flat. Pull the elbow toward the hip. Keep the chest square to the floor.",
+      "test": "apps/mobile/test/components/MovementPreview.movA08Rows.test.js :: movement 130 holds a constant torso angle (within 0.1 deg) across every 33 ms tick",
+      "bound": "across all 138 ticks of the 4500 ms cycle, trunk and spine angles remain flat and constant at 3.00 deg (0.0000 deg drift <= 0.1 deg) with chest square to the floor (twist = 0, roll = 0)"
+    }
+  ],
+  "fileQuotes": [
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 1653,
+      "endLine": 1654,
+      "text": "        \"instructions\": \"Stand holding the bar just outside the legs, then soften the knees and hinge until the torso is stable. Let the bar hang beneath the shoulders with the trunk braced and the neck long. Drive the elbows back to row toward the lower ribs, then lower to long arms without changing the torso angle. If the torso rises on each pull, reduce the load before the hips turn the row into a heave.\",\n        \"cues\": \"Brace the hinge before the pull. Drive the elbows behind you. Hold one torso angle for the set.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 8354,
+      "endLine": 8355,
+      "text": "        \"instructions\": \"Take a staggered stance, hinge until the torso is long and stable, and let the kettlebell hang beneath one shoulder. Row the bell toward the back pocket by driving the elbow past the ribs while the hips stay square to the floor. Lower until the shoulder blade reaches naturally; if the torso opens to finish the pull, the bell is heavier than the row you intended.\",\n        \"cues\": \"Set a long, square torso. Drive the elbow toward the back pocket. Reach the shoulder blade at the bottom.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 8556,
+      "endLine": 8557,
+      "text": "        \"instructions\": \"Take an underhand grip just outside the thighs, soften the knees, and hinge until the bar hangs below them with the torso braced. Pull the elbows back and row the bar toward the lower ribs, holding the top long enough to feel the shoulder blades finish. Lower to long arms without changing the hinge; if the torso rises on every pull, the bar is borrowing range from the hips.\",\n        \"cues\": \"Brace the hinge before the pull. Drive the elbows behind you. Touch the lower ribs and own the way down.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 21100,
+      "endLine": 21101,
+      "text": "        \"instructions\": \"Stand over two kettlebells, bend the knees slightly, push the hips back and take a handle in each hand with the back straight. Pull both kettlebells toward the stomach, drawing the shoulder blades together. Lower them under control until the arms are straight.\",\n        \"cues\": \"Hips back, back straight. Pull the elbows toward the hips. Lower under control.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 6681,
+      "endLine": 6682,
+      "text": "        \"instructions\": \"Straddle the bar, hinge to about 45 degrees, and take the handle with a neutral grip. Pull the plates to your chest, driving the elbows up and back, and let the bar stretch your lats at the bottom of every rep. Hold your hinge angle — every degree you stand up as the set gets hard is range you stole from your back.\",\n        \"cues\": \"Lock your hinge angle and defend it all set. Pull with the elbows to the chest. Full stretch at the bottom, plates floating.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 10109,
+      "endLine": 10110,
+      "text": "        \"instructions\": \"Stand over two kettlebells, bend the knees slightly, push the hips back and take a handle in each hand with the back flat. Pull one kettlebell toward the lower ribs, drawing that shoulder blade back, while the other hand holds its kettlebell on the floor. Lower it under control to the floor, then row the other side.\",\n        \"cues\": \"Hips back, back flat. Pull the elbow toward the hip. Keep the chest square to the floor.\","
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 1307,
+      "endLine": 1308,
+      "text": "  /** Whether a held kettlebell (or pair of kettlebells) hangs directly beneath the handle as in a row. */\n  kettlebellBelow?: boolean;"
+    }
+  ]
+}

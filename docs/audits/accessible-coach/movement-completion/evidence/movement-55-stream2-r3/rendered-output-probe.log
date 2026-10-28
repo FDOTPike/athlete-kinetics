@@ -1,0 +1,23 @@
+source commit: ab6f3877ce75ebba62719d3f0a166b148f536008
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with probe-57946c15bebd138fbb39e8468caf5cabfb4fbce2.json
+
+movements measured: 236 (baseline 236)
+added: none
+removed: none
+changed, expected: 195 Elevated Cable Rows; 296 Upright Cable Row; 188 Dumbbell Lying Rear Lateral Raise; 241 Lying Rear Delt Raise; 242 Lying Triceps Press; 215 Incline Barbell Triceps Extension; 233 Kneeling Cable Triceps Extension; 47 Dip; 166 Clock Push-Up; 145 Bent Over Two-Arm Long Bar Row; 153 Box Squat with Bands; 205 Front Barbell Squat To A Bench; 250 One-Arm Kettlebell Swings
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  195 Elevated Cable Rows: drawn 62f158e536648db26da1d6218bdaf3a7bddfb701ce8ef82281a1d18458807f51 captions a986d690654b37b3e37ae549667637f5c19cfb296a4be9a90dcfb305fd78f3d9 stage 230.00x240.00 cycle 3550 ms
+  296 Upright Cable Row: drawn ce25c98ddd8bc0afe0d784cc650d7d015d010c4c1deece8bc0334a0a635f84b2 captions 7cd3a3a550c7ef5baae19a677908df94e97cd0eec57ae87331e9d6399f44ba4d stage 165.16x240.00 cycle 3550 ms
+  188 Dumbbell Lying Rear Lateral Raise: drawn a86a9ca9e86eaa38e1f92cc0353a828c58a2fd60b229f9c99ad825b185b6820a captions 873e10532d0df32e764f4b4e09e0fb1e7ed50daff558d6283d8fd15e1bd768a0 stage 206.09x240.00 cycle 4400 ms
+  241 Lying Rear Delt Raise: drawn 56b21dbbd32115193eb7e7248e9a08fe30d8741a1c22bc351be7bfca10c85abf captions c4cbf50169bcbe2af29adb428dae7c85df465fdae84b8b481b42875b59dd1562 stage 206.09x240.00 cycle 4400 ms
+  242 Lying Triceps Press: drawn 58d9dd1be46068cba056f13384b34579a254f7d1877ea120e843f0f2328196c3 captions ba0f650475133c0ace9ce6e1e179868d81bc02480e84bb44b7403540cfa09b45 stage 240.00x234.29 cycle 2200 ms
+  215 Incline Barbell Triceps Extension: drawn 9f67ab1af2a402ce6641282ebe8371cb39af2af04269ed8b746ad539dba1056e captions f4dc424fe7649bc2afce7aa56031d713ea39e2359751abe73e17b5aae4988860 stage 240.00x232.26 cycle 2750 ms
+  233 Kneeling Cable Triceps Extension: drawn 04307c261d9b68154071ef343311a6d64afe96b52141d786e4bf0f105c28f92e captions d71f832be484b58735f708c2fb1185825adc504cb14d4939ed442d854135ef89 stage 230.40x240.00 cycle 2750 ms
+  47 Dip: drawn efd41c37f3aecbf019b1c34f17ed61b40cedc2e2fd0553088e1a4523e32682e7 captions 21a23a8c526850fbcde50bb3fa311863c50ba0897ba1df28632df3588a4b94b5 stage 150.93x240.00 cycle 2100 ms
+  166 Clock Push-Up: drawn 02a2b239283bb1914dfbf919ca2bd25f0fcd425cdac77ee86d9a8b76eb61e022 captions 6ad546984d5b102cd64ee46c34171d20c930bf6b7baf00edda52993f36017a3b stage 240.00x136.00 cycle 2660 ms
+  145 Bent Over Two-Arm Long Bar Row: drawn 7e99c97185dbbc55196cd7e06c2431697f30a18bccdf31d06d398490074bc6ac captions af885080cb47e3bd28de12175343f1f16703984be91ceefbc11a0d5de9511082 stage 197.26x240.00 cycle 3950 ms
+  153 Box Squat with Bands: drawn 96559ef099666565ba18dcb9c3c8de91d562191ec804eaf25e5225ab3177d207 captions e851495513904efaf9591d028e9744fe5ffc1d51d7e410b8e11da79c0cf4d4aa stage 130.21x240.00 cycle 3550 ms
+  205 Front Barbell Squat To A Bench: drawn 7cf6e4a5c0dce4a16342b7bd1ea79d666161754330fc3669efd8e568b514ee0a captions a58d6813322a5a1abd196e644ba8a802d821ab6d3851802d60bfbd50c18480b1 stage 149.68x240.00 cycle 2700 ms
+  250 One-Arm Kettlebell Swings: drawn f790dfcf30bc7ef4c95f2578b0c37330397bcd7a967ac411741151c389b85f3e captions ed90bd38a6d650d15bd31937c857071d961efabc36d413792e58cda166f7dd59 stage 187.83x240.00 cycle 1980 ms
+exit code: 0 (probe run exit 0)

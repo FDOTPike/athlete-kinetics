@@ -1,0 +1,11 @@
+source commit: 8b9082b978a09b2c98db7f4a38ad1fb64dcbea85
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with probe-edbd5418b4fcf83944f36a3499dbd3bf00c441d2.json
+
+movements measured: 209 (baseline 209)
+added: none
+removed: none
+changed, expected: 98 Barbell Hack Squat
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  98 Barbell Hack Squat: drawn df09477deb9718b7e50e5dfe8ed9048dd0fdaa766f314f27b074e07411dadc6c captions b02aee67082836f69d640dcd1eee7586a641c687399589ff2b1e39a50b7ed06e stage 118.68x240.00 cycle 3450 ms
+exit code: 0 (probe run exit 0)

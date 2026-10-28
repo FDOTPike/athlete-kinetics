@@ -377,6 +377,7 @@ export function deriveControlAction(
   profile: UserProfile,
   macroPhase: MacroPhase,
   macroBlockIndex: number,
+  rpeRaisePermitted: boolean = true,
 ): ControlAction {
   void macroPhase; // contract param; consumed by the future block-projection (§2 snap)
 
@@ -475,7 +476,14 @@ export function deriveControlAction(
   // six-block / roughly 24-week window failed the applied-action mixed-drift
   // gate, so the nearest lower clean step retains roughly 20 weeks of authority.
   // This uses the already-persisted macroBlockIndex, needs no hidden state, and
-  // guarantees the cumulative bound even when every boundary requests a raise.
+  // guarantees the cumulative bound even when every boundary requests a raise,
+  // PROVIDED each position is visited once. That is not so while a suspension
+  // is open: the position is frozen and blocks generated in the episode consume
+  // none (S6(b)), so the same position's grant would be offered again for every
+  // such block. The caller therefore withholds the grant for those blocks
+  // (`rpeRaisePermitted` false; decision of 2026-10-13,
+  // docs/decisions/SUSPENSION_RPE_RAISE_2026-10-13.md). Only the positive RPE
+  // grant is withheld: cuts, set changes and everything else are as they were.
   // Unused early grants do not bank; cuts are not in `rpePositives` and remain
   // completely unrationed.
   const macroGrantSlots = Math.floor(MAX_MACROCYCLE_RPE_RAISE / RPE_STEP);
@@ -483,7 +491,7 @@ export function deriveControlAction(
     Number.isFinite(macroBlockIndex)
       ? Math.max(1, Math.round(macroBlockIndex))
       : macroGrantSlots + 1;
-  const grantsThisBlock = normalizedMacroBlockIndex <= macroGrantSlots ? 1 : 0;
+  const grantsThisBlock = rpeRaisePermitted && normalizedMacroBlockIndex <= macroGrantSlots ? 1 : 0;
   const rpePositives = MOVEMENT_PATTERNS.filter((p) => corrections[p].dRpe_p > 0);
   const rankedRpePositives = [...rpePositives].sort(
     (a, b) =>

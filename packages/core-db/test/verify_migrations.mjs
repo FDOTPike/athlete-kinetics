@@ -19,7 +19,7 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 
 const require = createRequire(import.meta.url);
-const { runMigrations, sentinelsMissing, SENTINELS, DURABLE_TABLE_EXEMPTIONS } = require('./.build/migrationRunner.js');
+const { runMigrations, splitSqlStatements, sentinelsMissing, SENTINELS, DURABLE_TABLE_EXEMPTIONS } = require('./.build/migrationRunner.js');
 
 const SCHEMA_DIR = join(import.meta.dirname, '..', 'src', 'schema');
 const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vector.sql',
@@ -68,7 +68,8 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '066_focus_and_goals.sql',
   '067_sport_and_emphasis.sql',
   '068_movement_content_correction_v2.sql',
-  '069_resting_heart_rate.sql'];
+  '069_resting_heart_rate.sql',
+  '070_session_feel.sql', '071_beta_recording.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
@@ -1765,11 +1766,11 @@ console.log('[2u] 057 block_meta phase/index repair + enforcement');
     const db = freshDb();
     runMigrations(db, MIGRATIONS);
     // Slot 004 is the parameterized materialize script, never a migration:
-    // 68 files (slots 001-069, no 004) -> user_version 68. This count is
+    // 70 files (slots 001-071, no 004) -> user_version 70. This count is
     // pinned deliberately so adding a migration is a conscious act, not a
-    // silent one. Re-pinned for 069 (resting heart rate).
-    check('fresh install reaches user_version 68 (68 files, no slot 004)',
-      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 68,
+    // silent one. Re-pinned for 071 (beta recording).
+    check('fresh install reaches user_version 70 (70 files, no slot 004)',
+      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 70,
       String(uv(db)));
     const trig = db.raw.prepare(
       `SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'trigger'
@@ -4031,8 +4032,8 @@ const isTemplate = (row) => row.instructions.startsWith(`Set up ${row.name} with
 console.log('[069] resting heart rate (resting_hr_daily)');
 const IDX_069 = FILES.indexOf('069_resting_heart_rate.sql');
 {
-  check('069 is appended after 068 and completes the chain',
-    IDX_069 === IDX_068 + 1 && IDX_069 === MIGRATIONS.length - 1 && IDX_069 === 67, `index=${IDX_069}`);
+  check('069 is appended directly after 068',
+    IDX_069 === IDX_068 + 1 && IDX_069 === 67, `index=${IDX_069}`);
 
   const telemetry = (db) => JSON.stringify({
     hrv: db.raw.prepare('SELECT * FROM hrv_daily ORDER BY date').all(),
@@ -4091,6 +4092,324 @@ const IDX_069 = FILES.indexOf('069_resting_heart_rate.sql');
   runMigrations(lost, MIGRATIONS);
   check('a lost resting_hr_daily table is detected and rebuilt by self-heal',
     detected && sentinelsMissing(lost).length === 0 && rhrRows(lost).length === 0);
+}
+
+// =============================================================================
+// [070] how a finished session went, and why
+// =============================================================================
+// Append-only: one new table, nothing existing changes. Proves it lands on a
+// fresh install and on a populated upgrade without inventing or moving data,
+// that its one rule is enforced by the schema, that its rows survive every
+// replay and leave with their session, and that a lost table is detected and
+// rebuilt.
+console.log('[070] session feel (session_feel)');
+const IDX_070 = FILES.indexOf('070_session_feel.sql');
+{
+  check('070 is appended after 069',
+    IDX_070 === IDX_069 + 1 && IDX_070 === 68, `index=${IDX_070}`);
+
+  const feelRows = (db) => db.raw.prepare('SELECT * FROM session_feel ORDER BY session_id').all();
+  const sessionFacts = (db) => JSON.stringify({
+    sessions: db.raw.prepare('SELECT * FROM session ORDER BY session_id').all(),
+    notes: db.raw.prepare('SELECT * FROM session_note ORDER BY session_id').all(),
+    reports: db.raw.prepare('SELECT * FROM subjective_report ORDER BY report_id').all(),
+  });
+
+  // Populated pre-070 install: a finished session with a typed note beside it.
+  const upgrade = freshDb();
+  applyRaw(upgrade, MIGRATIONS, 0, IDX_070);
+  upgrade.raw.exec("INSERT INTO session (micro_cycle_id, session_date, started_at_ms, duration_min) VALUES (NULL, '2026-10-08', 1111, 48.0)");
+  upgrade.raw.exec("INSERT INTO session_note (session_id, note, created_at_ms) VALUES (1, 'left knee felt off on the last set', 2222)");
+  const before = sessionFacts(upgrade);
+  runMigrations(upgrade, MIGRATIONS);
+  check('a populated v68 install upgrades to the latest version with every sentinel present',
+    uv(upgrade) === MIGRATIONS.length && sentinelsMissing(upgrade).length === 0, `uv=${uv(upgrade)}`);
+  check('the upgrade leaves sessions, typed notes and reports byte-identical', sessionFacts(upgrade) === before);
+  check('the upgrade invents no answer (the new table starts empty)', feelRows(upgrade).length === 0);
+
+  // Domain: the one rule is in the schema.
+  const fresh = freshDb();
+  runMigrations(fresh, MIGRATIONS);
+  fresh.raw.exec('PRAGMA foreign_keys = ON');
+  for (const day of ['01', '02', '03', '04', '05']) {
+    fresh.raw.exec(`INSERT INTO session (micro_cycle_id, session_date, started_at_ms) VALUES (NULL, '2026-10-${day}', 1)`);
+  }
+  const insert = (sessionId, feel, reasons = {}) => {
+    const columns = Object.keys(reasons);
+    fresh.raw.prepare(
+      `INSERT INTO session_feel (session_id, feel${columns.map((c) => `, reason_${c}`).join('')}, recorded_at_ms)
+       VALUES (?, ?${columns.map(() => ', ?').join('')}, 1)`,
+    ).run(sessionId, feel, ...Object.values(reasons));
+  };
+  const rejects = (fn) => { try { fn(); return false; } catch { return true; } };
+  insert(1, 'as_planned');
+  insert(2, 'harder', { tired: 1, unwell: 1 });
+  insert(3, 'easier', { felt_good: 1 });
+  insert(4, 'stopped_early', { pain: 1 });
+  check('each of the four answers is accepted in its valid form', feelRows(fresh).length === 4);
+  check('"as planned" with a reason is rejected', rejects(() => insert(5, 'as_planned', { tired: 1 })));
+  check('any other answer with no reason is rejected',
+    rejects(() => insert(5, 'harder')) && rejects(() => insert(5, 'easier')) && rejects(() => insert(5, 'stopped_early')));
+  check('an unknown answer is rejected', rejects(() => insert(5, 'terrible', { other: 1 })) && rejects(() => insert(5, null, { other: 1 })));
+  check('a reason flag outside 0/1 is rejected', rejects(() => insert(5, 'harder', { pain: 2 })) && rejects(() => insert(5, 'harder', { pain: -1 })));
+  check('the table is STRICT (a text reason flag is rejected, not coerced)', rejects(() => insert(5, 'harder', { pain: 'yes' })));
+  check('a second row for the same session is rejected (one answer per session)', rejects(() => insert(1, 'harder', { other: 1 })));
+  check('an answer for a session that does not exist is rejected', rejects(() => insert(99, 'harder', { other: 1 })));
+  check('a negative timestamp is rejected', rejects(() => fresh.raw
+    .prepare("INSERT INTO session_feel (session_id, feel, recorded_at_ms) VALUES (5, 'as_planned', -1)").run()));
+  fresh.raw.prepare("UPDATE session_feel SET feel = 'as_planned', reason_tired = 0, reason_unwell = 0 WHERE session_id = 2").run();
+  check('an answer can be corrected to a valid one',
+    feelRows(fresh).find((row) => row.session_id === 2).feel === 'as_planned');
+  check('a correction that breaks the rule is rejected',
+    rejects(() => fresh.raw.prepare("UPDATE session_feel SET feel = 'as_planned' WHERE session_id = 4").run()));
+  fresh.raw.exec('DELETE FROM session WHERE session_id = 3');
+  check('an answer leaves with its session', feelRows(fresh).every((row) => row.session_id !== 3) && feelRows(fresh).length === 3);
+
+  // Replays keep the rows.
+  const kept = JSON.stringify(feelRows(fresh));
+  runMigrations(fresh, MIGRATIONS);
+  fresh.executeSync(`PRAGMA user_version = ${IDX_070};`);
+  runMigrations(fresh, MIGRATIONS);
+  fresh.executeSync('PRAGMA user_version = 0;');
+  runMigrations(fresh, MIGRATIONS);
+  check('answers survive a reboot, a replay from 070 and a full re-apply from 0',
+    JSON.stringify(feelRows(fresh)) === kept && uv(fresh) === MIGRATIONS.length);
+
+  // A database that claims the latest version but lost the table.
+  const lost = freshDb();
+  runMigrations(lost, MIGRATIONS);
+  lost.raw.exec('DROP TABLE session_feel');
+  const detected = sentinelsMissing(lost).includes('session_feel');
+  runMigrations(lost, MIGRATIONS);
+  check('a lost session_feel table is detected and rebuilt by self-heal',
+    detected && sentinelsMissing(lost).length === 0 && feelRows(lost).length === 0);
+}
+
+// =============================================================================
+// [071] which slots were skipped, and what the load entry was seeded with
+// =============================================================================
+// Append-only: two new record-only tables, nothing existing changes. Proves it
+// lands on a fresh install and on a populated upgrade without inventing a row
+// for work already finalized, that each rule is enforced by the schema, that
+// rows survive every replay and leave with their parents, and that each table,
+// lost on its own, is detected and rebuilt.
+console.log('[071] beta recording (session_skipped_slot, set_load_shown)');
+const IDX_071 = FILES.indexOf('071_beta_recording.sql');
+{
+  check('071 is appended after 070 and completes the chain',
+    IDX_071 === IDX_070 + 1 && IDX_071 === MIGRATIONS.length - 1 && IDX_071 === 69, `index=${IDX_071}`);
+  const skippedRows = (db) => db.raw.prepare('SELECT * FROM session_skipped_slot ORDER BY session_plan_slot_id').all();
+  const shownRows = (db) => db.raw.prepare('SELECT * FROM set_load_shown ORDER BY set_id').all();
+  const priorFacts = (db) => JSON.stringify({
+    sessions: db.raw.prepare('SELECT * FROM session ORDER BY session_id').all(),
+    slots: db.raw.prepare('SELECT * FROM session_plan_slot ORDER BY session_plan_slot_id').all(),
+    sets: db.raw.prepare('SELECT * FROM set_record ORDER BY set_id').all(),
+    targets: db.raw.prepare('SELECT * FROM set_target ORDER BY set_id').all(),
+    outcomes: db.raw.prepare('SELECT * FROM session_outcome ORDER BY session_id').all(),
+  });
+  const seed = (db) => {
+    db.raw.exec("INSERT INTO session (session_id, micro_cycle_id, session_date, started_at_ms) VALUES (1, NULL, '2026-10-08', 1111), (2, NULL, '2026-10-09', 1111)");
+    db.raw.exec(`INSERT INTO session_plan_slot (session_plan_slot_id, session_id, slot_index, movement_id, planned_sets, provenance_kind)
+      VALUES (11, 1, 0, 1, 3, 'free_form'), (12, 1, 1, 2, 3, 'free_form'), (13, 1, 2, 3, 3, 'free_form'), (21, 2, 0, 1, 3, 'free_form')`);
+    db.raw.exec(`INSERT INTO set_record (set_id, session_id, movement_id, set_index, reps, load_kg, rpe, logged_at_ms)
+      VALUES (101, 1, 1, 1, 8, 40, 7, 2222), (102, 1, 1, 2, 8, 40, NULL, 2223), (103, 1, 1, 3, 6, 40, 8, 2224), (201, 2, 1, 1, 8, 42.5, 7, 2225)`);
+  };
+
+  // Populated pre-071 install: a finalized session whose outcome already counts
+  // two skipped slots. The count is all that was kept, and it stays that way.
+  const upgrade = freshDb();
+  applyRaw(upgrade, MIGRATIONS, 0, IDX_071);
+  seed(upgrade);
+  upgrade.raw.exec(`INSERT INTO session_outcome (
+      session_id, outcome_kind, terminal_phase, halt_reason, origin_kind,
+      session_mode, training_age, slot_count, planned_set_count, logged_set_count,
+      exact_dose_count, under_dose_count, over_dose_count, unknown_dose_count,
+      unmapped_set_count, missing_set_count, missing_unskipped_set_count,
+      extra_set_count, adapted_slot_count, skipped_slot_count, off_plan_slot_count,
+      finalized_at_ms, engine_version
+    ) VALUES (
+      1, 'adapted_session', 'complete', NULL, 'planned',
+      'guided', 'beginner', 3, 9, 3,
+      3, 0, 0, 0,
+      0, 6, 0,
+      0, 2, 2, 0,
+      3333, 1
+    )`);
+  const before = priorFacts(upgrade);
+  runMigrations(upgrade, MIGRATIONS);
+  check('a populated v69 install upgrades to the latest version with every sentinel present',
+    uv(upgrade) === MIGRATIONS.length && sentinelsMissing(upgrade).length === 0, `uv=${uv(upgrade)}`);
+  check('the upgrade leaves sessions, planned slots, sets, targets and outcomes byte-identical', priorFacts(upgrade) === before);
+  check('the upgrade invents nothing: an outcome that counts two skipped slots gets no skipped-slot row, and no set gets a shown load',
+    skippedRows(upgrade).length === 0 && shownRows(upgrade).length === 0
+      && upgrade.raw.prepare('SELECT skipped_slot_count AS c FROM session_outcome WHERE session_id = 1').get().c === 2);
+
+  const fresh = freshDb();
+  runMigrations(fresh, MIGRATIONS);
+  fresh.raw.exec('PRAGMA foreign_keys = ON');
+  seed(fresh);
+  const rejects = (fn) => { try { fn(); return false; } catch { return true; } };
+
+  // session_skipped_slot
+  const skip = (slotId) => fresh.raw.prepare('INSERT INTO session_skipped_slot (session_plan_slot_id) VALUES (?)').run(slotId);
+  skip(12); skip(13); skip(21);
+  check('a skipped planned slot is recorded by its id', skippedRows(fresh).length === 3);
+  check('the same slot cannot be recorded as skipped twice', rejects(() => skip(12)));
+  check('a slot that does not exist is rejected', rejects(() => skip(999)));
+  check('the table is STRICT (a text id is rejected, not coerced)', rejects(() => skip('twelve')));
+  check('skipped slots are counted per session through the slot, which carries its session',
+    fresh.raw.prepare('SELECT COUNT(*) AS c FROM session_skipped_slot k JOIN session_plan_slot s ON s.session_plan_slot_id = k.session_plan_slot_id WHERE s.session_id = 1').get().c === 2);
+
+  // set_load_shown
+  const shown = (setId, source, kg, advisoryKg = null, advisoryKind = null) => fresh.raw
+    .prepare('INSERT INTO set_load_shown (set_id, load_source, shown_load_kg, advisory_kg, advisory_kind) VALUES (?, ?, ?, ?, ?)')
+    .run(setId, source, kg, advisoryKg, advisoryKind);
+  shown(101, 'history', 40);
+  shown(102, 'manual', null, 42.5, 'onerm');
+  shown(103, 'seeded', 0);
+  check('each kind of seed is accepted: a load, a blank field with an advisory, and a real zero',
+    shownRows(fresh).length === 3
+      && shownRows(fresh).find((row) => row.set_id === 102).shown_load_kg === null
+      && shownRows(fresh).find((row) => row.set_id === 103).shown_load_kg === 0);
+  check('every load source the app has is accepted, and no other', (() => {
+    const probe = freshDb();
+    runMigrations(probe, MIGRATIONS);
+    seed(probe);
+    const put = (setId, source) => probe.raw.prepare('INSERT INTO set_load_shown (set_id, load_source) VALUES (?, ?)').run(setId, source);
+    put(101, 'seeded'); put(102, 'history'); put(103, 'derived'); put(201, 'manual');
+    probe.raw.exec('DELETE FROM set_load_shown');
+    return rejects(() => put(101, 'auto')) && rejects(() => put(101, '')) && rejects(() => put(101, null)) && rejects(() => put(101, 'History'));
+  })());
+  check('every advisory kind the app has is accepted, and no other', (() => {
+    const probe = freshDb();
+    runMigrations(probe, MIGRATIONS);
+    seed(probe);
+    const put = (setId, kind) => probe.raw.prepare("INSERT INTO set_load_shown (set_id, load_source, advisory_kg, advisory_kind) VALUES (?, 'manual', 40, ?)").run(setId, kind);
+    put(101, 'apre'); put(102, 'onerm'); put(103, 'history');
+    return rejects(() => put(201, 'derived')) && rejects(() => put(201, ''));
+  })());
+  check('a negative shown load or advisory is rejected',
+    rejects(() => shown(201, 'history', -0.5)) && rejects(() => shown(201, 'manual', null, -1, 'apre')));
+  check('an advisory value and its kind are stored together or not at all',
+    rejects(() => shown(201, 'manual', null, 40, null)) && rejects(() => shown(201, 'manual', null, null, 'apre')));
+  check('the table is STRICT (a text load is rejected, not coerced)', rejects(() => shown(201, 'history', 'forty')));
+  check('a second row for the same set is rejected (one seed per set)', rejects(() => shown(101, 'manual', null)));
+  check('a row for a set that does not exist is rejected', rejects(() => shown(999, 'history', 40)));
+  fresh.raw.exec('UPDATE set_record SET load_kg = 45 WHERE set_id = 101');
+  check('editing the logged load leaves what was shown as it was',
+    shownRows(fresh).find((row) => row.set_id === 101).shown_load_kg === 40);
+
+  // Replays keep the rows.
+  const kept = JSON.stringify({ skipped: skippedRows(fresh), shown: shownRows(fresh) });
+  const now = (db) => JSON.stringify({ skipped: skippedRows(db), shown: shownRows(db) });
+  runMigrations(fresh, MIGRATIONS);
+  fresh.executeSync(`PRAGMA user_version = ${IDX_071};`);
+  runMigrations(fresh, MIGRATIONS);
+  fresh.executeSync('PRAGMA user_version = 0;');
+  runMigrations(fresh, MIGRATIONS);
+  check('both records survive a reboot, a replay from 071 and a full re-apply from 0',
+    now(fresh) === kept && uv(fresh) === MIGRATIONS.length);
+
+  // Rows leave with their parents.
+  fresh.raw.exec('PRAGMA foreign_keys = ON');
+  fresh.raw.exec('DELETE FROM set_record WHERE set_id = 103');
+  check('a shown load leaves with its set', shownRows(fresh).every((row) => row.set_id !== 103) && shownRows(fresh).length === 2);
+  fresh.raw.exec('DELETE FROM session WHERE session_id = 1');
+  check('both records leave with their session',
+    shownRows(fresh).length === 0 && skippedRows(fresh).length === 1 && skippedRows(fresh)[0].session_plan_slot_id === 21);
+
+  // A database that claims the latest version but lost one table, then the other.
+  for (const [table, other] of [['session_skipped_slot', 'set_load_shown'], ['set_load_shown', 'session_skipped_slot']]) {
+    const lost = freshDb();
+    runMigrations(lost, MIGRATIONS);
+    seed(lost);
+    lost.raw.prepare('INSERT INTO session_skipped_slot (session_plan_slot_id) VALUES (12)').run();
+    lost.raw.prepare("INSERT INTO set_load_shown (set_id, load_source, shown_load_kg) VALUES (101, 'history', 40)").run();
+    lost.raw.exec(`DROP TABLE ${table}`);
+    const missing = sentinelsMissing(lost);
+    runMigrations(lost, MIGRATIONS);
+    check(`a lost ${table} table is detected and rebuilt by self-heal, and the other table keeps its row`,
+      missing.includes(table) && !missing.includes(other) && sentinelsMissing(lost).length === 0
+        && Number(lost.raw.prepare(`SELECT COUNT(*) AS c FROM ${table}`).get().c) === 0
+        && Number(lost.raw.prepare(`SELECT COUNT(*) AS c FROM ${other}`).get().c) === 1);
+  }
+}
+
+// --- one statement per database call ------------------------------------------
+// CI evidence (run 37877632952, iOS test3): op-sqlite 16.2.0 reads the rows of
+// one executeSync call at the combined column count of every statement in that
+// call, so a script with more than one row-returning statement is read past
+// the end of its rows (EXC_BAD_ACCESS in create_js_rows while a new athlete's
+// database was being built). The runner therefore hands the database one
+// statement per call. SQLite's own statement boundary (sourceSQL is the text
+// sqlite3_prepare consumed) is the oracle here, not the runner's scanner.
+console.log('\n[one statement per database call]');
+{
+  // Text with nothing in it but whitespace, comments and bare ';' holds no
+  // statement. SQLite is never asked about such text: node's SQLite answers
+  // differently by release (24.11 hands back a finalized statement, 24.21
+  // throws ERR_INVALID_ARG_VALUE "The SQL query contains no statements").
+  const isBlank = (sql) => sql.replace(/\/\*[\s\S]*?\*\//g, '').replace(/--[^\n]*/g, '').replace(/[\s;]/g, '') === '';
+  const recorded = freshDb();
+  const calls = [];
+  const multi = [];
+  const inner = recorded.executeSync.bind(recorded);
+  recorded.executeSync = (sql) => {
+    calls.push(sql);
+    let consumed = sql.length;
+    try { consumed = recorded.raw.prepare(sql).sourceSQL.length; } catch { /* the call itself reports it */ }
+    if (!isBlank(sql.slice(consumed))) multi.push(sql);
+    return inner(sql);
+  };
+  runMigrations(recorded, MIGRATIONS);
+  check('a fresh install hands the database exactly one statement per call',
+    multi.length === 0,
+    multi.length === 0 ? `${calls.length} calls` : `${multi.length} multi-statement call(s); first begins: ${multi[0].trim().slice(0, 60)}`);
+  const assertionCalls = ['role_eligibility', 'capability_family', 'capability_edge']
+    .map((table) => calls.filter((sql) => sql.includes(`ASSERTION_FAILED_movement_${table}_row_count_mismatch`)));
+  check('032 sends each of its three row-count assertions as its own call',
+    assertionCalls.every((found) => found.length === 1) && new Set(assertionCalls.flat()).size === 3,
+    assertionCalls.map((found) => found.length).join('/'));
+
+  // The runner must execute exactly the statements SQLite itself finds in each
+  // file, in order: walk every file with SQLite's own boundaries on a second
+  // database and compare with what the runner sent.
+  const reference = freshDb();
+  const expected = [];
+  for (const file of MIGRATIONS) {
+    let rest = file;
+    while (!isBlank(rest)) {
+      const empty = rest.match(/^\s*;/); // a bare ';' is an empty statement
+      if (empty !== null) {
+        rest = rest.slice(empty[0].length);
+        continue;
+      }
+      const text = reference.raw.prepare(rest).sourceSQL;
+      reference.raw.exec(text);
+      expected.push(text.trim());
+      rest = rest.slice(text.length);
+    }
+  }
+  const sentinelReads = SENTINELS.filter((sentinel) => sentinel.presenceSql !== undefined)
+    .map((sentinel) => sentinel.presenceSql.trim());
+  const sent = calls.map((sql) => sql.trim())
+    .filter((sql) => sql !== 'BEGIN' && sql !== 'COMMIT' && !/^PRAGMA user_version( = \d+)?;$/.test(sql)
+      && !/^SELECT 1 AS ok FROM sqlite_master /.test(sql) && !sentinelReads.includes(sql));
+  const firstDifference = expected.findIndex((sql, index) => sql !== sent[index]);
+  check(`the runner executes exactly SQLite's own statement sequence for all ${MIGRATIONS.length} files`,
+    expected.length === sent.length && firstDifference === -1,
+    `${expected.length} statements expected, ${sent.length} sent${firstDifference === -1 ? '' : `; first difference at ${firstDifference}`}`);
+
+  const split = (sql) => JSON.stringify(splitSqlStatements(sql).map((statement) => statement.trim()));
+  check('scanner: a trigger body, with CASE ... END and a quoted semicolon, stays one statement',
+    split("CREATE TABLE t(a); CREATE TRIGGER tr AFTER INSERT ON t BEGIN SELECT CASE WHEN 1 THEN 2 END; UPDATE t SET a = ';'; END; SELECT 1;")
+      === JSON.stringify(['CREATE TABLE t(a);', "CREATE TRIGGER tr AFTER INSERT ON t BEGIN SELECT CASE WHEN 1 THEN 2 END; UPDATE t SET a = ';'; END;", 'SELECT 1;']));
+  check('scanner: semicolons in comments, strings and quoted names do not split',
+    split("-- a; b\nINSERT INTO \"x;y\" VALUES ('it''s; fine', [z;]); /* c; d */ SELECT 2")
+      === JSON.stringify(["-- a; b\nINSERT INTO \"x;y\" VALUES ('it''s; fine', [z;]);", '/* c; d */ SELECT 2']));
+  check('scanner: blank pieces are dropped and names that merely contain keywords are plain names',
+    split(';; CREATE TABLE end_log(trigger_name, constructor); ; -- done\n')
+      === JSON.stringify(['CREATE TABLE end_log(trigger_name, constructor);']));
 }
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);

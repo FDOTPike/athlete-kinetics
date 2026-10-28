@@ -168,6 +168,10 @@ import {
   type RungResolution,
   targetLoadKg,
   evaluateSessionOutcome,
+  SESSION_FEEL_REASONS,
+  meanRpeDrift,
+  shouldAskSessionFeel,
+  validateSessionFeel,
   advance as advanceSessionRunner,
   currentSlot as currentRunnerSlot,
   deserializeRunner,
@@ -177,6 +181,12 @@ import {
   type RunnerState,
   type RunnerTarget,
   type SessionOutcomeDecision,
+  type SessionOutcomeKind,
+  type SessionFeelDraft,
+  type SessionFeelKind,
+  type SessionFeelProblem,
+  type SessionFeelReason,
+  type SessionFeelRecord,
   type SessionOutcomeInput,
   type SessionOutcomeOriginKind,
   type SessionOutcomeProvenanceKind,
@@ -187,15 +197,42 @@ import {
   type StateVectorRow,
   type TriageResult,
   type UserProfile,
+  ADVISORY_KINDS,
+  LOAD_SOURCES,
   defaultLoadPreference,
   resolveLoadSelection,
   transitionLoadPreference,
+  type AdvisoryKind,
   type LoadPreference,
   type LoadSelection,
+  type LoadSource,
 } from '@ak/inference';
 
 export type { MovementAvailability };
 export type { LoadPreference, LoadSelection, LoadSource } from '@ak/inference';
+
+/** What the load entry was seeded with for the set being logged, as the session
+ *  screen held it (071). `shownLoadKg` null means the field was blank and the
+ *  athlete had to choose; 0 is a real zero. A record only: nothing reads it. */
+export interface SetLoadShown {
+  source: LoadSource;
+  shownLoadKg: number | null;
+  advisoryKg: number | null;
+  advisoryKind: AdvisoryKind | null;
+}
+
+/** The seed as it may be stored, or null when it is absent or malformed. A
+ *  malformed seed is left unrecorded: it must never stop a set being logged,
+ *  and a row is never invented from a default. */
+export const storableLoadShown = (shown: SetLoadShown | null | undefined): SetLoadShown | null => {
+  if (shown === null || shown === undefined) return null;
+  const kgOk = (kg: number | null): boolean => kg === null || (typeof kg === 'number' && Number.isFinite(kg) && kg >= 0);
+  if (!LOAD_SOURCES.includes(shown.source)) return null;
+  if (!kgOk(shown.shownLoadKg) || !kgOk(shown.advisoryKg)) return null;
+  if ((shown.advisoryKg === null) !== (shown.advisoryKind === null)) return null;
+  if (shown.advisoryKind !== null && !ADVISORY_KINDS.includes(shown.advisoryKind)) return null;
+  return { source: shown.source, shownLoadKg: shown.shownLoadKg, advisoryKg: shown.advisoryKg, advisoryKind: shown.advisoryKind };
+};
 import {
   PREPARATION_FLOOR_MIN,
   PREPARATION_HELD_MOVEMENT_IDS,
@@ -523,6 +560,15 @@ export interface ActiveBlock {
 }
 
 /** One cell of the block grid (a planned training day). */
+/** What the completion screen needs to ask, or show, how a session went. */
+export interface SessionFeelView {
+  /** True when the session did not go to plan (see sessionFeel.ts). */
+  ask: boolean;
+  saved: SessionFeelRecord | null;
+  /** The typed note saved with the session, word for word; null when none. */
+  note: string | null;
+}
+
 export interface BlockSessionSummary {
   plannedSessionId: number;
   weekIndex: number;
@@ -869,6 +915,14 @@ interface KineticsStore {
   loadCoachMovementAccessContext: () => CoachMovementAccessContext;
   /** Attach/replace a free-text note on the last completed session. */
   saveSessionNote: (text: string) => void;
+  /** Record how the last completed session went and why (070). The typed
+   *  note, when there is one, is saved word for word in session_note and is
+   *  never interpreted. Changes no prescription, block or progression.
+   *  Returns null when saved, otherwise why it was not. */
+  saveSessionFeel: (draft: SessionFeelDraft, note: string) => SessionFeelProblem | 'not_saved' | null;
+  /** Read-only: whether the completion screen should ask how this session
+   *  went, and the answer and note already saved for it. */
+  loadSessionFeel: (sessionId: number) => SessionFeelView;
   /** Wire the Health Connect bridge (null = unavailable). READ-ONLY at
    *  boot: checks existing grants, NEVER opens a permission sheet (the
    *  v0.11.0 boot crash lived in an automatic boot-time request). */
@@ -1087,8 +1141,10 @@ interface KineticsStore {
    *  concatenation (e.g. 'DB Bench Press') into the in-memory log payload;
    *  falls back to the movement's canonical name when absent. `appliedPrefixes`
    *  (Phase 13) are the toggled condition tokens; their compound multipliers +
-   *  effective load are persisted to the set_prefix side-car. */
-  logSet: (movementId: number, reps: number, loadKg: number, rpe: number | null, displayName?: string, appliedPrefixes?: readonly MovementPrefix[], implement?: MovementPrefix, metrics?: { timeS?: number; bandLevel?: number }, sessionPlanSlotId?: number) => void;
+   *  effective load are persisted to the set_prefix side-car. `loadShown`
+   *  (071) is what the load entry was seeded with; it is recorded beside the
+   *  set and read by nothing. Absent, no row is written. */
+  logSet: (movementId: number, reps: number, loadKg: number, rpe: number | null, displayName?: string, appliedPrefixes?: readonly MovementPrefix[], implement?: MovementPrefix, metrics?: { timeS?: number; bandLevel?: number }, sessionPlanSlotId?: number, loadShown?: SetLoadShown | null) => void;
   /** Hard-delete one logged set. The 001 AFTER DELETE trigger
    *  (trg_set_record_ad) drains mech_daily by this row's exact contribution;
    *  the in-memory list drops the row. */
@@ -1317,6 +1373,9 @@ let biometrics: BiometricsBridge | null = null;
 /** Upper bound on one native Health read (see syncBiometrics). Generous: a
  *  week of compacted reads finishes in well under a second on device. */
 const BIOMETRICS_READ_TIMEOUT_MS = 30_000;
+/** Upper bound on the read-only permission check at boot (see
+ *  connectBiometrics). It normally answers at once. */
+const BIOMETRICS_STATUS_TIMEOUT_MS = 10_000;
 /**
  * Health permission operations are ORDERED (reviewed async-ownership repair,
  * ported 2026-10-04). Every connect/request/disconnect starts a new revision
@@ -4412,12 +4471,18 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const flawReport = detectFlaws(windowVectors, patternWindow, profile.training_age, autopilotGuardrail);
 
     const blockEmphasisInput = programEmphasisFor(d, today);
+    // Decision of 2026-10-13: a block generated while a suspension is open gets
+    // no autopilot effort raise. It consumes no macro position (S6(b)), so the
+    // per-position ceiling on raises would not count it. Read once here and
+    // checked again at commit, where the block is attributed to the episode.
+    const suspensionBeforeGeneration = openSuspension(d);
     const plan = generateBlock({
       profile,
       movements: genMovements,
       startDate: today,
       schemaType,
       macroBlockIndex,
+      autopilotRpeRaisePermitted: suspensionBeforeGeneration === null,
       programDays: pendingProgramCreation?.programDays ?? pendingProgramContinuation?.programDays,
       flawReport,
       powerPreferredMovementNames: powerNamesGenerate,
@@ -4510,6 +4575,11 @@ export const useStore = create<KineticsStore>()((set, get) => {
         insertBlockEmphasis(d, blockId, blockEmphasisInput, plan.emphasis, Date.now());
       }
       const openAtGeneration = openSuspension(d);
+      // The plan was generated under one suspension state; it is committed under
+      // the same one or not at all.
+      if ((openAtGeneration?.episode_id ?? null) !== (suspensionBeforeGeneration?.episode_id ?? null)) {
+        throw new Error('The suspension state changed while the block was being generated. Nothing was saved; generate the block again.');
+      }
       if (programId !== null && openAtGeneration === null) {
         linkTrainingBlockProgram(d, blockId, programId, pendingProgramContinuation?.sequenceIndex ?? 1);
       }
@@ -5387,6 +5457,12 @@ export const useStore = create<KineticsStore>()((set, get) => {
     get().refreshBlock();
     return { plannedSessionId, archivedPreviousBlock };
   },
+  /**
+   * Boot-time Health connection: records the bridge (null means this device
+   * cannot serve biometrics) and makes one read-only permission check, bounded
+   * at BIOMETRICS_STATUS_TIMEOUT_MS. It never opens a permission sheet; the
+   * athlete asks for access with CONNECT (requestBiometricsAccess).
+   */
   connectBiometrics: async (bridge) => {
     biometrics = bridge;
     const athleteId = get().activeAthleteId;
@@ -5404,7 +5480,17 @@ export const useStore = create<KineticsStore>()((set, get) => {
     try {
       // Boot is READ-ONLY: already-granted -> sync; otherwise wait for the
       // athlete to tap CONNECT. No automatic permission sheet, ever.
-      const granted = await bridge.hasGrantedPermissions();
+      // A check that never settles must not leave the status at "checking"
+      // with no CONNECT (seen on an iOS 27 simulator whose Health service had
+      // restarted): past the bound it counts as not granted, which claims
+      // nothing, and any late answer is discarded.
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const answered = await Promise.race([
+        bridge.hasGrantedPermissions(),
+        new Promise<null>((resolve) => { timer = setTimeout(() => resolve(null), BIOMETRICS_STATUS_TIMEOUT_MS); }),
+      ]).finally(() => { if (timer !== undefined) clearTimeout(timer); });
+      if (answered === null) uiTestTrace(`connect unanswered rev=${operation.revision}`);
+      const granted = answered === true;
       uiTestTrace(`connect settled rev=${operation.revision} answered=${granted} owns=${ownsOperation()} current=${stillCurrent()}`);
       if (!ownsOperation()) return; // a newer connect/request/disconnect owns status
       if (!stillCurrent()) {
@@ -5755,6 +5841,90 @@ export const useStore = create<KineticsStore>()((set, get) => {
       'INSERT INTO session_note (session_id, note, created_at_ms) VALUES (?, ?, ?) ON CONFLICT(session_id) DO UPDATE SET note = excluded.note, created_at_ms = excluded.created_at_ms',
       [sessionId, raw, Date.now()],
     );
+  },
+
+  /** Save how the last ended session went (070) and, when one was typed, its
+   *  note, in one transaction. A record only: writes session_feel and
+   *  session_note and nothing a prescription, block or progression reads. */
+  saveSessionFeel: (draft, note) => {
+    const sessionId = get().lastEndedSessionId;
+    if (sessionId === null) return 'not_saved';
+    const checked = validateSessionFeel(draft);
+    if (!checked.ok) return checked.problem;
+    const flag = (reason: SessionFeelReason): number => (checked.record.reasons.includes(reason) ? 1 : 0);
+    const typed = note.trim().slice(0, 1000);
+    const now = Date.now();
+    const d = getDb();
+    d.executeSync('BEGIN');
+    try {
+      // Only a finished session carries an answer.
+      const finished = rowsOf<{ present: number }>(d.executeSync(
+        'SELECT 1 AS present FROM session_outcome WHERE session_id = ?', [sessionId],
+      )).length > 0;
+      if (!finished) {
+        d.executeSync('ROLLBACK');
+        return 'not_saved';
+      }
+      d.executeSync(
+        'INSERT INTO session_feel (session_id, feel, reason_pain, reason_tired, reason_unwell, reason_technique, reason_equipment, reason_time, reason_felt_good, reason_other, recorded_at_ms) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(session_id) DO UPDATE SET feel = excluded.feel, reason_pain = excluded.reason_pain, reason_tired = excluded.reason_tired, reason_unwell = excluded.reason_unwell, reason_technique = excluded.reason_technique, reason_equipment = excluded.reason_equipment, reason_time = excluded.reason_time, reason_felt_good = excluded.reason_felt_good, reason_other = excluded.reason_other, recorded_at_ms = excluded.recorded_at_ms',
+        [
+          sessionId, checked.record.feel,
+          flag('pain'), flag('tired'), flag('unwell'), flag('technique'),
+          flag('equipment'), flag('time'), flag('felt_good'), flag('other'),
+          now,
+        ],
+      );
+      // The note is stored as typed. An empty note leaves an earlier one alone.
+      if (typed.length > 0) {
+        d.executeSync(
+          'INSERT INTO session_note (session_id, note, created_at_ms) VALUES (?, ?, ?) ON CONFLICT(session_id) DO UPDATE SET note = excluded.note, created_at_ms = excluded.created_at_ms',
+          [sessionId, typed, now],
+        );
+      }
+      d.executeSync('COMMIT');
+      return null;
+    } catch (error) {
+      try { d.executeSync('ROLLBACK'); } catch { /* nothing was written */ }
+      set({ error: error instanceof Error ? error.message : String(error) });
+      return 'not_saved';
+    }
+  },
+
+  /** Read-only: whether to ask how this session went (it did not go to plan)
+   *  and the answer and note already saved for it. Never throws. */
+  loadSessionFeel: (sessionId) => {
+    const nothing: SessionFeelView = { ask: false, saved: null, note: null };
+    try {
+      const d = getDb();
+      const outcome = rowsOf<{ outcome_kind: string }>(d.executeSync(
+        'SELECT outcome_kind FROM session_outcome WHERE session_id = ?', [sessionId],
+      ))[0];
+      if (outcome === undefined) return nothing;
+      const effort = rowsOf<{ rpe: number | null; target_rpe: number | null }>(d.executeSync(
+        'SELECT sr.rpe AS rpe, st.target_rpe AS target_rpe FROM set_record sr LEFT JOIN set_target st ON st.set_id = sr.set_id WHERE sr.session_id = ?',
+        [sessionId],
+      ));
+      const ask = shouldAskSessionFeel({
+        // An outcome kind this build does not know is, at the least, not "followed the plan".
+        outcomeKind: outcome.outcome_kind as SessionOutcomeKind,
+        meanRpeDrift: meanRpeDrift(effort.map((row) => ({ rpe: row.rpe, targetRpe: row.target_rpe }))),
+      });
+      const row = rowsOf<Record<string, number | string>>(d.executeSync(
+        'SELECT feel, reason_pain, reason_tired, reason_unwell, reason_technique, reason_equipment, reason_time, reason_felt_good, reason_other FROM session_feel WHERE session_id = ?',
+        [sessionId],
+      ))[0];
+      const noteRow = rowsOf<{ note: string }>(d.executeSync(
+        'SELECT note FROM session_note WHERE session_id = ?', [sessionId],
+      ))[0];
+      const saved: SessionFeelRecord | null = row === undefined ? null : {
+        feel: row.feel as SessionFeelKind,
+        reasons: SESSION_FEEL_REASONS.filter((reason) => row[`reason_${reason}`] === 1),
+      };
+      return { ask, saved, note: noteRow === undefined ? null : noteRow.note };
+    } catch {
+      // Reading the answer must never block the completion screen.
+      return nothing;
+    }
   },
 
   loadSessionSlots: (plannedSessionId) => {
@@ -7049,7 +7219,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
     get().refreshBlock();
   },
 
-  logSet: (movementId, reps, loadKg, rpe, displayName, appliedPrefixes, implement, metrics, sessionPlanSlotId) => {
+  logSet: (movementId, reps, loadKg, rpe, displayName, appliedPrefixes, implement, metrics, sessionPlanSlotId, loadShown) => {
     const state = get();
     const s = state.session;
     if (s === null) return;
@@ -7219,6 +7389,16 @@ export const useStore = create<KineticsStore>()((set, get) => {
             prescribedDose.kind === 'reps' ? prescribedDose.reps : null,
             prescribedDose.kind === 'time' ? prescribedDose.seconds : null,
           ],
+        );
+      }
+      // 071: what the entry was seeded with. Same transaction as the set, so a
+      // fault here rolls the set back with it; a missing or malformed seed
+      // writes no row.
+      const shown = storableLoadShown(loadShown);
+      if (shown !== null) {
+        d.executeSync(
+          'INSERT INTO set_load_shown (set_id, load_source, shown_load_kg, advisory_kg, advisory_kind) VALUES (?, ?, ?, ?, ?)',
+          [setId, shown.source, shown.shownLoadKg, shown.advisoryKg, shown.advisoryKind],
         );
       }
       if (timeMode && metrics?.timeS !== undefined && metrics.timeS > 0) {
@@ -7477,6 +7657,12 @@ export const useStore = create<KineticsStore>()((set, get) => {
           terminalRunner.tier,
           outcomeDecision,
         );
+        // 071: which slots were skipped. The outcome above keeps their count;
+        // the ids lived only in the checkpoint deleted below. Same ids, same
+        // transaction, so the two cannot disagree.
+        for (const sessionPlanSlotId of terminalRunner.skippedSessionPlanSlotIds) {
+          d.executeSync('INSERT INTO session_skipped_slot (session_plan_slot_id) VALUES (?)', [sessionPlanSlotId]);
+        }
       }
 
       // Always the final DML before COMMIT. A fault here rolls session
@@ -7736,15 +7922,22 @@ export const useStore = create<KineticsStore>()((set, get) => {
       d.executeSync('DELETE FROM planned_slot_load_intent');
       d.executeSync('DELETE FROM planned_session_routine_context');
       d.executeSync('DELETE FROM planned_session_method');
+      // 071 records, each before its parent. Named explicitly for the reason
+      // given for preparation above: ids are reused once the parent is empty,
+      // and an orphan surviving an FK-OFF reset would attach an old record to
+      // new work.
+      d.executeSync('DELETE FROM session_skipped_slot');
       d.executeSync('DELETE FROM session_plan_slot');
       d.executeSync('DELETE FROM session_origin');
       d.executeSync('DELETE FROM set_prefix');
+      d.executeSync('DELETE FROM set_load_shown');
       d.executeSync('DELETE FROM set_record');
       // 026 snapshot immutability permits deletion only after its parent is
       // gone. With FKs on the parent cascade already emptied this table; with
       // FKs off this explicit pass removes the now-parentless rows.
       d.executeSync('DELETE FROM set_dose_target');
       d.executeSync('DELETE FROM session_note');
+      d.executeSync('DELETE FROM session_feel');
       d.executeSync('DELETE FROM report_severity');
       d.executeSync('DELETE FROM slot_override');
       d.executeSync('DELETE FROM planned_slot');

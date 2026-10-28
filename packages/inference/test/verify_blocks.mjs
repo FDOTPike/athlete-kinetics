@@ -497,6 +497,15 @@ check('non-positive load, zero reps and non-finite inputs yield no estimate',
   && estimateOneRepMax(100, 5, Number.NaN) === null);
 check('an RPE outside the set_record CHECK domain yields no estimate',
   estimateOneRepMax(100, 5, -1) === null && estimateOneRepMax(100, 5, 11) === null);
+// Owner effort floor (E1RM_RPE_FLOOR_2026-10-15.md): strictly below RPE 6 yields no estimate.
+check('a set at RPE 5.5 (below the 6.0 floor) yields no estimate',
+  estimateOneRepMax(100, 5, 5.5) === null
+  && estimateOneRepMax(100, 5, 5.9) === null
+  && estimateOneRepMax(100, 5, 5.99) === null
+  && estimateOneRepMax(100, 5, 0) === null);
+check('a set at RPE 6.0 (at the floor) yields an estimate',
+  estimateOneRepMax(100, 5, 6.0) !== null
+  && Math.abs(estimateOneRepMax(100, 5, 6.0) - 100 / targetPct(5, 6.0)) < 1e-9);
 
 const mkSet = (set_id, session_id, session_date, reps, load_kg, rpe) => ({
   set_id, session_id, session_date, reps, load_kg, rpe });
@@ -522,6 +531,21 @@ check('bestPerSession is order-independent and does not mutate its input',
     mkSet(2, 10, '2026-07-01', 3, 110, 8),
   ])));
 check('bestPerSession of no sets is an empty series', bestPerSession([]).length === 0);
+check('a session whose only sets are below RPE 6 produces no point from bestPerSession',
+  bestPerSession([
+    mkSet(1, 40, '2026-07-04', 5, 120, 5.5),
+    mkSet(2, 40, '2026-07-04', 5, 130, 5.0),
+  ]).length === 0);
+const mixedFloorSession = bestPerSession([
+  mkSet(1, 50, '2026-07-05', 5, 140, 5.5),
+  mkSet(2, 50, '2026-07-05', 5, 100, 6.0),
+]);
+check('a session with a set below 6 and a set at 6 or above takes its point from the latter only',
+  mixedFloorSession.length === 1
+  && mixedFloorSession[0].session_id === 50
+  && mixedFloorSession[0].set_id === 2
+  && Math.abs(mixedFloorSession[0].e1rm_kg - 100 / targetPct(5, 6.0)) < 1e-9,
+  JSON.stringify(mixedFloorSession));
 
 // Numerical calibration is DEFERRED (Calibration Policy v1 section 5). This module
 // must expose the two derivations and NOTHING else — no MDC, no noise floor, no
@@ -1325,6 +1349,36 @@ check('C6B fallback applied-slot cumulative RPE raise ≤ 2.5 over macro blocks 
   macroAppliedRpeRaise >= 0 && macroAppliedRpeRaise <= 2.5,
   `delta=${macroAppliedRpeRaise}`);
 
+// Decision of 2026-10-13: a block generated while a suspension is open gets
+// no autopilot effort raise. Position by position: no slot is raised above the
+// plan without a flaw report, and the block is otherwise the block the
+// autopilot would have produced.
+let suspendedRaise = 0;
+let suspendedBlocksCompared = 0;
+let suspendedOnlyRpeDiffers = true;
+for (let macroBlockIndex = 1; macroBlockIndex <= 8; macroBlockIndex++) {
+  const common = { profile: prof({ objective: 'strength' }), movements, startDate: START, macroBlockIndex };
+  const base = generateBlock(common);
+  const granted = generateBlock({ ...common, flawReport: allHeadroomReport });
+  const withheld = generateBlock({ ...common, flawReport: allHeadroomReport, autopilotRpeRaisePermitted: false });
+  const explicit = generateBlock({ ...common, flawReport: allHeadroomReport, autopilotRpeRaisePermitted: true });
+  const rpes = (plan) => plan.sessions.flatMap((s) => s.slots.map((sl) => sl.target_rpe));
+  const shape = (plan) => JSON.stringify(plan.sessions.map((s) => s.slots.map((sl) => [sl.movement_id, sl.sets, sl.reps])));
+  suspendedRaise += rpes(withheld).reduce((sum, rpe, i) => sum + Math.max(0, rpe - (rpes(base)[i] ?? rpe)), 0);
+  if (JSON.stringify(explicit) !== JSON.stringify(granted)) suspendedOnlyRpeDiffers = false;
+  // In this fixture no session is at its time limit, so sets, reps and movements are what the autopilot gave and
+  // only effort targets differ: each is the plain plan's own. (At the limit the time fit follows the planned targets, as for any block.)
+  if (shape(withheld) !== shape(granted)) suspendedOnlyRpeDiffers = false;
+  if (!rpes(withheld).every((rpe, i) => rpe === rpes(base)[i])) suspendedOnlyRpeDiffers = false;
+  suspendedBlocksCompared += 1;
+}
+check('suspension: a block generated with the raise withheld has no effort target above the plain plan, at any macro position',
+  suspendedRaise === 0 && suspendedBlocksCompared === 8, `raise=${suspendedRaise}`);
+check('suspension: withholding changes effort targets only, each back to the plain plan; granted explicitly is the default block',
+  suspendedOnlyRpeDiffers);
+check('suspension: the raise the default grants is real, so the check above is not empty',
+  macroAppliedRpeRaise > 0, `default cycle raise=${macroAppliedRpeRaise}`);
+
 const allDeficitReport = makeFlawReport(Object.fromEntries(
   MOVEMENT_PATTERNS.map((p) => [p, { phi: 0.5 }]),
 ));
@@ -1341,6 +1395,16 @@ const lateCutRpe = lateCut.sessions.flatMap((s) => s.slots.map((sl) => sl.target
 check('R1 late-cycle cuts remain applied and unrationed',
   lateCutRpe.every((rpe, i) => rpe <= lateBaseRpe[i]) &&
   lateCutRpe.some((rpe, i) => rpe < lateBaseRpe[i]));
+const suspendedCut = generateBlock({
+  profile: prof({ objective: 'strength' }), movements, startDate: START,
+  macroBlockIndex: 3, flawReport: allDeficitReport, autopilotRpeRaisePermitted: false,
+});
+const openCut = generateBlock({
+  profile: prof({ objective: 'strength' }), movements, startDate: START,
+  macroBlockIndex: 3, flawReport: allDeficitReport,
+});
+check('suspension: cuts are applied in full — a deficit block is identical with and without the raise withheld',
+  JSON.stringify(suspendedCut) === JSON.stringify(openCut));
 
 // thin-data / injury safety propagates through the generator (Step-3 R2#1 fix).
 const injuredThin = genFR({ objective: 'strength' },
@@ -2459,7 +2523,7 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
   // Pin the corpus itself, so a library change cannot move the figures below
   // without announcing itself.
   check('[F2-corpus] the shipped catalogue is the one being measured',
-    rows.length === 300 && chain.length === 68,
+    rows.length === 300 && chain.length === 70,
     `${rows.length} movements from ${chain.length} migrations`);
 
   // Round-2 finding 1. Gate [11] validates supported_prefixes tokens against

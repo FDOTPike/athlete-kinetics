@@ -1,0 +1,176 @@
+{
+  "batch": "MOV-A07",
+  "sourceCommit": "14af98271e0283abd8a190e5516c0fd89ea3149b",
+  "bounds": [
+    {
+      "id": 229,
+      "quote": "Sit on the floor with the legs spread comfortably wide for a stable base. Clean one kettlebell to the shoulder so the bell rests on the forearm.",
+      "test": "MovementPreview.movA07OverheadOther.test.js:85-98",
+      "bound": "implement === 'kettlebell', equipment.length === 0, painted underside of near/far thighs and near shin within [0, 0.5] of FLOOR = 96.9 (measured thigh gap 0.05, shin gap 0.049), and ankle spread across Z >= 40 (measured 43.309)"
+    },
+    {
+      "id": 229,
+      "quote": "Press up and out until the arm locks out overhead, then return to the shoulder under control.",
+      "test": "MovementPreview.movA07OverheadOther.test.js:121-127",
+      "bound": "rack elbow <= 75 deg (measured 26.401 deg), rack wrist-to-shoulder distance <= 9.5 (measured 5.616), lockout elbow >= 176 deg (measured 180 deg), wrist vertical rise > 20 (measured 20.026), and wrist outward delta Z > 1.5 (measured 8.077)"
+    },
+    {
+      "id": 229,
+      "quote": "Keep the legs wide and settled. Finish with the elbow locked overhead.",
+      "test": "MovementPreview.movA07OverheadOther.test.js:102-118",
+      "bound": "hip and both ankles drift < 0.01 across every 33 ms tick, 2D trunk angle >= 85 deg (measured 90 deg), and near upper-arm bone maintains positive clearance > 0 outside the head circle outer stroke"
+    },
+    {
+      "id": 85,
+      "quote": "Dip a few inches by bending the knees with a vertical torso, then drive the legs hard and let that force carry both bells to locked-out arms overhead.",
+      "test": "MovementPreview.movA07OverheadOther.test.js:146-171",
+      "bound": "implement === 'kettlebells', phases [1, 0, 2, 2, 1, 1], shallow hip dip in [4.0, 8.0] (measured 4.985), dip knee angle in [125, 148] deg (measured 125.403 deg) vs rack/lockout knee >= 175 deg (measured 178.332 deg), 2D trunk angle >= 88 deg (measured 90 deg), and both elbows >= 176 deg at lockout (measured 180 deg, wrists +23.965 above shoulders)"
+    },
+    {
+      "id": 85,
+      "quote": "The legs start the press and the arms finish it — a shallow, snappy dip beats a deep slow one every time.",
+      "test": "MovementPreview.movA07OverheadOther.test.js:174-175",
+      "bound": "dip segment duration <= 400 ms (measured 330 ms) and at least 2x faster than the 820 ms leg-drive-and-press segment (segmentDurationsMs[0] * 2 <= segmentDurationsMs[1])"
+    },
+    {
+      "id": 85,
+      "quote": "Dip shallow, drive fast. Legs throw it, arms catch the lockout. Rack, reset, breathe between reps.",
+      "test": "MovementPreview.movA07OverheadOther.test.js:166-176",
+      "bound": "bells remain racked at the shoulders through the dip (wrist-to-shoulder distance <= 9.5, measured 4.906) and cycle ends with a rack reset pause >= 400 ms (measured 450 ms)"
+    },
+    {
+      "id": 112,
+      "quote": "Clean one kettlebell to the shoulder, set the feet wider than the hips, and turn them slightly away from the loaded side.",
+      "test": "MovementPreview.movA07OverheadOther.test.js:196-198",
+      "bound": "implement === 'kettlebell', ankle spread across Z >= 22 (measured 24), and feet turned away from the loaded near side with foot[1] <= -12 deg (measured -18 deg)"
+    },
+    {
+      "id": 112,
+      "quote": "Send the hips away and wedge the torso under the bell, straightening the arm as the body descends while the eyes stay on the handle.",
+      "test": "MovementPreview.movA07OverheadOther.test.js:201-207",
+      "bound": "hips shift away (wedge hip X < setup hip X - 6, measured -15.2) and descend (wedge hip Y < setup hip Y - 4, measured -7), torso wedges to <= 55 deg from horizontal (measured 46.715 deg), near shoulder drops > 14 units under the bell, and near elbow straightens from <= 65 deg (measured 13.831 deg) to >= 176 deg (measured 176.107 deg) while head looks up at the handle"
+    },
+    {
+      "id": 112,
+      "quote": "Once the elbow is locked, drive the feet through the floor to stand tall; if the bell travels sideways instead of staying over its base, the range is too deep or the setup was rushed.",
+      "test": "MovementPreview.movA07OverheadOther.test.js:210-226",
+      "bound": "stand tall with trunk >= 85 deg (measured 89.152 deg) and locked elbow >= 176 deg (measured 177.587 deg) raising the bell +14.845 units, while bell hold X and Z drift <= 1.2 across every 33 ms tick (measured 0)"
+    },
+    {
+      "id": 101,
+      "quote": "Stand with very light dumbbells and raise the elbows wide to shoulder height, forearms hanging below them.",
+      "test": "MovementPreview.movA07OverheadOther.test.js:248-255",
+      "bound": "implement === 'bells', Stage 1 elbow Y within 1.0 of shoulder Y (measured 0), elbow out along Z >= 11.5 (measured 12.5), and wrist hanging below elbow by > 11.5 (measured -12)"
+    },
+    {
+      "id": 101,
+      "quote": "Keep the upper arms fixed while rotating the forearms until the wrists stack directly over the elbows, then press to a tall overhead finish.",
+      "test": "MovementPreview.movA07OverheadOther.test.js:258-270",
+      "bound": "from Stage 1 to Stage 2 both elbows drift < 0.05 (measured 0) with 90 deg elbow angle while wrists rotate to +12 above elbows, then Stage 3 presses to >= 175 deg elbow lockout (measured 180 deg) with wrists +23.965 above shoulders"
+    },
+    {
+      "id": 101,
+      "quote": "Reverse every stage under control; if the hips have to help, the bells are too heavy for the rotation you are training.",
+      "test": "MovementPreview.movA07OverheadOther.test.js:241-281",
+      "bound": "phases [0, 1, 2, 3, 3, 2, 1, 0] reverse every stage in order, and hip and ankle positions drift < 0.01 across every 33 ms tick"
+    },
+    {
+      "id": 58,
+      "quote": "Clear the floor, place a firm padded target beneath the head, and kick to the wall with the hands just outside shoulder width.",
+      "test": "MovementPreview.movA07OverheadOther.test.js:304-327",
+      "bound": "inverted vertical stack with wrist span across Z > shoulder span + 2.0 (measured 22.4 vs 18.768), wall slab and floor pad slab rendered, and painted hands resting within [0, 0.5] of FLOOR = 96.9 (measured 0.1)"
+    },
+    {
+      "id": 58,
+      "quote": "Brace into a vertical line and lower for up to five seconds until the head meets the pad softly.",
+      "test": "MovementPreview.movA07OverheadOther.test.js:308-356",
+      "bound": "lowering segment duration in [4000, 5000] ms (measured 4600 ms), elbow flexing from >= 170 deg (measured 173.96 deg) to <= 98 deg (measured 89.245 deg), painted head-to-pad gap in [0, 0.5] at bottom (measured 0.1), and painted near heel-to-wall gap in [0, 0.6] on every tick (measured 0.111)"
+    },
+    {
+      "id": 58,
+      "quote": "Exit through the rehearsed clear side, reset, and kick back up; the controlled lowering is the full rep.",
+      "test": "MovementPreview.movA07OverheadOther.test.js:360-364",
+      "bound": "phases [0, 1, 2, 2, 0] exit from the bottom through the clear side (far ankle displacement > 15, measured 36.698) without pressing back up from ph=1"
+    },
+    {
+      "id": 63,
+      "quote": "Clear the floor, place a firm padded target beneath the head, and kick to the wall with the hands just outside shoulder width.",
+      "test": "MovementPreview.movA07OverheadOther.test.js:304-343",
+      "bound": "wrist span across Z > shoulder span + 2.0 (measured 22.4 vs 18.768), wall and head-pad slabs drawn, and painted hands resting within [0, 0.5] of FLOOR = 96.9 (measured 0.1)"
+    },
+    {
+      "id": 63,
+      "quote": "Brace into one vertical line and lower until the head meets the pad softly. Press back to straight arms, then exit through a rehearsed clear side.",
+      "test": "MovementPreview.movA07OverheadOther.test.js:308-361",
+      "bound": "phases [0, 1, 1, 0, 0] lower at normal tempo (1500 ms <= 2000 ms) from 173.96 deg to 89.245 deg elbow angle until painted head meets pad (gap 0.1 in [0, 0.5]) and press back to straight arms (173.96 deg)"
+    },
+    {
+      "id": 69,
+      "quote": "Start in a push-up position, then walk your feet in and lift your hips high so your torso points at the floor like an inverted V.",
+      "test": "MovementPreview.movA07OverheadOther.test.js:383-386",
+      "bound": "hips stacked high above neck (+15.14 at top, +19.83 at bottom) and ankles, with 3D neck-hip-ankle included angle <= 105 deg throughout (measured 78.997 deg at top, 58.757 deg at bottom)"
+    },
+    {
+      "id": 69,
+      "quote": "Bend your elbows and lower the top of your head towards the floor between your hands. Press back to long arms without the hips drifting forward.",
+      "test": "MovementPreview.movA07OverheadOther.test.js:389-413",
+      "bound": "elbows bend from >= 158 deg (measured 160.989 deg) to <= 95 deg (measured 76.665 deg) and press back to long arms while hip X never drifts forward across any 33 ms tick (measured hipDriftForwardX = 0)"
+    },
+    {
+      "id": 69,
+      "quote": "Hips stacked high the whole rep. Head travels to a spot just ahead of the hands. Elbows track at about 45 degrees.",
+      "test": "MovementPreview.movA07OverheadOther.test.js:391-398",
+      "bound": "at bottom head Y <= 9.5 (measured 9.463), head X is 2.0..7.5 units ahead of wrist X (measured +3.993), and elbow tracking angle from sagittal is in [30, 60] deg (measured 55.035 deg)"
+    }
+  ],
+  "fileQuotes": [
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4641,
+      "endLine": 4656,
+      "text": "  'kettlebell-seated-press': {\n    root: 'hip',\n    view: 'oblique',\n    yawDeg: 45,\n    originX: 48,\n    feet: 'free',\n    implement: 'kettlebell',\n    nearArmOverHead: true,\n    farArmOver: true,\n    poses: [\n      {\n        at: [-8, CHAIN_THIGH_HALF + 0.05], trunk: 90, head: 90,\n        thigh: [0, 19.5], shin: [-1.84, 19.5], foot: [80, 16],\n        upperArm: [80, 146], forearm: [68, -10],\n        farUpperArm: [-28, 32], farForearm: [-8, 20],\n      },"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4668,
+      "endLine": 4694,
+      "text": "  'double-kettlebell-push-press': {\n    root: 'hip',\n    view: 'oblique',\n    yawDeg: 28,\n    originX: 50,\n    footSpread: 2.5,\n    implement: 'kettlebells',\n    nearArmOverHead: true,\n    farArmOver: true,"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4699,
+      "endLine": 4726,
+      "text": "  'bent-press': {\n    root: 'hip',\n    view: 'oblique',\n    yawDeg: 32,\n    originX: 52,\n    feet: 'free',\n    elbowPole: [-90, 35],\n    implement: 'kettlebell',\n    nearArmOverHead: true,\n    farArmOver: true,"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4740,
+      "endLine": 4771,
+      "text": "  'cuban-press': {\n    root: 'hip',\n    view: 'oblique',\n    yawDeg: 38,\n    originX: 50,\n    footSpread: 2.0,\n    implement: 'bells',\n    nearArmOverHead: true,\n    farArmOver: true,"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4776,
+      "endLine": 4787,
+      "text": "  'eccentric-wall-handstand-push-up': {\n    root: 'neck',\n    view: 'oblique',\n    yawDeg: 20,\n    originX: 50,\n    feet: 'free',\n    elbowPole: [-140, 35],\n    equipment: [\n      { kind: 'slab', a: [-7.02, 2.0], b: [-7.02, 95.0], layer: 'behind' },\n      { kind: 'slab', a: [-3.5, 2.0], b: [7.5, 2.0], layer: 'behind' },\n    ],"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4812,
+      "endLine": 4823,
+      "text": "  'handstand-push-up': {\n    root: 'neck',\n    view: 'oblique',\n    yawDeg: 20,\n    originX: 50,\n    feet: 'free',\n    elbowPole: [-140, 35],\n    equipment: [\n      { kind: 'slab', a: [-7.02, 2.0], b: [-7.02, 95.0], layer: 'behind' },\n      { kind: 'slab', a: [-3.5, 2.0], b: [7.5, 2.0], layer: 'behind' },\n    ],"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4842,
+      "endLine": 4866,
+      "text": "  'pike-push-up': {\n    root: 'hip',\n    view: 'oblique',\n    yawDeg: 22,\n    originX: 50,\n    feet: 'free',\n    elbowPole: [-135, 45],\n    kneePole: -45,"
+    },
+    {
+      "file": "tools/rendering/wo09_split_preview_manifest.mjs",
+      "line": 98,
+      "endLine": 104,
+      "text": "  229: 'vertical-press@seated',\n  85: 'vertical-press@standing',\n  112: 'vertical-press@standing',\n  101: 'vertical-press@standing',\n  58: 'vertical-press@standing',\n  63: 'vertical-press@standing',\n  69: 'vertical-press@standing',"
+    }
+  ]
+}
