@@ -321,6 +321,10 @@ final class AthleteKineticsUITests: XCTestCase {
       let inApp = healthPermissionButton(title)
       let named = NSPredicate(format: "label IN %@", [title, title.replacingOccurrences(of: "’", with: "'")])
       // The remote sheet can retain its text while rebuilding the offscreen buttons.
+      // Evidence: CI run 40731107914, job 122977480835 (Xcode 27), artifact
+      // athlete-kinetics-ios-simulator-unsigned-xcode27, XCTest runner log at 18:22:02.810:
+      // the Don't Allow button node is absent, its static text remains, and the table has two pages.
+      // A dismissed sheet leaves no text behind, so the "sheet stayed open" checks stay truthful.
       if inApp.exists || app.staticTexts.matching(named).firstMatch.exists { log("health sheet: in the app"); return inApp }
       let inSpringboard = healthPermissionButton(title, in: springboard)
       if inSpringboard.exists || springboard.staticTexts.matching(named).firstMatch.exists { log("health sheet: in SpringBoard"); return inSpringboard }
