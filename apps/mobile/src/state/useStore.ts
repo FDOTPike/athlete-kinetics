@@ -8108,6 +8108,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
     ).map(movementFromRow);
     set({ movements, lastLoggedLoads: latestLoadMap(d) });
     get().refreshVector();
+    get().computePrescription([]);
     return 'loaded';
   },
 
