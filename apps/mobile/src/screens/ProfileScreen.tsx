@@ -140,7 +140,9 @@ function OneRmRow({ label, valueKg, onChange }: OneRmRowProps): React.JSX.Elemen
       setText('');
       return;
     }
+    const snapped = Math.min(500, Math.max(20, Math.round(parsed / 2.5) * 2.5));
     onChange(parsed); // store snaps to 2.5 and clamps 20..500
+    setText(snapped.toFixed(1));
   };
   return (
     <View style={styles.field}>
@@ -292,8 +294,13 @@ export default function ProfileScreen(): React.JSX.Element {
   }, [activeAthleteId, session, loadRecentOutcomes, databaseReady]);
 
   useEffect(() => {
-    setRecentMeasures(databaseReady ? loadMeasuredHistory(14) : []);
-  }, [activeAthleteId, loadMeasuredHistory, databaseReady]);
+    const measures = databaseReady ? loadMeasuredHistory(14) : [];
+    setRecentMeasures(measures);
+    const todayBw = measures.find((row) => row.date === today)?.bodyweightKg ?? null;
+    const hydrated = todayBw !== null ? todayBw.toFixed(1) : '';
+    savedBodyweightText.current = hydrated;
+    setBodyweightText(hydrated);
+  }, [activeAthleteId, today, loadMeasuredHistory, databaseReady]);
   // In-canvas double-confirm states (P2 & P5)
   const [confirmingDeleteAthleteId, setConfirmingDeleteAthleteId] = useState<string | null>(null);
   const [confirmingWipeBlock, setConfirmingWipeBlock] = useState(false);
@@ -316,6 +323,7 @@ export default function ProfileScreen(): React.JSX.Element {
   const [includeImportReadiness, setIncludeImportReadiness] = useState(false);
   const [recentMeasures, setRecentMeasures] = useState<ReturnType<typeof loadMeasuredHistory>>([]);
   const [bodyweightText, setBodyweightText] = useState('');
+  const savedBodyweightText = useRef('');
   const [glossaryOpen, setGlossaryOpen] = useState(false);
   const [activitiesOpen, setActivitiesOpen] = useState(false);
   const [labOpen, setLabOpen] = useState(false);
@@ -857,8 +865,24 @@ export default function ProfileScreen(): React.JSX.Element {
             onEndEditing={() => {
               // A focused input can still end editing after the database closed.
               if (!databaseReady) return;
-              const value = Number.parseFloat(bodyweightText.replace(',', '.'));
-              saveBodyweight(today, Number.isFinite(value) && value >= 20 ? value : null);
+              if (bodyweightText === savedBodyweightText.current) return;
+              const trimmed = bodyweightText.trim();
+              if (trimmed === '') {
+                saveBodyweight(today, null);
+                savedBodyweightText.current = '';
+                setBodyweightText('');
+                setRecentMeasures(loadMeasuredHistory(14));
+                return;
+              }
+              const value = Number.parseFloat(trimmed.replace(',', '.'));
+              if (!Number.isFinite(value) || value < 20 || value > 500) {
+                setBodyweightText(savedBodyweightText.current);
+                return;
+              }
+              const saved = (Math.round(value * 10) / 10).toFixed(1);
+              saveBodyweight(today, value);
+              savedBodyweightText.current = saved;
+              setBodyweightText(saved);
               setRecentMeasures(loadMeasuredHistory(14));
             }}
             keyboardType="numeric"
