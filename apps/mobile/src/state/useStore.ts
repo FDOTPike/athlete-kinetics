@@ -7832,7 +7832,11 @@ export const useStore = create<KineticsStore>()((set, get) => {
            VALUES (?, ?, ?, NULL, ?, 0, NULL, NULL, NULL)`,
           [today, Date.now(), raw, resolved.similarity],
         );
-        set({ lastTriage: { kind: 'rejected' } });
+        get().computePrescription([]);
+        const triageAfter = get().lastTriage;
+        if (triageAfter === null || triageAfter.kind !== 'matched' || !triageAfter.directive.halt) {
+          set({ lastTriage: { kind: 'rejected' } });
+        }
         return;
       }
       // Persist the routing outcome. The audit snapshot uses the SAME pure
