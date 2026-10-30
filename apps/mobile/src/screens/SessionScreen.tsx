@@ -1162,7 +1162,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                         {/* Draining chalk barRestTimerCard */}
                         <RestTimerCard
                           totalSeconds={rest.seconds}
-                          elapsedSeconds={restRemaining}
+                          elapsedSeconds={rest.seconds - restRemaining}
                           style={{ alignSelf: 'stretch' }}
                         />
                         {runnerResting && (
