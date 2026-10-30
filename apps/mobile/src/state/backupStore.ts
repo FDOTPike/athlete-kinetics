@@ -1159,8 +1159,19 @@ export const useBackupStore = create<BackupState>((set, get) => ({
     let releaseMaintenance: (() => void) | null = null;
     let safeToRestart = true;
     try {
-      if (!(await actionCanProceed(get(), set))) return;
-      releaseMaintenance = acquireDataMaintenanceLock('encrypted-restore');
+      if (!(await actionCanProceed(get(), set))) {
+        pendingRestore = null;
+        return;
+      }
+      try {
+        releaseMaintenance = acquireDataMaintenanceLock('encrypted-restore');
+      } catch (error) {
+        set({
+          status: 'preview',
+          message: error instanceof Error ? error.message : 'Athlete data is still being saved or opened. Try again in a moment.',
+        });
+        return;
+      }
       revokeAthleteDataBoot();
       closeStoreDatabaseForRestore();
       if (!usesRetainedRecovery) {
@@ -1180,8 +1191,10 @@ export const useBackupStore = create<BackupState>((set, get) => ({
       // A retained previous-data recovery is the undo point being used: it is
       // never rewritten or superseded, and no replacement undo point is created.
       await replaceAllData(pending.archive);
+      pendingRestore = null;
       set({ status: 'success', message: 'Restore complete. All athlete data was replaced from the backup.', preview: null });
     } catch (error) {
+      pendingRestore = null;
       safeToRestart = !(error instanceof RestoreRecoveryRequiredError || error instanceof RecoveryPublicationUnresolvedError);
       if (!safeToRestart) revokeAthleteDataBoot();
       set({
@@ -1191,7 +1204,7 @@ export const useBackupStore = create<BackupState>((set, get) => ({
         preview: null,
       });
     } finally {
-      pendingRestore = null;
+      if (releaseMaintenance !== null) pendingRestore = null;
       try {
         if (recoveryWork !== null) await removeIfPresent(recoveryWork);
         if (releaseMaintenance !== null) releaseMaintenance();
