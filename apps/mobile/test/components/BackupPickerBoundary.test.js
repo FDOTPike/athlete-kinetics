@@ -156,3 +156,15 @@ test('Android refuses import when the bounded native module is absent, without a
   expect(mockNative.keepLocalCopy).not.toHaveBeenCalled();
   expect(store.useBackupStore.getState()).toMatchObject({ status: 'error', preview: null });
 });
+
+test('Android missing NativeModules.AKBackupCopy produces the private app storage copy error message', async () => {
+  const { store } = load('android');
+  delete NativeModules.AKBackupCopy;
+  mockNative.pick.mockResolvedValue([{ uri: 'content://provider/backup', size: 64 }]);
+  await store.useBackupStore.getState().chooseRestore('restore-password');
+  expect(store.useBackupStore.getState()).toMatchObject({
+    status: 'error',
+    message: 'The selected backup could not be copied into private app storage.',
+    preview: null,
+  });
+});

@@ -36,7 +36,7 @@ class BackupCopyModule(context: ReactApplicationContext) : ReactContextBaseJavaM
         BoundedBackupCopy.copy(reactApplicationContext.contentResolver.openInputStream(uri), destination)
         promise.resolve(destination.absolutePath)
       } catch (error: Exception) {
-        promise.reject("BACKUP_COPY_FAILED", "The selected backup could not be copied safely.", error)
+        promise.reject("BACKUP_COPY_FAILED", "The selected backup could not be copied into private app storage.", error)
       }
     }
   }

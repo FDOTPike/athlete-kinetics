@@ -625,7 +625,7 @@ async function pickerOpen(): Promise<string | null> {
     validatePortableBackupFileSize(selected.size);
     if (Platform.OS === 'android') {
       const boundedCopy = NativeModules.AKBackupCopy as { copyBackup(uri: string): Promise<string> } | undefined;
-      if (boundedCopy === undefined) throw new Error('Safe backup import is unavailable. Update the app before restoring.');
+      if (boundedCopy === undefined) throw new Error('The selected backup could not be copied into private app storage.');
       return await boundedCopy.copyBackup(selected.uri);
     }
     const [copy] = await picker.keepLocalCopy({
