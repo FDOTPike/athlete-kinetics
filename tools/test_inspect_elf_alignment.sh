@@ -202,6 +202,8 @@ echo
 echo "[running auditor on fixtures]"
 set +e
 bash "$AUDITOR" "$WORK/A.apk"               >/dev/null 2>&1; a_rc=$?
+env -u JAVA_HOME bash "$AUDITOR" "$WORK/A.apk" >/dev/null 2>&1; nojava_rc=$?
+JAVA_HOME="$WORK/no-jdk" bash "$AUDITOR" "$WORK/A.apk" >/dev/null 2>&1; nojar_rc=$?
 bash "$AUDITOR" "$WORK/S.apk"               >/dev/null 2>&1; s_rc=$?
 bash "$AUDITOR" "$WORK/B.apk"               >/dev/null 2>&1; b_rc=$?
 bash "$AUDITOR" "$WORK/M.apk"               >/dev/null 2>&1; m_rc=$?
@@ -218,6 +220,8 @@ bash "$AUDITOR" /nonexistent.apk             >/dev/null 2>&1; n_rc=$?
 set -e
 
 t "aligned-only APK with model (0x4000) passes"           0 "$a_rc"
+t "standalone audit works without JAVA_HOME"              0 "$nojava_rc"
+t "standalone audit works without jar.exe"                0 "$nojar_rc"
 t "stronger-than-required APK with model (0x8000) passes"  0 "$s_rc"
 t "0x1000-only APK fails independently on ELF alignment"  1 "$b_rc"
 t "mixed-only 0x1000/0x4000 APK fails independently"      1 "$m_rc"

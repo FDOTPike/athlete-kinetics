@@ -11,6 +11,7 @@
 import {
   MIN_SAMPLES_IN_REQUEST_WINDOW,
   WRAPPER_REQUEST_ID,
+  bindTargetSamples,
   computeCadence,
   computeSamplingSegments,
   correlateRequests,
@@ -945,6 +946,28 @@ console.log('\n[14] HERMES r4 R4-2 — the epoch session ledger');
   const { qualified } = correlate(lines, DENSE, { anchor: false });
   check('HERMES R4-2: a balanced ledger (3 creations, 3 witnessed) still QUALIFIES',
     qualified.length === 3, `${qualified.length} qualified`);
+}
+
+{
+  const lines = anchored([
+    ...fullLifecycleAt(BASE + 1000, 900),
+    pidLine(BASE + 2200, 901, phaseMsg('wrapper', 'settled', 0, 1, 0, 0)),
+    ...fullLifecycleAt(BASE + 3000, 901),
+    ...fullLifecycleAt(BASE + 1000, 999),
+  ]);
+  const { markers } = parseLifecycleMarkers(lines.join('\n'));
+  const samples = Array.from({ length: 41 }, (_, i) => ({
+    captureStartMs: BASE + i * 100, appName: 'target.app', processId: i < 20 ? 900 : 901,
+  }));
+  const segments = computeSamplingSegments(samples.map((s) => s.captureStartMs), { continuityGapMs: 2000 });
+  const bound = bindTargetSamples({ samples, markers, segments, packageName: 'target.app' });
+  const result = correlateRequests(bound);
+  check('SEC11: cold restart qualifies both target process lifetimes', result.qualified.length === 2);
+  check('SEC11: foreign PID markers are excluded', bound.markers.every((m) => m.pid !== 999));
+  check('SEC11: sampling segments split at a PID change', bound.segments.length === 2);
+  let refused = false;
+  try { bindTargetSamples({ samples, markers, segments, packageName: 'other.app' }); } catch { refused = true; }
+  check('SEC11: mismatched raw package identity fails closed', refused);
 }
 
 console.log(`\n${fail === 0 ? 'ALL LIFECYCLE CORRELATOR FIXTURES PASSED' : `${fail} LIFECYCLE CORRELATOR FIXTURE(S) FAILED`}`);

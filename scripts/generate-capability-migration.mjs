@@ -87,7 +87,7 @@ export function buildSchemaContext(customSchemaDir = SCHEMA_DIR) {
   }
 
   const files = readdirSync(customSchemaDir)
-    .filter((f) => f.endsWith('.sql') && !f.startsWith('_') && !f.endsWith('_capability_content.sql'))
+    .filter((f) => f.endsWith('.sql') && !f.startsWith('_'))
     .sort();
 
   for (const file of files) {
@@ -253,92 +253,99 @@ export function validateCapabilityContent(input, ctx) {
     return { errors, validData: null };
   }
 
-  // Graph validation over same-family prerequisite edges
-  const allFamiliesMap = new Map();
-  for (const f of ctx.existingFamilies) {
-    allFamiliesMap.set(f.movement_id, f.family);
-  }
-  for (const f of validatedFamilies) {
-    const mId = ctx.movementMap.get(f.movementName);
-    allFamiliesMap.set(mId, f.family);
-  }
-
-  const allPrereqEdges = [];
-  for (const e of ctx.existingEdges) {
-    if (e.relationship === 'prerequisite') {
-      allPrereqEdges.push({ src: e.prerequisite_movement_id, dst: e.movement_id });
+  // Retain staging checks, then check the graph additive SQL actually produces.
+  for (const preserveExisting of [false, true]) {
+    const allFamiliesMap = new Map();
+    for (const f of ctx.existingFamilies) {
+      allFamiliesMap.set(f.movement_id, f.family);
     }
-  }
-  for (const e of validatedEdges) {
-    if (e.relationship === 'prerequisite') {
-      const srcId = ctx.movementMap.get(e.prerequisiteMovementName);
-      const dstId = ctx.movementMap.get(e.movementName);
-      allPrereqEdges.push({ src: srcId, dst: dstId });
-    }
-  }
-
-  // Group movements by family and validate acyclic unbranched chains
-  const familyMovements = new Map();
-  for (const [mId, fam] of allFamiliesMap.entries()) {
-    if (!familyMovements.has(fam)) familyMovements.set(fam, new Set());
-    familyMovements.get(fam).add(mId);
-  }
-
-  for (const [famName, mSet] of familyMovements.entries()) {
-    const famEdges = allPrereqEdges.filter(
-      (e) => allFamiliesMap.get(e.src) === famName && allFamiliesMap.get(e.dst) === famName
-    );
-
-    const inDeg = new Map();
-    const outDeg = new Map();
-    const nextNode = new Map();
-
-    for (const mId of mSet) {
-      inDeg.set(mId, 0);
-      outDeg.set(mId, 0);
+    for (const f of validatedFamilies) {
+      const mId = ctx.movementMap.get(f.movementName);
+      if (!preserveExisting || !allFamiliesMap.has(mId)) allFamiliesMap.set(mId, f.family);
     }
 
-    for (const e of famEdges) {
-      const currentIn = inDeg.get(e.dst) ?? 0;
-      if (currentIn >= 1) {
-        errors.push(`Branching ambiguity in family "${famName}": movement ${e.dst} has multiple prerequisites`);
+    const allPrereqEdges = [];
+    const retainedPairs = new Set();
+    for (const e of ctx.existingEdges) {
+      retainedPairs.add(`${e.prerequisite_movement_id}:${e.movement_id}`);
+      if (e.relationship === 'prerequisite') {
+        allPrereqEdges.push({ src: e.prerequisite_movement_id, dst: e.movement_id });
       }
-      inDeg.set(e.dst, currentIn + 1);
-
-      const currentOut = outDeg.get(e.src) ?? 0;
-      if (currentOut >= 1) {
-        errors.push(`Branching ambiguity in family "${famName}": movement ${e.src} has multiple dependents`);
+    }
+    for (const e of validatedEdges) {
+      if (e.relationship === 'prerequisite') {
+        const srcId = ctx.movementMap.get(e.prerequisiteMovementName);
+        const dstId = ctx.movementMap.get(e.movementName);
+        const pair = `${srcId}:${dstId}`;
+        if (retainedPairs.has(pair)) continue;
+        retainedPairs.add(pair);
+        allPrereqEdges.push({ src: srcId, dst: dstId });
       }
-      outDeg.set(e.src, currentOut + 1);
-      nextNode.set(e.src, e.dst);
     }
 
-    const roots = Array.from(mSet).filter((mId) => (inDeg.get(mId) ?? 0) === 0);
-    if (famEdges.length > 0 && roots.length > 1) {
-      errors.push(`Branching ambiguity in family "${famName}": multiple root movements found`);
-    }
-    if (roots.length === 0) {
-      errors.push(`Cycle detected in family "${famName}": no root movement found`);
+    // Group movements by family and validate acyclic unbranched chains
+    const familyMovements = new Map();
+    for (const [mId, fam] of allFamiliesMap.entries()) {
+      if (!familyMovements.has(fam)) familyMovements.set(fam, new Set());
+      familyMovements.get(fam).add(mId);
     }
 
-    const visited = new Set();
-    for (const root of roots) {
-      let curr = root;
-      while (curr !== undefined) {
-        if (visited.has(curr)) {
-          errors.push(`Cycle detected in family "${famName}" at movement ${curr}`);
-          break;
+    for (const [famName, mSet] of familyMovements.entries()) {
+      const famEdges = allPrereqEdges.filter(
+        (e) => allFamiliesMap.get(e.src) === famName && allFamiliesMap.get(e.dst) === famName
+      );
+
+      const inDeg = new Map();
+      const outDeg = new Map();
+      const nextNode = new Map();
+
+      for (const mId of mSet) {
+        inDeg.set(mId, 0);
+        outDeg.set(mId, 0);
+      }
+
+      for (const e of famEdges) {
+        const currentIn = inDeg.get(e.dst) ?? 0;
+        if (currentIn >= 1) {
+          errors.push(`Branching ambiguity in family "${famName}": movement ${e.dst} has multiple prerequisites`);
         }
-        visited.add(curr);
-        curr = nextNode.get(curr);
+        inDeg.set(e.dst, currentIn + 1);
+
+        const currentOut = outDeg.get(e.src) ?? 0;
+        if (currentOut >= 1) {
+          errors.push(`Branching ambiguity in family "${famName}": movement ${e.src} has multiple dependents`);
+        }
+        outDeg.set(e.src, currentOut + 1);
+        nextNode.set(e.src, e.dst);
+      }
+
+      const roots = Array.from(mSet).filter((mId) => (inDeg.get(mId) ?? 0) === 0);
+      if (famEdges.length > 0 && roots.length > 1) {
+        errors.push(`Branching ambiguity in family "${famName}": multiple root movements found`);
+      }
+      if (roots.length === 0) {
+        errors.push(`Cycle detected in family "${famName}": no root movement found`);
+      }
+
+      const visited = new Set();
+      for (const root of roots) {
+        let curr = root;
+        while (curr !== undefined) {
+          if (visited.has(curr)) {
+            errors.push(`Cycle detected in family "${famName}" at movement ${curr}`);
+            break;
+          }
+          visited.add(curr);
+          curr = nextNode.get(curr);
+        }
+      }
+
+      if (visited.size !== mSet.size && errors.length === 0) {
+        errors.push(`Disconnected components or cycle in family "${famName}"`);
       }
     }
 
-    if (visited.size !== mSet.size && errors.length === 0) {
-      errors.push(`Disconnected components or cycle in family "${famName}"`);
-    }
   }
-
   return {
     errors,
     validData: errors.length === 0 ? { roles: validatedRoles, families: validatedFamilies, edges: validatedEdges } : null,
