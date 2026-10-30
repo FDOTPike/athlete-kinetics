@@ -712,9 +712,19 @@ export default function OnboardingScreen(): React.JSX.Element {
                 onEdit={() => goTo('focus')}
               >
                 {wantsTarget && goalValidation.ok && (
-                  <Text style={styles.reviewSupportLine} testID="onboarding-summary-target-row">
-                    {`TARGET — ${goalValidation.goal.specificOutcome}: ${goalValidation.goal.targetValue} ${goalValidation.goal.unit}${goalValidation.goal.requestedDeadline === null ? ', no deadline' : ` by ${goalValidation.goal.requestedDeadline}`}`}
-                  </Text>
+                  <View style={styles.reviewHeadingRow}>
+                    <Text style={styles.reviewSupportLine} testID="onboarding-summary-target-row">
+                      {`TARGET — ${goalValidation.goal.specificOutcome}: ${goalValidation.goal.targetValue} ${goalValidation.goal.unit}${goalValidation.goal.requestedDeadline === null ? ', no deadline' : ` by ${goalValidation.goal.requestedDeadline}`}`}
+                    </Text>
+                    <Pressable
+                      onPress={() => goTo('target')}
+                      accessibilityRole="button"
+                      accessibilityLabel="Edit target"
+                      style={styles.reviewEdit}
+                    >
+                      <Text style={styles.reviewEditText}>EDIT</Text>
+                    </Pressable>
+                  </View>
                 )}
                 {!wantsTarget && (
                   <Text style={styles.reviewDescription} testID="onboarding-summary-target-row">
