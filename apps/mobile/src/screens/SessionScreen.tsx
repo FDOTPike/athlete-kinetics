@@ -1068,6 +1068,8 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                 const metricSummary = latestCompleted?.timeS !== null && latestCompleted?.timeS !== undefined
                   ? ` · ${secondsText(latestCompleted.timeS)} logged`
                   : bandLabel === null ? '' : ` · ${bandLabel}`;
+                const asNames = loggedAsNames(slot);
+                const includesSuffix = asNames.length > 0 ? ` · includes ${asNames.join(', ')}` : '';
 
                 return (
                   <View key={slot.sessionPlanSlotId} style={styles.timelineRow}>
@@ -1078,7 +1080,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                     </View>
                     <View style={styles.completeRow}>
                       <Text style={styles.completeRowName} numberOfLines={1}>{movement?.name ?? 'Movement'}</Text>
-                      <Text style={styles.completeRowMeta}>{logged} sets complete{metricSummary}</Text>
+                      <Text style={styles.completeRowMeta}>{logged} sets complete{metricSummary}{includesSuffix}</Text>
                       <CompletedMetrics sets={completedSets} bandLadder={bandLadder} movementsById={byId} onEdit={editSet} />
                     </View>
                   </View>

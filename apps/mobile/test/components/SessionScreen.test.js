@@ -2084,3 +2084,133 @@ test('a skipped slot whose logged set was recorded under an earlier movement nam
   expect(screen.getByText('Skipped: Later movement · no sets logged')).toBeOnTheScreen();
 });
 
+test('a finished slot whose logged sets include a different movement_id shows includes with that movement name', () => {
+  mockState = state({
+    movements: [
+      movement(1, 'Narrow Stance Squats'),
+      movement(2, 'Later movement'),
+      movement(3, 'Box Squat'),
+    ],
+    session: {
+      sessionId: 10,
+      date: '2026-07-15',
+      startedAtMs: Date.now(),
+      sets: [
+        {
+          set_id: 77,
+          movement_id: 3,
+          movement_name: 'Box Squat',
+          set_index: 1,
+          reps: 7,
+          load_kg: 60,
+          rpe: 8,
+          tonnage_kg: 420,
+          session_plan_slot_id: 1,
+          timeS: null,
+          bandLevel: null,
+        },
+        {
+          set_id: 78,
+          movement_id: 3,
+          movement_name: 'Box Squat',
+          set_index: 2,
+          reps: 7,
+          load_kg: 60,
+          rpe: 8,
+          tonnage_kg: 420,
+          session_plan_slot_id: 1,
+          timeS: null,
+          bandLevel: null,
+        },
+        {
+          set_id: 79,
+          movement_id: 1,
+          movement_name: 'Narrow Stance Squats',
+          set_index: 3,
+          reps: 7,
+          load_kg: 60,
+          rpe: 8,
+          tonnage_kg: 420,
+          session_plan_slot_id: 1,
+          timeS: null,
+          bandLevel: null,
+        },
+        {
+          set_id: 80,
+          movement_id: 1,
+          movement_name: 'Narrow Stance Squats',
+          set_index: 4,
+          reps: 7,
+          load_kg: 60,
+          rpe: 8,
+          tonnage_kg: 420,
+          session_plan_slot_id: 1,
+          timeS: null,
+          bandLevel: null,
+        },
+      ],
+    },
+    sessionPlan: [slot(1, 1, 7, { plannedSets: 4 }), slot(2, 2, 8)],
+    activeSessionPlanSlotId: 2,
+    runner: runner({
+      slots: [
+        { sessionPlanSlotId: 1, movementId: 1, movementName: 'Narrow Stance Squats', sets: 4, target: { kind: 'reps', reps: 7 }, targetRpe: 8 },
+        { sessionPlanSlotId: 2, movementId: 2, movementName: 'Later movement', sets: 3, target: { kind: 'reps', reps: 8 }, targetRpe: 8 },
+      ],
+      slotIndex: 1,
+      slotSetCounts: [4, 0],
+      loggedSets: 4,
+    }),
+  });
+
+  render(<SessionScreen />);
+
+  expect(screen.getByText('Narrow Stance Squats')).toBeOnTheScreen();
+  expect(screen.getByText('4 sets complete · includes Box Squat')).toBeOnTheScreen();
+});
+
+test('a finished slot whose sets all match shows no includes', () => {
+  mockState = state({
+    movements: [
+      movement(1, 'Narrow Stance Squats'),
+      movement(2, 'Later movement'),
+      movement(3, 'Box Squat'),
+    ],
+    session: {
+      sessionId: 10,
+      date: '2026-07-15',
+      startedAtMs: Date.now(),
+      sets: [1, 2, 3, 4].map((setIndex) => ({
+        set_id: 76 + setIndex,
+        movement_id: 1,
+        movement_name: 'Narrow Stance Squats',
+        set_index: setIndex,
+        reps: 7,
+        load_kg: 60,
+        rpe: 8,
+        tonnage_kg: 420,
+        session_plan_slot_id: 1,
+        timeS: null,
+        bandLevel: null,
+      })),
+    },
+    sessionPlan: [slot(1, 1, 7, { plannedSets: 4 }), slot(2, 2, 8)],
+    activeSessionPlanSlotId: 2,
+    runner: runner({
+      slots: [
+        { sessionPlanSlotId: 1, movementId: 1, movementName: 'Narrow Stance Squats', sets: 4, target: { kind: 'reps', reps: 7 }, targetRpe: 8 },
+        { sessionPlanSlotId: 2, movementId: 2, movementName: 'Later movement', sets: 3, target: { kind: 'reps', reps: 8 }, targetRpe: 8 },
+      ],
+      slotIndex: 1,
+      slotSetCounts: [4, 0],
+      loggedSets: 4,
+    }),
+  });
+
+  render(<SessionScreen />);
+
+  expect(screen.getByText('Narrow Stance Squats')).toBeOnTheScreen();
+  expect(screen.getByText('4 sets complete')).toBeOnTheScreen();
+  expect(screen.queryByText(/includes/)).toBeNull();
+});
+
