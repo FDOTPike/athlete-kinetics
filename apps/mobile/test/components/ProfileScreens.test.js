@@ -1,10 +1,11 @@
 import React from 'react';
 import { BackHandler, StyleSheet } from 'react-native';
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { TRAINING_AGES } from '@ak/inference';
+import { act, fireEvent, render, renderAsync, screen, within } from '@testing-library/react-native';
+import { HISTORY_IMPORT_EXAMPLE, TRAINING_AGES } from '@ak/inference';
 import ProfileScreen from '../../src/screens/ProfileScreen';
 import OnboardingScreen from '../../src/screens/OnboardingScreen';
 import { NavigationProvider } from '../../src/navigation/navigation';
+import { PrimaryButton } from '../../src/components/ui';
 
 let mockState;
 const mockBackupState = {
@@ -26,7 +27,7 @@ jest.mock('@ak/inference', () => ({
 
 jest.mock('../../src/state/useStore', () => ({
   palette: { bg: '#000', surface: '#15151A', line: '#26262E', text: '#F4F4F6', dim: '#86868F', green: '#2EE6A8', amber: '#FFB454', red: '#FF5D5D' },
-  useStore: (selector) => selector(mockState),
+  useStore: Object.assign((selector) => selector(mockState), { getState: () => mockState }),
 }));
 
 jest.mock('../../src/state/backupStore', () => ({
@@ -89,6 +90,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
   let saveLoadPreferenceMock;
 
   beforeEach(() => {
+    mockBackupState.status = 'idle';
     deleteAthleteMock = jest.fn();
     wipeBlockStateMock = jest.fn();
     switchProfileMock = jest.fn();
@@ -98,6 +100,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       // A booted store: ProfileScreen reads the database (availability verdicts,
       // recent outcomes, measured history) only once status is 'ready'.
       status: 'ready',
+      error: null,
       profile: baseProfile,
       saveProfile: jest.fn(),
       uiPreferences: { sessionModeOverride: null, readinessDetail: 'summary', restTimerEnabled: true, textScale: 'system' },
@@ -160,6 +163,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       completeOnboarding: jest.fn(),
       beginOnboardingDraft: () => ({ athleteId: 'default', contextRevision: 0 }),
       loadDemoAthlete: jest.fn(),
+      resetTrainingData: jest.fn(() => { mockState.error = null; return true; }),
       loadRecentOutcomes: () => [
         { outcomeKind: 'followed_plan', finalizedAtMs: 1700000000000 },
         { outcomeKind: 'adapted_session', finalizedAtMs: 1700000100000 },
@@ -167,6 +171,302 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
         { outcomeKind: 'session_recorded', finalizedAtMs: 1700000300000 },
       ],
     };
+  });
+
+  describe('Reset training data', () => {
+    const caption = "This removes training history, telemetry, blocks, and today's reports. Your profile and saved profile slots remain.";
+    const resetSection = () => within(screen.getByTestId('reset-training-data-section'));
+
+    const openReset = async () => {
+      await renderAsync(<ProfileScreen />);
+      fireEvent.press(screen.getByRole('button', { name: 'Reset training data' }));
+    };
+
+    const showImportNotice = () => {
+      mockState.importHistory.mockReturnValue({
+        committed: true, duplicate: false,
+        preview: { sessions: [], errors: [], warnings: [], unknownMovementNames: [], formatVersion: null },
+      });
+      fireEvent.press(screen.getByText('IMPORT TRAINING HISTORY'));
+      fireEvent.changeText(screen.getByLabelText('Paste AK history import text'), HISTORY_IMPORT_EXAMPLE);
+      fireEvent.press(screen.getByLabelText('Preview history import without saving'));
+      fireEvent.press(screen.getByLabelText('Commit reviewed history import'));
+      expect(screen.getByText('History imported. It is visible in the local timeline.')).toBeOnTheScreen();
+    };
+
+    beforeEach(() => {
+      mockState.vector = { readiness_score: 75 };
+      mockState.blockSessions = [{ sessionId: 1 }];
+    });
+
+    test('renders immediately after backup with the exact reset confirmation strings even with history', async () => {
+      await openReset();
+
+      expect(screen.getAllByTestId(/^(backup-transfer|reset-training-data|learning-terminology)-section$/)
+        .map((section) => section.props.testID)).toEqual([
+        'backup-transfer-section', 'reset-training-data-section', 'learning-terminology-section',
+      ]);
+      const section = within(screen.getByTestId('reset-training-data-section'));
+      expect(section.getByText('Reset training data')).toBeOnTheScreen();
+      expect(section.getByText(caption)).toBeOnTheScreen();
+      expect(section.getByText('Continue to reset')).toBeOnTheScreen();
+      expect(section.getByLabelText('Continue to reset training data')).toBeEnabled();
+
+      fireEvent.press(section.getByTestId('reset-continue-button'));
+      expect(section.getByText('This cannot be undone. Reset the training data?')).toBeOnTheScreen();
+      expect(section.getByTestId('reset-confirm-button')).toHaveTextContent('Reset training data');
+      expect(section.getByLabelText('Confirm reset training data')).toBeOnTheScreen();
+      expect(section.getByTestId('reset-keep-button')).toHaveTextContent('Keep my data');
+    });
+
+    test('Continue then Keep my data returns to step 1 without resetting', async () => {
+      await openReset();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      expect(mockState.resetTrainingData).not.toHaveBeenCalled();
+      fireEvent.press(screen.getByTestId('reset-keep-button'));
+
+      expect(mockState.resetTrainingData).not.toHaveBeenCalled();
+      expect(screen.getByText(caption)).toBeOnTheScreen();
+      expect(screen.getByTestId('reset-continue-button')).toBeOnTheScreen();
+      expect(screen.queryByTestId('reset-confirm-button')).toBeNull();
+    });
+
+    test('Continue then Reset training data resets exactly once and returns to step 1', async () => {
+      await openReset();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      expect(mockState.resetTrainingData).not.toHaveBeenCalled();
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+
+      expect(mockState.resetTrainingData).toHaveBeenCalledTimes(1);
+      expect(mockState.resetTrainingData).toHaveBeenCalledWith();
+      expect(screen.getByText(caption)).toBeOnTheScreen();
+      expect(screen.getByTestId('reset-continue-button')).toBeOnTheScreen();
+      expect(screen.queryByTestId('reset-confirm-button')).toBeNull();
+    });
+
+    test('a successful reset clears typed bodyweight and ending an edit does not save the old value', async () => {
+      await openReset();
+      fireEvent.changeText(screen.getByLabelText('Bodyweight today in kilograms'), '75');
+      fireEvent(screen.getByLabelText('Bodyweight today in kilograms'), 'endEditing');
+      expect(mockState.saveBodyweight).toHaveBeenCalledWith(mockState.today, 75);
+      mockState.saveBodyweight.mockClear();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+
+      expect(screen.getByLabelText('Bodyweight today in kilograms')).toHaveDisplayValue('');
+      fireEvent(screen.getByLabelText('Bodyweight today in kilograms'), 'endEditing');
+      expect(mockState.saveBodyweight).not.toHaveBeenCalledWith(mockState.today, 75);
+      expect(mockState.saveBodyweight).toHaveBeenCalledWith(mockState.today, null);
+    });
+
+    test('a successful reset clears the import notice and preserves history input and preview', async () => {
+      await openReset();
+      showImportNotice();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+
+      expect(screen.queryByText('History imported. It is visible in the local timeline.')).toBeNull();
+      expect(screen.getByLabelText('Paste AK history import text')).toHaveDisplayValue(HISTORY_IMPORT_EXAMPLE);
+      expect(screen.getByLabelText('Commit reviewed history import')).toBeOnTheScreen();
+    });
+
+    test('a failed reset preserves typed bodyweight and the import notice', async () => {
+      mockState.resetTrainingData.mockImplementation(() => { mockState.error = 'COMMIT failed'; return false; });
+      await openReset();
+      showImportNotice();
+      fireEvent.changeText(screen.getByLabelText('Bodyweight today in kilograms'), '75');
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+
+      expect(screen.getByLabelText('Bodyweight today in kilograms')).toHaveDisplayValue('75');
+      expect(screen.getByText('History imported. It is visible in the local timeline.')).toBeOnTheScreen();
+      expect(screen.getByLabelText('Paste AK history import text')).toHaveDisplayValue(HISTORY_IMPORT_EXAMPLE);
+      expect(screen.getByLabelText('Commit reviewed history import')).toBeOnTheScreen();
+    });
+
+    test('a failing reset keeps step 2 open and shows the exact store error as an alert', async () => {
+      const error = 'DELETE FROM session failed';
+      mockState.resetTrainingData.mockImplementation(() => { mockState.error = error; return false; });
+      mockState.loadRecentOutcomes = jest.fn(() => []);
+      await openReset();
+      mockState.loadRecentOutcomes.mockClear();
+      mockState.loadMeasuredHistory.mockClear();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+
+      const section = within(screen.getByTestId('reset-training-data-section'));
+      expect(section.getByTestId('reset-confirm-button')).toBeOnTheScreen();
+      expect(section.queryByTestId('reset-continue-button')).toBeNull();
+      expect(section.getByRole('alert').props.children).toBe(error);
+      expect(mockState.loadRecentOutcomes).toHaveBeenCalledWith(20);
+      expect(mockState.loadMeasuredHistory).toHaveBeenCalledWith(14);
+    });
+
+    test('a successful reset of an empty database returns false and returns to step 1 without an alert', async () => {
+      mockState.resetTrainingData.mockImplementation(() => { mockState.error = null; return false; });
+      await openReset();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+
+      expect(screen.getByTestId('reset-continue-button')).toBeOnTheScreen();
+      expect(screen.queryByTestId('reset-confirm-button')).toBeNull();
+      expect(resetSection().queryByRole('alert')).toBeNull();
+    });
+
+    test('a stale error before Confirm is not shown after a successful reset', async () => {
+      mockState.error = 'Earlier unrelated error';
+      await openReset();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      expect(resetSection().queryByRole('alert')).toBeNull();
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+
+      expect(screen.getByTestId('reset-continue-button')).toBeOnTheScreen();
+      expect(resetSection().queryByRole('alert')).toBeNull();
+      expect(screen.queryByText('Earlier unrelated error')).toBeNull();
+    });
+
+    test('Keep my data clears a shown reset error', async () => {
+      mockState.resetTrainingData.mockImplementation(() => { mockState.error = 'COMMIT failed'; return false; });
+      await openReset();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+      expect(resetSection().getByRole('alert')).toHaveTextContent('COMMIT failed');
+      fireEvent.press(screen.getByTestId('reset-keep-button'));
+
+      expect(screen.getByTestId('reset-continue-button')).toBeOnTheScreen();
+      expect(resetSection().queryByRole('alert')).toBeNull();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      expect(resetSection().queryByRole('alert')).toBeNull();
+    });
+
+    test('pressing Reset again clears the shown error after a successful retry', async () => {
+      mockState.resetTrainingData.mockImplementationOnce(() => { mockState.error = 'COMMIT failed'; return false; });
+      await openReset();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+      expect(resetSection().getByRole('alert')).toHaveTextContent('COMMIT failed');
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+
+      expect(mockState.resetTrainingData).toHaveBeenCalledTimes(2);
+      expect(screen.getByTestId('reset-continue-button')).toBeOnTheScreen();
+      expect(resetSection().queryByRole('alert')).toBeNull();
+    });
+
+    test('changing the active athlete clears a shown reset error', async () => {
+      mockState.resetTrainingData.mockImplementation(() => { mockState.error = 'COMMIT failed'; return false; });
+      await openReset();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+      expect(resetSection().getByRole('alert')).toHaveTextContent('COMMIT failed');
+      mockState.activeAthleteId = 'ath-2';
+      await screen.rerenderAsync(<ProfileScreen />);
+
+      expect(screen.getByTestId('reset-continue-button')).toBeOnTheScreen();
+      expect(resetSection().queryByRole('alert')).toBeNull();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      expect(resetSection().queryByRole('alert')).toBeNull();
+    });
+
+    test('changing athletes clears reset confirmation and requires the new athlete to continue', async () => {
+      await openReset();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+
+      mockState.activeAthleteId = 'ath-2';
+      await screen.rerenderAsync(<ProfileScreen />);
+
+      expect(screen.queryByTestId('reset-confirm-button')).toBeNull();
+      expect(screen.getByTestId('reset-continue-button')).toBeOnTheScreen();
+      expect(mockState.resetTrainingData).not.toHaveBeenCalled();
+
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+      expect(mockState.resetTrainingData).toHaveBeenCalledTimes(1);
+    });
+
+    test.each([
+      ['a live session', { session: { sessionId: 10, sets: [] } }, 'idle'],
+      ['backup working', {}, 'working'],
+      ['the database booting', { status: 'booting' }, 'idle'],
+      ['the database in error', { status: 'error' }, 'idle'],
+    ])('Confirm keeps the confirmation open and does not reset with %s', async (_reason, state, backupStatus) => {
+      await openReset();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+
+      Object.assign(mockState, state);
+      mockBackupState.status = backupStatus;
+      await screen.rerenderAsync(<ProfileScreen />);
+
+      // Invoke the handler directly to verify its guard independently of the disabled button.
+      const confirm = screen.UNSAFE_getAllByType(PrimaryButton)
+        .find((button) => button.props.testID === 'reset-confirm-button');
+      act(() => confirm.props.onPress());
+      expect(mockState.resetTrainingData).not.toHaveBeenCalled();
+      expect(screen.getByTestId('reset-confirm-button')).toBeDisabled();
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+      expect(mockState.resetTrainingData).not.toHaveBeenCalled();
+
+      Object.assign(mockState, { session: null, status: 'ready' });
+      mockBackupState.status = 'idle';
+      await screen.rerenderAsync(<ProfileScreen />);
+      expect(screen.getByTestId('reset-confirm-button')).toBeEnabled();
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+      expect(mockState.resetTrainingData).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId('reset-continue-button')).toBeOnTheScreen();
+    });
+
+    test.each([
+      ['a live session', { session: { sessionId: 10, sets: [] } }, 'idle'],
+      ['backup working', {}, 'working'],
+      ['the database booting', { status: 'booting' }, 'idle'],
+      ['the database in error', { status: 'error' }, 'idle'],
+    ])('Continue is disabled with %s', async (_reason, state, backupStatus) => {
+      Object.assign(mockState, state);
+      mockBackupState.status = backupStatus;
+      await openReset();
+
+      expect(screen.getByTestId('reset-continue-button')).toBeDisabled();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      expect(screen.queryByTestId('reset-confirm-button')).toBeNull();
+      expect(mockState.resetTrainingData).not.toHaveBeenCalled();
+    });
+
+    test('confirm resets training data without loading the demo athlete', async () => {
+      await openReset();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+
+      expect(mockState.resetTrainingData).toHaveBeenCalledTimes(1);
+      expect(mockState.loadDemoAthlete).not.toHaveBeenCalled();
+    });
+
+    test.each([true, false])('confirm refreshes outcomes and measurements with no live session when reset returns %s', async (resetResult) => {
+      let outcomes = [{ outcomeKind: 'followed_plan', finalizedAtMs: 1700000000000 }];
+      let measures = [{ date: '2026-10-29', tonnageKg: 500, setCount: 5, bodyweightKg: 75 }];
+      mockState.loadRecentOutcomes = jest.fn(() => outcomes);
+      mockState.loadMeasuredHistory.mockImplementation(() => measures);
+      mockState.resetTrainingData.mockImplementation(() => {
+        outcomes = [];
+        measures = [];
+        return resetResult;
+      });
+      await openReset();
+      fireEvent.press(screen.getByRole('button', { name: 'TRAINING-DECISIONS DISCLOSURE' }));
+      expect(screen.getByText('Plan followed')).toBeOnTheScreen();
+      expect(screen.getByText('2026-10-29')).toBeOnTheScreen();
+      expect(mockState.session).toBeNull();
+      mockState.loadRecentOutcomes.mockClear();
+      mockState.loadMeasuredHistory.mockClear();
+
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+
+      expect(mockState.loadRecentOutcomes).toHaveBeenCalledWith(20);
+      expect(mockState.loadMeasuredHistory).toHaveBeenCalledWith(14);
+      expect(screen.queryByText('Plan followed')).toBeNull();
+      expect(screen.queryByText('2026-10-29')).toBeNull();
+      expect(screen.getByText('No finalized session outcomes recorded yet.')).toBeOnTheScreen();
+      expect(screen.getByTestId('reset-continue-button')).toBeOnTheScreen();
+    });
   });
 
   test('a) chips & steppers render with shared primitive accessibility semantics', () => {

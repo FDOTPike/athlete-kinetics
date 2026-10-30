@@ -34,8 +34,9 @@ import { SportPanel } from '../components/SportPanel';
 import { theme } from '../theme/theme';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { useStore } from '../state/useStore';
+import { useBackupStore } from '../state/backupStore';
 import { useSubViewBack } from '../navigation/navigation';
-import { Chip, Stepper, QuietAction, Disclosure, ListRow } from '../components/ui';
+import { Chip, Stepper, QuietAction, Disclosure, ListRow, PrimaryButton, SecondaryButton } from '../components/ui';
 import InfoTip from '../components/InfoTip';
 import { biometricsCopy, providerForPlatform } from '../state/biometricsCopy';
 import CoachVerificationLabScreen from './CoachVerificationLabScreen';
@@ -266,6 +267,8 @@ export default function ProfileScreen(): React.JSX.Element {
   const switchProfile = useStore((s) => (s.status === 'ready' ? s.switchProfile : inertWhileClosed));
   const wipeActiveBlockState = useStore((s) => (s.status === 'ready' ? s.wipeActiveBlockState : inertWhileClosed));
   const session = useStore((s) => s.session);
+  const resetTrainingData = useStore((s) => s.resetTrainingData);
+  const backupWorking = useBackupStore((s) => s.status === 'working');
   const athletes = useStore((s) => s.athletes);
   const activeAthleteId = useStore((s) => s.activeAthleteId);
   const switchAthlete = useStore((s) => s.switchAthlete);
@@ -294,6 +297,12 @@ export default function ProfileScreen(): React.JSX.Element {
   // In-canvas double-confirm states (P2 & P5)
   const [confirmingDeleteAthleteId, setConfirmingDeleteAthleteId] = useState<string | null>(null);
   const [confirmingWipeBlock, setConfirmingWipeBlock] = useState(false);
+  const [resetAthleteId, setResetAthleteId] = useState<string | null>(null);
+  const [resetError, setResetError] = useState<string | null>(null);
+  useEffect(() => {
+    setResetAthleteId(null);
+    setResetError(null);
+  }, [activeAthleteId]);
   const [confirmingSwitchProfileId, setConfirmingSwitchProfileId] = useState<number | null>(null);
   const [confirmingDeleteBandLevel, setConfirmingDeleteBandLevel] = useState<number | null>(null);
   const [historyText, setHistoryText] = useState('');
@@ -976,6 +985,63 @@ export default function ProfileScreen(): React.JSX.Element {
       </View>
 
       <BackupTransferPanel />
+
+      <View style={styles.mgmtSection} testID="reset-training-data-section">
+        <Disclosure label="Reset training data">
+          {resetAthleteId === null ? (
+            <View style={{ gap: theme.space[3] }}>
+              <Text style={styles.fieldHint}>
+                This removes training history, telemetry, blocks, and today's reports. Your profile and saved profile slots remain.
+              </Text>
+              <SecondaryButton
+                label="Continue to reset"
+                onPress={() => {
+                  setResetError(null);
+                  setResetAthleteId(activeAthleteId);
+                }}
+                disabled={session !== null || backupWorking || !databaseReady}
+                accessibilityLabel="Continue to reset training data"
+                testID="reset-continue-button"
+              />
+            </View>
+          ) : (
+            <View style={{ gap: theme.space[3] }}>
+              <Text style={styles.confirmText}>This cannot be undone. Reset the training data?</Text>
+              {resetError !== null && (
+                <Text style={styles.fieldHint} accessibilityRole="alert">{resetError}</Text>
+              )}
+              <PrimaryButton
+                label="Reset training data"
+                onPress={() => {
+                  if (resetAthleteId !== activeAthleteId || session !== null || backupWorking || !databaseReady) return;
+                  setResetError(null);
+                  resetTrainingData();
+                  const error = useStore.getState().error;
+                  setResetError(error);
+                  setRecentOutcomes(loadRecentOutcomes(20));
+                  setRecentMeasures(loadMeasuredHistory(14));
+                  if (error === null) {
+                    setResetAthleteId(null);
+                    setBodyweightText('');
+                    setHistoryNotice(null);
+                  }
+                }}
+                disabled={session !== null || backupWorking || !databaseReady}
+                accessibilityLabel="Confirm reset training data"
+                testID="reset-confirm-button"
+              />
+              <SecondaryButton
+                label="Keep my data"
+                onPress={() => {
+                  setResetError(null);
+                  setResetAthleteId(null);
+                }}
+                testID="reset-keep-button"
+              />
+            </View>
+          )}
+        </Disclosure>
+      </View>
 
       {/* ---- Learning & Terminology Glossary ---- */}
       <View style={styles.mgmtSection} testID="learning-terminology-section">

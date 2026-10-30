@@ -7914,6 +7914,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
   },
 
   resetTrainingData: () => {
+    set({ error: null });
     const d = getDb();
     const had = rowsOf<{ c: number }>(d.executeSync('SELECT (SELECT count(*) FROM session) + (SELECT count(*) FROM question_log) AS c'))[0];
     d.executeSync('BEGIN');
