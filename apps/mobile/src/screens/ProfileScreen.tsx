@@ -1020,7 +1020,11 @@ export default function ProfileScreen(): React.JSX.Element {
                   setResetError(error);
                   setRecentOutcomes(loadRecentOutcomes(20));
                   setRecentMeasures(loadMeasuredHistory(14));
-                  if (error === null) setResetAthleteId(null);
+                  if (error === null) {
+                    setResetAthleteId(null);
+                    setBodyweightText('');
+                    setHistoryNotice(null);
+                  }
                 }}
                 disabled={session !== null || backupWorking || !databaseReady}
                 accessibilityLabel="Confirm reset training data"

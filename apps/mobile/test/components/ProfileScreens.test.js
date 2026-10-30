@@ -1,7 +1,7 @@
 import React from 'react';
 import { BackHandler, StyleSheet } from 'react-native';
 import { act, fireEvent, render, renderAsync, screen, within } from '@testing-library/react-native';
-import { TRAINING_AGES } from '@ak/inference';
+import { HISTORY_IMPORT_EXAMPLE, TRAINING_AGES } from '@ak/inference';
 import ProfileScreen from '../../src/screens/ProfileScreen';
 import OnboardingScreen from '../../src/screens/OnboardingScreen';
 import { NavigationProvider } from '../../src/navigation/navigation';
@@ -182,6 +182,18 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       fireEvent.press(screen.getByRole('button', { name: 'Reset training data' }));
     };
 
+    const showImportNotice = () => {
+      mockState.importHistory.mockReturnValue({
+        committed: true, duplicate: false,
+        preview: { sessions: [], errors: [], warnings: [], unknownMovementNames: [], formatVersion: null },
+      });
+      fireEvent.press(screen.getByText('IMPORT TRAINING HISTORY'));
+      fireEvent.changeText(screen.getByLabelText('Paste AK history import text'), HISTORY_IMPORT_EXAMPLE);
+      fireEvent.press(screen.getByLabelText('Preview history import without saving'));
+      fireEvent.press(screen.getByLabelText('Commit reviewed history import'));
+      expect(screen.getByText('History imported. It is visible in the local timeline.')).toBeOnTheScreen();
+    };
+
     beforeEach(() => {
       mockState.vector = { readiness_score: 75 };
       mockState.blockSessions = [{ sessionId: 1 }];
@@ -230,6 +242,46 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       expect(screen.getByText(caption)).toBeOnTheScreen();
       expect(screen.getByTestId('reset-continue-button')).toBeOnTheScreen();
       expect(screen.queryByTestId('reset-confirm-button')).toBeNull();
+    });
+
+    test('a successful reset clears typed bodyweight and ending an edit does not save the old value', async () => {
+      await openReset();
+      fireEvent.changeText(screen.getByLabelText('Bodyweight today in kilograms'), '75');
+      fireEvent(screen.getByLabelText('Bodyweight today in kilograms'), 'endEditing');
+      expect(mockState.saveBodyweight).toHaveBeenCalledWith(mockState.today, 75);
+      mockState.saveBodyweight.mockClear();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+
+      expect(screen.getByLabelText('Bodyweight today in kilograms')).toHaveDisplayValue('');
+      fireEvent(screen.getByLabelText('Bodyweight today in kilograms'), 'endEditing');
+      expect(mockState.saveBodyweight).not.toHaveBeenCalledWith(mockState.today, 75);
+      expect(mockState.saveBodyweight).toHaveBeenCalledWith(mockState.today, null);
+    });
+
+    test('a successful reset clears the import notice and preserves history input and preview', async () => {
+      await openReset();
+      showImportNotice();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+
+      expect(screen.queryByText('History imported. It is visible in the local timeline.')).toBeNull();
+      expect(screen.getByLabelText('Paste AK history import text')).toHaveDisplayValue(HISTORY_IMPORT_EXAMPLE);
+      expect(screen.getByLabelText('Commit reviewed history import')).toBeOnTheScreen();
+    });
+
+    test('a failed reset preserves typed bodyweight and the import notice', async () => {
+      mockState.resetTrainingData.mockImplementation(() => { mockState.error = 'COMMIT failed'; return false; });
+      await openReset();
+      showImportNotice();
+      fireEvent.changeText(screen.getByLabelText('Bodyweight today in kilograms'), '75');
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+
+      expect(screen.getByLabelText('Bodyweight today in kilograms')).toHaveDisplayValue('75');
+      expect(screen.getByText('History imported. It is visible in the local timeline.')).toBeOnTheScreen();
+      expect(screen.getByLabelText('Paste AK history import text')).toHaveDisplayValue(HISTORY_IMPORT_EXAMPLE);
+      expect(screen.getByLabelText('Commit reviewed history import')).toBeOnTheScreen();
     });
 
     test('a failing reset keeps step 2 open and shows the exact store error as an alert', async () => {
