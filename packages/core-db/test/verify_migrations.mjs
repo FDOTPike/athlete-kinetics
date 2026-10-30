@@ -1672,7 +1672,7 @@ console.log('[2s] R1 durable-object drift guard');
   const registered = new Set(SENTINELS.map((s) => s.name));
   const exempt = new Map(DURABLE_TABLE_EXEMPTIONS.map((e) => [e.name, e.reason]));
   const durable = dbDrift.raw.prepare(
-    `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`,
+    `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT GLOB 'sqlite_*' ORDER BY name`,
   ).all().map((r) => r.name);
   const uncovered = durable.filter((t) => !registered.has(t) && !exempt.has(t));
   check('every durable table is a sentinel or a justified exemption',
