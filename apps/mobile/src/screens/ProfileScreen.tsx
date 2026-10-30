@@ -1020,9 +1020,9 @@ export default function ProfileScreen(): React.JSX.Element {
                   resetTrainingData();
                   const error = useStore.getState().error;
                   setResetError(error);
-                  setRecentOutcomes(loadRecentOutcomes(20));
-                  setRecentMeasures(loadMeasuredHistory(14));
                   if (error === null) {
+                    setRecentOutcomes(loadRecentOutcomes(20));
+                    setRecentMeasures(loadMeasuredHistory(14));
                     setResetAthleteId(null);
                     setBodyweightText('');
                     setHistoryNotice(null);

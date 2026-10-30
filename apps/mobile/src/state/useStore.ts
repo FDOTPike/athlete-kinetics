@@ -7914,11 +7914,25 @@ export const useStore = create<KineticsStore>()((set, get) => {
   },
 
   resetTrainingData: () => {
-    set({ error: null });
-    const d = getDb();
-    const had = rowsOf<{ c: number }>(d.executeSync('SELECT (SELECT count(*) FROM session) + (SELECT count(*) FROM question_log) AS c'))[0];
-    d.executeSync('BEGIN');
+    if (get().session !== null) {
+      set({ error: 'End the active session before resetting training data.' });
+      return false;
+    }
+    const releaseLease = tryAcquireDataMutationLease(true);
+    if (releaseLease === null) {
+      set({ error: mutationRefusalMessage() });
+      return false;
+    }
     try {
+      set({ error: null });
+      let d: DB;
+      let had: { c: number } | undefined;
+      let inTx = false;
+      try {
+        d = getDb();
+        had = rowsOf<{ c: number }>(d.executeSync('SELECT (SELECT count(*) FROM session) + (SELECT count(*) FROM question_log) AS c'))[0];
+        d.executeSync('BEGIN');
+        inTx = true;
       // Children before parents, so it is correct whether or not foreign_keys is
       // ON. KEEPS athlete_profile / movement library / preferences / profile_slot.
       d.executeSync('DELETE FROM history_import_capability_evidence');
@@ -8035,8 +8049,11 @@ export const useStore = create<KineticsStore>()((set, get) => {
       d.executeSync('DELETE FROM mech_daily');
       d.executeSync('DELETE FROM state_vector');
       d.executeSync('COMMIT');
+      inTx = false;
     } catch (e) {
-      d.executeSync('ROLLBACK');
+      if (inTx) {
+        try { d!.executeSync('ROLLBACK'); } catch { /* ignore rollback error */ }
+      }
       set({ error: e instanceof Error ? e.message : String(e) });
       return false;
     }
@@ -8073,6 +8090,9 @@ export const useStore = create<KineticsStore>()((set, get) => {
     // in-memory value and the database agree after the wipe.
     get().refreshSuspension();
     return (had?.c ?? 0) > 0;
+    } finally {
+      releaseLease();
+    }
   },
 
   loadDemoAthlete: (): DemoLoadResult => {
