@@ -174,6 +174,7 @@ function AvailableRoutineTemplateBuilder({
     3: false,
   });
   const [errorText, setErrorText] = useState<string | null>(null);
+  const [doseDrafts, setDoseDrafts] = useState<Record<string, string>>({});
 
   const normalizedRpeSlots = initialTemplate?.slots.filter(
     (slot) => slot.targetRpe > profile.base_rpe_cap,
@@ -676,6 +677,30 @@ function AvailableRoutineTemplateBuilder({
     setSlots(updated);
   };
 
+  const handleDoseChange = (
+    index: number,
+    slotId: string,
+    field: 'sets' | 'reps' | 'targetRpe',
+    value: string,
+  ): void => {
+    const key = `${slotId}:${field}`;
+    setDoseDrafts((current) => ({ ...current, [key]: value }));
+    const trimmed = value.trim();
+    if (trimmed === '' || trimmed.endsWith('.')) return;
+    if (!Number.isFinite(Number(trimmed))) return;
+    updateDose(index, field, trimmed);
+  };
+
+  const handleDoseBlur = (slotId: string, field: 'sets' | 'reps' | 'targetRpe'): void => {
+    const key = `${slotId}:${field}`;
+    setDoseDrafts((current) => {
+      if (!(key in current)) return current;
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  };
+
   const handleSave = (): void => {
     setErrorText(null);
     const trimmed = name.trim();
@@ -920,8 +945,9 @@ function AvailableRoutineTemplateBuilder({
                         <TextInput
                           disableFullscreenUI
                           style={styles.doseInput}
-                          value={String(slot.sets ?? defaults?.sets ?? '')}
-                          onChangeText={(value) => updateDose(index, 'sets', value)}
+                          value={doseDrafts[`${slot.id}:sets`] ?? String(slot.sets ?? defaults?.sets ?? '')}
+                          onChangeText={(value) => handleDoseChange(index, slot.id, 'sets', value)}
+                          onBlur={() => handleDoseBlur(slot.id, 'sets')}
                           keyboardType="number-pad"
                           accessibilityLabel={`Sets for day ${activeDay} slot ${activeSlotIndex + 1}`}
                         />
@@ -931,8 +957,9 @@ function AvailableRoutineTemplateBuilder({
                         <TextInput
                           disableFullscreenUI
                           style={styles.doseInput}
-                          value={String(slot.reps ?? defaults?.reps ?? '')}
-                          onChangeText={(value) => updateDose(index, 'reps', value)}
+                          value={doseDrafts[`${slot.id}:reps`] ?? String(slot.reps ?? defaults?.reps ?? '')}
+                          onChangeText={(value) => handleDoseChange(index, slot.id, 'reps', value)}
+                          onBlur={() => handleDoseBlur(slot.id, 'reps')}
                           keyboardType="number-pad"
                           accessibilityLabel={`Reps for day ${activeDay} slot ${activeSlotIndex + 1}`}
                         />
@@ -961,8 +988,9 @@ function AvailableRoutineTemplateBuilder({
                         <TextInput
                           disableFullscreenUI
                           style={styles.doseInput}
-                          value={String(peakRpe ?? '')}
-                          onChangeText={(value) => updateDose(index, 'targetRpe', value)}
+                          value={doseDrafts[`${slot.id}:targetRpe`] ?? String(peakRpe ?? '')}
+                          onChangeText={(value) => handleDoseChange(index, slot.id, 'targetRpe', value)}
+                          onBlur={() => handleDoseBlur(slot.id, 'targetRpe')}
                           keyboardType="decimal-pad"
                           accessibilityLabel={majorProjection === undefined
                             ? `Target RPE for day ${activeDay} slot ${activeSlotIndex + 1}`
