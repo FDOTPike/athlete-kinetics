@@ -9,6 +9,7 @@ import React, { useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { StateVectorRow } from '@ak/inference';
 import { useStore } from '../state/useStore';
+import TrainingSupportNotice from '../components/TrainingSupportNotice';
 import { theme } from '../theme/theme';
 import {
   PrimaryButton,
@@ -87,7 +88,17 @@ function CenteredState({ children }: { children: React.ReactNode }): React.JSX.E
   return <View style={styles.center}>{children}</View>;
 }
 
-export default function ReadinessScreen({
+export default function ReadinessScreen(props: ReadinessScreenProps): React.JSX.Element {
+  const state = useStore((s) => s);
+  const decision = typeof state.getTrainingSupportDecision === 'function'
+    ? state.getTrainingSupportDecision(state.todayPlan?.slots.map((slot) => slot.movementId))
+    : { status: 'support_unavailable' as const };
+  if (state.status !== 'booting' && decision.status !== 'available') return <TrainingSupportNotice
+    unavailable={decision.status === 'support_unavailable'} onOpenSession={state.session !== null ? props.onOpenSession : undefined} />;
+  return <AvailableReadinessScreen {...props} />;
+}
+
+function AvailableReadinessScreen({
   onOpenSession,
   onOpenCoach,
 }: ReadinessScreenProps): React.JSX.Element {
