@@ -6500,7 +6500,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
         set({ error: error instanceof Error ? error.message : String(error) });
         return;
       }
-      set(runnerSelection(nextRunner));
+      set({ ...runnerSelection(nextRunner), substitution: null });
       return;
     }
     set({ activeSessionPlanSlotId: sessionPlanSlotId, activeMovementId: slot.movementId });
