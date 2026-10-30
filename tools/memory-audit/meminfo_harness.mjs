@@ -60,17 +60,17 @@ function secureDirectory(path) {
   path = resolve(path);
   const parent = dirname(path);
   const links = new Set();
-  const validateAncestor = (p, target = false) => {
-    if (dirname(p) !== p) validateAncestor(dirname(p), target);
+  const validateAncestor = (p) => {
+    if (dirname(p) !== p) validateAncestor(dirname(p));
     let stat;
     try { stat = lstatSync(p); } catch (e) { if (e.code === 'ENOENT') return; throw e; }
     if (stat.isSymbolicLink()) {
       if (!process.getuid || stat.uid !== 0 || links.has(p)) throw new Error(`Linked evidence directory: ${p}`);
       links.add(p);
       // System aliases are safe only if their entire target chain is trusted.
-      validateAncestor(resolve(dirname(p), readlinkSync(p)), true);
+      validateAncestor(resolve(dirname(p), readlinkSync(p)));
       links.delete(p);
-    } else if (target && process.getuid && (!stat.isDirectory()
+    } else if (process.getuid && (!stat.isDirectory()
         || (stat.uid !== 0 && stat.uid !== process.getuid())
         || ((stat.mode & 0o022) !== 0 && !(stat.uid === 0 && (stat.mode & 0o1000))))) {
       throw new Error(`Linked evidence directory: ${p}`);
