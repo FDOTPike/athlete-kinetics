@@ -298,8 +298,8 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       expect(section.getByTestId('reset-confirm-button')).toBeOnTheScreen();
       expect(section.queryByTestId('reset-continue-button')).toBeNull();
       expect(section.getByRole('alert').props.children).toBe(error);
-      expect(mockState.loadRecentOutcomes).toHaveBeenCalledWith(20);
-      expect(mockState.loadMeasuredHistory).toHaveBeenCalledWith(14);
+      expect(mockState.loadRecentOutcomes).not.toHaveBeenCalled();
+      expect(mockState.loadMeasuredHistory).not.toHaveBeenCalled();
     });
 
     test('a successful reset of an empty database returns false and returns to step 1 without an alert', async () => {
