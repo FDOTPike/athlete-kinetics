@@ -271,32 +271,42 @@ export default function LibraryScreenV2({ initialMovementId }: LibraryScreenProp
               </View>
             )}
             <View style={styles.chipRow}>
-              <Chip
-                label={selectedMovement.is_compound ? 'COMPOUND' : 'ISOLATION'}
-                selected={false}
-                onPress={() => {}}
-              />
-              <Chip
-                label={`${selectedMovement.difficulty.toUpperCase()}${selectedMovement.beginnerOk && selectedMovement.difficulty !== 'Beginner' ? ' · BEGINNER OK' : ''}`}
-                selected={false}
-                onPress={() => {}}
-              />
-              <Chip label={selectedMovement.loggingMode.toUpperCase()} selected={false} onPress={() => {}} />
+              <View style={styles.detailTag} accessibilityRole="text">
+                <Text style={styles.detailTagLabel} numberOfLines={1}>
+                  {selectedMovement.is_compound ? 'COMPOUND' : 'ISOLATION'}
+                </Text>
+              </View>
+              <View style={styles.detailTag} accessibilityRole="text">
+                <Text style={styles.detailTagLabel} numberOfLines={1}>
+                  {`${selectedMovement.difficulty.toUpperCase()}${selectedMovement.beginnerOk && selectedMovement.difficulty !== 'Beginner' ? ' · BEGINNER OK' : ''}`}
+                </Text>
+              </View>
+              <View style={styles.detailTag} accessibilityRole="text">
+                <Text style={styles.detailTagLabel} numberOfLines={1}>
+                  {selectedMovement.loggingMode.toUpperCase()}
+                </Text>
+              </View>
               {selectedMovement.scope === 'full_body' && (
-                <Chip
-                  label={FULL_BODY_LABEL.toUpperCase()}
-                  selected={false}
-                  onPress={() => {}}
+                <View
+                  style={styles.detailTag}
+                  accessibilityRole="text"
                   accessibilityLabel={`${selectedMovement.name} is a full body movement`}
-                />
+                >
+                  <Text style={styles.detailTagLabel} numberOfLines={1}>
+                    {FULL_BODY_LABEL.toUpperCase()}
+                  </Text>
+                </View>
               )}
               {selectedMovement.required.map((requirement) => (
-                <Chip
+                <View
                   key={requirement}
-                  label={equipmentLabel(requirement).toUpperCase()}
-                  selected={false}
-                  onPress={() => {}}
-                />
+                  style={styles.detailTag}
+                  accessibilityRole="text"
+                >
+                  <Text style={styles.detailTagLabel} numberOfLines={1}>
+                    {equipmentLabel(requirement).toUpperCase()}
+                  </Text>
+                </View>
               ))}
             </View>
             {selectedMovement.targetMuscles.length > 0 && (
@@ -586,6 +596,21 @@ const styles = StyleSheet.create({
   teachingOnlyBanner: { borderLeftWidth: 4, borderLeftColor: theme.color.textMid, paddingLeft: theme.space[3] },
   teachingOnlyBannerText: { ...theme.font.body, color: theme.color.textMid },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.space[2] },
+  detailTag: {
+    minHeight: theme.touch.min,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: theme.space[4],
+    borderRadius: theme.radius.chip,
+    borderWidth: 1,
+    borderColor: theme.color.line,
+    backgroundColor: 'transparent',
+  },
+  detailTagLabel: {
+    ...theme.font.label,
+    fontFamily: theme.font.family,
+    color: theme.color.textMid,
+  },
   targetMuscles: { ...theme.font.label, color: theme.color.textMid },
   sectionBlock: { gap: theme.space[2] },
   sectionTitle: { ...theme.font.cue, color: theme.color.textHi },
