@@ -231,6 +231,22 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       expect(screen.queryByTestId('reset-confirm-button')).toBeNull();
     });
 
+    test('changing athletes clears reset confirmation and requires the new athlete to continue', async () => {
+      await openReset();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+
+      mockState.activeAthleteId = 'ath-2';
+      await screen.rerenderAsync(<ProfileScreen />);
+
+      expect(screen.queryByTestId('reset-confirm-button')).toBeNull();
+      expect(screen.getByTestId('reset-continue-button')).toBeOnTheScreen();
+      expect(mockState.resetTrainingData).not.toHaveBeenCalled();
+
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+      expect(mockState.resetTrainingData).toHaveBeenCalledTimes(1);
+    });
+
     test.each([
       ['a live session', { session: { sessionId: 10, sets: [] } }, 'idle'],
       ['backup working', {}, 'working'],

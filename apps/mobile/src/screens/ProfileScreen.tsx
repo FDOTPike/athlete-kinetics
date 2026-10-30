@@ -297,7 +297,10 @@ export default function ProfileScreen(): React.JSX.Element {
   // In-canvas double-confirm states (P2 & P5)
   const [confirmingDeleteAthleteId, setConfirmingDeleteAthleteId] = useState<string | null>(null);
   const [confirmingWipeBlock, setConfirmingWipeBlock] = useState(false);
-  const [confirmingResetTrainingData, setConfirmingResetTrainingData] = useState(false);
+  const [resetAthleteId, setResetAthleteId] = useState<string | null>(null);
+  useEffect(() => {
+    setResetAthleteId(null);
+  }, [activeAthleteId]);
   const [confirmingSwitchProfileId, setConfirmingSwitchProfileId] = useState<number | null>(null);
   const [confirmingDeleteBandLevel, setConfirmingDeleteBandLevel] = useState<number | null>(null);
   const [historyText, setHistoryText] = useState('');
@@ -983,14 +986,14 @@ export default function ProfileScreen(): React.JSX.Element {
 
       <View style={styles.mgmtSection} testID="reset-training-data-section">
         <Disclosure label="Reset training data">
-          {!confirmingResetTrainingData ? (
+          {resetAthleteId === null ? (
             <View style={{ gap: theme.space[3] }}>
               <Text style={styles.fieldHint}>
                 This removes training history, telemetry, blocks, and today's reports. Your profile and saved profile slots remain.
               </Text>
               <SecondaryButton
                 label="Continue to reset"
-                onPress={() => setConfirmingResetTrainingData(true)}
+                onPress={() => setResetAthleteId(activeAthleteId)}
                 disabled={session !== null || backupWorking || !databaseReady}
                 accessibilityLabel="Continue to reset training data"
                 testID="reset-continue-button"
@@ -1002,15 +1005,16 @@ export default function ProfileScreen(): React.JSX.Element {
               <PrimaryButton
                 label="Reset training data"
                 onPress={() => {
+                  if (resetAthleteId !== activeAthleteId) return;
                   resetTrainingData();
-                  setConfirmingResetTrainingData(false);
+                  setResetAthleteId(null);
                 }}
                 accessibilityLabel="Confirm reset training data"
                 testID="reset-confirm-button"
               />
               <SecondaryButton
                 label="Keep my data"
-                onPress={() => setConfirmingResetTrainingData(false)}
+                onPress={() => setResetAthleteId(null)}
                 testID="reset-keep-button"
               />
             </View>
