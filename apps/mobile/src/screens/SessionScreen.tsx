@@ -957,7 +957,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
           <Text style={styles.headerTitle}>{halted ? 'Session paused' : complete ? 'Session complete' : 'Your next step'}</Text>
           {!halted && !complete && (
             <Text style={styles.headerMeta}>
-              {sessionPlan.length === 0 ? 'No movements are planned yet.' : `${sessionPlan.filter((slot) => loggedCount(slot) >= slot.plannedSets).length} of ${sessionPlan.length} exercises complete`}
+              {sessionPlan.length === 0 ? 'No movements are planned yet.' : `${sessionPlan.filter((slot) => loggedCount(slot) >= slot.plannedSets).length} of ${sessionPlan.length} exercises complete${runner?.skippedSessionPlanSlotIds.length ? ` · ${runner.skippedSessionPlanSlotIds.length} skipped` : ''}`}
             </Text>
           )}
           {preparation !== null && preparation.sessionId === session.sessionId && (
@@ -1050,6 +1050,38 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                       <Text style={styles.completeRowName} numberOfLines={1}>{movement?.name ?? 'Movement'}</Text>
                       <Text style={styles.completeRowMeta}>{logged} sets complete{metricSummary}</Text>
                       <CompletedMetrics sets={completedSets} bandLadder={bandLadder} movementsById={byId} onEdit={editSet} />
+                    </View>
+                  </View>
+                );
+              }
+
+              if (skipped && !active) {
+                const skippedSets = session?.sets.filter((set) => sameSlot(set, slot)) ?? [];
+                const name = movement?.name ?? 'Movement';
+                const skippedMeta = logged > 0
+                  ? `Skipped · ${logged} of ${slot.plannedSets} sets logged`
+                  : 'Skipped · no sets logged';
+                const skippedLabel = logged > 0
+                  ? `${name}, skipped, ${logged} of ${slot.plannedSets} sets logged`
+                  : `${name}, skipped, no sets logged`;
+
+                return (
+                  <View key={slot.sessionPlanSlotId} style={styles.timelineRow}>
+                    <View style={styles.rail}>
+                      <View style={[styles.dot, styles.dotSkipped]}>
+                        <Text style={styles.skipMark}>–</Text>
+                      </View>
+                    </View>
+                    <View
+                      style={styles.completeRow}
+                      accessibilityRole="text"
+                      accessibilityLabel={skippedLabel}
+                    >
+                      <Text style={styles.completeRowName} numberOfLines={1}>{name}</Text>
+                      <Text style={styles.completeRowMeta}>{skippedMeta}</Text>
+                      {logged > 0 && (
+                        <CompletedMetrics sets={skippedSets} bandLadder={bandLadder} movementsById={byId} onEdit={editSet} />
+                      )}
                     </View>
                   </View>
                 );
@@ -1672,8 +1704,17 @@ const styles = StyleSheet.create({
     borderColor: theme.color.chalk,
     backgroundColor: theme.color.chalk,
   },
+  dotSkipped: {
+    borderColor: theme.color.textMid,
+    backgroundColor: theme.color.ink1,
+  },
   check: {
     color: theme.color.ink0,
+    fontSize: 9,
+    fontWeight: '900',
+  },
+  skipMark: {
+    color: theme.color.textMid,
     fontSize: 9,
     fontWeight: '900',
   },

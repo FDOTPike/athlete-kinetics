@@ -212,8 +212,8 @@ describe('which slots were skipped', () => {
 
     expect(state().activeSessionPlanSlotId).toBe(second.sessionPlanSlotId);
     expect(screen.queryByRole('button', { name: `Choose ${nameOf(first)} as the current exercise` })).toBeNull();
-    const skippedRow = screen.getByLabelText(new RegExp(`^${nameOf(first)}, upcoming,`));
-    expect(skippedRow.props.accessibilityState.disabled).toBe(true);
+    expect(screen.queryByLabelText(new RegExp(`^${nameOf(first)}, upcoming,`))).toBeNull();
+    const skippedRow = screen.getByLabelText(`${nameOf(first)}, skipped, 1 of ${first.plannedSets} sets logged`);
     fireEvent.press(skippedRow);
     expect(state().activeSessionPlanSlotId).toBe(second.sessionPlanSlotId);
     const checkpoint = deserializeRunner(raw().prepare('SELECT runner_state_json FROM session_runner_checkpoint WHERE session_id = ?').get(sessionId).runner_state_json);
