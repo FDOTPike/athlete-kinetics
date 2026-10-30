@@ -947,6 +947,8 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
     );
   }
 
+  const exercisesCompleteText = `${sessionPlan.filter((slot) => loggedCount(slot) >= slot.plannedSets).length} of ${sessionPlan.length} exercises complete${runner?.skippedSessionPlanSlotIds.length ? ` · ${runner.skippedSessionPlanSlotIds.length} skipped` : ''}`;
+
   return (
     <View style={styles.screen}>
       <KeyboardAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} accessibilityLabel="Current workout timeline">
@@ -955,9 +957,9 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
           <Text style={styles.wordmark}>pikeMethods</Text>
           <Text style={styles.kicker}>{mode === 'guided' ? 'GUIDED SESSION' : 'SELF-DIRECTED SESSION'}</Text>
           <Text style={styles.headerTitle}>{halted ? 'Session paused' : complete ? 'Session complete' : 'Your next step'}</Text>
-          {!halted && !complete && (
+          {!halted && (!complete || Boolean(runner?.skippedSessionPlanSlotIds.length)) && (
             <Text style={styles.headerMeta}>
-              {sessionPlan.length === 0 ? 'No movements are planned yet.' : `${sessionPlan.filter((slot) => loggedCount(slot) >= slot.plannedSets).length} of ${sessionPlan.length} exercises complete${runner?.skippedSessionPlanSlotIds.length ? ` · ${runner.skippedSessionPlanSlotIds.length} skipped` : ''}`}
+              {sessionPlan.length === 0 ? 'No movements are planned yet.' : exercisesCompleteText}
             </Text>
           )}
           {preparation !== null && preparation.sessionId === session.sessionId && (
@@ -1072,12 +1074,15 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                         <Text style={styles.skipMark}>–</Text>
                       </View>
                     </View>
-                    <View
-                      style={styles.completeRow}
-                      accessibilityRole="text"
-                      accessibilityLabel={skippedLabel}
-                    >
-                      <Text style={styles.completeRowName} numberOfLines={1}>{name}</Text>
+                    <View style={styles.completeRow}>
+                      <Text
+                        style={styles.completeRowName}
+                        numberOfLines={1}
+                        accessibilityRole="text"
+                        accessibilityLabel={skippedLabel}
+                      >
+                        {name}
+                      </Text>
                       <Text style={styles.completeRowMeta}>{skippedMeta}</Text>
                       {logged > 0 && (
                         <CompletedMetrics sets={skippedSets} bandLadder={bandLadder} movementsById={byId} onEdit={editSet} />

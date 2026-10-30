@@ -1913,3 +1913,52 @@ test('the header appends the skipped count when slots are skipped and leaves the
   expect(screen.getByText('0 of 4 exercises complete')).toBeOnTheScreen();
   expect(screen.queryByText(/skipped/i)).toBeNull();
 });
+
+test('a runner that is complete because its last slot was skipped shows Session complete and the skipped meta line, while a complete session with no skips has no exercises complete text', () => {
+  const completedFirstSlotSets = Array.from({ length: 3 }, (_, index) => ({
+    set_id: index + 1,
+    movement_id: 1,
+    movement_name: 'First movement',
+    set_index: index + 1,
+    reps: 5,
+    load_kg: 0,
+    rpe: 8,
+    tonnage_kg: 0,
+    session_plan_slot_id: 1,
+    timeS: null,
+    bandLevel: null,
+  }));
+
+  mockState = state({
+    session: {
+      sessionId: 10,
+      date: '2026-07-15',
+      startedAtMs: Date.now(),
+      sets: completedFirstSlotSets,
+    },
+    runner: runner({
+      phase: 'complete',
+      slotIndex: 1,
+      setIndex: 0,
+      slotSetCounts: [3, 0],
+      loggedSets: 3,
+      skippedSessionPlanSlotIds: [2],
+    }),
+  });
+
+  const view = render(<SessionScreen />);
+  expect(screen.getByText('Session complete')).toBeOnTheScreen();
+  expect(screen.getByText('1 of 2 exercises complete · 1 skipped')).toBeOnTheScreen();
+
+  mockState.runner = runner({
+    phase: 'complete',
+    slotIndex: 1,
+    setIndex: 0,
+    slotSetCounts: [3, 3],
+    loggedSets: 6,
+    skippedSessionPlanSlotIds: [],
+  });
+  view.rerender(<SessionScreen />);
+  expect(screen.getByText('Session complete')).toBeOnTheScreen();
+  expect(screen.queryByText(/exercises complete/i)).toBeNull();
+});
