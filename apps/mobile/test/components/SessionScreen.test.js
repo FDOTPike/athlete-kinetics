@@ -1962,3 +1962,60 @@ test('a runner that is complete because its last slot was skipped shows Session 
   expect(screen.getByText('Session complete')).toBeOnTheScreen();
   expect(screen.queryByText(/exercises complete/i)).toBeNull();
 });
+
+test('the complete card lists skipped slots in plan order when slots were skipped and omits the list when none were skipped', () => {
+  mockState = state({
+    session: {
+      sessionId: 10,
+      date: '2026-07-15',
+      startedAtMs: Date.now(),
+      sets: [{
+        set_id: 1,
+        movement_id: 1,
+        movement_name: 'First movement',
+        set_index: 1,
+        reps: 5,
+        load_kg: 0,
+        rpe: 8,
+        tonnage_kg: 0,
+        session_plan_slot_id: 1,
+        timeS: null,
+        bandLevel: null,
+      }],
+    },
+    sessionPlan: [slot(1, 1, 5, { plannedSets: 4 }), slot(2, 2, 8)],
+    runner: runner({
+      slots: [
+        { sessionPlanSlotId: 1, movementId: 1, movementName: 'First movement', sets: 4, target: { kind: 'reps', reps: 5 }, targetRpe: 8 },
+        { sessionPlanSlotId: 2, movementId: 2, movementName: 'Later movement', sets: 3, target: { kind: 'reps', reps: 8 }, targetRpe: 8 },
+      ],
+      phase: 'complete',
+      slotIndex: 1,
+      setIndex: 0,
+      slotSetCounts: [1, 0],
+      loggedSets: 1,
+      skippedSessionPlanSlotIds: [2, 1],
+    }),
+  });
+
+  const view = render(<SessionScreen />);
+  const skippedList = screen.getByTestId('session-complete-skipped');
+  expect(skippedList).toBeOnTheScreen();
+  expect(screen.getByText('Skipped: First movement · 1 of 4 sets logged')).toBeOnTheScreen();
+  expect(screen.getByText('Skipped: Later movement · no sets logged')).toBeOnTheScreen();
+  expect(skippedList.children.map((child) => child.props.children)).toEqual([
+    'Skipped: First movement · 1 of 4 sets logged',
+    'Skipped: Later movement · no sets logged',
+  ]);
+
+  mockState.runner = runner({
+    phase: 'complete',
+    slotIndex: 1,
+    setIndex: 0,
+    slotSetCounts: [3, 3],
+    loggedSets: 6,
+    skippedSessionPlanSlotIds: [],
+  });
+  view.rerender(<SessionScreen />);
+  expect(screen.queryByTestId('session-complete-skipped')).toBeNull();
+});

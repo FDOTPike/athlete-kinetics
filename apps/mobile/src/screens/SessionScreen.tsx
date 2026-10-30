@@ -993,6 +993,23 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
           <View style={styles.completeCard} accessibilityRole="summary">
             <Text style={styles.completeTitle}>{runner?.skippedSessionPlanSlotIds.length ? 'No exercises remain.' : 'All planned work is logged.'}</Text>
             <Text style={styles.completeBody}>{runner?.skippedSessionPlanSlotIds.length ? 'Finish this session when you are ready.' : 'Take the win. There is nothing else you need to decide here.'}</Text>
+            {Boolean(runner?.skippedSessionPlanSlotIds.length) && (
+              <View testID="session-complete-skipped">
+                {sessionPlan
+                  .filter((slot) => runner?.skippedSessionPlanSlotIds.includes(slot.sessionPlanSlotId))
+                  .map((slot) => {
+                    const name = byId.get(slot.movementId)?.name ?? 'Movement';
+                    const logged = loggedCount(slot);
+                    return (
+                      <Text key={slot.sessionPlanSlotId} style={styles.completeRowMeta}>
+                        {logged > 0
+                          ? `Skipped: ${name} · ${logged} of ${slot.plannedSets} sets logged`
+                          : `Skipped: ${name} · no sets logged`}
+                      </Text>
+                    );
+                  })}
+              </View>
+            )}
             <CompletedMetrics sets={session.sets} bandLadder={bandLadder} movementsById={byId} onEdit={editSet} />
             <PrimaryButton
               label="Finish session"
