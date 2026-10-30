@@ -110,3 +110,46 @@ export function derivePrescription(input: DeriveInput): DerivedPrescription {
     directive: { ...directive, vector: flooredVector },
   };
 }
+
+const PLATE_INCREMENT_KG = 2.5;
+
+export function applyLoadModifier(
+  loadKg: number | null,
+  vector: Pick<AdjustmentVector, 'load_modifier'> | null | undefined,
+): number | null {
+  if (loadKg === null || !Number.isFinite(loadKg) || loadKg < 0) return loadKg;
+  const loadMod = vector?.load_modifier ?? 1;
+  if (!Number.isFinite(loadMod) || loadMod >= 1) return loadKg;
+  if (loadMod <= 0) return 0;
+  const scaled = Math.floor((loadKg * loadMod) / PLATE_INCREMENT_KG) * PLATE_INCREMENT_KG;
+  return Math.max(0, Math.min(loadKg, scaled));
+}
+
+export function applyPrescriptionToSlot<
+  T extends {
+    sets: number;
+    targetRpe: number;
+    overrideLoadKg?: number | null;
+    target?: { kind: 'reps'; reps: number } | { kind: 'time'; seconds: number };
+    routineDecision?: unknown;
+  },
+>(
+  slot: T,
+  vector: Pick<AdjustmentVector, 'load_modifier' | 'set_modifier' | 'rpe_cap'> | null | undefined,
+): T {
+  if (vector === null || vector === undefined) return slot;
+  const adjustedSets = Math.min(6, Math.max(1, Math.round(slot.sets + vector.set_modifier)));
+  const sets = slot.target?.kind === 'time' || slot.routineDecision !== undefined
+    ? Math.min(slot.sets, adjustedSets)
+    : adjustedSets;
+  const targetRpe = Math.min(slot.targetRpe, vector.rpe_cap);
+  const overrideLoadKg = slot.overrideLoadKg === undefined
+    ? undefined
+    : applyLoadModifier(slot.overrideLoadKg, vector);
+  return {
+    ...slot,
+    sets,
+    targetRpe,
+    ...(overrideLoadKg === undefined ? {} : { overrideLoadKg }),
+  };
+}

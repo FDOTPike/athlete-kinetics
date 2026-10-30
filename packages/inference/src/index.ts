@@ -107,6 +107,8 @@ export {
   type RirOption,
 } from './effortCues';
 export {
+  applyLoadModifier,
+  applyPrescriptionToSlot,
   derivePrescription,
   type DeriveInput,
   type DerivedPrescription,

@@ -39,6 +39,7 @@
  */
 import React, { useMemo } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { applyPrescriptionToSlot } from '@ak/inference';
 import { useStore } from '../state/useStore';
 import TrainingSupportNotice from '../components/TrainingSupportNotice';
 import { theme } from '../theme/theme';
@@ -95,12 +96,16 @@ function AvailableTodayScreen({
   const block = useStore((s) => s.block);
   const hasArchivedBlock = useStore((s) => s.hasArchivedBlock);
   const lastTriage = useStore((s) => s.lastTriage);
+  const prescription = useStore((s) => s.prescription);
   const vector = useStore((s) => s.vector);
   const profile = useStore((s) => s.profile);
   const startSession = useStore((s) => s.startSession);
   const refreshVector = useStore((s) => s.refreshVector);
   const recordedDurationsForFocus = useStore((s) => s.recordedDurationsForFocus);
   const error = useStore((s) => s.error);
+  const todaysVector = prescription != null && prescription.forDate === today
+    ? prescription.vector
+    : null;
 
   const [refreshing, setRefreshing] = React.useState(false);
   const handleRefresh = React.useCallback(() => {
@@ -243,13 +248,16 @@ function AvailableTodayScreen({
             <Text style={styles.title}>{focusName(state.focus)}</Text>
             <Text style={styles.caption} testID="today-duration">{durationCopy(estimate)}</Text>
             <View style={styles.preview}>
-              {preview.map((slot) => (
-                <Text key={slot.plannedSlotId} style={styles.previewRow}>
-                  {slot.movementName} · {slot.sets}×{slot.target.kind === 'time'
-                    ? `${slot.target.seconds}s`
-                    : slot.target.reps}
-                </Text>
-              ))}
+              {preview.map((slot) => {
+                const effective = applyPrescriptionToSlot(slot, todaysVector);
+                return (
+                  <Text key={slot.plannedSlotId} style={styles.previewRow}>
+                    {slot.movementName} · {effective.sets}×{slot.target.kind === 'time'
+                      ? `${slot.target.seconds}s`
+                      : slot.target.reps}
+                  </Text>
+                );
+              })}
               {remaining > 0 && (
                 <Text style={styles.caption}>+{remaining} more</Text>
               )}

@@ -87,6 +87,8 @@ import {
   computeSubstitutions,
   DEFAULT_PROFILE,
   detectFlaws,
+  applyLoadModifier,
+  applyPrescriptionToSlot,
   derivePrescription,
   ENERGY_SYSTEMS,
   EQUIPMENT_ITEMS,
@@ -210,6 +212,7 @@ import {
 
 export type { MovementAvailability };
 export type { LoadPreference, LoadSelection, LoadSource } from '@ak/inference';
+export { applyLoadModifier, applyPrescriptionToSlot } from '@ak/inference';
 
 /** What the load entry was seeded with for the set being logged, as the session
  *  screen held it (071). `shownLoadKg` null means the field was blank and the
@@ -3377,7 +3380,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
         : latest,
       null,
     ) ?? null;
-    return resolveLoadSelection({
+    const isFirstSet = latestCurrentSessionSet === null;
+    const base = resolveLoadSelection({
       trainingAge: state.profile.training_age,
       preference: state.loadPreference,
       bodyweightMode: input.bodyweightMode,
@@ -3387,8 +3391,20 @@ export const useStore = create<KineticsStore>()((set, get) => {
       overrideLoadKg: input.overrideLoadKg,
       lastLoggedLoadKg: state.lastLoggedLoads[input.movementId] ?? null,
       currentSessionLoadKg: latestCurrentSessionSet?.load_kg ?? null,
-      isFirstSet: latestCurrentSessionSet === null,
+      isFirstSet,
     });
+    const todaysVector = state.prescription !== null && state.prescription.forDate === state.today
+      ? state.prescription.vector
+      : null;
+    if (todaysVector === null || todaysVector.load_modifier >= 1) {
+      return base;
+    }
+    const carryForwardManual = base.source === 'manual' && !isFirstSet && latestCurrentSessionSet !== null;
+    return {
+      ...base,
+      initialLoadKg: carryForwardManual ? base.initialLoadKg : applyLoadModifier(base.initialLoadKg, todaysVector),
+      advisoryKg: applyLoadModifier(base.advisoryKg, todaysVector),
+    };
   },
 
   refreshBandLadder: () => {
@@ -6266,31 +6282,26 @@ export const useStore = create<KineticsStore>()((set, get) => {
     }
     const originKind = consumePlan ? 'planned' : 'free_form';
 
-    const setDelta = prescription !== null && prescription.forDate === today
-      ? prescription.vector.set_modifier
-      : 0;
+    const todaysVector = prescription !== null && prescription.forDate === today
+      ? prescription.vector
+      : null;
+    const setDelta = todaysVector?.set_modifier ?? 0;
 
     let sessionPlan: PlanSlot[];
     if (consumePlan) {
-      const rpeSafetyCap = prescription?.vector.rpe_cap ?? 10.0;
       sessionPlan = planToConsume!.slots.map((sl) => {
-        const effectiveRpe = Math.min(sl.targetRpe, rpeSafetyCap);
-        const movement = movements.find((m) => m.movement_id === sl.movementId);
-        const adjustedSets = Math.round(clamp(sl.sets + setDelta, 1, 6));
         // Timed policies and complete-microcycle routine analysis both own a
         // hard upper dose. Readiness may ease either prescription, but a good
         // day cannot silently grow it past the frozen bound.
-        const plannedSets = sl.target.kind === 'time' || sl.routineDecision !== undefined
-          ? Math.min(sl.sets, adjustedSets)
-          : adjustedSets;
+        const adjusted = applyPrescriptionToSlot(sl, todaysVector);
         return {
           sessionPlanSlotId: 0,
           movementId: sl.movementId,
-          plannedSets,
+          plannedSets: adjusted.sets,
           plannedReps: sl.target.kind === 'reps' ? sl.target.reps : null,
           target: sl.target,
           provenanceKind: 'planned' as const,
-          targetRpe: effectiveRpe,
+          targetRpe: adjusted.targetRpe,
           sourcePlannedSlotId: sl.plannedSlotId,
           originalMovementId: null,
           originalSessionDate: today,
@@ -6333,7 +6344,6 @@ export const useStore = create<KineticsStore>()((set, get) => {
 
     // Preparation for THIS frozen plan, built before the transaction so the
     // protocol and the session row are inserted together or not at all.
-    const todaysVector = prescription !== null && prescription.forDate === today ? prescription.vector : null;
     const preparationProtocol = buildSessionPreparationProtocol({
       d, sessionPlan, movements, profile,
       accessContext: executionContext,
