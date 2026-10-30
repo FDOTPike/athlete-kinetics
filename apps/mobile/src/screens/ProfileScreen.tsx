@@ -1007,6 +1007,8 @@ export default function ProfileScreen(): React.JSX.Element {
                 onPress={() => {
                   if (resetAthleteId !== activeAthleteId || session !== null || backupWorking || !databaseReady) return;
                   resetTrainingData();
+                  setRecentOutcomes(loadRecentOutcomes(20));
+                  setRecentMeasures(loadMeasuredHistory(14));
                   setResetAthleteId(null);
                 }}
                 disabled={session !== null || backupWorking || !databaseReady}

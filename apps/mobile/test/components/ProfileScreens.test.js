@@ -303,6 +303,35 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       expect(mockState.resetTrainingData).toHaveBeenCalledTimes(1);
       expect(mockState.loadDemoAthlete).not.toHaveBeenCalled();
     });
+
+    test.each([true, false])('confirm refreshes outcomes and measurements with no live session when reset returns %s', async (resetResult) => {
+      let outcomes = [{ outcomeKind: 'followed_plan', finalizedAtMs: 1700000000000 }];
+      let measures = [{ date: '2026-10-29', tonnageKg: 500, setCount: 5, bodyweightKg: 75 }];
+      mockState.loadRecentOutcomes = jest.fn(() => outcomes);
+      mockState.loadMeasuredHistory.mockImplementation(() => measures);
+      mockState.resetTrainingData.mockImplementation(() => {
+        outcomes = [];
+        measures = [];
+        return resetResult;
+      });
+      await openReset();
+      fireEvent.press(screen.getByRole('button', { name: 'TRAINING-DECISIONS DISCLOSURE' }));
+      expect(screen.getByText('Plan followed')).toBeOnTheScreen();
+      expect(screen.getByText('2026-10-29')).toBeOnTheScreen();
+      expect(mockState.session).toBeNull();
+      mockState.loadRecentOutcomes.mockClear();
+      mockState.loadMeasuredHistory.mockClear();
+
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+
+      expect(mockState.loadRecentOutcomes).toHaveBeenCalledWith(20);
+      expect(mockState.loadMeasuredHistory).toHaveBeenCalledWith(14);
+      expect(screen.queryByText('Plan followed')).toBeNull();
+      expect(screen.queryByText('2026-10-29')).toBeNull();
+      expect(screen.getByText('No finalized session outcomes recorded yet.')).toBeOnTheScreen();
+      expect(screen.getByTestId('reset-continue-button')).toBeOnTheScreen();
+    });
   });
 
   test('a) chips & steppers render with shared primitive accessibility semantics', () => {
