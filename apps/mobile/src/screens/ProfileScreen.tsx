@@ -299,9 +299,11 @@ export default function ProfileScreen(): React.JSX.Element {
   const [confirmingWipeBlock, setConfirmingWipeBlock] = useState(false);
   const [resetAthleteId, setResetAthleteId] = useState<string | null>(null);
   const [resetError, setResetError] = useState<string | null>(null);
+  const [coachError, setCoachError] = useState<string | null>(null);
   useEffect(() => {
     setResetAthleteId(null);
     setResetError(null);
+    setCoachError(null);
   }, [activeAthleteId]);
   const [confirmingSwitchProfileId, setConfirmingSwitchProfileId] = useState<number | null>(null);
   const [confirmingDeleteBandLevel, setConfirmingDeleteBandLevel] = useState<number | null>(null);
@@ -1170,6 +1172,9 @@ export default function ProfileScreen(): React.JSX.Element {
               profile switch above, NOTHING is shared. Built for coaching (or
               testing) several people on one phone.
             </Text>
+            {coachError !== null && (
+              <Text style={styles.fieldHint} accessibilityRole="alert">{coachError}</Text>
+            )}
             {athletes.map((a) => {
               const isActive = a.id === activeAthleteId;
               const deletable = !isActive && a.id !== 'default';
@@ -1181,7 +1186,10 @@ export default function ProfileScreen(): React.JSX.Element {
                       disableFullscreenUI
                       style={styles.athleteEditInput}
                       value={editAthleteName}
-                      onChangeText={setEditAthleteName}
+                      onChangeText={(t) => {
+                        setCoachError(null);
+                        setEditAthleteName(t);
+                      }}
                       maxLength={24}
                       autoFocus
                       accessibilityLabel={`New name for ${a.name}`}
@@ -1189,14 +1197,22 @@ export default function ProfileScreen(): React.JSX.Element {
                     <QuietAction
                       label="SAVE"
                       onPress={() => {
+                        setCoachError(null);
                         renameAthleteEntry(a.id, editAthleteName);
-                        setEditingAthleteId(null);
+                        const error = useStore.getState().error;
+                        setCoachError(error);
+                        if (error === null) {
+                          setEditingAthleteId(null);
+                        }
                       }}
                       accessibilityLabel="Save name"
                     />
                     <QuietAction
                       label="CANCEL"
-                      onPress={() => setEditingAthleteId(null)}
+                      onPress={() => {
+                        setCoachError(null);
+                        setEditingAthleteId(null);
+                      }}
                       accessibilityLabel="Cancel rename"
                     />
                   </View>
@@ -1208,7 +1224,11 @@ export default function ProfileScreen(): React.JSX.Element {
                     <Pressable
                       style={styles.athleteMain}
                       disabled={isActive}
-                      onPress={() => switchAthlete(a.id)}
+                      onPress={() => {
+                        setCoachError(null);
+                        switchAthlete(a.id);
+                        setCoachError(useStore.getState().error);
+                      }}
                       accessibilityRole="button"
                       accessibilityState={{ selected: isActive }}
                       accessibilityLabel={`Athlete ${a.name}${isActive ? ', active' : ', tap to switch'}`}
@@ -1220,6 +1240,7 @@ export default function ProfileScreen(): React.JSX.Element {
                     <QuietAction
                       label="RENAME"
                       onPress={() => {
+                        setCoachError(null);
                         setEditingAthleteId(a.id);
                         setEditAthleteName(a.name);
                       }}
@@ -1228,7 +1249,10 @@ export default function ProfileScreen(): React.JSX.Element {
                     {deletable && (
                       <QuietAction
                         label="DELETE"
-                        onPress={() => setConfirmingDeleteAthleteId(isConfirmingDelete ? null : a.id)}
+                        onPress={() => {
+                          setCoachError(null);
+                          setConfirmingDeleteAthleteId(isConfirmingDelete ? null : a.id);
+                        }}
                         accessibilityLabel={`Delete ${a.name} and their database`}
                       />
                     )}
@@ -1241,14 +1265,22 @@ export default function ProfileScreen(): React.JSX.Element {
                       <QuietAction
                         label={`Confirm delete ${a.name}`}
                         onPress={() => {
+                          setCoachError(null);
                           deleteAthlete(a.id);
-                          setConfirmingDeleteAthleteId(null);
+                          const error = useStore.getState().error;
+                          setCoachError(error);
+                          if (error === null) {
+                            setConfirmingDeleteAthleteId(null);
+                          }
                         }}
                         style={styles.confirmActionIsolated}
                       />
                       <QuietAction
                         label="Keep athlete"
-                        onPress={() => setConfirmingDeleteAthleteId(null)}
+                        onPress={() => {
+                          setCoachError(null);
+                          setConfirmingDeleteAthleteId(null);
+                        }}
                       />
                     </View>
                   )}
@@ -1260,7 +1292,10 @@ export default function ProfileScreen(): React.JSX.Element {
                 disableFullscreenUI
                 style={styles.athleteEditInput}
                 value={newAthleteName}
-                onChangeText={setNewAthleteName}
+                onChangeText={(t) => {
+                  setCoachError(null);
+                  setNewAthleteName(t);
+                }}
                 placeholder="New athlete's name"
                 placeholderTextColor={theme.color.textLow}
                 maxLength={24}
@@ -1269,9 +1304,14 @@ export default function ProfileScreen(): React.JSX.Element {
               <QuietAction
                 label="ADD ATHLETE"
                 onPress={() => {
+                  setCoachError(null);
                   const trimmed = newAthleteName.trim();
                   createAthlete(trimmed.length > 0 ? trimmed : 'New Athlete');
-                  setNewAthleteName('');
+                  const error = useStore.getState().error;
+                  setCoachError(error);
+                  if (error === null) {
+                    setNewAthleteName('');
+                  }
                 }}
                 accessibilityLabel="Add a new athlete"
               />
