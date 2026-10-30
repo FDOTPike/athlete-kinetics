@@ -27,7 +27,7 @@ jest.mock('@ak/inference', () => ({
 
 jest.mock('../../src/state/useStore', () => ({
   palette: { bg: '#000', surface: '#15151A', line: '#26262E', text: '#F4F4F6', dim: '#86868F', green: '#2EE6A8', amber: '#FFB454', red: '#FF5D5D' },
-  useStore: (selector) => selector(mockState),
+  useStore: Object.assign((selector) => selector(mockState), { getState: () => mockState }),
 }));
 
 jest.mock('../../src/state/backupStore', () => ({
@@ -100,6 +100,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       // A booted store: ProfileScreen reads the database (availability verdicts,
       // recent outcomes, measured history) only once status is 'ready'.
       status: 'ready',
+      error: null,
       profile: baseProfile,
       saveProfile: jest.fn(),
       uiPreferences: { sessionModeOverride: null, readinessDetail: 'summary', restTimerEnabled: true, textScale: 'system' },
@@ -162,7 +163,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       completeOnboarding: jest.fn(),
       beginOnboardingDraft: () => ({ athleteId: 'default', contextRevision: 0 }),
       loadDemoAthlete: jest.fn(),
-      resetTrainingData: jest.fn(() => true),
+      resetTrainingData: jest.fn(() => { mockState.error = null; return true; }),
       loadRecentOutcomes: () => [
         { outcomeKind: 'followed_plan', finalizedAtMs: 1700000000000 },
         { outcomeKind: 'adapted_session', finalizedAtMs: 1700000100000 },
@@ -174,6 +175,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
 
   describe('Reset training data', () => {
     const caption = "This removes training history, telemetry, blocks, and today's reports. Your profile and saved profile slots remain.";
+    const resetSection = () => within(screen.getByTestId('reset-training-data-section'));
 
     const openReset = async () => {
       await renderAsync(<ProfileScreen />);
@@ -228,6 +230,89 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       expect(screen.getByText(caption)).toBeOnTheScreen();
       expect(screen.getByTestId('reset-continue-button')).toBeOnTheScreen();
       expect(screen.queryByTestId('reset-confirm-button')).toBeNull();
+    });
+
+    test('a failing reset keeps step 2 open and shows the exact store error as an alert', async () => {
+      const error = 'DELETE FROM session failed';
+      mockState.resetTrainingData.mockImplementation(() => { mockState.error = error; return false; });
+      mockState.loadRecentOutcomes = jest.fn(() => []);
+      await openReset();
+      mockState.loadRecentOutcomes.mockClear();
+      mockState.loadMeasuredHistory.mockClear();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+
+      const section = within(screen.getByTestId('reset-training-data-section'));
+      expect(section.getByTestId('reset-confirm-button')).toBeOnTheScreen();
+      expect(section.queryByTestId('reset-continue-button')).toBeNull();
+      expect(section.getByRole('alert').props.children).toBe(error);
+      expect(mockState.loadRecentOutcomes).toHaveBeenCalledWith(20);
+      expect(mockState.loadMeasuredHistory).toHaveBeenCalledWith(14);
+    });
+
+    test('a successful reset of an empty database returns false and returns to step 1 without an alert', async () => {
+      mockState.resetTrainingData.mockImplementation(() => { mockState.error = null; return false; });
+      await openReset();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+
+      expect(screen.getByTestId('reset-continue-button')).toBeOnTheScreen();
+      expect(screen.queryByTestId('reset-confirm-button')).toBeNull();
+      expect(resetSection().queryByRole('alert')).toBeNull();
+    });
+
+    test('a stale error before Confirm is not shown after a successful reset', async () => {
+      mockState.error = 'Earlier unrelated error';
+      await openReset();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      expect(resetSection().queryByRole('alert')).toBeNull();
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+
+      expect(screen.getByTestId('reset-continue-button')).toBeOnTheScreen();
+      expect(resetSection().queryByRole('alert')).toBeNull();
+      expect(screen.queryByText('Earlier unrelated error')).toBeNull();
+    });
+
+    test('Keep my data clears a shown reset error', async () => {
+      mockState.resetTrainingData.mockImplementation(() => { mockState.error = 'COMMIT failed'; return false; });
+      await openReset();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+      expect(resetSection().getByRole('alert')).toHaveTextContent('COMMIT failed');
+      fireEvent.press(screen.getByTestId('reset-keep-button'));
+
+      expect(screen.getByTestId('reset-continue-button')).toBeOnTheScreen();
+      expect(resetSection().queryByRole('alert')).toBeNull();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      expect(resetSection().queryByRole('alert')).toBeNull();
+    });
+
+    test('pressing Reset again clears the shown error after a successful retry', async () => {
+      mockState.resetTrainingData.mockImplementationOnce(() => { mockState.error = 'COMMIT failed'; return false; });
+      await openReset();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+      expect(resetSection().getByRole('alert')).toHaveTextContent('COMMIT failed');
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+
+      expect(mockState.resetTrainingData).toHaveBeenCalledTimes(2);
+      expect(screen.getByTestId('reset-continue-button')).toBeOnTheScreen();
+      expect(resetSection().queryByRole('alert')).toBeNull();
+    });
+
+    test('changing the active athlete clears a shown reset error', async () => {
+      mockState.resetTrainingData.mockImplementation(() => { mockState.error = 'COMMIT failed'; return false; });
+      await openReset();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+      expect(resetSection().getByRole('alert')).toHaveTextContent('COMMIT failed');
+      mockState.activeAthleteId = 'ath-2';
+      await screen.rerenderAsync(<ProfileScreen />);
+
+      expect(screen.getByTestId('reset-continue-button')).toBeOnTheScreen();
+      expect(resetSection().queryByRole('alert')).toBeNull();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      expect(resetSection().queryByRole('alert')).toBeNull();
     });
 
     test('changing athletes clears reset confirmation and requires the new athlete to continue', async () => {

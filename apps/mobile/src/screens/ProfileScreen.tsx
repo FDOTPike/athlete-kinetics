@@ -298,8 +298,10 @@ export default function ProfileScreen(): React.JSX.Element {
   const [confirmingDeleteAthleteId, setConfirmingDeleteAthleteId] = useState<string | null>(null);
   const [confirmingWipeBlock, setConfirmingWipeBlock] = useState(false);
   const [resetAthleteId, setResetAthleteId] = useState<string | null>(null);
+  const [resetError, setResetError] = useState<string | null>(null);
   useEffect(() => {
     setResetAthleteId(null);
+    setResetError(null);
   }, [activeAthleteId]);
   const [confirmingSwitchProfileId, setConfirmingSwitchProfileId] = useState<number | null>(null);
   const [confirmingDeleteBandLevel, setConfirmingDeleteBandLevel] = useState<number | null>(null);
@@ -993,7 +995,10 @@ export default function ProfileScreen(): React.JSX.Element {
               </Text>
               <SecondaryButton
                 label="Continue to reset"
-                onPress={() => setResetAthleteId(activeAthleteId)}
+                onPress={() => {
+                  setResetError(null);
+                  setResetAthleteId(activeAthleteId);
+                }}
                 disabled={session !== null || backupWorking || !databaseReady}
                 accessibilityLabel="Continue to reset training data"
                 testID="reset-continue-button"
@@ -1002,14 +1007,20 @@ export default function ProfileScreen(): React.JSX.Element {
           ) : (
             <View style={{ gap: theme.space[3] }}>
               <Text style={styles.confirmText}>This cannot be undone. Reset the training data?</Text>
+              {resetError !== null && (
+                <Text style={styles.fieldHint} accessibilityRole="alert">{resetError}</Text>
+              )}
               <PrimaryButton
                 label="Reset training data"
                 onPress={() => {
                   if (resetAthleteId !== activeAthleteId || session !== null || backupWorking || !databaseReady) return;
+                  setResetError(null);
                   resetTrainingData();
+                  const error = useStore.getState().error;
+                  setResetError(error);
                   setRecentOutcomes(loadRecentOutcomes(20));
                   setRecentMeasures(loadMeasuredHistory(14));
-                  setResetAthleteId(null);
+                  if (error === null) setResetAthleteId(null);
                 }}
                 disabled={session !== null || backupWorking || !databaseReady}
                 accessibilityLabel="Confirm reset training data"
@@ -1017,7 +1028,10 @@ export default function ProfileScreen(): React.JSX.Element {
               />
               <SecondaryButton
                 label="Keep my data"
-                onPress={() => setResetAthleteId(null)}
+                onPress={() => {
+                  setResetError(null);
+                  setResetAthleteId(null);
+                }}
                 testID="reset-keep-button"
               />
             </View>
