@@ -7918,7 +7918,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       set({ error: 'End the active session before resetting training data.' });
       return false;
     }
-    const releaseLease = tryAcquireDataMutationLease(true);
+    const releaseLease = tryAcquireDataMutationLease();
     if (releaseLease === null) {
       set({ error: mutationRefusalMessage() });
       return false;
@@ -7930,7 +7930,9 @@ export const useStore = create<KineticsStore>()((set, get) => {
       let inTx = false;
       try {
         d = getDb();
-        had = rowsOf<{ c: number }>(d.executeSync('SELECT (SELECT count(*) FROM session) + (SELECT count(*) FROM question_log) AS c'))[0];
+        had = rowsOf<{ c: number }>(d.executeSync(
+          'SELECT (SELECT count(*) FROM session) + (SELECT count(*) FROM set_record) + (SELECT count(*) FROM set_metric) + (SELECT count(*) FROM question_log) + (SELECT count(*) FROM history_import) + (SELECT count(*) FROM import_readiness_daily) + (SELECT count(*) FROM bodyweight_daily) + (SELECT count(*) FROM movement_capability_attestation) + (SELECT count(*) FROM movement_prior_experience) + (SELECT count(*) FROM capability_session_evidence) + (SELECT count(*) FROM training_program) + (SELECT count(*) FROM training_block) + (SELECT count(*) FROM suspension_episode WHERE ended_at_ms IS NULL) + (SELECT count(*) FROM subjective_report) + (SELECT count(*) FROM niggle) + (SELECT count(*) FROM one_rep_max) + (SELECT count(*) FROM return_checkin_ack) + (SELECT count(*) FROM hrv_daily) + (SELECT count(*) FROM resting_hr_daily) + (SELECT count(*) FROM sleep_daily) + (SELECT count(*) FROM spo2_daily) + (SELECT count(*) FROM spo2_sample) + (SELECT count(*) FROM mech_daily) + (SELECT count(*) FROM state_vector) AS c',
+        ))[0];
         d.executeSync('BEGIN');
         inTx = true;
       // Children before parents, so it is correct whether or not foreign_keys is
@@ -7982,6 +7984,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       d.executeSync('DELETE FROM session_origin');
       d.executeSync('DELETE FROM set_prefix');
       d.executeSync('DELETE FROM set_load_shown');
+      d.executeSync('DELETE FROM set_metric');
       d.executeSync('DELETE FROM set_record');
       // 026 snapshot immutability permits deletion only after its parent is
       // gone. With FKs on the parent cascade already emptied this table; with
