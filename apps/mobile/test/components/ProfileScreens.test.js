@@ -5,6 +5,7 @@ import { TRAINING_AGES } from '@ak/inference';
 import ProfileScreen from '../../src/screens/ProfileScreen';
 import OnboardingScreen from '../../src/screens/OnboardingScreen';
 import { NavigationProvider } from '../../src/navigation/navigation';
+import { PrimaryButton } from '../../src/components/ui';
 
 jest.setTimeout(30000);
 
@@ -245,6 +246,37 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       fireEvent.press(screen.getByTestId('reset-continue-button'));
       fireEvent.press(screen.getByTestId('reset-confirm-button'));
       expect(mockState.resetTrainingData).toHaveBeenCalledTimes(1);
+    });
+
+    test.each([
+      ['a live session', { session: { sessionId: 10, sets: [] } }, 'idle'],
+      ['backup working', {}, 'working'],
+      ['the database booting', { status: 'booting' }, 'idle'],
+      ['the database in error', { status: 'error' }, 'idle'],
+    ])('Confirm keeps the confirmation open and does not reset with %s', async (_reason, state, backupStatus) => {
+      await openReset();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+
+      Object.assign(mockState, state);
+      mockBackupState.status = backupStatus;
+      await screen.rerenderAsync(<ProfileScreen />);
+
+      // Invoke the handler directly to verify its guard independently of the disabled button.
+      const confirm = screen.UNSAFE_getAllByType(PrimaryButton)
+        .find((button) => button.props.testID === 'reset-confirm-button');
+      act(() => confirm.props.onPress());
+      expect(mockState.resetTrainingData).not.toHaveBeenCalled();
+      expect(screen.getByTestId('reset-confirm-button')).toBeDisabled();
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+      expect(mockState.resetTrainingData).not.toHaveBeenCalled();
+
+      Object.assign(mockState, { session: null, status: 'ready' });
+      mockBackupState.status = 'idle';
+      await screen.rerenderAsync(<ProfileScreen />);
+      expect(screen.getByTestId('reset-confirm-button')).toBeEnabled();
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+      expect(mockState.resetTrainingData).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId('reset-continue-button')).toBeOnTheScreen();
     });
 
     test.each([

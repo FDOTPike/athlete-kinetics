@@ -1005,10 +1005,11 @@ export default function ProfileScreen(): React.JSX.Element {
               <PrimaryButton
                 label="Reset training data"
                 onPress={() => {
-                  if (resetAthleteId !== activeAthleteId) return;
+                  if (resetAthleteId !== activeAthleteId || session !== null || backupWorking || !databaseReady) return;
                   resetTrainingData();
                   setResetAthleteId(null);
                 }}
+                disabled={session !== null || backupWorking || !databaseReady}
                 accessibilityLabel="Confirm reset training data"
                 testID="reset-confirm-button"
               />
