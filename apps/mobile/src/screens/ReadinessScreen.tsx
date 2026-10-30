@@ -54,7 +54,7 @@ const STATE_META: Record<AthleteState, ReadinessMeta> = {
   },
 };
 
-const HALT_META: ReadinessMeta = {
+export const HALT_META: ReadinessMeta = {
   label: 'Training paused',
   title: 'Resolve today\'s safety report',
   recommendation: 'Training is paused for today. Review the report before doing more work.',

@@ -50,7 +50,7 @@ import {
   type SessionRef,
   type TodayState,
 } from '../state/todayState';
-import { classifyReadiness } from './ReadinessScreen';
+import { classifyReadiness, HALT_META } from './ReadinessScreen';
 import { autopilotReasonCopy } from '../state/autopilotCopy';
 import { PrimaryButton, QuietAction, Disclosure, ListRow } from '../components/ui';
 
@@ -448,7 +448,7 @@ function AvailableTodayScreen({
             No readiness estimate yet. It builds from logged sessions and any synced telemetry.
           </Text>
         ) : (
-          <Disclosure label={READINESS_LABEL[classifyReadiness(vector)]} hint="The short explanation first">
+          <Disclosure label={state.kind === 'halted' ? HALT_META.title : READINESS_LABEL[classifyReadiness(vector)]} hint="The short explanation first">
             <ListRow
               label="Readiness estimate"
               detail={`${Math.round(vector.readiness_score)} / 100`}
