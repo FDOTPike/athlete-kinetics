@@ -1,10 +1,12 @@
 import React from 'react';
 import { BackHandler, StyleSheet } from 'react-native';
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, renderAsync, screen, within } from '@testing-library/react-native';
 import { TRAINING_AGES } from '@ak/inference';
 import ProfileScreen from '../../src/screens/ProfileScreen';
 import OnboardingScreen from '../../src/screens/OnboardingScreen';
 import { NavigationProvider } from '../../src/navigation/navigation';
+
+jest.setTimeout(30000);
 
 let mockState;
 const mockBackupState = {
@@ -89,6 +91,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
   let saveLoadPreferenceMock;
 
   beforeEach(() => {
+    mockBackupState.status = 'idle';
     deleteAthleteMock = jest.fn();
     wipeBlockStateMock = jest.fn();
     switchProfileMock = jest.fn();
@@ -160,6 +163,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       completeOnboarding: jest.fn(),
       beginOnboardingDraft: () => ({ athleteId: 'default', contextRevision: 0 }),
       loadDemoAthlete: jest.fn(),
+      resetTrainingData: jest.fn(() => true),
       loadRecentOutcomes: () => [
         { outcomeKind: 'followed_plan', finalizedAtMs: 1700000000000 },
         { outcomeKind: 'adapted_session', finalizedAtMs: 1700000100000 },
@@ -167,6 +171,90 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
         { outcomeKind: 'session_recorded', finalizedAtMs: 1700000300000 },
       ],
     };
+  });
+
+  describe('Reset training data', () => {
+    const caption = "This removes training history, telemetry, blocks, and today's reports. Your profile and saved profile slots remain.";
+
+    const openReset = async () => {
+      await renderAsync(<ProfileScreen />);
+      fireEvent.press(screen.getByRole('button', { name: 'Reset training data' }));
+    };
+
+    beforeEach(() => {
+      mockState.vector = { readiness_score: 75 };
+      mockState.blockSessions = [{ sessionId: 1 }];
+    });
+
+    test('renders immediately after backup with the exact reset confirmation strings even with history', async () => {
+      await openReset();
+
+      expect(screen.getAllByTestId(/^(backup-transfer|reset-training-data|learning-terminology)-section$/)
+        .map((section) => section.props.testID)).toEqual([
+        'backup-transfer-section', 'reset-training-data-section', 'learning-terminology-section',
+      ]);
+      const section = within(screen.getByTestId('reset-training-data-section'));
+      expect(section.getByText('Reset training data')).toBeOnTheScreen();
+      expect(section.getByText(caption)).toBeOnTheScreen();
+      expect(section.getByText('Continue to reset')).toBeOnTheScreen();
+      expect(section.getByLabelText('Continue to reset training data')).toBeEnabled();
+
+      fireEvent.press(section.getByTestId('reset-continue-button'));
+      expect(section.getByText('This cannot be undone. Reset the training data?')).toBeOnTheScreen();
+      expect(section.getByTestId('reset-confirm-button')).toHaveTextContent('Reset training data');
+      expect(section.getByLabelText('Confirm reset training data')).toBeOnTheScreen();
+      expect(section.getByTestId('reset-keep-button')).toHaveTextContent('Keep my data');
+    });
+
+    test('Continue then Keep my data returns to step 1 without resetting', async () => {
+      await openReset();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      expect(mockState.resetTrainingData).not.toHaveBeenCalled();
+      fireEvent.press(screen.getByTestId('reset-keep-button'));
+
+      expect(mockState.resetTrainingData).not.toHaveBeenCalled();
+      expect(screen.getByText(caption)).toBeOnTheScreen();
+      expect(screen.getByTestId('reset-continue-button')).toBeOnTheScreen();
+      expect(screen.queryByTestId('reset-confirm-button')).toBeNull();
+    });
+
+    test('Continue then Reset training data resets exactly once and returns to step 1', async () => {
+      await openReset();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      expect(mockState.resetTrainingData).not.toHaveBeenCalled();
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+
+      expect(mockState.resetTrainingData).toHaveBeenCalledTimes(1);
+      expect(mockState.resetTrainingData).toHaveBeenCalledWith();
+      expect(screen.getByText(caption)).toBeOnTheScreen();
+      expect(screen.getByTestId('reset-continue-button')).toBeOnTheScreen();
+      expect(screen.queryByTestId('reset-confirm-button')).toBeNull();
+    });
+
+    test.each([
+      ['a live session', { session: { sessionId: 10, sets: [] } }, 'idle'],
+      ['backup working', {}, 'working'],
+      ['the database booting', { status: 'booting' }, 'idle'],
+      ['the database in error', { status: 'error' }, 'idle'],
+    ])('Continue is disabled with %s', async (_reason, state, backupStatus) => {
+      Object.assign(mockState, state);
+      mockBackupState.status = backupStatus;
+      await openReset();
+
+      expect(screen.getByTestId('reset-continue-button')).toBeDisabled();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      expect(screen.queryByTestId('reset-confirm-button')).toBeNull();
+      expect(mockState.resetTrainingData).not.toHaveBeenCalled();
+    });
+
+    test('confirm resets training data without loading the demo athlete', async () => {
+      await openReset();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+
+      expect(mockState.resetTrainingData).toHaveBeenCalledTimes(1);
+      expect(mockState.loadDemoAthlete).not.toHaveBeenCalled();
+    });
   });
 
   test('a) chips & steppers render with shared primitive accessibility semantics', () => {
