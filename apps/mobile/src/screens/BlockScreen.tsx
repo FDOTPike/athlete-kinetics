@@ -928,9 +928,9 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                             onPress={() => setAttributionSlotId((currentId) => currentId === slot.plannedSlotId ? null : slot.plannedSlotId)}
                           />
                         </View>
-                        {slot.overrideLoadKg !== null && (
-                          <View style={styles.substitutedBadge} accessibilityRole="text">
-                            <Text style={styles.substitutedBadgeText}>SUBSTITUTED</Text>
+                        {slot.overrideReason != null && slot.overrideReason.trim() !== '' && (
+                          <View style={styles.overrideBadge} accessibilityRole="text">
+                            <Text style={styles.overrideBadgeText}>{slot.overrideReason}</Text>
                           </View>
                         )}
                       </View>
@@ -1726,7 +1726,7 @@ const styles = StyleSheet.create({
     paddingTop: theme.space[3],
     gap: theme.space[2],
   },
-  substitutedBadge: {
+  overrideBadge: {
     borderWidth: 1,
     borderColor: theme.color.line,
     borderRadius: theme.radius.chip,
@@ -1734,7 +1734,7 @@ const styles = StyleSheet.create({
     paddingVertical: theme.space[1],
     backgroundColor: theme.color.ink1,
   },
-  substitutedBadgeText: {
+  overrideBadgeText: {
     ...theme.font.eyebrow,
     color: theme.color.textMid,
   },
