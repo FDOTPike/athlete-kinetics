@@ -7099,7 +7099,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
     ).length ?? 0;
     // Never erase logged work. A replacement can only finish the remaining
     // volume of its current slot, even when the pulled-forward source is smaller.
-    const movedSets = Math.max(1, Math.round(option.setsConserved), loggedSetsCount);
+    const movedSets = Math.max(1, Math.round(option.setsConserved), loggedSetsCount + 1);
     const movedReps = movedTarget.kind === 'reps' ? movedTarget.reps : null;
 
     const overrideRow = rowsOf<{ target_load_kg: number; reason: string | null }>(d.executeSync(
@@ -7156,7 +7156,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
           })
         : runner;
       const completedHere = throughSubstitution.slotSetCounts[runnerSlotIndex] ?? 0;
-      const runnerSets = Math.max(movedSets, completedHere);
+      const runnerSets = Math.max(movedSets, completedHere + 1);
       nextRunner = {
         ...throughSubstitution,
         slots: throughSubstitution.slots.map((slot, index) => index === runnerSlotIndex
