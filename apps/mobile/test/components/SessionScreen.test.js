@@ -2019,3 +2019,68 @@ test('the complete card lists skipped slots in plan order when slots were skippe
   view.rerender(<SessionScreen />);
   expect(screen.queryByTestId('session-complete-skipped')).toBeNull();
 });
+
+test('a skipped slot whose logged set was recorded under an earlier movement names that movement in the timeline and completion card', () => {
+  mockState = state({
+    movements: [
+      movement(1, 'Narrow Stance Squats'),
+      movement(2, 'Later movement'),
+      movement(3, 'Box Squat'),
+    ],
+    session: {
+      sessionId: 10,
+      date: '2026-07-15',
+      startedAtMs: Date.now(),
+      sets: [{
+        set_id: 77,
+        movement_id: 3,
+        movement_name: 'Box Squat',
+        set_index: 1,
+        reps: 7,
+        load_kg: 60,
+        rpe: 8,
+        tonnage_kg: 420,
+        session_plan_slot_id: 1,
+        timeS: null,
+        bandLevel: null,
+      }],
+    },
+    sessionPlan: [slot(1, 1, 7, { plannedSets: 4 }), slot(2, 2, 8)],
+    activeSessionPlanSlotId: 2,
+    runner: runner({
+      slots: [
+        { sessionPlanSlotId: 1, movementId: 1, movementName: 'Narrow Stance Squats', sets: 4, target: { kind: 'reps', reps: 7 }, targetRpe: 8 },
+        { sessionPlanSlotId: 2, movementId: 2, movementName: 'Later movement', sets: 3, target: { kind: 'reps', reps: 8 }, targetRpe: 8 },
+      ],
+      slotIndex: 1,
+      slotSetCounts: [1, 0],
+      loggedSets: 1,
+      skippedSessionPlanSlotIds: [1],
+    }),
+  });
+
+  const view = render(<SessionScreen />);
+
+  expect(screen.getByText('Skipped · 1 of 4 sets logged as Box Squat')).toBeOnTheScreen();
+  const skippedRow = screen.getByLabelText('Narrow Stance Squats, skipped, 1 of 4 sets logged as Box Squat');
+  expect(skippedRow).toBeOnTheScreen();
+  expect(skippedRow.props.accessibilityRole).toBe('text');
+
+  mockState.runner = runner({
+    slots: [
+      { sessionPlanSlotId: 1, movementId: 1, movementName: 'Narrow Stance Squats', sets: 4, target: { kind: 'reps', reps: 7 }, targetRpe: 8 },
+      { sessionPlanSlotId: 2, movementId: 2, movementName: 'Later movement', sets: 3, target: { kind: 'reps', reps: 8 }, targetRpe: 8 },
+    ],
+    phase: 'complete',
+    slotIndex: 1,
+    setIndex: 0,
+    slotSetCounts: [1, 0],
+    loggedSets: 1,
+    skippedSessionPlanSlotIds: [1, 2],
+  });
+  view.rerender(<SessionScreen />);
+
+  expect(screen.getByText('Skipped: Narrow Stance Squats · 1 of 4 sets logged as Box Squat')).toBeOnTheScreen();
+  expect(screen.getByText('Skipped: Later movement · no sets logged')).toBeOnTheScreen();
+});
+

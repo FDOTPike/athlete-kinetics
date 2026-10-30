@@ -421,6 +421,15 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
 
   const byId = useMemo(() => new Map(movements.map((m) => [m.movement_id, m])), [movements]);
   const loggedCount = (slot: PlanSlot): number => session?.sets.filter((set) => sameSlot(set, slot)).length ?? 0;
+  const loggedAsNames = (slot: PlanSlot): string[] => {
+    const names: string[] = [];
+    for (const set of session?.sets.filter((set) => sameSlot(set, slot)) ?? []) {
+      if (set.movement_id === slot.movementId) continue;
+      const name = byId.get(set.movement_id)?.name ?? 'Movement';
+      if (!names.includes(name)) names.push(name);
+    }
+    return names;
+  };
   const runnerCurrent = runner?.slots?.[runner.slotIndex ?? -1];
   const runnerCurrentId = runnerCurrent?.sessionPlanSlotId ?? null;
   const selected = activeSessionPlanSlotId === null ? null : sessionPlan.find((slot) => slot.sessionPlanSlotId === activeSessionPlanSlotId) ?? null;
@@ -1000,10 +1009,12 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                   .map((slot) => {
                     const name = byId.get(slot.movementId)?.name ?? 'Movement';
                     const logged = loggedCount(slot);
+                    const asNames = loggedAsNames(slot);
+                    const loggedSuffix = asNames.length > 0 ? ` as ${asNames.join(', ')}` : '';
                     return (
                       <Text key={slot.sessionPlanSlotId} style={styles.completeRowMeta}>
                         {logged > 0
-                          ? `Skipped: ${name} · ${logged} of ${slot.plannedSets} sets logged`
+                          ? `Skipped: ${name} · ${logged} of ${slot.plannedSets} sets logged${loggedSuffix}`
                           : `Skipped: ${name} · no sets logged`}
                       </Text>
                     );
@@ -1077,11 +1088,13 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
               if (skipped && !active) {
                 const skippedSets = session?.sets.filter((set) => sameSlot(set, slot)) ?? [];
                 const name = movement?.name ?? 'Movement';
+                const asNames = loggedAsNames(slot);
+                const loggedSuffix = asNames.length > 0 ? ` as ${asNames.join(', ')}` : '';
                 const skippedMeta = logged > 0
-                  ? `Skipped · ${logged} of ${slot.plannedSets} sets logged`
+                  ? `Skipped · ${logged} of ${slot.plannedSets} sets logged${loggedSuffix}`
                   : 'Skipped · no sets logged';
                 const skippedLabel = logged > 0
-                  ? `${name}, skipped, ${logged} of ${slot.plannedSets} sets logged`
+                  ? `${name}, skipped, ${logged} of ${slot.plannedSets} sets logged${loggedSuffix}`
                   : `${name}, skipped, no sets logged`;
 
                 return (
