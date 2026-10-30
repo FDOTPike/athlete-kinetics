@@ -358,7 +358,7 @@ export default function ProfileScreen(): React.JSX.Element {
   useEffect(() => {
     setInjuryText(profile.injury_flags.map((f) => `${f.region}: ${f.note}`).join('\n'));
     setMobilityText(profile.mobility_limits.map((f) => `${f.region}: ${f.note}`).join('\n'));
-  }, [activeSlotId]);
+  }, [activeSlotId, activeAthleteId, databaseReady, profile.injury_flags, profile.mobility_limits]);
 
   const parseNotes = (text: string): UserProfile['injury_flags'] =>
     text

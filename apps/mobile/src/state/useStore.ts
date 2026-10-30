@@ -1239,7 +1239,7 @@ export function closeStoreDatabaseForRestore(): void {
   dbAthleteId = null;
   bootInFlight = false;
   athleteContextRevision += 1;
-  useStore.setState({ status: 'booting' });
+  useStore.setState({ ...PER_ATHLETE_RESET, status: 'booting' });
 }
 
 /** Re-open and rehydrate after either replacement or deterministic rollback. */
