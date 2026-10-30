@@ -153,3 +153,15 @@ export function applyPrescriptionToSlot<
     ...(overrideLoadKg === undefined ? {} : { overrideLoadKg }),
   };
 }
+
+export function isPrescriptionReduced(
+  vector: Pick<AdjustmentVector, 'load_modifier' | 'set_modifier' | 'rpe_cap'> | null | undefined,
+  profile: Pick<UserProfile, 'base_rpe_cap'>,
+): boolean {
+  if (vector === null || vector === undefined) return false;
+  return (
+    vector.set_modifier < 0 ||
+    vector.load_modifier < 1 ||
+    vector.rpe_cap < profile.base_rpe_cap
+  );
+}

@@ -110,6 +110,7 @@ export {
   applyLoadModifier,
   applyPrescriptionToSlot,
   derivePrescription,
+  isPrescriptionReduced,
   type DeriveInput,
   type DerivedPrescription,
   type ReportInput,

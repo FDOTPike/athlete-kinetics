@@ -12,6 +12,7 @@ import {
   addDaysIso,
   applyLoadModifier,
   applyPrescriptionToSlot,
+  isPrescriptionReduced,
   targetLoadKg,
   splitExplainer,
   SPLIT_EXPLAINER_FOOTER,
@@ -706,7 +707,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
         </View>
         <Text style={styles.cardTitle}>{todayTitle}</Text>
         <Text style={styles.bodyText}>{todayMessage}</Text>
-        {current !== null && !halted && (
+        {current !== null && !halted && isPrescriptionReduced(current.vector, profile) && (
           <Text style={styles.adjustedText}>Coach adjusted today's plan.</Text>
         )}
 

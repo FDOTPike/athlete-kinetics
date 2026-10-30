@@ -90,6 +90,7 @@ import {
   applyLoadModifier,
   applyPrescriptionToSlot,
   derivePrescription,
+  isPrescriptionReduced,
   ENERGY_SYSTEMS,
   EQUIPMENT_ITEMS,
   evaluateReturn,
@@ -212,7 +213,7 @@ import {
 
 export type { MovementAvailability };
 export type { LoadPreference, LoadSelection, LoadSource } from '@ak/inference';
-export { applyLoadModifier, applyPrescriptionToSlot } from '@ak/inference';
+export { applyLoadModifier, applyPrescriptionToSlot, isPrescriptionReduced } from '@ak/inference';
 
 /** What the load entry was seeded with for the set being logged, as the session
  *  screen held it (071). `shownLoadKg` null means the field was blank and the
@@ -6349,8 +6350,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       accessContext: executionContext,
       capabilityAvailable,
       niggles: get().niggles,
-      readinessReduced: todaysVector !== null && (todaysVector.set_modifier < 0
-        || todaysVector.load_modifier < 1 || todaysVector.rpe_cap < profile.base_rpe_cap),
+      readinessReduced: isPrescriptionReduced(todaysVector, profile),
     });
     // Preparation drills answer to the same support decision as the main plan.
     const supportIds = [...sessionPlan.map((slot) => slot.movementId),
