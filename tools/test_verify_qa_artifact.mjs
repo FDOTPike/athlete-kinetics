@@ -739,27 +739,28 @@ async function main() {
       // Exercise POSIX open flags on every host, including Windows without FIFOs.
       const flagsTest = `
         import assert from 'node:assert/strict';
-        import * as fs from 'node:fs';
-        import { mock } from 'node:test';
-        const nonblock = fs.constants.O_NONBLOCK ?? 2048;
-        let checked = false;
-        mock.module('node:fs', { namedExports: { ...fs,
-          constants: { ...fs.constants, O_NONBLOCK: nonblock },
-          openSync: (path, flags) => {
-            assert.equal(flags & nonblock, nonblock, 'provenance must open without blocking');
-            checked = true;
-            return fs.openSync(path, 'r');
-          },
-          fstatSync: (fd) => ({ ...fs.fstatSync(fd), isFile: () => false }),
-        } });
+        import fs from 'node:fs';
+        import { syncBuiltinESMExports } from 'node:module';
         const { verifyProvenance } = await import(${JSON.stringify(pathToFileURL(VERIFIER).href)});
+        const nonblock = fs.constants.O_NONBLOCK ?? 2048;
+        fs.constants.O_NONBLOCK = nonblock;
+        const openSync = fs.openSync;
+        const fstatSync = fs.fstatSync;
+        let checked = false;
+        fs.openSync = (path, flags) => {
+          assert.equal(flags & nonblock, nonblock, 'provenance must open without blocking');
+          checked = true;
+          return openSync(path, 'r');
+        };
+        fs.fstatSync = (fd) => ({ ...fstatSync(fd), isFile: () => false });
+        syncBuiltinESMExports();
         const result = verifyProvenance(${JSON.stringify({ ...manifest, newFiles: [{ path: 'files/file', sha256 }] })},
           { repoRoot: ${JSON.stringify(repo)} });
         assert.ok(checked);
         assert.equal(result.ok, false);
         assert.deepEqual(result.problems, ['newFiles exceeds regular-file or aggregate byte budget']);
       `;
-      execFileSync(process.execPath, ['--experimental-test-module-mocks', '--input-type=module', '-e', flagsTest],
+      execFileSync(process.execPath, ['--input-type=module', '-e', flagsTest],
         { timeout: 10000, stdio: 'pipe' });
       check('provenance opens without blocking and rejects a non-regular descriptor', true);
       if (process.platform !== 'win32') {
