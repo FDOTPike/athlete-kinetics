@@ -743,7 +743,9 @@ async function main() {
         import { syncBuiltinESMExports } from 'node:module';
         const { verifyProvenance } = await import(${JSON.stringify(pathToFileURL(VERIFIER).href)});
         const nonblock = fs.constants.O_NONBLOCK ?? 2048;
-        fs.constants.O_NONBLOCK = nonblock;
+        if (fs.constants.O_NONBLOCK === undefined) {
+          try { fs.constants.O_NONBLOCK = nonblock; } catch {}
+        }
         const openSync = fs.openSync;
         const fstatSync = fs.fstatSync;
         let checked = false;
