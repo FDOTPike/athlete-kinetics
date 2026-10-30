@@ -299,12 +299,16 @@ export default function ProfileScreen(): React.JSX.Element {
   const [confirmingWipeBlock, setConfirmingWipeBlock] = useState(false);
   const [resetAthleteId, setResetAthleteId] = useState<string | null>(null);
   const [resetError, setResetError] = useState<string | null>(null);
-  useEffect(() => {
-    setResetAthleteId(null);
-    setResetError(null);
-  }, [activeAthleteId]);
   const [confirmingSwitchProfileId, setConfirmingSwitchProfileId] = useState<number | null>(null);
   const [confirmingDeleteBandLevel, setConfirmingDeleteBandLevel] = useState<number | null>(null);
+  useEffect(() => {
+    setConfirmingDeleteAthleteId(null);
+    setConfirmingWipeBlock(false);
+    setResetAthleteId(null);
+    setResetError(null);
+    setConfirmingSwitchProfileId(null);
+    setConfirmingDeleteBandLevel(null);
+  }, [activeAthleteId]);
   const [historyText, setHistoryText] = useState('');
   const [historyPreview, setHistoryPreview] = useState<HistoryParseResult | null>(null);
   const [historyNotice, setHistoryNotice] = useState<string | null>(null);
