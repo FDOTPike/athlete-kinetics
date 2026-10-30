@@ -914,6 +914,7 @@ function AvailableRoutineTemplateBuilder({
                   <Pressable
                     onPress={() => removeSlot(index)}
                     style={styles.removeButton}
+                    accessibilityRole="button"
                     accessibilityLabel={`Remove day ${activeDay} slot ${activeSlotIndex + 1}`}
                   >
                     <Text style={styles.removeText}>X</Text>
