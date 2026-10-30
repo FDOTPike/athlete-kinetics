@@ -7,8 +7,6 @@ import OnboardingScreen from '../../src/screens/OnboardingScreen';
 import { NavigationProvider } from '../../src/navigation/navigation';
 import { PrimaryButton } from '../../src/components/ui';
 
-jest.setTimeout(30000);
-
 let mockState;
 const mockBackupState = {
   status: 'idle', startupSafe: true, recoveryAvailable: false, message: null, lastSuccessfulBackupAt: null, preview: null,
