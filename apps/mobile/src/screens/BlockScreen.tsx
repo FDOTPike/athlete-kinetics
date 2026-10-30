@@ -448,7 +448,8 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
 
   const openNextSession = (): void => {
     if (nextPlanned === undefined) {
-      openManageBlock();
+      if (program == null) openManageBlock();
+      else setEditingProgram(true);
       return;
     }
     setDetail({ summary: nextPlanned, slots: loadSessionSlots(nextPlanned.plannedSessionId) });
@@ -700,7 +701,11 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           ) : todayPlan !== null ? (
             <PrimaryButton label="Start session" onPress={startAndOpenSession} accessibilityLabel="Start session" />
           ) : block === null ? (
-            <PrimaryButton label="Set up a four-week block" onPress={openManageBlock} accessibilityLabel="Set up a four-week block" />
+            <PrimaryButton
+              label="Set up a four-week block"
+              onPress={program == null ? openManageBlock : () => setEditingProgram(true)}
+              accessibilityLabel="Set up a four-week block"
+            />
           ) : (
             <PrimaryButton
               label={nextPlanned === undefined ? 'Plan the next block' : 'Preview next session'}
