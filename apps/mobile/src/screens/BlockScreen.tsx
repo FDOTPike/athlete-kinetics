@@ -395,12 +395,24 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
     );
   }
 
+  const halted = lastTriage !== null && lastTriage.kind === 'matched' && lastTriage.directive.halt;
+
   if (vector === null) {
     return (
       // The no-vector gate is an early return INSIDE the real screen, so the
       // route identity (coach-screen) is still asserted by tests even when
       // readiness data has not arrived yet.
       <View style={styles.center} testID="coach-screen">
+        {halted && lastTriage !== null && lastTriage.kind === 'matched' && (
+          <View style={[styles.card, styles.haltCard]}>
+            <Text style={styles.eyebrow}>SAFETY</Text>
+            <Text style={styles.cardTitle}>Stop training today</Text>
+            <Text style={styles.bodyText}>{lastTriage.directive.vector.coaching_cue}</Text>
+            {lastTriage.directive.followUp !== null && (
+              <Text style={styles.followUpText}>{lastTriage.directive.followUp}</Text>
+            )}
+          </View>
+        )}
         <View style={styles.card}>
           <Text style={styles.eyebrow}>COACH</Text>
           <Text style={styles.cardTitle}>Readiness is needed first</Text>
@@ -422,7 +434,6 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
   }
 
   const current = prescription !== null && prescription.forDate === today ? prescription : null;
-  const halted = lastTriage !== null && lastTriage.kind === 'matched' && lastTriage.directive.halt;
   const rows = weekRowsFor(blockSessions);
   const nextPlanned = blockSessions.find((planned) => planned.sessionDate > today);
   const programBlockExpired = program?.status === 'active' && block !== null

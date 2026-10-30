@@ -149,12 +149,34 @@ export default function ReadinessScreen({
     );
   }
 
+  const halted = lastTriage !== null && lastTriage.kind === 'matched' && lastTriage.directive.halt;
+  const hasLiveSession = session !== null;
+  const primaryHandler = hasLiveSession ? onOpenSession : onOpenCoach;
+
   if (vector === null) {
     return (
       <ScrollView style={styles.screen} contentContainerStyle={styles.contentContainer} testID="readiness-screen">
         <View style={styles.header}>
           <Text style={styles.wordmark}>pikeMethods</Text>
         </View>
+        {halted && (
+          <View style={[styles.card, styles.cardActiveSpine]}>
+            <View style={styles.statusBadge}>
+              <Text style={styles.statusBadgeText}>{HALT_META.label.toUpperCase()}</Text>
+            </View>
+            <Text style={styles.title}>{HALT_META.title}</Text>
+            <Text style={styles.body}>{HALT_META.recommendation}</Text>
+            {hasLiveSession && <Text style={styles.caption}>Your active workout is ready to resume.</Text>}
+            {!hasLiveSession && todayPlan !== null && (
+              <Text style={styles.caption}>{formatFocus(todayPlan.focus)} session planned today.</Text>
+            )}
+            {primaryHandler !== undefined ? (
+              <PrimaryButton label="Review safety report" onPress={primaryHandler} />
+            ) : (
+              <Text style={styles.navigationHint}>Open the relevant tab below to continue.</Text>
+            )}
+          </View>
+        )}
         <View style={styles.card}>
           <Text style={styles.wordmark}>READY</Text>
           <Text style={styles.title}>No readiness yet</Text>
@@ -208,10 +230,8 @@ export default function ReadinessScreen({
     );
   }
 
-  const halted = lastTriage !== null && lastTriage.kind === 'matched' && lastTriage.directive.halt;
   const athleteState = classifyReadiness(vector);
   const meta = halted ? HALT_META : STATE_META[athleteState];
-  const hasLiveSession = session !== null;
   const isRestDay = todayPlan === null && !halted && !hasLiveSession;
 
   const primaryLabel = halted
@@ -223,7 +243,6 @@ export default function ReadinessScreen({
         : athleteState === 'OVERREACHED'
           ? 'Review recovery plan'
           : 'Review your plan';
-  const primaryHandler = hasLiveSession ? onOpenSession : onOpenCoach;
 
   // Quiet readiness metrics rows
   const renderRawMetricsList = () => {
