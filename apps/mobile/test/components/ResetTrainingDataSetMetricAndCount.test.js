@@ -168,20 +168,22 @@ describe('resetTrainingData deletes set_metric and counts non-session training d
 
     // 2. With foreign_keys OFF, seed each child/metadata table alone and verify resetTrainingData returns true.
     driver.raw.exec('PRAGMA foreign_keys = OFF;');
-    const statements = [
-      "INSERT INTO set_target (set_id, session_plan_slot_id, provenance_kind, target_rpe, source_planned_slot_id, created_at_ms) VALUES (1, 1, 'planned', 8.0, 101, 1000)",
-      "INSERT INTO session_note (session_id, note, created_at_ms) VALUES (1, 'Moved well', 1000)",
-      "INSERT INTO session_feel (session_id, feel, recorded_at_ms) VALUES (1, 'as_planned', 1000)",
-      "INSERT INTO slot_override (planned_slot_id, target_load_kg, reason, created_at_ms) VALUES (1, 100, 'APRE adjustment', 1000)",
-      "INSERT INTO block_meta (block_id, macro_block_index, macro_phase, schema_type, peak_shifted) VALUES (1, 1, 'gpp', 'LINEAR', 0)",
+    const seeds = [
+      ['set_target', "INSERT INTO set_target (set_id, session_plan_slot_id, provenance_kind, target_rpe, source_planned_slot_id, created_at_ms) VALUES (1, 1, 'planned', 8.0, 101, 1000)"],
+      ['session_note', "INSERT INTO session_note (session_id, note, created_at_ms) VALUES (1, 'Moved well', 1000)"],
+      ['session_feel', "INSERT INTO session_feel (session_id, feel, recorded_at_ms) VALUES (1, 'as_planned', 1000)"],
+      ['slot_override', "INSERT INTO slot_override (planned_slot_id, target_load_kg, reason, created_at_ms) VALUES (1, 100, 'APRE adjustment', 1000)"],
+      ['block_meta', "INSERT INTO block_meta (block_id, macro_block_index, macro_phase, schema_type, peak_shifted) VALUES (1, 1, 'gpp', 'LINEAR', 0)"],
     ];
-    for (const sql of statements) {
+    for (const [table, sql] of seeds) {
       driver.raw.exec(sql);
       let hadTableData = false;
       act(() => {
         hadTableData = useStore.getState().resetTrainingData();
       });
-      expect(hadTableData).toBe(true);
+      // Both halves of the reset contract: it reports the data, and the data is gone.
+      expect({ table, hadTableData }).toEqual({ table, hadTableData: true });
+      expect({ table, left: driver.raw.prepare(`SELECT count(*) AS c FROM ${table}`).get().c }).toEqual({ table, left: 0 });
     }
   });
 });
