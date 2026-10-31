@@ -8,7 +8,7 @@ import { JOINTS as ACTUAL_JOINTS, PATTERN_JOINTS } from '../../../../packages/in
 import { EXPERIENCE_SEVERITY } from '../../../../packages/inference/src/types';
 import SessionScreen from '../../src/screens/SessionScreen';
 import { RestTimerCard } from '../../src/components/ui/RestTimerCard';
-import { restSecondsFor as runnerRestSecondsFor } from '../../../../packages/inference/src/sessionRunner';
+import { advance as advanceRunner, restSecondsFor as runnerRestSecondsFor } from '../../../../packages/inference/src/sessionRunner';
 
 let mockState;
 
@@ -2212,5 +2212,221 @@ test('a finished slot whose sets all match shows no includes', () => {
   expect(screen.getByText('Narrow Stance Squats')).toBeOnTheScreen();
   expect(screen.getByText('4 sets complete')).toBeOnTheScreen();
   expect(screen.queryByText(/includes/)).toBeNull();
+});
+
+describe('session-2: honest discomfort wording per tier and after-save outcomes', () => {
+  const discomfortFixture = (tier, { opensSubstitution = true } = {}) => {
+    const fixtureState = state({
+      profile: { training_age: tier, equipment_inventory: [], session_duration_cap_min: 60 },
+      runner: runner({
+        tier,
+        phase: 'working',
+      }),
+    });
+    fixtureState.reportNiggle = jest.fn((region, severity) => {
+      const next = advanceRunner(fixtureState.runner, {
+        kind: 'NIGGLE',
+        atMs: Date.now() + 1000,
+        severity,
+      });
+      fixtureState.runner = next;
+      fixtureState.niggles = [...fixtureState.niggles, { region, severity }];
+      if (
+        opensSubstitution &&
+        next.phase === 'working' &&
+        next.substitutionOfferedForSessionPlanSlotId !== null
+      ) {
+        fixtureState.substitution = {
+          targetId: 1,
+          result: {
+            haltAdvised: false,
+            layer1Regression: {
+              options: [{ movement_id: 2, name: 'Later movement', rationale: 'Lighter option.' }],
+            },
+            layer2DaySwap: { options: [] },
+          },
+        };
+      }
+    });
+    return fixtureState;
+  };
+
+  test.each([
+    [
+      'beginner',
+      [
+        ['Mild discomfort, 4 of 10', 'Save report', false],
+        ['Moderate discomfort, 6 of 10', 'Save report', false],
+        ['Stop discomfort, 8 of 10', 'Save report and stop session', true],
+      ],
+    ],
+    [
+      'intermediate',
+      [
+        ['Mild discomfort, 4 of 10', 'Save report', false],
+        ['Moderate discomfort, 6 of 10', 'Save report', false],
+        ['Stop discomfort, 8 of 10', 'Save report and stop session', true],
+      ],
+    ],
+    [
+      'advanced',
+      [
+        ['Mild discomfort, 4 of 10', 'Save report', false],
+        ['Moderate discomfort, 6 of 10', 'Save report', false],
+        ['Stop discomfort, 8 of 10', 'Save report and stop session', true],
+      ],
+    ],
+    [
+      'elite',
+      [
+        ['Mild discomfort, 4 of 10', 'Save report', false],
+        ['Moderate discomfort, 6 of 10', 'Save report and stop session', true],
+        ['Stop discomfort, 8 of 10', 'Save report and stop session', true],
+      ],
+    ],
+  ])('button labels and halt caption for %s at Mild (4), Moderate (6) and Stop (8)', (tier, expectations) => {
+    mockState = discomfortFixture(tier);
+    render(<SessionScreen />);
+    fireEvent.press(screen.getByLabelText('Report discomfort'));
+
+    for (const [chipLabel, expectedButtonText, expectHaltCaption] of expectations) {
+      fireEvent.press(screen.getByLabelText(chipLabel));
+      expect(screen.getByText(expectedButtonText)).toBeOnTheScreen();
+      expect(screen.queryByText('Find an alternative')).toBeNull();
+      if (expectHaltCaption) {
+        expect(screen.getByText('At this level the session stops for today.')).toBeOnTheScreen();
+      } else {
+        expect(screen.queryByText('At this level the session stops for today.')).toBeNull();
+      }
+    }
+  });
+
+  test('beginner fixture: Mild (4) shows Report saved with this session., Moderate (6) opens substitution without the saved line, and Stop (8) halts without the saved line', () => {
+    // 1. Beginner + Mild (4): below triageMin (5) and below haltMin (8) -> saved notice shown
+    mockState = discomfortFixture('beginner');
+    const view1 = render(<SessionScreen />);
+    fireEvent.press(screen.getByLabelText('Report discomfort'));
+    fireEvent.press(screen.getByLabelText('knee'));
+    fireEvent.press(screen.getByLabelText('Mild discomfort, 4 of 10'));
+    expect(screen.getByText('Save report')).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText('Save discomfort report'));
+    view1.rerender(<SessionScreen />);
+    expect(screen.getByText('Report saved with this session.')).toBeOnTheScreen();
+    expect(screen.queryByText('Choose an alternative')).toBeNull();
+    expect(screen.queryByText('Stop training for today.')).toBeNull();
+    view1.unmount();
+
+    // 2. Beginner + Moderate (6): >= triageMin (5) and < haltMin (8) -> substitution opens, no saved line
+    mockState = discomfortFixture('beginner');
+    const view2 = render(<SessionScreen />);
+    fireEvent.press(screen.getByLabelText('Report discomfort'));
+    fireEvent.press(screen.getByLabelText('knee'));
+    fireEvent.press(screen.getByLabelText('Moderate discomfort, 6 of 10'));
+    expect(screen.getByText('Save report')).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText('Save discomfort report'));
+    view2.rerender(<SessionScreen />);
+    expect(screen.getByText('Choose an alternative')).toBeOnTheScreen();
+    expect(screen.queryByText('Report saved with this session.')).toBeNull();
+    view2.unmount();
+
+    // 3. Beginner + Stop (8): >= haltMin (8) -> halts, no saved line
+    mockState = discomfortFixture('beginner');
+    const view3 = render(<SessionScreen />);
+    fireEvent.press(screen.getByLabelText('Report discomfort'));
+    fireEvent.press(screen.getByLabelText('knee'));
+    fireEvent.press(screen.getByLabelText('Stop discomfort, 8 of 10'));
+    expect(screen.getByText('Save report and stop session')).toBeOnTheScreen();
+    expect(screen.getByText('At this level the session stops for today.')).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText('Save discomfort report'));
+    view3.rerender(<SessionScreen />);
+    expect(screen.getByText('Stop training for today.')).toBeOnTheScreen();
+    expect(screen.queryByText('Report saved with this session.')).toBeNull();
+    view3.unmount();
+  });
+
+  test('intermediate fixture: Mild (4) opens substitution without the saved line, Mild (4) when substitution does not open shows Report saved with this session., and Stop (8) halts without the saved line', () => {
+    // 1. Intermediate + Mild (4): >= triageMin (4) -> substitution opens, no saved line
+    mockState = discomfortFixture('intermediate');
+    const view1 = render(<SessionScreen />);
+    fireEvent.press(screen.getByLabelText('Report discomfort'));
+    fireEvent.press(screen.getByLabelText('shoulder'));
+    fireEvent.press(screen.getByLabelText('Mild discomfort, 4 of 10'));
+    expect(screen.getByText('Save report')).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText('Save discomfort report'));
+    view1.rerender(<SessionScreen />);
+    expect(screen.getByText('Choose an alternative')).toBeOnTheScreen();
+    expect(screen.queryByText('Report saved with this session.')).toBeNull();
+    view1.unmount();
+
+    // 2. Intermediate + Mild (4) when neither substitution nor halt happens -> saved line shown
+    mockState = discomfortFixture('intermediate', { opensSubstitution: false });
+    const view2 = render(<SessionScreen />);
+    fireEvent.press(screen.getByLabelText('Report discomfort'));
+    fireEvent.press(screen.getByLabelText('shoulder'));
+    fireEvent.press(screen.getByLabelText('Mild discomfort, 4 of 10'));
+    fireEvent.press(screen.getByLabelText('Save discomfort report'));
+    view2.rerender(<SessionScreen />);
+    expect(screen.getByText('Report saved with this session.')).toBeOnTheScreen();
+    expect(screen.queryByText('Choose an alternative')).toBeNull();
+    expect(screen.queryByText('Stop training for today.')).toBeNull();
+    view2.unmount();
+
+    // 3. Intermediate + Stop (8): >= haltMin (8) -> halts, no saved line
+    mockState = discomfortFixture('intermediate');
+    const view3 = render(<SessionScreen />);
+    fireEvent.press(screen.getByLabelText('Report discomfort'));
+    fireEvent.press(screen.getByLabelText('shoulder'));
+    fireEvent.press(screen.getByLabelText('Stop discomfort, 8 of 10'));
+    expect(screen.getByText('Save report and stop session')).toBeOnTheScreen();
+    expect(screen.getByText('At this level the session stops for today.')).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText('Save discomfort report'));
+    view3.rerender(<SessionScreen />);
+    expect(screen.getByText('Stop training for today.')).toBeOnTheScreen();
+    expect(screen.queryByText('Report saved with this session.')).toBeNull();
+    view3.unmount();
+  });
+
+  test('elite fixture: Mild (4) opens substitution, Mild (4) when substitution does not open shows Report saved with this session., and Moderate (6) halts with caption and stop button label', () => {
+    // 1. Elite + Mild (4): >= triageMin (3), < haltMin (6) -> substitution opens
+    mockState = discomfortFixture('elite');
+    const view1 = render(<SessionScreen />);
+    fireEvent.press(screen.getByLabelText('Report discomfort'));
+    fireEvent.press(screen.getByLabelText('knee'));
+    fireEvent.press(screen.getByLabelText('Mild discomfort, 4 of 10'));
+    expect(screen.getByText('Save report')).toBeOnTheScreen();
+    expect(screen.queryByText('At this level the session stops for today.')).toBeNull();
+    fireEvent.press(screen.getByLabelText('Save discomfort report'));
+    view1.rerender(<SessionScreen />);
+    expect(screen.getByText('Choose an alternative')).toBeOnTheScreen();
+    expect(screen.queryByText('Report saved with this session.')).toBeNull();
+    view1.unmount();
+
+    // 2. Elite + Mild (4) when neither substitution nor halt happens -> saved line shown
+    mockState = discomfortFixture('elite', { opensSubstitution: false });
+    const view2 = render(<SessionScreen />);
+    fireEvent.press(screen.getByLabelText('Report discomfort'));
+    fireEvent.press(screen.getByLabelText('knee'));
+    fireEvent.press(screen.getByLabelText('Mild discomfort, 4 of 10'));
+    fireEvent.press(screen.getByLabelText('Save discomfort report'));
+    view2.rerender(<SessionScreen />);
+    expect(screen.getByText('Report saved with this session.')).toBeOnTheScreen();
+    expect(screen.queryByText('Choose an alternative')).toBeNull();
+    expect(screen.queryByText('Stop training for today.')).toBeNull();
+    view2.unmount();
+
+    // 3. Elite + Moderate (6): >= haltMin (6) -> caption + Save report and stop session -> halts
+    mockState = discomfortFixture('elite');
+    const view3 = render(<SessionScreen />);
+    fireEvent.press(screen.getByLabelText('Report discomfort'));
+    fireEvent.press(screen.getByLabelText('knee'));
+    fireEvent.press(screen.getByLabelText('Moderate discomfort, 6 of 10'));
+    expect(screen.getByText('Save report and stop session')).toBeOnTheScreen();
+    expect(screen.getByText('At this level the session stops for today.')).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText('Save discomfort report'));
+    view3.rerender(<SessionScreen />);
+    expect(screen.getByText('Stop training for today.')).toBeOnTheScreen();
+    expect(screen.queryByText('Report saved with this session.')).toBeNull();
+    view3.unmount();
+  });
 });
 

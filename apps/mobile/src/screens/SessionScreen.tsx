@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING_NOTE, EFFORT_STOP_GUIDANCE, effortCue, mapRirToRpe, RIR_OPTIONS, PREPARATION_STATUS_LABEL, isTerminalPreparationStatus, preparationDoseUnit, type EffortAnswer, type RunnerHaltReason } from '@ak/inference';
+import { EXPERIENCE_SEVERITY, runnerTierForTrainingAge } from '../../../../packages/inference/src/sessionRunner';
 import { formatTeachingOnlyReason, freeFormStartIsEmpty, useStore, type LoadSelection, type LoggedSet, type SetLoadShown, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
 import { useNavigation, useSubViewBack } from '../navigation/navigation';
 import { buildSessionSummary, NO_NEXT_SESSION_TEXT } from '../state/sessionSummary';
@@ -358,7 +359,9 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [niggleRegion, setNiggleRegion] = useState<string | null>(null);
   const [niggleSeverity, setNiggleSeverity] = useState(4);
+  const [niggleSavedNotice, setNiggleSavedNotice] = useState(false);
   const [bandLevel, setBandLevel] = useState<number | null>(null);
+  const haltMin = EXPERIENCE_SEVERITY[runnerTierForTrainingAge(profile.training_age)].haltMin;
   const advancedRest = useRef<string | null>(null);
 
   // Session feel (070): the sub-view that records how the ended session went.
@@ -533,7 +536,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
 
   useEffect(() => {
     if (currentSlot === null || target === null) return;
-    setDetailsOpen(false); setSafetyOpen(false); setNiggleRegion(null); setNiggleSeverity(4); setBandLevel(null);
+    setDetailsOpen(false); setSafetyOpen(false); setNiggleRegion(null); setNiggleSeverity(4); setNiggleSavedNotice(false); setBandLevel(null);
     setReps(target.kind === 'reps' ? target.reps : 1);
     setSeconds(target.kind === 'time' ? target.seconds : 30);
     // Initialize the load draft ONCE per set key from the resolver output.
@@ -953,6 +956,11 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
     if (niggleRegion === null) return;
     reportNiggle(niggleRegion, niggleSeverity);
     setSafetyOpen(false);
+    const after = typeof useStore.getState === 'function' ? useStore.getState() : state;
+    const afterHalted = after?.runner?.phase === 'halted'
+      || (after?.runner?.phase !== 'complete' && after?.lastTriage?.kind === 'matched' && after.lastTriage.directive.halt);
+    const afterSubstitutionOpened = after?.substitution !== null && after?.substitution !== undefined;
+    setNiggleSavedNotice(!afterHalted && !afterSubstitutionOpened);
   };
 
   const setup = lines(currentMovement?.instructions, 4);
@@ -1557,7 +1565,10 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                           />
                           <SecondaryButton
                             label="Report discomfort"
-                            onPress={() => setSafetyOpen((value) => !value)}
+                            onPress={() => {
+                              setSafetyOpen((value) => !value);
+                              setNiggleSavedNotice(false);
+                            }}
                             accessibilityLabel="Report discomfort"
                             style={{ flex: 1, minHeight: theme.touch.min }}
                           />
@@ -1597,15 +1608,23 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                                 );
                               })}
                             </View>
+                            {niggleSeverity >= haltMin && (
+                              <Text style={styles.loadEvidence}>
+                                At this level the session stops for today.
+                              </Text>
+                            )}
                             <View style={{ marginTop: theme.space[3] }}>
                               <PrimaryButton
-                                label={niggleSeverity >= 8 ? 'Stop session' : 'Find an alternative'}
+                                label={niggleSeverity >= haltMin ? 'Save report and stop session' : 'Save report'}
                                 onPress={submitNiggle}
                                 disabled={niggleRegion === null}
                                 accessibilityLabel="Save discomfort report"
                               />
                             </View>
                           </View>
+                        )}
+                        {!safetyOpen && niggleSavedNotice && substitution === null && !halted && (
+                          <Text style={styles.loadEvidence}>Report saved with this session.</Text>
                         )}
 
                         {/* Stop Session outlined full-width SecondaryButton */}
