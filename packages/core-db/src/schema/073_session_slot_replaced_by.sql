@@ -1,2 +1,7 @@
--- Record which newly inserted session_plan_slot row replaced a slot swapped after logged sets.
-ALTER TABLE session_plan_slot ADD COLUMN replaced_by_session_plan_slot_id INTEGER REFERENCES session_plan_slot(session_plan_slot_id) ON DELETE SET NULL;
+-- Links a session_plan_slot swapped after logged sets to its newly inserted replacement row.
+-- Side-car table (not ALTER TABLE ... ADD COLUMN) so self-heal re-application of the migration chain is idempotent.
+CREATE TABLE IF NOT EXISTS session_plan_slot_replacement (
+  session_plan_slot_id INTEGER PRIMARY KEY REFERENCES session_plan_slot(session_plan_slot_id) ON DELETE CASCADE,
+  replaced_by_session_plan_slot_id INTEGER NOT NULL UNIQUE REFERENCES session_plan_slot(session_plan_slot_id) ON DELETE CASCADE,
+  CHECK (replaced_by_session_plan_slot_id <> session_plan_slot_id)
+) STRICT;

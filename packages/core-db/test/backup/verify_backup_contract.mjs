@@ -38,20 +38,20 @@ const cryptoProvider = {
 const runnerSource = readFileSync(join(import.meta.dirname, '..', '..', 'src', 'migrationRunner.ts'), 'utf8');
 const sentinelTables = [...runnerSource.matchAll(/type: 'table', name: '([^']+)'/g)].map((match) => match[1]);
 const tableNames = [...new Set([...sentinelTables, 'routine_template_contract_cutoff'])].sort();
-assert.equal(tableNames.length, 122, 'live durable inventory must still contain exactly 122 tables');
+assert.equal(tableNames.length, 123, 'live durable inventory must still contain exactly 123 tables');
 
 // The supported-schema registry. The current contract is pinned here as
 // literals on purpose (adding a migration must be a conscious act), and the
 // pre-upgrade contract is the EXACT one that shipped: its fingerprint
 // authenticates backups already in the field and must never be edited.
 assert.deepEqual(backup.SUPPORTED_BACKUP_SCHEMA_CONTRACTS.map((contract) => [contract.userVersion, contract.migrationSlot, contract.tableCount, contract.objectCount]),
-  [[63, 64, 104, 174], [64, 65, 106, 181], [65, 66, 114, 198], [66, 67, 117, 203], [67, 68, 117, 203], [68, 69, 118, 204], [69, 70, 119, 205], [70, 71, 121, 207], [71, 72, 122, 208], [72, 73, 122, 208]], 'supported schema registry must list every supported contract, oldest first, ending with the current one');
+  [[63, 64, 104, 174], [64, 65, 106, 181], [65, 66, 114, 198], [66, 67, 117, 203], [67, 68, 117, 203], [68, 69, 118, 204], [69, 70, 119, 205], [70, 71, 121, 207], [71, 72, 122, 208], [72, 73, 123, 209]], 'supported schema registry must list every supported contract, oldest first, ending with the current one');
 assert.equal(backup.SUPPORTED_BACKUP_SCHEMA_CONTRACTS[0].fingerprint, 'f829bcba999b7f125d70c6f2a4053f11bdfe3bbda42781f6ef8ee8e3449590f6',
   'the shipped v63 fingerprint must never change');
 assert.equal(backup.CURRENT_BACKUP_SCHEMA_CONTRACT, backup.SUPPORTED_BACKUP_SCHEMA_CONTRACTS.at(-1));
 assert.equal(backup.BACKUP_SCHEMA_USER_VERSION, 72);
 assert.equal(backup.BACKUP_SCHEMA_MIGRATION_SLOT, 73);
-assert.equal(backup.BACKUP_SCHEMA_TABLE_COUNT, 122);
+assert.equal(backup.BACKUP_SCHEMA_TABLE_COUNT, 123);
 assert.equal(backup.backupSchemaContractFor(63, 64), backup.SUPPORTED_BACKUP_SCHEMA_CONTRACTS[0]);
 assert.equal(backup.backupSchemaContractFor(64, 65), backup.SUPPORTED_BACKUP_SCHEMA_CONTRACTS[1]);
 assert.equal(backup.backupSchemaContractFor(65, 66), backup.SUPPORTED_BACKUP_SCHEMA_CONTRACTS[2]);
@@ -144,7 +144,9 @@ function makeDatabase(file, label) {
   db.prepare('INSERT INTO session_skipped_slot (session_plan_slot_id) VALUES (?)').run(7101);
   db.prepare('INSERT INTO set_load_shown (set_id,load_source,shown_load_kg,advisory_kg,advisory_kind) VALUES (?,?,?,?,?)').run(7101, 'manual', null, 42.5, 'onerm');
   db.prepare('INSERT INTO question_log (asked_at, question_text, outcome_kind, glossary_term_id) VALUES (?,?,?,?)').run(4, 'private-question-' + label, 'card', 'RPE');
-  db.exec('PRAGMA user_version=71');
+  db.prepare("INSERT INTO session_plan_slot (session_plan_slot_id,session_id,slot_index,movement_id,planned_sets,provenance_kind) VALUES (?,?,?,(SELECT MIN(movement_id) FROM movement),?,?)").run(7102, 7001, 1, 2, 'free_form');
+  db.prepare('INSERT INTO session_plan_slot_replacement (session_plan_slot_id, replaced_by_session_plan_slot_id) VALUES (?,?)').run(7101, 7102);
+  db.exec('PRAGMA user_version=72');
   assert.equal(db.prepare('PRAGMA quick_check').get().quick_check, 'ok');
   const schemaObjects = db.prepare("SELECT type,name,tbl_name,coalesce(sql,'') AS sql FROM sqlite_master WHERE type IN ('table','index','trigger') AND name NOT LIKE 'sqlite_%' ORDER BY type,name").all()
     .map((object) => [object.type, object.name, object.tbl_name, object.sql, object.type === 'table'
@@ -162,7 +164,7 @@ function makeDatabase(file, label) {
 function snapshot(athleteId, dbName, bytes) {
   return {
     athleteId, dbName, byteLength: bytes.length, sha256Hex: cryptoProvider.sha256Hex(bytes),
-    userVersion: 71, tableCount: 122, databaseBase64: backup.bytesToBase64(bytes),
+    userVersion: 72, tableCount: 123, databaseBase64: backup.bytesToBase64(bytes),
   };
 }
 
@@ -264,8 +266,8 @@ const archive = {
   backupId: '00112233445566778899aabbccddeeff',
   createdAt: '2026-09-13T05:00:00.000Z',
   sourceAppVersion: '0.1.0',
-  sourceSchemaVersion: 71,
-  sourceMigrationSlot: 72,
+  sourceSchemaVersion: 72,
+  sourceMigrationSlot: 73,
   scope: 'all-athletes',
   restorePolicy: 'replace',
   registry: {
@@ -394,9 +396,9 @@ try {
     ...archive, sourceSchemaVersion: version, sourceMigrationSlot: slot,
     databases: archive.databases.map((database) => ({ ...database, userVersion: version, tableCount })),
   });
-  await assert.rejects(() => backup.sealBackup(withSchema(73, 74, 123), password, cryptoProvider),
+  await assert.rejects(() => backup.sealBackup(withSchema(73, 74, 124), password, cryptoProvider),
     (error) => error.code === 'newer_version', 'a future schema must be refused as newer, not as corruption');
-  await assert.rejects(() => backup.sealBackup(withSchema(72, 74, 122), password, cryptoProvider),
+  await assert.rejects(() => backup.sealBackup(withSchema(72, 74, 123), password, cryptoProvider),
     (error) => error.code === 'newer_version');
   await assert.rejects(() => backup.sealBackup(withSchema(63, 65, 104), password, cryptoProvider),
     (error) => error.code === 'unsupported_version', 'a mismatched version/slot pair is not a known schema');
@@ -587,8 +589,8 @@ try {
 
   const inventory = readFileSync(join(import.meta.dirname, '..', '..', '..', '..', 'docs', 'audits', 'accessible-coach', 'WO03_DURABLE_DATA_INVENTORY.md'), 'utf8');
   for (const tableName of tableNames) assert.ok(inventory.includes(`\`${tableName}\``), `inventory must list ${tableName}`);
-  assert.match(inventory, /Final live durable tables: 122/);
-  console.log('verify:backup PASS — AES-GCM+scrypt all-athlete physical round trip, 122 tables including activity/support/preparation/focus/goals/sport/resting HR/session feel/skipped slots/shown load/questions, current schema v71, v63-v70 forward-restore contracts, wrong-password/tamper/truncation/KDF cap/nonce/duplicate/compatibility/journal rollback');
+  assert.match(inventory, /Final live durable tables: 123/);
+  console.log('verify:backup PASS — AES-GCM+scrypt all-athlete physical round trip, 123 tables including activity/support/preparation/focus/goals/sport/resting HR/session feel/skipped slots/shown load/questions/slot replacements, current schema v72, v63-v71 forward-restore contracts, wrong-password/tamper/truncation/KDF cap/nonce/duplicate/compatibility/journal rollback');
 } finally {
   rmSync(work, { recursive: true, force: true });
 }

@@ -3136,9 +3136,10 @@ export const useStore = create<KineticsStore>()((set, get) => {
                     sst.target_kind, sst.target_reps, sst.target_seconds,
                     sps.provenance_kind, sps.target_rpe, sps.source_planned_slot_id,
                     sps.original_movement_id, sps.original_session_date, sps.override_load_kg, sps.override_reason,
-                    sps.replaced_by_session_plan_slot_id
+                    spsr.replaced_by_session_plan_slot_id
              FROM session_plan_slot sps
              LEFT JOIN session_slot_target sst ON sst.session_plan_slot_id = sps.session_plan_slot_id
+             LEFT JOIN session_plan_slot_replacement spsr ON spsr.session_plan_slot_id = sps.session_plan_slot_id
              WHERE sps.session_id = ?
              ORDER BY sps.slot_index`,
             [openSession.session_id]
@@ -7008,8 +7009,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
           ],
         );
         d.executeSync(
-          'UPDATE session_plan_slot SET replaced_by_session_plan_slot_id = ? WHERE session_plan_slot_id = ?',
-          [newSlotId, slot.sessionPlanSlotId],
+          'INSERT INTO session_plan_slot_replacement (session_plan_slot_id, replaced_by_session_plan_slot_id) VALUES (?, ?)',
+          [slot.sessionPlanSlotId, newSlotId],
         );
         if (runner !== null) {
           const origRunnerSlot = runner.slots.find((candidate) => candidate.sessionPlanSlotId === slot.sessionPlanSlotId);
@@ -7447,8 +7448,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
           ],
         );
         d.executeSync(
-          'UPDATE session_plan_slot SET replaced_by_session_plan_slot_id = ? WHERE session_plan_slot_id = ?',
-          [newSlotId, targetSlot.sessionPlanSlotId],
+          'INSERT INTO session_plan_slot_replacement (session_plan_slot_id, replaced_by_session_plan_slot_id) VALUES (?, ?)',
+          [targetSlot.sessionPlanSlotId, newSlotId],
         );
         if (runner !== null) {
           const origRunnerSlot = runner.slots.find((slot) => slot.sessionPlanSlotId === targetSlot.sessionPlanSlotId);
@@ -7984,6 +7985,10 @@ export const useStore = create<KineticsStore>()((set, get) => {
         if (snapshot.loggedSets.length !== 0) {
           throw new Error('Only an empty session can be discarded.');
         }
+        d.executeSync(
+          'DELETE FROM session_plan_slot_replacement WHERE session_plan_slot_id IN (SELECT session_plan_slot_id FROM session_plan_slot WHERE session_id = ?) OR replaced_by_session_plan_slot_id IN (SELECT session_plan_slot_id FROM session_plan_slot WHERE session_id = ?)',
+          [activeSession.sessionId, activeSession.sessionId],
+        );
         // Parent-first keeps 026's immutable side-cars legal. The explicit
         // cleanup that follows also handles test/dev connections with FKs off.
         d.executeSync('DELETE FROM session WHERE session_id = ?', [activeSession.sessionId]);
@@ -8348,6 +8353,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       // and an orphan surviving an FK-OFF reset would attach an old record to
       // new work.
       d.executeSync('DELETE FROM session_skipped_slot');
+      d.executeSync('DELETE FROM session_plan_slot_replacement');
       d.executeSync('DELETE FROM session_plan_slot');
       d.executeSync('DELETE FROM session_origin');
       d.executeSync('DELETE FROM set_prefix');

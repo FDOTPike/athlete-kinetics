@@ -110,7 +110,7 @@ test('applyDaySwap after 1 of 3 logged sets keeps A at slot_index 0 with planned
   expect(state().sessionPlan).toHaveLength(3);
 
   const dbSlots = raw().prepare(
-    'SELECT session_plan_slot_id, slot_index, movement_id, planned_sets, planned_reps, provenance_kind, target_rpe, source_planned_slot_id, original_movement_id, replaced_by_session_plan_slot_id FROM session_plan_slot WHERE session_id = ? ORDER BY slot_index',
+    'SELECT sps.session_plan_slot_id, sps.slot_index, sps.movement_id, sps.planned_sets, sps.planned_reps, sps.provenance_kind, sps.target_rpe, sps.source_planned_slot_id, sps.original_movement_id, spsr.replaced_by_session_plan_slot_id FROM session_plan_slot sps LEFT JOIN session_plan_slot_replacement spsr ON spsr.session_plan_slot_id = sps.session_plan_slot_id WHERE sps.session_id = ? ORDER BY sps.slot_index',
   ).all(state().session.sessionId);
 
   expect(dbSlots).toHaveLength(3);
@@ -255,7 +255,7 @@ test('applyRegression after 2 of 4 sets logged keeps A with planned_sets = 2 and
   expect(state().sessionPlan).toHaveLength(3);
 
   const dbSlots = raw().prepare(
-    'SELECT session_plan_slot_id, slot_index, movement_id, planned_sets, planned_reps, provenance_kind, target_rpe, source_planned_slot_id, original_movement_id, replaced_by_session_plan_slot_id FROM session_plan_slot WHERE session_id = ? ORDER BY slot_index',
+    'SELECT sps.session_plan_slot_id, sps.slot_index, sps.movement_id, sps.planned_sets, sps.planned_reps, sps.provenance_kind, sps.target_rpe, sps.source_planned_slot_id, sps.original_movement_id, spsr.replaced_by_session_plan_slot_id FROM session_plan_slot sps LEFT JOIN session_plan_slot_replacement spsr ON spsr.session_plan_slot_id = sps.session_plan_slot_id WHERE sps.session_id = ? ORDER BY sps.slot_index',
   ).all(state().session.sessionId);
 
   expect(dbSlots).toHaveLength(3);
@@ -433,7 +433,7 @@ test('invalid set counts (0, 7, NaN, non-integer) are refused with no DB or stat
   state().logSet(moveA, 5, 0, 8, undefined, undefined, undefined, undefined, slotA.sessionPlanSlotId);
 
   const snapshotDbSlots = () => raw().prepare(
-    'SELECT * FROM session_plan_slot WHERE session_id = ? ORDER BY slot_index',
+    'SELECT sps.*, spsr.replaced_by_session_plan_slot_id FROM session_plan_slot sps LEFT JOIN session_plan_slot_replacement spsr ON spsr.session_plan_slot_id = sps.session_plan_slot_id WHERE sps.session_id = ? ORDER BY sps.slot_index',
   ).all(state().session.sessionId);
   const snapshotCheckpoint = () => raw().prepare(
     'SELECT runner_state_json FROM session_runner_checkpoint WHERE session_id = ?',
