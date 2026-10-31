@@ -46,6 +46,11 @@ jest.mock('../../src/state/backupStore', () => {
   return { useBackupStore };
 });
 
+// The whole AppShell renders here, including Athlete Profile. With a cold
+// transform cache (`--no-cache`, one worker) this test took 5,350 ms on
+// 2026-10-31 and failed Jest's 5 s default, so it keeps a longer limit.
+jest.setTimeout(30_000);
+
 const settle = async () => {
   for (let n = 0; n < 12; n += 1) await new Promise((resolve) => { setImmediate(resolve); });
 };
