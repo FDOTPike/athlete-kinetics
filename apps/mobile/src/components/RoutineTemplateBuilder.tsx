@@ -591,10 +591,25 @@ function AvailableRoutineTemplateBuilder({
     setSlots(updated);
   };
 
+  const clearSlotDoseDrafts = (slotId: string): void => {
+    setDoseDrafts((current) => {
+      const setsKey = `${slotId}:sets`;
+      const repsKey = `${slotId}:reps`;
+      const rpeKey = `${slotId}:targetRpe`;
+      if (!(setsKey in current) && !(repsKey in current) && !(rpeKey in current)) return current;
+      const next = { ...current };
+      delete next[setsKey];
+      delete next[repsKey];
+      delete next[rpeKey];
+      return next;
+    });
+  };
+
   const updateRole = (index: number, role: RoutineRole): void => {
     const updated = [...slots];
     const movementId = updated[index].movementId;
     const sameRole = updated[index].role === role;
+    if (!sameRole) clearSlotDoseDrafts(updated[index].id);
     updated[index] = {
       ...updated[index],
       role,
@@ -611,6 +626,7 @@ function AvailableRoutineTemplateBuilder({
   const selectMovementForSlot = (movementId: number): void => {
     if (pickerSlotIndex === null) return;
     const updated = [...slots];
+    clearSlotDoseDrafts(updated[pickerSlotIndex].id);
     updated[pickerSlotIndex] = {
       ...updated[pickerSlotIndex],
       movementId,
@@ -803,6 +819,7 @@ function AvailableRoutineTemplateBuilder({
                 <Pressable
                   onPress={() => {
                     setSchemaType(st);
+                    setDoseDrafts((current) => (Object.keys(current).length === 0 ? current : {}));
                     setSlots((current) => current.map((slot) => ({
                       ...slot, sets: undefined, reps: undefined, targetRpe: undefined,
                     })));

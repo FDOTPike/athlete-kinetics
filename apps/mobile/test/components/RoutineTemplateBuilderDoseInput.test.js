@@ -6,6 +6,7 @@ let mockState;
 
 jest.mock('../../src/state/useStore', () => ({
   palette: { bg: '#000', surface: '#15151A', line: '#26262E', text: '#F4F4F6', dim: '#86868F', green: '#2EE6A8', amber: '#FFB454', red: '#FF5D5D' },
+  formatTeachingOnlyReason: () => '',
   useStore: (selector) => selector(mockState),
 }));
 
@@ -165,5 +166,31 @@ test('RoutineTemplateBuilder handleDoseChange normalizes comma decimal separator
     }),
   );
 });
+
+test('RoutineTemplateBuilder clears affected dose drafts when loading method, role, or movement resets slot doses', () => {
+  render(<RoutineTemplateBuilder initialTemplate={initialTemplate} />);
+
+  // 1. Loading method change clears focused draft
+  fireEvent.changeText(screen.getByLabelText('Sets for day 1 slot 1'), '9');
+  expect(screen.getByLabelText('Sets for day 1 slot 1').props.value).toBe('9');
+  fireEvent.press(screen.getByLabelText('Undulating loading method'));
+  expect(screen.getByLabelText('Sets for day 1 slot 1').props.value).toBe('5');
+
+  // 2. Role change clears focused draft for that slot
+  fireEvent.changeText(screen.getByLabelText('Sets for day 1 slot 1'), '9');
+  expect(screen.getByLabelText('Sets for day 1 slot 1').props.value).toBe('9');
+  fireEvent.press(screen.getByLabelText('Set day 1 slot 1 role to conditional'));
+  expect(screen.getByLabelText('Sets for day 1 slot 1').props.value).toBe('2');
+  fireEvent.press(screen.getByLabelText('Set day 1 slot 1 role to major'));
+  expect(screen.getByLabelText('Sets for day 1 slot 1').props.value).toBe('5');
+
+  // 3. Movement selection clears focused draft for that slot
+  fireEvent.changeText(screen.getByLabelText('Sets for day 1 slot 1'), '9');
+  expect(screen.getByLabelText('Sets for day 1 slot 1').props.value).toBe('9');
+  fireEvent.press(screen.getByLabelText('Select movement for day 1 slot 1'));
+  fireEvent.press(screen.getByLabelText('Choose Barbell Back Squat'));
+  expect(screen.getByLabelText('Sets for day 1 slot 1').props.value).toBe('5');
+});
+
 
 
