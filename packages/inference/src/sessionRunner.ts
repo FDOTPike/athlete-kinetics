@@ -813,6 +813,72 @@ export function replayRunner(
   return events.reduce((state, event) => advance(state, event), startRunner(slots, config));
 }
 
+export interface ReplaceSlotAfterLoggedSetsInput {
+  readonly targetSessionPlanSlotId: number;
+  readonly completedSets: number;
+  readonly replacementSlot: RunnerSlotInput;
+  readonly atMs: number;
+}
+
+/**
+ * When a slot is swapped after one or more sets are already logged on it,
+ * keeps the original runner slot with its completed set count, inserts the new
+ * runner slot right after it, and positions the runner at set 1 of the new slot
+ * in the working phase (applying the existing SUBSTITUTE event where it applies).
+ */
+export function replaceSlotAfterLoggedSets(
+  state: RunnerState,
+  input: ReplaceSlotAfterLoggedSetsInput,
+): RunnerState {
+  const runnerSlotIndex = state.slots.findIndex(
+    (candidate) => candidate.sessionPlanSlotId === input.targetSessionPlanSlotId,
+  );
+  if (runnerSlotIndex < 0) return state;
+  const originalSlot = state.slots[runnerSlotIndex]!;
+  const current = currentSlot(state);
+  const throughSubstitution = current?.sessionPlanSlotId === input.targetSessionPlanSlotId &&
+    state.substitutionOfferedForSessionPlanSlotId === input.targetSessionPlanSlotId
+    ? advance(state, {
+        kind: 'SUBSTITUTE',
+        atMs: input.atMs,
+        movementId: input.replacementSlot.movementId,
+        movementName: input.replacementSlot.movementName,
+      })
+    : state;
+  const completedCount = Math.max(
+    1,
+    throughSubstitution.slotSetCounts[runnerSlotIndex] ?? input.completedSets,
+  );
+  const normalizedReplacement = normalizeSlot(input.replacementSlot);
+  const nextSlots: RunnerSlot[] = [
+    ...throughSubstitution.slots.slice(0, runnerSlotIndex),
+    { ...originalSlot, sets: completedCount },
+    normalizedReplacement,
+    ...throughSubstitution.slots.slice(runnerSlotIndex + 1),
+  ];
+  const nextCounts: number[] = [
+    ...throughSubstitution.slotSetCounts.slice(0, runnerSlotIndex),
+    completedCount,
+    0,
+    ...throughSubstitution.slotSetCounts.slice(runnerSlotIndex + 1),
+  ];
+  const loggedSets = nextCounts.reduce((sum, count) => sum + count, 0);
+  return normalizeState({
+    ...throughSubstitution,
+    slots: nextSlots,
+    slotSetCounts: nextCounts,
+    loggedSets,
+    slotIndex: runnerSlotIndex + 1,
+    setIndex: 1,
+    phase: 'working',
+    restSecondsTarget: 0,
+    restStartedAtMs: null,
+    restRpe: null,
+    substitutionOfferedForSessionPlanSlotId: null,
+    updatedAtMs: input.atMs,
+  });
+}
+
 /** Create a validated, defensive-copy checkpoint suitable for plain JSON storage. */
 export function createRunnerCheckpoint(state: RunnerState): RunnerCheckpoint {
   return { version: RUNNER_CHECKPOINT_VERSION, state: cloneState(state) };

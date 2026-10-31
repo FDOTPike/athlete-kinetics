@@ -332,6 +332,12 @@ export const SENTINELS: readonly MigrationSentinel[] = [
   { type: 'table', name: 'question_log' }, // 072
   { type: 'table', name: 'session_skipped_slot' },                            // 071
   { type: 'table', name: 'set_load_shown' },                                  // 071
+  {
+    type: 'row',
+    name: 'session_plan_slot.replaced_by_session_plan_slot_id',               // 073
+    presenceSql: `SELECT 1 AS ok FROM pragma_table_info('session_plan_slot')
+      WHERE name = 'replaced_by_session_plan_slot_id'`,
+  },
 ];
 
 /** Durable tables deliberately absent from SENTINELS, each with the reason it
@@ -505,7 +511,17 @@ export function splitSqlStatements(sql: string): string[] {
  * steps only the first statement of a script.)
  */
 function executeScript(db: MigrationDb, sql: string): void {
-  for (const statement of splitSqlStatements(sql)) db.executeSync(statement);
+  for (const statement of splitSqlStatements(sql)) {
+    try {
+      db.executeSync(statement);
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      if (/duplicate column name/i.test(msg) && /^\s*(?:--[^\r\n]*\r?\n\s*)*ALTER\s+TABLE\b[\s\S]*\bADD\b/i.test(statement)) {
+        continue;
+      }
+      throw error;
+    }
+  }
 }
 
 function applyFrom(db: MigrationDb, migrations: readonly string[], start: number): void {

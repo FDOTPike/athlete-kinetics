@@ -69,7 +69,7 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '067_sport_and_emphasis.sql',
   '068_movement_content_correction_v2.sql',
   '069_resting_heart_rate.sql',
-  '070_session_feel.sql', '071_beta_recording.sql', '072_question_log.sql'];
+  '070_session_feel.sql', '071_beta_recording.sql', '072_question_log.sql', '073_session_slot_replaced_by.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
@@ -1766,11 +1766,11 @@ console.log('[2u] 057 block_meta phase/index repair + enforcement');
     const db = freshDb();
     runMigrations(db, MIGRATIONS);
     // Slot 004 is the parameterized materialize script, never a migration:
-    // 71 files (slots 001-072, no 004) -> user_version 71. This count is
+    // 72 files (slots 001-073, no 004) -> user_version 72. This count is
     // pinned deliberately so adding a migration is a conscious act, not a
-    // silent one. Re-pinned for 072 (question log).
-    check('fresh install reaches user_version 71 (71 files, no slot 004)',
-      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 71,
+    // silent one. Re-pinned for 073 (session_slot_replaced_by).
+    check('fresh install reaches user_version 72 (72 files, no slot 004)',
+      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 72,
       String(uv(db)));
     const trig = db.raw.prepare(
       `SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'trigger'
@@ -4202,7 +4202,7 @@ const IDX_071 = FILES.indexOf('071_beta_recording.sql');
   const shownRows = (db) => db.raw.prepare('SELECT * FROM set_load_shown ORDER BY set_id').all();
   const priorFacts = (db) => JSON.stringify({
     sessions: db.raw.prepare('SELECT * FROM session ORDER BY session_id').all(),
-    slots: db.raw.prepare('SELECT * FROM session_plan_slot ORDER BY session_plan_slot_id').all(),
+    slots: db.raw.prepare('SELECT session_plan_slot_id, session_id, slot_index, movement_id, planned_sets, planned_reps, provenance_kind, target_rpe, source_planned_slot_id, original_movement_id, original_session_date, override_load_kg, override_reason FROM session_plan_slot ORDER BY session_plan_slot_id').all(),
     sets: db.raw.prepare('SELECT * FROM set_record ORDER BY set_id').all(),
     targets: db.raw.prepare('SELECT * FROM set_target ORDER BY set_id').all(),
     outcomes: db.raw.prepare('SELECT * FROM session_outcome ORDER BY session_id').all(),
@@ -4336,9 +4336,10 @@ const IDX_071 = FILES.indexOf('071_beta_recording.sql');
 }
 
 console.log('[072] question log');
+const IDX_072 = FILES.indexOf('072_question_log.sql');
 {
-  const index = FILES.indexOf('072_question_log.sql');
-  check('072 is appended after 071 and completes the chain', index === IDX_071 + 1 && index === MIGRATIONS.length - 1 && index === 70);
+  const index = IDX_072;
+  check('072 is appended after 071', index === IDX_071 + 1 && index === 70);
   const questions = (db) => db.raw.prepare('SELECT * FROM question_log ORDER BY id').all();
   const upgraded = freshDb();
   applyRaw(upgraded, MIGRATIONS, 0, index);
@@ -4370,6 +4371,39 @@ console.log('[072] question log');
   runMigrations(upgraded, MIGRATIONS);
   check('self-heal rebuilds the lost log while retaining session data', questions(upgraded).length === 0
     && sentinelsMissing(upgraded).length === 0 && upgraded.raw.prepare('SELECT COUNT(*) AS c FROM session WHERE session_id = 72').get().c === 1);
+}
+
+console.log('[073] session slot replaced by');
+{
+  const index = FILES.indexOf('073_session_slot_replaced_by.sql');
+  check('073 is appended after 072 and completes the chain', index === IDX_072 + 1 && index === MIGRATIONS.length - 1 && index === 71);
+  const upgraded = freshDb();
+  applyRaw(upgraded, MIGRATIONS, 0, index);
+  const firstMoveId = Number(upgraded.raw.prepare('SELECT movement_id FROM movement ORDER BY movement_id LIMIT 1').get().movement_id);
+  upgraded.raw.exec("INSERT INTO session (session_id, session_date, started_at_ms) VALUES (73, '2026-10-31', 1)");
+  upgraded.raw.prepare(
+    "INSERT INTO session_plan_slot (session_plan_slot_id, session_id, slot_index, movement_id, planned_sets, planned_reps, provenance_kind) VALUES (1, 73, 0, ?, 3, 5, 'free_form')",
+  ).run(firstMoveId);
+  runMigrations(upgraded, MIGRATIONS);
+  const preRow = upgraded.raw.prepare('SELECT session_plan_slot_id, replaced_by_session_plan_slot_id FROM session_plan_slot WHERE session_plan_slot_id = 1').get();
+  check('existing session_plan_slot rows get NULL replaced_by_session_plan_slot_id after 073',
+    preRow !== undefined && preRow.replaced_by_session_plan_slot_id === null);
+  upgraded.raw.prepare(
+    "INSERT INTO session_plan_slot (session_plan_slot_id, session_id, slot_index, movement_id, planned_sets, planned_reps, provenance_kind, original_movement_id) VALUES (2, 73, 1, ?, 2, 5, 'free_form', ?)",
+  ).run(firstMoveId, firstMoveId);
+  upgraded.raw.exec('UPDATE session_plan_slot SET planned_sets = 1, replaced_by_session_plan_slot_id = 2 WHERE session_plan_slot_id = 1');
+  const linkedRow = upgraded.raw.prepare('SELECT replaced_by_session_plan_slot_id FROM session_plan_slot WHERE session_plan_slot_id = 1').get();
+  check('replaced_by_session_plan_slot_id references the replacement row and ON DELETE SET NULL clears it',
+    linkedRow?.replaced_by_session_plan_slot_id === 2);
+  upgraded.executeSync(`PRAGMA user_version = ${index};`);
+  runMigrations(upgraded, MIGRATIONS);
+  upgraded.executeSync('PRAGMA user_version = 0;');
+  runMigrations(upgraded, MIGRATIONS);
+  check('073 survives replay and full re-apply with linked row preserved',
+    upgraded.raw.prepare('SELECT replaced_by_session_plan_slot_id FROM session_plan_slot WHERE session_plan_slot_id = 1').get()?.replaced_by_session_plan_slot_id === 2);
+  upgraded.raw.exec('DELETE FROM session_plan_slot WHERE session_plan_slot_id = 2');
+  check('deleting the replacement row sets replaced_by_session_plan_slot_id to NULL',
+    upgraded.raw.prepare('SELECT replaced_by_session_plan_slot_id FROM session_plan_slot WHERE session_plan_slot_id = 1').get()?.replaced_by_session_plan_slot_id === null);
 }
 
 // --- one statement per database call ------------------------------------------

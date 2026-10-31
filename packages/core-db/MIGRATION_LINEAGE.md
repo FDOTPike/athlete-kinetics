@@ -24,6 +24,8 @@ The third is `071_beta_recording` (ordinal 70): two new record-only tables,
 `session_skipped_slot` and `set_load_shown`, and nothing else.
 The fourth is `072_question_log` (ordinal 71): local question text and its
 record-only routing outcome in `question_log`.
+The fifth is `073_session_slot_replaced_by` (ordinal 72): adds nullable
+`replaced_by_session_plan_slot_id` on `session_plan_slot`.
 `MIGRATION_LINEAGE.json` records the SHA-256 of every shipped file and its
 ordinal, and of master's 34-entry chain. Master's exact `034`/`058` bytes and its
 registry live under `test/fixtures/lineage/master-1da218d/`.

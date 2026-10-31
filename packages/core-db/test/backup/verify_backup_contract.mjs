@@ -45,12 +45,12 @@ assert.equal(tableNames.length, 122, 'live durable inventory must still contain 
 // pre-upgrade contract is the EXACT one that shipped: its fingerprint
 // authenticates backups already in the field and must never be edited.
 assert.deepEqual(backup.SUPPORTED_BACKUP_SCHEMA_CONTRACTS.map((contract) => [contract.userVersion, contract.migrationSlot, contract.tableCount, contract.objectCount]),
-  [[63, 64, 104, 174], [64, 65, 106, 181], [65, 66, 114, 198], [66, 67, 117, 203], [67, 68, 117, 203], [68, 69, 118, 204], [69, 70, 119, 205], [70, 71, 121, 207], [71, 72, 122, 208]], 'supported schema registry must list every supported contract, oldest first, ending with the current one');
+  [[63, 64, 104, 174], [64, 65, 106, 181], [65, 66, 114, 198], [66, 67, 117, 203], [67, 68, 117, 203], [68, 69, 118, 204], [69, 70, 119, 205], [70, 71, 121, 207], [71, 72, 122, 208], [72, 73, 122, 208]], 'supported schema registry must list every supported contract, oldest first, ending with the current one');
 assert.equal(backup.SUPPORTED_BACKUP_SCHEMA_CONTRACTS[0].fingerprint, 'f829bcba999b7f125d70c6f2a4053f11bdfe3bbda42781f6ef8ee8e3449590f6',
   'the shipped v63 fingerprint must never change');
 assert.equal(backup.CURRENT_BACKUP_SCHEMA_CONTRACT, backup.SUPPORTED_BACKUP_SCHEMA_CONTRACTS.at(-1));
-assert.equal(backup.BACKUP_SCHEMA_USER_VERSION, 71);
-assert.equal(backup.BACKUP_SCHEMA_MIGRATION_SLOT, 72);
+assert.equal(backup.BACKUP_SCHEMA_USER_VERSION, 72);
+assert.equal(backup.BACKUP_SCHEMA_MIGRATION_SLOT, 73);
 assert.equal(backup.BACKUP_SCHEMA_TABLE_COUNT, 122);
 assert.equal(backup.backupSchemaContractFor(63, 64), backup.SUPPORTED_BACKUP_SCHEMA_CONTRACTS[0]);
 assert.equal(backup.backupSchemaContractFor(64, 65), backup.SUPPORTED_BACKUP_SCHEMA_CONTRACTS[1]);
@@ -60,6 +60,7 @@ assert.equal(backup.backupSchemaContractFor(67, 68), backup.SUPPORTED_BACKUP_SCH
 assert.equal(backup.backupSchemaContractFor(68, 69), backup.SUPPORTED_BACKUP_SCHEMA_CONTRACTS[5]);
 assert.equal(backup.backupSchemaContractFor(69, 70), backup.SUPPORTED_BACKUP_SCHEMA_CONTRACTS[6]);
 assert.equal(backup.backupSchemaContractFor(70, 71), backup.SUPPORTED_BACKUP_SCHEMA_CONTRACTS[7]);
+assert.equal(backup.backupSchemaContractFor(71, 72), backup.SUPPORTED_BACKUP_SCHEMA_CONTRACTS[8]);
 // 068 changes coaching text only, so it shares the v66 schema fingerprint. The
 // two are still distinct contracts: version and slot identify a backup.
 assert.equal(backup.SUPPORTED_BACKUP_SCHEMA_CONTRACTS[3].fingerprint, backup.SUPPORTED_BACKUP_SCHEMA_CONTRACTS[4].fingerprint);
@@ -68,9 +69,10 @@ assert.notEqual(backup.SUPPORTED_BACKUP_SCHEMA_CONTRACTS[3], backup.SUPPORTED_BA
 assert.notEqual(backup.SUPPORTED_BACKUP_SCHEMA_CONTRACTS[4].fingerprint, backup.SUPPORTED_BACKUP_SCHEMA_CONTRACTS[5].fingerprint);
 assert.notEqual(backup.SUPPORTED_BACKUP_SCHEMA_CONTRACTS[5].fingerprint, backup.SUPPORTED_BACKUP_SCHEMA_CONTRACTS[6].fingerprint);
 assert.notEqual(backup.SUPPORTED_BACKUP_SCHEMA_CONTRACTS[6].fingerprint, backup.CURRENT_BACKUP_SCHEMA_CONTRACT.fingerprint);
+assert.notEqual(backup.SUPPORTED_BACKUP_SCHEMA_CONTRACTS[8].fingerprint, backup.CURRENT_BACKUP_SCHEMA_CONTRACT.fingerprint);
 assert.equal(backup.backupSchemaContractFor(63, 65), null, 'a version and slot that do not belong together are not a known schema');
-assert.equal(backup.backupSchemaContractFor(71, 72), backup.CURRENT_BACKUP_SCHEMA_CONTRACT);
-assert.equal(backup.backupSchemaContractFor(72, 73), null, 'a future schema has no contract');
+assert.equal(backup.backupSchemaContractFor(72, 73), backup.CURRENT_BACKUP_SCHEMA_CONTRACT);
+assert.equal(backup.backupSchemaContractFor(73, 74), null, 'a future schema has no contract');
 assert.equal(backup.backupSchemaContractFor(62, 63), null, 'a schema older than the first backup-capable build has no contract');
 
 const schemaFiles = readdirSync(schemaDirectory).filter((name) => /^0\d\d_.*\.sql$/.test(name) && !name.startsWith('004_')).sort();
@@ -376,12 +378,12 @@ try {
   );
   await assert.rejects(() => backup.sealBackup(archive, 'too-short', cryptoProvider), /at least 12/);
 
-  const compatible = { readerSchemaVersion: 71, supportedSourceSchemaVersions: [63, 64, 65, 66, 67, 68, 69, 70, 71], readerMigrationSlot: 72, supportedSourceMigrationSlots: [64, 65, 66, 67, 68, 69, 70, 71, 72] };
+  const compatible = { readerSchemaVersion: 72, supportedSourceSchemaVersions: [63, 64, 65, 66, 67, 68, 69, 70, 71, 72], readerMigrationSlot: 73, supportedSourceMigrationSlots: [64, 65, 66, 67, 68, 69, 70, 71, 72, 73] };
   assert.equal(backup.decideRestore('merge', opened.archive, compatible).code, 'merge_not_supported');
   assert.equal(backup.decideRestore('replace', opened.archive, compatible).recoveryCopyRequired, true);
   assert.equal(backup.decideRestore('replace', opened.archive, { ...compatible, readerSchemaVersion: 69 }).code, 'newer_schema');
   assert.equal(backup.decideRestore('replace', opened.archive, { ...compatible, supportedSourceSchemaVersions: [63, 64, 65, 66, 67, 68, 69] }).code, 'schema_adapter_unavailable');
-  assert.equal(backup.decideRestore('replace', { ...opened.archive, sourceMigrationSlot: 73 }, compatible).code, 'newer_schema');
+  assert.equal(backup.decideRestore('replace', { ...opened.archive, sourceMigrationSlot: 74 }, compatible).code, 'newer_schema');
   // A supported pre-upgrade archive is restorable; it is not treated as current.
   assert.equal(backup.decideRestore('replace', { ...opened.archive, sourceSchemaVersion: 63, sourceMigrationSlot: 64 }, compatible).ok, true);
 
@@ -392,9 +394,9 @@ try {
     ...archive, sourceSchemaVersion: version, sourceMigrationSlot: slot,
     databases: archive.databases.map((database) => ({ ...database, userVersion: version, tableCount })),
   });
-  await assert.rejects(() => backup.sealBackup(withSchema(72, 73, 123), password, cryptoProvider),
+  await assert.rejects(() => backup.sealBackup(withSchema(73, 74, 123), password, cryptoProvider),
     (error) => error.code === 'newer_version', 'a future schema must be refused as newer, not as corruption');
-  await assert.rejects(() => backup.sealBackup(withSchema(71, 73, 122), password, cryptoProvider),
+  await assert.rejects(() => backup.sealBackup(withSchema(72, 74, 122), password, cryptoProvider),
     (error) => error.code === 'newer_version');
   await assert.rejects(() => backup.sealBackup(withSchema(63, 65, 104), password, cryptoProvider),
     (error) => error.code === 'unsupported_version', 'a mismatched version/slot pair is not a known schema');
@@ -402,7 +404,7 @@ try {
     (error) => error.code === 'unsupported_version', 'a schema older than the first backup-capable build is refused');
   await assert.rejects(() => backup.sealBackup(withSchema(63, 64, 106), password, cryptoProvider),
     (error) => error.code === 'invalid_archive', 'a v63 archive must carry the v63 table count, not the current one');
-  await assert.rejects(() => backup.sealBackup(withSchema(71, 72, 104), password, cryptoProvider),
+  await assert.rejects(() => backup.sealBackup(withSchema(72, 73, 104), password, cryptoProvider),
     (error) => error.code === 'invalid_archive', 'a current archive must carry the current table count');
   await assert.rejects(() => backup.sealBackup(withSchema(64, 65, 121), password, cryptoProvider),
     (error) => error.code === 'invalid_archive', 'a v64 archive must carry the v64 table count');
