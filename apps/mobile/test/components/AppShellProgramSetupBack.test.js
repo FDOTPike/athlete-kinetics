@@ -45,8 +45,6 @@ jest.mock('../../src/state/backupStore', () => {
   return { useBackupStore };
 });
 
-jest.setTimeout(60_000);
-
 const settle = async () => {
   for (let n = 0; n < 12; n += 1) await new Promise((resolve) => { setImmediate(resolve); });
 };
