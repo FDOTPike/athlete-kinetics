@@ -685,7 +685,7 @@ function AvailableRoutineTemplateBuilder({
   ): void => {
     const key = `${slotId}:${field}`;
     setDoseDrafts((current) => ({ ...current, [key]: value }));
-    const trimmed = value.trim();
+    const trimmed = value.trim().replace(/,/g, '.');
     if (trimmed === '' || trimmed.endsWith('.')) return;
     if (!Number.isFinite(Number(trimmed))) return;
     updateDose(index, field, trimmed);

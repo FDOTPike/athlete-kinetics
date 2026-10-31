@@ -146,3 +146,24 @@ test('RoutineTemplateBuilder handleSave resolves incomplete focused dose drafts 
   );
 });
 
+test('RoutineTemplateBuilder handleDoseChange normalizes comma decimal separators for RPE input', () => {
+  render(<RoutineTemplateBuilder initialTemplate={initialTemplate} />);
+
+  const rpeInput = screen.getByLabelText('Maximum RPE for day 1 slot 1');
+
+  fireEvent.changeText(rpeInput, '7,');
+  expect(screen.getByLabelText('Maximum RPE for day 1 slot 1').props.value).toBe('7,');
+
+  fireEvent.changeText(screen.getByLabelText('Maximum RPE for day 1 slot 1'), '7,5');
+  fireEvent(screen.getByLabelText('Maximum RPE for day 1 slot 1'), 'blur');
+  expect(screen.getByLabelText('Maximum RPE for day 1 slot 1').props.value).toBe('7.5');
+
+  fireEvent.press(screen.getByLabelText('Save routine template'));
+  expect(mockState.saveRoutineTemplate).toHaveBeenCalledWith(
+    expect.objectContaining({
+      slots: [expect.objectContaining({ targetRpe: 7.5 })],
+    }),
+  );
+});
+
+
