@@ -1202,12 +1202,14 @@ export default function ProfileScreen(): React.JSX.Element {
                       label="SAVE"
                       onPress={() => {
                         setCoachError(null);
-                        renameAthleteEntry(a.id, editAthleteName);
-                        const error = useStore.getState().error;
-                        setCoachError(error);
-                        if (error === null) {
+                        void (async () => {
+                          const ok = await renameAthleteEntry(a.id, editAthleteName);
+                          if (ok === false) {
+                            setCoachError(useStore.getState().error);
+                            return;
+                          }
                           setEditingAthleteId(null);
-                        }
+                        })();
                       }}
                       accessibilityLabel="Save name"
                     />
@@ -1230,8 +1232,12 @@ export default function ProfileScreen(): React.JSX.Element {
                       disabled={isActive}
                       onPress={() => {
                         setCoachError(null);
-                        switchAthlete(a.id);
-                        setCoachError(useStore.getState().error);
+                        void (async () => {
+                          const ok = await switchAthlete(a.id);
+                          if (ok === false) {
+                            setCoachError(useStore.getState().error);
+                          }
+                        })();
                       }}
                       accessibilityRole="button"
                       accessibilityState={{ selected: isActive }}
@@ -1270,12 +1276,14 @@ export default function ProfileScreen(): React.JSX.Element {
                         label={`Confirm delete ${a.name}`}
                         onPress={() => {
                           setCoachError(null);
-                          deleteAthlete(a.id);
-                          const error = useStore.getState().error;
-                          setCoachError(error);
-                          if (error === null) {
+                          void (async () => {
+                            const ok = await deleteAthlete(a.id);
+                            if (ok === false) {
+                              setCoachError(useStore.getState().error);
+                              return;
+                            }
                             setConfirmingDeleteAthleteId(null);
-                          }
+                          })();
                         }}
                         style={styles.confirmActionIsolated}
                       />
@@ -1310,12 +1318,14 @@ export default function ProfileScreen(): React.JSX.Element {
                 onPress={() => {
                   setCoachError(null);
                   const trimmed = newAthleteName.trim();
-                  createAthlete(trimmed.length > 0 ? trimmed : 'New Athlete');
-                  const error = useStore.getState().error;
-                  setCoachError(error);
-                  if (error === null) {
+                  void (async () => {
+                    const ok = await createAthlete(trimmed.length > 0 ? trimmed : 'New Athlete');
+                    if (ok === false) {
+                      setCoachError(useStore.getState().error);
+                      return;
+                    }
                     setNewAthleteName('');
-                  }
+                  })();
                 }}
                 accessibilityLabel="Add a new athlete"
               />

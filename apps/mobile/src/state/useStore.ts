@@ -1024,15 +1024,15 @@ interface KineticsStore {
   revokeMovementPriorExperience: (movementId: number) => boolean;
   /** Coach Mode: close the current athlete's DB and re-boot against the
    *  target athlete's file. Refused while a session is active. */
-  switchAthlete: (id: string) => void;
+  switchAthlete: (id: string) => Promise<boolean>;
   /** Coach Mode: register a new athlete (fresh, empty DB file) and switch to
    *  them — a fresh file has updated_at_ms = 0, so they land in onboarding. */
-  createAthlete: (name: string) => void;
+  createAthlete: (name: string) => Promise<boolean>;
   /** Coach Mode: rename a registry entry (display name only). */
-  renameAthleteEntry: (id: string, name: string) => void;
+  renameAthleteEntry: (id: string, name: string) => Promise<boolean>;
   /** Coach Mode: remove a non-active, non-default athlete from the registry
    *  and best-effort delete their DB file. */
-  deleteAthlete: (id: string) => void;
+  deleteAthlete: (id: string) => Promise<boolean>;
   /** Unlock or explicitly relock the advanced coaching/debug surfaces. */
   setAdvancedToolsUnlocked: (unlocked: boolean) => void;
   /** Onboarding completion: persist every answer in ONE save (no partial
@@ -3715,121 +3715,127 @@ export const useStore = create<KineticsStore>()((set, get) => {
   },
 
   // --- Coach Mode (Phase 15): one DB file per athlete ------------------------
-  switchAthlete: (id) => {
+  switchAthlete: async (id) => {
     if (get().session !== null) {
       set({ error: 'End the active session before switching athletes.' });
-      return;
+      return false;
     }
-    if (id === get().activeAthleteId && get().status === 'ready') return;
+    if (id === get().activeAthleteId && get().status === 'ready') {
+      set({ error: null });
+      return true;
+    }
     // Lease from the registry read through the write, the close and the boot hand-off.
     const releaseLease = tryAcquireDataMutationLease(true);
     if (releaseLease === null) {
       set({ error: mutationRefusalMessage() });
-      return;
+      return false;
     }
     athleteContextRevision += 1;
     set({ status: 'booting', error: null });
-    void (async () => {
-      try {
-        const reg = setActiveAthlete(await loadRegistry(), id);
-        if (reg.activeId !== id) {
-          set({ status: 'ready', error: 'Unknown athlete.' });
-          return;
-        }
-        if (!(await saveRegistry(reg))) {
-          set({ status: 'ready', error: 'Could not persist the athlete switch — registry write failed.' });
-          return;
-        }
-        if (db !== null) {
-          try { closeKineticsDb(db); } catch { /* reopen path recovers */ }
-          db = null;
-        }
-        set({ ...PER_ATHLETE_RESET, athletes: reg.athletes, activeAthleteId: id });
-        get().boot(); // status is 'booting' -> full open/migrate/hydrate path
-      } catch (e) {
-        set({ status: 'error', error: e instanceof Error ? e.message : String(e) });
-      } finally {
-        releaseLease();
+    try {
+      const reg = setActiveAthlete(await loadRegistry(), id);
+      if (reg.activeId !== id) {
+        set({ status: 'ready', error: 'Unknown athlete.' });
+        return false;
       }
-    })();
+      if (!(await saveRegistry(reg))) {
+        set({ status: 'ready', error: 'Could not persist the athlete switch — registry write failed.' });
+        return false;
+      }
+      if (db !== null) {
+        try { closeKineticsDb(db); } catch { /* reopen path recovers */ }
+        db = null;
+      }
+      set({ ...PER_ATHLETE_RESET, athletes: reg.athletes, activeAthleteId: id });
+      get().boot(); // status is 'booting' -> full open/migrate/hydrate path
+      return true;
+    } catch (e) {
+      set({ status: 'error', error: e instanceof Error ? e.message : String(e) });
+      return false;
+    } finally {
+      releaseLease();
+    }
   },
 
-  createAthlete: (name) => {
+  createAthlete: async (name) => {
     if (get().session !== null) {
       set({ error: 'End the active session before adding athletes.' });
-      return;
+      return false;
     }
     const releaseLease = tryAcquireDataMutationLease(true);
     if (releaseLease === null) {
       set({ error: mutationRefusalMessage() });
-      return;
+      return false;
     }
     athleteContextRevision += 1;
     set({ status: 'booting', error: null });
-    void (async () => {
-      try {
-        const { reg, entry } = addAthlete(await loadRegistry(), name, Date.now());
-        if (!(await saveRegistry(setActiveAthlete(reg, entry.id)))) {
-          set({ status: 'ready', error: 'Could not create the athlete — registry write failed.' });
-          return;
-        }
-        if (db !== null) {
-          try { closeKineticsDb(db); } catch { /* reopen path recovers */ }
-          db = null;
-        }
-        set({
-          ...PER_ATHLETE_RESET,
-          athletes: reg.athletes,
-          activeAthleteId: entry.id,
-        });
-        // Fresh file: migrate() builds the full schema; its athlete_profile
-        // row has updated_at_ms = 0, so this athlete lands in onboarding.
-        get().boot();
-      } catch (e) {
-        set({ status: 'error', error: e instanceof Error ? e.message : String(e) });
-      } finally {
-        releaseLease();
+    try {
+      const { reg, entry } = addAthlete(await loadRegistry(), name, Date.now());
+      if (!(await saveRegistry(setActiveAthlete(reg, entry.id)))) {
+        set({ status: 'ready', error: 'Could not create the athlete — registry write failed.' });
+        return false;
       }
-    })();
+      if (db !== null) {
+        try { closeKineticsDb(db); } catch { /* reopen path recovers */ }
+        db = null;
+      }
+      set({
+        ...PER_ATHLETE_RESET,
+        athletes: reg.athletes,
+        activeAthleteId: entry.id,
+      });
+      // Fresh file: migrate() builds the full schema; its athlete_profile
+      // row has updated_at_ms = 0, so this athlete lands in onboarding.
+      get().boot();
+      return true;
+    } catch (e) {
+      set({ status: 'error', error: e instanceof Error ? e.message : String(e) });
+      return false;
+    } finally {
+      releaseLease();
+    }
   },
 
-  renameAthleteEntry: (id, name) => {
+  renameAthleteEntry: async (id, name) => {
     const releaseLease = tryAcquireDataMutationLease(true);
     if (releaseLease === null) {
       set({ error: mutationRefusalMessage() });
-      return;
+      return false;
     }
-    void (async () => {
-      try {
-        const reg = regRenameAthlete(await loadRegistry(), id, name);
-        if (!(await saveRegistry(reg))) {
-          set({ error: 'Rename not saved — registry write failed.' });
-          return;
-        }
-        set({ athletes: reg.athletes });
-      } finally {
-        releaseLease();
+    set({ error: null });
+    try {
+      const reg = regRenameAthlete(await loadRegistry(), id, name);
+      if (!(await saveRegistry(reg))) {
+        set({ error: 'Rename not saved — registry write failed.' });
+        return false;
       }
-    })();
+      set({ athletes: reg.athletes, error: null });
+      return true;
+    } catch (e) {
+      set({ error: e instanceof Error ? e.message : String(e) });
+      return false;
+    } finally {
+      releaseLease();
+    }
   },
 
-  deleteAthlete: (id) => {
+  deleteAthlete: async (id) => {
     // The lease also covers the database file removal after the registry write.
     const releaseLease = tryAcquireDataMutationLease(true);
     if (releaseLease === null) {
       set({ error: mutationRefusalMessage() });
-      return;
+      return false;
     }
-    void (async () => {
-      try {
+    set({ error: null });
+    try {
       const { reg, removed } = regRemoveAthlete(await loadRegistry(), id);
       if (removed === null) {
         set({ error: 'The active and default athletes cannot be deleted.' });
-        return;
+        return false;
       }
       if (!(await saveRegistry(reg))) {
         set({ error: 'Delete not saved — registry write failed. The athlete is unchanged.' });
-        return;
+        return false;
       }
       // File removal: an orphaned file is invisible but the UI promised the
       // database is removed — say so honestly when it is not (audit A3).
@@ -3842,10 +3848,13 @@ export const useStore = create<KineticsStore>()((set, get) => {
         athletes: reg.athletes,
         error: fileGone ? null : 'Athlete removed from the list, but their database file could not be deleted. It holds no visible data and can be cleared by reinstalling.',
       });
-      } finally {
-        releaseLease();
-      }
-    })();
+      return fileGone;
+    } catch (e) {
+      set({ error: e instanceof Error ? e.message : String(e) });
+      return false;
+    } finally {
+      releaseLease();
+    }
   },
 
   setAdvancedToolsUnlocked: (unlocked) => {
