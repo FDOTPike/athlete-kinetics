@@ -4425,6 +4425,36 @@ console.log('[073] session slot replaced by (session_plan_slot_replacement)');
   check('self-heal rebuilds session_plan_slot_replacement while retaining session data',
     replacements(upgraded).length === 0 && sentinelsMissing(upgraded).length === 0
       && Number(upgraded.raw.prepare('SELECT COUNT(*) AS c FROM session WHERE session_id = 73').get().c) === 1);
+
+  // Applying the full chain twice to the same database (the self-heal replay)
+  // succeeds and leaves session_plan_slot_replacement present. With the earlier
+  // ALTER TABLE session_plan_slot ADD COLUMN replaced_by_session_plan_slot_id
+  // version, the second pass failed with:
+  //   Error: duplicate column name: replaced_by_session_plan_slot_id
+  const replayed = freshDb();
+  applyRaw(replayed, MIGRATIONS, 0, MIGRATIONS.length);
+  applyRaw(replayed, MIGRATIONS, 0, MIGRATIONS.length);
+  replayed.executeSync('PRAGMA user_version = 0;');
+  runMigrations(replayed, MIGRATIONS);
+  let addColumnReplayError = '';
+  try {
+    const withAddColumn = [
+      ...MIGRATIONS.slice(0, index),
+      'ALTER TABLE session_plan_slot ADD COLUMN replaced_by_session_plan_slot_id INTEGER REFERENCES session_plan_slot(session_plan_slot_id) ON DELETE SET NULL;',
+    ];
+    const broken = freshDb();
+    runMigrations(broken, withAddColumn);
+    broken.executeSync('PRAGMA user_version = 0;');
+    runMigrations(broken, withAddColumn);
+  } catch (error) {
+    addColumnReplayError = error instanceof Error ? error.message : String(error);
+  }
+  check('applying the full chain twice to the same database (self-heal replay) succeeds and session_plan_slot_replacement exists (whereas ADD COLUMN failed with duplicate column name: replaced_by_session_plan_slot_id)',
+    uv(replayed) === MIGRATIONS.length
+      && replayed.raw.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'session_plan_slot_replacement'").get() !== undefined
+      && !sentinelsMissing(replayed).includes('session_plan_slot_replacement')
+      && /duplicate column name: replaced_by_session_plan_slot_id/i.test(addColumnReplayError),
+    addColumnReplayError);
 }
 
 // --- one statement per database call ------------------------------------------

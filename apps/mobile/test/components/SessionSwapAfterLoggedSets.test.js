@@ -530,3 +530,94 @@ test('restarting/resuming the session from SQLite after a post-set swap restores
   expect(state().selectMovementSlot(slotA.sessionPlanSlotId)).toBeUndefined();
   expect(state().activeSessionPlanSlotId).toBe(newSlotId);
 });
+
+test('after a swap with logged sets, the session_plan_slot_replacement link row exists, and resetting training data removes it', async () => {
+  let nowMs = 1_700_000_500_000;
+  jest.spyOn(Date, 'now').mockImplementation(() => ++nowMs);
+  await bootStore();
+  state().saveProfile({
+    training_age: 'intermediate',
+    equipment_inventory: ['barbell', 'squat_rack', 'dumbbells', 'bench', 'kettlebell'],
+  });
+
+  const today = state().today;
+  const moveA = idOf('Push-up');
+  const moveB = idOf('Incline Push-Up');
+  const moveC = idOf('Bodyweight Squat');
+  const moveD = idOf('Glute Bridge');
+
+  raw().prepare(
+    "INSERT INTO training_block (block_id, start_date, objective, created_at_ms, status) VALUES (1, ?, 'strength', 1000, 'active')",
+  ).run(today);
+  raw().prepare(
+    "INSERT INTO planned_session (planned_session_id, block_id, week_index, day_index, focus, phase, session_date) VALUES (100, 1, 1, 1, 'upper', 'accumulation', ?)",
+  ).run(today);
+  raw().prepare(
+    'INSERT INTO planned_slot (planned_slot_id, planned_session_id, slot_index, movement_id, sets, reps, target_rpe) VALUES (500, 100, 1, ?, 3, 5, 8)',
+  ).run(moveA);
+  raw().prepare(
+    'INSERT INTO planned_slot (planned_slot_id, planned_session_id, slot_index, movement_id, sets, reps, target_rpe) VALUES (501, 100, 2, ?, 3, 8, 8)',
+  ).run(moveC);
+  raw().prepare(
+    "INSERT INTO planned_session (planned_session_id, block_id, week_index, day_index, focus, phase, session_date) VALUES (101, 1, 1, 3, 'upper', 'accumulation', date(?, '+2 days'))",
+  ).run(today);
+  raw().prepare(
+    'INSERT INTO planned_slot (planned_slot_id, planned_session_id, slot_index, movement_id, sets, reps, target_rpe) VALUES (502, 101, 1, ?, 2, 8, 8)',
+  ).run(moveB);
+
+  state().refreshBlock();
+  state().startSession();
+  state().finishPreparation('already_warm', state().preparation.revision);
+
+  const slotA = state().sessionPlan[0];
+  const slotC = state().sessionPlan[1];
+
+  state().logSet(moveA, 5, 0, 8, undefined, undefined, undefined, undefined, slotA.sessionPlanSlotId);
+  state().applyDaySwap(
+    moveA,
+    {
+      plannedSlotId: 502,
+      fromDayIndex: 2,
+      movement_id: moveB,
+      name: 'Incline Push-Up',
+      pattern: 'horizontal_push',
+      setsConserved: 2,
+      color: 'green',
+      rationale: 'Swap from later day.',
+    },
+    2,
+  );
+  const slotB = state().sessionPlan[1];
+
+  state().logSet(moveB, 8, 0, 8, undefined, undefined, undefined, undefined, slotB.sessionPlanSlotId);
+  state().skipRunnerRest();
+  state().logSet(moveB, 8, 0, 8, undefined, undefined, undefined, undefined, slotB.sessionPlanSlotId);
+  state().skipRunnerRest();
+  state().logSet(moveC, 8, 0, 8, undefined, undefined, undefined, undefined, slotC.sessionPlanSlotId);
+  state().skipRunnerRest();
+  state().applyRegression(moveC, moveD, 1);
+  const slotD = state().sessionPlan[3];
+
+  const linkRows = raw().prepare(
+    'SELECT session_plan_slot_id, replaced_by_session_plan_slot_id FROM session_plan_slot_replacement ORDER BY session_plan_slot_id',
+  ).all();
+  expect(linkRows).toEqual([
+    {
+      session_plan_slot_id: slotA.sessionPlanSlotId,
+      replaced_by_session_plan_slot_id: slotB.sessionPlanSlotId,
+    },
+    {
+      session_plan_slot_id: slotC.sessionPlanSlotId,
+      replaced_by_session_plan_slot_id: slotD.sessionPlanSlotId,
+    },
+  ]);
+
+  raw().exec('PRAGMA foreign_keys = OFF;');
+  state().resetTrainingData();
+  raw().exec('PRAGMA foreign_keys = ON;');
+
+  const afterResetLinks = raw().prepare(
+    'SELECT * FROM session_plan_slot_replacement',
+  ).all();
+  expect(afterResetLinks).toEqual([]);
+});
