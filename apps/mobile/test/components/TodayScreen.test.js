@@ -596,3 +596,43 @@ describe('F5: Today opens the workout only after a session actually exists', () 
     expect(screen.getByText('Refused.')).toBeOnTheScreen();
   });
 });
+
+describe('session-5: empty unplanned starts show the plan-first card instead of starting', () => {
+  test.each([
+    ['unscheduled', { todayPlan: null, block: null, blockSessions: [] }, 'today-adhoc-session'],
+    ['scheduled_rest', { todayPlan: null, blockSessions: [blockSession({ sessionDate: '2026-07-17' })] }, 'today-adhoc-session'],
+    ['overdue', { todayPlan: null, blockSessions: [blockSession({ sessionDate: '2026-07-14', completionStatus: null })] }, 'today-adhoc-session'],
+    ['completed_today', { blockSessions: [blockSession({ sessionDate: TODAY, completionStatus: 'complete' })] }, 'today-extra-session'],
+    ['stopped_today', { blockSessions: [blockSession({ sessionDate: TODAY, completionStatus: 'halted' })] }, 'today-stopped-extra'],
+  ])('on %s when freeFormStartIsEmpty() is true, pressing start shows the inline card, Go to Plan navigates, Cancel closes, and startSession is not called', (_label, overrides, controlTestId) => {
+    const onOpenPlan = jest.fn();
+    mockState = baseState({
+      ...overrides,
+      freeFormStartIsEmpty: () => true,
+    });
+    render(<TodayScreen onOpenPlan={onOpenPlan} />);
+    fireEvent.press(screen.getByTestId(controlTestId));
+    expect(mockState.startSession).not.toHaveBeenCalled();
+    expect(screen.getByText('Nothing to start yet')).toBeOnTheScreen();
+    expect(
+      screen.getByText('There is no plan for today and no earlier session to repeat. Build your plan first.'),
+    ).toBeOnTheScreen();
+
+    fireEvent.press(screen.getByLabelText('Cancel'));
+    expect(screen.queryByText('Nothing to start yet')).toBeNull();
+    expect(screen.getByTestId(controlTestId)).toBeOnTheScreen();
+
+    fireEvent.press(screen.getByTestId(controlTestId));
+    fireEvent.press(screen.getByLabelText('Go to Plan'));
+    expect(onOpenPlan).toHaveBeenCalledTimes(1);
+    expect(mockState.startSession).not.toHaveBeenCalled();
+  });
+
+  test('a planned start is unchanged even when freeFormStartIsEmpty() is true', () => {
+    mockState = baseState({ freeFormStartIsEmpty: () => true });
+    render(<TodayScreen />);
+    fireEvent.press(screen.getByTestId('today-primary-start'));
+    expect(mockState.startSession).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('Nothing to start yet')).toBeNull();
+  });
+});

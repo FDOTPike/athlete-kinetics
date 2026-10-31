@@ -9,9 +9,11 @@
  */
 import React from 'react';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { useStore } from '../../src/state/useStore';
+import { freeFormStartIsEmpty, useStore } from '../../src/state/useStore';
 import { authorizeAthleteDataBoot } from '../../src/state/dataMaintenanceLock';
 import SessionScreen from '../../src/screens/SessionScreen';
+import TodayScreen from '../../src/screens/TodayScreen';
+import BlockScreen from '../../src/screens/BlockScreen';
 import { makeNodeSqliteDriver } from '../helpers/nodeSqliteOpDriver';
 
 let mockDriver;
@@ -161,4 +163,112 @@ test('a restart mid-preparation comes back to the same step', async () => {
   expect(screen.getByTestId('preparation-item-0-recorded').props.children).toBe('Done as written');
   expect(screen.getByTestId('preparation-item-1-done')).toBeTruthy();
   expect(logSetButton()).toBeNull();
+});
+
+describe('session-5: plan-first empty free-form starts', () => {
+  test('when there is no plan for today and no earlier session to repeat, Today, Plan and Session show the inline card, Go to Plan navigates, Cancel closes, and no session row is created', () => {
+    // Clear the program/block so today has no planned session and no prior logged sets exist.
+    raw().exec('DELETE FROM planned_slot; DELETE FROM planned_session; DELETE FROM training_block; DELETE FROM training_program;');
+    act(() => {
+      state().refreshBlock();
+      state().refreshProgram();
+    });
+    expect(state().todayPlan).toBeNull();
+    expect(freeFormStartIsEmpty()).toBe(true);
+    expect(count('SELECT COUNT(*) AS c FROM session')).toBe(0);
+
+    // 1. TodayScreen unplanned start
+    const openPlanFromToday = jest.fn();
+    const todayView = render(<TodayScreen onOpenPlan={openPlanFromToday} />);
+    fireEvent.press(screen.getByTestId('today-adhoc-session'));
+    expect(screen.getByText('Nothing to start yet')).toBeOnTheScreen();
+    expect(
+      screen.getByText('There is no plan for today and no earlier session to repeat. Build your plan first.'),
+    ).toBeOnTheScreen();
+    expect(count('SELECT COUNT(*) AS c FROM session')).toBe(0);
+    expect(state().session).toBeNull();
+
+    // Cancel closes the card and restores the start control
+    fireEvent.press(screen.getByLabelText('Cancel'));
+    expect(screen.queryByText('Nothing to start yet')).toBeNull();
+    expect(screen.getByTestId('today-adhoc-session')).toBeOnTheScreen();
+
+    // Re-open and press Go to Plan
+    fireEvent.press(screen.getByTestId('today-adhoc-session'));
+    fireEvent.press(screen.getByLabelText('Go to Plan'));
+    expect(openPlanFromToday).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('Nothing to start yet')).toBeNull();
+    expect(count('SELECT COUNT(*) AS c FROM session')).toBe(0);
+    todayView.unmount();
+
+    // 2. SessionScreen unplanned start
+    const openPlanFromSession = jest.fn();
+    const sessionView = render(<SessionScreen onOpenPlan={openPlanFromSession} />);
+    fireEvent.press(screen.getByLabelText('Start a new workout session'));
+    expect(screen.getByText('Nothing to start yet')).toBeOnTheScreen();
+    expect(
+      screen.getByText('There is no plan for today and no earlier session to repeat. Build your plan first.'),
+    ).toBeOnTheScreen();
+    expect(count('SELECT COUNT(*) AS c FROM session')).toBe(0);
+    expect(state().session).toBeNull();
+
+    fireEvent.press(screen.getByLabelText('Cancel'));
+    expect(screen.queryByText('Nothing to start yet')).toBeNull();
+    expect(screen.getByLabelText('Start a new workout session')).toBeOnTheScreen();
+
+    fireEvent.press(screen.getByLabelText('Start a new workout session'));
+    fireEvent.press(screen.getByLabelText('Go to Plan'));
+    expect(openPlanFromSession).toHaveBeenCalledTimes(1);
+    expect(count('SELECT COUNT(*) AS c FROM session')).toBe(0);
+    sessionView.unmount();
+
+    // 3. BlockScreen unplanned start
+    useStore.setState({
+      vector: {
+        date: state().today, readiness_score: 80, hrv_component: 80, load_component: 80,
+        sleep_component: 80, spo2_component: 80, acwr: 1.0, acute_load_kg: 1000,
+        chronic_load_kg: 1000, ln_rmssd: 4.0, hrv_z: 0, sleep_efficiency_pct: 85,
+        spo2_night_mean: 97, computed_at_ms: 1,
+      },
+    });
+    const blockView = render(<BlockScreen />);
+    fireEvent.press(screen.getByText('Start without a planned session'));
+    fireEvent.press(screen.getByLabelText('Start an unplanned session'));
+    expect(screen.getByText('Nothing to start yet')).toBeOnTheScreen();
+    expect(
+      screen.getByText('There is no plan for today and no earlier session to repeat. Build your plan first.'),
+    ).toBeOnTheScreen();
+    expect(count('SELECT COUNT(*) AS c FROM session')).toBe(0);
+
+    fireEvent.press(screen.getByLabelText('Cancel'));
+    expect(screen.queryByText('Nothing to start yet')).toBeNull();
+    expect(screen.getByLabelText('Start an unplanned session')).toBeOnTheScreen();
+    blockView.unmount();
+  });
+
+  test('an already-open empty session shows updated preparation and empty-card copy and still discards on finish', () => {
+    raw().exec('DELETE FROM planned_slot; DELETE FROM planned_session; DELETE FROM training_block; DELETE FROM training_program;');
+    act(() => {
+      state().refreshBlock();
+      state().refreshProgram();
+      state().startSession();
+    });
+    expect(state().session).not.toBeNull();
+    expect(state().sessionPlan).toHaveLength(0);
+
+    render(<SessionScreen />);
+    expect(screen.getByText('No movements are planned yet.')).toBeOnTheScreen();
+    expect(screen.queryByText('No movements are planned yet. Prepare first, then add your work.')).toBeNull();
+
+    press('preparation-already-warm');
+    expect(screen.getByText('No exercise is queued.')).toBeOnTheScreen();
+    expect(screen.getByText('Finish this session, then build your plan on the PLAN tab.')).toBeOnTheScreen();
+    expect(screen.queryByText('Return to Coach to create a session plan, then come back here.')).toBeNull();
+
+    act(() => {
+      fireEvent.press(screen.getByLabelText('Finish empty session'));
+    });
+    expect(state().session).toBeNull();
+    expect(count('SELECT COUNT(*) AS c FROM session')).toBe(0);
+  });
 });

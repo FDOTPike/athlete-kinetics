@@ -1140,6 +1140,7 @@ interface KineticsStore {
   /** Reload today's niggles from 011 into state (boot + day rollover). */
   refreshNiggles: () => void;
   refreshVector: () => void;
+  freeFormStartIsEmpty: () => boolean;
   startSession: (repeatPlanned?: boolean) => void;
   /** Append a logged set. `displayName` carries the prefix-engine
    *  concatenation (e.g. 'DB Bench Press') into the in-memory log payload;
@@ -1739,6 +1740,58 @@ const capabilityAvailableMovementIds = (
     .filter((row) => row.state === 'available')
     .map((row) => row.movementId),
 );
+
+const seedFreeFormSessionPlan = (
+  d: DB,
+  movements: readonly Movement[],
+  profile: UserProfile,
+  capabilityAvailable: ReadonlySet<number>,
+  plannedSets: number,
+): PlanSlot[] => {
+  const lastMovements = rowsOf<{ movement_id: number }>(d.executeSync(
+    `SELECT movement_id FROM set_record
+     WHERE session_id = (
+       SELECT s.session_id FROM session s
+       JOIN set_record r ON r.session_id = s.session_id
+       ORDER BY s.session_id DESC LIMIT 1)
+     GROUP BY movement_id ORDER BY MIN(set_id)`,
+  ));
+  return lastMovements.flatMap((m) => {
+    const movement = movements.find((item) => item.movement_id === m.movement_id);
+    // Repeating old history is still a prescription route. A beginner may
+    // never inherit an Advanced movement from a prior athlete tier.
+    if (!permittedForProfile(movement, profile, 'weight_room') || !capabilityAvailable.has(m.movement_id)) return [];
+    const target = targetForMovement(movement, 5);
+    return [{
+      sessionPlanSlotId: 0,
+      movementId: m.movement_id,
+      plannedSets: defaultSetsForTarget(movement, plannedSets),
+      plannedReps: target.kind === 'reps' ? target.reps : null,
+      target,
+      provenanceKind: 'free_form' as const,
+      targetRpe: null,
+      sourcePlannedSlotId: null,
+      originalMovementId: null,
+      originalSessionDate: null,
+      overrideLoadKg: null,
+      overrideReason: null,
+    }];
+  });
+};
+
+export function freeFormStartIsEmpty(): boolean {
+  if (db === null) return false;
+  const { movements, profile, activePriorExperienceMovementIds, niggles } = useStore.getState();
+  const capabilityAvailable = capabilityAvailableMovementIds(
+    db,
+    movements,
+    profile,
+    'weight_room',
+    new Set(activePriorExperienceMovementIds),
+    safetyExcludedMovementIdsFor(movements, profile, niggles),
+  );
+  return seedFreeFormSessionPlan(db, movements, profile, capabilityAvailable, 3).length === 0;
+}
 
 export const PREPARATION_GATE_MESSAGE = 'Finish, skip or record your preparation before logging your first set.';
 
@@ -6122,6 +6175,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
     set({ vector, trend, today });
   },
 
+  freeFormStartIsEmpty: () => freeFormStartIsEmpty(),
+
   startSession: (repeatPlanned) => {
     // Audit A2: double-start would orphan the first session's rows.
     if (get().session !== null) return;
@@ -6300,35 +6355,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       });
     } else {
       const plannedSets = Math.round(clamp(3 + setDelta, 1, 6));
-      const lastMovements = rowsOf<{ movement_id: number }>(d.executeSync(
-        `SELECT movement_id FROM set_record
-         WHERE session_id = (
-           SELECT s.session_id FROM session s
-           JOIN set_record r ON r.session_id = s.session_id
-           ORDER BY s.session_id DESC LIMIT 1)
-         GROUP BY movement_id ORDER BY MIN(set_id)`,
-      ));
-      sessionPlan = lastMovements.flatMap((m) => {
-        const movement = movements.find((item) => item.movement_id === m.movement_id);
-        // Repeating old history is still a prescription route. A beginner may
-        // never inherit an Advanced movement from a prior athlete tier.
-        if (!permittedForProfile(movement, profile, 'weight_room') || !capabilityAvailable.has(m.movement_id)) return [];
-        const target = targetForMovement(movement, 5);
-        return [{
-          sessionPlanSlotId: 0,
-          movementId: m.movement_id,
-          plannedSets: defaultSetsForTarget(movement, plannedSets),
-          plannedReps: target.kind === 'reps' ? target.reps : null,
-          target,
-          provenanceKind: 'free_form' as const,
-          targetRpe: null,
-          sourcePlannedSlotId: null,
-          originalMovementId: null,
-          originalSessionDate: null,
-          overrideLoadKg: null,
-          overrideReason: null,
-        }];
-      });
+      sessionPlan = seedFreeFormSessionPlan(d, movements, profile, capabilityAvailable, plannedSets);
     }
 
     // Preparation for THIS frozen plan, built before the transaction so the

@@ -10,12 +10,13 @@ import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-
 import { SELECTABLE_SCHEMA_TYPES, addDaysIso, targetLoadKg, splitExplainer, SPLIT_EXPLAINER_FOOTER, type BlockPlan, type SchemaType } from '@ak/inference';
 import {
   useStore,
+  freeFormStartIsEmpty,
   type BlockSessionSummary,
   type TodaySlot,
   type RoutineTemplate,
 } from '../state/useStore';
 import { RoutineTemplateBuilder } from '../components/RoutineTemplateBuilder';
-import { useSubViewBack } from '../navigation/navigation';
+import { useNavigation, useSubViewBack } from '../navigation/navigation';
 import ProgramSetupScreen from './ProgramSetupScreen';
 import NewBlockChooserScreen from './NewBlockChooserScreen';
 import InfoTip from '../components/InfoTip';
@@ -27,6 +28,7 @@ import { EMPTY_ACTIVITY_LEDGER } from '../state/activityStore';
 import {
   PrimaryButton,
   SecondaryButton,
+  QuietAction,
   Chip,
   Disclosure,
 } from '../components/ui';
@@ -223,6 +225,14 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
   const [continuationError, setContinuationError] = useState<string | null>(null);
   const [continuationPending, setContinuationPending] = useState(false);
   const startSession = useStore((s) => s.startSession);
+  const storeFreeFormStartIsEmpty = useStore((s) => s.freeFormStartIsEmpty);
+  const nav = typeof useNavigation === 'function' ? useNavigation() : undefined;
+  const [emptyStartPromptOpen, setEmptyStartPromptOpen] = useState(false);
+  const checkFreeFormStartIsEmpty = (): boolean => {
+    if (typeof storeFreeFormStartIsEmpty === 'function') return storeFreeFormStartIsEmpty();
+    if (typeof freeFormStartIsEmpty === 'function') return freeFormStartIsEmpty();
+    return false;
+  };
   const pendingAdjustments = useStore((s) => s.pendingAutopilotAdjustments) ?? [];
   const blockEndDate = blockSessions.length > 0 ? blockSessions[blockSessions.length - 1].sessionDate : null;
 
@@ -1227,21 +1237,63 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
         {(block === null || todayPlan === null) && !halted && session === null && (
           <Disclosure label="Start without a planned session">
             <View style={styles.disclosureContent}>
-              {!confirmUnplannedStart ? (
+              {emptyStartPromptOpen ? (
+                <View style={styles.card} testID="empty-free-form-start-card">
+                  <Text style={styles.cardTitle}>Nothing to start yet</Text>
+                  <Text style={styles.bodyText}>
+                    There is no plan for today and no earlier session to repeat. Build your plan first.
+                  </Text>
+                  <PrimaryButton
+                    label="Go to Plan"
+                    onPress={() => {
+                      setEmptyStartPromptOpen(false);
+                      setConfirmUnplannedStart(false);
+                      nav?.setTab('coach');
+                      if (block === null) setShowChooser(true);
+                      else openManageBlock();
+                    }}
+                    accessibilityLabel="Go to Plan"
+                  />
+                  <QuietAction
+                    label="Cancel"
+                    onPress={() => {
+                      setEmptyStartPromptOpen(false);
+                      setConfirmUnplannedStart(false);
+                    }}
+                    accessibilityLabel="Cancel"
+                  />
+                </View>
+              ) : !confirmUnplannedStart ? (
                 <>
                   <Text style={styles.captionText}>
                     This starts a session without the day's planned exercise order.
                   </Text>
                   <SecondaryButton
                     label="Start an unplanned session"
-                    onPress={() => setConfirmUnplannedStart(true)}
+                    onPress={() => {
+                      if (checkFreeFormStartIsEmpty()) {
+                        setEmptyStartPromptOpen(true);
+                        return;
+                      }
+                      setConfirmUnplannedStart(true);
+                    }}
                     accessibilityLabel="Start an unplanned session"
                   />
                 </>
               ) : (
                 <>
                   <Text style={styles.bodyText}>Start a session without a planned workout?</Text>
-                  <PrimaryButton label="Start unplanned session" onPress={startAndOpenSession} accessibilityLabel="Start unplanned session" />
+                  <PrimaryButton
+                    label="Start unplanned session"
+                    onPress={() => {
+                      if (checkFreeFormStartIsEmpty()) {
+                        setEmptyStartPromptOpen(true);
+                        return;
+                      }
+                      startAndOpenSession();
+                    }}
+                    accessibilityLabel="Start unplanned session"
+                  />
                   <SecondaryButton label="Cancel" onPress={() => setConfirmUnplannedStart(false)} accessibilityLabel="Cancel" />
                 </>
               )}
