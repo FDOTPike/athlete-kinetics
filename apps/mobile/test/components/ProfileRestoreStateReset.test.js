@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, render } from '@testing-library/react-native';
+import { act, fireEvent, render } from '@testing-library/react-native';
 import ProfileScreen from '../../src/screens/ProfileScreen';
 import {
   closeStoreDatabaseForRestore,
@@ -167,5 +167,23 @@ describe('closeStoreDatabaseForRestore and restartStoreAfterRestore reset per-at
       lastEndedSessionId: null,
       lastTriage: null,
     });
+  });
+
+  test('typing in the notes fields (which save as you type) is not rewritten mid-keystroke', async () => {
+    useStore.getState().boot();
+    await flush();
+    expect(useStore.getState().status).toBe('ready');
+
+    const tree = render(<ProfileScreen />);
+    await flush();
+
+    const injuries = () => tree.getByLabelText('Historical injuries, one per line');
+    act(() => { fireEvent.changeText(injuries(), 'knee'); });
+    await flush();
+    expect(injuries().props.value).toBe('knee');
+    act(() => { fireEvent.changeText(injuries(), 'knee: old strain\n'); });
+    await flush();
+    expect(injuries().props.value).toBe('knee: old strain\n');
+    expect(useStore.getState().profile.injury_flags).toEqual([{ region: 'knee', note: 'old strain' }]);
   });
 });

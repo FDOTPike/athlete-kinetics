@@ -360,7 +360,11 @@ export default function ProfileScreen(): React.JSX.Element {
   useEffect(() => {
     setInjuryText(profile.injury_flags.map((f) => `${f.region}: ${f.note}`).join('\n'));
     setMobilityText(profile.mobility_limits.map((f) => `${f.region}: ${f.note}`).join('\n'));
-  }, [activeSlotId, activeAthleteId, databaseReady, profile.injury_flags, profile.mobility_limits]);
+    // Re-seed only when the source profile changes underneath the screen
+    // (slot switch, athlete switch, restore reopening the database). Not on
+    // profile edits: these fields save as you type, and re-seeding from the
+    // parsed notes would rewrite the text mid-keystroke.
+  }, [activeSlotId, activeAthleteId, databaseReady]);
 
   const parseNotes = (text: string): UserProfile['injury_flags'] =>
     text
