@@ -75,14 +75,30 @@ test('plan-5: LibraryScreenV2 movement detail metadata badges are not exposed as
 
   fireEvent.press(screen.getByRole('button', { name: /Barbell Back Squat/i }));
 
-  // Read-only metadata tags (COMPOUND, REPS, BARBELL, etc.) in the detail view must not be
-  // announced as interactive toggle buttons with accessibilityRole="button".
-  expect(screen.queryByRole('button', { name: 'COMPOUND' })).toBeNull();
-  expect(screen.queryByRole('button', { name: 'REPS' })).toBeNull();
-  expect(screen.queryByRole('button', { name: 'BARBELL' })).toBeNull();
+  // Read-only metadata tags (COMPOUND, INTERMEDIATE · BEGINNER OK, REPS, FULL BODY,
+  // BARBELL, SQUAT RACK) in the detail view must be present as non-interactive text
+  // and must not be announced as interactive toggle buttons with accessibilityRole="button".
+  for (const tag of [
+    'COMPOUND',
+    'INTERMEDIATE · BEGINNER OK',
+    'REPS',
+    'BARBELL',
+    'SQUAT RACK',
+  ]) {
+    expect(screen.getByText(tag)).toBeOnTheScreen();
+    expect(screen.getByRole('text', { name: tag })).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: tag })).toBeNull();
+  }
+  expect(screen.getByText('FULL BODY')).toBeOnTheScreen();
   expect(
     screen.getByRole('text', {
       name: 'Barbell Back Squat is a full body movement',
     }),
   ).toBeOnTheScreen();
+  expect(screen.queryByRole('button', { name: 'FULL BODY' })).toBeNull();
+  expect(
+    screen.queryByRole('button', {
+      name: 'Barbell Back Squat is a full body movement',
+    }),
+  ).toBeNull();
 });
