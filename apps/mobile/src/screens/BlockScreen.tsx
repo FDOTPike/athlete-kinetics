@@ -181,7 +181,11 @@ export default function BlockScreen(props: BlockScreenProps): React.JSX.Element 
   const state = useStore((s) => s);
   const decision = typeof state.getTrainingSupportDecision === 'function'
     ? state.getTrainingSupportDecision() : { status: 'support_unavailable' as const };
+  const narrowScopeOnly = typeof state.isBroadHoldFromNarrowScopes === 'function'
+    ? state.isBroadHoldFromNarrowScopes(undefined, decision)
+    : false;
   if (decision.status !== 'available') return <TrainingSupportNotice unavailable={decision.status === 'support_unavailable'}
+    narrowScopeOnly={narrowScopeOnly}
     onOpenSession={state.session !== null ? props.onSessionStarted : undefined} />;
   return <AvailableBlockScreen key={state.activeAthleteId} {...props} />;
 }

@@ -48,7 +48,7 @@ import {
 } from './healthSupportStore';
 import type {
   HealthSupportPreferenceKind, HealthSupportNoteKind, HealthSupportReviewState,
-  PersonalizedAdviceTarget, TrainingSupportDecision,
+  HealthSupportScope, PersonalizedAdviceTarget, TrainingSupportDecision,
 } from '@ak/inference';
 import {
   inventoryFromRowCell,
@@ -761,6 +761,7 @@ export interface ReturnCheckinState {
 interface KineticsStore {
   healthSupportRevision: number;
   getTrainingSupportDecision: (movementIds?: readonly number[]) => TrainingSupportDecision;
+  isBroadHoldFromNarrowScopes: (movementIds?: readonly number[], decision?: TrainingSupportDecision) => boolean;
   requireTrainingSupport: (operation: SupportOperation, movementIds: readonly number[] | undefined, targetIdentity: string) => boolean;
   getHealthSupportFacts: () => SupportFacts;
   getHealthSupportDetails: (athleteId: string) => SupportDetails;
@@ -1297,6 +1298,32 @@ const supportDecision = (ids?: readonly number[], operation?: SupportOperation, 
         : adapter.recordDecision(movementSupportTargets(ids), SUPPORT_ADVICE_KINDS[operation], `${operation}:${targetIdentity}`, Date.now());
   } catch { return { status: 'support_unavailable', holdIds: [] }; }
 };
+const isNarrowSupportScope = (scope: HealthSupportScope): boolean =>
+  (scope.targetKind === 'movement' && (scope.movementId ?? null) !== null)
+  || (scope.targetKind === 'activity_definition' && (scope.activityId ?? null) !== null)
+  || (scope.targetKind === 'activity_series' && (scope.seriesId ?? null) !== null)
+  || (scope.targetKind === 'activity_occurrence' && (scope.occurrenceId ?? null) !== null);
+export function isBroadHoldFromNarrowScopes(
+  movementIds?: readonly number[],
+  decision?: TrainingSupportDecision,
+): boolean {
+  if (movementIds !== undefined && movementIds.length > 0) return false;
+  try {
+    const resolved = decision ?? useStore.getState().getTrainingSupportDecision(movementIds);
+    if (resolved.status !== 'held' || resolved.holdIds.length === 0) return false;
+    const snapshot = supportAdapter().captureEvaluation();
+    const byId = new Map(snapshot.holds.map((hold) => [hold.holdId, hold]));
+    return resolved.holdIds.every((holdId) => {
+      const hold = byId.get(holdId);
+      return hold !== undefined
+        && hold.state === 'held'
+        && hold.scopes.length > 0
+        && hold.scopes.every(isNarrowSupportScope);
+    });
+  } catch {
+    return false;
+  }
+}
 const supportMessage = (decision: TrainingSupportDecision): string => decision.status === 'support_unavailable'
   ? SUPPORT_UNAVAILABLE_MESSAGE : SUPPORT_HELD_MESSAGE;
 const rowsOf = <T>(res: unknown): T[] => {
@@ -2877,6 +2904,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
   activeAthleteId: 'default',
   healthSupportRevision: 0,
   getTrainingSupportDecision: (ids) => supportDecision(ids),
+  isBroadHoldFromNarrowScopes: (ids, decision) => isBroadHoldFromNarrowScopes(ids, decision),
   requireTrainingSupport: (operation, ids, targetIdentity) => {
     const decision = supportDecision(ids, operation, targetIdentity);
     if (decision.status === 'available') {

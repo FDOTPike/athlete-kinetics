@@ -41,6 +41,7 @@ export interface SupportEvaluationSnapshot {
    * content-free support snapshot. Callers must still use recordDecision at
    * the actual mutation boundary; this is preview filtering only. */
   readonly evaluate: (targets: readonly PersonalizedAdviceTarget[]) => TrainingSupportDecision;
+  readonly holds: readonly HealthSupportHold[];
 }
 
 const rows = <T>(result: unknown): T[] => {
@@ -110,6 +111,7 @@ export function createHealthSupportStore(binding: SupportBinding, current: () =>
     const snapshot = facts();
     if (!snapshot.contractAvailable) return {
       facts: snapshot,
+      holds: [],
       evaluate: () => evaluateTrainingSupport({ contractAvailable: false, holds: [], target: { targetKind: 'all_prescription' } }),
     };
     try {
@@ -127,6 +129,7 @@ export function createHealthSupportStore(binding: SupportBinding, current: () =>
       check();
       return {
         facts: snapshot,
+        holds,
         evaluate: (targets) => {
           const holdIds: string[] = [];
           const reasonCodes = new Set<string>();
@@ -141,7 +144,7 @@ export function createHealthSupportStore(binding: SupportBinding, current: () =>
       };
     } catch {
       const unavailableSnapshot = unavailable();
-      return { facts: unavailableSnapshot, evaluate: () => ({ status: 'support_unavailable', holdIds: [] }) };
+      return { facts: unavailableSnapshot, holds: [], evaluate: () => ({ status: 'support_unavailable', holdIds: [] }) };
     }
   };
   const evaluate = (targets: readonly PersonalizedAdviceTarget[]): TrainingSupportDecision =>

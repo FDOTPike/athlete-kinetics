@@ -681,3 +681,21 @@ adds this entry. Rationale and the options not taken:
 `docs/decisions/SUSPENSION_RPE_RAISE_2026-10-13.md`. Machine-checked in
 verify:autopilot, verify:blocks, verify:store and
 `SuspensionRpeRaise.test.js`.
+
+## 2026-10-31 — Beta product decisions: broad holds explained, honest discomfort wording, plan-first empty starts
+
+1. **One held exercise locks the whole Plan tab (safety-4):** "Explain it". Keep the broad hold. Explain it on screen.
+   - **Finding (`safety-4`):** A narrow movement-scoped or activity-scoped hold (`targetKind: 'movement'` or `'activity_*'`) matches `targetKind: 'all_prescription'` in `evaluateTrainingSupport`, placing whole-prescription surfaces (`BlockScreen` and unscheduled `TodayScreen`) on hold.
+   - **What changed:** Added store helper `isBroadHoldFromNarrowScopes` (backed by `healthSupportStore`'s captured holds and `getTrainingSupportDecision`'s `holdIds`) to detect when a held decision on a whole-prescription query comes only from narrow-scope holds (movement or activity scopes, not `all_prescription` and not `unresolved`). When true, `TrainingSupportNotice` renders the additional explanation line (`This note covers specific exercises or activities. The coach cannot yet tell which suggestions it affects, so all suggestions stay on hold.`) after `SUPPORT_HELD_MESSAGE` on `TodayScreen` and `BlockScreen`.
+   - **Unchanged boundaries:** Thresholds, hold matching (`sameTarget`), and stops are unchanged pending the clinical review (D10, SC-06, SC-08). Never suggests deleting a note to release suggestions.
+
+2. **The discomfort button promises an alternative it doesn't always give (session-2):** "Honest wording now". Same numbers and same stops; honest labels and feedback. The thresholds wait for the clinical reviewer.
+   - **Finding (`session-2`):** The "Report discomfort" form in `SessionScreen.tsx` labelled its primary button `Find an alternative` below severity 8 and `Stop session` at 8, whereas the store and runner use `EXPERIENCE_SEVERITY` per tier (beginner triage 5 / halt 8, intermediate 4/8, advanced 3/7, elite 3/6).
+   - **What changed:** `SessionScreen.tsx` computes the athlete's halt threshold from `EXPERIENCE_SEVERITY` using the runner's `runnerTierForTrainingAge` mapping. The chips (`Mild` 4, `Moderate` 6, `Stop` 8) and their values are unchanged. The primary button reads `Save report and stop session` at or above the athlete's halt threshold and `Save report` below it; at or above the halt threshold the caption `At this level the session stops for today.` appears under the chips; and after saving, when neither the substitution sheet opened nor the session halted, `Report saved with this session.` is shown where the form was.
+   - **Unchanged boundaries:** Thresholds, hold matching (`sameTarget`), and stops are unchanged pending the clinical review (D10, SC-06, SC-08).
+
+3. **An empty free-form start dead-ends (session-5):** "Plan first". Before an empty session would start, offer Plan or Cancel.
+   - **Finding (`session-5`):** Starting an unplanned (`free_form`) session when there is no plan for today and no eligible prior logged session to repeat created an empty session with no way to add movements on the workout screen.
+   - **What changed:** Factored free-form history seeding in `useStore.ts` into `seedFreeFormSessionPlan` and exported the side-effect-free helper `freeFormStartIsEmpty(): boolean`. Unplanned session entry points (`TodayScreen.tsx`, `BlockScreen.tsx`, and `SessionScreen.tsx`) check `freeFormStartIsEmpty()` first and, when true, show the inline card (`Nothing to start yet` / `There is no plan for today and no earlier session to repeat. Build your plan first.`) with `Go to Plan` and `Cancel` instead of starting an empty session. Already-open empty sessions in `SessionScreen.tsx` now read `No movements are planned yet.` and `Finish this session, then build your plan on the PLAN tab.`.
+   - **Unchanged boundaries:** Thresholds, hold matching (`sameTarget`), and stops are unchanged pending the clinical review (D10, SC-06, SC-08).
+
