@@ -131,4 +131,57 @@ describe('resetTrainingData deletes set_metric and counts non-session training d
       hadNonSessionData: true,
     });
   });
+
+  test('resetTrainingData returns true when wiping athlete_goal_observation or other deleted tables (set_target, session_note, session_feel, slot_override, block_meta)', async () => {
+    useStore.getState().boot();
+    await flush();
+    expect(useStore.getState().status).toBe('ready');
+
+    const driver = drivers.get('athlete_kinetics.db');
+
+    // Empty database returns false.
+    expect(useStore.getState().resetTrainingData()).toBe(false);
+
+    // 1. Save a goal and record a goal observation (athlete_goal_observation only).
+    act(() => {
+      useStore.getState().saveGoal({
+        specificOutcome: 'Squat 100 kg for 5 reps',
+        metricId: 'load_kg',
+        measurementMethod: 'Back squat, 5 reps to parallel',
+        baselineKnown: true,
+        baselineValue: 80,
+        targetValue: 100,
+        reason: 'To be stronger for football',
+        requestedDeadline: '2099-01-08',
+      });
+      const goalId = useStore.getState().goals[0].goalId;
+      useStore.getState().recordGoalObservation(goalId, '2026-10-30', 85);
+    });
+    expect(driver.raw.prepare('SELECT count(*) AS c FROM athlete_goal_observation').get().c).toBe(1);
+
+    let hadGoalObservation = false;
+    act(() => {
+      hadGoalObservation = useStore.getState().resetTrainingData();
+    });
+    expect(hadGoalObservation).toBe(true);
+    expect(driver.raw.prepare('SELECT count(*) AS c FROM athlete_goal_observation').get().c).toBe(0);
+
+    // 2. With foreign_keys OFF, seed each child/metadata table alone and verify resetTrainingData returns true.
+    driver.raw.exec('PRAGMA foreign_keys = OFF;');
+    const statements = [
+      "INSERT INTO set_target (set_id, session_plan_slot_id, provenance_kind, target_rpe, source_planned_slot_id, created_at_ms) VALUES (1, 1, 'planned', 8.0, 101, 1000)",
+      "INSERT INTO session_note (session_id, note, created_at_ms) VALUES (1, 'Moved well', 1000)",
+      "INSERT INTO session_feel (session_id, feel, recorded_at_ms) VALUES (1, 'as_planned', 1000)",
+      "INSERT INTO slot_override (planned_slot_id, target_load_kg, reason, created_at_ms) VALUES (1, 100, 'APRE adjustment', 1000)",
+      "INSERT INTO block_meta (block_id, macro_block_index, macro_phase, schema_type, peak_shifted) VALUES (1, 1, 'gpp', 'LINEAR', 0)",
+    ];
+    for (const sql of statements) {
+      driver.raw.exec(sql);
+      let hadTableData = false;
+      act(() => {
+        hadTableData = useStore.getState().resetTrainingData();
+      });
+      expect(hadTableData).toBe(true);
+    }
+  });
 });
