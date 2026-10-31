@@ -162,10 +162,15 @@ export default function ProgramSetupScreen({
   };
 
   const setDayFocus = (dayIndex: number, focus: BlockFocus): void => {
+    const currentFocus = dayFocuses[dayIndex]
+      ?? programFocuses(profile.objective, dayIndices.length)[dayIndices.indexOf(dayIndex)]
+      ?? 'full';
+    if (currentFocus === focus) return;
     setDayFocuses((current) => ({
       ...current,
       [dayIndex]: focus,
     }));
+    setPreferences((current) => current.filter((preference) => preference.dayIndex !== dayIndex));
   };
 
   const chooseMovement = (dayIndex: number, slotIndex: number, pattern: TrainingProgramMovementPreference['pattern'], movementId: number): void => {
