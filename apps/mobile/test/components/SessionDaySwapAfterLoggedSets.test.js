@@ -95,13 +95,27 @@ test('applying a day-swap option on Set 3 of 3 when the pulled-forward slot has 
   const daySwapButton = screen.getByLabelText('Move Incline Push-Up forward into this session');
   fireEvent.press(daySwapButton);
 
+  expect(screen.getByText('Sets of Incline Push-Up')).toBeOnTheScreen();
+  expect(screen.getByText('2 logged sets of Push-up are kept.')).toBeOnTheScreen();
+  fireEvent.press(screen.getByLabelText('Move Incline Push-Up forward into this session'));
+
   expect({
     error: state().error,
     substitutionOpen: state().substitution !== null,
-    activeMovementId: state().sessionPlan[0].movementId,
+    originalMovementId: state().sessionPlan[0].movementId,
+    originalPlannedSets: state().sessionPlan[0].plannedSets,
+    originalReplacedBy: state().sessionPlan[0].replacedBySessionPlanSlotId,
+    replacementMovementId: state().sessionPlan[1].movementId,
+    replacementPlannedSets: state().sessionPlan[1].plannedSets,
+    activeSessionPlanSlotId: state().activeSessionPlanSlotId,
   }).toEqual({
     error: null,
     substitutionOpen: false,
-    activeMovementId: inclinePushUpId,
+    originalMovementId: pushUpId,
+    originalPlannedSets: 2,
+    originalReplacedBy: state().sessionPlan[1].sessionPlanSlotId,
+    replacementMovementId: inclinePushUpId,
+    replacementPlannedSets: 1,
+    activeSessionPlanSlotId: state().sessionPlan[1].sessionPlanSlotId,
   });
 });

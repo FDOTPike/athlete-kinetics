@@ -367,12 +367,20 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   const [feelRevision, setFeelRevision] = useState(0);
   useEffect(() => { setFeelOpen(false); }, [lastEndedSessionId]);
 
+  type PendingSubstitution =
+    | { kind: 'regression'; option: NonNullable<typeof substitution>['result']['layer1Regression']['options'][number] }
+    | { kind: 'daySwap'; option: NonNullable<typeof substitution>['result']['layer2DaySwap']['options'][number] };
+  const [pendingSub, setPendingSub] = useState<PendingSubstitution | null>(null);
+  const [pendingSubSets, setPendingSubSets] = useState<number>(1);
+  useEffect(() => { setPendingSub(null); }, [substitution]);
+
   const hasSubView = feelOpen || detailsOpen || safetyOpen || niggleRegion !== null || substitution !== null;
   useSubViewBack(hasSubView, () => {
     if (feelOpen) setFeelOpen(false);
     else if (detailsOpen) setDetailsOpen(false);
     else if (safetyOpen) setSafetyOpen(false);
     else if (niggleRegion !== null) setNiggleRegion(null);
+    else if (pendingSub !== null) setPendingSub(null);
     else if (substitution !== null) closeSubstitution();
   });
 
@@ -454,6 +462,19 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   const currentSlot = runnerCurrentId !== null ? sessionPlan.find((slot) => slot.sessionPlanSlotId === runnerCurrentId) ?? fallback : fallback;
   const currentMovement: Movement | null = currentSlot === null ? null : byId.get(runnerCurrent?.movementId ?? currentSlot.movementId) ?? byId.get(currentSlot.movementId) ?? null;
   const currentLogged = currentSlot === null ? 0 : (runner !== null && (runner.slotIndex ?? -1) >= 0 && runner.slotSetCounts?.[runner.slotIndex] != null ? Math.max(loggedCount(currentSlot), runner.slotSetCounts[runner.slotIndex]) : loggedCount(currentSlot));
+  const subTargetSlot = substitution === null
+    ? null
+    : (currentSlot !== null && currentSlot.movementId === substitution.targetId
+        ? currentSlot
+        : sessionPlan.find((slot) => slot.movementId === substitution.targetId && slot.replacedBySessionPlanSlotId == null) ?? currentSlot);
+  const subTargetLogged = subTargetSlot === null
+    ? 0
+    : subTargetSlot.sessionPlanSlotId === currentSlot?.sessionPlanSlotId
+      ? currentLogged
+      : loggedCount(subTargetSlot);
+  const subTargetMovementName = (subTargetSlot !== null ? byId.get(subTargetSlot.movementId)?.name : undefined)
+    ?? (substitution !== null ? byId.get(substitution.targetId)?.name : undefined)
+    ?? 'Movement';
   const allDone = sessionPlan.length > 0 && sessionPlan.every((slot) => loggedCount(slot) >= slot.plannedSets);
   const triageHalted = lastTriage?.kind === 'matched' && lastTriage.directive.halt;
   const runnerComplete = runnerPhase === 'complete';
@@ -1649,72 +1670,158 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
 
         {!halted && !complete && substitution !== null && (
           <View style={styles.substitution}>
-            <View style={styles.subHeader}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.subTitle}>Choose an alternative</Text>
-                <Text style={styles.subBody}>Your completed sets stay recorded. The replacement carries the remaining work.</Text>
-              </View>
-              <Pressable onPress={closeSubstitution} accessibilityRole="button" accessibilityLabel="Close substitution options" style={styles.close}>
-                <Text style={styles.closeText}>×</Text>
-              </Pressable>
-            </View>
-            {substitution.result.haltAdvised && (
-              <View style={styles.subHalt}>
-                <Text style={styles.subHaltText}>This report needs a pause rather than another exercise today.</Text>
-                <SecondaryButton
-                  label="Stop session"
-                  onPress={() => runnerHalt('safety')}
-                  accessibilityLabel="Halt session from substitution safety advice"
-                  fullWidth={true}
-                  style={{ marginTop: theme.space[3] }}
-                />
-              </View>
+            {pendingSub !== null && subTargetLogged > 0 ? (
+              <>
+                <View style={styles.subHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.subTitle}>{`Sets of ${pendingSub.option.name}`}</Text>
+                    <Text style={styles.subBody}>
+                      {`${subTargetLogged} logged ${subTargetLogged === 1 ? 'set' : 'sets'} of ${subTargetMovementName} are kept.`}
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={() => {
+                      setPendingSub(null);
+                      closeSubstitution();
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Close substitution options"
+                    style={styles.close}
+                  >
+                    <Text style={styles.closeText}>×</Text>
+                  </Pressable>
+                </View>
+                <View style={styles.rirChoicesRow}>
+                  {[1, 2, 3, 4, 5, 6].map((k) => (
+                    <Chip
+                      key={k}
+                      label={String(k)}
+                      selected={pendingSubSets === k}
+                      onPress={() => setPendingSubSets(k)}
+                      accessibilityLabel={k === 1 ? `1 set of ${pendingSub.option.name}` : `${k} sets of ${pendingSub.option.name}`}
+                      style={styles.rirChip}
+                    />
+                  ))}
+                </View>
+                <View style={{ marginTop: theme.space[3], gap: theme.space[2] }}>
+                  <PrimaryButton
+                    label={pendingSub.kind === 'regression' ? `Use ${pendingSub.option.name} instead` : `Move ${pendingSub.option.name} forward into this session`}
+                    accessibilityLabel={pendingSub.kind === 'regression' ? `Use ${pendingSub.option.name} instead` : `Move ${pendingSub.option.name} forward into this session`}
+                    onPress={() => {
+                      const targetId = substitution.targetId;
+                      const chosen = pendingSub;
+                      const chosenSets = pendingSubSets;
+                      setPendingSub(null);
+                      if (chosen.kind === 'regression') {
+                        applyRegression(targetId, chosen.option.movement_id, chosenSets);
+                      } else {
+                        applyDaySwap(targetId, chosen.option, chosenSets);
+                      }
+                    }}
+                  />
+                  <QuietAction label="Cancel" accessibilityLabel="Cancel" onPress={() => setPendingSub(null)} />
+                </View>
+              </>
+            ) : (
+              <>
+                <View style={styles.subHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.subTitle}>Choose an alternative</Text>
+                    <Text style={styles.subBody}>Your completed sets stay recorded. The replacement carries the remaining work.</Text>
+                  </View>
+                  <Pressable onPress={closeSubstitution} accessibilityRole="button" accessibilityLabel="Close substitution options" style={styles.close}>
+                    <Text style={styles.closeText}>×</Text>
+                  </Pressable>
+                </View>
+                {substitution.result.haltAdvised && (
+                  <View style={styles.subHalt}>
+                    <Text style={styles.subHaltText}>This report needs a pause rather than another exercise today.</Text>
+                    <SecondaryButton
+                      label="Stop session"
+                      onPress={() => runnerHalt('safety')}
+                      accessibilityLabel="Halt session from substitution safety advice"
+                      fullWidth={true}
+                      style={{ marginTop: theme.space[3] }}
+                    />
+                  </View>
+                )}
+                <View style={{ marginTop: theme.space[3] }}>
+                  {substitution.result.layer1Regression.options.map((option) => {
+                    const avail = availabilityMap.get(option.movement_id);
+                    // Fail closed: only an explicit 'available' verdict is selectable.
+                    // The store refuses the swap anyway; the sheet must not offer it.
+                    const selectable = avail?.state === 'available';
+                    const isTeachingOnly = !selectable;
+                    return (
+                      <Pressable
+                        key={option.movement_id}
+                        disabled={!selectable}
+                        onPress={() => {
+                          if (subTargetLogged > 0) {
+                            setPendingSubSets(clamp((subTargetSlot?.plannedSets ?? 1) - subTargetLogged, 1, 6));
+                            setPendingSub({ kind: 'regression', option });
+                          } else {
+                            applyRegression(substitution.targetId, option.movement_id);
+                          }
+                        }}
+                        accessibilityRole="button"
+                        accessibilityState={{ disabled: !selectable }}
+                        accessibilityLabel={`Use ${option.name} instead`}
+                        style={({ pressed }) => [styles.option, pressed && selectable && styles.pressed, !selectable && styles.optionDisabled]}
+                      >
+                        <View style={styles.optionCopy}>
+                          <Text style={styles.optionName}>{option.name}</Text>
+                          <Text style={styles.optionReason}>{option.rationale}</Text>
+                          {isTeachingOnly && (
+                            <Text style={styles.teachingOnlyOption}>
+                              {formatTeachingOnlyReason(avail)}
+                            </Text>
+                          )}
+                        </View>
+                        <Text style={styles.optionArrow}>›</Text>
+                      </Pressable>
+                    );
+                  })}
+                  {substitution.result.layer2DaySwap.options.map((option) => {
+                    const avail = availabilityMap.get(option.movement_id);
+                    const selectable = avail?.state === 'available';
+                    const isTeachingOnly = !selectable;
+                    return (
+                      <Pressable
+                        key={`swap-${option.plannedSlotId}`}
+                        disabled={!selectable}
+                        onPress={() => {
+                          if (subTargetLogged > 0) {
+                            setPendingSubSets(clamp((subTargetSlot?.plannedSets ?? 1) - subTargetLogged, 1, 6));
+                            setPendingSub({ kind: 'daySwap', option });
+                          } else {
+                            applyDaySwap(substitution.targetId, option);
+                          }
+                        }}
+                        accessibilityRole="button"
+                        accessibilityState={{ disabled: !selectable }}
+                        accessibilityLabel={`Move ${option.name} forward into this session`}
+                        style={({ pressed }) => [styles.option, pressed && selectable && styles.pressed, !selectable && styles.optionDisabled]}
+                      >
+                        <View style={styles.optionCopy}>
+                          <Text style={styles.optionName}>{option.name}</Text>
+                          <Text style={styles.optionReason}>{option.rationale}</Text>
+                          {isTeachingOnly && (
+                            <Text style={styles.teachingOnlyOption}>
+                              {formatTeachingOnlyReason(avail)}
+                            </Text>
+                          )}
+                        </View>
+                        <Text style={styles.optionArrow}>›</Text>
+                      </Pressable>
+                    );
+                  })}
+                  {substitution.result.layer1Regression.options.length === 0 && substitution.result.layer2DaySwap.options.length === 0 && (
+                    <Text style={styles.noOptions}>No replacement is available under the current app checks. It is okay to finish here.</Text>
+                  )}
+                </View>
+              </>
             )}
-            <View style={{ marginTop: theme.space[3] }}>
-              {substitution.result.layer1Regression.options.map((option) => {
-                const avail = availabilityMap.get(option.movement_id);
-                // Fail closed: only an explicit 'available' verdict is selectable.
-                // The store refuses the swap anyway; the sheet must not offer it.
-                const selectable = avail?.state === 'available';
-                const isTeachingOnly = !selectable;
-                return (
-                  <Pressable key={option.movement_id} disabled={!selectable} onPress={() => applyRegression(substitution.targetId, option.movement_id)} accessibilityRole="button" accessibilityState={{ disabled: !selectable }} accessibilityLabel={`Use ${option.name} instead`} style={({ pressed }) => [styles.option, pressed && selectable && styles.pressed, !selectable && styles.optionDisabled]}>
-                    <View style={styles.optionCopy}>
-                      <Text style={styles.optionName}>{option.name}</Text>
-                      <Text style={styles.optionReason}>{option.rationale}</Text>
-                      {isTeachingOnly && (
-                        <Text style={styles.teachingOnlyOption}>
-                          {formatTeachingOnlyReason(avail)}
-                        </Text>
-                      )}
-                    </View>
-                    <Text style={styles.optionArrow}>›</Text>
-                  </Pressable>
-                );
-              })}
-              {substitution.result.layer2DaySwap.options.map((option) => {
-                const avail = availabilityMap.get(option.movement_id);
-                const selectable = avail?.state === 'available';
-                const isTeachingOnly = !selectable;
-                return (
-                  <Pressable key={`swap-${option.plannedSlotId}`} disabled={!selectable} onPress={() => applyDaySwap(substitution.targetId, option)} accessibilityRole="button" accessibilityState={{ disabled: !selectable }} accessibilityLabel={`Move ${option.name} forward into this session`} style={({ pressed }) => [styles.option, pressed && selectable && styles.pressed, !selectable && styles.optionDisabled]}>
-                    <View style={styles.optionCopy}>
-                      <Text style={styles.optionName}>{option.name}</Text>
-                      <Text style={styles.optionReason}>{option.rationale}</Text>
-                      {isTeachingOnly && (
-                        <Text style={styles.teachingOnlyOption}>
-                          {formatTeachingOnlyReason(avail)}
-                        </Text>
-                      )}
-                    </View>
-                    <Text style={styles.optionArrow}>›</Text>
-                  </Pressable>
-                );
-              })}
-              {substitution.result.layer1Regression.options.length === 0 && substitution.result.layer2DaySwap.options.length === 0 && (
-                <Text style={styles.noOptions}>No replacement is available under the current app checks. It is okay to finish here.</Text>
-              )}
-            </View>
           </View>
         )}
       </KeyboardAwareScrollView>
