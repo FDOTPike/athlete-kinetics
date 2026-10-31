@@ -13042,3 +13042,54 @@ The status assertion and its wording are unchanged, and its 30 s bound still run
   - The nit: the settled check now also compares the element's type, identifier and label.
   - Still no retry and no new bound. `npm run typecheck` exit 0; `verify:native-config` exit 0.
  In 38344991834 attempt 1 it failed in `test1` with "the Progress screen marker (progress-screen) did not appear within 30 s". Neither was investigated here.
+
+## Entry 0273 — 2026-10-31 · Design brief: in-block effort drift ("hall effect"), detect and realign (Claude Code Desktop, side session)
+
+**Executor:** Claude Code Desktop (side session started from the Entry 0271 session).
+
+### Prompt (verbatim)
+
+```text
+Task:
+Write a design brief (no code) for the owner's new request: detect when an athlete is drifting off track mid-block, for example when logged RPE climbs faster than the plan expects. Allow for normal variation. When drift is detected, the engine realigns the program to help the athlete adjust. The owner called this the "hall effect" as an analogy.
+
+What already exists (verify each item before relying on it):
+- `packages/inference/src/kinematicAutopilot.ts` `detectFlaws` already compares logged RPE with target RPE per movement pattern:
+  - `LAMBDA` 0.88 recency weighting;
+  - `DELTA` 0.15 deadband;
+  - `MIN_OBSERVATIONS` 5;
+  - a within-7-day trend term weighted `W_TREND` 0.3.
+- `deriveControlAction` eases or raises, but only at `generateNewBlock` (`apps/mobile/src/state/useStore.ts` around 4414-4476), over a 21-day window.
+- `blockGenerator.ts` applies `dRpe_p`/`dSet_p` but not `dLoad_p`.
+- `deriveDailyAdjustment` is diagnostics-only.
+- `sessionFeel.ts` `SESSION_FEEL_RPE_DRIFT_THRESHOLD` = 1 only asks a question.
+- Goal progress (`focusGoals.ts` `goalProgress`) uses athlete-entered measurements only.
+- `review_due` is count-based.
+
+What the owner already ruled (quote each with path:line and do not reopen any without saying so):
+- `docs/decisions/CALIBRATION_POLICY_V1.md`: autopilot coefficients frozen; retrospective signals never prospectively change a session without independent owner approval; neutral trend indicators are allowed.
+- `docs/decisions/PROGRESSION_MEASUREMENT_OPEN_DECISIONS.md`: progression signal as a prescription input is PLAN ONLY and deferred; no stagnation or plateau detector is authorized.
+- `docs/BRIEF_progression_control_safety.md`: the RPE self-confirming ratchet warning; reduction-only recommended.
+- `docs/SWEEP_completion_action_2026-07-31.md` 2026-10-13: authority waits on real beta logs.
+- `DEVIATION_LOG.md`: the authority envelope and controller-stability caveats.
+
+Deliverable: `docs/BRIEF_in_block_effort_drift_2026-10-31.md`, under about 1,500 words. It should contain:
+1. The owner's request, quoted.
+2. What exists, and the gap.
+3. Which rulings it touches.
+4. Two or three options. At least one must be a neutral indicator only (allowed today). At least one must be reduction-only mid-block realignment under the existing guard layer.
+5. For each option: the athlete-facing effect, the safety direction, the build size, and the tests or verifiers needed.
+6. One recommendation.
+7. The exact ruling the owner would need to grant.
+
+Get advice from Sol and Astra (Codex CLI) before recommending, per the owner's working rules. Also note the suspected defect in `getPendingAutopilotAdjustments` (useStore around 6016, `WHERE tb.status = 'active'`): it may show the current block's applied rows as "what changes next block", and BlockScreen renders the raw `reason` token. Confirm it or rule it out.
+
+Open a draft PR into `claude/beta-question-box-2026-10-28`. Never merge to master.
+```
+
+### Output
+
+- New file `docs/BRIEF_in_block_effort_drift_2026-10-31.md` (design only, no code). Every code fact and ruling quotation was checked against the files; quotations matched by script.
+- Sol and Astra advised read-only through the Codex CLI. Both recommended option A (effort against plan, observation only, no next-block forecast) and a shadow-only ruling for option C. Both corrected the draft: lowering a target while effort is unchanged makes the RPE error larger, so C's main risk is repeated easing (a ratchet), and the block-wide `rpeRaisePermitted` withhold does not mitigate it. Both corrections are in the brief.
+- Defect confirmed: `getPendingAutopilotAdjustments` returns the current block's applied rows, BlockScreen heads them "What changes next block" and prints the raw reason token per slot; the component test seeds reasons the schema rejects. Recorded in the brief, not fixed here.
+- Branch `claude/in-block-effort-drift-brief-2026-10-31`, draft pull request into `claude/beta-question-box-2026-10-28`. No tests run (docs only).
