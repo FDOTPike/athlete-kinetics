@@ -90,10 +90,13 @@ function CenteredState({ children }: { children: React.ReactNode }): React.JSX.E
 
 export default function ReadinessScreen(props: ReadinessScreenProps): React.JSX.Element {
   const state = useStore((s) => s);
+  if (state.status === 'booting' || state.status === 'error') {
+    return <AvailableReadinessScreen {...props} />;
+  }
   const decision = typeof state.getTrainingSupportDecision === 'function'
     ? state.getTrainingSupportDecision(state.todayPlan?.slots.map((slot) => slot.movementId))
     : { status: 'support_unavailable' as const };
-  if (state.status !== 'booting' && decision.status !== 'available') return <TrainingSupportNotice
+  if (decision.status !== 'available') return <TrainingSupportNotice
     unavailable={decision.status === 'support_unavailable'} onOpenSession={state.session !== null ? props.onOpenSession : undefined} />;
   return <AvailableReadinessScreen {...props} />;
 }

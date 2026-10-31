@@ -166,3 +166,21 @@ test('ReadinessScreen enforces training-support hold and renders TrainingSupport
   expect(screen.queryByText('Ready to train')).toBeNull();
   expect(screen.queryByText("Follow today's plan at the effort it prescribes.")).toBeNull();
 });
+
+test('ReadinessScreen renders the boot error view with Retry before evaluating training support', () => {
+  const boot = jest.fn();
+  const getTrainingSupportDecision = jest.fn(() => ({ status: 'support_unavailable', holdIds: [] }));
+  mockState = baseState({
+    status: 'error',
+    error: 'The database could not be opened.',
+    boot,
+    getTrainingSupportDecision,
+  });
+  render(<ReadinessScreen />);
+
+  expect(getTrainingSupportDecision).not.toHaveBeenCalled();
+  expect(screen.queryByTestId('training-support-notice')).toBeNull();
+  expect(screen.getByText('Training data needs attention')).toBeOnTheScreen();
+  expect(screen.getByText('The database could not be opened.')).toBeOnTheScreen();
+  expect(screen.getByLabelText('Retry database boot')).toBeOnTheScreen();
+});
