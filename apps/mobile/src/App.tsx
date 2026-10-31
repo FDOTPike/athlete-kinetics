@@ -303,7 +303,7 @@ export function AppShell(): React.JSX.Element {
                 database is ready. */}
             {tab === 'session' && status === 'ready' && (
               <View style={{ flex: 1 }} testID="session-screen-shown">
-                <SessionScreen onReturnToToday={() => setTab('today')} />
+                <SessionScreen onReturnToToday={() => setTab('today')} onOpenPlan={() => setTab('coach')} />
               </View>
             )}
             {/* PR #13 review: ProgressScreen's loaders read the database on

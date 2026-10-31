@@ -6,6 +6,7 @@
  * persists the returned plain-object state as its durable checkpoint.
  */
 import { EXPERIENCE_SEVERITY, type TrainingAge } from './types';
+export { EXPERIENCE_SEVERITY, type TrainingAge };
 
 /** One prescribed set: repetition work or a timed interval. */
 export type RunnerTarget =
@@ -233,13 +234,17 @@ function normalizeSlots(values: unknown): readonly RunnerSlot[] {
   return slots;
 }
 
+export function runnerTierForTrainingAge(tier: TrainingAge | undefined): TrainingAge {
+  const resolved = tier ?? 'intermediate';
+  if (!isTrainingAge(resolved)) throw new RunnerCheckpointError('invalid training tier');
+  return resolved;
+}
+
 function normalizeStartConfig(config: RunnerStartConfig | undefined): Required<RunnerStartOptions> {
   if (typeof config === 'string') {
-    if (!isTrainingAge(config)) throw new RunnerCheckpointError('invalid training tier');
-    return { tier: config, startedAtMs: null };
+    return { tier: runnerTierForTrainingAge(config), startedAtMs: null };
   }
-  const tier = config?.tier ?? 'intermediate';
-  if (!isTrainingAge(tier)) throw new RunnerCheckpointError('invalid training tier');
+  const tier = runnerTierForTrainingAge(config?.tier);
   const startedAtMs = config?.startedAtMs ?? null;
   if (startedAtMs !== null && !isNonNegativeTimestamp(startedAtMs)) {
     throw new RunnerCheckpointError('startedAtMs must be a non-negative millisecond timestamp');

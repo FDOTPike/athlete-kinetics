@@ -2,8 +2,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING_NOTE, EFFORT_STOP_GUIDANCE, effortCue, mapRirToRpe, RIR_OPTIONS, PREPARATION_STATUS_LABEL, isTerminalPreparationStatus, preparationDoseUnit, type EffortAnswer, type RunnerHaltReason } from '@ak/inference';
-import { formatTeachingOnlyReason, useStore, type LoadSelection, type LoggedSet, type SetLoadShown, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
-import { useSubViewBack } from '../navigation/navigation';
+import { EXPERIENCE_SEVERITY, runnerTierForTrainingAge } from '../../../../packages/inference/src/sessionRunner';
+import { formatTeachingOnlyReason, freeFormStartIsEmpty, useStore, type LoadSelection, type LoggedSet, type SetLoadShown, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
+import { useNavigation, useSubViewBack } from '../navigation/navigation';
 import { buildSessionSummary, NO_NEXT_SESSION_TEXT } from '../state/sessionSummary';
 import { SUPPORT_HELD_MESSAGE, SUPPORT_UNAVAILABLE_MESSAGE } from '../state/healthSupportStore';
 import { theme } from '../theme/theme';
@@ -283,6 +284,8 @@ export interface SessionScreenProps {
    * renders standalone in component tests.
    */
   onReturnToToday?: () => void;
+  /** Shell-supplied: open the PLAN tab when starting an empty unplanned session is blocked. */
+  onOpenPlan?: () => void;
 }
 
 /**
@@ -290,8 +293,15 @@ export interface SessionScreenProps {
  * completion screen shown after a session ends (its saved outcome, the
  * summary of what was done, and the optional record of how it went).
  */
-export default function SessionScreen({ onReturnToToday }: SessionScreenProps = {}): React.JSX.Element {
+export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionScreenProps = {}): React.JSX.Element {
   const state = useStore((s) => s);
+  const nav = typeof useNavigation === 'function' ? useNavigation() : undefined;
+  const [emptyStartPromptOpen, setEmptyStartPromptOpen] = useState(false);
+  const checkFreeFormStartIsEmpty = (): boolean => {
+    if (typeof state.freeFormStartIsEmpty === 'function') return state.freeFormStartIsEmpty();
+    if (typeof freeFormStartIsEmpty === 'function') return freeFormStartIsEmpty();
+    return false;
+  };
   const {
     movements, session, sessionPlan, activeSessionPlanSlotId, profile, oneRepMaxes,
     lastTriage, substitution, startSession, selectMovementSlot, setMovementPreference,
@@ -346,7 +356,10 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [niggleRegion, setNiggleRegion] = useState<string | null>(null);
   const [niggleSeverity, setNiggleSeverity] = useState(4);
+  const [niggleSavedNotice, setNiggleSavedNotice] = useState(false);
   const [bandLevel, setBandLevel] = useState<number | null>(null);
+  // The runner stops on the tier it started with; fall back to the profile before it starts.
+  const haltMin = EXPERIENCE_SEVERITY[runnerTierForTrainingAge(state.runner?.tier ?? profile.training_age)].haltMin;
   const advancedRest = useRef<string | null>(null);
 
   // Session feel (070): the sub-view that records how the ended session went.
@@ -521,7 +534,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
 
   useEffect(() => {
     if (currentSlot === null || target === null) return;
-    setDetailsOpen(false); setSafetyOpen(false); setNiggleRegion(null); setNiggleSeverity(4); setBandLevel(null);
+    setDetailsOpen(false); setSafetyOpen(false); setNiggleRegion(null); setNiggleSeverity(4); setNiggleSavedNotice(false); setBandLevel(null);
     setReps(target.kind === 'reps' ? target.reps : 1);
     setSeconds(target.kind === 'time' ? target.seconds : 30);
     // Initialize the load draft ONCE per set key from the resolver output.
@@ -769,12 +782,42 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
             : 'Your session will stay in one clear vertical timeline.'}
         </Text>
         {!blocked && (
-          <PrimaryButton
-            label="Start session"
-            onPress={() => startSession()}
-            accessibilityLabel="Start a new workout session"
-            style={{ marginTop: theme.space[5] }}
-          />
+          emptyStartPromptOpen ? (
+            <View style={[styles.emptyCard, { marginTop: theme.space[5] }]} testID="empty-free-form-start-card">
+              <Text style={styles.emptyTitle}>Nothing to start yet</Text>
+              <Text style={styles.emptyBody}>
+                There is no plan for today and no earlier session to repeat. Build your plan first.
+              </Text>
+              <PrimaryButton
+                label="Go to Plan"
+                onPress={() => {
+                  setEmptyStartPromptOpen(false);
+                  onOpenPlan?.();
+                  nav?.setTab('coach');
+                }}
+                accessibilityLabel="Go to Plan"
+                style={{ marginTop: theme.space[4] }}
+              />
+              <QuietAction
+                label="Cancel"
+                onPress={() => setEmptyStartPromptOpen(false)}
+                accessibilityLabel="Cancel"
+              />
+            </View>
+          ) : (
+            <PrimaryButton
+              label="Start session"
+              onPress={() => {
+                if (checkFreeFormStartIsEmpty()) {
+                  setEmptyStartPromptOpen(true);
+                  return;
+                }
+                startSession();
+              }}
+              accessibilityLabel="Start a new workout session"
+              style={{ marginTop: theme.space[5] }}
+            />
+          )
         )}
       </View>
     );
@@ -909,8 +952,17 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
 
   const submitNiggle = (): void => {
     if (niggleRegion === null) return;
-    reportNiggle(niggleRegion, niggleSeverity);
+    // A report that did not save keeps the form open and claims nothing.
+    if (reportNiggle(niggleRegion, niggleSeverity) !== true) {
+      setNiggleSavedNotice(false);
+      return;
+    }
     setSafetyOpen(false);
+    const after = typeof useStore.getState === 'function' ? useStore.getState() : state;
+    const afterHalted = after?.runner?.phase === 'halted'
+      || (after?.runner?.phase !== 'complete' && after?.lastTriage?.kind === 'matched' && after.lastTriage.directive.halt);
+    const afterSubstitutionOpened = after?.substitution !== null && after?.substitution !== undefined;
+    setNiggleSavedNotice(!afterHalted && !afterSubstitutionOpened);
   };
 
   const setup = lines(currentMovement?.instructions, 4);
@@ -943,7 +995,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
             <Text style={styles.headerTitle}>Before your first set</Text>
             <Text style={styles.headerMeta}>
               {sessionPlan.length === 0
-                ? 'No movements are planned yet. Prepare first, then add your work.'
+                ? 'No movements are planned yet.'
                 : `${sessionPlan.length} exercise${sessionPlan.length === 1 ? '' : 's'} planned after preparation.`}
             </Text>
           </View>
@@ -1037,7 +1089,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
         {!halted && !complete && sessionPlan.length === 0 && (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyTitle}>No exercise is queued.</Text>
-            <Text style={styles.emptyBody}>Return to Coach to create a session plan, then come back here.</Text>
+            <Text style={styles.emptyBody}>Finish this session, then build your plan on the PLAN tab.</Text>
             <SecondaryButton
               label="Finish session"
               onPress={endSession}
@@ -1515,7 +1567,10 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                           />
                           <SecondaryButton
                             label="Report discomfort"
-                            onPress={() => setSafetyOpen((value) => !value)}
+                            onPress={() => {
+                              setSafetyOpen((value) => !value);
+                              setNiggleSavedNotice(false);
+                            }}
                             accessibilityLabel="Report discomfort"
                             style={{ flex: 1, minHeight: theme.touch.min }}
                           />
@@ -1555,15 +1610,23 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                                 );
                               })}
                             </View>
+                            {niggleSeverity >= haltMin && (
+                              <Text style={styles.loadEvidence}>
+                                At this level the session stops for today.
+                              </Text>
+                            )}
                             <View style={{ marginTop: theme.space[3] }}>
                               <PrimaryButton
-                                label={niggleSeverity >= 8 ? 'Stop session' : 'Find an alternative'}
+                                label={niggleSeverity >= haltMin ? 'Save report and stop session' : 'Save report'}
                                 onPress={submitNiggle}
                                 disabled={niggleRegion === null}
-                                accessibilityLabel="Save discomfort report"
+                                accessibilityLabel={niggleSeverity >= haltMin ? 'Save discomfort report and stop session' : 'Save discomfort report'}
                               />
                             </View>
                           </View>
+                        )}
+                        {!safetyOpen && niggleSavedNotice && substitution === null && !halted && (
+                          <Text style={styles.loadEvidence}>Report saved with this session.</Text>
                         )}
 
                         {/* Stop Session outlined full-width SecondaryButton */}
