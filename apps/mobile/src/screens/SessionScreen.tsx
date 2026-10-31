@@ -456,8 +456,9 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   };
   const runnerCurrent = runner?.slots?.[runner.slotIndex ?? -1];
   const runnerCurrentId = runnerCurrent?.sessionPlanSlotId ?? null;
-  const selected = activeSessionPlanSlotId === null ? null : sessionPlan.find((slot) => slot.sessionPlanSlotId === activeSessionPlanSlotId) ?? null;
-  const firstIncomplete = sessionPlan.find((slot) => loggedCount(slot) < slot.plannedSets) ?? null;
+  const selectedCandidate = activeSessionPlanSlotId === null ? null : sessionPlan.find((slot) => slot.sessionPlanSlotId === activeSessionPlanSlotId) ?? null;
+  const selected = selectedCandidate !== null && selectedCandidate.replacedBySessionPlanSlotId == null ? selectedCandidate : null;
+  const firstIncomplete = sessionPlan.find((slot) => slot.replacedBySessionPlanSlotId == null && loggedCount(slot) < slot.plannedSets) ?? null;
   const fallback = selected !== null && loggedCount(selected) < selected.plannedSets ? selected : firstIncomplete;
   const currentSlot = runnerCurrentId !== null ? sessionPlan.find((slot) => slot.sessionPlanSlotId === runnerCurrentId) ?? fallback : fallback;
   const currentMovement: Movement | null = currentSlot === null ? null : byId.get(runnerCurrent?.movementId ?? currentSlot.movementId) ?? byId.get(currentSlot.movementId) ?? null;
@@ -901,7 +902,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
     : formatTeachingOnlyReason(currentAvailability);
 
   const chooseSlot = (slot: PlanSlot): void => {
-    if (mode === 'guided' || loggedCount(slot) >= slot.plannedSets) return;
+    if (mode === 'guided' || slot.replacedBySessionPlanSlotId != null || loggedCount(slot) >= slot.plannedSets) return;
     selectMovementSlot(slot.sessionPlanSlotId);
   };
 
@@ -1128,12 +1129,45 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                 ? movement.media.fallbackUrl
                 : null;
               const logged = loggedCount(slot);
-              const finished = logged >= slot.plannedSets;
+              const isReplaced = slot.replacedBySessionPlanSlotId != null;
+              const replacedBySlot = isReplaced
+                ? sessionPlan.find((candidate) => candidate.sessionPlanSlotId === slot.replacedBySessionPlanSlotId) ?? null
+                : null;
+              const finished = isReplaced || logged >= slot.plannedSets;
               // Cross-movement rest still belongs to the just-finished slot.
               // Keep it active so the rest controls remain reachable.
-              const active = currentSlot?.sessionPlanSlotId === slot.sessionPlanSlotId && (!finished || resting);
-              const skipped = runner?.skippedSessionPlanSlotIds.includes(slot.sessionPlanSlotId) ?? false;
-              const selectable = mode === 'self_directed' && !finished && !active && !resting && !skipped;
+              const active = !isReplaced && currentSlot?.sessionPlanSlotId === slot.sessionPlanSlotId && (!finished || resting);
+              const skipped = !isReplaced && (runner?.skippedSessionPlanSlotIds.includes(slot.sessionPlanSlotId) ?? false);
+              const selectable = mode === 'self_directed' && !isReplaced && !finished && !active && !resting && !skipped;
+
+              if (isReplaced) {
+                const completedSets = session?.sets.filter((set) => sameSlot(set, slot)) ?? [];
+                const name = movement?.name ?? 'Movement';
+                const replacementName = (replacedBySlot !== null ? byId.get(replacedBySlot.movementId)?.name : undefined) ?? 'Movement';
+                const swappedMeta = `Swapped for ${replacementName} · ${logged} ${logged === 1 ? 'set' : 'sets'} logged`;
+                const swappedLabel = `Swapped for ${replacementName} · ${name} · ${logged} ${logged === 1 ? 'set' : 'sets'} logged`;
+
+                return (
+                  <View
+                    key={slot.sessionPlanSlotId}
+                    style={[styles.timelineRow, styles.replacedRow]}
+                    accessibilityRole="text"
+                    accessibilityLabel={swappedLabel}
+                    accessibilityState={{ disabled: true }}
+                  >
+                    <View style={styles.rail}>
+                      <View style={[styles.dot, styles.dotComplete]}>
+                        <Text style={styles.check}>✓</Text>
+                      </View>
+                    </View>
+                    <View style={styles.completeRow}>
+                      <Text style={styles.completeRowName} numberOfLines={1}>{name}</Text>
+                      <Text style={styles.completeRowMeta}>{swappedMeta}</Text>
+                      <CompletedMetrics sets={completedSets} bandLadder={bandLadder} movementsById={byId} onEdit={editSet} />
+                    </View>
+                  </View>
+                );
+              }
 
               if (finished && !active) {
                 const completedSets = session?.sets.filter((set) => sameSlot(set, slot)) ?? [];
@@ -1884,6 +1918,9 @@ const styles = StyleSheet.create({
   timelineRow: {
     flexDirection: 'row',
     alignItems: 'stretch',
+  },
+  replacedRow: {
+    opacity: 0.4,
   },
   rail: {
     width: 30,
