@@ -272,3 +272,11 @@ describe('session-5: plan-first empty free-form starts', () => {
     expect(count('SELECT COUNT(*) AS c FROM session')).toBe(0);
   });
 });
+
+test('session-5: an unused plan for today is never treated as an empty start, even with no history', () => {
+  // startSession consumes today's unused plan, so the plan-first card must not block it.
+  expect(state().todayPlan).not.toBeNull();
+  expect(count('SELECT COUNT(*) AS c FROM set_record')).toBe(0);
+  expect(count('SELECT COUNT(*) AS c FROM session_origin')).toBe(0);
+  expect(freeFormStartIsEmpty()).toBe(false);
+});

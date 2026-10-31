@@ -1806,18 +1806,34 @@ const seedFreeFormSessionPlan = (
   });
 };
 
+/** True when `startSession()` (no repeat) would open a session with no
+ *  exercises: today's plan is absent or already used, and the most recent
+ *  logged session gives nothing this athlete may repeat. Reads only. */
 export function freeFormStartIsEmpty(): boolean {
   if (db === null) return false;
-  const { movements, profile, activePriorExperienceMovementIds, niggles } = useStore.getState();
-  const capabilityAvailable = capabilityAvailableMovementIds(
-    db,
-    movements,
-    profile,
-    'weight_room',
-    new Set(activePriorExperienceMovementIds),
-    safetyExcludedMovementIdsFor(movements, profile, niggles),
-  );
-  return seedFreeFormSessionPlan(db, movements, profile, capabilityAvailable, 3).length === 0;
+  const d = db;
+  try {
+    const { movements, profile, activePriorExperienceMovementIds, niggles, todayPlan } = useStore.getState();
+    // Same rule as startSession: an unused plan for today is consumed, so the start is not empty.
+    if (todayPlan !== null) {
+      const alreadyPlannedToday = rowsOf<{ c: number }>(d.executeSync(
+        'SELECT COUNT(*) AS c FROM session_origin WHERE source_planned_session_id = ?',
+        [todayPlan.plannedSessionId],
+      ))[0]?.c ?? 0;
+      if (alreadyPlannedToday === 0) return false;
+    }
+    const capabilityAvailable = capabilityAvailableMovementIds(
+      d,
+      movements,
+      profile,
+      'weight_room',
+      new Set(activePriorExperienceMovementIds),
+      safetyExcludedMovementIdsFor(movements, profile, niggles),
+    );
+    return seedFreeFormSessionPlan(d, movements, profile, capabilityAvailable, 3).length === 0;
+  } catch {
+    return false;
+  }
 }
 
 export const PREPARATION_GATE_MESSAGE = 'Finish, skip or record your preparation before logging your first set.';

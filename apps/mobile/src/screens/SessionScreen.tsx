@@ -302,9 +302,6 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
     if (typeof freeFormStartIsEmpty === 'function') return freeFormStartIsEmpty();
     return false;
   };
-  const isUnplannedIdleStart = state.todayPlan === null || (state.blockSessions ?? []).some(
-    (s) => s.plannedSessionId === state.todayPlan?.plannedSessionId && s.completionStatus !== null,
-  );
   const {
     movements, session, sessionPlan, activeSessionPlanSlotId, profile, oneRepMaxes,
     lastTriage, substitution, startSession, selectMovementSlot, setMovementPreference,
@@ -361,7 +358,8 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   const [niggleSeverity, setNiggleSeverity] = useState(4);
   const [niggleSavedNotice, setNiggleSavedNotice] = useState(false);
   const [bandLevel, setBandLevel] = useState<number | null>(null);
-  const haltMin = EXPERIENCE_SEVERITY[runnerTierForTrainingAge(profile.training_age)].haltMin;
+  // The runner stops on the tier it started with; fall back to the profile before it starts.
+  const haltMin = EXPERIENCE_SEVERITY[runnerTierForTrainingAge(state.runner?.tier ?? profile.training_age)].haltMin;
   const advancedRest = useRef<string | null>(null);
 
   // Session feel (070): the sub-view that records how the ended session went.
@@ -810,7 +808,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
             <PrimaryButton
               label="Start session"
               onPress={() => {
-                if (isUnplannedIdleStart && checkFreeFormStartIsEmpty()) {
+                if (checkFreeFormStartIsEmpty()) {
                   setEmptyStartPromptOpen(true);
                   return;
                 }
