@@ -724,7 +724,7 @@ a('bounded: the set-aggregate carries a session_date window predicate', /WHERE s
 a('no executeSync inside a for/map/forEach in the hydration (n+1 guard)', !/(for\s*\(|\.forEach\s*\(|\.map\s*\()[^;{]*executeSync/.test(hyd));
 
 // --- [Work Order C] Next Block Panel read-only store invariants ----------------
-console.log('[Work Order C — Next Block Panel store invariants]');
+console.log('[Work Order C — Changed in this block panel store invariants - the active block applied rows]');
 const getAdjustmentsRaw = (() => {
   const i = src.indexOf('getPendingAutopilotAdjustments: (): PendingAutopilotAdjustment[]');
   const j = src.indexOf('\n  },', i);
@@ -740,7 +740,7 @@ a('READ-ONLY: getPendingAutopilotAdjustments contains NO INSERT, UPDATE, or DELE
 const adjustmentsQuerySql = statements.find((sql) =>
   sql.includes('FROM planned_slot_autopilot') && sql.includes('JOIN movement') && sql.includes("WHERE tb.status = 'active'"),
 );
-a('store exposes the next block autopilot adjustments query SQL', Boolean(adjustmentsQuerySql));
+a('store exposes the active block applied autopilot adjustments query SQL', Boolean(adjustmentsQuerySql));
 a('refreshBlock stores pendingAutopilotAdjustments in store state',
   /pendingAutopilotAdjustments\s*=\s*get\(\)\.getPendingAutopilotAdjustments\(\)/.test(src));
 if (adjustmentsQuerySql) {
