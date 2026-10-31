@@ -180,7 +180,6 @@ function AvailableReadinessScreen({
             </View>
             <Text style={styles.title}>{HALT_META.title}</Text>
             <Text style={styles.body}>{HALT_META.recommendation}</Text>
-            {hasLiveSession && <Text style={styles.caption}>Your active workout is ready to resume.</Text>}
             {!hasLiveSession && todayPlan !== null && (
               <Text style={styles.caption}>{formatFocus(todayPlan.focus)} session planned today.</Text>
             )}

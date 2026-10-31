@@ -195,3 +195,36 @@ test('when vector is null during a safety halt, BlockScreen and ReadinessScreen 
   expect(screen.getByText('Training is paused for today. Review the report before doing more work.')).toBeOnTheScreen();
   expect(screen.getByText('No readiness yet')).toBeOnTheScreen();
 });
+
+test('when vector is null and a safety halt is active with an open session, ReadinessScreen does not claim the workout is ready to resume', () => {
+  mockState = baseState({
+    vector: null,
+    session: {
+      sessionId: 10,
+      date: TODAY,
+      startedAtMs: 1,
+      sets: [],
+    },
+    lastTriage: {
+      kind: 'matched',
+      directive: {
+        ruleId: 'RED_FLAG_SYSTEMIC',
+        similarity: 1,
+        matchedAnchor: 'dizziness',
+        halt: true,
+        followUp: 'Are the symptoms easing at complete rest right now?',
+        vector: {
+          load_modifier: 0,
+          set_modifier: -99,
+          rpe_cap: 0,
+          coaching_cue: 'Systemic symptom reported. Stop the session and rest.',
+        },
+      },
+    },
+  });
+
+  render(<ReadinessScreen onOpenSession={jest.fn()} />);
+  expect(screen.getByText("Resolve today's safety report")).toBeOnTheScreen();
+  expect(screen.getByText('Training is paused for today. Review the report before doing more work.')).toBeOnTheScreen();
+  expect(screen.queryByText('Your active workout is ready to resume.')).toBeNull();
+});
