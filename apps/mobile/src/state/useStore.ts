@@ -3400,10 +3400,17 @@ export const useStore = create<KineticsStore>()((set, get) => {
     if (todaysVector === null || todaysVector.load_modifier >= 1) {
       return base;
     }
-    const carryForwardManual = base.source === 'manual' && !isFirstSet && latestCurrentSessionSet !== null;
+    const hasCurrentSessionLoad = !isFirstSet
+      && latestCurrentSessionSet !== null
+      && Number.isFinite(latestCurrentSessionSet.load_kg)
+      && latestCurrentSessionSet.load_kg >= 0;
+    const carryForwardManual = base.source === 'manual' && hasCurrentSessionLoad;
+    const carryForwardHistory = base.source === 'history' && hasCurrentSessionLoad;
     return {
       ...base,
-      initialLoadKg: carryForwardManual ? base.initialLoadKg : applyLoadModifier(base.initialLoadKg, todaysVector),
+      initialLoadKg: carryForwardManual || carryForwardHistory
+        ? base.initialLoadKg
+        : applyLoadModifier(base.initialLoadKg, todaysVector),
       advisoryKg: applyLoadModifier(base.advisoryKg, todaysVector),
     };
   },
@@ -7462,9 +7469,15 @@ export const useStore = create<KineticsStore>()((set, get) => {
       timeS: timeMode ? (metrics?.timeS ?? null) : null,
       bandLevel: metrics?.bandLevel ?? null,
     };
+    const todaysVector = state.prescription !== null && state.prescription.forDate === state.today
+      ? state.prescription.vector
+      : null;
+    const hasLoadReduction = todaysVector !== null && todaysVector.load_modifier < 1;
     set({
       session: { ...s, sets: [logged, ...s.sets] },
-      lastLoggedLoads: { ...state.lastLoggedLoads, [movementId]: safeLoad },
+      lastLoggedLoads: hasLoadReduction
+        ? state.lastLoggedLoads
+        : { ...state.lastLoggedLoads, [movementId]: safeLoad },
       ...(nextRunner !== null ? runnerSelection(nextRunner) : {}),
     });
   },

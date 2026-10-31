@@ -114,6 +114,8 @@ export function resolveLoadSelection(input: LoadSelectionInput): LoadSelection {
   } = input;
 
   const history = isHonest(lastLoggedLoadKg) ? lastLoggedLoadKg : null;
+  const currentSession = !isFirstSet && isHonest(currentSessionLoadKg) ? currentSessionLoadKg : null;
+  const historyLoad = currentSession ?? history;
   const apre = isHonest(overrideLoadKg) ? overrideLoadKg : null;
   const oneRm = isHonest(oneRepMaxKg) ? oneRepMaxKg : null;
   const validTargetReps = targetReps !== null
@@ -141,8 +143,8 @@ export function resolveLoadSelection(input: LoadSelectionInput): LoadSelection {
 
   // 1. Beginner: seeded -> history. 1RM/APRE never become operative.
   if (trainingAge === 'beginner') {
-    if (history !== null) {
-      return { source: 'history', initialLoadKg: history, advisoryKg: null, advisoryKind: null };
+    if (historyLoad !== null) {
+      return { source: 'history', initialLoadKg: historyLoad, advisoryKg: null, advisoryKind: null };
     }
     // Bodyweight identity load: explicit 0 is lawful even at first exposure.
     return {
@@ -158,10 +160,10 @@ export function resolveLoadSelection(input: LoadSelectionInput): LoadSelection {
     // Current-session carry-forward: after the first logged set, the actual
     // logged load initializes the next set. The source stays manual; the
     // carried value is the athlete's own, not an advisory.
-    if (!isFirstSet && isHonest(currentSessionLoadKg)) {
+    if (currentSession !== null) {
       return {
         source: 'manual',
-        initialLoadKg: currentSessionLoadKg,
+        initialLoadKg: currentSession,
         advisoryKg: advisory.kg,
         advisoryKind: advisory.kind,
       };
@@ -183,8 +185,8 @@ export function resolveLoadSelection(input: LoadSelectionInput): LoadSelection {
   if (derived !== null) {
     return { source: 'derived', initialLoadKg: derived, advisoryKg: null, advisoryKind: null };
   }
-  if (history !== null) {
-    return { source: 'history', initialLoadKg: history, advisoryKg: null, advisoryKind: null };
+  if (historyLoad !== null) {
+    return { source: 'history', initialLoadKg: historyLoad, advisoryKg: null, advisoryKind: null };
   }
   return {
     source: 'seeded',

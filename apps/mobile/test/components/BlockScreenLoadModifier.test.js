@@ -363,3 +363,173 @@ test('resolveSlotLoad reduces and rounds down history-based and APRE override lo
     advisoryKind: null,
   });
 });
+
+test('history-based load modifier applies only once across sets 1, 2, and 3 in both auto and manual-advisory paths without an APRE override', async () => {
+  const runThreeSets = async (loadPreference) => {
+    mockState = null;
+    resetDataMaintenanceLockForTests();
+    authorizeAthleteDataBoot();
+    mockDriver = makeNodeSqliteDriver();
+    useStore.setState({
+      status: 'booting',
+      error: null,
+      session: null,
+      runner: null,
+      sessionMode: null,
+      sessionPlan: [],
+      preparation: null,
+      activeSessionPlanSlotId: null,
+      activeMovementId: null,
+      triaging: false,
+      lastTriage: null,
+      prescription: null,
+      niggles: [],
+      todayPlan: null,
+      block: null,
+      program: null,
+      lastEndedSessionId: null,
+    });
+    useStore.getState().setEmbedder(null);
+    useStore.getState().boot();
+    await settle();
+    expect(useStore.getState().status).toBe('ready');
+
+    const movementId = Number(
+      mockDriver.raw.prepare("SELECT movement_id FROM movement WHERE name = 'Sumo Deadlift'").get().movement_id,
+    );
+    mockDriver.raw.exec(
+      "INSERT INTO session (session_id, micro_cycle_id, session_date, started_at_ms, duration_min) VALUES (9000, NULL, '2026-01-05', 1000, 40)",
+    );
+    mockDriver.raw
+      .prepare(
+        'INSERT INTO set_record (session_id, movement_id, set_index, reps, load_kg, rpe, logged_at_ms) VALUES (9000, ?, 1, 8, 82.5, 7, 2000)',
+      )
+      .run(movementId);
+
+    useStore.setState({ status: 'booting', session: null, runner: null });
+    useStore.getState().boot();
+    await settle();
+    expect(useStore.getState().status).toBe('ready');
+    expect(useStore.getState().lastLoggedLoads[movementId]).toBe(82.5);
+
+    useStore.getState().saveProfile({
+      training_age: 'intermediate',
+      equipment_inventory: ['barbell', 'squat_rack', 'dumbbells', 'bench'],
+    });
+    useStore.getState().saveLoadPreference(loadPreference);
+
+    const today = useStore.getState().today;
+    useStore.setState({
+      oneRepMaxes: {},
+      prescription: {
+        forDate: today,
+        source: 'guardrail',
+        vector: {
+          load_modifier: 0.7,
+          set_modifier: 0,
+          rpe_cap: 7.0,
+          coaching_cue: 'Reduced load today.',
+        },
+      },
+    });
+
+    useStore.getState().startSession();
+    expect(useStore.getState().error).toBeNull();
+    useStore.getState().finishPreparation('skipped', useStore.getState().preparation.revision);
+
+    const slot = useStore.getState().sessionPlan[0];
+    expect(slot.movementId).toBe(movementId);
+    expect(slot.overrideLoadKg).toBeNull();
+
+    const resolveCurrent = () =>
+      useStore.getState().resolveSlotLoad({
+        movementId,
+        bodyweightMode: false,
+        targetReps: 8,
+        targetRpe: 7.0,
+        overrideLoadKg: null,
+        sessionPlanSlotId: slot.sessionPlanSlotId,
+      });
+
+    const set1 = resolveCurrent();
+    useStore.getState().logSet(
+      movementId,
+      8,
+      57.5,
+      7,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      slot.sessionPlanSlotId,
+    );
+    expect(useStore.getState().error).toBeNull();
+    useStore.getState().skipRunnerRest();
+
+    const set2 = resolveCurrent();
+    useStore.getState().logSet(
+      movementId,
+      8,
+      57.5,
+      7,
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      slot.sessionPlanSlotId,
+    );
+    expect(useStore.getState().error).toBeNull();
+    useStore.getState().skipRunnerRest();
+
+    const set3 = resolveCurrent();
+    return {
+      movementId,
+      set1,
+      set2,
+      set3,
+      baselineLoadAfterSet2: useStore.getState().lastLoggedLoads[movementId],
+    };
+  };
+
+  const autoResult = await runThreeSets('auto');
+  expect(autoResult.set1).toEqual({
+    source: 'history',
+    initialLoadKg: 57.5,
+    advisoryKg: null,
+    advisoryKind: null,
+  });
+  expect(autoResult.set2).toEqual({
+    source: 'history',
+    initialLoadKg: 57.5,
+    advisoryKg: null,
+    advisoryKind: null,
+  });
+  expect(autoResult.set3).toEqual({
+    source: 'history',
+    initialLoadKg: 57.5,
+    advisoryKg: null,
+    advisoryKind: null,
+  });
+  expect(autoResult.baselineLoadAfterSet2).toBe(82.5);
+
+  const manualResult = await runThreeSets('manual');
+  expect(manualResult.set1).toEqual({
+    source: 'manual',
+    initialLoadKg: null,
+    advisoryKg: 57.5,
+    advisoryKind: 'history',
+  });
+  expect(manualResult.set2).toEqual({
+    source: 'manual',
+    initialLoadKg: 57.5,
+    advisoryKg: 57.5,
+    advisoryKind: 'history',
+  });
+  expect(manualResult.set3).toEqual({
+    source: 'manual',
+    initialLoadKg: 57.5,
+    advisoryKg: 57.5,
+    advisoryKind: 'history',
+  });
+  expect(manualResult.baselineLoadAfterSet2).toBe(82.5);
+});
