@@ -130,6 +130,7 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
 
   const resetForm = (): void => {
     setEntryDraftKept(false);
+    setEntryMode('weekly');
     setActivityId(undefined);
     setSeriesId(undefined);
     setKindId('walking');

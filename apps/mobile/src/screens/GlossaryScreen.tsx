@@ -45,6 +45,7 @@ const CATEGORY_CHIPS: readonly { readonly id: FilterCategory; readonly label: st
   { id: 'goal', label: 'GOALS' },
   { id: 'role', label: 'ROLES' },
   { id: 'movement', label: 'PATTERNS' },
+  { id: 'general', label: 'GENERAL' },
 ];
 
 export default function GlossaryScreen({ onClose }: GlossaryScreenProps): React.JSX.Element {
