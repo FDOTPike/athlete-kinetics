@@ -1,4 +1,5 @@
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { useStore } from '../../src/state/useStore';
 import { authorizeAthleteDataBoot, resetDataMaintenanceLockForTests } from '../../src/state/dataMaintenanceLock';
@@ -83,11 +84,17 @@ describe('OnboardingScreen review step provides an Edit target action when wants
     next();
 
     expect(screen.getByLabelText('START TRAINING')).toBeOnTheScreen();
-    expect(screen.getByTestId('onboarding-summary-target-row').props.children)
+    const targetRow = screen.getByTestId('onboarding-summary-target-row');
+    expect(targetRow.props.children)
       .toContain('TARGET — Squat 100 kg for 5 reps');
+    expect(StyleSheet.flatten(targetRow.props.style)).toMatchObject({ flexShrink: 1 });
 
     const editLabels = screen.getAllByLabelText(/^Edit /).map((node) => node.props.accessibilityLabel);
     expect(editLabels).toContain('Edit target');
+    expect(StyleSheet.flatten(screen.getByLabelText('Edit target').props.style)).toMatchObject({
+      minWidth: 56,
+      minHeight: 56,
+    });
 
     pressLabel('Edit target');
     expect(screen.getByTestId('goal-editor')).toBeOnTheScreen();

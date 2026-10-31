@@ -937,7 +937,7 @@ const styles = StyleSheet.create({
   reviewHeadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.space[2] },
   reviewHeading: { ...theme.font.eyebrow, color: theme.color.textHi, flexShrink: 1 },
   reviewDescription: { ...theme.font.body, color: theme.color.textMid },
-  reviewSupportLine: { ...theme.font.body, color: theme.color.textHi, fontWeight: '600' },
+  reviewSupportLine: { ...theme.font.body, color: theme.color.textHi, fontWeight: '600', flexShrink: 1 },
   reviewEdit: {
     minWidth: theme.touch.min,
     minHeight: theme.touch.min,
