@@ -620,6 +620,11 @@ export interface TodaySlot {
   };
 }
 
+/**
+ * An autopilot change ALREADY APPLIED to a planned slot of the active block,
+ * stored when that block was built. Not a queued change for the next block,
+ * despite the historical "Pending" name (kept because verifiers pin it).
+ */
 export interface PendingAutopilotAdjustment {
   plannedSlotId: number;
   movementId: number;
@@ -5991,6 +5996,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
     }));
   },
 
+  // The active block's already-applied autopilot changes, one row per planned
+  // slot. The Plan tab shows them as "Changed in this block".
   getPendingAutopilotAdjustments: (): PendingAutopilotAdjustment[] => {
     if (db === null) return [];
     const d = db;

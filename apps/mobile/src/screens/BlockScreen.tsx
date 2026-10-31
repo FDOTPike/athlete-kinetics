@@ -22,7 +22,7 @@ import InfoTip from '../components/InfoTip';
 import { EmphasisReportCard } from '../components/EmphasisReportCard';
 import { theme } from '../theme/theme';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
-import { autopilotReasonCopy } from '../state/autopilotCopy';
+import { appliedAdjustmentLines, autopilotReasonCopy } from '../state/autopilotCopy';
 import { EMPTY_ACTIVITY_LEDGER } from '../state/activityStore';
 import {
   PrimaryButton,
@@ -223,7 +223,8 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
   const [continuationError, setContinuationError] = useState<string | null>(null);
   const [continuationPending, setContinuationPending] = useState(false);
   const startSession = useStore((s) => s.startSession);
-  const pendingAdjustments = useStore((s) => s.pendingAutopilotAdjustments) ?? [];
+  const appliedAdjustments = useStore((s) => s.pendingAutopilotAdjustments) ?? [];
+  const appliedLines = appliedAdjustmentLines(appliedAdjustments);
   const blockEndDate = blockSessions.length > 0 ? blockSessions[blockSessions.length - 1].sessionDate : null;
 
   const routineTemplates = useStore((s) => s.routineTemplates) ?? [];
@@ -942,29 +943,23 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
         )}
       </View>
 
-      {/* What changes next block panel */}
-      {block !== null && (
+      {/* Changed in this block: the autopilot changes stored when the active
+          block was built. Hidden when there is nothing to show, because an
+          empty list says nothing about what the next block will do. */}
+      {block !== null && appliedLines.length > 0 && (
         <View style={styles.section}>
-          <View style={styles.nextBlockPanel} testID="next-block-adjustments-panel">
-            <Text style={styles.nextBlockHeading}>What changes next block</Text>
-            <Text style={styles.nextBlockIntro}>
-              Your current block is fixed. These adjustments apply when the next one is built.
+          <View style={styles.blockAdjustmentsPanel} testID="block-adjustments-panel">
+            <Text style={styles.blockAdjustmentsHeading}>Changed in this block</Text>
+            <Text style={styles.blockAdjustmentsIntro}>
+              These adjustments were applied when this block was built.
             </Text>
-            {pendingAdjustments.length === 0 ? (
-              <Text style={styles.nextBlockEmpty}>
-                Nothing queued. Your next block will follow the plan as written.
-              </Text>
-            ) : (
-              <View style={styles.adjustmentsList}>
-                {pendingAdjustments.map((adj) => (
-                  <View key={adj.plannedSlotId} style={styles.adjustmentRow}>
-                    <Text style={styles.adjustmentText}>
-                      {adj.movementName}: {adj.reason}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            )}
+            <View style={styles.adjustmentsList}>
+              {appliedLines.map((line) => (
+                <View key={line.key} style={styles.adjustmentRow}>
+                  <Text style={styles.adjustmentText}>{line.text}</Text>
+                </View>
+              ))}
+            </View>
           </View>
         </View>
       )}
@@ -1753,7 +1748,7 @@ const styles = StyleSheet.create({
     color: theme.color.textMid,
     letterSpacing: 1.2,
   },
-  nextBlockPanel: {
+  blockAdjustmentsPanel: {
     backgroundColor: theme.color.ink1,
     borderWidth: 1,
     borderColor: theme.color.line,
@@ -1761,20 +1756,14 @@ const styles = StyleSheet.create({
     padding: theme.space[4],
     gap: theme.space[2],
   },
-  nextBlockHeading: {
+  blockAdjustmentsHeading: {
     ...theme.font.cue,
     color: theme.color.textHi,
   },
-  nextBlockIntro: {
+  blockAdjustmentsIntro: {
     ...theme.font.label,
     color: theme.color.textMid,
     lineHeight: 20,
-  },
-  nextBlockEmpty: {
-    ...theme.font.body,
-    color: theme.color.textLow,
-    fontStyle: 'italic',
-    paddingTop: theme.space[1],
   },
   adjustmentsList: {
     gap: theme.space[2],

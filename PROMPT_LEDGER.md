@@ -13042,3 +13042,28 @@ The status assertion and its wording are unchanged, and its 30 s bound still run
   - The nit: the settled check now also compares the element's type, identifier and label.
   - Still no retry and no new bound. `npm run typecheck` exit 0; `verify:native-config` exit 0.
  In 38344991834 attempt 1 it failed in `test1` with "the Progress screen marker (progress-screen) did not appear within 30 s". Neither was investigated here.
+
+## Entry 0274 — 2026-10-31 · Fix the Plan tab's "What changes next block" panel (Claude Code Desktop, side session)
+
+**Executor:** Claude Code Desktop (side session; follows Entry 0273, the in-block effort drift brief, PR 100).
+
+### Prompt (verbatim)
+
+```text
+Yes, fix the panel
+```
+
+Mid-turn, the owner added: "why do you keep asking me , can you use Codex cli running Astra on medium to decide". The design choices below were therefore put to Astra (Codex CLI, medium effort, read-only), and its decisions were followed.
+
+### Output
+
+- **Astra's decisions:**
+  - Heading "Changed in this block"; intro "These adjustments were applied when this block was built."
+  - One line per movement and reason, in plain wording; unknown reasons are left out.
+  - The panel is hidden when there is nothing to show.
+  - Store names and the SQL pin are kept, with comments.
+  - testID renamed to `block-adjustments-panel`.
+- **Code:** `apps/mobile/src/state/autopilotCopy.ts` gains `appliedAdjustmentLines`. `BlockScreen.tsx` uses it. `useStore.ts` comments say the rows are the active block's applied changes.
+- **Tests:** `NextBlockPanel.test.js` is renamed to `BlockAdjustmentsPanel.test.js` and rewritten with real reason tokens. It has seven cases: wording, one line per movement, distinct reasons kept, unknown-only hidden, empty hidden, no block hidden, no writes. The `verify_store_sql.mjs` labels were updated; its SQL pin is unchanged.
+- **Gates (fresh `npm ci` in the worktree):** `npm run typecheck` exit 0. Jest `--no-cache` passed 7 suites, 166 tests: BlockAdjustmentsPanel, FocusScreens, NavigationShell, SessionFeel, TodaySpine, TodayScreen, TrainingSupportBoundary. `npm run verify:store`: ALL CHECKS PASSED.
+- **Branch:** `claude/block-adjustments-panel-2026-10-31`, draft pull request into `claude/beta-question-box-2026-10-28`.
