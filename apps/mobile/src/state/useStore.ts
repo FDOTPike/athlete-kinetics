@@ -175,6 +175,7 @@ import {
   advance as advanceSessionRunner,
   currentSlot as currentRunnerSlot,
   deserializeRunner,
+  replaceSlotAfterLoggedSets,
   serializeRunner,
   startRunner,
   type RunnerHaltReason,
@@ -552,6 +553,7 @@ export interface PlanSlot {
   originalSessionDate: string | null;
   overrideLoadKg: number | null;
   overrideReason: string | null;
+  replacedBySessionPlanSlotId: number | null;
 }
 
 // --- 4-week block (007 tables) ----------------------------------------------
@@ -1117,7 +1119,7 @@ interface KineticsStore {
   /** What was recorded for a session's preparation; null = not recorded. */
   loadSessionPreparation: (sessionId: number) => PreparationSummary | null;
   addPlanSlot: (movementId: number) => void;
-  swapMovement: (oldMovementId: number, newMovementId: number) => void;
+  swapMovement: (oldMovementId: number, newMovementId: number, replacementSets?: number) => void;
   /** Thumbs sentiment for a movement. NEUTRAL (0) DELETEs the row (the 010
    *  invariant: neutral == no row); AVOID (-1) / PRIORITIZE (+1) upsert it.
    *  The deterministic substitution router reads this map. */
@@ -1130,11 +1132,11 @@ interface KineticsStore {
   closeSubstitution: () => void;
   /** Apply a Layer-1 regression: swap the target slot for the chosen movement
    *  (logged sets stand as history). */
-  applyRegression: (targetMovementId: number, optionMovementId: number) => void;
+  applyRegression: (targetMovementId: number, optionMovementId: number, replacementSets?: number) => void;
   /** Apply a Layer-2 day-swap: replace today's target with the pulled movement
    *  AND delete its origin future planned_slot (conservation of volume — the
    *  moved work is performed today instead of on its scheduled day). */
-  applyDaySwap: (targetMovementId: number, option: DaySwapOption) => void;
+  applyDaySwap: (targetMovementId: number, option: DaySwapOption, replacementSets?: number) => void;
   /** Log a niggle (append-only to 011) and add it to the active niggle set so
    *  the next SWAP un-hides Layer 3 / activates the guardrail. */
   /** True when the report was saved; false when it was refused or rolled back. */
@@ -1803,6 +1805,7 @@ const seedFreeFormSessionPlan = (
       originalSessionDate: null,
       overrideLoadKg: null,
       overrideReason: null,
+      replacedBySessionPlanSlotId: null,
     }];
   });
 };
@@ -3126,14 +3129,17 @@ export const useStore = create<KineticsStore>()((set, get) => {
           original_session_date: string | null;
           override_load_kg: number | null;
           override_reason: string | null;
+          replaced_by_session_plan_slot_id: number | null;
         }>(
           db!.executeSync(
             `SELECT sps.session_plan_slot_id, sps.movement_id, sps.planned_sets, sps.planned_reps,
                     sst.target_kind, sst.target_reps, sst.target_seconds,
                     sps.provenance_kind, sps.target_rpe, sps.source_planned_slot_id,
-                    sps.original_movement_id, sps.original_session_date, sps.override_load_kg, sps.override_reason
+                    sps.original_movement_id, sps.original_session_date, sps.override_load_kg, sps.override_reason,
+                    spsr.replaced_by_session_plan_slot_id
              FROM session_plan_slot sps
              LEFT JOIN session_slot_target sst ON sst.session_plan_slot_id = sps.session_plan_slot_id
+             LEFT JOIN session_plan_slot_replacement spsr ON spsr.session_plan_slot_id = sps.session_plan_slot_id
              WHERE sps.session_id = ?
              ORDER BY sps.slot_index`,
             [openSession.session_id]
@@ -3152,6 +3158,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
           originalSessionDate: ps.original_session_date,
           overrideLoadKg: ps.override_load_kg,
           overrideReason: ps.override_reason,
+          replacedBySessionPlanSlotId: ps.replaced_by_session_plan_slot_id ?? null,
         }));
         const checkpoint = rowsOf<{
           session_mode: string;
@@ -6396,6 +6403,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
           originalSessionDate: today,
           overrideLoadKg: sl.overrideLoadKg,
           overrideReason: sl.overrideReason,
+          replacedBySessionPlanSlotId: null,
         };
       });
     } else {
@@ -6518,7 +6526,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
 
   selectMovement: (movementId) => {
     const { sessionPlan } = get();
-    const slot = sessionPlan.find((s) => s.movementId === movementId);
+    const slot = sessionPlan.find((s) => s.movementId === movementId && (s.replacedBySessionPlanSlotId === null || s.replacedBySessionPlanSlotId === undefined));
+    if (slot === undefined && sessionPlan.some((s) => s.movementId === movementId)) return;
     set({
       activeMovementId: movementId,
       activeSessionPlanSlotId: slot ? slot.sessionPlanSlotId : null,
@@ -6530,6 +6539,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const slotIndex = sessionPlan.findIndex((slot) => slot.sessionPlanSlotId === sessionPlanSlotId);
     const slot = slotIndex >= 0 ? sessionPlan[slotIndex] : undefined;
     if (slot === undefined) return;
+    if (slot.replacedBySessionPlanSlotId !== null && slot.replacedBySessionPlanSlotId !== undefined) return;
     if (!get().requireTrainingSupport('select-slot', [slot.movementId],
       `session:${session?.sessionId ?? 'draft'}:slot:${sessionPlanSlotId}:movement:${slot.movementId}`)) return;
     if (runner === null || session === null || sessionMode === null) {
@@ -6867,6 +6877,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       originalSessionDate: null,
       overrideLoadKg: null,
       overrideReason: null,
+      replacedBySessionPlanSlotId: null,
     };
     if (session !== null) {
       const d = getDb();
@@ -6890,7 +6901,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
     });
   },
 
-  swapMovement: (oldMovementId, newMovementId) => {
+  swapMovement: (oldMovementId, newMovementId, replacementSets) => {
     const state = get();
     const { sessionPlan, activeSessionPlanSlotId, session, runner, sessionMode, movements, profile } = state;
     const slot = activeSessionPlanSlotId !== null
@@ -6898,6 +6909,23 @@ export const useStore = create<KineticsStore>()((set, get) => {
       : sessionPlan.find((candidate) => candidate.movementId === oldMovementId);
     const replacement = movements.find((movement) => movement.movement_id === newMovementId);
     if (slot === undefined || replacement === undefined) return;
+    const loggedSetsCount = session?.sets.filter((setRow) =>
+      setRow.session_plan_slot_id !== null
+        ? setRow.session_plan_slot_id === slot.sessionPlanSlotId
+        : setRow.movement_id === slot.movementId
+    ).length ?? 0;
+    if (
+      replacementSets !== undefined &&
+      (typeof replacementSets !== 'number' || !Number.isInteger(replacementSets) || replacementSets < 1 || replacementSets > 6)
+    ) {
+      return;
+    }
+    if (
+      loggedSetsCount > 0 &&
+      (typeof replacementSets !== 'number' || !Number.isInteger(replacementSets) || replacementSets < 1 || replacementSets > 6)
+    ) {
+      return;
+    }
     if (!get().requireTrainingSupport('swap-movement', [oldMovementId, newMovementId],
       `session:${session?.sessionId ?? 'draft'}:slot:${slot.sessionPlanSlotId}:movement:${oldMovementId}->${newMovementId}`)) return;
     const accessContext = executionContextForState(state);
@@ -6918,6 +6946,128 @@ export const useStore = create<KineticsStore>()((set, get) => {
 
     const originalMv = slot.originalMovementId ?? slot.movementId;
     const newProvKind: SlotProvenanceKind = slot.targetRpe !== null ? 'substituted' : slot.provenanceKind;
+
+    if (loggedSetsCount > 0 && session !== null) {
+      const chosenCount = replacementSets as number;
+      const d = getDb();
+      let newSlotId = 0;
+      let nextRunner = runner;
+      d.executeSync('BEGIN');
+      try {
+        const originalSlotRow = rowsOf<{ slot_index: number }>(
+          d.executeSync(
+            'SELECT slot_index FROM session_plan_slot WHERE session_plan_slot_id = ?',
+            [slot.sessionPlanSlotId],
+          ),
+        )[0];
+        if (originalSlotRow === undefined) {
+          throw new Error('Target session slot is missing.');
+        }
+        d.executeSync(
+          'UPDATE session_plan_slot SET planned_sets = ? WHERE session_plan_slot_id = ?',
+          [loggedSetsCount, slot.sessionPlanSlotId],
+        );
+        const laterSlots = rowsOf<{ session_plan_slot_id: number; slot_index: number }>(
+          d.executeSync(
+            'SELECT session_plan_slot_id, slot_index FROM session_plan_slot WHERE session_id = ? AND slot_index > ? ORDER BY slot_index DESC',
+            [session.sessionId, originalSlotRow.slot_index],
+          ),
+        );
+        for (const later of laterSlots) {
+          d.executeSync(
+            'UPDATE session_plan_slot SET slot_index = ? WHERE session_plan_slot_id = ?',
+            [later.slot_index + 1, later.session_plan_slot_id],
+          );
+        }
+        d.executeSync(
+          `INSERT INTO session_plan_slot (session_id, slot_index, movement_id, planned_sets, planned_reps, provenance_kind, target_rpe, source_planned_slot_id, original_movement_id, original_session_date, override_load_kg, override_reason)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            session.sessionId,
+            originalSlotRow.slot_index + 1,
+            newMovementId,
+            chosenCount,
+            slot.plannedReps,
+            newProvKind,
+            slot.targetRpe,
+            slot.sourcePlannedSlotId,
+            originalMv,
+            slot.originalSessionDate,
+            slot.overrideLoadKg,
+            slot.overrideReason,
+          ],
+        );
+        newSlotId = rowsOf<{ id: number }>(d.executeSync('SELECT last_insert_rowid() AS id'))[0]!.id;
+        d.executeSync(
+          `INSERT INTO session_slot_target (session_plan_slot_id, target_kind, target_reps, target_seconds)
+           VALUES (?, ?, ?, ?)`,
+          [
+            newSlotId,
+            slot.target.kind,
+            slot.target.kind === 'reps' ? slot.target.reps : null,
+            slot.target.kind === 'time' ? slot.target.seconds : null,
+          ],
+        );
+        d.executeSync(
+          'INSERT INTO session_plan_slot_replacement (session_plan_slot_id, replaced_by_session_plan_slot_id) VALUES (?, ?)',
+          [slot.sessionPlanSlotId, newSlotId],
+        );
+        if (runner !== null) {
+          const origRunnerSlot = runner.slots.find((candidate) => candidate.sessionPlanSlotId === slot.sessionPlanSlotId);
+          nextRunner = replaceSlotAfterLoggedSets(runner, {
+            targetSessionPlanSlotId: slot.sessionPlanSlotId,
+            completedSets: loggedSetsCount,
+            replacementSlot: {
+              sessionPlanSlotId: newSlotId,
+              plannedSlotId: slot.sourcePlannedSlotId,
+              movementId: newMovementId,
+              movementName: replacement.name,
+              sets: chosenCount,
+              target: slot.target,
+              targetRpe: origRunnerSlot?.targetRpe ?? slot.targetRpe ?? 8,
+            },
+            atMs: Date.now(),
+          });
+          if (sessionMode !== null) {
+            persistRunnerCheckpoint(d, session.sessionId, sessionMode, nextRunner);
+          }
+        }
+        d.executeSync('COMMIT');
+      } catch (error) {
+        try { d.executeSync('ROLLBACK'); } catch { /* no partial substitution */ }
+        set({ error: error instanceof Error ? error.message : String(error) });
+        return;
+      }
+
+      const newSlot: PlanSlot = {
+        sessionPlanSlotId: newSlotId,
+        movementId: newMovementId,
+        plannedSets: chosenCount,
+        plannedReps: slot.plannedReps,
+        target: slot.target,
+        provenanceKind: newProvKind,
+        targetRpe: slot.targetRpe,
+        sourcePlannedSlotId: slot.sourcePlannedSlotId,
+        originalMovementId: originalMv,
+        originalSessionDate: slot.originalSessionDate,
+        overrideLoadKg: slot.overrideLoadKg,
+        overrideReason: slot.overrideReason,
+        replacedBySessionPlanSlotId: null,
+      };
+      const nextPlan = sessionPlan.flatMap((candidate) =>
+        candidate.sessionPlanSlotId === slot.sessionPlanSlotId
+          ? [{ ...candidate, plannedSets: loggedSetsCount, replacedBySessionPlanSlotId: newSlotId }, newSlot]
+          : [candidate],
+      );
+      set({
+        sessionPlan: nextPlan,
+        activeSessionPlanSlotId: newSlotId,
+        activeMovementId: newMovementId,
+        ...(nextRunner !== null ? runnerSelection(nextRunner) : {}),
+      });
+      return;
+    }
+
     const nextPlan = sessionPlan.map((candidate) =>
       candidate.sessionPlanSlotId === slot.sessionPlanSlotId
         ? { ...candidate, movementId: newMovementId, provenanceKind: newProvKind, originalMovementId: originalMv }
@@ -7128,18 +7278,57 @@ export const useStore = create<KineticsStore>()((set, get) => {
     set({ niggles: rows.map((r) => ({ region: r.region, severity: r.severity })) });
   },
 
-  applyRegression: (targetMovementId, optionMovementId) => {
-    get().swapMovement(targetMovementId, optionMovementId);
+  applyRegression: (targetMovementId, optionMovementId, replacementSets) => {
+    const loggedSetsCount = get().session?.sets.filter((setRow) => {
+      const { sessionPlan, activeSessionPlanSlotId } = get();
+      const slot = activeSessionPlanSlotId !== null
+        ? sessionPlan.find((candidate) => candidate.sessionPlanSlotId === activeSessionPlanSlotId)
+        : sessionPlan.find((candidate) => candidate.movementId === targetMovementId);
+      if (slot === undefined) return false;
+      return setRow.session_plan_slot_id !== null
+        ? setRow.session_plan_slot_id === slot.sessionPlanSlotId
+        : setRow.movement_id === slot.movementId;
+    }).length ?? 0;
+    if (
+      replacementSets !== undefined &&
+      (typeof replacementSets !== 'number' || !Number.isInteger(replacementSets) || replacementSets < 1 || replacementSets > 6)
+    ) {
+      return;
+    }
+    if (
+      loggedSetsCount > 0 &&
+      (typeof replacementSets !== 'number' || !Number.isInteger(replacementSets) || replacementSets < 1 || replacementSets > 6)
+    ) {
+      return;
+    }
+    get().swapMovement(targetMovementId, optionMovementId, replacementSets);
     set({ substitution: null });
   },
 
-  applyDaySwap: (targetMovementId, option) => {
+  applyDaySwap: (targetMovementId, option, replacementSets) => {
     const state = get();
     const { sessionPlan, activeSessionPlanSlotId, session, runner, sessionMode, movements, profile } = state;
     const targetSlot = activeSessionPlanSlotId !== null
       ? sessionPlan.find((slot) => slot.sessionPlanSlotId === activeSessionPlanSlotId)
       : sessionPlan.find((slot) => slot.movementId === targetMovementId);
     if (targetSlot === undefined) return;
+    const loggedSetsCount = session?.sets.filter((setRow) =>
+      setRow.session_plan_slot_id !== null
+        ? setRow.session_plan_slot_id === targetSlot.sessionPlanSlotId
+        : setRow.movement_id === targetSlot.movementId
+    ).length ?? 0;
+    if (
+      replacementSets !== undefined &&
+      (typeof replacementSets !== 'number' || !Number.isInteger(replacementSets) || replacementSets < 1 || replacementSets > 6)
+    ) {
+      return;
+    }
+    if (
+      loggedSetsCount > 0 &&
+      (typeof replacementSets !== 'number' || !Number.isInteger(replacementSets) || replacementSets < 1 || replacementSets > 6)
+    ) {
+      return;
+    }
     if (!get().requireTrainingSupport('day-swap', [targetMovementId, option.movement_id],
       `session:${session?.sessionId ?? 'draft'}:slot:${targetSlot.sessionPlanSlotId}:movement:${targetMovementId}->${option.movement_id}:planned-slot:${option.plannedSlotId}`)) return;
 
@@ -7165,14 +7354,6 @@ export const useStore = create<KineticsStore>()((set, get) => {
       futureSlotInfo?.target_seconds,
       futureSlotInfo?.reps ?? 5,
     );
-    const loggedSetsCount = session?.sets.filter((setRow) =>
-      setRow.session_plan_slot_id !== null
-        ? setRow.session_plan_slot_id === targetSlot.sessionPlanSlotId
-        : setRow.movement_id === targetSlot.movementId
-    ).length ?? 0;
-    // Never erase logged work. A replacement can only finish the remaining
-    // volume of its current slot, even when the pulled-forward source is smaller.
-    const movedSets = Math.max(1, Math.round(option.setsConserved), loggedSetsCount + 1);
     const movedReps = movedTarget.kind === 'reps' ? movedTarget.reps : null;
 
     const overrideRow = rowsOf<{ target_load_kg: number; reason: string | null }>(d.executeSync(
@@ -7198,6 +7379,138 @@ export const useStore = create<KineticsStore>()((set, get) => {
       return;
     }
 
+    const originalMv = targetSlot.originalMovementId ?? targetSlot.movementId;
+
+    if (loggedSetsCount > 0 && session !== null) {
+      const chosenCount = replacementSets as number;
+      let newSlotId = 0;
+      let nextRunner = runner;
+      d.executeSync('BEGIN');
+      try {
+        d.executeSync(
+          `INSERT INTO planned_slot_disposition (planned_slot_id, disposition, session_id)
+           VALUES (?, 'swapped', ?)
+           ON CONFLICT(planned_slot_id) DO UPDATE SET disposition = excluded.disposition, session_id = excluded.session_id`,
+          [option.plannedSlotId, session.sessionId],
+        );
+        const originalSlotRow = rowsOf<{ slot_index: number }>(
+          d.executeSync(
+            'SELECT slot_index FROM session_plan_slot WHERE session_plan_slot_id = ?',
+            [targetSlot.sessionPlanSlotId],
+          ),
+        )[0];
+        if (originalSlotRow === undefined) {
+          throw new Error('Target session slot is missing.');
+        }
+        d.executeSync(
+          'UPDATE session_plan_slot SET planned_sets = ? WHERE session_plan_slot_id = ?',
+          [loggedSetsCount, targetSlot.sessionPlanSlotId],
+        );
+        const laterSlots = rowsOf<{ session_plan_slot_id: number; slot_index: number }>(
+          d.executeSync(
+            'SELECT session_plan_slot_id, slot_index FROM session_plan_slot WHERE session_id = ? AND slot_index > ? ORDER BY slot_index DESC',
+            [session.sessionId, originalSlotRow.slot_index],
+          ),
+        );
+        for (const later of laterSlots) {
+          d.executeSync(
+            'UPDATE session_plan_slot SET slot_index = ? WHERE session_plan_slot_id = ?',
+            [later.slot_index + 1, later.session_plan_slot_id],
+          );
+        }
+        d.executeSync(
+          `INSERT INTO session_plan_slot (session_id, slot_index, movement_id, planned_sets, planned_reps, provenance_kind, target_rpe, source_planned_slot_id, original_movement_id, original_session_date, override_load_kg, override_reason)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            session.sessionId,
+            originalSlotRow.slot_index + 1,
+            option.movement_id,
+            chosenCount,
+            movedReps,
+            swapKind,
+            swapTarget,
+            option.plannedSlotId,
+            originalMv,
+            originDate,
+            overrideLoad,
+            overrideReason,
+          ],
+        );
+        newSlotId = rowsOf<{ id: number }>(d.executeSync('SELECT last_insert_rowid() AS id'))[0]!.id;
+        d.executeSync(
+          `INSERT INTO session_slot_target (session_plan_slot_id, target_kind, target_reps, target_seconds)
+           VALUES (?, ?, ?, ?)`,
+          [
+            newSlotId,
+            movedTarget.kind,
+            movedTarget.kind === 'reps' ? movedTarget.reps : null,
+            movedTarget.kind === 'time' ? movedTarget.seconds : null,
+          ],
+        );
+        d.executeSync(
+          'INSERT INTO session_plan_slot_replacement (session_plan_slot_id, replaced_by_session_plan_slot_id) VALUES (?, ?)',
+          [targetSlot.sessionPlanSlotId, newSlotId],
+        );
+        if (runner !== null) {
+          const origRunnerSlot = runner.slots.find((slot) => slot.sessionPlanSlotId === targetSlot.sessionPlanSlotId);
+          nextRunner = replaceSlotAfterLoggedSets(runner, {
+            targetSessionPlanSlotId: targetSlot.sessionPlanSlotId,
+            completedSets: loggedSetsCount,
+            replacementSlot: {
+              sessionPlanSlotId: newSlotId,
+              plannedSlotId: option.plannedSlotId,
+              movementId: option.movement_id,
+              movementName: replacement?.name ?? option.name,
+              sets: chosenCount,
+              target: movedTarget,
+              targetRpe: swapTarget ?? origRunnerSlot?.targetRpe ?? targetSlot.targetRpe ?? 8,
+            },
+            atMs: Date.now(),
+          });
+          if (sessionMode !== null) {
+            persistRunnerCheckpoint(d, session.sessionId, sessionMode, nextRunner);
+          }
+        }
+        d.executeSync('COMMIT');
+      } catch (error) {
+        try { d.executeSync('ROLLBACK'); } catch { /* no partial day swap */ }
+        set({ error: error instanceof Error ? error.message : String(error) });
+        return;
+      }
+
+      const newSlot: PlanSlot = {
+        sessionPlanSlotId: newSlotId,
+        movementId: option.movement_id,
+        plannedSets: chosenCount,
+        plannedReps: movedReps,
+        target: movedTarget,
+        provenanceKind: swapKind,
+        targetRpe: swapTarget,
+        sourcePlannedSlotId: option.plannedSlotId,
+        originalMovementId: originalMv,
+        originalSessionDate: originDate,
+        overrideLoadKg: overrideLoad,
+        overrideReason: overrideReason,
+        replacedBySessionPlanSlotId: null,
+      };
+      const nextPlan = sessionPlan.flatMap((slot) =>
+        slot.sessionPlanSlotId === targetSlot.sessionPlanSlotId
+          ? [{ ...slot, plannedSets: loggedSetsCount, replacedBySessionPlanSlotId: newSlotId }, newSlot]
+          : [slot],
+      );
+      set({
+        sessionPlan: nextPlan,
+        substitution: null,
+        ...(nextRunner !== null ? runnerSelection(nextRunner) : {
+          activeMovementId: option.movement_id,
+          activeSessionPlanSlotId: newSlotId,
+        }),
+      });
+      get().refreshBlock();
+      return;
+    }
+
+    const movedSets = Math.max(1, Math.round(option.setsConserved));
     const nextPlan = sessionPlan.map((slot) =>
       slot.sessionPlanSlotId === targetSlot.sessionPlanSlotId
         ? {
@@ -7209,7 +7522,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
             provenanceKind: swapKind,
             targetRpe: swapTarget,
             sourcePlannedSlotId: option.plannedSlotId,
-            originalMovementId: slot.originalMovementId ?? slot.movementId,
+            originalMovementId: originalMv,
             originalSessionDate: originDate,
             overrideLoadKg: overrideLoad,
             overrideReason: overrideReason,
@@ -7264,7 +7577,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
           `UPDATE session_plan_slot
            SET movement_id = ?, planned_sets = ?, planned_reps = ?, provenance_kind = ?, target_rpe = ?, source_planned_slot_id = ?, original_movement_id = ?, original_session_date = ?, override_load_kg = ?, override_reason = ?
            WHERE session_plan_slot_id = ?`,
-          [option.movement_id, movedSets, movedReps, swapKind, swapTarget, option.plannedSlotId, targetSlot.originalMovementId ?? targetSlot.movementId, originDate, overrideLoad, overrideReason, targetSlot.sessionPlanSlotId]
+          [option.movement_id, movedSets, movedReps, swapKind, swapTarget, option.plannedSlotId, originalMv, originDate, overrideLoad, overrideReason, targetSlot.sessionPlanSlotId]
         );
         d.executeSync(
           `INSERT INTO session_slot_target (session_plan_slot_id, target_kind, target_reps, target_seconds)
@@ -7672,6 +7985,10 @@ export const useStore = create<KineticsStore>()((set, get) => {
         if (snapshot.loggedSets.length !== 0) {
           throw new Error('Only an empty session can be discarded.');
         }
+        d.executeSync(
+          'DELETE FROM session_plan_slot_replacement WHERE session_plan_slot_id IN (SELECT session_plan_slot_id FROM session_plan_slot WHERE session_id = ?) OR replaced_by_session_plan_slot_id IN (SELECT session_plan_slot_id FROM session_plan_slot WHERE session_id = ?)',
+          [activeSession.sessionId, activeSession.sessionId],
+        );
         // Parent-first keeps 026's immutable side-cars legal. The explicit
         // cleanup that follows also handles test/dev connections with FKs off.
         d.executeSync('DELETE FROM session WHERE session_id = ?', [activeSession.sessionId]);
@@ -8036,6 +8353,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       // and an orphan surviving an FK-OFF reset would attach an old record to
       // new work.
       d.executeSync('DELETE FROM session_skipped_slot');
+      d.executeSync('DELETE FROM session_plan_slot_replacement');
       d.executeSync('DELETE FROM session_plan_slot');
       d.executeSync('DELETE FROM session_origin');
       d.executeSync('DELETE FROM set_prefix');

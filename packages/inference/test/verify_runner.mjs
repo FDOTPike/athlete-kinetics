@@ -15,6 +15,7 @@ const {
   currentSlot,
   deserializeRunner,
   nextUp,
+  replaceSlotAfterLoggedSets,
   replayRunner,
   restoreRunnerCheckpoint,
   restSecondsFor,
@@ -511,6 +512,32 @@ check('session rest override is deterministic, crash-safe, bounded, and session-
   assert.equal(restoreRunnerCheckpoint(legacyCheckpoint).restSecondsOverride, null, 'old checkpoints default safely');
 
   assert.equal(completeSession(state).restSecondsOverride, null, 'override dies with terminal session state');
+});
+
+check('replaceSlotAfterLoggedSets keeps original slot at completed count, inserts replacement slot after it, and positions runner at set 1 of replacement slot', () => {
+  let state = startRunner([repSlot(801, 3, 5, 8, 11, 'Squat'), repSlot(802, 2, 8, 7.5, 12, 'Row')], { tier: 'intermediate', startedAtMs: 0 });
+  state = advance(state, event('LOG_SET', 10, { actualRpe: 8 }));
+  state = advance(state, event('SKIP_REST', 20));
+  state = advance(state, event('THUMBS_DOWN', 30));
+  assert.equal(state.substitutionOfferedForSessionPlanSlotId, 801);
+
+  const replaced = replaceSlotAfterLoggedSets(state, {
+    targetSessionPlanSlotId: 801,
+    completedSets: 1,
+    replacementSlot: repSlot(803, 2, 8, 8, 13, 'Split Squat'),
+    atMs: 40,
+  });
+
+  assert.equal(replaced.slots.length, 3);
+  assert.deepEqual(replaced.slots[0], { ...repSlot(801, 1, 5, 8, 11, 'Squat'), plannedSlotId: null });
+  assert.deepEqual(replaced.slots[1], { ...repSlot(803, 2, 8, 8, 13, 'Split Squat'), plannedSlotId: null });
+  assert.deepEqual(replaced.slots[2], { ...repSlot(802, 2, 8, 7.5, 12, 'Row'), plannedSlotId: null });
+  assert.deepEqual(replaced.slotSetCounts, [1, 0, 0]);
+  assert.equal(replaced.slotIndex, 1);
+  assert.equal(replaced.setIndex, 1);
+  assert.equal(replaced.phase, 'working');
+  assert.equal(replaced.substitutionOfferedForSessionPlanSlotId, null);
+  assert.deepEqual(deserializeRunner(serializeRunner(replaced)), replaced);
 });
 
 

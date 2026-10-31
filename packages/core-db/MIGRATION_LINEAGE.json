@@ -361,6 +361,11 @@
         "ordinal": 71,
         "file": "072_question_log.sql",
         "sha256": "854309b3a2007b42d7a83f5b48070980ec572a4b2fa30fa3bedf52d198eee8c2"
+      },
+      {
+        "ordinal": 72,
+        "file": "073_session_slot_replaced_by.sql",
+        "sha256": "4be439ec4be24b97914b6dc57fa1f5ff1bed785e87a73349f8233e11b177e2ce"
       }
     ]
   },

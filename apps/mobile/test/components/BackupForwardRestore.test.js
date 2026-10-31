@@ -710,9 +710,13 @@ describe('every registered pre-upgrade schema restores, not only the first', () 
     const v70 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 70);
     expect(v70).not.toBe(CURRENT);
     const v71 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 71);
-    expect(v71).toBe(CURRENT);
+    expect(v71).not.toBe(CURRENT);
     expect(v71.fingerprint).not.toBe(v70.fingerprint);
     expect([v71.migrationSlot, v71.tableCount]).toEqual([72, v70.tableCount + 1]);
+    const v72 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 72);
+    expect(v72).toBe(CURRENT);
+    expect(v72.fingerprint).not.toBe(v71.fingerprint);
+    expect([v72.migrationSlot, v72.tableCount]).toEqual([73, v71.tableCount + 1]);
     expect(v70.fingerprint).not.toBe(v69.fingerprint);
     expect([v70.migrationSlot, v70.tableCount]).toEqual([71, v69.tableCount + 2]);
     expect(PRE_UPGRADE.length).toBeGreaterThanOrEqual(7);
