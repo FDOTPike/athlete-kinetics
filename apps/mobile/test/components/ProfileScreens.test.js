@@ -595,6 +595,8 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     // Navigate to goal step
     pressNext();
     expect(screen.getByText('WHAT ARE WE TRAINING FOR?')).toBeOnTheScreen();
+    // Owner 2026-10-31: say from the start that goals can change later.
+    expect(screen.getByText('You can change your goals at any time in Athlete Profile.')).toBeOnTheScreen();
   });
 
   test('WO-02 uses supportive weight-loss and week-ceiling copy exactly', () => {
