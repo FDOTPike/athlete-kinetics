@@ -7,7 +7,19 @@
 import React, { useEffect, useRef, useState } from 'react';
 import TrainingSupportNotice from '../components/TrainingSupportNotice';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SELECTABLE_SCHEMA_TYPES, addDaysIso, targetLoadKg, splitExplainer, SPLIT_EXPLAINER_FOOTER, type BlockPlan, type SchemaType } from '@ak/inference';
+import {
+  SELECTABLE_SCHEMA_TYPES,
+  addDaysIso,
+  applyLoadModifier,
+  applyPrescriptionToSlot,
+  isPrescriptionReduced,
+  targetLoadKg,
+  splitExplainer,
+  SPLIT_EXPLAINER_FOOTER,
+  type AdjustmentVector,
+  type BlockPlan,
+  type SchemaType,
+} from '@ak/inference';
 import {
   useStore,
   type BlockSessionSummary,
@@ -115,15 +127,21 @@ function targetLabel(slot: TodaySlot): string {
     : `${slot.sets} x ${slot.target.reps}`;
 }
 
-function slotTarget(slot: TodaySlot, oneRepMaxes: Record<number, number>): string {
-  if (slot.target.kind === 'time') {
-    return `${targetLabel(slot)} at RPE ${slot.targetRpe.toFixed(1)}`;
+function slotTarget(
+  slot: TodaySlot,
+  oneRepMaxes: Record<number, number>,
+  vector: AdjustmentVector | null = null,
+): string {
+  const effective = applyPrescriptionToSlot(slot, vector);
+  if (effective.target.kind === 'time') {
+    return `${targetLabel(effective)} at RPE ${effective.targetRpe.toFixed(1)}`;
   }
-  const oneRepMax = oneRepMaxes[slot.movementId];
-  const load = slot.overrideLoadKg ?? (
-    oneRepMax !== undefined ? targetLoadKg(oneRepMax, slot.target.reps, slot.targetRpe) : null
-  );
-  return `${targetLabel(slot)} at RPE ${slot.targetRpe.toFixed(1)}${
+  const oneRepMax = oneRepMaxes[effective.movementId];
+  const derivedLoad = oneRepMax !== undefined
+    ? applyLoadModifier(targetLoadKg(oneRepMax, effective.target.reps, effective.targetRpe), vector)
+    : null;
+  const load = effective.overrideLoadKg ?? derivedLoad;
+  return `${targetLabel(effective)} at RPE ${effective.targetRpe.toFixed(1)}${
     load === null ? '' : `, ${load.toFixed(1)} kg`
   }`;
 }
@@ -395,12 +413,24 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
     );
   }
 
+  const halted = lastTriage !== null && lastTriage.kind === 'matched' && lastTriage.directive.halt;
+
   if (vector === null) {
     return (
       // The no-vector gate is an early return INSIDE the real screen, so the
       // route identity (coach-screen) is still asserted by tests even when
       // readiness data has not arrived yet.
       <View style={styles.center} testID="coach-screen">
+        {halted && lastTriage !== null && lastTriage.kind === 'matched' && (
+          <View style={[styles.card, styles.haltCard]}>
+            <Text style={styles.eyebrow}>SAFETY</Text>
+            <Text style={styles.cardTitle}>Stop training today</Text>
+            <Text style={styles.bodyText}>{lastTriage.directive.vector.coaching_cue}</Text>
+            {lastTriage.directive.followUp !== null && (
+              <Text style={styles.followUpText}>{lastTriage.directive.followUp}</Text>
+            )}
+          </View>
+        )}
         <View style={styles.card}>
           <Text style={styles.eyebrow}>COACH</Text>
           <Text style={styles.cardTitle}>Readiness is needed first</Text>
@@ -422,7 +452,6 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
   }
 
   const current = prescription !== null && prescription.forDate === today ? prescription : null;
-  const halted = lastTriage !== null && lastTriage.kind === 'matched' && lastTriage.directive.halt;
   const rows = weekRowsFor(blockSessions);
   const nextPlanned = blockSessions.find((planned) => planned.sessionDate > today);
   const programBlockExpired = program?.status === 'active' && block !== null
@@ -678,7 +707,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
         </View>
         <Text style={styles.cardTitle}>{todayTitle}</Text>
         <Text style={styles.bodyText}>{todayMessage}</Text>
-        {current !== null && !halted && (
+        {current !== null && !halted && isPrescriptionReduced(current.vector, profile) && (
           <Text style={styles.adjustedText}>Coach adjusted today's plan.</Text>
         )}
 
@@ -1010,7 +1039,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                 <View key={slot.slotIndex} style={styles.slotRow}>
                   <View style={styles.slotMain}>
                     <Text style={styles.slotName}>{slot.movementName}</Text>
-                    <Text style={styles.slotTarget}>{slotTarget(slot, oneRepMaxes)}</Text>
+                    <Text style={styles.slotTarget}>{slotTarget(slot, oneRepMaxes, current?.vector ?? null)}</Text>
                     {slot.routineDecision !== undefined && (
                       <>
                         <Text style={styles.captionText}>

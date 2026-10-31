@@ -9,6 +9,7 @@ import React, { useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { StateVectorRow } from '@ak/inference';
 import { useStore } from '../state/useStore';
+import TrainingSupportNotice from '../components/TrainingSupportNotice';
 import { theme } from '../theme/theme';
 import {
   PrimaryButton,
@@ -54,7 +55,7 @@ const STATE_META: Record<AthleteState, ReadinessMeta> = {
   },
 };
 
-const HALT_META: ReadinessMeta = {
+export const HALT_META: ReadinessMeta = {
   label: 'Training paused',
   title: 'Resolve today\'s safety report',
   recommendation: 'Training is paused for today. Review the report before doing more work.',
@@ -87,7 +88,47 @@ function CenteredState({ children }: { children: React.ReactNode }): React.JSX.E
   return <View style={styles.center}>{children}</View>;
 }
 
-export default function ReadinessScreen({
+/**
+ * A support hold replaces the screen, but a same-day halt must stay visible
+ * above it: both can be active at once, and the halt is the stronger message.
+ * Reuses the existing halt copy only.
+ */
+export function HeldScreenWithHalt({ lastTriage, children }: {
+  lastTriage: ReturnType<typeof useStore.getState>['lastTriage'];
+  children: React.ReactNode;
+}): React.JSX.Element {
+  if (lastTriage === null || lastTriage.kind !== 'matched' || !lastTriage.directive.halt) return <>{children}</>;
+  return (
+    <ScrollView style={styles.screen} contentContainerStyle={styles.contentContainer}>
+      <View style={[styles.card, styles.cardActiveSpine]} testID="held-screen-halt-card">
+        <View style={styles.statusBadge}>
+          <Text style={styles.statusBadgeText}>{HALT_META.label.toUpperCase()}</Text>
+        </View>
+        <Text style={styles.title}>{HALT_META.title}</Text>
+        <Text style={styles.body}>{HALT_META.recommendation}</Text>
+        <Text style={styles.haltCue}>{lastTriage.directive.vector.coaching_cue}</Text>
+      </View>
+      {children}
+    </ScrollView>
+  );
+}
+
+export default function ReadinessScreen(props: ReadinessScreenProps): React.JSX.Element {
+  const state = useStore((s) => s);
+  if (state.status === 'booting' || state.status === 'error') {
+    return <AvailableReadinessScreen {...props} />;
+  }
+  const decision = typeof state.getTrainingSupportDecision === 'function'
+    ? state.getTrainingSupportDecision(state.todayPlan?.slots.map((slot) => slot.movementId))
+    : { status: 'support_unavailable' as const };
+  if (decision.status !== 'available') return <HeldScreenWithHalt lastTriage={state.lastTriage}>
+    <TrainingSupportNotice
+      unavailable={decision.status === 'support_unavailable'} onOpenSession={state.session !== null ? props.onOpenSession : undefined} />
+  </HeldScreenWithHalt>;
+  return <AvailableReadinessScreen {...props} />;
+}
+
+function AvailableReadinessScreen({
   onOpenSession,
   onOpenCoach,
 }: ReadinessScreenProps): React.JSX.Element {
@@ -149,12 +190,33 @@ export default function ReadinessScreen({
     );
   }
 
+  const halted = lastTriage !== null && lastTriage.kind === 'matched' && lastTriage.directive.halt;
+  const hasLiveSession = session !== null;
+  const primaryHandler = hasLiveSession ? onOpenSession : onOpenCoach;
+
   if (vector === null) {
     return (
       <ScrollView style={styles.screen} contentContainerStyle={styles.contentContainer} testID="readiness-screen">
         <View style={styles.header}>
           <Text style={styles.wordmark}>pikeMethods</Text>
         </View>
+        {halted && (
+          <View style={[styles.card, styles.cardActiveSpine]}>
+            <View style={styles.statusBadge}>
+              <Text style={styles.statusBadgeText}>{HALT_META.label.toUpperCase()}</Text>
+            </View>
+            <Text style={styles.title}>{HALT_META.title}</Text>
+            <Text style={styles.body}>{HALT_META.recommendation}</Text>
+            {!hasLiveSession && todayPlan !== null && (
+              <Text style={styles.caption}>{formatFocus(todayPlan.focus)} session planned today.</Text>
+            )}
+            {primaryHandler !== undefined ? (
+              <PrimaryButton label="Review safety report" onPress={primaryHandler} />
+            ) : (
+              <Text style={styles.navigationHint}>Open the relevant tab below to continue.</Text>
+            )}
+          </View>
+        )}
         <View style={styles.card}>
           <Text style={styles.wordmark}>READY</Text>
           <Text style={styles.title}>No readiness yet</Text>
@@ -208,10 +270,8 @@ export default function ReadinessScreen({
     );
   }
 
-  const halted = lastTriage !== null && lastTriage.kind === 'matched' && lastTriage.directive.halt;
   const athleteState = classifyReadiness(vector);
   const meta = halted ? HALT_META : STATE_META[athleteState];
-  const hasLiveSession = session !== null;
   const isRestDay = todayPlan === null && !halted && !hasLiveSession;
 
   const primaryLabel = halted
@@ -223,7 +283,6 @@ export default function ReadinessScreen({
         : athleteState === 'OVERREACHED'
           ? 'Review recovery plan'
           : 'Review your plan';
-  const primaryHandler = hasLiveSession ? onOpenSession : onOpenCoach;
 
   // Quiet readiness metrics rows
   const renderRawMetricsList = () => {

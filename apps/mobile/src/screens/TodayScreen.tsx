@@ -39,6 +39,7 @@
  */
 import React, { useMemo } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { applyPrescriptionToSlot } from '@ak/inference';
 import { useStore } from '../state/useStore';
 import TrainingSupportNotice from '../components/TrainingSupportNotice';
 import { theme } from '../theme/theme';
@@ -50,7 +51,7 @@ import {
   type SessionRef,
   type TodayState,
 } from '../state/todayState';
-import { classifyReadiness } from './ReadinessScreen';
+import { classifyReadiness, HALT_META, HeldScreenWithHalt } from './ReadinessScreen';
 import { autopilotReasonCopy } from '../state/autopilotCopy';
 import { PrimaryButton, QuietAction, Disclosure, ListRow } from '../components/ui';
 
@@ -78,8 +79,10 @@ export default function TodayScreen(props: TodayScreenProps): React.JSX.Element 
   const decision = typeof state.getTrainingSupportDecision === 'function'
     ? state.getTrainingSupportDecision(state.todayPlan?.slots.map((slot) => slot.movementId))
     : { status: 'support_unavailable' as const };
-  if (state.status !== 'booting' && decision.status !== 'available') return <TrainingSupportNotice
-    unavailable={decision.status === 'support_unavailable'} onOpenSession={state.session !== null ? props.onOpenSession : undefined} />;
+  if (state.status !== 'booting' && decision.status !== 'available') return <HeldScreenWithHalt lastTriage={state.lastTriage}>
+    <TrainingSupportNotice
+      unavailable={decision.status === 'support_unavailable'} onOpenSession={state.session !== null ? props.onOpenSession : undefined} />
+  </HeldScreenWithHalt>;
   return <AvailableTodayScreen {...props} />;
 }
 
@@ -95,12 +98,16 @@ function AvailableTodayScreen({
   const block = useStore((s) => s.block);
   const hasArchivedBlock = useStore((s) => s.hasArchivedBlock);
   const lastTriage = useStore((s) => s.lastTriage);
+  const prescription = useStore((s) => s.prescription);
   const vector = useStore((s) => s.vector);
   const profile = useStore((s) => s.profile);
   const startSession = useStore((s) => s.startSession);
   const refreshVector = useStore((s) => s.refreshVector);
   const recordedDurationsForFocus = useStore((s) => s.recordedDurationsForFocus);
   const error = useStore((s) => s.error);
+  const todaysVector = prescription != null && prescription.forDate === today
+    ? prescription.vector
+    : null;
 
   const [refreshing, setRefreshing] = React.useState(false);
   const handleRefresh = React.useCallback(() => {
@@ -243,13 +250,16 @@ function AvailableTodayScreen({
             <Text style={styles.title}>{focusName(state.focus)}</Text>
             <Text style={styles.caption} testID="today-duration">{durationCopy(estimate)}</Text>
             <View style={styles.preview}>
-              {preview.map((slot) => (
-                <Text key={slot.plannedSlotId} style={styles.previewRow}>
-                  {slot.movementName} · {slot.sets}×{slot.target.kind === 'time'
-                    ? `${slot.target.seconds}s`
-                    : slot.target.reps}
-                </Text>
-              ))}
+              {preview.map((slot) => {
+                const effective = applyPrescriptionToSlot(slot, todaysVector);
+                return (
+                  <Text key={slot.plannedSlotId} style={styles.previewRow}>
+                    {slot.movementName} · {effective.sets}×{slot.target.kind === 'time'
+                      ? `${slot.target.seconds}s`
+                      : slot.target.reps}
+                  </Text>
+                );
+              })}
               {remaining > 0 && (
                 <Text style={styles.caption}>+{remaining} more</Text>
               )}
@@ -448,7 +458,7 @@ function AvailableTodayScreen({
             No readiness estimate yet. It builds from logged sessions and any synced telemetry.
           </Text>
         ) : (
-          <Disclosure label={READINESS_LABEL[classifyReadiness(vector)]} hint="The short explanation first">
+          <Disclosure label={state.kind === 'halted' ? HALT_META.title : READINESS_LABEL[classifyReadiness(vector)]} hint="The short explanation first">
             <ListRow
               label="Readiness estimate"
               detail={`${Math.round(vector.readiness_score)} / 100`}
