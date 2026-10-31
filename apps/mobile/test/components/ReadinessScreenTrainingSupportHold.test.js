@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react-native';
 import ReadinessScreen from '../../src/screens/ReadinessScreen';
+import TodayScreen from '../../src/screens/TodayScreen';
 
 let mockState;
 
@@ -183,4 +184,46 @@ test('ReadinessScreen renders the boot error view with Retry before evaluating t
   expect(screen.getByText('Training data needs attention')).toBeOnTheScreen();
   expect(screen.getByText('The database could not be opened.')).toBeOnTheScreen();
   expect(screen.getByLabelText('Retry database boot')).toBeOnTheScreen();
+});
+
+const matchedHalt = {
+  kind: 'matched',
+  region: 'knee',
+  severity: 8,
+  directive: { halt: true, vector: { coaching_cue: 'Stop loading the knee today.' } },
+};
+
+test('a same-day halt stays visible above the training-support hold on Readiness', () => {
+  mockState = baseState({
+    lastTriage: matchedHalt,
+    getTrainingSupportDecision: () => ({ status: 'held', holdIds: ['hold-1'] }),
+  });
+  render(<ReadinessScreen />);
+
+  expect(screen.getByTestId('training-support-notice')).toBeOnTheScreen();
+  expect(screen.getByTestId('held-screen-halt-card')).toBeOnTheScreen();
+  expect(screen.getByText("Resolve today's safety report")).toBeOnTheScreen();
+  expect(screen.getByText('Training is paused for today. Review the report before doing more work.')).toBeOnTheScreen();
+  expect(screen.getByText('Stop loading the knee today.')).toBeOnTheScreen();
+});
+
+test('a same-day halt stays visible above the training-support hold on Today', () => {
+  mockState = baseState({
+    lastTriage: matchedHalt,
+    getTrainingSupportDecision: () => ({ status: 'support_unavailable', holdIds: [] }),
+  });
+  render(<TodayScreen />);
+
+  expect(screen.getByTestId('training-support-notice')).toBeOnTheScreen();
+  expect(screen.getByTestId('held-screen-halt-card')).toBeOnTheScreen();
+  expect(screen.getByText('Stop loading the knee today.')).toBeOnTheScreen();
+});
+
+test('without a halt, the hold notice is shown alone', () => {
+  mockState = baseState({
+    getTrainingSupportDecision: () => ({ status: 'held', holdIds: ['hold-1'] }),
+  });
+  render(<ReadinessScreen />);
+  expect(screen.getByTestId('training-support-notice')).toBeOnTheScreen();
+  expect(screen.queryByTestId('held-screen-halt-card')).toBeNull();
 });

@@ -51,7 +51,7 @@ import {
   type SessionRef,
   type TodayState,
 } from '../state/todayState';
-import { classifyReadiness, HALT_META } from './ReadinessScreen';
+import { classifyReadiness, HALT_META, HeldScreenWithHalt } from './ReadinessScreen';
 import { autopilotReasonCopy } from '../state/autopilotCopy';
 import { PrimaryButton, QuietAction, Disclosure, ListRow } from '../components/ui';
 
@@ -79,8 +79,10 @@ export default function TodayScreen(props: TodayScreenProps): React.JSX.Element 
   const decision = typeof state.getTrainingSupportDecision === 'function'
     ? state.getTrainingSupportDecision(state.todayPlan?.slots.map((slot) => slot.movementId))
     : { status: 'support_unavailable' as const };
-  if (state.status !== 'booting' && decision.status !== 'available') return <TrainingSupportNotice
-    unavailable={decision.status === 'support_unavailable'} onOpenSession={state.session !== null ? props.onOpenSession : undefined} />;
+  if (state.status !== 'booting' && decision.status !== 'available') return <HeldScreenWithHalt lastTriage={state.lastTriage}>
+    <TrainingSupportNotice
+      unavailable={decision.status === 'support_unavailable'} onOpenSession={state.session !== null ? props.onOpenSession : undefined} />
+  </HeldScreenWithHalt>;
   return <AvailableTodayScreen {...props} />;
 }
 

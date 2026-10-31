@@ -88,6 +88,31 @@ function CenteredState({ children }: { children: React.ReactNode }): React.JSX.E
   return <View style={styles.center}>{children}</View>;
 }
 
+/**
+ * A support hold replaces the screen, but a same-day halt must stay visible
+ * above it: both can be active at once, and the halt is the stronger message.
+ * Reuses the existing halt copy only.
+ */
+export function HeldScreenWithHalt({ lastTriage, children }: {
+  lastTriage: ReturnType<typeof useStore.getState>['lastTriage'];
+  children: React.ReactNode;
+}): React.JSX.Element {
+  if (lastTriage === null || lastTriage.kind !== 'matched' || !lastTriage.directive.halt) return <>{children}</>;
+  return (
+    <ScrollView style={styles.screen} contentContainerStyle={styles.contentContainer}>
+      <View style={[styles.card, styles.cardActiveSpine]} testID="held-screen-halt-card">
+        <View style={styles.statusBadge}>
+          <Text style={styles.statusBadgeText}>{HALT_META.label.toUpperCase()}</Text>
+        </View>
+        <Text style={styles.title}>{HALT_META.title}</Text>
+        <Text style={styles.body}>{HALT_META.recommendation}</Text>
+        <Text style={styles.haltCue}>{lastTriage.directive.vector.coaching_cue}</Text>
+      </View>
+      {children}
+    </ScrollView>
+  );
+}
+
 export default function ReadinessScreen(props: ReadinessScreenProps): React.JSX.Element {
   const state = useStore((s) => s);
   if (state.status === 'booting' || state.status === 'error') {
@@ -96,8 +121,10 @@ export default function ReadinessScreen(props: ReadinessScreenProps): React.JSX.
   const decision = typeof state.getTrainingSupportDecision === 'function'
     ? state.getTrainingSupportDecision(state.todayPlan?.slots.map((slot) => slot.movementId))
     : { status: 'support_unavailable' as const };
-  if (decision.status !== 'available') return <TrainingSupportNotice
-    unavailable={decision.status === 'support_unavailable'} onOpenSession={state.session !== null ? props.onOpenSession : undefined} />;
+  if (decision.status !== 'available') return <HeldScreenWithHalt lastTriage={state.lastTriage}>
+    <TrainingSupportNotice
+      unavailable={decision.status === 'support_unavailable'} onOpenSession={state.session !== null ? props.onOpenSession : undefined} />
+  </HeldScreenWithHalt>;
   return <AvailableReadinessScreen {...props} />;
 }
 
