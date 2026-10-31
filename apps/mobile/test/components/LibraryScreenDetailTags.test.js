@@ -80,4 +80,9 @@ test('plan-5: LibraryScreenV2 movement detail metadata badges are not exposed as
   expect(screen.queryByRole('button', { name: 'COMPOUND' })).toBeNull();
   expect(screen.queryByRole('button', { name: 'REPS' })).toBeNull();
   expect(screen.queryByRole('button', { name: 'BARBELL' })).toBeNull();
+  expect(
+    screen.getByRole('text', {
+      name: 'Barbell Back Squat is a full body movement',
+    }),
+  ).toBeOnTheScreen();
 });

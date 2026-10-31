@@ -289,6 +289,7 @@ export default function LibraryScreenV2({ initialMovementId }: LibraryScreenProp
               {selectedMovement.scope === 'full_body' && (
                 <View
                   style={styles.detailTag}
+                  accessible={true}
                   accessibilityRole="text"
                   accessibilityLabel={`${selectedMovement.name} is a full body movement`}
                 >
