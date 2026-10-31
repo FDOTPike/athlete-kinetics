@@ -61,7 +61,11 @@ describe('ProgramSetupScreen setDayFocus clears stale movementPreferences for th
     expect(screen.getByText('5. Customize generated week')).toBeOnTheScreen();
 
     // Pick a weight-room movement preference on Day 1 Slot 1 (Box Squat Chip in 5. Customize generated week)
-    fireEvent.press(screen.getAllByLabelText('Box Squat')[0]);
+    // and a movement preference on another day so we can verify other days' preferences survive.
+    const boxSquatId = useStore.getState().movements.find((m) => m.name === 'Box Squat').movement_id;
+    const boxSquatChips = screen.getAllByLabelText('Box Squat');
+    fireEvent.press(boxSquatChips[0]);
+    fireEvent.press(boxSquatChips[1]);
 
     // Now change Day 1 ("Today") focus from lower to upper
     fireEvent.press(screen.getAllByLabelText('upper')[0]);
@@ -77,5 +81,17 @@ describe('ProgramSetupScreen setDayFocus clears stale movementPreferences for th
       invalidPreferenceErrorShown: false,
       createProgramDisabled: false,
     });
+
+    fireEvent.press(screen.getByLabelText('Create program'));
+    const savedPreferences = useStore.getState().program?.movementPreferences ?? [];
+    expect(savedPreferences.some((pref) => pref.dayIndex === 1)).toBe(false);
+    expect(savedPreferences).toEqual([
+      {
+        dayIndex: 4,
+        slotIndex: 1,
+        pattern: 'squat',
+        movementId: boxSquatId,
+      },
+    ]);
   });
 });
