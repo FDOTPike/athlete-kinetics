@@ -128,3 +128,21 @@ test('plan-3: RoutineTemplateBuilder RPE decimal-pad input preserves trailing de
   fireEvent(screen.getByLabelText('Maximum RPE for day 1 slot 1'), 'blur');
   expect(screen.getByLabelText('Maximum RPE for day 1 slot 1').props.value).toBe('7.5');
 });
+
+test('RoutineTemplateBuilder handleSave resolves incomplete focused dose drafts without blur', () => {
+  render(<RoutineTemplateBuilder initialTemplate={initialTemplate} />);
+
+  const setsInput = screen.getByLabelText('Sets for day 1 slot 1');
+  fireEvent.changeText(setsInput, '');
+  expect(screen.getByLabelText('Sets for day 1 slot 1').props.value).toBe('');
+
+  fireEvent.press(screen.getByLabelText('Save routine template'));
+
+  expect(screen.getByLabelText('Sets for day 1 slot 1').props.value).toBe(String(initialTemplate.slots[0].sets));
+  expect(mockState.saveRoutineTemplate).toHaveBeenCalledWith(
+    expect.objectContaining({
+      slots: [expect.objectContaining({ sets: initialTemplate.slots[0].sets })],
+    }),
+  );
+});
+

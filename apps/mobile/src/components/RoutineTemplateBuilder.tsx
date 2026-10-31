@@ -703,6 +703,7 @@ function AvailableRoutineTemplateBuilder({
 
   const handleSave = (): void => {
     setErrorText(null);
+    setDoseDrafts((current) => (Object.keys(current).length === 0 ? current : {}));
     const trimmed = name.trim();
     if (trimmed.length < 1 || trimmed.length > 80) {
       setErrorText('Template name must be between 1 and 80 characters.');
