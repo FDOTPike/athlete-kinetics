@@ -1710,7 +1710,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                   <View style={{ flex: 1 }}>
                     <Text style={styles.subTitle}>{`Sets of ${pendingSub.option.name}`}</Text>
                     <Text style={styles.subBody}>
-                      {`${subTargetLogged} logged ${subTargetLogged === 1 ? 'set' : 'sets'} of ${subTargetMovementName} are kept.`}
+                      {`${subTargetLogged} logged ${subTargetLogged === 1 ? 'set' : 'sets'} of ${subTargetMovementName} ${subTargetLogged === 1 ? 'is' : 'are'} kept.`}
                     </Text>
                   </View>
                   <Pressable

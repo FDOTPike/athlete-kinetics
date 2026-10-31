@@ -226,7 +226,7 @@ test('with 1 logged set of 4 planned, choosing an option shows picker with singu
   expect(mockState.applyRegression).not.toHaveBeenCalled();
 
   expect(screen.getByText('Sets of Knee Push-Up')).toBeOnTheScreen();
-  expect(screen.getByText('1 logged set of Push-up are kept.')).toBeOnTheScreen();
+  expect(screen.getByText('1 logged set of Push-up is kept.')).toBeOnTheScreen();
 
   const chip1 = screen.getByLabelText('1 set of Knee Push-Up');
   const chip2 = screen.getByLabelText('2 sets of Knee Push-Up');

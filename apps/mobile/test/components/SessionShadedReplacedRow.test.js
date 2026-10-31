@@ -86,7 +86,7 @@ test('a replaced row after 1 logged set is drawn at opacity 0.4 with singular Sw
   fireEvent.press(screen.getByLabelText('Avoid Push-up and find a substitution'));
   fireEvent.press(screen.getByLabelText('Use Incline Push-Up instead'));
   expect(screen.getByText('Sets of Incline Push-Up')).toBeOnTheScreen();
-  expect(screen.getByText('1 logged set of Push-up are kept.')).toBeOnTheScreen();
+  expect(screen.getByText('1 logged set of Push-up is kept.')).toBeOnTheScreen();
   fireEvent.press(screen.getByLabelText('Use Incline Push-Up instead'));
 
   const replacedSlot = state().sessionPlan[0];
