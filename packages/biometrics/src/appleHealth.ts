@@ -104,18 +104,19 @@ function union(intervals: readonly Interval[]): Interval[] {
 /** Remove from `a` everything covered by `cover` (both unions). */
 function subtract(a: readonly Interval[], cover: readonly Interval[]): Interval[] {
   const out: Interval[] = [];
+  let coverIndex = 0;
   for (const iv of a) {
-    let pieces: Interval[] = [{ ...iv }];
-    for (const c of cover) {
-      pieces = pieces.flatMap((p) => {
-        if (c.end <= p.start || c.start >= p.end) return [p];
-        const kept: Interval[] = [];
-        if (c.start > p.start) kept.push({ start: p.start, end: c.start });
-        if (c.end < p.end) kept.push({ start: c.end, end: p.end });
-        return kept;
-      });
+    let start = iv.start;
+    while (coverIndex < cover.length && cover[coverIndex]!.end <= start) coverIndex += 1;
+    while (coverIndex < cover.length && cover[coverIndex]!.start < iv.end) {
+      const c = cover[coverIndex]!;
+      if (c.start > start) out.push({ start, end: c.start });
+      start = Math.max(start, c.end);
+      // Keep a covering interval for the next input if it extends past this one.
+      if (start >= iv.end) break;
+      coverIndex += 1;
     }
-    out.push(...pieces);
+    if (start < iv.end) out.push({ start, end: iv.end });
   }
   return out;
 }
@@ -137,8 +138,10 @@ const minutes = (ivs: readonly Interval[]): number => ivs.reduce((sum, iv) => su
  *   known stages keeps them all, so an awake-only night is 0 asleep minutes,
  *   never an estimate.
  * - Malformed, zero-length, inverted or > 24 h samples are dropped.
+ * - Batches over the native 5,000-sample budget are refused as a whole.
  */
 export function appleSleepToRecords(samples: readonly AppleSleepSampleLike[]): SleepRecordLike[] {
+  if (samples.length > SAMPLE_LIMIT) return [];
   const clean = samples
     .map((s) => ({ start: toMs(s.startDate), end: toMs(s.endDate), value: s.value, sourceId: String(s.sourceId ?? '') }))
     .filter((s) => Number.isFinite(s.start) && Number.isFinite(s.end) && s.end > s.start
@@ -158,7 +161,11 @@ export function appleSleepToRecords(samples: readonly AppleSleepSampleLike[]): S
   const records: SleepRecordLike[] = [];
   for (const episode of episodes) {
     const bySource = new Map<string, typeof clean>();
-    for (const s of episode) bySource.set(s.sourceId, [...(bySource.get(s.sourceId) ?? []), s]);
+    for (const s of episode) {
+      let list = bySource.get(s.sourceId);
+      if (list === undefined) { list = []; bySource.set(s.sourceId, list); }
+      list.push(s);
+    }
     const ranked = [...bySource.entries()].map(([sourceId, list]) => {
       const staged = union(list.filter((s) => s.value >= APPLE_SLEEP_VALUE.asleepCore).map(({ start, end }) => ({ start, end })));
       const all = union(list.map(({ start, end }) => ({ start, end })));
@@ -171,7 +178,7 @@ export function appleSleepToRecords(samples: readonly AppleSleepSampleLike[]): S
     const stages: SleepStageLike[] = [];
     for (const value of [APPLE_SLEEP_VALUE.asleepDeep, APPLE_SLEEP_VALUE.asleepREM, APPLE_SLEEP_VALUE.asleepCore,
       APPLE_SLEEP_VALUE.asleepUnspecified, APPLE_SLEEP_VALUE.awake]) {
-      const own = union(subtract(intervalsFor(value), covered));
+      const own = subtract(intervalsFor(value), covered);
       for (const iv of own) {
         stages.push({ startTime: new Date(iv.start).toISOString(), endTime: new Date(iv.end).toISOString(), stage: STAGE_FOR_VALUE[value]! });
       }
@@ -219,8 +226,10 @@ export interface AppleQuantitySampleLike {
  *   deterministic. Its samples for that date are averaged by aggregateDaily.
  * - A sample in any unit other than count/min, a non-finite value, a value
  *   outside the stored 20..150 bpm domain, or an unreadable date is dropped.
+ * - Batches over the native 5,000-sample budget are refused as a whole.
  */
 export function appleRestingHrToRecords(samples: readonly AppleQuantitySampleLike[]): RhrRecordLike[] {
+  if (samples.length > SAMPLE_LIMIT) return [];
   const clean = samples
     .map((s) => ({ start: toMs(s.startDate), quantity: s.quantity, unit: s.unit, sourceId: String(s.sourceId ?? '') }))
     .filter((s) => Number.isFinite(s.start) && typeof s.quantity === 'number' && Number.isFinite(s.quantity)
@@ -230,7 +239,9 @@ export function appleRestingHrToRecords(samples: readonly AppleQuantitySampleLik
   for (const s of clean) {
     const date = localDateOf(new Date(s.start).toISOString());
     const sources = byDate.get(date) ?? new Map<string, typeof clean>();
-    sources.set(s.sourceId, [...(sources.get(s.sourceId) ?? []), s]);
+    let list = sources.get(s.sourceId);
+    if (list === undefined) { list = []; sources.set(s.sourceId, list); }
+    list.push(s);
     byDate.set(date, sources);
   }
   const records: RhrRecordLike[] = [];
@@ -314,9 +325,10 @@ export async function tryCreateAppleHealthBridge(): Promise<BiometricsBridge | n
           const filter = { date: { startDate, endDate } };
           // Each type is read on its own: a failure (or no data, or no access —
           // HealthKit does not say which) for one never sinks the other.
+          // One extra sample detects truncation while preserving complete batches at the budget.
           const [sleep, restingHr] = await Promise.all([
-            hk.queryCategorySamples(SLEEP, { limit: SAMPLE_LIMIT, ascending: true, filter }).catch(() => []),
-            hk.queryQuantitySamples(RESTING_HR, { limit: SAMPLE_LIMIT, ascending: true, unit: APPLE_RESTING_HR_UNIT, filter })
+            hk.queryCategorySamples(SLEEP, { limit: SAMPLE_LIMIT + 1, ascending: true, filter }).catch(() => []),
+            hk.queryQuantitySamples(RESTING_HR, { limit: SAMPLE_LIMIT + 1, ascending: true, unit: APPLE_RESTING_HR_UNIT, filter })
               .catch(() => []),
           ]);
           return appleHealthDaily(

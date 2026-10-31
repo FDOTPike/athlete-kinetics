@@ -454,6 +454,7 @@ export default function OnboardingScreen(): React.JSX.Element {
         {step === 'goal' && (
           <View style={styles.cardGroup}>
             <Text style={styles.h2}>WHAT ARE WE TRAINING FOR?</Text>
+            <Text style={styles.pDim}>You can change your goals at any time in Athlete Profile.</Text>
             {OBJECTIVES.map((o) => (
               <ChoiceRow
                 key={o}
@@ -519,6 +520,7 @@ export default function OnboardingScreen(): React.JSX.Element {
         {step === 'target' && (
           <View>
             <Text style={styles.h2}>YOUR TARGET</Text>
+            <Text style={styles.pDim}>You can change your goals at any time in Athlete Profile.</Text>
             <GoalEditor fields={goalFields} onChange={setGoalFields} today={today} trainingAge={draft.training_age}
               exercise={{ movements, movementId: goalExerciseId, onChange: setGoalExerciseId }} />
             <QuietAction

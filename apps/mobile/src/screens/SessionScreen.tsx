@@ -1,6 +1,6 @@
 /** Phase 17 utility-first active-session surface. */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING_NOTE, EFFORT_STOP_GUIDANCE, effortCue, mapRirToRpe, RIR_OPTIONS, PREPARATION_STATUS_LABEL, isTerminalPreparationStatus, preparationDoseUnit, type EffortAnswer, type RunnerHaltReason } from '@ak/inference';
 import { formatTeachingOnlyReason, useStore, type LoadSelection, type LoggedSet, type SetLoadShown, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
 import { useSubViewBack } from '../navigation/navigation';
@@ -421,6 +421,15 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
 
   const byId = useMemo(() => new Map(movements.map((m) => [m.movement_id, m])), [movements]);
   const loggedCount = (slot: PlanSlot): number => session?.sets.filter((set) => sameSlot(set, slot)).length ?? 0;
+  const loggedAsNames = (slot: PlanSlot): string[] => {
+    const names: string[] = [];
+    for (const set of session?.sets.filter((set) => sameSlot(set, slot)) ?? []) {
+      if (set.movement_id === slot.movementId) continue;
+      const name = byId.get(set.movement_id)?.name ?? 'Movement';
+      if (!names.includes(name)) names.push(name);
+    }
+    return names;
+  };
   const runnerCurrent = runner?.slots?.[runner.slotIndex ?? -1];
   const runnerCurrentId = runnerCurrent?.sessionPlanSlotId ?? null;
   const selected = activeSessionPlanSlotId === null ? null : sessionPlan.find((slot) => slot.sessionPlanSlotId === activeSessionPlanSlotId) ?? null;
@@ -882,6 +891,19 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
     openSubstitution(currentMovement.movement_id);
   };
 
+  const confirmSkipExercise = (): void => {
+    if (runner?.phase !== 'working' || currentSlot === null) return;
+    Alert.alert('Skip this exercise', 'Skip the remaining sets for this exercise? Sets already logged will be kept.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Skip this exercise', onPress: () => {
+        const latest = useStore.getState();
+        if (latest.session?.sessionId === session?.sessionId
+          && latest.activeSessionPlanSlotId === currentSlot.sessionPlanSlotId
+          && latest.runner?.phase === 'working') latest.runnerSkipSlot();
+      } },
+    ]);
+  };
+
   const submitNiggle = (): void => {
     if (niggleRegion === null) return;
     reportNiggle(niggleRegion, niggleSeverity);
@@ -934,6 +956,8 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
     );
   }
 
+  const exercisesCompleteText = `${sessionPlan.filter((slot) => loggedCount(slot) >= slot.plannedSets).length} of ${sessionPlan.length} exercises complete${runner?.skippedSessionPlanSlotIds.length ? ` · ${runner.skippedSessionPlanSlotIds.length} skipped` : ''}`;
+
   return (
     <View style={styles.screen}>
       <KeyboardAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} accessibilityLabel="Current workout timeline">
@@ -942,9 +966,9 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
           <Text style={styles.wordmark}>pikeMethods</Text>
           <Text style={styles.kicker}>{mode === 'guided' ? 'GUIDED SESSION' : 'SELF-DIRECTED SESSION'}</Text>
           <Text style={styles.headerTitle}>{halted ? 'Session paused' : complete ? 'Session complete' : 'Your next step'}</Text>
-          {!halted && !complete && (
+          {!halted && (!complete || Boolean(runner?.skippedSessionPlanSlotIds.length)) && (
             <Text style={styles.headerMeta}>
-              {sessionPlan.length === 0 ? 'No movements are planned yet.' : `${sessionPlan.filter((slot) => loggedCount(slot) >= slot.plannedSets).length} of ${sessionPlan.length} exercises complete`}
+              {sessionPlan.length === 0 ? 'No movements are planned yet.' : exercisesCompleteText}
             </Text>
           )}
           {preparation !== null && preparation.sessionId === session.sessionId && (
@@ -976,8 +1000,27 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
 
         {complete && (
           <View style={styles.completeCard} accessibilityRole="summary">
-            <Text style={styles.completeTitle}>All planned work is logged.</Text>
-            <Text style={styles.completeBody}>Take the win. There is nothing else you need to decide here.</Text>
+            <Text style={styles.completeTitle}>{runner?.skippedSessionPlanSlotIds.length ? 'No exercises remain.' : 'All planned work is logged.'}</Text>
+            <Text style={styles.completeBody}>{runner?.skippedSessionPlanSlotIds.length ? 'Finish this session when you are ready.' : 'Take the win. There is nothing else you need to decide here.'}</Text>
+            {Boolean(runner?.skippedSessionPlanSlotIds.length) && (
+              <View testID="session-complete-skipped">
+                {sessionPlan
+                  .filter((slot) => runner?.skippedSessionPlanSlotIds.includes(slot.sessionPlanSlotId))
+                  .map((slot) => {
+                    const name = byId.get(slot.movementId)?.name ?? 'Movement';
+                    const logged = loggedCount(slot);
+                    const asNames = loggedAsNames(slot);
+                    const loggedSuffix = asNames.length > 0 ? ` as ${asNames.join(', ')}` : '';
+                    return (
+                      <Text key={slot.sessionPlanSlotId} style={styles.completeRowMeta}>
+                        {logged > 0
+                          ? `Skipped: ${name} · ${logged} of ${slot.plannedSets} sets logged${loggedSuffix}`
+                          : `Skipped: ${name} · no sets logged`}
+                      </Text>
+                    );
+                  })}
+              </View>
+            )}
             <CompletedMetrics sets={session.sets} bandLadder={bandLadder} movementsById={byId} onEdit={editSet} />
             <PrimaryButton
               label="Finish session"
@@ -1013,7 +1056,8 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
               // Cross-movement rest still belongs to the just-finished slot.
               // Keep it active so the rest controls remain reachable.
               const active = currentSlot?.sessionPlanSlotId === slot.sessionPlanSlotId && (!finished || resting);
-              const selectable = mode === 'self_directed' && !finished && !active && !resting;
+              const skipped = runner?.skippedSessionPlanSlotIds.includes(slot.sessionPlanSlotId) ?? false;
+              const selectable = mode === 'self_directed' && !finished && !active && !resting && !skipped;
 
               if (finished && !active) {
                 const completedSets = session?.sets.filter((set) => sameSlot(set, slot)) ?? [];
@@ -1024,6 +1068,8 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                 const metricSummary = latestCompleted?.timeS !== null && latestCompleted?.timeS !== undefined
                   ? ` · ${secondsText(latestCompleted.timeS)} logged`
                   : bandLabel === null ? '' : ` · ${bandLabel}`;
+                const asNames = loggedAsNames(slot);
+                const includesSuffix = asNames.length > 0 ? ` · includes ${asNames.join(', ')}` : '';
 
                 return (
                   <View key={slot.sessionPlanSlotId} style={styles.timelineRow}>
@@ -1034,8 +1080,45 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                     </View>
                     <View style={styles.completeRow}>
                       <Text style={styles.completeRowName} numberOfLines={1}>{movement?.name ?? 'Movement'}</Text>
-                      <Text style={styles.completeRowMeta}>{logged} sets complete{metricSummary}</Text>
+                      <Text style={styles.completeRowMeta}>{logged} sets complete{metricSummary}{includesSuffix}</Text>
                       <CompletedMetrics sets={completedSets} bandLadder={bandLadder} movementsById={byId} onEdit={editSet} />
+                    </View>
+                  </View>
+                );
+              }
+
+              if (skipped && !active) {
+                const skippedSets = session?.sets.filter((set) => sameSlot(set, slot)) ?? [];
+                const name = movement?.name ?? 'Movement';
+                const asNames = loggedAsNames(slot);
+                const loggedSuffix = asNames.length > 0 ? ` as ${asNames.join(', ')}` : '';
+                const skippedMeta = logged > 0
+                  ? `Skipped · ${logged} of ${slot.plannedSets} sets logged${loggedSuffix}`
+                  : 'Skipped · no sets logged';
+                const skippedLabel = logged > 0
+                  ? `${name}, skipped, ${logged} of ${slot.plannedSets} sets logged${loggedSuffix}`
+                  : `${name}, skipped, no sets logged`;
+
+                return (
+                  <View key={slot.sessionPlanSlotId} style={styles.timelineRow}>
+                    <View style={styles.rail}>
+                      <View style={[styles.dot, styles.dotSkipped]}>
+                        <Text style={styles.skipMark}>–</Text>
+                      </View>
+                    </View>
+                    <View style={styles.completeRow}>
+                      <Text
+                        style={styles.completeRowName}
+                        numberOfLines={1}
+                        accessibilityRole="text"
+                        accessibilityLabel={skippedLabel}
+                      >
+                        {name}
+                      </Text>
+                      <Text style={styles.completeRowMeta}>{skippedMeta}</Text>
+                      {logged > 0 && (
+                        <CompletedMetrics sets={skippedSets} bandLadder={bandLadder} movementsById={byId} onEdit={editSet} />
+                      )}
                     </View>
                   </View>
                 );
@@ -1379,6 +1462,8 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                               : `Log set ${Math.min(slot.plannedSets, currentLogged + 1)} for ${movement?.name ?? 'movement'}, unavailable — enter a load first`}
                         />
 
+                        {runner?.phase === 'working' && <QuietAction label="Skip this exercise" onPress={confirmSkipExercise} />}
+
                         {/* Shared Disclosure Primitive */}
                         <Disclosure
                           label="How & why"
@@ -1656,8 +1741,17 @@ const styles = StyleSheet.create({
     borderColor: theme.color.chalk,
     backgroundColor: theme.color.chalk,
   },
+  dotSkipped: {
+    borderColor: theme.color.textMid,
+    backgroundColor: theme.color.ink1,
+  },
   check: {
     color: theme.color.ink0,
+    fontSize: 9,
+    fontWeight: '900',
+  },
+  skipMark: {
+    color: theme.color.textMid,
     fontSize: 9,
     fontWeight: '900',
   },

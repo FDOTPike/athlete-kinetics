@@ -101,6 +101,14 @@ export const SUPPORTED_BACKUP_SCHEMA_CONTRACTS: readonly BackupSchemaContract[] 
     objectCount: 207,
     fingerprint: '19a684a3b413a3ae15ae3f919851a803e27a36a02d1e77d52f000672d35f4d53',
   },
+  // Through 072_question_log: local questions and the one card or fixed message shown.
+  {
+    userVersion: 71,
+    migrationSlot: 72,
+    tableCount: 122,
+    objectCount: 208,
+    fingerprint: '15aaa4b3bc4d575a2a9b28f4b29da543ce598a843455a43b73dbfbc161e3aa37',
+  },
 ];
 
 export const CURRENT_BACKUP_SCHEMA_CONTRACT: BackupSchemaContract =

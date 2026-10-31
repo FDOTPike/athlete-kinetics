@@ -24,18 +24,20 @@
  *     ONE request id to carry session+inference+disposal+completion, all ok=1,
  *     with cumulative counters proving the created session was the disposed one,
  *     inside ONE CONTINUOUS sampling segment and with no clock slack;
- *   - writes ALL evidence outside the repository (AK_MEM_EVIDENCE_DIR or the
- *     OS temp dir) — never into the worktree;
+ *   - writes ALL evidence outside the repository (AK_MEM_EVIDENCE_DIR or
+ *     a private session directory under the user home) — never into the worktree;
  *   - finish FAILS unless at least one request qualifies under that contract;
  *   - reports "maximum sampled Private Dirty" and refuses to call it a peak
  *     unless the achieved cadence actually supports a transient-peak claim.
  */
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { tmpdir } from 'node:os';
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, writeFileSync, renameSync, unlinkSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { dirname, join, resolve } from 'node:path';
+import { homedir } from 'node:os';
 import { parseMeminfoDump, privateDirtyBytes } from './meminfo_parser.mjs';
 import {
+  bindTargetSamples,
   computeCadence,
   computeSamplingSegments,
   correlateRequests,
@@ -51,8 +53,76 @@ import { PREFERRED_TARGET_BYTES, RATIFIED_CEILING_BYTES } from './memory_gate.mj
 const PACKAGE_DEFAULT = 'com.pikemethods.training.qa';
 const SESSION_FILE = () => join(evidenceRoot(), 'session.json');
 
-function evidenceRoot() {
-  return process.env.AK_MEM_EVIDENCE_DIR || join(tmpdir(), 'ak-mem-evidence');
+const STATE_ROOT = join(homedir(), '.ak-mem-evidence');
+let activeRoot;
+
+function secureDirectory(path) {
+  path = resolve(path);
+  const parent = dirname(path);
+  const links = new Set();
+  const validateAncestor = (p) => {
+    if (dirname(p) !== p) validateAncestor(dirname(p));
+    let stat;
+    try { stat = lstatSync(p); } catch (e) { if (e.code === 'ENOENT') return; throw e; }
+    if (stat.isSymbolicLink()) {
+      if (!process.getuid || stat.uid !== 0 || links.has(p)) throw new Error(`Linked evidence directory: ${p}`);
+      links.add(p);
+      // System aliases are safe only if their entire target chain is trusted.
+      validateAncestor(resolve(dirname(p), readlinkSync(p)));
+      links.delete(p);
+    } else if (process.getuid && (!stat.isDirectory()
+        || (stat.uid !== 0 && stat.uid !== process.getuid())
+        || ((stat.mode & 0o022) !== 0 && !(stat.uid === 0 && (stat.mode & 0o1000))))) {
+      throw new Error(`Linked evidence directory: ${p}`);
+    }
+  };
+  if (parent !== path) {
+    validateAncestor(parent);
+  }
+  mkdirSync(path, { recursive: true, mode: 0o700 });
+  const stat = lstatSync(path);
+  if (stat.isSymbolicLink()) throw new Error(`Linked evidence directory: ${path}`);
+  if (!stat.isDirectory()
+      || (process.getuid && (stat.uid !== process.getuid() || (stat.mode & 0o077) !== 0))) {
+    throw new Error(`Evidence directory must be private and owned by the current user: ${path}`);
+  }
+  return path;
+}
+
+function writeEvidence(path, content) {
+  secureDirectory(dirname(path));
+  if (existsSync(path) && (!lstatSync(path).isFile() || lstatSync(path).isSymbolicLink())) {
+    throw new Error(`Refusing linked or non-file evidence output: ${path}`);
+  }
+  const temporary = join(dirname(path), `.write-${randomUUID()}`);
+  try {
+    writeFileSync(temporary, content, { flag: 'wx', mode: 0o600 });
+    // Replacing the directory entry cannot truncate a symlink or hardlink target.
+    renameSync(temporary, path);
+  } finally {
+    if (existsSync(temporary)) unlinkSync(temporary);
+  }
+}
+
+function evidenceRoot(start = false) {
+  if (activeRoot) return activeRoot;
+  if (process.env.AK_MEM_EVIDENCE_DIR) return secureDirectory(process.env.AK_MEM_EVIDENCE_DIR);
+  secureDirectory(STATE_ROOT);
+  const pointer = join(STATE_ROOT, 'active.json');
+  if (start) {
+    activeRoot = mkdtempSync(join(STATE_ROOT, 'run-'));
+    writeEvidence(pointer, JSON.stringify(activeRoot));
+  } else {
+    if (!existsSync(pointer) || !lstatSync(pointer).isFile() || lstatSync(pointer).isSymbolicLink()) {
+      throw new Error('No active session. Run meminfo_harness.mjs start');
+    }
+    activeRoot = JSON.parse(readFileSync(pointer, 'utf8'));
+    if (typeof activeRoot !== 'string' || dirname(activeRoot) !== STATE_ROOT
+        || !/^run-[A-Za-z0-9]+$/.test(activeRoot.slice(STATE_ROOT.length + 1))) {
+      throw new Error('Invalid active evidence directory');
+    }
+  }
+  return secureDirectory(activeRoot);
 }
 
 function adb(args, { optional = false } = {}) {
@@ -97,7 +167,7 @@ function readDeviceUtcOffsetMinutes() {
 
 function cmdStart(argv) {
   const pkg = argv.package ?? PACKAGE_DEFAULT;
-  mkdirSync(evidenceRoot(), { recursive: true });
+  evidenceRoot(true);
   const devices = adb(['devices'], { optional: true });
   if (!devices || !/\tdevice/.test(devices.replace(/\r/g, ''))) {
     throw new Error('No authorized device attached via adb. Attach one and re-run.');
@@ -126,8 +196,8 @@ function cmdStart(argv) {
     },
     samples: [],
   };
-  writeFileSync(SESSION_FILE(), JSON.stringify(session, null, 2));
-  if (procMem.raw) writeFileSync(join(evidenceRoot(), 'proc-meminfo.txt'), procMem.raw);
+  writeEvidence(SESSION_FILE(), JSON.stringify(session, null, 2));
+  if (procMem.raw) writeEvidence(join(evidenceRoot(), 'proc-meminfo.txt'), procMem.raw);
   console.log(`[harness] session opened for ${pkg}; evidence in ${evidenceRoot()}`);
   console.log(`[harness] device RAM: ${procMem.memTotalBytes ?? 'UNKNOWN'} B (${session.deviceRam.source})`);
   console.log(`[harness] device UTC offset: ${session.deviceUtcOffsetMinutes ?? 'UNKNOWN'} min`);
@@ -136,18 +206,22 @@ function cmdStart(argv) {
 }
 
 function captureSample(label) {
+  if (!label || /[\\/\0<>:"|?*]/.test(label)) throw new Error('Sample label must be a filename-safe name');
   const session = loadSession();
   const captureStartMs = Date.now();
   const raw = adb(['shell', 'dumpsys', 'meminfo', '-d', session.package]);
   const captureEndMs = Date.now();
   const seq = session.samples.length + 1;
   const rawPath = join(evidenceRoot(), `sample-${String(seq).padStart(3, '0')}-${label}.txt`);
-  writeFileSync(rawPath, raw);
+  writeEvidence(rawPath, raw);
   const parsed = parseMeminfoDump(raw);
   if (!parsed.totalRowFound) {
     throw new Error(`sample ${seq}: TOTAL table row missing from dumpsys output (raw kept at ${rawPath})`);
   }
+  if (parsed.appName !== session.package || !parsed.processId) throw new Error('Memory dump does not identify the target package and PID');
   const record = {
+    appName: parsed.appName,
+    processId: parsed.processId,
     seq,
     label,
     captureStartUtc: new Date(captureStartMs).toISOString(),
@@ -163,7 +237,7 @@ function captureSample(label) {
     informationalSummary: parsed.summary,
   };
   session.samples.push(record);
-  writeFileSync(SESSION_FILE(), JSON.stringify(session, null, 2));
+  writeEvidence(SESSION_FILE(), JSON.stringify(session, null, 2));
   console.log(
     `[harness] sample ${seq} (${label}): Private Dirty ${record.privateDirtyBytes} B`
     + ` (capture took ${record.captureDurationMs} ms)`,
@@ -184,7 +258,7 @@ async function cmdWatch(argv) {
   // cadence instead of implying the request was honoured.
   const session = loadSession();
   session.requestedIntervalMs = intervalMs;
-  writeFileSync(SESSION_FILE(), JSON.stringify(session, null, 2));
+  writeEvidence(SESSION_FILE(), JSON.stringify(session, null, 2));
 
   const deadline = Date.now() + durationS * 1000;
   let n = 0;
@@ -215,14 +289,14 @@ function cmdFinish() {
   // Freeze the exact text correlated here into the packet: provenance
   // re-derives the lifecycle claims from <evidence>/logcat-epoch.txt, whatever
   // the source (adb -d, or a still-growing AK_LOGCAT_FILE).
-  writeFileSync(join(evidenceRoot(), LOGCAT_FILENAME), logcat);
+  writeEvidence(join(evidenceRoot(), LOGCAT_FILENAME), logcat);
   const tzOffsetMinutes = Number.isFinite(session.deviceUtcOffsetMinutes)
     ? session.deviceUtcOffsetMinutes : null;
-  const { markers, undated, malformed } = parseLifecycleMarkers(logcat, {
+  let { markers, undated, malformed } = parseLifecycleMarkers(logcat, {
     tzOffsetMinutes,
     year: new Date(session.startedAtUtc).getUTCFullYear(),
   });
-  writeFileSync(join(evidenceRoot(), 'lifecycle-markers.txt'),
+  writeEvidence(join(evidenceRoot(), 'lifecycle-markers.txt'),
     markers.map((m) => m.raw).join('\n'));
 
   // --- cadence and continuous sampling segments -------------------------------
@@ -235,12 +309,17 @@ function cmdFinish() {
   const continuityGapMs = Number.isFinite(Number(process.env.AK_CONTINUITY_GAP_MS))
     ? Number(process.env.AK_CONTINUITY_GAP_MS)
     : defaultContinuityGapMs(cadence);
-  const segments = computeSamplingSegments(sampleStarts, { continuityGapMs });
+  let segments = computeSamplingSegments(sampleStarts, { continuityGapMs });
+  // Re-read identities from the raw dumps rather than trusting session metadata.
+  const processSamples = session.samples.map((s) => ({ ...s,
+    ...parseMeminfoDump(readFileSync(s.rawFile, 'utf8')),
+  }));
+  ({ markers, segments } = bindTargetSamples({ samples: processSamples, markers, segments, packageName: session.package }));
 
   // --- correlation ------------------------------------------------------------
   const { qualified, rejected, disposalIntegrity } = correlateRequests({ markers, segments });
   if (qualified.length === 0) {
-    writeFileSync(join(evidenceRoot(), 'correlation-rejections.json'),
+    writeEvidence(join(evidenceRoot(), 'correlation-rejections.json'),
       JSON.stringify({ rejected, undatedCount: undated.length, malformed }, null, 2));
     throw new Error(
       'No request satisfied the production-path inference contract during continuous sampling. '
@@ -363,8 +442,8 @@ function cmdFinish() {
   console.log(`[harness] evidence binding: ${summary.evidenceBinding.fileCount} raw input(s), `
     + `digest ${summary.evidenceBinding.bindingDigest}`);
 
-  writeFileSync(join(evidenceRoot(), 'session.json'), JSON.stringify({ ...session, summary }, null, 2));
-  writeFileSync(join(evidenceRoot(), 'correlation-rejections.json'),
+  writeEvidence(join(evidenceRoot(), 'session.json'), JSON.stringify({ ...session, summary }, null, 2));
+  writeEvidence(join(evidenceRoot(), 'correlation-rejections.json'),
     JSON.stringify({ rejected, undatedCount: undated.length, malformed }, null, 2));
   console.log(JSON.stringify(summary, null, 2));
 }

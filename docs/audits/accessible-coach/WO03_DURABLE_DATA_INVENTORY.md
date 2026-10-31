@@ -202,6 +202,12 @@ The two tables belong with "Native workout history, execution checkpoints, prepa
 
 Both are athlete-owned records and are included in a backup and removed by a training-data reset like the rest of that group.
 
+## Update 2026-10-28 - migration 072 (question log)
+
+Final live durable tables: 122 (the 121 above, and `question_log`). The migration array has 71 entries through slot `072`, so `PRAGMA user_version = 71`. The current backup contract fingerprints 208 durable table/index/trigger objects; all earlier schema contracts remain registered unchanged.
+
+`question_log` stores the local question text, asked-at time, outcome kind, and nullable glossary term id. It is record-only and is not read by training decisions. It stays in the athlete database, travels only in the existing encrypted physical backup, survives forward restoration and migration replay, and is cleared by Reset training data. No automatic transfer is added.
+
 ## Correction 2026-10-29 — distinguish migrations 070 and 071
 
 The original inventory above is restored to its release-integration record through `069`: 68 migration-array entries, `user_version = 68`, 118 durable tables, 16 native workout/history tables, and 204 fingerprinted table/index/trigger objects. The October 13 note's phrase "Everything above ... through migration `070`" describes an earlier in-place edit, not that restored historical baseline.

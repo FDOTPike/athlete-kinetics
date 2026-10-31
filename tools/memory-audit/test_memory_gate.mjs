@@ -803,5 +803,40 @@ console.log('\n[13] HERMES r4 R4-3 — a deleted tier is a deleted check');
     checkUniformCeiling({ deviceTiers: [] }).ok === false);
 }
 
+{
+  const pkt = makePacket();
+  const log = join(pkt.dir, 'logcat-epoch.txt');
+  writeFileSync(log, readFileSync(log, 'utf8').replaceAll('4242 4243', '9999 10000'));
+  pkt.binding = computeEvidenceBinding({ evidenceDir: pkt.dir, session: pkt.session });
+  const v = verifyEvidencePacket({ sessionPath: sealPacket(pkt), requireManifest: false });
+  check('SEC11: unrelated application lifecycle cannot qualify target memory',
+    !v.ok && v.problems.some((p) => p.startsWith('correlatedRequestCount:')), v.problems.join('; '));
+  rmSync(pkt.dir, { recursive: true, force: true });
+}
+
+{
+  const pkt = makePacket();
+  const original = [...pkt.session.samples];
+  const log = join(pkt.dir, 'logcat-epoch.txt');
+  const later = readFileSync(log, 'utf8').replace(/^(\d+\.\d+)/gm, (t) => (Number(t) + 3).toFixed(3))
+    .replaceAll('4242 4243', '5555 5556');
+  writeFileSync(log, readFileSync(log, 'utf8') + '\n' + later);
+  for (const sample of original) {
+    const seq = pkt.session.samples.length + 1;
+    const rawFile = join(pkt.dir, `sample-${seq}-restart.txt`);
+    writeFileSync(rawFile, readFileSync(sample.rawFile, 'utf8').replace('pid 4242', 'pid 5555'));
+    pkt.session.samples.push({ ...sample, seq, rawFile, captureStartMs: sample.captureStartMs + 3000,
+      atUtc: new Date(sample.captureStartMs + 3000).toISOString() });
+  }
+  pkt.binding = computeEvidenceBinding({ evidenceDir: pkt.dir, session: pkt.session });
+  const path = sealPacket(pkt);
+  const packet = JSON.parse(readFileSync(path, 'utf8'));
+  packet.summary.lifecycle.correlatedRequestCount = 2;
+  writeFileSync(path, JSON.stringify(packet));
+  const v = verifyEvidencePacket({ sessionPath: path, requireManifest: false });
+  check('SEC11: provenance accepts a genuine cold-start PID change', v.ok, v.problems.join('; '));
+  rmSync(pkt.dir, { recursive: true, force: true });
+}
+
 console.log(`\n${fail === 0 ? 'ALL MEMORY GATE FIXTURES PASSED' : `${fail} MEMORY GATE FIXTURE(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

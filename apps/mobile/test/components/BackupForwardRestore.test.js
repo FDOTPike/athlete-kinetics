@@ -237,7 +237,7 @@ function makeDatabase(path, contract, label) {
 }
 
 const open = (path) => new DatabaseSync(path);
-const schemaObjects = (db) => db.prepare("SELECT type,name,tbl_name,coalesce(sql,'') AS sql FROM sqlite_master WHERE type IN ('table','index','trigger') AND name NOT LIKE 'sqlite_%' ORDER BY type,name").all()
+const schemaObjects = (db) => db.prepare("SELECT type,name,tbl_name,coalesce(sql,'') AS sql FROM sqlite_master WHERE type IN ('table','index','trigger') AND name NOT GLOB 'sqlite_*' ORDER BY type,name").all()
   .map((object) => [object.type, object.name, object.tbl_name, object.sql, object.type === 'table'
     ? db.prepare(`PRAGMA table_info("${object.name.replaceAll('"', '""')}")`).all()
       .map((column) => [column.cid, column.name, column.type, column.notnull, column.dflt_value, column.pk]) : []]);
@@ -706,9 +706,13 @@ describe('every registered pre-upgrade schema restores, not only the first', () 
     const v69 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 69);
     expect(v69.fingerprint).not.toBe(v68.fingerprint);
     expect([v69.migrationSlot, v69.tableCount]).toEqual([70, v68.tableCount + 1]);
-    // 071 adds two (session_skipped_slot, set_load_shown), so v70 is the current schema with its own fingerprint.
+    // 071 adds two tables (session_skipped_slot, set_load_shown), giving v70 its own fingerprint.
     const v70 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 70);
-    expect(v70).toBe(CURRENT);
+    expect(v70).not.toBe(CURRENT);
+    const v71 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 71);
+    expect(v71).toBe(CURRENT);
+    expect(v71.fingerprint).not.toBe(v70.fingerprint);
+    expect([v71.migrationSlot, v71.tableCount]).toEqual([72, v70.tableCount + 1]);
     expect(v70.fingerprint).not.toBe(v69.fingerprint);
     expect([v70.migrationSlot, v70.tableCount]).toEqual([71, v69.tableCount + 2]);
     expect(PRE_UPGRADE.length).toBeGreaterThanOrEqual(7);
@@ -811,7 +815,8 @@ test('round trip at the current schema: focus, goals, every revision and measure
       VALUES (7101, 7100, 1, 1, 8, 40, 7, 9100), (7102, 7100, 1, 2, 8, 42.5, NULL, 9200);
     INSERT INTO session_skipped_slot (session_plan_slot_id) VALUES (7102);
     INSERT INTO set_load_shown (set_id, load_source, shown_load_kg, advisory_kg, advisory_kind)
-      VALUES (7101, 'history', 40, NULL, NULL), (7102, 'manual', NULL, 45, 'onerm');`);
+      VALUES (7101, 'history', 40, NULL, NULL), (7102, 'manual', NULL, 45, 'onerm');
+    INSERT INTO question_log (asked_at, question_text, outcome_kind, glossary_term_id) VALUES (9501, 'private-question', 'card', 'RPE');`);
   db.close();
   const sessionRecords = (file) => {
     const reader = open(file);
@@ -820,12 +825,14 @@ test('round trip at the current schema: focus, goals, every revision and measure
         feel: reader.prepare('SELECT * FROM session_feel ORDER BY session_id').all(),
         skipped: reader.prepare('SELECT * FROM session_skipped_slot ORDER BY session_plan_slot_id').all(),
         shown: reader.prepare('SELECT * FROM set_load_shown ORDER BY set_id').all(),
+        questions: reader.prepare('SELECT * FROM question_log ORDER BY id').all(),
       });
     } finally { reader.close(); }
   };
   const recordsBefore = sessionRecords(livePath);
   expect(JSON.parse(recordsBefore)).toMatchObject({
     feel: [{ session_id: 7100, feel: 'harder' }],
+    questions: [{ id: 1, asked_at: 9501, question_text: 'private-question', outcome_kind: 'card', glossary_term_id: 'RPE' }],
     skipped: [{ session_plan_slot_id: 7102 }],
     shown: [{ set_id: 7101, load_source: 'history', shown_load_kg: 40 }, { set_id: 7102, load_source: 'manual', shown_load_kg: null, advisory_kg: 45, advisory_kind: 'onerm' }],
   });
@@ -846,16 +853,17 @@ test('round trip at the current schema: focus, goals, every revision and measure
   expect(readFileSync(mockSavedBackupPath, 'utf8')).not.toContain('private-reason');
   expect(readFileSync(mockSavedBackupPath, 'utf8')).not.toContain('private-sport');
   expect(readFileSync(mockSavedBackupPath, 'utf8')).not.toContain('private-report');
+  expect(readFileSync(mockSavedBackupPath, 'utf8')).not.toContain('private-question');
 
   // Lose the data, then restore. Deleting the goal is the one supported way
   // to remove its revisions and measurements (they cascade with it).
   const wipe = open(livePath);
   wipe.exec('PRAGMA foreign_keys = ON; DELETE FROM athlete_goal; DELETE FROM athlete_focus;'
     + ' DELETE FROM athlete_sport_profile; DELETE FROM training_block;'
-    + ' DELETE FROM hrv_daily; DELETE FROM resting_hr_daily; DELETE FROM session WHERE session_id = 7100;');
+    + ' DELETE FROM hrv_daily; DELETE FROM resting_hr_daily; DELETE FROM session WHERE session_id = 7100; DELETE FROM question_log;');
   wipe.close();
   // The session's records went with it.
-  expect(JSON.parse(sessionRecords(livePath))).toEqual({ feel: [], skipped: [], shown: [] });
+  expect(JSON.parse(sessionRecords(livePath))).toEqual({ feel: [], skipped: [], shown: [], questions: [] });
   expect(JSON.parse(telemetryRows(livePath))).toEqual({ hrv: [], restingHr: [] });
   expect(focusGoalRows(livePath)).toBe(NO_FOCUS_OR_GOALS);
   // The goal link and the block explanation went with their parents.

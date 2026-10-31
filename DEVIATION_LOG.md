@@ -681,3 +681,15 @@ adds this entry. Rationale and the options not taken:
 `docs/decisions/SUSPENSION_RPE_RAISE_2026-10-13.md`. Machine-checked in
 verify:autopilot, verify:blocks, verify:store and
 `SuspensionRpeRaise.test.js`.
+
+## 2026-10-31 — Backup import copy failure wording (PR 86)
+
+CodeRabbit thread 4404278406 flagged two new user-facing strings with no ruling
+behind them: `'Safe backup import is unavailable. Update the app before restoring.'`
+in `apps/mobile/src/state/backupStore.ts` and `"The selected backup could not be copied safely."`
+in `apps/mobile/android/app/src/main/java/com/athletekinetics/BackupCopyPackage.kt`.
+The owner asked: can both reuse "The selected backup could not be copied into private app storage."?
+On 2026-10-31 the owner answered: "Yes, reuse it". Both locations now use
+`"The selected backup could not be copied into private app storage."`, and
+"Update the app" was dropped because a missing native module is not always
+caused by an old app.

@@ -356,6 +356,9 @@ import type { BiometricsBridge } from '@ak/biometrics';
 import { groupSummaryExercises } from './sessionSummary';
 import phraseCodebaseJson from '../../../../packages/inference/assets/phrase-codebase.json';
 import phraseVectorsJson from '../../../../packages/inference/assets/phrase-codebase.vectors.json';
+import { routeQuestion, type QuestionIndex, type QuestionResult } from '../../../../packages/inference/src/semantic/questionRouter';
+import { packVectors } from '../../../../packages/inference/src/semantic/cosine';
+import { scanRedFlags } from '../../../../packages/inference/src/semantic/redFlag';
 
 // ---------------------------------------------------------------------------
 // Shared dark palette (sweaty-hands UI: high contrast, zero decoration)
@@ -939,6 +942,7 @@ interface KineticsStore {
   /** Synchronous read of a planned session's slots (grid detail view). */
   loadSessionSlots: (plannedSessionId: number) => TodaySlot[];
   setEmbedder: (e: Embedder | null) => void;
+  askQuestion: (text: string) => Promise<QuestionResult | null>;
   saveProfile: (patch: Partial<UserProfile>) => void;
   /** Re-read UI preferences for the active profile slot. */
   refreshUiPreferences: () => void;
@@ -1367,6 +1371,7 @@ const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.m
 // Semantic triage singletons (native-adjacent, non-serializable: module level)
 // ---------------------------------------------------------------------------
 let embedder: Embedder | null = null;
+let questionIndex: QuestionIndex | null = null;
 /** Health Connect bridge; null = device cannot serve biometrics (by design,
  *  nothing else in the app changes — subjective-triage-only routing). */
 let biometrics: BiometricsBridge | null = null;
@@ -6641,7 +6646,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       set({ error: error instanceof Error ? error.message : String(error) });
       return;
     }
-    set(runnerSelection(nextRunner));
+    set({ ...runnerSelection(nextRunner), substitution: null });
   },
 
   runnerHalt: (reason = 'manual') => {
@@ -7744,6 +7749,37 @@ export const useStore = create<KineticsStore>()((set, get) => {
     set({ triageReady: e !== null });
   },
 
+  askQuestion: async (text) => {
+    if (get().status !== 'ready' || text.trim().length === 0 || text.length > 300) return null;
+    const releaseLease = tryAcquireDataMutationLease();
+    if (releaseLease === null) { set({ error: DATA_LOCKED_MESSAGE }); return null; }
+    const athleteId = get().activeAthleteId;
+    const contextRevision = athleteContextRevision;
+    const askedAt = Date.now();
+    set({ error: null });
+    try {
+      const scan = scanRedFlags(text);
+      let result: QuestionResult = { outcome: scan.pain || scan.systemic ? 'refer' : 'none', shown: [] };
+      if (!scan.pain && !scan.systemic && embedder !== null) {
+        if (questionIndex === null) {
+          const asset = require('../../../../packages/inference/assets/question-vectors.json') as {
+            dim: number; entryIds: string[]; vectors: number[][];
+          };
+          questionIndex = { matrix: packVectors(asset.vectors, asset.dim), entryIds: asset.entryIds, dim: asset.dim };
+        }
+        result = routeQuestion(text, await embedder.embed(text), questionIndex);
+      }
+      if (athleteContextRevision !== contextRevision || get().activeAthleteId !== athleteId || dbAthleteId !== athleteId || db === null) return null;
+      const termId = result.shown[0] ?? null;
+      getDb().executeSync('INSERT INTO question_log (asked_at, question_text, outcome_kind, glossary_term_id) VALUES (?, ?, ?, ?)',
+        [askedAt, text, termId === null ? result.outcome : 'card', termId]);
+      return result;
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : String(error) });
+      return null;
+    } finally { releaseLease(); }
+  },
+
   reportSubjective: async (text, severity) => {
     // A report typed after midnight must land on the NEW day — persisting it
     // under a stale date would make the resulting halt vanish on restart.
@@ -7878,8 +7914,9 @@ export const useStore = create<KineticsStore>()((set, get) => {
   },
 
   resetTrainingData: () => {
+    set({ error: null });
     const d = getDb();
-    const had = rowsOf<{ c: number }>(d.executeSync('SELECT count(*) AS c FROM session'))[0];
+    const had = rowsOf<{ c: number }>(d.executeSync('SELECT (SELECT count(*) FROM session) + (SELECT count(*) FROM question_log) AS c'))[0];
     d.executeSync('BEGIN');
     try {
       // Children before parents, so it is correct whether or not foreign_keys is
@@ -7938,6 +7975,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       d.executeSync('DELETE FROM set_dose_target');
       d.executeSync('DELETE FROM session_note');
       d.executeSync('DELETE FROM session_feel');
+      d.executeSync('DELETE FROM question_log');
       d.executeSync('DELETE FROM report_severity');
       d.executeSync('DELETE FROM slot_override');
       d.executeSync('DELETE FROM planned_slot');
@@ -8002,6 +8040,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       set({ error: e instanceof Error ? e.message : String(e) });
       return false;
     }
+    athleteContextRevision += 1;
     // Reflect the now-empty DB in memory — EVERY derived surface, not just
     // 1RMs (audit B1: stale prescription/session/plan state survived the
     // reset). profileNotes intentionally stay: athlete_profile — including
