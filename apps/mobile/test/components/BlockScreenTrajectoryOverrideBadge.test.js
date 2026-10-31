@@ -1,4 +1,5 @@
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import BlockScreen from '../../src/screens/BlockScreen';
 
@@ -128,6 +129,18 @@ test('plan-2: an untouched planned slot with an APRE slot_override load adjustme
   // The movement was never substituted; its overrideLoadKg is an APRE load progression adjustment
   expect(screen.queryByText('SUBSTITUTED')).toBeNull();
   expect(screen.getByText('APRE: +5 kg, beat the 6-rep target by 3 last week')).toBeOnTheScreen();
+});
+
+test('plan-2: the override reason keeps its letter case and wraps inside a bounded badge', () => {
+  mockState = buildState();
+  render(<BlockScreen />);
+  fireEvent.press(screen.getByLabelText(`Week 2, lower session on ${TODAY}`));
+
+  const reason = screen.getByText('APRE: +5 kg, beat the 6-rep target by 3 last week');
+  const textStyle = StyleSheet.flatten(reason.props.style);
+  expect(textStyle.textTransform ?? 'none').toBe('none');
+  const badgeStyle = StyleSheet.flatten(reason.parent.parent.props.style);
+  expect(badgeStyle).toMatchObject({ flexShrink: 1, maxWidth: '50%' });
 });
 
 test.each([null, ''])('plan-2: renders no override badge when overrideReason is %p', (overrideReason) => {

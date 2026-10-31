@@ -1727,6 +1727,9 @@ const styles = StyleSheet.create({
     gap: theme.space[2],
   },
   overrideBadge: {
+    // A long reason wraps inside the badge instead of crowding the movement details.
+    flexShrink: 1,
+    maxWidth: '50%',
     borderWidth: 1,
     borderColor: theme.color.line,
     borderRadius: theme.radius.chip,
@@ -1736,6 +1739,8 @@ const styles = StyleSheet.create({
   },
   overrideBadgeText: {
     ...theme.font.eyebrow,
+    // The reason is shown verbatim (DEVIATION_LOG APRE ruling), so no forced capitals.
+    textTransform: 'none',
     color: theme.color.textMid,
   },
   trajectoryHeaderRow: {
