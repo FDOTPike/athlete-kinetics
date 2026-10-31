@@ -92,7 +92,7 @@ const initialTemplate = {
       role: 'major',
       movementId: 1,
       movementName: 'Barbell Back Squat',
-      sets: 4,
+      sets: 3,
       reps: 5,
       targetRpe: 8,
       legacyRoleAllowed: false,
@@ -104,14 +104,22 @@ test('plan-3: RoutineTemplateBuilder dose inputs allow clearing the field withou
   render(<RoutineTemplateBuilder initialTemplate={initialTemplate} />);
 
   const setsInput = screen.getByLabelText('Sets for day 1 slot 1');
+  expect(setsInput.props.value).toBe('3');
 
   // Clearing the Sets input to type a new number should leave the field empty instead of snapping to default "4"
   fireEvent.changeText(setsInput, '');
   expect(screen.getByLabelText('Sets for day 1 slot 1').props.value).toBe('');
 
-  // Blurring an empty draft drops the draft so the field shows the stored value again
+  // Blurring an empty draft drops the draft so the field shows the stored non-default value again
   fireEvent(screen.getByLabelText('Sets for day 1 slot 1'), 'blur');
-  expect(screen.getByLabelText('Sets for day 1 slot 1').props.value).toBe('4');
+  expect(screen.getByLabelText('Sets for day 1 slot 1').props.value).toBe('3');
+
+  fireEvent.press(screen.getByLabelText('Save routine template'));
+  expect(mockState.saveRoutineTemplate).toHaveBeenCalledWith(
+    expect.objectContaining({
+      slots: [expect.objectContaining({ sets: 3 })],
+    }),
+  );
 });
 
 test('plan-3: RoutineTemplateBuilder RPE decimal-pad input preserves trailing decimal point while typing', () => {
