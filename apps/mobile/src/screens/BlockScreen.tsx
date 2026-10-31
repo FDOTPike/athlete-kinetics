@@ -181,7 +181,7 @@ export default function BlockScreen(props: BlockScreenProps): React.JSX.Element 
   const state = useStore((s) => s);
   const decision = typeof state.getTrainingSupportDecision === 'function'
     ? state.getTrainingSupportDecision() : { status: 'support_unavailable' as const };
-  const narrowScopeOnly = typeof state.isBroadHoldFromNarrowScopes === 'function'
+  const narrowScopeOnly = decision.status === 'held' && typeof state.isBroadHoldFromNarrowScopes === 'function'
     ? state.isBroadHoldFromNarrowScopes(undefined, decision)
     : false;
   if (decision.status !== 'available') return <TrainingSupportNotice unavailable={decision.status === 'support_unavailable'}

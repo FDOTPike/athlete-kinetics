@@ -80,7 +80,7 @@ export default function TodayScreen(props: TodayScreenProps): React.JSX.Element 
   const decision = typeof state.getTrainingSupportDecision === 'function'
     ? state.getTrainingSupportDecision(movementIds)
     : { status: 'support_unavailable' as const };
-  const narrowScopeOnly = typeof state.isBroadHoldFromNarrowScopes === 'function'
+  const narrowScopeOnly = decision.status === 'held' && typeof state.isBroadHoldFromNarrowScopes === 'function'
     ? state.isBroadHoldFromNarrowScopes(movementIds, decision)
     : false;
   if (state.status !== 'booting' && decision.status !== 'available') return <TrainingSupportNotice
