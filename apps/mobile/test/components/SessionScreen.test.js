@@ -1789,3 +1789,298 @@ test('R5 local rest fallback is identical for every tier and equals the runner r
   expect([...observed.values()].map((values) => new Set(values).size)).toEqual([1, 1, 1, 1, 1, 1]);
   expect([...observed.values()].map((values) => values[0])).toEqual([240, 240, 180, 120, 90, 180]);
 }, 60000);
+
+test('a skipped slot with one logged set shows the skipped meta line, CompletedMetrics, and skipped accessibility label', () => {
+  mockState = state({
+    movements: [
+      movement(1, 'Narrow Stance Squats', { supportedPrefixes: ['Banded'] }),
+      movement(2, 'Later movement'),
+    ],
+    session: {
+      sessionId: 10,
+      date: '2026-07-15',
+      startedAtMs: Date.now(),
+      sets: [{
+        set_id: 77,
+        movement_id: 1,
+        movement_name: 'Narrow Stance Squats',
+        set_index: 1,
+        reps: 7,
+        load_kg: 60,
+        rpe: 8,
+        tonnage_kg: 420,
+        session_plan_slot_id: 1,
+        timeS: 30,
+        bandLevel: 1,
+      }],
+    },
+    sessionPlan: [slot(1, 1, 7, { plannedSets: 4 }), slot(2, 2, 8)],
+    activeSessionPlanSlotId: 2,
+    runner: runner({
+      slots: [
+        { sessionPlanSlotId: 1, movementId: 1, movementName: 'Narrow Stance Squats', sets: 4, target: { kind: 'reps', reps: 7 }, targetRpe: 8 },
+        { sessionPlanSlotId: 2, movementId: 2, movementName: 'Later movement', sets: 3, target: { kind: 'reps', reps: 8 }, targetRpe: 8 },
+      ],
+      slotIndex: 1,
+      slotSetCounts: [1, 0],
+      loggedSets: 1,
+      skippedSessionPlanSlotIds: [1],
+    }),
+    bandLadder: [{ level: 1, label: 'Light' }, { level: 2, label: 'Heavy' }],
+  });
+
+  render(<SessionScreen />);
+
+  expect(screen.getByText('–')).toBeOnTheScreen();
+  expect(screen.getByText('Skipped · 1 of 4 sets logged')).toBeOnTheScreen();
+  const skippedRow = screen.getByLabelText('Narrow Stance Squats, skipped, 1 of 4 sets logged');
+  expect(skippedRow).toBeOnTheScreen();
+  expect(skippedRow.props.accessibilityRole).toBe('text');
+  expect(screen.queryByLabelText(/Narrow Stance Squats, upcoming,/)).toBeNull();
+
+  fireEvent.press(screen.getByLabelText('Review logged details, collapsed'));
+  fireEvent.press(screen.getByLabelText('Decrease logged duration for set 1'));
+  expect(mockState.editSet).toHaveBeenCalledWith(77, 7, 60, 8, { timeS: 25 });
+});
+
+test('a skipped slot with no logged sets shows the no-sets-logged copy and accessibility label', () => {
+  mockState = state({
+    movements: [
+      movement(1, 'Narrow Stance Squats'),
+      movement(2, 'Later movement'),
+    ],
+    sessionPlan: [slot(1, 1, 7, { plannedSets: 4 }), slot(2, 2, 8)],
+    activeSessionPlanSlotId: 2,
+    runner: runner({
+      slots: [
+        { sessionPlanSlotId: 1, movementId: 1, movementName: 'Narrow Stance Squats', sets: 4, target: { kind: 'reps', reps: 7 }, targetRpe: 8 },
+        { sessionPlanSlotId: 2, movementId: 2, movementName: 'Later movement', sets: 3, target: { kind: 'reps', reps: 8 }, targetRpe: 8 },
+      ],
+      slotIndex: 1,
+      slotSetCounts: [0, 0],
+      loggedSets: 0,
+      skippedSessionPlanSlotIds: [1],
+    }),
+  });
+
+  render(<SessionScreen />);
+
+  expect(screen.getByText('Skipped · no sets logged')).toBeOnTheScreen();
+  const skippedRow = screen.getByLabelText('Narrow Stance Squats, skipped, no sets logged');
+  expect(skippedRow).toBeOnTheScreen();
+  expect(skippedRow.props.accessibilityRole).toBe('text');
+  expect(screen.queryByLabelText(/Narrow Stance Squats, upcoming,/)).toBeNull();
+  expect(screen.queryByLabelText(/Review logged details/)).toBeNull();
+});
+
+test('the header appends the skipped count when slots are skipped and leaves the text unchanged when none are skipped', () => {
+  const fourSlotPlan = [
+    slot(1, 1, 7, { plannedSets: 4 }),
+    slot(2, 2, 8),
+    slot(3, 1, 5),
+    slot(4, 2, 8),
+  ];
+  const fourRunnerSlots = [
+    { sessionPlanSlotId: 1, movementId: 1, movementName: 'First movement', sets: 4, target: { kind: 'reps', reps: 7 }, targetRpe: 8 },
+    { sessionPlanSlotId: 2, movementId: 2, movementName: 'Later movement', sets: 3, target: { kind: 'reps', reps: 8 }, targetRpe: 8 },
+    { sessionPlanSlotId: 3, movementId: 1, movementName: 'First movement', sets: 3, target: { kind: 'reps', reps: 5 }, targetRpe: 8 },
+    { sessionPlanSlotId: 4, movementId: 2, movementName: 'Later movement', sets: 3, target: { kind: 'reps', reps: 8 }, targetRpe: 8 },
+  ];
+
+  mockState = state({
+    sessionPlan: fourSlotPlan,
+    activeSessionPlanSlotId: 2,
+    runner: runner({
+      slots: fourRunnerSlots,
+      slotIndex: 1,
+      slotSetCounts: [1, 0, 0, 0],
+      loggedSets: 1,
+      skippedSessionPlanSlotIds: [1],
+    }),
+  });
+  const view = render(<SessionScreen />);
+  expect(screen.getByText('0 of 4 exercises complete · 1 skipped')).toBeOnTheScreen();
+
+  mockState.runner = runner({
+    slots: fourRunnerSlots,
+    slotIndex: 0,
+    slotSetCounts: [0, 0, 0, 0],
+    loggedSets: 0,
+    skippedSessionPlanSlotIds: [],
+  });
+  mockState.activeSessionPlanSlotId = 1;
+  view.rerender(<SessionScreen />);
+  expect(screen.getByText('0 of 4 exercises complete')).toBeOnTheScreen();
+  expect(screen.queryByText(/skipped/i)).toBeNull();
+});
+
+test('a runner that is complete because its last slot was skipped shows Session complete and the skipped meta line, while a complete session with no skips has no exercises complete text', () => {
+  const completedFirstSlotSets = Array.from({ length: 3 }, (_, index) => ({
+    set_id: index + 1,
+    movement_id: 1,
+    movement_name: 'First movement',
+    set_index: index + 1,
+    reps: 5,
+    load_kg: 0,
+    rpe: 8,
+    tonnage_kg: 0,
+    session_plan_slot_id: 1,
+    timeS: null,
+    bandLevel: null,
+  }));
+
+  mockState = state({
+    session: {
+      sessionId: 10,
+      date: '2026-07-15',
+      startedAtMs: Date.now(),
+      sets: completedFirstSlotSets,
+    },
+    runner: runner({
+      phase: 'complete',
+      slotIndex: 1,
+      setIndex: 0,
+      slotSetCounts: [3, 0],
+      loggedSets: 3,
+      skippedSessionPlanSlotIds: [2],
+    }),
+  });
+
+  const view = render(<SessionScreen />);
+  expect(screen.getByText('Session complete')).toBeOnTheScreen();
+  expect(screen.getByText('1 of 2 exercises complete · 1 skipped')).toBeOnTheScreen();
+
+  mockState.runner = runner({
+    phase: 'complete',
+    slotIndex: 1,
+    setIndex: 0,
+    slotSetCounts: [3, 3],
+    loggedSets: 6,
+    skippedSessionPlanSlotIds: [],
+  });
+  view.rerender(<SessionScreen />);
+  expect(screen.getByText('Session complete')).toBeOnTheScreen();
+  expect(screen.queryByText(/exercises complete/i)).toBeNull();
+});
+
+test('the complete card lists skipped slots in plan order when slots were skipped and omits the list when none were skipped', () => {
+  mockState = state({
+    session: {
+      sessionId: 10,
+      date: '2026-07-15',
+      startedAtMs: Date.now(),
+      sets: [{
+        set_id: 1,
+        movement_id: 1,
+        movement_name: 'First movement',
+        set_index: 1,
+        reps: 5,
+        load_kg: 0,
+        rpe: 8,
+        tonnage_kg: 0,
+        session_plan_slot_id: 1,
+        timeS: null,
+        bandLevel: null,
+      }],
+    },
+    sessionPlan: [slot(1, 1, 5, { plannedSets: 4 }), slot(2, 2, 8)],
+    runner: runner({
+      slots: [
+        { sessionPlanSlotId: 1, movementId: 1, movementName: 'First movement', sets: 4, target: { kind: 'reps', reps: 5 }, targetRpe: 8 },
+        { sessionPlanSlotId: 2, movementId: 2, movementName: 'Later movement', sets: 3, target: { kind: 'reps', reps: 8 }, targetRpe: 8 },
+      ],
+      phase: 'complete',
+      slotIndex: 1,
+      setIndex: 0,
+      slotSetCounts: [1, 0],
+      loggedSets: 1,
+      skippedSessionPlanSlotIds: [2, 1],
+    }),
+  });
+
+  const view = render(<SessionScreen />);
+  const skippedList = screen.getByTestId('session-complete-skipped');
+  expect(skippedList).toBeOnTheScreen();
+  expect(screen.getByText('Skipped: First movement · 1 of 4 sets logged')).toBeOnTheScreen();
+  expect(screen.getByText('Skipped: Later movement · no sets logged')).toBeOnTheScreen();
+  expect(skippedList.children.map((child) => child.props.children)).toEqual([
+    'Skipped: First movement · 1 of 4 sets logged',
+    'Skipped: Later movement · no sets logged',
+  ]);
+
+  mockState.runner = runner({
+    phase: 'complete',
+    slotIndex: 1,
+    setIndex: 0,
+    slotSetCounts: [3, 3],
+    loggedSets: 6,
+    skippedSessionPlanSlotIds: [],
+  });
+  view.rerender(<SessionScreen />);
+  expect(screen.queryByTestId('session-complete-skipped')).toBeNull();
+});
+
+test('a skipped slot whose logged set was recorded under an earlier movement names that movement in the timeline and completion card', () => {
+  mockState = state({
+    movements: [
+      movement(1, 'Narrow Stance Squats'),
+      movement(2, 'Later movement'),
+      movement(3, 'Box Squat'),
+    ],
+    session: {
+      sessionId: 10,
+      date: '2026-07-15',
+      startedAtMs: Date.now(),
+      sets: [{
+        set_id: 77,
+        movement_id: 3,
+        movement_name: 'Box Squat',
+        set_index: 1,
+        reps: 7,
+        load_kg: 60,
+        rpe: 8,
+        tonnage_kg: 420,
+        session_plan_slot_id: 1,
+        timeS: null,
+        bandLevel: null,
+      }],
+    },
+    sessionPlan: [slot(1, 1, 7, { plannedSets: 4 }), slot(2, 2, 8)],
+    activeSessionPlanSlotId: 2,
+    runner: runner({
+      slots: [
+        { sessionPlanSlotId: 1, movementId: 1, movementName: 'Narrow Stance Squats', sets: 4, target: { kind: 'reps', reps: 7 }, targetRpe: 8 },
+        { sessionPlanSlotId: 2, movementId: 2, movementName: 'Later movement', sets: 3, target: { kind: 'reps', reps: 8 }, targetRpe: 8 },
+      ],
+      slotIndex: 1,
+      slotSetCounts: [1, 0],
+      loggedSets: 1,
+      skippedSessionPlanSlotIds: [1],
+    }),
+  });
+
+  const view = render(<SessionScreen />);
+
+  expect(screen.getByText('Skipped · 1 of 4 sets logged as Box Squat')).toBeOnTheScreen();
+  const skippedRow = screen.getByLabelText('Narrow Stance Squats, skipped, 1 of 4 sets logged as Box Squat');
+  expect(skippedRow).toBeOnTheScreen();
+  expect(skippedRow.props.accessibilityRole).toBe('text');
+
+  mockState.runner = runner({
+    slots: [
+      { sessionPlanSlotId: 1, movementId: 1, movementName: 'Narrow Stance Squats', sets: 4, target: { kind: 'reps', reps: 7 }, targetRpe: 8 },
+      { sessionPlanSlotId: 2, movementId: 2, movementName: 'Later movement', sets: 3, target: { kind: 'reps', reps: 8 }, targetRpe: 8 },
+    ],
+    phase: 'complete',
+    slotIndex: 1,
+    setIndex: 0,
+    slotSetCounts: [1, 0],
+    loggedSets: 1,
+    skippedSessionPlanSlotIds: [1, 2],
+  });
+  view.rerender(<SessionScreen />);
+
+  expect(screen.getByText('Skipped: Narrow Stance Squats · 1 of 4 sets logged as Box Squat')).toBeOnTheScreen();
+  expect(screen.getByText('Skipped: Later movement · no sets logged')).toBeOnTheScreen();
+});
+
