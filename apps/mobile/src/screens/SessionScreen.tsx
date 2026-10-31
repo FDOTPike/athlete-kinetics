@@ -194,9 +194,12 @@ function CompletedMetrics({
   onEdit: (setId: number, reps: number, loadKg: number, rpe: number | null, metrics?: SetMetricPatch) => void;
 }): React.JSX.Element | null {
   const [open, setOpen] = useState(false);
-  const metricSets = sets.filter((set) => set.timeS !== null || set.bandLevel !== null || (
-    bandLadder.length > 0 && movementsById.get(set.movement_id)?.supportedPrefixes?.includes('Banded') === true
-  ));
+  const metricSets = sets
+    .filter((set) => set.timeS !== null || set.bandLevel !== null || (
+      bandLadder.length > 0 && movementsById.get(set.movement_id)?.supportedPrefixes?.includes('Banded') === true
+    ))
+    .slice()
+    .sort((a, b) => a.set_index - b.set_index || a.set_id - b.set_id);
   if (metricSets.length === 0) return null;
 
   return (
@@ -1162,7 +1165,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                         {/* Draining chalk barRestTimerCard */}
                         <RestTimerCard
                           totalSeconds={rest.seconds}
-                          elapsedSeconds={restRemaining}
+                          elapsedSeconds={rest.seconds - restRemaining}
                           style={{ alignSelf: 'stretch' }}
                         />
                         {runnerResting && (
