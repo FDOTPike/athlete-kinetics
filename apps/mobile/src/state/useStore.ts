@@ -1024,15 +1024,15 @@ interface KineticsStore {
   revokeMovementPriorExperience: (movementId: number) => boolean;
   /** Coach Mode: close the current athlete's DB and re-boot against the
    *  target athlete's file. Refused while a session is active. */
-  switchAthlete: (id: string) => void;
+  switchAthlete: (id: string) => Promise<boolean>;
   /** Coach Mode: register a new athlete (fresh, empty DB file) and switch to
    *  them — a fresh file has updated_at_ms = 0, so they land in onboarding. */
-  createAthlete: (name: string) => void;
+  createAthlete: (name: string) => Promise<boolean>;
   /** Coach Mode: rename a registry entry (display name only). */
-  renameAthleteEntry: (id: string, name: string) => void;
+  renameAthleteEntry: (id: string, name: string) => Promise<boolean>;
   /** Coach Mode: remove a non-active, non-default athlete from the registry
    *  and best-effort delete their DB file. */
-  deleteAthlete: (id: string) => void;
+  deleteAthlete: (id: string) => Promise<boolean>;
   /** Unlock or explicitly relock the advanced coaching/debug surfaces. */
   setAdvancedToolsUnlocked: (unlocked: boolean) => void;
   /** Onboarding completion: persist every answer in ONE save (no partial
@@ -1239,7 +1239,7 @@ export function closeStoreDatabaseForRestore(): void {
   dbAthleteId = null;
   bootInFlight = false;
   athleteContextRevision += 1;
-  useStore.setState({ status: 'booting' });
+  useStore.setState({ ...PER_ATHLETE_RESET, status: 'booting' });
 }
 
 /** Re-open and rehydrate after either replacement or deterministic rollback. */
@@ -3715,121 +3715,127 @@ export const useStore = create<KineticsStore>()((set, get) => {
   },
 
   // --- Coach Mode (Phase 15): one DB file per athlete ------------------------
-  switchAthlete: (id) => {
+  switchAthlete: async (id) => {
     if (get().session !== null) {
       set({ error: 'End the active session before switching athletes.' });
-      return;
+      return false;
     }
-    if (id === get().activeAthleteId && get().status === 'ready') return;
+    if (id === get().activeAthleteId && get().status === 'ready') {
+      set({ error: null });
+      return true;
+    }
     // Lease from the registry read through the write, the close and the boot hand-off.
     const releaseLease = tryAcquireDataMutationLease(true);
     if (releaseLease === null) {
       set({ error: mutationRefusalMessage() });
-      return;
+      return false;
     }
     athleteContextRevision += 1;
     set({ status: 'booting', error: null });
-    void (async () => {
-      try {
-        const reg = setActiveAthlete(await loadRegistry(), id);
-        if (reg.activeId !== id) {
-          set({ status: 'ready', error: 'Unknown athlete.' });
-          return;
-        }
-        if (!(await saveRegistry(reg))) {
-          set({ status: 'ready', error: 'Could not persist the athlete switch — registry write failed.' });
-          return;
-        }
-        if (db !== null) {
-          try { closeKineticsDb(db); } catch { /* reopen path recovers */ }
-          db = null;
-        }
-        set({ ...PER_ATHLETE_RESET, athletes: reg.athletes, activeAthleteId: id });
-        get().boot(); // status is 'booting' -> full open/migrate/hydrate path
-      } catch (e) {
-        set({ status: 'error', error: e instanceof Error ? e.message : String(e) });
-      } finally {
-        releaseLease();
+    try {
+      const reg = setActiveAthlete(await loadRegistry(), id);
+      if (reg.activeId !== id) {
+        set({ status: 'ready', error: 'Unknown athlete.' });
+        return false;
       }
-    })();
+      if (!(await saveRegistry(reg))) {
+        set({ status: 'ready', error: 'Could not persist the athlete switch — registry write failed.' });
+        return false;
+      }
+      if (db !== null) {
+        try { closeKineticsDb(db); } catch { /* reopen path recovers */ }
+        db = null;
+      }
+      set({ ...PER_ATHLETE_RESET, athletes: reg.athletes, activeAthleteId: id });
+      get().boot(); // status is 'booting' -> full open/migrate/hydrate path
+      return true;
+    } catch (e) {
+      set({ status: 'error', error: e instanceof Error ? e.message : String(e) });
+      return false;
+    } finally {
+      releaseLease();
+    }
   },
 
-  createAthlete: (name) => {
+  createAthlete: async (name) => {
     if (get().session !== null) {
       set({ error: 'End the active session before adding athletes.' });
-      return;
+      return false;
     }
     const releaseLease = tryAcquireDataMutationLease(true);
     if (releaseLease === null) {
       set({ error: mutationRefusalMessage() });
-      return;
+      return false;
     }
     athleteContextRevision += 1;
     set({ status: 'booting', error: null });
-    void (async () => {
-      try {
-        const { reg, entry } = addAthlete(await loadRegistry(), name, Date.now());
-        if (!(await saveRegistry(setActiveAthlete(reg, entry.id)))) {
-          set({ status: 'ready', error: 'Could not create the athlete — registry write failed.' });
-          return;
-        }
-        if (db !== null) {
-          try { closeKineticsDb(db); } catch { /* reopen path recovers */ }
-          db = null;
-        }
-        set({
-          ...PER_ATHLETE_RESET,
-          athletes: reg.athletes,
-          activeAthleteId: entry.id,
-        });
-        // Fresh file: migrate() builds the full schema; its athlete_profile
-        // row has updated_at_ms = 0, so this athlete lands in onboarding.
-        get().boot();
-      } catch (e) {
-        set({ status: 'error', error: e instanceof Error ? e.message : String(e) });
-      } finally {
-        releaseLease();
+    try {
+      const { reg, entry } = addAthlete(await loadRegistry(), name, Date.now());
+      if (!(await saveRegistry(setActiveAthlete(reg, entry.id)))) {
+        set({ status: 'ready', error: 'Could not create the athlete — registry write failed.' });
+        return false;
       }
-    })();
+      if (db !== null) {
+        try { closeKineticsDb(db); } catch { /* reopen path recovers */ }
+        db = null;
+      }
+      set({
+        ...PER_ATHLETE_RESET,
+        athletes: reg.athletes,
+        activeAthleteId: entry.id,
+      });
+      // Fresh file: migrate() builds the full schema; its athlete_profile
+      // row has updated_at_ms = 0, so this athlete lands in onboarding.
+      get().boot();
+      return true;
+    } catch (e) {
+      set({ status: 'error', error: e instanceof Error ? e.message : String(e) });
+      return false;
+    } finally {
+      releaseLease();
+    }
   },
 
-  renameAthleteEntry: (id, name) => {
+  renameAthleteEntry: async (id, name) => {
     const releaseLease = tryAcquireDataMutationLease(true);
     if (releaseLease === null) {
       set({ error: mutationRefusalMessage() });
-      return;
+      return false;
     }
-    void (async () => {
-      try {
-        const reg = regRenameAthlete(await loadRegistry(), id, name);
-        if (!(await saveRegistry(reg))) {
-          set({ error: 'Rename not saved — registry write failed.' });
-          return;
-        }
-        set({ athletes: reg.athletes });
-      } finally {
-        releaseLease();
+    set({ error: null });
+    try {
+      const reg = regRenameAthlete(await loadRegistry(), id, name);
+      if (!(await saveRegistry(reg))) {
+        set({ error: 'Rename not saved — registry write failed.' });
+        return false;
       }
-    })();
+      set({ athletes: reg.athletes, error: null });
+      return true;
+    } catch (e) {
+      set({ error: e instanceof Error ? e.message : String(e) });
+      return false;
+    } finally {
+      releaseLease();
+    }
   },
 
-  deleteAthlete: (id) => {
+  deleteAthlete: async (id) => {
     // The lease also covers the database file removal after the registry write.
     const releaseLease = tryAcquireDataMutationLease(true);
     if (releaseLease === null) {
       set({ error: mutationRefusalMessage() });
-      return;
+      return false;
     }
-    void (async () => {
-      try {
+    set({ error: null });
+    try {
       const { reg, removed } = regRemoveAthlete(await loadRegistry(), id);
       if (removed === null) {
         set({ error: 'The active and default athletes cannot be deleted.' });
-        return;
+        return false;
       }
       if (!(await saveRegistry(reg))) {
         set({ error: 'Delete not saved — registry write failed. The athlete is unchanged.' });
-        return;
+        return false;
       }
       // File removal: an orphaned file is invisible but the UI promised the
       // database is removed — say so honestly when it is not (audit A3).
@@ -3842,10 +3848,13 @@ export const useStore = create<KineticsStore>()((set, get) => {
         athletes: reg.athletes,
         error: fileGone ? null : 'Athlete removed from the list, but their database file could not be deleted. It holds no visible data and can be cleared by reinstalling.',
       });
-      } finally {
-        releaseLease();
-      }
-    })();
+      return fileGone;
+    } catch (e) {
+      set({ error: e instanceof Error ? e.message : String(e) });
+      return false;
+    } finally {
+      releaseLease();
+    }
   },
 
   setAdvancedToolsUnlocked: (unlocked) => {
@@ -7914,11 +7923,34 @@ export const useStore = create<KineticsStore>()((set, get) => {
   },
 
   resetTrainingData: () => {
-    set({ error: null });
-    const d = getDb();
-    const had = rowsOf<{ c: number }>(d.executeSync('SELECT (SELECT count(*) FROM session) + (SELECT count(*) FROM question_log) AS c'))[0];
-    d.executeSync('BEGIN');
+    if (get().session !== null) {
+      set({ error: 'End the active session before resetting training data.' });
+      return false;
+    }
+    const releaseLease = tryAcquireDataMutationLease();
+    if (releaseLease === null) {
+      set({ error: mutationRefusalMessage() });
+      return false;
+    }
     try {
+      set({ error: null });
+      let d: DB;
+      let had: { c: number } | undefined;
+      let hadModuleTables: { c: number } | undefined;
+      let inTx = false;
+      try {
+        d = getDb();
+        const moduleTablesCountSql =
+          'SELECT (SELECT count(*) FROM athlete_goal_observation)'
+          + ' + (SELECT count(*) FROM session_preparation_item)'
+          + ' + (SELECT count(*) FROM session_preparation)'
+          + ' + (SELECT count(*) FROM block_emphasis) AS c';
+        had = rowsOf<{ c: number }>(d.executeSync(
+          'SELECT (SELECT count(*) FROM history_import_capability_evidence) + (SELECT count(*) FROM history_import_set) + (SELECT count(*) FROM history_import_session) + (SELECT count(*) FROM history_import) + (SELECT count(*) FROM import_readiness_daily) + (SELECT count(*) FROM bodyweight_daily) + (SELECT count(*) FROM movement_capability_attestation) + (SELECT count(*) FROM movement_prior_experience) + (SELECT count(*) FROM capability_session_evidence) + (SELECT count(*) FROM set_target) + (SELECT count(*) FROM session_runner_checkpoint) + (SELECT count(*) FROM session_slot_target) + (SELECT count(*) FROM planned_slot_disposition) + (SELECT count(*) FROM planned_slot_autopilot) + (SELECT count(*) FROM planned_slot_legacy_role_allowance) + (SELECT count(*) FROM planned_slot_routine_decision) + (SELECT count(*) FROM planned_slot_target) + (SELECT count(*) FROM planned_slot_load_intent) + (SELECT count(*) FROM planned_session_routine_context) + (SELECT count(*) FROM planned_session_method) + (SELECT count(*) FROM session_plan_slot) + (SELECT count(*) FROM session_origin) + (SELECT count(*) FROM set_prefix) + (SELECT count(*) FROM set_metric) + (SELECT count(*) FROM set_record) + (SELECT count(*) FROM set_dose_target) + (SELECT count(*) FROM session_note) + (SELECT count(*) FROM session_feel) + (SELECT count(*) FROM question_log) + (SELECT count(*) FROM report_severity) + (SELECT count(*) FROM slot_override) + (SELECT count(*) FROM planned_slot) + (SELECT count(*) FROM planned_session) + (SELECT count(*) FROM block_meta) + (SELECT count(*) FROM suspension_episode WHERE ended_at_ms IS NULL) + (SELECT count(*) FROM training_program_movement_preference) + (SELECT count(*) FROM training_program_day) + (SELECT count(*) FROM training_block_program) + (SELECT count(*) FROM training_program) + (SELECT count(*) FROM session) + (SELECT count(*) FROM session_outcome) + (SELECT count(*) FROM micro_cycle) + (SELECT count(*) FROM macro_cycle) + (SELECT count(*) FROM training_block) + (SELECT count(*) FROM suspension_episode_program) + (SELECT count(*) FROM block_suspension_origin) + (SELECT count(*) FROM subjective_report) + (SELECT count(*) FROM niggle) + (SELECT count(*) FROM one_rep_max) + (SELECT count(*) FROM return_checkin_ack) + (SELECT count(*) FROM hrv_daily) + (SELECT count(*) FROM resting_hr_daily) + (SELECT count(*) FROM sleep_daily) + (SELECT count(*) FROM spo2_daily) + (SELECT count(*) FROM spo2_sample) + (SELECT count(*) FROM mech_daily) + (SELECT count(*) FROM state_vector) AS c',
+        ))[0];
+        hadModuleTables = rowsOf<{ c: number }>(d.executeSync(moduleTablesCountSql))[0];
+        d.executeSync('BEGIN');
+        inTx = true;
       // Children before parents, so it is correct whether or not foreign_keys is
       // ON. KEEPS athlete_profile / movement library / preferences / profile_slot.
       d.executeSync('DELETE FROM history_import_capability_evidence');
@@ -7968,6 +8000,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       d.executeSync('DELETE FROM session_origin');
       d.executeSync('DELETE FROM set_prefix');
       d.executeSync('DELETE FROM set_load_shown');
+      d.executeSync('DELETE FROM set_metric');
       d.executeSync('DELETE FROM set_record');
       // 026 snapshot immutability permits deletion only after its parent is
       // gone. With FKs on the parent cascade already emptied this table; with
@@ -8035,8 +8068,11 @@ export const useStore = create<KineticsStore>()((set, get) => {
       d.executeSync('DELETE FROM mech_daily');
       d.executeSync('DELETE FROM state_vector');
       d.executeSync('COMMIT');
+      inTx = false;
     } catch (e) {
-      d.executeSync('ROLLBACK');
+      if (inTx) {
+        try { d!.executeSync('ROLLBACK'); } catch { /* ignore rollback error */ }
+      }
       set({ error: e instanceof Error ? e.message : String(e) });
       return false;
     }
@@ -8072,7 +8108,10 @@ export const useStore = create<KineticsStore>()((set, get) => {
     // the same read every other surface here gets, and it is what makes the
     // in-memory value and the database agree after the wipe.
     get().refreshSuspension();
-    return (had?.c ?? 0) > 0;
+    return ((had?.c ?? 0) + (hadModuleTables?.c ?? 0)) > 0;
+    } finally {
+      releaseLease();
+    }
   },
 
   loadDemoAthlete: (): DemoLoadResult => {

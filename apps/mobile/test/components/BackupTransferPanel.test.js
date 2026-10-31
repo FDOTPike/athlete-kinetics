@@ -44,18 +44,30 @@ test('requires a confirmed 12-character password to create but not to open a res
   expect(mockState.chooseRestore).not.toHaveBeenCalled();
 });
 
-test('preview confirmation is explicit and cancellation never invokes restore', () => {
-  mockState.preview = {
-    backupId: 'one', createdAt: '2026-09-13T05:00:00.000Z', athleteNames: ['Athlete 1'],
-    databaseCount: 1, totalBytes: 1_048_576, replaceOnly: true,
-  };
-  render(<BackupTransferPanel />);
-  fireEvent.changeText(screen.getByLabelText('Backup password, at least 12 characters'), 'restore-passphrase');
+const PREVIEW = {
+  backupId: 'one', createdAt: '2026-09-13T05:00:00.000Z', athleteNames: ['Athlete 1'],
+  databaseCount: 1, totalBytes: 1_048_576, replaceOnly: true,
+};
+
+test('cancelling the preview never invokes restore and removes the confirmation', () => {
+  mockState.preview = PREVIEW;
+  // Model the store: cancelling clears the preview.
+  mockState.cancelRestore = jest.fn(() => { mockState.preview = null; });
+  const view = render(<BackupTransferPanel />);
   fireEvent.press(screen.getByTestId('cancel-restore-button'));
+  view.rerender(<BackupTransferPanel />);
   expect(mockState.cancelRestore).toHaveBeenCalledTimes(1);
   expect(mockState.confirmRestore).not.toHaveBeenCalled();
+  expect(screen.queryByTestId('confirm-restore-button')).toBeNull();
+});
+
+test('preview confirmation is explicit and uses the pending candidate', () => {
+  mockState.preview = PREVIEW;
+  render(<BackupTransferPanel />);
+  expect(mockState.confirmRestore).not.toHaveBeenCalled();
+  expect(screen.getByTestId('confirm-restore-button').props.accessibilityState.disabled).toBe(false);
   fireEvent.press(screen.getByTestId('confirm-restore-button'));
-  expect(mockState.confirmRestore).toHaveBeenCalledWith('restore-passphrase');
+  expect(mockState.confirmRestore).toHaveBeenCalledWith();
 });
 
 test('offers a bounded password-gated path to review the previous encrypted recovery', () => {

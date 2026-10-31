@@ -121,8 +121,8 @@ export default function BackupTransferPanel(): React.JSX.Element {
           )}
           <QuietAction
             label="CONFIRM REPLACE ALL DATA"
-            onPress={() => { void confirmRestore(password); }}
-            disabled={working || recoveryBlocked || !strongEnough}
+            onPress={() => { void confirmRestore(); }}
+            disabled={working || recoveryBlocked}
             accessibilityLabel="Confirm replace all current athlete data from this backup"
             testID="confirm-restore-button"
           />
