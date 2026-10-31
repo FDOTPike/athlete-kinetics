@@ -952,7 +952,11 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
 
   const submitNiggle = (): void => {
     if (niggleRegion === null) return;
-    reportNiggle(niggleRegion, niggleSeverity);
+    // A report that did not save keeps the form open and claims nothing.
+    if (reportNiggle(niggleRegion, niggleSeverity) !== true) {
+      setNiggleSavedNotice(false);
+      return;
+    }
     setSafetyOpen(false);
     const after = typeof useStore.getState === 'function' ? useStore.getState() : state;
     const afterHalted = after?.runner?.phase === 'halted'
@@ -1616,7 +1620,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                                 label={niggleSeverity >= haltMin ? 'Save report and stop session' : 'Save report'}
                                 onPress={submitNiggle}
                                 disabled={niggleRegion === null}
-                                accessibilityLabel="Save discomfort report"
+                                accessibilityLabel={niggleSeverity >= haltMin ? 'Save discomfort report and stop session' : 'Save discomfort report'}
                               />
                             </View>
                           </View>

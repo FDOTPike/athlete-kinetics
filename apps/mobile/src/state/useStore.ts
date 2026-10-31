@@ -1137,7 +1137,8 @@ interface KineticsStore {
   applyDaySwap: (targetMovementId: number, option: DaySwapOption) => void;
   /** Log a niggle (append-only to 011) and add it to the active niggle set so
    *  the next SWAP un-hides Layer 3 / activates the guardrail. */
-  reportNiggle: (region: string, severity: number) => void;
+  /** True when the report was saved; false when it was refused or rolled back. */
+  reportNiggle: (region: string, severity: number) => boolean;
   /** Reload today's niggles from 011 into state (boot + day rollover). */
   refreshNiggles: () => void;
   refreshVector: () => void;
@@ -7075,7 +7076,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
 
   reportNiggle: (region, severity) => {
     // Region must be a JOINTS member or the engine cannot apply its safety rules.
-    if (!JOINT_SET.has(region)) return;
+    if (!JOINT_SET.has(region)) return false;
     const safe = Math.round(clamp(severity, 1, 10));
     const loggedAtMs = Date.now();
     const id = `${loggedAtMs}-${niggleSeq++}-${Math.floor(Math.random() * 1e9).toString(36)}`;
@@ -7102,7 +7103,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
     } catch (error) {
       try { d.executeSync('ROLLBACK'); } catch { /* no partial safety report */ }
       set({ error: error instanceof Error ? error.message : String(error) });
-      return;
+      return false;
     }
     set({
       niggles: [...state.niggles, { region, severity: safe }],
@@ -7115,6 +7116,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       nextRunner.substitutionOfferedForSessionPlanSlotId !== null && current !== null) {
       get().openSubstitution(current.movementId);
     }
+    return true;
   },
   refreshNiggles: () => {
     const rows = rowsOf<{ region: string; severity: number }>(

@@ -92,7 +92,7 @@ const state = (overrides = {}) => {
     oneRepMaxes: {}, lastLoggedLoads: {}, lastTriage: null, substitution: null,
     startSession: jest.fn(), selectMovementSlot: jest.fn(), setMovementPreference: jest.fn(),
     openSubstitution: jest.fn(), closeSubstitution: jest.fn(), applyRegression: jest.fn(), applyDaySwap: jest.fn(),
-    reportNiggle: jest.fn(), logSet: jest.fn(), editSet: jest.fn(), endSession: jest.fn(),
+    reportNiggle: jest.fn(() => true), logSet: jest.fn(), editSet: jest.fn(), endSession: jest.fn(),
     runner: runner(), sessionMode: 'guided',
     uiPreferences: { sessionModeOverride: null, readinessDetail: 'summary', restTimerEnabled: true, textScale: 'system' },
     bandLadder: [], advanceRunnerRest: jest.fn(), skipRunnerRest: jest.fn(), setRunnerRestOverride: jest.fn(), runnerThumbsDown: jest.fn(), runnerHalt: jest.fn(),
@@ -1623,6 +1623,20 @@ const niggleCounterexampleState = () => state({
   getMovementAvailabilityVerdicts: realVerdictsFor,
 });
 
+test('a discomfort report that fails to save keeps the form open and does not say it was saved', () => {
+  mockState = niggleCounterexampleState();
+  mockState.reportNiggle = jest.fn(() => false);
+  render(<SessionScreen />);
+
+  fireEvent.press(screen.getByLabelText('Report discomfort'));
+  fireEvent.press(screen.getByLabelText('knee'));
+  fireEvent.press(screen.getByLabelText('Save discomfort report'));
+
+  expect(mockState.reportNiggle).toHaveBeenCalledWith('knee', 4);
+  expect(screen.queryByText('Report saved with this session.')).toBeNull();
+  expect(screen.getByLabelText('Save discomfort report')).toBeOnTheScreen();
+});
+
 test('a non-halting knee niggle keeps the session and opens substitution instead of blanking it', () => {
   mockState = niggleCounterexampleState();
   const view = render(<SessionScreen />);
@@ -2247,6 +2261,7 @@ describe('session-2: honest discomfort wording per tier and after-save outcomes'
           },
         };
       }
+      return true;
     });
     return fixtureState;
   };
@@ -2337,7 +2352,7 @@ describe('session-2: honest discomfort wording per tier and after-save outcomes'
     fireEvent.press(screen.getByLabelText('Stop discomfort, 8 of 10'));
     expect(screen.getByText('Save report and stop session')).toBeOnTheScreen();
     expect(screen.getByText('At this level the session stops for today.')).toBeOnTheScreen();
-    fireEvent.press(screen.getByLabelText('Save discomfort report'));
+    fireEvent.press(screen.getByLabelText('Save discomfort report and stop session'));
     view3.rerender(<SessionScreen />);
     expect(screen.getByText('Stop training for today.')).toBeOnTheScreen();
     expect(screen.queryByText('Report saved with this session.')).toBeNull();
@@ -2379,7 +2394,7 @@ describe('session-2: honest discomfort wording per tier and after-save outcomes'
     fireEvent.press(screen.getByLabelText('Stop discomfort, 8 of 10'));
     expect(screen.getByText('Save report and stop session')).toBeOnTheScreen();
     expect(screen.getByText('At this level the session stops for today.')).toBeOnTheScreen();
-    fireEvent.press(screen.getByLabelText('Save discomfort report'));
+    fireEvent.press(screen.getByLabelText('Save discomfort report and stop session'));
     view3.rerender(<SessionScreen />);
     expect(screen.getByText('Stop training for today.')).toBeOnTheScreen();
     expect(screen.queryByText('Report saved with this session.')).toBeNull();
@@ -2422,7 +2437,7 @@ describe('session-2: honest discomfort wording per tier and after-save outcomes'
     fireEvent.press(screen.getByLabelText('Moderate discomfort, 6 of 10'));
     expect(screen.getByText('Save report and stop session')).toBeOnTheScreen();
     expect(screen.getByText('At this level the session stops for today.')).toBeOnTheScreen();
-    fireEvent.press(screen.getByLabelText('Save discomfort report'));
+    fireEvent.press(screen.getByLabelText('Save discomfort report and stop session'));
     view3.rerender(<SessionScreen />);
     expect(screen.getByText('Stop training for today.')).toBeOnTheScreen();
     expect(screen.queryByText('Report saved with this session.')).toBeNull();
