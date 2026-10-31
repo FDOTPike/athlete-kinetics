@@ -1050,6 +1050,8 @@ export default function ProfileScreen(): React.JSX.Element {
                   setRecentMeasures(loadMeasuredHistory(14));
                   if (error === null) {
                     setResetAthleteId(null);
+                    // The reset deleted today's bodyweight, so nothing is saved now.
+                    savedBodyweightText.current = '';
                     setBodyweightText('');
                     setHistoryNotice(null);
                   }
