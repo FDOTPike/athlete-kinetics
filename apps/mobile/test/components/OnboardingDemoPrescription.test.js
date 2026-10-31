@@ -69,6 +69,8 @@ describe('Skipping onboarding to load the demo athlete computes today prescripti
     const state = useStore.getState();
     expect(state.onboarded).toBe(true);
     expect(state.vector).not.toBeNull();
+    expect(state.vector.date).toBe(state.today);
     expect(state.prescription).not.toBeNull();
+    expect(state.prescription.forDate).toBe(state.today);
   });
 });
