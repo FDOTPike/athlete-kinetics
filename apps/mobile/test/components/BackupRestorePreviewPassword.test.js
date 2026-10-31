@@ -235,4 +235,33 @@ describe('BackupTransferPanel restore preview password retention', () => {
       message: 'Review the previous data recovery before replacing current data.',
     });
   });
+
+  test('remounting BackupTransferPanel during RESTORE PREVIEW keeps confirmation enabled and consumes the pending restore candidate without local password state', async () => {
+    const tree = render(<BackupTransferPanel />);
+    fireEvent.changeText(
+      tree.getByLabelText('Backup password, at least 12 characters'),
+      'restore-password',
+    );
+    await act(async () => {
+      fireEvent.press(tree.getByTestId('choose-restore-button'));
+    });
+    expect(useBackupStore.getState().status).toBe('preview');
+
+    tree.unmount();
+    const remounted = render(<BackupTransferPanel />);
+    const confirmButton = remounted.getByTestId('confirm-restore-button');
+    expect(confirmButton.props.accessibilityState.disabled).toBe(false);
+
+    await act(async () => {
+      fireEvent.press(confirmButton);
+    });
+
+    expect({
+      status: useBackupStore.getState().status,
+      recoveryAvailable: useBackupStore.getState().recoveryAvailable,
+    }).toEqual({
+      status: 'success',
+      recoveryAvailable: true,
+    });
+  });
 });

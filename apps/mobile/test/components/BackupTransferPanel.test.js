@@ -50,12 +50,12 @@ test('preview confirmation is explicit and cancellation never invokes restore', 
     databaseCount: 1, totalBytes: 1_048_576, replaceOnly: true,
   };
   render(<BackupTransferPanel />);
-  fireEvent.changeText(screen.getByLabelText('Backup password, at least 12 characters'), 'restore-passphrase');
   fireEvent.press(screen.getByTestId('cancel-restore-button'));
   expect(mockState.cancelRestore).toHaveBeenCalledTimes(1);
   expect(mockState.confirmRestore).not.toHaveBeenCalled();
+  expect(screen.getByTestId('confirm-restore-button').props.accessibilityState.disabled).toBe(false);
   fireEvent.press(screen.getByTestId('confirm-restore-button'));
-  expect(mockState.confirmRestore).toHaveBeenCalledWith('restore-passphrase');
+  expect(mockState.confirmRestore).toHaveBeenCalledWith();
 });
 
 test('offers a bounded password-gated path to review the previous encrypted recovery', () => {

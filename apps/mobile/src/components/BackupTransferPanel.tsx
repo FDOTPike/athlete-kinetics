@@ -22,13 +22,11 @@ export default function BackupTransferPanel(): React.JSX.Element {
   const cancelRestore = useBackupStore((state) => state.cancelRestore);
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
-  const [restorePassword, setRestorePassword] = useState<string | null>(null);
 
   const working = status === 'working';
   const recoveryBlocked = startupSafe !== true;
   const strongEnough = password.length >= 12;
   const confirmed = strongEnough && password === confirmation;
-  const previewPassword = preview !== null && restorePassword !== null ? restorePassword : password;
 
   return (
     <View style={styles.section} testID="backup-transfer-section">
@@ -83,7 +81,7 @@ export default function BackupTransferPanel(): React.JSX.Element {
       />
       <QuietAction
         label="RESTORE ENCRYPTED BACKUP"
-        onPress={() => { setRestorePassword(password); void chooseRestore(password); }}
+        onPress={() => { void chooseRestore(password); }}
         disabled={working || recoveryBlocked || !strongEnough || preview !== null}
         accessibilityLabel="Choose and preview an encrypted backup to replace all data"
         testID="choose-restore-button"
@@ -95,7 +93,7 @@ export default function BackupTransferPanel(): React.JSX.Element {
           </Text>
           <QuietAction
             label="REVIEW PREVIOUS DATA RECOVERY"
-            onPress={() => { setRestorePassword(password); void reviewRecovery(password); }}
+            onPress={() => { void reviewRecovery(password); }}
             disabled={working || recoveryBlocked || !strongEnough || preview !== null}
             accessibilityLabel="Review the protected data recovery from the previous restore"
             testID="review-recovery-button"
@@ -123,12 +121,12 @@ export default function BackupTransferPanel(): React.JSX.Element {
           )}
           <QuietAction
             label="CONFIRM REPLACE ALL DATA"
-            onPress={() => { void confirmRestore(previewPassword); }}
-            disabled={working || recoveryBlocked || previewPassword.length < 12}
+            onPress={() => { void confirmRestore(); }}
+            disabled={working || recoveryBlocked}
             accessibilityLabel="Confirm replace all current athlete data from this backup"
             testID="confirm-restore-button"
           />
-          <QuietAction label="KEEP CURRENT DATA" onPress={() => { setRestorePassword(null); cancelRestore(); }} disabled={working || recoveryBlocked} testID="cancel-restore-button" />
+          <QuietAction label="KEEP CURRENT DATA" onPress={cancelRestore} disabled={working || recoveryBlocked} testID="cancel-restore-button" />
         </View>
       )}
     </View>
