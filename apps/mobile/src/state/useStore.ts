@@ -7157,7 +7157,13 @@ export const useStore = create<KineticsStore>()((set, get) => {
     // around the movement. Halt-level reports block `logSet` at this boundary.
     if (nextRunner !== null && nextRunner.phase === 'working' &&
       nextRunner.substitutionOfferedForSessionPlanSlotId !== null && current !== null) {
-      get().openSubstitution(current.movementId);
+      // The report is already saved; a failure to open the sheet is shown, not
+      // turned into a failed save that a retry would duplicate.
+      try {
+        get().openSubstitution(current.movementId);
+      } catch (error) {
+        set({ error: error instanceof Error ? error.message : String(error) });
+      }
     }
     return true;
   },

@@ -661,6 +661,24 @@ describe('a discomfort report that cannot open its transaction', () => {
     expect(prepRow(sessionId).status).toBe('stopped');
   });
 
+  test('a saved report is still saved when opening the substitution sheet fails', () => {
+    startPlanned();
+    const openSubstitution = state().openSubstitution;
+    useStore.setState({ openSubstitution: () => { throw new Error('substitution unavailable'); } });
+    let saved;
+    try {
+      expect(() => { saved = state().reportNiggle('knee', 6); }).not.toThrow();
+    } finally {
+      useStore.setState({ openSubstitution });
+    }
+    // Committed before the sheet is opened: reported as saved, with the error shown.
+    expect(saved).toBe(true);
+    expect(count('SELECT COUNT(*) AS c FROM niggle')).toBe(1);
+    expect(state().niggles).toEqual([{ region: 'knee', severity: 6 }]);
+    expect(state().runner.substitutionOfferedForSessionPlanSlotId).not.toBeNull();
+    expect(state().error).toMatch(/substitution unavailable/);
+  });
+
   test('does not roll back a transaction it did not open', () => {
     startPlanned();
     // Another writer holds an open transaction with a pending write, so the
