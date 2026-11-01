@@ -19,8 +19,12 @@ jest.mock('../../src/state/useStore', () => ({
   useStore: (selector) => selector({ getTrainingSupportDecision: () => ({ status: 'available', holdIds: [] }), ...mockState }),
 }));
 
-// The first BlockScreen render in a jest worker can take several seconds.
-jest.setTimeout(30000);
+// No timeout override. Measured 2026-11-01 (`npx jest --config
+// apps/mobile/jest.config.js --no-cache --maxWorkers=1 --verbose` on this
+// file): the first test takes about 7.6 s (the first BlockScreen render in the
+// worker) and the rest 19-49 ms. Every test here is synchronous, and Jest's
+// 5 s timeout only interrupts async tests, so all seven pass without one. If a
+// test here becomes async, it will need a timeout.
 
 // The panel lists the autopilot changes stored when the ACTIVE block was
 // built (planned_slot_autopilot rows, one per planned slot). It used to be

@@ -761,6 +761,24 @@ if (adjustmentsQuerySql) {
       && adjustmentsRows[1].reason === 'raised',
     JSON.stringify(adjustmentsRows));
   db.exec('ROLLBACK');
+
+  // A time-mode movement with a time policy keeps the policy's set count at
+  // commit (defaultSetsForTarget), so a set-only attribution row for it was
+  // never applied and must not be listed as a change in this block.
+  db.exec('BEGIN');
+  db.exec("INSERT INTO movement (movement_id,name,pattern,is_compound) VALUES (950,'Timed Hold A','carry',0),(951,'Timed Hold B','carry',0),(952,'Timed No Policy','carry',0),(953,'Plain Row','pull_h',1)");
+  db.exec("INSERT INTO movement_logging_mode (movement_id,mode) VALUES (950,'time'),(951,'time'),(952,'time')");
+  db.exec("INSERT INTO movement_time_policy (movement_id,default_sets,target_seconds) VALUES (950,3,30),(951,3,30)");
+  db.exec("INSERT INTO training_block (block_id,start_date,objective,status,created_at_ms) VALUES (950, '2030-05-01','strength','active',0)");
+  db.exec("INSERT INTO planned_session (planned_session_id,block_id,week_index,day_index,focus,phase,session_date) VALUES (950,950,1,1,'full','accumulation','2030-05-01')");
+  db.exec("INSERT INTO planned_slot (planned_slot_id,planned_session_id,slot_index,movement_id,sets,reps,target_rpe) VALUES (950,950,1,950,3,30,7.0),(951,950,2,951,3,30,6.5),(952,950,3,952,2,30,7.0),(953,950,4,953,2,8,7.0)");
+  db.exec("INSERT INTO planned_slot_autopilot (planned_slot_id,rpe_delta,set_delta,reason) VALUES (950,0,-1,'eased'),(951,-0.5,-1,'eased'),(952,0,-1,'eased'),(953,0,-1,'eased')");
+  const timedRows = db.prepare(adjustmentsQuerySql).all();
+  const timedIds = timedRows.map((r) => r.planned_slot_id);
+  a('getPendingAutopilotAdjustments leaves out a set-only row for a time-policy movement, keeps its RPE row, a timed movement with no policy, and a reps movement',
+    JSON.stringify(timedIds) === JSON.stringify([951, 952, 953]),
+    JSON.stringify(timedIds));
+  db.exec('ROLLBACK');
 }
 
 // --- Calibration Policy v1 store invariants -------------------------------------

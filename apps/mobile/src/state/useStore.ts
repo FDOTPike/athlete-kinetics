@@ -5998,6 +5998,10 @@ export const useStore = create<KineticsStore>()((set, get) => {
 
   // The active block's already-applied autopilot changes, one row per planned
   // slot. The Plan tab shows them as "Changed in this block".
+  // A time-mode movement with a time policy keeps the policy's set count when
+  // the block is committed (defaultSetsForTarget), so a row that changed only
+  // its sets was never applied and is left out. No logging-mode row means
+  // 'reps'; a time-mode row that changed RPE is kept.
   getPendingAutopilotAdjustments: (): PendingAutopilotAdjustment[] => {
     if (db === null) return [];
     const d = db;
@@ -6020,7 +6024,13 @@ export const useStore = create<KineticsStore>()((set, get) => {
       JOIN movement m ON m.movement_id = sl.movement_id
       JOIN planned_session ps ON ps.planned_session_id = sl.planned_session_id
       JOIN training_block tb ON tb.block_id = ps.block_id
+      LEFT JOIN movement_logging_mode lm ON lm.movement_id = sl.movement_id
+      LEFT JOIN movement_time_policy tp ON tp.movement_id = sl.movement_id
       WHERE tb.status = 'active'
+        AND NOT (COALESCE(lm.mode, 'reps') = 'time'
+                 AND tp.movement_id IS NOT NULL
+                 AND pa.rpe_delta = 0
+                 AND pa.set_delta <> 0)
       ORDER BY ps.session_date, sl.slot_index, pa.planned_slot_id
     `));
     return rows.map((r) => ({
