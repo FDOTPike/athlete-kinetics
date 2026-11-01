@@ -7,15 +7,28 @@
 import React, { useEffect, useRef, useState } from 'react';
 import TrainingSupportNotice from '../components/TrainingSupportNotice';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { SELECTABLE_SCHEMA_TYPES, addDaysIso, targetLoadKg, splitExplainer, SPLIT_EXPLAINER_FOOTER, type BlockPlan, type SchemaType } from '@ak/inference';
+import {
+  SELECTABLE_SCHEMA_TYPES,
+  addDaysIso,
+  applyLoadModifier,
+  applyPrescriptionToSlot,
+  isPrescriptionReduced,
+  targetLoadKg,
+  splitExplainer,
+  SPLIT_EXPLAINER_FOOTER,
+  type AdjustmentVector,
+  type BlockPlan,
+  type SchemaType,
+} from '@ak/inference';
 import {
   useStore,
+  freeFormStartIsEmpty,
   type BlockSessionSummary,
   type TodaySlot,
   type RoutineTemplate,
 } from '../state/useStore';
 import { RoutineTemplateBuilder } from '../components/RoutineTemplateBuilder';
-import { useSubViewBack } from '../navigation/navigation';
+import { useNavigation, useSubViewBack } from '../navigation/navigation';
 import ProgramSetupScreen from './ProgramSetupScreen';
 import NewBlockChooserScreen from './NewBlockChooserScreen';
 import InfoTip from '../components/InfoTip';
@@ -27,6 +40,7 @@ import { EMPTY_ACTIVITY_LEDGER } from '../state/activityStore';
 import {
   PrimaryButton,
   SecondaryButton,
+  QuietAction,
   Chip,
   Disclosure,
 } from '../components/ui';
@@ -115,15 +129,21 @@ function targetLabel(slot: TodaySlot): string {
     : `${slot.sets} x ${slot.target.reps}`;
 }
 
-function slotTarget(slot: TodaySlot, oneRepMaxes: Record<number, number>): string {
-  if (slot.target.kind === 'time') {
-    return `${targetLabel(slot)} at RPE ${slot.targetRpe.toFixed(1)}`;
+function slotTarget(
+  slot: TodaySlot,
+  oneRepMaxes: Record<number, number>,
+  vector: AdjustmentVector | null = null,
+): string {
+  const effective = applyPrescriptionToSlot(slot, vector);
+  if (effective.target.kind === 'time') {
+    return `${targetLabel(effective)} at RPE ${effective.targetRpe.toFixed(1)}`;
   }
-  const oneRepMax = oneRepMaxes[slot.movementId];
-  const load = slot.overrideLoadKg ?? (
-    oneRepMax !== undefined ? targetLoadKg(oneRepMax, slot.target.reps, slot.targetRpe) : null
-  );
-  return `${targetLabel(slot)} at RPE ${slot.targetRpe.toFixed(1)}${
+  const oneRepMax = oneRepMaxes[effective.movementId];
+  const derivedLoad = oneRepMax !== undefined
+    ? applyLoadModifier(targetLoadKg(oneRepMax, effective.target.reps, effective.targetRpe), vector)
+    : null;
+  const load = effective.overrideLoadKg ?? derivedLoad;
+  return `${targetLabel(effective)} at RPE ${effective.targetRpe.toFixed(1)}${
     load === null ? '' : `, ${load.toFixed(1)} kg`
   }`;
 }
@@ -179,7 +199,11 @@ export default function BlockScreen(props: BlockScreenProps): React.JSX.Element 
   const state = useStore((s) => s);
   const decision = typeof state.getTrainingSupportDecision === 'function'
     ? state.getTrainingSupportDecision() : { status: 'support_unavailable' as const };
+  const narrowScopeOnly = decision.status === 'held' && typeof state.isBroadHoldFromNarrowScopes === 'function'
+    ? state.isBroadHoldFromNarrowScopes(undefined, decision)
+    : false;
   if (decision.status !== 'available') return <TrainingSupportNotice unavailable={decision.status === 'support_unavailable'}
+    narrowScopeOnly={narrowScopeOnly}
     onOpenSession={state.session !== null ? props.onSessionStarted : undefined} />;
   return <AvailableBlockScreen key={state.activeAthleteId} {...props} />;
 }
@@ -223,6 +247,14 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
   const [continuationError, setContinuationError] = useState<string | null>(null);
   const [continuationPending, setContinuationPending] = useState(false);
   const startSession = useStore((s) => s.startSession);
+  const storeFreeFormStartIsEmpty = useStore((s) => s.freeFormStartIsEmpty);
+  const nav = typeof useNavigation === 'function' ? useNavigation() : undefined;
+  const [emptyStartPromptOpen, setEmptyStartPromptOpen] = useState(false);
+  const checkFreeFormStartIsEmpty = (): boolean => {
+    if (typeof storeFreeFormStartIsEmpty === 'function') return storeFreeFormStartIsEmpty();
+    if (typeof freeFormStartIsEmpty === 'function') return freeFormStartIsEmpty();
+    return false;
+  };
   const appliedAdjustments = useStore((s) => s.pendingAutopilotAdjustments) ?? [];
   const appliedLines = appliedAdjustmentLines(appliedAdjustments);
   const blockEndDate = blockSessions.length > 0 ? blockSessions[blockSessions.length - 1].sessionDate : null;
@@ -396,12 +428,24 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
     );
   }
 
+  const halted = lastTriage !== null && lastTriage.kind === 'matched' && lastTriage.directive.halt;
+
   if (vector === null) {
     return (
       // The no-vector gate is an early return INSIDE the real screen, so the
       // route identity (coach-screen) is still asserted by tests even when
       // readiness data has not arrived yet.
       <View style={styles.center} testID="coach-screen">
+        {halted && lastTriage !== null && lastTriage.kind === 'matched' && (
+          <View style={[styles.card, styles.haltCard]}>
+            <Text style={styles.eyebrow}>SAFETY</Text>
+            <Text style={styles.cardTitle}>Stop training today</Text>
+            <Text style={styles.bodyText}>{lastTriage.directive.vector.coaching_cue}</Text>
+            {lastTriage.directive.followUp !== null && (
+              <Text style={styles.followUpText}>{lastTriage.directive.followUp}</Text>
+            )}
+          </View>
+        )}
         <View style={styles.card}>
           <Text style={styles.eyebrow}>COACH</Text>
           <Text style={styles.cardTitle}>Readiness is needed first</Text>
@@ -423,7 +467,6 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
   }
 
   const current = prescription !== null && prescription.forDate === today ? prescription : null;
-  const halted = lastTriage !== null && lastTriage.kind === 'matched' && lastTriage.directive.halt;
   const rows = weekRowsFor(blockSessions);
   const nextPlanned = blockSessions.find((planned) => planned.sessionDate > today);
   const programBlockExpired = program?.status === 'active' && block !== null
@@ -449,7 +492,8 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
 
   const openNextSession = (): void => {
     if (nextPlanned === undefined) {
-      openManageBlock();
+      if (program == null) openManageBlock();
+      else setEditingProgram(true);
       return;
     }
     setDetail({ summary: nextPlanned, slots: loadSessionSlots(nextPlanned.plannedSessionId) });
@@ -679,7 +723,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
         </View>
         <Text style={styles.cardTitle}>{todayTitle}</Text>
         <Text style={styles.bodyText}>{todayMessage}</Text>
-        {current !== null && !halted && (
+        {current !== null && !halted && isPrescriptionReduced(current.vector, profile) && (
           <Text style={styles.adjustedText}>Coach adjusted today's plan.</Text>
         )}
 
@@ -701,7 +745,11 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           ) : todayPlan !== null ? (
             <PrimaryButton label="Start session" onPress={startAndOpenSession} accessibilityLabel="Start session" />
           ) : block === null ? (
-            <PrimaryButton label="Set up a four-week block" onPress={openManageBlock} accessibilityLabel="Set up a four-week block" />
+            <PrimaryButton
+              label="Set up a four-week block"
+              onPress={program == null ? openManageBlock : () => setEditingProgram(true)}
+              accessibilityLabel="Set up a four-week block"
+            />
           ) : (
             <PrimaryButton
               label={nextPlanned === undefined ? 'Plan the next block' : 'Preview next session'}
@@ -924,9 +972,9 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                             onPress={() => setAttributionSlotId((currentId) => currentId === slot.plannedSlotId ? null : slot.plannedSlotId)}
                           />
                         </View>
-                        {slot.overrideLoadKg !== null && (
-                          <View style={styles.substitutedBadge} accessibilityRole="text">
-                            <Text style={styles.substitutedBadgeText}>SUBSTITUTED</Text>
+                        {slot.overrideReason != null && slot.overrideReason.trim() !== '' && (
+                          <View style={styles.overrideBadge} accessibilityRole="text">
+                            <Text style={styles.overrideBadgeText}>{slot.overrideReason}</Text>
                           </View>
                         )}
                       </View>
@@ -1005,7 +1053,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                 <View key={slot.slotIndex} style={styles.slotRow}>
                   <View style={styles.slotMain}>
                     <Text style={styles.slotName}>{slot.movementName}</Text>
-                    <Text style={styles.slotTarget}>{slotTarget(slot, oneRepMaxes)}</Text>
+                    <Text style={styles.slotTarget}>{slotTarget(slot, oneRepMaxes, current?.vector ?? null)}</Text>
                     {slot.routineDecision !== undefined && (
                       <>
                         <Text style={styles.captionText}>
@@ -1222,21 +1270,65 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
         {(block === null || todayPlan === null) && !halted && session === null && (
           <Disclosure label="Start without a planned session">
             <View style={styles.disclosureContent}>
-              {!confirmUnplannedStart ? (
+              {emptyStartPromptOpen ? (
+                <View style={styles.card} testID="empty-free-form-start-card">
+                  <Text style={styles.cardTitle}>Nothing to start yet</Text>
+                  <Text style={styles.bodyText}>
+                    There is no plan for today and no earlier session to repeat. Build your plan first.
+                  </Text>
+                  <PrimaryButton
+                    label="Go to Plan"
+                    onPress={() => {
+                      setEmptyStartPromptOpen(false);
+                      setConfirmUnplannedStart(false);
+                      nav?.setTab('coach');
+                      // With a program the Manage block section is hidden, so open the program editor.
+                      if (program != null) setEditingProgram(true);
+                      else if (block === null) setShowChooser(true);
+                      else openManageBlock();
+                    }}
+                    accessibilityLabel="Go to Plan"
+                  />
+                  <QuietAction
+                    label="Cancel"
+                    onPress={() => {
+                      setEmptyStartPromptOpen(false);
+                      setConfirmUnplannedStart(false);
+                    }}
+                    accessibilityLabel="Cancel"
+                  />
+                </View>
+              ) : !confirmUnplannedStart ? (
                 <>
                   <Text style={styles.captionText}>
                     This starts a session without the day's planned exercise order.
                   </Text>
                   <SecondaryButton
                     label="Start an unplanned session"
-                    onPress={() => setConfirmUnplannedStart(true)}
+                    onPress={() => {
+                      if (checkFreeFormStartIsEmpty()) {
+                        setEmptyStartPromptOpen(true);
+                        return;
+                      }
+                      setConfirmUnplannedStart(true);
+                    }}
                     accessibilityLabel="Start an unplanned session"
                   />
                 </>
               ) : (
                 <>
                   <Text style={styles.bodyText}>Start a session without a planned workout?</Text>
-                  <PrimaryButton label="Start unplanned session" onPress={startAndOpenSession} accessibilityLabel="Start unplanned session" />
+                  <PrimaryButton
+                    label="Start unplanned session"
+                    onPress={() => {
+                      if (checkFreeFormStartIsEmpty()) {
+                        setEmptyStartPromptOpen(true);
+                        return;
+                      }
+                      startAndOpenSession();
+                    }}
+                    accessibilityLabel="Start unplanned session"
+                  />
                   <SecondaryButton label="Cancel" onPress={() => setConfirmUnplannedStart(false)} accessibilityLabel="Cancel" />
                 </>
               )}
@@ -1716,7 +1808,10 @@ const styles = StyleSheet.create({
     paddingTop: theme.space[3],
     gap: theme.space[2],
   },
-  substitutedBadge: {
+  overrideBadge: {
+    // A long reason wraps inside the badge instead of crowding the movement details.
+    flexShrink: 1,
+    maxWidth: '50%',
     borderWidth: 1,
     borderColor: theme.color.line,
     borderRadius: theme.radius.chip,
@@ -1724,8 +1819,10 @@ const styles = StyleSheet.create({
     paddingVertical: theme.space[1],
     backgroundColor: theme.color.ink1,
   },
-  substitutedBadgeText: {
+  overrideBadgeText: {
     ...theme.font.eyebrow,
+    // The reason is shown verbatim (DEVIATION_LOG APRE ruling), so no forced capitals.
+    textTransform: 'none',
     color: theme.color.textMid,
   },
   trajectoryHeaderRow: {

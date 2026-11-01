@@ -927,7 +927,7 @@ interface BackupState {
   createBackup(password: string): Promise<void>;
   chooseRestore(password: string): Promise<void>;
   reviewRecovery(password: string): Promise<void>;
-  confirmRestore(password: string): Promise<void>;
+  confirmRestore(password?: string): Promise<void>;
   cancelRestore(): void;
 }
 
@@ -936,6 +936,7 @@ interface BackupState {
 interface PendingRestore {
   readonly archive: BackupArchiveV1;
   readonly source: RestoreSource;
+  readonly password: string;
 }
 
 let pendingRestore: PendingRestore | null = null;
@@ -1084,7 +1085,7 @@ export const useBackupStore = create<BackupState>((set, get) => ({
       if (!opened.ok) throw new Error(opened.message);
       const decision = decideRestore('replace', opened.archive, RESTORE_COMPATIBILITY);
       if (!decision.ok) throw new Error(decision.message);
-      const pending: PendingRestore = { archive: opened.archive, source: 'portable_backup' };
+      const pending: PendingRestore = { archive: opened.archive, source: 'portable_backup', password };
       pendingRestore = pending;
       set({ status: 'preview', message: 'Review this backup before replacing data.', preview: restorePreview(pending) });
     } catch (error) {
@@ -1126,7 +1127,7 @@ export const useBackupStore = create<BackupState>((set, get) => ({
       if (opened === null || !opened.ok) throw new Error('Previous data recovery could not be opened. Check the password from the previous restore.');
       const decision = decideRestore('replace', opened.archive, RESTORE_COMPATIBILITY);
       if (!decision.ok) throw new Error('Previous data recovery is not compatible with this app version.');
-      const pending: PendingRestore = { archive: opened.archive, source: 'retained_recovery' };
+      const pending: PendingRestore = { archive: opened.archive, source: 'retained_recovery', password };
       pendingRestore = pending;
       set({
         status: 'preview',
@@ -1144,10 +1145,11 @@ export const useBackupStore = create<BackupState>((set, get) => ({
       actionInFlight = false;
     }
   },
-  confirmRestore: async (password) => {
+  confirmRestore: async (_password) => {
     const pending = pendingRestore;
     if (actionInFlight || pending === null || get().status !== 'preview') return;
     actionInFlight = true;
+    const restorePassword = pending.password;
     const usesRetainedRecovery = pending.source === 'retained_recovery';
     set({
       status: 'working',
@@ -1157,19 +1159,30 @@ export const useBackupStore = create<BackupState>((set, get) => ({
     let releaseMaintenance: (() => void) | null = null;
     let safeToRestart = true;
     try {
-      if (!(await actionCanProceed(get(), set))) return;
-      releaseMaintenance = acquireDataMaintenanceLock('encrypted-restore');
+      if (!(await actionCanProceed(get(), set))) {
+        pendingRestore = null;
+        return;
+      }
+      try {
+        releaseMaintenance = acquireDataMaintenanceLock('encrypted-restore');
+      } catch (error) {
+        set({
+          status: 'preview',
+          message: error instanceof Error ? error.message : 'Athlete data is still being saved or opened. Try again in a moment.',
+        });
+        return;
+      }
       revokeAthleteDataBoot();
       closeStoreDatabaseForRestore();
       if (!usesRetainedRecovery) {
         // A portable restore may supersede the retained recovery only after this
         // current-data recovery is sealed, authenticated, and durably retained.
-        const recovery = await createEncryptedBytes(password, get().lastSuccessfulBackupAt);
+        const recovery = await createEncryptedBytes(restorePassword, get().lastSuccessfulBackupAt);
         recoveryWork = recovery.workDirectory;
         await ensurePlaintextSnapshotsRemoved(recoveryWork);
         recoveryWork = null;
         await publishRecoveryBackup(recoveryPublicationIo(), recoveryPublicationPaths(), recovery.text, async (text) => {
-          const opened = await openBackup(text, password, mobileBackupCrypto);
+          const opened = await openBackup(text, restorePassword, mobileBackupCrypto);
           return opened.ok ? opened.archive.backupId : null;
         });
         set({ recoveryAvailable: true });
@@ -1178,8 +1191,10 @@ export const useBackupStore = create<BackupState>((set, get) => ({
       // A retained previous-data recovery is the undo point being used: it is
       // never rewritten or superseded, and no replacement undo point is created.
       await replaceAllData(pending.archive);
+      pendingRestore = null;
       set({ status: 'success', message: 'Restore complete. All athlete data was replaced from the backup.', preview: null });
     } catch (error) {
+      pendingRestore = null;
       safeToRestart = !(error instanceof RestoreRecoveryRequiredError || error instanceof RecoveryPublicationUnresolvedError);
       if (!safeToRestart) revokeAthleteDataBoot();
       set({
@@ -1189,7 +1204,7 @@ export const useBackupStore = create<BackupState>((set, get) => ({
         preview: null,
       });
     } finally {
-      pendingRestore = null;
+      if (releaseMaintenance !== null) pendingRestore = null;
       try {
         if (recoveryWork !== null) await removeIfPresent(recoveryWork);
         if (releaseMaintenance !== null) releaseMaintenance();

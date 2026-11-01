@@ -48,7 +48,7 @@ import {
 } from './healthSupportStore';
 import type {
   HealthSupportPreferenceKind, HealthSupportNoteKind, HealthSupportReviewState,
-  PersonalizedAdviceTarget, TrainingSupportDecision,
+  HealthSupportScope, PersonalizedAdviceTarget, TrainingSupportDecision,
 } from '@ak/inference';
 import {
   inventoryFromRowCell,
@@ -87,7 +87,10 @@ import {
   computeSubstitutions,
   DEFAULT_PROFILE,
   detectFlaws,
+  applyLoadModifier,
+  applyPrescriptionToSlot,
   derivePrescription,
+  isPrescriptionReduced,
   ENERGY_SYSTEMS,
   EQUIPMENT_ITEMS,
   evaluateReturn,
@@ -175,6 +178,7 @@ import {
   advance as advanceSessionRunner,
   currentSlot as currentRunnerSlot,
   deserializeRunner,
+  replaceSlotAfterLoggedSets,
   serializeRunner,
   startRunner,
   type RunnerHaltReason,
@@ -210,6 +214,7 @@ import {
 
 export type { MovementAvailability };
 export type { LoadPreference, LoadSelection, LoadSource } from '@ak/inference';
+export { applyLoadModifier, applyPrescriptionToSlot, isPrescriptionReduced } from '@ak/inference';
 
 /** What the load entry was seeded with for the set being logged, as the session
  *  screen held it (071). `shownLoadKg` null means the field was blank and the
@@ -552,6 +557,7 @@ export interface PlanSlot {
   originalSessionDate: string | null;
   overrideLoadKg: number | null;
   overrideReason: string | null;
+  replacedBySessionPlanSlotId: number | null;
 }
 
 // --- 4-week block (007 tables) ----------------------------------------------
@@ -766,6 +772,7 @@ export interface ReturnCheckinState {
 interface KineticsStore {
   healthSupportRevision: number;
   getTrainingSupportDecision: (movementIds?: readonly number[]) => TrainingSupportDecision;
+  isBroadHoldFromNarrowScopes: (movementIds?: readonly number[], decision?: TrainingSupportDecision) => boolean;
   requireTrainingSupport: (operation: SupportOperation, movementIds: readonly number[] | undefined, targetIdentity: string) => boolean;
   getHealthSupportFacts: () => SupportFacts;
   getHealthSupportDetails: (athleteId: string) => SupportDetails;
@@ -1029,15 +1036,15 @@ interface KineticsStore {
   revokeMovementPriorExperience: (movementId: number) => boolean;
   /** Coach Mode: close the current athlete's DB and re-boot against the
    *  target athlete's file. Refused while a session is active. */
-  switchAthlete: (id: string) => void;
+  switchAthlete: (id: string) => Promise<boolean>;
   /** Coach Mode: register a new athlete (fresh, empty DB file) and switch to
    *  them — a fresh file has updated_at_ms = 0, so they land in onboarding. */
-  createAthlete: (name: string) => void;
+  createAthlete: (name: string) => Promise<boolean>;
   /** Coach Mode: rename a registry entry (display name only). */
-  renameAthleteEntry: (id: string, name: string) => void;
+  renameAthleteEntry: (id: string, name: string) => Promise<boolean>;
   /** Coach Mode: remove a non-active, non-default athlete from the registry
    *  and best-effort delete their DB file. */
-  deleteAthlete: (id: string) => void;
+  deleteAthlete: (id: string) => Promise<boolean>;
   /** Unlock or explicitly relock the advanced coaching/debug surfaces. */
   setAdvancedToolsUnlocked: (unlocked: boolean) => void;
   /** Onboarding completion: persist every answer in ONE save (no partial
@@ -1121,7 +1128,7 @@ interface KineticsStore {
   /** What was recorded for a session's preparation; null = not recorded. */
   loadSessionPreparation: (sessionId: number) => PreparationSummary | null;
   addPlanSlot: (movementId: number) => void;
-  swapMovement: (oldMovementId: number, newMovementId: number) => void;
+  swapMovement: (oldMovementId: number, newMovementId: number, replacementSets?: number) => void;
   /** Thumbs sentiment for a movement. NEUTRAL (0) DELETEs the row (the 010
    *  invariant: neutral == no row); AVOID (-1) / PRIORITIZE (+1) upsert it.
    *  The deterministic substitution router reads this map. */
@@ -1134,17 +1141,19 @@ interface KineticsStore {
   closeSubstitution: () => void;
   /** Apply a Layer-1 regression: swap the target slot for the chosen movement
    *  (logged sets stand as history). */
-  applyRegression: (targetMovementId: number, optionMovementId: number) => void;
+  applyRegression: (targetMovementId: number, optionMovementId: number, replacementSets?: number) => void;
   /** Apply a Layer-2 day-swap: replace today's target with the pulled movement
    *  AND delete its origin future planned_slot (conservation of volume — the
    *  moved work is performed today instead of on its scheduled day). */
-  applyDaySwap: (targetMovementId: number, option: DaySwapOption) => void;
+  applyDaySwap: (targetMovementId: number, option: DaySwapOption, replacementSets?: number) => void;
   /** Log a niggle (append-only to 011) and add it to the active niggle set so
    *  the next SWAP un-hides Layer 3 / activates the guardrail. */
-  reportNiggle: (region: string, severity: number) => void;
+  /** True when the report was saved; false when it was refused or rolled back. */
+  reportNiggle: (region: string, severity: number) => boolean;
   /** Reload today's niggles from 011 into state (boot + day rollover). */
   refreshNiggles: () => void;
   refreshVector: () => void;
+  freeFormStartIsEmpty: () => boolean;
   startSession: (repeatPlanned?: boolean) => void;
   /** Append a logged set. `displayName` carries the prefix-engine
    *  concatenation (e.g. 'DB Bench Press') into the in-memory log payload;
@@ -1244,7 +1253,7 @@ export function closeStoreDatabaseForRestore(): void {
   dbAthleteId = null;
   bootInFlight = false;
   athleteContextRevision += 1;
-  useStore.setState({ status: 'booting' });
+  useStore.setState({ ...PER_ATHLETE_RESET, status: 'booting' });
 }
 
 /** Re-open and rehydrate after either replacement or deterministic rollback. */
@@ -1301,6 +1310,32 @@ const supportDecision = (ids?: readonly number[], operation?: SupportOperation, 
         : adapter.recordDecision(movementSupportTargets(ids), SUPPORT_ADVICE_KINDS[operation], `${operation}:${targetIdentity}`, Date.now());
   } catch { return { status: 'support_unavailable', holdIds: [] }; }
 };
+const isNarrowSupportScope = (scope: HealthSupportScope): boolean =>
+  (scope.targetKind === 'movement' && (scope.movementId ?? null) !== null)
+  || (scope.targetKind === 'activity_definition' && (scope.activityId ?? null) !== null)
+  || (scope.targetKind === 'activity_series' && (scope.seriesId ?? null) !== null)
+  || (scope.targetKind === 'activity_occurrence' && (scope.occurrenceId ?? null) !== null);
+export function isBroadHoldFromNarrowScopes(
+  movementIds?: readonly number[],
+  decision?: TrainingSupportDecision,
+): boolean {
+  if (movementIds !== undefined && movementIds.length > 0) return false;
+  try {
+    const resolved = decision ?? useStore.getState().getTrainingSupportDecision(movementIds);
+    if (resolved.status !== 'held' || resolved.holdIds.length === 0) return false;
+    const snapshot = supportAdapter().captureEvaluation();
+    const byId = new Map(snapshot.holds.map((hold) => [hold.holdId, hold]));
+    return resolved.holdIds.every((holdId) => {
+      const hold = byId.get(holdId);
+      return hold !== undefined
+        && hold.state === 'held'
+        && hold.scopes.length > 0
+        && hold.scopes.every(isNarrowSupportScope);
+    });
+  } catch {
+    return false;
+  }
+}
 const supportMessage = (decision: TrainingSupportDecision): string => decision.status === 'support_unavailable'
   ? SUPPORT_UNAVAILABLE_MESSAGE : SUPPORT_HELD_MESSAGE;
 const rowsOf = <T>(res: unknown): T[] => {
@@ -1730,6 +1765,14 @@ const capabilityMovementAvailability = (
   });
 };
 
+/** The finished count the runner keeps for a slot swapped after logged sets;
+ *  the database row and the in-memory plan use the same number, so the
+ *  checkpoint always matches the frozen plan. Falls back to the logged rows. */
+const retainedSetsForSwap = (runner: RunnerState | null, sessionPlanSlotId: number, loggedSetsCount: number): number => {
+  const index = runner === null ? -1 : runner.slots.findIndex((candidate) => candidate.sessionPlanSlotId === sessionPlanSlotId);
+  return Math.max(1, index >= 0 ? (runner!.slotSetCounts[index] ?? loggedSetsCount) : loggedSetsCount);
+};
+
 const capabilityAvailableMovementIds = (
   d: DB,
   movements: readonly Movement[],
@@ -1744,6 +1787,78 @@ const capabilityAvailableMovementIds = (
     .filter((row) => row.state === 'available')
     .map((row) => row.movementId),
 );
+
+const seedFreeFormSessionPlan = (
+  d: DB,
+  movements: readonly Movement[],
+  profile: UserProfile,
+  capabilityAvailable: ReadonlySet<number>,
+  plannedSets: number,
+): PlanSlot[] => {
+  const lastMovements = rowsOf<{ movement_id: number }>(d.executeSync(
+    `SELECT movement_id FROM set_record
+     WHERE session_id = (
+       SELECT s.session_id FROM session s
+       JOIN set_record r ON r.session_id = s.session_id
+       ORDER BY s.session_id DESC LIMIT 1)
+     GROUP BY movement_id ORDER BY MIN(set_id)`,
+  ));
+  return lastMovements.flatMap((m) => {
+    const movement = movements.find((item) => item.movement_id === m.movement_id);
+    // Repeating old history is still a prescription route. A beginner may
+    // never inherit an Advanced movement from a prior athlete tier.
+    if (!permittedForProfile(movement, profile, 'weight_room') || !capabilityAvailable.has(m.movement_id)) return [];
+    const target = targetForMovement(movement, 5);
+    return [{
+      sessionPlanSlotId: 0,
+      movementId: m.movement_id,
+      plannedSets: defaultSetsForTarget(movement, plannedSets),
+      plannedReps: target.kind === 'reps' ? target.reps : null,
+      target,
+      provenanceKind: 'free_form' as const,
+      targetRpe: null,
+      sourcePlannedSlotId: null,
+      originalMovementId: null,
+      originalSessionDate: null,
+      overrideLoadKg: null,
+      overrideReason: null,
+      replacedBySessionPlanSlotId: null,
+    }];
+  });
+};
+
+/** True when `startSession()` (no repeat) would open a session with no
+ *  exercises: today's plan is absent or already used, and the most recent
+ *  logged session gives nothing this athlete may repeat. Reads only. */
+export function freeFormStartIsEmpty(): boolean {
+  if (db === null) return false;
+  const d = db;
+  try {
+    const { movements, profile, activePriorExperienceMovementIds, niggles, todayPlan, today } = useStore.getState();
+    // Past midnight the plan and niggles in state are yesterday's until startSession
+    // rolls the day over, so no prediction is made: the start goes ahead as before.
+    if (today !== localToday()) return false;
+    // Same rule as startSession: an unused plan for today is consumed, so the start is not empty.
+    if (todayPlan !== null) {
+      const alreadyPlannedToday = rowsOf<{ c: number }>(d.executeSync(
+        'SELECT COUNT(*) AS c FROM session_origin WHERE source_planned_session_id = ?',
+        [todayPlan.plannedSessionId],
+      ))[0]?.c ?? 0;
+      if (alreadyPlannedToday === 0) return false;
+    }
+    const capabilityAvailable = capabilityAvailableMovementIds(
+      d,
+      movements,
+      profile,
+      'weight_room',
+      new Set(activePriorExperienceMovementIds),
+      safetyExcludedMovementIdsFor(movements, profile, niggles),
+    );
+    return seedFreeFormSessionPlan(d, movements, profile, capabilityAvailable, 3).length === 0;
+  } catch {
+    return false;
+  }
+}
 
 export const PREPARATION_GATE_MESSAGE = 'Finish, skip or record your preparation before logging your first set.';
 
@@ -2829,6 +2944,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
   activeAthleteId: 'default',
   healthSupportRevision: 0,
   getTrainingSupportDecision: (ids) => supportDecision(ids),
+  isBroadHoldFromNarrowScopes: (ids, decision) => isBroadHoldFromNarrowScopes(ids, decision),
   requireTrainingSupport: (operation, ids, targetIdentity) => {
     const decision = supportDecision(ids, operation, targetIdentity);
     if (decision.status === 'available') {
@@ -3033,14 +3149,17 @@ export const useStore = create<KineticsStore>()((set, get) => {
           original_session_date: string | null;
           override_load_kg: number | null;
           override_reason: string | null;
+          replaced_by_session_plan_slot_id: number | null;
         }>(
           db!.executeSync(
             `SELECT sps.session_plan_slot_id, sps.movement_id, sps.planned_sets, sps.planned_reps,
                     sst.target_kind, sst.target_reps, sst.target_seconds,
                     sps.provenance_kind, sps.target_rpe, sps.source_planned_slot_id,
-                    sps.original_movement_id, sps.original_session_date, sps.override_load_kg, sps.override_reason
+                    sps.original_movement_id, sps.original_session_date, sps.override_load_kg, sps.override_reason,
+                    spsr.replaced_by_session_plan_slot_id
              FROM session_plan_slot sps
              LEFT JOIN session_slot_target sst ON sst.session_plan_slot_id = sps.session_plan_slot_id
+             LEFT JOIN session_plan_slot_replacement spsr ON spsr.session_plan_slot_id = sps.session_plan_slot_id
              WHERE sps.session_id = ?
              ORDER BY sps.slot_index`,
             [openSession.session_id]
@@ -3059,6 +3178,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
           originalSessionDate: ps.original_session_date,
           overrideLoadKg: ps.override_load_kg,
           overrideReason: ps.override_reason,
+          replacedBySessionPlanSlotId: ps.replaced_by_session_plan_slot_id ?? null,
         }));
         const checkpoint = rowsOf<{
           session_mode: string;
@@ -3382,7 +3502,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
         : latest,
       null,
     ) ?? null;
-    return resolveLoadSelection({
+    const isFirstSet = latestCurrentSessionSet === null;
+    const base = resolveLoadSelection({
       trainingAge: state.profile.training_age,
       preference: state.loadPreference,
       bodyweightMode: input.bodyweightMode,
@@ -3392,8 +3513,27 @@ export const useStore = create<KineticsStore>()((set, get) => {
       overrideLoadKg: input.overrideLoadKg,
       lastLoggedLoadKg: state.lastLoggedLoads[input.movementId] ?? null,
       currentSessionLoadKg: latestCurrentSessionSet?.load_kg ?? null,
-      isFirstSet: latestCurrentSessionSet === null,
+      isFirstSet,
     });
+    const todaysVector = state.prescription !== null && state.prescription.forDate === state.today
+      ? state.prescription.vector
+      : null;
+    if (todaysVector === null || todaysVector.load_modifier >= 1) {
+      return base;
+    }
+    const hasCurrentSessionLoad = !isFirstSet
+      && latestCurrentSessionSet !== null
+      && Number.isFinite(latestCurrentSessionSet.load_kg)
+      && latestCurrentSessionSet.load_kg >= 0;
+    const carryForwardManual = base.source === 'manual' && hasCurrentSessionLoad;
+    const carryForwardHistory = base.source === 'history' && hasCurrentSessionLoad;
+    return {
+      ...base,
+      initialLoadKg: carryForwardManual || carryForwardHistory
+        ? base.initialLoadKg
+        : applyLoadModifier(base.initialLoadKg, todaysVector),
+      advisoryKg: applyLoadModifier(base.advisoryKg, todaysVector),
+    };
   },
 
   refreshBandLadder: () => {
@@ -3720,121 +3860,127 @@ export const useStore = create<KineticsStore>()((set, get) => {
   },
 
   // --- Coach Mode (Phase 15): one DB file per athlete ------------------------
-  switchAthlete: (id) => {
+  switchAthlete: async (id) => {
     if (get().session !== null) {
       set({ error: 'End the active session before switching athletes.' });
-      return;
+      return false;
     }
-    if (id === get().activeAthleteId && get().status === 'ready') return;
+    if (id === get().activeAthleteId && get().status === 'ready') {
+      set({ error: null });
+      return true;
+    }
     // Lease from the registry read through the write, the close and the boot hand-off.
     const releaseLease = tryAcquireDataMutationLease(true);
     if (releaseLease === null) {
       set({ error: mutationRefusalMessage() });
-      return;
+      return false;
     }
     athleteContextRevision += 1;
     set({ status: 'booting', error: null });
-    void (async () => {
-      try {
-        const reg = setActiveAthlete(await loadRegistry(), id);
-        if (reg.activeId !== id) {
-          set({ status: 'ready', error: 'Unknown athlete.' });
-          return;
-        }
-        if (!(await saveRegistry(reg))) {
-          set({ status: 'ready', error: 'Could not persist the athlete switch — registry write failed.' });
-          return;
-        }
-        if (db !== null) {
-          try { closeKineticsDb(db); } catch { /* reopen path recovers */ }
-          db = null;
-        }
-        set({ ...PER_ATHLETE_RESET, athletes: reg.athletes, activeAthleteId: id });
-        get().boot(); // status is 'booting' -> full open/migrate/hydrate path
-      } catch (e) {
-        set({ status: 'error', error: e instanceof Error ? e.message : String(e) });
-      } finally {
-        releaseLease();
+    try {
+      const reg = setActiveAthlete(await loadRegistry(), id);
+      if (reg.activeId !== id) {
+        set({ status: 'ready', error: 'Unknown athlete.' });
+        return false;
       }
-    })();
+      if (!(await saveRegistry(reg))) {
+        set({ status: 'ready', error: 'Could not persist the athlete switch — registry write failed.' });
+        return false;
+      }
+      if (db !== null) {
+        try { closeKineticsDb(db); } catch { /* reopen path recovers */ }
+        db = null;
+      }
+      set({ ...PER_ATHLETE_RESET, athletes: reg.athletes, activeAthleteId: id });
+      get().boot(); // status is 'booting' -> full open/migrate/hydrate path
+      return true;
+    } catch (e) {
+      set({ status: 'error', error: e instanceof Error ? e.message : String(e) });
+      return false;
+    } finally {
+      releaseLease();
+    }
   },
 
-  createAthlete: (name) => {
+  createAthlete: async (name) => {
     if (get().session !== null) {
       set({ error: 'End the active session before adding athletes.' });
-      return;
+      return false;
     }
     const releaseLease = tryAcquireDataMutationLease(true);
     if (releaseLease === null) {
       set({ error: mutationRefusalMessage() });
-      return;
+      return false;
     }
     athleteContextRevision += 1;
     set({ status: 'booting', error: null });
-    void (async () => {
-      try {
-        const { reg, entry } = addAthlete(await loadRegistry(), name, Date.now());
-        if (!(await saveRegistry(setActiveAthlete(reg, entry.id)))) {
-          set({ status: 'ready', error: 'Could not create the athlete — registry write failed.' });
-          return;
-        }
-        if (db !== null) {
-          try { closeKineticsDb(db); } catch { /* reopen path recovers */ }
-          db = null;
-        }
-        set({
-          ...PER_ATHLETE_RESET,
-          athletes: reg.athletes,
-          activeAthleteId: entry.id,
-        });
-        // Fresh file: migrate() builds the full schema; its athlete_profile
-        // row has updated_at_ms = 0, so this athlete lands in onboarding.
-        get().boot();
-      } catch (e) {
-        set({ status: 'error', error: e instanceof Error ? e.message : String(e) });
-      } finally {
-        releaseLease();
+    try {
+      const { reg, entry } = addAthlete(await loadRegistry(), name, Date.now());
+      if (!(await saveRegistry(setActiveAthlete(reg, entry.id)))) {
+        set({ status: 'ready', error: 'Could not create the athlete — registry write failed.' });
+        return false;
       }
-    })();
+      if (db !== null) {
+        try { closeKineticsDb(db); } catch { /* reopen path recovers */ }
+        db = null;
+      }
+      set({
+        ...PER_ATHLETE_RESET,
+        athletes: reg.athletes,
+        activeAthleteId: entry.id,
+      });
+      // Fresh file: migrate() builds the full schema; its athlete_profile
+      // row has updated_at_ms = 0, so this athlete lands in onboarding.
+      get().boot();
+      return true;
+    } catch (e) {
+      set({ status: 'error', error: e instanceof Error ? e.message : String(e) });
+      return false;
+    } finally {
+      releaseLease();
+    }
   },
 
-  renameAthleteEntry: (id, name) => {
+  renameAthleteEntry: async (id, name) => {
     const releaseLease = tryAcquireDataMutationLease(true);
     if (releaseLease === null) {
       set({ error: mutationRefusalMessage() });
-      return;
+      return false;
     }
-    void (async () => {
-      try {
-        const reg = regRenameAthlete(await loadRegistry(), id, name);
-        if (!(await saveRegistry(reg))) {
-          set({ error: 'Rename not saved — registry write failed.' });
-          return;
-        }
-        set({ athletes: reg.athletes });
-      } finally {
-        releaseLease();
+    set({ error: null });
+    try {
+      const reg = regRenameAthlete(await loadRegistry(), id, name);
+      if (!(await saveRegistry(reg))) {
+        set({ error: 'Rename not saved — registry write failed.' });
+        return false;
       }
-    })();
+      set({ athletes: reg.athletes, error: null });
+      return true;
+    } catch (e) {
+      set({ error: e instanceof Error ? e.message : String(e) });
+      return false;
+    } finally {
+      releaseLease();
+    }
   },
 
-  deleteAthlete: (id) => {
+  deleteAthlete: async (id) => {
     // The lease also covers the database file removal after the registry write.
     const releaseLease = tryAcquireDataMutationLease(true);
     if (releaseLease === null) {
       set({ error: mutationRefusalMessage() });
-      return;
+      return false;
     }
-    void (async () => {
-      try {
+    set({ error: null });
+    try {
       const { reg, removed } = regRemoveAthlete(await loadRegistry(), id);
       if (removed === null) {
         set({ error: 'The active and default athletes cannot be deleted.' });
-        return;
+        return false;
       }
       if (!(await saveRegistry(reg))) {
         set({ error: 'Delete not saved — registry write failed. The athlete is unchanged.' });
-        return;
+        return false;
       }
       // File removal: an orphaned file is invisible but the UI promised the
       // database is removed — say so honestly when it is not (audit A3).
@@ -3847,10 +3993,13 @@ export const useStore = create<KineticsStore>()((set, get) => {
         athletes: reg.athletes,
         error: fileGone ? null : 'Athlete removed from the list, but their database file could not be deleted. It holds no visible data and can be cleared by reinstalling.',
       });
-      } finally {
-        releaseLease();
-      }
-    })();
+      return fileGone;
+    } catch (e) {
+      set({ error: e instanceof Error ? e.message : String(e) });
+      return false;
+    } finally {
+      releaseLease();
+    }
   },
 
   setAdvancedToolsUnlocked: (unlocked) => {
@@ -6142,6 +6291,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
     set({ vector, trend, today });
   },
 
+  freeFormStartIsEmpty: () => freeFormStartIsEmpty(),
+
   startSession: (repeatPlanned) => {
     // Audit A2: double-start would orphan the first session's rows.
     if (get().session !== null) return;
@@ -6286,81 +6437,47 @@ export const useStore = create<KineticsStore>()((set, get) => {
     }
     const originKind = consumePlan ? 'planned' : 'free_form';
 
-    const setDelta = prescription !== null && prescription.forDate === today
-      ? prescription.vector.set_modifier
-      : 0;
+    const todaysVector = prescription !== null && prescription.forDate === today
+      ? prescription.vector
+      : null;
+    const setDelta = todaysVector?.set_modifier ?? 0;
 
     let sessionPlan: PlanSlot[];
     if (consumePlan) {
-      const rpeSafetyCap = prescription?.vector.rpe_cap ?? 10.0;
       sessionPlan = planToConsume!.slots.map((sl) => {
-        const effectiveRpe = Math.min(sl.targetRpe, rpeSafetyCap);
-        const movement = movements.find((m) => m.movement_id === sl.movementId);
-        const adjustedSets = Math.round(clamp(sl.sets + setDelta, 1, 6));
         // Timed policies and complete-microcycle routine analysis both own a
         // hard upper dose. Readiness may ease either prescription, but a good
         // day cannot silently grow it past the frozen bound.
-        const plannedSets = sl.target.kind === 'time' || sl.routineDecision !== undefined
-          ? Math.min(sl.sets, adjustedSets)
-          : adjustedSets;
+        const adjusted = applyPrescriptionToSlot(sl, todaysVector);
         return {
           sessionPlanSlotId: 0,
           movementId: sl.movementId,
-          plannedSets,
+          plannedSets: adjusted.sets,
           plannedReps: sl.target.kind === 'reps' ? sl.target.reps : null,
           target: sl.target,
           provenanceKind: 'planned' as const,
-          targetRpe: effectiveRpe,
+          targetRpe: adjusted.targetRpe,
           sourcePlannedSlotId: sl.plannedSlotId,
           originalMovementId: null,
           originalSessionDate: today,
           overrideLoadKg: sl.overrideLoadKg,
           overrideReason: sl.overrideReason,
+          replacedBySessionPlanSlotId: null,
         };
       });
     } else {
       const plannedSets = Math.round(clamp(3 + setDelta, 1, 6));
-      const lastMovements = rowsOf<{ movement_id: number }>(d.executeSync(
-        `SELECT movement_id FROM set_record
-         WHERE session_id = (
-           SELECT s.session_id FROM session s
-           JOIN set_record r ON r.session_id = s.session_id
-           ORDER BY s.session_id DESC LIMIT 1)
-         GROUP BY movement_id ORDER BY MIN(set_id)`,
-      ));
-      sessionPlan = lastMovements.flatMap((m) => {
-        const movement = movements.find((item) => item.movement_id === m.movement_id);
-        // Repeating old history is still a prescription route. A beginner may
-        // never inherit an Advanced movement from a prior athlete tier.
-        if (!permittedForProfile(movement, profile, 'weight_room') || !capabilityAvailable.has(m.movement_id)) return [];
-        const target = targetForMovement(movement, 5);
-        return [{
-          sessionPlanSlotId: 0,
-          movementId: m.movement_id,
-          plannedSets: defaultSetsForTarget(movement, plannedSets),
-          plannedReps: target.kind === 'reps' ? target.reps : null,
-          target,
-          provenanceKind: 'free_form' as const,
-          targetRpe: null,
-          sourcePlannedSlotId: null,
-          originalMovementId: null,
-          originalSessionDate: null,
-          overrideLoadKg: null,
-          overrideReason: null,
-        }];
-      });
+      sessionPlan = seedFreeFormSessionPlan(d, movements, profile, capabilityAvailable, plannedSets);
     }
 
     // Preparation for THIS frozen plan, built before the transaction so the
     // protocol and the session row are inserted together or not at all.
-    const todaysVector = prescription !== null && prescription.forDate === today ? prescription.vector : null;
     const preparationProtocol = buildSessionPreparationProtocol({
       d, sessionPlan, movements, profile,
       accessContext: executionContext,
       capabilityAvailable,
       niggles: get().niggles,
-      readinessReduced: todaysVector !== null && (todaysVector.set_modifier < 0
-        || todaysVector.load_modifier < 1 || todaysVector.rpe_cap < profile.base_rpe_cap),
+      readinessReduced: isPrescriptionReduced(todaysVector, profile),
     });
     // Preparation drills answer to the same support decision as the main plan.
     const supportIds = [...sessionPlan.map((slot) => slot.movementId),
@@ -6466,7 +6583,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
 
   selectMovement: (movementId) => {
     const { sessionPlan } = get();
-    const slot = sessionPlan.find((s) => s.movementId === movementId);
+    const slot = sessionPlan.find((s) => s.movementId === movementId && (s.replacedBySessionPlanSlotId === null || s.replacedBySessionPlanSlotId === undefined));
+    if (slot === undefined && sessionPlan.some((s) => s.movementId === movementId)) return;
     set({
       activeMovementId: movementId,
       activeSessionPlanSlotId: slot ? slot.sessionPlanSlotId : null,
@@ -6478,6 +6596,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const slotIndex = sessionPlan.findIndex((slot) => slot.sessionPlanSlotId === sessionPlanSlotId);
     const slot = slotIndex >= 0 ? sessionPlan[slotIndex] : undefined;
     if (slot === undefined) return;
+    if (slot.replacedBySessionPlanSlotId !== null && slot.replacedBySessionPlanSlotId !== undefined) return;
     if (!get().requireTrainingSupport('select-slot', [slot.movementId],
       `session:${session?.sessionId ?? 'draft'}:slot:${sessionPlanSlotId}:movement:${slot.movementId}`)) return;
     if (runner === null || session === null || sessionMode === null) {
@@ -6520,7 +6639,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
         set({ error: error instanceof Error ? error.message : String(error) });
         return;
       }
-      set(runnerSelection(nextRunner));
+      set({ ...runnerSelection(nextRunner), substitution: null });
       return;
     }
     set({ activeSessionPlanSlotId: sessionPlanSlotId, activeMovementId: slot.movementId });
@@ -6815,6 +6934,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       originalSessionDate: null,
       overrideLoadKg: null,
       overrideReason: null,
+      replacedBySessionPlanSlotId: null,
     };
     if (session !== null) {
       const d = getDb();
@@ -6838,7 +6958,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
     });
   },
 
-  swapMovement: (oldMovementId, newMovementId) => {
+  swapMovement: (oldMovementId, newMovementId, replacementSets) => {
     const state = get();
     const { sessionPlan, activeSessionPlanSlotId, session, runner, sessionMode, movements, profile } = state;
     const slot = activeSessionPlanSlotId !== null
@@ -6846,6 +6966,23 @@ export const useStore = create<KineticsStore>()((set, get) => {
       : sessionPlan.find((candidate) => candidate.movementId === oldMovementId);
     const replacement = movements.find((movement) => movement.movement_id === newMovementId);
     if (slot === undefined || replacement === undefined) return;
+    const loggedSetsCount = session?.sets.filter((setRow) =>
+      setRow.session_plan_slot_id !== null
+        ? setRow.session_plan_slot_id === slot.sessionPlanSlotId
+        : setRow.movement_id === slot.movementId
+    ).length ?? 0;
+    if (
+      replacementSets !== undefined &&
+      (typeof replacementSets !== 'number' || !Number.isInteger(replacementSets) || replacementSets < 1 || replacementSets > 6)
+    ) {
+      return;
+    }
+    if (
+      loggedSetsCount > 0 &&
+      (typeof replacementSets !== 'number' || !Number.isInteger(replacementSets) || replacementSets < 1 || replacementSets > 6)
+    ) {
+      return;
+    }
     if (!get().requireTrainingSupport('swap-movement', [oldMovementId, newMovementId],
       `session:${session?.sessionId ?? 'draft'}:slot:${slot.sessionPlanSlotId}:movement:${oldMovementId}->${newMovementId}`)) return;
     const accessContext = executionContextForState(state);
@@ -6866,6 +7003,131 @@ export const useStore = create<KineticsStore>()((set, get) => {
 
     const originalMv = slot.originalMovementId ?? slot.movementId;
     const newProvKind: SlotProvenanceKind = slot.targetRpe !== null ? 'substituted' : slot.provenanceKind;
+
+    if (loggedSetsCount > 0 && session !== null) {
+      // A halted session stays stopped; refuse before any write.
+      if (runner?.phase === 'halted') return;
+      const chosenCount = replacementSets as number;
+      const d = getDb();
+      let newSlotId = 0;
+      let nextRunner = runner;
+      const retainedSets = retainedSetsForSwap(runner, slot.sessionPlanSlotId, loggedSetsCount);
+      d.executeSync('BEGIN');
+      try {
+        const originalSlotRow = rowsOf<{ slot_index: number }>(
+          d.executeSync(
+            'SELECT slot_index FROM session_plan_slot WHERE session_plan_slot_id = ?',
+            [slot.sessionPlanSlotId],
+          ),
+        )[0];
+        if (originalSlotRow === undefined) {
+          throw new Error('Target session slot is missing.');
+        }
+        d.executeSync(
+          'UPDATE session_plan_slot SET planned_sets = ? WHERE session_plan_slot_id = ?',
+          [retainedSets, slot.sessionPlanSlotId],
+        );
+        const laterSlots = rowsOf<{ session_plan_slot_id: number; slot_index: number }>(
+          d.executeSync(
+            'SELECT session_plan_slot_id, slot_index FROM session_plan_slot WHERE session_id = ? AND slot_index > ? ORDER BY slot_index DESC',
+            [session.sessionId, originalSlotRow.slot_index],
+          ),
+        );
+        for (const later of laterSlots) {
+          d.executeSync(
+            'UPDATE session_plan_slot SET slot_index = ? WHERE session_plan_slot_id = ?',
+            [later.slot_index + 1, later.session_plan_slot_id],
+          );
+        }
+        d.executeSync(
+          `INSERT INTO session_plan_slot (session_id, slot_index, movement_id, planned_sets, planned_reps, provenance_kind, target_rpe, source_planned_slot_id, original_movement_id, original_session_date, override_load_kg, override_reason)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            session.sessionId,
+            originalSlotRow.slot_index + 1,
+            newMovementId,
+            chosenCount,
+            slot.plannedReps,
+            newProvKind,
+            slot.targetRpe,
+            slot.sourcePlannedSlotId,
+            originalMv,
+            slot.originalSessionDate,
+            slot.overrideLoadKg,
+            slot.overrideReason,
+          ],
+        );
+        newSlotId = rowsOf<{ id: number }>(d.executeSync('SELECT last_insert_rowid() AS id'))[0]!.id;
+        d.executeSync(
+          `INSERT INTO session_slot_target (session_plan_slot_id, target_kind, target_reps, target_seconds)
+           VALUES (?, ?, ?, ?)`,
+          [
+            newSlotId,
+            slot.target.kind,
+            slot.target.kind === 'reps' ? slot.target.reps : null,
+            slot.target.kind === 'time' ? slot.target.seconds : null,
+          ],
+        );
+        d.executeSync(
+          'INSERT INTO session_plan_slot_replacement (session_plan_slot_id, replaced_by_session_plan_slot_id) VALUES (?, ?)',
+          [slot.sessionPlanSlotId, newSlotId],
+        );
+        if (runner !== null) {
+          const origRunnerSlot = runner.slots.find((candidate) => candidate.sessionPlanSlotId === slot.sessionPlanSlotId);
+          nextRunner = replaceSlotAfterLoggedSets(runner, {
+            targetSessionPlanSlotId: slot.sessionPlanSlotId,
+            completedSets: retainedSets,
+            replacementSlot: {
+              sessionPlanSlotId: newSlotId,
+              plannedSlotId: slot.sourcePlannedSlotId,
+              movementId: newMovementId,
+              movementName: replacement.name,
+              sets: chosenCount,
+              target: slot.target,
+              targetRpe: origRunnerSlot?.targetRpe ?? slot.targetRpe ?? 8,
+            },
+            atMs: Date.now(),
+          });
+          if (sessionMode !== null) {
+            persistRunnerCheckpoint(d, session.sessionId, sessionMode, nextRunner);
+          }
+        }
+        d.executeSync('COMMIT');
+      } catch (error) {
+        try { d.executeSync('ROLLBACK'); } catch { /* no partial substitution */ }
+        set({ error: error instanceof Error ? error.message : String(error) });
+        return;
+      }
+
+      const newSlot: PlanSlot = {
+        sessionPlanSlotId: newSlotId,
+        movementId: newMovementId,
+        plannedSets: chosenCount,
+        plannedReps: slot.plannedReps,
+        target: slot.target,
+        provenanceKind: newProvKind,
+        targetRpe: slot.targetRpe,
+        sourcePlannedSlotId: slot.sourcePlannedSlotId,
+        originalMovementId: originalMv,
+        originalSessionDate: slot.originalSessionDate,
+        overrideLoadKg: slot.overrideLoadKg,
+        overrideReason: slot.overrideReason,
+        replacedBySessionPlanSlotId: null,
+      };
+      const nextPlan = sessionPlan.flatMap((candidate) =>
+        candidate.sessionPlanSlotId === slot.sessionPlanSlotId
+          ? [{ ...candidate, plannedSets: retainedSets, replacedBySessionPlanSlotId: newSlotId }, newSlot]
+          : [candidate],
+      );
+      set({
+        sessionPlan: nextPlan,
+        activeSessionPlanSlotId: newSlotId,
+        activeMovementId: newMovementId,
+        ...(nextRunner !== null ? runnerSelection(nextRunner) : {}),
+      });
+      return;
+    }
+
     const nextPlan = sessionPlan.map((candidate) =>
       candidate.sessionPlanSlotId === slot.sessionPlanSlotId
         ? { ...candidate, movementId: newMovementId, provenanceKind: newProvKind, originalMovementId: originalMv }
@@ -7024,7 +7286,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
 
   reportNiggle: (region, severity) => {
     // Region must be a JOINTS member or the engine cannot apply its safety rules.
-    if (!JOINT_SET.has(region)) return;
+    if (!JOINT_SET.has(region)) return false;
     const safe = Math.round(clamp(severity, 1, 10));
     const loggedAtMs = Date.now();
     const id = `${loggedAtMs}-${niggleSeq++}-${Math.floor(Math.random() * 1e9).toString(36)}`;
@@ -7034,7 +7296,13 @@ export const useStore = create<KineticsStore>()((set, get) => {
       ? null
       : advanceSessionRunner(state.runner, { kind: 'NIGGLE', atMs: loggedAtMs, severity: safe });
     const d = getDb();
-    d.executeSync('BEGIN');
+    try {
+      d.executeSync('BEGIN');
+    } catch (error) {
+      // Nothing was opened, so nothing is rolled back; the form stays open to retry.
+      set({ error: error instanceof Error ? error.message : String(error) });
+      return false;
+    }
     try {
       d.executeSync(
         'INSERT INTO niggle (id, region, severity, reported_at_ms) VALUES (?, ?, ?, ?)',
@@ -7051,19 +7319,34 @@ export const useStore = create<KineticsStore>()((set, get) => {
     } catch (error) {
       try { d.executeSync('ROLLBACK'); } catch { /* no partial safety report */ }
       set({ error: error instanceof Error ? error.message : String(error) });
-      return;
+      return false;
+    }
+    // The report is committed. A failed preparation re-read must not hide it
+    // or its stop from the screen; the previous preparation stays until the next read.
+    let preparationUpdate: { preparation?: ReturnType<typeof readSessionPreparation> } = {};
+    if (state.session !== null) {
+      try {
+        preparationUpdate = { preparation: readSessionPreparation(d, state.session.sessionId) };
+      } catch { /* keep the previous preparation */ }
     }
     set({
       niggles: [...state.niggles, { region, severity: safe }],
       ...(nextRunner !== null && nextRunner !== state.runner ? runnerSelection(nextRunner) : {}),
-      ...(state.session !== null ? { preparation: readSessionPreparation(d, state.session.sessionId) } : {}),
+      ...preparationUpdate,
     });
     // A qualifying (but not halt-level) niggle immediately offers a route
     // around the movement. Halt-level reports block `logSet` at this boundary.
     if (nextRunner !== null && nextRunner.phase === 'working' &&
       nextRunner.substitutionOfferedForSessionPlanSlotId !== null && current !== null) {
-      get().openSubstitution(current.movementId);
+      // The report is already saved; a failure to open the sheet is shown, not
+      // turned into a failed save that a retry would duplicate.
+      try {
+        get().openSubstitution(current.movementId);
+      } catch (error) {
+        set({ error: error instanceof Error ? error.message : String(error) });
+      }
     }
+    return true;
   },
   refreshNiggles: () => {
     const rows = rowsOf<{ region: string; severity: number }>(
@@ -7075,18 +7358,57 @@ export const useStore = create<KineticsStore>()((set, get) => {
     set({ niggles: rows.map((r) => ({ region: r.region, severity: r.severity })) });
   },
 
-  applyRegression: (targetMovementId, optionMovementId) => {
-    get().swapMovement(targetMovementId, optionMovementId);
+  applyRegression: (targetMovementId, optionMovementId, replacementSets) => {
+    const loggedSetsCount = get().session?.sets.filter((setRow) => {
+      const { sessionPlan, activeSessionPlanSlotId } = get();
+      const slot = activeSessionPlanSlotId !== null
+        ? sessionPlan.find((candidate) => candidate.sessionPlanSlotId === activeSessionPlanSlotId)
+        : sessionPlan.find((candidate) => candidate.movementId === targetMovementId);
+      if (slot === undefined) return false;
+      return setRow.session_plan_slot_id !== null
+        ? setRow.session_plan_slot_id === slot.sessionPlanSlotId
+        : setRow.movement_id === slot.movementId;
+    }).length ?? 0;
+    if (
+      replacementSets !== undefined &&
+      (typeof replacementSets !== 'number' || !Number.isInteger(replacementSets) || replacementSets < 1 || replacementSets > 6)
+    ) {
+      return;
+    }
+    if (
+      loggedSetsCount > 0 &&
+      (typeof replacementSets !== 'number' || !Number.isInteger(replacementSets) || replacementSets < 1 || replacementSets > 6)
+    ) {
+      return;
+    }
+    get().swapMovement(targetMovementId, optionMovementId, replacementSets);
     set({ substitution: null });
   },
 
-  applyDaySwap: (targetMovementId, option) => {
+  applyDaySwap: (targetMovementId, option, replacementSets) => {
     const state = get();
     const { sessionPlan, activeSessionPlanSlotId, session, runner, sessionMode, movements, profile } = state;
     const targetSlot = activeSessionPlanSlotId !== null
       ? sessionPlan.find((slot) => slot.sessionPlanSlotId === activeSessionPlanSlotId)
       : sessionPlan.find((slot) => slot.movementId === targetMovementId);
     if (targetSlot === undefined) return;
+    const loggedSetsCount = session?.sets.filter((setRow) =>
+      setRow.session_plan_slot_id !== null
+        ? setRow.session_plan_slot_id === targetSlot.sessionPlanSlotId
+        : setRow.movement_id === targetSlot.movementId
+    ).length ?? 0;
+    if (
+      replacementSets !== undefined &&
+      (typeof replacementSets !== 'number' || !Number.isInteger(replacementSets) || replacementSets < 1 || replacementSets > 6)
+    ) {
+      return;
+    }
+    if (
+      loggedSetsCount > 0 &&
+      (typeof replacementSets !== 'number' || !Number.isInteger(replacementSets) || replacementSets < 1 || replacementSets > 6)
+    ) {
+      return;
+    }
     if (!get().requireTrainingSupport('day-swap', [targetMovementId, option.movement_id],
       `session:${session?.sessionId ?? 'draft'}:slot:${targetSlot.sessionPlanSlotId}:movement:${targetMovementId}->${option.movement_id}:planned-slot:${option.plannedSlotId}`)) return;
 
@@ -7112,14 +7434,6 @@ export const useStore = create<KineticsStore>()((set, get) => {
       futureSlotInfo?.target_seconds,
       futureSlotInfo?.reps ?? 5,
     );
-    const loggedSetsCount = session?.sets.filter((setRow) =>
-      setRow.session_plan_slot_id !== null
-        ? setRow.session_plan_slot_id === targetSlot.sessionPlanSlotId
-        : setRow.movement_id === targetSlot.movementId
-    ).length ?? 0;
-    // Never erase logged work. A replacement can only finish the remaining
-    // volume of its current slot, even when the pulled-forward source is smaller.
-    const movedSets = Math.max(1, Math.round(option.setsConserved), loggedSetsCount);
     const movedReps = movedTarget.kind === 'reps' ? movedTarget.reps : null;
 
     const overrideRow = rowsOf<{ target_load_kg: number; reason: string | null }>(d.executeSync(
@@ -7145,6 +7459,141 @@ export const useStore = create<KineticsStore>()((set, get) => {
       return;
     }
 
+    const originalMv = targetSlot.originalMovementId ?? targetSlot.movementId;
+
+    if (loggedSetsCount > 0 && session !== null) {
+      // A halted session stays stopped; refuse before any write.
+      if (runner?.phase === 'halted') return;
+      const chosenCount = replacementSets as number;
+      let newSlotId = 0;
+      let nextRunner = runner;
+      const retainedSets = retainedSetsForSwap(runner, targetSlot.sessionPlanSlotId, loggedSetsCount);
+      d.executeSync('BEGIN');
+      try {
+        d.executeSync(
+          `INSERT INTO planned_slot_disposition (planned_slot_id, disposition, session_id)
+           VALUES (?, 'swapped', ?)
+           ON CONFLICT(planned_slot_id) DO UPDATE SET disposition = excluded.disposition, session_id = excluded.session_id`,
+          [option.plannedSlotId, session.sessionId],
+        );
+        const originalSlotRow = rowsOf<{ slot_index: number }>(
+          d.executeSync(
+            'SELECT slot_index FROM session_plan_slot WHERE session_plan_slot_id = ?',
+            [targetSlot.sessionPlanSlotId],
+          ),
+        )[0];
+        if (originalSlotRow === undefined) {
+          throw new Error('Target session slot is missing.');
+        }
+        d.executeSync(
+          'UPDATE session_plan_slot SET planned_sets = ? WHERE session_plan_slot_id = ?',
+          [retainedSets, targetSlot.sessionPlanSlotId],
+        );
+        const laterSlots = rowsOf<{ session_plan_slot_id: number; slot_index: number }>(
+          d.executeSync(
+            'SELECT session_plan_slot_id, slot_index FROM session_plan_slot WHERE session_id = ? AND slot_index > ? ORDER BY slot_index DESC',
+            [session.sessionId, originalSlotRow.slot_index],
+          ),
+        );
+        for (const later of laterSlots) {
+          d.executeSync(
+            'UPDATE session_plan_slot SET slot_index = ? WHERE session_plan_slot_id = ?',
+            [later.slot_index + 1, later.session_plan_slot_id],
+          );
+        }
+        d.executeSync(
+          `INSERT INTO session_plan_slot (session_id, slot_index, movement_id, planned_sets, planned_reps, provenance_kind, target_rpe, source_planned_slot_id, original_movement_id, original_session_date, override_load_kg, override_reason)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            session.sessionId,
+            originalSlotRow.slot_index + 1,
+            option.movement_id,
+            chosenCount,
+            movedReps,
+            swapKind,
+            swapTarget,
+            option.plannedSlotId,
+            originalMv,
+            originDate,
+            overrideLoad,
+            overrideReason,
+          ],
+        );
+        newSlotId = rowsOf<{ id: number }>(d.executeSync('SELECT last_insert_rowid() AS id'))[0]!.id;
+        d.executeSync(
+          `INSERT INTO session_slot_target (session_plan_slot_id, target_kind, target_reps, target_seconds)
+           VALUES (?, ?, ?, ?)`,
+          [
+            newSlotId,
+            movedTarget.kind,
+            movedTarget.kind === 'reps' ? movedTarget.reps : null,
+            movedTarget.kind === 'time' ? movedTarget.seconds : null,
+          ],
+        );
+        d.executeSync(
+          'INSERT INTO session_plan_slot_replacement (session_plan_slot_id, replaced_by_session_plan_slot_id) VALUES (?, ?)',
+          [targetSlot.sessionPlanSlotId, newSlotId],
+        );
+        if (runner !== null) {
+          const origRunnerSlot = runner.slots.find((slot) => slot.sessionPlanSlotId === targetSlot.sessionPlanSlotId);
+          nextRunner = replaceSlotAfterLoggedSets(runner, {
+            targetSessionPlanSlotId: targetSlot.sessionPlanSlotId,
+            completedSets: retainedSets,
+            replacementSlot: {
+              sessionPlanSlotId: newSlotId,
+              plannedSlotId: option.plannedSlotId,
+              movementId: option.movement_id,
+              movementName: replacement?.name ?? option.name,
+              sets: chosenCount,
+              target: movedTarget,
+              targetRpe: swapTarget ?? origRunnerSlot?.targetRpe ?? targetSlot.targetRpe ?? 8,
+            },
+            atMs: Date.now(),
+          });
+          if (sessionMode !== null) {
+            persistRunnerCheckpoint(d, session.sessionId, sessionMode, nextRunner);
+          }
+        }
+        d.executeSync('COMMIT');
+      } catch (error) {
+        try { d.executeSync('ROLLBACK'); } catch { /* no partial day swap */ }
+        set({ error: error instanceof Error ? error.message : String(error) });
+        return;
+      }
+
+      const newSlot: PlanSlot = {
+        sessionPlanSlotId: newSlotId,
+        movementId: option.movement_id,
+        plannedSets: chosenCount,
+        plannedReps: movedReps,
+        target: movedTarget,
+        provenanceKind: swapKind,
+        targetRpe: swapTarget,
+        sourcePlannedSlotId: option.plannedSlotId,
+        originalMovementId: originalMv,
+        originalSessionDate: originDate,
+        overrideLoadKg: overrideLoad,
+        overrideReason: overrideReason,
+        replacedBySessionPlanSlotId: null,
+      };
+      const nextPlan = sessionPlan.flatMap((slot) =>
+        slot.sessionPlanSlotId === targetSlot.sessionPlanSlotId
+          ? [{ ...slot, plannedSets: retainedSets, replacedBySessionPlanSlotId: newSlotId }, newSlot]
+          : [slot],
+      );
+      set({
+        sessionPlan: nextPlan,
+        substitution: null,
+        ...(nextRunner !== null ? runnerSelection(nextRunner) : {
+          activeMovementId: option.movement_id,
+          activeSessionPlanSlotId: newSlotId,
+        }),
+      });
+      get().refreshBlock();
+      return;
+    }
+
+    const movedSets = Math.max(1, Math.round(option.setsConserved));
     const nextPlan = sessionPlan.map((slot) =>
       slot.sessionPlanSlotId === targetSlot.sessionPlanSlotId
         ? {
@@ -7156,7 +7605,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
             provenanceKind: swapKind,
             targetRpe: swapTarget,
             sourcePlannedSlotId: option.plannedSlotId,
-            originalMovementId: slot.originalMovementId ?? slot.movementId,
+            originalMovementId: originalMv,
             originalSessionDate: originDate,
             overrideLoadKg: overrideLoad,
             overrideReason: overrideReason,
@@ -7176,7 +7625,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
           })
         : runner;
       const completedHere = throughSubstitution.slotSetCounts[runnerSlotIndex] ?? 0;
-      const runnerSets = Math.max(movedSets, completedHere);
+      const runnerSets = Math.max(movedSets, completedHere + 1);
       nextRunner = {
         ...throughSubstitution,
         slots: throughSubstitution.slots.map((slot, index) => index === runnerSlotIndex
@@ -7211,7 +7660,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
           `UPDATE session_plan_slot
            SET movement_id = ?, planned_sets = ?, planned_reps = ?, provenance_kind = ?, target_rpe = ?, source_planned_slot_id = ?, original_movement_id = ?, original_session_date = ?, override_load_kg = ?, override_reason = ?
            WHERE session_plan_slot_id = ?`,
-          [option.movement_id, movedSets, movedReps, swapKind, swapTarget, option.plannedSlotId, targetSlot.originalMovementId ?? targetSlot.movementId, originDate, overrideLoad, overrideReason, targetSlot.sessionPlanSlotId]
+          [option.movement_id, movedSets, movedReps, swapKind, swapTarget, option.plannedSlotId, originalMv, originDate, overrideLoad, overrideReason, targetSlot.sessionPlanSlotId]
         );
         d.executeSync(
           `INSERT INTO session_slot_target (session_plan_slot_id, target_kind, target_reps, target_seconds)
@@ -7472,9 +7921,15 @@ export const useStore = create<KineticsStore>()((set, get) => {
       timeS: timeMode ? (metrics?.timeS ?? null) : null,
       bandLevel: metrics?.bandLevel ?? null,
     };
+    const todaysVector = state.prescription !== null && state.prescription.forDate === state.today
+      ? state.prescription.vector
+      : null;
+    const hasLoadReduction = todaysVector !== null && todaysVector.load_modifier < 1;
     set({
       session: { ...s, sets: [logged, ...s.sets] },
-      lastLoggedLoads: { ...state.lastLoggedLoads, [movementId]: safeLoad },
+      lastLoggedLoads: hasLoadReduction
+        ? state.lastLoggedLoads
+        : { ...state.lastLoggedLoads, [movementId]: safeLoad },
       ...(nextRunner !== null ? runnerSelection(nextRunner) : {}),
     });
   },
@@ -7619,6 +8074,10 @@ export const useStore = create<KineticsStore>()((set, get) => {
         if (snapshot.loggedSets.length !== 0) {
           throw new Error('Only an empty session can be discarded.');
         }
+        d.executeSync(
+          'DELETE FROM session_plan_slot_replacement WHERE session_plan_slot_id IN (SELECT session_plan_slot_id FROM session_plan_slot WHERE session_id = ?) OR replaced_by_session_plan_slot_id IN (SELECT session_plan_slot_id FROM session_plan_slot WHERE session_id = ?)',
+          [activeSession.sessionId, activeSession.sessionId],
+        );
         // Parent-first keeps 026's immutable side-cars legal. The explicit
         // cleanup that follows also handles test/dev connections with FKs off.
         d.executeSync('DELETE FROM session WHERE session_id = ?', [activeSession.sessionId]);
@@ -7852,7 +8311,11 @@ export const useStore = create<KineticsStore>()((set, get) => {
            VALUES (?, ?, ?, NULL, ?, 0, NULL, NULL, NULL)`,
           [today, Date.now(), raw, resolved.similarity],
         );
-        set({ lastTriage: { kind: 'rejected' } });
+        get().computePrescription([]);
+        const triageAfter = get().lastTriage;
+        if (triageAfter === null || triageAfter.kind !== 'matched' || !triageAfter.directive.halt) {
+          set({ lastTriage: { kind: 'rejected' } });
+        }
         return;
       }
       // Persist the routing outcome. The audit snapshot uses the SAME pure
@@ -7934,11 +8397,34 @@ export const useStore = create<KineticsStore>()((set, get) => {
   },
 
   resetTrainingData: () => {
-    set({ error: null });
-    const d = getDb();
-    const had = rowsOf<{ c: number }>(d.executeSync('SELECT (SELECT count(*) FROM session) + (SELECT count(*) FROM question_log) AS c'))[0];
-    d.executeSync('BEGIN');
+    if (get().session !== null) {
+      set({ error: 'End the active session before resetting training data.' });
+      return false;
+    }
+    const releaseLease = tryAcquireDataMutationLease();
+    if (releaseLease === null) {
+      set({ error: mutationRefusalMessage() });
+      return false;
+    }
     try {
+      set({ error: null });
+      let d: DB;
+      let had: { c: number } | undefined;
+      let hadModuleTables: { c: number } | undefined;
+      let inTx = false;
+      try {
+        d = getDb();
+        const moduleTablesCountSql =
+          'SELECT (SELECT count(*) FROM athlete_goal_observation)'
+          + ' + (SELECT count(*) FROM session_preparation_item)'
+          + ' + (SELECT count(*) FROM session_preparation)'
+          + ' + (SELECT count(*) FROM block_emphasis) AS c';
+        had = rowsOf<{ c: number }>(d.executeSync(
+          'SELECT (SELECT count(*) FROM history_import_capability_evidence) + (SELECT count(*) FROM history_import_set) + (SELECT count(*) FROM history_import_session) + (SELECT count(*) FROM history_import) + (SELECT count(*) FROM import_readiness_daily) + (SELECT count(*) FROM bodyweight_daily) + (SELECT count(*) FROM movement_capability_attestation) + (SELECT count(*) FROM movement_prior_experience) + (SELECT count(*) FROM capability_session_evidence) + (SELECT count(*) FROM set_target) + (SELECT count(*) FROM session_runner_checkpoint) + (SELECT count(*) FROM session_slot_target) + (SELECT count(*) FROM planned_slot_disposition) + (SELECT count(*) FROM planned_slot_autopilot) + (SELECT count(*) FROM planned_slot_legacy_role_allowance) + (SELECT count(*) FROM planned_slot_routine_decision) + (SELECT count(*) FROM planned_slot_target) + (SELECT count(*) FROM planned_slot_load_intent) + (SELECT count(*) FROM planned_session_routine_context) + (SELECT count(*) FROM planned_session_method) + (SELECT count(*) FROM session_plan_slot) + (SELECT count(*) FROM session_origin) + (SELECT count(*) FROM set_prefix) + (SELECT count(*) FROM set_metric) + (SELECT count(*) FROM set_record) + (SELECT count(*) FROM set_dose_target) + (SELECT count(*) FROM session_note) + (SELECT count(*) FROM session_feel) + (SELECT count(*) FROM question_log) + (SELECT count(*) FROM report_severity) + (SELECT count(*) FROM slot_override) + (SELECT count(*) FROM planned_slot) + (SELECT count(*) FROM planned_session) + (SELECT count(*) FROM block_meta) + (SELECT count(*) FROM suspension_episode WHERE ended_at_ms IS NULL) + (SELECT count(*) FROM training_program_movement_preference) + (SELECT count(*) FROM training_program_day) + (SELECT count(*) FROM training_block_program) + (SELECT count(*) FROM training_program) + (SELECT count(*) FROM session) + (SELECT count(*) FROM session_outcome) + (SELECT count(*) FROM micro_cycle) + (SELECT count(*) FROM macro_cycle) + (SELECT count(*) FROM training_block) + (SELECT count(*) FROM suspension_episode_program) + (SELECT count(*) FROM block_suspension_origin) + (SELECT count(*) FROM subjective_report) + (SELECT count(*) FROM niggle) + (SELECT count(*) FROM one_rep_max) + (SELECT count(*) FROM return_checkin_ack) + (SELECT count(*) FROM hrv_daily) + (SELECT count(*) FROM resting_hr_daily) + (SELECT count(*) FROM sleep_daily) + (SELECT count(*) FROM spo2_daily) + (SELECT count(*) FROM spo2_sample) + (SELECT count(*) FROM mech_daily) + (SELECT count(*) FROM state_vector) AS c',
+        ))[0];
+        hadModuleTables = rowsOf<{ c: number }>(d.executeSync(moduleTablesCountSql))[0];
+        d.executeSync('BEGIN');
+        inTx = true;
       // Children before parents, so it is correct whether or not foreign_keys is
       // ON. KEEPS athlete_profile / movement library / preferences / profile_slot.
       d.executeSync('DELETE FROM history_import_capability_evidence');
@@ -7984,10 +8470,12 @@ export const useStore = create<KineticsStore>()((set, get) => {
       // and an orphan surviving an FK-OFF reset would attach an old record to
       // new work.
       d.executeSync('DELETE FROM session_skipped_slot');
+      d.executeSync('DELETE FROM session_plan_slot_replacement');
       d.executeSync('DELETE FROM session_plan_slot');
       d.executeSync('DELETE FROM session_origin');
       d.executeSync('DELETE FROM set_prefix');
       d.executeSync('DELETE FROM set_load_shown');
+      d.executeSync('DELETE FROM set_metric');
       d.executeSync('DELETE FROM set_record');
       // 026 snapshot immutability permits deletion only after its parent is
       // gone. With FKs on the parent cascade already emptied this table; with
@@ -8055,8 +8543,11 @@ export const useStore = create<KineticsStore>()((set, get) => {
       d.executeSync('DELETE FROM mech_daily');
       d.executeSync('DELETE FROM state_vector');
       d.executeSync('COMMIT');
+      inTx = false;
     } catch (e) {
-      d.executeSync('ROLLBACK');
+      if (inTx) {
+        try { d!.executeSync('ROLLBACK'); } catch { /* ignore rollback error */ }
+      }
       set({ error: e instanceof Error ? e.message : String(e) });
       return false;
     }
@@ -8092,7 +8583,10 @@ export const useStore = create<KineticsStore>()((set, get) => {
     // the same read every other surface here gets, and it is what makes the
     // in-memory value and the database agree after the wipe.
     get().refreshSuspension();
-    return (had?.c ?? 0) > 0;
+    return ((had?.c ?? 0) + (hadModuleTables?.c ?? 0)) > 0;
+    } finally {
+      releaseLease();
+    }
   },
 
   loadDemoAthlete: (): DemoLoadResult => {
@@ -8128,6 +8622,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
     ).map(movementFromRow);
     set({ movements, lastLoggedLoads: latestLoadMap(d) });
     get().refreshVector();
+    get().computePrescription([]);
     return 'loaded';
   },
 

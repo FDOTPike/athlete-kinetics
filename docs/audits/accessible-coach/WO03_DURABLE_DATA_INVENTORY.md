@@ -213,3 +213,9 @@ Final live durable tables: 122 (the 121 above, and `question_log`). The migratio
 The original inventory above is restored to its release-integration record through `069`: 68 migration-array entries, `user_version = 68`, 118 durable tables, 16 native workout/history tables, and 204 fingerprinted table/index/trigger objects. The October 13 note's phrase "Everything above ... through migration `070`" describes an earlier in-place edit, not that restored historical baseline.
 
 Migration `070` adds `session_feel` to the native workout/history group: 69 array entries, `user_version = 69`, backup contract v69, 119 tables, 17 in that group, and 205 fingerprinted objects. Migration `071` adds `session_skipped_slot` and `set_load_shown`: 70 array entries, `user_version = 70`, backup contract v70, **121 durable tables**, 19 in that group, and **207 fingerprinted objects**. All three additions are athlete-owned backup/reset data and are never engine inputs.
+
+## Update 2026-10-31 — migration 073 (session slot replacement)
+
+Final live durable tables: 123 (the 122 above, and `session_plan_slot_replacement`). The migration array has 72 entries through slot `073`, so `PRAGMA user_version = 72`. The current backup contract fingerprints 209 durable table/index/trigger objects; all earlier schema contracts remain registered unchanged.
+
+`session_plan_slot_replacement` links a `session_plan_slot` row swapped after logged sets to its newly inserted replacement `session_plan_slot` row. It is included in the encrypted physical backup, survives forward restoration and migration replay, and is cleared on empty-session discard and Reset training data.
