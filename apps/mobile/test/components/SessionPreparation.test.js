@@ -638,6 +638,29 @@ describe('a discomfort report that cannot open its transaction', () => {
     expect(state().runner.phase).not.toBe('halted');
   });
 
+  test('a saved halt-level report still reaches state when the preparation re-read fails', () => {
+    const sessionId = startPlanned();
+    const real = mockDriver.executeSync.bind(mockDriver);
+    let committed = false;
+    mockDriver.executeSync = (sql, params) => {
+      if (sql === 'COMMIT') committed = true;
+      if (committed && /FROM session_preparation\b/.test(sql)) throw new Error('disk I/O error');
+      return real(sql, params);
+    };
+    let saved;
+    try {
+      expect(() => { saved = state().reportNiggle('knee', 9); }).not.toThrow();
+    } finally {
+      mockDriver.executeSync = real;
+    }
+    // The report is committed, so it is reported as saved and the stop shows.
+    expect(saved).toBe(true);
+    expect(count('SELECT COUNT(*) AS c FROM niggle')).toBe(1);
+    expect(state().niggles).toEqual([{ region: 'knee', severity: 9 }]);
+    expect(state().runner.phase).toBe('halted');
+    expect(prepRow(sessionId).status).toBe('stopped');
+  });
+
   test('does not roll back a transaction it did not open', () => {
     startPlanned();
     // Another writer holds an open transaction with a pending write, so the

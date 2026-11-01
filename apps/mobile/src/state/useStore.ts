@@ -7140,10 +7140,18 @@ export const useStore = create<KineticsStore>()((set, get) => {
       set({ error: error instanceof Error ? error.message : String(error) });
       return false;
     }
+    // The report is committed. A failed preparation re-read must not hide it
+    // or its stop from the screen; the previous preparation stays until the next read.
+    let preparationUpdate: { preparation?: ReturnType<typeof readSessionPreparation> } = {};
+    if (state.session !== null) {
+      try {
+        preparationUpdate = { preparation: readSessionPreparation(d, state.session.sessionId) };
+      } catch { /* keep the previous preparation */ }
+    }
     set({
       niggles: [...state.niggles, { region, severity: safe }],
       ...(nextRunner !== null && nextRunner !== state.runner ? runnerSelection(nextRunner) : {}),
-      ...(state.session !== null ? { preparation: readSessionPreparation(d, state.session.sessionId) } : {}),
+      ...preparationUpdate,
     });
     // A qualifying (but not halt-level) niggle immediately offers a route
     // around the movement. Halt-level reports block `logSet` at this boundary.

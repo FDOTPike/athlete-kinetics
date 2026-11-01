@@ -227,3 +227,41 @@ test('without a halt, the hold notice is shown alone', () => {
   expect(screen.getByTestId('training-support-notice')).toBeOnTheScreen();
   expect(screen.queryByTestId('held-screen-halt-card')).toBeNull();
 });
+
+const NARROW_SCOPE_EXPLANATION =
+  'This note covers specific exercises or activities. The coach cannot yet tell which suggestions it affects, so all suggestions stay on hold.';
+
+test('Readiness explains a whole-prescription hold that comes only from narrow scopes, as Today and Plan do', () => {
+  const isBroadHoldFromNarrowScopes = jest.fn(() => true);
+  const decision = { status: 'held', holdIds: ['hold-1'] };
+  mockState = baseState({
+    todayPlan: null,
+    getTrainingSupportDecision: () => decision,
+    isBroadHoldFromNarrowScopes,
+  });
+  render(<ReadinessScreen />);
+  expect(screen.getByTestId('training-support-notice')).toBeOnTheScreen();
+  expect(screen.getByText(NARROW_SCOPE_EXPLANATION)).toBeOnTheScreen();
+  // Same movement ids and decision as the hold query.
+  expect(isBroadHoldFromNarrowScopes).toHaveBeenCalledWith(undefined, decision);
+});
+
+test('Readiness shows no narrow-scope explanation for a broad hold or when support is unavailable', () => {
+  mockState = baseState({
+    getTrainingSupportDecision: () => ({ status: 'held', holdIds: ['hold-1'] }),
+    isBroadHoldFromNarrowScopes: () => false,
+  });
+  const { unmount } = render(<ReadinessScreen />);
+  expect(screen.getByTestId('training-support-notice')).toBeOnTheScreen();
+  expect(screen.queryByText(NARROW_SCOPE_EXPLANATION)).toBeNull();
+  unmount();
+
+  const isBroadHoldFromNarrowScopes = jest.fn(() => true);
+  mockState = baseState({
+    getTrainingSupportDecision: () => ({ status: 'support_unavailable', holdIds: [] }),
+    isBroadHoldFromNarrowScopes,
+  });
+  render(<ReadinessScreen />);
+  expect(screen.queryByText(NARROW_SCOPE_EXPLANATION)).toBeNull();
+  expect(isBroadHoldFromNarrowScopes).not.toHaveBeenCalled();
+});

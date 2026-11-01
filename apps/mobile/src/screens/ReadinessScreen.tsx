@@ -118,12 +118,19 @@ export default function ReadinessScreen(props: ReadinessScreenProps): React.JSX.
   if (state.status === 'booting' || state.status === 'error') {
     return <AvailableReadinessScreen {...props} />;
   }
+  const movementIds = state.todayPlan?.slots.map((slot) => slot.movementId);
   const decision = typeof state.getTrainingSupportDecision === 'function'
-    ? state.getTrainingSupportDecision(state.todayPlan?.slots.map((slot) => slot.movementId))
+    ? state.getTrainingSupportDecision(movementIds)
     : { status: 'support_unavailable' as const };
+  // Same explanation as Today and Plan when only narrow-scope holds lock the whole prescription.
+  const narrowScopeOnly = decision.status === 'held' && typeof state.isBroadHoldFromNarrowScopes === 'function'
+    ? state.isBroadHoldFromNarrowScopes(movementIds, decision)
+    : false;
   if (decision.status !== 'available') return <HeldScreenWithHalt lastTriage={state.lastTriage}>
     <TrainingSupportNotice
-      unavailable={decision.status === 'support_unavailable'} onOpenSession={state.session !== null ? props.onOpenSession : undefined} />
+      unavailable={decision.status === 'support_unavailable'}
+      narrowScopeOnly={narrowScopeOnly}
+      onOpenSession={state.session !== null ? props.onOpenSession : undefined} />
   </HeldScreenWithHalt>;
   return <AvailableReadinessScreen {...props} />;
 }
