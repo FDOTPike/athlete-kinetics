@@ -4,13 +4,13 @@ These files back the claims in `PROMPT_LEDGER.md` Entry 0273.
 
 ## Quotations
 
-`quotes.json` lists every passage the brief presents as file text, with the line range it cites. `check_quotes.mjs` confirms each passage appears inside its range. Run it from the repository root:
+`quotes.json` lists every passage the brief presents as file text, with the line range it cites. The brief's line references are to revision `23c29d34be247123605923ab2862cd5d86e561c6` (the `revision` field), the last commit of this brief before later work moved those lines. `check_quotes.mjs` reads each file at that revision with `git show` and confirms each passage appears inside its range. Run it from the repository root:
 
 ```bash
 node docs/evidence/BRIEF_in_block_effort_drift_2026-10-31/check_quotes.mjs
 ```
 
-On this revision it reports 33 of 33. It exits 1 and names each miss otherwise. Two planted misses (a changed word, a wrong line) were both caught before commit.
+It reports 33 of 33. It exits 1 and names each miss otherwise. Two planted misses (a changed word, a wrong line) were both caught, before the first commit and again after pinning the revision.
 
 The owner's full request in brief section 1 is **not** checked here. It is not in any committed revision. Only its first clause is, at `DEVIATION_LOG.md:699-709`.
 

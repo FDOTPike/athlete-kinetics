@@ -1,6 +1,6 @@
 # Brief: in-block effort drift (the "hall effect")
 
-**Status:** design brief, 2026-10-31. No code. Ratifies nothing. Every claim about the app is cited so it can be checked. Sol and Astra advised (read-only) before the recommendation; where they corrected the draft, the correction is kept.
+**Status:** design brief, 2026-10-31. No code. Ratifies nothing. Every claim about the app is cited so it can be checked. Line references are to revision `23c29d34be247123605923ab2862cd5d86e561c6`; later merges moved some of them, and pull request 101 has since fixed the panel defect described in section 2 (see `docs/evidence/BRIEF_in_block_effort_drift_2026-10-31/README.md`). Sol and Astra advised (read-only) before the recommendation; where they corrected the draft, the correction is kept.
 
 ## 1. The request
 

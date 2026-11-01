@@ -1,5 +1,6 @@
 {
   "brief": "docs/BRIEF_in_block_effort_drift_2026-10-31.md",
+  "revision": "23c29d34be247123605923ab2862cd5d86e561c6",
   "note": "Every passage the brief presents as file text, with the line range it cites. check_quotes.mjs confirms each text appears inside that range (whitespace collapsed). The owner's full request is not here: it is not in any committed revision (see brief section 1).",
   "quotes": [
     { "file": "DEVIATION_LOG.md", "lines": [699, 709], "text": "For now dont prompt the athlete" },
