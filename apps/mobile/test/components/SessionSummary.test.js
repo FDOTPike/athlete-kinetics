@@ -20,6 +20,7 @@
  *    exactly once, no writes during render, plain RPE wording.
  */
 import React from 'react';
+import { ScrollView } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import SessionScreen from '../../src/screens/SessionScreen';
 import {
@@ -380,6 +381,24 @@ const baseState = (overrides = {}) => {
 };
 
 describe('screen laws: D5, D6, D8, D9', () => {
+  test('long completion summary and saved feel remain in a scrollable flow', () => {
+    mockState = baseState({
+      loadSessionSummaryFacts: () => ({
+        durationMin: 38,
+        exercises: Array.from({ length: 5 }, (_, i) => exercise({ movementId: i + 1, movementName: `Movement ${i + 1}` })),
+        previousSets: [],
+      }),
+      loadSessionFeel: () => ({ ask: false, saved: { feel: 'as_planned', reasons: [] }, note: 'A saved note' }),
+    });
+    render(<SessionScreen />);
+    for (let i = 1; i <= 5; i += 1) expect(screen.getByText(new RegExp(`Movement ${i}`))).toBeOnTheScreen();
+    expect(screen.getByTestId('session-feel-saved')).toHaveTextContent('How it went: As planned.');
+    expect(screen.getByText('Your note is saved with this session.')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Back to Today')).toBeOnTheScreen();
+    const scroll = screen.UNSAFE_getByType(ScrollView);
+    expect(scroll.props.contentContainerStyle).toEqual(expect.objectContaining({ flexGrow: 1 }));
+  });
+
   test('render performs no endSession / plan / progression / log call (D8 guard)', () => {
     mockState = baseState();
     render(<SessionScreen />);
