@@ -13089,7 +13089,12 @@ Open a draft PR into `claude/beta-question-box-2026-10-28`. Never merge to maste
 
 ### Output
 
-- New file `docs/BRIEF_in_block_effort_drift_2026-10-31.md` (design only, no code). Every code fact and ruling quotation was checked against the files; quotations matched by script.
-- Sol and Astra advised read-only through the Codex CLI. Both recommended option A (effort against plan, observation only, no next-block forecast) and a shadow-only ruling for option C. Both corrected the draft: lowering a target while effort is unchanged makes the RPE error larger, so C's main risk is repeated easing (a ratchet), and the block-wide `rpeRaisePermitted` withhold does not mitigate it. Both corrections are in the brief.
+- New file `docs/BRIEF_in_block_effort_drift_2026-10-31.md` (design only, no code). Every code fact and ruling quotation was checked against the files. Quotations were matched by script; the committed check is `docs/evidence/BRIEF_in_block_effort_drift_2026-10-31/check_quotes.mjs` with `quotes.json` (33 of 33 after the 2026-11-01 merge of the base branch). The owner's full request is not in any committed revision, and the brief marks it as not verified here.
+- Sol and Astra advised read-only through the Codex CLI. The request and both answers, with session ids, are committed in `docs/evidence/BRIEF_in_block_effort_drift_2026-10-31/`. Both recommended option A (effort against plan, observation only, no next-block forecast) and a shadow-only ruling for option C. Both corrected the draft: lowering a target while effort is unchanged makes the RPE error larger, so C's main risk is repeated easing (a ratchet), and the block-wide `rpeRaisePermitted` withhold does not mitigate it. Both corrections are in the brief.
 - Defect confirmed: `getPendingAutopilotAdjustments` returns the current block's applied rows, BlockScreen heads them "What changes next block" and prints the raw reason token per slot; the component test seeds reasons the schema rejects. Recorded in the brief, not fixed here.
 - Branch `claude/in-block-effort-drift-brief-2026-10-31`, draft pull request into `claude/beta-question-box-2026-10-28`. No tests run (docs only).
+- **2026-11-01, CodeRabbit threads 4435090714 and 4435090720** (asked by the session that started this one; its message is recorded verbatim as Entry 0275 on the PR 101 branch):
+  - The base branch was merged in, so pull request 92's `DEVIATION_LOG.md` entry is part of this revision.
+  - Brief section 1 now separates what can be checked here (the first clause, `DEVIATION_LOG.md:699-709`) from the full request, which it marks as not verified.
+  - Line citations moved by the merge were updated.
+  - Evidence was added under `docs/evidence/BRIEF_in_block_effort_drift_2026-10-31/`. The quote check passed 33 of 33 and caught two planted misses.
