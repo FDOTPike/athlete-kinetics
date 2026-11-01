@@ -21,6 +21,7 @@ jest.mock('../../src/state/athleteRegistry', () => {
   };
 });
 
+// Measured at 6427 ms (16.555 s suite) with --no-cache --maxWorkers=1, exceeding Jest's 5 s default.
 jest.setTimeout(60_000);
 
 const state = () => useStore.getState();

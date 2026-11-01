@@ -682,6 +682,32 @@ adds this entry. Rationale and the options not taken:
 verify:autopilot, verify:blocks, verify:store and
 `SuspensionRpeRaise.test.js`.
 
+## 2026-10-31 — Backup import copy failure wording (PR 86)
+
+CodeRabbit thread 4404278406 flagged two new user-facing strings with no ruling
+behind them: `'Safe backup import is unavailable. Update the app before restoring.'`
+in `apps/mobile/src/state/backupStore.ts` and `"The selected backup could not be copied safely."`
+in `apps/mobile/android/app/src/main/java/com/athletekinetics/BackupCopyPackage.kt`.
+The owner asked: can both reuse "The selected backup could not be copied into private app storage."?
+On 2026-10-31 the owner answered: "Yes, reuse it". Both locations now use
+`"The selected backup could not be copied into private app storage."`, and
+"Update the app" was dropped because a missing native module is not always
+caused by an old app.
+
+## 2026-10-31 — A goal program due for review does not block planning (PR 92)
+
+CodeRabbit thread 4428183136 asked whether a `review_due` program should open
+the program editor from "Plan the next block" and "Set up a four-week block",
+or keep the athlete on goal reassessment first. On 2026-10-31 the owner
+answered: "For now dont prompt the athlete". Both buttons open the program
+editor for any program, including `review_due`, as the card's secondary
+button already did. The existing "Reassess goal" card is unchanged. The owner
+also asked for a way to tell when an athlete is off track (for example,
+perceived effort climbing faster than the plan expects, with some allowance
+for normal variation) so the engine can realign the program; that is recorded
+as a separate design question, not built here. Onboarding now tells athletes
+they can change their goals at any time in Athlete Profile (PR 99).
+
 ## 2026-10-31 — Beta product decisions: broad holds explained, honest discomfort wording, plan-first empty starts
 
 1. **One held exercise locks the whole Plan tab (safety-4):** "Explain it". Keep the broad hold. Explain it on screen.

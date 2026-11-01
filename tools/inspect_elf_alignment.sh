@@ -5,7 +5,7 @@
 # FAIL-CLOSED by design:
 #   - toolchain versions are resolved from apps/mobile/android/build.gradle
 #     (exactly one ndkVersion and one buildToolsVersion; exit 2 otherwise)
-#   - extraction uses $JAVA_HOME/bin/jar.exe (exit 2 if unavailable)
+#   - extraction uses the bounded Node ZIP reader (exit 2 on invalid input)
 #   - extraction happens in a unique temp dir removed via EXIT trap
 #   - zipalign -P 16 failure, readelf failure, malformed/absent LOAD
 #     alignment, zero native libraries, and zero inspected ELF64 libraries
@@ -26,10 +26,6 @@ if [ -z "$APK" ] || [ ! -f "$APK" ]; then
 fi
 if [ -z "${ANDROID_HOME:-}" ]; then
   echo "ERROR: ANDROID_HOME is not set" >&2
-  exit 2
-fi
-if [ -z "${JAVA_HOME:-}" ]; then
-  echo "ERROR: JAVA_HOME is not set (needed for jar.exe extraction)" >&2
   exit 2
 fi
 
@@ -59,14 +55,13 @@ BUILD_TOOLS_VERSION="$(resolve_single buildToolsVersion)"
 
 READELF="$ANDROID_HOME/ndk/$NDK_VERSION/toolchains/llvm/prebuilt/windows-x86_64/bin/llvm-readelf.exe"
 ZIPALIGN="$ANDROID_HOME/build-tools/$BUILD_TOOLS_VERSION/zipalign.exe"
-JAR="$JAVA_HOME/bin/jar.exe"
-for bin in "$READELF" "$ZIPALIGN" "$JAR"; do
+for bin in "$READELF" "$ZIPALIGN"; do
   if [ ! -x "$bin" ]; then
     echo "ERROR: missing required binary: $bin" >&2
     exit 2
   fi
 done
-for tool in awk sed grep find sort; do
+for tool in node awk sed grep find sort; do
   command -v "$tool" >/dev/null 2>&1 || { echo "ERROR: missing required tool: $tool" >&2; exit 2; }
 done
 
@@ -74,7 +69,7 @@ done
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 WIN_WORK="$(cygpath -w "$WORK" 2>/dev/null || echo "$WORK")"
-# Windows-native tools (jar.exe, zipalign.exe) cannot resolve MSYS paths.
+# Windows-native tools (node, zipalign.exe) cannot resolve MSYS paths.
 # Absolutize first: cygpath -w of a RELATIVE path stays relative and jar
 # would then resolve it against the temp extraction cwd.
 APK_ABS="$(cd "$(dirname "$APK")" 2>/dev/null && pwd)/$(basename "$APK")"
@@ -84,7 +79,7 @@ echo "=== APK: $APK ==="
 echo "=== toolchain: NDK $NDK_VERSION / build-tools $BUILD_TOOLS_VERSION ==="
 
 # --- extraction (validated) ---------------------------------------------------
-if ! (cd "$WORK" && "$JAR" xf "$APK_WIN" >/dev/null 2>&1); then
+if ! node "$ROOT/tools/extract_alignment_inputs.mjs" "$APK_WIN" "$WIN_WORK"; then
   echo "ERROR: jar extraction failed for $APK" >&2
   exit 2
 fi

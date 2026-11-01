@@ -77,7 +77,7 @@ assert.equal(backup.backupSchemaContractFor(62, 63), null, 'a schema older than 
 
 const schemaFiles = readdirSync(schemaDirectory).filter((name) => /^0\d\d_.*\.sql$/.test(name) && !name.startsWith('004_')).sort();
 function schemaObjectsOf(db) {
-  return db.prepare("SELECT type,name,tbl_name,coalesce(sql,'') AS sql FROM sqlite_master WHERE type IN ('table','index','trigger') AND name NOT LIKE 'sqlite_%' ORDER BY type,name").all()
+  return db.prepare("SELECT type,name,tbl_name,coalesce(sql,'') AS sql FROM sqlite_master WHERE type IN ('table','index','trigger') AND name NOT GLOB 'sqlite_*' ORDER BY type,name").all()
     .map((object) => [object.type, object.name, object.tbl_name, object.sql, object.type === 'table'
       ? db.prepare(`PRAGMA table_info("${object.name.replaceAll('"', '""')}")`).all()
         .map((column) => [column.cid, column.name, column.type, column.notnull, column.dflt_value, column.pk]) : []]);
@@ -148,7 +148,7 @@ function makeDatabase(file, label) {
   db.prepare('INSERT INTO session_plan_slot_replacement (session_plan_slot_id, replaced_by_session_plan_slot_id) VALUES (?,?)').run(7101, 7102);
   db.exec('PRAGMA user_version=72');
   assert.equal(db.prepare('PRAGMA quick_check').get().quick_check, 'ok');
-  const schemaObjects = db.prepare("SELECT type,name,tbl_name,coalesce(sql,'') AS sql FROM sqlite_master WHERE type IN ('table','index','trigger') AND name NOT LIKE 'sqlite_%' ORDER BY type,name").all()
+  const schemaObjects = db.prepare("SELECT type,name,tbl_name,coalesce(sql,'') AS sql FROM sqlite_master WHERE type IN ('table','index','trigger') AND name NOT GLOB 'sqlite_*' ORDER BY type,name").all()
     .map((object) => [object.type, object.name, object.tbl_name, object.sql, object.type === 'table'
       ? db.prepare(`PRAGMA table_info("${object.name.replaceAll('"', '""')}")`).all()
         .map((column) => [column.cid, column.name, column.type, column.notnull, column.dflt_value, column.pk]) : []]);

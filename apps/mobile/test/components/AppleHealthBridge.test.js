@@ -44,12 +44,12 @@ jest.mock('@kingstinct/react-native-healthkit', () => ({
   queryCategorySamples: async (identifier, options) => {
     mockHealthKit.queries.push([identifier, options]);
     if (mockHealthKit.fail || mockHealthKit.failSleep) throw new Error('synthetic native failure');
-    return mockHealthKit.samples;
+    return mockHealthKit.samples.slice(0, options.limit);
   },
   queryQuantitySamples: async (identifier, options) => {
     mockHealthKit.queries.push([identifier, options]);
     if (mockHealthKit.fail || mockHealthKit.failRestingHr) throw new Error('synthetic native failure');
-    return mockHealthKit.restingHr;
+    return mockHealthKit.restingHr.slice(0, options.limit);
   },
 }));
 
@@ -81,6 +81,102 @@ beforeEach(() => {
 afterEach(() => { Platform.OS = originalOs; });
 
 describe('sleep normalization (pure)', () => {
+  test('a 5,000-sample fragmented night keeps interval and source-grouping work bounded', () => {
+    const base = Date.parse('2026-09-30T00:00:00Z');
+    const count = 4999;
+    const samples = [sample(new Date(base).toISOString(), new Date(base + count * 2000).toISOString(), APPLE_SLEEP_VALUE.asleepCore),
+      ...Array.from({ length: count }, (_, i) => sample(new Date(base + i * 2000).toISOString(),
+        new Date(base + i * 2000 + 1000).toISOString(), APPLE_SLEEP_VALUE.asleepDeep))];
+    function measure(normalize) {
+      let work = 0;
+      const iterator = Array.prototype[Symbol.iterator];
+      const flatMap = Array.prototype.flatMap;
+      const map = Array.prototype.map;
+      const filter = Array.prototype.filter;
+      const iteratorSpy = jest.spyOn(Array.prototype, Symbol.iterator).mockImplementation(function* () {
+        const source = iterator.call(this);
+        for (let step = source.next(); !step.done; step = source.next()) { work += 1; yield step.value; }
+      });
+      const fragmentSpy = jest.spyOn(Array.prototype, 'flatMap').mockImplementation(function (...args) {
+        work += this.length;
+        return flatMap.apply(this, args);
+      });
+      const mapSpy = jest.spyOn(Array.prototype, 'map').mockImplementation(function (...args) {
+        work += this.length;
+        return map.apply(this, args);
+      });
+      const filterSpy = jest.spyOn(Array.prototype, 'filter').mockImplementation(function (...args) {
+        work += this.length;
+        return filter.apply(this, args);
+      });
+      let records;
+      try { records = normalize(samples); }
+      finally {
+        iteratorSpy.mockRestore();
+        fragmentSpy.mockRestore();
+        mapSpy.mockRestore();
+        filterSpy.mockRestore();
+      }
+      return { records, work };
+    }
+    const { records, work } = measure(appleSleepToRecords);
+    // Count actual array visits rather than relying on machine-specific timings.
+    expect(work).toBeLessThan(samples.length * 100);
+    expect(records).toEqual([{
+      startTime: new Date(base).toISOString(), endTime: new Date(base + count * 2000).toISOString(),
+      stages: Array.from({ length: count * 2 }, (_, i) => ({
+        startTime: new Date(base + i * 1000).toISOString(), endTime: new Date(base + (i + 1) * 1000).toISOString(),
+        stage: i % 2 === 0 ? 5 : 4,
+      })),
+    }]);
+    // These mutations keep identical records but re-copy the growing source bucket.
+    for (const method of ['map', 'filter']) {
+      const quadratic = measure((source) => {
+        let bucket = [];
+        for (const item of source) {
+          bucket = bucket[method]((value) => method === 'map' ? value : true);
+          bucket.push(item);
+        }
+        return appleSleepToRecords(bucket);
+      });
+      expect(quadratic.records).toEqual(records);
+      expect(quadratic.work).toBeGreaterThanOrEqual(samples.length * 100);
+    }
+  });
+
+  test('exported normalizers reject oversized batches instead of reporting partial health data', () => {
+    const sleep = sample('2026-09-30T13:00:00Z', '2026-09-30T14:00:00Z', APPLE_SLEEP_VALUE.asleepCore);
+    expect(appleSleepToRecords(Array(5001).fill(sleep))).toEqual([]);
+    expect(appleRestingHrToRecords(Array(5001).fill({ startDate: sleep.startDate, quantity: 55, sourceId: 'watch' }))).toEqual([]);
+  });
+
+  test('overlapping stage unions agree with a pointwise precedence oracle', () => {
+    const base = Date.parse('2026-09-30T00:00:00Z');
+    const priority = [4, 5, 3, 1, 2]; // deep, REM, core, unspecified, awake
+    const codes = { 4: 5, 5: 6, 3: 4, 1: 2, 2: 1 };
+    let seed = 12345;
+    const next = (limit) => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed % limit; };
+    for (let fixture = 0; fixture < 30; fixture += 1) {
+      const intervals = Array.from({ length: 40 }, () => {
+        const start = next(90);
+        return { start, end: start + 1 + next(100 - start), value: next(6) };
+      });
+      const [record] = appleSleepToRecords(intervals.map(({ start, end, value }) =>
+        sample(new Date(base + start * 1000).toISOString(), new Date(base + end * 1000).toISOString(), value)));
+      const expected = [];
+      for (let second = 0; second < 100; second += 1) {
+        const value = priority.find((v) => intervals.some((iv) => iv.value === v && iv.start <= second && iv.end > second));
+        if (value === undefined) continue;
+        const startTime = new Date(base + second * 1000).toISOString();
+        const endTime = new Date(base + (second + 1) * 1000).toISOString();
+        const last = expected[expected.length - 1];
+        if (last?.stage === codes[value] && last.endTime === startTime) last.endTime = endTime;
+        else expected.push({ startTime, endTime, stage: codes[value] });
+      }
+      expect(record.stages ?? []).toEqual(expected);
+    }
+  });
+
   const night = [
     sample('2026-09-30T13:00:00Z', '2026-09-30T14:00:00Z', APPLE_SLEEP_VALUE.asleepCore),
     sample('2026-09-30T14:00:00Z', '2026-09-30T15:00:00Z', APPLE_SLEEP_VALUE.asleepDeep),
@@ -247,6 +343,25 @@ describe('bridge contract', () => {
     expect(await bridge.readDaily(7)).toEqual([]);
     expect(await bridge.hasGrantedPermissions()).toBe(false);
     expect(await bridge.requestPermissions()).toBe(false);
+  });
+
+  test.each(['sleep', 'restingHr'])('a truncated %s query is refused without sinking the other type', async (type) => {
+    Platform.OS = 'ios';
+    const bridge = await tryCreateAppleHealthBridge();
+    const sleep = { ...sample('2026-09-30T13:00:00Z', '2026-09-30T20:00:00Z', APPLE_SLEEP_VALUE.asleepCore),
+      sourceRevision: { source: { bundleIdentifier: 'watch' } } };
+    const restingHr = { ...rhr('2026-09-28', 53), sourceRevision: { source: { bundleIdentifier: 'watch' } } };
+    mockHealthKit.samples = type === 'sleep' ? Array(5001).fill(sleep) : [sleep];
+    mockHealthKit.restingHr = type === 'restingHr' ? Array(5001).fill(restingHr) : [restingHr];
+    expect(await bridge.readDaily(7)).toEqual(type === 'sleep'
+      ? [expect.objectContaining({ restingHrBpm: 53, inBedMin: null })]
+      : [expect.objectContaining({ restingHrBpm: null, inBedMin: 420 })]);
+    // A complete batch at the normalizer budget still contributes both types.
+    if (type === 'sleep') mockHealthKit.samples.pop();
+    else mockHealthKit.restingHr.pop();
+    const daily = await bridge.readDaily(7);
+    expect(daily.some((day) => day.inBedMin === 420)).toBe(true);
+    expect(daily.some((day) => day.restingHrBpm === 53)).toBe(true);
   });
 
   test('the production adapter reports an 8 h awake-only night as 0 asleep minutes (no fabricated sleep or HRV)', async () => {
