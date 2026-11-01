@@ -18,7 +18,7 @@ import {
 import { tryCreateBiometricsBridge } from '@ak/biometrics';
 import { palette, useStore } from './state/useStore';
 import { tryCreateDeviceEmbedder } from './inference/deviceEmbedder';
-import { NavigationProvider, useNavigation, type Tab } from './navigation/navigation';
+import { NavigationProvider, useNavigation, useSubViewBack, type Tab } from './navigation/navigation';
 import TodayScreen from './screens/TodayScreen';
 import ReadinessScreen from './screens/ReadinessScreen';
 import SessionScreen from './screens/SessionScreen';
@@ -133,6 +133,7 @@ export function AppShell(): React.JSX.Element {
     setSetupDismissed(false);
   }, [activeAthleteId]);
   const showProgramSetup = programSetupPending && !setupDismissed;
+  useSubViewBack(showProgramSetup, () => setSetupDismissed(true));
   const { tab, setTab } = useNavigation();
   const boot = useStore((s) => s.boot);
   const backupStartupSafe = useBackupStore((s) => s.startupSafe);

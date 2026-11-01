@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Platform } from 'react-native';
+import { NativeModules, Platform } from 'react-native';
 import type { DB } from '@op-engineering/op-sqlite';
 import {
   BACKUP_RESTORE_POLICY,
@@ -331,7 +331,7 @@ function quickCheck(handle: DB): boolean {
 function schemaContract(handle: DB): BackupSchemaObject[] {
   const objects = rows<{ type: string; name: string; tbl_name: string; sql: string }>(handle.executeSync(
     "SELECT type,name,tbl_name,coalesce(sql,'') AS sql FROM sqlite_master "
-      + "WHERE type IN ('table','index','trigger') AND name NOT LIKE 'sqlite_%' ORDER BY type,name",
+      + "WHERE type IN ('table','index','trigger') AND name NOT GLOB 'sqlite_*' ORDER BY type,name",
   ));
   return objects.map((object): BackupSchemaObject => {
     const columns = object.type !== 'table' ? [] : rows<{
@@ -528,7 +528,7 @@ async function prepareDatabaseSnapshot(
   try {
     if (!quickCheck(snapshotHandle)) throw new Error('A database snapshot did not pass its integrity check. No backup was saved.');
     userVersion = oneNumber(snapshotHandle, 'PRAGMA user_version', 'user_version');
-    tableCount = oneNumber(snapshotHandle, "SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'", 'count');
+    tableCount = oneNumber(snapshotHandle, "SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name NOT GLOB 'sqlite_*'", 'count');
     requireCurrentSchema(snapshotHandle, 'A database snapshot does not match the verified app schema. No backup was saved.');
   } finally { snapshotHandle.close(); }
   if (userVersion !== SCHEMA_VERSION || tableCount !== TABLE_COUNT) throw new Error('A database uses an unsupported schema. Update the app before backing up.');
@@ -620,10 +620,14 @@ async function pickerOpen(): Promise<string | null> {
     const [selected] = await picker.pick({
       mode: 'import', type: backupImportTypes(Platform.OS, picker.types.allFiles), allowMultiSelection: false, allowVirtualFiles: false,
     });
-    // The native import path copies before JavaScript regains control. Reject
-    // unknown or oversized provider metadata before asking it to make that
-    // private copy, then retain the post-copy stat as defence in depth.
+    // Metadata is only an early rejection; Android also enforces the byte
+    // limit while reading the provider, before writing private cache storage.
     validatePortableBackupFileSize(selected.size);
+    if (Platform.OS === 'android') {
+      const boundedCopy = NativeModules.AKBackupCopy as { copyBackup(uri: string): Promise<string> } | undefined;
+      if (boundedCopy === undefined) throw new Error('The selected backup could not be copied into private app storage.');
+      return await boundedCopy.copyBackup(selected.uri);
+    }
     const [copy] = await picker.keepLocalCopy({
       files: [{ uri: selected.uri, fileName: selected.name ?? 'selected.pmbak' }], destination: 'cachesDirectory',
     });
@@ -643,15 +647,16 @@ async function verifyStagedDatabase(
 ): Promise<void> {
   const handle = openDatabase(basename(path), dirname(path));
   try {
-    if (!quickCheck(handle)
-      || expected.userVersion !== sourceContract.userVersion
+    if (expected.userVersion !== sourceContract.userVersion
       || oneNumber(handle, 'PRAGMA user_version', 'user_version') !== sourceContract.userVersion
-      || oneNumber(handle, "SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'", 'count') !== sourceContract.tableCount) {
+      || oneNumber(handle, "SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name NOT GLOB 'sqlite_*'", 'count') !== sourceContract.tableCount) {
       throw new Error('A restored database failed validation. Existing data is unchanged.');
     }
+    // quick_check evaluates stored CHECK expressions, so only run trusted SQL.
     if (!matchesBackupSchemaContract(schemaContract(handle), sourceContract, mobileBackupCrypto)) {
       throw new Error('A restored database does not match the verified app schema. Existing data is unchanged.');
     }
+    if (!quickCheck(handle)) throw new Error('A restored database failed validation. Existing data is unchanged.');
   } finally { handle.close(); }
 }
 

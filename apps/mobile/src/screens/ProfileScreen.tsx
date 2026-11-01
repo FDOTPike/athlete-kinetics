@@ -34,8 +34,9 @@ import { SportPanel } from '../components/SportPanel';
 import { theme } from '../theme/theme';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { useStore } from '../state/useStore';
+import { useBackupStore } from '../state/backupStore';
 import { useSubViewBack } from '../navigation/navigation';
-import { Chip, Stepper, QuietAction, Disclosure, ListRow } from '../components/ui';
+import { Chip, Stepper, QuietAction, Disclosure, ListRow, PrimaryButton, SecondaryButton } from '../components/ui';
 import InfoTip from '../components/InfoTip';
 import { biometricsCopy, providerForPlatform } from '../state/biometricsCopy';
 import CoachVerificationLabScreen from './CoachVerificationLabScreen';
@@ -139,7 +140,9 @@ function OneRmRow({ label, valueKg, onChange }: OneRmRowProps): React.JSX.Elemen
       setText('');
       return;
     }
+    const snapped = Math.min(500, Math.max(20, Math.round(parsed / 2.5) * 2.5));
     onChange(parsed); // store snaps to 2.5 and clamps 20..500
+    setText(snapped.toFixed(1));
   };
   return (
     <View style={styles.field}>
@@ -266,6 +269,8 @@ export default function ProfileScreen(): React.JSX.Element {
   const switchProfile = useStore((s) => (s.status === 'ready' ? s.switchProfile : inertWhileClosed));
   const wipeActiveBlockState = useStore((s) => (s.status === 'ready' ? s.wipeActiveBlockState : inertWhileClosed));
   const session = useStore((s) => s.session);
+  const resetTrainingData = useStore((s) => s.resetTrainingData);
+  const backupWorking = useBackupStore((s) => s.status === 'working');
   const athletes = useStore((s) => s.athletes);
   const activeAthleteId = useStore((s) => s.activeAthleteId);
   const switchAthlete = useStore((s) => s.switchAthlete);
@@ -289,13 +294,28 @@ export default function ProfileScreen(): React.JSX.Element {
   }, [activeAthleteId, session, loadRecentOutcomes, databaseReady]);
 
   useEffect(() => {
-    setRecentMeasures(databaseReady ? loadMeasuredHistory(14) : []);
-  }, [activeAthleteId, loadMeasuredHistory, databaseReady]);
+    const measures = databaseReady ? loadMeasuredHistory(14) : [];
+    setRecentMeasures(measures);
+    const todayBw = measures.find((row) => row.date === today)?.bodyweightKg ?? null;
+    const hydrated = todayBw !== null ? todayBw.toFixed(1) : '';
+    savedBodyweightText.current = hydrated;
+    setBodyweightText(hydrated);
+  }, [activeAthleteId, today, loadMeasuredHistory, databaseReady]);
   // In-canvas double-confirm states (P2 & P5)
   const [confirmingDeleteAthleteId, setConfirmingDeleteAthleteId] = useState<string | null>(null);
   const [confirmingWipeBlock, setConfirmingWipeBlock] = useState(false);
+  const [resetAthleteId, setResetAthleteId] = useState<string | null>(null);
+  const [resetError, setResetError] = useState<string | null>(null);
   const [confirmingSwitchProfileId, setConfirmingSwitchProfileId] = useState<number | null>(null);
   const [confirmingDeleteBandLevel, setConfirmingDeleteBandLevel] = useState<number | null>(null);
+  useEffect(() => {
+    setConfirmingDeleteAthleteId(null);
+    setConfirmingWipeBlock(false);
+    setResetAthleteId(null);
+    setResetError(null);
+    setConfirmingSwitchProfileId(null);
+    setConfirmingDeleteBandLevel(null);
+  }, [activeAthleteId]);
   const [historyText, setHistoryText] = useState('');
   const [historyPreview, setHistoryPreview] = useState<HistoryParseResult | null>(null);
   const [historyNotice, setHistoryNotice] = useState<string | null>(null);
@@ -303,6 +323,7 @@ export default function ProfileScreen(): React.JSX.Element {
   const [includeImportReadiness, setIncludeImportReadiness] = useState(false);
   const [recentMeasures, setRecentMeasures] = useState<ReturnType<typeof loadMeasuredHistory>>([]);
   const [bodyweightText, setBodyweightText] = useState('');
+  const savedBodyweightText = useRef('');
   const [glossaryOpen, setGlossaryOpen] = useState(false);
   const [activitiesOpen, setActivitiesOpen] = useState(false);
   const [labOpen, setLabOpen] = useState(false);
@@ -844,8 +865,24 @@ export default function ProfileScreen(): React.JSX.Element {
             onEndEditing={() => {
               // A focused input can still end editing after the database closed.
               if (!databaseReady) return;
-              const value = Number.parseFloat(bodyweightText.replace(',', '.'));
-              saveBodyweight(today, Number.isFinite(value) && value >= 20 ? value : null);
+              if (bodyweightText === savedBodyweightText.current) return;
+              const trimmed = bodyweightText.trim();
+              if (trimmed === '') {
+                saveBodyweight(today, null);
+                savedBodyweightText.current = '';
+                setBodyweightText('');
+                setRecentMeasures(loadMeasuredHistory(14));
+                return;
+              }
+              const value = Number.parseFloat(trimmed.replace(',', '.'));
+              if (!Number.isFinite(value) || value < 20 || value > 500) {
+                setBodyweightText(savedBodyweightText.current);
+                return;
+              }
+              const saved = (Math.round(value * 10) / 10).toFixed(1);
+              saveBodyweight(today, value);
+              savedBodyweightText.current = saved;
+              setBodyweightText(saved);
               setRecentMeasures(loadMeasuredHistory(14));
             }}
             keyboardType="numeric"
@@ -976,6 +1013,65 @@ export default function ProfileScreen(): React.JSX.Element {
       </View>
 
       <BackupTransferPanel />
+
+      <View style={styles.mgmtSection} testID="reset-training-data-section">
+        <Disclosure label="Reset training data">
+          {resetAthleteId === null ? (
+            <View style={{ gap: theme.space[3] }}>
+              <Text style={styles.fieldHint}>
+                This removes training history, telemetry, blocks, and today's reports. Your profile and saved profile slots remain.
+              </Text>
+              <SecondaryButton
+                label="Continue to reset"
+                onPress={() => {
+                  setResetError(null);
+                  setResetAthleteId(activeAthleteId);
+                }}
+                disabled={session !== null || backupWorking || !databaseReady}
+                accessibilityLabel="Continue to reset training data"
+                testID="reset-continue-button"
+              />
+            </View>
+          ) : (
+            <View style={{ gap: theme.space[3] }}>
+              <Text style={styles.confirmText}>This cannot be undone. Reset the training data?</Text>
+              {resetError !== null && (
+                <Text style={styles.fieldHint} accessibilityRole="alert">{resetError}</Text>
+              )}
+              <PrimaryButton
+                label="Reset training data"
+                onPress={() => {
+                  if (resetAthleteId !== activeAthleteId || session !== null || backupWorking || !databaseReady) return;
+                  setResetError(null);
+                  resetTrainingData();
+                  const error = useStore.getState().error;
+                  setResetError(error);
+                  setRecentOutcomes(loadRecentOutcomes(20));
+                  setRecentMeasures(loadMeasuredHistory(14));
+                  if (error === null) {
+                    setResetAthleteId(null);
+                    // The reset deleted today's bodyweight, so nothing is saved now.
+                    savedBodyweightText.current = '';
+                    setBodyweightText('');
+                    setHistoryNotice(null);
+                  }
+                }}
+                disabled={session !== null || backupWorking || !databaseReady}
+                accessibilityLabel="Confirm reset training data"
+                testID="reset-confirm-button"
+              />
+              <SecondaryButton
+                label="Keep my data"
+                onPress={() => {
+                  setResetError(null);
+                  setResetAthleteId(null);
+                }}
+                testID="reset-keep-button"
+              />
+            </View>
+          )}
+        </Disclosure>
+      </View>
 
       {/* ---- Learning & Terminology Glossary ---- */}
       <View style={styles.mgmtSection} testID="learning-terminology-section">

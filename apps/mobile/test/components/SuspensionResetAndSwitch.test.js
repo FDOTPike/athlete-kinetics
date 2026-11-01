@@ -165,6 +165,14 @@ beforeEach(() => {
 // (b) resetTrainingData
 // ---------------------------------------------------------------------------
 
+test('a successful empty training-data reset clears an earlier store error', async () => {
+  await bootRealStore();
+  useStore.setState({ error: 'Earlier unrelated error' });
+
+  expect(store().resetTrainingData()).toBe(false);
+  expect(store().error).toBeNull();
+});
+
 test('a confirmed training-data reset clears the open episode in BOTH the database and memory', async () => {
   await bootRealStore();
   store().generateNewBlock('LINEAR');
