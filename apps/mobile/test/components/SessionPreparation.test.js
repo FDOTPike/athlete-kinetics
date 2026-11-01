@@ -615,3 +615,26 @@ describe('no fabricated preparation history', () => {
     expect(state().loadSessionPreparation(sessionId)).toBeNull();
   });
 });
+
+describe('a discomfort report that cannot open its transaction', () => {
+  test('returns false, records nothing and leaves the session running', () => {
+    const sessionId = startPlanned();
+    const real = mockDriver.executeSync.bind(mockDriver);
+    mockDriver.executeSync = (sql, params) => {
+      if (sql === 'BEGIN') throw new Error('database is locked');
+      return real(sql, params);
+    };
+    let saved;
+    try {
+      expect(() => { saved = state().reportNiggle('knee', 9); }).not.toThrow();
+    } finally {
+      mockDriver.executeSync = real;
+    }
+    expect(saved).toBe(false);
+    expect(state().error).toMatch(/database is locked/);
+    expect(count('SELECT COUNT(*) AS c FROM niggle')).toBe(0);
+    expect(state().niggles).toEqual([]);
+    expect(state().session.sessionId).toBe(sessionId);
+    expect(state().runner.phase).not.toBe('halted');
+  });
+});

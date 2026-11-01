@@ -7115,7 +7115,13 @@ export const useStore = create<KineticsStore>()((set, get) => {
       ? null
       : advanceSessionRunner(state.runner, { kind: 'NIGGLE', atMs: loggedAtMs, severity: safe });
     const d = getDb();
-    d.executeSync('BEGIN');
+    try {
+      d.executeSync('BEGIN');
+    } catch (error) {
+      // Nothing was opened, so nothing is rolled back; the form stays open to retry.
+      set({ error: error instanceof Error ? error.message : String(error) });
+      return false;
+    }
     try {
       d.executeSync(
         'INSERT INTO niggle (id, region, severity, reported_at_ms) VALUES (?, ?, ?, ?)',
