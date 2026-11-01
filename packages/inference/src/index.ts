@@ -351,6 +351,7 @@ export {
   replayRunner,
   restoreRunnerCheckpoint,
   restSecondsFor,
+  runnerTierForTrainingAge,
   serializeRunner,
   startRunner,
   type LegacyRunnerSlot,

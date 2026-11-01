@@ -671,3 +671,107 @@ test('skipping the final slot completes the session despite a hold, so ending st
   state().endSession();
   expect(state().session).toBeNull();
 });
+
+const BROAD_HOLD_EXPLANATION =
+  'This note covers specific exercises or activities. The coach cannot yet tell which suggestions it affects, so all suggestions stay on hold.';
+
+test('safety-4: TrainingSupportNotice shows the narrow-scope explanation on whole-prescription queries only when all active holds are narrow-scoped', () => {
+  const athlete = state().activeAthleteId;
+  const movementId = state().movements[0].movement_id;
+
+  // 1. Movement-scoped instruction hold only -> extra line shows on Plan and unscheduled Today
+  state().saveSupportInstruction(
+    athlete,
+    { instructionText: 'Scoped exercise note', scopes: [{ targetKind: 'movement', movementId }] },
+    state().getHealthSupportFacts().revision,
+  );
+  expect(state().isBroadHoldFromNarrowScopes()).toBe(true);
+  const planView = render(<BlockScreen />);
+  expect(planView.getByTestId('training-support-notice')).toBeTruthy();
+  expect(planView.getByText(BROAD_HOLD_EXPLANATION)).toBeTruthy();
+  planView.unmount();
+
+  const todayView = render(<TodayScreen />);
+  expect(todayView.getByTestId('training-support-notice')).toBeTruthy();
+  expect(todayView.getByText(BROAD_HOLD_EXPLANATION)).toBeTruthy();
+  todayView.unmount();
+
+  // 2. Add an unresolved instruction hold alongside the narrow hold -> extra line is NOT shown
+  state().saveSupportInstruction(
+    athlete,
+    { instructionText: 'Unresolved scope note', scopes: [{ targetKind: 'unresolved' }] },
+    state().getHealthSupportFacts().revision,
+  );
+  expect(state().isBroadHoldFromNarrowScopes()).toBe(false);
+  const mixedPlanView = render(<BlockScreen />);
+  expect(mixedPlanView.getByTestId('training-support-notice')).toBeTruthy();
+  expect(mixedPlanView.queryByText(BROAD_HOLD_EXPLANATION)).toBeNull();
+  mixedPlanView.unmount();
+});
+
+test('safety-4: activity-scoped hold shows the narrow-scope explanation; all_prescription, unscoped, and movement-targeted queries do not', () => {
+  const athlete = state().activeAthleteId;
+  state().saveOneOffActivity({
+    kindId: 'custom',
+    displayName: 'Morning swim',
+    demand: 'unknown',
+    facilityCode: null,
+    equipmentCode: null,
+    localDate: localToday(),
+    localStartMinute: null,
+    timezoneId: 'Australia/Sydney',
+    timing: 'flexible',
+    state: 'completed',
+    modalityId: 'unknown',
+    purposeId: 'recreation',
+    expectedDurationMin: null,
+    expectedEffort: null,
+    actualDurationMin: 30,
+    actualEffort: null,
+  });
+  const occurrenceId = state().activityLedger.occurrences[0].occurrenceId;
+
+  // 1. Activity-occurrence-scoped hold only -> extra line shows on Plan
+  state().saveSupportInstruction(
+    athlete,
+    { instructionText: 'Activity note', scopes: [{ targetKind: 'activity_occurrence', occurrenceId }] },
+    state().getHealthSupportFacts().revision,
+  );
+  expect(state().isBroadHoldFromNarrowScopes()).toBe(true);
+  const activityPlanView = render(<BlockScreen />);
+  expect(activityPlanView.getByText(BROAD_HOLD_EXPLANATION)).toBeTruthy();
+  activityPlanView.unmount();
+
+  // 2. Withdraw and test all_prescription hold -> extra line does NOT show
+  unhold();
+  state().saveSupportInstruction(
+    athlete,
+    { instructionText: 'All prescription note', scopes: [{ targetKind: 'all_prescription' }] },
+    state().getHealthSupportFacts().revision,
+  );
+  expect(state().isBroadHoldFromNarrowScopes()).toBe(false);
+  const allPrescriptionView = render(<BlockScreen />);
+  expect(allPrescriptionView.getByTestId('training-support-notice')).toBeTruthy();
+  expect(allPrescriptionView.queryByText(BROAD_HOLD_EXPLANATION)).toBeNull();
+  allPrescriptionView.unmount();
+
+  // 3. Withdraw, generate a block so Today has planned movements, then hold one of Today's movements:
+  // Today asks about todayPlan.slots movementIds (not all_prescription), so Today omits the extra line while Plan shows it.
+  unhold();
+  state().generateNewBlock();
+  const todaySlotMovementId = state().todayPlan.slots[0].movementId;
+  hold(todaySlotMovementId);
+  act(() => { useStore.setState({ healthSupportRevision: 99 }); });
+  expect(state().isBroadHoldFromNarrowScopes()).toBe(true);
+  expect(state().isBroadHoldFromNarrowScopes(state().todayPlan.slots.map((s) => s.movementId))).toBe(false);
+
+  const plannedTodayView = render(<TodayScreen />);
+  expect(plannedTodayView.getByTestId('training-support-notice')).toBeTruthy();
+  expect(plannedTodayView.queryByText(BROAD_HOLD_EXPLANATION)).toBeNull();
+  plannedTodayView.unmount();
+
+  const plannedBlockView = render(<BlockScreen />);
+  expect(plannedBlockView.getByTestId('training-support-notice')).toBeTruthy();
+  expect(plannedBlockView.getByText(BROAD_HOLD_EXPLANATION)).toBeTruthy();
+  plannedBlockView.unmount();
+});

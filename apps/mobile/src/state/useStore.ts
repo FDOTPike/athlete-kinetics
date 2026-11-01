@@ -48,7 +48,7 @@ import {
 } from './healthSupportStore';
 import type {
   HealthSupportPreferenceKind, HealthSupportNoteKind, HealthSupportReviewState,
-  PersonalizedAdviceTarget, TrainingSupportDecision,
+  HealthSupportScope, PersonalizedAdviceTarget, TrainingSupportDecision,
 } from '@ak/inference';
 import {
   inventoryFromRowCell,
@@ -765,6 +765,7 @@ export interface ReturnCheckinState {
 interface KineticsStore {
   healthSupportRevision: number;
   getTrainingSupportDecision: (movementIds?: readonly number[]) => TrainingSupportDecision;
+  isBroadHoldFromNarrowScopes: (movementIds?: readonly number[], decision?: TrainingSupportDecision) => boolean;
   requireTrainingSupport: (operation: SupportOperation, movementIds: readonly number[] | undefined, targetIdentity: string) => boolean;
   getHealthSupportFacts: () => SupportFacts;
   getHealthSupportDetails: (athleteId: string) => SupportDetails;
@@ -1140,10 +1141,12 @@ interface KineticsStore {
   applyDaySwap: (targetMovementId: number, option: DaySwapOption) => void;
   /** Log a niggle (append-only to 011) and add it to the active niggle set so
    *  the next SWAP un-hides Layer 3 / activates the guardrail. */
-  reportNiggle: (region: string, severity: number) => void;
+  /** True when the report was saved; false when it was refused or rolled back. */
+  reportNiggle: (region: string, severity: number) => boolean;
   /** Reload today's niggles from 011 into state (boot + day rollover). */
   refreshNiggles: () => void;
   refreshVector: () => void;
+  freeFormStartIsEmpty: () => boolean;
   startSession: (repeatPlanned?: boolean) => void;
   /** Append a logged set. `displayName` carries the prefix-engine
    *  concatenation (e.g. 'DB Bench Press') into the in-memory log payload;
@@ -1300,6 +1303,32 @@ const supportDecision = (ids?: readonly number[], operation?: SupportOperation, 
         : adapter.recordDecision(movementSupportTargets(ids), SUPPORT_ADVICE_KINDS[operation], `${operation}:${targetIdentity}`, Date.now());
   } catch { return { status: 'support_unavailable', holdIds: [] }; }
 };
+const isNarrowSupportScope = (scope: HealthSupportScope): boolean =>
+  (scope.targetKind === 'movement' && (scope.movementId ?? null) !== null)
+  || (scope.targetKind === 'activity_definition' && (scope.activityId ?? null) !== null)
+  || (scope.targetKind === 'activity_series' && (scope.seriesId ?? null) !== null)
+  || (scope.targetKind === 'activity_occurrence' && (scope.occurrenceId ?? null) !== null);
+export function isBroadHoldFromNarrowScopes(
+  movementIds?: readonly number[],
+  decision?: TrainingSupportDecision,
+): boolean {
+  if (movementIds !== undefined && movementIds.length > 0) return false;
+  try {
+    const resolved = decision ?? useStore.getState().getTrainingSupportDecision(movementIds);
+    if (resolved.status !== 'held' || resolved.holdIds.length === 0) return false;
+    const snapshot = supportAdapter().captureEvaluation();
+    const byId = new Map(snapshot.holds.map((hold) => [hold.holdId, hold]));
+    return resolved.holdIds.every((holdId) => {
+      const hold = byId.get(holdId);
+      return hold !== undefined
+        && hold.state === 'held'
+        && hold.scopes.length > 0
+        && hold.scopes.every(isNarrowSupportScope);
+    });
+  } catch {
+    return false;
+  }
+}
 const supportMessage = (decision: TrainingSupportDecision): string => decision.status === 'support_unavailable'
   ? SUPPORT_UNAVAILABLE_MESSAGE : SUPPORT_HELD_MESSAGE;
 const rowsOf = <T>(res: unknown): T[] => {
@@ -1743,6 +1772,77 @@ const capabilityAvailableMovementIds = (
     .filter((row) => row.state === 'available')
     .map((row) => row.movementId),
 );
+
+const seedFreeFormSessionPlan = (
+  d: DB,
+  movements: readonly Movement[],
+  profile: UserProfile,
+  capabilityAvailable: ReadonlySet<number>,
+  plannedSets: number,
+): PlanSlot[] => {
+  const lastMovements = rowsOf<{ movement_id: number }>(d.executeSync(
+    `SELECT movement_id FROM set_record
+     WHERE session_id = (
+       SELECT s.session_id FROM session s
+       JOIN set_record r ON r.session_id = s.session_id
+       ORDER BY s.session_id DESC LIMIT 1)
+     GROUP BY movement_id ORDER BY MIN(set_id)`,
+  ));
+  return lastMovements.flatMap((m) => {
+    const movement = movements.find((item) => item.movement_id === m.movement_id);
+    // Repeating old history is still a prescription route. A beginner may
+    // never inherit an Advanced movement from a prior athlete tier.
+    if (!permittedForProfile(movement, profile, 'weight_room') || !capabilityAvailable.has(m.movement_id)) return [];
+    const target = targetForMovement(movement, 5);
+    return [{
+      sessionPlanSlotId: 0,
+      movementId: m.movement_id,
+      plannedSets: defaultSetsForTarget(movement, plannedSets),
+      plannedReps: target.kind === 'reps' ? target.reps : null,
+      target,
+      provenanceKind: 'free_form' as const,
+      targetRpe: null,
+      sourcePlannedSlotId: null,
+      originalMovementId: null,
+      originalSessionDate: null,
+      overrideLoadKg: null,
+      overrideReason: null,
+    }];
+  });
+};
+
+/** True when `startSession()` (no repeat) would open a session with no
+ *  exercises: today's plan is absent or already used, and the most recent
+ *  logged session gives nothing this athlete may repeat. Reads only. */
+export function freeFormStartIsEmpty(): boolean {
+  if (db === null) return false;
+  const d = db;
+  try {
+    const { movements, profile, activePriorExperienceMovementIds, niggles, todayPlan, today } = useStore.getState();
+    // Past midnight the plan and niggles in state are yesterday's until startSession
+    // rolls the day over, so no prediction is made: the start goes ahead as before.
+    if (today !== localToday()) return false;
+    // Same rule as startSession: an unused plan for today is consumed, so the start is not empty.
+    if (todayPlan !== null) {
+      const alreadyPlannedToday = rowsOf<{ c: number }>(d.executeSync(
+        'SELECT COUNT(*) AS c FROM session_origin WHERE source_planned_session_id = ?',
+        [todayPlan.plannedSessionId],
+      ))[0]?.c ?? 0;
+      if (alreadyPlannedToday === 0) return false;
+    }
+    const capabilityAvailable = capabilityAvailableMovementIds(
+      d,
+      movements,
+      profile,
+      'weight_room',
+      new Set(activePriorExperienceMovementIds),
+      safetyExcludedMovementIdsFor(movements, profile, niggles),
+    );
+    return seedFreeFormSessionPlan(d, movements, profile, capabilityAvailable, 3).length === 0;
+  } catch {
+    return false;
+  }
+}
 
 export const PREPARATION_GATE_MESSAGE = 'Finish, skip or record your preparation before logging your first set.';
 
@@ -2828,6 +2928,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
   activeAthleteId: 'default',
   healthSupportRevision: 0,
   getTrainingSupportDecision: (ids) => supportDecision(ids),
+  isBroadHoldFromNarrowScopes: (ids, decision) => isBroadHoldFromNarrowScopes(ids, decision),
   requireTrainingSupport: (operation, ids, targetIdentity) => {
     const decision = supportDecision(ids, operation, targetIdentity);
     if (decision.status === 'available') {
@@ -6155,6 +6256,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
     set({ vector, trend, today });
   },
 
+  freeFormStartIsEmpty: () => freeFormStartIsEmpty(),
+
   startSession: (repeatPlanned) => {
     // Audit A2: double-start would orphan the first session's rows.
     if (get().session !== null) return;
@@ -6328,35 +6431,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       });
     } else {
       const plannedSets = Math.round(clamp(3 + setDelta, 1, 6));
-      const lastMovements = rowsOf<{ movement_id: number }>(d.executeSync(
-        `SELECT movement_id FROM set_record
-         WHERE session_id = (
-           SELECT s.session_id FROM session s
-           JOIN set_record r ON r.session_id = s.session_id
-           ORDER BY s.session_id DESC LIMIT 1)
-         GROUP BY movement_id ORDER BY MIN(set_id)`,
-      ));
-      sessionPlan = lastMovements.flatMap((m) => {
-        const movement = movements.find((item) => item.movement_id === m.movement_id);
-        // Repeating old history is still a prescription route. A beginner may
-        // never inherit an Advanced movement from a prior athlete tier.
-        if (!permittedForProfile(movement, profile, 'weight_room') || !capabilityAvailable.has(m.movement_id)) return [];
-        const target = targetForMovement(movement, 5);
-        return [{
-          sessionPlanSlotId: 0,
-          movementId: m.movement_id,
-          plannedSets: defaultSetsForTarget(movement, plannedSets),
-          plannedReps: target.kind === 'reps' ? target.reps : null,
-          target,
-          provenanceKind: 'free_form' as const,
-          targetRpe: null,
-          sourcePlannedSlotId: null,
-          originalMovementId: null,
-          originalSessionDate: null,
-          overrideLoadKg: null,
-          overrideReason: null,
-        }];
-      });
+      sessionPlan = seedFreeFormSessionPlan(d, movements, profile, capabilityAvailable, plannedSets);
     }
 
     // Preparation for THIS frozen plan, built before the transaction so the
@@ -7030,7 +7105,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
 
   reportNiggle: (region, severity) => {
     // Region must be a JOINTS member or the engine cannot apply its safety rules.
-    if (!JOINT_SET.has(region)) return;
+    if (!JOINT_SET.has(region)) return false;
     const safe = Math.round(clamp(severity, 1, 10));
     const loggedAtMs = Date.now();
     const id = `${loggedAtMs}-${niggleSeq++}-${Math.floor(Math.random() * 1e9).toString(36)}`;
@@ -7040,7 +7115,13 @@ export const useStore = create<KineticsStore>()((set, get) => {
       ? null
       : advanceSessionRunner(state.runner, { kind: 'NIGGLE', atMs: loggedAtMs, severity: safe });
     const d = getDb();
-    d.executeSync('BEGIN');
+    try {
+      d.executeSync('BEGIN');
+    } catch (error) {
+      // Nothing was opened, so nothing is rolled back; the form stays open to retry.
+      set({ error: error instanceof Error ? error.message : String(error) });
+      return false;
+    }
     try {
       d.executeSync(
         'INSERT INTO niggle (id, region, severity, reported_at_ms) VALUES (?, ?, ?, ?)',
@@ -7057,19 +7138,34 @@ export const useStore = create<KineticsStore>()((set, get) => {
     } catch (error) {
       try { d.executeSync('ROLLBACK'); } catch { /* no partial safety report */ }
       set({ error: error instanceof Error ? error.message : String(error) });
-      return;
+      return false;
+    }
+    // The report is committed. A failed preparation re-read must not hide it
+    // or its stop from the screen; the previous preparation stays until the next read.
+    let preparationUpdate: { preparation?: ReturnType<typeof readSessionPreparation> } = {};
+    if (state.session !== null) {
+      try {
+        preparationUpdate = { preparation: readSessionPreparation(d, state.session.sessionId) };
+      } catch { /* keep the previous preparation */ }
     }
     set({
       niggles: [...state.niggles, { region, severity: safe }],
       ...(nextRunner !== null && nextRunner !== state.runner ? runnerSelection(nextRunner) : {}),
-      ...(state.session !== null ? { preparation: readSessionPreparation(d, state.session.sessionId) } : {}),
+      ...preparationUpdate,
     });
     // A qualifying (but not halt-level) niggle immediately offers a route
     // around the movement. Halt-level reports block `logSet` at this boundary.
     if (nextRunner !== null && nextRunner.phase === 'working' &&
       nextRunner.substitutionOfferedForSessionPlanSlotId !== null && current !== null) {
-      get().openSubstitution(current.movementId);
+      // The report is already saved; a failure to open the sheet is shown, not
+      // turned into a failed save that a retry would duplicate.
+      try {
+        get().openSubstitution(current.movementId);
+      } catch (error) {
+        set({ error: error instanceof Error ? error.message : String(error) });
+      }
     }
+    return true;
   },
   refreshNiggles: () => {
     const rows = rowsOf<{ region: string; severity: number }>(
