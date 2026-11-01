@@ -19,10 +19,11 @@ jest.mock('../../src/state/useStore', () => ({
   useStore: (selector) => selector({ getTrainingSupportDecision: () => ({ status: 'available', holdIds: [] }), ...mockState }),
 }));
 
-// No timeout override. Measured 2026-11-01 (`npx jest --config
-// apps/mobile/jest.config.js --no-cache --maxWorkers=1 --verbose` on this
-// file): the first test takes about 7.6 s (the first BlockScreen render in the
-// worker) and the rest 19-49 ms. Every test here is synchronous, and Jest's
+// No timeout override. Measured 2026-11-01 with `npx jest --config
+// apps/mobile/jest.config.js --no-cache --maxWorkers=1 --verbose
+// --runTestsByPath apps/mobile/test/components/BlockAdjustmentsPanel.test.js`:
+// the first test takes 4.3-7.6 s (the first BlockScreen render in the worker)
+// and the rest 19-49 ms. Every test here is synchronous, and Jest's
 // 5 s timeout only interrupts async tests, so all seven pass without one. If a
 // test here becomes async, it will need a timeout.
 

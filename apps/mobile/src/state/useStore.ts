@@ -6010,14 +6010,17 @@ export const useStore = create<KineticsStore>()((set, get) => {
       movement_id: number;
       movement_name: string;
       rpe_delta: number;
-      set_delta: number;
+      applied_set_delta: number;
       reason: string;
     }>(d.executeSync(`
       SELECT pa.planned_slot_id,
              sl.movement_id,
              m.name AS movement_name,
              pa.rpe_delta,
-             pa.set_delta,
+             -- A time-policy movement keeps the policy's set count at commit
+             -- (defaultSetsForTarget), so its stored set delta was not applied.
+             CASE WHEN COALESCE(lm.mode, 'reps') = 'time' AND tp.movement_id IS NOT NULL
+                  THEN 0 ELSE pa.set_delta END AS applied_set_delta,
              pa.reason
       FROM planned_slot_autopilot pa
       JOIN planned_slot sl ON sl.planned_slot_id = pa.planned_slot_id
@@ -6038,7 +6041,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       movementId: r.movement_id,
       movementName: r.movement_name,
       rpeDelta: r.rpe_delta,
-      setDelta: r.set_delta,
+      setDelta: r.applied_set_delta,
       reason: r.reason,
     }));
   },

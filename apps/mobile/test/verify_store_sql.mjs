@@ -778,6 +778,12 @@ if (adjustmentsQuerySql) {
   a('getPendingAutopilotAdjustments leaves out a set-only row for a time-policy movement, keeps its RPE row, a timed movement with no policy, and a reps movement',
     JSON.stringify(timedIds) === JSON.stringify([951, 952, 953]),
     JSON.stringify(timedIds));
+  // The kept RPE row for a time-policy movement reports no set change: the
+  // block holds the policy's set count. Other rows report the stored delta.
+  const appliedSets = timedRows.map((r) => [r.planned_slot_id, r.rpe_delta, r.applied_set_delta]);
+  a('getPendingAutopilotAdjustments reports a set change of 0 for a time-policy movement and the stored set change otherwise',
+    JSON.stringify(appliedSets) === JSON.stringify([[951, -0.5, 0], [952, 0, -1], [953, 0, -1]]),
+    JSON.stringify(appliedSets));
   db.exec('ROLLBACK');
 }
 
