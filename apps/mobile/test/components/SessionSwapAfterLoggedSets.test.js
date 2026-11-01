@@ -661,9 +661,15 @@ test('after a swap with logged sets, the session_plan_slot_replacement link row 
     },
   ]);
 
+  // A reset is refused while a session is open (PR 97), so finish it first.
+  state().logSet(moveD, 8, 0, 8, undefined, undefined, undefined, undefined, slotD.sessionPlanSlotId);
+  state().endSession();
+  expect(state().session).toBeNull();
+
   raw().exec('PRAGMA foreign_keys = OFF;');
-  state().resetTrainingData();
+  const wasReset = state().resetTrainingData();
   raw().exec('PRAGMA foreign_keys = ON;');
+  expect(wasReset).toBe(true);
 
   const afterResetLinks = raw().prepare(
     'SELECT * FROM session_plan_slot_replacement',
