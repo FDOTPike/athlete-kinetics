@@ -317,6 +317,55 @@ test('applyRegression after 2 of 4 sets logged keeps A with planned_sets = 2 and
   expect(state().runner.phase).toBe('complete');
 });
 
+test('when the logged rows and the runner disagree, the swap keeps the runner count so the session still finishes', async () => {
+  let nowMs = 1_700_000_200_000;
+  jest.spyOn(Date, 'now').mockImplementation(() => ++nowMs);
+  await bootStore();
+  state().saveProfile({
+    training_age: 'intermediate',
+    equipment_inventory: ['barbell', 'squat_rack', 'dumbbells', 'bench', 'kettlebell'],
+  });
+  const today = state().today;
+  const moveA = idOf('Push-up');
+  const moveB = idOf('Incline Push-Up');
+  raw().prepare(
+    "INSERT INTO training_block (block_id, start_date, objective, created_at_ms, status) VALUES (1, ?, 'strength', 1000, 'active')",
+  ).run(today);
+  raw().prepare(
+    "INSERT INTO planned_session (planned_session_id, block_id, week_index, day_index, focus, phase, session_date) VALUES (100, 1, 1, 1, 'upper', 'accumulation', ?)",
+  ).run(today);
+  raw().prepare(
+    'INSERT INTO planned_slot (planned_slot_id, planned_session_id, slot_index, movement_id, sets, reps, target_rpe) VALUES (500, 100, 1, ?, 4, 6, 8)',
+  ).run(moveA);
+  state().refreshBlock();
+  state().startSession();
+  state().finishPreparation('already_warm', state().preparation.revision);
+  const slotA = state().sessionPlan[0];
+
+  state().logSet(moveA, 6, 0, 8, undefined, undefined, undefined, undefined, slotA.sessionPlanSlotId);
+  state().skipRunnerRest();
+  state().logSet(moveA, 6, 0, 8, undefined, undefined, undefined, undefined, slotA.sessionPlanSlotId);
+  state().skipRunnerRest();
+  // deleteSet has no screen caller today, but it leaves the runner's count at 2.
+  const lastSetId = raw().prepare('SELECT max(set_id) AS id FROM set_record WHERE session_id = ?').get(state().session.sessionId).id;
+  state().deleteSet(lastSetId);
+  const runnerCount = state().runner.slotSetCounts[0];
+
+  state().applyRegression(moveA, moveB, 1);
+  expect(state().error).toBeNull();
+
+  const plannedA = raw().prepare('SELECT planned_sets FROM session_plan_slot WHERE session_plan_slot_id = ?').get(slotA.sessionPlanSlotId).planned_sets;
+  expect({ db: plannedA, memory: state().sessionPlan[0].plannedSets, runner: state().runner.slots[0].sets })
+    .toEqual({ db: runnerCount, memory: runnerCount, runner: runnerCount });
+
+  const rowB = state().sessionPlan[1];
+  state().logSet(moveB, 6, 0, 8, undefined, undefined, undefined, undefined, rowB.sessionPlanSlotId);
+  expect(state().runner.phase).toBe('complete');
+  state().endSession();
+  expect(state().error).toBeNull();
+  expect(state().session).toBeNull();
+});
+
 test('with 0 sets logged, both applyDaySwap and applyRegression still replace in place and add no row', async () => {
   let nowMs = 1_700_000_200_000;
   jest.spyOn(Date, 'now').mockImplementation(() => ++nowMs);

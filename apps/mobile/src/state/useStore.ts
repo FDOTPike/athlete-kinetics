@@ -1756,6 +1756,14 @@ const capabilityMovementAvailability = (
   });
 };
 
+/** The finished count the runner keeps for a slot swapped after logged sets;
+ *  the database row and the in-memory plan use the same number, so the
+ *  checkpoint always matches the frozen plan. Falls back to the logged rows. */
+const retainedSetsForSwap = (runner: RunnerState | null, sessionPlanSlotId: number, loggedSetsCount: number): number => {
+  const index = runner === null ? -1 : runner.slots.findIndex((candidate) => candidate.sessionPlanSlotId === sessionPlanSlotId);
+  return Math.max(1, index >= 0 ? (runner!.slotSetCounts[index] ?? loggedSetsCount) : loggedSetsCount);
+};
+
 const capabilityAvailableMovementIds = (
   d: DB,
   movements: readonly Movement[],
@@ -6952,6 +6960,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       const d = getDb();
       let newSlotId = 0;
       let nextRunner = runner;
+      const retainedSets = retainedSetsForSwap(runner, slot.sessionPlanSlotId, loggedSetsCount);
       d.executeSync('BEGIN');
       try {
         const originalSlotRow = rowsOf<{ slot_index: number }>(
@@ -6965,7 +6974,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
         }
         d.executeSync(
           'UPDATE session_plan_slot SET planned_sets = ? WHERE session_plan_slot_id = ?',
-          [loggedSetsCount, slot.sessionPlanSlotId],
+          [retainedSets, slot.sessionPlanSlotId],
         );
         const laterSlots = rowsOf<{ session_plan_slot_id: number; slot_index: number }>(
           d.executeSync(
@@ -7016,7 +7025,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
           const origRunnerSlot = runner.slots.find((candidate) => candidate.sessionPlanSlotId === slot.sessionPlanSlotId);
           nextRunner = replaceSlotAfterLoggedSets(runner, {
             targetSessionPlanSlotId: slot.sessionPlanSlotId,
-            completedSets: loggedSetsCount,
+            completedSets: retainedSets,
             replacementSlot: {
               sessionPlanSlotId: newSlotId,
               plannedSlotId: slot.sourcePlannedSlotId,
@@ -7056,7 +7065,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       };
       const nextPlan = sessionPlan.flatMap((candidate) =>
         candidate.sessionPlanSlotId === slot.sessionPlanSlotId
-          ? [{ ...candidate, plannedSets: loggedSetsCount, replacedBySessionPlanSlotId: newSlotId }, newSlot]
+          ? [{ ...candidate, plannedSets: retainedSets, replacedBySessionPlanSlotId: newSlotId }, newSlot]
           : [candidate],
       );
       set({
@@ -7385,6 +7394,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       const chosenCount = replacementSets as number;
       let newSlotId = 0;
       let nextRunner = runner;
+      const retainedSets = retainedSetsForSwap(runner, targetSlot.sessionPlanSlotId, loggedSetsCount);
       d.executeSync('BEGIN');
       try {
         d.executeSync(
@@ -7404,7 +7414,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
         }
         d.executeSync(
           'UPDATE session_plan_slot SET planned_sets = ? WHERE session_plan_slot_id = ?',
-          [loggedSetsCount, targetSlot.sessionPlanSlotId],
+          [retainedSets, targetSlot.sessionPlanSlotId],
         );
         const laterSlots = rowsOf<{ session_plan_slot_id: number; slot_index: number }>(
           d.executeSync(
@@ -7455,7 +7465,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
           const origRunnerSlot = runner.slots.find((slot) => slot.sessionPlanSlotId === targetSlot.sessionPlanSlotId);
           nextRunner = replaceSlotAfterLoggedSets(runner, {
             targetSessionPlanSlotId: targetSlot.sessionPlanSlotId,
-            completedSets: loggedSetsCount,
+            completedSets: retainedSets,
             replacementSlot: {
               sessionPlanSlotId: newSlotId,
               plannedSlotId: option.plannedSlotId,
@@ -7495,7 +7505,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       };
       const nextPlan = sessionPlan.flatMap((slot) =>
         slot.sessionPlanSlotId === targetSlot.sessionPlanSlotId
-          ? [{ ...slot, plannedSets: loggedSetsCount, replacedBySessionPlanSlotId: newSlotId }, newSlot]
+          ? [{ ...slot, plannedSets: retainedSets, replacedBySessionPlanSlotId: newSlotId }, newSlot]
           : [slot],
       );
       set({
