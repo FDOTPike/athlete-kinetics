@@ -40,7 +40,8 @@
 import React, { useMemo } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { applyPrescriptionToSlot } from '@ak/inference';
-import { useStore } from '../state/useStore';
+import { useStore, freeFormStartIsEmpty } from '../state/useStore';
+import { useNavigation } from '../navigation/navigation';
 import TrainingSupportNotice from '../components/TrainingSupportNotice';
 import { theme } from '../theme/theme';
 import {
@@ -76,12 +77,16 @@ const READINESS_LABEL: Record<'OPTIMAL' | 'RECOVERY' | 'OVERREACHED', string> = 
 
 export default function TodayScreen(props: TodayScreenProps): React.JSX.Element {
   const state = useStore((s) => s);
+  const movementIds = state.todayPlan?.slots.map((slot) => slot.movementId);
   const decision = typeof state.getTrainingSupportDecision === 'function'
-    ? state.getTrainingSupportDecision(state.todayPlan?.slots.map((slot) => slot.movementId))
+    ? state.getTrainingSupportDecision(movementIds)
     : { status: 'support_unavailable' as const };
+  const narrowScopeOnly = decision.status === 'held' && typeof state.isBroadHoldFromNarrowScopes === 'function'
+    ? state.isBroadHoldFromNarrowScopes(movementIds, decision)
+    : false;
   if (state.status !== 'booting' && decision.status !== 'available') return <HeldScreenWithHalt lastTriage={state.lastTriage}>
     <TrainingSupportNotice
-      unavailable={decision.status === 'support_unavailable'} onOpenSession={state.session !== null ? props.onOpenSession : undefined} />
+      unavailable={decision.status === 'support_unavailable'} narrowScopeOnly={narrowScopeOnly} onOpenSession={state.session !== null ? props.onOpenSession : undefined} />
   </HeldScreenWithHalt>;
   return <AvailableTodayScreen {...props} />;
 }
@@ -102,9 +107,19 @@ function AvailableTodayScreen({
   const vector = useStore((s) => s.vector);
   const profile = useStore((s) => s.profile);
   const startSession = useStore((s) => s.startSession);
+  const storeFreeFormStartIsEmpty = useStore((s) => s.freeFormStartIsEmpty);
   const refreshVector = useStore((s) => s.refreshVector);
   const recordedDurationsForFocus = useStore((s) => s.recordedDurationsForFocus);
   const error = useStore((s) => s.error);
+  const nav = typeof useNavigation === 'function' ? useNavigation() : undefined;
+
+  const [emptyStartPromptOpen, setEmptyStartPromptOpen] = React.useState(false);
+  const checkFreeFormStartIsEmpty = React.useCallback((): boolean => {
+    if (typeof storeFreeFormStartIsEmpty === 'function') return storeFreeFormStartIsEmpty();
+    if (typeof freeFormStartIsEmpty === 'function') return freeFormStartIsEmpty();
+    return false;
+  }, [storeFreeFormStartIsEmpty]);
+
   const todaysVector = prescription != null && prescription.forDate === today
     ? prescription.vector
     : null;
@@ -156,6 +171,51 @@ function AvailableTodayScreen({
     setAwaitingStart(true);
     startSession();
   }, [startSession]);
+  const startUnplannedAndOpen = React.useCallback(() => {
+    if (checkFreeFormStartIsEmpty()) {
+      setEmptyStartPromptOpen(true);
+      return;
+    }
+    startAndOpen();
+  }, [checkFreeFormStartIsEmpty, startAndOpen]);
+  const renderUnplannedStartControl = (control: {
+    label: string;
+    accessibilityLabel: string;
+    testID: string;
+  }): React.JSX.Element => {
+    if (emptyStartPromptOpen) {
+      return (
+        <View style={styles.card} testID="empty-free-form-start-card">
+          <Text style={styles.title}>Nothing to start yet</Text>
+          <Text style={styles.body}>
+            There is no plan for today and no earlier session to repeat. Build your plan first.
+          </Text>
+          <PrimaryButton
+            label="Go to Plan"
+            onPress={() => {
+              setEmptyStartPromptOpen(false);
+              onOpenPlan?.();
+              nav?.setTab('coach');
+            }}
+            accessibilityLabel="Go to Plan"
+          />
+          <QuietAction
+            label="Cancel"
+            onPress={() => setEmptyStartPromptOpen(false)}
+            accessibilityLabel="Cancel"
+          />
+        </View>
+      );
+    }
+    return (
+      <QuietAction
+        label={control.label}
+        onPress={startUnplannedAndOpen}
+        accessibilityLabel={control.accessibilityLabel}
+        testID={control.testID}
+      />
+    );
+  };
   React.useEffect(() => {
     if (!awaitingStart) return;
     setAwaitingStart(false);
@@ -292,12 +352,11 @@ function AvailableTodayScreen({
             {/* Sol R4 F3: no "Start workout" here. The planned attempt is
                 closed, and the store starts any further session as free_form,
                 so the only start offered says plainly that it is unplanned. */}
-            <QuietAction
-              label="Start an extra unplanned session"
-              onPress={startAndOpen}
-              accessibilityLabel="Start an extra unplanned session today"
-              testID="today-stopped-extra"
-            />
+            {renderUnplannedStartControl({
+              label: 'Start an extra unplanned session',
+              accessibilityLabel: 'Start an extra unplanned session today',
+              testID: 'today-stopped-extra',
+            })}
           </View>
         );
 
@@ -313,12 +372,11 @@ function AvailableTodayScreen({
                 invites a duplicate of work already banked. The extra session
                 below is the SAME ad-hoc path Coach already offers, and it is
                 deliberately quiet. */}
-            <QuietAction
-              label="Start an extra session"
-              onPress={startAndOpen}
-              accessibilityLabel="Start an extra unplanned session today"
-              testID="today-extra-session"
-            />
+            {renderUnplannedStartControl({
+              label: 'Start an extra session',
+              accessibilityLabel: 'Start an extra unplanned session today',
+              testID: 'today-extra-session',
+            })}
           </View>
         );
 
@@ -345,12 +403,11 @@ function AvailableTodayScreen({
               accessibilityLabel="Open your plan to see unfinished sessions"
               testID="today-primary-plan"
             />
-            <QuietAction
-              label="Start a session now"
-              onPress={startAndOpen}
-              accessibilityLabel="Start an unplanned session now"
-              testID="today-adhoc-session"
-            />
+            {renderUnplannedStartControl({
+              label: 'Start a session now',
+              accessibilityLabel: 'Start an unplanned session now',
+              testID: 'today-adhoc-session',
+            })}
           </View>
         );
 
@@ -362,12 +419,11 @@ function AvailableTodayScreen({
             <Text style={styles.body}>
               Your plan schedules recovery today. That is the work.
             </Text>
-            <QuietAction
-              label="Start a session anyway"
-              onPress={startAndOpen}
-              accessibilityLabel="Start an unplanned session on a scheduled rest day"
-              testID="today-adhoc-session"
-            />
+            {renderUnplannedStartControl({
+              label: 'Start a session anyway',
+              accessibilityLabel: 'Start an unplanned session on a scheduled rest day',
+              testID: 'today-adhoc-session',
+            })}
           </View>
         );
 
@@ -402,12 +458,11 @@ function AvailableTodayScreen({
               accessibilityLabel="Open your plan"
               testID="today-primary-plan"
             />
-            <QuietAction
-              label="Start a session now"
-              onPress={startAndOpen}
-              accessibilityLabel="Start an unplanned session now"
-              testID="today-adhoc-session"
-            />
+            {renderUnplannedStartControl({
+              label: 'Start a session now',
+              accessibilityLabel: 'Start an unplanned session now',
+              testID: 'today-adhoc-session',
+            })}
           </View>
         );
       }

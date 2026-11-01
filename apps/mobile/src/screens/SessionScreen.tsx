@@ -2,8 +2,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING_NOTE, EFFORT_STOP_GUIDANCE, effortCue, mapRirToRpe, RIR_OPTIONS, PREPARATION_STATUS_LABEL, isTerminalPreparationStatus, preparationDoseUnit, type EffortAnswer, type RunnerHaltReason } from '@ak/inference';
-import { formatTeachingOnlyReason, useStore, type LoadSelection, type LoggedSet, type SetLoadShown, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
-import { useSubViewBack } from '../navigation/navigation';
+import { EXPERIENCE_SEVERITY, runnerTierForTrainingAge } from '../../../../packages/inference/src/sessionRunner';
+import { formatTeachingOnlyReason, freeFormStartIsEmpty, useStore, type LoadSelection, type LoggedSet, type SetLoadShown, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
+import { useNavigation, useSubViewBack } from '../navigation/navigation';
 import { buildSessionSummary, NO_NEXT_SESSION_TEXT } from '../state/sessionSummary';
 import { SUPPORT_HELD_MESSAGE, SUPPORT_UNAVAILABLE_MESSAGE } from '../state/healthSupportStore';
 import { theme } from '../theme/theme';
@@ -283,6 +284,8 @@ export interface SessionScreenProps {
    * renders standalone in component tests.
    */
   onReturnToToday?: () => void;
+  /** Shell-supplied: open the PLAN tab when starting an empty unplanned session is blocked. */
+  onOpenPlan?: () => void;
 }
 
 /**
@@ -290,8 +293,15 @@ export interface SessionScreenProps {
  * completion screen shown after a session ends (its saved outcome, the
  * summary of what was done, and the optional record of how it went).
  */
-export default function SessionScreen({ onReturnToToday }: SessionScreenProps = {}): React.JSX.Element {
+export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionScreenProps = {}): React.JSX.Element {
   const state = useStore((s) => s);
+  const nav = typeof useNavigation === 'function' ? useNavigation() : undefined;
+  const [emptyStartPromptOpen, setEmptyStartPromptOpen] = useState(false);
+  const checkFreeFormStartIsEmpty = (): boolean => {
+    if (typeof state.freeFormStartIsEmpty === 'function') return state.freeFormStartIsEmpty();
+    if (typeof freeFormStartIsEmpty === 'function') return freeFormStartIsEmpty();
+    return false;
+  };
   const {
     movements, session, sessionPlan, activeSessionPlanSlotId, profile, oneRepMaxes,
     lastTriage, substitution, startSession, selectMovementSlot, setMovementPreference,
@@ -346,7 +356,10 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [niggleRegion, setNiggleRegion] = useState<string | null>(null);
   const [niggleSeverity, setNiggleSeverity] = useState(4);
+  const [niggleSavedNotice, setNiggleSavedNotice] = useState(false);
   const [bandLevel, setBandLevel] = useState<number | null>(null);
+  // The runner stops on the tier it started with; fall back to the profile before it starts.
+  const haltMin = EXPERIENCE_SEVERITY[runnerTierForTrainingAge(state.runner?.tier ?? profile.training_age)].haltMin;
   const advancedRest = useRef<string | null>(null);
 
   // Session feel (070): the sub-view that records how the ended session went.
@@ -354,12 +367,20 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
   const [feelRevision, setFeelRevision] = useState(0);
   useEffect(() => { setFeelOpen(false); }, [lastEndedSessionId]);
 
+  type PendingSubstitution =
+    | { kind: 'regression'; option: NonNullable<typeof substitution>['result']['layer1Regression']['options'][number] }
+    | { kind: 'daySwap'; option: NonNullable<typeof substitution>['result']['layer2DaySwap']['options'][number] };
+  const [pendingSub, setPendingSub] = useState<PendingSubstitution | null>(null);
+  const [pendingSubSets, setPendingSubSets] = useState<number>(1);
+  useEffect(() => { setPendingSub(null); }, [substitution]);
+
   const hasSubView = feelOpen || detailsOpen || safetyOpen || niggleRegion !== null || substitution !== null;
   useSubViewBack(hasSubView, () => {
     if (feelOpen) setFeelOpen(false);
     else if (detailsOpen) setDetailsOpen(false);
     else if (safetyOpen) setSafetyOpen(false);
     else if (niggleRegion !== null) setNiggleRegion(null);
+    else if (pendingSub !== null) setPendingSub(null);
     else if (substitution !== null) closeSubstitution();
   });
 
@@ -435,12 +456,26 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
   };
   const runnerCurrent = runner?.slots?.[runner.slotIndex ?? -1];
   const runnerCurrentId = runnerCurrent?.sessionPlanSlotId ?? null;
-  const selected = activeSessionPlanSlotId === null ? null : sessionPlan.find((slot) => slot.sessionPlanSlotId === activeSessionPlanSlotId) ?? null;
-  const firstIncomplete = sessionPlan.find((slot) => loggedCount(slot) < slot.plannedSets) ?? null;
+  const selectedCandidate = activeSessionPlanSlotId === null ? null : sessionPlan.find((slot) => slot.sessionPlanSlotId === activeSessionPlanSlotId) ?? null;
+  const selected = selectedCandidate !== null && selectedCandidate.replacedBySessionPlanSlotId == null ? selectedCandidate : null;
+  const firstIncomplete = sessionPlan.find((slot) => slot.replacedBySessionPlanSlotId == null && loggedCount(slot) < slot.plannedSets) ?? null;
   const fallback = selected !== null && loggedCount(selected) < selected.plannedSets ? selected : firstIncomplete;
   const currentSlot = runnerCurrentId !== null ? sessionPlan.find((slot) => slot.sessionPlanSlotId === runnerCurrentId) ?? fallback : fallback;
   const currentMovement: Movement | null = currentSlot === null ? null : byId.get(runnerCurrent?.movementId ?? currentSlot.movementId) ?? byId.get(currentSlot.movementId) ?? null;
   const currentLogged = currentSlot === null ? 0 : (runner !== null && (runner.slotIndex ?? -1) >= 0 && runner.slotSetCounts?.[runner.slotIndex] != null ? Math.max(loggedCount(currentSlot), runner.slotSetCounts[runner.slotIndex]) : loggedCount(currentSlot));
+  const subTargetSlot = substitution === null
+    ? null
+    : (currentSlot !== null && currentSlot.movementId === substitution.targetId
+        ? currentSlot
+        : sessionPlan.find((slot) => slot.movementId === substitution.targetId && slot.replacedBySessionPlanSlotId == null) ?? currentSlot);
+  const subTargetLogged = subTargetSlot === null
+    ? 0
+    : subTargetSlot.sessionPlanSlotId === currentSlot?.sessionPlanSlotId
+      ? currentLogged
+      : loggedCount(subTargetSlot);
+  const subTargetMovementName = (subTargetSlot !== null ? byId.get(subTargetSlot.movementId)?.name : undefined)
+    ?? (substitution !== null ? byId.get(substitution.targetId)?.name : undefined)
+    ?? 'Movement';
   const allDone = sessionPlan.length > 0 && sessionPlan.every((slot) => loggedCount(slot) >= slot.plannedSets);
   const triageHalted = lastTriage?.kind === 'matched' && lastTriage.directive.halt;
   const runnerComplete = runnerPhase === 'complete';
@@ -521,7 +556,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
 
   useEffect(() => {
     if (currentSlot === null || target === null) return;
-    setDetailsOpen(false); setSafetyOpen(false); setNiggleRegion(null); setNiggleSeverity(4); setBandLevel(null);
+    setDetailsOpen(false); setSafetyOpen(false); setNiggleRegion(null); setNiggleSeverity(4); setNiggleSavedNotice(false); setBandLevel(null);
     setReps(target.kind === 'reps' ? target.reps : 1);
     setSeconds(target.kind === 'time' ? target.seconds : 30);
     // Initialize the load draft ONCE per set key from the resolver output.
@@ -769,12 +804,42 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
             : 'Your session will stay in one clear vertical timeline.'}
         </Text>
         {!blocked && (
-          <PrimaryButton
-            label="Start session"
-            onPress={() => startSession()}
-            accessibilityLabel="Start a new workout session"
-            style={{ marginTop: theme.space[5] }}
-          />
+          emptyStartPromptOpen ? (
+            <View style={[styles.emptyCard, { marginTop: theme.space[5] }]} testID="empty-free-form-start-card">
+              <Text style={styles.emptyTitle}>Nothing to start yet</Text>
+              <Text style={styles.emptyBody}>
+                There is no plan for today and no earlier session to repeat. Build your plan first.
+              </Text>
+              <PrimaryButton
+                label="Go to Plan"
+                onPress={() => {
+                  setEmptyStartPromptOpen(false);
+                  onOpenPlan?.();
+                  nav?.setTab('coach');
+                }}
+                accessibilityLabel="Go to Plan"
+                style={{ marginTop: theme.space[4] }}
+              />
+              <QuietAction
+                label="Cancel"
+                onPress={() => setEmptyStartPromptOpen(false)}
+                accessibilityLabel="Cancel"
+              />
+            </View>
+          ) : (
+            <PrimaryButton
+              label="Start session"
+              onPress={() => {
+                if (checkFreeFormStartIsEmpty()) {
+                  setEmptyStartPromptOpen(true);
+                  return;
+                }
+                startSession();
+              }}
+              accessibilityLabel="Start a new workout session"
+              style={{ marginTop: theme.space[5] }}
+            />
+          )
         )}
       </View>
     );
@@ -837,7 +902,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
     : formatTeachingOnlyReason(currentAvailability);
 
   const chooseSlot = (slot: PlanSlot): void => {
-    if (mode === 'guided' || loggedCount(slot) >= slot.plannedSets) return;
+    if (mode === 'guided' || slot.replacedBySessionPlanSlotId != null || loggedCount(slot) >= slot.plannedSets) return;
     selectMovementSlot(slot.sessionPlanSlotId);
   };
 
@@ -909,8 +974,17 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
 
   const submitNiggle = (): void => {
     if (niggleRegion === null) return;
-    reportNiggle(niggleRegion, niggleSeverity);
+    // A report that did not save keeps the form open and claims nothing.
+    if (reportNiggle(niggleRegion, niggleSeverity) !== true) {
+      setNiggleSavedNotice(false);
+      return;
+    }
     setSafetyOpen(false);
+    const after = typeof useStore.getState === 'function' ? useStore.getState() : state;
+    const afterHalted = after?.runner?.phase === 'halted'
+      || (after?.runner?.phase !== 'complete' && after?.lastTriage?.kind === 'matched' && after.lastTriage.directive.halt);
+    const afterSubstitutionOpened = after?.substitution !== null && after?.substitution !== undefined;
+    setNiggleSavedNotice(!afterHalted && !afterSubstitutionOpened);
   };
 
   const setup = lines(currentMovement?.instructions, 4);
@@ -943,7 +1017,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
             <Text style={styles.headerTitle}>Before your first set</Text>
             <Text style={styles.headerMeta}>
               {sessionPlan.length === 0
-                ? 'No movements are planned yet. Prepare first, then add your work.'
+                ? 'No movements are planned yet.'
                 : `${sessionPlan.length} exercise${sessionPlan.length === 1 ? '' : 's'} planned after preparation.`}
             </Text>
           </View>
@@ -1037,7 +1111,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
         {!halted && !complete && sessionPlan.length === 0 && (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyTitle}>No exercise is queued.</Text>
-            <Text style={styles.emptyBody}>Return to Coach to create a session plan, then come back here.</Text>
+            <Text style={styles.emptyBody}>Finish this session, then build your plan on the PLAN tab.</Text>
             <SecondaryButton
               label="Finish session"
               onPress={endSession}
@@ -1055,12 +1129,45 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                 ? movement.media.fallbackUrl
                 : null;
               const logged = loggedCount(slot);
-              const finished = logged >= slot.plannedSets;
+              const isReplaced = slot.replacedBySessionPlanSlotId != null;
+              const replacedBySlot = isReplaced
+                ? sessionPlan.find((candidate) => candidate.sessionPlanSlotId === slot.replacedBySessionPlanSlotId) ?? null
+                : null;
+              const finished = isReplaced || logged >= slot.plannedSets;
               // Cross-movement rest still belongs to the just-finished slot.
               // Keep it active so the rest controls remain reachable.
-              const active = currentSlot?.sessionPlanSlotId === slot.sessionPlanSlotId && (!finished || resting);
-              const skipped = runner?.skippedSessionPlanSlotIds.includes(slot.sessionPlanSlotId) ?? false;
-              const selectable = mode === 'self_directed' && !finished && !active && !resting && !skipped;
+              const active = !isReplaced && currentSlot?.sessionPlanSlotId === slot.sessionPlanSlotId && (!finished || resting);
+              const skipped = !isReplaced && (runner?.skippedSessionPlanSlotIds.includes(slot.sessionPlanSlotId) ?? false);
+              const selectable = mode === 'self_directed' && !isReplaced && !finished && !active && !resting && !skipped;
+
+              if (isReplaced) {
+                const completedSets = session?.sets.filter((set) => sameSlot(set, slot)) ?? [];
+                const name = movement?.name ?? 'Movement';
+                const replacementName = (replacedBySlot !== null ? byId.get(replacedBySlot.movementId)?.name : undefined) ?? 'Movement';
+                const swappedMeta = `Swapped for ${replacementName} · ${logged} ${logged === 1 ? 'set' : 'sets'} logged`;
+                const swappedLabel = `Swapped for ${replacementName} · ${name} · ${logged} ${logged === 1 ? 'set' : 'sets'} logged`;
+
+                return (
+                  <View
+                    key={slot.sessionPlanSlotId}
+                    style={[styles.timelineRow, styles.replacedRow]}
+                    accessibilityRole="text"
+                    accessibilityLabel={swappedLabel}
+                    accessibilityState={{ disabled: true }}
+                  >
+                    <View style={styles.rail}>
+                      <View style={[styles.dot, styles.dotComplete]}>
+                        <Text style={styles.check}>✓</Text>
+                      </View>
+                    </View>
+                    <View style={styles.completeRow}>
+                      <Text style={styles.completeRowName} numberOfLines={1}>{name}</Text>
+                      <Text style={styles.completeRowMeta}>{swappedMeta}</Text>
+                      <CompletedMetrics sets={completedSets} bandLadder={bandLadder} movementsById={byId} onEdit={editSet} />
+                    </View>
+                  </View>
+                );
+              }
 
               if (finished && !active) {
                 const completedSets = session?.sets.filter((set) => sameSlot(set, slot)) ?? [];
@@ -1515,7 +1622,10 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                           />
                           <SecondaryButton
                             label="Report discomfort"
-                            onPress={() => setSafetyOpen((value) => !value)}
+                            onPress={() => {
+                              setSafetyOpen((value) => !value);
+                              setNiggleSavedNotice(false);
+                            }}
                             accessibilityLabel="Report discomfort"
                             style={{ flex: 1, minHeight: theme.touch.min }}
                           />
@@ -1555,15 +1665,23 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                                 );
                               })}
                             </View>
+                            {niggleSeverity >= haltMin && (
+                              <Text style={styles.loadEvidence}>
+                                At this level the session stops for today.
+                              </Text>
+                            )}
                             <View style={{ marginTop: theme.space[3] }}>
                               <PrimaryButton
-                                label={niggleSeverity >= 8 ? 'Stop session' : 'Find an alternative'}
+                                label={niggleSeverity >= haltMin ? 'Save report and stop session' : 'Save report'}
                                 onPress={submitNiggle}
                                 disabled={niggleRegion === null}
-                                accessibilityLabel="Save discomfort report"
+                                accessibilityLabel={niggleSeverity >= haltMin ? 'Save discomfort report and stop session' : 'Save discomfort report'}
                               />
                             </View>
                           </View>
+                        )}
+                        {!safetyOpen && niggleSavedNotice && substitution === null && !halted && (
+                          <Text style={styles.loadEvidence}>Report saved with this session.</Text>
                         )}
 
                         {/* Stop Session outlined full-width SecondaryButton */}
@@ -1586,72 +1704,158 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
 
         {!halted && !complete && substitution !== null && (
           <View style={styles.substitution}>
-            <View style={styles.subHeader}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.subTitle}>Choose an alternative</Text>
-                <Text style={styles.subBody}>Your completed sets stay recorded. The replacement carries the remaining work.</Text>
-              </View>
-              <Pressable onPress={closeSubstitution} accessibilityRole="button" accessibilityLabel="Close substitution options" style={styles.close}>
-                <Text style={styles.closeText}>×</Text>
-              </Pressable>
-            </View>
-            {substitution.result.haltAdvised && (
-              <View style={styles.subHalt}>
-                <Text style={styles.subHaltText}>This report needs a pause rather than another exercise today.</Text>
-                <SecondaryButton
-                  label="Stop session"
-                  onPress={() => runnerHalt('safety')}
-                  accessibilityLabel="Halt session from substitution safety advice"
-                  fullWidth={true}
-                  style={{ marginTop: theme.space[3] }}
-                />
-              </View>
+            {pendingSub !== null && subTargetLogged > 0 ? (
+              <>
+                <View style={styles.subHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.subTitle}>{`Sets of ${pendingSub.option.name}`}</Text>
+                    <Text style={styles.subBody}>
+                      {`${subTargetLogged} logged ${subTargetLogged === 1 ? 'set' : 'sets'} of ${subTargetMovementName} ${subTargetLogged === 1 ? 'is' : 'are'} kept.`}
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={() => {
+                      setPendingSub(null);
+                      closeSubstitution();
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Close substitution options"
+                    style={styles.close}
+                  >
+                    <Text style={styles.closeText}>×</Text>
+                  </Pressable>
+                </View>
+                <View style={styles.rirChoicesRow}>
+                  {[1, 2, 3, 4, 5, 6].map((k) => (
+                    <Chip
+                      key={k}
+                      label={String(k)}
+                      selected={pendingSubSets === k}
+                      onPress={() => setPendingSubSets(k)}
+                      accessibilityLabel={k === 1 ? `1 set of ${pendingSub.option.name}` : `${k} sets of ${pendingSub.option.name}`}
+                      style={styles.rirChip}
+                    />
+                  ))}
+                </View>
+                <View style={{ marginTop: theme.space[3], gap: theme.space[2] }}>
+                  <PrimaryButton
+                    label={pendingSub.kind === 'regression' ? `Use ${pendingSub.option.name} instead` : `Move ${pendingSub.option.name} forward into this session`}
+                    accessibilityLabel={pendingSub.kind === 'regression' ? `Use ${pendingSub.option.name} instead` : `Move ${pendingSub.option.name} forward into this session`}
+                    onPress={() => {
+                      const targetId = substitution.targetId;
+                      const chosen = pendingSub;
+                      const chosenSets = pendingSubSets;
+                      setPendingSub(null);
+                      if (chosen.kind === 'regression') {
+                        applyRegression(targetId, chosen.option.movement_id, chosenSets);
+                      } else {
+                        applyDaySwap(targetId, chosen.option, chosenSets);
+                      }
+                    }}
+                  />
+                  <QuietAction label="Cancel" accessibilityLabel="Cancel" onPress={() => setPendingSub(null)} />
+                </View>
+              </>
+            ) : (
+              <>
+                <View style={styles.subHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.subTitle}>Choose an alternative</Text>
+                    <Text style={styles.subBody}>Your completed sets stay recorded. The replacement carries the remaining work.</Text>
+                  </View>
+                  <Pressable onPress={closeSubstitution} accessibilityRole="button" accessibilityLabel="Close substitution options" style={styles.close}>
+                    <Text style={styles.closeText}>×</Text>
+                  </Pressable>
+                </View>
+                {substitution.result.haltAdvised && (
+                  <View style={styles.subHalt}>
+                    <Text style={styles.subHaltText}>This report needs a pause rather than another exercise today.</Text>
+                    <SecondaryButton
+                      label="Stop session"
+                      onPress={() => runnerHalt('safety')}
+                      accessibilityLabel="Halt session from substitution safety advice"
+                      fullWidth={true}
+                      style={{ marginTop: theme.space[3] }}
+                    />
+                  </View>
+                )}
+                <View style={{ marginTop: theme.space[3] }}>
+                  {substitution.result.layer1Regression.options.map((option) => {
+                    const avail = availabilityMap.get(option.movement_id);
+                    // Fail closed: only an explicit 'available' verdict is selectable.
+                    // The store refuses the swap anyway; the sheet must not offer it.
+                    const selectable = avail?.state === 'available';
+                    const isTeachingOnly = !selectable;
+                    return (
+                      <Pressable
+                        key={option.movement_id}
+                        disabled={!selectable}
+                        onPress={() => {
+                          if (subTargetLogged > 0) {
+                            setPendingSubSets(clamp((subTargetSlot?.plannedSets ?? 1) - subTargetLogged, 1, 6));
+                            setPendingSub({ kind: 'regression', option });
+                          } else {
+                            applyRegression(substitution.targetId, option.movement_id);
+                          }
+                        }}
+                        accessibilityRole="button"
+                        accessibilityState={{ disabled: !selectable }}
+                        accessibilityLabel={`Use ${option.name} instead`}
+                        style={({ pressed }) => [styles.option, pressed && selectable && styles.pressed, !selectable && styles.optionDisabled]}
+                      >
+                        <View style={styles.optionCopy}>
+                          <Text style={styles.optionName}>{option.name}</Text>
+                          <Text style={styles.optionReason}>{option.rationale}</Text>
+                          {isTeachingOnly && (
+                            <Text style={styles.teachingOnlyOption}>
+                              {formatTeachingOnlyReason(avail)}
+                            </Text>
+                          )}
+                        </View>
+                        <Text style={styles.optionArrow}>›</Text>
+                      </Pressable>
+                    );
+                  })}
+                  {substitution.result.layer2DaySwap.options.map((option) => {
+                    const avail = availabilityMap.get(option.movement_id);
+                    const selectable = avail?.state === 'available';
+                    const isTeachingOnly = !selectable;
+                    return (
+                      <Pressable
+                        key={`swap-${option.plannedSlotId}`}
+                        disabled={!selectable}
+                        onPress={() => {
+                          if (subTargetLogged > 0) {
+                            setPendingSubSets(clamp((subTargetSlot?.plannedSets ?? 1) - subTargetLogged, 1, 6));
+                            setPendingSub({ kind: 'daySwap', option });
+                          } else {
+                            applyDaySwap(substitution.targetId, option);
+                          }
+                        }}
+                        accessibilityRole="button"
+                        accessibilityState={{ disabled: !selectable }}
+                        accessibilityLabel={`Move ${option.name} forward into this session`}
+                        style={({ pressed }) => [styles.option, pressed && selectable && styles.pressed, !selectable && styles.optionDisabled]}
+                      >
+                        <View style={styles.optionCopy}>
+                          <Text style={styles.optionName}>{option.name}</Text>
+                          <Text style={styles.optionReason}>{option.rationale}</Text>
+                          {isTeachingOnly && (
+                            <Text style={styles.teachingOnlyOption}>
+                              {formatTeachingOnlyReason(avail)}
+                            </Text>
+                          )}
+                        </View>
+                        <Text style={styles.optionArrow}>›</Text>
+                      </Pressable>
+                    );
+                  })}
+                  {substitution.result.layer1Regression.options.length === 0 && substitution.result.layer2DaySwap.options.length === 0 && (
+                    <Text style={styles.noOptions}>No replacement is available under the current app checks. It is okay to finish here.</Text>
+                  )}
+                </View>
+              </>
             )}
-            <View style={{ marginTop: theme.space[3] }}>
-              {substitution.result.layer1Regression.options.map((option) => {
-                const avail = availabilityMap.get(option.movement_id);
-                // Fail closed: only an explicit 'available' verdict is selectable.
-                // The store refuses the swap anyway; the sheet must not offer it.
-                const selectable = avail?.state === 'available';
-                const isTeachingOnly = !selectable;
-                return (
-                  <Pressable key={option.movement_id} disabled={!selectable} onPress={() => applyRegression(substitution.targetId, option.movement_id)} accessibilityRole="button" accessibilityState={{ disabled: !selectable }} accessibilityLabel={`Use ${option.name} instead`} style={({ pressed }) => [styles.option, pressed && selectable && styles.pressed, !selectable && styles.optionDisabled]}>
-                    <View style={styles.optionCopy}>
-                      <Text style={styles.optionName}>{option.name}</Text>
-                      <Text style={styles.optionReason}>{option.rationale}</Text>
-                      {isTeachingOnly && (
-                        <Text style={styles.teachingOnlyOption}>
-                          {formatTeachingOnlyReason(avail)}
-                        </Text>
-                      )}
-                    </View>
-                    <Text style={styles.optionArrow}>›</Text>
-                  </Pressable>
-                );
-              })}
-              {substitution.result.layer2DaySwap.options.map((option) => {
-                const avail = availabilityMap.get(option.movement_id);
-                const selectable = avail?.state === 'available';
-                const isTeachingOnly = !selectable;
-                return (
-                  <Pressable key={`swap-${option.plannedSlotId}`} disabled={!selectable} onPress={() => applyDaySwap(substitution.targetId, option)} accessibilityRole="button" accessibilityState={{ disabled: !selectable }} accessibilityLabel={`Move ${option.name} forward into this session`} style={({ pressed }) => [styles.option, pressed && selectable && styles.pressed, !selectable && styles.optionDisabled]}>
-                    <View style={styles.optionCopy}>
-                      <Text style={styles.optionName}>{option.name}</Text>
-                      <Text style={styles.optionReason}>{option.rationale}</Text>
-                      {isTeachingOnly && (
-                        <Text style={styles.teachingOnlyOption}>
-                          {formatTeachingOnlyReason(avail)}
-                        </Text>
-                      )}
-                    </View>
-                    <Text style={styles.optionArrow}>›</Text>
-                  </Pressable>
-                );
-              })}
-              {substitution.result.layer1Regression.options.length === 0 && substitution.result.layer2DaySwap.options.length === 0 && (
-                <Text style={styles.noOptions}>No replacement is available under the current app checks. It is okay to finish here.</Text>
-              )}
-            </View>
           </View>
         )}
       </KeyboardAwareScrollView>
@@ -1714,6 +1918,9 @@ const styles = StyleSheet.create({
   timelineRow: {
     flexDirection: 'row',
     alignItems: 'stretch',
+  },
+  replacedRow: {
+    opacity: 0.4,
   },
   rail: {
     width: 30,

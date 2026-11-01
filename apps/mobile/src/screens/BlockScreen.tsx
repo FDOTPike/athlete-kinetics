@@ -22,23 +22,25 @@ import {
 } from '@ak/inference';
 import {
   useStore,
+  freeFormStartIsEmpty,
   type BlockSessionSummary,
   type TodaySlot,
   type RoutineTemplate,
 } from '../state/useStore';
 import { RoutineTemplateBuilder } from '../components/RoutineTemplateBuilder';
-import { useSubViewBack } from '../navigation/navigation';
+import { useNavigation, useSubViewBack } from '../navigation/navigation';
 import ProgramSetupScreen from './ProgramSetupScreen';
 import NewBlockChooserScreen from './NewBlockChooserScreen';
 import InfoTip from '../components/InfoTip';
 import { EmphasisReportCard } from '../components/EmphasisReportCard';
 import { theme } from '../theme/theme';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
-import { autopilotReasonCopy } from '../state/autopilotCopy';
+import { appliedAdjustmentLines, autopilotReasonCopy } from '../state/autopilotCopy';
 import { EMPTY_ACTIVITY_LEDGER } from '../state/activityStore';
 import {
   PrimaryButton,
   SecondaryButton,
+  QuietAction,
   Chip,
   Disclosure,
 } from '../components/ui';
@@ -197,7 +199,11 @@ export default function BlockScreen(props: BlockScreenProps): React.JSX.Element 
   const state = useStore((s) => s);
   const decision = typeof state.getTrainingSupportDecision === 'function'
     ? state.getTrainingSupportDecision() : { status: 'support_unavailable' as const };
+  const narrowScopeOnly = decision.status === 'held' && typeof state.isBroadHoldFromNarrowScopes === 'function'
+    ? state.isBroadHoldFromNarrowScopes(undefined, decision)
+    : false;
   if (decision.status !== 'available') return <TrainingSupportNotice unavailable={decision.status === 'support_unavailable'}
+    narrowScopeOnly={narrowScopeOnly}
     onOpenSession={state.session !== null ? props.onSessionStarted : undefined} />;
   return <AvailableBlockScreen key={state.activeAthleteId} {...props} />;
 }
@@ -241,7 +247,16 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
   const [continuationError, setContinuationError] = useState<string | null>(null);
   const [continuationPending, setContinuationPending] = useState(false);
   const startSession = useStore((s) => s.startSession);
-  const pendingAdjustments = useStore((s) => s.pendingAutopilotAdjustments) ?? [];
+  const storeFreeFormStartIsEmpty = useStore((s) => s.freeFormStartIsEmpty);
+  const nav = typeof useNavigation === 'function' ? useNavigation() : undefined;
+  const [emptyStartPromptOpen, setEmptyStartPromptOpen] = useState(false);
+  const checkFreeFormStartIsEmpty = (): boolean => {
+    if (typeof storeFreeFormStartIsEmpty === 'function') return storeFreeFormStartIsEmpty();
+    if (typeof freeFormStartIsEmpty === 'function') return freeFormStartIsEmpty();
+    return false;
+  };
+  const appliedAdjustments = useStore((s) => s.pendingAutopilotAdjustments) ?? [];
+  const appliedLines = appliedAdjustmentLines(appliedAdjustments);
   const blockEndDate = blockSessions.length > 0 ? blockSessions[blockSessions.length - 1].sessionDate : null;
 
   const routineTemplates = useStore((s) => s.routineTemplates) ?? [];
@@ -976,29 +991,23 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
         )}
       </View>
 
-      {/* What changes next block panel */}
-      {block !== null && (
+      {/* Changed in this block: the autopilot changes stored when the active
+          block was built. Hidden when there is nothing to show, because an
+          empty list says nothing about what the next block will do. */}
+      {block !== null && appliedLines.length > 0 && (
         <View style={styles.section}>
-          <View style={styles.nextBlockPanel} testID="next-block-adjustments-panel">
-            <Text style={styles.nextBlockHeading}>What changes next block</Text>
-            <Text style={styles.nextBlockIntro}>
-              Your current block is fixed. These adjustments apply when the next one is built.
+          <View style={styles.blockAdjustmentsPanel} testID="block-adjustments-panel">
+            <Text style={styles.blockAdjustmentsHeading}>Changed in this block</Text>
+            <Text style={styles.blockAdjustmentsIntro}>
+              These adjustments were applied when this block was built.
             </Text>
-            {pendingAdjustments.length === 0 ? (
-              <Text style={styles.nextBlockEmpty}>
-                Nothing queued. Your next block will follow the plan as written.
-              </Text>
-            ) : (
-              <View style={styles.adjustmentsList}>
-                {pendingAdjustments.map((adj) => (
-                  <View key={adj.plannedSlotId} style={styles.adjustmentRow}>
-                    <Text style={styles.adjustmentText}>
-                      {adj.movementName}: {adj.reason}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            )}
+            <View style={styles.adjustmentsList}>
+              {appliedLines.map((line) => (
+                <View key={line.key} style={styles.adjustmentRow}>
+                  <Text style={styles.adjustmentText}>{line.text}</Text>
+                </View>
+              ))}
+            </View>
           </View>
         </View>
       )}
@@ -1261,21 +1270,65 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
         {(block === null || todayPlan === null) && !halted && session === null && (
           <Disclosure label="Start without a planned session">
             <View style={styles.disclosureContent}>
-              {!confirmUnplannedStart ? (
+              {emptyStartPromptOpen ? (
+                <View style={styles.card} testID="empty-free-form-start-card">
+                  <Text style={styles.cardTitle}>Nothing to start yet</Text>
+                  <Text style={styles.bodyText}>
+                    There is no plan for today and no earlier session to repeat. Build your plan first.
+                  </Text>
+                  <PrimaryButton
+                    label="Go to Plan"
+                    onPress={() => {
+                      setEmptyStartPromptOpen(false);
+                      setConfirmUnplannedStart(false);
+                      nav?.setTab('coach');
+                      // With a program the Manage block section is hidden, so open the program editor.
+                      if (program != null) setEditingProgram(true);
+                      else if (block === null) setShowChooser(true);
+                      else openManageBlock();
+                    }}
+                    accessibilityLabel="Go to Plan"
+                  />
+                  <QuietAction
+                    label="Cancel"
+                    onPress={() => {
+                      setEmptyStartPromptOpen(false);
+                      setConfirmUnplannedStart(false);
+                    }}
+                    accessibilityLabel="Cancel"
+                  />
+                </View>
+              ) : !confirmUnplannedStart ? (
                 <>
                   <Text style={styles.captionText}>
                     This starts a session without the day's planned exercise order.
                   </Text>
                   <SecondaryButton
                     label="Start an unplanned session"
-                    onPress={() => setConfirmUnplannedStart(true)}
+                    onPress={() => {
+                      if (checkFreeFormStartIsEmpty()) {
+                        setEmptyStartPromptOpen(true);
+                        return;
+                      }
+                      setConfirmUnplannedStart(true);
+                    }}
                     accessibilityLabel="Start an unplanned session"
                   />
                 </>
               ) : (
                 <>
                   <Text style={styles.bodyText}>Start a session without a planned workout?</Text>
-                  <PrimaryButton label="Start unplanned session" onPress={startAndOpenSession} accessibilityLabel="Start unplanned session" />
+                  <PrimaryButton
+                    label="Start unplanned session"
+                    onPress={() => {
+                      if (checkFreeFormStartIsEmpty()) {
+                        setEmptyStartPromptOpen(true);
+                        return;
+                      }
+                      startAndOpenSession();
+                    }}
+                    accessibilityLabel="Start unplanned session"
+                  />
                   <SecondaryButton label="Cancel" onPress={() => setConfirmUnplannedStart(false)} accessibilityLabel="Cancel" />
                 </>
               )}
@@ -1792,7 +1845,7 @@ const styles = StyleSheet.create({
     color: theme.color.textMid,
     letterSpacing: 1.2,
   },
-  nextBlockPanel: {
+  blockAdjustmentsPanel: {
     backgroundColor: theme.color.ink1,
     borderWidth: 1,
     borderColor: theme.color.line,
@@ -1800,20 +1853,14 @@ const styles = StyleSheet.create({
     padding: theme.space[4],
     gap: theme.space[2],
   },
-  nextBlockHeading: {
+  blockAdjustmentsHeading: {
     ...theme.font.cue,
     color: theme.color.textHi,
   },
-  nextBlockIntro: {
+  blockAdjustmentsIntro: {
     ...theme.font.label,
     color: theme.color.textMid,
     lineHeight: 20,
-  },
-  nextBlockEmpty: {
-    ...theme.font.body,
-    color: theme.color.textLow,
-    fontStyle: 'italic',
-    paddingTop: theme.space[1],
   },
   adjustmentsList: {
     gap: theme.space[2],

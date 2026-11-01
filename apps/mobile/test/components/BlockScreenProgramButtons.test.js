@@ -156,3 +156,16 @@ test('plan-1: pressing "Set up a four-week block" on the Today card when block i
 
   expect(screen.getByText('MANAGE PROGRAM')).toBeOnTheScreen();
 });
+
+test('plan-first card: with a program active, Go to Plan opens the program editor (the Manage block section is hidden)', () => {
+  mockState = baseState({ freeFormStartIsEmpty: () => true });
+  render(<BlockScreen />);
+
+  fireEvent.press(screen.getByText('Start without a planned session'));
+  fireEvent.press(screen.getByLabelText('Start an unplanned session'));
+  expect(screen.getByText('Nothing to start yet')).toBeOnTheScreen();
+  fireEvent.press(screen.getByLabelText('Go to Plan'));
+
+  expect(mockState.startSession).not.toHaveBeenCalled();
+  expect(screen.getByText('MANAGE PROGRAM')).toBeOnTheScreen();
+});
