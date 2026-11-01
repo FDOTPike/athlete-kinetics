@@ -350,6 +350,11 @@ test('when the logged rows and the runner disagree, the swap keeps the runner co
   const lastSetId = raw().prepare('SELECT max(set_id) AS id FROM set_record WHERE session_id = ?').get(state().session.sessionId).id;
   state().deleteSet(lastSetId);
   const runnerCount = state().runner.slotSetCounts[0];
+  // The disagreement under test: SQLite now holds one set for A, the runner still counts two.
+  expect({
+    rows: raw().prepare('SELECT count(*) AS c FROM set_record WHERE session_id = ? AND movement_id = ?').get(state().session.sessionId, moveA).c,
+    runner: runnerCount,
+  }).toEqual({ rows: 1, runner: 2 });
 
   state().applyRegression(moveA, moveB, 1);
   expect(state().error).toBeNull();
