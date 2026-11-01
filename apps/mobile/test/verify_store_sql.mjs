@@ -79,7 +79,7 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   // 071 adds session_skipped_slot and set_load_shown, which the store writes
   // (at finalization and with each logged set) and empties on reset. It depends
   // on 001 and 022.
-  '071_beta_recording.sql', '072_question_log.sql'];
+  '071_beta_recording.sql', '072_question_log.sql', '073_session_slot_replaced_by.sql'];
 
 
 const db = new DatabaseSync(':memory:');
