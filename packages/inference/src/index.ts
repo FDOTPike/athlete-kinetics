@@ -194,6 +194,7 @@ export {
 } from './completionAction';
 export {
   applyProfileLimits,
+  effectiveRpeCeiling,
   applySeverityToGuardrail,
   EXPERIENCE_TRIAGE,
   scaleGuardrailForExperience,

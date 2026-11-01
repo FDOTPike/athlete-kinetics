@@ -98,3 +98,27 @@ describe('OnboardingScreen review step provides an Edit target action when wants
     expect(screen.getByTestId('goal-editor')).toBeOnTheScreen();
   });
 });
+
+
+describe('OnboardingScreen review effort ceiling', () => {
+  test.each([
+    ['beginner', /^NEW TO THIS\./, '8.5', 'Hard but controlled \u2014 a couple of reps always in reserve.'],
+    ['intermediate', /^SOME MILEAGE\./, '9.0', 'Close to the limit on the biggest days.'],
+  ])('%s shows the applicable ceiling', (age, label, ceiling, blurb) => {
+    render(<OnboardingScreen />);
+    next();
+    next();
+    next();
+    pressLabel(label);
+    next();
+    next();
+    next();
+    pressLabel('No, nothing to note');
+    next();
+
+    expect(screen.getByText(new RegExp(`Effort ceiling ${ceiling} \u2014 ${blurb}`))).toBeOnTheScreen();
+    if (age === 'beginner') {
+      expect(screen.getByText(/Your effort ceiling starts at 8\.5 and can change as your experience grows\./)).toBeOnTheScreen();
+    }
+  });
+});

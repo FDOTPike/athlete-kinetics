@@ -42,6 +42,7 @@ import {
   defaultLoadPreference,
   transitionLoadPreference,
   effortCue,
+  effectiveRpeCeiling,
   type EnergySystem,
   type EquipmentItem,
   type LoadPreference,
@@ -780,7 +781,7 @@ export default function OnboardingScreen(): React.JSX.Element {
                 <View testID="onboarding-coach-defaults">
                   <Text style={styles.reviewSupportLine}>COACH DEFAULTS — EDIT ANYTIME IN ATHLETE PROFILE</Text>
                   <Text style={styles.reviewDescription}>
-                    Effort ceiling {draft.base_rpe_cap.toFixed(1)} — {effortBlurb(draft.base_rpe_cap)}
+                    Effort ceiling {effectiveRpeCeiling(draft).toFixed(1)} — {effortBlurb(effectiveRpeCeiling(draft))}
                     {'\n'}How hard did that feel? 1 is very easy. 10 is your hardest effort.
                     {'\n'}Up to {draft.max_sessions_per_day} session{draft.max_sessions_per_day === 1 ? '' : 's'} a day
                     {'\n'}Energy focus: {ENERGY_COPY[draft.target_energy_system].label}
