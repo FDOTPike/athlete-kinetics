@@ -27,12 +27,19 @@ export interface ProfileLimitedPrescription {
 
 const round2 = (x: number): number => Math.round(x * 100) / 100;
 
+/** The ceilings `applyProfileLimits` applies by experience and objective. */
+export const BEGINNER_RPE_CEILING = 8.5;
+export const REHAB_RPE_CEILING = 7.0;
+
+/** The effort ceiling `applyProfileLimits` will reach from the profile alone:
+ *  the athlete's own setting, then the beginner and rehab ceilings, lowest wins.
+ *  Shown to athletes so they see the ceiling the engine uses. */
 export function effectiveRpeCeiling(
   profile: Pick<UserProfile, 'base_rpe_cap' | 'training_age' | 'objective'>,
 ): number {
   let ceiling = profile.base_rpe_cap;
-  if (profile.training_age === 'beginner' && ceiling > 8.5) ceiling = 8.5;
-  if (profile.objective === 'rehab' && ceiling > 7.0) ceiling = 7.0;
+  if (profile.training_age === 'beginner' && ceiling > BEGINNER_RPE_CEILING) ceiling = BEGINNER_RPE_CEILING;
+  if (profile.objective === 'rehab' && ceiling > REHAB_RPE_CEILING) ceiling = REHAB_RPE_CEILING;
   return ceiling;
 }
 
@@ -46,19 +53,16 @@ export function applyProfileLimits(
   let rpe = base.rpe_cap;
   const notes: string[] = [];
 
-  const profileCeiling = effectiveRpeCeiling({ ...profile, training_age: 'intermediate', objective: 'strength' });
-  const experienceCeiling = effectiveRpeCeiling({ ...profile, objective: 'strength' });
-  const ceiling = effectiveRpeCeiling(profile);
-  if (rpe > profileCeiling) {
-    rpe = profileCeiling;
+  if (rpe > profile.base_rpe_cap) {
+    rpe = profile.base_rpe_cap;
     notes.push(`Profile effort ceiling: RPE capped at ${profile.base_rpe_cap.toFixed(1)}.`);
   }
-  if (profile.training_age === 'beginner' && rpe > experienceCeiling) {
-    rpe = experienceCeiling;
+  if (profile.training_age === 'beginner' && rpe > BEGINNER_RPE_CEILING) {
+    rpe = BEGINNER_RPE_CEILING;
     notes.push('Beginner training age: RPE capped at 8.5.');
   }
-  if (profile.objective === 'rehab' && rpe > ceiling) {
-    rpe = ceiling;
+  if (profile.objective === 'rehab' && rpe > REHAB_RPE_CEILING) {
+    rpe = REHAB_RPE_CEILING;
     notes.push('Rehab objective: RPE capped at 7.0.');
   }
   // Daily session cap: work beyond the cap is damped once (no compounding).
