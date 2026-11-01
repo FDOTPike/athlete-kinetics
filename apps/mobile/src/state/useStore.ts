@@ -626,6 +626,11 @@ export interface TodaySlot {
   };
 }
 
+/**
+ * An autopilot change ALREADY APPLIED to a planned slot of the active block,
+ * stored when that block was built. Not a queued change for the next block,
+ * despite the historical "Pending" name (kept because verifiers pin it).
+ */
 export interface PendingAutopilotAdjustment {
   plannedSlotId: number;
   movementId: number;
@@ -6140,6 +6145,12 @@ export const useStore = create<KineticsStore>()((set, get) => {
     }));
   },
 
+  // The active block's already-applied autopilot changes, one row per planned
+  // slot. The Plan tab shows them as "Changed in this block".
+  // A time-mode movement with a time policy keeps the policy's set count when
+  // the block is committed (defaultSetsForTarget), so a row that changed only
+  // its sets was never applied and is left out. No logging-mode row means
+  // 'reps'; a time-mode row that changed RPE is kept.
   getPendingAutopilotAdjustments: (): PendingAutopilotAdjustment[] => {
     if (db === null) return [];
     const d = db;
@@ -6148,21 +6159,30 @@ export const useStore = create<KineticsStore>()((set, get) => {
       movement_id: number;
       movement_name: string;
       rpe_delta: number;
-      set_delta: number;
+      applied_set_delta: number;
       reason: string;
     }>(d.executeSync(`
       SELECT pa.planned_slot_id,
              sl.movement_id,
              m.name AS movement_name,
              pa.rpe_delta,
-             pa.set_delta,
+             -- A time-policy movement keeps the policy's set count at commit
+             -- (defaultSetsForTarget), so its stored set delta was not applied.
+             CASE WHEN COALESCE(lm.mode, 'reps') = 'time' AND tp.movement_id IS NOT NULL
+                  THEN 0 ELSE pa.set_delta END AS applied_set_delta,
              pa.reason
       FROM planned_slot_autopilot pa
       JOIN planned_slot sl ON sl.planned_slot_id = pa.planned_slot_id
       JOIN movement m ON m.movement_id = sl.movement_id
       JOIN planned_session ps ON ps.planned_session_id = sl.planned_session_id
       JOIN training_block tb ON tb.block_id = ps.block_id
+      LEFT JOIN movement_logging_mode lm ON lm.movement_id = sl.movement_id
+      LEFT JOIN movement_time_policy tp ON tp.movement_id = sl.movement_id
       WHERE tb.status = 'active'
+        AND NOT (COALESCE(lm.mode, 'reps') = 'time'
+                 AND tp.movement_id IS NOT NULL
+                 AND pa.rpe_delta = 0
+                 AND pa.set_delta <> 0)
       ORDER BY ps.session_date, sl.slot_index, pa.planned_slot_id
     `));
     return rows.map((r) => ({
@@ -6170,7 +6190,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       movementId: r.movement_id,
       movementName: r.movement_name,
       rpeDelta: r.rpe_delta,
-      setDelta: r.set_delta,
+      setDelta: r.applied_set_delta,
       reason: r.reason,
     }));
   },
