@@ -454,6 +454,7 @@ export default function OnboardingScreen(): React.JSX.Element {
         {step === 'goal' && (
           <View style={styles.cardGroup}>
             <Text style={styles.h2}>WHAT ARE WE TRAINING FOR?</Text>
+            <Text style={styles.pDim}>You can change your goals at any time in Athlete Profile.</Text>
             {OBJECTIVES.map((o) => (
               <ChoiceRow
                 key={o}
@@ -519,6 +520,7 @@ export default function OnboardingScreen(): React.JSX.Element {
         {step === 'target' && (
           <View>
             <Text style={styles.h2}>YOUR TARGET</Text>
+            <Text style={styles.pDim}>You can change your goals at any time in Athlete Profile.</Text>
             <GoalEditor fields={goalFields} onChange={setGoalFields} today={today} trainingAge={draft.training_age}
               exercise={{ movements, movementId: goalExerciseId, onChange: setGoalExerciseId }} />
             <QuietAction
@@ -712,9 +714,19 @@ export default function OnboardingScreen(): React.JSX.Element {
                 onEdit={() => goTo('focus')}
               >
                 {wantsTarget && goalValidation.ok && (
-                  <Text style={styles.reviewSupportLine} testID="onboarding-summary-target-row">
-                    {`TARGET — ${goalValidation.goal.specificOutcome}: ${goalValidation.goal.targetValue} ${goalValidation.goal.unit}${goalValidation.goal.requestedDeadline === null ? ', no deadline' : ` by ${goalValidation.goal.requestedDeadline}`}`}
-                  </Text>
+                  <View style={styles.reviewHeadingRow}>
+                    <Text style={styles.reviewSupportLine} testID="onboarding-summary-target-row">
+                      {`TARGET — ${goalValidation.goal.specificOutcome}: ${goalValidation.goal.targetValue} ${goalValidation.goal.unit}${goalValidation.goal.requestedDeadline === null ? ', no deadline' : ` by ${goalValidation.goal.requestedDeadline}`}`}
+                    </Text>
+                    <Pressable
+                      onPress={() => goTo('target')}
+                      accessibilityRole="button"
+                      accessibilityLabel="Edit target"
+                      style={styles.reviewEdit}
+                    >
+                      <Text style={styles.reviewEditText}>EDIT</Text>
+                    </Pressable>
+                  </View>
                 )}
                 {!wantsTarget && (
                   <Text style={styles.reviewDescription} testID="onboarding-summary-target-row">
@@ -927,7 +939,7 @@ const styles = StyleSheet.create({
   reviewHeadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.space[2] },
   reviewHeading: { ...theme.font.eyebrow, color: theme.color.textHi, flexShrink: 1 },
   reviewDescription: { ...theme.font.body, color: theme.color.textMid },
-  reviewSupportLine: { ...theme.font.body, color: theme.color.textHi, fontWeight: '600' },
+  reviewSupportLine: { ...theme.font.body, color: theme.color.textHi, fontWeight: '600', flexShrink: 1 },
   reviewEdit: {
     minWidth: theme.touch.min,
     minHeight: theme.touch.min,
