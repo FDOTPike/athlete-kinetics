@@ -637,4 +637,25 @@ describe('a discomfort report that cannot open its transaction', () => {
     expect(state().session.sessionId).toBe(sessionId);
     expect(state().runner.phase).not.toBe('halted');
   });
+
+  test('does not roll back a transaction it did not open', () => {
+    startPlanned();
+    // Another writer holds an open transaction with a pending write, so the
+    // report's own BEGIN fails. The pending write must survive the report.
+    raw().exec('BEGIN');
+    raw().prepare('INSERT INTO niggle (id, region, severity, reported_at_ms) VALUES (?, ?, ?, ?)')
+      .run('outer-pending', 'elbow', 2, 1);
+    let saved;
+    try {
+      expect(() => { saved = state().reportNiggle('knee', 9); }).not.toThrow();
+      expect(saved).toBe(false);
+      expect(raw().isTransaction).toBe(true);
+      expect(count("SELECT COUNT(*) AS c FROM niggle WHERE id = 'outer-pending'")).toBe(1);
+      expect(count("SELECT COUNT(*) AS c FROM niggle WHERE region = 'knee'")).toBe(0);
+    } finally {
+      if (raw().isTransaction) raw().exec('ROLLBACK');
+    }
+    expect(state().niggles).toEqual([]);
+    expect(state().runner.phase).not.toBe('halted');
+  });
 });
