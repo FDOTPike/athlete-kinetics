@@ -1818,7 +1818,10 @@ export function freeFormStartIsEmpty(): boolean {
   if (db === null) return false;
   const d = db;
   try {
-    const { movements, profile, activePriorExperienceMovementIds, niggles, todayPlan } = useStore.getState();
+    const { movements, profile, activePriorExperienceMovementIds, niggles, todayPlan, today } = useStore.getState();
+    // Past midnight the plan and niggles in state are yesterday's until startSession
+    // rolls the day over, so no prediction is made: the start goes ahead as before.
+    if (today !== localToday()) return false;
     // Same rule as startSession: an unused plan for today is consumed, so the start is not empty.
     if (todayPlan !== null) {
       const alreadyPlannedToday = rowsOf<{ c: number }>(d.executeSync(

@@ -1287,7 +1287,9 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                       setEmptyStartPromptOpen(false);
                       setConfirmUnplannedStart(false);
                       nav?.setTab('coach');
-                      if (block === null) setShowChooser(true);
+                      // With a program the Manage block section is hidden, so open the program editor.
+                      if (program != null) setEditingProgram(true);
+                      else if (block === null) setShowChooser(true);
                       else openManageBlock();
                     }}
                     accessibilityLabel="Go to Plan"

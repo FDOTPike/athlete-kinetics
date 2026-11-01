@@ -280,3 +280,15 @@ test('session-5: an unused plan for today is never treated as an empty start, ev
   expect(count('SELECT COUNT(*) AS c FROM session_origin')).toBe(0);
   expect(freeFormStartIsEmpty()).toBe(false);
 });
+
+test('session-5: past midnight, before the day rolls over, the empty-start check makes no prediction', () => {
+  raw().exec('DELETE FROM planned_slot; DELETE FROM planned_session; DELETE FROM training_block; DELETE FROM training_program;');
+  act(() => {
+    state().refreshBlock();
+    state().refreshProgram();
+  });
+  expect(freeFormStartIsEmpty()).toBe(true);
+  // State still holds yesterday until startSession rolls the day over.
+  act(() => { useStore.setState({ today: '2000-01-01' }); });
+  expect(freeFormStartIsEmpty()).toBe(false);
+});
