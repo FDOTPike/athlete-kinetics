@@ -174,6 +174,7 @@ function AvailableRoutineTemplateBuilder({
     3: false,
   });
   const [errorText, setErrorText] = useState<string | null>(null);
+  const [doseDrafts, setDoseDrafts] = useState<Record<string, string>>({});
 
   const normalizedRpeSlots = initialTemplate?.slots.filter(
     (slot) => slot.targetRpe > profile.base_rpe_cap,
@@ -590,10 +591,25 @@ function AvailableRoutineTemplateBuilder({
     setSlots(updated);
   };
 
+  const clearSlotDoseDrafts = (slotId: string): void => {
+    setDoseDrafts((current) => {
+      const setsKey = `${slotId}:sets`;
+      const repsKey = `${slotId}:reps`;
+      const rpeKey = `${slotId}:targetRpe`;
+      if (!(setsKey in current) && !(repsKey in current) && !(rpeKey in current)) return current;
+      const next = { ...current };
+      delete next[setsKey];
+      delete next[repsKey];
+      delete next[rpeKey];
+      return next;
+    });
+  };
+
   const updateRole = (index: number, role: RoutineRole): void => {
     const updated = [...slots];
     const movementId = updated[index].movementId;
     const sameRole = updated[index].role === role;
+    if (!sameRole) clearSlotDoseDrafts(updated[index].id);
     updated[index] = {
       ...updated[index],
       role,
@@ -610,6 +626,7 @@ function AvailableRoutineTemplateBuilder({
   const selectMovementForSlot = (movementId: number): void => {
     if (pickerSlotIndex === null) return;
     const updated = [...slots];
+    clearSlotDoseDrafts(updated[pickerSlotIndex].id);
     updated[pickerSlotIndex] = {
       ...updated[pickerSlotIndex],
       movementId,
@@ -676,8 +693,33 @@ function AvailableRoutineTemplateBuilder({
     setSlots(updated);
   };
 
+  const handleDoseChange = (
+    index: number,
+    slotId: string,
+    field: 'sets' | 'reps' | 'targetRpe',
+    value: string,
+  ): void => {
+    const key = `${slotId}:${field}`;
+    setDoseDrafts((current) => ({ ...current, [key]: value }));
+    const trimmed = value.trim().replace(/,/g, '.');
+    if (trimmed === '' || trimmed.endsWith('.')) return;
+    if (!Number.isFinite(Number(trimmed))) return;
+    updateDose(index, field, trimmed);
+  };
+
+  const handleDoseBlur = (slotId: string, field: 'sets' | 'reps' | 'targetRpe'): void => {
+    const key = `${slotId}:${field}`;
+    setDoseDrafts((current) => {
+      if (!(key in current)) return current;
+      const next = { ...current };
+      delete next[key];
+      return next;
+    });
+  };
+
   const handleSave = (): void => {
     setErrorText(null);
+    setDoseDrafts((current) => (Object.keys(current).length === 0 ? current : {}));
     const trimmed = name.trim();
     if (trimmed.length < 1 || trimmed.length > 80) {
       setErrorText('Template name must be between 1 and 80 characters.');
@@ -777,6 +819,7 @@ function AvailableRoutineTemplateBuilder({
                 <Pressable
                   onPress={() => {
                     setSchemaType(st);
+                    setDoseDrafts((current) => (Object.keys(current).length === 0 ? current : {}));
                     setSlots((current) => current.map((slot) => ({
                       ...slot, sets: undefined, reps: undefined, targetRpe: undefined,
                     })));
@@ -889,6 +932,7 @@ function AvailableRoutineTemplateBuilder({
                   <Pressable
                     onPress={() => removeSlot(index)}
                     style={styles.removeButton}
+                    accessibilityRole="button"
                     accessibilityLabel={`Remove day ${activeDay} slot ${activeSlotIndex + 1}`}
                   >
                     <Text style={styles.removeText}>X</Text>
@@ -920,8 +964,9 @@ function AvailableRoutineTemplateBuilder({
                         <TextInput
                           disableFullscreenUI
                           style={styles.doseInput}
-                          value={String(slot.sets ?? defaults?.sets ?? '')}
-                          onChangeText={(value) => updateDose(index, 'sets', value)}
+                          value={doseDrafts[`${slot.id}:sets`] ?? String(slot.sets ?? defaults?.sets ?? '')}
+                          onChangeText={(value) => handleDoseChange(index, slot.id, 'sets', value)}
+                          onBlur={() => handleDoseBlur(slot.id, 'sets')}
                           keyboardType="number-pad"
                           accessibilityLabel={`Sets for day ${activeDay} slot ${activeSlotIndex + 1}`}
                         />
@@ -931,8 +976,9 @@ function AvailableRoutineTemplateBuilder({
                         <TextInput
                           disableFullscreenUI
                           style={styles.doseInput}
-                          value={String(slot.reps ?? defaults?.reps ?? '')}
-                          onChangeText={(value) => updateDose(index, 'reps', value)}
+                          value={doseDrafts[`${slot.id}:reps`] ?? String(slot.reps ?? defaults?.reps ?? '')}
+                          onChangeText={(value) => handleDoseChange(index, slot.id, 'reps', value)}
+                          onBlur={() => handleDoseBlur(slot.id, 'reps')}
                           keyboardType="number-pad"
                           accessibilityLabel={`Reps for day ${activeDay} slot ${activeSlotIndex + 1}`}
                         />
@@ -961,8 +1007,9 @@ function AvailableRoutineTemplateBuilder({
                         <TextInput
                           disableFullscreenUI
                           style={styles.doseInput}
-                          value={String(peakRpe ?? '')}
-                          onChangeText={(value) => updateDose(index, 'targetRpe', value)}
+                          value={doseDrafts[`${slot.id}:targetRpe`] ?? String(peakRpe ?? '')}
+                          onChangeText={(value) => handleDoseChange(index, slot.id, 'targetRpe', value)}
+                          onBlur={() => handleDoseBlur(slot.id, 'targetRpe')}
                           keyboardType="decimal-pad"
                           accessibilityLabel={majorProjection === undefined
                             ? `Target RPE for day ${activeDay} slot ${activeSlotIndex + 1}`
