@@ -491,7 +491,8 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
 
   const openNextSession = (): void => {
     if (nextPlanned === undefined) {
-      openManageBlock();
+      if (program == null) openManageBlock();
+      else setEditingProgram(true);
       return;
     }
     setDetail({ summary: nextPlanned, slots: loadSessionSlots(nextPlanned.plannedSessionId) });
@@ -743,7 +744,11 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           ) : todayPlan !== null ? (
             <PrimaryButton label="Start session" onPress={startAndOpenSession} accessibilityLabel="Start session" />
           ) : block === null ? (
-            <PrimaryButton label="Set up a four-week block" onPress={openManageBlock} accessibilityLabel="Set up a four-week block" />
+            <PrimaryButton
+              label="Set up a four-week block"
+              onPress={program == null ? openManageBlock : () => setEditingProgram(true)}
+              accessibilityLabel="Set up a four-week block"
+            />
           ) : (
             <PrimaryButton
               label={nextPlanned === undefined ? 'Plan the next block' : 'Preview next session'}
@@ -966,9 +971,9 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                             onPress={() => setAttributionSlotId((currentId) => currentId === slot.plannedSlotId ? null : slot.plannedSlotId)}
                           />
                         </View>
-                        {slot.overrideLoadKg !== null && (
-                          <View style={styles.substitutedBadge} accessibilityRole="text">
-                            <Text style={styles.substitutedBadgeText}>SUBSTITUTED</Text>
+                        {slot.overrideReason != null && slot.overrideReason.trim() !== '' && (
+                          <View style={styles.overrideBadge} accessibilityRole="text">
+                            <Text style={styles.overrideBadgeText}>{slot.overrideReason}</Text>
                           </View>
                         )}
                       </View>
@@ -1806,7 +1811,10 @@ const styles = StyleSheet.create({
     paddingTop: theme.space[3],
     gap: theme.space[2],
   },
-  substitutedBadge: {
+  overrideBadge: {
+    // A long reason wraps inside the badge instead of crowding the movement details.
+    flexShrink: 1,
+    maxWidth: '50%',
     borderWidth: 1,
     borderColor: theme.color.line,
     borderRadius: theme.radius.chip,
@@ -1814,8 +1822,10 @@ const styles = StyleSheet.create({
     paddingVertical: theme.space[1],
     backgroundColor: theme.color.ink1,
   },
-  substitutedBadgeText: {
+  overrideBadgeText: {
     ...theme.font.eyebrow,
+    // The reason is shown verbatim (DEVIATION_LOG APRE ruling), so no forced capitals.
+    textTransform: 'none',
     color: theme.color.textMid,
   },
   trajectoryHeaderRow: {

@@ -612,15 +612,20 @@ test('COACH enforces Law-2 assertion by marking only TODAY with chalk in the tra
   });
 });
 
-test('COACH displays SUBSTITUTED badge element when slot load is overridden', () => {
-  const substitutedSlot = { ...todaySlot, overrideLoadKg: 45.0 };
+test('COACH displays overrideReason badge element when slot load is overridden', () => {
+  const overriddenSlot = {
+    ...todaySlot,
+    overrideLoadKg: 45.0,
+    overrideReason: 'APRE: +2.5 kg, beat the 8-rep target by 2 last week',
+  };
   mockState = baseState({
-    loadSessionSlots: jest.fn(() => [substitutedSlot]),
+    loadSessionSlots: jest.fn(() => [overriddenSlot]),
   });
   render(<BlockScreen />);
   fireEvent.press(screen.getByLabelText(`Week 1, lower session on ${TODAY}`));
 
-  expect(screen.getByText('SUBSTITUTED')).toBeOnTheScreen();
+  expect(screen.getByText('APRE: +2.5 kg, beat the 8-rep target by 2 last week')).toBeOnTheScreen();
+  expect(screen.queryByText('SUBSTITUTED')).toBeNull();
 });
 
 test('READY renders return check-in card when layoff is detected, with truthful non-dose copy', () => {
