@@ -256,7 +256,21 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       expect(screen.getByLabelText('Bodyweight today in kilograms')).toHaveDisplayValue('');
       fireEvent(screen.getByLabelText('Bodyweight today in kilograms'), 'endEditing');
       expect(mockState.saveBodyweight).not.toHaveBeenCalledWith(mockState.today, 75);
-      expect(mockState.saveBodyweight).toHaveBeenCalledWith(mockState.today, null);
+    });
+
+    test('after a successful reset, typing the old bodyweight again saves it', async () => {
+      await openReset();
+      fireEvent.changeText(screen.getByLabelText('Bodyweight today in kilograms'), '75');
+      fireEvent(screen.getByLabelText('Bodyweight today in kilograms'), 'endEditing');
+      expect(screen.getByLabelText('Bodyweight today in kilograms')).toHaveDisplayValue('75.0');
+      mockState.saveBodyweight.mockClear();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+
+      // The reset deleted today's value; entering the same value must store it again.
+      fireEvent.changeText(screen.getByLabelText('Bodyweight today in kilograms'), '75.0');
+      fireEvent(screen.getByLabelText('Bodyweight today in kilograms'), 'endEditing');
+      expect(mockState.saveBodyweight).toHaveBeenCalledWith(mockState.today, 75);
     });
 
     test('a successful reset clears the import notice and preserves history input and preview', async () => {
