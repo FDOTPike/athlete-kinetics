@@ -511,14 +511,93 @@ test('invalid set counts (0, 7, NaN, non-integer) are refused with no DB or stat
 
   for (const invalidCount of [0, 7, NaN, 2.5, -1, undefined]) {
     state().applyDaySwap(moveA, daySwapOption, invalidCount);
+    expect(state().error).toBeNull();
     state().applyRegression(moveA, moveB, invalidCount);
+    expect(state().error).toBeNull();
     state().swapMovement(moveA, moveB, invalidCount);
+    expect(state().error).toBeNull();
   }
 
   expect(snapshotDbSlots()).toEqual(beforeSlots);
   expect(snapshotCheckpoint()).toEqual(beforeCheckpoint);
   expect(state().sessionPlan).toBe(beforePlan);
   expect(state().runner).toBe(beforeRunner);
+});
+
+test('after a halt, a swap with logged sets changes nothing and the session stays stopped', async () => {
+  let nowMs = 1_700_000_350_000;
+  jest.spyOn(Date, 'now').mockImplementation(() => ++nowMs);
+  await bootStore();
+  state().saveProfile({
+    training_age: 'intermediate',
+    equipment_inventory: ['barbell', 'squat_rack', 'dumbbells', 'bench', 'kettlebell'],
+  });
+
+  const today = state().today;
+  const moveA = idOf('Push-up');
+  const moveB = idOf('Incline Push-Up');
+
+  raw().prepare(
+    "INSERT INTO training_block (block_id, start_date, objective, created_at_ms, status) VALUES (1, ?, 'strength', 1000, 'active')",
+  ).run(today);
+  raw().prepare(
+    "INSERT INTO planned_session (planned_session_id, block_id, week_index, day_index, focus, phase, session_date) VALUES (100, 1, 1, 1, 'upper', 'accumulation', ?)",
+  ).run(today);
+  raw().prepare(
+    'INSERT INTO planned_slot (planned_slot_id, planned_session_id, slot_index, movement_id, sets, reps, target_rpe) VALUES (500, 100, 1, ?, 3, 5, 8)',
+  ).run(moveA);
+  raw().prepare(
+    "INSERT INTO planned_session (planned_session_id, block_id, week_index, day_index, focus, phase, session_date) VALUES (101, 1, 1, 3, 'upper', 'accumulation', date(?, '+2 days'))",
+  ).run(today);
+  raw().prepare(
+    'INSERT INTO planned_slot (planned_slot_id, planned_session_id, slot_index, movement_id, sets, reps, target_rpe) VALUES (502, 101, 1, ?, 2, 8, 8)',
+  ).run(moveB);
+
+  state().refreshBlock();
+  state().startSession();
+  state().finishPreparation('already_warm', state().preparation.revision);
+
+  const slotA = state().sessionPlan[0];
+  state().logSet(moveA, 5, 0, 8, undefined, undefined, undefined, undefined, slotA.sessionPlanSlotId);
+  state().runnerHalt('safety');
+  expect(state().runner.phase).toBe('halted');
+
+  const snapshotDbSlots = () => raw().prepare(
+    'SELECT sps.*, spsr.replaced_by_session_plan_slot_id FROM session_plan_slot sps LEFT JOIN session_plan_slot_replacement spsr ON spsr.session_plan_slot_id = sps.session_plan_slot_id WHERE sps.session_id = ? ORDER BY sps.slot_index',
+  ).all(state().session.sessionId);
+  const snapshotCheckpoint = () => raw().prepare(
+    'SELECT runner_state_json FROM session_runner_checkpoint WHERE session_id = ?',
+  ).get(state().session.sessionId);
+  const dispositions = () => Number(raw().prepare('SELECT COUNT(*) AS c FROM planned_slot_disposition').get().c);
+
+  const beforeSlots = snapshotDbSlots();
+  const beforeCheckpoint = snapshotCheckpoint();
+  const beforeDispositions = dispositions();
+  const beforePlan = state().sessionPlan;
+  const beforeRunner = state().runner;
+
+  // Refused before any write: no transaction is opened and no checkpoint error
+  // from the runner reaches the athlete.
+  state().swapMovement(moveA, moveB, 2);
+  expect(state().error).toBeNull();
+  state().applyDaySwap(moveA, {
+    plannedSlotId: 502,
+    fromDayIndex: 2,
+    movement_id: moveB,
+    name: 'Incline Push-Up',
+    pattern: 'horizontal_push',
+    setsConserved: 2,
+    color: 'green',
+    rationale: 'Swap from later day.',
+  }, 2);
+  expect(state().error).toBeNull();
+
+  expect(snapshotDbSlots()).toEqual(beforeSlots);
+  expect(snapshotCheckpoint()).toEqual(beforeCheckpoint);
+  expect(dispositions()).toBe(beforeDispositions);
+  expect(state().sessionPlan).toBe(beforePlan);
+  expect(state().runner).toBe(beforeRunner);
+  expect(state().runner.phase).toBe('halted');
 });
 
 test('restarting/resuming the session from SQLite after a post-set swap restores both rows, replacedBySessionPlanSlotId, and the runner position', async () => {

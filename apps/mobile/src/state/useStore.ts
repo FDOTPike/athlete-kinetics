@@ -6982,6 +6982,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const newProvKind: SlotProvenanceKind = slot.targetRpe !== null ? 'substituted' : slot.provenanceKind;
 
     if (loggedSetsCount > 0 && session !== null) {
+      // A halted session stays stopped; refuse before any write.
+      if (runner?.phase === 'halted') return;
       const chosenCount = replacementSets as number;
       const d = getDb();
       let newSlotId = 0;
@@ -7417,6 +7419,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const originalMv = targetSlot.originalMovementId ?? targetSlot.movementId;
 
     if (loggedSetsCount > 0 && session !== null) {
+      // A halted session stays stopped; refuse before any write.
+      if (runner?.phase === 'halted') return;
       const chosenCount = replacementSets as number;
       let newSlotId = 0;
       let nextRunner = runner;

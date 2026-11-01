@@ -541,4 +541,22 @@ check('replaceSlotAfterLoggedSets keeps original slot at completed count, insert
 });
 
 
+check('replaceSlotAfterLoggedSets leaves a halted runner halted and unchanged', () => {
+  let state = startRunner([repSlot(801, 3, 5, 8, 11, 'Squat'), repSlot(802, 2, 8, 7.5, 12, 'Row')], { tier: 'intermediate', startedAtMs: 0 });
+  state = advance(state, event('LOG_SET', 10, { actualRpe: 8 }));
+  state = advance(state, event('HALT', 20, { reason: 'safety' }));
+  assert.equal(state.phase, 'halted');
+
+  const replaced = replaceSlotAfterLoggedSets(state, {
+    targetSessionPlanSlotId: 801,
+    completedSets: 1,
+    replacementSlot: repSlot(803, 2, 8, 8, 13, 'Split Squat'),
+    atMs: 30,
+  });
+
+  assert.equal(replaced, state, 'a stop is never resumed by a swap');
+  assert.equal(replaced.phase, 'halted');
+  assert.equal(replaced.haltReason, 'safety');
+});
+
 console.log(`verify:runner - all ${n} checks green`);

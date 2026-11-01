@@ -830,6 +830,8 @@ export function replaceSlotAfterLoggedSets(
   state: RunnerState,
   input: ReplaceSlotAfterLoggedSetsInput,
 ): RunnerState {
+  // A stop is final: a swap never resumes a halted session.
+  if (state.phase === 'halted') return state;
   const runnerSlotIndex = state.slots.findIndex(
     (candidate) => candidate.sessionPlanSlotId === input.targetSessionPlanSlotId,
   );
