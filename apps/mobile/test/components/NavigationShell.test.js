@@ -131,8 +131,10 @@ beforeEach(() => { mockState = state(); });
 describe('exactly Today, Plan and Progress are the primary destinations', () => {
   test('the shared shell actively resizes above the keyboard on both platforms', () => {
     render(<AppShellTestHarness />);
-    expect(screen.UNSAFE_getByType(KeyboardAvoidingView).props.behavior)
-      .toBe(Platform.OS === 'ios' ? 'padding' : 'height');
+    const shell = screen.UNSAFE_getByType(KeyboardAvoidingView).props;
+    expect(shell.behavior).toBe('padding');
+    // Android enables it only while the keyboard is shown (fn-1, 2026-11-03).
+    expect(shell.enabled).toBe(Platform.OS === 'ios');
   });
 
   test('the primary bar renders TODAY, PLAN, PROGRESS and nothing else', () => {
