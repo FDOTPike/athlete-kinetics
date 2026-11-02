@@ -544,7 +544,7 @@ const styles = StyleSheet.create({
     height: theme.touch.min,
     justifyContent: 'center',
   },
-  searchInput: { ...theme.font.body, fontFamily: theme.font.family, color: theme.color.textHi, padding: 0 },
+  searchInput: { ...theme.font.body, fontFamily: theme.font.family, color: theme.color.textHi, padding: 0, minHeight: theme.touch.min, textAlignVertical: 'center' },
   filterLabel: { ...theme.font.eyebrow, color: theme.color.textMid },
   filterScroll: { gap: theme.space[2], paddingVertical: theme.space[1] },
   toggleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.space[2] },
