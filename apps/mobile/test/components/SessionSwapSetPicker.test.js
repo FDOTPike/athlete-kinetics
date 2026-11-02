@@ -319,3 +319,22 @@ test('Cancel and Close return without changing anything', () => {
   expect(mockState.applyDaySwap).not.toHaveBeenCalled();
   expect(mockState.closeSubstitution).toHaveBeenCalledTimes(1);
 });
+
+// Android walk 2026-11-03 (ux-4): "Choose an alternative" opened below the
+// next exercise, fully off-screen. Opening it now scrolls the workout to it,
+// once per opening, so later layout changes do not pull the page around.
+test('opening the alternatives scrolls the workout to them once', () => {
+  const { ScrollView } = require('react-native');
+  const { theme } = require('../../src/theme/theme');
+  mockState = makeState({ plannedSets: 3, loggedSets: [] });
+  render(<SessionScreen />);
+  const sheet = screen.getByTestId('substitution-sheet');
+  const scroller = screen.UNSAFE_getAllByType(ScrollView)
+    .map((node) => node.instance)
+    .find((instance) => instance && typeof instance.scrollTo === 'function');
+  const scrollTo = jest.spyOn(scroller, 'scrollTo');
+  fireEvent(sheet, 'layout', { nativeEvent: { layout: { x: 0, y: 900, width: 300, height: 400 } } });
+  expect(scrollTo).toHaveBeenCalledWith({ y: 900 - theme.space[4], animated: true });
+  fireEvent(sheet, 'layout', { nativeEvent: { layout: { x: 0, y: 950, width: 300, height: 420 } } });
+  expect(scrollTo).toHaveBeenCalledTimes(1);
+});
