@@ -1059,6 +1059,28 @@ check('Layer 2 pulls only same-category, strictly-later slots',
   ds.options.map((o) => `${o.name}@${o.fromDayIndex}`).join(', '));
 check('conservation of volume: setsConserved == origin slot sets, origin slot identified',
   ds.options[0].setsConserved === 4 && ds.options[0].plannedSlotId === 77);
+// Android walk 2026-11-03 (ux-4): the option said "from day 2" for a session
+// the plan shows as the third day. Name the session by its date when known,
+// otherwise count block days from 1, as the plan does.
+const dsDated = computeSubstitutions({ target: byName('Barbell Row'), library: subLib,
+  inventory: [...EQUIPMENT_ITEMS], niggles: [],
+  futureSlots: [{ ...futureSlots[0], sessionDate: '2026-11-10' }], currentDayIndex: 2,
+  trainingAge: 'intermediate', accessContext: 'weight_room' }).layer2DaySwap;
+check('day-swap names the origin session by its date when the date is known',
+  dsDated.options[0].rationale.includes('the 2026-11-10 session')
+    && dsDated.options[0].sessionDate === '2026-11-10'
+    && !/day 5/.test(dsDated.options[0].rationale),
+  dsDated.options[0].rationale);
+check('day-swap without a date counts block days from 1, not 0',
+  ds.options[0].rationale.includes('block day 6') && !/day 5/.test(ds.options[0].rationale),
+  ds.options[0].rationale);
+{
+  const sameLevel = subLib.flatMap((m) => computeSubstitutions({ ...baseInput, target: m })
+    .layer1Regression.options.filter((o) => o.difficulty === m.difficulty).map((o) => o.rationale));
+  check('same-difficulty regression options exist and carry no "altered torque" jargon',
+    sameLevel.length > 0 && sameLevel.every((r) => !/torque/i.test(r)),
+    `${sameLevel.length} options; first: ${sameLevel[0]}`);
+}
 
 // sentiment routing
 const avoidLib = subLib.map((m) => m.name === 'Goblet Squat' ? { ...m, preference: -1 } : m);
