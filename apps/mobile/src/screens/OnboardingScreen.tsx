@@ -351,11 +351,12 @@ export default function OnboardingScreen(): React.JSX.Element {
       setStepIdx((i) => Math.min(steps.length - 1, i + 1));
       return;
     }
-    const nextKey = steps[stepIdx + 1];
-    const addedAndUnanswered = (nextKey === 'sport' && !sportValidation.ok)
-      || (nextKey === 'target' && !goalValidation.ok);
-    if (addedAndUnanswered) {
-      setStepIdx(stepIdx + 1);
+    // Any later sport or target screen still unanswered comes first, even
+    // when an answered one sits between (a valid sport before a new target).
+    const unansweredIdx = steps.findIndex((key, i) => i > stepIdx
+      && ((key === 'sport' && !sportValidation.ok) || (key === 'target' && !goalValidation.ok)));
+    if (unansweredIdx !== -1) {
+      setStepIdx(unansweredIdx);
       return;
     }
     setEditingFromReview(false);

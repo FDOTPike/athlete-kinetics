@@ -174,6 +174,28 @@ describe('OnboardingScreen EDIT from review returns to the review', () => {
     expect(screen.getByLabelText('START TRAINING')).toBeOnTheScreen();
   });
 
+  test('with a sport already answered, an edit that adds the target still walks into the target', () => {
+    render(<OnboardingScreen />);
+    next();
+    next();
+    press('onboarding-wants-sport');
+    next();
+    press('sport-family-basketball');
+    press('sport-outcome-general_support');
+    press('sport-experience-new');
+    next();
+    next();
+    next();
+    next();
+    pressLabel('No, nothing to note');
+    next();
+    expect(screen.getByLabelText('START TRAINING')).toBeOnTheScreen();
+    pressLabel('Edit focus');
+    press('onboarding-wants-target');
+    next();
+    expect(screen.getByTestId('goal-editor')).toBeOnTheScreen();
+  });
+
   test('without an edit, NEXT still walks one screen at a time', () => {
     render(<OnboardingScreen />);
     next();
