@@ -104,6 +104,7 @@ export function FocusPicker({ value, onChange, showMuscles, onToggleMuscles }: F
             <Chip
               key={bundleId}
               testID={`focus-bundle-${bundleId}`}
+              wrap
               label={`${bundle.label.toUpperCase()} — ${bundle.description}`}
               selected={value.bundleId === bundleId}
               onPress={() => chooseBundle(bundleId)}

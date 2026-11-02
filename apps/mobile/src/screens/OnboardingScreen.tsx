@@ -505,6 +505,7 @@ export default function OnboardingScreen(): React.JSX.Element {
             <Text style={styles.fieldLabel}>A SPORT? (OPTIONAL)</Text>
             <Chip
               testID="onboarding-wants-sport"
+              wrap
               label="I PLAY OR COMPETE IN A SPORT — plan the gym around it"
               selected={wantsSport}
               onPress={() => setWantsSport((value) => !value)}
@@ -516,6 +517,7 @@ export default function OnboardingScreen(): React.JSX.Element {
             <Text style={styles.fieldLabel}>A SPECIFIC TARGET? (OPTIONAL)</Text>
             <Chip
               testID="onboarding-wants-target"
+              wrap
               label="I ALSO HAVE A SPECIFIC TARGET — a number and a date I want to reach"
               selected={wantsTarget}
               onPress={() => setWantsTarget((value) => !value)}
