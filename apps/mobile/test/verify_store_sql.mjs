@@ -972,7 +972,39 @@ if (resetTables.length >= 15) {
 {
   const { readdirSync, statSync } = await import('node:fs');
   const storeSrc = readFileSync(join(import.meta.dirname, '..', 'src', 'state', 'useStore.ts'), 'utf-8');
-  const sqlNaming = (table) => [...storeSrc.matchAll(new RegExp("'([^'\\n]*\\b" + table + "\\b[^'\\n]*)'", 'g'))].map((m) => m[1]);
+  // Every string literal that names the table: single-quoted, double-quoted,
+  // and backtick SQL templates (which may span lines; their whitespace is
+  // collapsed). Single quotes alone missed a backtick SELECT in review
+  // (PR 116, 2026-11-03), so a read of a record-only table went unseen.
+  // A backtick literal counts as SQL when a SQL keyword opens it; anchoring
+  // on the keyword keeps a closing backtick elsewhere in the file from being
+  // read as an opening one.
+  const SQL_TEMPLATE = /`(\s*(?:SELECT|INSERT|UPDATE|DELETE|WITH|REPLACE|CREATE|DROP|ALTER)\b[^`]*)`/gi;
+  const sqlNamingIn = (src, table) => {
+    const found = [];
+    for (const quote of ["'", '"']) {
+      const re = new RegExp(quote + '([^' + quote + '\\n]*\\b' + table + '\\b[^' + quote + '\\n]*)' + quote, 'g');
+      for (const m of src.matchAll(re)) found.push(m[1]);
+    }
+    const named = new RegExp('\\b' + table + '\\b');
+    for (const m of src.matchAll(SQL_TEMPLATE)) {
+      if (named.test(m[1])) found.push(m[1].replace(/\s+/g, ' ').trim());
+    }
+    return found;
+  };
+  const sqlNaming = (table) => sqlNamingIn(storeSrc, table);
+  a('the SQL-naming check sees single-quoted, double-quoted and backtick SQL alike',
+    JSON.stringify(sqlNamingIn([
+      "x('DELETE FROM probe_table')",
+      'y("INSERT INTO probe_table (a) VALUES (?)")',
+      'z(`SELECT a\n   FROM probe_table\n  WHERE a = ?`)',
+      "w('SELECT 1 FROM other_table')",
+      'v(`label ${x}`); u(`elsewhere`)',
+    ].join('\n'), 'probe_table')) === JSON.stringify([
+      'DELETE FROM probe_table',
+      'INSERT INTO probe_table (a) VALUES (?)',
+      'SELECT a FROM probe_table WHERE a = ?',
+    ]), JSON.stringify(sqlNamingIn('z(`SELECT a\n FROM probe_table`)', 'probe_table')));
   a('071: the store names session_skipped_slot in one INSERT and one DELETE only',
     JSON.stringify(sqlNaming('session_skipped_slot').sort()) === JSON.stringify([
       'DELETE FROM session_skipped_slot',
