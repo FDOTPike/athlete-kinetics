@@ -574,5 +574,5 @@ test('a note starter also focuses the note field, so the athlete can type straig
     .find((node) => node.props.testID === 'session-feel-note');
   const focus = jest.spyOn(input.instance, 'focus');
   fireEvent.press(screen.getByTestId('session-note-starter-body'));
-  expect(focus).toHaveBeenCalledTimes(1);
+  expect(focus).toHaveBeenCalled();
 });

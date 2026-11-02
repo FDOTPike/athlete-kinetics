@@ -545,7 +545,8 @@ describe('screen laws: D5, D6, D8, D9', () => {
     render(<SessionScreen />);
     // With no rating, the cue line carries the plain wording (ux-8 removed
     // the second line that repeated it).
-    expect(screen.getByText(/This effort rating will be saved with the set\.|Effort is optional evidence — leave it untouched to skip\./)).toBeOnTheScreen();
+    expect(screen.getByText('Effort is optional evidence — leave it untouched to skip.')).toBeOnTheScreen();
+    expect(screen.queryByText('This effort rating will be saved with the set.')).toBeNull();
     expect(screen.queryByText(/Coach evidence/)).toBeNull();
   });
 });
