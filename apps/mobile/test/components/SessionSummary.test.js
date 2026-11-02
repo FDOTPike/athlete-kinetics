@@ -20,7 +20,7 @@
  *    exactly once, no writes during render, plain RPE wording.
  */
 import React from 'react';
-import { ScrollView } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import SessionScreen from '../../src/screens/SessionScreen';
 import {
@@ -395,8 +395,23 @@ describe('screen laws: D5, D6, D8, D9', () => {
     expect(screen.getByTestId('session-feel-saved')).toHaveTextContent('How it went: As planned.');
     expect(screen.getByText('Your note is saved with this session.')).toBeOnTheScreen();
     expect(screen.getByLabelText('Back to Today')).toBeOnTheScreen();
+    // The rule: the whole completion page scrolls as one flow, so a long
+    // summary can neither run under the footer nor push Back to Today off
+    // screen. Every piece must sit inside the one scrolling view, with no
+    // absolutely positioned layer between it and that view.
     const scroll = screen.UNSAFE_getByType(ScrollView);
-    expect(scroll.props.contentContainerStyle).toEqual(expect.objectContaining({ flexGrow: 1 }));
+    expect(scroll.props.scrollEnabled).not.toBe(false);
+    const inScrollFlow = (node) => {
+      for (let n = node; n !== null; n = n.parent) {
+        if (n === scroll) return true;
+        expect(StyleSheet.flatten(n.props.style)?.position).not.toBe('absolute');
+      }
+      return false;
+    };
+    expect(inScrollFlow(screen.getByText(/2026-09-12/))).toBe(true);
+    expect(inScrollFlow(screen.getByTestId('session-feel-saved'))).toBe(true);
+    expect(inScrollFlow(screen.getByText('Your note is saved with this session.'))).toBe(true);
+    expect(inScrollFlow(screen.getByLabelText('Back to Today'))).toBe(true);
   });
 
   test('render performs no endSession / plan / progression / log call (D8 guard)', () => {
