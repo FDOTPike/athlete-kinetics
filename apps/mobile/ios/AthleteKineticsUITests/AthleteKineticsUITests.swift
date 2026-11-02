@@ -340,9 +340,11 @@ final class AthleteKineticsUITests: XCTestCase {
   /// open there would also explain CI's intermittent "the permission sheet
   /// stayed open" and "Failed to determine hittability of Don't Allow".
   /// The app's alerts and SpringBoard's are searched for at most `timeout`
-  /// seconds. An alert that mentions Health is preferred; otherwise only an
-  /// alert whose single button is OK qualifies, so an alert offering any other
-  /// choice is never answered here. OK is tapped at the centre read from a
+  /// seconds. An alert that mentions Health is preferred, wherever it is.
+  /// Failing that, only a SpringBoard alert whose single button is OK
+  /// qualifies: the Health Access box is a system alert, and an alert the app
+  /// itself raises (an error, say) is never dismissed here, so it still shows
+  /// up in the checks that follow. OK is tapped at the centre read from a
   /// snapshot (an alert that vanishes meanwhile is skipped, not a failure), and
   /// the tap is recorded with where the alert was and its title. This only
   /// dismisses: every check after it is unchanged.
@@ -365,7 +367,7 @@ final class AthleteKineticsUITests: XCTestCase {
             || alert.staticTexts.matching(healthNamed).firstMatch.exists
           if mentionsHealth && healthAlert == nil {
             healthAlert = (place, target, alert, ok, frame)
-          } else if !mentionsHealth && okOnlyAlert == nil && alert.buttons.count == 1 {
+          } else if !mentionsHealth && okOnlyAlert == nil && place == "SpringBoard" && alert.buttons.count == 1 {
             okOnlyAlert = (place, target, alert, ok, frame)
           }
         }
@@ -373,7 +375,7 @@ final class AthleteKineticsUITests: XCTestCase {
       if let found = healthAlert ?? okOnlyAlert {
         let title = currentLabel(found.alert).flatMap { $0.isEmpty ? nil : $0 }
           ?? currentLabel(found.alert.staticTexts.firstMatch) ?? "<no title>"
-        let kind = healthAlert != nil ? "Health alert" : "alert whose only button is OK"
+        let kind = healthAlert != nil ? "Health alert" : "SpringBoard alert whose only button is OK"
         found.target.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
           .withOffset(CGVector(dx: found.frame.midX, dy: found.frame.midY)).tap()
         sleep(1)
