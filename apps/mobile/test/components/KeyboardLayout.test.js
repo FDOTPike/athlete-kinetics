@@ -22,9 +22,14 @@ describe('KeyboardAwareScrollView contract', () => {
     }
 
     collectProductFiles(srcRoot);
+    // A JSX tag, not a type argument: `useRef<TextInput | null>` follows an
+    // identifier and is not an input on screen.
+    const JSX_TEXT_INPUT = /(?<![\w.])<TextInput\b[\s\S]*?\/>/g;
+    expect([...'const r = useRef<TextInput | null>(null); <View />'.matchAll(JSX_TEXT_INPUT)]).toHaveLength(0);
+    expect([...'(\n  <TextInput disableFullscreenUI />'.matchAll(JSX_TEXT_INPUT)]).toHaveLength(1);
     const inputTags = productFiles.flatMap((file) => {
       const source = fs.readFileSync(file, 'utf8');
-      return [...source.matchAll(/<TextInput\b[\s\S]*?\/>/g)].map((match) => ({ file, tag: match[0] }));
+      return [...source.matchAll(JSX_TEXT_INPUT)].map((match) => ({ file, tag: match[0] }));
     });
 
     const backupInputs = inputTags.filter(({ file }) => path.basename(file) === 'BackupTransferPanel.tsx');
