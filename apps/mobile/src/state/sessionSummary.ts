@@ -280,6 +280,8 @@ const comparisonLine = (exercise: SummaryExercise, facts: PreviousFacts): Summar
 
 export interface SessionSummaryView {
   exerciseLines: SummaryLine[];
+  /** One line per skipped exercise, in the session timeline's wording. */
+  skippedLines: SummaryLine[];
   comparisonLines: SummaryLine[];
   durationLine: string | null;
   nextLine: string | null;
@@ -292,6 +294,8 @@ export interface BuildSummaryInput {
   durationMin: number | null;
   blockSessions: readonly TodayBlockSession[];
   today: string;
+  /** Names of the exercises the athlete skipped, in plan order. */
+  skippedExercises?: readonly string[];
 }
 
 export const buildSessionSummary = (input: BuildSummaryInput): SessionSummaryView => {
@@ -312,8 +316,13 @@ export const buildSessionSummary = (input: BuildSummaryInput): SessionSummaryVie
   // is exported as NO_NEXT_SESSION_TEXT (the single source of truth; the
   // screen renders it directly).
   const next: SessionRef | null = nextSessionAfter(input.blockSessions, input.today);
+  const skippedLines: SummaryLine[] = (input.skippedExercises ?? []).map((name, index) => ({
+    key: `skipped-${index}`,
+    text: `Skipped: ${name} · no sets logged`,
+  }));
   return {
     exerciseLines,
+    skippedLines,
     comparisonLines,
     durationLine,
     nextLine: next === null

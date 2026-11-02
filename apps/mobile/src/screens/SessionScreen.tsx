@@ -409,6 +409,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
       const facts = loadSessionSummaryFacts(lastEndedSessionId);
       return buildSessionSummary({
         exercises: facts.exercises,
+        skippedExercises: facts.skippedExercises ?? [],
         previousSets: facts.previousSets,
         durationMin: facts.durationMin,
         blockSessions: summaryBlockSessions,
@@ -705,6 +706,9 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
             <View style={styles.summaryBlock} testID="session-summary">
               {summary.exerciseLines.map((line) => (
                 <Text key={line.key} style={styles.summaryLine}>{line.text}</Text>
+              ))}
+              {summary.skippedLines.map((line) => (
+                <Text key={line.key} style={styles.summaryLine} testID="session-summary-skipped">{line.text}</Text>
               ))}
               {summary.comparisonLines.map((line) => (
                 <Text key={line.key} style={styles.summaryComparison}>{line.text}</Text>
