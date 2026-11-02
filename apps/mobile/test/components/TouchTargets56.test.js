@@ -24,8 +24,10 @@ const resolveWidth = (expr) => {
   if (value === 'theme.touch.min') return theme.touch.min;
   throw new Error(`cannot resolve width expression ${value}`);
 };
+// Comments are removed first, so a commented-out declaration never counts.
+const stripComments = (block) => block.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '');
 const widthFloor = (block) => {
-  const values = [...block.matchAll(/\b(minWidth|width):([^,\n}]*)/g)].map((m) => resolveWidth(m[2]));
+  const values = [...stripComments(block).matchAll(/\b(minWidth|width):([^,\n}]*)/g)].map((m) => resolveWidth(m[2]));
   if (values.length === 0) throw new Error('style sets no width');
   return Math.min(...values);
 };
@@ -53,5 +55,11 @@ describe('the width reader fails closed', () => {
   test('a partial expression is refused, not read as its first term', () => {
     expect(() => widthFloor('\n    minWidth: theme.touch.min / 2,\n')).toThrow(/cannot resolve/);
     expect(widthFloor('\n    minWidth: theme.touch.min,\n    width: 60,\n')).toBe(theme.touch.min);
+  });
+
+  test('a commented-out width does not count', () => {
+    expect(() => widthFloor('\n    // minWidth: theme.touch.min,\n    minHeight: 56,\n')).toThrow(/sets no width/);
+    expect(() => widthFloor('\n    /* minWidth: theme.touch.min, */\n    minHeight: 56,\n')).toThrow(/sets no width/);
+    expect(widthFloor('\n    // was 44\n    minWidth: theme.touch.min,\n')).toBe(theme.touch.min);
   });
 });
