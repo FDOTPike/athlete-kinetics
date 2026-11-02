@@ -511,7 +511,10 @@ test('guided mode keeps only the current movement expanded and future work unava
 test('untouched actual RPE logs null instead of fabricating target equality', () => {
   render(<SessionScreen />);
 
-  expect(screen.getByText('Effort rating is optional; leave it blank if you are unsure.')).toBeOnTheScreen();
+  // One line says effort is optional; a second line saying the same thing
+  // was removed (Android walk 2026-11-03, ux-8).
+  expect(screen.getByTestId('rpe-cue').props.children).toBe('Effort is optional evidence — leave it untouched to skip.');
+  expect(screen.queryByText('Effort rating is optional; leave it blank if you are unsure.')).toBeNull();
   fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
 
   expect(mockState.logSet).toHaveBeenCalledWith(

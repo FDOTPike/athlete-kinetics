@@ -543,7 +543,10 @@ describe('screen laws: D5, D6, D8, D9', () => {
       resolveSlotLoadCalls: [],
     });
     render(<SessionScreen />);
-    expect(screen.getByText(/This effort rating will be saved with the set\.|Effort rating is optional; leave it blank if you are unsure\./)).toBeOnTheScreen();
+    // With no rating, the cue line carries the plain wording (ux-8 removed
+    // the second line that repeated it).
+    expect(screen.getByText('Effort is optional evidence — leave it untouched to skip.')).toBeOnTheScreen();
+    expect(screen.queryByText('This effort rating will be saved with the set.')).toBeNull();
     expect(screen.queryByText(/Coach evidence/)).toBeNull();
   });
 });
