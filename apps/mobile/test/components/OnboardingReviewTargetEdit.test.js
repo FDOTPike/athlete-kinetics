@@ -217,6 +217,28 @@ describe('OnboardingScreen long option chips wrap instead of cutting their sente
     expect(ids.length).toBeGreaterThanOrEqual(6);
     for (const id of ids) {
       expect(screen.getByTestId(id).findByType(Text).props.numberOfLines).toBeUndefined();
+
+// Android walk 2026-11-03 (ux-5): HOME BASIC claimed a pull-up bar its
+// description did not mention. A preset's description names every item in it.
+describe('OnboardingScreen HOME BASIC says what it adds', () => {
+  test('the HOME BASIC description names exactly the items of the preset', () => {
+    const { EQUIPMENT_PRESETS, EQUIPMENT_ITEMS } = require('@ak/inference');
+    // How each item reads in a preset description. Every equipment item has
+    // an entry, so an item added to the preset cannot slip past unnamed.
+    const SPOKEN = {
+      barbell: 'barbell', squat_rack: 'rack', bench: 'bench', dumbbells: 'dumbbells', kettlebell: 'kettlebell',
+      pullup_bar: 'pull-up bar', nordic_bench: 'nordic', bands: 'bands', cable_machine: 'cable', mats: 'mats', boards: 'boards',
+    };
+    expect(Object.keys(SPOKEN).sort()).toEqual([...EQUIPMENT_ITEMS].sort());
+    expect(EQUIPMENT_PRESETS.home_basic.length).toBeGreaterThan(0);
+    render(<OnboardingScreen />);
+    for (let i = 0; i < 5; i += 1) next();
+    const description = screen.getByLabelText(/^HOME BASIC\. /).props.accessibilityLabel.toLowerCase();
+    // Both directions: every preset item is named, and nothing outside the
+    // preset is named.
+    for (const item of EQUIPMENT_ITEMS) {
+      expect([item, description.includes(SPOKEN[item])])
+        .toEqual([item, EQUIPMENT_PRESETS.home_basic.includes(item)]);
     }
   });
 });

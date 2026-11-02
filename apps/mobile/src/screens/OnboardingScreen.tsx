@@ -146,7 +146,7 @@ const EQUIPMENT_DESCRIPTION: Record<EquipmentItem, string> = {
 
 const PRESET_COPY = {
   full_gym: { label: 'FULL GYM', blurb: 'A broad setup with racks, free weights, cables, bands, and mats.' },
-  home_basic: { label: 'HOME BASIC', blurb: 'A compact setup with dumbbells, a kettlebell, bands, and mats.' },
+  home_basic: { label: 'HOME BASIC', blurb: 'A compact setup with dumbbells, a kettlebell, a pull-up bar, bands, and mats.' },
   minimal: { label: 'MINIMAL', blurb: 'No equipment required; bodyweight movements remain available.' },
 } as const;
 
