@@ -1069,10 +1069,10 @@ const dsDated = computeSubstitutions({ target: byName('Barbell Row'), library: s
 check('day-swap names the origin session by its date when the date is known',
   dsDated.options[0].rationale.includes('the 2026-11-10 session')
     && dsDated.options[0].sessionDate === '2026-11-10'
-    && !/day 5/.test(dsDated.options[0].rationale),
+    && !/\bday 5\b/.test(dsDated.options[0].rationale),
   dsDated.options[0].rationale);
 check('day-swap without a date counts block days from 1, not 0',
-  ds.options[0].rationale.includes('block day 6') && !/day 5/.test(ds.options[0].rationale),
+  ds.options[0].rationale.includes('block day 6') && !/\bday 5\b/.test(ds.options[0].rationale),
   ds.options[0].rationale);
 {
   const sameLevel = subLib.flatMap((m) => computeSubstitutions({ ...baseInput, target: m })
