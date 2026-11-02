@@ -915,7 +915,9 @@ test('session rest override changes by 15 seconds and persists through the runne
   render(<SessionScreen />);
 
   expect(screen.getByLabelText('Session rest seconds 90')).toBeOnTheScreen();
-  expect(screen.getByText('Applies to this session.')).toBeOnTheScreen();
+  // Android walk 2026-11-03 (ux-8): the number follows the last set's effort,
+  // so the caption says why it changes between rests.
+  expect(screen.getByText('Rest adjusts to your last set’s effort: harder sets get longer rests. Your changes apply for this session.')).toBeOnTheScreen();
   fireEvent.press(screen.getByLabelText('Increase Session rest seconds'));
   expect(mockState.setRunnerRestOverride).toHaveBeenCalledWith(105);
   fireEvent.press(screen.getByLabelText('Decrease Session rest seconds'));

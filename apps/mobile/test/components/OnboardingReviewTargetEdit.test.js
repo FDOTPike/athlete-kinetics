@@ -122,3 +122,22 @@ describe('OnboardingScreen review effort ceiling', () => {
     }
   });
 });
+
+// Android walk 2026-11-03 (ux-5): HOME BASIC claimed a pull-up bar its
+// description did not mention. A preset's description names every item in it.
+describe('OnboardingScreen HOME BASIC says what it adds', () => {
+  test('the HOME BASIC description names every item of the preset', () => {
+    const { EQUIPMENT_PRESETS } = require('@ak/inference');
+    const SPOKEN = {
+      dumbbells: 'dumbbells', kettlebell: 'kettlebell', pullup_bar: 'pull-up bar', bands: 'bands', mats: 'mats',
+    };
+    render(<OnboardingScreen />);
+    for (let i = 0; i < 5; i += 1) next();
+    const option = screen.getByLabelText(/^HOME BASIC\. /);
+    const description = option.props.accessibilityLabel;
+    for (const item of EQUIPMENT_PRESETS.home_basic) {
+      expect(SPOKEN[item]).toBeDefined();
+      expect(description).toContain(SPOKEN[item]);
+    }
+  });
+});
