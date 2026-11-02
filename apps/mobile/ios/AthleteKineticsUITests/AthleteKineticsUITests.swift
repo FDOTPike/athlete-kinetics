@@ -340,7 +340,9 @@ final class AthleteKineticsUITests: XCTestCase {
   /// open there would also explain CI's intermittent "the permission sheet
   /// stayed open" and "Failed to determine hittability of Don't Allow".
   /// The app's alerts and SpringBoard's are searched for at most `timeout`
-  /// seconds. An alert that mentions Health is preferred, wherever it is.
+  /// seconds. Only an alert whose single button is OK is ever answered. One
+  /// that mentions Health is preferred, in either place (the app raises no
+  /// Health-named alert itself, and HealthKit may host its alert in the app).
   /// Failing that, only a SpringBoard alert whose single button is OK
   /// qualifies: the Health Access box is a system alert, and an alert the app
   /// itself raises (an error, say) is never dismissed here, so it still shows
@@ -365,7 +367,7 @@ final class AthleteKineticsUITests: XCTestCase {
           guard let frame = (try? ok.snapshot())?.frame else { continue }
           let mentionsHealth = (currentLabel(alert) ?? "").localizedCaseInsensitiveContains("Health")
             || alert.staticTexts.matching(healthNamed).firstMatch.exists
-          if mentionsHealth && healthAlert == nil {
+          if mentionsHealth && healthAlert == nil && alert.buttons.count == 1 {
             healthAlert = (place, target, alert, ok, frame)
           } else if !mentionsHealth && okOnlyAlert == nil && place == "SpringBoard" && alert.buttons.count == 1 {
             okOnlyAlert = (place, target, alert, ok, frame)
