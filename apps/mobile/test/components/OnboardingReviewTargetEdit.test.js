@@ -122,3 +122,85 @@ describe('OnboardingScreen review effort ceiling', () => {
     }
   });
 });
+
+// Android walk 2026-11-03 (ux-5): EDIT on the review led into the middle of
+// the questions, and NEXT walked through every later screen again. NEXT now
+// returns to the review, unless the edit added a screen still to be answered.
+describe('OnboardingScreen EDIT from review returns to the review', () => {
+  const toReview = () => {
+    next();
+    next();
+    next();
+    next();
+    next();
+    next();
+    pressLabel('No, nothing to note');
+    next();
+    expect(screen.getByLabelText('START TRAINING')).toBeOnTheScreen();
+  };
+
+  test('NEXT after an edit goes straight back to the review', () => {
+    render(<OnboardingScreen />);
+    toReview();
+    pressLabel('Edit experience');
+    expect(screen.queryByLabelText('START TRAINING')).toBeNull();
+    next();
+    expect(screen.getByLabelText('START TRAINING')).toBeOnTheScreen();
+  });
+
+  test('an edit that adds the target screen walks into it, then returns to the review', () => {
+    render(<OnboardingScreen />);
+    toReview();
+    pressLabel('Edit focus');
+    press('onboarding-wants-target');
+    next();
+    expect(screen.getByTestId('goal-editor')).toBeOnTheScreen();
+    type('goal-outcome', 'Squat 100 kg for 5 reps');
+    type('goal-method', 'Back squat, 5 reps to parallel');
+    type('goal-baseline', '80');
+    type('goal-target', '100');
+    type('goal-reason', 'To be stronger for football');
+    next();
+    expect(screen.getByLabelText('START TRAINING')).toBeOnTheScreen();
+  });
+
+  test('BACK during an edit steps back one screen, and NEXT still returns to the review', () => {
+    render(<OnboardingScreen />);
+    toReview();
+    pressLabel('Edit your week');
+    pressLabel('Back');
+    expect(screen.getByText('HOW LONG HAVE YOU BEEN TRAINING?')).toBeOnTheScreen();
+    next();
+    expect(screen.getByLabelText('START TRAINING')).toBeOnTheScreen();
+  });
+
+  test('with a sport already answered, an edit that adds the target still walks into the target', () => {
+    render(<OnboardingScreen />);
+    next();
+    next();
+    press('onboarding-wants-sport');
+    next();
+    press('sport-family-basketball');
+    press('sport-outcome-general_support');
+    press('sport-experience-new');
+    next();
+    next();
+    next();
+    next();
+    pressLabel('No, nothing to note');
+    next();
+    expect(screen.getByLabelText('START TRAINING')).toBeOnTheScreen();
+    pressLabel('Edit focus');
+    press('onboarding-wants-target');
+    next();
+    expect(screen.getByTestId('goal-editor')).toBeOnTheScreen();
+  });
+
+  test('without an edit, NEXT still walks one screen at a time', () => {
+    render(<OnboardingScreen />);
+    next();
+    next();
+    next();
+    expect(screen.getByText('HOW LONG HAVE YOU BEEN TRAINING?')).toBeOnTheScreen();
+  });
+});
