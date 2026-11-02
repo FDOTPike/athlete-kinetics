@@ -263,14 +263,7 @@ export function AppShell(): React.JSX.Element {
                     importantForAccessibility="no-hide-descendants"
                   />
                 )}
-                {/* One line, shrunk to fit: at large system font sizes the
-                    label wrapped as "WORKOU / T" (Android walk 2026-11-03). */}
-                <Text
-                  style={[styles.headerText, active && styles.headerTextActive]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.5}
-                >
+                <Text style={[styles.headerText, active && styles.headerTextActive]}>
                   {t.label}
                 </Text>
               </Pressable>
@@ -345,14 +338,7 @@ export function AppShell(): React.JSX.Element {
                 style={({ pressed }) => [styles.tabBtn, pressed && styles.tabBtnPressed]}
               >
                 <View style={[styles.tabIndicator, active && styles.tabIndicatorActive]} />
-                <Text
-                  style={[styles.tabText, active && styles.tabTextActive]}
-                  numberOfLines={1}
-                  adjustsFontSizeToFit
-                  minimumFontScale={0.5}
-                >
-                  {t.label}
-                </Text>
+                <Text style={[styles.tabText, active && styles.tabTextActive]}>{t.label}</Text>
               </Pressable>
             );
           })}
@@ -397,11 +383,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 4,
   },
+  // No letter spacing on header and tab labels: at system font size 2.0 the
+  // tracking made "WORKOUT" wrap to "WORKOU / T" (Android walk 2026-11-03).
+  // Labels keep full font scaling and may wrap, centred, rather than shrink.
   headerText: {
     color: palette.faint,
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 1.2,
+    letterSpacing: 0,
+    textAlign: 'center',
   },
   headerTextActive: {
     color: palette.text,
@@ -416,7 +406,7 @@ const styles = StyleSheet.create({
   tabBtnPressed: {
     opacity: 0.7,
   },
-  tabText: { color: palette.faint, fontSize: 11, fontWeight: '700', letterSpacing: 1.6 },
+  tabText: { color: palette.faint, fontSize: 11, fontWeight: '700', letterSpacing: 0, textAlign: 'center' },
   tabTextActive: { color: palette.text, fontWeight: '800' },
   tabIndicator: { height: 3, width: 32, backgroundColor: 'transparent' },
   tabIndicatorActive: { backgroundColor: palette.chalk },
