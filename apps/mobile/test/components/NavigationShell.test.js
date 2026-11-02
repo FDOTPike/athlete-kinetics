@@ -20,7 +20,7 @@
  *    cold-start root.
  */
 import React from 'react';
-import { KeyboardAvoidingView, Platform } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
 import { render, screen, fireEvent, act } from '@testing-library/react-native';
 import { NavigationProvider, useNavigation } from '../../src/navigation/navigation';
 import AppShellTestHarness from '../../src/AppShellTestHarness';
@@ -135,6 +135,33 @@ describe('exactly Today, Plan and Progress are the primary destinations', () => 
     expect(shell.behavior).toBe('padding');
     // Android enables it only while the keyboard is shown (fn-1, 2026-11-03).
     expect(shell.enabled).toBe(Platform.OS === 'ios');
+  });
+
+  test('on Android the shell enables its padding when the keyboard shows and drops it when it hides', () => {
+    jest.replaceProperty(Platform, 'OS', 'android');
+    const listeners = { keyboardDidShow: [], keyboardDidHide: [] };
+    const spy = jest.spyOn(Keyboard, 'addListener').mockImplementation((event, handler) => {
+      (listeners[event] ??= []).push(handler);
+      return { remove: jest.fn() };
+    });
+    const keyboardEvent = {
+      duration: 0,
+      easing: 'keyboard',
+      endCoordinates: { screenX: 0, screenY: 500, width: 400, height: 300 },
+    };
+    try {
+      render(<AppShellTestHarness />);
+      const shellProps = () => screen.UNSAFE_getByType(KeyboardAvoidingView).props;
+      expect(shellProps().behavior).toBe('padding');
+      expect(shellProps().enabled).toBe(false);
+      expect(listeners.keyboardDidShow.length).toBeGreaterThan(0);
+      act(() => listeners.keyboardDidShow.forEach((handler) => handler(keyboardEvent)));
+      expect(shellProps().enabled).toBe(true);
+      act(() => listeners.keyboardDidHide.forEach((handler) => handler(keyboardEvent)));
+      expect(shellProps().enabled).toBe(false);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   test('the primary bar renders TODAY, PLAN, PROGRESS and nothing else', () => {
