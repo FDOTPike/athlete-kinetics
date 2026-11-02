@@ -2,7 +2,7 @@
 // sentences short at the default font size ("…No extra emphasis. Train ev…",
 // "…a number and a date…"), because every Chip was limited to one line.
 import React from 'react';
-import { Text } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 import { render, screen } from '@testing-library/react-native';
 import { Chip } from '../../src/components/ui/Chip';
 
@@ -18,4 +18,5 @@ test('a Chip asked to wrap shows its whole label, centred', () => {
   const label = labelOf('c');
   expect(label.props.numberOfLines).toBeUndefined();
   expect(label.props.children).toBe('BALANCED WHOLE BODY — No extra emphasis. Train everything evenly.');
+  expect(StyleSheet.flatten(label.props.style).textAlign).toBe('center');
 });
