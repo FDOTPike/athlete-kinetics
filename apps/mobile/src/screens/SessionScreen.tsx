@@ -2320,8 +2320,8 @@ const styles = StyleSheet.create({
     marginTop: theme.space[1],
   },
   close: {
-    width: 42,
-    height: 42,
+    minWidth: theme.touch.min,
+    minHeight: theme.touch.min,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2504,7 +2504,7 @@ const styles = StyleSheet.create({
     alignItems: 'stretch',
   },
   directToggle: {
-    minHeight: 44,
+    minHeight: theme.touch.min,
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: theme.space[2],
