@@ -1445,7 +1445,9 @@ const styles = StyleSheet.create({
   mgmtHeading: { ...theme.font.cue, color: theme.color.textHi, marginBottom: theme.space[2] },
   subheading: { ...theme.font.body, color: theme.color.textMid, marginTop: theme.space[1], marginBottom: theme.space[4] },
   field: { marginBottom: theme.space[4] },
-  fieldLabel: { ...theme.font.eyebrow, color: theme.color.textLow },
+  // flexShrink: a long heading wraps instead of pushing its info button off
+  // screen at large font sizes (Android walk 2026-11-03, a11y-5).
+  fieldLabel: { ...theme.font.eyebrow, color: theme.color.textLow, flexShrink: 1 },
   fieldLabelRow: { flexDirection: 'row', alignItems: 'center', marginBottom: theme.space[2] },
   fieldHint: { ...theme.font.label, color: theme.color.textMid, marginBottom: theme.space[2] },
   inventoryWrap: { marginTop: theme.space[2] },
