@@ -1782,7 +1782,7 @@ const styles = StyleSheet.create({
     gap: theme.space[2],
   },
   severityChip: {
-    width: 44,
+    minWidth: theme.touch.min,
     minHeight: theme.touch.min,
     borderRadius: theme.radius.chip,
     borderWidth: 1,
