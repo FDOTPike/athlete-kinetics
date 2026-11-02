@@ -28,6 +28,10 @@ export interface ChipProps {
   accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
   testID?: string;
+  /** Let a long label wrap, centred, instead of cutting it at one line.
+   *  For option chips whose label is a sentence (onboarding focus, sport and
+   *  target choices); short chips keep the single line. */
+  wrap?: boolean;
 }
 
 export function Chip({
@@ -38,6 +42,7 @@ export function Chip({
   accessibilityLabel,
   style,
   testID,
+  wrap = false,
 }: ChipProps): React.JSX.Element {
   return (
     <Pressable
@@ -61,8 +66,9 @@ export function Chip({
           styles.label,
           selected && styles.labelSelected,
           disabled && styles.labelDisabled,
+          wrap && styles.labelWrap,
         ]}
-        numberOfLines={1}
+        numberOfLines={wrap ? undefined : 1}
       >
         {label}
       </Text>
@@ -101,6 +107,9 @@ const styles = StyleSheet.create({
     ...theme.font.label,
     fontFamily: theme.font.family,
     color: theme.color.textMid,
+  },
+  labelWrap: {
+    textAlign: 'center',
   },
   labelSelected: {
     // ink0 on the inverted textHi fill
