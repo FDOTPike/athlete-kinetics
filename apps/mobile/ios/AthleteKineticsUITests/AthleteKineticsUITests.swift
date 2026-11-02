@@ -333,6 +333,63 @@ final class AthleteKineticsUITests: XCTestCase {
     return nil
   }
 
+  /// A system alert with an OK button left over HealthKit's sheet. Evidence:
+  /// Xcode 27.2 / iOS 26.5 run 2026-11-02: a Health Access alert with OK sat
+  /// over the permission sheet after Don't Allow; nothing tapped it, and the
+  /// test went on to log HEALTH-UNANSWERED and HEALTH-VIEW-STUCK. An alert left
+  /// open there would also explain CI's intermittent "the permission sheet
+  /// stayed open" and "Failed to determine hittability of Don't Allow".
+  /// The app's alerts and SpringBoard's are searched for at most `timeout`
+  /// seconds. Only an alert whose single button is OK is ever answered. One
+  /// that mentions Health is preferred, in either place (the app raises no
+  /// Health-named alert itself, and HealthKit may host its alert in the app).
+  /// Failing that, only a SpringBoard alert whose single button is OK
+  /// qualifies: the Health Access box is a system alert, and an alert the app
+  /// itself raises (an error, say) is never dismissed here, so it still shows
+  /// up in the checks that follow. OK is tapped at the centre read from a
+  /// snapshot (an alert that vanishes meanwhile is skipped, not a failure), and
+  /// the tap is recorded with where the alert was and its title. This only
+  /// dismisses: every check after it is unchanged.
+  @discardableResult
+  private func dismissHealthAccessAlertIfShown(_ context: String, timeout: TimeInterval = 3) -> Bool {
+    let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+    let current: XCUIApplication = app
+    let places: [(String, XCUIApplication)] = [("the app", current), ("SpringBoard", springboard)]
+    let okNamed = NSPredicate(format: "label ==[c] %@", "OK")
+    let healthNamed = NSPredicate(format: "label CONTAINS[c] %@", "Health")
+    let deadline = Date().addingTimeInterval(timeout)
+    repeat {
+      var healthAlert: (place: String, target: XCUIApplication, alert: XCUIElement, ok: XCUIElement, frame: CGRect)?
+      var okOnlyAlert: (place: String, target: XCUIApplication, alert: XCUIElement, ok: XCUIElement, frame: CGRect)?
+      for (place, target) in places {
+        for alert in target.alerts.allElementsBoundByIndex {
+          let ok = alert.buttons.matching(okNamed).firstMatch
+          guard let frame = (try? ok.snapshot())?.frame else { continue }
+          let mentionsHealth = (currentLabel(alert) ?? "").localizedCaseInsensitiveContains("Health")
+            || alert.staticTexts.matching(healthNamed).firstMatch.exists
+          if mentionsHealth && healthAlert == nil && alert.buttons.count == 1 {
+            healthAlert = (place, target, alert, ok, frame)
+          } else if !mentionsHealth && okOnlyAlert == nil && place == "SpringBoard" && alert.buttons.count == 1 {
+            okOnlyAlert = (place, target, alert, ok, frame)
+          }
+        }
+      }
+      if let found = healthAlert ?? okOnlyAlert {
+        let title = currentLabel(found.alert).flatMap { $0.isEmpty ? nil : $0 }
+          ?? currentLabel(found.alert.staticTexts.firstMatch) ?? "<no title>"
+        let kind = healthAlert != nil ? "Health alert" : "SpringBoard alert whose only button is OK"
+        found.target.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
+          .withOffset(CGVector(dx: found.frame.midX, dy: found.frame.midY)).tap()
+        sleep(1)
+        log("HEALTH-ALERT-OK tapped OK on a system \(kind) in \(found.place) (\(context)); title: \(title.prefix(120)); still shown after 1 s: \(found.ok.exists ? "yes" : "no")")
+        return true
+      }
+      usleep(250_000)
+    } while Date() < deadline
+    log("health alert: no system alert with OK in the app or SpringBoard within \(Int(timeout)) s (\(context))")
+    return false
+  }
+
   // MARK: - tests
 
   /// Onboarding, every primary and header destination, and Apple's
@@ -482,6 +539,9 @@ final class AthleteKineticsUITests: XCTestCase {
               dontAllow.tap()
               denialTapped = true
               log("health sheet: tapped Don't Allow (attempt \(attempt), after \(Int(Date().timeIntervalSince(started))) s)")
+              // Xcode 27.2 / iOS 26.5 run 2026-11-02: a Health Access alert with
+              // OK sat over the permission sheet after Don't Allow.
+              dismissHealthAccessAlertIfShown("after Don't Allow, attempt \(attempt)")
               break
             }
             if resolvedAgain { break }
@@ -553,6 +613,10 @@ final class AthleteKineticsUITests: XCTestCase {
     } else {
       log("HEALTH-UNANSWERED HealthKit returned no answer to the app on this simulator; the app kept its request pending and claimed nothing")
     }
+    // Xcode 27.2 / iOS 26.5 run 2026-11-02: a Health Access alert with OK sat
+    // over the permission sheet after Don't Allow. Any such alert still open
+    // (it may come up later than the check after the tap) is answered first.
+    dismissHealthAccessAlertIfShown("before the sheet check")
     XCTAssertNil(findHealthSheetButton("Don’t Allow", timeout: 2), "the permission sheet stayed open")
     // CI evidence (c4ef71b, 37c6022): when the sheet was answered but healthd
     // never closed the transaction, nothing in the app was hittable afterwards
