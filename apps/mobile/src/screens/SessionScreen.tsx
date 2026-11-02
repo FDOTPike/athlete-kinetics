@@ -1,6 +1,6 @@
 /** Phase 17 utility-first active-session surface. */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING_NOTE, EFFORT_STOP_GUIDANCE, effortCue, mapRirToRpe, RIR_OPTIONS, PREPARATION_STATUS_LABEL, isTerminalPreparationStatus, preparationDoseUnit, type EffortAnswer, type RunnerHaltReason } from '@ak/inference';
 import { EXPERIENCE_SEVERITY, runnerTierForTrainingAge } from '../../../../packages/inference/src/sessionRunner';
 import { formatTeachingOnlyReason, freeFormStartIsEmpty, useStore, type LoadSelection, type LoggedSet, type SetLoadShown, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
@@ -670,7 +670,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
     }
 
     return (
-      <View style={styles.outcomeContainer}>
+      <ScrollView style={styles.outcomeContainer} contentContainerStyle={{ flexGrow: 1, padding: theme.space[4] }}>
         {/* Wordmark top-left */}
         <View style={styles.header}>
           <Text style={styles.wordmark}>pikeMethods</Text>
@@ -768,7 +768,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
             style={{ alignSelf: 'stretch' }}
           />
         </View>
-      </View>
+      </ScrollView>
     );
   }
 
@@ -2389,7 +2389,6 @@ const styles = StyleSheet.create({
   outcomeContainer: {
     flex: 1,
     backgroundColor: theme.color.ink0,
-    padding: theme.space[4],
   },
   outcomeMain: {
     flex: 1,
