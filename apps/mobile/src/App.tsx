@@ -263,7 +263,14 @@ export function AppShell(): React.JSX.Element {
                     importantForAccessibility="no-hide-descendants"
                   />
                 )}
-                <Text style={[styles.headerText, active && styles.headerTextActive]}>
+                {/* One line, shrunk to fit: at large system font sizes the
+                    label wrapped as "WORKOU / T" (Android walk 2026-11-03). */}
+                <Text
+                  style={[styles.headerText, active && styles.headerTextActive]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.5}
+                >
                   {t.label}
                 </Text>
               </Pressable>
@@ -338,7 +345,14 @@ export function AppShell(): React.JSX.Element {
                 style={({ pressed }) => [styles.tabBtn, pressed && styles.tabBtnPressed]}
               >
                 <View style={[styles.tabIndicator, active && styles.tabIndicatorActive]} />
-                <Text style={[styles.tabText, active && styles.tabTextActive]}>{t.label}</Text>
+                <Text
+                  style={[styles.tabText, active && styles.tabTextActive]}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.5}
+                >
+                  {t.label}
+                </Text>
               </Pressable>
             );
           })}

@@ -21,7 +21,7 @@
  */
 import React from 'react';
 import { KeyboardAvoidingView, Platform } from 'react-native';
-import { render, screen, fireEvent, act } from '@testing-library/react-native';
+import { render, screen, fireEvent, act, within } from '@testing-library/react-native';
 import { NavigationProvider, useNavigation } from '../../src/navigation/navigation';
 import AppShellTestHarness from '../../src/AppShellTestHarness';
 
@@ -133,6 +133,22 @@ describe('exactly Today, Plan and Progress are the primary destinations', () => 
     render(<AppShellTestHarness />);
     expect(screen.UNSAFE_getByType(KeyboardAvoidingView).props.behavior)
       .toBe(Platform.OS === 'ios' ? 'padding' : 'height');
+  });
+
+  // Android walk 2026-11-03 (a11y-5): at system font size 2.0 "WORKOUT"
+  // wrapped to "WORKOU / T" and "PROGRESS" ran off the screen edge.
+  test('header and tab labels stay on one line and shrink to fit at large font sizes', () => {
+    render(<AppShellTestHarness />);
+    const labels = [
+      ...['readiness', 'session', 'library', 'athlete'].map((key) => screen.getByTestId(`header-${key}`)),
+      ...['today', 'coach', 'progress'].map((key) => screen.getByTestId(`tab-${key}`)),
+    ].map((button) => within(button).getByText(/^[A-Z]+$/));
+    expect(labels).toHaveLength(7);
+    for (const label of labels) {
+      expect(label.props.numberOfLines).toBe(1);
+      expect(label.props.adjustsFontSizeToFit).toBe(true);
+      expect(label.props.minimumFontScale).toBeGreaterThan(0);
+    }
   });
 
   test('the primary bar renders TODAY, PLAN, PROGRESS and nothing else', () => {
