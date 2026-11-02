@@ -1290,7 +1290,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                                 say so, or the number reads as a setting that changed by
                                 itself (Android walk 2026-11-03, ux-8). */}
                             <Text style={styles.nextUp}>
-                              Rest adjusts to your last set’s effort: harder sets get longer rests. Your changes apply for this session.
+                              Rest uses your effort rating, or the planned effort if you leave it blank. Harder sets get longer rests. Your changes apply for this session.
                             </Text>
                           </>
                         )}
