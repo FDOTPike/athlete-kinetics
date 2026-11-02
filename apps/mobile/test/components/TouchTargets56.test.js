@@ -14,6 +14,19 @@ const styleBlock = (source, name) => {
   if (!match) throw new Error(`style ${name} not found`);
   return match[1];
 };
+// The effective width floor a style block sets: the smallest of its minWidth
+// and any fixed width. Only a number or theme.touch.min can be resolved;
+// anything else fails loudly rather than passing by accident.
+const resolveWidth = (expr) => {
+  if (/^\d+(\.\d+)?$/.test(expr)) return Number(expr);
+  if (expr === 'theme.touch.min') return theme.touch.min;
+  throw new Error(`cannot resolve width expression ${expr}`);
+};
+const widthFloor = (block) => {
+  const values = [...block.matchAll(/\b(minWidth|width):\s*([\w.]+)/g)].map((m) => resolveWidth(m[2]));
+  if (values.length === 0) throw new Error('style sets no width');
+  return Math.min(...values);
+};
 
 describe('tap targets meet theme.touch.min in both directions', () => {
   test('every Chip is at least 56 wide, so one-character chips (1-6, 0-4+, bjj, hip) are too', () => {
@@ -23,13 +36,13 @@ describe('tap targets meet theme.touch.min in both directions', () => {
     expect(style.minHeight).toBeGreaterThanOrEqual(theme.touch.min);
   });
 
-  test('the session chips no longer lower the Chip minimum to 48', () => {
-    expect(styleBlock(src('screens/SessionScreen.tsx'), 'rirChip')).not.toMatch(/minWidth:\s*48/);
+  test('the session chips do not lower the Chip minimum below theme.touch.min', () => {
+    expect(widthFloor(styleBlock(src('screens/SessionScreen.tsx'), 'rirChip')))
+      .toBeGreaterThanOrEqual(theme.touch.min);
   });
 
-  test('the "Something feels off" severity chips are 56 wide, not a fixed 44', () => {
-    const block = styleBlock(src('screens/BlockScreen.tsx'), 'severityChip');
-    expect(block).not.toMatch(/\bwidth:\s*44/);
-    expect(block).toMatch(/minWidth:\s*theme\.touch\.min/);
+  test('the "Something feels off" severity chips are at least theme.touch.min wide', () => {
+    expect(widthFloor(styleBlock(src('screens/BlockScreen.tsx'), 'severityChip')))
+      .toBeGreaterThanOrEqual(theme.touch.min);
   });
 });
