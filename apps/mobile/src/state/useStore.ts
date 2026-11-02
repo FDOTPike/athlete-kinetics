@@ -358,7 +358,7 @@ export const formatTeachingOnlyReason = (verdict: MovementAvailability | undefin
 // Codebase + pre-embedded vectors ride in the JS bundle (~1 MB total);
 // relative imports resolve via metro watchFolders / tsc include.
 import type { BiometricsBridge } from '@ak/biometrics';
-import { groupSummaryExercises } from './sessionSummary';
+import { groupSummaryExercises, type SkippedExercise } from './sessionSummary';
 import phraseCodebaseJson from '../../../../packages/inference/assets/phrase-codebase.json';
 import phraseVectorsJson from '../../../../packages/inference/assets/phrase-codebase.vectors.json';
 import { routeQuestion, type QuestionIndex, type QuestionResult } from '../../../../packages/inference/src/semantic/questionRouter';
@@ -915,8 +915,9 @@ interface KineticsStore {
     durationMin: number | null;
     exercises: { movementId: number; movementName: string; plannedSets: number | null; sets: { reps: number; loadKg: number; timeS: number | null }[] }[];
     previousSets: { movementId: number; reps: number; loadKg: number; sessionId: number }[];
-    /** Exercises the athlete chose to skip (071 session_skipped_slot), in plan order. */
-    skippedExercises: string[];
+    /** Exercises the athlete chose to skip (071 session_skipped_slot), in plan
+     *  order, with the sets logged for that slot before the skip. */
+    skippedExercises: SkippedExercise[];
   };
   /** Upsert (or clear with null) an absolute 1RM for a movement. */
   saveOneRepMax: (movementId: number, kg: number | null) => void;
@@ -6260,8 +6261,12 @@ export const useStore = create<KineticsStore>()((set, get) => {
     ));
     // Android walk 2026-11-03 (ux-8): a skipped exercise belongs in the
     // record of the session; it was left out because it has no sets.
-    const skippedRows = rowsOf<{ movement_name: string }>(d.executeSync(
-      `SELECT m.name AS movement_name
+    // Owner ruling 2026-11-03 (Entry 0286): this display read is the one
+    // reader of 071 session_skipped_slot. No engine reads it.
+    const skippedRows = rowsOf<{
+      session_plan_slot_id: number; movement_id: number; movement_name: string; planned_sets: number;
+    }>(d.executeSync(
+      `SELECT k.session_plan_slot_id, sps.movement_id, m.name AS movement_name, sps.planned_sets
          FROM session_skipped_slot k
          JOIN session_plan_slot sps ON sps.session_plan_slot_id = k.session_plan_slot_id
          JOIN movement m ON m.movement_id = sps.movement_id
@@ -6271,7 +6276,18 @@ export const useStore = create<KineticsStore>()((set, get) => {
     ));
     return {
       durationMin: sessionRow?.duration_min ?? null,
-      skippedExercises: skippedRows.map((row) => row.movement_name),
+      // A set belongs to a skipped slot as the session timeline counts it: by
+      // its slot when it has one, else by movement.
+      skippedExercises: skippedRows.map((row) => {
+        const sets = setRows.filter((set) => (set.session_plan_slot_id != null
+          ? set.session_plan_slot_id === row.session_plan_slot_id
+          : set.movement_id === row.movement_id));
+        const loggedAs: string[] = [];
+        for (const set of sets) {
+          if (set.movement_id !== row.movement_id && !loggedAs.includes(set.movement_name)) loggedAs.push(set.movement_name);
+        }
+        return { name: row.movement_name, plannedSets: row.planned_sets, loggedSets: sets.length, loggedAs };
+      }),
       exercises: groupSummaryExercises(setRows.map((row) => ({
         movementId: row.movement_id,
         movementName: row.movement_name,

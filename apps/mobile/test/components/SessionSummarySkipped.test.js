@@ -4,12 +4,15 @@
  * from the record of the session, although the timeline had shown
  * "Skipped: Bodyweight Squat · no sets logged" a moment before.
  *
+ * Owner ruling 2026-11-03 (Entry 0286): the completion summary may read 071
+ * session_skipped_slot. It is the one reader; no engine reads it.
+ *
  * Store tests run the REAL store over the production migration chain
  * (node:sqlite stands in for op-sqlite), as in SessionFeelStore.test.js.
  */
 import { useStore } from '../../src/state/useStore';
 import { authorizeAthleteDataBoot } from '../../src/state/dataMaintenanceLock';
-import { buildSessionSummary } from '../../src/state/sessionSummary';
+import { buildSessionSummary, skippedExerciseText } from '../../src/state/sessionSummary';
 import { makeNodeSqliteDriver } from '../helpers/nodeSqliteOpDriver';
 
 let mockDriver;
@@ -42,7 +45,24 @@ beforeEach(async () => {
   expect(state().status).toBe('ready');
 });
 
+const slotId = (index) => Number(raw().prepare(
+  'SELECT session_plan_slot_id AS id FROM session_plan_slot WHERE session_id = 7000 AND slot_index = ?',
+).get(index).id);
+
+let nextSetIndex = 1;
+const logSet = (movementName, slotIndex) => {
+  const { lastInsertRowid } = raw().prepare(
+    'INSERT INTO set_record (session_id, movement_id, set_index, reps, load_kg, rpe, logged_at_ms) VALUES (7000, ?, ?, 10, 16, 7, 2000)',
+  ).run(idOf(movementName), nextSetIndex);
+  nextSetIndex += 1;
+  if (slotIndex !== undefined) {
+    raw().prepare("INSERT INTO set_target (set_id, session_plan_slot_id, provenance_kind) VALUES (?, ?, 'added')")
+      .run(Number(lastInsertRowid), slotId(slotIndex));
+  }
+};
+
 const seedSession = () => {
+  nextSetIndex = 1;
   raw().exec("INSERT INTO session (session_id, micro_cycle_id, session_date, started_at_ms, duration_min) VALUES (7000, NULL, '2026-11-03', 1000, 30)");
   const slot = raw().prepare(
     "INSERT INTO session_plan_slot (session_id, slot_index, movement_id, planned_sets, planned_reps, provenance_kind) VALUES (7000, ?, ?, ?, 10, 'added')",
@@ -50,18 +70,35 @@ const seedSession = () => {
   slot.run(0, idOf('Goblet Squat'), 3);
   slot.run(1, idOf('Push-up'), 2);
   slot.run(2, idOf('Walking Lunge'), 2);
-  const slotId = (index) => Number(raw().prepare('SELECT session_plan_slot_id AS id FROM session_plan_slot WHERE session_id = 7000 AND slot_index = ?').get(index).id);
-  raw().prepare('INSERT INTO set_record (session_id, movement_id, set_index, reps, load_kg, rpe, logged_at_ms) VALUES (7000, ?, 1, 10, 16, 7, 2000)')
-    .run(idOf('Goblet Squat'));
-  raw().prepare('INSERT INTO session_skipped_slot (session_plan_slot_id) VALUES (?)').run(slotId(2));
-  raw().prepare('INSERT INTO session_skipped_slot (session_plan_slot_id) VALUES (?)').run(slotId(1));
+  logSet('Goblet Squat');
 };
+const skip = (slotIndex) => raw().prepare('INSERT INTO session_skipped_slot (session_plan_slot_id) VALUES (?)').run(slotId(slotIndex));
 
 test('the summary facts name the skipped exercises, in plan order', () => {
   seedSession();
+  skip(2);
+  skip(1);
   const facts = state().loadSessionSummaryFacts(7000);
-  expect(facts.skippedExercises).toEqual(['Push-up', 'Walking Lunge']);
+  expect(facts.skippedExercises).toEqual([
+    { name: 'Push-up', plannedSets: 2, loggedSets: 0, loggedAs: [] },
+    { name: 'Walking Lunge', plannedSets: 2, loggedSets: 0, loggedAs: [] },
+  ]);
   expect(facts.exercises.map((exercise) => exercise.movementName)).toEqual(['Goblet Squat']);
+});
+
+// CodeRabbit on PR 116: "no sets logged" was false when the athlete logged a
+// set and then skipped the rest. Sets are counted as the timeline counts them.
+test('sets logged before a skip are counted, by slot or else by movement', () => {
+  seedSession();
+  logSet('Push-up');                  // no slot link: counted by movement
+  logSet('Bodyweight Squat', 2);      // a swap logged into the lunge slot
+  skip(1);
+  skip(2);
+  const facts = state().loadSessionSummaryFacts(7000);
+  expect(facts.skippedExercises).toEqual([
+    { name: 'Push-up', plannedSets: 2, loggedSets: 1, loggedAs: [] },
+    { name: 'Walking Lunge', plannedSets: 2, loggedSets: 1, loggedAs: ['Bodyweight Squat'] },
+  ]);
 });
 
 test('a session with nothing skipped reports an empty list', () => {
@@ -76,13 +113,23 @@ test('the summary view gives each skipped exercise its own line, in the timeline
     durationMin: null,
     blockSessions: [],
     today: '2026-11-03',
-    skippedExercises: ['Push-up', 'Walking Lunge'],
+    skippedExercises: [
+      { name: 'Push-up', plannedSets: 2, loggedSets: 0, loggedAs: [] },
+      { name: 'Walking Lunge', plannedSets: 3, loggedSets: 1, loggedAs: [] },
+      { name: 'Goblet Squat', plannedSets: 3, loggedSets: 2, loggedAs: ['Bodyweight Squat'] },
+    ],
   });
   expect(view.skippedLines.map((line) => line.text)).toEqual([
     'Skipped: Push-up · no sets logged',
-    'Skipped: Walking Lunge · no sets logged',
+    'Skipped: Walking Lunge · 1 of 3 sets logged',
+    'Skipped: Goblet Squat · 2 of 3 sets logged as Bodyweight Squat',
   ]);
-  expect(new Set(view.skippedLines.map((line) => line.key)).size).toBe(2);
+  expect(new Set(view.skippedLines.map((line) => line.key)).size).toBe(3);
+});
+
+test('the completion card and the summary share one wording', () => {
+  expect(skippedExerciseText({ name: 'Push-up', plannedSets: 2, loggedSets: 0, loggedAs: [] }))
+    .toBe('Skipped: Push-up · no sets logged');
 });
 
 test('without skipped exercises the view has no skipped lines', () => {

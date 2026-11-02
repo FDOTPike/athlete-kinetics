@@ -278,6 +278,23 @@ const comparisonLine = (exercise: SummaryExercise, facts: PreviousFacts): Summar
   };
 };
 
+/** A planned slot the athlete skipped, with what was logged for it first. */
+export interface SkippedExercise {
+  name: string;
+  plannedSets: number;
+  loggedSets: number;
+  /** Other movements logged in this slot (a swap), in logged order. */
+  loggedAs: readonly string[];
+}
+
+/** The session timeline's wording for a skipped exercise; one source for the
+ *  completion card and the summary. */
+export const skippedExerciseText = (skipped: SkippedExercise): string => {
+  if (skipped.loggedSets <= 0) return `Skipped: ${skipped.name} · no sets logged`;
+  const loggedSuffix = skipped.loggedAs.length > 0 ? ` as ${skipped.loggedAs.join(', ')}` : '';
+  return `Skipped: ${skipped.name} · ${skipped.loggedSets} of ${skipped.plannedSets} sets logged${loggedSuffix}`;
+};
+
 export interface SessionSummaryView {
   exerciseLines: SummaryLine[];
   /** One line per skipped exercise, in the session timeline's wording. */
@@ -294,8 +311,8 @@ export interface BuildSummaryInput {
   durationMin: number | null;
   blockSessions: readonly TodayBlockSession[];
   today: string;
-  /** Names of the exercises the athlete skipped, in plan order. */
-  skippedExercises?: readonly string[];
+  /** The exercises the athlete skipped, in plan order. */
+  skippedExercises?: readonly SkippedExercise[];
 }
 
 export const buildSessionSummary = (input: BuildSummaryInput): SessionSummaryView => {
@@ -316,9 +333,9 @@ export const buildSessionSummary = (input: BuildSummaryInput): SessionSummaryVie
   // is exported as NO_NEXT_SESSION_TEXT (the single source of truth; the
   // screen renders it directly).
   const next: SessionRef | null = nextSessionAfter(input.blockSessions, input.today);
-  const skippedLines: SummaryLine[] = (input.skippedExercises ?? []).map((name, index) => ({
+  const skippedLines: SummaryLine[] = (input.skippedExercises ?? []).map((skipped, index) => ({
     key: `skipped-${index}`,
-    text: `Skipped: ${name} · no sets logged`,
+    text: skippedExerciseText(skipped),
   }));
   return {
     exerciseLines,

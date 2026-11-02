@@ -421,7 +421,7 @@ describe('screen laws: D5, D6, D8, D9', () => {
         durationMin: 20,
         exercises: [exercise({ movementId: 1, movementName: 'Goblet Squat' })],
         previousSets: [],
-        skippedExercises: ['Push-up'],
+        skippedExercises: [{ name: 'Push-up', plannedSets: 2, loggedSets: 0, loggedAs: [] }],
       }),
     });
     render(<SessionScreen />);
