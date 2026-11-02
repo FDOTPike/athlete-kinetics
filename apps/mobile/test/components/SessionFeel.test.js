@@ -564,3 +564,15 @@ describe('completion screen: asked only when the session did not go to plan', ()
     expectNoTrainingAction();
   });
 });
+
+// Android walk 2026-11-03 (ux-8): a note starter put "Body: " in the note
+// but left the keyboard closed, so typing went nowhere.
+test('a note starter also focuses the note field, so the athlete can type straight away', () => {
+  const { TextInput } = require('react-native');
+  render(<SessionFeelPanel saved={null} note={null} onSave={jest.fn(() => null)} onClose={jest.fn()} />);
+  const input = screen.UNSAFE_getAllByType(TextInput)
+    .find((node) => node.props.testID === 'session-feel-note');
+  const focus = jest.spyOn(input.instance, 'focus');
+  fireEvent.press(screen.getByTestId('session-note-starter-body'));
+  expect(focus).toHaveBeenCalledTimes(1);
+});
