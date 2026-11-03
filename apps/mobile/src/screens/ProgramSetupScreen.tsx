@@ -17,6 +17,7 @@ import {
   weeklyProgressionSummary,
   type BlockFocus,
   type SchemaType,
+  type SessionTimeAlternative,
 } from '@ak/inference';
 import { Chip, Disclosure, PrimaryButton, SecondaryButton } from '../components/ui';
 import { theme } from '../theme/theme';
@@ -103,6 +104,14 @@ export default function ProgramSetupScreen({
     program?.movementPreferences ?? [],
   );
   const [localError, setLocalError] = useState<string | null>(null);
+  // Android walk 2026-11-03 (W1-4): a session length the athlete picked from
+  // the plan's own offers. It is a draft until Create program saves it; Cancel
+  // leaves the profile as it was. null = the profile's length.
+  const [sessionCapOverride, setSessionCapOverride] = useState<number | null>(null);
+  const planningProfile = useMemo(
+    () => (sessionCapOverride === null ? profile : { ...profile, session_duration_cap_min: sessionCapOverride }),
+    [profile, sessionCapOverride],
+  );
 
   const input = useMemo<TrainingProgramInput | null>(() => {
     // Only ONE way to be incomplete survives: choosing the Date horizon and not
@@ -122,8 +131,9 @@ export default function ProgramSetupScreen({
       dayIndices,
       days,
       movementPreferences: buildMode === 'custom' ? preferences : [],
+      ...(sessionCapOverride === null ? {} : { sessionDurationCapMin: sessionCapOverride }),
     };
-  }, [horizonKind, schemaType, buildMode, blockCount, reviewDate, dayIndices, preferences, dayFocuses, profile.objective]);
+  }, [horizonKind, schemaType, buildMode, blockCount, reviewDate, dayIndices, preferences, dayFocuses, profile.objective, sessionCapOverride]);
 
   const previewResult = useMemo(() => {
     if (input === null) return { preview: null, error: null };
@@ -217,17 +227,17 @@ export default function ProgramSetupScreen({
   // duration-shaped week can carry; fewer than 3 cannot carry the big
   // three (an all-lower week can never bench).
   const anchorCapacity = useMemo(() => strengthAnchorCapacity(
-    profile, programFocuses, defaultProgramDayIndices,
+    planningProfile, programFocuses, defaultProgramDayIndices,
     dayIndices.map((dayIndex) => ({ dayIndex, focus: dayFocuses[dayIndex] ?? 'full' })),
-  ), [profile.objective, profile.weekly_frequency, profile.session_duration_cap_min, dayIndices, dayFocuses]);
+  ), [planningProfile, dayIndices, dayFocuses]);
   const strengthCapacityShort = profile.objective === 'strength' && anchorCapacity < 3;
   // Round 5: the warning speaks in ROLES, not slot counts — the pure export
   // names the distinct squat/push/hinge roles the drafted week covers, and
   // the copy names the missing role with the focus change that remedies it.
   const anchorRoleNames = useMemo(() => strengthAnchorRoleNames(
-    profile, programFocuses,
+    planningProfile, programFocuses,
     dayIndices.map((dayIndex) => ({ dayIndex, focus: dayFocuses[dayIndex] ?? 'full' })),
-  ), [profile.objective, profile.weekly_frequency, profile.session_duration_cap_min, dayIndices, dayFocuses]);
+  ), [planningProfile, dayIndices, dayFocuses]);
   const missingAnchorRoles = useMemo(() => {
     const ALL_ROLES = ['squat', 'horizontal push (bench)', 'hinge (deadlift)'];
     return ALL_ROLES.filter((role) => !anchorRoleNames.includes(role));
@@ -251,7 +261,7 @@ export default function ProgramSetupScreen({
       for (const candidate of BLOCK_FOCUS_LIST) {
         if (candidate === day.focus) continue;
         const simulated = strengthAnchorCapacity(
-          profile, programFocuses, defaultProgramDayIndices,
+          planningProfile, programFocuses, defaultProgramDayIndices,
           draft.map((d) => (d.dayIndex === day.dayIndex ? { ...d, focus: candidate } : d)),
         );
         if (simulated === 3) {
@@ -260,19 +270,19 @@ export default function ProgramSetupScreen({
       }
     }
     return fixes;
-  }, [missingAnchorRoles, dayIndices, dayFocuses, profile.objective, profile.weekly_frequency, profile.session_duration_cap_min]);
+  }, [missingAnchorRoles, dayIndices, dayFocuses, planningProfile]);
   const durationConstrained = useMemo(() => {
     // Duration is the constraint when a longer session would let a drafted
     // day's menu reach a role the budget currently trims away.
     if (missingAnchorRoles.length === 0) return false;
-    const longer = { ...profile, session_duration_cap_min: Math.min(240, profile.session_duration_cap_min + 15) };
+    const longer = { ...planningProfile, session_duration_cap_min: Math.min(240, planningProfile.session_duration_cap_min + 15) };
     const draft = dayIndices.map((dayIndex) => ({
       dayIndex,
       focus: (dayFocuses[dayIndex] ?? 'full') as BlockFocus,
     }));
     return strengthAnchorCapacity(longer, programFocuses, defaultProgramDayIndices, draft)
       > anchorCapacity;
-  }, [missingAnchorRoles, profile, dayIndices, dayFocuses, anchorCapacity]);
+  }, [missingAnchorRoles, planningProfile, dayIndices, dayFocuses, anchorCapacity]);
   // Anchor coverage for strength: which of the big three are gated-available
   // this week, which are blocked (with reasons), and whether a local
   // prior-experience declaration would clear an ordinary capability gap
@@ -317,8 +327,28 @@ export default function ProgramSetupScreen({
       longestMin: Math.max(...budget.sessions.map((session) => session.estimatedMin)),
       trimmed: budget.sessions.some((session) => session.trimmedSlotIndexes.length > 0),
       conflicts: budget.conflicts,
+      alternatives: budget.alternatives ?? [],
     };
   }, [previewResult.preview]);
+  // W1-4: each verified offer is a choice that redraws the plan. A fewer-days
+  // offer was verified on the default schedule for that number of days, so it
+  // takes that schedule; movement choices tied to the old days are dropped.
+  const chooseAlternative = (alternative: SessionTimeAlternative): void => {
+    setSessionCapOverride(alternative.capMin === profile.session_duration_cap_min ? null : alternative.capMin);
+    if (alternative.kind === 'fewer_longer_sessions') {
+      const days = [...defaultProgramDayIndices(alternative.weeklyFrequency)];
+      const focuses = programFocuses(profile.objective, days.length);
+      const nextFocuses: Record<number, BlockFocus> = {};
+      days.forEach((day, index) => { nextFocuses[day] = focuses[index] ?? 'full'; });
+      setDayIndices(days);
+      setDayFocuses(nextFocuses);
+      setPreferences([]);
+    }
+  };
+  const alternativeLabel = (alternative: SessionTimeAlternative): string =>
+    alternative.kind === 'extend_session'
+      ? `Use ${alternative.capMin}-minute sessions`
+      : `Train ${alternative.weeklyFrequency} day${alternative.weeklyFrequency === 1 ? '' : 's'} a week at ${alternative.capMin} minutes`;
   const rankingNotes = previewResult.preview?.plan?.warnings?.filter((w) =>
     w.includes('unavailable for') || w.includes('no loaded')) ?? [];
 
@@ -647,6 +677,29 @@ export default function ProgramSetupScreen({
           {sessionTime.conflicts.map((conflict) => (
             <Text key={conflict} style={styles.error} testID="session-time-conflict">{conflict}</Text>
           ))}
+          {!editing && sessionTime.conflicts.length > 0 && sessionTime.alternatives.length > 0 && (
+            <View style={styles.alternatives} testID="session-time-alternatives">
+              <Text style={styles.caption}>Choose one to redraw the plan. Nothing is saved until you create it.</Text>
+              {sessionTime.alternatives.map((alternative) => (
+                <SecondaryButton
+                  key={`${alternative.kind}:${alternative.capMin}`}
+                  label={alternativeLabel(alternative)}
+                  onPress={() => chooseAlternative(alternative)}
+                />
+              ))}
+            </View>
+          )}
+          {!editing && sessionCapOverride !== null && (
+            <View style={styles.alternatives} testID="session-time-draft">
+              <Text style={styles.caption}>
+                {`This plan uses ${sessionCapOverride}-minute sessions. Your profile says ${profile.session_duration_cap_min}. Create program saves ${sessionCapOverride} minutes as your session length.`}
+              </Text>
+              <SecondaryButton
+                label={`Back to ${profile.session_duration_cap_min} minutes`}
+                onPress={() => setSessionCapOverride(null)}
+              />
+            </View>
+          )}
         </View>
       )}
       {/* Work order 3: what focus, goals, sport and sport workload change in
@@ -697,6 +750,7 @@ const styles = StyleSheet.create({
   eyebrow: { color: theme.color.textLow, fontSize: 11, fontWeight: '800', letterSpacing: 2 },
   title: { color: theme.color.textHi, fontSize: 30, fontWeight: '800', textTransform: 'capitalize' },
   body: { color: theme.color.textMid, fontSize: 15, lineHeight: 22 },
+  alternatives: { gap: theme.space[2] },
   card: { backgroundColor: theme.color.ink1, borderWidth: 1, borderColor: theme.color.line, padding: theme.space[4], gap: theme.space[3] },
   sectionTitle: { color: theme.color.textHi, fontSize: 17, fontWeight: '800' },
   row: { flexDirection: 'row', gap: 8 },

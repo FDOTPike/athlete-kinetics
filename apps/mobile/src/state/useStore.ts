@@ -706,6 +706,10 @@ export interface TrainingProgramInput {
   dayIndices: number[];
   movementPreferences?: TrainingProgramMovementPreference[];
   days?: TrainingProgramDay[];
+  /** A session length the athlete chose on the Build screen from the plan's
+   *  own offers (Android walk 2026-11-03, W1-4). The preview plans with it;
+   *  creating the program saves it to the profile. Absent = the profile's. */
+  sessionDurationCapMin?: number;
 }
 
 export interface TrainingProgramPreview {
@@ -4433,7 +4437,13 @@ export const useStore = create<KineticsStore>()((set, get) => {
       // dated program takes the athlete's rotation position exactly as an
       // undated one does. Dedicated competition preparation is deferred.
       : nextMacroPosition(d).macroBlockIndex;
-    const effectiveProfile = { ...planningProfile, weekly_frequency: shape.days.length };
+    const effectiveProfile = {
+      ...planningProfile,
+      weekly_frequency: shape.days.length,
+      ...(input.sessionDurationCapMin === undefined ? {} : {
+        session_duration_cap_min: Math.round(clamp(input.sessionDurationCapMin, 15, 240)),
+      }),
+    };
     const previewEmphasis = programEmphasisFor(d, startDate);
     const plan = generateBlock({
       profile: effectiveProfile, movements: genMovements, startDate,
@@ -4460,8 +4470,26 @@ export const useStore = create<KineticsStore>()((set, get) => {
       set({ error: 'Archive the current block or program before creating another.' });
       return false;
     }
+    // W1-4: a session length chosen on the Build screen becomes the
+    // profile's before the block is generated, so the block, the profile and
+    // every later block agree. It is put back if creation fails.
+    const priorCapMin = get().profile.session_duration_cap_min;
+    const chosenCapMin = input.sessionDurationCapMin === undefined ? null
+      : Math.round(clamp(input.sessionDurationCapMin, 15, 240));
+    const capChanges = chosenCapMin !== null && chosenCapMin !== priorCapMin;
+    const restoreCap = (): void => {
+      if (capChanges && get().profile.session_duration_cap_min !== priorCapMin) {
+        get().saveProfile({ session_duration_cap_min: priorCapMin });
+      }
+    };
     try {
       const preview = get().previewTrainingProgram(input);
+      if (capChanges) {
+        get().saveProfile({ session_duration_cap_min: chosenCapMin });
+        if (get().profile.session_duration_cap_min !== chosenCapMin) {
+          throw new Error('Your session length could not be saved. Nothing was created.');
+        }
+      }
       const shape = trainingProgramShape(get().profile, input, preview.startDate);
       pendingProgramCreation = { input, preview, programDays: shape.programDays };
       set({ error: null });
@@ -4469,9 +4497,15 @@ export const useStore = create<KineticsStore>()((set, get) => {
       get().refreshProgram();
       const created = get().program !== null && get().error === null;
       pendingProgramCreation = null;
+      if (!created) {
+        const error = get().error;
+        restoreCap();
+        if (error !== null) set({ error });
+      }
       return created;
     } catch (e) {
       pendingProgramCreation = null;
+      restoreCap();
       set({ error: e instanceof Error ? e.message : String(e) });
       return false;
     }
