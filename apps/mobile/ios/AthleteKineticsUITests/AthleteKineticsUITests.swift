@@ -15,10 +15,14 @@ import XCTest
 
 final class AthleteKineticsUITests: XCTestCase {
   private var app: XCUIApplication!
+  private var isInitialLaunchOfTest = true
 
   override func setUpWithError() throws {
     continueAfterFailure = false
+    isInitialLaunchOfTest = true
     app = XCUIApplication()
+    app.terminate()
+    app.resetAuthorizationStatus(for: .health)
   }
 
   override func tearDownWithError() throws {
@@ -186,7 +190,12 @@ final class AthleteKineticsUITests: XCTestCase {
   }
 
   private func launch(_ arguments: [String] = []) {
-    app.launchArguments = arguments
+    var args = arguments
+    if isInitialLaunchOfTest {
+      isInitialLaunchOfTest = false
+      args.append(contentsOf: ["-AKUITestResetStorage", "1"])
+    }
+    app.launchArguments = args
     app.launch()
     wait(element("shell-root"), "the app shell", timeout: 90)
   }
@@ -269,7 +278,7 @@ final class AthleteKineticsUITests: XCTestCase {
   }
 
   private func unlockAdvancedTools() {
-    if element("advanced-athlete-manager").exists { return }
+    if (try? element("advanced-athlete-manager").snapshot()) != nil { return }
     let build = element("Build 0.1.0")
     // The label sits at the foot of the full Profile form, beyond reveal()'s
     // fifteen slow swipes; scroll down at normal speed first.
@@ -378,10 +387,26 @@ final class AthleteKineticsUITests: XCTestCase {
         let title = currentLabel(found.alert).flatMap { $0.isEmpty ? nil : $0 }
           ?? currentLabel(found.alert.staticTexts.firstMatch) ?? "<no title>"
         let kind = healthAlert != nil ? "Health alert" : "SpringBoard alert whose only button is OK"
-        found.target.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
-          .withOffset(CGVector(dx: found.frame.midX, dy: found.frame.midY)).tap()
+        let alertFrame = (try? found.alert.snapshot())?.frame ?? .null
+        let rootOrigin = found.target.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
+        // On iOS 26.5 the HealthPrivacyService remote scene is hosted inside a
+        // modal card sheet whose top edge sits ~48 pt below the screen top,
+        // and ok.snapshot().frame reports sheet-relative coordinates (midY 453
+        // instead of screen-space 501, with alertFrame.midY ~407 < screen midY).
+        let needsHostedSheetOffset = found.place == "the app"
+          && !alertFrame.isNull
+          && alertFrame.midY < found.target.frame.midY - 20
+        let initialOffsetY = found.frame.midY + (needsHostedSheetOffset ? 48 : 0)
+        rootOrigin.withOffset(CGVector(dx: found.frame.midX, dy: initialOffsetY)).tap()
         sleep(1)
-        log("HEALTH-ALERT-OK tapped OK on a system \(kind) in \(found.place) (\(context)); title: \(title.prefix(120)); still shown after 1 s: \(found.ok.exists ? "yes" : "no")")
+        var stillShown = (try? found.ok.snapshot()) != nil
+        if stillShown && found.place == "the app" {
+          let fallbackOffsetY = needsHostedSheetOffset ? found.frame.midY : (found.frame.midY + 48)
+          rootOrigin.withOffset(CGVector(dx: found.frame.midX, dy: fallbackOffsetY)).tap()
+          sleep(1)
+          stillShown = (try? found.ok.snapshot()) != nil
+        }
+        log("HEALTH-ALERT-OK tapped OK on a system \(kind) in \(found.place) (\(context)); title: \(title.prefix(120)); okFrame=(\(Int(found.frame.midX)),\(Int(found.frame.midY))) alertMidY=\(alertFrame.isNull ? -1 : Int(alertFrame.midY)); still shown after 1 s: \(stillShown ? "yes" : "no")")
         return true
       }
       usleep(250_000)
@@ -580,7 +605,11 @@ final class AthleteKineticsUITests: XCTestCase {
         for claim in ["Connected", "granted"] where now.contains(claim) {
           XCTFail("the Health wording claimed access ('\(claim)') while the request was open: \(now)")
         }
-        if now.hasPrefix("Apple Health access requested") { answered = denialTapped; break }
+        if now.hasPrefix("Apple Health access requested") {
+          XCTAssertTrue(denialTapped, "the Health wording claimed 'access requested' without the test tapping Don't Allow: \(now)")
+          answered = denialTapped
+          break
+        }
         if now.hasPrefix("The Apple Health request did not complete") { break }
         sleep(1)
       }
@@ -888,33 +917,68 @@ final class AthleteKineticsUITests: XCTestCase {
     let named = NSPredicate(format: "label IN %@ OR identifier IN %@", names, names)
     let opened = Date()
     var found: XCUIElement?
+    var foundSnap: XCUIElementSnapshot?
     var inBar = false
+    var lastCandidate: XCUIElement?
+    var lastFromBar = false
     var lastFrame = CGRect.null
     var lastIdentity = ""
+    func currentChoice() -> (XCUIElement, XCUIElementSnapshot, Bool)? {
+      let bar = filesSheetBar()
+      if (try? bar.snapshot()) != nil {
+        let barSources: [() -> XCUIElement] = [
+          { bar.buttons.matching(named).firstMatch },
+          { bar.descendants(matching: .any).matching(named).firstMatch },
+        ]
+        for source in barSources {
+          let el = source()
+          if let snap = try? el.snapshot(), !snap.frame.isEmpty, el.isHittable {
+            return (el, snap, true)
+          }
+        }
+      }
+      let appSources: [() -> XCUIElement] = [
+        { self.app.buttons.matching(named).firstMatch },
+        { self.app.descendants(matching: .any).matching(named).firstMatch },
+      ]
+      for source in appSources {
+        let el = source()
+        if let snap = try? el.snapshot(), !snap.frame.isEmpty, el.isHittable {
+          return (el, snap, false)
+        }
+      }
+      return nil
+    }
     while Date().timeIntervalSince(opened) < 30 {
       // The first hittable of: a button in the sheet's bar, any element in
-      // that bar, then the earlier lookup over the whole app.
-      let bar = filesSheetBar()
-      let choices: [(XCUIElement, Bool)] = [
-        (bar.buttons.matching(named).firstMatch, true),
-        (bar.descendants(matching: .any).matching(named).firstMatch, true),
-        (filesControl(names), false),
-      ]
-      if let choice = choices.first(where: { $0.0.exists && $0.0.isHittable }) {
-        let (candidate, fromBar) = choice
-        // Settled: the same element (type, identifier, label, lookup) at the
-        // same frame on two reads half a second apart, so the tap is not
-        // aimed at a sheet still sliding in.
-        let frame = candidate.frame
-        let identity = "\(candidate.elementType.rawValue)|\(candidate.identifier)|\(candidate.label)|\(fromBar)"
-        if frame == lastFrame && identity == lastIdentity { found = candidate; inBar = fromBar; break }
-        lastFrame = frame
-        lastIdentity = identity
+      // that bar, then the whole-app lookup (evaluated lazily so a full-tree
+      // scan is skipped whenever the bar already holds Cancel).
+      if let (candidate, snap, fromBar) = currentChoice() {
+        // Settled: the same element (type, identifier, label) at the same
+        // frame on two reads half a second apart, so the tap is not aimed at
+        // a sheet still sliding in.
+        let frame = snap.frame
+        let identity = "\(snap.elementType.rawValue)|\(snap.identifier)|\(snap.label)"
+        if frame == lastFrame && identity == lastIdentity {
+          found = candidate; foundSnap = snap; inBar = fromBar; break
+        }
+        lastCandidate = candidate; lastFromBar = fromBar
+        lastFrame = frame; lastIdentity = identity
       } else {
+        lastCandidate = nil
         lastFrame = .null
         lastIdentity = ""
       }
       usleep(500_000)
+    }
+    if found == nil, let candidate = lastCandidate, !lastFrame.isNull {
+      usleep(500_000)
+      if let snap = try? candidate.snapshot(),
+         snap.frame == lastFrame,
+         "\(snap.elementType.rawValue)|\(snap.identifier)|\(snap.label)" == lastIdentity,
+         candidate.isHittable {
+        found = candidate; foundSnap = snap; inBar = lastFromBar
+      }
     }
     guard let cancel = found else {
       log("files sheet without Cancel: \(filesSheetInventory())")
@@ -922,9 +986,13 @@ final class AthleteKineticsUITests: XCTestCase {
       return Date()
     }
     let shown = Date().timeIntervalSince(opened)
-    let barWasUp = filesSheetBar().exists
-    let f = cancel.frame
-    log("files sheet cancel: tapping \(cancel.elementType.rawValue):'\(cancel.label)'|'\(cancel.identifier)' at {{\(Int(f.minX)), \(Int(f.minY))}, {\(Int(f.width)), \(Int(f.height))}} found by \(inBar ? "the sheet's bar" : "the whole-app lookup") \(String(format: "%.1f", shown)) s after RESTORE")
+    let barWasUp = (try? filesSheetBar().snapshot()) != nil
+    let snap = foundSnap ?? (try? cancel.snapshot())
+    let f = snap?.frame ?? cancel.frame
+    let elType = snap?.elementType.rawValue ?? cancel.elementType.rawValue
+    let elLabel = snap?.label ?? cancel.label
+    let elId = snap?.identifier ?? cancel.identifier
+    log("files sheet cancel: tapping \(elType):'\(elLabel)'|'\(elId)' at {{\(Int(f.minX)), \(Int(f.minY))}, {\(Int(f.width)), \(Int(f.height))}} found by \(inBar ? "the sheet's bar" : "the whole-app lookup") \(String(format: "%.1f", shown)) s after RESTORE")
     cancel.tap()
     let tapped = Date()
     // Closed: the sheet's bar is gone, or, when no bar was found, the

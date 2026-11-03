@@ -311,7 +311,12 @@ export async function tryCreateAppleHealthBridge(): Promise<BiometricsBridge | n
         try {
           // true = the request completed (answered). HealthKit does not say
           // whether reading was allowed; see AUTHORIZATION SEMANTICS.
-          return await hk.requestAuthorization({ toRead: READ_TYPES });
+          // CI evidence (run 41488711463, job 125438649133): healthd can reset
+          // authorization records mid-request ("Application proxy missing
+          // bundle URL for source """) and finish the transaction with true
+          // while getRequestStatusForAuthorization is still shouldRequest (1).
+          if (!(await hk.requestAuthorization({ toRead: READ_TYPES }))) return false;
+          return (await hk.getRequestStatusForAuthorization({ toRead: READ_TYPES })) === REQUEST_UNNECESSARY;
         } catch {
           return false;
         }

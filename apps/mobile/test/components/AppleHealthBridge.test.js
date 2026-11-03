@@ -316,6 +316,9 @@ describe('bridge contract', () => {
     const bridge = await tryCreateAppleHealthBridge();
     expect(bridge.provider).toBe('apple_health');
     expect(await bridge.hasGrantedPermissions()).toBe(false); // shouldRequest
+    // CI run 41488711463: healthd finished the transaction with true after
+    // resetting the bundle record, leaving requestStatus at shouldRequest (1).
+    expect(await bridge.requestPermissions()).toBe(false);
     mockHealthKit.requestStatus = 2; // unnecessary: already answered
     expect(await bridge.hasGrantedPermissions()).toBe(true);
     expect(await bridge.requestPermissions()).toBe(true);
