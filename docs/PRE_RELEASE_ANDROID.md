@@ -157,6 +157,37 @@ Expected outputs:
 Install the APK on a connected test device with `adb install -r` and record the
 AAB SHA-256 alongside the version code/name used for the build.
 
+### Beta builds (question box on)
+
+Beta features (today: the question box in the glossary) are switched by one
+build-time value, `AK_BETA_BUILD`. A build made without it is **not** a beta
+build and has the question box off; there is no in-app setting. To make a beta
+build, set it as an **environment variable** in the same PowerShell session,
+before the Gradle command:
+
+```powershell
+$env:AK_BETA_BUILD='on'
+Push-Location apps\mobile\android
+.\gradlew.bat :app:verifyOnnxRuntimePackagingContract bundleRelease assembleRelease --no-daemon
+Pop-Location
+Remove-Item Env:AK_BETA_BUILD   # so the next build in this session is not a beta build
+```
+
+The same applies to the QA variant (`.\gradlew.bat assembleQa --no-daemon`).
+
+- Only `on` (also `true` or `1`, any case) turns it on. Unset, empty or any
+  other value builds with the question box off.
+- It must be an environment variable. `-PAK_BETA_BUILD=...` is refused by the
+  Gradle build, because a Gradle property never reaches the JS bundler.
+- The value is read by `apps/mobile/babel.config.js` when the JS bundle is
+  built and written into the bundle. The Gradle bundle task and Metro's cache
+  are keyed on it, so switching it re-bundles.
+- Debug builds load JS from Metro: start Metro with the value set
+  (`$env:AK_BETA_BUILD='on'; npx react-native start`) to try the beta features
+  in a debug build.
+- Check on the device: the GLOSSARY screen shows a "Question box" action only
+  in a beta build.
+
 ## 4. Required device acceptance pass
 
 - Confirm Archivo renders on onboarding, READY, BLOCK, SESSION, LIBRARY, and ATHLETE.
