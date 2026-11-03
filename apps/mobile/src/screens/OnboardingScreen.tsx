@@ -231,6 +231,11 @@ function ReviewSection({ heading, description, onEdit, children }: ReviewSection
 // ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
+// Walk 1 (W1-15): STRENGTH + GRAPPLING found no grappling sport in the list.
+// The goal itself plans the BJJ days; the sport step is for another sport.
+export const HYBRID_SPORT_NOTE = 'Your Strength + Grappling goal already includes BJJ days. '
+  + 'Do you also train another sport? This step is optional.';
+
 // Walk 1 (W1-11): a blank name made every new athlete "Athlete 1", even
 // beside an existing "Athlete 1". A blank name takes the first free number.
 export const fallbackAthleteName = (
@@ -518,6 +523,11 @@ export default function OnboardingScreen(): React.JSX.Element {
               onToggleMuscles={() => setShowFocusMuscles((visible) => !visible)}
             />
             <Text style={styles.fieldLabel}>A SPORT? (OPTIONAL)</Text>
+            {draft.objective === 'hybrid' && (
+              <Text style={styles.pDim} testID="onboarding-hybrid-sport-note">
+                {HYBRID_SPORT_NOTE}
+              </Text>
+            )}
             <Chip
               testID="onboarding-wants-sport"
               wrap
@@ -550,6 +560,11 @@ export default function OnboardingScreen(): React.JSX.Element {
         {step === 'sport' && (
           <View>
             <Text style={styles.h2}>{SPORT_QUESTION.toUpperCase()}</Text>
+            {draft.objective === 'hybrid' && (
+              <Text style={styles.pDim} testID="onboarding-hybrid-sport-step-note">
+                {HYBRID_SPORT_NOTE}
+              </Text>
+            )}
             <SportEditor fields={sportFields} onChange={setSportFields} today={today} />
             <QuietAction
               label="Skip this — plan general gym training"

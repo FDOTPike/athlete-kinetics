@@ -221,6 +221,25 @@ describe('Onboarding wording found on the Android walk', () => {
     expect(fallbackAthleteName([], null)).toBe('Athlete 1');
   });
 
+  test('STRENGTH + GRAPPLING says its BJJ days are planned and the sport step is for another sport', () => {
+    const { HYBRID_SPORT_NOTE } = require('../../src/screens/OnboardingScreen');
+    render(<OnboardingScreen />);
+    next();
+    pressLabel(/^STRENGTH \+ GRAPPLING/);
+    next();
+    expect(screen.getByTestId('onboarding-hybrid-sport-note').props.children).toBe(HYBRID_SPORT_NOTE);
+    press('onboarding-wants-sport');
+    next();
+    expect(screen.getByTestId('onboarding-hybrid-sport-step-note')).toBeOnTheScreen();
+  });
+
+  test('other goals show no grappling note', () => {
+    render(<OnboardingScreen />);
+    next();
+    next();
+    expect(screen.queryByTestId('onboarding-hybrid-sport-note')).toBeNull();
+  });
+
   test('one limitation note is singular', () => {
     const { limitationNotesLine } = require('../../src/screens/OnboardingScreen');
     expect(limitationNotesLine(1)).toBe('1 limitation note recorded for your reference.');
