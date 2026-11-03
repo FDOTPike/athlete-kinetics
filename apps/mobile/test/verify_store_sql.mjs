@@ -972,39 +972,51 @@ if (resetTables.length >= 15) {
 {
   const { readdirSync, statSync } = await import('node:fs');
   const storeSrc = readFileSync(join(import.meta.dirname, '..', 'src', 'state', 'useStore.ts'), 'utf-8');
-  // Every string literal that names the table: single-quoted, double-quoted,
-  // and backtick SQL templates (which may span lines; their whitespace is
-  // collapsed). Single quotes alone missed a backtick SELECT in review
-  // (PR 116, 2026-11-03), so a read of a record-only table went unseen.
-  // A backtick literal counts as SQL when a SQL keyword opens it; anchoring
-  // on the keyword keeps a closing backtick elsewhere in the file from being
-  // read as an opening one.
-  const SQL_TEMPLATE = /`(\s*(?:SELECT|INSERT|UPDATE|DELETE|WITH|REPLACE|CREATE|DROP|ALTER)\b[^`]*)`/gi;
+  // Every string literal in the code that names the table: single-quoted,
+  // double-quoted and backtick (which may span lines; whitespace is collapsed).
+  // Single quotes alone missed a backtick SELECT in review (PR 116,
+  // 2026-11-03), so a read of a record-only table went unseen. The literals
+  // come from the TypeScript parser, so a comment that quotes SQL is not code
+  // and is not counted, and a backtick in one place cannot pair with another.
+  // SQLite table names are case-insensitive, so the name is matched without
+  // regard to case: `FROM SESSION_SKIPPED_SLOT` is the same read.
+  const ts = createRequire(import.meta.url)('typescript');
   const sqlNamingIn = (src, table) => {
+    const named = new RegExp('\\b' + table + '\\b', 'i');
     const found = [];
-    for (const quote of ["'", '"']) {
-      const re = new RegExp(quote + '([^' + quote + '\\n]*\\b' + table + '\\b[^' + quote + '\\n]*)' + quote, 'g');
-      for (const m of src.matchAll(re)) found.push(m[1]);
-    }
-    const named = new RegExp('\\b' + table + '\\b');
-    for (const m of src.matchAll(SQL_TEMPLATE)) {
-      if (named.test(m[1])) found.push(m[1].replace(/\s+/g, ' ').trim());
-    }
+    const visit = (node) => {
+      let text = null;
+      if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) text = node.text;
+      else if (ts.isTemplateExpression(node)) {
+        text = node.head.text + node.templateSpans.map((span) => '${}' + span.literal.text).join('');
+      }
+      if (text !== null && named.test(text)) found.push(text.replace(/\s+/g, ' ').trim());
+      ts.forEachChild(node, visit);
+    };
+    visit(ts.createSourceFile('probe.ts', src, ts.ScriptTarget.Latest, false, ts.ScriptKind.TS));
     return found;
   };
   const sqlNaming = (table) => sqlNamingIn(storeSrc, table);
-  a('the SQL-naming check sees single-quoted, double-quoted and backtick SQL alike',
+  a('the SQL-naming check sees single-quoted, double-quoted and backtick SQL alike, in any case, and not in comments',
     JSON.stringify(sqlNamingIn([
       "x('DELETE FROM probe_table')",
       'y("INSERT INTO probe_table (a) VALUES (?)")',
       'z(`SELECT a\n   FROM probe_table\n  WHERE a = ?`)',
       "w('SELECT 1 FROM other_table')",
       'v(`label ${x}`); u(`elsewhere`)',
+      "s('DELETE FROM PROBE_TABLE')",
+      'r("insert into Probe_Table (a) values (?)")',
+      'q(`SELECT a FROM Probe_table WHERE b = ${b}`)',
+      '// Documentation example: `SELECT * FROM probe_table`',
+      "/* or 'DELETE FROM probe_table' in a block comment */",
     ].join('\n'), 'probe_table')) === JSON.stringify([
       'DELETE FROM probe_table',
       'INSERT INTO probe_table (a) VALUES (?)',
       'SELECT a FROM probe_table WHERE a = ?',
-    ]), JSON.stringify(sqlNamingIn('z(`SELECT a\n FROM probe_table`)', 'probe_table')));
+      'DELETE FROM PROBE_TABLE',
+      'insert into Probe_Table (a) values (?)',
+      'SELECT a FROM Probe_table WHERE b = ${}',
+    ]), JSON.stringify(sqlNamingIn('z(`SELECT a\n FROM probe_table`); y("DELETE FROM PROBE_TABLE") // `SELECT * FROM probe_table`', 'probe_table')));
   a('071: the store names session_skipped_slot in one INSERT and one DELETE only',
     JSON.stringify(sqlNaming('session_skipped_slot').sort()) === JSON.stringify([
       'DELETE FROM session_skipped_slot',
@@ -1053,7 +1065,7 @@ if (resetTables.length >= 15) {
     join(ROOT, 'packages', 'core-db', 'src', 'migrationRunner.ts'),   // recovery sentinels
     join(ROOT, 'packages', 'core-db', 'src', 'backup', 'schemaContract.ts'), // a comment naming the contract
   ]);
-  const naming = sources.filter((file) => /\b(session_skipped_slot|set_load_shown)\b/.test(readFileSync(file, 'utf-8')));
+  const naming = sources.filter((file) => /\b(session_skipped_slot|set_load_shown)\b/i.test(readFileSync(file, 'utf-8')));
   a('071: no other source file in the app or the engine names either table',
     sources.length > 100 && naming.every((file) => allowed.has(file)) && naming.includes(join(ROOT, 'apps', 'mobile', 'src', 'state', 'useStore.ts')),
     naming.filter((file) => !allowed.has(file)).join(', ') || String(sources.length) + ' files scanned');
