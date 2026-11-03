@@ -2715,6 +2715,9 @@ interface PendingProgramCreation {
   input: TrainingProgramInput;
   preview: TrainingProgramPreview;
   programDays: ProgramDayPreference[];
+  /** A session length chosen on the Build screen, saved to the profile in the
+   *  same transaction as the program (null: the profile's length is kept). */
+  sessionDurationCapMin: number | null;
 }
 
 let pendingProgramCreation: PendingProgramCreation | null = null;
@@ -4471,41 +4474,28 @@ export const useStore = create<KineticsStore>()((set, get) => {
       return false;
     }
     // W1-4: a session length chosen on the Build screen becomes the
-    // profile's before the block is generated, so the block, the profile and
-    // every later block agree. It is put back if creation fails.
+    // profile's, so the block, the profile and every later block agree.
+    // Review (PR 194): it is written inside the block-creation transaction,
+    // not committed ahead of it, so creation either saves both or neither.
     const priorCapMin = get().profile.session_duration_cap_min;
     const chosenCapMin = input.sessionDurationCapMin === undefined ? null
       : Math.round(clamp(input.sessionDurationCapMin, 15, 240));
     const capChanges = chosenCapMin !== null && chosenCapMin !== priorCapMin;
-    const restoreCap = (): void => {
-      if (capChanges && get().profile.session_duration_cap_min !== priorCapMin) {
-        get().saveProfile({ session_duration_cap_min: priorCapMin });
-      }
-    };
     try {
       const preview = get().previewTrainingProgram(input);
-      if (capChanges) {
-        get().saveProfile({ session_duration_cap_min: chosenCapMin });
-        if (get().profile.session_duration_cap_min !== chosenCapMin) {
-          throw new Error('Your session length could not be saved. Nothing was created.');
-        }
-      }
       const shape = trainingProgramShape(get().profile, input, preview.startDate);
-      pendingProgramCreation = { input, preview, programDays: shape.programDays };
+      pendingProgramCreation = {
+        input, preview, programDays: shape.programDays,
+        sessionDurationCapMin: capChanges ? chosenCapMin : null,
+      };
       set({ error: null });
       get().generateNewBlock(input.schemaType);
       get().refreshProgram();
       const created = get().program !== null && get().error === null;
       pendingProgramCreation = null;
-      if (!created) {
-        const error = get().error;
-        restoreCap();
-        if (error !== null) set({ error });
-      }
       return created;
     } catch (e) {
       pendingProgramCreation = null;
-      restoreCap();
       set({ error: e instanceof Error ? e.message : String(e) });
       return false;
     }
@@ -4535,8 +4525,14 @@ export const useStore = create<KineticsStore>()((set, get) => {
       ?? pendingProgramContinuation?.weeklyFrequency;
     const pendingObjective = pendingProgramCreation?.preview.objective
       ?? pendingProgramContinuation?.objective;
-    const profile = pendingFrequency === undefined && pendingObjective === undefined ? storedProfile
-      : { ...storedProfile, weekly_frequency: pendingFrequency ?? storedProfile.weekly_frequency, objective: pendingObjective ?? storedProfile.objective };
+    const pendingCapMin = pendingProgramCreation?.sessionDurationCapMin ?? undefined;
+    const profile = pendingFrequency === undefined && pendingObjective === undefined && pendingCapMin === undefined ? storedProfile
+      : {
+        ...storedProfile,
+        weekly_frequency: pendingFrequency ?? storedProfile.weekly_frequency,
+        objective: pendingObjective ?? storedProfile.objective,
+        session_duration_cap_min: pendingCapMin ?? storedProfile.session_duration_cap_min,
+      };
     if (status !== 'ready') return;
     // Audit A2: regenerating mid-session archives the plan the live session
     // was built from — APRE completion would then read the WRONG plan.
@@ -4741,6 +4737,15 @@ export const useStore = create<KineticsStore>()((set, get) => {
           weeklyFrequency: programDraft.preview.days.length,
           now: Date.now(),
         });
+        // Review (PR 194): the chosen session length is written in the same
+        // transaction as the program, so a stop between two commits can no
+        // longer leave a changed length with no program.
+        if (programDraft.sessionDurationCapMin !== null) {
+          d.executeSync(
+            'UPDATE athlete_profile SET session_duration_cap_min = ?, updated_at_ms = ? WHERE profile_id = 1',
+            [programDraft.sessionDurationCapMin, Date.now()],
+          );
+        }
       }
       if (pendingProgramContinuation !== null) {
         updateTrainingProgramEndDate(d, pendingProgramContinuation.programId,
@@ -4848,7 +4853,9 @@ export const useStore = create<KineticsStore>()((set, get) => {
       set({ error: e instanceof Error ? e.message : String(e) });
       return;
     }
-    if (pendingFrequency !== undefined) set({ profile });
+    // State follows the commit: the chosen length (if any) is the profile's now.
+    if (pendingFrequency !== undefined || pendingCapMin !== undefined) set({ profile });
+    if (pendingCapMin !== undefined && get().prescription !== null) get().computePrescription([]);
     get().refreshBlock();
     get().refreshProgram();
     get().refreshReturnCheckin();

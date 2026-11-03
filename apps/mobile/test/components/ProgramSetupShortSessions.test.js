@@ -80,6 +80,55 @@ describe('ProgramSetupScreen: a session that does not fit offers choices', () =>
     expect(useStore.getState().profile.session_duration_cap_min).toBe(chosen);
   });
 
+  // Review (PR 194): the chosen length and the new program are one commit. A
+  // stop between two separate commits used to leave a changed length with no
+  // program; the length's write now sits inside the program's transaction.
+  test('the chosen length is written in the same transaction as the program', () => {
+    const driver = mockDrivers.get('athlete_kinetics.db');
+    const original = driver.executeSync;
+    const statements = [];
+    driver.executeSync = (sql, params) => { statements.push(String(sql).trim().replace(/\s+/g, ' ')); return original.call(driver, sql, params); };
+    try {
+      render(<ProgramSetupScreen />);
+      fireEvent.press(screen.getByText(/^Use \d+-minute sessions$/));
+      fireEvent.press(screen.getByLabelText('Create program'));
+    } finally {
+      driver.executeSync = original;
+    }
+    expect(useStore.getState().program).not.toBeNull();
+    const capWrites = statements.map((sql, i) => [sql, i]).filter(([sql]) => /^UPDATE athlete_profile SET/.test(sql) && /session_duration_cap_min/.test(sql));
+    expect(capWrites).toHaveLength(1);
+    const at = capWrites[0][1];
+    const begin = statements.slice(0, at).lastIndexOf('BEGIN');
+    const commit = statements.indexOf('COMMIT', at);
+    expect(begin).toBeGreaterThanOrEqual(0);
+    expect(statements.slice(begin + 1, at).includes('COMMIT')).toBe(false);
+    const inTransaction = statements.slice(begin, commit);
+    expect(inTransaction.some((sql) => /^INSERT INTO training_program\b/.test(sql))).toBe(true);
+    expect(inTransaction.some((sql) => /^INSERT INTO training_block\b/.test(sql))).toBe(true);
+  });
+
+  test('a failure inside that transaction saves neither the length nor the program', () => {
+    const driver = mockDrivers.get('athlete_kinetics.db');
+    const original = driver.executeSync;
+    driver.executeSync = (sql, params) => {
+      if (/^\s*INSERT INTO training_block\b/.test(String(sql))) throw new Error('synthetic failure inside the block transaction');
+      return original.call(driver, sql, params);
+    };
+    try {
+      render(<ProgramSetupScreen />);
+      fireEvent.press(screen.getByText(/^Use \d+-minute sessions$/));
+      fireEvent.press(screen.getByLabelText('Create program'));
+    } finally {
+      driver.executeSync = original;
+    }
+    expect(useStore.getState().program).toBeNull();
+    expect(useStore.getState().profile.session_duration_cap_min).toBe(SHORT_CAP);
+    const stored = driver.executeSync('SELECT session_duration_cap_min AS cap FROM athlete_profile WHERE profile_id = 1');
+    const rows = stored.rows?._array ?? stored.rows ?? [];
+    expect(Number(rows[0].cap)).toBe(SHORT_CAP);
+  });
+
   test('Cancel after choosing leaves the profile and the plan untouched', () => {
     const onCancel = jest.fn();
     render(<ProgramSetupScreen onCancel={onCancel} />);
