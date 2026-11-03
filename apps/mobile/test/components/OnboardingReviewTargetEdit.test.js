@@ -211,6 +211,16 @@ describe('OnboardingScreen EDIT from review returns to the review', () => {
 
 // Walk 1 copy findings (W1-9, W1-12, W1-15).
 describe('Onboarding wording found on the Android walk', () => {
+  test('a blank name takes the first free "Athlete N", never a name another athlete has', () => {
+    const { fallbackAthleteName } = require('../../src/screens/OnboardingScreen');
+    const roster = [
+      { id: 'a', name: 'Sam' }, { id: 'b', name: 'Athlete 1' }, { id: 'c', name: 'athlete 2' }, { id: 'new', name: 'New Athlete' },
+    ];
+    expect(fallbackAthleteName(roster, 'new')).toBe('Athlete 3');
+    expect(fallbackAthleteName([{ id: 'default', name: 'Athlete 1' }], 'default')).toBe('Athlete 1');
+    expect(fallbackAthleteName([], null)).toBe('Athlete 1');
+  });
+
   test('one limitation note is singular', () => {
     const { limitationNotesLine } = require('../../src/screens/OnboardingScreen');
     expect(limitationNotesLine(1)).toBe('1 limitation note recorded for your reference.');

@@ -231,6 +231,17 @@ function ReviewSection({ heading, description, onEdit, children }: ReviewSection
 // ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
+// Walk 1 (W1-11): a blank name made every new athlete "Athlete 1", even
+// beside an existing "Athlete 1". A blank name takes the first free number.
+export const fallbackAthleteName = (
+  athletes: readonly { id: string; name: string }[], activeId: string | null,
+): string => {
+  const taken = new Set(athletes.filter((a) => a.id !== activeId).map((a) => a.name.trim().toLowerCase()));
+  let n = 1;
+  while (taken.has(`athlete ${n}`)) n += 1;
+  return `Athlete ${n}`;
+};
+
 // Walk 1 (W1-12): "1 limitation notes" read wrong.
 export const limitationNotesLine = (count: number): string =>
   `${count} limitation ${count === 1 ? 'note' : 'notes'} recorded for your reference.`;
@@ -391,7 +402,7 @@ export default function OnboardingScreen(): React.JSX.Element {
     setSaveAttempted(true);
     completeOnboarding(
       { ...draft, injury_flags: parseNotes(injuryText), mobility_limits: parseNotes(mobilityText) },
-      name.trim().length > 0 ? name : 'Athlete 1',
+      name.trim().length > 0 ? name : fallbackAthleteName(athletes, activeAthleteId),
       loadPreference,
       loadPreferenceExplicit,
       {
