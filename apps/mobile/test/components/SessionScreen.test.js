@@ -511,7 +511,10 @@ test('guided mode keeps only the current movement expanded and future work unava
 test('untouched actual RPE logs null instead of fabricating target equality', () => {
   render(<SessionScreen />);
 
-  expect(screen.getByText('Effort rating is optional; leave it blank if you are unsure.')).toBeOnTheScreen();
+  // One line says effort is optional; a second line saying the same thing
+  // was removed (Android walk 2026-11-03, ux-8).
+  expect(screen.getByTestId('rpe-cue').props.children).toBe('Effort is optional evidence — leave it untouched to skip.');
+  expect(screen.queryByText('Effort rating is optional; leave it blank if you are unsure.')).toBeNull();
   fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
 
   expect(mockState.logSet).toHaveBeenCalledWith(
@@ -915,7 +918,9 @@ test('session rest override changes by 15 seconds and persists through the runne
   render(<SessionScreen />);
 
   expect(screen.getByLabelText('Session rest seconds 90')).toBeOnTheScreen();
-  expect(screen.getByText('Applies to this session.')).toBeOnTheScreen();
+  // Android walk 2026-11-03 (ux-8): the number follows the last set's effort,
+  // so the caption says why it changes between rests.
+  expect(screen.getByText('Rest uses your effort rating, or the planned effort if you leave it blank. Harder sets get longer rests. Your changes apply for this session.')).toBeOnTheScreen();
   fireEvent.press(screen.getByLabelText('Increase Session rest seconds'));
   expect(mockState.setRunnerRestOverride).toHaveBeenCalledWith(105);
   fireEvent.press(screen.getByLabelText('Decrease Session rest seconds'));

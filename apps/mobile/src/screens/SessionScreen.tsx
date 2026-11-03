@@ -1293,7 +1293,12 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                               repeatOnHold={true}
                               style={styles.sessionStepper}
                             />
-                            <Text style={styles.nextUp}>Applies to this session.</Text>
+                            {/* The target follows the last set's effort (restSecondsFor);
+                                say so, or the number reads as a setting that changed by
+                                itself (Android walk 2026-11-03, ux-8). */}
+                            <Text style={styles.nextUp}>
+                              Rest uses your effort rating, or the planned effort if you leave it blank. Harder sets get longer rests. Your changes apply for this session.
+                            </Text>
                           </>
                         )}
                         <PrimaryButton
@@ -1538,11 +1543,11 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                           </Text>
                           <Text style={styles.effortCue}>{EFFORT_BREATHING_NOTE}</Text>
                           <Text style={styles.effortStop} testID="effort-stop-guidance">{EFFORT_STOP_GUIDANCE}</Text>
-                          <Text style={styles.rpeEvidence}>
-                            {safeRpe !== null
-                              ? 'This effort rating will be saved with the set.'
-                              : 'Effort rating is optional; leave it blank if you are unsure.'}
-                          </Text>
+                          {/* With no rating, the cue above already says effort is
+                              optional; a second line said it again (ux-8). */}
+                          {safeRpe !== null && (
+                            <Text style={styles.rpeEvidence}>This effort rating will be saved with the set.</Text>
+                          )}
                         </View>
 
                         {supportsBands && (

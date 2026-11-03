@@ -387,11 +387,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 4,
   },
+  // No letter spacing on header and tab labels: at system font size 2.0 the
+  // tracking made "WORKOUT" wrap to "WORKOU / T" (Android walk 2026-11-03).
+  // Labels keep full font scaling and may wrap, centred, rather than shrink.
   headerText: {
     color: palette.faint,
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 1.2,
+    letterSpacing: 0,
+    textAlign: 'center',
   },
   headerTextActive: {
     color: palette.text,
@@ -406,7 +410,7 @@ const styles = StyleSheet.create({
   tabBtnPressed: {
     opacity: 0.7,
   },
-  tabText: { color: palette.faint, fontSize: 11, fontWeight: '700', letterSpacing: 1.6 },
+  tabText: { color: palette.faint, fontSize: 11, fontWeight: '700', letterSpacing: 0, textAlign: 'center' },
   tabTextActive: { color: palette.text, fontWeight: '800' },
   tabIndicator: { height: 3, width: 32, backgroundColor: 'transparent' },
   tabIndicatorActive: { backgroundColor: palette.chalk },
