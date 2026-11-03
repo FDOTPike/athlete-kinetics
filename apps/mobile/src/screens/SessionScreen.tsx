@@ -1286,6 +1286,16 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                   <View style={styles.currentCard}>
                     {resting ? (
                       <View style={{ alignItems: 'center', gap: theme.space[3] }}>
+                        {/* Walk 2 (W2-12): the exercise just worked stays named during
+                            its rest; it vanished from the timeline until Ready now. */}
+                        <View style={{ alignSelf: 'stretch' }} testID="session-rest-exercise">
+                          <Text style={styles.completeRowName} numberOfLines={1}>{movement?.name ?? 'Movement'}</Text>
+                          <Text style={styles.completeRowMeta}>
+                            {finished
+                              ? `${logged} ${logged === 1 ? 'set' : 'sets'} complete`
+                              : `${setsOfPlanned(logged, slot.plannedSets)} done`}
+                          </Text>
+                        </View>
                         {/* Draining chalk barRestTimerCard */}
                         <RestTimerCard
                           totalSeconds={rest.seconds}

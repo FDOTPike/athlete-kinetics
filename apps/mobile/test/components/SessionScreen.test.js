@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, within } from '@testing-library/react-native';
 import { resolveLoadSelection as actualResolveLoadSelection } from '../../../../packages/inference/src/loadSelection';
 import { isDifficultyAllowed as actualIsDifficultyAllowed } from '../../../../packages/inference/src/tierPolicy';
 import { resolveMovementAvailability as actualResolveMovementAvailability } from '../../../../packages/inference/src/capabilityResolver';
@@ -900,6 +900,15 @@ test('rest is silent, previews the next deterministic set, and can end early', (
   expect(screen.getByText('Next up: First movement · set 2 of 3')).toBeOnTheScreen();
   fireEvent.press(screen.getByLabelText('Ready now, skip the rest timer'));
   expect(mockState.skipRunnerRest).toHaveBeenCalledTimes(1);
+});
+// Android walk 2026-11-03 (W2-12): the exercise just worked vanished from the
+// timeline during its rest and came back only after Ready now.
+test('during rest the exercise just worked stays named, with its set count', () => {
+  mockState = state({ runner: runner({ phase: 'resting', setIndex: 1, restSecondsTarget: 90, restStartedAtMs: Date.now(), restRpe: 8, slotSetCounts: [1, 0], loggedSets: 1 }) });
+  render(<SessionScreen />);
+  const card = within(screen.getByTestId('session-rest-exercise'));
+  expect(card.getByText('First movement')).toBeOnTheScreen();
+  expect(card.getByText(/^\d+ of 3 sets done$|^\d+ sets? complete$/)).toBeOnTheScreen();
 });
 test('session rest override changes by 15 seconds and persists through the runner action', () => {
   mockState = state({
