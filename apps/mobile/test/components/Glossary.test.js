@@ -249,3 +249,11 @@ describe('Learning Glossary & InfoTip Contracts (WO §7.2 Items 12–16)', () =>
     });
   });
 });
+
+// Android walk 2026-11-03 (W2-14): Plan names the intensification phase
+// "Build strength", but its info button asked about INTENSIFICATION.
+test('the phase shown as "Build strength" explains itself under that name', () => {
+  render(<InfoTip term="INTENSIFICATION" />);
+  expect(screen.getByLabelText('What does BUILD STRENGTH mean?')).toBeOnTheScreen();
+  expect(screen.queryByLabelText('What does INTENSIFICATION mean?')).toBeNull();
+});

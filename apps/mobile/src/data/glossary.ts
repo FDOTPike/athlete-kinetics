@@ -277,11 +277,13 @@ export const GLOSSARY_ENTRIES: readonly GlossaryEntry[] = [
   },
   {
     id: 'INTENSIFICATION',
-    term: 'INTENSIFICATION',
+    // Walk 2 (W2-14): Plan names this phase "Build strength"; its info
+    // button asked "What does INTENSIFICATION mean?".
+    term: 'BUILD STRENGTH',
     category: 'structure',
     definition:
       "Volume comes down, effort goes up. You do less work but it's harder.",
-    aliases: ['intensification phase', 'transmutation'],
+    aliases: ['intensification', 'intensification phase', 'transmutation'],
   },
   {
     id: 'REALISE',
