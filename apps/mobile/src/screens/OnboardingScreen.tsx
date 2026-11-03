@@ -147,7 +147,7 @@ const EQUIPMENT_DESCRIPTION: Record<EquipmentItem, string> = {
 const PRESET_COPY = {
   full_gym: { label: 'FULL GYM', blurb: 'A broad setup with racks, free weights, cables, bands, and mats.' },
   home_basic: { label: 'HOME BASIC', blurb: 'A compact setup with dumbbells, a kettlebell, a pull-up bar, bands, and mats.' },
-  minimal: { label: 'MINIMAL', blurb: 'No equipment required; bodyweight movements remain available.' },
+  minimal: { label: 'MINIMAL', blurb: 'Bands and mats only; bodyweight movements remain available.' },
 } as const;
 
 /** Plain-language read of an RPE effort cap, shown live under the stepper. */
@@ -747,7 +747,7 @@ export default function OnboardingScreen(): React.JSX.Element {
                       {`TARGET — ${goalValidation.goal.specificOutcome}: ${goalValidation.goal.targetValue} ${goalValidation.goal.unit}${goalValidation.goal.requestedDeadline === null ? ', no deadline' : ` by ${goalValidation.goal.requestedDeadline}`}`}
                     </Text>
                     <Pressable
-                      onPress={() => goTo('target')}
+                      onPress={() => editFromReview('target')}
                       accessibilityRole="button"
                       accessibilityLabel="Edit target"
                       style={styles.reviewEdit}

@@ -96,6 +96,10 @@ describe('OnboardingScreen review step provides an Edit target action when wants
 
     pressLabel('Edit target');
     expect(screen.getByTestId('goal-editor')).toBeOnTheScreen();
+    // Walk 1 (W1-1): NEXT after editing the target returns to the review,
+    // like every other EDIT, instead of walking on to the experience step.
+    next();
+    expect(screen.getByLabelText('START TRAINING')).toBeOnTheScreen();
   });
 });
 
@@ -226,24 +230,43 @@ describe('OnboardingScreen long option chips wrap instead of cutting their sente
 // Android walk 2026-11-03 (ux-5): HOME BASIC claimed a pull-up bar its
 // description did not mention. A preset's description names every item in it.
 describe('OnboardingScreen HOME BASIC says what it adds', () => {
+  const { EQUIPMENT_PRESETS, EQUIPMENT_ITEMS } = require('@ak/inference');
+  const { GLOSSARY_ENTRIES: GLOSSARY } = require('../../src/data/glossary');
+  // How each item reads in a preset description. Every equipment item has
+  // an entry, so an item added to the preset cannot slip past unnamed.
+  const SPOKEN = {
+    barbell: 'barbell', squat_rack: 'rack', bench: 'bench', dumbbells: 'dumbbells', kettlebell: 'kettlebell',
+    pullup_bar: 'pull-up bar', nordic_bench: 'nordic', bands: 'bands', cable_machine: 'cable', mats: 'mats', boards: 'boards',
+  };
+  // Both directions: every preset item is named, and nothing outside the
+  // preset is named.
+  const expectNamesExactly = (text, preset) => {
+    const lower = text.toLowerCase();
+    for (const item of EQUIPMENT_ITEMS) {
+      expect([item, lower.includes(SPOKEN[item])]).toEqual([item, EQUIPMENT_PRESETS[preset].includes(item)]);
+    }
+  };
+
   test('the HOME BASIC description names exactly the items of the preset', () => {
-    const { EQUIPMENT_PRESETS, EQUIPMENT_ITEMS } = require('@ak/inference');
-    // How each item reads in a preset description. Every equipment item has
-    // an entry, so an item added to the preset cannot slip past unnamed.
-    const SPOKEN = {
-      barbell: 'barbell', squat_rack: 'rack', bench: 'bench', dumbbells: 'dumbbells', kettlebell: 'kettlebell',
-      pullup_bar: 'pull-up bar', nordic_bench: 'nordic', bands: 'bands', cable_machine: 'cable', mats: 'mats', boards: 'boards',
-    };
     expect(Object.keys(SPOKEN).sort()).toEqual([...EQUIPMENT_ITEMS].sort());
     expect(EQUIPMENT_PRESETS.home_basic.length).toBeGreaterThan(0);
     render(<OnboardingScreen />);
     for (let i = 0; i < 5; i += 1) next();
-    const description = screen.getByLabelText(/^HOME BASIC\. /).props.accessibilityLabel.toLowerCase();
-    // Both directions: every preset item is named, and nothing outside the
-    // preset is named.
-    for (const item of EQUIPMENT_ITEMS) {
-      expect([item, description.includes(SPOKEN[item])])
-        .toEqual([item, EQUIPMENT_PRESETS.home_basic.includes(item)]);
-    }
+    expectNamesExactly(screen.getByLabelText(/^HOME BASIC\. /).props.accessibilityLabel, 'home_basic');
   });
+
+  // Walk 1 (W1-2, W1-6): the glossary "i" text for HOME BASIC left out the
+  // pull-up bar, and MINIMAL said "no equipment" while it selects bands and mats.
+  test.each([['HOME BASIC', 'home_basic'], ['MINIMAL', 'minimal']])(
+    '%s: the onboarding description and the glossary entry name exactly the preset',
+    (label, preset) => {
+      render(<OnboardingScreen />);
+      for (let i = 0; i < 5; i += 1) next();
+      expectNamesExactly(screen.getByLabelText(new RegExp(`^${label}\\. `)).props.accessibilityLabel, preset);
+      const entry = GLOSSARY.find((term) => term.id === label);
+      expect(entry).toBeDefined();
+      expectNamesExactly(entry.definition, preset);
+      expect(entry.definition.toLowerCase()).not.toContain('no equipment');
+    },
+  );
 });
