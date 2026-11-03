@@ -51,6 +51,9 @@ function PastSessionSummary({ sessionId, load }: {
   load: (sessionId: number) => ReturnType<ReturnType<typeof useStore.getState>['loadSessionSummaryFacts']>;
 }): React.JSX.Element {
   let lines: string[] = [];
+  // Review (PR 194): a failed read is not an empty session. Only a summary
+  // that was read and holds nothing says that no sets were logged.
+  let readFailed = false;
   try {
     const facts = load(sessionId);
     const view = buildSessionSummary({
@@ -64,10 +67,13 @@ function PastSessionSummary({ sessionId, load }: {
     ];
   } catch {
     lines = [];
+    readFailed = true;
   }
   return (
     <View style={styles.pastSummary} testID={`progress-session-${sessionId}-summary`}>
-      {lines.length === 0
+      {readFailed
+        ? <Text style={styles.caption}>This session's summary could not be read.</Text>
+        : lines.length === 0
         ? <Text style={styles.caption}>No sets were logged in this session.</Text>
         : lines.map((text, index) => <Text key={`${index}-${text}`} style={styles.caption}>{text}</Text>)}
     </View>

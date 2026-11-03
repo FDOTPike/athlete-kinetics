@@ -112,4 +112,21 @@ describe('Recent sessions open to what was logged', () => {
     fireEvent.press(screen.getByTestId('progress-session-11'));
     expect(screen.queryByTestId('progress-session-11-summary')).toBeNull();
   });
+
+  // Review (PR 194): a read that fails is not an empty session.
+  test('a summary that cannot be read does not say that no sets were logged', () => {
+    mockState.loadSessionSummaryFacts = jest.fn(() => { throw new Error('synthetic read failure'); });
+    render(<ProgressScreen />);
+    fireEvent.press(screen.getByTestId('progress-session-11'));
+    expect(screen.getByText("This session's summary could not be read.")).toBeOnTheScreen();
+    expect(screen.queryByText('No sets were logged in this session.')).toBeNull();
+  });
+
+  test('a session read with nothing in it still says that no sets were logged', () => {
+    mockState.loadSessionSummaryFacts = jest.fn(() => ({ durationMin: null, exercises: [], previousSets: [], skippedExercises: [] }));
+    render(<ProgressScreen />);
+    fireEvent.press(screen.getByTestId('progress-session-11'));
+    expect(screen.getByText('No sets were logged in this session.')).toBeOnTheScreen();
+    expect(screen.queryByText("This session's summary could not be read.")).toBeNull();
+  });
 });
