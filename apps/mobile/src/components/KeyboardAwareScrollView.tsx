@@ -1,4 +1,4 @@
-import React, { forwardRef, useCallback, useEffect, useRef } from 'react';
+import React, { forwardRef, useCallback, useEffect, useRef, useState } from 'react';
 import {
   Keyboard,
   Platform,
@@ -11,7 +11,44 @@ export const DEFAULT_KEYBOARD_EXTRA_SCROLL_HEIGHT = 128;
 export const KEYBOARD_TAP_BEHAVIOR = 'handled' as const;
 export const KEYBOARD_DISMISS_MODE = Platform.OS === 'ios' ? 'interactive' as const : 'on-drag' as const;
 
-type ScrollResponder = Pick<ScrollView, 'scrollResponderScrollNativeHandleToKeyboard'>;
+export interface ShellKeyboardAvoidance {
+  readonly behavior: 'padding';
+  readonly enabled: boolean;
+}
+
+/**
+ * Settings for the app shell's single KeyboardAvoidingView.
+ *
+ * Both platforms use 'padding'. On Android the window is not resized for the
+ * keyboard here, so the shell must lift its own content. 'height' changed the
+ * view's own size, and that re-triggered the keyboard measurement: after the
+ * keyboard closed, the onboarding footer jumped between two heights about 30
+ * times a second and taps missed (Android walk 2026-11-03, fn-1).
+ *
+ * The keyboard-hidden event on Android still reports an overlap, which left a
+ * band of padding below the footer. So on Android the view is enabled only
+ * while the keyboard is shown; disabled, it renders no padding. iOS is
+ * unchanged.
+ */
+export function shellKeyboardAvoidance(os: string, keyboardShown: boolean): ShellKeyboardAvoidance {
+  return { behavior: 'padding', enabled: os === 'ios' ? true : keyboardShown };
+}
+
+/** True while the software keyboard is shown (Android did-show / did-hide events). */
+export function useKeyboardShown(): boolean {
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => setShown(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setShown(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+  return shown;
+}
+
+type ScrollResponder =Pick<ScrollView, 'scrollResponderScrollNativeHandleToKeyboard'>;
 
 export function scrollFocusedInputIntoView(
   scrollResponder: ScrollResponder | null,

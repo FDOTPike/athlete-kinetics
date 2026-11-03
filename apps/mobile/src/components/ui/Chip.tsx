@@ -5,7 +5,8 @@
  * Unselected: line border, textMid label, transparent fill.
  * Disabled: 45% opacity, ink1 fill, textLow label.
  * borderRadius: theme.radius.chip (2pt).
- * minHeight: theme.touch.min (56pt).
+ * minHeight and minWidth: theme.touch.min (56pt), so a one-character chip
+ * is still a full-size target.
  *
  * Law 2: Selected chips = inverted white fill, not chalk.
  * Law: zero hex literals.
@@ -79,6 +80,7 @@ export function Chip({
 const styles = StyleSheet.create({
   base: {
     minHeight: theme.touch.min,
+    minWidth: theme.touch.min,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: theme.space[4], // 16

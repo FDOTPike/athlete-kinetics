@@ -128,8 +128,11 @@ export interface NiggleInput {
 /** A movement scheduled later in the 28-day block, eligible to pull forward. */
 export interface FutureSlot {
   plannedSlotId: number;
-  /** Absolute day index within the block. */
+  /** Absolute day index within the block (0 = the block's first day). */
   dayIndex: number;
+  /** The origin session's date (YYYY-MM-DD), when known. Shown to the athlete
+   *  instead of the 0-based day index. */
+  sessionDate?: string;
   movement: SubstitutionMovement;
   /** Planned working sets at the origin slot (the volume that will move). */
   sets: number;
@@ -169,6 +172,8 @@ export interface DaySwapOption {
   name: string;
   preference: MovementPreference;
   fromDayIndex: number;
+  /** The origin session's date, copied from the slot when known. */
+  sessionDate?: string;
   plannedSlotId: number;
   /** Volume moved forward AND deducted from the origin (conservation). */
   setsConserved: number;
@@ -293,7 +298,7 @@ export function computeSubstitutions(input: SubstitutionInput): SubstitutionResu
       preference: m.preference,
       rationale:
         `${m.name} (${m.difficulty}) substitutes ${input.target.name}` +
-        (easier ? ' with reduced mechanical demand' : ' at matched difficulty, altered torque') +
+        (easier ? ' with reduced mechanical demand' : ' at matched difficulty') +
         (guarded ? '; Passes the app’s current reported-joint checks' : ''),
     });
   }
@@ -316,10 +321,13 @@ export function computeSubstitutions(input: SubstitutionInput): SubstitutionResu
       name: m.name,
       preference: m.preference,
       fromDayIndex: slot.dayIndex,
+      ...(slot.sessionDate !== undefined ? { sessionDate: slot.sessionDate } : {}),
       plannedSlotId: slot.plannedSlotId,
       setsConserved: slot.sets,
       rationale:
-        `Pull ${m.name} forward from day ${slot.dayIndex}; ${slot.sets} set(s) ` +
+        // The athlete never sees 0-based day indices: name the session by its
+        // date, or count block days from 1 as the plan does.
+        `Pull ${m.name} forward from ${slot.sessionDate !== undefined ? `the ${slot.sessionDate} session` : `block day ${slot.dayIndex + 1}`}; ${slot.sets} set(s) ` +
         'deducted from that slot to conserve block volume.',
     });
   }
