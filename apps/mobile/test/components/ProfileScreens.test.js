@@ -675,7 +675,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     pressNext();
     fireEvent.press(screen.getByLabelText('Increase TRAINING DAYS PER WEEK'));
     pressNext();
-    fireEvent.press(screen.getByRole('button', { name: /MINIMAL\. No equipment/ }));
+    fireEvent.press(screen.getByRole('button', { name: /MINIMAL\. Bands and mats only/ }));
     pressNext();
     fireEvent.press(screen.getByLabelText('No, nothing to note'));
     pressNext();
