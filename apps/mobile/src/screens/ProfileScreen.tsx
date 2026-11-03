@@ -37,6 +37,7 @@ import { useStore } from '../state/useStore';
 import { useBackupStore } from '../state/backupStore';
 import { useSubViewBack } from '../navigation/navigation';
 import { Chip, Stepper, QuietAction, Disclosure, ListRow, PrimaryButton, SecondaryButton } from '../components/ui';
+import { measuredDayDetail } from './measuredDayDetail';
 import InfoTip from '../components/InfoTip';
 import { biometricsCopy, providerForPlatform } from '../state/biometricsCopy';
 import CoachVerificationLabScreen from './CoachVerificationLabScreen';
@@ -64,6 +65,27 @@ const formatFinalizedDate = (ms: number): string => {
 /** Walk W3 (for W4): the objective info button always asked "What does GPP
  *  mean?". It now explains the objective that is selected. Weight loss has no
  *  glossary entry, so it shows no button rather than a wrong one. */
+/** Walk W4-4: no preset ever showed as chosen. A preset is shown selected when
+ *  the athlete's standard equipment is exactly that preset (specialist items,
+ *  which no preset includes, are left out of the comparison). */
+export const presetMatches = (inventory: readonly string[], preset: readonly string[]): boolean => {
+  const standard = new Set(inventory.filter((item) => (STANDARD_EQUIPMENT_ITEMS as readonly string[]).includes(item)));
+  return standard.size === new Set(preset).size && preset.every((item) => standard.has(item));
+};
+
+/** Walk W4-6: the reset did not say whose data it removes (only the active
+ *  athlete's). */
+export const resetScopeText = (name: string | undefined): string =>
+  `This removes ${name ? `${name}'s` : "this athlete's"} training history, telemetry, blocks, and today's reports. Their profile, saved profile slots and other athletes are not changed.`;
+export const resetConfirmText = (name: string | undefined): string =>
+  `This cannot be undone. Reset ${name ? `${name}'s` : "this athlete's"} training data?`;
+
+/** Walk W4-9: the energy system "i" always explained ATP-PC. It now explains
+ *  the chosen system; the glossary has an entry only for ATP-PC so far. */
+export const ENERGY_SYSTEM_TIP: Partial<Record<(typeof ENERGY_SYSTEMS)[number], string>> = {
+  atp_pc: 'ATP-PC',
+};
+
 export const OBJECTIVE_TIP: Partial<Record<(typeof OBJECTIVES)[number], string>> = {
   strength: 'STRENGTH',
   hypertrophy: 'HYPERTROPHY',
@@ -143,6 +165,7 @@ interface OneRmRowProps {
 }
 function OneRmRow({ label, valueKg, onChange }: OneRmRowProps): React.JSX.Element {
   const [text, setText] = useState(valueKg !== undefined ? valueKg.toFixed(1) : '');
+  const [clampNote, setClampNote] = useState<string | null>(null);
   useEffect(() => {
     setText(valueKg !== undefined ? valueKg.toFixed(1) : '');
   }, [valueKg]);
@@ -156,6 +179,8 @@ function OneRmRow({ label, valueKg, onChange }: OneRmRowProps): React.JSX.Elemen
     const snapped = Math.min(500, Math.max(20, Math.round(parsed / 2.5) * 2.5));
     onChange(parsed); // store snaps to 2.5 and clamps 20..500
     setText(snapped.toFixed(1));
+    // Walk W4-7: 999 became 500.0 with no word. Say what was saved.
+    setClampNote(oneRmClampNote(parsed));
   };
   return (
     <View style={styles.field}>
@@ -192,9 +217,14 @@ function OneRmRow({ label, valueKg, onChange }: OneRmRowProps): React.JSX.Elemen
           <Text style={styles.numBtnText}>+</Text>
         </Pressable>
       </View>
+      {clampNote !== null && <Text style={styles.fieldHint} accessibilityLiveRegion="polite">{clampNote}</Text>}
     </View>
   );
 }
+
+/** What to say when a typed one-rep max is outside what the field keeps. */
+export const oneRmClampNote = (typedKg: number): string | null =>
+  typedKg > 500 ? `Saved as 500.0 kg, the highest one-rep max this field accepts. Check the number you typed.` : null;
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -503,7 +533,7 @@ export default function ProfileScreen(): React.JSX.Element {
       />
       <ChipRow
         label="7 · TARGET ENERGY SYSTEM"
-        tip="ATP-PC"
+        tip={ENERGY_SYSTEM_TIP[profile.target_energy_system]}
         options={ENERGY_SYSTEMS}
         value={profile.target_energy_system}
         onSelect={(target_energy_system) => saveProfile({ target_energy_system })}
@@ -814,7 +844,7 @@ export default function ProfileScreen(): React.JSX.Element {
             <Chip
               key={preset}
               label={preset.replace(/_/g, ' ').toUpperCase()}
-              selected={false}
+              selected={presetMatches(profile.equipment_inventory, EQUIPMENT_PRESETS[preset])}
               onPress={() => saveProfile({ equipment_inventory: [...EQUIPMENT_PRESETS[preset]] })}
               accessibilityLabel={`Use ${preset.replace(/_/g, ' ')} equipment preset`}
             />
@@ -917,7 +947,7 @@ export default function ProfileScreen(): React.JSX.Element {
               <ListRow
                 key={row.date}
                 label={row.date}
-                detail={`${Math.round(row.tonnageKg)} kg load · ${row.setCount} sets${row.bodyweightKg === null ? '' : ` · ${row.bodyweightKg.toFixed(1)} kg BW`}`}
+                detail={measuredDayDetail({ ...row, restingHr: null })}
                 style={styles.clinicalRow}
               />
             ))}
@@ -1038,7 +1068,7 @@ export default function ProfileScreen(): React.JSX.Element {
           {resetAthleteId === null ? (
             <View style={{ gap: theme.space[3] }}>
               <Text style={styles.fieldHint}>
-                This removes training history, telemetry, blocks, and today's reports. Your profile and saved profile slots remain.
+                {resetScopeText(athletes.find((a) => a.id === activeAthleteId)?.name)}
               </Text>
               <SecondaryButton
                 label="Continue to reset"
@@ -1053,7 +1083,7 @@ export default function ProfileScreen(): React.JSX.Element {
             </View>
           ) : (
             <View style={{ gap: theme.space[3] }}>
-              <Text style={styles.confirmText}>This cannot be undone. Reset the training data?</Text>
+              <Text style={styles.confirmText}>{resetConfirmText(athletes.find((a) => a.id === resetAthleteId)?.name)}</Text>
               {resetError !== null && (
                 <Text style={styles.fieldHint} accessibilityRole="alert">{resetError}</Text>
               )}

@@ -22,6 +22,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useStore } from '../state/useStore';
 import { theme } from '../theme/theme';
 import { ListRow } from '../components/ui';
+import { measuredDayDetail } from './measuredDayDetail';
 import { buildSessionSummary } from '../state/sessionSummary';
 
 const OUTCOME_LABELS: Record<string, string> = {
@@ -135,7 +136,7 @@ export default function ProgressScreen(): React.JSX.Element {
             <ListRow
               key={row.date}
               label={row.date}
-              detail={`${Math.round(row.tonnageKg)} kg load · ${row.setCount} sets${row.bodyweightKg === null ? '' : ` · ${row.bodyweightKg.toFixed(1)} kg BW`}${row.restingHr === null ? '' : ` · ${Math.round(row.restingHr)} bpm resting HR`}`}
+              detail={measuredDayDetail(row)}
             />
           ))
         )}
