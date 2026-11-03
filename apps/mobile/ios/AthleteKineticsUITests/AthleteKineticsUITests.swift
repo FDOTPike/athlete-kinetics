@@ -14,6 +14,7 @@
 import XCTest
 
 final class AthleteKineticsUITests: XCTestCase {
+  private static var test3IterationsRun = 0
   private var app: XCUIApplication!
   private var isInitialLaunchOfTest = true
 
@@ -21,7 +22,6 @@ final class AthleteKineticsUITests: XCTestCase {
     continueAfterFailure = false
     isInitialLaunchOfTest = true
     app = XCUIApplication()
-    app.resetAuthorizationStatus(for: .health)
   }
 
   override func tearDownWithError() throws {
@@ -507,6 +507,10 @@ final class AthleteKineticsUITests: XCTestCase {
   /// never claim it can read. Then Coach Mode: a second athlete is added (own
   /// onboarding) and switching athletes never reopens the permission sheet.
   func test3_healthDenialAndAthleteSwitching() throws {
+    if Self.test3IterationsRun > 0 {
+      app.resetAuthorizationStatus(for: .health)
+    }
+    Self.test3IterationsRun += 1
     // -AKUITestTrace: the app logs which branch its permission flow took
     // (content-free; captured from the system log by tools/ios_ui_tests.sh).
     launch(["-AKUITestTrace", "1"])
