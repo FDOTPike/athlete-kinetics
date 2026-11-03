@@ -46,12 +46,23 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     let fm = FileManager.default
     var removed = 0
     for dir in [FileManager.SearchPathDirectory.documentDirectory, .libraryDirectory] {
-      guard let root = fm.urls(for: dir, in: .userDomainMask).first,
-            let items = try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: nil) else { continue }
+      guard let root = fm.urls(for: dir, in: .userDomainMask).first else { continue }
+      let items: [URL]
+      do {
+        items = try fm.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)
+      } catch {
+        NSLog("[ak-uitest] resetUITestStorageIfRequested failed to list %@ after %d item(s): %@", root.lastPathComponent, removed, String(describing: error))
+        return
+      }
       for item in items {
-        if item.lastPathComponent == "Caches" || item.lastPathComponent == "SplashBoard" { continue }
-        if (try? fm.removeItem(at: item)) != nil {
+        let name = item.lastPathComponent
+        if name == "Caches" || name == "SplashBoard" { continue }
+        do {
+          try fm.removeItem(at: item)
           removed += 1
+        } catch {
+          NSLog("[ak-uitest] resetUITestStorageIfRequested failed to remove %@ after %d item(s): %@", name, removed, String(describing: error))
+          return
         }
       }
     }
