@@ -267,6 +267,7 @@ export function GoalExerciseField({ movements, movementId, onChange }: GoalExerc
           <View style={styles.wrap}>
             {matches.map((movement) => (
               <Chip
+                wrap
                 key={movement.movement_id}
                 testID={`goal-exercise-option-${movement.movement_id}`}
                 label={movement.name.toUpperCase()}
@@ -343,6 +344,7 @@ export function GoalEditor({ fields, onChange, today, trainingAge, showAllErrors
       <View style={styles.wrap}>
         {GOAL_METRICS.map((metricId) => (
           <Chip
+            wrap
             key={metricId}
             testID={`goal-metric-${metricId}`}
             label={GOAL_METRIC_INFO[metricId].label.toUpperCase()}

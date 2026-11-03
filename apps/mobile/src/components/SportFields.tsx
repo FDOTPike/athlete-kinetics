@@ -165,6 +165,7 @@ export function SportEditor({ fields, onChange, today, showAllErrors = false }: 
           <View style={styles.group}>
             {members.map((sportId) => (
               <Chip
+                wrap
                 key={sportId}
                 testID={`sport-${sportId}`}
                 label={`${SPORT_INFO[sportId].label.toUpperCase()} — ${SPORT_INFO[sportId].distinction ?? ''}`}
@@ -205,6 +206,7 @@ export function SportEditor({ fields, onChange, today, showAllErrors = false }: 
           <View style={styles.group}>
             {SPORT_OUTCOMES_BY_SPORT[fields.sportId].map((outcomeId) => (
               <Chip
+                wrap
                 key={outcomeId}
                 testID={`sport-outcome-${outcomeId}`}
                 label={SPORT_OUTCOME_LABEL[outcomeId].toUpperCase()}
@@ -240,6 +242,7 @@ export function SportEditor({ fields, onChange, today, showAllErrors = false }: 
           <View style={styles.wrap}>
             {SPORT_EXPERIENCE.map((experienceId) => (
               <Chip
+                wrap
                 key={experienceId}
                 testID={`sport-experience-${experienceId}`}
                 label={SPORT_EXPERIENCE_LABEL[experienceId].toUpperCase()}
