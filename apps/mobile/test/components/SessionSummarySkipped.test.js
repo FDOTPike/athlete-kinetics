@@ -161,3 +161,26 @@ test('without skipped exercises the view has no skipped lines', () => {
   });
   expect(view.skippedLines).toEqual([]);
 });
+
+// Android walk 2026-11-03 (W2-6): the summary listed exercises by movement
+// id, not in the order they were done.
+test('the summary lists exercises in the order they were logged', () => {
+  seedSession();                      // logs Goblet Squat first
+  const later = ['Walking Lunge', 'Push-up', 'Bodyweight Squat'].sort((a, b) => idOf(b) - idOf(a));
+  for (const name of later) logSet(name);
+  const facts = state().loadSessionSummaryFacts(7000);
+  expect(facts.exercises.map((exercise) => exercise.movementName)).toEqual(['Goblet Squat', ...later]);
+});
+
+// Android walk 2026-11-03 (W2-10): "1 of 1 sets" and "Bjj session".
+test('set counts and focus names read correctly', () => {
+  const { setsOfPlanned, sessionFocusName, skippedExerciseText } = require('../../src/state/sessionSummary');
+  expect(setsOfPlanned(1, 1)).toBe('1 of 1 set');
+  expect(setsOfPlanned(0, 3)).toBe('0 of 3 sets');
+  expect(skippedExerciseText({ name: 'Plank', plannedSets: 1, loggedSets: 1, loggedAs: [] }))
+    .toBe('Skipped: Plank · 1 of 1 set logged');
+  expect(sessionFocusName('bjj')).toBe('BJJ');
+  expect(sessionFocusName('lower')).toBe('Lower');
+  expect(sessionFocusName('full_body')).toBe('Full Body');
+  expect(sessionFocusName('')).toBe('Session');
+});

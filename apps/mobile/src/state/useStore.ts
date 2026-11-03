@@ -6267,6 +6267,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
     }>(d.executeSync(
       // Sol R4 F4: the slot identity is read so the planned-set denominator is
       // attributed per SLOT, never copied onto every movement a slot held.
+      // Walk 2 (W2-6): rows come in logging order, so the summary lists the
+      // exercises in the order they were done, not by movement id.
       `SELECT sr.movement_id, m.name AS movement_name, sr.reps, sr.load_kg,
               tm.value AS time_s, st.session_plan_slot_id, sps.planned_sets
          FROM set_record sr
@@ -6276,7 +6278,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
          LEFT JOIN session_plan_slot sps
               ON sps.session_plan_slot_id = st.session_plan_slot_id
         WHERE sr.session_id = ?
-        ORDER BY sr.movement_id, sr.set_index`,
+        ORDER BY sr.set_id`,
       [sessionId],
     ));
     const previousRows = rowsOf<{

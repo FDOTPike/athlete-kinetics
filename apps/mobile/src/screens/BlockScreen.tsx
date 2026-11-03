@@ -37,6 +37,7 @@ import { theme } from '../theme/theme';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { appliedAdjustmentLines, autopilotReasonCopy } from '../state/autopilotCopy';
 import { EMPTY_ACTIVITY_LEDGER } from '../state/activityStore';
+import { sessionFocusName } from '../state/sessionSummary';
 import {
   PrimaryButton,
   SecondaryButton,
@@ -106,10 +107,7 @@ const signed = (value: number): string => (value > 0 ? `+${value}` : String(valu
 
 const focusLabel = (focus: string): string => FOCUS_ABBREV[focus] ?? focus.slice(0, 3).toUpperCase();
 
-const focusName = (focus: string): string => focus
-  .split('_')
-  .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-  .join(' ');
+const focusName = (focus: string): string => sessionFocusName(focus);
 
 const phaseLabel = (phase: string): string => PHASE_LABEL[phase] ?? phase;
 

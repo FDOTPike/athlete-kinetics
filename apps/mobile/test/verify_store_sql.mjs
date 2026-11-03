@@ -1293,9 +1293,9 @@ if (resetTables.length >= 15) {
   // groupSummaryExercises to attribute planned_sets per SLOT.
   {
     const sqlStart = src.indexOf('`SELECT sr.movement_id, m.name AS movement_name, sr.reps, sr.load_kg,');
-    const sqlEnd = src.indexOf('ORDER BY sr.movement_id, sr.set_index`', sqlStart);
+    const sqlEnd = src.indexOf('ORDER BY sr.set_id`', sqlStart);
     const summarySql = sqlStart >= 0 && sqlEnd > sqlStart
-      ? src.slice(sqlStart + 1, sqlEnd + 'ORDER BY sr.movement_id, sr.set_index'.length)
+      ? src.slice(sqlStart + 1, sqlEnd + 'ORDER BY sr.set_id'.length)
       : '';
     check('F4: summary set SELECT located in useStore.ts', summarySql.length > 0);
     let summaryRows = [];

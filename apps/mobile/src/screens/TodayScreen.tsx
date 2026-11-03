@@ -55,6 +55,7 @@ import {
 import { classifyReadiness, HALT_META, HeldScreenWithHalt } from './ReadinessScreen';
 import { autopilotReasonCopy } from '../state/autopilotCopy';
 import { PrimaryButton, QuietAction, Disclosure, ListRow } from '../components/ui';
+import { sessionFocusName } from '../state/sessionSummary';
 
 export interface TodayScreenProps {
   /** Shell-supplied: go to the live session surface. */
@@ -63,8 +64,7 @@ export interface TodayScreenProps {
   onOpenPlan?: () => void;
 }
 
-const focusName = (focus: string): string =>
-  focus.length === 0 ? 'Session' : focus.charAt(0).toUpperCase() + focus.slice(1).toLowerCase();
+const focusName = (focus: string): string => sessionFocusName(focus);
 
 /** "Lower session · Fri 12 Sep" without pulling in a date library. */
 const shortDate = (iso: string): string => iso;

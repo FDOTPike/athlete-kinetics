@@ -5,7 +5,7 @@ import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING
 import { EXPERIENCE_SEVERITY, runnerTierForTrainingAge } from '../../../../packages/inference/src/sessionRunner';
 import { formatTeachingOnlyReason, freeFormStartIsEmpty, useStore, type LoadSelection, type LoggedSet, type SetLoadShown, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
 import { useNavigation, useSubViewBack } from '../navigation/navigation';
-import { buildSessionSummary, NO_NEXT_SESSION_TEXT, skippedExerciseText } from '../state/sessionSummary';
+import { buildSessionSummary, NO_NEXT_SESSION_TEXT, setsOfPlanned, skippedExerciseText } from '../state/sessionSummary';
 import { SUPPORT_HELD_MESSAGE, SUPPORT_UNAVAILABLE_MESSAGE } from '../state/healthSupportStore';
 import { theme } from '../theme/theme';
 import InfoTip from '../components/InfoTip';
@@ -1204,7 +1204,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                     </View>
                     <View style={styles.completeRow}>
                       <Text style={styles.completeRowName} numberOfLines={1}>{movement?.name ?? 'Movement'}</Text>
-                      <Text style={styles.completeRowMeta}>{logged} sets complete{metricSummary}{includesSuffix}</Text>
+                      <Text style={styles.completeRowMeta}>{logged} {logged === 1 ? 'set' : 'sets'} complete{metricSummary}{includesSuffix}</Text>
                       <CompletedMetrics sets={completedSets} bandLadder={bandLadder} movementsById={byId} onEdit={editSet} />
                     </View>
                   </View>
@@ -1217,10 +1217,10 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                 const asNames = loggedAsNames(slot);
                 const loggedSuffix = asNames.length > 0 ? ` as ${asNames.join(', ')}` : '';
                 const skippedMeta = logged > 0
-                  ? `Skipped · ${logged} of ${slot.plannedSets} sets logged${loggedSuffix}`
+                  ? `Skipped · ${setsOfPlanned(logged, slot.plannedSets)} logged${loggedSuffix}`
                   : 'Skipped · no sets logged';
                 const skippedLabel = logged > 0
-                  ? `${name}, skipped, ${logged} of ${slot.plannedSets} sets logged${loggedSuffix}`
+                  ? `${name}, skipped, ${setsOfPlanned(logged, slot.plannedSets)} logged${loggedSuffix}`
                   : `${name}, skipped, no sets logged`;
 
                 return (
