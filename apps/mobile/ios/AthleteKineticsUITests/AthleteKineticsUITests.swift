@@ -256,7 +256,7 @@ final class AthleteKineticsUITests: XCTestCase {
   /// active athlete (after onboarding, a switch or a restore); that offer
   /// covers the shell, so it is cancelled before navigating.
   private func dismissSetUpOfferIfShown(_ context: String) {
-    if element("Create program").exists && element("Cancel").exists {
+    if (try? element("Create program").snapshot()) != nil && (try? element("Cancel").snapshot()) != nil {
       element("Cancel").tap()
       log("program set-up offer: cancelled (\(context))")
     }
@@ -736,7 +736,7 @@ final class AthleteKineticsUITests: XCTestCase {
       // program that athlete is offered set-up, which covers the Profile.
       // Checked first: while the offer is up, its text is not a status
       // (CI evidence c5cf82c: "Box Squat — 3×10" was read as the status).
-      if element("Cancel").exists && element("Create program").exists {
+      if (try? element("Cancel").snapshot()) != nil && (try? element("Create program").snapshot()) != nil {
         log("restore t=\(Int(Date().timeIntervalSince(restoreStart)))s: set-up offered for the restored athlete; cancelled")
         element("Cancel").tap()
         openProfile()
@@ -859,7 +859,7 @@ final class AthleteKineticsUITests: XCTestCase {
   private func filesControl(_ names: [String]) -> XCUIElement {
     let named = NSPredicate(format: "label IN %@ OR identifier IN %@", names, names)
     let button = app.buttons.matching(named).firstMatch
-    return button.exists ? button : app.descendants(matching: .any).matching(named).firstMatch
+    return ((try? button.snapshot()) != nil) ? button : app.descendants(matching: .any).matching(named).firstMatch
   }
 
   /// The Files sheet's own navigation bar ("FullDocumentManagerViewController
@@ -888,33 +888,69 @@ final class AthleteKineticsUITests: XCTestCase {
     let named = NSPredicate(format: "label IN %@ OR identifier IN %@", names, names)
     let opened = Date()
     var found: XCUIElement?
+    var foundSnap: XCUIElementSnapshot?
     var inBar = false
+    var lastCandidate: XCUIElement?
+    var lastFromBar = false
     var lastFrame = CGRect.null
     var lastIdentity = ""
-    while Date().timeIntervalSince(opened) < 30 {
-      // The first hittable of: a button in the sheet's bar, any element in
-      // that bar, then the earlier lookup over the whole app.
+    func readCandidate(_ candidate: XCUIElement) -> (XCUIElementSnapshot, CGRect, String)? {
+      guard let snap = try? candidate.snapshot() else { return nil }
+      let f = snap.frame
+      guard snap.isEnabled, !f.isNull, !f.isEmpty, f.width > 1, f.height > 1 else { return nil }
+      return (snap, f, "\(snap.elementType.rawValue)|\(snap.identifier)|\(snap.label)")
+    }
+    func currentChoice() -> (XCUIElement, XCUIElementSnapshot, CGRect, String, Bool)? {
       let bar = filesSheetBar()
-      let choices: [(XCUIElement, Bool)] = [
-        (bar.buttons.matching(named).firstMatch, true),
-        (bar.descendants(matching: .any).matching(named).firstMatch, true),
-        (filesControl(names), false),
+      let barSources: [() -> XCUIElement] = [
+        { bar.buttons.matching(named).firstMatch },
+        { bar.descendants(matching: .any).matching(named).firstMatch },
       ]
-      if let choice = choices.first(where: { $0.0.exists && $0.0.isHittable }) {
-        let (candidate, fromBar) = choice
-        // Settled: the same element (type, identifier, label, lookup) at the
-        // same frame on two reads half a second apart, so the tap is not
-        // aimed at a sheet still sliding in.
-        let frame = candidate.frame
-        let identity = "\(candidate.elementType.rawValue)|\(candidate.identifier)|\(candidate.label)|\(fromBar)"
-        if frame == lastFrame && identity == lastIdentity { found = candidate; inBar = fromBar; break }
-        lastFrame = frame
-        lastIdentity = identity
+      for source in barSources {
+        let el = source()
+        if let (snap, f, id) = readCandidate(el) {
+          return (el, snap, f, id, true)
+        }
+      }
+      let appSources: [() -> XCUIElement] = [
+        { self.app.buttons.matching(named).firstMatch },
+        { self.app.descendants(matching: .any).matching(named).firstMatch },
+      ]
+      for source in appSources {
+        let el = source()
+        if let (snap, f, id) = readCandidate(el) {
+          return (el, snap, f, id, false)
+        }
+      }
+      return nil
+    }
+    while Date().timeIntervalSince(opened) < 30 {
+      // The first present and enabled of: a button in the sheet's bar, any
+      // element in that bar, then the whole-app lookup (evaluated lazily so a
+      // full-tree scan is skipped whenever the bar already holds Cancel).
+      if let (candidate, snap, frame, identity, fromBar) = currentChoice() {
+        // Settled: the same element (type, identifier, label) at the same
+        // frame on two reads half a second apart, so the tap is not aimed at
+        // a sheet still sliding in.
+        if frame == lastFrame && identity == lastIdentity {
+          found = candidate; foundSnap = snap; inBar = fromBar; break
+        }
+        lastCandidate = candidate; lastFromBar = fromBar
+        lastFrame = frame; lastIdentity = identity
       } else {
+        lastCandidate = nil
         lastFrame = .null
         lastIdentity = ""
       }
       usleep(500_000)
+    }
+    if found == nil, let candidate = lastCandidate, !lastFrame.isNull {
+      usleep(500_000)
+      if let (snap, frame, identity) = readCandidate(candidate),
+         frame == lastFrame, identity == lastIdentity {
+        log("files sheet cancel: settled on the read after the window")
+        found = candidate; foundSnap = snap; inBar = lastFromBar
+      }
     }
     guard let cancel = found else {
       log("files sheet without Cancel: \(filesSheetInventory())")
@@ -922,15 +958,19 @@ final class AthleteKineticsUITests: XCTestCase {
       return Date()
     }
     let shown = Date().timeIntervalSince(opened)
-    let barWasUp = filesSheetBar().exists
-    let f = cancel.frame
-    log("files sheet cancel: tapping \(cancel.elementType.rawValue):'\(cancel.label)'|'\(cancel.identifier)' at {{\(Int(f.minX)), \(Int(f.minY))}, {\(Int(f.width)), \(Int(f.height))}} found by \(inBar ? "the sheet's bar" : "the whole-app lookup") \(String(format: "%.1f", shown)) s after RESTORE")
+    let barWasUp = (try? filesSheetBar().snapshot()) != nil
+    let snap = foundSnap ?? (try? cancel.snapshot())
+    let f = snap?.frame ?? cancel.frame
+    let elType = snap?.elementType.rawValue ?? cancel.elementType.rawValue
+    let elLabel = snap?.label ?? cancel.label
+    let elId = snap?.identifier ?? cancel.identifier
+    log("files sheet cancel: tapping \(elType):'\(elLabel)'|'\(elId)' at {{\(Int(f.minX)), \(Int(f.minY))}, {\(Int(f.width)), \(Int(f.height))}} found by \(inBar ? "the sheet's bar" : "the whole-app lookup") \(String(format: "%.1f", shown)) s after RESTORE")
     cancel.tap()
     let tapped = Date()
     // Closed: the sheet's bar is gone, or, when no bar was found, the
     // tapped control (part of the sheet) is gone.
     let signal = barWasUp ? "its bar" : "the tapped control"
-    let stillOpen = { barWasUp ? self.filesSheetBar().exists : cancel.exists }
+    let stillOpen = { barWasUp ? ((try? self.filesSheetBar().snapshot()) != nil) : ((try? cancel.snapshot()) != nil) }
     let deadline = tapped.addingTimeInterval(30)
     while stillOpen() && Date() < deadline { usleep(250_000) }
     if stillOpen() {
