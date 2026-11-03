@@ -78,19 +78,25 @@ for test in "${TESTS[@]}"; do
   # test3 may accept that HealthKit never answered ONLY if the app's own trace
   # proves no answer arrived; an answer the UI did not show is a failure.
   if [ "$test" = test3_healthDenialAndAthleteSwitching ] && grep -q 'AKUI HEALTH-UNANSWERED' "$OUT/$test.log"; then
-    if grep -q '\[ak-health\] request settled' "$OUT/$test.system.log"; then
-      echo "::error title=ui $test::the app DID receive HealthKit's answer (trace: request settled) but the UI never showed it"
+    last_start_rev=$(sed -n 's/.*\[ak-health\] request start rev=\([0-9][0-9]*\).*/\1/p' "$OUT/$test.system.log" | tail -n 1)
+    start_count=$(grep -c '\[ak-health\] request start' "$OUT/$test.system.log" || true)
+    expected_starts=1
+    if [ "$start_count" = "2" ] && grep -q 'Authorization session timed out' "$OUT/$test.system.log"; then
+      expected_starts=2
+    fi
+    if [ -n "$last_start_rev" ] && grep -q "\[ak-health\] request settled rev=$last_start_rev" "$OUT/$test.system.log"; then
+      echo "::error title=ui $test::the app DID receive HealthKit's answer (trace: request settled rev=$last_start_rev) but the UI never showed it"
       code=1
       FAILED=1
-    elif [ "$(grep -c '\[ak-health\] request start' "$OUT/$test.system.log" || true)" != "1" ]; then
+    elif [ "$start_count" != "$expected_starts" ]; then
       # The test ends the unanswered request by relaunching. More than one
-      # "request start" would mean a relaunch, a new athlete or a switch asked
-      # again; none would mean the trace is missing.
-      echo "::error title=ui $test::an unanswered HealthKit request is accepted only when the app asked exactly once; its trace shows $(grep -c '\[ak-health\] request start' "$OUT/$test.system.log" || true) request start(s)"
+      # unanswered "request start" would mean a relaunch, a new athlete or a
+      # switch asked again; none would mean the trace is missing.
+      echo "::error title=ui $test::an unanswered HealthKit request is accepted only when the app asked once (or twice after a timed-out first session); its trace shows $start_count request start(s)"
       code=1
       FAILED=1
     else
-      echo "::warning title=ui $test HealthKit unanswered::healthd never answered the app on this simulator (no 'request settled' in the app trace). Real-sheet denial needs a physical-device check (owner). The app claimed nothing and kept the request pending."
+      echo "::warning title=ui $test HealthKit unanswered::healthd never answered the app on this simulator (no 'request settled' for rev=${last_start_rev:-none} in the app trace). Real-sheet denial needs a physical-device check (owner). The app claimed nothing and kept the request pending."
     fi
   fi
   # test3 may accept the app's "did not complete" wording ONLY if healthd's own

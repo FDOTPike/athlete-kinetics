@@ -26,6 +26,7 @@ const mockHealthKit = {
   requests: [],
   queries: [],
   fail: false,
+  failStatus: false,
   failSleep: false,
   failRestingHr: false,
 };
@@ -33,7 +34,7 @@ jest.mock('@kingstinct/react-native-healthkit', () => ({
   isHealthDataAvailable: () => mockHealthKit.available,
   getRequestStatusForAuthorization: async (request) => {
     mockHealthKit.requests.push(['status', request]);
-    if (mockHealthKit.fail) throw new Error('synthetic native failure');
+    if (mockHealthKit.fail || mockHealthKit.failStatus) throw new Error('synthetic native failure');
     return mockHealthKit.requestStatus;
   },
   requestAuthorization: async (request) => {
@@ -75,7 +76,7 @@ beforeEach(() => {
   originalOs = Platform.OS;
   Object.assign(mockHealthKit, {
     available: true, requestStatus: 1, requestResult: true, samples: [], restingHr: [], requests: [], queries: [],
-    fail: false, failSleep: false, failRestingHr: false,
+    fail: false, failStatus: false, failSleep: false, failRestingHr: false,
   });
 });
 afterEach(() => { Platform.OS = originalOs; });
@@ -316,9 +317,15 @@ describe('bridge contract', () => {
     const bridge = await tryCreateAppleHealthBridge();
     expect(bridge.provider).toBe('apple_health');
     expect(await bridge.hasGrantedPermissions()).toBe(false); // shouldRequest
+    // CI run 41488711463: healthd finished the transaction with true after
+    // resetting the bundle record, leaving requestStatus at shouldRequest (1).
+    expect(await bridge.requestPermissions()).toBe(false);
     mockHealthKit.requestStatus = 2; // unnecessary: already answered
     expect(await bridge.hasGrantedPermissions()).toBe(true);
     expect(await bridge.requestPermissions()).toBe(true);
+    mockHealthKit.failStatus = true; // getRequestStatusForAuthorization throws after requestAuthorization returns true
+    expect(await bridge.requestPermissions()).toBe(false);
+    mockHealthKit.failStatus = false;
     for (const [, request] of mockHealthKit.requests) {
       expect(request).toEqual({ toRead: ['HKCategoryTypeIdentifierSleepAnalysis', 'HKQuantityTypeIdentifierRestingHeartRate'] });
       expect(request.toShare).toBeUndefined();
