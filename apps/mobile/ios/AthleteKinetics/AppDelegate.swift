@@ -45,12 +45,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
           args[idx + 1] == "1" else { return }
     let fm = FileManager.default
     var removed = 0
+    var failures = 0
     for dir in [FileManager.SearchPathDirectory.documentDirectory, .libraryDirectory] {
       guard let root = fm.urls(for: dir, in: .userDomainMask).first else { continue }
       let items: [URL]
       do {
         items = try fm.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)
       } catch {
+        failures += 1
         NSLog("[ak-uitest] resetUITestStorageIfRequested failed to list %@ after %d item(s): %@", root.lastPathComponent, removed, String(describing: error))
         continue
       }
@@ -61,6 +63,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
           try fm.removeItem(at: item)
           removed += 1
         } catch {
+          failures += 1
           NSLog("[ak-uitest] resetUITestStorageIfRequested failed to remove %@ after %d item(s): %@", name, removed, String(describing: error))
           continue
         }
@@ -70,7 +73,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
       UserDefaults.standard.removePersistentDomain(forName: bundleId)
       UserDefaults.standard.synchronize()
     }
-    NSLog("[ak-uitest] resetUITestStorageIfRequested removed %d item(s)", removed)
+    NSLog("[ak-uitest] resetUITestStorageIfRequested removed %d item(s), %d failure(s)", removed, failures)
   }
   #endif
 }
