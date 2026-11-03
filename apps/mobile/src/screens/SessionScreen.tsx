@@ -1293,7 +1293,12 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                               repeatOnHold={true}
                               style={styles.sessionStepper}
                             />
-                            <Text style={styles.nextUp}>Applies to this session.</Text>
+                            {/* The target follows the last set's effort (restSecondsFor);
+                                say so, or the number reads as a setting that changed by
+                                itself (Android walk 2026-11-03, ux-8). */}
+                            <Text style={styles.nextUp}>
+                              Rest uses your effort rating, or the planned effort if you leave it blank. Harder sets get longer rests. Your changes apply for this session.
+                            </Text>
                           </>
                         )}
                         <PrimaryButton
