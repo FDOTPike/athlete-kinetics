@@ -6,7 +6,7 @@ import { isDifficultyAllowed as actualIsDifficultyAllowed } from '../../../../pa
 import { resolveMovementAvailability as actualResolveMovementAvailability } from '../../../../packages/inference/src/capabilityResolver';
 import { JOINTS as ACTUAL_JOINTS, PATTERN_JOINTS } from '../../../../packages/inference/src/substitution';
 import { EXPERIENCE_SEVERITY } from '../../../../packages/inference/src/types';
-import SessionScreen from '../../src/screens/SessionScreen';
+import SessionScreen, { clearUnloggedLoadDraftsForTests } from '../../src/screens/SessionScreen';
 import { RestTimerCard } from '../../src/components/ui/RestTimerCard';
 import { advance as advanceRunner, restSecondsFor as runnerRestSecondsFor } from '../../../../packages/inference/src/sessionRunner';
 
@@ -155,7 +155,7 @@ const state = (overrides = {}) => {
   return base;
 };
 
-beforeEach(() => { mockState = state(); });
+beforeEach(() => { mockState = state(); clearUnloggedLoadDraftsForTests(); });
 
 test('keeps all current-set values visible in a phone-width vertical stack', () => {
   render(<SessionScreen />);
@@ -2459,3 +2459,23 @@ describe('session-2: honest discomfort wording per tier and after-save outcomes'
   });
 });
 
+
+// Android walk 2026-11-03 (W2-13): a load typed but not logged was lost when
+// the athlete left the workout and came back.
+test('an unlogged load survives leaving the workout and coming back', () => {
+  const first = render(<SessionScreen />);
+  const seeded = screen.getByTestId('session-load-input').props.value;
+  const typed = seeded === '42.5' ? '47.5' : '42.5';
+  fireEvent.changeText(screen.getByTestId('session-load-input'), typed);
+  first.unmount();
+  render(<SessionScreen />);
+  expect(screen.getByTestId('session-load-input').props.value).toBe(typed);
+});
+
+test('without an edit, coming back shows the seeded load', () => {
+  const first = render(<SessionScreen />);
+  const seeded = screen.getByTestId('session-load-input').props.value;
+  first.unmount();
+  render(<SessionScreen />);
+  expect(screen.getByTestId('session-load-input').props.value).toBe(seeded);
+});

@@ -293,6 +293,15 @@ export interface SessionScreenProps {
  * completion screen shown after a session ends (its saved outcome, the
  * summary of what was done, and the optional record of how it went).
  */
+// Walk 2 (W2-13): a load typed but not yet logged was lost when the athlete
+// left the workout (the screen unmounts) and came back. Unlogged drafts are
+// kept here, in memory only, by session, slot, set and movement. They are
+// never logged evidence and never feed a suggestion.
+const unloggedLoadDrafts = new Map<string, string>();
+const loadDraftKey = (sessionId: number | undefined, slotId: number, logged: number, movementId: number | undefined): string =>
+  `${sessionId ?? 'none'}:${slotId}:${logged}:${movementId ?? 'none'}`;
+export const clearUnloggedLoadDraftsForTests = (): void => { unloggedLoadDrafts.clear(); };
+
 export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionScreenProps = {}): React.JSX.Element {
   const state = useStore((s) => s);
   const nav = typeof useNavigation === 'function' ? useNavigation() : undefined;
@@ -596,7 +605,8 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
         advisoryKind: seed.advisoryKind,
       },
     };
-    setLoadText(initial === null ? '' : initial.toFixed(1));
+    const draft = unloggedLoadDrafts.get(loadDraftKey(session?.sessionId, currentSlot.sessionPlanSlotId, currentLogged, currentMovement?.movement_id));
+    setLoadText(draft ?? (initial === null ? '' : initial.toFixed(1)));
     setLoadInvalid(false);
   }, [
     currentSlot?.sessionPlanSlotId,
@@ -606,6 +616,14 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
     target?.kind === 'reps' ? target.reps : target?.seconds,
     currentSlot?.overrideLoadKg,
   ]);
+
+  // The athlete's own edits of the load field, remembered until the set is logged.
+  const editLoadText = (text: string): void => {
+    setLoadText(text);
+    if (currentSlot !== null) {
+      unloggedLoadDrafts.set(loadDraftKey(session?.sessionId, currentSlot.sessionPlanSlotId, currentLogged, currentMovement?.movement_id), text);
+    }
+  };
 
   const moveLegacyForward = (): void => {
     if (currentSlot === null) return;
@@ -1389,7 +1407,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                                 onPress={() => {
                                   const current = parseLoadDraft(loadText);
                                   if (current === null) return;
-                                  setLoadText(clamp(current - 2.5, 0, 500).toFixed(1));
+                                  editLoadText(clamp(current - 2.5, 0, 500).toFixed(1));
                                   setLoadInvalid(false);
                                 }}
                                 disabled={!isLoadDraftLoggable(loadText)}
@@ -1410,7 +1428,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                                 style={styles.loadInput}
                                 value={loadText}
                                 onChangeText={(t) => {
-                                  setLoadText(t);
+                                  editLoadText(t);
                                   const parsed = parseLoadDraft(t);
                                   setLoadInvalid(t.trim() !== '' && (parsed === null || !isOnLoadGrid(parsed)));
                                 }}
@@ -1429,7 +1447,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                                 onPress={() => {
                                   const current = parseLoadDraft(loadText);
                                   if (current === null) return;
-                                  setLoadText(clamp(current + 2.5, 0, 500).toFixed(1));
+                                  editLoadText(clamp(current + 2.5, 0, 500).toFixed(1));
                                   setLoadInvalid(false);
                                 }}
                                 disabled={!isLoadDraftLoggable(loadText)}
