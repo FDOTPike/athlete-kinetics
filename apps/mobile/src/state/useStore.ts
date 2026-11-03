@@ -100,6 +100,7 @@ import {
   generateBlock,
   groupRoutineTemplateDays,
   accessContextForBlockFocus,
+  movementFitsFocusDay,
   historyContentFingerprint,
   parseHistoryImport,
   defaultProgramDayIndices,
@@ -4402,6 +4403,11 @@ export const useStore = create<KineticsStore>()((set, get) => {
         : capabilityAvailableWeightRoom;
       if (movement === undefined || movement.pattern !== preference.pattern) {
         throw new Error('A preferred movement does not match that slot.');
+      }
+      // Review (PR 194): a choice the generator would drop from this day is
+      // refused here rather than replaced silently in the generated week.
+      if (day !== undefined && !movementFitsFocusDay(movement, day.focus as BlockFocus)) {
+        throw new Error('A preferred movement does not belong on that day.');
       }
       if (!permittedForProfile(movement, profile, accessContext) || !capabilityAvailable.has(movement.movement_id)) {
         throw new Error('A preferred movement is teaching-only for this athlete.');

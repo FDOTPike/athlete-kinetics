@@ -377,6 +377,9 @@ const STRENGTH_FOCI: ReadonlySet<BlockFocus> = new Set(['lower', 'upper', 'full'
 const GRAPPLING_ROUND_NAMES: ReadonlySet<string> = new Set(['BJJ Sparring Round']);
 const fitsFocusDay = (movement: { name: string }, focus: BlockFocus): boolean =>
   focus === 'bjj' || !GRAPPLING_ROUND_NAMES.has(movement.name);
+/** The same day rule, for the program builder: a choice it offers or accepts
+ *  must be one the generator will place on that day (review, PR 194). */
+export const movementFitsFocusDay = fitsFocusDay;
 
 // Weekly splits, indexed by weekly_frequency - 1. Hybrid alternates lifting
 // and sport days; at frequency 1 the sport IS the week (concurrent training

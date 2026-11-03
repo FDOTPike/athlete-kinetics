@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   accessContextForBlockFocus,
+  movementFitsFocusDay,
   ANCHOR_MOVEMENT_NAMES,
   NO_EMPHASIS_EXPLANATION,
   objectiveStyleLabel,
@@ -670,8 +671,11 @@ export default function ProgramSetupScreen({
                 const selectedId = preferences.find((item) =>
                   item.dayIndex === session.day_index && item.slotIndex === slot.slot_index)?.movementId ?? slot.movement_id;
                 const accessContext = accessContextForBlockFocus(session.focus as BlockFocus);
+                // Only choices the generator will place on this day (a sparring
+                // round belongs on a BJJ day only).
                 const choices = movements.filter((item) => item.pattern === movement.pattern
-                  && availableIdsByContext[accessContext].has(item.movement_id));
+                  && availableIdsByContext[accessContext].has(item.movement_id)
+                  && movementFitsFocusDay(item, session.focus as BlockFocus));
                 return (
                   <View key={slot.slot_index} style={styles.slot}>
                     <Text style={styles.slotTitle}>{movement.pattern.replace('_', ' ')}</Text>

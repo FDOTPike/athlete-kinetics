@@ -123,6 +123,7 @@ export {
   type NormalizedProgramHorizon,
   type ProgramReviewHorizon,
   accessContextForBlockFocus,
+  movementFitsFocusDay,
   availableMovements,
   BLOCK_WEEKS,
   generateBlock,
