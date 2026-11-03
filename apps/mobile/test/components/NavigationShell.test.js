@@ -20,8 +20,8 @@
  *    cold-start root.
  */
 import React from 'react';
-import { Keyboard, KeyboardAvoidingView, Platform } from 'react-native';
-import { render, screen, fireEvent, act } from '@testing-library/react-native';
+import { Keyboard, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
+import { render, screen, fireEvent, act, within } from '@testing-library/react-native';
 import { NavigationProvider, useNavigation } from '../../src/navigation/navigation';
 import AppShellTestHarness from '../../src/AppShellTestHarness';
 
@@ -162,6 +162,73 @@ describe('exactly Today, Plan and Progress are the primary destinations', () => 
     } finally {
       spy.mockRestore();
     }
+  });
+
+  // Android walk 2026-11-03 (a11y-5): at system font size 2.0 "WORKOUT"
+  // wrapped to "WORKOU / T" and "PROGRESS" ran off the screen edge.
+  // The fix keeps the athlete's text size: no shrink-to-fit, no line limit,
+  // no font cap. The letter spacing that made the labels too wide is gone,
+  // and a label that still does not fit wraps, centred.
+  test('header and tab labels keep full font scaling and carry no letter spacing', () => {
+    render(<AppShellTestHarness />);
+    const labels = [
+      ...['readiness', 'session', 'library', 'athlete'].map((key) => screen.getByTestId(`header-${key}`)),
+      ...['today', 'coach', 'progress'].map((key) => screen.getByTestId(`tab-${key}`)),
+    ].map((button) => within(button).getByText(/^[A-Z]+$/));
+    expect(labels).toHaveLength(7);
+    for (const label of labels) {
+      const style = StyleSheet.flatten(label.props.style);
+      expect(style.letterSpacing ?? 0).toBe(0);
+      expect(style.textAlign).toBe('center');
+      expect(label.props.allowFontScaling).not.toBe(false);
+      expect(label.props.maxFontSizeMultiplier).toBeUndefined();
+      expect(label.props.adjustsFontSizeToFit).toBeUndefined();
+      expect(label.props.numberOfLines).toBeUndefined();
+    }
+  });
+
+  // The label props above are not enough on their own: the clipping can come
+  // from the layout around a label. Jest does not lay text out, so the real
+  // 2.0 check is on device (the iOS Dynamic Type UI test and Android walk W6).
+  // What a render can check is that nothing between each label and its bar
+  // can cut a larger or wrapped label: no fixed or maximum height or width,
+  // no hidden overflow, and every control takes an equal, growable share of
+  // its bar, so no label is pushed past the screen edge by a wider neighbour.
+  test('nothing between a nav label and its bar can clip a larger or wrapped label', () => {
+    render(<AppShellTestHarness />);
+    const bars = [
+      [screen.getByTestId('shell-top-header'), ['readiness', 'session', 'library', 'athlete'].map((key) => `header-${key}`)],
+      [screen.getByTestId('shell-primary-tabs'), ['today', 'coach', 'progress'].map((key) => `tab-${key}`)],
+    ];
+    let checked = 0;
+    for (const [bar, ids] of bars) {
+      expect(StyleSheet.flatten(bar.props.style).flexDirection).toBe('row');
+      for (const id of ids) {
+        const control = screen.getByTestId(id);
+        const controlStyle = StyleSheet.flatten(control.props.style);
+        expect(controlStyle.flex).toBe(1);
+        expect(controlStyle.height).toBeUndefined();
+        expect(controlStyle.width).toBeUndefined();
+        const label = within(control).getByText(/^[A-Z]+$/);
+        let reachedBar = false;
+        for (let node = label; node; node = node.parent) {
+          if (typeof node.type === 'string') {
+            const style = StyleSheet.flatten(node.props.style) ?? {};
+            expect(style.overflow).not.toBe('hidden');
+            expect(style.maxHeight).toBeUndefined();
+            expect(style.maxWidth).toBeUndefined();
+            if (node !== label && node !== bar) {
+              expect(style.height).toBeUndefined();
+              expect(style.width).toBeUndefined();
+            }
+            checked += 1;
+          }
+          if (node === bar) { reachedBar = true; break; }
+        }
+        expect(reachedBar).toBe(true);
+      }
+    }
+    expect(checked).toBeGreaterThanOrEqual(14);
   });
 
   test('the primary bar renders TODAY, PLAN, PROGRESS and nothing else', () => {
