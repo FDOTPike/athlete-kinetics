@@ -126,6 +126,20 @@ describe('OnboardingScreen review effort ceiling', () => {
 // Android walk 2026-11-03 (ux-5): HOME BASIC claimed a pull-up bar its
 // description did not mention. A preset's description names every item in it.
 describe('OnboardingScreen HOME BASIC says what it adds', () => {
+  // Whole words only: "mats" must not be found inside "formats".
+  const namesWord = (text, word) => {
+    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(^|[^a-z])${escaped}([^a-z]|$)`).test(text);
+  };
+
+  test('equipment names match as whole words', () => {
+    expect(namesWord('bands and mats only', 'mats')).toBe(true);
+    expect(namesWord('several formats', 'mats')).toBe(false);
+    expect(namesWord('a pull-up bar.', 'pull-up bar')).toBe(true);
+    expect(namesWord('cable-free', 'cable')).toBe(true);
+    expect(namesWord('cables', 'cable')).toBe(false);
+  });
+
   test('the HOME BASIC description names exactly the items of the preset', () => {
     const { EQUIPMENT_PRESETS, EQUIPMENT_ITEMS } = require('@ak/inference');
     // How each item reads in a preset description. Every equipment item has
@@ -142,7 +156,7 @@ describe('OnboardingScreen HOME BASIC says what it adds', () => {
     // Both directions: every preset item is named, and nothing outside the
     // preset is named.
     for (const item of EQUIPMENT_ITEMS) {
-      expect([item, description.includes(SPOKEN[item])])
+      expect([item, namesWord(description, SPOKEN[item])])
         .toEqual([item, EQUIPMENT_PRESETS.home_basic.includes(item)]);
     }
   });
