@@ -347,9 +347,10 @@ final class AthleteKineticsUITests: XCTestCase {
   /// qualifies: the Health Access box is a system alert, and an alert the app
   /// itself raises (an error, say) is never dismissed here, so it still shows
   /// up in the checks that follow. OK is tapped at the centre read from a
-  /// snapshot (an alert that vanishes meanwhile is skipped, not a failure), and
-  /// the tap is recorded with where the alert was and its title. This only
-  /// dismisses: every check after it is unchanged.
+  /// snapshot, translated by `targetFrame.height - remoteContainer.height` when
+  /// the hosted `HealthPrivacyService` remote scene reports unshifted local
+  /// coordinates (`remoteContainer.minY == 0` inside a shorter modal card sheet),
+  /// and verified after 1 s and again 2 s later.
   @discardableResult
   private func dismissHealthAccessAlertIfShown(_ context: String, timeout: TimeInterval = 3) -> Bool {
     let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
@@ -390,40 +391,40 @@ final class AthleteKineticsUITests: XCTestCase {
         }
         var measuredOffset: CGFloat = 0
         var offsetSource = "none"
-        if found.place == "the app" {
+        var remoteContainerMinY = -1
+        var remoteContainerHeight = -1
+        if found.place == "the app", !alertFrame.isNull, alertFrame.midY < targetFrame.midY {
           if let root = targetSnap, let ancestors = findAlertAncestors(root) {
             for node in ancestors.reversed() where node.elementType != .alert {
               let nf = node.frame
-              if nf.minY > 0 && nf.minY < targetFrame.midY && abs(nf.width - targetFrame.width) <= 2 {
-                measuredOffset = nf.minY
-                offsetSource = "sheetContainer.minY"
-                break
-              }
               if nf.minY == 0 && nf.height > targetFrame.midY && nf.height < targetFrame.height - 1 && abs(nf.width - targetFrame.width) <= 2 {
                 measuredOffset = targetFrame.height - nf.height
                 offsetSource = "targetHeight-remoteHeight"
+                remoteContainerMinY = Int(nf.minY.rounded())
+                remoteContainerHeight = Int(nf.height.rounded())
                 break
               }
             }
           }
-          if measuredOffset == 0 && !alertFrame.isNull && alertFrame.midY < targetFrame.midY {
-            measuredOffset = targetFrame.midY - alertFrame.midY
-            offsetSource = "targetMidY-alertMidY"
-          }
         }
         let rootOrigin = found.target.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
         let initialOffsetY = found.frame.midY + measuredOffset
+        var tapY = initialOffsetY
         var tapPath = measuredOffset > 0 ? "\(offsetSource)(+\(Int(measuredOffset.rounded()))pt)" : "direct"
         rootOrigin.withOffset(CGVector(dx: found.frame.midX, dy: initialOffsetY)).tap()
         sleep(1)
         var stillShown = (try? found.ok.snapshot()) != nil
         if stillShown && measuredOffset > 0 {
           rootOrigin.withOffset(CGVector(dx: found.frame.midX, dy: found.frame.midY)).tap()
+          tapY = found.frame.midY
           sleep(1)
           stillShown = (try? found.ok.snapshot()) != nil
-          if !stillShown { tapPath = "unshifted-after-\(offsetSource)" }
+          tapPath = stillShown ? "\(tapPath),unshifted-retry" : "unshifted-after-\(offsetSource)"
         }
-        log("HEALTH-ALERT-OK tapped OK on a system \(kind) in \(found.place) (\(context)); title: \(title.prefix(120)); tapPath=\(tapPath) okFrame=(\(Int(found.frame.midX)),\(Int(found.frame.midY))) alertMidY=\(alertFrame.isNull ? -1 : Int(alertFrame.midY)); still shown after 1 s: \(stillShown ? "yes" : "no")")
+        sleep(2)
+        let stillShownAfter3s = (try? found.ok.snapshot()) != nil
+        log("HEALTH-ALERT-OK tapped OK on a system \(kind) in \(found.place) (\(context)); title: \(title.prefix(120)); tapPath=\(tapPath) okFrame=(\(Int(found.frame.midX)),\(Int(found.frame.midY))) tapY=\(Int(tapY.rounded())) remoteContainer=(minY:\(remoteContainerMinY),h:\(remoteContainerHeight)) alertMidY=\(alertFrame.isNull ? -1 : Int(alertFrame.midY)); still shown after 1 s: \(stillShown ? "yes" : "no"); still shown 2 s later: \(stillShownAfter3s ? "yes" : "no")")
+        XCTAssertFalse(stillShownAfter3s, "the Health Access alert stayed open after the OK tap")
         return true
       }
       usleep(250_000)

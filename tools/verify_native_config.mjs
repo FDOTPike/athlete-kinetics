@@ -265,6 +265,9 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
       && /if now\.hasPrefix\("Apple Health access requested"\) \{ answered = denialTapped; break \}/.test(suite)
       && /\} else if denialTapSkipped \{\s+XCTFail\("the Health denial tap was skipped and no later attempt completed the denial"\)\s+\} else if healthHint\.exists/.test(suite));
   const denial = suite.slice(suite.indexOf('if var dontAllow = findHealthSheetButton'), suite.indexOf('// Every change of the wording'));
+  const lookup = suite
+    .slice(suite.indexOf('private func findHealthSheetButton('), suite.indexOf('/// A system alert with an OK button'))
+    .replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
   check('Health denial waits within the original sheet deadline, scrolls its own table and taps the element with one re-resolution',
     denial.includes('let deadline = started.addingTimeInterval(150)')
       && denial.includes('while Date() < deadline')
@@ -276,8 +279,8 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
       && denial.includes('springboard.tables.containing(named).firstMatch')
       && /if table\.exists && table\.isHittable \{\s+table\.swipeUp\(velocity: \.slow\)\s+scrolls \+= 1/.test(denial)
       && !/coordinate\(|snapshot\(/.test(denial)
-      && suite.includes('(try? inApp.snapshot()) != nil || (try? app.staticTexts.matching(named).firstMatch.snapshot()) != nil')
-      && suite.includes('(try? inSpringboard.snapshot()) != nil || (try? springboard.staticTexts.matching(named).firstMatch.snapshot()) != nil'));
+      && lookup.includes('(try? inApp.snapshot()) != nil || (try? app.staticTexts.matching(named).firstMatch.snapshot()) != nil')
+      && lookup.includes('(try? inSpringboard.snapshot()) != nil || (try? springboard.staticTexts.matching(named).firstMatch.snapshot()) != nil'));
   const reveal = suite.slice(suite.indexOf('private func reveal('), suite.indexOf('private func tap('));
   check('general reveal keeps the passing master app gestures without extra ScrollView queries',
     reveal.includes('app.swipeUp(velocity: .slow)') && reveal.includes('app.swipeDown(velocity: .slow)')
