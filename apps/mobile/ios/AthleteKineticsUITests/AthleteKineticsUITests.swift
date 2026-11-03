@@ -878,10 +878,11 @@ final class AthleteKineticsUITests: XCTestCase {
   /// at the instant RESTORE had been tapped (a Button of that name if one
   /// existed then, otherwise any element of the app carrying the name) and
   /// tapped as soon as it existed. It is now taken from the sheet's bar when
-  /// the bar holds a hittable one (otherwise as before), tapped only once it
-  /// is hittable and has stopped moving, recorded with its type, identifier
-  /// and frame, and the sheet must then close: its bar must go, or, when no
-  /// bar was found, the tapped control must go. Nothing is tapped twice.
+  /// the bar holds a hittable one, then from the whole-app lookup when
+  /// hittable, before falling back to an enabled non-hittable one; tapped only
+  /// once it has stopped moving within 30 s, recorded with its type,
+  /// identifier and frame, and the sheet must then close: its bar must go, or,
+  /// when no bar was found, the tapped control must go. Nothing is tapped twice.
   @discardableResult
   private func cancelFilesSheet(file: StaticString = #filePath, line: UInt = #line) -> Date {
     let names = ["Cancel", "Close"]
@@ -890,67 +891,54 @@ final class AthleteKineticsUITests: XCTestCase {
     var found: XCUIElement?
     var foundSnap: XCUIElementSnapshot?
     var inBar = false
-    var lastCandidate: XCUIElement?
-    var lastFromBar = false
     var lastFrame = CGRect.null
     var lastIdentity = ""
-    func readCandidate(_ candidate: XCUIElement) -> (XCUIElementSnapshot, CGRect, String)? {
+    func readCandidate(_ candidate: XCUIElement, fromBar: Bool) -> (XCUIElementSnapshot, CGRect, String, Bool)? {
       guard let snap = try? candidate.snapshot() else { return nil }
       let f = snap.frame
       guard snap.isEnabled, !f.isNull, !f.isEmpty, f.width > 1, f.height > 1 else { return nil }
-      return (snap, f, "\(snap.elementType.rawValue)|\(snap.identifier)|\(snap.label)")
+      return (snap, f, "\(snap.elementType.rawValue)|\(snap.identifier)|\(snap.label)|\(fromBar)", candidate.isHittable)
     }
     func currentChoice() -> (XCUIElement, XCUIElementSnapshot, CGRect, String, Bool)? {
       let bar = filesSheetBar()
-      let barSources: [() -> XCUIElement] = [
-        { bar.buttons.matching(named).firstMatch },
-        { bar.descendants(matching: .any).matching(named).firstMatch },
+      let sources: [(() -> XCUIElement, Bool)] = [
+        ({ bar.buttons.matching(named).firstMatch }, true),
+        ({ bar.descendants(matching: .any).matching(named).firstMatch }, true),
+        ({ self.app.buttons.matching(named).firstMatch }, false),
+        ({ self.app.descendants(matching: .any).matching(named).firstMatch }, false),
       ]
-      for source in barSources {
+      var fallback: (XCUIElement, XCUIElementSnapshot, CGRect, String, Bool)?
+      for (source, fromBar) in sources {
         let el = source()
-        if let (snap, f, id) = readCandidate(el) {
-          return (el, snap, f, id, true)
+        if let (snap, f, id, hittable) = readCandidate(el, fromBar: fromBar) {
+          if hittable {
+            return (el, snap, f, id, fromBar)
+          }
+          if fallback == nil {
+            fallback = (el, snap, f, id, fromBar)
+          }
         }
       }
-      let appSources: [() -> XCUIElement] = [
-        { self.app.buttons.matching(named).firstMatch },
-        { self.app.descendants(matching: .any).matching(named).firstMatch },
-      ]
-      for source in appSources {
-        let el = source()
-        if let (snap, f, id) = readCandidate(el) {
-          return (el, snap, f, id, false)
-        }
-      }
-      return nil
+      return fallback
     }
     while Date().timeIntervalSince(opened) < 30 {
-      // The first present and enabled of: a button in the sheet's bar, any
-      // element in that bar, then the whole-app lookup (evaluated lazily so a
-      // full-tree scan is skipped whenever the bar already holds Cancel).
+      // Prefer the first enabled, hittable candidate in the sheet's bar, then
+      // the whole-app lookup (evaluated lazily so a full-tree scan is skipped
+      // whenever the bar already holds a hittable Cancel), before falling back
+      // to an enabled non-hittable candidate.
       if let (candidate, snap, frame, identity, fromBar) = currentChoice() {
-        // Settled: the same element (type, identifier, label) at the same
-        // frame on two reads half a second apart, so the tap is not aimed at
-        // a sheet still sliding in.
+        // Settled: the same element (type, identifier, label, lookup) at the
+        // same frame on two reads half a second apart, so the tap is not aimed
+        // at a sheet still sliding in.
         if frame == lastFrame && identity == lastIdentity {
           found = candidate; foundSnap = snap; inBar = fromBar; break
         }
-        lastCandidate = candidate; lastFromBar = fromBar
         lastFrame = frame; lastIdentity = identity
       } else {
-        lastCandidate = nil
         lastFrame = .null
         lastIdentity = ""
       }
       usleep(500_000)
-    }
-    if found == nil, let candidate = lastCandidate, !lastFrame.isNull {
-      usleep(500_000)
-      if let (snap, frame, identity) = readCandidate(candidate),
-         frame == lastFrame, identity == lastIdentity {
-        log("files sheet cancel: settled on the read after the window")
-        found = candidate; foundSnap = snap; inBar = lastFromBar
-      }
     }
     guard let cancel = found else {
       log("files sheet without Cancel: \(filesSheetInventory())")
