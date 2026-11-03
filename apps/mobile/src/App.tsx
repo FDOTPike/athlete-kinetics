@@ -35,6 +35,7 @@ import { authorizeAthleteDataBoot } from './state/dataMaintenanceLock';
 import { startDeviceBackupExclusion } from './state/deviceBackupPolicy';
 import { nativeSmokeRequested, runNativeSmoke } from './diagnostics/nativeSmoke';
 import { QuietAction } from './components/ui';
+import { shellKeyboardAvoidance, useKeyboardShown } from './components/KeyboardAwareScrollView';
 
 /**
  * W4: exactly THREE primary destinations. PLAN is the coach/program-management
@@ -109,6 +110,8 @@ export default function App(): React.JSX.Element {
 }
 
 export function AppShell(): React.JSX.Element {
+  const keyboardShown = useKeyboardShown();
+  const keyboardAvoidance = shellKeyboardAvoidance(Platform.OS, keyboardShown);
   const programSetupPending = useStore((s) =>
     s.status === 'ready' && s.onboarded && s.block === null && s.program === null);
   // "No block and no program" is NOT only a first-run state: archiving a
@@ -273,7 +276,8 @@ export function AppShell(): React.JSX.Element {
       )}
       <KeyboardAvoidingView
         style={styles.body}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={keyboardAvoidance.behavior}
+        enabled={keyboardAvoidance.enabled}
         testID="shell-body"
       >
         {showOnboarding ? (

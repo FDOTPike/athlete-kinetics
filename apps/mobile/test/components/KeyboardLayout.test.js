@@ -70,3 +70,61 @@ describe('KeyboardAwareScrollView contract', () => {
       .toHaveBeenCalledWith(42, 128, true);
   });
 });
+
+// Android walk 2026-11-03 (fn-1): with behavior 'height' the shell resized
+// itself against its own keyboard measurement and the onboarding footer
+// jumped between two heights after the keyboard closed. Both platforms now use
+// 'padding'; on Android the shell is enabled only while the keyboard is shown,
+// because the did-hide event still reports an overlap.
+describe('app shell keyboard avoidance', () => {
+  const { Keyboard } = require('react-native');
+  const { act } = require('@testing-library/react-native');
+  const {
+    shellKeyboardAvoidance,
+    useKeyboardShown,
+  } = require('../../src/components/KeyboardAwareScrollView');
+
+  test('never uses height, which made the shell resize against itself', () => {
+    for (const os of ['ios', 'android']) {
+      for (const shown of [true, false]) {
+        expect(shellKeyboardAvoidance(os, shown).behavior).toBe('padding');
+      }
+    }
+  });
+
+  test('Android adds padding only while the keyboard is shown', () => {
+    expect(shellKeyboardAvoidance('android', true).enabled).toBe(true);
+    expect(shellKeyboardAvoidance('android', false).enabled).toBe(false);
+  });
+
+  test('iOS keeps the shell enabled at all times, as before', () => {
+    expect(shellKeyboardAvoidance('ios', true).enabled).toBe(true);
+    expect(shellKeyboardAvoidance('ios', false).enabled).toBe(true);
+  });
+
+  test('useKeyboardShown follows did-show and did-hide and unsubscribes on unmount', () => {
+    const handlers = {};
+    const removers = [];
+    const spy = jest.spyOn(Keyboard, 'addListener').mockImplementation((event, handler) => {
+      handlers[event] = handler;
+      const remove = jest.fn();
+      removers.push(remove);
+      return { remove };
+    });
+    let shown = null;
+    function Probe() {
+      shown = useKeyboardShown();
+      return null;
+    }
+    const view = render(<Probe />);
+    expect(shown).toBe(false);
+    act(() => handlers.keyboardDidShow());
+    expect(shown).toBe(true);
+    act(() => handlers.keyboardDidHide());
+    expect(shown).toBe(false);
+    view.unmount();
+    expect(removers).toHaveLength(2);
+    for (const remove of removers) expect(remove).toHaveBeenCalledTimes(1);
+    spy.mockRestore();
+  });
+});
