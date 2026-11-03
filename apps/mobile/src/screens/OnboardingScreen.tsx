@@ -231,6 +231,10 @@ function ReviewSection({ heading, description, onEdit, children }: ReviewSection
 // ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
+// Walk 1 (W1-12): "1 limitation notes" read wrong.
+export const limitationNotesLine = (count: number): string =>
+  `${count} limitation ${count === 1 ? 'note' : 'notes'} recorded for your reference.`;
+
 export default function OnboardingScreen(): React.JSX.Element {
   const completeOnboarding = useStore((s) => s.completeOnboarding);
   const beginOnboardingDraft = useStore((s) => s.beginOnboardingDraft);
@@ -789,7 +793,7 @@ export default function OnboardingScreen(): React.JSX.Element {
               <ReviewSection
                 heading="TRAINING SUPPORT"
                 description={(parseNotes(injuryText).length + parseNotes(mobilityText).length) > 0
-                  ? `${parseNotes(injuryText).length + parseNotes(mobilityText).length} limitation notes recorded for your reference.`
+                  ? limitationNotesLine(parseNotes(injuryText).length + parseNotes(mobilityText).length)
                   : 'No limitations noted. You can add or change these later.'}
                 onEdit={() => editFromReview('limits')}
               >

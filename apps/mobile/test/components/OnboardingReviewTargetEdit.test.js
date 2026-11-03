@@ -209,6 +209,33 @@ describe('OnboardingScreen EDIT from review returns to the review', () => {
   });
 });
 
+// Walk 1 copy findings (W1-9, W1-12, W1-15).
+describe('Onboarding wording found on the Android walk', () => {
+  test('one limitation note is singular', () => {
+    const { limitationNotesLine } = require('../../src/screens/OnboardingScreen');
+    expect(limitationNotesLine(1)).toBe('1 limitation note recorded for your reference.');
+    expect(limitationNotesLine(2)).toBe('2 limitation notes recorded for your reference.');
+  });
+
+  test('the sport length error gives the range and points at no missing "Not sure" choice', () => {
+    const { validateSportProfile: validateSportDraft, SPORT_SESSION_MINUTES_MAX } = require('@ak/inference');
+    expect(typeof validateSportDraft).toBe('function');
+    const result = validateSportDraft({
+      sportId: 'muay_thai', otherSportName: null, outcomeId: 'general_support', experienceId: 'new',
+      practiceSessionsPerWeek: null, matchesPerWeek: null, typicalSessionMinutes: 0, competitionDate: null,
+    }, '2026-11-03');
+    const message = (result.errors ?? []).find((error) => error.field === 'typicalSessionMinutes')?.message;
+    expect(message).toBe(`Enter the usual length in minutes (1 to ${SPORT_SESSION_MINUTES_MAX}), or leave it empty.`);
+  });
+
+  test('no outcome offered to a Muay Thai athlete talks about a game', () => {
+    const { SPORT_OUTCOMES_BY_SPORT, SPORT_OUTCOME_LABEL } = require('@ak/inference');
+    for (const outcome of SPORT_OUTCOMES_BY_SPORT.muay_thai) {
+      expect([outcome, /\bgame\b/i.test(SPORT_OUTCOME_LABEL[outcome])]).toEqual([outcome, false]);
+    }
+  });
+});
+
 describe('OnboardingScreen long option chips wrap instead of cutting their sentence', () => {
   test('focus bundles and the sport and target choices show their whole label', () => {
     const { Text } = require('react-native');

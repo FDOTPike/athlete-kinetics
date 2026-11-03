@@ -387,8 +387,10 @@ export default function ProgramSetupScreen({
     <KeyboardAwareScrollView style={styles.scroll} contentContainerStyle={styles.content}>
       <Text style={styles.eyebrow}>{editing ? 'MANAGE PROGRAM' : 'BUILD YOUR PROGRAM'}</Text>
       <Text style={styles.title}>{styleLabel}</Text>
+      {/* Walk 1 (W1-15): the title already names the goal in the athlete's
+          words; the internal code ("hypertrophy", "gpp") is not shown. */}
       <Text style={styles.body}>
-        Goal: {profile.objective.replace('_', ' ')} — {styleLabel}. Four-week blocks stay intact. You choose when to review the goal.
+        Four-week blocks stay intact. You choose when to review the goal.
       </Text>
 
       {/* W2: the recommendation, stated before anything is asked. Every value

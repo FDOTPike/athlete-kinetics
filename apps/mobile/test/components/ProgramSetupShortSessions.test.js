@@ -101,6 +101,16 @@ describe('ProgramSetupScreen: a session that does not fit offers choices', () =>
     expect(createDisabled()).toBe(true);
   });
 
+  // Walk 1 (W1-15): the header showed internal goal codes ("Goal: hypertrophy",
+  // "gpp", "hybrid"). The title names the goal in the athlete's words.
+  test.each(['hypertrophy', 'gpp', 'hybrid', 'weight_loss'])('the %s header shows no internal goal code', (objective) => {
+    act(() => { useStore.getState().saveProfile({ objective, session_duration_cap_min: 90 }); });
+    render(<ProgramSetupScreen />);
+    expect(screen.queryByText(new RegExp(`Goal: ${objective.replace('_', ' ')}`))).toBeNull();
+    expect(screen.queryByText(/^Goal: /)).toBeNull();
+    expect(screen.getByText(/Four-week blocks stay intact/)).toBeOnTheScreen();
+  });
+
   test('a fewer-days offer, when made, takes that many days and fits', () => {
     act(() => { useStore.getState().saveProfile({ weekly_frequency: 7 }); });
     render(<ProgramSetupScreen />);
