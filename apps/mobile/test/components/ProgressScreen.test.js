@@ -8,7 +8,7 @@
  *    its year, so an old session cannot masquerade as recent.
  */
 import React from 'react';
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 import ProgressScreen from '../../src/screens/ProgressScreen';
 
 let mockState;
@@ -65,5 +65,51 @@ describe('Progress truth (D5)', () => {
     render(<ProgressScreen />);
     expect(screen.getByText('Plan followed')).toBeOnTheScreen();
     expect(screen.getByText(/2025/)).toBeOnTheScreen();
+  });
+});
+
+// Android walk 2026-11-03 (W2-9): a recent session was a label and a date that
+// could not be opened, and two sessions on one day looked identical.
+describe('Recent sessions open to what was logged', () => {
+  const at = (iso) => new SpyDate(iso).getTime();
+  const facts = (sessionId) => ({
+    durationMin: 31,
+    exercises: [{ movementId: 1, movementName: sessionId === 11 ? 'Goblet Squat' : 'Push-up', plannedSets: 3, sets: [
+      { reps: 10, loadKg: 16, timeS: null }, { reps: 10, loadKg: 16, timeS: null }, { reps: 8, loadKg: 16, timeS: null },
+    ] }],
+    previousSets: [],
+    skippedExercises: sessionId === 11 ? [{ name: 'Walking Lunge', plannedSets: 2, loggedSets: 0, loggedAs: [] }] : [],
+  });
+
+  beforeEach(() => {
+    mockState = state({
+      loadRecentOutcomes: jest.fn(() => [
+        { sessionId: 12, outcomeKind: 'adapted_session', finalizedAtMs: at('2026-11-03T18:05:00Z') },
+        { sessionId: 11, outcomeKind: 'session_recorded', finalizedAtMs: at('2026-11-03T09:40:00Z') },
+      ]),
+      loadSessionSummaryFacts: jest.fn(facts),
+    });
+  });
+
+  test('two sessions on one day are told apart by their time', () => {
+    render(<ProgressScreen />);
+    const labels = screen.getAllByLabelText(/Show what was logged.$/).map((node) => node.props.accessibilityLabel);
+    expect(labels).toHaveLength(2);
+    expect(labels[0]).not.toBe(labels[1]);
+    expect(labels[0]).toMatch(/2026 · /);
+  });
+
+  test('tapping a session shows its logged exercises and skips, and tapping again hides them', () => {
+    render(<ProgressScreen />);
+    expect(screen.queryByTestId('progress-session-11-summary')).toBeNull();
+    fireEvent.press(screen.getByTestId('progress-session-11'));
+    expect(mockState.loadSessionSummaryFacts).toHaveBeenCalledWith(11);
+    const summary = screen.getByTestId('progress-session-11-summary');
+    expect(summary).toBeOnTheScreen();
+    expect(screen.getByText(/Goblet Squat/)).toBeOnTheScreen();
+    expect(screen.getByText('Skipped: Walking Lunge · no sets logged')).toBeOnTheScreen();
+    expect(screen.queryByText(/^Next:|No next session/)).toBeNull();
+    fireEvent.press(screen.getByTestId('progress-session-11'));
+    expect(screen.queryByTestId('progress-session-11-summary')).toBeNull();
   });
 });

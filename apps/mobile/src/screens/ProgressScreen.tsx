@@ -22,6 +22,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useStore } from '../state/useStore';
 import { theme } from '../theme/theme';
 import { ListRow } from '../components/ui';
+import { buildSessionSummary } from '../state/sessionSummary';
 
 const OUTCOME_LABELS: Record<string, string> = {
   followed_plan: 'Plan followed',
@@ -39,12 +40,48 @@ const formatFinalizedDate = (ms: number): string => {
   });
 };
 
+// Two sessions on one day were identical rows; the time tells them apart.
+const formatFinalizedTime = (ms: number): string => (ms <= 0 ? '' : ` · ${new Date(ms).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`);
+
+/** The logged facts of one past session: no plan context, no completion
+ *  actions, only what was recorded. */
+function PastSessionSummary({ sessionId, load }: {
+  sessionId: number;
+  load: (sessionId: number) => ReturnType<ReturnType<typeof useStore.getState>['loadSessionSummaryFacts']>;
+}): React.JSX.Element {
+  let lines: string[] = [];
+  try {
+    const facts = load(sessionId);
+    const view = buildSessionSummary({
+      exercises: facts.exercises, previousSets: facts.previousSets, durationMin: facts.durationMin,
+      blockSessions: [], today: '', skippedExercises: facts.skippedExercises,
+    });
+    lines = [
+      ...view.exerciseLines.map((line) => line.text),
+      ...view.skippedLines.map((line) => line.text),
+      ...(view.durationLine === null ? [] : [view.durationLine]),
+    ];
+  } catch {
+    lines = [];
+  }
+  return (
+    <View style={styles.pastSummary} testID={`progress-session-${sessionId}-summary`}>
+      {lines.length === 0
+        ? <Text style={styles.caption}>No sets were logged in this session.</Text>
+        : lines.map((text, index) => <Text key={`${index}-${text}`} style={styles.caption}>{text}</Text>)}
+    </View>
+  );
+}
+
 export default function ProgressScreen(): React.JSX.Element {
   const loadRecentOutcomes = useStore((s) => s.loadRecentOutcomes);
   const loadMeasuredHistory = useStore((s) => s.loadMeasuredHistory);
+  const loadSessionSummaryFacts = useStore((s) => s.loadSessionSummaryFacts);
   const session = useStore((s) => s.session);
 
-  const [recentOutcomes, setRecentOutcomes] = useState<{ outcomeKind: string; finalizedAtMs: number }[]>([]);
+  const [recentOutcomes, setRecentOutcomes] = useState<{ sessionId: number; outcomeKind: string; finalizedAtMs: number }[]>([]);
+  // Walk 2 (W2-9): a recent session opens in place to its own summary.
+  const [openSessionId, setOpenSessionId] = useState<number | null>(null);
   const [recentMeasures, setRecentMeasures] = useState<ReturnType<typeof loadMeasuredHistory>>([]);
 
   useEffect(() => {
@@ -67,13 +104,23 @@ export default function ProgressScreen(): React.JSX.Element {
             No finalized session outcomes recorded yet.
           </Text>
         ) : (
-          recentOutcomes.map((row, i) => (
-            <ListRow
-              key={`${row.finalizedAtMs}-${i}`}
-              label={OUTCOME_LABELS[row.outcomeKind] ?? 'Outcome unavailable'}
-              detail={formatFinalizedDate(row.finalizedAtMs)}
-            />
-          ))
+          recentOutcomes.map((row, i) => {
+            const label = OUTCOME_LABELS[row.outcomeKind] ?? 'Outcome unavailable';
+            const when = `${formatFinalizedDate(row.finalizedAtMs)}${formatFinalizedTime(row.finalizedAtMs)}`;
+            const open = openSessionId === row.sessionId;
+            return (
+              <View key={`${row.sessionId}-${row.finalizedAtMs}-${i}`}>
+                <ListRow
+                  label={label}
+                  detail={when}
+                  testID={`progress-session-${row.sessionId}`}
+                  accessibilityLabel={`${label}, ${when}. ${open ? 'Hide' : 'Show'} what was logged.`}
+                  onPress={() => setOpenSessionId(open ? null : row.sessionId)}
+                />
+                {open && <PastSessionSummary sessionId={row.sessionId} load={loadSessionSummaryFacts} />}
+              </View>
+            );
+          })
         )}
       </View>
 
@@ -104,4 +151,5 @@ const styles = StyleSheet.create({
   caption: { ...theme.font.label, color: theme.color.textMid, marginTop: theme.space[1] },
   section: { marginTop: theme.space[5], gap: theme.space[2] },
   sectionTitle: { ...theme.font.eyebrow, color: theme.color.textLow },
+  pastSummary: { paddingLeft: theme.space[4], paddingBottom: theme.space[2], gap: theme.space[1] },
 });

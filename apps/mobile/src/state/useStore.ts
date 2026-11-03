@@ -1196,7 +1196,7 @@ interface KineticsStore {
   resetTrainingData: () => boolean;
   dismissOutcome: () => void;
   loadSessionOutcome: (sessionId: number) => { outcomeKind: string; finalizedAtMs: number } | null;
-  loadRecentOutcomes: (limit?: number) => { outcomeKind: string; finalizedAtMs: number }[];
+  loadRecentOutcomes: (limit?: number) => { sessionId: number; outcomeKind: string; finalizedAtMs: number }[];
   loadRoutineTemplates: () => void;
   saveRoutineTemplate: (input: {
     routineTemplateId?: number;
@@ -8722,11 +8722,13 @@ export const useStore = create<KineticsStore>()((set, get) => {
   loadRecentOutcomes: (limit = 20) => {
     try {
       const res = getDb().executeSync(
-        'SELECT outcome_kind, finalized_at_ms FROM session_outcome ORDER BY finalized_at_ms DESC LIMIT ?',
+        // Walk 2 (W2-9): the session id lets Progress open the session's summary.
+        'SELECT session_id, outcome_kind, finalized_at_ms FROM session_outcome ORDER BY finalized_at_ms DESC LIMIT ?',
         [limit],
       );
-      const rows = rowsOf<{ outcome_kind: string; finalized_at_ms: number }>(res);
+      const rows = rowsOf<{ session_id: number; outcome_kind: string; finalized_at_ms: number }>(res);
       return rows.map((r) => ({
+        sessionId: r.session_id,
         outcomeKind: r.outcome_kind,
         finalizedAtMs: r.finalized_at_ms,
       }));
