@@ -1760,6 +1760,7 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
         muscle,
         !emphasisDayExists.has(muscle) ? 'no_day' : !emphasisCandidateSeen.has(muscle) ? 'no_exercise' : 'no_room',
         capMin,
+        frequency,
       ));
     }
     if (emphasis.sport?.competitionLifts === true) {
