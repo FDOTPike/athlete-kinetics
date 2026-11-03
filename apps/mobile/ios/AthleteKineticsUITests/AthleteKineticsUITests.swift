@@ -15,10 +15,13 @@ import XCTest
 
 final class AthleteKineticsUITests: XCTestCase {
   private var app: XCUIApplication!
+  private var isInitialLaunchOfTest = true
 
   override func setUpWithError() throws {
     continueAfterFailure = false
+    isInitialLaunchOfTest = true
     app = XCUIApplication()
+    app.resetAuthorizationStatus(for: .health)
   }
 
   override func tearDownWithError() throws {
@@ -186,7 +189,14 @@ final class AthleteKineticsUITests: XCTestCase {
   }
 
   private func launch(_ arguments: [String] = []) {
-    app.launchArguments = arguments
+    var effectiveArguments = arguments
+    if isInitialLaunchOfTest {
+      isInitialLaunchOfTest = false
+      if !effectiveArguments.contains("-AKUITestResetStorage") {
+        effectiveArguments += ["-AKUITestResetStorage", "1"]
+      }
+    }
+    app.launchArguments = effectiveArguments
     app.launch()
     wait(element("shell-root"), "the app shell", timeout: 90)
   }

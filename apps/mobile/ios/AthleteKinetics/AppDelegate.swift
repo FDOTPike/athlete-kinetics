@@ -19,6 +19,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
+    #if targetEnvironment(simulator)
+    resetUITestStorageIfRequested()
+    #endif
     let delegate = ReactNativeDelegate()
     let factory = RCTReactNativeFactory(delegate: delegate)
     delegate.dependencyProvider = RCTAppDependencyProvider()
@@ -29,6 +32,36 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     return true
   }
+
+  #if targetEnvironment(simulator)
+  /// Clears persisted SQLite databases, athlete registry files, and user defaults
+  /// when launched by XCUITest at the start of a test method (-AKUITestResetStorage 1)
+  /// so repeated -test-iterations start from a clean onboarding state while
+  /// preserving mid-test relaunches. Simulator-only (#107).
+  private func resetUITestStorageIfRequested() {
+    let args = ProcessInfo.processInfo.arguments
+    guard let idx = args.firstIndex(of: "-AKUITestResetStorage"),
+          idx + 1 < args.count,
+          args[idx + 1] == "1" else { return }
+    let fm = FileManager.default
+    var removed = 0
+    for dir in [FileManager.SearchPathDirectory.documentDirectory, .libraryDirectory] {
+      guard let root = fm.urls(for: dir, in: .userDomainMask).first,
+            let items = try? fm.contentsOfDirectory(at: root, includingPropertiesForKeys: nil) else { continue }
+      for item in items {
+        if item.lastPathComponent == "Caches" || item.lastPathComponent == "SplashBoard" { continue }
+        if (try? fm.removeItem(at: item)) != nil {
+          removed += 1
+        }
+      }
+    }
+    if let bundleId = Bundle.main.bundleIdentifier {
+      UserDefaults.standard.removePersistentDomain(forName: bundleId)
+      UserDefaults.standard.synchronize()
+    }
+    NSLog("[ak-uitest] resetUITestStorageIfRequested removed %d item(s)", removed)
+  }
+  #endif
 }
 
 // The UIScene life cycle (declared in Info.plist, UIApplicationSceneManifest).
