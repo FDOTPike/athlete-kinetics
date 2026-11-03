@@ -294,12 +294,25 @@ describe('OnboardingScreen HOME BASIC says what it adds', () => {
     barbell: 'barbell', squat_rack: 'rack', bench: 'bench', dumbbells: 'dumbbells', kettlebell: 'kettlebell',
     pullup_bar: 'pull-up bar', nordic_bench: 'nordic', bands: 'bands', cable_machine: 'cable', mats: 'mats', boards: 'boards',
   };
+  // Whole words only: "mats" must not be found inside "formats".
+  const namesWord = (text, word) => {
+    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`(^|[^a-z])${escaped}([^a-z]|$)`).test(text);
+  };
+
+  test('equipment names match as whole words', () => {
+    expect(namesWord('bands and mats only', 'mats')).toBe(true);
+    expect(namesWord('several formats', 'mats')).toBe(false);
+    expect(namesWord('a pull-up bar.', 'pull-up bar')).toBe(true);
+    expect(namesWord('cable-free', 'cable')).toBe(true);
+    expect(namesWord('cables', 'cable')).toBe(false);
+  });
   // Both directions: every preset item is named, and nothing outside the
   // preset is named.
   const expectNamesExactly = (text, preset) => {
     const lower = text.toLowerCase();
     for (const item of EQUIPMENT_ITEMS) {
-      expect([item, lower.includes(SPOKEN[item])]).toEqual([item, EQUIPMENT_PRESETS[preset].includes(item)]);
+      expect([item, namesWord(lower, SPOKEN[item])]).toEqual([item, EQUIPMENT_PRESETS[preset].includes(item)]);
     }
   };
 
