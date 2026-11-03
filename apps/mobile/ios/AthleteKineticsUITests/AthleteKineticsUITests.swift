@@ -269,7 +269,7 @@ final class AthleteKineticsUITests: XCTestCase {
   }
 
   private func unlockAdvancedTools() {
-    if element("advanced-athlete-manager").exists { return }
+    if (try? element("advanced-athlete-manager").snapshot()) != nil { return }
     let build = element("Build 0.1.0")
     // The label sits at the foot of the full Profile form, beyond reveal()'s
     // fifteen slow swipes; scroll down at normal speed first.
@@ -325,9 +325,9 @@ final class AthleteKineticsUITests: XCTestCase {
       // athlete-kinetics-ios-simulator-unsigned-xcode27, XCTest runner log at 18:22:02.810:
       // the Don't Allow button node is absent, its static text remains, and the table has two pages.
       // A dismissed sheet leaves no text behind, so the "sheet stayed open" checks stay truthful.
-      if inApp.exists || app.staticTexts.matching(named).firstMatch.exists { log("health sheet: in the app"); return inApp }
+      if (try? inApp.snapshot()) != nil || (try? app.staticTexts.matching(named).firstMatch.snapshot()) != nil { log("health sheet: in the app"); return inApp }
       let inSpringboard = healthPermissionButton(title, in: springboard)
-      if inSpringboard.exists || springboard.staticTexts.matching(named).firstMatch.exists { log("health sheet: in SpringBoard"); return inSpringboard }
+      if (try? inSpringboard.snapshot()) != nil || (try? springboard.staticTexts.matching(named).firstMatch.snapshot()) != nil { log("health sheet: in SpringBoard"); return inSpringboard }
       sleep(1)
     } while Date() < deadline
     return nil
@@ -347,9 +347,10 @@ final class AthleteKineticsUITests: XCTestCase {
   /// qualifies: the Health Access box is a system alert, and an alert the app
   /// itself raises (an error, say) is never dismissed here, so it still shows
   /// up in the checks that follow. OK is tapped at the centre read from a
-  /// snapshot (an alert that vanishes meanwhile is skipped, not a failure), and
-  /// the tap is recorded with where the alert was and its title. This only
-  /// dismisses: every check after it is unchanged.
+  /// snapshot, translated by `targetFrame.height - remoteContainer.height` when
+  /// the hosted `HealthPrivacyService` remote scene reports unshifted local
+  /// coordinates (`remoteContainer.minY == 0` inside a shorter modal card sheet),
+  /// and verified after 1 s and again 2 s later.
   @discardableResult
   private func dismissHealthAccessAlertIfShown(_ context: String, timeout: TimeInterval = 3) -> Bool {
     let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
@@ -366,7 +367,7 @@ final class AthleteKineticsUITests: XCTestCase {
           let ok = alert.buttons.matching(okNamed).firstMatch
           guard let frame = (try? ok.snapshot())?.frame else { continue }
           let mentionsHealth = (currentLabel(alert) ?? "").localizedCaseInsensitiveContains("Health")
-            || alert.staticTexts.matching(healthNamed).firstMatch.exists
+            || ((try? alert.staticTexts.matching(healthNamed).firstMatch.snapshot()) != nil)
           if mentionsHealth && healthAlert == nil && alert.buttons.count == 1 {
             healthAlert = (place, target, alert, ok, frame)
           } else if !mentionsHealth && okOnlyAlert == nil && place == "SpringBoard" && alert.buttons.count == 1 {
@@ -378,10 +379,71 @@ final class AthleteKineticsUITests: XCTestCase {
         let title = currentLabel(found.alert).flatMap { $0.isEmpty ? nil : $0 }
           ?? currentLabel(found.alert.staticTexts.firstMatch) ?? "<no title>"
         let kind = healthAlert != nil ? "Health alert" : "SpringBoard alert whose only button is OK"
-        found.target.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
-          .withOffset(CGVector(dx: found.frame.midX, dy: found.frame.midY)).tap()
+        let alertFrame = (try? found.alert.snapshot())?.frame ?? .null
+        let targetSnap = try? found.target.snapshot()
+        let targetFrame = targetSnap?.frame ?? found.target.frame
+        func findAlertAncestors(_ node: XCUIElementSnapshot) -> [XCUIElementSnapshot]? {
+          if node.elementType == .alert { return [node] }
+          for child in node.children {
+            if let path = findAlertAncestors(child) { return [node] + path }
+          }
+          return nil
+        }
+        var measuredOffset: CGFloat = 0
+        var offsetSource = "none"
+        var remoteContainerMinY = -1
+        var remoteContainerHeight = -1
+        if found.place == "the app", !alertFrame.isNull, alertFrame.midY < targetFrame.midY {
+          if let root = targetSnap, let ancestors = findAlertAncestors(root) {
+            for node in ancestors.reversed() where node.elementType != .alert {
+              let nf = node.frame
+              if nf.minY == 0 && nf.height > targetFrame.midY && nf.height < targetFrame.height - 1 && abs(nf.width - targetFrame.width) <= 2 {
+                measuredOffset = targetFrame.height - nf.height
+                offsetSource = "targetHeight-remoteHeight"
+                remoteContainerMinY = Int(nf.minY.rounded())
+                remoteContainerHeight = Int(nf.height.rounded())
+                break
+              }
+            }
+          }
+        }
+        let rootOrigin = found.target.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
+        let initialOffsetY = found.frame.midY + measuredOffset
+        var tapY = initialOffsetY
+        var tapPath = measuredOffset > 0 ? "\(offsetSource)(+\(Int(measuredOffset.rounded()))pt)" : "direct"
+        func probeAlertOKStillShown(_ phase: String) -> Bool {
+          do {
+            _ = try found.ok.snapshot()
+            return true
+          } catch {
+            let okErrorText = String(describing: error)
+            do {
+              let root = try found.target.snapshot()
+              if findAlertAncestors(root) == nil {
+                return false
+              }
+              log("health alert probe (\(phase)) found alert still in \(found.place) tree after ok.snapshot() threw: \(okErrorText)")
+              return true
+            } catch let targetError {
+              log("health alert probe (\(phase)) query failed in \(found.place); ok error: \(okErrorText); target error: \(targetError)")
+              return true
+            }
+          }
+        }
+        rootOrigin.withOffset(CGVector(dx: found.frame.midX, dy: initialOffsetY)).tap()
         sleep(1)
-        log("HEALTH-ALERT-OK tapped OK on a system \(kind) in \(found.place) (\(context)); title: \(title.prefix(120)); still shown after 1 s: \(found.ok.exists ? "yes" : "no")")
+        var stillShown = probeAlertOKStillShown("after-1s")
+        if stillShown && measuredOffset > 0 {
+          rootOrigin.withOffset(CGVector(dx: found.frame.midX, dy: found.frame.midY)).tap()
+          tapY = found.frame.midY
+          sleep(1)
+          stillShown = probeAlertOKStillShown("after-unshifted-retry")
+          tapPath = stillShown ? "\(tapPath),unshifted-retry" : "unshifted-after-\(offsetSource)"
+        }
+        sleep(2)
+        let stillShownAfter3s = probeAlertOKStillShown("after-3s")
+        log("HEALTH-ALERT-OK tapped OK on a system \(kind) in \(found.place) (\(context)); title: \(title.prefix(120)); tapPath=\(tapPath) okFrame=(\(Int(found.frame.midX)),\(Int(found.frame.midY))) tapY=\(Int(tapY.rounded())) remoteContainer=(minY:\(remoteContainerMinY),h:\(remoteContainerHeight)) alertMidY=\(alertFrame.isNull ? -1 : Int(alertFrame.midY)); still shown after 1 s: \(stillShown ? "yes" : "no"); still shown 2 s later: \(stillShownAfter3s ? "yes" : "no")")
+        XCTAssertFalse(stillShownAfter3s, "the Health Access alert stayed open after the OK tap")
         return true
       }
       usleep(250_000)
