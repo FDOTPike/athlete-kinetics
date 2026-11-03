@@ -604,13 +604,9 @@ async function pickerSave(sourcePath: string, fileName: string): Promise<boolean
   return saved.error === null && saved.uri.length > 0;
 }
 
-/** The person-facing backup file name, dated by the athlete's own calendar
- *  day. The UTC date named a backup made at 01:52 on 3 Nov in Sydney
- *  "2026-11-02" (Android walk 2026-11-03, fn-6). */
-export function backupFileNameFor(now: Date): string {
-  const day = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  return `pikeMethods-${day}.pmbak`;
-}
+import { backupFileNameFor } from './backupFileName';
+
+export { backupFileNameFor };
 
 /** The Files import filter, per platform. The picker's iOS bridge resolves
  *  each entry with `UTType(identifier)` (PickerOptions.swift), so a MIME string
