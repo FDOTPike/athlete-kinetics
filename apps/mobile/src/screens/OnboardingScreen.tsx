@@ -453,7 +453,9 @@ export default function OnboardingScreen(): React.JSX.Element {
       <Text style={styles.wordmark}>pikeMethods</Text>
 
       {/* Progress dots (P4 ruling: keep as-is with chalk on current dot) */}
-      <View style={styles.dots} accessibilityLabel={`Step ${stepIdx + 1} of ${steps.length}`}>
+      {/* Walk W6-7: without `accessible` Android did not expose the step. */}
+      <View style={styles.dots} accessible accessibilityRole="text" testID="onboarding-progress"
+        accessibilityLabel={`Step ${stepIdx + 1} of ${steps.length}`}>
         {steps.map((k, i) => (
           <View key={k} style={[styles.dot, i === stepIdx && styles.dotActive, i < stepIdx && styles.dotDone]} />
         ))}

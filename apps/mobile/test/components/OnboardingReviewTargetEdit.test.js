@@ -326,3 +326,14 @@ describe('OnboardingScreen HOME BASIC says what it adds', () => {
     },
   );
 });
+
+// Android walk 2026-11-03, W6-7: the progress dots gave a screen reader no
+// "step N of M" (the label was set, but the view was not accessible).
+test('the onboarding progress dots announce the step', () => {
+  render(<OnboardingScreen />);
+  const dots = screen.getByTestId('onboarding-progress');
+  expect(dots.props.accessible).toBe(true);
+  expect(dots.props.accessibilityLabel).toMatch(/^Step 1 of \d+$/);
+  next();
+  expect(screen.getByTestId('onboarding-progress').props.accessibilityLabel).toMatch(/^Step 2 of \d+$/);
+});

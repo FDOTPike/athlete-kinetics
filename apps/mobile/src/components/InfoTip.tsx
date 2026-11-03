@@ -129,6 +129,9 @@ export default function InfoTip({ term }: InfoTipProps): React.JSX.Element | nul
             onPress={close}
             accessible={false}
             importantForAccessibility="no"
+            // Walk W6-5: Pressable is focusable by default, so the full-screen
+            // backdrop was an unlabelled focus stop on Android.
+            focusable={false}
           />
           <View style={styles.card}>
             <Text ref={titleRef} accessible accessibilityRole="header" style={styles.cardTerm}>
