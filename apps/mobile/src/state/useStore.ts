@@ -8721,8 +8721,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
 
   loadRecentOutcomes: (limit = 20) => {
     try {
+      // Walk 2 (W2-9): the session id lets Progress open the session's summary.
       const res = getDb().executeSync(
-        // Walk 2 (W2-9): the session id lets Progress open the session's summary.
         'SELECT session_id, outcome_kind, finalized_at_ms FROM session_outcome ORDER BY finalized_at_ms DESC LIMIT ?',
         [limit],
       );
