@@ -713,6 +713,7 @@ export default function OnboardingScreen(): React.JSX.Element {
             </Text>
             <View style={styles.cardGroup}>
               <Chip
+                wrap
                 label="NO — NOTHING TO NOTE"
                 selected={limitsAnswered === false}
                 onPress={() => answerLimits(false)}
@@ -720,6 +721,7 @@ export default function OnboardingScreen(): React.JSX.Element {
                 style={styles.cardChip}
               />
               <Chip
+                wrap
                 label="YES — LET ME ADD NOTES"
                 selected={limitsAnswered === true}
                 onPress={() => answerLimits(true)}
@@ -853,6 +855,7 @@ export default function OnboardingScreen(): React.JSX.Element {
                     <Text style={styles.fieldLabel}>WHO PICKS THE WEIGHTS? (OPTIONAL)</Text>
                     {(['auto', 'manual'] as const).map((p) => (
                       <Chip
+                        wrap
                         key={p}
                         testID={p === 'auto' ? 'onboarding-loads-auto' : 'onboarding-loads-manual'}
                         label={`${LOAD_PREFERENCE_COPY[p].label} — ${LOAD_PREFERENCE_COPY[p].blurb}`}

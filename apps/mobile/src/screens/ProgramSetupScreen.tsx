@@ -529,6 +529,7 @@ export default function ProgramSetupScreen({
                     history, not a coaching assessment.
                   </Text>
                   <Chip
+                    wrap
                     label={`I have trained ${anchor.name} before`}
                     selected={false}
                     onPress={() => confirmMovementPriorExperience(anchor.movementId, 'weight_room')}
