@@ -52,7 +52,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         items = try fm.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)
       } catch {
         NSLog("[ak-uitest] resetUITestStorageIfRequested failed to list %@ after %d item(s): %@", root.lastPathComponent, removed, String(describing: error))
-        return
+        continue
       }
       for item in items {
         let name = item.lastPathComponent
@@ -62,7 +62,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
           removed += 1
         } catch {
           NSLog("[ak-uitest] resetUITestStorageIfRequested failed to remove %@ after %d item(s): %@", name, removed, String(describing: error))
-          return
+          continue
         }
       }
     }
