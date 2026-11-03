@@ -723,8 +723,8 @@ describe('BlockScreen - Chooser Entry (Work Order E)', () => {
     expect(screen.getByText('Start a new block')).toBeOnTheScreen();
     expect(screen.getByText('Auto')).toBeOnTheScreen();
     expect(screen.getByText('Custom')).toBeOnTheScreen();
-    expect(screen.getByText('Guided')).toBeOnTheScreen();
-    expect(screen.getByText('Coming soon')).toBeOnTheScreen();
+    expect(screen.queryByText('Guided')).toBeNull();
+    expect(screen.queryByText('Coming soon')).toBeNull();
   });
 
   test('inter-block state with block === null and program !== null still opens chooser and routes to handlers', () => {
