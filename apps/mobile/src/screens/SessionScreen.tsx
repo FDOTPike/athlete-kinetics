@@ -2501,7 +2501,7 @@ const styles = StyleSheet.create({
     marginTop: theme.space[3],
   },
   rirChip: {
-    minWidth: 48,
+    minWidth: theme.touch.min,
   },
   derivedRpeContainer: {
     alignItems: 'center',
