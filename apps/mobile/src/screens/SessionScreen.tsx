@@ -1538,11 +1538,11 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                           </Text>
                           <Text style={styles.effortCue}>{EFFORT_BREATHING_NOTE}</Text>
                           <Text style={styles.effortStop} testID="effort-stop-guidance">{EFFORT_STOP_GUIDANCE}</Text>
-                          <Text style={styles.rpeEvidence}>
-                            {safeRpe !== null
-                              ? 'This effort rating will be saved with the set.'
-                              : 'Effort rating is optional; leave it blank if you are unsure.'}
-                          </Text>
+                          {/* With no rating, the cue above already says effort is
+                              optional; a second line said it again (ux-8). */}
+                          {safeRpe !== null && (
+                            <Text style={styles.rpeEvidence}>This effort rating will be saved with the set.</Text>
+                          )}
                         </View>
 
                         {supportsBands && (
