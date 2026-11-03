@@ -631,9 +631,12 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
     const outcomeCopy: Record<string, string> = isBeginner
       ? {
           followed_plan: "You followed today's plan. Recover well.",
-          adapted_session: "Session adjusted.",
+          // Walk 2 (W2-8): the same word Progress uses for this outcome.
+          adapted_session: "Session adapted.",
           stopped_safely: "Stopping was the right call. Recovery is part of the plan.",
-          session_recorded: "Your session is saved. Continue from here next time.",
+          // Walk 2 (W2-8): this shows after Finish session too; "continue from
+          // here next time" read as if the session were unfinished.
+          session_recorded: "Your session is saved.",
         }
       : {
           followed_plan: "Plan followed.",

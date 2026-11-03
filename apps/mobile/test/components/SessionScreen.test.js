@@ -1301,9 +1301,9 @@ test('post-session Outcome view displays correct copy for all mappings (beginner
 
   const beginnerOutcomes = [
     { kind: 'followed_plan', expected: "You followed today's plan. Recover well." },
-    { kind: 'adapted_session', expected: "Session adjusted." },
+    { kind: 'adapted_session', expected: "Session adapted." },
     { kind: 'stopped_safely', expected: "Stopping was the right call. Recovery is part of the plan." },
-    { kind: 'session_recorded', expected: "Your session is saved. Continue from here next time." },
+    { kind: 'session_recorded', expected: "Your session is saved." },
   ];
 
   for (const { kind, expected } of beginnerOutcomes) {
@@ -1358,7 +1358,7 @@ test('post-session Outcome view displays correct copy for all mappings (beginner
   });
 
   const { unmount } = render(<SessionScreen />);
-  expect(screen.getByText("Your session is saved. Continue from here next time.")).toBeOnTheScreen();
+  expect(screen.getByText("Your session is saved.")).toBeOnTheScreen();
   expect(screen.getByText('Session saved')).toBeOnTheScreen();
   
   // Test dismissing the outcome screen (S2)
