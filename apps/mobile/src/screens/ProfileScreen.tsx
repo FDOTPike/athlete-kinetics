@@ -174,6 +174,7 @@ function OneRmRow({ label, valueKg, onChange }: OneRmRowProps): React.JSX.Elemen
     if (!Number.isFinite(parsed) || parsed < 20) {
       onChange(null); // empty/garbage/sub-20 clears the max
       setText('');
+      setClampNote(null);
       return;
     }
     const snapped = Math.min(500, Math.max(20, Math.round(parsed / 2.5) * 2.5));
@@ -187,7 +188,7 @@ function OneRmRow({ label, valueKg, onChange }: OneRmRowProps): React.JSX.Elemen
       <Text style={styles.fieldLabel}>{label}</Text>
       <View style={styles.numberRow}>
         <Pressable
-          onPress={() => { if (valueKg !== undefined) onChange(valueKg - 2.5 < 20 ? null : valueKg - 2.5); }}
+          onPress={() => { setClampNote(null); if (valueKg !== undefined) onChange(valueKg - 2.5 < 20 ? null : valueKg - 2.5); }}
           hitSlop={8}
           accessibilityRole="button"
           accessibilityLabel={`Decrease ${label} one rep max`}
@@ -199,7 +200,9 @@ function OneRmRow({ label, valueKg, onChange }: OneRmRowProps): React.JSX.Elemen
           disableFullscreenUI
           style={styles.oneRmInput}
           value={text}
-          onChangeText={setText}
+          // Review (PR 194): the clamp notice describes one saved value; any
+          // new edit, a + or −, or a cleared max makes it untrue, so it goes.
+          onChangeText={(next) => { setText(next); setClampNote(null); }}
           onEndEditing={commitText}
           keyboardType="numeric"
           placeholder="—"
@@ -208,7 +211,7 @@ function OneRmRow({ label, valueKg, onChange }: OneRmRowProps): React.JSX.Elemen
           accessibilityLabel={`${label} one rep max in kilograms, type to set`}
         />
         <Pressable
-          onPress={() => onChange((valueKg ?? 57.5) + 2.5)}
+          onPress={() => { setClampNote(null); onChange((valueKg ?? 57.5) + 2.5); }}
           hitSlop={8}
           accessibilityRole="button"
           accessibilityLabel={`Increase ${label} one rep max`}
