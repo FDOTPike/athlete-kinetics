@@ -74,10 +74,13 @@ const parseLoadDraft = (text: string): number | null => {
   return Number.isFinite(value) && value >= 0 ? value : null;
 };
 
-/** P1-2 (Opus audit): a loggable load must sit on the 2.5 kg rack grid and be
- *  within 0–500 inclusive. Reject — never silently snap — any draft that
- *  would change numerically at commit time. */
-const LOAD_GRID = 2.5;
+/** P1-2: a loggable load must sit on the logging grid and be within 0–500
+ *  inclusive. Reject — never silently snap — any draft that would change
+ *  numerically at commit time.
+ *  Owner ruling 2026-11-03 (Entry 0288): the grid is 0.5 kg, so 12, 14, 16
+ *  and 24 kg dumbbells and kettlebells can be logged. Load suggestions and
+ *  the ± steppers stay on the 2.5 kg plate grid. */
+const LOAD_GRID = 0.5;
 const LOAD_MAX = 500;
 const isOnLoadGrid = (kg: number): boolean =>
   Number.isFinite(kg) && kg >= 0 && kg <= LOAD_MAX
@@ -1364,9 +1367,9 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                             style={styles.loadEvidence}
                             testID="session-load-validation"
                             accessibilityRole="alert"
-                            accessibilityLabel="Load validation. Enter a load from 0 to 500 in 2.5 kg increments."
+                            accessibilityLabel="Load validation. Enter a load from 0 to 500 in 0.5 kg steps."
                           >
-                            Enter a load from 0 to 500 in 2.5 kg increments.
+                            Enter a load from 0 to 500 in 0.5 kg steps.
                           </Text>
                         )}
                         {!loadInvalid && !loadLoggable && (

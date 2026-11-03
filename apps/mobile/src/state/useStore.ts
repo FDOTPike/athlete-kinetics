@@ -7863,7 +7863,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
     appliedPrefixes = (appliedPrefixes ?? []).filter((condition) => conditionApplies(condition, effImplement));
 
     const safeReps = timeMode ? 1 : Math.round(clamp(reps, 1, 50));
-    const safeLoad = clamp(Math.round(loadKg / 2.5) * 2.5, 0, 500);
+    // Owner ruling 2026-11-03 (Entry 0288): logged loads sit on a 0.5 kg grid.
+    const safeLoad = clamp(Math.round(loadKg / 0.5) * 0.5, 0, 500);
     const safeRpe = rpe === null ? null : clamp(Math.round(rpe * 2) / 2, 5, 10);
     const loggedAtMs = Date.now();
 
@@ -8028,7 +8029,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
       : metrics.bandLevel === null
         ? null
         : Math.round(clamp(metrics.bandLevel, 1, 20));
-    const safeLoad = clamp(Math.round(loadKg / 2.5) * 2.5, 0, 500);
+    // Owner ruling 2026-11-03 (Entry 0288): logged loads sit on a 0.5 kg grid.
+    const safeLoad = clamp(Math.round(loadKg / 0.5) * 0.5, 0, 500);
     const safeRpe = rpe === null ? null : clamp(Math.round(rpe * 2) / 2, 5, 10);
     // UPDATE OF reps, load_kg, rpe fires trg_set_record_au, which re-deltas
     // mech_daily (old contribution out, new in). tonnage_kg is a GENERATED

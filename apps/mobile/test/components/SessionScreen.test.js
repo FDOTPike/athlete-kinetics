@@ -365,7 +365,7 @@ test('invalid draft is distinct from blank, while explicit zero is valid and log
 
   expect(screen.queryByTestId('session-load-validation')).toBeNull();
   fireEvent.changeText(screen.getByTestId('session-load-input'), '12kg');
-  expect(screen.getByLabelText('Load validation. Enter a load from 0 to 500 in 2.5 kg increments.')).toBeOnTheScreen();
+  expect(screen.getByLabelText('Load validation. Enter a load from 0 to 500 in 0.5 kg steps.')).toBeOnTheScreen();
   fireEvent.changeText(screen.getByTestId('session-load-input'), '0');
   expect(screen.queryByTestId('session-load-validation')).toBeNull();
   fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
@@ -1378,18 +1378,20 @@ test('post-session Outcome view displays correct copy for all mappings (beginner
 });
 
 // --- P1-2: grid/range validation tests ---------------------------------------
-test('off-grid load 1 shows validation, disables Log set, and never calls logSet', () => {
+// Owner ruling 2026-11-03 (Entry 0288): the logging grid is 0.5 kg, so the
+// off-grid examples are now 1.3 and 61.2 (1 and 61 are loggable).
+test('off-grid load 1.3 shows validation, disables Log set, and never calls logSet', () => {
   render(<SessionScreen />);
-  fireEvent.changeText(screen.getByTestId('session-load-input'), '1');
+  fireEvent.changeText(screen.getByTestId('session-load-input'), '1.3');
   expect(screen.getByTestId('session-load-validation')).toBeOnTheScreen();
   expect(screen.getByLabelText('Log set 1 for First movement, unavailable — enter a load first')).toBeOnTheScreen();
   fireEvent.press(screen.getByLabelText(/Log set 1 for First movement/));
   expect(mockState.logSet).not.toHaveBeenCalled();
 });
 
-test('off-grid load 61 shows validation and never calls logSet', () => {
+test('off-grid load 61.2 shows validation and never calls logSet', () => {
   render(<SessionScreen />);
-  fireEvent.changeText(screen.getByTestId('session-load-input'), '61');
+  fireEvent.changeText(screen.getByTestId('session-load-input'), '61.2');
   expect(screen.getByTestId('session-load-validation')).toBeOnTheScreen();
   fireEvent.press(screen.getByLabelText(/Log set 1 for First movement/));
   expect(mockState.logSet).not.toHaveBeenCalled();
@@ -1410,6 +1412,12 @@ test.each([
   ['2,5', 2.5],
   ['60', 60],
   ['500', 500],
+  // Owner ruling 2026-11-03 (Entry 0288): dumbbell and kettlebell sizes.
+  ['12', 12],
+  ['16', 16],
+  ['24', 24],
+  ['12,5', 12.5],
+  ['1', 1],
 ])('valid grid value %s is loggable and reaches logSet unchanged', (value, expected) => {
   render(<SessionScreen />);
   fireEvent.changeText(screen.getByTestId('session-load-input'), value);
