@@ -33,6 +33,7 @@ const colors = palette ?? {
 import {
   GLOSSARY_ENTRIES,
   getGlossaryEntry,
+  glossaryTitle,
   type GlossaryEntry,
 } from '../data/glossary';
 
@@ -92,7 +93,7 @@ export default function InfoTip({ term }: InfoTipProps): React.JSX.Element | nul
     return null;
   }
 
-  const title = entry.term;
+  const title = glossaryTitle(entry);
 
   return (
     <>

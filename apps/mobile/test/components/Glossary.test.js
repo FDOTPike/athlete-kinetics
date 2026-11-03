@@ -257,3 +257,14 @@ test('the phase shown as "Build strength" explains itself under that name', () =
   expect(screen.getByLabelText('What does BUILD STRENGTH mean?')).toBeOnTheScreen();
   expect(screen.queryByLabelText('What does INTENSIFICATION mean?')).toBeNull();
 });
+
+// The display name must not change the bundled question index: `term` and
+// `aliases` feed it, so "Build strength" is a display name only.
+test('"Build strength" is found by search and lookup, as a display name', () => {
+  const { getGlossaryEntry, searchGlossary, glossaryTitle } = require('../../src/data/glossary');
+  const entry = getGlossaryEntry('build strength');
+  expect(entry.id).toBe('INTENSIFICATION');
+  expect(entry.term).toBe('INTENSIFICATION');
+  expect(glossaryTitle(entry)).toBe('BUILD STRENGTH');
+  expect(searchGlossary('build str')[0].id).toBe('INTENSIFICATION');
+});
