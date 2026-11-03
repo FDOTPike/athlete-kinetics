@@ -1009,9 +1009,11 @@ if (resetTables.length >= 15) {
   // Owner ruling 2026-11-03 (ledger Entry 0286): the completion summary may
   // read session_skipped_slot to list the skipped exercises. That display read
   // is the one reader; no engine, readiness or progression code reads it.
-  const SKIPPED_SUMMARY_READ = 'SELECT k.session_plan_slot_id, sps.movement_id, m.name AS movement_name, sps.planned_sets '
+  // Walk 2 (W2-1): the read names the PLANNED movement of a swapped slot.
+  const SKIPPED_SUMMARY_READ = 'SELECT k.session_plan_slot_id, COALESCE(sps.original_movement_id, sps.movement_id) AS movement_id, '
+    + 'sps.movement_id AS current_movement_id, m.name AS movement_name, sps.planned_sets '
     + 'FROM session_skipped_slot k JOIN session_plan_slot sps ON sps.session_plan_slot_id = k.session_plan_slot_id '
-    + 'JOIN movement m ON m.movement_id = sps.movement_id WHERE sps.session_id = ? ORDER BY sps.slot_index';
+    + 'JOIN movement m ON m.movement_id = COALESCE(sps.original_movement_id, sps.movement_id) WHERE sps.session_id = ? ORDER BY sps.slot_index';
   a('071: the store names session_skipped_slot in one INSERT, one DELETE and the summary read only',
     JSON.stringify(sqlNaming('session_skipped_slot').sort()) === JSON.stringify([
       'DELETE FROM session_skipped_slot',

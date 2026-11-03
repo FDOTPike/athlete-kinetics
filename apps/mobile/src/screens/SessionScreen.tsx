@@ -453,10 +453,13 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
 
   const byId = useMemo(() => new Map(movements.map((m) => [m.movement_id, m])), [movements]);
   const loggedCount = (slot: PlanSlot): number => session?.sets.filter((set) => sameSlot(set, slot)).length ?? 0;
+  // Walk 2 (W2-1): a swap rewrites the slot's movement. The skipped line
+  // names the PLANNED movement, and sets of anything else are "logged as".
+  const plannedMovementId = (slot: PlanSlot): number => slot.originalMovementId ?? slot.movementId;
   const loggedAsNames = (slot: PlanSlot): string[] => {
     const names: string[] = [];
     for (const set of session?.sets.filter((set) => sameSlot(set, slot)) ?? []) {
-      if (set.movement_id === slot.movementId) continue;
+      if (set.movement_id === plannedMovementId(slot)) continue;
       const name = byId.get(set.movement_id)?.name ?? 'Movement';
       if (!names.includes(name)) names.push(name);
     }
@@ -1096,7 +1099,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                   .filter((slot) => runner?.skippedSessionPlanSlotIds.includes(slot.sessionPlanSlotId))
                   .map((slot) => {
                     const text = skippedExerciseText({
-                      name: byId.get(slot.movementId)?.name ?? 'Movement',
+                      name: byId.get(plannedMovementId(slot))?.name ?? 'Movement',
                       plannedSets: slot.plannedSets,
                       loggedSets: loggedCount(slot),
                       loggedAs: loggedAsNames(slot),

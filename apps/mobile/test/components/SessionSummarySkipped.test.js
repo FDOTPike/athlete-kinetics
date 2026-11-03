@@ -101,6 +101,29 @@ test('sets logged before a skip are counted, by slot or else by movement', () =>
   ]);
 });
 
+// Android walk 2026-11-03 (W2-1): a swap before any set rewrites the slot's
+// movement and keeps the planned one in original_movement_id. The line named
+// the replacement as if it were the skipped plan ("Skipped: Dumbbell Romanian
+// Deadlift · 1 of 3 sets logged"); it names the planned exercise.
+test('a slot swapped before its first set is named by its planned exercise', () => {
+  seedSession();
+  const swap = raw().prepare(
+    // An added slot keeps its provenance when swapped, as the store does.
+    'UPDATE session_plan_slot SET movement_id = ?, original_movement_id = ? WHERE session_plan_slot_id = ?',
+  );
+  swap.run(idOf('Bodyweight Squat'), idOf('Walking Lunge'), slotId(2));
+  swap.run(idOf('Dumbbell Squat'), idOf('Push-up'), slotId(1));
+  logSet('Bodyweight Squat', 2);
+  logSet('Dumbbell Squat');           // no slot link: counted by the slot's current movement
+  skip(1);
+  skip(2);
+  const facts = state().loadSessionSummaryFacts(7000);
+  expect(facts.skippedExercises).toEqual([
+    { name: 'Push-up', plannedSets: 2, loggedSets: 1, loggedAs: ['Dumbbell Squat'] },
+    { name: 'Walking Lunge', plannedSets: 2, loggedSets: 1, loggedAs: ['Bodyweight Squat'] },
+  ]);
+});
+
 test('a session with nothing skipped reports an empty list', () => {
   raw().exec("INSERT INTO session (session_id, micro_cycle_id, session_date, started_at_ms, duration_min) VALUES (7001, NULL, '2026-11-03', 1000, 30)");
   expect(state().loadSessionSummaryFacts(7001).skippedExercises).toEqual([]);

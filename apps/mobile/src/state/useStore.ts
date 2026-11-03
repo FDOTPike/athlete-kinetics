@@ -6297,13 +6297,17 @@ export const useStore = create<KineticsStore>()((set, get) => {
     // record of the session; it was left out because it has no sets.
     // Owner ruling 2026-11-03 (Entry 0286): this display read is the one
     // reader of 071 session_skipped_slot. No engine reads it.
+    // Walk 2 (W2-1): a swap rewrites sps.movement_id and keeps the planned
+    // one in original_movement_id; the line names the planned movement.
     const skippedRows = rowsOf<{
-      session_plan_slot_id: number; movement_id: number; movement_name: string; planned_sets: number;
+      session_plan_slot_id: number; movement_id: number; current_movement_id: number;
+      movement_name: string; planned_sets: number;
     }>(d.executeSync(
-      `SELECT k.session_plan_slot_id, sps.movement_id, m.name AS movement_name, sps.planned_sets
+      `SELECT k.session_plan_slot_id, COALESCE(sps.original_movement_id, sps.movement_id) AS movement_id,
+              sps.movement_id AS current_movement_id, m.name AS movement_name, sps.planned_sets
          FROM session_skipped_slot k
          JOIN session_plan_slot sps ON sps.session_plan_slot_id = k.session_plan_slot_id
-         JOIN movement m ON m.movement_id = sps.movement_id
+         JOIN movement m ON m.movement_id = COALESCE(sps.original_movement_id, sps.movement_id)
         WHERE sps.session_id = ?
         ORDER BY sps.slot_index`,
       [sessionId],
@@ -6315,7 +6319,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       skippedExercises: skippedRows.map((row) => {
         const sets = setRows.filter((set) => (set.session_plan_slot_id != null
           ? set.session_plan_slot_id === row.session_plan_slot_id
-          : set.movement_id === row.movement_id));
+          : set.movement_id === row.movement_id || set.movement_id === row.current_movement_id));
         const loggedAs: string[] = [];
         for (const set of sets) {
           if (set.movement_id !== row.movement_id && !loggedAs.includes(set.movement_name)) loggedAs.push(set.movement_name);
