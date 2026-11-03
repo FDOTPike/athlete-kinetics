@@ -483,10 +483,14 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   // Walk 2 (W2-1): a swap rewrites the slot's movement. The skipped line
   // names the PLANNED movement, and sets of anything else are "logged as".
   const plannedMovementId = (slot: PlanSlot): number => slot.originalMovementId ?? slot.movementId;
-  const loggedAsNames = (slot: PlanSlot): string[] => {
+  // Review (PR 194): the "logged as"/"includes" names are the movements other
+  // than the one the row is titled with. A finished row is titled with the
+  // current movement; a skipped row and the completion card with the planned
+  // one, so after a swap no row repeats its own name.
+  const loggedAsNames = (slot: PlanSlot, baseMovementId: number = plannedMovementId(slot)): string[] => {
     const names: string[] = [];
     for (const set of session?.sets.filter((set) => sameSlot(set, slot)) ?? []) {
-      if (set.movement_id === plannedMovementId(slot)) continue;
+      if (set.movement_id === baseMovementId) continue;
       const name = byId.get(set.movement_id)?.name ?? 'Movement';
       if (!names.includes(name)) names.push(name);
     }
@@ -1234,7 +1238,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                 const metricSummary = latestCompleted?.timeS !== null && latestCompleted?.timeS !== undefined
                   ? ` · ${secondsText(latestCompleted.timeS)} logged`
                   : bandLabel === null ? '' : ` · ${bandLabel}`;
-                const asNames = loggedAsNames(slot);
+                const asNames = loggedAsNames(slot, slot.movementId);
                 const includesSuffix = asNames.length > 0 ? ` · includes ${asNames.join(', ')}` : '';
 
                 return (
@@ -1255,7 +1259,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
 
               if (skipped && !active) {
                 const skippedSets = session?.sets.filter((set) => sameSlot(set, slot)) ?? [];
-                const name = movement?.name ?? 'Movement';
+                const name = byId.get(plannedMovementId(slot))?.name ?? 'Movement';
                 const asNames = loggedAsNames(slot);
                 const loggedSuffix = asNames.length > 0 ? ` as ${asNames.join(', ')}` : '';
                 const skippedMeta = logged > 0

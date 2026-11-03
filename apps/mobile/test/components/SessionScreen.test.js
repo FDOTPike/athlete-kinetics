@@ -2205,6 +2205,45 @@ test('a finished slot whose logged sets include a different movement_id shows in
   expect(screen.getByText('4 sets complete · includes Box Squat')).toBeOnTheScreen();
 });
 
+// Review (PR 194): after an in-place swap the slot's movementId is the
+// replacement and originalMovementId the planned movement. A row never names
+// its own title movement again in "includes" / "logged as".
+describe('swapped slot names', () => {
+  const boxSet = (setId, index) => ({
+    set_id: setId, movement_id: 3, movement_name: 'Box Squat', set_index: index, reps: 7, load_kg: 60,
+    rpe: 8, tonnage_kg: 420, session_plan_slot_id: 1, timeS: null, bandLevel: null,
+  });
+  const swappedState = (sets, runnerOverrides) => state({
+    movements: [movement(1, 'Narrow Stance Squats'), movement(2, 'Later movement'), movement(3, 'Box Squat')],
+    session: { sessionId: 10, date: '2026-07-15', startedAtMs: Date.now(), sets },
+    sessionPlan: [slot(1, 3, 7, { plannedSets: 2, originalMovementId: 1 }), slot(2, 2, 8)],
+    activeSessionPlanSlotId: 2,
+    runner: runner({
+      slots: [
+        { sessionPlanSlotId: 1, movementId: 3, movementName: 'Box Squat', sets: 2, target: { kind: 'reps', reps: 7 }, targetRpe: 8 },
+        { sessionPlanSlotId: 2, movementId: 2, movementName: 'Later movement', sets: 3, target: { kind: 'reps', reps: 8 }, targetRpe: 8 },
+      ],
+      slotIndex: 1,
+      ...runnerOverrides,
+    }),
+  });
+
+  test('a finished swapped slot is titled with the replacement and does not repeat it as "includes"', () => {
+    mockState = swappedState([boxSet(77, 1), boxSet(78, 2)], { slotSetCounts: [2, 0], loggedSets: 2 });
+    render(<SessionScreen />);
+    expect(screen.getByText('Box Squat')).toBeOnTheScreen();
+    expect(screen.getByText('2 sets complete')).toBeOnTheScreen();
+    expect(screen.queryByText(/includes Box Squat/)).toBeNull();
+  });
+
+  test('a skipped swapped slot names the planned movement, as the completion card does', () => {
+    mockState = swappedState([boxSet(77, 1)], { slotSetCounts: [1, 0], loggedSets: 1, skippedSessionPlanSlotIds: [1] });
+    render(<SessionScreen />);
+    expect(screen.getByLabelText('Narrow Stance Squats, skipped, 1 of 2 sets logged as Box Squat')).toBeOnTheScreen();
+    expect(screen.getByText('Narrow Stance Squats')).toBeOnTheScreen();
+  });
+});
+
 test('a finished slot whose sets all match shows no includes', () => {
   mockState = state({
     movements: [
