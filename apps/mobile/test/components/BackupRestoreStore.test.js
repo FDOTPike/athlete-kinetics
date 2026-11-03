@@ -429,12 +429,22 @@ test('the file handed to the OS save sheet is named by the local-date namer', as
   const namer = jest.spyOn(require('../../src/state/backupFileName'), 'backupFileNameFor')
     .mockReturnValue('pikeMethods-2031-07-09.pmbak');
   try {
+    const before = Date.now();
     await useBackupStore.getState().createBackup('restore-password');
+    const after = Date.now();
     expect(useBackupStore.getState().status).toBe('success');
     expect(namer).toHaveBeenCalledTimes(1);
-    expect(namer.mock.calls[0][0]).toBeInstanceOf(Date);
+    // Review (PR 118): the namer is given the time of this backup, not any
+    // Date (an epoch or a stale stamp would also be a Date).
+    const namedAt = namer.mock.calls[0][0];
+    expect(namedAt).toBeInstanceOf(Date);
+    expect(namedAt.getTime()).toBeGreaterThanOrEqual(before);
+    expect(namedAt.getTime()).toBeLessThanOrEqual(after);
     expect(mockSaveDocuments).toHaveBeenCalledTimes(1);
-    expect(mockSaveDocuments.mock.calls[0][0].sourceUris[0]).toMatch(/\/pikeMethods-2031-07-09\.pmbak$/);
+    const saveCall = mockSaveDocuments.mock.calls[0][0];
+    // iOS names the saved file after the source file; Android uses fileName.
+    expect(saveCall.sourceUris[0]).toMatch(/\/pikeMethods-2031-07-09\.pmbak$/);
+    expect(saveCall.fileName).toBe('pikeMethods-2031-07-09.pmbak');
   } finally {
     namer.mockRestore();
   }
