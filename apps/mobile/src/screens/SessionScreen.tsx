@@ -300,10 +300,25 @@ export interface SessionScreenProps {
 // left the workout (the screen unmounts) and came back. Unlogged drafts are
 // kept here, in memory only, by session, slot, set and movement. They are
 // never logged evidence and never feed a suggestion.
+// Review (PR 194): each athlete has its own database, so session and slot
+// ids repeat between athletes; the athlete is part of the key. A draft is
+// kept only for the athlete and session in hand, and only for sets not yet
+// logged, so the map cannot grow with drafts nothing will read again.
 const unloggedLoadDrafts = new Map<string, string>();
-const loadDraftKey = (sessionId: number | undefined, slotId: number, logged: number, movementId: number | undefined): string =>
-  `${sessionId ?? 'none'}:${slotId}:${logged}:${movementId ?? 'none'}`;
+const loadDraftScope = (athleteId: string | null, sessionId: number | undefined): string =>
+  `${athleteId ?? 'none'}:${sessionId ?? 'none'}:`;
+const loadDraftKey = (athleteId: string | null, sessionId: number | undefined, slotId: number, logged: number, movementId: number | undefined): string =>
+  `${loadDraftScope(athleteId, sessionId)}${slotId}:${logged}:${movementId ?? 'none'}`;
+const pruneLoadDrafts = (athleteId: string | null, sessionId: number | undefined, slotId: number, logged: number): void => {
+  const scope = loadDraftScope(athleteId, sessionId);
+  for (const key of [...unloggedLoadDrafts.keys()]) {
+    if (!key.startsWith(scope)) { unloggedLoadDrafts.delete(key); continue; }
+    const [slot, setsLogged] = key.slice(scope.length).split(':');
+    if (Number(slot) === slotId && Number(setsLogged) < logged) unloggedLoadDrafts.delete(key);
+  }
+};
 export const clearUnloggedLoadDraftsForTests = (): void => { unloggedLoadDrafts.clear(); };
+export const unloggedLoadDraftCountForTests = (): number => unloggedLoadDrafts.size;
 
 export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionScreenProps = {}): React.JSX.Element {
   const state = useStore((s) => s);
@@ -608,10 +623,13 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
         advisoryKind: seed.advisoryKind,
       },
     };
-    const draft = unloggedLoadDrafts.get(loadDraftKey(session?.sessionId, currentSlot.sessionPlanSlotId, currentLogged, currentMovement?.movement_id));
+    pruneLoadDrafts(state.activeAthleteId, session?.sessionId, currentSlot.sessionPlanSlotId, currentLogged);
+    const draft = unloggedLoadDrafts.get(loadDraftKey(state.activeAthleteId, session?.sessionId, currentSlot.sessionPlanSlotId, currentLogged, currentMovement?.movement_id));
     setLoadText(draft ?? (initial === null ? '' : initial.toFixed(1)));
     setLoadInvalid(false);
   }, [
+    state.activeAthleteId,
+    session?.sessionId,
     currentSlot?.sessionPlanSlotId,
     currentLogged,
     currentMovement?.movement_id,
@@ -624,7 +642,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   const editLoadText = (text: string): void => {
     setLoadText(text);
     if (currentSlot !== null) {
-      unloggedLoadDrafts.set(loadDraftKey(session?.sessionId, currentSlot.sessionPlanSlotId, currentLogged, currentMovement?.movement_id), text);
+      unloggedLoadDrafts.set(loadDraftKey(state.activeAthleteId, session?.sessionId, currentSlot.sessionPlanSlotId, currentLogged, currentMovement?.movement_id), text);
     }
   };
 

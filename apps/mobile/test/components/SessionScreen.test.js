@@ -6,7 +6,7 @@ import { isDifficultyAllowed as actualIsDifficultyAllowed } from '../../../../pa
 import { resolveMovementAvailability as actualResolveMovementAvailability } from '../../../../packages/inference/src/capabilityResolver';
 import { JOINTS as ACTUAL_JOINTS, PATTERN_JOINTS } from '../../../../packages/inference/src/substitution';
 import { EXPERIENCE_SEVERITY } from '../../../../packages/inference/src/types';
-import SessionScreen, { clearUnloggedLoadDraftsForTests } from '../../src/screens/SessionScreen';
+import SessionScreen, { clearUnloggedLoadDraftsForTests, unloggedLoadDraftCountForTests } from '../../src/screens/SessionScreen';
 import { RestTimerCard } from '../../src/components/ui/RestTimerCard';
 import { advance as advanceRunner, restSecondsFor as runnerRestSecondsFor } from '../../../../packages/inference/src/sessionRunner';
 
@@ -2492,6 +2492,27 @@ test('an unlogged load survives leaving the workout and coming back', () => {
   first.unmount();
   render(<SessionScreen />);
   expect(screen.getByTestId('session-load-input').props.value).toBe(typed);
+});
+
+// Review (PR 194): session and slot ids repeat between athletes (one database
+// each), so a draft typed for one athlete must not appear for another, and
+// drafts outside the athlete and session in hand are dropped.
+test('an unlogged load typed for one athlete never shows for another', () => {
+  mockState = { ...mockState, activeAthleteId: 'athlete-a' };
+  const first = render(<SessionScreen />);
+  const seeded = screen.getByTestId('session-load-input').props.value;
+  const typed = seeded === '42.5' ? '47.5' : '42.5';
+  fireEvent.changeText(screen.getByTestId('session-load-input'), typed);
+  first.unmount();
+  expect(unloggedLoadDraftCountForTests()).toBe(1);
+  mockState = { ...mockState, activeAthleteId: 'athlete-b' };
+  const second = render(<SessionScreen />);
+  expect(screen.getByTestId('session-load-input').props.value).toBe(seeded);
+  expect(unloggedLoadDraftCountForTests()).toBe(0);
+  second.unmount();
+  mockState = { ...mockState, activeAthleteId: 'athlete-a' };
+  render(<SessionScreen />);
+  expect(screen.getByTestId('session-load-input').props.value).toBe(seeded);
 });
 
 test('without an edit, coming back shows the seeded load', () => {
