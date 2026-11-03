@@ -2338,6 +2338,20 @@ describe('session-2: honest discomfort wording per tier and after-save outcomes'
     }
   });
 
+  // Android walk 2026-11-03, W5-7: equal thirds cut "MODERATE" to "MODER…".
+  test('severity chips start at their label width and the row wraps instead of cutting a label', () => {
+    const { StyleSheet } = require('react-native');
+    mockState = discomfortFixture('beginner');
+    render(<SessionScreen />);
+    fireEvent.press(screen.getByLabelText('Report discomfort'));
+    const chip = StyleSheet.flatten(screen.getByTestId('niggle-severity-6').props.style);
+    expect(chip.flexGrow).toBe(1);
+    expect(chip.flex).toBeUndefined();
+    expect(chip.flexBasis).toBeUndefined();
+    const row = StyleSheet.flatten(screen.getByTestId('niggle-severity-row').props.style);
+    expect(row.flexWrap).toBe('wrap');
+  });
+
   test('beginner fixture: Mild (4) shows Report saved with this session., Moderate (6) opens substitution without the saved line, and Stop (8) halts without the saved line', () => {
     // 1. Beginner + Mild (4): below triageMin (5) and below haltMin (8) -> saved notice shown
     mockState = discomfortFixture('beginner');

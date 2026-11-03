@@ -1702,7 +1702,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                                 );
                               })}
                             </View>
-                            <View style={styles.severity}>
+                            <View style={styles.severity} testID="niggle-severity-row">
                               {[4, 6, 8].map((severity) => {
                                 const selectedSeverity = niggleSeverity === severity;
                                 const label = severity === 4 ? 'Mild' : severity === 6 ? 'Moderate' : 'Stop';
@@ -1713,7 +1713,8 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                                     selected={selectedSeverity}
                                     onPress={() => setNiggleSeverity(severity)}
                                     accessibilityLabel={`${label} discomfort, ${severity} of 10`}
-                                    style={{ flex: 1, marginHorizontal: theme.space[1] }}
+                                    testID={`niggle-severity-${severity}`}
+                                    style={styles.severityChip}
                                   />
                                 );
                               })}
@@ -2305,8 +2306,13 @@ const styles = StyleSheet.create({
   },
   severity: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     marginTop: theme.space[3],
   },
+  // Walk W5-7: equal thirds (flex: 1) cut "MODERATE" to "MODER…". Each chip
+  // now starts at its label's width and shares what is left; at large text
+  // the row wraps instead of cutting a label.
+  severityChip: { flexGrow: 1, margin: theme.space[1] },
   haltCard: {
     padding: theme.space[4],
     borderWidth: 1,
