@@ -580,6 +580,9 @@ final class AthleteKineticsUITests: XCTestCase {
         for claim in ["Connected", "granted"] where now.contains(claim) {
           XCTFail("the Health wording claimed access ('\(claim)') while the request was open: \(now)")
         }
+        if !denialTapped && now.hasPrefix("Apple Health access requested") {
+          XCTFail("Apple Health access requested appeared without tapping Don't Allow: \(now)")
+        }
         if now.hasPrefix("Apple Health access requested") { answered = denialTapped; break }
         if now.hasPrefix("The Apple Health request did not complete") { break }
         sleep(1)
