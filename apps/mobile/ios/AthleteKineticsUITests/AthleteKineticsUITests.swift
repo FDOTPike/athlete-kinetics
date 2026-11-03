@@ -269,7 +269,7 @@ final class AthleteKineticsUITests: XCTestCase {
   }
 
   private func unlockAdvancedTools() {
-    if element("advanced-athlete-manager").exists { return }
+    if (try? element("advanced-athlete-manager").snapshot()) != nil { return }
     let build = element("Build 0.1.0")
     // The label sits at the foot of the full Profile form, beyond reveal()'s
     // fifteen slow swipes; scroll down at normal speed first.
@@ -325,9 +325,9 @@ final class AthleteKineticsUITests: XCTestCase {
       // athlete-kinetics-ios-simulator-unsigned-xcode27, XCTest runner log at 18:22:02.810:
       // the Don't Allow button node is absent, its static text remains, and the table has two pages.
       // A dismissed sheet leaves no text behind, so the "sheet stayed open" checks stay truthful.
-      if inApp.exists || app.staticTexts.matching(named).firstMatch.exists { log("health sheet: in the app"); return inApp }
+      if (try? inApp.snapshot()) != nil || (try? app.staticTexts.matching(named).firstMatch.snapshot()) != nil { log("health sheet: in the app"); return inApp }
       let inSpringboard = healthPermissionButton(title, in: springboard)
-      if inSpringboard.exists || springboard.staticTexts.matching(named).firstMatch.exists { log("health sheet: in SpringBoard"); return inSpringboard }
+      if (try? inSpringboard.snapshot()) != nil || (try? springboard.staticTexts.matching(named).firstMatch.snapshot()) != nil { log("health sheet: in SpringBoard"); return inSpringboard }
       sleep(1)
     } while Date() < deadline
     return nil
@@ -366,7 +366,7 @@ final class AthleteKineticsUITests: XCTestCase {
           let ok = alert.buttons.matching(okNamed).firstMatch
           guard let frame = (try? ok.snapshot())?.frame else { continue }
           let mentionsHealth = (currentLabel(alert) ?? "").localizedCaseInsensitiveContains("Health")
-            || alert.staticTexts.matching(healthNamed).firstMatch.exists
+            || ((try? alert.staticTexts.matching(healthNamed).firstMatch.snapshot()) != nil)
           if mentionsHealth && healthAlert == nil && alert.buttons.count == 1 {
             healthAlert = (place, target, alert, ok, frame)
           } else if !mentionsHealth && okOnlyAlert == nil && place == "SpringBoard" && alert.buttons.count == 1 {
@@ -378,10 +378,52 @@ final class AthleteKineticsUITests: XCTestCase {
         let title = currentLabel(found.alert).flatMap { $0.isEmpty ? nil : $0 }
           ?? currentLabel(found.alert.staticTexts.firstMatch) ?? "<no title>"
         let kind = healthAlert != nil ? "Health alert" : "SpringBoard alert whose only button is OK"
-        found.target.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
-          .withOffset(CGVector(dx: found.frame.midX, dy: found.frame.midY)).tap()
+        let alertFrame = (try? found.alert.snapshot())?.frame ?? .null
+        let targetSnap = try? found.target.snapshot()
+        let targetFrame = targetSnap?.frame ?? found.target.frame
+        func findAlertAncestors(_ node: XCUIElementSnapshot) -> [XCUIElementSnapshot]? {
+          if node.elementType == .alert { return [node] }
+          for child in node.children {
+            if let path = findAlertAncestors(child) { return [node] + path }
+          }
+          return nil
+        }
+        var measuredOffset: CGFloat = 0
+        var offsetSource = "none"
+        if found.place == "the app" {
+          if let root = targetSnap, let ancestors = findAlertAncestors(root) {
+            for node in ancestors.reversed() where node.elementType != .alert {
+              let nf = node.frame
+              if nf.minY > 0 && nf.minY < targetFrame.midY && abs(nf.width - targetFrame.width) <= 2 {
+                measuredOffset = nf.minY
+                offsetSource = "sheetContainer.minY"
+                break
+              }
+              if nf.minY == 0 && nf.height > targetFrame.midY && nf.height < targetFrame.height - 1 && abs(nf.width - targetFrame.width) <= 2 {
+                measuredOffset = targetFrame.height - nf.height
+                offsetSource = "targetHeight-remoteHeight"
+                break
+              }
+            }
+          }
+          if measuredOffset == 0 && !alertFrame.isNull && alertFrame.midY < targetFrame.midY {
+            measuredOffset = targetFrame.midY - alertFrame.midY
+            offsetSource = "targetMidY-alertMidY"
+          }
+        }
+        let rootOrigin = found.target.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
+        let initialOffsetY = found.frame.midY + measuredOffset
+        var tapPath = measuredOffset > 0 ? "\(offsetSource)(+\(Int(measuredOffset.rounded()))pt)" : "direct"
+        rootOrigin.withOffset(CGVector(dx: found.frame.midX, dy: initialOffsetY)).tap()
         sleep(1)
-        log("HEALTH-ALERT-OK tapped OK on a system \(kind) in \(found.place) (\(context)); title: \(title.prefix(120)); still shown after 1 s: \(found.ok.exists ? "yes" : "no")")
+        var stillShown = (try? found.ok.snapshot()) != nil
+        if stillShown && measuredOffset > 0 {
+          rootOrigin.withOffset(CGVector(dx: found.frame.midX, dy: found.frame.midY)).tap()
+          sleep(1)
+          stillShown = (try? found.ok.snapshot()) != nil
+          if !stillShown { tapPath = "unshifted-after-\(offsetSource)" }
+        }
+        log("HEALTH-ALERT-OK tapped OK on a system \(kind) in \(found.place) (\(context)); title: \(title.prefix(120)); tapPath=\(tapPath) okFrame=(\(Int(found.frame.midX)),\(Int(found.frame.midY))) alertMidY=\(alertFrame.isNull ? -1 : Int(alertFrame.midY)); still shown after 1 s: \(stillShown ? "yes" : "no")")
         return true
       }
       usleep(250_000)

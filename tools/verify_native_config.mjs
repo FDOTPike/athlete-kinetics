@@ -276,8 +276,8 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
       && denial.includes('springboard.tables.containing(named).firstMatch')
       && /if table\.exists && table\.isHittable \{\s+table\.swipeUp\(velocity: \.slow\)\s+scrolls \+= 1/.test(denial)
       && !/coordinate\(|snapshot\(/.test(denial)
-      && suite.includes('inApp.exists || app.staticTexts.matching(named).firstMatch.exists')
-      && suite.includes('inSpringboard.exists || springboard.staticTexts.matching(named).firstMatch.exists'));
+      && suite.includes('(try? inApp.snapshot()) != nil || (try? app.staticTexts.matching(named).firstMatch.snapshot()) != nil')
+      && suite.includes('(try? inSpringboard.snapshot()) != nil || (try? springboard.staticTexts.matching(named).firstMatch.snapshot()) != nil'));
   const reveal = suite.slice(suite.indexOf('private func reveal('), suite.indexOf('private func tap('));
   check('general reveal keeps the passing master app gestures without extra ScrollView queries',
     reveal.includes('app.swipeUp(velocity: .slow)') && reveal.includes('app.swipeDown(velocity: .slow)')
