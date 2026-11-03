@@ -103,7 +103,6 @@ interface WeekRow {
   cells: (BlockSessionSummary | null)[];
 }
 
-const signed = (value: number): string => (value > 0 ? `+${value}` : String(value));
 
 const focusLabel = (focus: string): string => FOCUS_ABBREV[focus] ?? focus.slice(0, 3).toUpperCase();
 
@@ -119,6 +118,24 @@ const SUSPENSION_REASON_LABEL: Record<(typeof SUSPENSION_REASONS)[number], strin
   injury: 'an injury',
   illness: 'illness',
   life: 'life events',
+};
+
+/** Walk W3-7: "Why today changed" showed raw values ("profile", "x0.77",
+ *  "-1"). These say the same thing in words. */
+const ADJUSTMENT_SOURCE_TEXT: Record<string, string> = {
+  profile: 'Based on your profile',
+  policy: 'Based on your readiness',
+  guardrail: 'A safety limit',
+};
+export const loadChangeText = (modifier: number): string => {
+  const pct = Math.round((1 - modifier) * 100);
+  if (pct === 0) return 'No change';
+  return pct > 0 ? `Planned load reduced by ${pct}%` : `Planned load raised by ${-pct}%`;
+};
+export const setChangeText = (delta: number): string => {
+  if (delta === 0) return 'No change';
+  const n = Math.abs(delta);
+  return `${n} ${delta < 0 ? 'fewer' : 'more'} ${n === 1 ? 'set' : 'sets'}`;
 };
 
 /** The paused card names the block the athlete can see on this screen (the
@@ -668,7 +685,9 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
             <Text style={styles.adjustedText} testID="suspension-error">{suspendError}</Text>
           )}
         </View>
-      ) : (
+      ) : block !== null || program != null ? (
+        /* Walk W3-7: with no block and no program there is nothing to hold,
+           so the pause buttons are not offered. An open pause still shows. */
         <View style={styles.card}>
           <Text style={styles.eyebrow}>PAUSE</Text>
           <Text style={styles.cardTitle}>Injured, ill, or life got in the way?</Text>
@@ -698,7 +717,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
             <Text style={styles.adjustedText} testID="suspension-error">{suspendError}</Text>
           )}
         </View>
-      )}
+      ) : null}
 
       {program != null && (
         <View style={styles.card}>
@@ -734,7 +753,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
         </View>
         <Text style={styles.cardTitle}>{todayTitle}</Text>
         <Text style={styles.bodyText}>{todayMessage}</Text>
-        {current !== null && !halted && isPrescriptionReduced(current.vector, profile) && (
+        {current !== null && !halted && (todayPlan !== null || session !== null) && isPrescriptionReduced(current.vector, profile) && (
           <Text style={styles.adjustedText}>Coach adjusted today's plan.</Text>
         )}
 
@@ -1033,15 +1052,15 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
             <View style={styles.disclosureContent}>
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Source</Text>
-                <Text style={styles.infoValue}>{current.source}</Text>
+                <Text style={styles.infoValue}>{ADJUSTMENT_SOURCE_TEXT[current.source] ?? current.source}</Text>
               </View>
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Load</Text>
-                <Text style={styles.infoValue}>x{current.vector.load_modifier.toFixed(2)}</Text>
+                <Text style={styles.infoValue}>{loadChangeText(current.vector.load_modifier)}</Text>
               </View>
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Sets</Text>
-                <Text style={styles.infoValue}>{signed(current.vector.set_modifier)}</Text>
+                <Text style={styles.infoValue}>{setChangeText(current.vector.set_modifier)}</Text>
               </View>
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>RPE cap</Text>

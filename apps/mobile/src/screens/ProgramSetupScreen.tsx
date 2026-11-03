@@ -32,6 +32,27 @@ import {
   type TrainingProgramMovementPreference,
 } from '../state/useStore';
 
+const FOCUS_SPLIT_WORD: Record<BlockFocus, string> = {
+  lower: 'lower-body',
+  upper: 'upper-body',
+  full: 'full-body',
+  conditioning: 'conditioning',
+  bjj: 'BJJ',
+};
+
+/** Walk W3-9b: the split description kept the objective's default wording
+ *  ("alternated with conditioning") after the athlete set every day to full.
+ *  When the chosen day types differ from the defaults, describe the choice. */
+export const chosenSplitText = (objective: string, focuses: readonly BlockFocus[]): string => {
+  const defaults = programFocuses(objective as Parameters<typeof programFocuses>[0], focuses.length);
+  if (focuses.every((focus, i) => focus === defaults[i])) return splitExplainer(objective, focuses.length);
+  const counts = new Map<BlockFocus, number>();
+  for (const focus of focuses) counts.set(focus, (counts.get(focus) ?? 0) + 1);
+  const parts = [...counts].map(([focus, n]) => `${n} ${FOCUS_SPLIT_WORD[focus]} ${n === 1 ? 'session' : 'sessions'}`);
+  const list = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+  return `${list} a week, as you chose.`;
+};
+
 /** Walk W3-8: the build page printed the resolver's raw reason codes
  *  ("capability"). Use the same plain words the Library uses. */
 export const anchorReasonText = (reasons: readonly string[]): string => {
@@ -371,13 +392,14 @@ export default function ProgramSetupScreen({
     const bodyweightNames = new Set((movements ?? [])
       .filter((m) => (m.supportedPrefixes ?? []).length === 1 && m.supportedPrefixes[0] === 'Bodyweight')
       .map((m) => m.movement_id));
-    return weeklyProgressionSummary(
+    // Walk W3-9b: the same line came back once per training day.
+    return [...new Set(weeklyProgressionSummary(
       previewResult.preview.plan,
       (movementId) => {
         const m = (movements ?? []).find((item) => item.movement_id === movementId);
         return m ? { name: m.name, bodyweight: bodyweightNames.has(m.movement_id) } : undefined;
       },
-    );
+    ))];
   }, [previewResult.preview, movements]);
 
   // R8 §2.3 said a rule must never be enforced invisibly. That contract is kept
@@ -591,7 +613,11 @@ export default function ProgramSetupScreen({
         {/* Split explainer */}
         <View style={styles.explainerBox}>
           <Text style={styles.explainerText}>
-            {splitExplainer(profile.objective, dayIndices.length)}
+            {chosenSplitText(
+              profile.objective,
+              dayIndices.map((dayIndex, i) =>
+                dayFocuses[dayIndex] ?? programFocuses(profile.objective, dayIndices.length)[i] ?? 'full'),
+            )}
           </Text>
           <Text style={styles.explainerFooter}>{SPLIT_EXPLAINER_FOOTER}</Text>
         </View>

@@ -216,7 +216,7 @@ test('COACH keeps the trajectory compact and expands a session only when its day
 
   fireEvent.press(screen.getByLabelText('Why today changed'));
   expect(screen.getByText('Source')).toBeOnTheScreen();
-  expect(screen.getByText('policy')).toBeOnTheScreen();
+  expect(screen.getByText('Based on your readiness')).toBeOnTheScreen();
 
   expect(screen.getByLabelText('Manage current block')).toBeOnTheScreen();
   fireEvent.press(screen.getByLabelText('Manage current block'));

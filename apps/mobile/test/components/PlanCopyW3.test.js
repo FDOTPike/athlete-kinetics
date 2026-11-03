@@ -34,3 +34,27 @@ test('the objective info button follows the selected objective', () => {
     expect(getGlossaryEntry(term)).toBeTruthy();
   }
 });
+
+// W3-7: "Why today changed" showed raw values ("x0.77", "-1").
+test('adjustment values read as words', () => {
+  const { loadChangeText, setChangeText } = require('../../src/screens/BlockScreen');
+  expect(loadChangeText(0.77)).toBe('Planned load reduced by 23%');
+  expect(loadChangeText(1)).toBe('No change');
+  expect(loadChangeText(1.05)).toBe('Planned load raised by 5%');
+  expect(setChangeText(-1)).toBe('1 fewer set');
+  expect(setChangeText(-2)).toBe('2 fewer sets');
+  expect(setChangeText(0)).toBe('No change');
+});
+
+// W3-9b: the split description kept the default wording after the athlete
+// set every day to full.
+test('the split description follows the chosen day types', () => {
+  const { chosenSplitText } = require('../../src/screens/ProgramSetupScreen');
+  const { programFocuses, splitExplainer } = require('@ak/inference');
+  const defaults = [...programFocuses('endurance', 2)];
+  expect(chosenSplitText('endurance', defaults)).toBe(splitExplainer('endurance', 2));
+  expect(chosenSplitText('endurance', ['full', 'full'])).toBe('2 full-body sessions a week, as you chose.');
+  expect(chosenSplitText('strength', ['full', 'lower', 'full'])).toBe(
+    '2 full-body sessions and 1 lower-body session a week, as you chose.',
+  );
+});

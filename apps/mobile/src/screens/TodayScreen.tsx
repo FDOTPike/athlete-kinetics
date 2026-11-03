@@ -101,6 +101,7 @@ function AvailableTodayScreen({
   const todayPlan = useStore((s) => s.todayPlan);
   const blockSessions = useStore((s) => s.blockSessions);
   const block = useStore((s) => s.block);
+  const suspension = useStore((s) => s.suspension);
   const hasArchivedBlock = useStore((s) => s.hasArchivedBlock);
   const lastTriage = useStore((s) => s.lastTriage);
   const prescription = useStore((s) => s.prescription);
@@ -485,6 +486,20 @@ function AvailableTodayScreen({
     >
       {workoutCard()}
 
+      {/* Walk W3-1b: a pause was visible only on Plan. Today now says so,
+          and points to the same card to resume. */}
+      {suspension != null && (
+        <View style={styles.card} testID="today-paused">
+          <Text style={styles.eyebrow}>PROGRAMME PAUSED</Text>
+          <Text style={styles.body}>Your place is being held. You can still train.</Text>
+          <QuietAction
+            label="Manage pause"
+            onPress={() => onOpenPlan?.()}
+            accessibilityLabel="Manage the pause on your plan"
+          />
+        </View>
+      )}
+
       {error !== null && (
         <Text style={styles.error} accessibilityLiveRegion="polite" testID="today-error">
           {error}
@@ -528,7 +543,7 @@ function AvailableTodayScreen({
       {state.kind !== 'planned' && state.kind !== 'active_session' && state.kind !== 'halted' && (
         renderNext(
           'next' in state ? state.next : null,
-          'No further sessions are scheduled in this block.',
+          block === null ? 'No training block is set up.' : 'No further sessions are scheduled in this block.',
         )
       )}
 
