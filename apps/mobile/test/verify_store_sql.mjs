@@ -1021,21 +1021,23 @@ if (resetTables.length >= 15) {
   };
   const sqlNaming = (table) => sqlNamingIn(storeSrc, table);
   const throwsOn = (src) => { try { sqlNamingIn(src, 'probe_table'); return false; } catch { return true; } };
-  a('the SQL-naming check folds constant interpolations and fails closed on names it cannot resolve',
-    JSON.stringify(sqlNamingIn([
+  // Review (PR 119): each fixture's result is computed once and that same
+  // value is both compared and printed, so a failing case is always shown.
+  const foldedNaming = JSON.stringify(sqlNamingIn([
       "a(`SELECT * FROM probe_${'table'}`)",
       'b(`SELECT * FROM probe_${suffix}`)',
       'c(`SELECT * FROM ${prefix}_table`)',
       'd(`DELETE FROM other_table WHERE id = ${id}`)',
-    ].join('\n'), 'probe_table')) === JSON.stringify([
+    ].join('\n'), 'probe_table'));
+  a('the SQL-naming check folds constant interpolations and fails closed on names it cannot resolve',
+    foldedNaming === JSON.stringify([
       'SELECT * FROM probe_table',
       'UNRESOLVED: SELECT * FROM probe_${}',
       'UNRESOLVED: SELECT * FROM ${}_table',
-    ]), JSON.stringify(sqlNamingIn('a(`SELECT * FROM probe_${\'table\'}`); b(`SELECT * FROM probe_${suffix}`)', 'probe_table')));
+    ]), foldedNaming);
   a('the SQL-naming check refuses source it cannot parse',
     throwsOn("x('DELETE FROM probe_table');\nconst y = ;") && !throwsOn("x('DELETE FROM probe_table');"));
-  a('the SQL-naming check sees single-quoted, double-quoted and backtick SQL alike, in any case, and not in comments',
-    JSON.stringify(sqlNamingIn([
+  const quotedNaming = JSON.stringify(sqlNamingIn([
       "x('DELETE FROM probe_table')",
       'y("INSERT INTO probe_table (a) VALUES (?)")',
       'z(`SELECT a\n   FROM probe_table\n  WHERE a = ?`)',
@@ -1046,14 +1048,16 @@ if (resetTables.length >= 15) {
       'q(`SELECT a FROM Probe_table WHERE b = ${b}`)',
       '// Documentation example: `SELECT * FROM probe_table`',
       "/* or 'DELETE FROM probe_table' in a block comment */",
-    ].join('\n'), 'probe_table')) === JSON.stringify([
+    ].join('\n'), 'probe_table'));
+  a('the SQL-naming check sees single-quoted, double-quoted and backtick SQL alike, in any case, and not in comments',
+    quotedNaming === JSON.stringify([
       'DELETE FROM probe_table',
       'INSERT INTO probe_table (a) VALUES (?)',
       'SELECT a FROM probe_table WHERE a = ?',
       'DELETE FROM PROBE_TABLE',
       'insert into Probe_Table (a) values (?)',
       'SELECT a FROM Probe_table WHERE b = ${}',
-    ]), JSON.stringify(sqlNamingIn('z(`SELECT a\n FROM probe_table`); y("DELETE FROM PROBE_TABLE") // `SELECT * FROM probe_table`', 'probe_table')));
+    ]), quotedNaming);
   a('071: the store names session_skipped_slot in one INSERT and one DELETE only',
     JSON.stringify(sqlNaming('session_skipped_slot').sort()) === JSON.stringify([
       'DELETE FROM session_skipped_slot',
