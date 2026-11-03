@@ -411,18 +411,37 @@ final class AthleteKineticsUITests: XCTestCase {
         let initialOffsetY = found.frame.midY + measuredOffset
         var tapY = initialOffsetY
         var tapPath = measuredOffset > 0 ? "\(offsetSource)(+\(Int(measuredOffset.rounded()))pt)" : "direct"
+        func probeAlertOKStillShown(_ phase: String) -> Bool {
+          do {
+            _ = try found.ok.snapshot()
+            return true
+          } catch {
+            let okErrorText = String(describing: error)
+            do {
+              let root = try found.target.snapshot()
+              if findAlertAncestors(root) == nil {
+                return false
+              }
+              log("health alert probe (\(phase)) found alert still in \(found.place) tree after ok.snapshot() threw: \(okErrorText)")
+              return true
+            } catch let targetError {
+              log("health alert probe (\(phase)) query failed in \(found.place); ok error: \(okErrorText); target error: \(targetError)")
+              return true
+            }
+          }
+        }
         rootOrigin.withOffset(CGVector(dx: found.frame.midX, dy: initialOffsetY)).tap()
         sleep(1)
-        var stillShown = (try? found.ok.snapshot()) != nil
+        var stillShown = probeAlertOKStillShown("after-1s")
         if stillShown && measuredOffset > 0 {
           rootOrigin.withOffset(CGVector(dx: found.frame.midX, dy: found.frame.midY)).tap()
           tapY = found.frame.midY
           sleep(1)
-          stillShown = (try? found.ok.snapshot()) != nil
+          stillShown = probeAlertOKStillShown("after-unshifted-retry")
           tapPath = stillShown ? "\(tapPath),unshifted-retry" : "unshifted-after-\(offsetSource)"
         }
         sleep(2)
-        let stillShownAfter3s = (try? found.ok.snapshot()) != nil
+        let stillShownAfter3s = probeAlertOKStillShown("after-3s")
         log("HEALTH-ALERT-OK tapped OK on a system \(kind) in \(found.place) (\(context)); title: \(title.prefix(120)); tapPath=\(tapPath) okFrame=(\(Int(found.frame.midX)),\(Int(found.frame.midY))) tapY=\(Int(tapY.rounded())) remoteContainer=(minY:\(remoteContainerMinY),h:\(remoteContainerHeight)) alertMidY=\(alertFrame.isNull ? -1 : Int(alertFrame.midY)); still shown after 1 s: \(stillShown ? "yes" : "no"); still shown 2 s later: \(stillShownAfter3s ? "yes" : "no")")
         XCTAssertFalse(stillShownAfter3s, "the Health Access alert stayed open after the OK tap")
         return true
