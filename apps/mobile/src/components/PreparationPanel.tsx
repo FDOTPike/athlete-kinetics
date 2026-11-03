@@ -45,7 +45,9 @@ const STAGE_LABEL: Record<PreparationStage, string> = {
 };
 
 const recordedText = (item: PreparationItem | undefined, record: PreparationItemRecord): string => {
-  const unit = item === undefined ? '' : preparationDoseUnit(item.dose) === 'seconds' ? ' seconds' : ' reps';
+  // Walk 2 (W2-11): an item planned "each side" records its change per side too.
+  const side = item !== undefined && 'perSide' in item.dose && item.dose.perSide ? ' each side' : '';
+  const unit = (item === undefined ? '' : preparationDoseUnit(item.dose) === 'seconds' ? ' seconds' : ' reps') + side;
   switch (record.status) {
     case 'pending': return 'Not recorded';
     case 'done': return 'Done as written';
