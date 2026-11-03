@@ -121,6 +121,19 @@ const SUSPENSION_REASON_LABEL: Record<(typeof SUSPENSION_REASONS)[number], strin
   life: 'life events',
 };
 
+/** The paused card names the block the athlete can see on this screen (the
+ *  goal program's "Block N of M"), never the internal 8-position cycle index,
+ *  which is a different counter and read as a contradiction (walk W3-1). */
+export function pausedHeldText(
+  reasonLabel: string,
+  program: { currentSequenceIndex: number; plannedBlockCount: number } | null | undefined,
+): string {
+  const place = program != null
+    ? `You are held at block ${program.currentSequenceIndex} of ${program.plannedBlockCount}`
+    : 'Your place is held';
+  return `Paused for ${reasonLabel}. ${place} and will come back to it — training you do now will not use it up. Keep training if you can; everything else works as normal.`;
+}
+
 function targetLabel(slot: TodaySlot): string {
   return slot.target.kind === 'time'
     ? `${slot.sets} x ${slot.target.seconds}s`
@@ -519,7 +532,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
     todayMessage = 'Your active workout is ready to resume.';
   } else if (todayPlan !== null) {
     todayTitle = `Today: ${focusName(todayPlan.focus)}`;
-    todayMessage = `${todayPlan.slots.length} movements are planned. Start when you are ready.`;
+    todayMessage = `${todayPlan.slots.length} ${todayPlan.slots.length === 1 ? 'movement is' : 'movements are'} planned. Start when you are ready.`;
   } else if (block === null) {
     todayTitle = hasArchivedBlock ? 'Your previous block had ended.' : 'Build your first block';
     todayMessage = 'A short four-week block gives Coach a clear trajectory to follow.';
@@ -626,9 +639,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           <Text style={styles.eyebrow}>PROGRAMME PAUSED</Text>
           <Text style={styles.cardTitle}>Your place is being held</Text>
           <Text style={styles.bodyText}>
-            Paused for {SUSPENSION_REASON_LABEL[suspension.reason]}. You are held at block{' '}
-            {suspension.frozen_macro_index} of 8 and will come back to it — training you do now
-            will not use it up. Keep training if you can; everything else works as normal.
+            {pausedHeldText(SUSPENSION_REASON_LABEL[suspension.reason], program)}
           </Text>
           <PrimaryButton
             label="Resume my programme"
@@ -644,7 +655,9 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                 setSuspendError(e instanceof Error ? e.message : String(e));
               }
             }}
-            accessibilityLabel={`Resume the programme and return to block ${suspension.frozen_macro_index} of 8`}
+            accessibilityLabel={program != null
+              ? `Resume the programme and return to block ${program.currentSequenceIndex} of ${program.plannedBlockCount}`
+              : 'Resume the programme and return to your place'}
             testID="suspension-resume"
           />
           {/* Mounted INSIDE the suspended branch. The resume button exists only
@@ -1192,7 +1205,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
               <Text style={styles.captionText}>
                 {block.objective.replace(/_/g, ' ')} block, started {block.startDate}
                 {blockMeta !== null
-                  ? ` - ${blockMeta.schemaType} - macro block ${blockMeta.macroBlockIndex} of 8`
+                  ? ` - ${blockMeta.schemaType}`
                   : ''}
               </Text>
             ) : (

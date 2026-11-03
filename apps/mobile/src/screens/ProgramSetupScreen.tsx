@@ -25,11 +25,21 @@ import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { EmphasisReportCard } from '../components/EmphasisReportCard';
 import { recommendedProgramDefaults } from '../state/programDefaults';
 import {
+  REASON_TEXT_MAP,
   useStore,
   type TrainingProgramDay,
   type TrainingProgramInput,
   type TrainingProgramMovementPreference,
 } from '../state/useStore';
+
+/** Walk W3-8: the build page printed the resolver's raw reason codes
+ *  ("capability"). Use the same plain words the Library uses. */
+export const anchorReasonText = (reasons: readonly string[]): string => {
+  const text = reasons
+    .map((reason) => REASON_TEXT_MAP[reason as keyof typeof REASON_TEXT_MAP] ?? reason)
+    .join('; ');
+  return text.length > 0 ? `${text.charAt(0).toUpperCase()}${text.slice(1)}.` : '';
+};
 
 const SCHEMA_LABEL: Record<SchemaType, string> = {
   LINEAR: 'Linear', WAVE: 'Undulating', STEP: 'Step loading', APRE: 'Autoregulated',
@@ -485,10 +495,10 @@ export default function ProgramSetupScreen({
           {anchorCoverage.map((anchor) => (
             <View key={anchor.name} style={styles.anchorRow}>
               <Text style={styles.anchorName}>
-                {anchor.name}: {anchor.state === 'available' ? 'ready' : anchor.state === 'missing_from_library' ? 'not in your library' : 'blocked'}
+                {anchor.name}: {anchor.state === 'available' ? 'ready' : anchor.state === 'missing_from_library' ? 'not in your library' : 'not available yet'}
               </Text>
               {anchor.state === 'blocked' && anchor.reasons.length > 0 && (
-                <Text style={styles.caption}>{anchor.reasons.join(', ')}</Text>
+                <Text style={styles.caption}>{anchorReasonText(anchor.reasons)}</Text>
               )}
               {anchor.confirmWouldClear && (
                 <>

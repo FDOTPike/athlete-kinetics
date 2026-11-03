@@ -61,6 +61,19 @@ const formatFinalizedDate = (ms: number): string => {
 // ---------------------------------------------------------------------------
 // Primitives consuming frozen components from components/ui
 // ---------------------------------------------------------------------------
+/** Walk W3 (for W4): the objective info button always asked "What does GPP
+ *  mean?". It now explains the objective that is selected. Weight loss has no
+ *  glossary entry, so it shows no button rather than a wrong one. */
+export const OBJECTIVE_TIP: Partial<Record<(typeof OBJECTIVES)[number], string>> = {
+  strength: 'STRENGTH',
+  hypertrophy: 'HYPERTROPHY',
+  power: 'POWER',
+  endurance: 'ENDURANCE',
+  gpp: 'GPP',
+  hybrid: 'HYBRID',
+  rehab: 'RETURN TO TRAINING',
+};
+
 interface ChipRowProps<T extends string> {
   label: string;
   options: readonly T[];
@@ -440,7 +453,7 @@ export default function ProfileScreen(): React.JSX.Element {
       <HealthTrainingSupportForm />
       <ChipRow
         label="1 · OBJECTIVE"
-        tip="GPP"
+        tip={OBJECTIVE_TIP[profile.objective]}
         options={OBJECTIVES}
         value={profile.objective}
         onSelect={(objective) => saveProfile({ objective })}
