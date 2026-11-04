@@ -77,8 +77,31 @@ test('a sparring round chosen for a conditioning day is refused, not silently re
   expect(previewWith('conditioning')).toThrow('A preferred movement does not belong on that day.');
 });
 
-test('the same choice on a BJJ day passes the day rule', () => {
-  let message = null;
-  try { previewWith('bjj')(); } catch (e) { message = e.message; }
-  expect(message).not.toBe('A preferred movement does not belong on that day.');
+test('the same choice on a BJJ day is accepted and placed in its slot', () => {
+  const slot = sameSlot('bjj');
+  const { plan } = previewWith('bjj')();
+  const placed = plan.sessions.find((session) => session.day_index === 1).slots
+    .find((candidate) => candidate.slot_index === slot.slot_index);
+  expect(placed.movement_id).toBe(sparring().movement_id);
+});
+
+// Review (PR 194): a preference saved before the day rule existed must not
+// make the continuation preview throw. It is left out, as continuation's
+// generator leaves it out.
+test('a saved preference that no longer fits its day does not break the continuation preview', () => {
+  const m = sparring();
+  const slot = sameSlot('conditioning');
+  expect(useStore.getState().createTrainingProgram({ ...baseInput('conditioning'), horizon: { kind: 'weeks', blockCount: 2 } })).toBe(true);
+  const raw = mockDriverFor('athlete_kinetics.db').raw;
+  const { program_id: programId } = raw.prepare("SELECT program_id FROM training_program WHERE status = 'active'").get();
+  raw.prepare(`INSERT INTO training_program_movement_preference (program_id, day_index, slot_index, pattern, movement_id)
+    VALUES (?, 1, ?, ?, ?)`).run(programId, slot.slot_index, m.pattern, m.movement_id);
+  raw.exec("UPDATE training_block SET start_date = date('now', '-28 days')");
+  useStore.getState().refreshProgram();
+  useStore.getState().refreshBlock();
+  expect(useStore.getState().program.movementPreferences.map((p) => p.movementId)).toEqual([m.movement_id]);
+  const preview = useStore.getState().previewNextProgramBlock();
+  expect(preview).not.toBeNull();
+  const day = preview.sessions.find((session) => session.day_index === 1);
+  expect(day.slots.map((candidate) => candidate.movement_id)).not.toContain(m.movement_id);
 });

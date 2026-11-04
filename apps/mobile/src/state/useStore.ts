@@ -5086,10 +5086,21 @@ export const useStore = create<KineticsStore>()((set, get) => {
     if (current === null || block === null || current.status !== 'active'
         || localToday() <= addDaysIso(block.startDate, 27)
         || current.currentSequenceIndex >= current.plannedBlockCount) return null;
+    // Review (PR 194): a preference saved before the focus-day rule may no
+    // longer fit its day. Continuation hands it to the generator, which leaves
+    // it out; the preview leaves out the same preferences (and only those)
+    // instead of refusing, so the review button cannot throw on old data.
+    const byId = new Map(get().movements.map((movement) => [movement.movement_id, movement]));
+    const focusByDay = new Map(current.days.map((day) => [day.dayIndex, day.focus as BlockFocus]));
+    const movementPreferences = current.movementPreferences.filter((preference) => {
+      const movement = byId.get(preference.movementId);
+      const focus = focusByDay.get(preference.dayIndex);
+      return movement === undefined || focus === undefined || movementFitsFocusDay(movement, focus);
+    });
     const input: TrainingProgramInput = {
       horizon: { kind: 'weeks', blockCount: current.plannedBlockCount },
       schemaType: current.schemaType, dayIndices: current.days.map((day) => day.dayIndex),
-      movementPreferences: current.movementPreferences,
+      movementPreferences,
     };
     return get().previewTrainingProgram(input).plan;
   },
