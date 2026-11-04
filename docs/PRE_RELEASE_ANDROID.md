@@ -182,9 +182,10 @@ The same applies to the QA variant (`.\gradlew.bat assembleQa --no-daemon`).
 - The value is read by `apps/mobile/babel.config.js` when the JS bundle is
   built and written into the bundle. The Gradle bundle task and Metro's cache
   are keyed on it, so switching it re-bundles.
-- Debug builds load JS from Metro: start Metro with the value set
-  (`$env:AK_BETA_BUILD='on'; npx react-native start`) to try the beta features
-  in a debug build.
+- Debug builds load JS from Metro: start Metro from the app folder with the
+  value set, so it uses the app's entry point and `metro.config.js`
+  (`Push-Location apps\mobile; $env:AK_BETA_BUILD='on'; npx react-native start`),
+  to try the beta features in a debug build.
 - Check on the device: the GLOSSARY screen shows a "Question box" action only
   in a beta build.
 
