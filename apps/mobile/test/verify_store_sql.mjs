@@ -972,7 +972,92 @@ if (resetTables.length >= 15) {
 {
   const { readdirSync, statSync } = await import('node:fs');
   const storeSrc = readFileSync(join(import.meta.dirname, '..', 'src', 'state', 'useStore.ts'), 'utf-8');
-  const sqlNaming = (table) => [...storeSrc.matchAll(new RegExp("'([^'\\n]*\\b" + table + "\\b[^'\\n]*)'", 'g'))].map((m) => m[1]);
+  // Every string literal in the code that names the table: single-quoted,
+  // double-quoted and backtick (which may span lines; whitespace is collapsed).
+  // Single quotes alone missed a backtick SELECT in review (PR 116,
+  // 2026-11-03), so a read of a record-only table went unseen. The literals
+  // come from the TypeScript parser, so a comment that quotes SQL is not code
+  // and is not counted, and a backtick in one place cannot pair with another.
+  // SQLite table names are case-insensitive, so the name is matched without
+  // regard to case: `FROM SESSION_SKIPPED_SLOT` is the same read.
+  const ts = createRequire(import.meta.url)('typescript');
+  // Review (PR 119): a constant interpolation (`session_${'skipped_slot'}`) is
+  // folded into the text, so it is read like any other literal. Any other
+  // interpolation that touches part of the table name (`session_${x}`) cannot
+  // be resolved here and is reported as UNRESOLVED, which fails the exact
+  // checks below: a verifier fails closed. Source the parser could not read
+  // is an error, not an empty result.
+  const sqlNamingIn = (src, table) => {
+    const named = new RegExp('\\b' + table + '\\b', 'i');
+    const lower = table.toLowerCase();
+    const touchesName = (fragment) => fragment !== undefined && fragment.length >= 3 && lower.includes(fragment.toLowerCase());
+    const found = [];
+    const visit = (node) => {
+      let text = null;
+      if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) text = node.text;
+      else if (ts.isTemplateExpression(node)) {
+        text = node.head.text;
+        let unresolved = false;
+        for (const span of node.templateSpans) {
+          const e = span.expression;
+          if (ts.isStringLiteral(e) || ts.isNoSubstitutionTemplateLiteral(e) || ts.isNumericLiteral(e)) {
+            text += e.text + span.literal.text;
+          } else {
+            if (touchesName(/[A-Za-z0-9_]+$/.exec(text)?.[0]) || touchesName(/^[A-Za-z0-9_]+/.exec(span.literal.text)?.[0])) unresolved = true;
+            text += '${}' + span.literal.text;
+          }
+        }
+        if (unresolved) found.push('UNRESOLVED: ' + text.replace(/\s+/g, ' ').trim());
+      }
+      if (text !== null && named.test(text)) found.push(text.replace(/\s+/g, ' ').trim());
+      ts.forEachChild(node, visit);
+    };
+    const file = ts.createSourceFile('probe.ts', src, ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
+    const problems = file.parseDiagnostics;
+    if (!Array.isArray(problems)) throw new Error('verify_store_sql: the TypeScript parser gave no diagnostics list; the parse cannot be trusted');
+    if (problems.length > 0) throw new Error(`verify_store_sql: the source does not parse (${problems.length} error(s)); the SQL check cannot read it`);
+    visit(file);
+    return found;
+  };
+  const sqlNaming = (table) => sqlNamingIn(storeSrc, table);
+  const throwsOn = (src) => { try { sqlNamingIn(src, 'probe_table'); return false; } catch { return true; } };
+  // Review (PR 119): each fixture's result is computed once and that same
+  // value is both compared and printed, so a failing case is always shown.
+  const foldedNaming = JSON.stringify(sqlNamingIn([
+      "a(`SELECT * FROM probe_${'table'}`)",
+      'b(`SELECT * FROM probe_${suffix}`)',
+      'c(`SELECT * FROM ${prefix}_table`)',
+      'd(`DELETE FROM other_table WHERE id = ${id}`)',
+    ].join('\n'), 'probe_table'));
+  a('the SQL-naming check folds constant interpolations and fails closed on names it cannot resolve',
+    foldedNaming === JSON.stringify([
+      'SELECT * FROM probe_table',
+      'UNRESOLVED: SELECT * FROM probe_${}',
+      'UNRESOLVED: SELECT * FROM ${}_table',
+    ]), foldedNaming);
+  a('the SQL-naming check refuses source it cannot parse',
+    throwsOn("x('DELETE FROM probe_table');\nconst y = ;") && !throwsOn("x('DELETE FROM probe_table');"));
+  const quotedNaming = JSON.stringify(sqlNamingIn([
+      "x('DELETE FROM probe_table')",
+      'y("INSERT INTO probe_table (a) VALUES (?)")',
+      'z(`SELECT a\n   FROM probe_table\n  WHERE a = ?`)',
+      "w('SELECT 1 FROM other_table')",
+      'v(`label ${x}`); u(`elsewhere`)',
+      "s('DELETE FROM PROBE_TABLE')",
+      'r("insert into Probe_Table (a) values (?)")',
+      'q(`SELECT a FROM Probe_table WHERE b = ${b}`)',
+      '// Documentation example: `SELECT * FROM probe_table`',
+      "/* or 'DELETE FROM probe_table' in a block comment */",
+    ].join('\n'), 'probe_table'));
+  a('the SQL-naming check sees single-quoted, double-quoted and backtick SQL alike, in any case, and not in comments',
+    quotedNaming === JSON.stringify([
+      'DELETE FROM probe_table',
+      'INSERT INTO probe_table (a) VALUES (?)',
+      'SELECT a FROM probe_table WHERE a = ?',
+      'DELETE FROM PROBE_TABLE',
+      'insert into Probe_Table (a) values (?)',
+      'SELECT a FROM Probe_table WHERE b = ${}',
+    ]), quotedNaming);
   a('071: the store names session_skipped_slot in one INSERT and one DELETE only',
     JSON.stringify(sqlNaming('session_skipped_slot').sort()) === JSON.stringify([
       'DELETE FROM session_skipped_slot',
@@ -1021,7 +1106,7 @@ if (resetTables.length >= 15) {
     join(ROOT, 'packages', 'core-db', 'src', 'migrationRunner.ts'),   // recovery sentinels
     join(ROOT, 'packages', 'core-db', 'src', 'backup', 'schemaContract.ts'), // a comment naming the contract
   ]);
-  const naming = sources.filter((file) => /\b(session_skipped_slot|set_load_shown)\b/.test(readFileSync(file, 'utf-8')));
+  const naming = sources.filter((file) => /\b(session_skipped_slot|set_load_shown)\b/i.test(readFileSync(file, 'utf-8')));
   a('071: no other source file in the app or the engine names either table',
     sources.length > 100 && naming.every((file) => allowed.has(file)) && naming.includes(join(ROOT, 'apps', 'mobile', 'src', 'state', 'useStore.ts')),
     naming.filter((file) => !allowed.has(file)).join(', ') || String(sources.length) + ' files scanned');
