@@ -259,6 +259,8 @@ describe('Onboarding wording found on the Android walk', () => {
 
   test('no outcome offered to a Muay Thai athlete talks about a game', () => {
     const { SPORT_OUTCOMES_BY_SPORT, SPORT_OUTCOME_LABEL } = require('@ak/inference');
+    // The sport answer needs an outcome, so an empty list is a failure too.
+    expect(SPORT_OUTCOMES_BY_SPORT.muay_thai.length).toBeGreaterThan(0);
     for (const outcome of SPORT_OUTCOMES_BY_SPORT.muay_thai) {
       expect([outcome, /\bgame\b/i.test(SPORT_OUTCOME_LABEL[outcome])]).toEqual([outcome, false]);
     }
