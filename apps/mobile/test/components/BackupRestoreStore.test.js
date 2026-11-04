@@ -421,6 +421,35 @@ test('backup removes and confirms plaintext snapshots before opening the OS save
   expect(readdirSync(mockCacheDir).filter((name) => /^ak-backup-|^ak-portable-/.test(name))).toEqual([]);
 });
 
+// Review (PR 118): the file the OS save sheet receives is named by
+// backupFileNameFor, whose local-date rule BackupFileName.test.js proves in a
+// Sydney-zone process. A distinctive return value shows the save path uses that
+// namer for the file it hands over, so a revert to an inline UTC date fails here.
+test('the file handed to the OS save sheet is named by the local-date namer', async () => {
+  const namer = jest.spyOn(require('../../src/state/backupFileName'), 'backupFileNameFor')
+    .mockReturnValue('pikeMethods-2031-07-09.pmbak');
+  try {
+    const before = Date.now();
+    await useBackupStore.getState().createBackup('restore-password');
+    const after = Date.now();
+    expect(useBackupStore.getState().status).toBe('success');
+    expect(namer).toHaveBeenCalledTimes(1);
+    // Review (PR 118): the namer is given the time of this backup, not any
+    // Date (an epoch or a stale stamp would also be a Date).
+    const namedAt = namer.mock.calls[0][0];
+    expect(namedAt).toBeInstanceOf(Date);
+    expect(namedAt.getTime()).toBeGreaterThanOrEqual(before);
+    expect(namedAt.getTime()).toBeLessThanOrEqual(after);
+    expect(mockSaveDocuments).toHaveBeenCalledTimes(1);
+    const saveCall = mockSaveDocuments.mock.calls[0][0];
+    // iOS names the saved file after the source file; Android uses fileName.
+    expect(saveCall.sourceUris[0]).toMatch(/\/pikeMethods-2031-07-09\.pmbak$/);
+    expect(saveCall.fileName).toBe('pikeMethods-2031-07-09.pmbak');
+  } finally {
+    namer.mockRestore();
+  }
+});
+
 test('previous recovery is absent or wrong-password fail-closed without exposing a path', async () => {
   await useBackupStore.getState().reviewRecovery('restore-password');
   expect(useBackupStore.getState().message).toBe('No previous data recovery is available.');
