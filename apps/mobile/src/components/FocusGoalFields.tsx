@@ -104,6 +104,7 @@ export function FocusPicker({ value, onChange, showMuscles, onToggleMuscles }: F
             <Chip
               key={bundleId}
               testID={`focus-bundle-${bundleId}`}
+              wrap
               label={`${bundle.label.toUpperCase()} — ${bundle.description}`}
               selected={value.bundleId === bundleId}
               onPress={() => chooseBundle(bundleId)}
@@ -266,6 +267,7 @@ export function GoalExerciseField({ movements, movementId, onChange }: GoalExerc
           <View style={styles.wrap}>
             {matches.map((movement) => (
               <Chip
+                wrap
                 key={movement.movement_id}
                 testID={`goal-exercise-option-${movement.movement_id}`}
                 label={movement.name.toUpperCase()}
@@ -342,6 +344,7 @@ export function GoalEditor({ fields, onChange, today, trainingAge, showAllErrors
       <View style={styles.wrap}>
         {GOAL_METRICS.map((metricId) => (
           <Chip
+            wrap
             key={metricId}
             testID={`goal-metric-${metricId}`}
             label={GOAL_METRIC_INFO[metricId].label.toUpperCase()}
