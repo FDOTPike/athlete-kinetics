@@ -711,6 +711,11 @@ export interface TrainingProgramInput {
    *  own offers (Android walk 2026-11-03, W1-4). The preview plans with it;
    *  creating the program saves it to the profile. Absent = the profile's. */
   sessionDurationCapMin?: number;
+  /** Continuation preview only (review, PR 194): saved preferences that no
+   *  longer pass the day, profile or capability gates are left out, as the
+   *  continuation generator leaves them out, instead of refused. New choices
+   *  are always checked strictly. */
+  keepPlaceablePreferencesOnly?: boolean;
 }
 
 export interface TrainingProgramPreview {
@@ -4381,7 +4386,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const horizonAnchorDate = activeProgram === null
       ? startDate
       : programHorizonAnchor(activeProgram.plannedEndDate, activeProgram.plannedBlockCount);
-    const shape = trainingProgramShape(planningProfile, input, horizonAnchorDate);
+    let shape = trainingProgramShape(planningProfile, input, horizonAnchorDate);
     const byId = new Map(movements.map((movement) => [movement.movement_id, movement]));
     const d = getDb();
     const safetyExcluded = safetyExcludedMovementIdsFor(movements, profile, niggles);
@@ -4392,7 +4397,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const capabilityAvailableSport = capabilityAvailableMovementIds(
       d, movements, profile, 'sport_conditioning', priorExperience, safetyExcluded,
     );
-    for (const preference of shape.movementPreferences) {
+    const preferenceProblem = (preference: TrainingProgramMovementPreference): string | null => {
       const movement = byId.get(preference.movementId);
       const day = shape.days.find((candidate) => candidate.dayIndex === preference.dayIndex);
       const accessContext = day === undefined
@@ -4402,16 +4407,31 @@ export const useStore = create<KineticsStore>()((set, get) => {
         ? capabilityAvailableSport
         : capabilityAvailableWeightRoom;
       if (movement === undefined || movement.pattern !== preference.pattern) {
-        throw new Error('A preferred movement does not match that slot.');
+        return 'A preferred movement does not match that slot.';
       }
       // Review (PR 194): a choice the generator would drop from this day is
       // refused here rather than replaced silently in the generated week.
       if (day !== undefined && !movementFitsFocusDay(movement, day.focus as BlockFocus)) {
-        throw new Error('A preferred movement does not belong on that day.');
+        return 'A preferred movement does not belong on that day.';
       }
       if (!permittedForProfile(movement, profile, accessContext) || !capabilityAvailable.has(movement.movement_id)) {
-        throw new Error('A preferred movement is teaching-only for this athlete.');
+        return 'A preferred movement is teaching-only for this athlete.';
       }
+      return null;
+    };
+    if (input.keepPlaceablePreferencesOnly === true) {
+      // A saved preference can stop passing a gate after it was chosen (a new
+      // day rule, a profile change, a new safety exclusion). Continuation's
+      // generator falls back for it; the preview leaves out the same ones so
+      // it shows that week instead of throwing.
+      const placeable = shape.movementPreferences.filter((preference) => preferenceProblem(preference) === null);
+      if (placeable.length !== shape.movementPreferences.length) {
+        shape = trainingProgramShape(planningProfile, { ...input, movementPreferences: placeable }, horizonAnchorDate);
+      }
+    }
+    for (const preference of shape.movementPreferences) {
+      const problem = preferenceProblem(preference);
+      if (problem !== null) throw new Error(problem);
     }
     const chainInputs = chainPlanningInputs(d);
     // OW-001: the athlete's own declarations, read once and threaded in.
@@ -5086,24 +5106,17 @@ export const useStore = create<KineticsStore>()((set, get) => {
     if (current === null || block === null || current.status !== 'active'
         || localToday() <= addDaysIso(block.startDate, 27)
         || current.currentSequenceIndex >= current.plannedBlockCount) return null;
-    // Review (PR 194): a preference saved before the focus-day rule may no
-    // longer fit its day. Continuation hands it to the generator, which leaves
-    // it out; the preview leaves out the same preferences (and only those)
-    // instead of refusing, so the review button cannot throw on old data.
-    const byId = new Map(get().movements.map((movement) => [movement.movement_id, movement]));
-    const focusByDay = new Map(current.days.map((day) => [day.dayIndex, day.focus as BlockFocus]));
-    const movementPreferences = current.movementPreferences.filter((preference) => {
-      const movement = byId.get(preference.movementId);
-      const focus = focusByDay.get(preference.dayIndex);
-      return movement === undefined || focus === undefined || movementFitsFocusDay(movement, focus);
-    });
     const input: TrainingProgramInput = {
       horizon: { kind: 'weeks', blockCount: current.plannedBlockCount },
       schemaType: current.schemaType, dayIndices: current.days.map((day) => day.dayIndex),
       // The saved focuses, as continuation uses them: without them the preview
       // would plan each day on the default focus and show a different week.
       days: current.days,
-      movementPreferences,
+      // Saved preferences that no longer pass a gate (a new day rule, a
+      // profile change) are left out as continuation leaves them out, so the
+      // review button cannot throw on old data.
+      movementPreferences: current.movementPreferences,
+      keepPlaceablePreferencesOnly: true,
     };
     return get().previewTrainingProgram(input).plan;
   },
