@@ -5100,6 +5100,9 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const input: TrainingProgramInput = {
       horizon: { kind: 'weeks', blockCount: current.plannedBlockCount },
       schemaType: current.schemaType, dayIndices: current.days.map((day) => day.dayIndex),
+      // The saved focuses, as continuation uses them: without them the preview
+      // would plan each day on the default focus and show a different week.
+      days: current.days,
       movementPreferences,
     };
     return get().previewTrainingProgram(input).plan;
