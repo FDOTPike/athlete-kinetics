@@ -146,7 +146,7 @@ const EQUIPMENT_DESCRIPTION: Record<EquipmentItem, string> = {
 
 const PRESET_COPY = {
   full_gym: { label: 'FULL GYM', blurb: 'A broad setup with racks, free weights, cables, bands, and mats.' },
-  home_basic: { label: 'HOME BASIC', blurb: 'A compact setup with dumbbells, a kettlebell, bands, and mats.' },
+  home_basic: { label: 'HOME BASIC', blurb: 'A compact setup with dumbbells, a kettlebell, a pull-up bar, bands, and mats.' },
   minimal: { label: 'MINIMAL', blurb: 'No equipment required; bodyweight movements remain available.' },
 } as const;
 
@@ -309,6 +309,14 @@ export default function OnboardingScreen(): React.JSX.Element {
   const step = steps[Math.min(stepIdx, steps.length - 1)];
   const isLast = step === 'review';
   const goTo = (key: StepKey): void => setStepIdx(Math.max(0, steps.indexOf(key)));
+  // EDIT on the review opens one screen; NEXT then returns to the review
+  // instead of walking every later screen again (Android walk 2026-11-03,
+  // ux-5). An edit that adds the sport or target screen walks into it first.
+  const [editingFromReview, setEditingFromReview] = useState(false);
+  const editFromReview = (key: StepKey): void => {
+    setEditingFromReview(true);
+    goTo(key);
+  };
   const goalValidation = useMemo(
     () => validateSmartGoal(goalDraftFromFields(goalFields), today),
     [goalFields, today],
@@ -337,6 +345,23 @@ export default function OnboardingScreen(): React.JSX.Element {
   // explicitly chosen Yes or No. Silence is never an answer to a safety
   // question; a skip would silently claim "no limitations" in the profile.
   const limitsGateOpen = step === 'limits' && limitsAnswered === null;
+
+  const goNext = (): void => {
+    if (!editingFromReview) {
+      setStepIdx((i) => Math.min(steps.length - 1, i + 1));
+      return;
+    }
+    // Any later sport or target screen still unanswered comes first, even
+    // when an answered one sits between (a valid sport before a new target).
+    const unansweredIdx = steps.findIndex((key, i) => i > stepIdx
+      && ((key === 'sport' && !sportValidation.ok) || (key === 'target' && !goalValidation.ok)));
+    if (unansweredIdx !== -1) {
+      setStepIdx(unansweredIdx);
+      return;
+    }
+    setEditingFromReview(false);
+    goTo('review');
+  };
 
   /** Truthful preset state: a preset chip reads selected only when the draft
    *  inventory is exactly that preset's bundle. */
@@ -707,12 +732,12 @@ export default function OnboardingScreen(): React.JSX.Element {
               <ReviewSection
                 heading="GOAL"
                 description={OBJECTIVE_COPY[draft.objective].label}
-                onEdit={() => goTo('goal')}
+                onEdit={() => editFromReview('goal')}
               />
               <ReviewSection
                 heading="FOCUS"
                 description={focusDraftSummary(focus)}
-                onEdit={() => goTo('focus')}
+                onEdit={() => editFromReview('focus')}
               >
                 {wantsTarget && goalValidation.ok && (
                   <View style={styles.reviewHeadingRow}>
@@ -739,32 +764,32 @@ export default function OnboardingScreen(): React.JSX.Element {
                 <ReviewSection
                   heading="SPORT"
                   description={sportFieldsSummary(sportFields)}
-                  onEdit={() => goTo('sport')}
+                  onEdit={() => editFromReview('sport')}
                 />
               )}
               <ReviewSection
                 heading="EXPERIENCE"
                 description={`${AGE_COPY[draft.training_age].label}. ${AGE_COPY[draft.training_age].blurb}`}
-                onEdit={() => goTo('experience')}
+                onEdit={() => editFromReview('experience')}
               />
               <ReviewSection
                 heading="YOUR WEEK"
                 description={`${draft.weekly_frequency} training days per week, up to ${draft.session_duration_cap_min} minutes each.`}
-                onEdit={() => goTo('logistics')}
+                onEdit={() => editFromReview('logistics')}
               />
               <ReviewSection
                 heading="EQUIPMENT"
                 description={draft.equipment_inventory.length === 0
                   ? 'No equipment selected.'
                   : draft.equipment_inventory.map((item) => EQUIPMENT_LABEL[item]).join(', ')}
-                onEdit={() => goTo('equipment')}
+                onEdit={() => editFromReview('equipment')}
               />
               <ReviewSection
                 heading="TRAINING SUPPORT"
                 description={(parseNotes(injuryText).length + parseNotes(mobilityText).length) > 0
                   ? `${parseNotes(injuryText).length + parseNotes(mobilityText).length} limitation notes recorded for your reference.`
                   : 'No limitations noted. You can add or change these later.'}
-                onEdit={() => goTo('limits')}
+                onEdit={() => editFromReview('limits')}
               >
                 <Text style={styles.reviewSupportLine} testID="onboarding-summary-limits-row">
                   LIMITATIONS — {(parseNotes(injuryText).length + parseNotes(mobilityText).length) > 0
@@ -848,7 +873,7 @@ export default function OnboardingScreen(): React.JSX.Element {
         {!isLast && (
           <PrimaryButton
             label="NEXT"
-            onPress={() => setStepIdx((i) => Math.min(steps.length - 1, i + 1))}
+            onPress={goNext}
             disabled={limitsGateOpen || targetGateOpen || sportGateOpen}
             accessibilityLabel="Next"
           />

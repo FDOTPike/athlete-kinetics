@@ -151,11 +151,15 @@ export function SessionFeelPanel({ saved, note, answerOptional = false, onSave, 
       : [...current, reason]));
   };
 
-  /** Tap a note starter: its words go into the note, and its example is shown. */
+  /** Tap a note starter: its words go into the note, its example is shown,
+   *  and the note field takes focus so the athlete can type straight away
+   *  (Android walk 2026-11-03, ux-8: the keyboard stayed closed). */
+  const noteRef = useRef<TextInput | null>(null);
   const startLine = (id: SessionNoteStarterId, label: string): void => {
     setStarter(id);
     if (id === 'body') setBodyLineStarted(true);
     setNoteText((current) => withNoteStarter(current, label));
+    noteRef.current?.focus();
   };
 
   /** Ask the store to save. Close on success; otherwise stay open and say why. */
@@ -250,6 +254,7 @@ export function SessionFeelPanel({ saved, note, answerOptional = false, onSave, 
           </Text>
         )}
         <TextInput
+          ref={noteRef}
           disableFullscreenUI
           style={styles.input}
           value={noteText}

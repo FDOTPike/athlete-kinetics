@@ -361,6 +361,13 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   // The runner stops on the tier it started with; fall back to the profile before it starts.
   const haltMin = EXPERIENCE_SEVERITY[runnerTierForTrainingAge(state.runner?.tier ?? profile.training_age)].haltMin;
   const advancedRest = useRef<string | null>(null);
+  // "Choose an alternative" renders below the next exercise, often off-screen
+  // (Android walk 2026-11-03, ux-4). Scroll to it once per opening.
+  const timelineRef = useRef<ScrollView | null>(null);
+  const scrolledToSubstitutionFor = useRef<number | null>(null);
+  useEffect(() => {
+    if (substitution === null) scrolledToSubstitutionFor.current = null;
+  }, [substitution]);
 
   // Session feel (070): the sub-view that records how the ended session went.
   const [feelOpen, setFeelOpen] = useState(false);
@@ -1041,7 +1048,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
 
   return (
     <View style={styles.screen}>
-      <KeyboardAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} accessibilityLabel="Current workout timeline">
+      <KeyboardAwareScrollView ref={timelineRef} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} accessibilityLabel="Current workout timeline">
         {/* Wordmark top-left */}
         <View style={styles.header}>
           <Text style={styles.wordmark}>pikeMethods</Text>
@@ -1290,7 +1297,12 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                               repeatOnHold={true}
                               style={styles.sessionStepper}
                             />
-                            <Text style={styles.nextUp}>Applies to this session.</Text>
+                            {/* The target follows the last set's effort (restSecondsFor);
+                                say so, or the number reads as a setting that changed by
+                                itself (Android walk 2026-11-03, ux-8). */}
+                            <Text style={styles.nextUp}>
+                              Rest uses your effort rating, or the planned effort if you leave it blank. Harder sets get longer rests. Your changes apply for this session.
+                            </Text>
                           </>
                         )}
                         <PrimaryButton
@@ -1535,11 +1547,11 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                           </Text>
                           <Text style={styles.effortCue}>{EFFORT_BREATHING_NOTE}</Text>
                           <Text style={styles.effortStop} testID="effort-stop-guidance">{EFFORT_STOP_GUIDANCE}</Text>
-                          <Text style={styles.rpeEvidence}>
-                            {safeRpe !== null
-                              ? 'This effort rating will be saved with the set.'
-                              : 'Effort rating is optional; leave it blank if you are unsure.'}
-                          </Text>
+                          {/* With no rating, the cue above already says effort is
+                              optional; a second line said it again (ux-8). */}
+                          {safeRpe !== null && (
+                            <Text style={styles.rpeEvidence}>This effort rating will be saved with the set.</Text>
+                          )}
                         </View>
 
                         {supportsBands && (
@@ -1707,7 +1719,15 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
         )}
 
         {!halted && !complete && substitution !== null && (
-          <View style={styles.substitution}>
+          <View
+            style={styles.substitution}
+            testID="substitution-sheet"
+            onLayout={(event) => {
+              if (scrolledToSubstitutionFor.current === substitution.targetId) return;
+              scrolledToSubstitutionFor.current = substitution.targetId;
+              timelineRef.current?.scrollTo({ y: Math.max(0, event.nativeEvent.layout.y - theme.space[4]), animated: true });
+            }}
+          >
             {pendingSub !== null && subTargetLogged > 0 ? (
               <>
                 <View style={styles.subHeader}>
@@ -2490,7 +2510,7 @@ const styles = StyleSheet.create({
     marginTop: theme.space[3],
   },
   rirChip: {
-    minWidth: 48,
+    minWidth: theme.touch.min,
   },
   derivedRpeContainer: {
     alignItems: 'center',

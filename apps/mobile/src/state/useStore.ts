@@ -7295,7 +7295,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
         const mv = byId.get(r.movement_id);
         return mv === undefined
           ? []
-          : [{ plannedSlotId: r.planned_slot_id, dayIndex: r.day_index, movement: toSubMovement(mv, capabilityAvailable), sets: r.sets }];
+          : [{ plannedSlotId: r.planned_slot_id, dayIndex: r.day_index, sessionDate: r.session_date, movement: toSubMovement(mv, capabilityAvailable), sets: r.sets }];
       });
     }
     const result = computeSubstitutions({
