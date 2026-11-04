@@ -31,7 +31,9 @@ test('a Chip asked to wrap shows its whole label, centred', () => {
 // counts as wrapping, and the word "wrap" inside another prop does not. A file
 // that does not parse, or a Chip whose label the scan cannot read, is a
 // failure, not a skip.
-const SENTENCE_SOURCES = ['—', 'SPORT_OUTCOME_LABEL', 'SPORT_EXPERIENCE_LABEL', 'I have trained', 'movement.name', 'GOAL_METRIC_INFO'];
+// `choice.name` (review, PR 115): the Build screen's movement choices are
+// movement-library names too, as long as any `movement.name` chip.
+const SENTENCE_SOURCES = ['—', 'SPORT_OUTCOME_LABEL', 'SPORT_EXPERIENCE_LABEL', 'I have trained', 'movement.name', 'choice.name', 'GOAL_METRIC_INFO'];
 
 const scanChips = (fileName, text) => {
   const ts = require('typescript');
@@ -78,11 +80,12 @@ test('the scan reads multi-line labels, wrap={true}, and refuses what it cannot 
     'const c = <Chip label="THREE — four" accessibilityHint="wrap" selected onPress={f} />;',
     'const d = <Chip label="FIVE — six" wrap={false} selected onPress={f} />;',
     'const e = <Chip label="SHORT" selected onPress={f} />;',
+    'const g = <Chip key={choice.movement_id} label={choice.name} selected onPress={f} />;',
   ].join('\n');
   const result = chipsNeedingWrap('probe.tsx', probe);
   expect(result.unreadable).toEqual([]);
-  expect(result.checked).toBe(4);
-  expect(result.missing.map((m) => m.split(' ')[0])).toEqual(['probe.tsx:1', 'probe.tsx:5', 'probe.tsx:6']);
+  expect(result.checked).toBe(5);
+  expect(result.missing.map((m) => m.split(' ')[0])).toEqual(['probe.tsx:1', 'probe.tsx:5', 'probe.tsx:6', 'probe.tsx:8']);
   expect(chipsNeedingWrap('bad.tsx', 'const a = <Chip {...props} />;').unreadable).toEqual(['bad.tsx:1 props spread into a Chip', 'bad.tsx:1 Chip label not found']);
   expect(chipsNeedingWrap('broken.tsx', 'const a = <Chip label="x" ;').unreadable).toEqual(['broken.tsx: does not parse']);
 });
