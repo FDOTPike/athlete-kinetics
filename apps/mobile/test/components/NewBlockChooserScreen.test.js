@@ -4,7 +4,7 @@ import NewBlockChooserScreen from '../../src/screens/NewBlockChooserScreen';
 import { splitExplainer, SPLIT_EXPLAINER_FOOTER } from '@ak/inference';
 
 describe('NewBlockChooserScreen', () => {
-  test('renders three mode options with exact approved copy and Guided visibly disabled', () => {
+  test('renders two mode options, Auto then Custom, with exact approved copy and no Guided card', () => {
     const onSelectAuto = jest.fn();
     const onSelectCustom = jest.fn();
     const onCancel = jest.fn();
@@ -33,12 +33,24 @@ describe('NewBlockChooserScreen', () => {
       "You choose every movement, day by day. Full control — you'll need to know what you're doing.",
     )).toBeOnTheScreen();
 
-    // Mode 3: Guided (disabled)
-    expect(screen.getByText('Guided')).toBeOnTheScreen();
-    expect(screen.getByText(
+    // Exactly two modes, in order: Auto, then Custom (issue #134).
+    // Review (PR 197): every button on the screen except Cancel is a mode
+    // card, whatever its label says, so a card in any label format counts.
+    const modeLabels = screen.getAllByRole('button')
+      .map(button => button.props.accessibilityLabel)
+      .filter(label => label !== 'Cancel');
+    expect(modeLabels).toHaveLength(2);
+    expect(modeLabels[0]).toMatch(/^Auto: /);
+    expect(modeLabels[1]).toMatch(/^Custom: /);
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeOnTheScreen();
+
+    // The Guided card is hidden for the beta: no "Coming soon" anywhere
+    expect(screen.queryByText('Guided')).toBeNull();
+    expect(screen.queryByText(
       "The coach drafts a week, you swap anything you don't like, then confirm.",
-    )).toBeOnTheScreen();
-    expect(screen.getByText('Coming soon')).toBeOnTheScreen();
+    )).toBeNull();
+    expect(screen.queryByText(/coming soon/i)).toBeNull();
+    expect(screen.queryByLabelText(/coming soon/i)).toBeNull();
 
     // Auto and Custom are enabled
     fireEvent.press(screen.getByText('Auto'));

@@ -681,7 +681,7 @@ export default function ProgramSetupScreen({
                     <Text style={styles.slotTitle}>{movement.pattern.replace('_', ' ')}</Text>
                     <View style={styles.wrap}>
                       {choices.map((choice) => (
-                        <Chip key={choice.movement_id} label={choice.name} selected={selectedId === choice.movement_id}
+                        <Chip key={choice.movement_id} wrap label={choice.name} selected={selectedId === choice.movement_id}
                           onPress={() => chooseMovement(session.day_index, slot.slot_index, movement.pattern as TrainingProgramMovementPreference['pattern'], choice.movement_id)} />
                       ))}
                     </View>

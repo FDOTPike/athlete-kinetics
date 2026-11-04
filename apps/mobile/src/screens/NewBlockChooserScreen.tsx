@@ -58,24 +58,6 @@ export default function NewBlockChooserScreen({
             You choose every movement, day by day. Full control — you'll need to know what you're doing.
           </Text>
         </Pressable>
-
-        {/* Mode 3: Guided (Disabled) */}
-        <View
-          style={[styles.card, styles.cardDisabled]}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: true }}
-          accessibilityLabel="Guided: The coach drafts a week, you swap anything you don't like, then confirm. Coming soon"
-        >
-          <View style={styles.cardHeaderRow}>
-            <Text style={[styles.modeName, styles.modeNameDisabled]}>Guided</Text>
-            <View style={styles.badgeDisabled}>
-              <Text style={styles.badgeDisabledText}>Coming soon</Text>
-            </View>
-          </View>
-          <Text style={[styles.modeBlurb, styles.modeBlurbDisabled]}>
-            The coach drafts a week, you swap anything you don't like, then confirm.
-          </Text>
-        </View>
       </View>
 
       {onCancel !== undefined && (
@@ -109,10 +91,6 @@ const styles = StyleSheet.create({
     borderColor: theme.color.textMid,
     backgroundColor: theme.color.ink1,
   },
-  cardDisabled: {
-    opacity: 0.6,
-    borderColor: theme.color.line,
-  },
   cardHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -123,28 +101,9 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
   },
-  modeNameDisabled: {
-    color: theme.color.textMid,
-  },
   modeBlurb: {
     color: theme.color.textMid,
     fontSize: 14,
     lineHeight: 20,
-  },
-  modeBlurbDisabled: {
-    color: theme.color.textLow,
-  },
-  badgeDisabled: {
-    backgroundColor: theme.color.ink0,
-    borderWidth: 1,
-    borderColor: theme.color.line,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  badgeDisabledText: {
-    color: theme.color.textLow,
-    fontSize: 11,
-    fontWeight: '700',
   },
 });

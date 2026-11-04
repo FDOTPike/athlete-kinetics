@@ -33,8 +33,24 @@ beforeEach(async () => {
 });
 afterEach(() => { state().setEmbedder(null); });
 
+// Review (PR 198): Jest does not run the bundle-time plugin, so the real module
+// reads AK_BETA_BUILD from this process. It is read with the variable unset,
+// so a shell left with AK_BETA_BUILD=on after a beta build does not decide the
+// default. (BetaBuildSwitch.test.js checks the bundle-time value itself.)
+const defaultBuildFeatures = () => {
+  const saved = process.env.AK_BETA_BUILD;
+  delete process.env.AK_BETA_BUILD;
+  try {
+    let features;
+    jest.isolateModules(() => { features = jest.requireActual('../../src/config/features'); });
+    return features;
+  } finally {
+    if (saved !== undefined) process.env.AK_BETA_BUILD = saved;
+  }
+};
+
 test('flag defaults off and hides the question box entry', () => {
-  expect(jest.requireActual('../../src/config/features').QUESTION_BOX_ENABLED).toBe(false);
+  expect(defaultBuildFeatures().QUESTION_BOX_ENABLED).toBe(false);
   mockQuestionBoxEnabled = false;
   render(<GlossaryScreen />);
   expect(screen.queryByRole('button', { name: 'Question box' })).toBeNull();
