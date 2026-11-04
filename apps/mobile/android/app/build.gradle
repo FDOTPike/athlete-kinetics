@@ -101,6 +101,24 @@ gradle.taskGraph.whenReady { taskGraph ->
 def appVersionCode = project.findProperty('AK_VERSION_CODE') ?: System.getenv('AK_VERSION_CODE') ?: '1'
 def appVersionName = project.findProperty('AK_VERSION_NAME') ?: System.getenv('AK_VERSION_NAME') ?: '1.0.0-beta.1'
 
+// Beta build switch (issue #132). AK_BETA_BUILD=on turns on the beta features
+// (the question box). It is read by babel.config.js when the JS bundle is built,
+// so it must be an ENVIRONMENT variable of this Gradle run; a -P property never
+// reaches the bundler and would silently give a non-beta build, so refuse it.
+// Unset means not a beta build.
+if (project.hasProperty('AK_BETA_BUILD')) {
+    throw new GradleException(
+        'AK_BETA_BUILD must be set as an environment variable, not a -P property: '
+        + 'it is read by the JS bundler. PowerShell: $env:AK_BETA_BUILD=\'on\''
+    )
+}
+// Declare it as an input of the JS bundle tasks, so changing it re-bundles
+// instead of reusing an up-to-date bundle built with the other value.
+def betaBuildEnv = System.getenv('AK_BETA_BUILD') ?: ''
+tasks.matching { it.name.startsWith('createBundle') && it.name.endsWith('JsAndAssets') }.configureEach {
+    inputs.property('AK_BETA_BUILD', betaBuildEnv)
+}
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
