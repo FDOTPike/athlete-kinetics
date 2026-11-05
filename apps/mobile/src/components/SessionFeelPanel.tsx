@@ -62,14 +62,16 @@ const BODY_REASONS: readonly SessionFeelReason[] = ['pain', 'unwell'];
 
 /**
  * Always shown. This panel only records, so the athlete is told where a report
- * does change training: first the place they can use now, after a session, and
- * then the one for next time. The two names are the labels of those controls
- * (BlockScreen, SessionScreen) and "Plan" is that tab's name; a test keeps
- * them in step.
+ * does change training: first the place they can use now, after a session (the
+ * completion screen, SessionScreen), then the Plan screen (BlockScreen), and
+ * then the one for next time. "Something feels off" is the label of both
+ * controls; "Plan" is that tab's name; a test keeps them in step. Both need
+ * today's readiness, as the Plan form does, so the sentence says so.
  */
 export const SESSION_FEEL_RECORD_ONLY_TEXT =
   'This is a record only. It does not adjust your training. If something hurts or you feel unwell, '
-  + 'report it under "Something feels off" on the Plan screen. '
+  + 'report it under "Something feels off" on the completion screen or on the Plan screen. '
+  + "Both need today's readiness first. "
   + 'During a session, use "Report discomfort" on the lift.';
 
 /**

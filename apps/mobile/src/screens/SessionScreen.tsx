@@ -23,6 +23,7 @@ import {
 import { PreparationPanel } from '../components/PreparationPanel';
 import { MovementPreview } from '../components/movementPreview/MovementPreview';
 import { SessionFeelPanel, describeSessionFeel } from '../components/SessionFeelPanel';
+import { SubjectiveReportPanel } from '../components/SubjectiveReportPanel';
 
 
 type SessionMode = 'guided' | 'self_directed';
@@ -373,6 +374,11 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   const [feelOpen, setFeelOpen] = useState(false);
   const [feelRevision, setFeelRevision] = useState(0);
   useEffect(() => { setFeelOpen(false); }, [lastEndedSessionId]);
+  // Issue #180, S5: "Something feels off" on the completion screen. The same form
+  // as the Plan screen; with no readiness vector it shows the Plan screen's gate.
+  const [reportOpen, setReportOpen] = useState(false);
+  useEffect(() => { setReportOpen(false); }, [lastEndedSessionId]);
+  const vector = state.vector ?? null;
 
   type PendingSubstitution =
     | { kind: 'regression'; option: NonNullable<typeof substitution>['result']['layer1Regression']['options'][number] }
@@ -381,9 +387,10 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   const [pendingSubSets, setPendingSubSets] = useState<number>(1);
   useEffect(() => { setPendingSub(null); }, [substitution]);
 
-  const hasSubView = feelOpen || detailsOpen || safetyOpen || niggleRegion !== null || substitution !== null;
+  const hasSubView = feelOpen || reportOpen || detailsOpen || safetyOpen || niggleRegion !== null || substitution !== null;
   useSubViewBack(hasSubView, () => {
-    if (feelOpen) setFeelOpen(false);
+    if (reportOpen) setReportOpen(false);
+    else if (feelOpen) setFeelOpen(false);
     else if (detailsOpen) setDetailsOpen(false);
     else if (safetyOpen) setSafetyOpen(false);
     else if (niggleRegion !== null) setNiggleRegion(null);
@@ -643,6 +650,22 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
     // their existing honest copy.
     const displayMsg = outcomeCopy[outcome.kind] ?? 'Outcome unavailable';
 
+    if (reportOpen) {
+      // Issue #180, S5: the Plan screen's "Something feels off" form, opened here.
+      // Apply hands the text and severity to the same store action (reportSubjective).
+      return (
+        <SubjectiveReportPanel
+          hasVector={vector !== null}
+          lastTriage={lastTriage ?? null}
+          triaging={state.triaging ?? false}
+          onApply={(text, severity) => (typeof state.reportSubjective === 'function'
+            ? state.reportSubjective(text, severity)
+            : Promise.reject(new Error('Coach is unavailable')))}
+          onClose={() => setReportOpen(false)}
+        />
+      );
+    }
+
     if (feelOpen && sessionFeel !== null) {
       // A session that went to plan is not asked anything, so its note may be
       // saved on its own. Once an answer exists, or the question was asked,
@@ -763,6 +786,16 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
               )}
             </View>
           )}
+          <View style={styles.feelBlock} testID="completion-report-block">
+            <Text style={styles.summaryComparison}>Add a subjective report only when you need Coach to adapt</Text>
+            <SecondaryButton
+              label="Something feels off"
+              onPress={() => { setFeelOpen(false); setReportOpen(true); }}
+              accessibilityLabel="Something feels off"
+              testID="completion-report-open"
+              style={{ alignSelf: 'stretch' }}
+            />
+          </View>
           <SecondaryButton
             label="Back to Today"
             onPress={() => {
