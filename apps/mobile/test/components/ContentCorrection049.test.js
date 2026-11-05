@@ -120,6 +120,7 @@ describe('049 full-body scope in the movement library', () => {
   test('the scope filter is independent of pattern and type, and narrows to the scoped rows', () => {
     render(<LibraryScreenV2 />);
     expect(screen.getByText('4 of 4 movements')).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText('Filters'));
     fireEvent.press(screen.getByLabelText('Filter scope by Full body'));
     expect(screen.getByText('2 of 4 movements')).toBeOnTheScreen();
     expect(screen.getByText('Kettlebell Turkish Get-Up')).toBeOnTheScreen();
@@ -129,6 +130,7 @@ describe('049 full-body scope in the movement library', () => {
 
   test('the scope filter composes conjunctively with an equipment facet', () => {
     render(<LibraryScreenV2 />);
+    fireEvent.press(screen.getByLabelText('Filters'));
     fireEvent.press(screen.getByLabelText('Filter scope by Full body'));
     fireEvent.press(screen.getByLabelText('Filter equipment by Boards'));
     expect(screen.getByText('No matching movements')).toBeOnTheScreen();
@@ -136,6 +138,7 @@ describe('049 full-body scope in the movement library', () => {
 
   test('clearing filters restores the full corpus', () => {
     render(<LibraryScreenV2 />);
+    fireEvent.press(screen.getByLabelText('Filters'));
     fireEvent.press(screen.getByLabelText('Filter scope by Full body'));
     fireEvent.press(screen.getAllByLabelText('Clear search and filters')[0]);
     expect(screen.getByText('4 of 4 movements')).toBeOnTheScreen();

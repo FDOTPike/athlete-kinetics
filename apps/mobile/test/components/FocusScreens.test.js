@@ -813,3 +813,22 @@ test('OW-007 the resume error is action-scoped: an unrelated store error does no
   // The global error channel must never read as a refusal of this control.
   expect(screen.queryByTestId('suspension-error')).toBeNull();
 });
+
+describe('#210: the Pause card comes after the plan, for everyone', () => {
+  const order = () => JSON.stringify(screen.toJSON());
+
+  test.each(['beginner', 'intermediate', 'advanced', 'elite'])(
+    'for a %s athlete, PAUSE renders after the block and today\'s session',
+    (trainingAge) => {
+      mockState = baseState({ profile: { ...baseState().profile, training_age: trainingAge } });
+      render(<BlockScreen />);
+      const json = order();
+      const pause = json.indexOf('Injured, ill, or life got in the way?');
+      expect(pause).toBeGreaterThan(-1);
+      expect(json.indexOf('"TODAY"')).toBeGreaterThan(-1);
+      expect(json.indexOf('"TODAY"')).toBeLessThan(pause);
+      expect(json.indexOf('Four-week trajectory')).toBeGreaterThan(-1);
+      expect(json.indexOf('Four-week trajectory')).toBeLessThan(pause);
+    },
+  );
+});

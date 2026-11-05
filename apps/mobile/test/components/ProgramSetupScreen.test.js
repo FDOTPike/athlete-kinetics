@@ -370,3 +370,60 @@ test('custom week-one rows use the middle dot between day number and focus', () 
   expect(screen.getAllByText(/Day \d+ · /).length).toBeGreaterThan(0);
   expect(screen.queryByText(/Day \d+ \? /)).toBeNull();
 });
+
+// ---------------------------------------------------------------------------
+// #210 — expert sections collapsed for everyone; no "bjj" chip without a
+// grappling goal or sport
+// ---------------------------------------------------------------------------
+
+test.each(['beginner', 'intermediate', 'advanced', 'elite'])(
+  '#210 Fine-tune starts collapsed for a %s athlete',
+  (trainingAge) => {
+    mockState = stateFor(trainingAge);
+    render(<ProgramSetupScreen />);
+    expect(screen.getByLabelText('Fine-tune your program (optional)').props.accessibilityState)
+      .toMatchObject({ expanded: false });
+    expect(screen.queryByText('2. Review horizon')).toBeNull();
+    expect(screen.queryByText('4. Training method')).toBeNull();
+  },
+);
+
+test('#210 no "bjj" day chip for a strength athlete with no sport', () => {
+  mockState = stateFor('intermediate');
+  mockState.sport = null;
+  render(<ProgramSetupScreen />);
+  openAdvanced();
+  expect(screen.getAllByText('lower').length).toBeGreaterThan(0);
+  expect(screen.queryAllByText('bjj')).toHaveLength(0);
+});
+
+test('#210 the "bjj" day chip shows for the strength + grappling goal', () => {
+  mockState = stateFor('intermediate');
+  mockState.profile.objective = 'hybrid';
+  mockState.sport = null;
+  render(<ProgramSetupScreen />);
+  openAdvanced();
+  expect(screen.queryAllByText('bjj').length).toBeGreaterThan(0);
+});
+
+test('#210 the "bjj" day chip shows for a grappling sport named under Other', () => {
+  mockState = stateFor('intermediate');
+  mockState.sport = { sportId: 'other', otherSportName: 'Brazilian Jiu-Jitsu' };
+  render(<ProgramSetupScreen />);
+  openAdvanced();
+  expect(screen.queryAllByText('bjj').length).toBeGreaterThan(0);
+});
+
+test('#210 a day already set to bjj keeps its chip so the choice stays visible', () => {
+  mockState = stateFor('advanced');
+  mockState.sport = null;
+  mockState.program = {
+    programId: 1, objective: 'strength', startDate: '2026-06-01',
+    horizonKind: 'weeks', requestedReviewDate: null, plannedEndDate: '2026-09-01',
+    plannedBlockCount: 2, startingMacroBlockIndex: 1, schemaType: 'LINEAR',
+    status: 'active', currentSequenceIndex: 1,
+    days: [{ dayIndex: 1, focus: 'bjj' }], movementPreferences: [],
+  };
+  render(<ProgramSetupScreen editing />);
+  expect(screen.queryAllByText('bjj')).toHaveLength(1);
+});

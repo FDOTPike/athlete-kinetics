@@ -646,79 +646,6 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
         </View>
       )}
 
-      {/* RR-02 suspension. Athlete-owned in BOTH directions: the app never
-          infers an episode and never ends one. Suspension freezes the macro
-          position and NOTHING else — training, substitution, the RPE ceiling
-          and halt supremacy all keep working, which is why this card offers no
-          "stop training" affordance. */}
-      {suspension != null ? (
-        <View style={[styles.card, styles.haltCard]}>
-          <Text style={styles.eyebrow}>PROGRAMME PAUSED</Text>
-          <Text style={styles.cardTitle}>Your place is being held</Text>
-          <Text style={styles.bodyText}>
-            {pausedHeldText(SUSPENSION_REASON_LABEL[suspension.reason], program)}
-          </Text>
-          <PrimaryButton
-            label="Resume my programme"
-            onPress={() => {
-              // Same action-scoped try/catch the pause controls use below. The
-              // resume path had none, so a database failure escaped the handler
-              // and the athlete saw this card unchanged with no explanation —
-              // in the one flow that is athlete-owned in BOTH directions.
-              try {
-                setSuspendError(null);
-                endSuspension(Date.now());
-              } catch (e) {
-                setSuspendError(e instanceof Error ? e.message : String(e));
-              }
-            }}
-            accessibilityLabel={program != null
-              ? `Resume the programme and return to block ${program.currentSequenceIndex} of ${program.plannedBlockCount}`
-              : 'Resume the programme and return to your place'}
-            testID="suspension-resume"
-          />
-          {/* Mounted INSIDE the suspended branch. The resume button exists only
-              here, so an error node living only in the other branch could never
-              be seen by the athlete whose resume just failed — the second,
-              independent reason the message was invisible. */}
-          {suspendError !== null && (
-            <Text style={styles.adjustedText} testID="suspension-error">{suspendError}</Text>
-          )}
-        </View>
-      ) : block !== null || program != null ? (
-        /* Walk W3-7: with no block and no program there is nothing to hold,
-           so the pause buttons are not offered. An open pause still shows. */
-        <View style={styles.card}>
-          <Text style={styles.eyebrow}>PAUSE</Text>
-          <Text style={styles.cardTitle}>Injured, ill, or life got in the way?</Text>
-          <Text style={styles.bodyText}>
-            Pausing holds your place in the programme so a gap does not cost you a block. You can
-            still train while paused.
-          </Text>
-          {SUSPENSION_REASONS.map((reason) => (
-            <PrimaryButton
-              key={reason}
-              label={`Pause — ${SUSPENSION_REASON_LABEL[reason]}`}
-              onPress={() => {
-                try {
-                  setSuspendError(null);
-                  beginSuspension(reason, Date.now());
-                } catch (e) {
-                  setSuspendError(e instanceof Error ? e.message : String(e));
-                }
-              }}
-              accessibilityLabel={`Pause my programme for ${SUSPENSION_REASON_LABEL[reason]}`}
-              testID={`suspension-begin-${reason}`}
-            />
-          ))}
-          {/* Action-scoped, not the global error channel: an unrelated store
-              error must never read as a refusal of this control. */}
-          {suspendError !== null && (
-            <Text style={styles.adjustedText} testID="suspension-error">{suspendError}</Text>
-          )}
-        </View>
-      ) : null}
-
       {program != null && (
         <View style={styles.card}>
           <Text style={styles.eyebrow}>GOAL PROGRAM</Text>
@@ -1020,6 +947,81 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           </>
         )}
       </View>
+
+      {/* #210: the Pause card comes after the block and today's session, for
+          every athlete; a healthy athlete sees the plan first.
+          RR-02 suspension. Athlete-owned in BOTH directions: the app never
+          infers an episode and never ends one. Suspension freezes the macro
+          position and NOTHING else — training, substitution, the RPE ceiling
+          and halt supremacy all keep working, which is why this card offers no
+          "stop training" affordance. */}
+      {suspension != null ? (
+        <View style={[styles.card, styles.haltCard]}>
+          <Text style={styles.eyebrow}>PROGRAMME PAUSED</Text>
+          <Text style={styles.cardTitle}>Your place is being held</Text>
+          <Text style={styles.bodyText}>
+            {pausedHeldText(SUSPENSION_REASON_LABEL[suspension.reason], program)}
+          </Text>
+          <PrimaryButton
+            label="Resume my programme"
+            onPress={() => {
+              // Same action-scoped try/catch the pause controls use below. The
+              // resume path had none, so a database failure escaped the handler
+              // and the athlete saw this card unchanged with no explanation —
+              // in the one flow that is athlete-owned in BOTH directions.
+              try {
+                setSuspendError(null);
+                endSuspension(Date.now());
+              } catch (e) {
+                setSuspendError(e instanceof Error ? e.message : String(e));
+              }
+            }}
+            accessibilityLabel={program != null
+              ? `Resume the programme and return to block ${program.currentSequenceIndex} of ${program.plannedBlockCount}`
+              : 'Resume the programme and return to your place'}
+            testID="suspension-resume"
+          />
+          {/* Mounted INSIDE the suspended branch. The resume button exists only
+              here, so an error node living only in the other branch could never
+              be seen by the athlete whose resume just failed — the second,
+              independent reason the message was invisible. */}
+          {suspendError !== null && (
+            <Text style={styles.adjustedText} testID="suspension-error">{suspendError}</Text>
+          )}
+        </View>
+      ) : block !== null || program != null ? (
+        /* Walk W3-7: with no block and no program there is nothing to hold,
+           so the pause buttons are not offered. An open pause still shows. */
+        <View style={styles.card}>
+          <Text style={styles.eyebrow}>PAUSE</Text>
+          <Text style={styles.cardTitle}>Injured, ill, or life got in the way?</Text>
+          <Text style={styles.bodyText}>
+            Pausing holds your place in the programme so a gap does not cost you a block. You can
+            still train while paused.
+          </Text>
+          {SUSPENSION_REASONS.map((reason) => (
+            <PrimaryButton
+              key={reason}
+              label={`Pause — ${SUSPENSION_REASON_LABEL[reason]}`}
+              onPress={() => {
+                try {
+                  setSuspendError(null);
+                  beginSuspension(reason, Date.now());
+                } catch (e) {
+                  setSuspendError(e instanceof Error ? e.message : String(e));
+                }
+              }}
+              accessibilityLabel={`Pause my programme for ${SUSPENSION_REASON_LABEL[reason]}`}
+              testID={`suspension-begin-${reason}`}
+            />
+          ))}
+          {/* Action-scoped, not the global error channel: an unrelated store
+              error must never read as a refusal of this control. */}
+          {suspendError !== null && (
+            <Text style={styles.adjustedText} testID="suspension-error">{suspendError}</Text>
+          )}
+        </View>
+      ) : null}
 
       {/* Changed in this block: the autopilot changes stored when the active
           block was built. Hidden when there is nothing to show, because an

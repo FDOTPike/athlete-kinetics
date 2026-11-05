@@ -63,6 +63,21 @@ export const anchorReasonText = (reasons: readonly string[]): string => {
   return text.length > 0 ? `${text.charAt(0).toUpperCase()}${text.slice(1)}.` : '';
 };
 
+/** #210: the sport list has no grappling sport, so a grappling sport can only
+ *  be one the athlete named under "Other". These words only decide whether a
+ *  day-type chip is offered; they change nothing the generator does. */
+const GRAPPLING_SPORT_NAME = /\b(bjj|jiu[\s-]?jitsu|ju[\s-]?jitsu|jujitsu|judo|wrestl\w*|grappl\w*|sambo)\b/i;
+
+/** #210: the "bjj" day type is offered only with the Strength + Grappling goal
+ *  or a grappling sport. A day already set to bjj keeps the chip (see below),
+ *  so an existing choice is never hidden. */
+export const offersGrapplingDays = (
+  objective: string,
+  sport: { sportId: string; otherSportName: string | null } | null | undefined,
+): boolean => objective === 'hybrid'
+  || (sport != null && sport.sportId === 'other' && sport.otherSportName != null
+    && GRAPPLING_SPORT_NAME.test(sport.otherSportName));
+
 const SCHEMA_LABEL: Record<SchemaType, string> = {
   LINEAR: 'Linear', WAVE: 'Undulating', STEP: 'Step loading', APRE: 'Autoregulated',
 };
@@ -81,6 +96,7 @@ export default function ProgramSetupScreen({
   const profile = useStore((s) => s.profile);
   const today = useStore((s) => s.today);
   const program = useStore((s) => s.program);
+  const sport = useStore((s) => s.sport);
   const movements = useStore((s) => s.movements);
   const niggles = useStore((s) => s.niggles);
   const previewTrainingProgram = useStore((s) => s.previewTrainingProgram);
@@ -632,7 +648,8 @@ export default function ProgramSetupScreen({
               <View key={dayIndex} style={styles.dayRow}>
                 <Text style={styles.dayRowTitle}>{DAY_NAME[dayIndex - 1]}</Text>
                 <View style={styles.focusChipRow}>
-                  {BLOCK_FOCUS_LIST.map((focus) => (
+                  {BLOCK_FOCUS_LIST.filter((focus) => focus !== 'bjj' || currentFocus === 'bjj'
+                    || offersGrapplingDays(profile.objective, sport)).map((focus) => (
                     <Chip
                       key={focus}
                       label={focus}

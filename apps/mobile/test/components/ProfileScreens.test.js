@@ -744,6 +744,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       ],
     });
 
+    fireEvent.press(screen.getByLabelText('One-rep maxes (optional)'));
     const squat = screen.getByLabelText('SQUAT one rep max in kilograms, type to set');
     expect(squat.props.keyboardType).toBe('numeric');
     fireEvent.changeText(squat, '142.5');
@@ -1091,6 +1092,31 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       hardwareBack.restore();
     }
   }, 30000);
+
+  describe('#210: expert sections start collapsed for every athlete', () => {
+    test.each(['beginner', 'intermediate', 'advanced', 'elite'])('for a %s athlete', (trainingAge) => {
+      mockState.profile = { ...mockState.profile, training_age: trainingAge };
+      render(<ProfileScreen />);
+      for (const heading of ['Energy system focus (optional)', 'Heart rate and sleep data (optional)', 'One-rep maxes (optional)']) {
+        expect(screen.getByLabelText(heading).props.accessibilityState).toMatchObject({ expanded: false });
+      }
+      expect(screen.queryByText('7 · TARGET ENERGY SYSTEM')).toBeNull();
+      expect(screen.queryByText(/HEALTH CONNECT|APPLE HEALTH/)).toBeNull();
+      expect(screen.queryByText('ONE-REP MAXES (KG)')).toBeNull();
+      // Every other numbered field is still in view.
+      expect(screen.getByText('6 · EFFORT CEILING')).toBeOnTheScreen();
+    }, 30000);
+
+    test('each heading opens its section', () => {
+      render(<ProfileScreen />);
+      fireEvent.press(screen.getByLabelText('Energy system focus (optional)'));
+      expect(screen.getByText('7 · TARGET ENERGY SYSTEM')).toBeOnTheScreen();
+      fireEvent.press(screen.getByLabelText('Heart rate and sleep data (optional)'));
+      expect(screen.getByText(/HEALTH CONNECT|APPLE HEALTH/)).toBeOnTheScreen();
+      fireEvent.press(screen.getByLabelText('One-rep maxes (optional)'));
+      expect(screen.getByText('ONE-REP MAXES (KG)')).toBeOnTheScreen();
+    }, 30000);
+  });
 });
 
 // ---------------------------------------------------------------------------
