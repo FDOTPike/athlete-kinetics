@@ -246,24 +246,27 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
   // A test is either run (TESTS) or on hold by an owner decision (HELD_TESTS,
   // each entry "<test>:<tracking issue>", and the CI notice prints that issue).
   // Never both, never neither, and never skipped inside the suite or scheme.
+  // null = the array is not declared (the runner reads both under set -u, so a
+  // missing declaration fails the check rather than counting as empty).
   const runnerArray = (name) => {
     const m = runner.match(new RegExp(`^${name}=\\((?:\\n([\\s\\S]*?))?\\n?\\)`, 'm'));
-    return m === null || m[1] === undefined ? [] : m[1].split('\n').map((line) => line.trim()).filter((line) => line !== '' && !line.startsWith('#'));
+    if (m === null) return null;
+    return m[1] === undefined ? [] : m[1].split('\n').map((line) => line.trim()).filter((line) => line !== '' && !line.startsWith('#'));
   };
-  const runTests = runnerArray('TESTS');
+  const runTests = runnerArray('TESTS') ?? [];
   const heldEntries = runnerArray('HELD_TESTS');
-  const held = heldEntries.map((entry) => entry.match(/^(test\w+):(\d+)$/));
+  const held = (heldEntries ?? []).map((entry) => entry.match(/^(test\w+):(\d+)$/));
   const heldTests = held.map((m, i) => (m === null ? heldEntries[i] : m[1]));
   const heldNoticeNamesIssue = runner.includes('on hold::not run in CI (owner decision, issue #${held##*:})')
     && runner.includes('if [ "${#HELD_TESTS[@]}" -gt 0 ]; then');
   check('every UI test in the suite is run by CI or on hold with its own tracking issue, none skipped',
-    tests.length >= 4 && runTests.length >= 4
+    tests.length >= 4 && runTests.length >= 4 && heldEntries !== null
       && tests.every((t) => runTests.includes(t) !== heldTests.includes(t))
       && [...runTests, ...heldTests].every((t) => tests.includes(t))
       && held.every((m) => m !== null)
-      && (held.length === 0 || heldNoticeNamesIssue)
+      && heldNoticeNamesIssue
       && !/XCTSkip|skipped = "YES"/.test(suite + scheme),
-    `run=${runTests.join(',')} held=${heldEntries.join(',') || 'none'}`);
+    `run=${runTests.join(',')} held=${heldEntries === null ? 'NOT DECLARED' : (heldEntries.join(',') || 'none')}`);
   check('the suite covers the audit, Dynamic Type, Health denial + switching and Files backup/restore',
     suite.includes('performAccessibilityAudit(for: .all)') && suite.includes('UICTContentSizeCategoryAccessibilityXXXL')
       && suite.includes('Don’t Allow') && suite.includes('Athlete UITest B, active')
