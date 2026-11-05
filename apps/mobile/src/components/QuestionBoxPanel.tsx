@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import type { QuestionResult } from '../../../../packages/inference/src/semantic/questionRouter';
-import { GLOSSARY_ENTRIES } from '../data/glossary';
+import { GLOSSARY_ENTRIES, glossaryTitle } from '../data/glossary';
 import { useStore } from '../state/useStore';
 import { theme } from '../theme/theme';
 import { PrimaryButton, QuietAction } from './ui';
@@ -39,7 +39,7 @@ export default function QuestionBoxPanel({ onClose }: { onClose: () => void }): 
     {result?.outcome === 'none' && <Text style={styles.text} accessibilityLiveRegion="polite">no answer for that yet</Text>}
     {result?.outcome === 'refer' && <Text style={styles.text} accessibilityRole="alert">{QUESTION_SYMPTOM_MESSAGE}</Text>}
     {entry !== undefined && <View style={styles.panel} testID="question-answer-card" accessibilityLiveRegion="polite">
-      <Text style={styles.title}>{entry.term}</Text><Text style={styles.text}>{entry.definition}</Text>
+      <Text style={styles.title}>{glossaryTitle(entry)}</Text><Text style={styles.text}>{entry.definition}</Text>
     </View>}
   </View>;
 }

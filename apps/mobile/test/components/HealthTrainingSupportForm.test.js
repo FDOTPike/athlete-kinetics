@@ -93,3 +93,19 @@ test('R3 grouping preserves each radio role, checked state and press behavior', 
   expect(within(notesAfter).getByRole('radio', { name: 'Note type: rest context' }).props.accessibilityState).toMatchObject({ checked: true });
   expect(within(notesAfter).getByRole('radio', { name: 'Note type: general' }).props.accessibilityState).toMatchObject({ checked: false });
 });
+
+// Android walk 2026-11-03, W4-3: the saved answer was drawn exactly like the
+// other options; only the accessibility tree said which was checked.
+test('the saved answer is drawn as chosen: a filled dot and the accent border', () => {
+  const { StyleSheet } = require('react-native');
+  const { theme } = require('../../src/theme/theme');
+  openSupport();
+  const chosen = screen.getByLabelText('position: seated');
+  const other = screen.getByLabelText('position: standing');
+  expect(within(chosen).getByText('●')).toBeOnTheScreen();
+  expect(within(other).getByText('○')).toBeOnTheScreen();
+  expect(StyleSheet.flatten(chosen.props.style).borderColor).toBe(theme.color.chalk);
+  expect(StyleSheet.flatten(other.props.style).borderColor).toBe(theme.color.line);
+  expect(screen.getByText('Seated')).toBeOnTheScreen();
+  expect(screen.getByText('Position changes')).toBeOnTheScreen();
+});

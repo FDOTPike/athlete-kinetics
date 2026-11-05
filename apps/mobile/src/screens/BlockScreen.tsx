@@ -37,6 +37,7 @@ import { theme } from '../theme/theme';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { appliedAdjustmentLines, autopilotReasonCopy } from '../state/autopilotCopy';
 import { EMPTY_ACTIVITY_LEDGER } from '../state/activityStore';
+import { sessionFocusName } from '../state/sessionSummary';
 import {
   PrimaryButton,
   SecondaryButton,
@@ -102,14 +103,10 @@ interface WeekRow {
   cells: (BlockSessionSummary | null)[];
 }
 
-const signed = (value: number): string => (value > 0 ? `+${value}` : String(value));
 
 const focusLabel = (focus: string): string => FOCUS_ABBREV[focus] ?? focus.slice(0, 3).toUpperCase();
 
-const focusName = (focus: string): string => focus
-  .split('_')
-  .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-  .join(' ');
+const focusName = (focus: string): string => sessionFocusName(focus);
 
 const phaseLabel = (phase: string): string => PHASE_LABEL[phase] ?? phase;
 
@@ -122,6 +119,43 @@ const SUSPENSION_REASON_LABEL: Record<(typeof SUSPENSION_REASONS)[number], strin
   illness: 'illness',
   life: 'life events',
 };
+
+/** Walk W3-7: "Why today changed" showed raw values ("profile", "x0.77",
+ *  "-1"). These say the same thing in words. */
+const ADJUSTMENT_SOURCE_TEXT: Record<string, string> = {
+  profile: 'Based on your profile',
+  policy: 'Based on your readiness',
+  guardrail: 'A safety limit',
+};
+export const loadChangeText = (modifier: number): string => {
+  const pct = Math.round((1 - modifier) * 100);
+  if (pct === 0) return 'No change';
+  return pct > 0 ? `Planned load reduced by ${pct}%` : `Planned load raised by ${-pct}%`;
+};
+export const setChangeText = (delta: number): string => {
+  if (delta === 0) return 'No change';
+  const n = Math.abs(delta);
+  return `${n} ${delta < 0 ? 'fewer' : 'more'} ${n === 1 ? 'set' : 'sets'}`;
+};
+
+/** The paused card names the block the athlete can see on this screen (the
+ *  goal program's "Block N of M"), never the internal 8-position cycle index,
+ *  which is a different counter and read as a contradiction (walk W3-1). */
+export function pausedHeldText(
+  reasonLabel: string,
+  program: { currentSequenceIndex: number; plannedBlockCount: number } | null | undefined,
+  reason?: (typeof SUSPENSION_REASONS)[number],
+): string {
+  const place = program != null
+    ? `You are held at block ${program.currentSequenceIndex} of ${program.plannedBlockCount}`
+    : 'Your place is held';
+  // #188: an injury pause never tells the athlete to keep training; it points
+  // to the report form instead. What a pause does is unchanged.
+  if (reason === 'injury') {
+    return `Paused for ${reasonLabel}. ${place} and will come back to it. If something hurts, report it under "Something feels off" so Coach can adjust today's plan.`;
+  }
+  return `Paused for ${reasonLabel}. ${place} and will come back to it — training you do now will not use it up. Keep training if you can; everything else works as normal.`;
+}
 
 function targetLabel(slot: TodaySlot): string {
   return slot.target.kind === 'time'
@@ -276,6 +310,10 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
   const trajectorySectionY = useRef(0);
   const manageSectionOffsetY = useRef(0);
   const [reportOpen, setReportOpen] = useState(false);
+  // #188: the reason a pause button was pressed for, until it is confirmed.
+  const [confirmPauseReason, setConfirmPauseReason] = useState<(typeof SUSPENSION_REASONS)[number] | null>(null);
+  const disclosuresSectionY = useRef(0);
+  const reportDisclosureOffsetY = useRef(0);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [confirmUnplannedStart, setConfirmUnplannedStart] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<
@@ -335,6 +373,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
     nextProgramPreview !== null ||
     detail !== null ||
     reportOpen ||
+    confirmPauseReason !== null ||
     confirmRegenerate ||
     confirmUnplannedStart ||
     editingTemplate !== null ||
@@ -348,6 +387,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
     else if (confirmRoutineAction !== null) setConfirmRoutineAction(null);
     else if (detail !== null) setDetail(null);
     else if (reportOpen) setReportOpen(false);
+    else if (confirmPauseReason !== null) setConfirmPauseReason(null);
     else if (confirmRegenerate) setConfirmRegenerate(false);
     else if (confirmUnplannedStart) setConfirmUnplannedStart(false);
   });
@@ -490,6 +530,15 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
     });
   };
 
+  /** Open "Something feels off" and bring it into view (#188, injury pause). */
+  const openReportForm = (): void => {
+    setReportOpen(true);
+    scrollRef.current?.scrollTo({
+      y: Math.max(0, disclosuresSectionY.current + reportDisclosureOffsetY.current - theme.space[4]),
+      animated: true,
+    });
+  };
+
   const openNextSession = (): void => {
     if (nextPlanned === undefined) {
       if (program == null) openManageBlock();
@@ -521,7 +570,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
     todayMessage = 'Your active workout is ready to resume.';
   } else if (todayPlan !== null) {
     todayTitle = `Today: ${focusName(todayPlan.focus)}`;
-    todayMessage = `${todayPlan.slots.length} movements are planned. Start when you are ready.`;
+    todayMessage = `${todayPlan.slots.length} ${todayPlan.slots.length === 1 ? 'movement is' : 'movements are'} planned. Start when you are ready.`;
   } else if (block === null) {
     todayTitle = hasArchivedBlock ? 'Your previous block had ended.' : 'Build your first block';
     todayMessage = 'A short four-week block gives Coach a clear trajectory to follow.';
@@ -628,10 +677,16 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           <Text style={styles.eyebrow}>PROGRAMME PAUSED</Text>
           <Text style={styles.cardTitle}>Your place is being held</Text>
           <Text style={styles.bodyText}>
-            Paused for {SUSPENSION_REASON_LABEL[suspension.reason]}. You are held at block{' '}
-            {suspension.frozen_macro_index} of 8 and will come back to it — training you do now
-            will not use it up. Keep training if you can; everything else works as normal.
+            {pausedHeldText(SUSPENSION_REASON_LABEL[suspension.reason], program, suspension.reason)}
           </Text>
+          {suspension.reason === 'injury' && (
+            <SecondaryButton
+              label="Something feels off"
+              onPress={openReportForm}
+              accessibilityLabel="Open Something feels off to report the injury"
+              testID="suspension-injury-report"
+            />
+          )}
           <PrimaryButton
             label="Resume my programme"
             onPress={() => {
@@ -646,7 +701,9 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                 setSuspendError(e instanceof Error ? e.message : String(e));
               }
             }}
-            accessibilityLabel={`Resume the programme and return to block ${suspension.frozen_macro_index} of 8`}
+            accessibilityLabel={program != null
+              ? `Resume the programme and return to block ${program.currentSequenceIndex} of ${program.plannedBlockCount}`
+              : 'Resume the programme and return to your place'}
             testID="suspension-resume"
           />
           {/* Mounted INSIDE the suspended branch. The resume button exists only
@@ -657,7 +714,9 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
             <Text style={styles.adjustedText} testID="suspension-error">{suspendError}</Text>
           )}
         </View>
-      ) : (
+      ) : block !== null || program != null ? (
+        /* Walk W3-7: with no block and no program there is nothing to hold,
+           so the pause buttons are not offered. An open pause still shows. */
         <View style={styles.card}>
           <Text style={styles.eyebrow}>PAUSE</Text>
           <Text style={styles.cardTitle}>Injured, ill, or life got in the way?</Text>
@@ -665,29 +724,53 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
             Pausing holds your place in the programme so a gap does not cost you a block. You can
             still train while paused.
           </Text>
-          {SUSPENSION_REASONS.map((reason) => (
+          {/* #188: every pause asks first; the pause itself is unchanged. */}
+          {confirmPauseReason === null ? SUSPENSION_REASONS.map((reason) => (
             <PrimaryButton
               key={reason}
               label={`Pause — ${SUSPENSION_REASON_LABEL[reason]}`}
               onPress={() => {
-                try {
-                  setSuspendError(null);
-                  beginSuspension(reason, Date.now());
-                } catch (e) {
-                  setSuspendError(e instanceof Error ? e.message : String(e));
-                }
+                setSuspendError(null);
+                setConfirmPauseReason(reason);
               }}
               accessibilityLabel={`Pause my programme for ${SUSPENSION_REASON_LABEL[reason]}`}
               testID={`suspension-begin-${reason}`}
             />
-          ))}
+          )) : (
+            <>
+              <Text style={styles.bodyText}>
+                {`Pause your programme (${SUSPENSION_REASON_LABEL[confirmPauseReason]})?`}
+              </Text>
+              <PrimaryButton
+                label="Pause my programme"
+                onPress={() => {
+                  const reason = confirmPauseReason;
+                  setConfirmPauseReason(null);
+                  try {
+                    setSuspendError(null);
+                    beginSuspension(reason, Date.now());
+                  } catch (e) {
+                    setSuspendError(e instanceof Error ? e.message : String(e));
+                  }
+                }}
+                accessibilityLabel={`Confirm: pause my programme for ${SUSPENSION_REASON_LABEL[confirmPauseReason]}`}
+                testID="suspension-confirm"
+              />
+              <SecondaryButton
+                label="Cancel"
+                onPress={() => setConfirmPauseReason(null)}
+                accessibilityLabel="Cancel and keep the programme running"
+                testID="suspension-cancel"
+              />
+            </>
+          )}
           {/* Action-scoped, not the global error channel: an unrelated store
               error must never read as a refusal of this control. */}
           {suspendError !== null && (
             <Text style={styles.adjustedText} testID="suspension-error">{suspendError}</Text>
           )}
         </View>
-      )}
+      ) : null}
 
       {program != null && (
         <View style={styles.card}>
@@ -723,7 +806,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
         </View>
         <Text style={styles.cardTitle}>{todayTitle}</Text>
         <Text style={styles.bodyText}>{todayMessage}</Text>
-        {current !== null && !halted && isPrescriptionReduced(current.vector, profile) && (
+        {current !== null && !halted && (todayPlan !== null || session !== null) && isPrescriptionReduced(current.vector, profile) && (
           <Text style={styles.adjustedText}>Coach adjusted today's plan.</Text>
         )}
 
@@ -1013,7 +1096,10 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
       )}
 
       {/* Disclosures Section */}
-      <View style={styles.section}>
+      <View
+        style={styles.section}
+        onLayout={(event) => { disclosuresSectionY.current = event.nativeEvent.layout.y; }}
+      >
         <Text style={styles.sectionTitle}>Optional details</Text>
         <Disclosure label="Why today changed" hint="Adjustment source and limits">
           {current === null ? (
@@ -1022,15 +1108,15 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
             <View style={styles.disclosureContent}>
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Source</Text>
-                <Text style={styles.infoValue}>{current.source}</Text>
+                <Text style={styles.infoValue}>{ADJUSTMENT_SOURCE_TEXT[current.source] ?? current.source}</Text>
               </View>
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Load</Text>
-                <Text style={styles.infoValue}>x{current.vector.load_modifier.toFixed(2)}</Text>
+                <Text style={styles.infoValue}>{loadChangeText(current.vector.load_modifier)}</Text>
               </View>
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Sets</Text>
-                <Text style={styles.infoValue}>{signed(current.vector.set_modifier)}</Text>
+                <Text style={styles.infoValue}>{setChangeText(current.vector.set_modifier)}</Text>
               </View>
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>RPE cap</Text>
@@ -1194,7 +1280,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
               <Text style={styles.captionText}>
                 {block.objective.replace(/_/g, ' ')} block, started {block.startDate}
                 {blockMeta !== null
-                  ? ` - ${blockMeta.schemaType} - macro block ${blockMeta.macroBlockIndex} of 8`
+                  ? ` - ${blockMeta.schemaType}`
                   : ''}
               </Text>
             ) : (
@@ -1336,94 +1422,96 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           </Disclosure>
         )}
 
-        <Disclosure
-          label="Something feels off"
-          hint="Add a subjective report only when you need Coach to adapt"
-          open={reportOpen}
-          onOpenChange={setReportOpen}
-        >
-          <View style={styles.disclosureContent}>
-            {!triageReady && (
-              <Text style={styles.captionText}>
-                Semantic matching is unavailable in this build. Injury-language safety checks still apply.
-              </Text>
-            )}
-            <TextInput
-              disableFullscreenUI
-              style={styles.reportInput}
-              value={reportText}
-              onChangeText={setReportText}
-              placeholder="For example: my knee feels sore when I squat"
-              placeholderTextColor={theme.color.textLow}
-              maxLength={500}
-              multiline
-              accessibilityLabel="Describe how your body feels today"
-            />
-            <Text style={styles.severityLabel}>Severity from 1 to 10</Text>
-            <View style={styles.severityRow}>
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((severity) => {
-                const selected = reportSeverity === severity;
-                return (
-                  <Pressable
-                    key={severity}
-                    onPress={() => setReportSeverity(severity)}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected }}
-                    accessibilityLabel={`Severity ${severity} of 10`}
-                    style={[
-                      styles.severityChip,
-                      selected && styles.severityChipSelected,
-                    ]}
-                  >
-                    <Text style={[styles.severityText, selected && styles.severityTextSelected]}>{severity}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <PrimaryButton
-              label={triaging ? 'Checking report' : 'Apply report'}
-              disabled={reportText.trim().length === 0 || reportSeverity === null || triaging}
-              onPress={() => {
-                if (reportSeverity === null) return;
-                void reportSubjective(reportText, reportSeverity).then(() => {
-                  setReportText('');
-                  setReportSeverity(null);
-                });
-              }}
-              accessibilityLabel={triaging ? 'Checking report' : 'Apply report'}
-            />
-
-            {lastTriage !== null && lastTriage.kind === 'positive' && (
-              <View style={styles.reportResult}>
-                <View style={styles.statusBadge}>
-                  <Text style={styles.statusBadgeText}>Noted</Text>
-                </View>
-                <Text style={styles.bodyText}>{lastTriage.cue}</Text>
-              </View>
-            )}
-            {lastTriage !== null && lastTriage.kind === 'rejected' && (
-              <View style={styles.reportResult}>
-                <View style={styles.statusBadge}>
-                  <Text style={styles.statusBadgeText}>No change</Text>
-                </View>
+        <View onLayout={(event) => { reportDisclosureOffsetY.current = event.nativeEvent.layout.y; }}>
+          <Disclosure
+            label="Something feels off"
+            hint="Add a subjective report only when you need Coach to adapt"
+            open={reportOpen}
+            onOpenChange={setReportOpen}
+          >
+            <View style={styles.disclosureContent}>
+              {!triageReady && (
                 <Text style={styles.captionText}>
-                  Coach did not match this to a known scenario, so today's plan is unchanged.
+                  Semantic matching is unavailable in this build. Injury-language safety checks still apply.
                 </Text>
+              )}
+              <TextInput
+                disableFullscreenUI
+                style={styles.reportInput}
+                value={reportText}
+                onChangeText={setReportText}
+                placeholder="For example: my knee feels sore when I squat"
+                placeholderTextColor={theme.color.textLow}
+                maxLength={500}
+                multiline
+                accessibilityLabel="Describe how your body feels today"
+              />
+              <Text style={styles.severityLabel}>Severity from 1 to 10</Text>
+              <View style={styles.severityRow}>
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((severity) => {
+                  const selected = reportSeverity === severity;
+                  return (
+                    <Pressable
+                      key={severity}
+                      onPress={() => setReportSeverity(severity)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      accessibilityLabel={`Severity ${severity} of 10`}
+                      style={[
+                        styles.severityChip,
+                        selected && styles.severityChipSelected,
+                      ]}
+                    >
+                      <Text style={[styles.severityText, selected && styles.severityTextSelected]}>{severity}</Text>
+                    </Pressable>
+                  );
+                })}
               </View>
-            )}
-            {lastTriage !== null && lastTriage.kind === 'matched' && !lastTriage.directive.halt && (
-              <View style={styles.reportResult}>
-                <View style={styles.statusBadge}>
-                  <Text style={styles.statusBadgeText}>Plan adjusted</Text>
+              <PrimaryButton
+                label={triaging ? 'Checking report' : 'Apply report'}
+                disabled={reportText.trim().length === 0 || reportSeverity === null || triaging}
+                onPress={() => {
+                  if (reportSeverity === null) return;
+                  void reportSubjective(reportText, reportSeverity).then(() => {
+                    setReportText('');
+                    setReportSeverity(null);
+                  });
+                }}
+                accessibilityLabel={triaging ? 'Checking report' : 'Apply report'}
+              />
+
+              {lastTriage !== null && lastTriage.kind === 'positive' && (
+                <View style={styles.reportResult}>
+                  <View style={styles.statusBadge}>
+                    <Text style={styles.statusBadgeText}>Noted</Text>
+                  </View>
+                  <Text style={styles.bodyText}>{lastTriage.cue}</Text>
                 </View>
-                <Text style={styles.bodyText}>{lastTriage.directive.vector.coaching_cue}</Text>
-                {lastTriage.directive.followUp !== null && (
-                  <Text style={styles.captionText}>{lastTriage.directive.followUp}</Text>
-                )}
-              </View>
-            )}
-          </View>
-        </Disclosure>
+              )}
+              {lastTriage !== null && lastTriage.kind === 'rejected' && (
+                <View style={styles.reportResult}>
+                  <View style={styles.statusBadge}>
+                    <Text style={styles.statusBadgeText}>No change</Text>
+                  </View>
+                  <Text style={styles.captionText}>
+                    Coach did not match this to a known scenario, so today's plan is unchanged.
+                  </Text>
+                </View>
+              )}
+              {lastTriage !== null && lastTriage.kind === 'matched' && !lastTriage.directive.halt && (
+                <View style={styles.reportResult}>
+                  <View style={styles.statusBadge}>
+                    <Text style={styles.statusBadgeText}>Plan adjusted</Text>
+                  </View>
+                  <Text style={styles.bodyText}>{lastTriage.directive.vector.coaching_cue}</Text>
+                  {lastTriage.directive.followUp !== null && (
+                    <Text style={styles.captionText}>{lastTriage.directive.followUp}</Text>
+                  )}
+                </View>
+              )}
+            </View>
+          </Disclosure>
+        </View>
       </View>
     </KeyboardAwareScrollView>
   );
