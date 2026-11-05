@@ -23,6 +23,8 @@
  *   [N9] Xcode 26 toolchain: the Podfile disables fmt's consteval for Apple
  *        clang (fmtlib/fmt#4740) while React Native pins fmt 11.0.2, and makes
  *        glog's namespace-included headers textual for Swift/C++ interop.
+ *   [N11] beta orientation lock (#168): the Android main activity and iPhone
+ *        are portrait only; iPad keeps its own orientation list.
  *
  * Run: npm run verify:native-config
  */
@@ -303,6 +305,23 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
   check('CI builds the tests ad-hoc for the simulator only (no team, no profile) and runs them fail-closed',
     /CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER=/.test(ci) && /-sdk iphonesimulator[\s\S]*build-for-testing/.test(ci)
       && ci.includes('tools/ios_ui_tests.sh') && runner.includes('exit "$FAILED"') && runner.includes('lsof -nP -a -i -p'));
+}
+
+console.log('[N11] beta orientation lock (#168)');
+{
+  // A beta decision to revisit: landscape left too little room on every
+  // screen (the rest card's countdown never fit). Tablets are not in the beta,
+  // so the iPad list is kept as it was.
+  const manifest = read('apps/mobile/android/app/src/main/AndroidManifest.xml');
+  const mainActivity = manifest.match(/<activity\s[^>]*android:name="\.MainActivity"[^>]*>/)?.[0] ?? '';
+  check('Android MainActivity is locked to portrait', /android:screenOrientation="portrait"/.test(mainActivity));
+  const orientations = (key) => [...String(plist.get(key) ?? '').matchAll(/<string>([^<]+)<\/string>/g)].map((m) => m[1]);
+  const iphone = orientations('UISupportedInterfaceOrientations');
+  check('iPhone supports portrait only', iphone.length === 1 && iphone[0] === 'UIInterfaceOrientationPortrait', iphone.join(','));
+  const ipad = orientations('UISupportedInterfaceOrientations~ipad');
+  check('iPad keeps portrait and both landscape orientations',
+    ['UIInterfaceOrientationPortrait', 'UIInterfaceOrientationLandscapeLeft', 'UIInterfaceOrientationLandscapeRight']
+      .every((o) => ipad.includes(o)), ipad.join(','));
 }
 
 console.log(`\n${fail === 0 ? 'NATIVE CONFIG VERIFIED (static contract; native build evidence comes from the macOS CI job)' : `${fail} NATIVE CONFIG CHECK(S) FAILED`}`);
