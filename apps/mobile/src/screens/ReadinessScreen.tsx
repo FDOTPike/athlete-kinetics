@@ -456,7 +456,10 @@ function AvailableReadinessScreen({
           <Text style={styles.statusBadgeText}>{meta.label.toUpperCase()}</Text>
         </View>
         <Text style={styles.title}>{meta.title}</Text>
-        <Text style={styles.body}>{meta.recommendation}</Text>
+        {/* #253: once today's session is recorded, this line no longer tells the athlete to follow the plan. */}
+        <Text style={styles.body}>
+          {todaySessionDone ? "Today's session is done. Rest and recover." : meta.recommendation}
+        </Text>
         {hasLiveSession && <Text style={styles.caption}>Your active workout is ready to resume.</Text>}
         {!hasLiveSession && todayPlan !== null && (
           <Text style={styles.caption}>

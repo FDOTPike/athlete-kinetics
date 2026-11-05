@@ -121,3 +121,19 @@ describe('#200: no session yet today, both screens still say it is planned', () 
     expect(screen.queryByText(/is recorded/)).toBeNull();
   });
 });
+
+describe('#253: READY\'s main line once today\'s session is recorded', () => {
+  test('with today\'s session complete, READY says it is done, not "Follow today\'s plan"', () => {
+    mockState = baseState('complete');
+    render(<ReadinessScreen />);
+    expect(screen.getByText("Today's session is done. Rest and recover.")).toBeOnTheScreen();
+    expect(screen.queryByText(/Follow today's plan/)).toBeNull();
+  });
+
+  test('with no session yet, READY still says "Follow today\'s plan"', () => {
+    mockState = baseState(null);
+    render(<ReadinessScreen />);
+    expect(screen.getByText("Follow today's plan at the effort it prescribes.")).toBeOnTheScreen();
+    expect(screen.queryByText("Today's session is done. Rest and recover.")).toBeNull();
+  });
+});
