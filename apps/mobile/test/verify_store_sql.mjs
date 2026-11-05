@@ -1360,6 +1360,9 @@ if (resetTables.length >= 15) {
       && summaryRows.every((r) => 'session_plan_slot_id' in r)
       && summaryRows.some((r) => r.session_plan_slot_id === 1)
       && summaryRows.some((r) => r.session_plan_slot_id === 2);
+    // Issue #230: the top set names the effort logged with it, so the same
+    // read carries each set's own rpe column (a fact, never an estimate).
+    check('#230: summary SELECT returns each set\'s logged rpe', summaryRows.length >= 2 && summaryRows.every((r) => 'rpe' in r));
     check('F4: summary SELECT returns each set\'s session_plan_slot_id (planned slot 1 and substituted slot 2)', slotIdsOk);
 
     // PR #13 review: the lifecycle's two slots both plan 3 sets, so a wrong

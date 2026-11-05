@@ -36,6 +36,9 @@
  * INDEPENDENT maxima with plain labels — "most reps in one set", "heaviest
  * load used", "longest recorded time". No combined "best set N reps at X kg"
  * form exists, because that reads as one set that never occurred.
+ * The one exception is the TOP SET (issue #230): it is a single logged set,
+ * named exactly as logged (load × reps at its logged effort), never composed
+ * from two sets and never an estimate.
  *
  * D4 — the no-next-session copy is the universal fallback text; D6 — summary
  * lines carry stable movement-based keys, never rendered text or indexes.
@@ -53,6 +56,8 @@ export interface SummarySetFact {
   reps: number;
   loadKg: number;
   timeS: number | null;
+  /** The effort logged with the set; null or absent when none was given. */
+  rpe?: number | null;
 }
 
 /** One movement of the ended session, with the sets actually recorded. */
@@ -74,6 +79,8 @@ export interface SummarySetRow {
   reps: number;
   loadKg: number;
   timeS: number | null;
+  /** The effort logged with the set; null or absent when none was given. */
+  rpe?: number | null;
   /** `set_target.session_plan_slot_id`; null for a set with no planned slot. */
   sessionPlanSlotId: number | null;
   /** `session_plan_slot.planned_sets` of that slot; null when unmapped. */
@@ -109,7 +116,7 @@ export const groupSummaryExercises = (rows: readonly SummarySetRow[]): SummaryEx
       entry = { name: row.movementName, slots: new Set(), sets: [] };
       byMovement.set(row.movementId, entry);
     }
-    entry.sets.push({ reps: row.reps, loadKg: row.loadKg, timeS: row.timeS });
+    entry.sets.push({ reps: row.reps, loadKg: row.loadKg, timeS: row.timeS, rpe: row.rpe ?? null });
     if (row.sessionPlanSlotId !== null) {
       entry.slots.add(row.sessionPlanSlotId);
       let members = movementsBySlot.get(row.sessionPlanSlotId);
@@ -271,6 +278,32 @@ const exerciseLine = (exercise: SummaryExercise): SummaryLine => {
   return { key: `exercise-${exercise.movementId}`, text: parts.join(' · ') };
 };
 
+/** The top set of one exercise: ONE logged set, the heaviest load and, among
+ *  equal loads, the most reps (then the higher logged effort, so set order
+ *  never changes it). Only loaded sets with reps count; null when there is
+ *  none. A fact as logged, never an estimate (issue #230). */
+export const topSetOf = (exercise: SummaryExercise): { loadKg: number; reps: number; rpe: number | null } | null => {
+  let top: { loadKg: number; reps: number; rpe: number | null } | null = null;
+  for (const set of exercise.sets) {
+    if (implementClassOf(set.loadKg) !== 'loaded' || set.reps <= 0) continue;
+    const rpe = set.rpe ?? null;
+    if (top === null
+      || set.loadKg > top.loadKg
+      || (set.loadKg === top.loadKg && set.reps > top.reps)
+      || (set.loadKg === top.loadKg && set.reps === top.reps && (rpe ?? -1) > (top.rpe ?? -1))) {
+      top = { loadKg: set.loadKg, reps: set.reps, rpe };
+    }
+  }
+  return top;
+};
+
+const topSetLine = (exercise: SummaryExercise): SummaryLine | null => {
+  const top = topSetOf(exercise);
+  if (top === null) return null;
+  const effort = top.rpe === null ? '' : ` at effort ${Number.isInteger(top.rpe) ? top.rpe.toFixed(0) : top.rpe.toFixed(1)}`;
+  return { key: `top-set-${exercise.movementId}`, text: `Top set ${loadCopy(top.loadKg)} × ${top.reps}${effort}` };
+};
+
 /**
  * The previous-session line (D2 + D3). Facts come ONLY from the one eligible
  * prior session; today's numbers never appear here. A line is emitted only
@@ -310,6 +343,9 @@ export const skippedExerciseText = (skipped: SkippedExercise): string => {
 
 export interface SessionSummaryView {
   exerciseLines: SummaryLine[];
+  /** The top set line shown under an exercise line, keyed by that exercise
+   *  line's key; absent for an exercise with no loaded set. */
+  topSetByExercise: Record<string, SummaryLine>;
   /** One line per skipped exercise, in the session timeline's wording. */
   skippedLines: SummaryLine[];
   comparisonLines: SummaryLine[];
@@ -330,6 +366,11 @@ export interface BuildSummaryInput {
 
 export const buildSessionSummary = (input: BuildSummaryInput): SessionSummaryView => {
   const exerciseLines = input.exercises.map(exerciseLine);
+  const topSetByExercise: Record<string, SummaryLine> = {};
+  input.exercises.forEach((exercise, index) => {
+    const line = topSetLine(exercise);
+    if (line !== null) topSetByExercise[exerciseLines[index]!.key] = line;
+  });
   const comparisonLines: SummaryLine[] = [];
   for (const exercise of input.exercises) {
     const facts = matchPreviousFacts(exercise, input.previousSets);
@@ -352,6 +393,7 @@ export const buildSessionSummary = (input: BuildSummaryInput): SessionSummaryVie
   }));
   return {
     exerciseLines,
+    topSetByExercise,
     skippedLines,
     comparisonLines,
     durationLine,
