@@ -63,6 +63,10 @@ export interface RunnerState {
   readonly restRpe: number | null;
   /** Athlete-selected rest duration for this session; null uses the prescription. */
   readonly restSecondsOverride: number | null;
+  /** Present (true) only while resting after a bodyweight set (0 kg on a
+   *  bodyweight movement): that rest follows the bodyweight rule (issue #209).
+   *  Absent in every other state, so older checkpoints restore unchanged. */
+  readonly restBodyweight?: true;
   /** Completed logged sets by immutable session-plan slot index. */
   readonly slotSetCounts: readonly number[];
   /** Aggregate of slotSetCounts, retained for concise session summaries. */
@@ -94,7 +98,7 @@ interface TimestampedRunnerEvent {
 }
 
 export type RunnerEvent =
-  | (TimestampedRunnerEvent & { readonly kind: 'LOG_SET'; readonly actualRpe?: number })
+  | (TimestampedRunnerEvent & { readonly kind: 'LOG_SET'; readonly actualRpe?: number; readonly bodyweightSet?: boolean })
   | (TimestampedRunnerEvent & { readonly kind: 'REST_ELAPSED' })
   | (TimestampedRunnerEvent & { readonly kind: 'SKIP_REST' })
   | (TimestampedRunnerEvent & { readonly kind: 'SET_REST_OVERRIDE'; readonly seconds: number | null })
@@ -405,7 +409,11 @@ function normalizeState(value: unknown): RunnerState {
     throw new RunnerCheckpointError('state.loggedSets must equal the sum of state.slotSetCounts');
   }
 
+  if (value.restBodyweight !== undefined && typeof value.restBodyweight !== 'boolean') {
+    throw new RunnerCheckpointError('state.restBodyweight is invalid');
+  }
   const state: RunnerState = {
+    ...(value.restBodyweight === true && phase === 'resting' ? { restBodyweight: true as const } : {}),
     tier,
     slots,
     slotIndex,
@@ -481,7 +489,8 @@ function normalizeState(value: unknown): RunnerState {
     allSlotsResolved(slots, state.slotSetCounts, skipped)) {
     throw new RunnerCheckpointError('resting state must follow a logged, non-final session set');
   }
-  const prescribedRest = state.restSecondsOverride ?? restSecondsFor(current, state.tier, state.restRpe);
+  const prescribedRest = state.restSecondsOverride
+    ?? restSecondsFor(current, state.tier, state.restRpe, state.restBodyweight === true);
   // A checkpoint saved mid-rest before the tier-neutral rest ruling keeps the
   // rest it was already counting down; every later rest is tier-neutral.
   const savedPreRulingRest = state.restSecondsOverride === null
@@ -511,6 +520,13 @@ function rpeBandRestSeconds(rpe: number): number {
   return rpe >= 9 ? 240 : rpe >= 8 ? 180 : rpe >= 7 ? 120 : 90;
 }
 
+/** Rest after a bodyweight set (issue #209): 60 s below RPE 8, 90 s at RPE 8
+ *  or above. By load, never by tier (docs/decisions/
+ *  REST_AFTER_BODYWEIGHT_SETS_2026-11-05.md, PROPOSED). */
+function bodyweightRestSeconds(rpe: number): number {
+  return rpe >= 8 ? 90 : 60;
+}
+
 /** Snap to a 15-second step in the inclusive 45..300 second contract. */
 function snapRestSeconds(seconds: number): number {
   return Math.min(300, Math.max(45, Math.round(seconds / 15) * 15));
@@ -527,11 +543,12 @@ export function restSecondsFor(
   slot: Pick<RunnerSlot, 'targetRpe'>,
   tier: TrainingAge,
   actualRpe?: number | null,
+  bodyweightSet = false,
 ): number {
   if (!isTrainingAge(tier)) throw new RunnerCheckpointError('invalid training tier');
   const rpe = actualRpe ?? slot.targetRpe;
   if (!isRpe(rpe)) throw new RunnerCheckpointError('RPE must be a finite value from 0 to 10');
-  return snapRestSeconds(rpeBandRestSeconds(rpe));
+  return snapRestSeconds(bodyweightSet ? bodyweightRestSeconds(rpe) : rpeBandRestSeconds(rpe));
 }
 
 /** The rest an earlier build prescribed; used only to accept a restored mid-rest checkpoint. */
@@ -626,7 +643,12 @@ function isNormalEventTime(state: RunnerState, atMs: number): boolean {
 }
 
 function withUpdate(state: RunnerState, atMs: number, changes: Partial<RunnerState>): RunnerState {
-  return { ...state, ...changes, updatedAtMs: atMs };
+  const { restBodyweight, ...merged } = { ...state, ...changes, updatedAtMs: atMs };
+  // The bodyweight-rest marker lives only through the rest it started: a new
+  // rest, or leaving rest, drops it unless the change sets it again.
+  const keep = restBodyweight === true && merged.phase === 'resting'
+    && (!('restStartedAtMs' in changes) || changes.restBodyweight === true);
+  return keep ? { ...merged, restBodyweight: true } : merged;
 }
 
 function completeAt(state: RunnerState, atMs: number): RunnerState {
@@ -714,7 +736,7 @@ export function advance(state: RunnerState, event: RunnerEvent): RunnerState {
     case 'SET_REST_OVERRIDE': {
       if (event.seconds !== null && !isRestTarget(event.seconds)) return state;
       const restSecondsTarget = state.phase === 'resting'
-        ? event.seconds ?? restSecondsFor(slot, state.tier, state.restRpe)
+        ? event.seconds ?? restSecondsFor(slot, state.tier, state.restRpe, state.restBodyweight === true)
         : 0;
       if (state.restSecondsOverride === event.seconds &&
         (state.phase !== 'resting' || state.restSecondsTarget === restSecondsTarget)) return state;
@@ -741,9 +763,10 @@ export function advance(state: RunnerState, event: RunnerEvent): RunnerState {
         slotSetCounts,
         loggedSets,
         phase: 'resting',
-        restSecondsTarget: state.restSecondsOverride ?? restSecondsFor(slot, state.tier, actualRpe),
+        restSecondsTarget: state.restSecondsOverride ?? restSecondsFor(slot, state.tier, actualRpe, event.bodyweightSet === true),
         restStartedAtMs: event.atMs,
         restRpe: actualRpe,
+        ...(event.bodyweightSet === true ? { restBodyweight: true as const } : {}),
         substitutionOfferedForSessionPlanSlotId: null,
       });
     }

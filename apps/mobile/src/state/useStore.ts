@@ -7914,6 +7914,9 @@ export const useStore = create<KineticsStore>()((set, get) => {
         kind: 'LOG_SET',
         atMs: loggedAtMs,
         ...(safeRpe === null ? {} : { actualRpe: safeRpe }),
+        // Issue #209: 0 kg on a bodyweight movement rests by the bodyweight
+        // rule (60 s / 90 s), whatever the athlete's tier.
+        ...(movement.supportedPrefixes[0] === 'Bodyweight' && safeLoad === 0 ? { bodyweightSet: true } : {}),
       });
       if (nextRunner === state.runner) {
         set({ error: 'That set cannot be logged in the current session state.' });

@@ -926,13 +926,15 @@ test('session rest override changes by 15 seconds and persists through the runne
 
   render(<SessionScreen />);
 
-  expect(screen.getByLabelText('Session rest seconds 90')).toBeOnTheScreen();
+  // Issue #209: rest is shown in minutes and seconds with a plain label.
+  expect(screen.getByTestId('session-rest-between')).toHaveTextContent('Rest between sets: 1:30');
+  expect(screen.getByLabelText('Change rest (min:sec) 1:30')).toBeOnTheScreen();
   // Android walk 2026-11-03 (ux-8): the number follows the last set's effort,
   // so the caption says why it changes between rests.
-  expect(screen.getByText('Rest uses your effort rating, or the planned effort if you leave it blank. Harder sets get longer rests. Your changes apply for this session.')).toBeOnTheScreen();
-  fireEvent.press(screen.getByLabelText('Increase Session rest seconds'));
+  expect(screen.getByText('Rest uses your effort rating, or the planned effort if you leave it blank. Harder sets get longer rests; a bodyweight set gets 60 to 90 seconds. Your changes apply for this session.')).toBeOnTheScreen();
+  fireEvent.press(screen.getByLabelText('Increase Change rest (min:sec)'));
   expect(mockState.setRunnerRestOverride).toHaveBeenCalledWith(105);
-  fireEvent.press(screen.getByLabelText('Decrease Session rest seconds'));
+  fireEvent.press(screen.getByLabelText('Decrease Change rest (min:sec)'));
   expect(mockState.setRunnerRestOverride).toHaveBeenCalledWith(75);
 });
 
@@ -1811,8 +1813,14 @@ test('R5 local rest fallback is identical for every tier and equals the runner r
   const observed = new Map();
   for (const tier of ['beginner', 'intermediate', 'advanced', 'elite']) {
     for (const [answer, rpe] of answers) {
-      mockState = state({ runner: null, profile: { training_age: tier, equipment_inventory: [], session_duration_cap_min: 60 } });
+      // A loaded set (issue #209 gives bodyweight sets their own rest, below).
+      mockState = state({
+        runner: null,
+        movements: [movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }), movement(2, 'Later movement')],
+        profile: { training_age: tier, equipment_inventory: [], session_duration_cap_min: 60 },
+      });
       const view = render(<SessionScreen />);
+      fireEvent.changeText(screen.getByTestId('session-load-input'), '60');
       if (answer !== null) fireEvent.press(screen.getByLabelText(answer));
       fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
       expect(mockState.logSet.mock.calls[0][3]).toBe(rpe);
@@ -1824,6 +1832,32 @@ test('R5 local rest fallback is identical for every tier and equals the runner r
   }
   expect([...observed.values()].map((values) => new Set(values).size)).toEqual([1, 1, 1, 1, 1, 1]);
   expect([...observed.values()].map((values) => values[0])).toEqual([240, 240, 180, 120, 90, 180]);
+}, 60000);
+
+// Issue #209: with no runner, a 0 kg set on a bodyweight movement rests 60 s
+// below RPE 8 and 90 s at 8 or above, for every tier, equal to the runner.
+test('local rest after a bodyweight set is 60 or 90 seconds for every tier; added load keeps the RPE bands', () => {
+  const answers = [['0 clean reps left', 10, 90], ['2 clean reps left', 8, 90], ['3 clean reps left', 7, 60], ['4+ clean reps left', 6, 60]];
+  for (const tier of ['beginner', 'intermediate', 'advanced', 'elite']) {
+    for (const [answer, rpe, expected] of answers) {
+      mockState = state({ runner: null, profile: { training_age: tier, equipment_inventory: [], session_duration_cap_min: 60 } });
+      const view = render(<SessionScreen />);
+      fireEvent.press(screen.getByLabelText(answer));
+      fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+      expect(mockState.logSet.mock.calls[0][2]).toBe(0);
+      const seconds = screen.UNSAFE_getByType(RestTimerCard).props.totalSeconds;
+      expect(seconds).toBe(expected);
+      expect(seconds).toBe(runnerRestSecondsFor({ targetRpe: 8 }, 'intermediate', rpe, true));
+      view.unmount();
+    }
+  }
+  mockState = state({ runner: null });
+  render(<SessionScreen />);
+  fireEvent.changeText(screen.getByTestId('session-load-input'), '10');
+  fireEvent.press(screen.getByLabelText('3 clean reps left'));
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(screen.UNSAFE_getByType(RestTimerCard).props.totalSeconds).toBe(120);
+  expect(screen.getByTestId('session-rest-between')).toHaveTextContent('Rest between sets: 2:00');
 }, 60000);
 
 test('a skipped slot with one logged set shows the skipped meta line, CompletedMetrics, and skipped accessibility label', () => {
