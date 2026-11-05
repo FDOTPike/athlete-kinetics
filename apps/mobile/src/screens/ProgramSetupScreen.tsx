@@ -132,7 +132,9 @@ export default function ProgramSetupScreen({
     } catch (error) {
       return { preview: null, error: error instanceof Error ? error.message : String(error) };
     }
-  }, [input, previewTrainingProgram]);
+    // previewTrainingProgram reads the prior-experience list from the store at
+    // call time, so a declaration (or revoke) must redraw the week (#211).
+  }, [input, previewTrainingProgram, movementAvailabilityRevision, activePriorExperienceMovementIds]);
 
   const availableIdsByContext = useMemo(() => ({
     weight_room: new Set(getVerdicts('weight_room')
