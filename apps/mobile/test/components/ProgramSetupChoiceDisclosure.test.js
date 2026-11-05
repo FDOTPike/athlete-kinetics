@@ -51,6 +51,8 @@ const topBox = () => {
 test('with nothing changed, the top box shows the recommended defaults', () => {
   render(<ProgramSetupScreen />);
   expect(topBox()).toBe(recommendedProgramDefaults(mockState.profile).disclosure);
+  // Pinned to the approved default sentence, not only to the shared builder.
+  expect(topBox()).toBe('Coach picks the movements, on a linear progression, with a review after 12 weeks (3 four-week blocks). Change any of it below.');
 });
 
 test.each([
@@ -70,6 +72,15 @@ test('after changing the review length to 8 weeks, the top box says 8 weeks', ()
   fireEvent.press(screen.getByText('8 wk'));
   expect(topBox()).toContain('8 weeks');
   expect(topBox()).not.toContain('12 weeks');
+});
+
+test('after entering a date horizon, the top box uses the trimmed date', () => {
+  render(<ProgramSetupScreen />);
+  openAdvanced();
+  fireEvent.press(screen.getByText('Date'));
+  fireEvent.changeText(screen.getByPlaceholderText('YYYY-MM-DD'), ' 2026-12-01 ');
+  expect(topBox()).toContain('with a review around 2026-12-01 (rounded up to whole four-week blocks)');
+  expect(topBox()).not.toContain('around  2026-12-01  (');
 });
 
 test('choosing Customize says the athlete picks the movements', () => {
