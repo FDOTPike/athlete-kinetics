@@ -813,3 +813,41 @@ test('OW-007 the resume error is action-scoped: an unrelated store error does no
   // The global error channel must never read as a refusal of this control.
   expect(screen.queryByTestId('suspension-error')).toBeNull();
 });
+
+describe('#170: the neutral default of 50 is named as a default', () => {
+  const noInputs = {
+    ...vector,
+    readiness_score: 50,
+    hrv_component: 50,
+    sleep_component: 50,
+    ln_rmssd: null,
+    hrv_z: null,
+    sleep_efficiency_pct: null,
+  };
+
+  test('with no inputs, READY says it uses a neutral default and drops "Your signals support"', () => {
+    mockState = baseState({ vector: noInputs });
+    render(<ReadinessScreen />);
+    fireEvent.press(screen.getByLabelText('Why this recommendation'));
+    expect(screen.getByText('No signals yet. Using a neutral default of 50.')).toBeOnTheScreen();
+    expect(screen.queryByText(/Your signals support/)).toBeNull();
+    expect(screen.queryByText(/Your recovery signals support/)).toBeNull();
+  });
+
+  test('with inputs, READY keeps the signal-based explanation', () => {
+    render(<ReadinessScreen />);
+    fireEvent.press(screen.getByLabelText('Why this recommendation'));
+    expect(screen.getByText('Your recovery signals support the planned work.')).toBeOnTheScreen();
+    expect(screen.queryByText('No signals yet. Using a neutral default of 50.')).toBeNull();
+  });
+
+  test('the HRV deviation shows its unit', () => {
+    mockState = baseState({
+      uiPreferences: { sessionModeOverride: null, readinessDetail: 'full', restTimerEnabled: true, textScale: 'system' },
+    });
+    render(<ReadinessScreen />);
+    fireEvent.press(screen.getByLabelText('Why this recommendation'));
+    fireEvent.press(screen.getByLabelText('Full readiness metrics'));
+    expect(screen.getByText('+0.4 SD from your baseline')).toBeOnTheScreen();
+  });
+});

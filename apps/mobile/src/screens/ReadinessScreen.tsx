@@ -77,6 +77,13 @@ export const readinessCoverage = (vector: StateVectorRow): string => {
   if (available === 0) return 'No current inputs';
   return `${available} of 2 inputs`;
 };
+
+// #170: with no HRV or sleep input the score is the neutral default of 50
+// (004_state_vector_materialize.sql). Say so instead of crediting "your signals".
+export const NEUTRAL_DEFAULT_EXPLANATION = 'No signals yet. Using a neutral default of 50.';
+
+const hasNoReadinessInputs = (vector: StateVectorRow): boolean =>
+  vector.hrv_z === null && vector.sleep_efficiency_pct === null;
 export interface ReadinessScreenProps {
   /** Supplied by the shell so the focused action can open a live session. */
   onOpenSession?: () => void;
@@ -279,6 +286,7 @@ function AvailableReadinessScreen({
 
   const athleteState = classifyReadiness(vector);
   const meta = halted ? HALT_META : STATE_META[athleteState];
+  const explanation = !halted && hasNoReadinessInputs(vector) ? NEUTRAL_DEFAULT_EXPLANATION : meta.explanation;
   const isRestDay = todayPlan === null && !halted && !hasLiveSession;
 
   const primaryLabel = halted
@@ -305,7 +313,10 @@ function AvailableReadinessScreen({
             Recent recorded external load compared with the preceding four-week average. Bodyweight, conditioning, grappling, and unlogged training may be incomplete. Shown as history only: it does not affect the readiness estimate or today&apos;s plan, and there is no target range.
           </Text>
         </ListRow>
-        <ListRow label="HRV deviation" detail={formatSigned(vector.hrv_z, 1)} />
+        <ListRow
+          label="HRV deviation"
+          detail={vector.hrv_z === null ? 'Not available' : `${formatSigned(vector.hrv_z, 1)} SD from your baseline`}
+        />
         <ListRow label="Sleep efficiency" detail={format(vector.sleep_efficiency_pct, 1, '%')} />
         <ListRow label="Acute load" detail={format(vector.acute_load_kg, 0, ' kg')} />
         <ListRow label="Chronic load" detail={format(vector.chronic_load_kg, 0, ' kg')} />
@@ -395,7 +406,7 @@ function AvailableReadinessScreen({
 
         <View style={styles.section}>
           <Disclosure label="Why this recommendation" hint="The short explanation first">
-            <Text style={styles.body}>{meta.explanation}</Text>
+            <Text style={styles.body}>{explanation}</Text>
             <View style={{ marginTop: theme.space[4] }}>
               <SecondaryButton label="Refresh readiness" onPress={refreshVector} />
             </View>
@@ -459,7 +470,7 @@ function AvailableReadinessScreen({
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>DETAILS</Text>
         <Disclosure label="Why this recommendation" hint="The short explanation first">
-          <Text style={styles.body}>{meta.explanation}</Text>
+          <Text style={styles.body}>{explanation}</Text>
           {halted && lastTriage !== null && lastTriage.kind === 'matched' && (
             <Text style={styles.haltCue}>{lastTriage.directive.vector.coaching_cue}</Text>
           )}
