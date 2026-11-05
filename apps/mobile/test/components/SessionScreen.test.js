@@ -237,7 +237,8 @@ test('seeded external load stays blank and cannot log until explicitly entered',
   render(<SessionScreen />);
 
   expect(screen.getByTestId('session-load-input').props.value).toBe('');
-  expect(screen.getByText('First time on this one — pick a weight you could lift about ten times.')).toBeOnTheScreen();
+  // Issue #218: the hint names what to aim for at the slot's 5 reps at effort 8.
+  expect(screen.getByText('First time on this one — choose a weight you could lift about 7 times, so you finish 5 reps with about 2 left.')).toBeOnTheScreen();
   expect(screen.getByText('Enter a load to log this set.')).toBeOnTheScreen();
   expect(screen.getByLabelText(/Log set 1 for First movement, unavailable/).props.accessibilityState.disabled).toBe(true);
 });
@@ -1513,6 +1514,37 @@ test('beginner fixture with persisted manual preference reaches the real resolve
   // Beginner authority lives in the resolver: identical output either way.
   expect(screen.getByTestId('session-load-input').props.value).toBe(manualValue);
   expect(screen.getByTestId('session-load-source-line').props.children).toBe(manualSource);
+});
+
+// Issue #218: the first-time hint follows the slot's reps and effort.
+test('the first-time hint reflects the slot: 10 reps at effort 7 aims for about 13', () => {
+  mockState = state({
+    movements: [
+      movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }),
+      movement(2, 'Later movement'),
+    ],
+    sessionPlan: [slot(1, 1, 10, { targetRpe: 7 }), slot(2, 2, 8)],
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+  });
+  render(<SessionScreen />);
+  expect(screen.getByText('First time on this one — choose a weight you could lift about 13 times, so you finish 10 reps with about 3 left.')).toBeOnTheScreen();
+});
+
+// Issue #218: a dumbbell load is per dumbbell, as typed; nothing multiplies it.
+test('a dumbbell movement labels the load per dumbbell and logs the number as typed', () => {
+  mockState = state({
+    movements: [
+      movement(1, 'First movement', { supportedPrefixes: ['DB'] }),
+      movement(2, 'Later movement'),
+    ],
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+  });
+  render(<SessionScreen />);
+  expect(screen.getByTestId('session-load-label').props.children).toBe('LOAD KG PER DUMBBELL');
+  expect(screen.getByTestId('session-load-input').props.accessibilityLabel).toMatch(/^Load in kilograms per dumbbell\./);
+  fireEvent.changeText(screen.getByTestId('session-load-input'), '22.5');
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(mockState.logSet.mock.calls[0][2]).toBe(22.5);
 });
 
 // --- P2-2: unknown implement fails toward blank ------------------------------

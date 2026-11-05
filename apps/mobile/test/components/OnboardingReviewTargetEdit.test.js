@@ -25,7 +25,13 @@ const settle = async () => {
 const press = (testID) => act(() => { fireEvent.press(screen.getByTestId(testID)); });
 const pressLabel = (label) => act(() => { fireEvent.press(screen.getByLabelText(label)); });
 const type = (testID, text) => act(() => { fireEvent.changeText(screen.getByTestId(testID), text); });
-const next = () => pressLabel('Next');
+// The optional one-rep-max screen (issue #218) joins from SOME MILEAGE up; these
+// tests are about other screens, so NEXT walks straight through it (it is
+// covered in OnboardingMaxesStep.test.js).
+const next = () => {
+  pressLabel('Next');
+  if (screen.queryByTestId('onboarding-maxes-step') !== null) pressLabel('Next');
+};
 
 beforeEach(async () => {
   resetDataMaintenanceLockForTests();
@@ -173,8 +179,9 @@ describe('OnboardingScreen EDIT from review returns to the review', () => {
     toReview();
     pressLabel('Edit your week');
     pressLabel('Back');
-    expect(screen.getByText('HOW LONG HAVE YOU BEEN TRAINING?')).toBeOnTheScreen();
-    next();
+    // One screen back from YOUR WEEK is the optional maxes screen (issue #218).
+    expect(screen.getByTestId('onboarding-maxes-step')).toBeOnTheScreen();
+    pressLabel('Next');
     expect(screen.getByLabelText('START TRAINING')).toBeOnTheScreen();
   });
 

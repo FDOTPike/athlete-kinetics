@@ -65,6 +65,8 @@ export interface SummaryExercise {
    */
   plannedSets: number | null;
   sets: SummarySetFact[];
+  /** Issue #218: a dumbbell exercise; its loads are per dumbbell, as logged. */
+  perDumbbell?: boolean;
 }
 
 /** One persisted set row as the store reads it, with its slot identity. */
@@ -264,7 +266,7 @@ const exerciseLine = (exercise: SummaryExercise): SummaryLine => {
     parts.push(`most reps in one set ${Math.max(...reps.map((s) => s.reps))}`);
   }
   if (loaded.length > 0) {
-    parts.push(`heaviest load used ${loadCopy(Math.max(...loaded.map((s) => s.loadKg)))}`);
+    parts.push(`heaviest load used ${loadCopy(Math.max(...loaded.map((s) => s.loadKg)))}${exercise.perDumbbell === true ? ' per dumbbell' : ''}`);
   }
   if (timed.length > 0) {
     parts.push(`longest recorded time ${Math.max(...timed.map((s) => s.timeS!))} s`);
@@ -283,7 +285,7 @@ const comparisonLine = (exercise: SummaryExercise, facts: PreviousFacts): Summar
     parts.push(`most reps in one set ${facts.mostRepsInOneSet}`);
   }
   if (facts.implementClass === 'loaded' && facts.heaviestLoadKg !== null && facts.heaviestLoadKg > 0) {
-    parts.push(`heaviest load used ${loadCopy(facts.heaviestLoadKg)}`);
+    parts.push(`heaviest load used ${loadCopy(facts.heaviestLoadKg)}${exercise.perDumbbell === true ? ' per dumbbell' : ''}`);
   }
   if (parts.length === 0) return null;
   return {

@@ -31,6 +31,7 @@
 import React, { useMemo, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
+  BIG4_LIFTS,
   DEFAULT_PROFILE,
   ENERGY_SYSTEMS,
   EQUIPMENT_ITEMS,
@@ -59,6 +60,7 @@ import InfoTip from '../components/InfoTip';
 import { useStore } from '../state/useStore';
 import { useSubViewBack } from '../navigation/navigation';
 import { Chip, Stepper, QuietAction, PrimaryButton } from '../components/ui';
+import { OneRmRow, oneRmKeptKg } from '../components/OneRmRow';
 import {
   BALANCED_FOCUS_DRAFT,
   EMPTY_GOAL_FIELDS,
@@ -159,7 +161,7 @@ const effortBlurb = (rpe: number): string => {
 };
 
 type StepKey =
-  | 'welcome' | 'goal' | 'focus' | 'sport' | 'target' | 'experience' | 'logistics' | 'equipment' | 'limits' | 'review';
+  | 'welcome' | 'goal' | 'focus' | 'sport' | 'target' | 'experience' | 'maxes' | 'logistics' | 'equipment' | 'limits' | 'review';
 
 interface ChoiceRowProps {
   readonly label: string;
@@ -300,6 +302,19 @@ export default function OnboardingScreen(): React.JSX.Element {
   const [sportFields, setSportFields] = useState<SportFieldsState>(EMPTY_SPORT_FIELDS);
   const movements = useStore((s) => s.movements) ?? [];
   const [saveAttempted, setSaveAttempted] = useState(false);
+  // Issue #218: optional one-rep maxes, from SOME MILEAGE up. Held as the
+  // value the store will keep (movement id -> kg) and written with the rest
+  // of the interview, never before.
+  const [maxDraft, setMaxDraft] = useState<Record<number, number>>({});
+  const asksMaxes = draft.training_age !== 'beginner';
+  const setMax = (movementId: number, kg: number | null): void => {
+    setMaxDraft((current) => {
+      const nextDraft = { ...current };
+      if (kg === null) delete nextDraft[movementId];
+      else nextDraft[movementId] = oneRmKeptKg(kg);
+      return nextDraft;
+    });
+  };
   const today = localIsoToday();
 
   useSubViewBack(stepIdx > 0, () => setStepIdx((i) => Math.max(0, i - 1)));
@@ -319,12 +334,13 @@ export default function OnboardingScreen(): React.JSX.Element {
   };
 
   // Eight screens for every athlete; the sport screen and the detailed-target
-  // screen each join only when the athlete asked for them.
+  // screen each join only when the athlete asked for them, and the optional
+  // maxes screen joins from SOME MILEAGE up (issue #218).
   const steps: StepKey[] = useMemo(
     () => ['welcome', 'goal', 'focus', ...(wantsSport ? ['sport' as const] : []),
       ...(wantsTarget ? ['target' as const] : []),
-      'experience', 'logistics', 'equipment', 'limits', 'review'],
-    [wantsSport, wantsTarget],
+      'experience', ...(asksMaxes ? ['maxes' as const] : []), 'logistics', 'equipment', 'limits', 'review'],
+    [wantsSport, wantsTarget, asksMaxes],
   );
   const step = steps[Math.min(stepIdx, steps.length - 1)];
   const isLast = step === 'review';
@@ -416,6 +432,11 @@ export default function OnboardingScreen(): React.JSX.Element {
         goal: wantsTarget ? goalDraftFromFields(goalFields) : null,
         goalMovementId: wantsTarget && GOAL_EXERCISE_METRICS.has(goalFields.metricId) ? goalExerciseId : null,
         sport: wantsSport ? sportDraftFromFields(sportFields) : null,
+        // A beginner is never asked; maxes typed before switching to NEW TO
+        // THIS are not saved.
+        oneRepMaxes: asksMaxes
+          ? Object.entries(maxDraft).map(([movementId, kg]) => ({ movementId: Number(movementId), kg }))
+          : [],
       },
     );
   };
@@ -607,6 +628,36 @@ export default function OnboardingScreen(): React.JSX.Element {
                 accessibilityLabel={`${AGE_COPY[a].label}. ${AGE_COPY[a].blurb}`}
               />
             ))}
+          </View>
+        )}
+
+        {step === 'maxes' && (
+          <View testID="onboarding-maxes-step">
+            <Text style={styles.h2}>YOUR ONE-REP MAXES (OPTIONAL)</Text>
+            <Text style={styles.pDim}>
+              If you know the most you can lift once on any of these, enter it and SESSION shows target kilograms for that lift. Leave any blank. You can add or change them later in Profile.
+            </Text>
+            {BIG4_LIFTS.map(({ name: liftName, label }) => {
+              const movement = movements.find((m) => m.name === liftName);
+              if (movement === undefined) return null;
+              return (
+                <OneRmRow
+                  key={liftName}
+                  label={label}
+                  valueKg={maxDraft[movement.movement_id]}
+                  onChange={(kg) => setMax(movement.movement_id, kg)}
+                />
+              );
+            })}
+            <QuietAction
+              label="Skip for now"
+              onPress={() => {
+                setMaxDraft({});
+                goNext();
+              }}
+              accessibilityLabel="Skip one-rep maxes for now"
+              testID="onboarding-maxes-skip"
+            />
           </View>
         )}
 

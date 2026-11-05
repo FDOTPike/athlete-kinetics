@@ -73,14 +73,18 @@ function captureHardwareBack() {
 // The tests in this file predate it and are about OTHER screens, so these two
 // helpers walk straight through it, leaving its default answer (balanced whole
 // body) in place. The focus and target screens themselves are covered in
-// OnboardingFocusGoal.test.js.
+// OnboardingFocusGoal.test.js. The optional one-rep-max screen (issue #218)
+// joins from SOME MILEAGE up and is walked through the same way; it is
+// covered in OnboardingMaxesStep.test.js.
+const passThrough = () => screen.queryByTestId('focus-picker') !== null
+  || screen.queryByTestId('onboarding-maxes-step') !== null;
 const pressNext = () => {
   fireEvent.press(screen.getByLabelText('Next'));
-  if (screen.queryByTestId('focus-picker') !== null) fireEvent.press(screen.getByLabelText('Next'));
+  if (passThrough()) fireEvent.press(screen.getByLabelText('Next'));
 };
 const pressBack = () => {
   fireEvent.press(screen.getByLabelText('Back'));
-  if (screen.queryByTestId('focus-picker') !== null) fireEvent.press(screen.getByLabelText('Back'));
+  if (passThrough()) fireEvent.press(screen.getByLabelText('Back'));
 };
 
 describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
@@ -912,17 +916,19 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
   // question — so the flow is eight; a ninth appears only when the athlete says
   // they have a specific target (covered in OnboardingFocusGoal.test.js).
 
-  test('first-run flow is eight screens, asks the focus question third, and combines days with minutes', () => {
+  test('first-run flow is nine screens from SOME MILEAGE up (the optional maxes screen, issue #218), asks the focus question third, and combines days with minutes', () => {
     render(<OnboardingScreen />);
-    expect(screen.getByLabelText('Step 1 of 8')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Step 1 of 9')).toBeOnTheScreen();
     fireEvent.press(screen.getByLabelText('Next')); // goal
-    expect(screen.getByLabelText('Step 2 of 8')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Step 2 of 9')).toBeOnTheScreen();
     fireEvent.press(screen.getByLabelText('Next')); // focus
-    expect(screen.getByLabelText('Step 3 of 8')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Step 3 of 9')).toBeOnTheScreen();
     expect(screen.getByText('Is there an area that you want to work on?')).toBeOnTheScreen();
     fireEvent.press(screen.getByLabelText('Next')); // experience
     expect(screen.getByText('HOW LONG HAVE YOU BEEN TRAINING?')).toBeOnTheScreen();
-    pressNext(); // logistics
+    fireEvent.press(screen.getByLabelText('Next')); // maxes (optional)
+    expect(screen.getByTestId('onboarding-maxes-step')).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText('Next')); // logistics
     expect(screen.getByText('TRAINING DAYS PER WEEK')).toBeOnTheScreen();
     expect(screen.getByText('MINUTES IN A SESSION, TOPS')).toBeOnTheScreen();
     // The retired per-decision screens never appear anywhere in the flow.
@@ -936,7 +942,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     fireEvent.press(screen.getByLabelText('No, nothing to note'));
     expect(screen.getByLabelText('Next')).not.toBeDisabled();
     pressNext();
-    expect(screen.getByLabelText('Step 8 of 8')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Step 9 of 9')).toBeOnTheScreen();
   });
 
   test('limitations asks one explicit no/yes; yes reveals notes, no clears drafts, review discloses', () => {

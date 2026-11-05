@@ -106,11 +106,24 @@ const isLoadDraftLoggable = (text: string): boolean => {
  *  audit corrections 3–6). The effective source comes from the pure resolver;
  *  this maps it to reviewed copy. An edited value keeps its source — there is
  *  no fifth "athlete-entered" source. */
+/** Issue #218: the first-time hint names what to aim for at the slot's reps
+ *  and effort: a weight lifted about reps + reps-left times, where reps left
+ *  is what the target effort leaves (effort 8 leaves about 2). Null when the
+ *  slot has no rep target or effort, so the fixed hint stays. */
+const firstTimeAim = (reps: number | null, targetRpe: number | null): string | null => {
+  if (reps === null || !Number.isFinite(reps) || reps < 1 || targetRpe === null || !Number.isFinite(targetRpe)) return null;
+  const left = Math.max(0, Math.round(10 - targetRpe));
+  return left === 0
+    ? `First time on this one — choose a weight you could lift about ${reps} ${reps === 1 ? 'time' : 'times'}.`
+    : `First time on this one — choose a weight you could lift about ${reps + left} times, so you finish ${reps} ${reps === 1 ? 'rep' : 'reps'} with about ${left} left.`;
+};
+
 const loadSourceCopy = (
   sel: LoadSelection,
   bodyweightMode: boolean,
   oneRmKg: number | undefined,
   timedTarget: boolean,
+  aim: string | null = null,
 ): string => {
   if (sel.source === 'manual') {
     switch (sel.advisoryKind) {
@@ -130,7 +143,7 @@ const loadSourceCopy = (
     ? '0 kg means bodyweight only. Add weight when you need it.'
     : timedTarget
       ? 'First time on this one — choose a load you can control for the full interval.'
-      : 'First time on this one — pick a weight you could lift about ten times.';
+      : aim ?? 'First time on this one — pick a weight you could lift about ten times.';
 };
 
 /** Derived-source copy must distinguish APRE prescription from 1RM
@@ -141,6 +154,7 @@ const loadCopyFor = (
   oneRmKg: number | undefined,
   apreOverrideKg: number | null,
   timedTarget: boolean,
+  aim: string | null = null,
 ): string => {
   if (sel.source === 'derived') {
     const hasValidApre = apreOverrideKg !== null
@@ -152,7 +166,7 @@ const loadCopyFor = (
         : `Prescribed ${apreOverrideKg.toFixed(1)} kg`
       : `Based on your ${oneRmKg === undefined ? '' : formatLoadKg(oneRmKg)} kg 1RM`;
   }
-  return loadSourceCopy(sel, bodyweightMode, oneRmKg, timedTarget);
+  return loadSourceCopy(sel, bodyweightMode, oneRmKg, timedTarget, aim);
 };
 
 // Local rest when no runner owns the timer: the runner's RPE bands. Training
@@ -450,8 +464,10 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
     if (lastEndedSessionId == null) return null;
     try {
       const facts = loadSessionSummaryFacts(lastEndedSessionId);
+      // Issue #218: a dumbbell exercise's loads are stated per dumbbell.
+      const dumbbellIds = new Set(movements.filter((m) => m.supportedPrefixes[0] === 'DB').map((m) => m.movement_id));
       return buildSessionSummary({
-        exercises: facts.exercises,
+        exercises: facts.exercises.map((exercise) => (dumbbellIds.has(exercise.movementId) ? { ...exercise, perDumbbell: true } : exercise)),
         skippedExercises: facts.skippedExercises ?? [],
         previousSets: facts.previousSets,
         durationMin: facts.durationMin,
@@ -463,7 +479,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
       // read stay unknown — the status line above is already persisted truth.
       return null;
     }
-  }, [lastEndedSessionId, loadSessionSummaryFacts, summaryBlockSessions, summaryToday]);
+  }, [lastEndedSessionId, loadSessionSummaryFacts, summaryBlockSessions, summaryToday, movements]);
 
   // Session feel (070): whether to ask how the ended session went, and what is
   // already saved. Component tests drive this screen with partial store states,
@@ -540,7 +556,10 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   // external-load safety behavior (blank first exposure, disabled LOG SET).
   const primaryImplement = currentMovement?.supportedPrefixes[0];
   const bodyweightMode = primaryImplement === 'Bodyweight';
-  const loadLabel = bodyweightMode ? 'Added kg (0 = bodyweight)' : 'Load kg';
+  // Issue #218: a dumbbell load is per dumbbell and is logged as typed;
+  // nothing multiplies it.
+  const dumbbellMode = primaryImplement === 'DB';
+  const loadLabel = bodyweightMode ? 'Added kg (0 = bodyweight)' : dumbbellMode ? 'Load kg per dumbbell' : 'Load kg';
   // P2-4 (Opus audit): one stable target-RPE value for load resolution —
   // the slot target when present, a fixed fallback when absent. Used by both
   // the display resolver call and the one-time draft initializer so they
@@ -565,6 +584,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
         oneRm,
         currentSlot?.overrideLoadKg ?? null,
         target?.kind === 'time',
+        firstTimeAim(target?.kind === 'reps' ? target.reps : null, currentSlot?.targetRpe ?? null),
       );
   const loadLoggable = isLoadDraftLoggable(loadText) && !loadInvalid;
 
@@ -1474,7 +1494,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                                 accessibilityLabel={
                                   loadSelection === null
                                     ? `${loadLabel} entry`
-                                    : `${bodyweightMode ? 'Added load in kilograms, zero means bodyweight only' : 'Load in kilograms'}. ${loadEvidence}`
+                                    : `${bodyweightMode ? 'Added load in kilograms, zero means bodyweight only' : dumbbellMode ? 'Load in kilograms per dumbbell' : 'Load in kilograms'}. ${loadEvidence}`
                                 }
                               />
                               <Pressable

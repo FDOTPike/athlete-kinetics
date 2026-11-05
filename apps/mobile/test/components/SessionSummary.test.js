@@ -315,6 +315,25 @@ describe('summary copy obeys D1, D2, and D3', () => {
   });
 });
 
+// Issue #218: a dumbbell load is stated per dumbbell, as logged.
+describe('per-dumbbell loads in the summary (issue #218)', () => {
+  const base = { durationMin: null, blockSessions: [], today: '2026-09-10' };
+  test('the heaviest load says "per dumbbell" today and last time, and is never doubled', () => {
+    const view = buildSessionSummary({
+      ...base,
+      exercises: [exercise({ perDumbbell: true, sets: [{ reps: 8, loadKg: 22.5, timeS: null }] })],
+      previousSets: [{ movementId: 11, reps: 8, loadKg: 20, sessionId: 3 }],
+    });
+    expect(view.exerciseLines[0].text).toContain('heaviest load used 22.5 kg per dumbbell');
+    expect(view.comparisonLines[0].text).toContain('heaviest load used 20 kg per dumbbell');
+    expect(view.exerciseLines[0].text).not.toContain('45 kg');
+  });
+  test('a barbell load has no per-dumbbell wording', () => {
+    const view = buildSessionSummary({ ...base, previousSets: [], exercises: [exercise()] });
+    expect(view.exerciseLines[0].text).not.toContain('per dumbbell');
+  });
+});
+
 // ---------------------------------------------------------------------------
 // 3. Screen laws: D5, D6, D8, D9
 // ---------------------------------------------------------------------------
