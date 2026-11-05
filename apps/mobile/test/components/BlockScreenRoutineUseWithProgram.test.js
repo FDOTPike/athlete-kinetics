@@ -108,18 +108,19 @@ test('#223: with no active goal program, "Use day 1 today" is shown and used as 
 });
 
 test('#223 review: a pending "Use day" confirmation is cleared when a goal program becomes active', () => {
-  mockState = baseState({ program: null });
+  const freeze = jest.fn(() => ({ archivedPreviousBlock: false }));
+  mockState = baseState({ program: null, freezeRoutineTemplateToPlannedSession: freeze });
   render(<BlockScreen />);
   openTemplates();
   fireEvent.press(screen.getByText('Use day 1 today'));
   expect(screen.getByText('Confirm day 1')).toBeOnTheScreen();
 
   // The athlete starts a goal program elsewhere and comes back to Plan.
-  mockState = baseState();
+  mockState = baseState({ freezeRoutineTemplateToPlannedSession: freeze });
   screen.rerender(<BlockScreen />);
 
   expect(screen.queryByText('Confirm day 1')).toBeNull();
   expect(screen.getByText('Edit')).toBeOnTheScreen();
   expect(screen.getByText('Delete')).toBeOnTheScreen();
-  expect(mockState.freezeRoutineTemplateToPlannedSession).not.toHaveBeenCalled();
+  expect(freeze).not.toHaveBeenCalled();
 });
