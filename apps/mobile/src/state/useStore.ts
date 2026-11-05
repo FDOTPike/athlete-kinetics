@@ -5898,7 +5898,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
     if (kg === null) {
       d.executeSync('DELETE FROM one_rep_max WHERE movement_id = ?', [movementId]);
     } else {
-      const safe = clamp(Math.round(kg / 2.5) * 2.5, 20, 500);
+      // One-rep maxes sit on the same 0.25 kg grid as logged loads (issue #233).
+      const safe = clamp(Math.round(kg / 0.25) * 0.25, 20, 500);
       d.executeSync(
         'INSERT INTO one_rep_max (movement_id, load_kg, updated_at_ms) VALUES (?, ?, ?) ON CONFLICT(movement_id) DO UPDATE SET load_kg = excluded.load_kg, updated_at_ms = excluded.updated_at_ms',
         [movementId, safe, Date.now()],
@@ -7903,8 +7904,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
     appliedPrefixes = (appliedPrefixes ?? []).filter((condition) => conditionApplies(condition, effImplement));
 
     const safeReps = timeMode ? 1 : Math.round(clamp(reps, 1, 50));
-    // Owner ruling 2026-11-03 (Entry 0288): logged loads sit on a 0.5 kg grid.
-    const safeLoad = clamp(Math.round(loadKg / 0.5) * 0.5, 0, 500);
+    // Logged loads sit on a 0.25 kg grid (issue #233; 0.5 kg before).
+    const safeLoad = clamp(Math.round(loadKg / 0.25) * 0.25, 0, 500);
     const safeRpe = rpe === null ? null : clamp(Math.round(rpe * 2) / 2, 5, 10);
     const loggedAtMs = Date.now();
 
@@ -8069,8 +8070,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
       : metrics.bandLevel === null
         ? null
         : Math.round(clamp(metrics.bandLevel, 1, 20));
-    // Owner ruling 2026-11-03 (Entry 0288): logged loads sit on a 0.5 kg grid.
-    const safeLoad = clamp(Math.round(loadKg / 0.5) * 0.5, 0, 500);
+    // Logged loads sit on a 0.25 kg grid (issue #233; 0.5 kg before).
+    const safeLoad = clamp(Math.round(loadKg / 0.25) * 0.25, 0, 500);
     const safeRpe = rpe === null ? null : clamp(Math.round(rpe * 2) / 2, 5, 10);
     // UPDATE OF reps, load_kg, rpe fires trg_set_record_au, which re-deltas
     // mech_daily (old contribution out, new in). tonnage_kg is a GENERATED

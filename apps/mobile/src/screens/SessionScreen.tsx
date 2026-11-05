@@ -77,14 +77,23 @@ const parseLoadDraft = (text: string): number | null => {
 /** P1-2: a loggable load must sit on the logging grid and be within 0–500
  *  inclusive. Reject — never silently snap — any draft that would change
  *  numerically at commit time.
- *  Owner ruling 2026-11-03 (Entry 0288): the grid is 0.5 kg, so 12, 14, 16
- *  and 24 kg dumbbells and kettlebells can be logged. Load suggestions and
+ *  The grid is 0.25 kg (issue #233), so 12, 14, 16 and 24 kg dumbbells and
+ *  kettlebells and 1.25 kg change plates can be logged. Load suggestions and
  *  the ± steppers stay on the 2.5 kg plate grid. */
-const LOAD_GRID = 0.5;
+const LOAD_GRID = 0.25;
 const LOAD_MAX = 500;
 const isOnLoadGrid = (kg: number): boolean =>
   Number.isFinite(kg) && kg >= 0 && kg <= LOAD_MAX
   && Math.abs(kg / LOAD_GRID - Math.round(kg / LOAD_GRID)) < 1e-9;
+
+/** A load as the field shows it: a load on the grid keeps its quarter
+ *  kilogram (22.75), so a logged load comes back exactly and stays loggable;
+ *  anything else keeps the one decimal it always had. */
+const formatLoadKg = (kg: number): string => {
+  if (!isOnLoadGrid(kg)) return kg.toFixed(1);
+  const hundredths = Math.round(kg * 100);
+  return (hundredths / 100).toFixed(hundredths % 10 === 0 ? 1 : 2);
+};
 
 /** True when the draft holds a loggable value (explicit zero included).
  *  Syntax + grid + range must all pass. */
@@ -106,15 +115,15 @@ const loadSourceCopy = (
   if (sel.source === 'manual') {
     switch (sel.advisoryKind) {
       case 'apre': return `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg — your entry stands.`;
-      case 'onerm': return `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg from your ${oneRmKg?.toFixed(1)} kg 1RM — your entry stands.`;
+      case 'onerm': return `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg from your ${oneRmKg === undefined ? '' : formatLoadKg(oneRmKg)} kg 1RM — your entry stands.`;
       case 'history': return `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg from your last session — your entry stands.`;
       default: return 'Your call. The number you enter is what gets logged.';
     }
   }
   if (sel.source === 'history') {
     return bodyweightMode
-      ? `Last logged ${sel.initialLoadKg?.toFixed(1)} kg added load`
-      : `Last logged ${sel.initialLoadKg?.toFixed(1)} kg`;
+      ? `Last logged ${sel.initialLoadKg == null ? '' : formatLoadKg(sel.initialLoadKg)} kg added load`
+      : `Last logged ${sel.initialLoadKg == null ? '' : formatLoadKg(sel.initialLoadKg)} kg`;
   }
   // seeded
   return bodyweightMode
@@ -141,7 +150,7 @@ const loadCopyFor = (
       ? bodyweightMode
         ? `Prescribed ${apreOverrideKg.toFixed(1)} kg added load`
         : `Prescribed ${apreOverrideKg.toFixed(1)} kg`
-      : `Based on your ${oneRmKg?.toFixed(1)} kg 1RM`;
+      : `Based on your ${oneRmKg === undefined ? '' : formatLoadKg(oneRmKg)} kg 1RM`;
   }
   return loadSourceCopy(sel, bodyweightMode, oneRmKg, timedTarget);
 };
@@ -615,21 +624,22 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
       sessionPlanSlotId: currentSlot.sessionPlanSlotId,
     });
     const initial = seed.initialLoadKg;
-    // The record holds the number the field showed (one decimal), not the
+    // The record holds the number the field showed (one decimal, two for a
+    // quarter kilogram), not the
     // resolver's unrounded value; null stays null (a blank field).
     loadShownRef.current = {
       slotId: currentSlot.sessionPlanSlotId,
       logged: currentLogged,
       seed: {
         source: seed.source,
-        shownLoadKg: initial === null ? null : Number(initial.toFixed(1)),
+        shownLoadKg: initial === null ? null : Number(formatLoadKg(initial)),
         advisoryKg: seed.advisoryKg,
         advisoryKind: seed.advisoryKind,
       },
     };
     pruneLoadDrafts(state.activeAthleteId, session?.sessionId, currentSlot.sessionPlanSlotId, currentLogged);
     const draft = unloggedLoadDrafts.get(loadDraftKey(state.activeAthleteId, session?.sessionId, currentSlot.sessionPlanSlotId, currentLogged, currentMovement?.movement_id));
-    setLoadText(draft ?? (initial === null ? '' : initial.toFixed(1)));
+    setLoadText(draft ?? (initial === null ? '' : formatLoadKg(initial)));
     setLoadInvalid(false);
   }, [
     state.activeAthleteId,
@@ -1389,9 +1399,9 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                             style={styles.loadEvidence}
                             testID="session-load-validation"
                             accessibilityRole="alert"
-                            accessibilityLabel="Load validation. Enter a load from 0 to 500 in 0.5 kg steps."
+                            accessibilityLabel="Load validation. Enter a load from 0 to 500 in 0.25 kg steps."
                           >
-                            Enter a load from 0 to 500 in 0.5 kg steps.
+                            Enter a load from 0 to 500 in 0.25 kg steps.
                           </Text>
                         )}
                         {!loadInvalid && !loadLoggable && (
@@ -1432,7 +1442,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                                 onPress={() => {
                                   const current = parseLoadDraft(loadText);
                                   if (current === null) return;
-                                  editLoadText(clamp(current - 2.5, 0, 500).toFixed(1));
+                                  editLoadText(formatLoadKg(clamp(current - 2.5, 0, 500)));
                                   setLoadInvalid(false);
                                 }}
                                 disabled={!isLoadDraftLoggable(loadText)}
@@ -1472,7 +1482,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                                 onPress={() => {
                                   const current = parseLoadDraft(loadText);
                                   if (current === null) return;
-                                  editLoadText(clamp(current + 2.5, 0, 500).toFixed(1));
+                                  editLoadText(formatLoadKg(clamp(current + 2.5, 0, 500)));
                                   setLoadInvalid(false);
                                 }}
                                 disabled={!isLoadDraftLoggable(loadText)}

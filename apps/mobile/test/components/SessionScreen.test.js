@@ -258,6 +258,25 @@ test('history auto source prefills the exact latest logged load, including sourc
   expect(screen.getByLabelText('Load source. Last logged 37.5 kg')).toBeOnTheScreen();
 });
 
+// Issue #233: a quarter-kilogram load logged last time comes back exactly as
+// logged, so the prefilled field is still loggable.
+test('a last logged 22.75 kg prefills as 22.75, is named exactly, and logs unchanged', () => {
+  mockState = state({
+    movements: [
+      movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }),
+      movement(2, 'Later movement'),
+    ],
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    lastLoggedLoads: { 1: 22.75 },
+  });
+  render(<SessionScreen />);
+  expect(screen.getByTestId('session-load-input').props.value).toBe('22.75');
+  expect(screen.getByLabelText('Load source. Last logged 22.75 kg')).toBeOnTheScreen();
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(mockState.logSet.mock.calls[0][2]).toBe(22.75);
+  expect(mockState.logSet.mock.calls[0][9]).toEqual({ source: 'history', shownLoadKg: 22.75, advisoryKg: null, advisoryKind: null });
+});
+
 test('APRE auto source prefills the absolute prescription ahead of other evidence', () => {
   mockState = state({
     movements: [
@@ -365,7 +384,7 @@ test('invalid draft is distinct from blank, while explicit zero is valid and log
 
   expect(screen.queryByTestId('session-load-validation')).toBeNull();
   fireEvent.changeText(screen.getByTestId('session-load-input'), '12kg');
-  expect(screen.getByLabelText('Load validation. Enter a load from 0 to 500 in 0.5 kg steps.')).toBeOnTheScreen();
+  expect(screen.getByLabelText('Load validation. Enter a load from 0 to 500 in 0.25 kg steps.')).toBeOnTheScreen();
   fireEvent.changeText(screen.getByTestId('session-load-input'), '0');
   expect(screen.queryByTestId('session-load-validation')).toBeNull();
   fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
@@ -1397,6 +1416,26 @@ test('off-grid load 61.2 shows validation and never calls logSet', () => {
   expect(mockState.logSet).not.toHaveBeenCalled();
 });
 
+// Issue #233: the logging grid is 0.25 kg, for 1.25 kg change plates.
+test('off-grid load 22.1 shows the 0.25 kg validation and never calls logSet', () => {
+  render(<SessionScreen />);
+  fireEvent.changeText(screen.getByTestId('session-load-input'), '22.1');
+  expect(screen.getByLabelText('Load validation. Enter a load from 0 to 500 in 0.25 kg steps.')).toBeOnTheScreen();
+  fireEvent.press(screen.getByLabelText(/Log set 1 for First movement/));
+  expect(mockState.logSet).not.toHaveBeenCalled();
+});
+
+test('the load steppers still move 2.5 kg and keep a quarter-kilogram load on the grid', () => {
+  render(<SessionScreen />);
+  fireEvent.changeText(screen.getByTestId('session-load-input'), '22.75');
+  fireEvent.press(screen.getByTestId('session-load-increase'));
+  expect(screen.getByTestId('session-load-input').props.value).toBe('25.25');
+  fireEvent.press(screen.getByTestId('session-load-decrease'));
+  fireEvent.press(screen.getByTestId('session-load-decrease'));
+  expect(screen.getByTestId('session-load-input').props.value).toBe('20.25');
+  expect(screen.queryByTestId('session-load-validation')).toBeNull();
+});
+
 test('out-of-range load 500.1 is rejected rather than becoming 500', () => {
   render(<SessionScreen />);
   fireEvent.changeText(screen.getByTestId('session-load-input'), '500.1');
@@ -1418,6 +1457,10 @@ test.each([
   ['24', 24],
   ['12,5', 12.5],
   ['1', 1],
+  // Issue #233: 1.25 kg change plates.
+  ['22.75', 22.75],
+  ['251.25', 251.25],
+  ['22,25', 22.25],
 ])('valid grid value %s is loggable and reaches logSet unchanged', (value, expected) => {
   render(<SessionScreen />);
   fireEvent.changeText(screen.getByTestId('session-load-input'), value);

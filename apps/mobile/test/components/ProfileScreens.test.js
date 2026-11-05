@@ -750,6 +750,11 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     expect(screen.getByLabelText('SQUAT one rep max in kilograms, type to set').props.value).toBe('142.5');
     fireEvent(squat, 'endEditing', { nativeEvent: { text: '142.5' } });
     expect(mockState.saveOneRepMax).toHaveBeenCalledWith(11, 142.5);
+    // Issue #233: a quarter-kilogram max stays as typed (no snap to 2.5).
+    fireEvent.changeText(squat, '251.25');
+    fireEvent(squat, 'endEditing', { nativeEvent: { text: '251.25' } });
+    expect(mockState.saveOneRepMax).toHaveBeenLastCalledWith(11, 251.25);
+    expect(screen.getByLabelText('SQUAT one rep max in kilograms, type to set').props.value).toBe('251.25');
   });
 
   test('Profile load selection is disabled during an active session', () => {
