@@ -35,6 +35,9 @@ import { theme } from '../theme/theme';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { useStore } from '../state/useStore';
 import { useBackupStore } from '../state/backupStore';
+import {
+  ADD_ATHLETE_BACKUP_WARNING, addingAthleteExceedsBackupCap, measureBackupSize, type BackupSizeEstimate,
+} from '../state/backupCapacity';
 import { useSubViewBack } from '../navigation/navigation';
 import { Chip, Stepper, QuietAction, Disclosure, ListRow, PrimaryButton, SecondaryButton } from '../components/ui';
 import InfoTip from '../components/InfoTip';
@@ -355,6 +358,16 @@ export default function ProfileScreen(): React.JSX.Element {
 
   // Coach Mode local UI state (collapsed by default — a beginner never needs it).
   const [coachOpen, setCoachOpen] = useState(false);
+  // #173: read the athlete database sizes whenever Coach mode is open, so the
+  // warning before another athlete is added reflects the athletes on the phone.
+  const [backupEstimate, setBackupEstimate] = useState<BackupSizeEstimate | null>(null);
+  useEffect(() => {
+    if (!coachOpen) return undefined;
+    let live = true;
+    void measureBackupSize().then((estimate) => { if (live) setBackupEstimate(estimate); });
+    return () => { live = false; };
+  }, [coachOpen, athletes.length]);
+  const addWouldExceedBackup = addingAthleteExceedsBackupCap(backupEstimate, athletes.length);
   const [newAthleteName, setNewAthleteName] = useState('');
   const [editingAthleteId, setEditingAthleteId] = useState<string | null>(null);
   const [editAthleteName, setEditAthleteName] = useState('');
@@ -1329,6 +1342,9 @@ export default function ProfileScreen(): React.JSX.Element {
                 </View>
               );
             })}
+            {addWouldExceedBackup && (
+              <Text style={styles.fieldHint} testID="add-athlete-backup-warning">{ADD_ATHLETE_BACKUP_WARNING}</Text>
+            )}
             <View style={styles.athleteRow}>
               <TextInput
                 disableFullscreenUI

@@ -544,6 +544,15 @@ async function readPreparedDatabaseSnapshot(prepared: PreparedDatabaseSnapshot):
   return { ...snapshot, databaseBase64: asText(await fs().readFile(snapshotPath, 'base64')) };
 }
 
+/** #173: the size of each athlete database a backup would read, in the
+ * registry's order. Read-only (file stats); the limit is still enforced by
+ * buildArchive below. */
+export async function measureAthleteDatabaseBytes(): Promise<number[]> {
+  const io = fs();
+  const registry = await loadRegistry();
+  return Promise.all(registry.athletes.map(async (athlete) => Number((await io.stat(dbPath(athlete.dbName))).size)));
+}
+
 async function buildArchive(previousSuccessfulBackupAt: string | null): Promise<{ archive: BackupArchiveV1; workDirectory: string }> {
   const io = fs();
   const registry = await loadRegistry();

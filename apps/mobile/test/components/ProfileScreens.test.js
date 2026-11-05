@@ -34,6 +34,13 @@ jest.mock('../../src/state/backupStore', () => ({
   useBackupStore: (selector) => selector(mockBackupState),
 }));
 
+// #173: the add-athlete warning reads the athlete database sizes.
+let mockBackupEstimate = null;
+jest.mock('../../src/state/backupCapacity', () => ({
+  ...jest.requireActual('../../src/state/backupCapacity'),
+  measureBackupSize: jest.fn(async () => mockBackupEstimate),
+}));
+
 const baseProfile = {
   objective: 'hybrid',
   training_age: 'intermediate',
@@ -1090,6 +1097,36 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       hardwareBack.restore();
     }
   }, 30000);
+
+  describe('#173: a warning before a sixth athlete is added', () => {
+    const WARNING = 'Backups cover up to about five athletes in this version. You can still add this athlete, '
+      + 'but a backup will not be possible until a later version.';
+    const fiveAthletes = [1, 2, 3, 4, 5].map((n) => ({ id: n === 1 ? 'default' : `ath-${n}`, name: `Athlete ${n}` }));
+
+    afterEach(() => { mockBackupEstimate = null; });
+
+    test('five athletes whose databases fill the backup: the warning shows before ADD ATHLETE', async () => {
+      const { estimateFromSizes } = jest.requireActual('../../src/state/backupCapacity');
+      mockBackupEstimate = estimateFromSizes(fiveAthletes.map(() => 1_400_832));
+      mockState.advancedToolsUnlocked = true;
+      mockState.athletes = fiveAthletes;
+      render(<ProfileScreen />);
+      fireEvent.press(screen.getByLabelText('Coach mode, 5 athletes, collapsed'));
+      expect(await screen.findByText(WARNING)).toBeOnTheScreen();
+      expect(screen.getByLabelText('Add a new athlete')).toBeOnTheScreen();
+      expect(mockState.createAthlete).not.toHaveBeenCalled();
+    }, 30000);
+
+    test('two small athletes: no warning', async () => {
+      const { estimateFromSizes } = jest.requireActual('../../src/state/backupCapacity');
+      mockBackupEstimate = estimateFromSizes([1_400_832, 1_400_832]);
+      mockState.advancedToolsUnlocked = true;
+      render(<ProfileScreen />);
+      fireEvent.press(screen.getByLabelText('Coach mode, 2 athletes, collapsed'));
+      await act(async () => {});
+      expect(screen.queryByText(WARNING)).toBeNull();
+    }, 30000);
+  });
 });
 
 // ---------------------------------------------------------------------------
