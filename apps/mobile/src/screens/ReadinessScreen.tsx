@@ -11,6 +11,8 @@ import type { StateVectorRow } from '@ak/inference';
 import { useStore } from '../state/useStore';
 import TrainingSupportNotice from '../components/TrainingSupportNotice';
 import { theme } from '../theme/theme';
+import { sessionFocusName } from '../state/sessionSummary';
+import { HALT_NEXT_TEXT, HALT_TODAY_TEXT } from '../state/haltCopy';
 import {
   PrimaryButton,
   SecondaryButton,
@@ -68,8 +70,7 @@ const format = (value: number | null, digits: number, suffix = ''): string =>
 const formatSigned = (value: number | null, digits: number): string =>
   value === null ? 'Not available' : `${value >= 0 ? '+' : ''}${value.toFixed(digits)}`;
 
-const formatFocus = (focus: string): string =>
-  focus ? focus.charAt(0).toUpperCase() + focus.slice(1).toLowerCase() : '';
+const formatFocus = (focus: string): string => (focus ? sessionFocusName(focus) : '');
 
 export const readinessCoverage = (vector: StateVectorRow): string => {
   const available = [vector.hrv_z !== null, vector.sleep_efficiency_pct !== null]
@@ -106,7 +107,8 @@ export function HeldScreenWithHalt({ lastTriage, children }: {
         </View>
         <Text style={styles.title}>{HALT_META.title}</Text>
         <Text style={styles.body}>{HALT_META.recommendation}</Text>
-        <Text style={styles.haltCue}>{lastTriage.directive.vector.coaching_cue}</Text>
+        {/* Halt-only wording (#178): never the entry's adjustment cue. */}
+        <Text style={styles.haltCue}>{HALT_NEXT_TEXT}</Text>
       </View>
       {children}
     </ScrollView>
@@ -214,9 +216,8 @@ function AvailableReadinessScreen({
             </View>
             <Text style={styles.title}>{HALT_META.title}</Text>
             <Text style={styles.body}>{HALT_META.recommendation}</Text>
-            {!hasLiveSession && todayPlan !== null && (
-              <Text style={styles.caption}>{formatFocus(todayPlan.focus)} session planned today.</Text>
-            )}
+            {/* No "planned today" while halted (#178): no session may start. */}
+            <Text style={styles.caption}>{HALT_NEXT_TEXT}</Text>
             {primaryHandler !== undefined ? (
               <PrimaryButton label="Review safety report" onPress={primaryHandler} />
             ) : (
@@ -438,8 +439,10 @@ function AvailableReadinessScreen({
         </View>
         <Text style={styles.title}>{meta.title}</Text>
         <Text style={styles.body}>{meta.recommendation}</Text>
-        {hasLiveSession && <Text style={styles.caption}>Your active workout is ready to resume.</Text>}
-        {!hasLiveSession && todayPlan !== null && (
+        {/* While halted, READY names no planned or resumable session (#178). */}
+        {halted && <Text style={styles.caption}>{HALT_NEXT_TEXT}</Text>}
+        {!halted && hasLiveSession && <Text style={styles.caption}>Your active workout is ready to resume.</Text>}
+        {!halted && !hasLiveSession && todayPlan !== null && (
           <Text style={styles.caption}>{formatFocus(todayPlan.focus)} session planned today.</Text>
         )}
         {!hasLiveSession && todayPlan === null && !halted && (
@@ -461,7 +464,7 @@ function AvailableReadinessScreen({
         <Disclosure label="Why this recommendation" hint="The short explanation first">
           <Text style={styles.body}>{meta.explanation}</Text>
           {halted && lastTriage !== null && lastTriage.kind === 'matched' && (
-            <Text style={styles.haltCue}>{lastTriage.directive.vector.coaching_cue}</Text>
+            <Text style={styles.haltCue}>{HALT_TODAY_TEXT}</Text>
           )}
           <View style={{ marginTop: theme.space[3] }}>
             {uiPreferences.readinessDetail === 'full' ? (
