@@ -25,6 +25,7 @@ import { theme } from '../theme/theme';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { EmphasisReportCard } from '../components/EmphasisReportCard';
 import { recommendedProgramDefaults } from '../state/programDefaults';
+import { anchorDisplayName, priorExperienceWouldClear } from '../state/priorExperience';
 import {
   REASON_TEXT_MAP,
   useStore,
@@ -315,12 +316,11 @@ export default function ProgramSetupScreen({
     return strengthAnchorCapacity(longer, programFocuses, defaultProgramDayIndices, draft)
       > anchorCapacity;
   }, [missingAnchorRoles, planningProfile, dayIndices, dayFocuses, anchorCapacity]);
-  // Anchor coverage for strength: which of the big three are gated-available
-  // this week, which are blocked (with reasons), and whether a local
-  // prior-experience declaration would clear an ordinary capability gap
-  // (shared verdict: capability is the ONLY blocker and confirmationWouldClear).
+  // Anchor coverage, for every goal (#217): which of the big three are
+  // gated-available this week, which are blocked (with reasons), and whether a
+  // local prior-experience declaration would clear an ordinary capability gap
+  // (the shared test the Library's chip uses: priorExperienceWouldClear).
   const anchorCoverage = useMemo(() => {
-    if (profile.objective !== 'strength') return [];
     return ANCHOR_MOVEMENT_NAMES.map((name) => {
       const movement = movements.find((m) => m.name === name);
       if (movement === undefined) {
@@ -328,11 +328,7 @@ export default function ProgramSetupScreen({
       }
       const verdict = getVerdicts('weight_room').find((v) => v.movementId === movement.movement_id);
       const reasons = verdict?.reasons ?? [];
-      const confirmWouldClear = (verdict?.state === 'teaching_only'
-        && verdict.confirmationWouldClear
-        && !verdict.separateAttestationRequired
-        && verdict.reasons.length === 1
-        && verdict.reasons[0] === 'capability');
+      const confirmWouldClear = priorExperienceWouldClear(verdict);
       const confirmed = activePriorExperienceMovementIds.includes(movement.movement_id);
       return {
         name,
@@ -343,7 +339,15 @@ export default function ProgramSetupScreen({
         confirmed,
       };
     });
-  }, [profile.objective, profile, movements, getVerdicts, movementAvailabilityRevision, activePriorExperienceMovementIds, niggles]);
+  }, [profile, movements, getVerdicts, movementAvailabilityRevision, activePriorExperienceMovementIds, niggles]);
+  // #204: the section is shown only when there is something to declare.
+  const showAnchorDeclarations = anchorCoverage.some((anchor) => anchor.confirmWouldClear);
+  // #204/#217: the title names what the program is. A strength plan with no
+  // competition lift available is not yet a big-lift plan.
+  const programTitle = profile.objective === 'strength'
+    && !anchorCoverage.some((anchor) => anchor.state === 'available')
+    ? 'Strength foundations'
+    : styleLabel;
 
   // Ranking decisions from the generated preview: anchor substitutions and
   // reasoned bodyweight fallbacks surface verbatim in the preview card.
@@ -419,7 +423,7 @@ export default function ProgramSetupScreen({
     <View style={styles.root}>
     <KeyboardAwareScrollView style={styles.scroll} contentContainerStyle={styles.content}>
       <Text style={styles.eyebrow}>{editing ? 'MANAGE PROGRAM' : 'BUILD YOUR PROGRAM'}</Text>
-      <Text style={styles.title}>{styleLabel}</Text>
+      <Text style={styles.title}>{programTitle}</Text>
       {/* Walk 1 (W1-15): the title already names the goal in the athlete's
           words; the internal code ("hypertrophy", "gpp") is not shown. */}
       <Text style={styles.body}>
@@ -512,28 +516,34 @@ export default function ProgramSetupScreen({
         </View>
       )}
 
-      {anchorCoverage.length > 0 && (
+      {showAnchorDeclarations && (
         <View style={styles.card} testID="anchor-coverage-card">
-          <Text style={styles.sectionTitle}>Big-lift availability</Text>
+          <Text style={styles.sectionTitle}>Squat, bench press and deadlift</Text>
           {anchorCoverage.map((anchor) => (
             <View key={anchor.name} style={styles.anchorRow}>
               <Text style={styles.anchorName}>
-                {anchor.name}: {anchor.state === 'available' ? 'ready' : anchor.state === 'missing_from_library' ? 'not in your library' : 'not available yet'}
+                {anchor.state === 'available'
+                  ? `${anchorDisplayName(anchor.name)}: can be in your plan.`
+                  : anchor.state === 'missing_from_library'
+                    ? `${anchorDisplayName(anchor.name)}: not in your library.`
+                    : anchor.confirmWouldClear
+                      ? `${anchorDisplayName(anchor.name)}: not in your plan yet. Tap below if you have trained it before.`
+                      : `${anchorDisplayName(anchor.name)}: not in your plan yet.`}
               </Text>
-              {anchor.state === 'blocked' && anchor.reasons.length > 0 && (
+              {anchor.state === 'blocked' && !anchor.confirmWouldClear && anchor.reasons.length > 0 && (
                 <Text style={styles.caption}>{anchorReasonText(anchor.reasons)}</Text>
               )}
               {anchor.confirmWouldClear && (
                 <>
                   <Text style={styles.caption}>
-                    You can declare you have trained this lift before — a local statement about your own
-                    history, not a coaching assessment.
+                    This is your own statement about your training history, not a coaching assessment.
                   </Text>
                   <Chip
                     wrap
-                    label={`I have trained ${anchor.name} before`}
+                    label={`I have trained ${anchorDisplayName(anchor.name)} before`}
                     selected={false}
                     onPress={() => confirmMovementPriorExperience(anchor.movementId, 'weight_room')}
+                    accessibilityLabel={`I have trained ${anchorDisplayName(anchor.name)} before`}
                     testID={`anchor-confirm-${anchor.movementId}`}
                   />
                 </>
