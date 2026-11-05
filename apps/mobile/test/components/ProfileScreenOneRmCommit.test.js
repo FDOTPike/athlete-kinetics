@@ -144,3 +144,35 @@ describe('ProfileScreen one-rep max commits typed text without endEditing (#224)
     expect(ohp().props.value).toBe('');
   });
 });
+
+// Review follow-up (#224): switching athletes with the keyboard still open
+// must save the typed max to the athlete it was typed for, and never to the
+// athlete being switched to.
+test('a typed max is saved for its own athlete before a Coach Mode switch', async () => {
+  mockRegistry = {
+    version: 1,
+    activeId: 'default',
+    advancedToolsUnlocked: true,
+    athletes: [
+      { id: 'default', name: 'Athlete 1', dbName: 'athlete_kinetics.db', createdAtMs: 0 },
+      { id: 'second', name: 'Athlete 2', dbName: 'athlete_second.db', createdAtMs: 1 },
+    ],
+  };
+  useStore.setState({ status: 'booting' });
+  useStore.getState().boot();
+  await settle();
+  expect(useStore.getState().status).toBe('ready');
+  const savedFor = [];
+  const realSave = useStore.getState().saveOneRepMax;
+  useStore.setState({ saveOneRepMax: (id, kg) => { savedFor.push([useStore.getState().activeAthleteId, id, kg]); return realSave(id, kg); } });
+
+  renderProfile();
+  fireEvent.changeText(ohp(), '70');
+  fireEvent.press(screen.getByLabelText('Coach mode, 2 athletes, collapsed'));
+  fireEvent.press(screen.getByLabelText('Athlete Athlete 2, tap to switch'));
+  await act(async () => { await settle(); });
+
+  expect(useStore.getState().activeAthleteId).toBe('second');
+  expect(savedFor).toEqual([['default', ohpId, 70]]);
+  expect(useStore.getState().oneRepMaxes[ohpId]).toBeUndefined();
+});
