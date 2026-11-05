@@ -39,6 +39,7 @@ import { appliedAdjustmentLines, autopilotReasonCopy } from '../state/autopilotC
 import { EMPTY_ACTIVITY_LEDGER } from '../state/activityStore';
 import { sessionFocusName } from '../state/sessionSummary';
 import { operativeReportLine } from '../state/operativeReportLine';
+import { reportEffectText, reportEntryName } from '../state/reportCopy';
 import {
   PrimaryButton,
   SecondaryButton,
@@ -305,6 +306,8 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
   const trajectorySectionY = useRef(0);
   const manageSectionOffsetY = useRef(0);
   const [reportOpen, setReportOpen] = useState(false);
+  const disclosuresSectionY = useRef(0);
+  const reportDisclosureOffsetY = useRef(0);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
   const [confirmUnplannedStart, setConfirmUnplannedStart] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<
@@ -1048,7 +1051,10 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
       )}
 
       {/* Disclosures Section */}
-      <View style={styles.section}>
+      <View
+        style={styles.section}
+        onLayout={(event) => { disclosuresSectionY.current = event.nativeEvent.layout.y; }}
+      >
         <Text style={styles.sectionTitle}>Optional details</Text>
         <Disclosure label="Why today changed" hint="Adjustment source and limits">
           {current === null ? (
@@ -1371,94 +1377,114 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           </Disclosure>
         )}
 
-        <Disclosure
-          label="Something feels off"
-          hint="Add a subjective report only when you need Coach to adapt"
-          open={reportOpen}
-          onOpenChange={setReportOpen}
-        >
-          <View style={styles.disclosureContent}>
-            {!triageReady && (
-              <Text style={styles.captionText}>
-                Semantic matching is unavailable in this build. Injury-language safety checks still apply.
-              </Text>
-            )}
-            <TextInput
-              disableFullscreenUI
-              style={styles.reportInput}
-              value={reportText}
-              onChangeText={setReportText}
-              placeholder="For example: my knee feels sore when I squat"
-              placeholderTextColor={theme.color.textLow}
-              maxLength={500}
-              multiline
-              accessibilityLabel="Describe how your body feels today"
-            />
-            <Text style={styles.severityLabel}>Severity from 1 to 10</Text>
-            <View style={styles.severityRow}>
-              {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((severity) => {
-                const selected = reportSeverity === severity;
-                return (
-                  <Pressable
-                    key={severity}
-                    onPress={() => setReportSeverity(severity)}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected }}
-                    accessibilityLabel={`Severity ${severity} of 10`}
-                    style={[
-                      styles.severityChip,
-                      selected && styles.severityChipSelected,
-                    ]}
-                  >
-                    <Text style={[styles.severityText, selected && styles.severityTextSelected]}>{severity}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            <PrimaryButton
-              label={triaging ? 'Checking report' : 'Apply report'}
-              disabled={reportText.trim().length === 0 || reportSeverity === null || triaging}
-              onPress={() => {
-                if (reportSeverity === null) return;
-                void reportSubjective(reportText, reportSeverity).then(() => {
-                  setReportText('');
-                  setReportSeverity(null);
-                });
-              }}
-              accessibilityLabel={triaging ? 'Checking report' : 'Apply report'}
-            />
-
-            {lastTriage !== null && lastTriage.kind === 'positive' && (
-              <View style={styles.reportResult}>
-                <View style={styles.statusBadge}>
-                  <Text style={styles.statusBadgeText}>Noted</Text>
+        <View onLayout={(event) => { reportDisclosureOffsetY.current = event.nativeEvent.layout.y; }}>
+          <Disclosure
+            label="Something feels off"
+            hint="Add a subjective report only when you need Coach to adapt"
+            open={reportOpen}
+            onOpenChange={setReportOpen}
+          >
+            <View style={styles.disclosureContent}>
+              {/* The reply to a report sits ABOVE the form, so it is in view
+                  after Apply (#207). It says, in this order: what the report
+                  matched, what changed today with the applied figures (after the
+                  severity gate and the experience scaling), then the entry's cue. */}
+              {lastTriage !== null && lastTriage.kind === 'positive' && (
+                <View style={styles.reportResult} testID="report-result-noted">
+                  <View style={styles.statusBadge}>
+                    <Text style={styles.statusBadgeText}>Noted</Text>
+                  </View>
+                  {lastTriage.entryId !== undefined && (
+                    <Text style={styles.captionText}>{`Matched: ${reportEntryName(lastTriage.entryId)}`}</Text>
+                  )}
+                  <Text style={styles.bodyText}>Today's plan is unchanged.</Text>
+                  <Text style={styles.captionText}>{lastTriage.cue}</Text>
                 </View>
-                <Text style={styles.bodyText}>{lastTriage.cue}</Text>
-              </View>
-            )}
-            {lastTriage !== null && lastTriage.kind === 'rejected' && (
-              <View style={styles.reportResult}>
-                <View style={styles.statusBadge}>
-                  <Text style={styles.statusBadgeText}>No change</Text>
+              )}
+              {lastTriage !== null && lastTriage.kind === 'rejected' && (
+                <View style={styles.reportResult}>
+                  <View style={styles.statusBadge}>
+                    <Text style={styles.statusBadgeText}>No change</Text>
+                  </View>
+                  <Text style={styles.captionText}>
+                    Coach did not match this to a known scenario, so today's plan is unchanged.
+                  </Text>
                 </View>
+              )}
+              {lastTriage !== null && lastTriage.kind === 'matched' && !lastTriage.directive.halt && (
+                <View style={styles.reportResult} testID="report-result-adjusted">
+                  <View style={styles.statusBadge}>
+                    <Text style={styles.statusBadgeText}>Plan adjusted</Text>
+                  </View>
+                  {current?.report != null && (
+                    <>
+                      <Text style={styles.captionText}>{`Matched: ${reportEntryName(current.report.entryId)}`}</Text>
+                      <Text style={styles.bodyText}>{reportEffectText(current.report.effect)}</Text>
+                    </>
+                  )}
+                  <Text style={styles.captionText}>{lastTriage.directive.vector.coaching_cue}</Text>
+                  {lastTriage.directive.followUp !== null && (
+                    <Text style={styles.captionText}>{lastTriage.directive.followUp}</Text>
+                  )}
+                </View>
+              )}
+              {!triageReady && (
                 <Text style={styles.captionText}>
-                  Coach did not match this to a known scenario, so today's plan is unchanged.
+                  Semantic matching is unavailable in this build. Injury-language safety checks still apply.
                 </Text>
+              )}
+              <TextInput
+                disableFullscreenUI
+                style={styles.reportInput}
+                value={reportText}
+                onChangeText={setReportText}
+                placeholder="For example: my knee feels sore when I squat"
+                placeholderTextColor={theme.color.textLow}
+                maxLength={500}
+                multiline
+                accessibilityLabel="Describe how your body feels today"
+              />
+              <Text style={styles.severityLabel}>Severity from 1 to 10</Text>
+              <View style={styles.severityRow}>
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((severity) => {
+                  const selected = reportSeverity === severity;
+                  return (
+                    <Pressable
+                      key={severity}
+                      onPress={() => setReportSeverity(severity)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      accessibilityLabel={`Severity ${severity} of 10`}
+                      style={[
+                        styles.severityChip,
+                        selected && styles.severityChipSelected,
+                      ]}
+                    >
+                      <Text style={[styles.severityText, selected && styles.severityTextSelected]}>{severity}</Text>
+                    </Pressable>
+                  );
+                })}
               </View>
-            )}
-            {lastTriage !== null && lastTriage.kind === 'matched' && !lastTriage.directive.halt && (
-              <View style={styles.reportResult}>
-                <View style={styles.statusBadge}>
-                  <Text style={styles.statusBadgeText}>Plan adjusted</Text>
-                </View>
-                <Text style={styles.bodyText}>{lastTriage.directive.vector.coaching_cue}</Text>
-                {lastTriage.directive.followUp !== null && (
-                  <Text style={styles.captionText}>{lastTriage.directive.followUp}</Text>
-                )}
-              </View>
-            )}
-          </View>
-        </Disclosure>
+              <PrimaryButton
+                label={triaging ? 'Checking report' : 'Apply report'}
+                disabled={reportText.trim().length === 0 || reportSeverity === null || triaging}
+                onPress={() => {
+                  if (reportSeverity === null) return;
+                  void reportSubjective(reportText, reportSeverity).then(() => {
+                    setReportText('');
+                    setReportSeverity(null);
+                    // Bring the reply (above the form) into view (#207).
+                    scrollRef.current?.scrollTo({
+                      y: Math.max(0, disclosuresSectionY.current + reportDisclosureOffsetY.current - theme.space[4]),
+                      animated: true,
+                    });
+                  });
+                }}
+                accessibilityLabel={triaging ? 'Checking report' : 'Apply report'}
+              />
+            </View>
+          </Disclosure>
+        </View>
       </View>
     </KeyboardAwareScrollView>
   );
