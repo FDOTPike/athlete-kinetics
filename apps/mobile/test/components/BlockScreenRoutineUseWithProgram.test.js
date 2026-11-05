@@ -106,3 +106,20 @@ test('#223: with no active goal program, "Use day 1 today" is shown and used as 
   fireEvent.press(screen.getByText('Confirm day 1'));
   expect(mockState.freezeRoutineTemplateToPlannedSession).toHaveBeenCalledWith(5, undefined, 1);
 });
+
+test('#223 review: a pending "Use day" confirmation is cleared when a goal program becomes active', () => {
+  mockState = baseState({ program: null });
+  render(<BlockScreen />);
+  openTemplates();
+  fireEvent.press(screen.getByText('Use day 1 today'));
+  expect(screen.getByText('Confirm day 1')).toBeOnTheScreen();
+
+  // The athlete starts a goal program elsewhere and comes back to Plan.
+  mockState = baseState();
+  screen.rerender(<BlockScreen />);
+
+  expect(screen.queryByText('Confirm day 1')).toBeNull();
+  expect(screen.getByText('Edit')).toBeOnTheScreen();
+  expect(screen.getByText('Delete')).toBeOnTheScreen();
+  expect(mockState.freezeRoutineTemplateToPlannedSession).not.toHaveBeenCalled();
+});

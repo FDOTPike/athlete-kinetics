@@ -329,6 +329,11 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
       setSessionStartError(storeError);
     }
   }, [awaitingSessionStart, session, storeError, onSessionStarted]);
+  // #223: a "Use day" confirmation chosen before a goal program started would
+  // stay on screen and call a store action that refuses the active program.
+  useEffect(() => {
+    if (goalProgramActive && confirmRoutineAction?.kind === 'use') setConfirmRoutineAction(null);
+  }, [goalProgramActive, confirmRoutineAction]);
   const [showChooser, setShowChooser] = useState(false);
 
   const hasSubView =
