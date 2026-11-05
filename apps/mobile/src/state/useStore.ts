@@ -365,6 +365,7 @@ import phraseVectorsJson from '../../../../packages/inference/assets/phrase-code
 import { routeQuestion, type QuestionIndex, type QuestionResult } from '../../../../packages/inference/src/semantic/questionRouter';
 import { packVectors } from '../../../../packages/inference/src/semantic/cosine';
 import { scanRedFlags } from '../../../../packages/inference/src/semantic/redFlag';
+import { reportEffectBetween, type ReportEffect } from './reportCopy';
 
 // ---------------------------------------------------------------------------
 // Shared dark palette (sweaty-hands UI: high contrast, zero decoration)
@@ -779,6 +780,23 @@ export interface ReturnCheckinState {
   readonly options: readonly ReturnAction[];
   readonly isDismissed: boolean;
 }
+/** One saved report as the read-only report view shows it (#185). */
+export interface TodaySafetyReport {
+  reportId: number;
+  reportedAtMs: number;
+  /** The words as typed. */
+  text: string;
+  /** 1-10, or null for a report saved before severity was recorded. */
+  severity: number | null;
+  /** The matched phrase-codebase entry, or null when nothing matched. */
+  entryId: string | null;
+  halt: boolean;
+  /** What the report changed today; null when it matched nothing. */
+  effect: ReportEffect | null;
+  /** The entry's follow-up question. It takes no answer for now. */
+  followUp: string | null;
+}
+
 interface KineticsStore {
   healthSupportRevision: number;
   getTrainingSupportDecision: (movementIds?: readonly number[]) => TrainingSupportDecision;
@@ -1187,6 +1205,10 @@ interface KineticsStore {
   editSet: (setId: number, reps: number, loadKg: number, rpe: number | null, metrics?: SetMetricPatch) => void;
   endSession: () => void;
   computePrescription: (patterns: readonly MovementPattern[]) => void;
+  /** Today's saved "Something feels off" reports, oldest first, for the
+   *  read-only report view (#185). Reads only: nothing here can withdraw,
+   *  correct or re-derive a report. Empty when no database is open. */
+  loadTodaySafetyReports: () => TodaySafetyReport[];
   /** First-run affordance: 180-day deterministic demo athlete. Refuses to run
    *  unless the database is empty — it must never touch real training data.
    *  Returns 'loaded' when the demo was seeded, or 'blocked_existing_data'
@@ -8332,6 +8354,56 @@ export const useStore = create<KineticsStore>()((set, get) => {
         ? { kind: 'matched', directive: derived.directive }
         : null,
       today,
+    });
+  },
+
+  loadTodaySafetyReports: () => {
+    if (db === null) return [];
+    const d = getDb();
+    const today = localToday();
+    const rows = rowsOf<{
+      report_id: number; reported_at_ms: number; raw_text: string; matched_entry_id: string | null;
+      halt: number; load_modifier: number | null; set_modifier: number | null; rpe_cap: number | null;
+      severity: number | null;
+    }>(d.executeSync(
+      `SELECT sr.report_id, sr.reported_at_ms, sr.raw_text, sr.matched_entry_id, sr.halt,
+              sr.load_modifier, sr.set_modifier, sr.rpe_cap, rs.severity
+         FROM subjective_report sr LEFT JOIN report_severity rs ON rs.report_id = sr.report_id
+        WHERE sr.date = ? ORDER BY sr.report_id`,
+      [today],
+    ));
+    // What each report changed is read against today's plan with no report,
+    // from the same pure derivation the operative path uses. With no
+    // readiness, the plan's own neutral figures stand in.
+    const { vector, profile, session } = get();
+    const baseline = vector !== null
+      ? derivePrescription({
+        vector,
+        profile,
+        ctx: profileCtx(d, today, session !== null ? session.sessionId : -1),
+        reports: [],
+      }).vector
+      : { load_modifier: 1, set_modifier: 0, rpe_cap: profile.base_rpe_cap };
+    return rows.map((row) => {
+      const entry = row.matched_entry_id === null ? undefined : entryById(row.matched_entry_id);
+      const halt = row.halt === 1;
+      const effect = row.load_modifier !== null && row.set_modifier !== null && row.rpe_cap !== null
+        ? reportEffectBetween(
+          { load_modifier: row.load_modifier, set_modifier: row.set_modifier, rpe_cap: row.rpe_cap },
+          baseline,
+          halt,
+        )
+        : halt ? reportEffectBetween(baseline, baseline, true) : null;
+      return {
+        reportId: row.report_id,
+        reportedAtMs: row.reported_at_ms,
+        text: row.raw_text,
+        severity: row.severity,
+        entryId: row.matched_entry_id,
+        halt,
+        effect,
+        followUp: entry?.guardrail.follow_up ?? null,
+      };
     });
   },
 
