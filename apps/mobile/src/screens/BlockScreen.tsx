@@ -38,6 +38,7 @@ import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { appliedAdjustmentLines, autopilotReasonCopy } from '../state/autopilotCopy';
 import { EMPTY_ACTIVITY_LEDGER } from '../state/activityStore';
 import { sessionFocusName } from '../state/sessionSummary';
+import { HALT_NEXT_TEXT, HALT_PAUSE_CARD_TEXT, HALT_TODAY_TEXT } from '../state/haltCopy';
 import {
   PrimaryButton,
   SecondaryButton,
@@ -144,10 +145,14 @@ export const setChangeText = (delta: number): string => {
 export function pausedHeldText(
   reasonLabel: string,
   program: { currentSequenceIndex: number; plannedBlockCount: number } | null | undefined,
+  halted = false,
 ): string {
   const place = program != null
     ? `You are held at block ${program.currentSequenceIndex} of ${program.plannedBlockCount}`
     : 'Your place is held';
+  // While today's safety report halts training, the card must not invite
+  // training (#178); the halt card above says what to do instead.
+  if (halted) return `Paused for ${reasonLabel}. ${place} and will come back to it. Today's safety report has stopped training for today.`;
   return `Paused for ${reasonLabel}. ${place} and will come back to it — training you do now will not use it up. Keep training if you can; everything else works as normal.`;
 }
 
@@ -468,7 +473,9 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           <View style={[styles.card, styles.haltCard]}>
             <Text style={styles.eyebrow}>SAFETY</Text>
             <Text style={styles.cardTitle}>Stop training today</Text>
-            <Text style={styles.bodyText}>{lastTriage.directive.vector.coaching_cue}</Text>
+            {/* Halt-only wording (#178): never the entry's adjustment cue. */}
+            <Text style={styles.bodyText}>{HALT_TODAY_TEXT}</Text>
+            <Text style={styles.bodyText}>{HALT_NEXT_TEXT}</Text>
             {lastTriage.directive.followUp !== null && (
               <Text style={styles.followUpText}>{lastTriage.directive.followUp}</Text>
             )}
@@ -639,7 +646,9 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
         <View style={[styles.card, styles.haltCard]}>
           <Text style={styles.eyebrow}>SAFETY</Text>
           <Text style={styles.cardTitle}>Stop training today</Text>
-          <Text style={styles.bodyText}>{lastTriage.directive.vector.coaching_cue}</Text>
+          {/* Halt-only wording (#178): never the entry's adjustment cue. */}
+          <Text style={styles.bodyText}>{HALT_TODAY_TEXT}</Text>
+          <Text style={styles.bodyText}>{HALT_NEXT_TEXT}</Text>
           {lastTriage.directive.followUp !== null && (
             <Text style={styles.followUpText}>{lastTriage.directive.followUp}</Text>
           )}
@@ -656,7 +665,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           <Text style={styles.eyebrow}>PROGRAMME PAUSED</Text>
           <Text style={styles.cardTitle}>Your place is being held</Text>
           <Text style={styles.bodyText}>
-            {pausedHeldText(SUSPENSION_REASON_LABEL[suspension.reason], program)}
+            {pausedHeldText(SUSPENSION_REASON_LABEL[suspension.reason], program, halted)}
           </Text>
           <PrimaryButton
             label="Resume my programme"
@@ -692,8 +701,9 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           <Text style={styles.eyebrow}>PAUSE</Text>
           <Text style={styles.cardTitle}>Injured, ill, or life got in the way?</Text>
           <Text style={styles.bodyText}>
-            Pausing holds your place in the programme so a gap does not cost you a block. You can
-            still train while paused.
+            {halted
+              ? HALT_PAUSE_CARD_TEXT
+              : 'Pausing holds your place in the programme so a gap does not cost you a block. You can still train while paused.'}
           </Text>
           {SUSPENSION_REASONS.map((reason) => (
             <PrimaryButton

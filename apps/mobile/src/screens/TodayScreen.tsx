@@ -56,6 +56,7 @@ import { classifyReadiness, HALT_META, HeldScreenWithHalt } from './ReadinessScr
 import { autopilotReasonCopy } from '../state/autopilotCopy';
 import { PrimaryButton, QuietAction, Disclosure, ListRow } from '../components/ui';
 import { sessionFocusName } from '../state/sessionSummary';
+import { HALT_NEXT_TEXT } from '../state/haltCopy';
 
 export interface TodayScreenProps {
   /** Shell-supplied: go to the live session surface. */
@@ -273,6 +274,7 @@ function AvailableTodayScreen({
             <Text style={styles.body}>
               A safety report paused training for today. Review it before doing more work.
             </Text>
+            <Text style={styles.body}>{HALT_NEXT_TEXT}</Text>
             <QuietAction
               label="Open your plan"
               onPress={() => onOpenPlan?.()}
@@ -491,7 +493,9 @@ function AvailableTodayScreen({
       {suspension != null && (
         <View style={styles.card} testID="today-paused">
           <Text style={styles.eyebrow}>PROGRAMME PAUSED</Text>
-          <Text style={styles.body}>Your place is being held. You can still train.</Text>
+          <Text style={styles.body}>
+            {halted ? 'Your place is being held.' : 'Your place is being held. You can still train.'}
+          </Text>
           <QuietAction
             label="Manage pause"
             onPress={() => onOpenPlan?.()}
