@@ -19,16 +19,20 @@ TESTS=(
   test4_backupToFilesAndRestore
   test5_workoutLogBackgroundAndRelaunch
 )
-# On hold by owner decision (issue #254): the Health test fails at random on
-# hosted runners, and the owner checks Health by hand on a real iPad. To turn
-# it back on, move it into TESTS above. Its checks below are kept unchanged.
+# Tests on hold by an owner decision, one per line as <test>:<tracking issue>.
+# To turn one back on, move its name into TESTS above. Its checks below stay.
+# - test3: fails at random on hosted runners; the owner checks Health by hand
+#   on a real iPad (issue #254).
 HELD_TESTS=(
-  test3_healthDenialAndAthleteSwitching
+  test3_healthDenialAndAthleteSwitching:254
 )
 mkdir -p "$OUT"
-for held in "${HELD_TESTS[@]}"; do
-  echo "::notice title=ui $held on hold::not run in CI (owner decision, issue #254: Health is checked by hand on a real iPad)"
-done
+# Guarded: with HELD_TESTS=() the bare expansion fails under set -u on Bash 3.2.
+if [ "${#HELD_TESTS[@]}" -gt 0 ]; then
+  for held in "${HELD_TESTS[@]}"; do
+    echo "::notice title=ui ${held%%:*} on hold::not run in CI (owner decision, issue #${held##*:})"
+  done
+fi
 trap 'code=$?; echo "::error title=ui tests::line $LINENO exit $code: $BASH_COMMAND"' ERR
 
 xcrun simctl list -j runtimes devicetypes > "$OUT/simctl-inventory.json"
