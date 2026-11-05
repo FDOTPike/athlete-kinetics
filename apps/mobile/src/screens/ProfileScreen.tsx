@@ -12,7 +12,7 @@
  * Law 4: Touch targets >= 56pt.
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   BIG4_LIFTS,
   ENERGY_SYSTEMS,
@@ -133,7 +133,7 @@ function OneRmRow({ label, valueKg, onChange }: OneRmRowProps): React.JSX.Elemen
   useEffect(() => {
     setText(valueKg !== undefined ? valueKg.toFixed(1) : '');
   }, [valueKg]);
-  const commitText = (): void => {
+  const saveText = (): void => {
     const parsed = Number.parseFloat(text.replace(',', '.'));
     if (!Number.isFinite(parsed) || parsed < 20) {
       onChange(null); // empty/garbage/sub-20 clears the max
@@ -144,6 +144,29 @@ function OneRmRow({ label, valueKg, onChange }: OneRmRowProps): React.JSX.Elemen
     onChange(parsed); // store snaps to 2.5 and clamps 20..500
     setText(snapped.toFixed(1));
   };
+  // Walk A-12 (#224): Android Back hides the keyboard without ending editing,
+  // and the typed text was lost when Profile closed. Typed text is now saved
+  // on end of editing, blur, keyboard hide or unmount, whichever comes first.
+  // It is saved once: text that matches the saved value is not saved again,
+  // and neither is text already saved from this render (Enter fires end of
+  // editing and blur before the row re-renders with the saved value).
+  const savedThisRender = useRef(false);
+  useEffect(() => { savedThisRender.current = false; });
+  const commitText = (): void => {
+    const shown = valueKg !== undefined ? valueKg.toFixed(1) : '';
+    if (text === shown || savedThisRender.current) return;
+    savedThisRender.current = true;
+    saveText();
+  };
+  const commitLatest = useRef(commitText);
+  commitLatest.current = commitText;
+  useEffect(() => {
+    const hide = Keyboard.addListener('keyboardDidHide', () => commitLatest.current());
+    return () => {
+      hide.remove();
+      commitLatest.current();
+    };
+  }, []);
   return (
     <View style={styles.field}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -163,6 +186,7 @@ function OneRmRow({ label, valueKg, onChange }: OneRmRowProps): React.JSX.Elemen
           value={text}
           onChangeText={setText}
           onEndEditing={commitText}
+          onBlur={commitText}
           keyboardType="numeric"
           placeholder="—"
           placeholderTextColor={theme.color.textLow}
