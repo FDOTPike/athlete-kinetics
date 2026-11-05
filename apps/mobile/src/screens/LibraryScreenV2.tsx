@@ -9,7 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Chip, PrimaryButton, SecondaryButton } from '../components/ui';
+import { Chip, Disclosure, PrimaryButton, SecondaryButton } from '../components/ui';
 import { MovementPreview } from '../components/movementPreview/MovementPreview';
 import { useSubViewBack } from '../navigation/navigation';
 import {
@@ -143,6 +143,9 @@ export default function LibraryScreenV2({ initialMovementId }: LibraryScreenProp
   const [kindFilter, setKindFilter] = useState<KindFilter>('all');
   const [scopeFilter, setScopeFilter] = useState<ScopeFilter>('all');
   const [selectedMovementId, setSelectedMovementId] = useState<number | null>(initialMovementId ?? null);
+  // #210: the six filter rows start collapsed behind one plain heading, for
+  // every athlete. Held here so they stay as left when a movement is opened.
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
     setAvailabilityView(trainingAge === 'beginner' ? 'available' : 'all');
@@ -396,6 +399,16 @@ export default function LibraryScreenV2({ initialMovementId }: LibraryScreenProp
           accessibilityLabel="Search movements"
         />
       </View>
+      <Disclosure
+        label="Filters"
+        hint={availabilityView === 'available'
+          ? 'Showing the movements available to you. Availability, pattern, equipment and more.'
+          : 'Availability, pattern, equipment and more.'}
+        open={filtersOpen}
+        onOpenChange={setFiltersOpen}
+        testID="library-filters"
+      >
+      <View style={styles.filterBody}>
       <Text style={styles.filterLabel}>Availability</Text>
       <View style={styles.toggleRow}>
         <Chip
@@ -484,6 +497,8 @@ export default function LibraryScreenV2({ initialMovementId }: LibraryScreenProp
         ))}
       </View>
       <SecondaryButton label="Clear filters" onPress={clearFilters} accessibilityLabel="Clear search and filters" />
+      </View>
+      </Disclosure>
     </View>
   );
 
@@ -546,6 +561,7 @@ const styles = StyleSheet.create({
   },
   searchInput: { ...theme.font.body, fontFamily: theme.font.family, color: theme.color.textHi, padding: 0, minHeight: theme.touch.min, textAlignVertical: 'center' },
   filterLabel: { ...theme.font.eyebrow, color: theme.color.textMid },
+  filterBody: { gap: theme.space[3] },
   filterScroll: { gap: theme.space[2], paddingVertical: theme.space[1] },
   toggleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.space[2] },
   wrapRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.space[2] },

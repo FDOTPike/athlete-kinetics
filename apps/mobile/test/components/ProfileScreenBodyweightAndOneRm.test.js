@@ -63,6 +63,8 @@ describe('ProfileScreen OneRmRow and Bodyweight inputs preserve saved values and
       </NavigationProvider>,
     );
 
+    // #210: the one-rep maxes sit behind a collapsed heading.
+    fireEvent.press(screen.getByLabelText('One-rep maxes (optional)'));
     const squatInput = screen.getAllByLabelText(/one rep max in kilograms, type to set/i)[0];
     expect(squatInput.props.value).toBe('100.0');
 
@@ -109,5 +111,50 @@ describe('ProfileScreen OneRmRow and Bodyweight inputs preserve saved values and
     fireEvent(bwInput, 'endEditing');
     expect(useStore.getState().loadMeasuredHistory(14).find((r) => r.date === today)?.bodyweightKg).toBe(82.5);
     expect(screen.getByLabelText('Bodyweight today in kilograms').props.value).toBe('82.5');
+  });
+});
+
+// Review (PR 194): "Saved as 500.0 kg" describes one saved value. Once the
+// athlete types again, presses + or −, or clears the max, it no longer does.
+describe('ProfileScreen one-rep-max clamp notice', () => {
+  const renderProfile = () => {
+    render(
+      <NavigationProvider initialTab="athlete">
+        <ProfileScreen />
+      </NavigationProvider>,
+    );
+    // #210: the one-rep maxes sit behind a collapsed heading.
+    fireEvent.press(screen.getByLabelText('One-rep maxes (optional)'));
+  };
+  const squat = () => screen.getAllByLabelText(/one rep max in kilograms, type to set/i)[0];
+  const clampTo500 = () => {
+    fireEvent.changeText(squat(), '999');
+    fireEvent(squat(), 'endEditing');
+    expect(screen.getByText(/^Saved as 500\.0 kg/)).toBeOnTheScreen();
+  };
+
+  test('typing a new value removes it', () => {
+    renderProfile();
+    clampTo500();
+    fireEvent.changeText(squat(), '120');
+    expect(screen.queryByText(/^Saved as 500\.0 kg/)).toBeNull();
+  });
+
+  test('pressing + or − removes it', () => {
+    renderProfile();
+    clampTo500();
+    fireEvent.press(screen.getAllByLabelText(/^Decrease .* one rep max$/)[0]);
+    expect(screen.queryByText(/^Saved as 500\.0 kg/)).toBeNull();
+    clampTo500();
+    fireEvent.press(screen.getAllByLabelText(/^Increase .* one rep max$/)[0]);
+    expect(screen.queryByText(/^Saved as 500\.0 kg/)).toBeNull();
+  });
+
+  test('clearing the max removes it', () => {
+    renderProfile();
+    clampTo500();
+    fireEvent.changeText(squat(), '');
+    fireEvent(squat(), 'endEditing');
+    expect(screen.queryByText(/^Saved as 500\.0 kg/)).toBeNull();
   });
 });

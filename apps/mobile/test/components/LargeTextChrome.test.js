@@ -4,7 +4,7 @@
 // (The header and tab labels are covered in NavigationShell.test.js.)
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 
 let mockFontScale = 1;
 jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
@@ -41,7 +41,7 @@ describe('profile headings shrink before they push an info button off screen', (
       status: 'ready',
       profile: {
         objective: 'gpp', training_age: 'intermediate', weekly_frequency: 4, max_sessions_per_day: 1,
-        session_duration_cap_min: 60, base_rpe_cap: 8.5, target_energy_system: 'hybrid',
+        session_duration_cap_min: 60, base_rpe_cap: 8.5, target_energy_system: 'atp_pc', // the energy "i" follows the choice (W4-9)
         progression_methodology: 'autoregulated', injury_flags: [], mobility_limits: [],
         equipment_inventory: ['barbell', 'dumbbells', 'bench'],
       },
@@ -91,6 +91,8 @@ describe('profile headings shrink before they push an info button off screen', (
     ['7 · TARGET ENERGY SYSTEM', 'ATP-PC'],
   ])('the label "%s" may shrink beside its %s info button, and the button may not', (labelText, term) => {
     render(<ProfileScreen />);
+    // #210: the energy system sits behind a collapsed heading.
+    if (labelText.startsWith('7 ')) fireEvent.press(screen.getByLabelText('Energy system focus (optional)'));
     const label = screen.getByText(labelText);
     const tip = screen.getByLabelText(`What does ${term} mean?`);
     // Both sit in the same row: walk up from the label to the first row and
