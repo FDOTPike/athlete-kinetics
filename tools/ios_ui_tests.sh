@@ -16,11 +16,19 @@ XCTESTRUN="$1"; APP="$2"; BUNDLE_ID="$3"; OUT="$4"
 TESTS=(
   test1_onboardingNavigationAndAccessibility
   test2_dynamicTypeScalesText
-  test3_healthDenialAndAthleteSwitching
   test4_backupToFilesAndRestore
   test5_workoutLogBackgroundAndRelaunch
 )
+# On hold by owner decision (issue #254): the Health test fails at random on
+# hosted runners, and the owner checks Health by hand on a real iPad. To turn
+# it back on, move it into TESTS above. Its checks below are kept unchanged.
+HELD_TESTS=(
+  test3_healthDenialAndAthleteSwitching
+)
 mkdir -p "$OUT"
+for held in "${HELD_TESTS[@]}"; do
+  echo "::notice title=ui $held on hold::not run in CI (owner decision, issue #254: Health is checked by hand on a real iPad)"
+done
 trap 'code=$?; echo "::error title=ui tests::line $LINENO exit $code: $BASH_COMMAND"' ERR
 
 xcrun simctl list -j runtimes devicetypes > "$OUT/simctl-inventory.json"

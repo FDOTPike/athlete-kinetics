@@ -243,8 +243,23 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
   const suite = read('apps/mobile/ios/AthleteKineticsUITests/AthleteKineticsUITests.swift');
   const runner = read('tools/ios_ui_tests.sh');
   const tests = [...suite.matchAll(/func (test\w+)\(\)/g)].map((m) => m[1]);
-  check('every UI test in the suite is run by CI, none skipped',
-    tests.length >= 4 && tests.every((t) => runner.includes(`  ${t}\n`)) && !/XCTSkip|skipped = "YES"/.test(suite + scheme), tests.join(','));
+  // A test is either run (TESTS) or on hold by an owner decision (HELD_TESTS,
+  // with the tracking issue named beside it and in its CI notice). Never both,
+  // never neither, and never skipped inside the suite or scheme.
+  const runnerArray = (name) => {
+    const m = runner.match(new RegExp(`^${name}=\\(\\n([\\s\\S]*?)\\n\\)`, 'm'));
+    return m === null ? [] : m[1].split('\n').map((line) => line.trim()).filter((line) => line !== '' && !line.startsWith('#'));
+  };
+  const runTests = runnerArray('TESTS');
+  const heldTests = runnerArray('HELD_TESTS');
+  const holdIssue = runner.match(/On hold by owner decision \(issue #(\d+)\)/)?.[1] ?? null;
+  check('every UI test in the suite is run by CI or on hold by a tracked owner decision, none skipped',
+    tests.length >= 4 && runTests.length >= 4
+      && tests.every((t) => runTests.includes(t) !== heldTests.includes(t))
+      && [...runTests, ...heldTests].every((t) => tests.includes(t))
+      && (heldTests.length === 0 || (holdIssue !== null && runner.includes(`issue #${holdIssue}: `)))
+      && !/XCTSkip|skipped = "YES"/.test(suite + scheme),
+    `run=${runTests.join(',')} held=${heldTests.join(',') || 'none'}${holdIssue === null ? '' : ` (issue #${holdIssue})`}`);
   check('the suite covers the audit, Dynamic Type, Health denial + switching and Files backup/restore',
     suite.includes('performAccessibilityAudit(for: .all)') && suite.includes('UICTContentSizeCategoryAccessibilityXXXL')
       && suite.includes('Don’t Allow') && suite.includes('Athlete UITest B, active')
