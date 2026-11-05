@@ -1,4 +1,4 @@
-// Existing harness contract: tools/memory-audit/meminfo_harness.mjs:4-36.
+// Existing harness contract: tools/memory-audit/meminfo_harness.mjs:4-32.
 import { execFileSync, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { closeSync, existsSync, mkdirSync, openSync, readFileSync, writeFileSync } from 'node:fs';
