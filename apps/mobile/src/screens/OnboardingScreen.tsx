@@ -895,7 +895,7 @@ export default function OnboardingScreen(): React.JSX.Element {
         <View style={styles.limitsGateNotice}>
           {/* Issue #215: name the first missing field in the validator's words. */}
           {!goalValidation.ok && goalValidation.errors.length > 0 && (
-            <Text style={styles.p} testID="onboarding-target-gate-missing">
+            <Text style={styles.p} testID="onboarding-target-gate-missing" accessibilityLiveRegion="polite">
               {goalValidation.errors[0]!.message}
             </Text>
           )}

@@ -28,6 +28,9 @@ jest.mock('../../src/state/athleteRegistry', () => ({
   saveRegistry: async (next) => { mockRegistry = next; return true; },
 }));
 
+// The real store boots through the full migration chain: a cold run
+// (--no-cache) measured 12.0 s for the first test, over Jest's 5 s default.
+// 60 s matches the other real-store suites (FocusGoalStore, AthleteSwapProfileRender).
 jest.setTimeout(60_000);
 
 const A = 'athlete_kinetics.db';
@@ -84,8 +87,11 @@ test('a target missing only the reason names the reason in the gate notice', () 
   expect(nextDisabled()).toBe(true);
   expect(screen.getByTestId('onboarding-target-gate-missing').props.children)
     .toBe('Say why this matters to you. It is what you will read when it gets hard.');
-  // The field itself says it is needed.
+  // A changed field message is announced.
+  expect(screen.getByTestId('onboarding-target-gate-missing').props.accessibilityLiveRegion).toBe('polite');
+  // The field itself says it is needed, on screen and to a screen reader.
   expect(screen.getByText('WHY DOES THIS MATTER TO YOU? (REQUIRED)')).toBeTruthy();
+  expect(screen.getByTestId('goal-reason').props.accessibilityLabel).toBe('Why does this matter to you? (required)');
 
   type('goal-reason', 'To be stronger for football');
   expect(nextDisabled()).toBe(false);
