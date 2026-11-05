@@ -653,6 +653,8 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
           saved={sessionFeel.saved}
           note={sessionFeel.note}
           answerOptional={answerOptional}
+          // Plan's "Something feels off" form exists only once readiness does.
+          planReportAvailable={state.vector != null}
           onSave={(draft, noteText) => {
             if (answerOptional && draft.feel === null) {
               if (noteText.trim().length === 0) return 'nothing_to_save';
