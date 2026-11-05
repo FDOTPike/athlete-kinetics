@@ -162,6 +162,26 @@ const targetText = (slot: PlanSlot): string => {
   return target.kind === 'time' ? `${slot.plannedSets} × ${secondsText(target.seconds)}` : `${slot.plannedSets} × ${target.reps}`;
 };
 
+/** Android walk (#203): rep-based sets ask "how many more clean reps", so the
+ *  target says reps left first, with RPE kept as support. Reps left is the
+ *  inverse of the RIR answer mapping (mapRirToRpe: 3 → 7, 2 → 8, 4+ → 6); a
+ *  half-point target falls between two answers and is shown as a range.
+ *  Timed work asks for RPE directly and keeps the RPE target only. Display
+ *  only: the target itself is unchanged. */
+const targetEffortText = (slot: PlanSlot): string => {
+  const rpe = slot.targetRpe;
+  if (rpe === null || !Number.isFinite(rpe)) return '';
+  if (targetFor(slot).kind === 'time') return ` · RPE ${rpe.toFixed(1)}`;
+  const left = 10 - rpe;
+  const lo = Math.floor(left);
+  const hi = Math.ceil(left);
+  const repsLeft = left >= 4 ? 'at least 4 reps left'
+    : left <= 0 ? 'no reps left'
+      : lo !== hi ? `about ${lo}–${hi} reps left`
+        : lo === 1 ? 'about 1 rep left' : `about ${lo} reps left`;
+  return ` · ${repsLeft} (RPE ${rpe.toFixed(1)})`;
+};
+
 const lines = (text: string | null | undefined, max: number): string[] => {
   if (text === null || text === undefined || text.trim().length === 0) return [];
   const split = text.split(/\r?\n|•/g).map((x) => x.replace(/^[-–—\s]+/, '').trim()).filter(Boolean);
@@ -1313,7 +1333,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                       <View style={{ gap: theme.space[3] }}>
                         <Text style={styles.currentLabel}>CURRENT · SET {Math.min(slot.plannedSets, currentLogged + 1)} OF {slot.plannedSets}</Text>
                         <Text style={styles.movementName}>{movement?.name ?? 'Movement'}</Text>
-                        <Text style={styles.targetLine}>Target {targetText(slot)}{slot.targetRpe === null ? '' : ` · RPE ${slot.targetRpe.toFixed(1)}`}</Text>
+                        <Text style={styles.targetLine} testID="session-target-line">Target {targetText(slot)}{targetEffortText(slot)}</Text>
                         <Text
                           style={styles.loadEvidence}
                           testID="session-load-source-line"
