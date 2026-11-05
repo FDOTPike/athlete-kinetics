@@ -125,6 +125,30 @@ describe('completion screen: "Something feels off" opens the Plan screen form', 
     expect(mockState.reportSubjective).toHaveBeenCalledWith('something odd', 2);
   });
 
+  test('a report the store does not take is kept on screen and said not to be sent', async () => {
+    mockState = baseState({ status: 'loading', reportSubjective: jest.fn(() => Promise.resolve()) });
+    render(<SessionScreen />);
+    fireEvent.press(screen.getByLabelText('Something feels off'));
+    fireEvent.changeText(screen.getByLabelText('Describe how your body feels today'), 'knee sore');
+    fireEvent.press(screen.getByLabelText('Severity 3 of 10'));
+    await act(async () => { fireEvent.press(screen.getByLabelText('Apply report')); });
+    expect(mockState.reportSubjective).not.toHaveBeenCalled();
+    expect(screen.getByTestId('completion-report-not-sent')).toHaveTextContent('Your report was not sent. It is still here, so you can try again.');
+    expect(screen.getByLabelText('Describe how your body feels today').props.value).toBe('knee sore');
+  });
+
+  test('a store call that fails keeps the typed report on screen', async () => {
+    mockState = baseState({ reportSubjective: jest.fn(() => Promise.reject(new Error('database closed'))) });
+    render(<SessionScreen />);
+    fireEvent.press(screen.getByLabelText('Something feels off'));
+    fireEvent.changeText(screen.getByLabelText('Describe how your body feels today'), 'knee sore');
+    fireEvent.press(screen.getByLabelText('Severity 3 of 10'));
+    await act(async () => { fireEvent.press(screen.getByLabelText('Apply report')); });
+    expect(mockState.reportSubjective).toHaveBeenCalledWith('knee sore', 3);
+    expect(screen.getByTestId('completion-report-not-sent')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Describe how your body feels today').props.value).toBe('knee sore');
+  });
+
   test('closing the form returns to the completion screen without sending anything', () => {
     mockState = baseState();
     render(<SessionScreen />);

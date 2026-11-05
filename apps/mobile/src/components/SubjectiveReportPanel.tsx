@@ -47,17 +47,19 @@ export function SubjectiveReportPanel({
   const [reportText, setReportText] = useState('');
   const [reportSeverity, setReportSeverity] = useState<number | null>(null);
   const [applied, setApplied] = useState(false);
+  const [notSent, setNotSent] = useState(false);
   const halted = lastTriage !== null && lastTriage.kind === 'matched' && lastTriage.directive.halt;
 
   const apply = (): void => {
     if (reportSeverity === null) return;
+    setNotSent(false);
     // The text is cleared only once the store has taken the report. A failure
-    // keeps it on screen, so nothing typed is lost.
+    // keeps it on screen and says so, so nothing typed is lost.
     onApply(reportText, reportSeverity).then(() => {
       setReportText('');
       setReportSeverity(null);
       setApplied(true);
-    }, () => { /* the text stays for another try */ });
+    }, () => { setNotSent(true); });
   };
 
   const haltCard = halted && lastTriage !== null && lastTriage.kind === 'matched' ? (
@@ -124,6 +126,11 @@ export function SubjectiveReportPanel({
         accessibilityLabel={triaging ? 'Checking report' : 'Apply report'}
         testID="completion-report-apply"
       />
+      {notSent && (
+        <Text style={styles.caption} accessibilityRole="alert" testID="completion-report-not-sent">
+          Your report was not sent. It is still here, so you can try again.
+        </Text>
+      )}
 
       {applied && lastTriage !== null && lastTriage.kind === 'positive' && (
         <View style={styles.result}>
