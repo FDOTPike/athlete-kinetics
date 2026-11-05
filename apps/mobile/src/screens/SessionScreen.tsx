@@ -23,6 +23,7 @@ import {
 import { PreparationPanel } from '../components/PreparationPanel';
 import { MovementPreview } from '../components/movementPreview/MovementPreview';
 import { SessionFeelPanel, describeSessionFeel } from '../components/SessionFeelPanel';
+import { operativeReportLine } from '../state/operativeReportLine';
 
 
 type SessionMode = 'guided' | 'self_directed';
@@ -1106,6 +1107,12 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
           {!halted && (!complete || Boolean(runner?.skippedSessionPlanSlotIds.length)) && (
             <Text style={styles.headerMeta}>
               {sessionPlan.length === 0 ? 'No movements are planned yet.' : exercisesCompleteText}
+            </Text>
+          )}
+          {/* #186: name the report shaping today and the change it applied. */}
+          {!halted && state.prescription?.report != null && state.prescription.forDate === session.date && (
+            <Text style={styles.headerMeta} testID="session-report-line">
+              {operativeReportLine(state.prescription.report)}
             </Text>
           )}
           {preparation !== null && preparation.sessionId === session.sessionId && (

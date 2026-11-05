@@ -56,6 +56,7 @@ import { classifyReadiness, HALT_META, HeldScreenWithHalt } from './ReadinessScr
 import { autopilotReasonCopy } from '../state/autopilotCopy';
 import { PrimaryButton, QuietAction, Disclosure, ListRow } from '../components/ui';
 import { sessionFocusName } from '../state/sessionSummary';
+import { operativeReportLine } from '../state/operativeReportLine';
 
 export interface TodayScreenProps {
   /** Shell-supplied: go to the live session surface. */
@@ -121,6 +122,7 @@ function AvailableTodayScreen({
     return false;
   }, [storeFreeFormStartIsEmpty]);
 
+  const todaysReport = prescription != null && prescription.forDate === today ? prescription.report ?? null : null;
   const todaysVector = prescription != null && prescription.forDate === today
     ? prescription.vector
     : null;
@@ -485,6 +487,11 @@ function AvailableTodayScreen({
       }
     >
       {workoutCard()}
+
+      {/* #186: name the report shaping today and the change it applied. */}
+      {todaysReport != null && !halted && (
+        <Text style={styles.caption} testID="today-report-line">{operativeReportLine(todaysReport)}</Text>
+      )}
 
       {/* Walk W3-1b: a pause was visible only on Plan. Today now says so,
           and points to the same card to resume. */}

@@ -38,6 +38,7 @@ import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { appliedAdjustmentLines, autopilotReasonCopy } from '../state/autopilotCopy';
 import { EMPTY_ACTIVITY_LEDGER } from '../state/activityStore';
 import { sessionFocusName } from '../state/sessionSummary';
+import { operativeReportLine } from '../state/operativeReportLine';
 import {
   PrimaryButton,
   SecondaryButton,
@@ -755,6 +756,10 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
         <Text style={styles.bodyText}>{todayMessage}</Text>
         {current !== null && !halted && (todayPlan !== null || session !== null) && isPrescriptionReduced(current.vector, profile) && (
           <Text style={styles.adjustedText}>Coach adjusted today's plan.</Text>
+        )}
+        {/* #186: name the report shaping today and the change it applied. */}
+        {current !== null && !halted && current.report != null && (
+          <Text style={styles.adjustedText} testID="plan-report-line">{operativeReportLine(current.report)}</Text>
         )}
 
         <View style={styles.cardActionRow}>

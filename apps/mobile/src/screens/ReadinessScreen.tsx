@@ -12,6 +12,7 @@ import { useStore } from '../state/useStore';
 import TrainingSupportNotice from '../components/TrainingSupportNotice';
 import { theme } from '../theme/theme';
 import { sessionFocusName } from '../state/sessionSummary';
+import { operativeReportLine } from '../state/operativeReportLine';
 import {
   PrimaryButton,
   SecondaryButton,
@@ -147,6 +148,7 @@ function AvailableReadinessScreen({
   const session = useStore((s) => s.session);
   const todayPlan = useStore((s) => s.todayPlan);
   const lastTriage = useStore((s) => s.lastTriage);
+  const prescription = useStore((s) => s.prescription);
   const uiPreferences = useStore((s) => s.uiPreferences);
   const boot = useStore((s) => s.boot);
   const refreshVector = useStore((s) => s.refreshVector);
@@ -278,7 +280,16 @@ function AvailableReadinessScreen({
   }
 
   const athleteState = classifyReadiness(vector);
-  const meta = halted ? HALT_META : STATE_META[athleteState];
+  // #186: a report shaping today is named with the change it applied, and
+  // READY no longer says the signals support the planned work.
+  const todaysReport = !halted && prescription != null && prescription.forDate === today
+    ? prescription.report ?? null : null;
+  const stateMeta = STATE_META[athleteState];
+  const meta = halted
+    ? HALT_META
+    : todaysReport !== null && athleteState === 'OPTIMAL'
+      ? { ...stateMeta, explanation: 'Your recovery signals are good, but a report you saved today changed the plan.' }
+      : stateMeta;
   const isRestDay = todayPlan === null && !halted && !hasLiveSession;
 
   const primaryLabel = halted
@@ -438,6 +449,9 @@ function AvailableReadinessScreen({
         </View>
         <Text style={styles.title}>{meta.title}</Text>
         <Text style={styles.body}>{meta.recommendation}</Text>
+        {todaysReport !== null && (
+          <Text style={styles.caption} testID="readiness-report-line">{operativeReportLine(todaysReport)}</Text>
+        )}
         {hasLiveSession && <Text style={styles.caption}>Your active workout is ready to resume.</Text>}
         {!hasLiveSession && todayPlan !== null && (
           <Text style={styles.caption}>{formatFocus(todayPlan.focus)} session planned today.</Text>
