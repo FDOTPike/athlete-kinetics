@@ -764,10 +764,12 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                 onPress={program == null ? openManageBlock : () => setEditingProgram(true)}
                 accessibilityLabel={program == null ? 'Manage current block' : 'Manage future program preferences'}
               />
+              {/* #172: with an active program this changes future blocks only;
+                  the current block stays. Without a program it plans a new block. */}
               <SecondaryButton
-                label="Plan a new block"
-                onPress={() => setShowChooser(true)}
-                accessibilityLabel="Plan a new block"
+                label={program == null ? 'Plan a new block' : 'Change future blocks'}
+                onPress={program == null ? () => setShowChooser(true) : () => setEditingProgram(true)}
+                accessibilityLabel={program == null ? 'Plan a new block' : 'Change future blocks'}
               />
             </>
           )}
@@ -1185,7 +1187,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
         >
         <Disclosure
           label="Manage block"
-          hint={block === null ? 'Choose a structure for your first block' : 'Block settings and regeneration'}
+          hint={block === null ? 'Start your first block' : 'Block settings and regeneration'}
           open={manageOpen}
           onOpenChange={setManageOpen}
         >
@@ -1207,6 +1209,10 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                 Coach inserted a deload week before the peak because fatigue was high.
               </Text>
             )}
+            {/* #171: with no block, "Start a new block" opens the chooser and
+                never reads a loading structure, so the chips are not shown. */}
+            {block !== null && (
+            <>
             <Text style={styles.schemaLabel}>Choose a loading structure</Text>
             <View style={styles.schemaRow}>
               {SELECTABLE_SCHEMA_TYPES.map((type) => {
@@ -1227,6 +1233,8 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                 );
               })}
             </View>
+            </>
+            )}
 
             {!confirmRegenerate ? (
               <PrimaryButton

@@ -223,6 +223,18 @@ test('COACH keeps the trajectory compact and expands a session only when its day
   expect(screen.getByText('Choose a loading structure')).toBeOnTheScreen();
 });
 
+// #171: with no block there is nothing for a loading structure to apply to,
+// and "Start a new block" never reads the chips, so they are not shown.
+test('Manage block shows no loading-structure chips when there is no block (#171)', () => {
+  mockState = baseState({ block: null, blockMeta: null, blockSessions: [], program: null });
+  render(<BlockScreen />);
+  // Manage block starts open when there is no block.
+  expect(screen.getByText('Coach will build from your objective, equipment, and weekly frequency.')).toBeOnTheScreen();
+  expect(screen.queryByText('Choose a loading structure')).toBeNull();
+  expect(screen.queryByText('Choose a structure for your first block')).toBeNull();
+  expect(screen.queryByLabelText('Linear loading structure')).toBeNull();
+});
+
 describe('Plan session starts navigate only after the store creates a session', () => {
   test('a refused planned start stays on Plan, exposes the store error, and never navigates', () => {
     const onSessionStarted = jest.fn();
@@ -699,7 +711,7 @@ test('READY hides return check-in card when dismissed or absent', () => {
 });
 
 describe('BlockScreen - Chooser Entry (Work Order E)', () => {
-  test('renders Plan a new block action when a block IS active and opens chooser', () => {
+  test('with an active program the button reads "Change future blocks" and says the current block stays (#172)', () => {
     mockState = baseState({
       block: { blockId: 1, startDate: '2026-07-01', objective: 'strength', createdAtMs: 1 },
       program: {
@@ -708,7 +720,25 @@ describe('BlockScreen - Chooser Entry (Work Order E)', () => {
         currentSequenceIndex: 1,
         plannedBlockCount: 2,
         plannedEndDate: '2026-08-26',
+        days: [{ dayIndex: 1, focus: 'lower' }, { dayIndex: 2, focus: 'upper' }],
+        movementPreferences: [],
       },
+    });
+
+    render(<BlockScreen />);
+
+    expect(screen.queryByText('Plan a new block')).toBeNull();
+    fireEvent.press(screen.getByText('Change future blocks'));
+    // It opens the program's future preferences directly, never a "Start a new block" chooser.
+    expect(screen.queryByText('Auto')).toBeNull();
+    expect(screen.getByText('MANAGE PROGRAM')).toBeOnTheScreen();
+    expect(screen.getByText('Your current block stays as it is. These choices apply to future blocks.')).toBeOnTheScreen();
+  });
+
+  test('renders Plan a new block action when a standalone block IS active and opens chooser', () => {
+    mockState = baseState({
+      block: { blockId: 1, startDate: '2026-07-01', objective: 'strength', createdAtMs: 1 },
+      program: null,
     });
 
     render(<BlockScreen />);
