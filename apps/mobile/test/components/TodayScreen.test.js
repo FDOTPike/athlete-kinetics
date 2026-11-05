@@ -17,7 +17,8 @@
  *    exactly the bug.
  */
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { Alert } from 'react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import TodayScreen from '../../src/screens/TodayScreen';
 import {
   deriveTodayState,
@@ -590,10 +591,42 @@ describe('F5: Today opens the workout only after a session actually exists', () 
     });
     mockState.startSession = jest.fn(() => { mockState.error = 'Refused.'; });
     const onOpenSession = jest.fn();
-    render(<TodayScreen onOpenSession={onOpenSession} />);
-    fireEvent.press(screen.getByTestId('today-stopped-extra'));
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    try {
+      render(<TodayScreen onOpenSession={onOpenSession} />);
+      fireEvent.press(screen.getByTestId('today-stopped-extra'));
+      act(() => { alert.mock.calls[0][2].find((button) => button.text === 'Start').onPress(); });
+    } finally {
+      alert.mockRestore();
+    }
     expect(onOpenSession).not.toHaveBeenCalled();
     expect(screen.getByText('Refused.')).toBeOnTheScreen();
+  });
+});
+
+// #165 (walk I-15): an extra session started on one tap of a text link.
+describe('an extra session asks first', () => {
+  test.each([
+    ['completed_today', { blockSessions: [blockSession({ sessionDate: TODAY, completionStatus: 'complete' })] }, 'today-extra-session'],
+    ['stopped_today', { blockSessions: [blockSession({ sessionDate: TODAY, completionStatus: 'halted' })] }, 'today-stopped-extra'],
+  ])('on %s, "Start an extra session?" with Start and Not now; nothing starts before Start', (_label, overrides, controlTestId) => {
+    mockState = baseState(overrides);
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    try {
+      render(<TodayScreen />);
+      fireEvent.press(screen.getByTestId(controlTestId));
+      expect(mockState.startSession).not.toHaveBeenCalled();
+      expect(alert).toHaveBeenCalledTimes(1);
+      const [title, , buttons] = alert.mock.calls[0];
+      expect(title).toBe('Start an extra session?');
+      expect(buttons.map((button) => button.text)).toEqual(['Not now', 'Start']);
+      buttons[0].onPress?.();
+      expect(mockState.startSession).not.toHaveBeenCalled();
+      act(() => { buttons[1].onPress(); });
+      expect(mockState.startSession).toHaveBeenCalledTimes(1);
+    } finally {
+      alert.mockRestore();
+    }
   });
 });
 

@@ -38,7 +38,7 @@
  * is still a claim.
  */
 import React, { useMemo } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { applyPrescriptionToSlot } from '@ak/inference';
 import { useStore, freeFormStartIsEmpty } from '../state/useStore';
 import { useNavigation } from '../navigation/navigation';
@@ -178,10 +178,25 @@ function AvailableTodayScreen({
     }
     startAndOpen();
   }, [checkFreeFormStartIsEmpty, startAndOpen]);
+  // #165 (walk I-15): an extra session after today's is one tap on a text
+  // link, so it asks first. An empty start still shows the plan-first card
+  // instead, without asking: nothing would start.
+  const confirmExtraSessionAndOpen = React.useCallback(() => {
+    if (checkFreeFormStartIsEmpty()) {
+      setEmptyStartPromptOpen(true);
+      return;
+    }
+    Alert.alert('Start an extra session?', 'It is unplanned and is recorded as a session of its own.', [
+      { text: 'Not now', style: 'cancel' },
+      { text: 'Start', onPress: startAndOpen },
+    ]);
+  }, [checkFreeFormStartIsEmpty, startAndOpen]);
   const renderUnplannedStartControl = (control: {
     label: string;
     accessibilityLabel: string;
     testID: string;
+    /** An extra session after today's asks first (#165). */
+    confirmExtra?: boolean;
   }): React.JSX.Element => {
     if (emptyStartPromptOpen) {
       return (
@@ -210,7 +225,7 @@ function AvailableTodayScreen({
     return (
       <QuietAction
         label={control.label}
-        onPress={startUnplannedAndOpen}
+        onPress={control.confirmExtra === true ? confirmExtraSessionAndOpen : startUnplannedAndOpen}
         accessibilityLabel={control.accessibilityLabel}
         testID={control.testID}
       />
@@ -356,6 +371,7 @@ function AvailableTodayScreen({
               label: 'Start an extra unplanned session',
               accessibilityLabel: 'Start an extra unplanned session today',
               testID: 'today-stopped-extra',
+              confirmExtra: true,
             })}
           </View>
         );
@@ -376,6 +392,7 @@ function AvailableTodayScreen({
               label: 'Start an extra session',
               accessibilityLabel: 'Start an extra unplanned session today',
               testID: 'today-extra-session',
+              confirmExtra: true,
             })}
           </View>
         );

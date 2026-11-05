@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet } from 'react-native';
+import { Alert, StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { resolveLoadSelection as actualResolveLoadSelection } from '../../../../packages/inference/src/loadSelection';
 import { isDifficultyAllowed as actualIsDifficultyAllowed } from '../../../../packages/inference/src/tierPolicy';
@@ -972,10 +972,24 @@ test('thumbs-down delegates the durable Avoid plus substitution transition to th
   expect(mockState.openSubstitution).not.toHaveBeenCalled();
 });
 
-test('stop uses the runner’s valid manual halt reason', () => {
-  render(<SessionScreen />);
-  fireEvent.press(screen.getByLabelText('Stop this session'));
-  expect(mockState.runnerHalt).toHaveBeenCalledWith('manual');
+// #165: "Stop session" asks first; it stops only on Stop.
+test('stop asks "Stop this session?" first, then uses the runner’s valid manual halt reason', () => {
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  try {
+    render(<SessionScreen />);
+    fireEvent.press(screen.getByLabelText('Stop this session'));
+    expect(mockState.runnerHalt).not.toHaveBeenCalled();
+    expect(alert).toHaveBeenCalledTimes(1);
+    const [title, , buttons] = alert.mock.calls[0];
+    expect(title).toBe('Stop this session?');
+    expect(buttons.map((button) => button.text)).toEqual(['Keep going', 'Stop']);
+    buttons[0].onPress?.();
+    expect(mockState.runnerHalt).not.toHaveBeenCalled();
+    buttons[1].onPress();
+    expect(mockState.runnerHalt).toHaveBeenCalledWith('manual');
+  } finally {
+    alert.mockRestore();
+  }
 });
 
 test('a beginner never renders a legacy plan containing an advanced movement', () => {

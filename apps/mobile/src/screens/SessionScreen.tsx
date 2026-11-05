@@ -966,6 +966,15 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
     openSubstitution(currentMovement.movement_id);
   };
 
+  // #165: a manual "Stop session" asks first; Keep going changes nothing.
+  // An empty stopped session is still discarded by endSession, as before.
+  const confirmStopSession = (stop: () => void): void => {
+    Alert.alert('Stop this session?', 'Sets you have logged are kept.', [
+      { text: 'Keep going', style: 'cancel' },
+      { text: 'Stop', style: 'destructive', onPress: stop },
+    ]);
+  };
+
   const confirmSkipExercise = (): void => {
     if (runner?.phase !== 'working' || currentSlot === null) return;
     Alert.alert('Skip this exercise', 'Skip the remaining sets for this exercise? Sets already logged will be kept.', [
@@ -1033,7 +1042,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
             onBegin={beginPreparation}
             onRecordItem={recordPreparationItem}
             onFinish={finishPreparation}
-            onStopSession={() => { runnerHalt('manual'); endSession(); }}
+            onStopSession={() => confirmStopSession(() => { runnerHalt('manual'); endSession(); })}
           />
         </KeyboardAwareScrollView>
       </View>
@@ -1700,7 +1709,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                         <View style={{ marginTop: theme.space[3] }}>
                           <SecondaryButton
                             label="Stop session"
-                            onPress={() => runnerHalt('manual')}
+                            onPress={() => confirmStopSession(() => runnerHalt('manual'))}
                             accessibilityLabel="Stop this session"
                             fullWidth={true}
                           />

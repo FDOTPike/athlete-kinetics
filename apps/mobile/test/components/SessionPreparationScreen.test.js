@@ -8,6 +8,7 @@
  * extra work instead of hiding it.
  */
 import React from 'react';
+import { Alert } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { freeFormStartIsEmpty, useStore } from '../../src/state/useStore';
 import { authorizeAthleteDataBoot } from '../../src/state/dataMaintenanceLock';
@@ -114,7 +115,17 @@ test('stopping from the preparation screen ends the session without logging anyt
   startFromScreen();
   const sessionId = state().session.sessionId;
   press('preparation-begin');
-  press('preparation-stop-session');
+  // #165: Stop session asks first; nothing stops until Stop is chosen.
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  try {
+    press('preparation-stop-session');
+    expect(state().session).not.toBeNull();
+    const [title, , buttons] = alert.mock.calls[0];
+    expect(title).toBe('Stop this session?');
+    act(() => { buttons.find((button) => button.text === 'Stop').onPress(); });
+  } finally {
+    alert.mockRestore();
+  }
   expect(state().session).toBeNull();
   expect(count('SELECT COUNT(*) AS c FROM set_record')).toBe(0);
   // A manual stop with no sets is an empty session: it and its preparation are discarded together.
