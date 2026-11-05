@@ -518,7 +518,13 @@ export interface SportWorkloadEffect {
   readonly accessorySetCut: 0 | 1 | 2;
   /** The hardest week repeats the week before it instead of stepping up. */
   readonly holdHardestWeek: boolean;
+  /** The effect on the block being planned (program preview, plan text). */
   readonly explanation: string;
+  /**
+   * The same effect said of the NEXT block, in the future tense, for screens
+   * shown before any block is made from it (the profile sport panel, #176).
+   */
+  readonly nextBlockExplanation: string;
 }
 
 /**
@@ -536,18 +542,21 @@ export function sportWorkloadEffect(workload: SportWorkload): SportWorkloadEffec
         accessorySetCut: 2,
         holdHardestWeek: true,
         explanation: `${lead} That is a very full week, so each accessory exercise has two fewer sets, and week 3 of the block repeats week 2 instead of stepping up — for every exercise, your main lifts included. Your main lifts keep their exercises and their sets.`,
+        nextBlockExplanation: `${lead} That is a very full week, so your next block will have two fewer sets on each accessory exercise, and its week 3 will repeat week 2 instead of stepping up — for every exercise, your main lifts included. Your main lifts will keep their exercises and their sets.`,
       };
     case 'high':
       return {
         accessorySetCut: 1,
         holdHardestWeek: false,
         explanation: `${lead} To leave room for it, each accessory exercise has one fewer set. Your main lifts and the weekly progression are unchanged.`,
+        nextBlockExplanation: `${lead} To leave room for it, your next block will have one fewer set on each accessory exercise. Its main lifts and weekly progression will be unchanged.`,
       };
     case 'light':
       return {
         accessorySetCut: 0,
         holdHardestWeek: false,
         explanation: `${lead} That does not change the gym plan.`,
+        nextBlockExplanation: `${lead} That will not change your next block.`,
       };
     case 'none':
     default:
@@ -555,6 +564,7 @@ export function sportWorkloadEffect(workload: SportWorkload): SportWorkloadEffec
         accessorySetCut: 0,
         holdHardestWeek: false,
         explanation: `${lead} The gym plan is not adjusted for sport workload. Add your weekly sessions in Activities and the next block will take them into account.`,
+        nextBlockExplanation: `${lead} Your next block will not be adjusted for sport workload. Add your weekly sessions in Activities and the next block will take them into account.`,
       };
   }
 }

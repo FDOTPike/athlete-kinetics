@@ -889,6 +889,40 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     expect(selectedCount).toBe(1);
   });
 
+  // #176: changing the objective asks first and says what will change.
+  test('OBJECTIVE asks first, says what will change, and saves only on confirm', () => {
+    mockState = { ...mockState, block: { blockId: 1, startDate: '2026-07-01', objective: 'hybrid', createdAtMs: 1 }, program: null };
+    render(<ProfileScreen />);
+    fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: strength'));
+    expect(mockState.saveProfile).not.toHaveBeenCalled();
+    expect(screen.getByTestId('profile-objective-change-text').props.children)
+      .toBe('Change your objective from hybrid to strength? Your current block stays as it is. Your next block will be built for strength.');
+    fireEvent.press(screen.getByTestId('profile-objective-keep'));
+    expect(screen.queryByTestId('profile-objective-change-text')).toBeNull();
+    expect(mockState.saveProfile).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: weight loss'));
+    fireEvent.press(screen.getByTestId('profile-objective-confirm'));
+    expect(mockState.saveProfile).toHaveBeenCalledWith({ objective: 'weight_loss' });
+    expect(screen.queryByTestId('profile-objective-change-text')).toBeNull();
+  });
+
+  test('OBJECTIVE change with a program running says the program keeps its objective', () => {
+    mockState = {
+      ...mockState,
+      block: { blockId: 1, startDate: '2026-07-01', objective: 'hybrid', createdAtMs: 1 },
+      program: { programId: 1, objective: 'hybrid', status: 'active', currentSequenceIndex: 1, plannedBlockCount: 2, days: [], movementPreferences: [] },
+    };
+    render(<ProfileScreen />);
+    fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: hypertrophy'));
+    expect(screen.getByTestId('profile-objective-change-text').props.children)
+      .toBe('Change your objective from hybrid to hypertrophy? Your current block and the rest of your program stay hybrid. Hypertrophy is used when you build your next program.');
+    // Tapping the chip that is already selected asks nothing.
+    fireEvent.press(screen.getByTestId('profile-objective-keep'));
+    fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: hybrid'));
+    expect(screen.queryByTestId('profile-objective-change-text')).toBeNull();
+    expect(mockState.saveProfile).not.toHaveBeenCalled();
+  });
+
   test('TRAINING AGE ChipRow keeps shared semantics and disables every chip during a session', () => {
     mockState.session = { sessionId: 10, date: '2026-07-15', startedAtMs: Date.now(), sets: [] };
     const { getByRole } = render(<ProfileScreen />);

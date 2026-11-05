@@ -216,6 +216,16 @@ console.log('[3] scheduled sport workload');
       // The week-3 hold applies to every slot, so "unchanged" would be false here.
       && /for every exercise, your main lifts included\. Your main lifts keep their exercises and their sets\./.test(effect(5).explanation)
       && !/main lifts are unchanged/i.test(effect(5).explanation));
+  // #176: the profile panel shows the effect before any block is made, so it
+  // speaks of the NEXT block in the future tense, never of a plan that has
+  // already changed.
+  check('the next-block wording is future tense and says the same thing as the plan wording',
+    [0, 2, 3, 5].every((n) => /^Sport workload: /.test(effect(n).nextBlockExplanation))
+      && /your next block will have one fewer set on each accessory exercise\. Its main lifts and weekly progression will be unchanged\./.test(effect(3).nextBlockExplanation)
+      && /your next block will have two fewer sets on each accessory exercise, and its week 3 will repeat week 2 instead of stepping up/.test(effect(5).nextBlockExplanation)
+      && /That will not change your next block\./.test(effect(2).nextBlockExplanation)
+      && [0, 2, 3, 5].every((n) => !/ has (one|two) fewer set| are unchanged\.| does not change the gym plan/.test(effect(n).nextBlockExplanation))
+      && !/main lifts and weekly progression will be unchanged/i.test(effect(5).nextBlockExplanation));
   check('no cross-sport load score is computed: the workload carries sessions and minutes only',
     Object.keys(fromSchedule).sort().join(',') === 'description,knownMinutesPerWeek,sessionsPerWeek,source,tier,unknownDurationSessions,weekdays');
 }
