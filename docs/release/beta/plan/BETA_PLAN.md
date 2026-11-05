@@ -1,0 +1,65 @@
+# Closed Android beta plan — draft for owner approval
+
+Owner rulings, 27 October 2026: about twelve of the owner's own athletes; Android closed beta; owner coaches in Coach Mode; fourteen days; athlete hands over encrypted backups; no automatic upload; a flagged question box showing one card and retaining a local question log; beginner previews only as the owner signs them off; clinical reviewer receives the drafted brief before the start. These are settled scope, not proposed features.
+
+All additional operating choices below are **proposals** until the owner approves them. No training-policy threshold is approved by this plan.
+
+## Entry and readiness
+
+Include consenting adults already coached by the owner, able to use an Android phone and follow the handover and stop instructions. Exclude anyone with a current injury under treatment, anyone unable to give informed consent, and anyone whose clinical restrictions or symptoms make this training inappropriate. The owner checks suitability privately; the app is not medical clearance. Participation and withdrawal must not affect access to ordinary coaching.
+
+Before recruitment: enter the owner/contact details, dates, approved storage location and deletion date in the consent form; review privacy wording; name the clinical reviewer and deliver the existing symptom-handling brief. The brief predates October safety changes: send a current-code addendum showing systemic danger language takes precedence over a non-halting curated match (`origin/master:packages/inference/src/semantic/redFlag.ts:149`). Do not change symptom policy as part of this beta draft.
+
+Do not start until the joined candidate contains migrations 070 and 071, the October safety changes, and the separately implemented question flag/log. At the schema reference below, 071 is migration slot 71 but SQLite user version 70; do not confuse the two (`origin/master:packages/core-db/src/backup/schemaContract.ts:95`). Verify the exact candidate, not merely this reference. Owner approves each beginner preview before exposure. Record build hash, version, flags, preview sign-offs and each athlete's start/end date outside the public repository.
+
+## Consent and fourteen-day block
+
+Explain and sign [CONSENT_FORM.md](CONSENT_FORM.md) before installing. Walk through [ATHLETE_GUIDE.md](ATHLETE_GUIDE.md), including the all-athlete backup warning. The owner sets the athlete's ordinary coached program; participation does not require extra sessions, maximal lifts, pain provocation or a changed training tier.
+
+At setup, confirm the correct athlete and Coach Mode arrangement on each phone. Coach Mode is local athlete-file switching, not remote coach access (`apps/mobile/src/screens/ProfileScreen.tsx:206`, `apps/mobile/src/screens/ProfileScreen.tsx:1145`). Do not put other people's records on a participant's phone. The owner demonstrates set logging, effort answers, session feel, stopping and backup creation. Confirm that a practice backup can be authenticated on an isolated analysis installation before relying on later returns.
+
+During the block, each athlete logs every performed set accurately, answers effort honestly without changing effort to qualify for analysis, records skips, uses the session-feel panel and optional note, and uses the flagged question box for training questions. The box is not a monitored message to the coach. Contact the owner directly for coaching and all halts/injury concerns; do not wait for a backup review.
+
+**Proposed return schedule:** an initial readability check after setup, a backup at day 7, and a final backup at day 14 or withdrawal. This operationalizes the weekly return cadence in the source research; it does not add sessions. Owner arranges in-person USB/offline file handover, confirms receipt and successful authentication, and keeps earlier returns until the final snapshot is checked. Give the password separately in person; never put it in a filename, repository, chat, email or results log. Do not use automatic or cloud handover. Unreadable/lost-password returns are recorded as missing; do not fabricate their history.
+
+## Measures and schema map
+
+Schema/code citations prefixed `origin/master:` refer to commit `26f6557a793f1cafe9f609fb10e015cfc42d22b0`, read with `git show origin/master:<path>` on 27 October 2026. Other citations refer to this worktree. Line numbers point at the definition or relevant implementation. SQL and denominators are in [LOG_READING_PLAN.md](LOG_READING_PLAN.md).
+
+| Measure | Tables and columns; evidence |
+| --- | --- |
+| Prescribed versus performed work, per slot | `session_plan_slot.session_plan_slot_id, session_id, movement_id, planned_sets, planned_reps, target_rpe, provenance_kind, source_planned_slot_id`; `session_slot_target.target_kind, target_reps, target_seconds`; `set_target.set_id, session_plan_slot_id`; `set_record.set_id, session_id, movement_id, reps, load_kg, rpe, logged_at_ms`. Definitions: `origin/master:packages/core-db/src/schema/022_set_target.sql:39`, `origin/master:packages/core-db/src/schema/022_set_target.sql:79`, `origin/master:packages/core-db/src/schema/023_phase17_session_foundation.sql:59`, `origin/master:packages/core-db/src/schema/001_mechanical_input.sql:73`. |
+| Which slots were deliberately skipped | `session_skipped_slot.session_plan_slot_id`; compare `session_outcome.skipped_slot_count, missing_unskipped_set_count, finalized_at_ms, training_age, outcome_kind`. `origin/master:packages/core-db/src/schema/071_beta_recording.sql:43`; `origin/master:packages/core-db/src/schema/026_phase18_session_outcome.sql:48`. A missing skip row is not historical proof of no skip: no backfill (`origin/master:packages/core-db/src/schema/071_beta_recording.sql:18`). |
+| Entry load shown/source versus lifted load | `set_load_shown.set_id, load_source, shown_load_kg, advisory_kg, advisory_kind` versus `set_record.load_kg`. `origin/master:packages/core-db/src/schema/071_beta_recording.sql:47`. This is the draft's initial load seed, not every subsequent advisory; NULL means blank, zero means actual zero, and missing row means unrecorded (`origin/master:packages/core-db/src/schema/071_beta_recording.sql:30`). |
+| Effort response and strength-estimate repeatability | `set_record.rpe, reps, load_kg, movement_id, logged_at_ms` plus `session.session_date`; estimate only qualifying sets through `estimateOneRepMax`, including the existing RPE 6 floor (`origin/master:packages/inference/src/e1rm.ts:77`). Timed doses identified by `set_dose_target.target_kind` (`origin/master:packages/core-db/src/schema/026_phase18_session_outcome.sql:14`); do not treat duration as repetitions. |
+| Session feel and what athletes write | `session_feel.session_id, feel, reason_pain, reason_tired, reason_unwell, reason_technique, reason_equipment, reason_time, reason_felt_good, reason_other, recorded_at_ms`; `session_note.session_id, note, created_at_ms`. `origin/master:packages/core-db/src/schema/070_session_feel.sql:26`; `origin/master:packages/core-db/src/schema/009_periodization.sql:55`. Session-level reasons cannot explain each missed lift. |
+| Symptom routing observed | `subjective_report.report_id, date, reported_at_ms, raw_text, matched_entry_id, similarity, halt, load_modifier, set_modifier, rpe_cap`. `origin/master:packages/core-db/src/schema/005_subjective_report.sql:8`. These are records of routing, not diagnoses or proof of correctness. |
+| Questions and card shown | **Launch dependency:** local question log in the separately built flagged box. No verified table/column contract at this reference; do not invent one. Before start, record exact migration/path:line and fields for text, time, selected card/no-answer/referral and flag/build version, confirm encrypted-backup inclusion, and add its query to the reading plan. If absent, this measure is unavailable and the owner's intended beta scope is not ready. |
+| App adjustments as context | `planned_slot_autopilot.planned_slot_id, rpe_delta, set_delta, reason`, via frozen `session_plan_slot.source_planned_slot_id`. `origin/master:packages/core-db/src/schema/034_autopilot_attribution.sql:5`. This joins live attribution, not a guaranteed historical snapshot after plan deletion. |
+
+## Proposed success criteria and stop rules
+
+Proposed operational success: every participant has informed consent and receives coaching/contact instructions; returned backups authenticate; the final inventory identifies all participants and missing returns; the core measures above can be reconciled with the candidate schema; all halt/injury reports reach the owner the same day; any missing values and safety incidents appear explicitly in the analysis. Proposed usability success: each athlete can log work, resume an interrupted session and hand over a usable backup with the agreed assistance. Report counts and failures rather than inventing a statistical pass percentage. A small coached beta cannot establish clinical safety, efficacy or population thresholds.
+
+An athlete stops the session on an app halt, injury report or concerning symptoms, contacts the owner the same day, and follows appropriate professional/emergency care rather than waiting for an app answer. The owner records receipt, action and return-to-training decision in a private incident register, separate from optional app notes. A weekly backup cannot satisfy same-day notification. No request to keep testing through a halt.
+
+**Proposed whole-beta stop criteria:** suspend new training through the beta immediately for a serious injury plausibly linked to app guidance, unsafe continuation after a halt, another athlete's records appearing, loss/exposure of health data, inability to recover reliable logs, or inability to provide the promised same-day owner response. Pause also if the required clinical review raises an unresolved safety issue. The owner documents the incident, contacts affected athletes, obtains qualified review where appropriate, and expressly authorizes any restart. Record who stopped, when, scope, mitigation and decision; do not silently exclude incidents from results.
+
+Device release condition remains the ratified 536,870,912-byte (512 MiB) dirty-RAM ceiling; readings above 450,000,000 bytes require explicit review and physical evidence (`tools/memory-audit/memory_gate.mjs:60`). The validation script supplies observations, not release approval.
+
+## Proposed health-data handling agreement
+
+Backups include every athlete and health-support record on the phone, not a beta-only extract (`apps/mobile/src/components/BackupTransferPanel.tsx:35`). Consent must cover that scope. Do not collect a backup containing a non-consenting person's records: isolate beta use first; if impossible, resolve with the owner before export.
+
+Proposed storage: owner-controlled, access-restricted, encrypted local PC storage and an encrypted offline recovery copy; no synced folders, repository, shared drive or automatic upload. Owner fills the exact location and approved analysis environment before consent. Only the owner and the explicitly named, authorized analyst may read identifiable material. Automated analysis must execute locally under that access boundary; never attach raw backups, passwords, symptom text or identifiable extracts to an external agent/service. Give a clinical reviewer only the minimum separately agreed de-identified material. Keep the identity-code key and consent forms separate from the analysis files.
+
+Preserve the encrypted originals with a local receipt/hash register. Plaintext SQLite copies and temporary restores are equally sensitive. Work on disposable copies and delete them, derived row-level extracts, recovery copies and backups after analysis. **Proposed deadline: within 30 days of the owner's acceptance of the final analysis**, with a calendar deletion date communicated before consent; retain only aggregated, non-identifiable findings. Owner records deletion across PC, analysis device, offline copy and transfer media. Explain any separately required consent/incident record retention before signing; do not promise forensic erasure of flash storage. Withdrawal stops collection and removes identifiable beta copies where still separable; already anonymous aggregate findings cannot be traced back and removed.
+
+## Owner actions before start
+
+- Approve these proposals, dates, contact availability, consent and withdrawal arrangements; recruit suitable own athletes.
+- Name the clinical reviewer; send the brief plus current-code addendum; resolve launch-blocking feedback.
+- Confirm joined build, signed distribution path, device evidence, privacy/store work and install instructions.
+- Approve beginner previews; verify the question flag, schema, local persistence and encrypted-backup round trip.
+- Confirm the private storage/analysis environment, named analyst, identity register and deletion date; demonstrate restore using synthetic records.
+- Arrange weekly in-person handovers and same-day incident monitoring; schedule analysis and independent review of the three deferred decisions.
