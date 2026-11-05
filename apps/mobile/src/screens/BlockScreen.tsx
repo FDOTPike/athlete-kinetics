@@ -129,6 +129,22 @@ function targetLabel(slot: TodaySlot): string {
     : `${slot.sets} x ${slot.target.reps}`;
 }
 
+/** The slot's load from the athlete's 1RM (or its load override), with the
+ *  readiness modifier applied when one is given. Null for a timed slot or a
+ *  movement with no 1RM and no override. */
+function slotLoadKg(
+  slot: TodaySlot,
+  oneRepMaxes: Record<number, number>,
+  vector: AdjustmentVector | null = null,
+): number | null {
+  if (slot.target.kind === 'time') return null;
+  const oneRepMax = oneRepMaxes[slot.movementId];
+  const derivedLoad = oneRepMax !== undefined
+    ? applyLoadModifier(targetLoadKg(oneRepMax, slot.target.reps, slot.targetRpe), vector)
+    : null;
+  return slot.overrideLoadKg ?? derivedLoad;
+}
+
 function slotTarget(
   slot: TodaySlot,
   oneRepMaxes: Record<number, number>,
@@ -138,11 +154,7 @@ function slotTarget(
   if (effective.target.kind === 'time') {
     return `${targetLabel(effective)} at RPE ${effective.targetRpe.toFixed(1)}`;
   }
-  const oneRepMax = oneRepMaxes[effective.movementId];
-  const derivedLoad = oneRepMax !== undefined
-    ? applyLoadModifier(targetLoadKg(oneRepMax, effective.target.reps, effective.targetRpe), vector)
-    : null;
-  const load = effective.overrideLoadKg ?? derivedLoad;
+  const load = slotLoadKg(effective, oneRepMaxes, vector);
   return `${targetLabel(effective)} at RPE ${effective.targetRpe.toFixed(1)}${
     load === null ? '' : `, ${load.toFixed(1)} kg`
   }`;
@@ -958,27 +970,36 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                           ? ' - stopped'
                           : ''}
                     </Text>
-                    {detail.slots.map((slot) => (
-                      <View key={slot.slotIndex} style={styles.slotRow}>
-                        <View style={styles.slotMain}>
-                          <Text style={styles.slotName}>{slot.movementName}</Text>
-                          <View style={styles.slotDetails}>
-                            <Text style={styles.slotValue}>{targetLabel(slot)}</Text>
-                            <Text style={styles.slotTarget}>RPE {slot.targetRpe.toFixed(1)}</Text>
+                    {detail.slots.map((slot) => {
+                      // #214: the planned load, from the same calculation as
+                      // today's preview but without today's readiness
+                      // modifier, since that day's readiness is not known.
+                      const plannedLoad = slotLoadKg(slot, oneRepMaxes);
+                      return (
+                        <View key={slot.slotIndex} style={styles.slotRow}>
+                          <View style={styles.slotMain}>
+                            <Text style={styles.slotName}>{slot.movementName}</Text>
+                            <View style={styles.slotDetails}>
+                              <Text style={styles.slotValue}>{targetLabel(slot)}</Text>
+                              <Text style={styles.slotTarget}>RPE {slot.targetRpe.toFixed(1)}</Text>
+                              {plannedLoad !== null && (
+                                <Text style={styles.slotTarget}>about {plannedLoad.toFixed(1)} kg</Text>
+                              )}
+                            </View>
+                            <AutopilotAttribution
+                              slot={slot}
+                              expanded={attributionSlotId === slot.plannedSlotId}
+                              onPress={() => setAttributionSlotId((currentId) => currentId === slot.plannedSlotId ? null : slot.plannedSlotId)}
+                            />
                           </View>
-                          <AutopilotAttribution
-                            slot={slot}
-                            expanded={attributionSlotId === slot.plannedSlotId}
-                            onPress={() => setAttributionSlotId((currentId) => currentId === slot.plannedSlotId ? null : slot.plannedSlotId)}
-                          />
+                          {slot.overrideReason != null && slot.overrideReason.trim() !== '' && (
+                            <View style={styles.overrideBadge} accessibilityRole="text">
+                              <Text style={styles.overrideBadgeText}>{slot.overrideReason}</Text>
+                            </View>
+                          )}
                         </View>
-                        {slot.overrideReason != null && slot.overrideReason.trim() !== '' && (
-                          <View style={styles.overrideBadge} accessibilityRole="text">
-                            <Text style={styles.overrideBadgeText}>{slot.overrideReason}</Text>
-                          </View>
-                        )}
-                      </View>
-                    ))}
+                      );
+                    })}
                     <SecondaryButton label="Close session preview" onPress={() => setDetail(null)} accessibilityLabel="Close session preview" />
                   </View>
                 )}
@@ -1652,6 +1673,7 @@ const styles = StyleSheet.create({
   },
   slotDetails: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: theme.space[2],
   },
   slotValue: {
