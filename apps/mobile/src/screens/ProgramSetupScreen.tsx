@@ -817,6 +817,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
   },
-  showAll: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
+  showAll: { minHeight: 56, justifyContent: 'center', alignSelf: 'flex-start' },
   showAllText: { color: theme.color.textHi, fontSize: 13, fontWeight: '700', textDecorationLine: 'underline' },
 });

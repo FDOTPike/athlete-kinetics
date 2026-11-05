@@ -9,6 +9,7 @@
 import React from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react-native';
 import ProgramSetupScreen from '../../src/screens/ProgramSetupScreen';
+import { StyleSheet } from 'react-native';
 
 let mockState;
 
@@ -80,7 +81,8 @@ test('a long slot starts with the current choice and offers "Show all"', () => {
   const slot = openCustomize();
   const names = chipNames(slot);
   expect(names[0]).toBe(CURRENT_SQUAT.name);
-  expect(names.length).toBeLessThan(SQUATS.length);
+  // The current choice plus four alternatives.
+  expect(names).toHaveLength(5);
   expect(within(slot).getByText(`Show all (${SQUATS.length})`)).toBeOnTheScreen();
 });
 
@@ -96,4 +98,10 @@ test('"Show all" lists every candidate, and the choice still works', () => {
   expect(mockState.createTrainingProgram.mock.calls[0][0].movementPreferences).toEqual([
     { dayIndex: 1, slotIndex: 1, pattern: 'squat', movementId: SQUATS[7].movement_id },
   ]);
+});
+
+test('"Show all" has a touch target of at least 56 pt', () => {
+  const slot = openCustomize();
+  const control = within(slot).getByTestId('customize-slot-1-1-show-all');
+  expect(StyleSheet.flatten(control.props.style).minHeight).toBeGreaterThanOrEqual(56);
 });
