@@ -484,6 +484,10 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
               accessibilityLabel="Build a standalone routine template"
             />
           )}
+          {/* #225: a save made from here returns here, so confirm it here. */}
+          {routineActionMessage !== null && (
+            <Text style={styles.captionText}>{routineActionMessage}</Text>
+          )}
         </View>
       </View>
     );

@@ -221,3 +221,21 @@ test('#225: a save returns to Routine templates and shows "Saved: Heavy Upper"',
   expect(screen.getByRole('button', { name: 'Routine templates' }).props.accessibilityState).toMatchObject({ expanded: true });
   expect(screen.getByText('Saved: Heavy Upper')).toBeOnTheScreen();
 });
+
+test('#225 review: a save made before readiness exists still shows "Saved: Heavy Upper"', () => {
+  mockState = baseState({ vector: null });
+  renderPlan();
+  expect(screen.getByText('Readiness is needed first')).toBeOnTheScreen();
+  fireEvent.press(screen.getByLabelText('Build a standalone routine template'));
+  fireEvent.changeText(screen.getByLabelText('Routine template name'), 'Heavy Upper');
+  fireEvent.press(screen.getByLabelText('Select movement for day 1 slot 1'));
+  fireEvent.press(screen.getByText('Competition Bench'));
+  fireEvent.press(screen.getByLabelText('Select movement for day 1 slot 2'));
+  fireEvent.press(screen.getByText('Barbell Row'));
+  fireEvent.press(screen.getByLabelText('Remove day 1 slot 3'));
+  fireEvent.press(screen.getByLabelText('Save routine template'));
+
+  expect(mockState.saveRoutineTemplate).toHaveBeenCalledTimes(1);
+  expect(screen.getByText('Readiness is needed first')).toBeOnTheScreen();
+  expect(screen.getByText('Saved: Heavy Upper')).toBeOnTheScreen();
+});
