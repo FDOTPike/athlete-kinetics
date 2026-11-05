@@ -32,6 +32,7 @@ import { useNavigation, useSubViewBack } from '../navigation/navigation';
 import ProgramSetupScreen from './ProgramSetupScreen';
 import NewBlockChooserScreen from './NewBlockChooserScreen';
 import InfoTip from '../components/InfoTip';
+import { REPORT_NOT_SENT_TEXT } from '../components/SubjectiveReportPanel';
 import { EmphasisReportCard } from '../components/EmphasisReportCard';
 import { theme } from '../theme/theme';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
@@ -267,6 +268,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
 
   const [reportText, setReportText] = useState('');
   const [reportSeverity, setReportSeverity] = useState<number | null>(null);
+  const [reportNotSent, setReportNotSent] = useState(false);
   const [schema, setSchema] = useState<SchemaType>('LINEAR');
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [attributionSlotId, setAttributionSlotId] = useState<number | null>(null);
@@ -1385,13 +1387,22 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
               disabled={reportText.trim().length === 0 || reportSeverity === null || triaging}
               onPress={() => {
                 if (reportSeverity === null) return;
-                void reportSubjective(reportText, reportSeverity).then(() => {
+                setReportNotSent(false);
+                // The text and severity clear only once the store has stored the report.
+                // Anything else keeps them on screen and says so, so nothing typed is lost.
+                void reportSubjective(reportText, reportSeverity).then((stored) => {
+                  if (!stored) { setReportNotSent(true); return; }
                   setReportText('');
                   setReportSeverity(null);
-                });
+                }, () => { setReportNotSent(true); });
               }}
               accessibilityLabel={triaging ? 'Checking report' : 'Apply report'}
             />
+            {reportNotSent && (
+              <Text style={styles.captionText} accessibilityRole="alert" testID="plan-report-not-sent">
+                {REPORT_NOT_SENT_TEXT}
+              </Text>
+            )}
 
             {lastTriage !== null && lastTriage.kind === 'positive' && (
               <View style={styles.reportResult}>

@@ -22,6 +22,9 @@ import { theme } from '../theme/theme';
 import { Chip, PrimaryButton, SecondaryButton } from './ui';
 import KeyboardAwareScrollView from './KeyboardAwareScrollView';
 
+/** Shown on both report forms (completion screen and Plan screen) when the store did not take the report. */
+export const REPORT_NOT_SENT_TEXT = 'Your report was not sent. It is still here, so you can try again.';
+
 export interface SubjectiveReportPanelProps {
   /** False when there is no readiness vector: the form is replaced by the gate. */
   hasVector: boolean;
@@ -138,7 +141,7 @@ export function SubjectiveReportPanel({
       />
       {notSent && (
         <Text style={styles.caption} accessibilityRole="alert" testID="completion-report-not-sent">
-          Your report was not sent. It is still here, so you can try again.
+          {REPORT_NOT_SENT_TEXT}
         </Text>
       )}
 
