@@ -4,7 +4,7 @@
  * Coaching information is arranged around one immediate decision, a compact
  * four-week trajectory (liquid calendar), and inline disclosures for management and context.
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import TrainingSupportNotice from '../components/TrainingSupportNotice';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
@@ -32,6 +32,7 @@ import { useNavigation, useSubViewBack } from '../navigation/navigation';
 import ProgramSetupScreen from './ProgramSetupScreen';
 import NewBlockChooserScreen from './NewBlockChooserScreen';
 import InfoTip from '../components/InfoTip';
+import { blockWeekTotals, phaseCardText } from '../state/blockWeekChanges';
 import { EmphasisReportCard } from '../components/EmphasisReportCard';
 import { theme } from '../theme/theme';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
@@ -417,6 +418,14 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
       setConfirmRoutineAction(null);
     }
   };
+
+  // #169: what this block's plan does from week to week, from its own slots.
+  const weekTotals = useMemo(() => (block === null || typeof loadSessionSlots !== 'function' ? [] : blockWeekTotals(
+    blockSessions.flatMap((summary) => loadSessionSlots(summary.plannedSessionId).map((slot) => ({
+      week: summary.weekIndex, phase: summary.phase, sets: slot.sets, targetRpe: slot.targetRpe,
+    }))),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  )), [block, blockSessions]);
 
   if (showChooser) {
     return (
@@ -891,7 +900,9 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                         <Text style={styles.weekTitle}>Week {row.week}</Text>
                         <View style={styles.weekPhaseRow}>
                           <Text style={styles.weekPhase}>{phaseLabel(row.phase)}</Text>
-                          {showPhaseTip && <InfoTip term={phaseTerm} />}
+                          {showPhaseTip && (
+                            <InfoTip term={phaseTerm} body={phaseCardText(weekTotals, row.phase, phaseLabel(row.phase))} />
+                          )}
                         </View>
                       </View>
                       <View testID={`trajectory-days-week-${row.week}`} style={styles.dayRail}>
