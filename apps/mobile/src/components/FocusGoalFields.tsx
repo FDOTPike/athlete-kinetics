@@ -448,7 +448,7 @@ export function GoalEditor({ fields, onChange, today, trainingAge, showAllErrors
       />
       {fieldError('targetValue', fields.targetText.length > 0)}
 
-      <Text style={styles.label}>WHY DOES THIS MATTER TO YOU?</Text>
+      <Text style={styles.label}>WHY DOES THIS MATTER TO YOU? (REQUIRED)</Text>
       <TextInput
         disableFullscreenUI
         style={styles.input}
