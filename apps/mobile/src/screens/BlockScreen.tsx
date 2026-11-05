@@ -182,6 +182,15 @@ function AutopilotAttribution({
   );
 }
 
+/** #227: a planned day before today with no finalized outcome. Same rule as
+ *  Today's overdue count (`missedSessions` in todayState): a stopped session
+ *  was attempted, so only a `null` status counts. Display only; the plan is
+ *  never moved or changed. */
+const isMissedSession = (
+  summary: Pick<BlockSessionSummary, 'sessionDate' | 'completionStatus'>,
+  today: string,
+): boolean => summary.completionStatus === null && summary.sessionDate < today;
+
 function weekRowsFor(sessions: readonly BlockSessionSummary[]): WeekRow[] {
   return [1, 2, 3, 4].map((week) => {
     const inWeek = sessions.filter((session) => session.weekIndex === week);
@@ -902,6 +911,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                         );
                       }
                       const isExpanded = detail?.summary.plannedSessionId === cell.plannedSessionId;
+                      const isMissed = isMissedSession(cell, today);
                       return (
                         <Pressable
                           key={cell.plannedSessionId}
@@ -912,13 +922,16 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                               ? ', completed'
                               : cell.completionStatus === 'halted'
                                 ? ', stopped'
-                                : ''
+                                : isMissed
+                                  ? ', not done'
+                                  : ''
                           }`}
                           accessibilityState={{ expanded: isExpanded, selected: isToday }}
                           testID={isToday ? 'today-marker' : undefined}
                           style={({ pressed }) => [
                             styles.dayMark,
                             cell.completionStatus !== null && styles.dayMarkFinalized,
+                            isMissed && styles.dayMarkMissed,
                             isToday && styles.dayMarkToday,
                             isExpanded && styles.dayMarkExpanded,
                             pressed && styles.dayMarkPressed,
@@ -928,6 +941,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                             style={[
                               styles.dayMarkText,
                               cell.completionStatus !== null && styles.dayMarkTextFinalized,
+                              isMissed && styles.dayMarkTextMissed,
                               isToday && styles.dayMarkTextToday,
                             ]}
                             numberOfLines={1}
@@ -938,9 +952,11 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                               ? 'Done'
                               : cell.completionStatus === 'halted'
                                 ? 'Stopped'
-                                : isToday
-                                  ? 'Today'
-                                  : focusLabel(cell.focus)}
+                                : isMissed
+                                  ? 'Missed'
+                                  : isToday
+                                    ? 'Today'
+                                    : focusLabel(cell.focus)}
                           </Text>
                         </Pressable>
                       );
@@ -956,7 +972,9 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                         ? ' - completed'
                         : detail.summary.completionStatus === 'halted'
                           ? ' - stopped'
-                          : ''}
+                          : isMissedSession(detail.summary, today)
+                            ? ' - not done'
+                            : ''}
                     </Text>
                     {detail.slots.map((slot) => (
                       <View key={slot.slotIndex} style={styles.slotRow}>
@@ -1590,6 +1608,11 @@ const styles = StyleSheet.create({
     borderColor: theme.color.line,
     backgroundColor: theme.color.ink1,
   },
+  dayMarkMissed: {
+    borderColor: theme.color.textLow,
+    borderStyle: 'dashed',
+    backgroundColor: 'transparent',
+  },
   dayMarkToday: {
     borderColor: theme.color.chalk,
     borderLeftWidth: 4,
@@ -1607,6 +1630,9 @@ const styles = StyleSheet.create({
   },
   dayMarkTextFinalized: {
     color: theme.color.textHi,
+  },
+  dayMarkTextMissed: {
+    color: theme.color.textLow,
   },
   dayMarkTextToday: {
     color: theme.color.chalk,
