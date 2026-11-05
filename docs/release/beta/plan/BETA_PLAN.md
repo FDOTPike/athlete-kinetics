@@ -16,7 +16,7 @@ Do not start until the joined candidate contains migrations 070 and 071, the Oct
 
 Explain and sign [CONSENT_FORM.md](CONSENT_FORM.md) before installing. Walk through [ATHLETE_GUIDE.md](ATHLETE_GUIDE.md), including the all-athlete backup warning. The owner sets the athlete's ordinary coached program; participation does not require extra sessions, maximal lifts, pain provocation or a changed training tier.
 
-At setup, confirm the correct athlete and Coach Mode arrangement on each phone. Coach Mode is local athlete-file switching, not remote coach access (`apps/mobile/src/screens/ProfileScreen.tsx:206`, `apps/mobile/src/screens/ProfileScreen.tsx:1145`). Do not put other people's records on a participant's phone. The owner demonstrates set logging, effort answers, session feel, stopping and backup creation. Confirm that a practice backup can be authenticated on an isolated analysis installation before relying on later returns.
+At setup, confirm the correct athlete and Coach Mode arrangement on each phone. Coach Mode is local athlete-file switching, not remote coach access (`apps/mobile/src/screens/ProfileScreen.tsx:209`, `apps/mobile/src/screens/ProfileScreen.tsx:1266`). Do not put other people's records on a participant's phone. The owner demonstrates set logging, effort answers, session feel, stopping and backup creation. Confirm that a practice backup can be authenticated on an isolated analysis installation before relying on later returns.
 
 During the block, each athlete logs every performed set accurately, answers effort honestly without changing effort to qualify for analysis, records skips, uses the session-feel panel and optional note, and uses the flagged question box for training questions. The box is not a monitored message to the coach. Contact the owner directly for coaching and all halts/injury concerns; do not wait for a backup review.
 
@@ -45,7 +45,7 @@ An athlete stops the session on an app halt, injury report or concerning symptom
 
 **Proposed whole-beta stop criteria:** suspend new training through the beta immediately for a serious injury plausibly linked to app guidance, unsafe continuation after a halt, another athlete's records appearing, loss/exposure of health data, inability to recover reliable logs, or inability to provide the promised same-day owner response. Pause also if the required clinical review raises an unresolved safety issue. The owner documents the incident, contacts affected athletes, obtains qualified review where appropriate, and expressly authorizes any restart. Record who stopped, when, scope, mitigation and decision; do not silently exclude incidents from results.
 
-Device release condition remains the ratified 536,870,912-byte (512 MiB) dirty-RAM ceiling; readings above 450,000,000 bytes require explicit review and physical evidence (`tools/memory-audit/memory_gate.mjs:60`). The validation script supplies observations, not release approval.
+Device release condition remains the ratified 536,870,912-byte (512 MiB) dirty-RAM ceiling; readings above 450,000,000 bytes require explicit review and physical evidence (`tools/memory-audit/memory_gate.mjs:56-57`). The validation script supplies observations, not release approval.
 
 ## Proposed health-data handling agreement
 

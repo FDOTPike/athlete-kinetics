@@ -10,7 +10,7 @@ import { RATIFIED_CEILING_BYTES, PREFERRED_TARGET_BYTES } from '../memory-audit/
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const harness = join(root, 'tools/memory-audit/meminfo_harness.mjs');
-const pkg = 'com.pikemethods.training.qa'; // apps/mobile/android/app/build.gradle:162-166.
+const pkg = 'com.pikemethods.training.qa'; // apps/mobile/android/app/build.gradle:180-184.
 export function memoryBand(bytes) {
   if (!Number.isFinite(bytes) || bytes < 0) return 'NOT MEASURED';
   if (bytes > RATIFIED_CEILING_BYTES) return 'BLOCK RELEASE';

@@ -5,12 +5,13 @@ import subprocess
 from unittest.mock import patch
 
 pinned = '26f6557a793f1cafe9f609fb10e015cfc42d22b0'
+beta = 'ee6dd8c49a642ec69396300c17d72480e3cadb41'
 check_output = subprocess.check_output
 reads = []
 
 def pinned_read(args, **kwargs):
     assert args[:2] == ['git', 'show'], args
-    assert args[2].startswith(pinned + ':'), 'reference reads must use the documented commit'
+    assert args[2].startswith(pinned + ':') or args[2] == beta + ':packages/core-db/src/schema/072_question_log.sql', 'reference reads must use the documented commit'
     reads.append(args[2])
     return check_output(args, **kwargs)
 

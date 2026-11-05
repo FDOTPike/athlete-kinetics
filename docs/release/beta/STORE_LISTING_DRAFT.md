@@ -27,4 +27,4 @@ pikeMethods provides training guidance, is not a medical device and does not dia
 
 **Icon brief:** A simple, distinctive movement or training symbol on a dark, solid field; no text, medical symbols or third-party marks. Keep the foreground within the 66dp central safe zone on the 108dp adaptive icon grid. Two editable candidates are in `icon/`; verify legibility at launcher size.
 
-**Feature evidence:** `apps/mobile/src/screens/OnboardingScreen.tsx:1`; `apps/mobile/src/screens/SessionScreen.tsx:1`; `apps/mobile/src/screens/ProgressScreen.tsx:1`; `apps/mobile/src/state/biometricsCopy.ts:63`; `apps/mobile/src/state/useStore.ts:802`; `apps/mobile/src/state/backupStore.ts:1021`
+**Feature evidence:** `apps/mobile/src/screens/OnboardingScreen.tsx:1`; `apps/mobile/src/screens/SessionScreen.tsx:1`; `apps/mobile/src/screens/ProgressScreen.tsx:1`; `apps/mobile/src/state/biometricsCopy.ts:63`; `apps/mobile/src/state/useStore.ts:863`; `apps/mobile/src/state/backupStore.ts:1031`

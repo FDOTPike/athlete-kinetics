@@ -4,7 +4,7 @@ Use only the approved private local environment in the signed consent. Do not at
 
 ## Reference and receipt
 
-All `origin/master:` citations below are at `26f6557a793f1cafe9f609fb10e015cfc42d22b0`. The backup schema reference ends at migration slot 71 / user version 70 (`origin/master:packages/core-db/src/backup/schemaContract.ts:95`). A joined release may add migrations: verify its actual contract, keep its exact source revision, and use a reader supporting that contract. An older backup may authenticate but cannot recreate facts never recorded.
+All `origin/master:` citations below are at `26f6557a793f1cafe9f609fb10e015cfc42d22b0`; unprefixed citations are at the beta branch's code revision `ee6dd8c49a642ec69396300c17d72480e3cadb41`. On the beta branch the backup schema reference ends at migration slot 73 / user version 72 (`packages/core-db/src/backup/schemaContract.ts:112-119`); at `origin/master` it ends at slot 71 / user version 70 (`origin/master:packages/core-db/src/backup/schemaContract.ts:95`). A joined release may add migrations: verify its actual contract, keep its exact source revision, and use a reader supporting that contract. An older backup may authenticate but cannot recreate facts never recorded.
 
 Owner records participant code, consent version, agreed date window, receipt time, file SHA-256, build, backup ID and creation time, schema slot/version and included athlete inventory. Keep names/passwords in a separate private register. Quarantine unconsented extra athletes; do not silently include their records. Confirm readability after the proposed setup/day-7/final handovers. These snapshots overlap: choose the latest authenticated final snapshot per athlete for the main analysis; do not concatenate weekly copies. Use earlier snapshots only to investigate loss/edits and identify withdrawn/deleted records explicitly. Keys are `(participant code, athlete identity, session_id/set_id)`, never bare numeric IDs across databases.
 
@@ -174,9 +174,18 @@ ORDER BY p.session_id, p.slot_index;
 
 Treat unmatched attribution as unavailable context if the original plan no longer exists. This does not reconstruct a frozen adjustment history.
 
-### Question log — explicit pre-start dependency
+### Question log
 
-The reference schema does not supply a verified question-log contract. Do not write a plausible table/query and call it implemented. Before recruitment, the separate feature owner must provide exact table/column paths and lines, persisted question text/time and selected card/no-answer/referral fields, flag/build identity, and encrypted backup round-trip evidence. Add a bound-window SELECT against that verified schema, inventory missing text/response rows and confirm only one shown card per response. Until then this query and the question measure are **NOT VERIFIED**. Ask the owner to label de-identified questions blind to the selected response; keep the new real-question evaluation set separate from previously seen questions.
+Source: `packages/core-db/src/schema/072_question_log.sql:2-10`. Migration 072 postdates the `origin/master` reference, so the verifier reads it at `ee6dd8c49a642ec69396300c17d72480e3cadb41`. The app writes one row per question with `asked_at = Date.now()` (`apps/mobile/src/state/useStore.ts:8237`, `apps/mobile/src/state/useStore.ts:8253`), and only in beta builds (`apps/mobile/src/config/features.ts:8`). The backup contract covers the table: slot 72 at `packages/core-db/src/backup/schemaContract.ts:104-110`, slot 73 at `:112-119`. The backup contract test inserts a row at `packages/core-db/test/backup/verify_backup_contract.mjs:146`.
+
+```sql
+SELECT asked_at, question_text, outcome_kind, glossary_term_id
+FROM question_log
+WHERE asked_at >= :start_ms AND asked_at < :end_ms
+ORDER BY asked_at;
+```
+
+Still open before recruitment: inventory missing question-text and missing-response rows, and confirm that each response shows at most one card. Encrypted backup round-trip evidence for this table is not yet recorded. Ask the owner to label de-identified questions blind to the selected response; keep the new real-question evaluation set separate from previously seen questions.
 
 ## The three deferred decisions this evidence informs
 
