@@ -7291,7 +7291,6 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const loggedAtMs = Date.now();
     const id = `${loggedAtMs}-${niggleSeq++}-${Math.floor(Math.random() * 1e9).toString(36)}`;
     const state = get();
-    const current = state.runner === null ? null : currentRunnerSlot(state.runner);
     const nextRunner = state.runner === null
       ? null
       : advanceSessionRunner(state.runner, { kind: 'NIGGLE', atMs: loggedAtMs, severity: safe });
@@ -7334,18 +7333,11 @@ export const useStore = create<KineticsStore>()((set, get) => {
       ...(nextRunner !== null && nextRunner !== state.runner ? runnerSelection(nextRunner) : {}),
       ...preparationUpdate,
     });
-    // A qualifying (but not halt-level) niggle immediately offers a route
-    // around the movement. Halt-level reports block `logSet` at this boundary.
-    if (nextRunner !== null && nextRunner.phase === 'working' &&
-      nextRunner.substitutionOfferedForSessionPlanSlotId !== null && current !== null) {
-      // The report is already saved; a failure to open the sheet is shown, not
-      // turned into a failed save that a retry would duplicate.
-      try {
-        get().openSubstitution(current.movementId);
-      } catch (error) {
-        set({ error: error instanceof Error ? error.message : String(error) });
-      }
-    }
+    // A qualifying (but not halt-level) niggle offers a route around the
+    // movement: the runner records the offer (substitutionOfferedFor...).
+    // #182: the sheet is NOT opened here. The screen first confirms that the
+    // report was saved, and only then opens the sheet. Halt-level reports
+    // block `logSet` at this boundary.
     return true;
   },
   refreshNiggles: () => {

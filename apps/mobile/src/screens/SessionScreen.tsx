@@ -990,18 +990,50 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
     const after = typeof useStore.getState === 'function' ? useStore.getState() : state;
     const afterHalted = after?.runner?.phase === 'halted'
       || (after?.runner?.phase !== 'complete' && after?.lastTriage?.kind === 'matched' && after.lastTriage.directive.halt);
-    const afterSubstitutionOpened = after?.substitution !== null && after?.substitution !== undefined;
-    setNiggleSavedNotice(!afterHalted && !afterSubstitutionOpened);
+    setNiggleSavedNotice(!afterHalted);
+    // #182: a report confirms it was saved before any sheet opens. The store
+    // records the offer of alternatives; the sheet opens only once the
+    // athlete has seen the confirmation.
+    const offeredSlotId = afterHalted ? null : after?.runner?.substitutionOfferedForSessionPlanSlotId ?? null;
+    const offeredMovementId = offeredSlotId === null
+      ? undefined
+      : (after?.sessionPlan ?? sessionPlan).find((planSlot) => planSlot.sessionPlanSlotId === offeredSlotId)?.movementId;
+    if (offeredMovementId !== undefined) {
+      Alert.alert('Report saved', 'Report saved with this session. Next, you can choose an alternative for this exercise.', [
+        { text: 'OK', onPress: () => openSubstitution(offeredMovementId) },
+      ]);
+    }
   };
 
   const setup = lines(currentMovement?.instructions, 4);
   const cues = lines(currentMovement?.cues, 3);
   const supportsBands = currentMovement?.supportedPrefixes?.includes('Banded') === true && bandLadder.length > 0;
-  const runnerNext = runner === null ? null : nextRunnerWork(runner);
+  // #182 (walk A-11): "Next up" never points at a slot a report holds back;
+  // it names the next slot that can be performed, in the runner's order.
+  const heldByReport = (sessionPlanSlotId: number): boolean => {
+    const planSlot = sessionPlan.find((candidate) => candidate.sessionPlanSlotId === sessionPlanSlotId);
+    return planSlot !== undefined && availabilityMap.get(planSlot.movementId)?.reasons.includes('safety') === true;
+  };
+  const runnerNextRaw = runner === null ? null : nextRunnerWork(runner);
+  const runnerNext = runner === null || runnerNextRaw === null || !heldByReport(runnerNextRaw.slot.sessionPlanSlotId)
+    ? runnerNextRaw
+    : (() => {
+      const skippedIds = new Set(runner.skippedSessionPlanSlotIds);
+      for (let offset = 1; offset <= runner.slots.length; offset += 1) {
+        const index = (runner.slotIndex + offset) % runner.slots.length;
+        const candidate = runner.slots[index];
+        const done = runner.slotSetCounts[index] ?? 0;
+        if (candidate === undefined || skippedIds.has(candidate.sessionPlanSlotId) || done >= candidate.sets) continue;
+        if (heldByReport(candidate.sessionPlanSlotId)) continue;
+        return { slot: candidate, setIndex: done + 1 };
+      }
+      return null;
+    })();
   const upcomingSlot = runnerNext !== null
     ? sessionPlan.find((slot) => slot.sessionPlanSlotId === runnerNext.slot.sessionPlanSlotId) ?? null
+    : runner !== null && runnerNextRaw !== null ? null
     : currentSlot === null ? firstIncomplete
-      : sessionPlan.slice(Math.max(0, sessionPlan.findIndex((slot) => slot.sessionPlanSlotId === currentSlot.sessionPlanSlotId) + 1)).find((slot) => loggedCount(slot) < slot.plannedSets) ?? null;
+      : sessionPlan.slice(Math.max(0, sessionPlan.findIndex((slot) => slot.sessionPlanSlotId === currentSlot.sessionPlanSlotId) + 1)).find((slot) => loggedCount(slot) < slot.plannedSets && !heldByReport(slot.sessionPlanSlotId)) ?? null;
   const upcomingText = runnerNext !== null && upcomingSlot !== null
     ? `${byId.get(upcomingSlot.movementId)?.name ?? 'Movement'} · set ${runnerNext.setIndex} of ${runnerNext.slot.sets}`
     : upcomingSlot !== null
@@ -1314,13 +1346,16 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                         <Text style={styles.currentLabel}>CURRENT · SET {Math.min(slot.plannedSets, currentLogged + 1)} OF {slot.plannedSets}</Text>
                         <Text style={styles.movementName}>{movement?.name ?? 'Movement'}</Text>
                         <Text style={styles.targetLine}>Target {targetText(slot)}{slot.targetRpe === null ? '' : ` · RPE ${slot.targetRpe.toFixed(1)}`}</Text>
-                        <Text
-                          style={styles.loadEvidence}
-                          testID="session-load-source-line"
-                          accessibilityLabel={`Load source. ${loadEvidence}`}
-                        >
-                          {loadEvidence}
-                        </Text>
+                        {/* #182: no "pick a weight" on a slot a report holds back. */}
+                        {!heldByReport(slot.sessionPlanSlotId) && (
+                          <Text
+                            style={styles.loadEvidence}
+                            testID="session-load-source-line"
+                            accessibilityLabel={`Load source. ${loadEvidence}`}
+                          >
+                            {loadEvidence}
+                          </Text>
+                        )}
                         {loadInvalid && (
                           <Text
                             style={styles.loadEvidence}
@@ -1692,7 +1727,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                             </View>
                           </View>
                         )}
-                        {!safetyOpen && niggleSavedNotice && substitution === null && !halted && (
+                        {!safetyOpen && niggleSavedNotice && !halted && (
                           <Text style={styles.loadEvidence}>Report saved with this session.</Text>
                         )}
 
