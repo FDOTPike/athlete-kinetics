@@ -285,6 +285,21 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
     kind: 'use' | 'delete'; routineTemplateId: number; routineDayIndex?: number;
   } | null>(null);
   const [routineActionMessage, setRoutineActionMessage] = useState<string | null>(null);
+  const [routineTemplatesOpen, setRoutineTemplatesOpen] = useState(false);
+  // After a save the screen remounts below the builder; scroll to Routine
+  // templates once both the section and the marker inside it have laid out.
+  const optionalDetailsY = useRef(0);
+  const routineTemplatesOffsetY = useRef(0);
+  const routineTemplatesScrollPending = useRef(0);
+  const routineTemplatesLaidOut = (): void => {
+    if (routineTemplatesScrollPending.current === 0) return;
+    routineTemplatesScrollPending.current -= 1;
+    if (routineTemplatesScrollPending.current > 0) return;
+    scrollRef.current?.scrollTo({
+      y: Math.max(0, optionalDetailsY.current + routineTemplatesOffsetY.current - theme.space[4]),
+      animated: true,
+    });
+  };
   const [blockArchivedNotice, setBlockArchivedNotice] = useState<string | null>(null);
   const [awaitingSessionStart, setAwaitingSessionStart] = useState(false);
   const [sessionStartError, setSessionStartError] = useState<string | null>(null);
@@ -422,7 +437,15 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
     return (
       <RoutineTemplateBuilder
         initialTemplate={editingTemplate === 'new' ? null : editingTemplate}
-        onSaved={() => setEditingTemplate(null)}
+        onSaved={(saved) => {
+          // #225: back to the Routine templates section, open, with the
+          // confirmation where the saved routine is listed.
+          setEditingTemplate(null);
+          setRoutineActionMessage(`Saved: ${saved.name}`);
+          setBlockArchivedNotice(null);
+          setRoutineTemplatesOpen(true);
+          routineTemplatesScrollPending.current = 2;
+        }}
         onCancel={() => setEditingTemplate(null)}
       />
     );
@@ -1013,7 +1036,13 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
       )}
 
       {/* Disclosures Section */}
-      <View style={styles.section}>
+      <View
+        style={styles.section}
+        onLayout={(event) => {
+          optionalDetailsY.current = event.nativeEvent.layout.y;
+          routineTemplatesLaidOut();
+        }}
+      >
         <Text style={styles.sectionTitle}>Optional details</Text>
         <Disclosure label="Why today changed" hint="Adjustment source and limits">
           {current === null ? (
@@ -1111,11 +1140,20 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           </Disclosure>
         )}
 
+        <View
+          style={styles.layoutMarker}
+          onLayout={(event) => {
+            routineTemplatesOffsetY.current = event.nativeEvent.layout.y;
+            routineTemplatesLaidOut();
+          }}
+        />
         <Disclosure
           label="Routine templates"
           hint={profile.training_age === 'beginner'
             ? 'Stored templates can be deleted; use and editing unlock later'
             : 'Create, edit, and freeze custom routine templates'}
+          open={routineTemplatesOpen}
+          onOpenChange={setRoutineTemplatesOpen}
         >
           <View style={styles.disclosureContent}>
             {routineTemplates.length === 0 ? (
@@ -1522,6 +1560,10 @@ const styles = StyleSheet.create({
   },
   section: {
     gap: theme.space[3],
+  },
+  /** Zero-height position marker inside a `section`; cancels the gap it adds. */
+  layoutMarker: {
+    marginBottom: -theme.space[3],
   },
   sectionTitle: {
     ...theme.font.eyebrow,
