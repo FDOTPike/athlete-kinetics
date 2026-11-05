@@ -10,6 +10,7 @@ jest.mock('@ak/inference', () => {
   const actual = jest.requireActual('@ak/inference');
   const actualTierPolicy = jest.requireActual('../../../../packages/inference/src/tierPolicy');
   return {
+    effectiveRpeCeiling: actual.effectiveRpeCeiling,
     JOINTS: ['shoulder', 'knee'],
     nextUp: jest.fn(() => null),
     targetLoadKg: actual.targetLoadKg,

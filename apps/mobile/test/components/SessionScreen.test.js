@@ -37,6 +37,7 @@ jest.mock('@ak/inference', () => {
     mapRirToRpe: actual.mapRirToRpe,
     RIR_CHOICES: actual.RIR_CHOICES,
     RIR_OPTIONS: actual.RIR_OPTIONS,
+    effectiveRpeCeiling: actual.effectiveRpeCeiling,
   };
 });
 const resolveLoadSelectionSpy = jest.fn((input) => actualResolveLoadSelection(input));
@@ -548,6 +549,45 @@ test('WO-02 labels athlete-reported RPE as Effort with the exact scale explanati
   expect(screen.getByLabelText('Effort —')).toBeOnTheScreen();
   expect(screen.getByRole('button', { name: 'Effort 8.5' })).toBeOnTheScreen();
   expect(screen.queryByText('Actual RPE')).toBeNull();
+});
+
+// Issue #206: a set rated above the athlete's effort ceiling gets one plain
+// note on the set card; logging and the plan are unchanged.
+test('an effort above the ceiling shows one note; at or below it shows none', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', objective: 'strength', base_rpe_cap: 8.5, equipment_inventory: [], session_duration_cap_min: 60 },
+  });
+  render(<SessionScreen />);
+  const note = 'That was above your ceiling of 8.5. Next set, stop with 2 reps left.';
+  expect(screen.queryByText(note)).toBeNull();
+  fireEvent.press(screen.getByLabelText(/^0 clean reps? left/i));
+  expect(screen.getByTestId('effort-above-ceiling-note')).toHaveTextContent(note);
+  fireEvent.press(screen.getByLabelText(/^2 clean reps? left/i));
+  expect(screen.queryByTestId('effort-above-ceiling-note')).toBeNull();
+  fireEvent.press(screen.getByRole('button', { name: 'Enter Effort directly' }));
+  fireEvent.press(screen.getByRole('button', { name: 'Effort 8.5' }));
+  expect(screen.queryByTestId('effort-above-ceiling-note')).toBeNull();
+  fireEvent.press(screen.getByRole('button', { name: 'Effort 9.0' }));
+  expect(screen.getByTestId('effort-above-ceiling-note')).toHaveTextContent(note);
+  // Logging is unchanged: the rated effort is saved as chosen.
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(mockState.logSet.mock.calls[0][3]).toBe(9);
+});
+
+test('a beginner ceiling is the lower beginner ceiling, and a rehab ceiling of 7 asks for 3 reps left', () => {
+  mockState = state({
+    profile: { training_age: 'beginner', objective: 'strength', base_rpe_cap: 9.5, equipment_inventory: [], session_duration_cap_min: 60 },
+  });
+  const { unmount } = render(<SessionScreen />);
+  fireEvent.press(screen.getByLabelText(/^1 clean reps? left/i));
+  expect(screen.getByTestId('effort-above-ceiling-note')).toHaveTextContent('That was above your ceiling of 8.5. Next set, stop with 2 reps left.');
+  unmount();
+  mockState = state({
+    profile: { training_age: 'intermediate', objective: 'rehab', base_rpe_cap: 9, equipment_inventory: [], session_duration_cap_min: 60 },
+  });
+  render(<SessionScreen />);
+  fireEvent.press(screen.getByLabelText(/^2 clean reps? left/i));
+  expect(screen.getByTestId('effort-above-ceiling-note')).toHaveTextContent('That was above your ceiling of 7.0. Next set, stop with 3 reps left.');
 });
 
 // ---------------------------------------------------------------------------

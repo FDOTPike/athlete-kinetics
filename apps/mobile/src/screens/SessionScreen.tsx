@@ -1,7 +1,7 @@
 /** Phase 17 utility-first active-session surface. */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING_NOTE, EFFORT_STOP_GUIDANCE, effortCue, mapRirToRpe, RIR_OPTIONS, PREPARATION_STATUS_LABEL, isTerminalPreparationStatus, preparationDoseUnit, type EffortAnswer, type RunnerHaltReason } from '@ak/inference';
+import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING_NOTE, EFFORT_STOP_GUIDANCE, effortCue, effectiveRpeCeiling, mapRirToRpe, RIR_OPTIONS, PREPARATION_STATUS_LABEL, isTerminalPreparationStatus, preparationDoseUnit, type EffortAnswer, type RunnerHaltReason } from '@ak/inference';
 import { EXPERIENCE_SEVERITY, runnerTierForTrainingAge } from '../../../../packages/inference/src/sessionRunner';
 import { formatTeachingOnlyReason, freeFormStartIsEmpty, useStore, type LoadSelection, type LoggedSet, type SetLoadShown, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
 import { useNavigation, useSubViewBack } from '../navigation/navigation';
@@ -141,6 +141,17 @@ const loadCopyFor = (
       : `Based on your ${oneRmKg?.toFixed(1)} kg 1RM`;
   }
   return loadSourceCopy(sel, bodyweightMode, oneRmKg, timedTarget);
+};
+
+/** One plain line when a rated set went above the athlete's effort ceiling
+ *  (issue #206): a statement of fact and the reps to leave next time. It
+ *  changes nothing: logging, the next-set target and next-session easing are
+ *  untouched. Reps left is the whole number that keeps the set at or under
+ *  the ceiling (8.5 → 2, 7.0 → 3). */
+const aboveCeilingNote = (rpe: number | null, ceiling: number): string | null => {
+  if (rpe === null || !Number.isFinite(rpe) || !Number.isFinite(ceiling) || rpe <= ceiling) return null;
+  const repsLeft = Math.max(1, Math.ceil(10 - ceiling));
+  return `That was above your ceiling of ${ceiling.toFixed(1)}. Next set, stop with ${repsLeft} ${repsLeft === 1 ? 'rep' : 'reps'} left.`;
 };
 
 // Local rest when no runner owns the timer: the runner's RPE bands. Training
@@ -529,6 +540,8 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
     : directRpe !== null
       ? clamp(Math.round(directRpe * 2) / 2, 5, 10)
       : null;
+
+  const ceilingNote = aboveCeilingNote(safeRpe, effectiveRpeCeiling(profile));
 
   const runnerResting = runnerPhase === 'resting';
   const rest = runnerResting ? {
@@ -1541,6 +1554,11 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                               ? (effortCue(safeRpe) ?? 'Effort is optional evidence — leave it untouched to skip.')
                               : 'Effort is optional evidence — leave it untouched to skip.'}
                           </Text>
+                          {ceilingNote !== null && (
+                            <Text style={styles.effortCue} testID="effort-above-ceiling-note" accessibilityLiveRegion="polite">
+                              {ceilingNote}
+                            </Text>
+                          )}
                           <Text style={styles.effortCue}>{EFFORT_BREATHING_NOTE}</Text>
                           <Text style={styles.effortStop} testID="effort-stop-guidance">{EFFORT_STOP_GUIDANCE}</Text>
                           {/* With no rating, the cue above already says effort is
