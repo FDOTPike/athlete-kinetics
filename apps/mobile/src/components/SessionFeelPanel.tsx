@@ -65,13 +65,13 @@ const BODY_REASONS: readonly SessionFeelReason[] = ['pain', 'unwell'];
  * does change training: first the place they can use now, after a session (the
  * completion screen, SessionScreen), then the Plan screen (BlockScreen), and
  * then the one for next time. "Something feels off" is the label of both
- * controls; "Plan" is that tab's name; a test keeps them in step. Both need
- * today's readiness, as the Plan form does, so the sentence says so.
+ * controls; "Plan" is that tab's name; a test keeps them in step. This is the
+ * sentence used when readiness exists, so both forms are there; without it the
+ * no-plan-form sentence below is used.
  */
 export const SESSION_FEEL_RECORD_ONLY_TEXT =
   'This is a record only. It does not adjust your training. If something hurts or you feel unwell, '
-  + 'report it under "Something feels off" on the completion screen or on the Plan screen. '
-  + "Both need today's readiness first. "
+  + 'report it under "Something feels off" here or on the Plan screen. '
   + 'During a session, use "Report discomfort" on the lift.';
 
 /**

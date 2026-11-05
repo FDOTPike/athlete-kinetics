@@ -283,10 +283,10 @@ describe('SessionFeelPanel: an answer by tapping', () => {
   test('the places it names exist under those names, the one usable after a session comes first, and it gives no advice', () => {
     const source = (file) => fs.readFileSync(path.join(__dirname, '..', '..', 'src', file), 'utf8');
     expect(SESSION_FEEL_RECORD_ONLY_TEXT).toMatch(/^This is a record only\. It does not adjust your training\./);
-    // Both places named under "Something feels off" exist, and both need today's readiness,
-    // as the Plan form does: the sentence never points at a form that is absent without it.
-    expect(SESSION_FEEL_RECORD_ONLY_TEXT).toContain('"Something feels off" on the completion screen or on the Plan screen.');
-    expect(SESSION_FEEL_RECORD_ONLY_TEXT).toContain("Both need today's readiness first.");
+    // With readiness, both places named under "Something feels off" exist. Without it,
+    // the no-plan-form sentence is used instead (#263), so this one never names an absent form.
+    expect(SESSION_FEEL_RECORD_ONLY_TEXT).toContain('"Something feels off" here or on the Plan screen.');
+    expect(SESSION_FEEL_RECORD_ONLY_TEXT).not.toContain("Both need today's readiness first.");
     expect(source('screens/BlockScreen.tsx')).toContain('label="Something feels off"');
     expect(source('screens/SessionScreen.tsx')).toContain('label="Something feels off"');
     // "Plan" is the tab that shows the screen holding that control.

@@ -29,8 +29,11 @@ export interface SubjectiveReportPanelProps {
   lastTriage: TriageOutcome | null;
   /** True while the store is checking a report. */
   triaging: boolean;
-  /** Hands the text and severity to the store action. Rejects when it could not run. */
-  onApply: (text: string, severity: number) => Promise<void>;
+  /** False when semantic matching is unavailable in this build (the Plan form's caption). */
+  triageReady: boolean;
+  /** Hands the text and severity to the store action. Resolves true only when the report
+   *  is stored; false or a rejection means it was not sent, and the text stays. */
+  onApply: (text: string, severity: number) => Promise<boolean>;
   /** Back to the completion screen. */
   onClose: () => void;
 }
@@ -41,6 +44,7 @@ export function SubjectiveReportPanel({
   hasVector,
   lastTriage,
   triaging,
+  triageReady,
   onApply,
   onClose,
 }: SubjectiveReportPanelProps): React.JSX.Element {
@@ -53,9 +57,10 @@ export function SubjectiveReportPanel({
   const apply = (): void => {
     if (reportSeverity === null) return;
     setNotSent(false);
-    // The text is cleared only once the store has taken the report. A failure
+    // The text is cleared only once the store has stored the report. Anything else
     // keeps it on screen and says so, so nothing typed is lost.
-    onApply(reportText, reportSeverity).then(() => {
+    onApply(reportText, reportSeverity).then((stored) => {
+      if (!stored) { setNotSent(true); return; }
       setReportText('');
       setReportSeverity(null);
       setApplied(true);
@@ -94,6 +99,11 @@ export function SubjectiveReportPanel({
       {haltCard}
       <Text style={styles.title} accessibilityRole="header">Something feels off</Text>
       <Text style={styles.caption}>Add a subjective report only when you need Coach to adapt</Text>
+      {!triageReady && (
+        <Text style={styles.caption}>
+          Semantic matching is unavailable in this build. Injury-language safety checks still apply.
+        </Text>
+      )}
       <TextInput
         disableFullscreenUI
         style={styles.input}
@@ -146,7 +156,7 @@ export function SubjectiveReportPanel({
           </Text>
         </View>
       )}
-      {applied && lastTriage !== null && lastTriage.kind === 'matched' && (
+      {applied && lastTriage !== null && lastTriage.kind === 'matched' && !lastTriage.directive.halt && (
         <View style={styles.result}>
           <Text style={styles.badge}>{lastTriage.directive.halt ? 'Stop training today' : 'Plan adjusted'}</Text>
           <Text style={styles.bodyText}>{lastTriage.directive.vector.coaching_cue}</Text>

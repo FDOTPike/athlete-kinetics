@@ -658,12 +658,10 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
           hasVector={vector !== null}
           lastTriage={lastTriage ?? null}
           triaging={state.triaging ?? false}
+          triageReady={state.triageReady ?? false}
           onApply={(text, severity) => {
-            // The store returns without a word when it is not ready. Reject instead,
-            // so the form keeps the report and says it was not sent.
-            if (typeof state.reportSubjective !== 'function' || state.status !== 'ready') {
-              return Promise.reject(new Error('Coach is not ready'));
-            }
+            // Resolves true only when the store stored the report; the form keeps the text otherwise.
+            if (typeof state.reportSubjective !== 'function') return Promise.resolve(false);
             return state.reportSubjective(text, severity);
           }}
           onClose={() => setReportOpen(false)}

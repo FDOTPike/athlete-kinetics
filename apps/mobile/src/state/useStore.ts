@@ -1100,7 +1100,10 @@ interface KineticsStore {
   setGoalMovement: (goalId: string, movementId: number | null) => boolean;
   /** Triage a free-text complaint with a forced 1-10 severity (Phase 12 Step
    *  5). The severity gates the matched guardrail by training age. */
-  reportSubjective: (text: string, severity: number) => Promise<void>;
+  /** Resolves true only when the report is stored (a safety report included). False on
+   *  every early exit (not ready, no readiness vector, already checking, empty or over-long
+   *  text, data lock, athlete changed, storage error), so nothing was stored. */
+  reportSubjective: (text: string, severity: number) => Promise<boolean>;
   selectMovement: (movementId: number) => void;
   selectMovementSlot: (sessionPlanSlotId: number) => void;
   /** Advance an elapsed rest only when its persisted target has actually ended. */
@@ -8266,8 +8269,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const { vector, triaging } = get();
     const today = localToday();
     const raw = text.trim();
-    if (get().status !== 'ready' || vector === null || triaging) return;
-    if (raw.length === 0 || raw.length > 500) return;
+    if (get().status !== 'ready' || vector === null || triaging) return false;
+    if (raw.length === 0 || raw.length > 500) return false;
     // The report belongs to the athlete whose database is open NOW. The lease
     // keeps that database bound through the inference await (switch, create
     // and restore are refused until it settles), so a delayed safety report
@@ -8275,7 +8278,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const releaseLease = tryAcquireDataMutationLease();
     if (releaseLease === null) {
       set({ error: DATA_LOCKED_MESSAGE });
-      return;
+      return false;
     }
     const athleteId = get().activeAthleteId;
     const contextRevision = athleteContextRevision;
@@ -8299,7 +8302,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       if (athleteContextRevision !== contextRevision || get().activeAthleteId !== athleteId
         || dbAthleteId !== athleteId || db === null) {
         set({ error: 'Your report was not saved because the athlete changed while it was being checked. Please report it again.' });
-        return;
+        return false;
       }
       const resolved = resolveReport(raw, semantic);
       const d = getDb();
@@ -8316,7 +8319,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
         if (triageAfter === null || triageAfter.kind !== 'matched' || !triageAfter.directive.halt) {
           set({ lastTriage: { kind: 'rejected' } });
         }
-        return;
+        return true;
       }
       // Persist the routing outcome. The audit snapshot uses the SAME pure
       // derivation as the operative path (this entry alone on today's
@@ -8372,7 +8375,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       } catch (error) {
         try { d.executeSync('ROLLBACK'); } catch { /* safety report is atomic */ }
         set({ error: error instanceof Error ? error.message : String(error) });
-        return;
+        return false;
       }
       if (haltedRunner !== null && haltedRunner !== activeRunner) {
         set(runnerSelection(haltedRunner));
@@ -8390,6 +8393,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       if (get().lastTriage === null) {
         set({ lastTriage: { kind: 'positive', cue: resolved.entry.cue } });
       }
+      return true;
     } finally {
       set({ triaging: false });
       releaseLease();
