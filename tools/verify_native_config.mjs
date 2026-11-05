@@ -260,7 +260,9 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
   const heldNoticeNamesIssue = runner.includes('on hold::not run in CI (owner decision, issue #${held##*:})')
     && runner.includes('if [ "${#HELD_TESTS[@]}" -gt 0 ]; then');
   check('every UI test in the suite is run by CI or on hold with its own tracking issue, none skipped',
-    tests.length >= 4 && runTests.length >= 4 && heldEntries !== null
+    tests.length >= 4 && new Set(runTests).size >= 4 && heldEntries !== null
+      // No name listed twice, in one list or across both.
+      && new Set([...runTests, ...heldTests]).size === runTests.length + heldTests.length
       && tests.every((t) => runTests.includes(t) !== heldTests.includes(t))
       && [...runTests, ...heldTests].every((t) => tests.includes(t))
       && held.every((m) => m !== null)
