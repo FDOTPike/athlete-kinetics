@@ -183,3 +183,45 @@ describe('a record, not a decision', () => {
     expect(count('SELECT COUNT(*) AS c FROM session_feel')).toBe(0);
   });
 });
+
+// Issue #220 (074): separate lists, the newer reasons in a side-car, and a
+// reason required only for "harder". Still a record only.
+describe('074: the newer reasons and the optional easier reason', () => {
+  const extraRow = (sessionId) => raw().prepare('SELECT * FROM session_feel_extra_reason WHERE session_id = ?').get(sessionId);
+
+  test('"easier" saves with no reason, and with the newer reasons, which read back', () => {
+    const sessionId = finishOneSession();
+    const before = trainingFacts();
+    expect(state().saveSessionFeel({ feel: 'easier', reasons: [] }, '')).toBeNull();
+    expect(feelRow(sessionId)).toMatchObject({ feel: 'easier', reason_felt_good: 0, reason_other: 0 });
+    expect(extraRow(sessionId)).toBeUndefined();
+    expect(state().saveSessionFeel({ feel: 'easier', reasons: ['rested_well', 'too_light', 'felt_good'] }, '')).toBeNull();
+    expect(extraRow(sessionId)).toEqual({ session_id: sessionId, reason_too_heavy: 0, reason_too_light: 1, reason_rested_well: 1 });
+    expect(state().loadSessionFeel(sessionId).saved).toEqual({ feel: 'easier', reasons: ['felt_good', 'too_light', 'rested_well'] });
+    expect(trainingFacts()).toBe(before);
+  });
+
+  test('"harder" may name only a newer reason; correcting to "as planned" clears the side-car', () => {
+    const sessionId = finishOneSession();
+    expect(state().saveSessionFeel({ feel: 'harder', reasons: ['too_heavy'] }, '')).toBeNull();
+    expect(state().loadSessionFeel(sessionId).saved).toEqual({ feel: 'harder', reasons: ['too_heavy'] });
+    expect(state().saveSessionFeel({ feel: 'as_planned', reasons: ['too_heavy'] }, '')).toBeNull();
+    expect(extraRow(sessionId)).toBeUndefined();
+    expect(state().loadSessionFeel(sessionId).saved).toEqual({ feel: 'as_planned', reasons: [] });
+  });
+
+  test('"stopped early" saves with no reason', () => {
+    const sessionId = finishOneSession();
+    expect(state().saveSessionFeel({ feel: 'stopped_early', reasons: [] }, '')).toBeNull();
+    expect(state().loadSessionFeel(sessionId).saved).toEqual({ feel: 'stopped_early', reasons: [] });
+  });
+
+  test('reset clears the side-car with the answers', () => {
+    finishOneSession();
+    expect(state().saveSessionFeel({ feel: 'easier', reasons: ['too_light'] }, '')).toBeNull();
+    expect(count('SELECT COUNT(*) AS c FROM session_feel_extra_reason')).toBe(1);
+    state().resetTrainingData();
+    expect(count('SELECT COUNT(*) AS c FROM session_feel_extra_reason')).toBe(0);
+    expect(count('SELECT COUNT(*) AS c FROM session_feel')).toBe(0);
+  });
+});

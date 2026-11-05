@@ -3,7 +3,9 @@
  *
  * A record, not a decision. Saving changes no prescription, block or
  * progression. The athlete answers by tapping: one answer for how the session
- * went and, unless it went as planned, at least one reason from a closed list.
+ * went and, unless it went as planned, reasons from that answer's closed list
+ * (issue #220: harder and easier have their own lists, and only "harder"
+ * needs a reason).
  * The typed note is optional, is stored word for word, and is never
  * interpreted by this component or by anything it calls. The note starters
  * only put a few words into the note for the athlete to finish: they are a
@@ -26,7 +28,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   SESSION_FEEL_KINDS,
-  SESSION_FEEL_REASONS,
+  sessionFeelReasonRequired,
+  sessionFeelReasonsFor,
   type SessionFeelDraft,
   type SessionFeelKind,
   type SessionFeelProblem,
@@ -53,6 +56,9 @@ export const SESSION_FEEL_REASON_LABEL: Record<SessionFeelReason, string> = {
   time: 'Short on time',
   felt_good: 'Felt good',
   other: 'Something else',
+  too_heavy: 'Load too heavy',
+  too_light: 'Load too light',
+  rested_well: 'Rested well',
 };
 
 export const SESSION_FEEL_NOTE_MAX_LENGTH = 1000;
@@ -97,11 +103,13 @@ export function withNoteStarter(note: string, label: string): string {
   return next.length > SESSION_FEEL_NOTE_MAX_LENGTH ? note : next;
 }
 
-/** One line for the completion screen: "Harder than planned: unwell, short on time." */
+/** One line for the completion screen, two plain sentences (issue #220):
+ *  "Easier than planned. Felt good." or "Harder than planned. Unwell, short on time." */
 export function describeSessionFeel(record: SessionFeelRecord): string {
   const answer = SESSION_FEEL_LABEL[record.feel];
   if (record.reasons.length === 0) return `${answer}.`;
-  return `${answer}: ${record.reasons.map((reason) => SESSION_FEEL_REASON_LABEL[reason].toLowerCase()).join(', ')}.`;
+  const reasons = record.reasons.map((reason) => SESSION_FEEL_REASON_LABEL[reason].toLowerCase()).join(', ');
+  return `${answer}. ${reasons.charAt(0).toUpperCase()}${reasons.slice(1)}.`;
 }
 
 /** 'nothing_to_save': the answer was optional and neither an answer nor a note was given. */
@@ -109,7 +117,7 @@ export type SessionFeelSaveResult = SessionFeelProblem | 'not_saved' | 'nothing_
 
 const PROBLEM_TEXT: Record<Exclude<SessionFeelSaveResult, null>, string> = {
   feel_required: 'Choose how the session went.',
-  reason_required: 'Choose at least one reason.',
+  reason_required: 'Choose at least one reason it was harder.',
   unknown_value: 'This could not be saved. Your session is still recorded.',
   not_saved: 'This could not be saved. Your session is still recorded.',
   nothing_to_save: 'Type a note, or choose how the session went.',
@@ -170,7 +178,8 @@ export function SessionFeelPanel({ saved, note, answerOptional = false, onSave, 
   };
 
   const reasonsShown = feel !== null && feel !== 'as_planned';
-  const bodyReasonChosen = reasonsShown && reasons.some((reason) => BODY_REASONS.includes(reason));
+  const offeredReasons = feel === null ? [] : sessionFeelReasonsFor(feel);
+  const bodyReasonChosen = reasonsShown && reasons.some((reason) => BODY_REASONS.includes(reason) && offeredReasons.includes(reason));
   // The sentence is always there; this only decides whether it stands out.
   const aboutTheBody = bodyReasonChosen || bodyLineStarted;
   // A screen reader hears it at the moment a sighted athlete sees it change.
@@ -209,9 +218,13 @@ export function SessionFeelPanel({ saved, note, answerOptional = false, onSave, 
 
       {reasonsShown && (
         <View style={styles.group} testID="session-feel-reasons">
-          <Text style={styles.label}>Why? Choose any that apply.</Text>
+          <Text style={styles.label} testID="session-feel-reasons-label">
+            {feel !== null && sessionFeelReasonRequired(feel)
+              ? 'Why? Choose at least one.'
+              : 'Why? Optional. Choose any that apply.'}
+          </Text>
           <View style={styles.chipRow}>
-            {SESSION_FEEL_REASONS.map((reason) => (
+            {offeredReasons.map((reason) => (
               <Chip
                 key={reason}
                 label={SESSION_FEEL_REASON_LABEL[reason]}

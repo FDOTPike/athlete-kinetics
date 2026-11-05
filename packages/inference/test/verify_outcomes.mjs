@@ -252,10 +252,11 @@ check('session feel: mean drift uses only sets that carry both a rating and a ta
   assert.equal(feel.meanRpeDrift([{ rpe: Number.NaN, targetRpe: 7 }, { rpe: 8, targetRpe: 7 }]), 1);
 });
 
-check('session feel: an answer needs a choice, and any choice but "as planned" needs a reason', () => {
+check('session feel: an answer needs a choice, and only "harder" needs a reason (issue #220)', () => {
   assert.deepEqual(feel.validateSessionFeel({ feel: null, reasons: ['tired'] }), { ok: false, problem: 'feel_required' });
-  for (const kindOfFeel of ['harder', 'easier', 'stopped_early']) {
-    assert.deepEqual(feel.validateSessionFeel({ feel: kindOfFeel, reasons: [] }), { ok: false, problem: 'reason_required' });
+  assert.deepEqual(feel.validateSessionFeel({ feel: 'harder', reasons: [] }), { ok: false, problem: 'reason_required' });
+  for (const kindOfFeel of ['easier', 'stopped_early']) {
+    assert.deepEqual(feel.validateSessionFeel({ feel: kindOfFeel, reasons: [] }), { ok: true, record: { feel: kindOfFeel, reasons: [] } });
   }
   assert.deepEqual(feel.validateSessionFeel({ feel: 'harder', reasons: ['unwell', 'tired', 'tired'] }),
     { ok: true, record: { feel: 'harder', reasons: ['tired', 'unwell'] } });
@@ -268,18 +269,39 @@ check('session feel: "as planned" is saved with no reasons, whatever was tapped 
     { ok: true, record: { feel: 'as_planned', reasons: [] } });
 });
 
+check('session feel: harder and easier keep only the reasons of their own list (issue #220)', () => {
+  assert.deepEqual([...feel.SESSION_FEEL_HARDER_REASONS], ['pain', 'tired', 'unwell', 'technique', 'equipment', 'time', 'too_heavy', 'other']);
+  assert.deepEqual([...feel.SESSION_FEEL_EASIER_REASONS], ['felt_good', 'too_light', 'rested_well', 'other']);
+  assert.deepEqual(feel.validateSessionFeel({ feel: 'easier', reasons: ['rested_well', 'pain', 'too_light'] }),
+    { ok: true, record: { feel: 'easier', reasons: ['too_light', 'rested_well'] } });
+  // A harder answer whose only reason belongs to the easier list has no reason.
+  assert.deepEqual(feel.validateSessionFeel({ feel: 'harder', reasons: ['felt_good'] }), { ok: false, problem: 'reason_required' });
+  assert.deepEqual(feel.validateSessionFeel({ feel: 'harder', reasons: ['too_heavy', 'too_light'] }),
+    { ok: true, record: { feel: 'harder', reasons: ['too_heavy'] } });
+});
+
 check('session feel: a value outside the closed lists is refused', () => {
   assert.deepEqual(feel.validateSessionFeel({ feel: 'terrible', reasons: ['tired'] }), { ok: false, problem: 'unknown_value' });
   assert.deepEqual(feel.validateSessionFeel({ feel: 'harder', reasons: ['weather'] }), { ok: false, problem: 'unknown_value' });
 });
 
-check('session feel: the closed lists mirror the 070 schema exactly', () => {
+check('session feel: the closed lists mirror the 070 and 074 schema exactly', () => {
   const sql = readFileSync(new URL('../../core-db/src/schema/070_session_feel.sql', import.meta.url), 'utf8');
   const domain = /feel\s+TEXT NOT NULL CHECK \(feel IN \(([^)]+)\)\)/.exec(sql);
   assert.ok(domain, 'the feel CHECK domain was not found in 070');
   assert.deepEqual(domain[1].split(',').map((value) => value.trim().replace(/'/g, '')), [...feel.SESSION_FEEL_KINDS]);
-  const columns = [...sql.matchAll(/^\s+reason_([a-z_]+)\s+INTEGER NOT NULL DEFAULT 0 CHECK/gm)].map((match) => match[1]);
-  assert.deepEqual(columns, [...feel.SESSION_FEEL_REASONS]);
+  const reasonColumns = (text) => [...text.matchAll(/^\s+reason_([a-z_]+)\s+INTEGER NOT NULL DEFAULT 0 CHECK/gm)].map((match) => match[1]);
+  const sql074 = readFileSync(new URL('../../core-db/src/schema/074_session_feel_reasons.sql', import.meta.url), 'utf8');
+  // 074 rebuilds session_feel with the same columns and the same domain...
+  const rebuilt = /CREATE TABLE IF NOT EXISTS session_feel_074 \(([\s\S]*?)\) STRICT;/.exec(sql074);
+  assert.ok(rebuilt, 'the 074 rebuild of session_feel was not found');
+  assert.deepEqual(reasonColumns(rebuilt[1]), reasonColumns(sql));
+  const rebuiltDomain = /feel\s+TEXT NOT NULL CHECK \(feel IN \(([^)]+)\)\)/.exec(rebuilt[1]);
+  assert.equal(rebuiltDomain?.[1], domain[1]);
+  // ...and its side-car carries the newer reasons, after the 070 ones.
+  const extra = /CREATE TABLE IF NOT EXISTS session_feel_extra_reason \(([\s\S]*?)\) STRICT;/.exec(sql074);
+  assert.ok(extra, 'the 074 side-car was not found');
+  assert.deepEqual([...reasonColumns(sql), ...reasonColumns(extra[1])], [...feel.SESSION_FEEL_REASONS]);
 });
 
 check('session feel: the module reads no clock, no randomness and no free text', () => {
