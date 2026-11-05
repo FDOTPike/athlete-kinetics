@@ -11,6 +11,8 @@ import type { StateVectorRow } from '@ak/inference';
 import { useStore } from '../state/useStore';
 import TrainingSupportNotice from '../components/TrainingSupportNotice';
 import { theme } from '../theme/theme';
+import { sessionFocusName } from '../state/sessionSummary';
+import { SafetyReportView } from '../components/SafetyReportView';
 import {
   PrimaryButton,
   SecondaryButton,
@@ -68,8 +70,7 @@ const format = (value: number | null, digits: number, suffix = ''): string =>
 const formatSigned = (value: number | null, digits: number): string =>
   value === null ? 'Not available' : `${value >= 0 ? '+' : ''}${value.toFixed(digits)}`;
 
-const formatFocus = (focus: string): string =>
-  focus ? focus.charAt(0).toUpperCase() + focus.slice(1).toLowerCase() : '';
+const formatFocus = (focus: string): string => (focus ? sessionFocusName(focus) : '');
 
 export const readinessCoverage = (vector: StateVectorRow): string => {
   const available = [vector.hrv_z !== null, vector.sleep_efficiency_pct !== null]
@@ -160,6 +161,7 @@ function AvailableReadinessScreen({
   // say so instead of leaving the button looking dead.
   const [demoBlocked, setDemoBlocked] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [reportViewOpen, setReportViewOpen] = useState(false);
 
   const attemptDemoLoad = React.useCallback(() => {
     const result = loadDemoAthlete();
@@ -217,13 +219,11 @@ function AvailableReadinessScreen({
             {!hasLiveSession && todayPlan !== null && (
               <Text style={styles.caption}>{formatFocus(todayPlan.focus)} session planned today.</Text>
             )}
-            {primaryHandler !== undefined ? (
-              <PrimaryButton label="Review safety report" onPress={primaryHandler} />
-            ) : (
-              <Text style={styles.navigationHint}>Open the relevant tab below to continue.</Text>
-            )}
+            {/* #185: the saved reports, read-only, wherever READY is opened from. */}
+            <PrimaryButton label="Review safety report" onPress={() => setReportViewOpen(true)} />
           </View>
         )}
+        {halted && reportViewOpen && <SafetyReportView onClose={() => setReportViewOpen(false)} />}
         <View style={styles.card}>
           <Text style={styles.wordmark}>READY</Text>
           <Text style={styles.title}>No readiness yet</Text>
@@ -449,12 +449,16 @@ function AvailableReadinessScreen({
               : 'There is no planned session for today.'}
           </Text>
         )}
-        {primaryHandler !== undefined ? (
+        {halted ? (
+          // #185: the saved reports, read-only, not the paused workout.
+          <PrimaryButton label={primaryLabel} onPress={() => setReportViewOpen(true)} />
+        ) : primaryHandler !== undefined ? (
           <PrimaryButton label={primaryLabel} onPress={primaryHandler} />
         ) : (
           <Text style={styles.navigationHint}>Open the relevant tab below to continue.</Text>
         )}
       </View>
+      {halted && reportViewOpen && <SafetyReportView onClose={() => setReportViewOpen(false)} />}
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>DETAILS</Text>

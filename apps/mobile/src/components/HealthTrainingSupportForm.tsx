@@ -21,6 +21,21 @@ const preferenceGroupLabels: Readonly<Record<HealthSupportPreferenceKind, string
   position_transitions: 'Position changes',
   rest: 'Rest needs',
 };
+/** Walk W4-3: the chosen option was drawn exactly like the others, so only a
+ *  screen reader could tell which answer was saved. The chosen one now shows a
+ *  filled dot and the accent border (not colour alone). */
+function RadioOption({ text, a11yLabel, checked, onPress }: {
+  text: string; a11yLabel: string; checked: boolean; onPress: () => void;
+}): React.JSX.Element {
+  return <Pressable style={[styles.button, checked && styles.chosen]} accessibilityRole="radio"
+    accessibilityLabel={a11yLabel} accessibilityState={{ checked }} onPress={onPress}>
+    <View style={styles.optionRow}>
+      <Text style={[styles.text, checked && styles.chosenText]}>{checked ? '●' : '○'}</Text>
+      <Text style={[styles.text, checked && styles.chosenText]}>{sentence(text)}</Text>
+    </View>
+  </Pressable>;
+}
+const sentence = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
 function Button({ title, onPress }: { title: string; onPress: () => void }): React.JSX.Element {
   return <Pressable accessibilityRole="button" accessibilityLabel={title} onPress={onPress} style={styles.button}>
     <Text style={styles.text}>{title}</Text>
@@ -101,14 +116,13 @@ function BoundSupportForm({ athleteId }: { athleteId: string }): React.JSX.Eleme
       <Button title="Withdraw my requested pause" onPress={() => save((r) => state.setSupportReviewState(athleteId, 'not_assessed', r))} />
       <Text style={styles.text}>Withdrawing your pause does not release an instruction review hold.</Text>
       {(Object.keys(preferenceOptions) as HealthSupportPreferenceKind[]).map((kind) => <View key={kind} style={styles.section}>
-        <Text style={styles.title}>{label(kind)}</Text>
+        <Text style={styles.title}>{preferenceGroupLabels[kind]}</Text>
         <View testID={`support-preference-${kind}-options`} style={styles.radioGroup}
           accessibilityRole="radiogroup" accessibilityLabel={preferenceGroupLabels[kind]}>
-          {preferenceOptions[kind].map((value) => <Pressable key={value} style={styles.button} accessibilityRole="radio"
-            accessibilityLabel={`${label(kind)}: ${label(value)}`}
-            accessibilityState={{ checked: (details.preferences.find((p) => p.preferenceKind === kind)?.reportedValue ?? 'unanswered') === value }}
-            onPress={() => save((r) => state.saveSupportPreference(athleteId, kind, value, preferenceDetail[kind], r))}>
-            <Text style={styles.text}>{label(value)}</Text></Pressable>)}
+          {preferenceOptions[kind].map((value) => <RadioOption key={value} text={label(value)}
+            a11yLabel={`${label(kind)}: ${label(value)}`}
+            checked={(details.preferences.find((p) => p.preferenceKind === kind)?.reportedValue ?? 'unanswered') === value}
+            onPress={() => save((r) => state.saveSupportPreference(athleteId, kind, value, preferenceDetail[kind], r))} />)}
         </View>
         <Field title={`${label(kind)} details`} value={preferenceDetail[kind]} change={(value) => setPreferenceDetail((p) => ({ ...p, [kind]: value }))} multiline />
         <Button title={`Save ${label(kind)} details`} onPress={() => save((r) => state.saveSupportPreference(athleteId, kind,
@@ -116,9 +130,8 @@ function BoundSupportForm({ athleteId }: { athleteId: string }): React.JSX.Eleme
       </View>)}
       <Text style={styles.title}>Notes for your records</Text>
       <View testID="support-note-kind-options" style={styles.radioGroup} accessibilityRole="radiogroup" accessibilityLabel="Note type">
-        {noteKinds.map((kind) => <Pressable key={kind} style={styles.button} accessibilityRole="radio"
-          accessibilityLabel={`Note type: ${label(kind)}`} accessibilityState={{ checked: noteKind === kind }} onPress={() => setNoteKind(kind)}>
-          <Text style={styles.text}>{label(kind)}</Text></Pressable>)}
+        {noteKinds.map((kind) => <RadioOption key={kind} text={label(kind)} a11yLabel={`Note type: ${label(kind)}`}
+          checked={noteKind === kind} onPress={() => setNoteKind(kind)} />)}
       </View>
       <Field title="Support note text" value={note} change={setNote} multiline />
       <Button title="Save support note" onPress={() => save((r) => { state.saveSupportNote(athleteId, noteKind, note, noteId, r); setNote(''); setNoteId(undefined); })} />
@@ -200,6 +213,9 @@ const styles = StyleSheet.create({
   title: { color: theme.color.textHi, fontSize: 18, fontWeight: '600' },
   text: { color: theme.color.textHi, fontSize: 16, flexShrink: 1 },
   button: { minHeight: 56, padding: 12, justifyContent: 'center', borderWidth: 1, borderColor: theme.color.line },
+  chosen: { borderWidth: 2, borderColor: theme.color.chalk },
+  chosenText: { color: theme.color.chalk, fontWeight: '600' },
+  optionRow: { flexDirection: 'row', gap: 12, alignItems: 'center' },
   input: { minHeight: 56, padding: 12, color: theme.color.textHi, borderWidth: 1, borderColor: theme.color.line },
   multiline: { minHeight: 112, textAlignVertical: 'top' },
 });
