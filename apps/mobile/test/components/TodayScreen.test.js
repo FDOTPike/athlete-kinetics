@@ -636,3 +636,23 @@ describe('session-5: empty unplanned starts show the plan-first card instead of 
     expect(screen.queryByText('Nothing to start yet')).toBeNull();
   });
 });
+
+describe('#177: Today names the active athlete only in Coach mode', () => {
+  test('with two athletes, Today names the active one', () => {
+    mockState = baseState({
+      athletes: [{ id: 'default', name: 'Default Athlete' }, { id: 'ath-2', name: 'Sam' }],
+      activeAthleteId: 'ath-2',
+    });
+    render(<TodayScreen />);
+    expect(screen.getByTestId('today-active-athlete')).toHaveTextContent('Athlete: Sam');
+  });
+
+  test('with one athlete, Today names no one', () => {
+    mockState = baseState({
+      athletes: [{ id: 'default', name: 'Default Athlete' }],
+      activeAthleteId: 'default',
+    });
+    render(<TodayScreen />);
+    expect(screen.queryByTestId('today-active-athlete')).toBeNull();
+  });
+});

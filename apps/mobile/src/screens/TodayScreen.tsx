@@ -54,6 +54,7 @@ import {
 } from '../state/todayState';
 import { classifyReadiness, HALT_META, HeldScreenWithHalt } from './ReadinessScreen';
 import { autopilotReasonCopy } from '../state/autopilotCopy';
+import { coachModeAthleteName } from '../state/coachModeAthlete';
 import { PrimaryButton, QuietAction, Disclosure, ListRow } from '../components/ui';
 
 export interface TodayScreenProps {
@@ -111,6 +112,9 @@ function AvailableTodayScreen({
   const refreshVector = useStore((s) => s.refreshVector);
   const recordedDurationsForFocus = useStore((s) => s.recordedDurationsForFocus);
   const error = useStore((s) => s.error);
+  const athletes = useStore((s) => s.athletes);
+  const activeAthleteId = useStore((s) => s.activeAthleteId);
+  const activeAthleteName = coachModeAthleteName(athletes, activeAthleteId);
   const nav = typeof useNavigation === 'function' ? useNavigation() : undefined;
 
   const [emptyStartPromptOpen, setEmptyStartPromptOpen] = React.useState(false);
@@ -483,6 +487,12 @@ function AvailableTodayScreen({
         />
       }
     >
+      {/* #177: in Coach mode (two or more athletes) Today names whose plan this is. */}
+      {activeAthleteName !== null && (
+        <Text style={styles.eyebrow} testID="today-active-athlete">
+          Athlete: {activeAthleteName}
+        </Text>
+      )}
       {workoutCard()}
 
       {error !== null && (
