@@ -221,6 +221,50 @@ export interface ExerciseOption {
 
 const GOAL_EXERCISE_MATCH_LIMIT = 6;
 
+/** Short forms lifters type for a library name. */
+const GOAL_EXERCISE_SHORT_FORMS: Readonly<Record<string, string>> = {
+  rdl: 'romaniandeadlift',
+  ohp: 'overheadpress',
+};
+
+const compact = (text: string): string => text.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+/**
+ * Library exercises whose name or base name contains the query. Spacing,
+ * hyphens and case are ignored ("pull up", "pullup" and "Pull-Up" are the
+ * same), a trailing plural "s" is dropped ("pullups"), and a few short forms
+ * are known (RDL, OHP). Exact names come first, then names that start with
+ * the query, then the rest, shorter names first (Android walk 2026-11-03, W1-7).
+ */
+export function goalExerciseMatches(
+  movements: readonly ExerciseOption[], query: string,
+): ExerciseOption[] {
+  const typed = compact(query);
+  if (query.trim().length < 2 || typed.length === 0) return [];
+  const needles = new Set([typed]);
+  if (typed.length > 3 && typed.endsWith('s')) needles.add(typed.slice(0, -1));
+  const shortForm = GOAL_EXERCISE_SHORT_FORMS[typed] ?? GOAL_EXERCISE_SHORT_FORMS[typed.replace(/s$/, '')];
+  if (shortForm !== undefined) needles.add(shortForm);
+  const rank = (movement: ExerciseOption): number => {
+    let best = Number.POSITIVE_INFINITY;
+    for (const name of [movement.name, movement.baseName ?? '']) {
+      const hay = compact(name);
+      if (hay.length === 0) continue;
+      for (const needle of needles) {
+        if (hay === needle) best = Math.min(best, 0);
+        else if (hay.startsWith(needle)) best = Math.min(best, 1);
+        else if (hay.includes(needle)) best = Math.min(best, 2);
+      }
+    }
+    return best;
+  };
+  return movements
+    .map((movement, index) => ({ movement, index, rank: rank(movement) }))
+    .filter((entry) => Number.isFinite(entry.rank))
+    .sort((a, b) => a.rank - b.rank || a.movement.name.length - b.movement.name.length || a.index - b.index)
+    .map((entry) => entry.movement);
+}
+
 export interface GoalExerciseLink {
   readonly movements: readonly ExerciseOption[];
   readonly movementId: number | null;
@@ -232,10 +276,7 @@ export function GoalExerciseField({ movements, movementId, onChange }: GoalExerc
   const [query, setQuery] = useState('');
   const linked = movementId === null ? undefined : movements.find((movement) => movement.movement_id === movementId);
   const needle = query.trim().toLowerCase();
-  const allMatches = needle.length < 2
-    ? []
-    : movements.filter((movement) => movement.name.toLowerCase().includes(needle)
-      || (movement.baseName ?? '').toLowerCase().includes(needle));
+  const allMatches = goalExerciseMatches(movements, query);
   const matches = allMatches.slice(0, GOAL_EXERCISE_MATCH_LIMIT);
   return (
     <View testID="goal-exercise">
