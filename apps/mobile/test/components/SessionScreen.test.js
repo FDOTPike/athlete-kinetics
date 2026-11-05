@@ -1209,6 +1209,65 @@ test('completed timed and band metrics are disclosed and edit through the store'
   expect(mockState.editSet).toHaveBeenLastCalledWith(77, 1, 0, null, { bandLevel: 2 });
 });
 
+// Android walk (#232): a movement whose only implement is a band (Band Row)
+// never asks for kilograms. With no bands named it says where to name them
+// and logs reps and effort with load 0; with bands named it offers the chips.
+describe('#232: band-only movement', () => {
+  const bandRow = () => [movement(1, 'Band Row', { supportedPrefixes: ['Banded'], pattern: 'pull_h' }), movement(2, 'Later movement')];
+
+  test('with no bands named: no Load kg field, the band-ladder hint, and the set logs with load 0 and no band', () => {
+    mockState = state({ movements: bandRow(), sessionPlan: [slot(1, 1, 7, { plannedSets: 4 }), slot(2, 2, 8)], bandLadder: [] });
+    render(<SessionScreen />);
+    expect(screen.queryByTestId('session-load-input')).toBeNull();
+    expect(screen.queryByTestId('session-load-label')).toBeNull();
+    expect(screen.queryByText(/load kg/i)).toBeNull();
+    expect(screen.queryByText(/pick a weight/i)).toBeNull();
+    expect(screen.queryByTestId('session-load-hint')).toBeNull();
+    expect(screen.getByTestId('session-load-source-line')).toHaveTextContent('No bands named yet. You can name them in Profile > Band ladder.');
+    expect(screen.getByLabelText('No bands named yet. You can name them in Profile > Band ladder.')).toBeOnTheScreen();
+    expect(screen.queryByLabelText(/^Band /)).toBeNull();
+
+    const logButton = screen.getByLabelText('Log set 1 for Band Row');
+    expect(logButton.props.accessibilityState?.disabled).toBeFalsy();
+    fireEvent.press(screen.getByLabelText(/^2 clean reps? left/i));
+    fireEvent.press(logButton);
+    expect(mockState.logSet).toHaveBeenCalledTimes(1);
+    const [movementId, reps, loadKg, rpe, , , , metrics, slotId, seed] = mockState.logSet.mock.calls[0];
+    expect([movementId, reps, loadKg, rpe, metrics, slotId, seed]).toEqual([1, 7, 0, 8, undefined, 1, null]);
+  });
+
+  test('with two bands named: two band chips, no Load kg field, and the chosen band is logged', () => {
+    mockState = state({
+      movements: bandRow(),
+      sessionPlan: [slot(1, 1, 7, { plannedSets: 4 }), slot(2, 2, 8)],
+      bandLadder: [{ level: 1, label: 'Light' }, { level: 2, label: 'Heavy' }],
+    });
+    render(<SessionScreen />);
+    expect(screen.queryByTestId('session-load-input')).toBeNull();
+    expect(screen.queryByText(/No bands named yet/)).toBeNull();
+    expect(screen.getByTestId('session-load-source-line')).toHaveTextContent('Choose the band you used. No kilograms are needed.');
+    expect(screen.getAllByLabelText(/^Band (Light|Heavy)$/)).toHaveLength(2);
+    fireEvent.press(screen.getByLabelText('Band Heavy'));
+    fireEvent.press(screen.getByLabelText('Log set 1 for Band Row'));
+    expect(mockState.logSet).toHaveBeenCalledTimes(1);
+    const call = mockState.logSet.mock.calls[0];
+    expect(call[2]).toBe(0);
+    expect(call[7]).toEqual({ bandLevel: 2 });
+  });
+
+  test('a movement that takes a load and a band keeps the Load kg field', () => {
+    mockState = state({
+      movements: [movement(1, 'Pallof Press', { supportedPrefixes: ['Cable', 'Banded'] }), movement(2, 'Later movement')],
+      bandLadder: [],
+    });
+    render(<SessionScreen />);
+    expect(screen.getByTestId('session-load-input')).toBeOnTheScreen();
+    expect(screen.getByTestId('session-load-label')).toHaveTextContent('LOAD KG');
+    expect(screen.queryByText(/No bands named yet/)).toBeNull();
+    expect(screen.queryByText(/No kilograms are needed/)).toBeNull();
+  });
+});
+
 test('idle state has one focused start action', () => {
   mockState = state({ session: null, sessionPlan: [], activeSessionPlanSlotId: null, runner: null, sessionMode: null });
   render(<SessionScreen />);
