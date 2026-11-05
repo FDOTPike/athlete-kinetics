@@ -53,13 +53,17 @@ const previewFixture = (over = {}) => ({
 // helpers walk straight through it, leaving its default answer (balanced whole
 // body) in place. The focus and target screens themselves are covered in
 // OnboardingFocusGoal.test.js.
+// The optional one-rep-max screen (issue #218) joins from SOME MILEAGE up and
+// is walked through the same way (covered in OnboardingMaxesStep.test.js).
+const passThrough = () => screen.queryByTestId('focus-picker') !== null
+  || screen.queryByTestId('onboarding-maxes-step') !== null;
 const pressNext = () => {
   fireEvent.press(screen.getByLabelText('Next'));
-  if (screen.queryByTestId('focus-picker') !== null) fireEvent.press(screen.getByLabelText('Next'));
+  if (passThrough()) fireEvent.press(screen.getByLabelText('Next'));
 };
 const pressBack = () => {
   fireEvent.press(screen.getByLabelText('Back'));
-  if (screen.queryByTestId('focus-picker') !== null) fireEvent.press(screen.getByLabelText('Back'));
+  if (passThrough()) fireEvent.press(screen.getByLabelText('Back'));
 };
 
 describe('Round 2 R5: the limitations screen blocks NEXT until an explicit answer', () => {

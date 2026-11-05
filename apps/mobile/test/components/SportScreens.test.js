@@ -96,7 +96,8 @@ const openSportSlide = () => {
   expect(screen.getByTestId('sport-editor')).toBeTruthy();
 };
 const walkToReview = () => {
-  next(); // experience -> logistics
+  next(); // experience -> maxes (optional, from SOME MILEAGE up; issue #218)
+  if (screen.queryByTestId('onboarding-maxes-step') !== null) next(); // maxes -> logistics
   next(); // logistics -> equipment
   next(); // equipment -> limits
   pressLabel('No, nothing to note');
@@ -109,13 +110,13 @@ describe('the sport screen in the interview', () => {
     render(<OnboardingScreen />);
     next();
     next();
-    expect(stepLabel()).toBe('Step 3 of 8');
+    expect(stepLabel()).toBe('Step 3 of 9');
     expect(selected('onboarding-wants-sport')).toBe(false);
     press('onboarding-wants-sport');
-    expect(stepLabel()).toBe('Step 3 of 9');
+    expect(stepLabel()).toBe('Step 3 of 10');
     next();
     expect(screen.getByText('DO YOU PLAY OR COMPETE IN A SPORT?')).toBeTruthy();
-    expect(stepLabel()).toBe('Step 4 of 9');
+    expect(stepLabel()).toBe('Step 4 of 10');
     for (const family of ['basketball', 'football', 'hockey', 'powerlifting', 'muay_thai', 'other']) {
       expect(screen.getByTestId(`sport-family-${family}`)).toBeTruthy();
     }
@@ -214,7 +215,7 @@ describe('the sport screen in the interview', () => {
     expect(nextDisabled()).toBe(false);
     next();
     walkToReview();
-    expect(stepLabel()).toBe('Step 9 of 9');
+    expect(stepLabel()).toBe('Step 10 of 10');
     expect(screen.getByText('Football (soccer) — keep training and playing without long breaks')).toBeTruthy();
     await startTraining();
     expect(state().error).toBeNull();
@@ -250,7 +251,7 @@ describe('the sport screen in the interview', () => {
     press('onboarding-skip-sport');
     expect(screen.queryByTestId('sport-editor')).toBeNull();
     expect(screen.getByText('HOW LONG HAVE YOU BEEN TRAINING?')).toBeTruthy();
-    expect(stepLabel()).toBe('Step 4 of 8');
+    expect(stepLabel()).toBe('Step 4 of 9');
     walkToReview();
     expect(screen.queryByText('SPORT')).toBeNull();
     await startTraining();
@@ -259,20 +260,20 @@ describe('the sport screen in the interview', () => {
     expect(count('athlete_sport_profile')).toBe(0);
   });
 
-  test('sport and target together: ten screens, sport first, and a goal can name its exercise', async () => {
+  test('sport and target together: eleven screens with the optional maxes screen, sport first, and a goal can name its exercise', async () => {
     render(<OnboardingScreen />);
     next();
     next();
     press('onboarding-wants-sport');
     press('onboarding-wants-target');
-    expect(stepLabel()).toBe('Step 3 of 10');
+    expect(stepLabel()).toBe('Step 3 of 11');
     next();
     press('sport-family-basketball');
     press('sport-outcome-general_support');
     press('sport-experience-new');
     next();
     expect(screen.getByTestId('goal-editor')).toBeTruthy();
-    expect(stepLabel()).toBe('Step 5 of 10');
+    expect(stepLabel()).toBe('Step 5 of 11');
     type('goal-outcome', 'Goblet squat 40 kg for 10');
     type('goal-method', 'Goblet squat, 10 reps to parallel');
     type('goal-baseline', '24');

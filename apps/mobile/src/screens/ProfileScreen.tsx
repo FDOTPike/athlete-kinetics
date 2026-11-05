@@ -37,7 +37,9 @@ import { useStore } from '../state/useStore';
 import { useBackupStore } from '../state/backupStore';
 import { useSubViewBack } from '../navigation/navigation';
 import { Chip, Stepper, QuietAction, Disclosure, ListRow, PrimaryButton, SecondaryButton } from '../components/ui';
+import { measuredDayDetail } from './measuredDayDetail';
 import InfoTip from '../components/InfoTip';
+import { OneRmRow, oneRmClampNote } from '../components/OneRmRow';
 import { biometricsCopy, providerForPlatform } from '../state/biometricsCopy';
 import CoachVerificationLabScreen from './CoachVerificationLabScreen';
 import GlossaryScreen from './GlossaryScreen';
@@ -61,6 +63,40 @@ const formatFinalizedDate = (ms: number): string => {
 // ---------------------------------------------------------------------------
 // Primitives consuming frozen components from components/ui
 // ---------------------------------------------------------------------------
+/** Walk W3 (for W4): the objective info button always asked "What does GPP
+ *  mean?". It now explains the objective that is selected. Weight loss has no
+ *  glossary entry, so it shows no button rather than a wrong one. */
+/** Walk W4-4: no preset ever showed as chosen. A preset is shown selected when
+ *  the athlete's standard equipment is exactly that preset (specialist items,
+ *  which no preset includes, are left out of the comparison). */
+export const presetMatches = (inventory: readonly string[], preset: readonly string[]): boolean => {
+  const standard = new Set(inventory.filter((item) => (STANDARD_EQUIPMENT_ITEMS as readonly string[]).includes(item)));
+  return standard.size === new Set(preset).size && preset.every((item) => standard.has(item));
+};
+
+/** Walk W4-6: the reset did not say whose data it removes (only the active
+ *  athlete's). */
+export const resetScopeText = (name: string | undefined): string =>
+  `This removes ${name ? `${name}'s` : "this athlete's"} training history, telemetry, blocks, and today's reports. Their profile, saved profile slots and other athletes are not changed.`;
+export const resetConfirmText = (name: string | undefined): string =>
+  `This cannot be undone. Reset ${name ? `${name}'s` : "this athlete's"} training data?`;
+
+/** Walk W4-9: the energy system "i" always explained ATP-PC. It now explains
+ *  the chosen system; the glossary has an entry only for ATP-PC so far. */
+export const ENERGY_SYSTEM_TIP: Partial<Record<(typeof ENERGY_SYSTEMS)[number], string>> = {
+  atp_pc: 'ATP-PC',
+};
+
+export const OBJECTIVE_TIP: Partial<Record<(typeof OBJECTIVES)[number], string>> = {
+  strength: 'STRENGTH',
+  hypertrophy: 'HYPERTROPHY',
+  power: 'POWER',
+  endurance: 'ENDURANCE',
+  gpp: 'GPP',
+  hybrid: 'HYBRID',
+  rehab: 'RETURN TO TRAINING',
+};
+
 interface ChipRowProps<T extends string> {
   label: string;
   options: readonly T[];
@@ -119,69 +155,9 @@ function NumberRow({ label, display, onDec, onInc, tip }: NumberRowProps): React
   );
 }
 
-// ---------------------------------------------------------------------------
-// One-rep-max row: type the number directly (a 300 kg deadlifter must not
-// tap +2.5 a hundred times); ± buttons remain for fine adjustment.
-// ---------------------------------------------------------------------------
-interface OneRmRowProps {
-  label: string;
-  valueKg: number | undefined;
-  onChange: (kg: number | null) => void;
-}
-function OneRmRow({ label, valueKg, onChange }: OneRmRowProps): React.JSX.Element {
-  const [text, setText] = useState(valueKg !== undefined ? valueKg.toFixed(1) : '');
-  useEffect(() => {
-    setText(valueKg !== undefined ? valueKg.toFixed(1) : '');
-  }, [valueKg]);
-  const commitText = (): void => {
-    const parsed = Number.parseFloat(text.replace(',', '.'));
-    if (!Number.isFinite(parsed) || parsed < 20) {
-      onChange(null); // empty/garbage/sub-20 clears the max
-      setText('');
-      return;
-    }
-    const snapped = Math.min(500, Math.max(20, Math.round(parsed / 2.5) * 2.5));
-    onChange(parsed); // store snaps to 2.5 and clamps 20..500
-    setText(snapped.toFixed(1));
-  };
-  return (
-    <View style={styles.field}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <View style={styles.numberRow}>
-        <Pressable
-          onPress={() => { if (valueKg !== undefined) onChange(valueKg - 2.5 < 20 ? null : valueKg - 2.5); }}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={`Decrease ${label} one rep max`}
-          style={({ pressed }) => [styles.numBtn, pressed && styles.numBtnPressed]}
-        >
-          <Text style={styles.numBtnText}>−</Text>
-        </Pressable>
-        <TextInput
-          disableFullscreenUI
-          style={styles.oneRmInput}
-          value={text}
-          onChangeText={setText}
-          onEndEditing={commitText}
-          keyboardType="numeric"
-          placeholder="—"
-          placeholderTextColor={theme.color.textLow}
-          maxLength={6}
-          accessibilityLabel={`${label} one rep max in kilograms, type to set`}
-        />
-        <Pressable
-          onPress={() => onChange((valueKg ?? 57.5) + 2.5)}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={`Increase ${label} one rep max`}
-          style={({ pressed }) => [styles.numBtn, pressed && styles.numBtnPressed]}
-        >
-          <Text style={styles.numBtnText}>+</Text>
-        </Pressable>
-      </View>
-    </View>
-  );
-}
+// One-rep-max rows live in ../components/OneRmRow (shared with onboarding,
+// issue #218); the clamp note stays exported here for existing callers.
+export { oneRmClampNote };
 
 // ---------------------------------------------------------------------------
 // Screen
@@ -440,7 +416,7 @@ export default function ProfileScreen(): React.JSX.Element {
       <HealthTrainingSupportForm />
       <ChipRow
         label="1 · OBJECTIVE"
-        tip="GPP"
+        tip={OBJECTIVE_TIP[profile.objective]}
         options={OBJECTIVES}
         value={profile.objective}
         onSelect={(objective) => saveProfile({ objective })}
@@ -490,7 +466,7 @@ export default function ProfileScreen(): React.JSX.Element {
       />
       <ChipRow
         label="7 · TARGET ENERGY SYSTEM"
-        tip="ATP-PC"
+        tip={ENERGY_SYSTEM_TIP[profile.target_energy_system]}
         options={ENERGY_SYSTEMS}
         value={profile.target_energy_system}
         onSelect={(target_energy_system) => saveProfile({ target_energy_system })}
@@ -566,7 +542,7 @@ export default function ProfileScreen(): React.JSX.Element {
         </View>
         <Text style={styles.fieldHint}>
           With a max set, SESSION shows real target kilograms for every planned
-          lift. Type the number directly (snapped to 2.5 kg); ± fine-tunes.
+          lift. Type the number directly (kept in 0.25 kg steps); ± moves 2.5 kg.
           Clear it by typing 0.
         </Text>
         {BIG4_LIFTS.map(({ name, label }) => {
@@ -801,7 +777,7 @@ export default function ProfileScreen(): React.JSX.Element {
             <Chip
               key={preset}
               label={preset.replace(/_/g, ' ').toUpperCase()}
-              selected={false}
+              selected={presetMatches(profile.equipment_inventory, EQUIPMENT_PRESETS[preset])}
               onPress={() => saveProfile({ equipment_inventory: [...EQUIPMENT_PRESETS[preset]] })}
               accessibilityLabel={`Use ${preset.replace(/_/g, ' ')} equipment preset`}
             />
@@ -904,7 +880,7 @@ export default function ProfileScreen(): React.JSX.Element {
               <ListRow
                 key={row.date}
                 label={row.date}
-                detail={`${Math.round(row.tonnageKg)} kg load · ${row.setCount} sets${row.bodyweightKg === null ? '' : ` · ${row.bodyweightKg.toFixed(1)} kg BW`}`}
+                detail={measuredDayDetail({ ...row, restingHr: null })}
                 style={styles.clinicalRow}
               />
             ))}
@@ -1025,7 +1001,7 @@ export default function ProfileScreen(): React.JSX.Element {
           {resetAthleteId === null ? (
             <View style={{ gap: theme.space[3] }}>
               <Text style={styles.fieldHint}>
-                This removes training history, telemetry, blocks, and today's reports. Your profile and saved profile slots remain.
+                {resetScopeText(athletes.find((a) => a.id === activeAthleteId)?.name)}
               </Text>
               <SecondaryButton
                 label="Continue to reset"
@@ -1040,7 +1016,7 @@ export default function ProfileScreen(): React.JSX.Element {
             </View>
           ) : (
             <View style={{ gap: theme.space[3] }}>
-              <Text style={styles.confirmText}>This cannot be undone. Reset the training data?</Text>
+              <Text style={styles.confirmText}>{resetConfirmText(athletes.find((a) => a.id === resetAthleteId)?.name)}</Text>
               {resetError !== null && (
                 <Text style={styles.fieldHint} accessibilityRole="alert">{resetError}</Text>
               )}
