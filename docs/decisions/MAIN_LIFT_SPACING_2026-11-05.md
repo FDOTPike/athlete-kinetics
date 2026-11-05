@@ -1,0 +1,58 @@
+# Main-Lift Spacing Decision Record
+
+Date: 2026-11-05
+Status: PROPOSED (ratified when the owner merges the pull request)
+Issue: #228
+
+## Rule (2026-11-05)
+
+> the generator does not place the same main lift on consecutive days
+
+## What changes
+
+- A session's **main lifts** are its first two slots (the slots before
+  `ACCESSORY_SLOT_FROM`) on a strength day (lower, upper or full).
+- When the generator's own pick for a main slot is a movement that is
+  already a main lift on the **calendar day before or after**, it takes the
+  ranker's next movement for that slot instead. The replacement must:
+  - have the same movement pattern;
+  - be in the same gated pool (every gate still applies: equipment, tier,
+    capability, niggles and attestation);
+  - have the same loading class (loaded or strictly bodyweight);
+  - have the same compound class;
+  - not be held for preparation;
+  - not be a main lift on either neighbouring day.
+- If no such movement exists, the pick stays as it was. The rule never drops
+  a slot and never fills one upward.
+- The days are calendar days. Each week makes the same choices, so day 7 and
+  the next week's day 1 count as neighbours.
+- Each swap is disclosed in the plan's warnings and shown under "Coach
+  decisions in this plan", for example: "full: Competition Bench planned
+  instead of Dumbbell Bench Press, the main lift the day before or after".
+
+## What does not change
+
+- An explicit athlete choice for the slot (Customize) or a goal's named
+  exercise is never moved. The athlete owns that choice, even when it puts
+  the same lift on two days in a row.
+- Sets, reps, effort, the weekly progression, the deload and the
+  session-time contract are unchanged. Only which movement fills the slot
+  can change.
+- Conditioning and BJJ days are not touched.
+- Days that are not back to back are not touched.
+- No tier rule is involved (D02). The rule is the same for every training
+  age.
+
+## Verification
+
+`packages/inference/test/verify_blocks.mjs`, section `[MAIN_LIFT_SPACING]`:
+
+- with a full gym, across 7 objectives × intermediate and advanced × 2 to 7
+  days a week, no movement is a main lift on two strength days in a row;
+- the walk's case (advanced, BUILD MUSCLE, 5 days) has no back-to-back
+  repeat, and the swap is disclosed;
+- an explicit choice of the same lift on two consecutive days is kept;
+- a week with no back-to-back strength days carries no spacing note.
+
+The full-inventory "no warnings" check now ignores this disclosure. It is a
+note about a choice, not a missing movement.

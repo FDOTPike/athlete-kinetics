@@ -56,6 +56,7 @@ import { classifyReadiness, HALT_META, HeldScreenWithHalt } from './ReadinessScr
 import { autopilotReasonCopy } from '../state/autopilotCopy';
 import { PrimaryButton, QuietAction, Disclosure, ListRow } from '../components/ui';
 import { sessionFocusName } from '../state/sessionSummary';
+import { offPlanStartCaption, offPlanStartTarget } from '../state/offPlanStart';
 
 export interface TodayScreenProps {
   /** Shell-supplied: go to the live session surface. */
@@ -172,13 +173,25 @@ function AvailableTodayScreen({
     setAwaitingStart(true);
     startSession();
   }, [startSession]);
+  // #228: an off-plan start takes the plan forward (the earliest unfinished
+  // session, else the next planned one) and says which; with nothing left in
+  // the plan it stays a free-form start.
+  const offPlanTarget = useMemo(
+    () => offPlanStartTarget(blockSessions ?? [], today),
+    [blockSessions, today],
+  );
   const startUnplannedAndOpen = React.useCallback(() => {
+    if (offPlanTarget !== null) {
+      setAwaitingStart(true);
+      startSession(false, offPlanTarget.session.plannedSessionId);
+      return;
+    }
     if (checkFreeFormStartIsEmpty()) {
       setEmptyStartPromptOpen(true);
       return;
     }
     startAndOpen();
-  }, [checkFreeFormStartIsEmpty, startAndOpen]);
+  }, [checkFreeFormStartIsEmpty, startAndOpen, offPlanTarget, startSession]);
   const renderUnplannedStartControl = (control: {
     label: string;
     accessibilityLabel: string;
@@ -209,12 +222,17 @@ function AvailableTodayScreen({
       );
     }
     return (
-      <QuietAction
-        label={control.label}
-        onPress={startUnplannedAndOpen}
-        accessibilityLabel={control.accessibilityLabel}
-        testID={control.testID}
-      />
+      <>
+        <QuietAction
+          label={control.label}
+          onPress={startUnplannedAndOpen}
+          accessibilityLabel={offPlanTarget === null ? control.accessibilityLabel : offPlanStartCaption(offPlanTarget)}
+          testID={control.testID}
+        />
+        {offPlanTarget !== null && (
+          <Text style={styles.caption} testID={`${control.testID}-caption`}>{offPlanStartCaption(offPlanTarget)}</Text>
+        )}
+      </>
     );
   };
   React.useEffect(() => {

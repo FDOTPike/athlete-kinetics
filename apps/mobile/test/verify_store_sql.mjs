@@ -1956,7 +1956,7 @@ if (resetTables.length >= 15) {
         src.indexOf('  // --- Coach Mode (Phase 15)'),
       )
         .includes('refreshVector()'));
-  const startBody = src.slice(src.indexOf('startSession: (repeatPlanned)'), src.indexOf('selectMovement: (movementId)'));
+  const startBody = src.slice(src.indexOf('startSession: (repeatPlanned, plannedSessionId)'), src.indexOf('selectMovement: (movementId)'));
   a('start computes consumePlan before validating only the plan it will consume',
     startBody.indexOf('const consumePlan') >= 0
       && startBody.indexOf('const planToConsume') > startBody.indexOf('const consumePlan')

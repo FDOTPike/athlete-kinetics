@@ -1135,6 +1135,11 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
     const weekCovered = new Set<MuscleGroupId>();
     const weekDisplaced = new Set<MovementPattern>();
     const weekGoalPlaced = new Set<number>();
+    // #228 (docs/decisions/MAIN_LIFT_SPACING_2026-11-05.md, PROPOSED): the
+    // main lifts (first two slots) of each strength day placed so far this
+    // week, by day_index. Every week makes the same choices, so day 7's
+    // neighbour across the week boundary is this week's day 1.
+    const weekMainLifts = new Map<number, ReadonlySet<number>>();
     const wmod = SCHEMA_WEEKS[schemaType][progIdx as 0 | 1 | 2];
 
     for (const { focus, day_index: dayIndex, movement_preferences: preferences } of schedule) {
@@ -1243,6 +1248,13 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
 
       const usedIds = new Set<number>();
       const slots: PlannedSlotPlan[] = [];
+      // #228: main lifts already planned on the calendar day before or after.
+      const neighbourMainLifts = new Set<number>();
+      if (STRENGTH_FOCI.has(focus)) {
+        for (const neighbour of [dayIndex === 1 ? 7 : dayIndex - 1, dayIndex === 7 ? 1 : dayIndex + 1]) {
+          for (const id of weekMainLifts.get(neighbour) ?? []) neighbourMainLifts.add(id);
+        }
+      }
       // W3 ranking disclosures for this session (anchor substitutes and the
       // exact fallback reasons for strictly-bodyweight defaults).
       const sessionRankingNotes: Set<string> = new Set();
@@ -1522,8 +1534,30 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
             }
           }
         }
-        const defaultChoice = preferredMovement ?? goalMovement ?? scopeMovement ?? rankedDefault
+        const coachDefault = preferredMovement ?? goalMovement ?? scopeMovement ?? rankedDefault
           ?? pickForPattern(pool, pattern, usedIds);
+        // #228: a coach-picked main lift that is also a main lift on the day
+        // before or after gives way to the ranker's next eligible movement of
+        // the same pattern, loading class and compound class, when one exists.
+        // An explicit athlete choice or a goal exercise is never moved.
+        const mainSlot = (slots.length + 1) < ACCESSORY_SLOT_FROM;
+        let spacedChoice: GeneratorMovement | null = null;
+        if (mainSlot && coachDefault !== null && preferredMovement === undefined && goalMovement === undefined
+            && neighbourMainLifts.has(coachDefault.movement_id)) {
+          for (const id of ranking.rankedIds) {
+            const candidate = pool.find((entry) => entry.movement_id === id);
+            if (candidate === undefined || candidate.pattern !== pattern || usedIds.has(id)) continue;
+            if (neighbourMainLifts.has(id) || PREPARATION_HELD_MOVEMENT_IDS.has(id)) continue;
+            if (isPurelyBodyweight(candidate) !== isPurelyBodyweight(coachDefault)) continue;
+            if (candidate.is_compound !== coachDefault.is_compound) continue;
+            spacedChoice = candidate;
+            break;
+          }
+          if (spacedChoice !== null) {
+            sessionRankingNotes.add(`${focus}: ${spacedChoice.name} planned instead of ${coachDefault.name}, the main lift the day before or after`);
+          }
+        }
+        const defaultChoice = spacedChoice ?? coachDefault;
         // Work order 3: the emphasis may swap the ranking DEFAULT for another
         // movement of the same pattern that trains an emphasised muscle
         // directly. It never touches an explicit choice, a goal exercise, a
@@ -1533,6 +1567,7 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
         // bodybuilding exclusion all still hold.
         let emphasisChoice: GeneratorMovement | null = null;
         if (emphasis !== null && emphasisIndex !== null && emphasisDay !== null
+            && spacedChoice === null
             && defaultChoice !== null && rankedDefault !== null
             && defaultChoice.movement_id === rankedDefault.movement_id
             && preferredMovement === undefined && goalMovement === undefined && scopeMovement === undefined
@@ -1546,6 +1581,7 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
             if (isPurelyBodyweight(candidate) !== isPurelyBodyweight(defaultChoice)) continue;
             if (candidate.is_compound !== defaultChoice.is_compound) continue;
             if (ANCHOR_MOVEMENT_NAMES.includes(candidate.name)) continue;
+            if (mainSlot && neighbourMainLifts.has(id)) continue;
             // A main lift (the first two slots) is only swapped for a movement
             // that still trains what the main lift trains: an incline press
             // may stand in for a flat press, but a glute-only variation never
@@ -1648,6 +1684,9 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
       if (slots.length === 0) {
         warnings.add(`${focus}: session dropped, no available movements at all`);
         continue;
+      }
+      if (STRENGTH_FOCI.has(focus)) {
+        weekMainLifts.set(dayIndex, new Set(slots.slice(0, ACCESSORY_SLOT_FROM - 1).map((slot) => slot.movement_id)));
       }
       // W3: flush this session's ranking disclosures into the block warnings
       // (deduped by the Set, sorted at block assembly below).

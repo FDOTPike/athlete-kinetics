@@ -153,7 +153,7 @@ for (const objective of OBJECTIVES) {
       .reduce((a, s) => a + s.slots.reduce((b, sl) => b + sl.sets, 0), 0);
     if (!(weekSets(4) < weekSets(1))) deloadAll = false;
     if (plan.weeks !== 4) weeks4 = false;
-    if (plan.warnings.length !== 0) warnFree = false; // full inventory: nothing missing
+    if (plan.warnings.filter((w) => !/the main lift the day before or after/.test(w)).length !== 0) warnFree = false; // full inventory: nothing missing (a #228 spacing disclosure is not a gap)
     if (plan.sessions.length !== f * 4) counts = false;
     for (const s of plan.sessions) {
       if (s.week_index === 4 && s.phase !== 'deload') endsDeload = false;
@@ -2645,6 +2645,79 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
   check('[OW-006] no bodyweight fatigue coefficient is ratified yet - if this FAILS, OW-026 landed and bodyweightDominant must be made reachable in the same change',
     divergent.length === 0 && schemas.length > 0 && phases.length > 0,
     divergent.join('; ') || `${schemas.length} schemas x ${phases.length} phases identical`);
+}
+
+// --- [MAIN_LIFT_SPACING] #228: no same main lift on back-to-back days ---------
+// docs/decisions/MAIN_LIFT_SPACING_2026-11-05.md (PROPOSED). A main lift is a
+// session's first two slots on a strength day. When the same movement would be
+// a main lift on two calendar days in a row, the later-decided day takes the
+// ranker's next eligible movement of the same pattern and class, if one exists.
+console.log('[MAIN_LIFT_SPACING] no same main lift on back-to-back days');
+{
+  const dayMs = 86_400_000;
+  const strengthDays = (plan) => plan.sessions.filter((s) => ['lower', 'upper', 'full'].includes(s.focus));
+  const mainIds = (session) => session.slots.slice(0, 2).map((slot) => slot.movement_id);
+  const backToBackRepeats = (plan) => {
+    const days = strengthDays(plan);
+    const repeats = [];
+    for (const a of days) {
+      for (const b of days) {
+        if (Date.parse(b.session_date) - Date.parse(a.session_date) !== dayMs) continue;
+        for (const id of mainIds(a)) if (mainIds(b).includes(id)) repeats.push(`${a.session_date}/${b.session_date}:${id}`);
+      }
+    }
+    return repeats;
+  };
+  let plans = 0;
+  let backToBackPairs = 0;
+  const offenders = [];
+  for (const objective of ['strength', 'hypertrophy', 'power', 'gpp', 'hybrid', 'weight_loss', 'endurance']) {
+    for (const training_age of ['intermediate', 'advanced']) {
+      for (let f = 2; f <= 7; f += 1) {
+        const plan = gen({ objective, training_age, weekly_frequency: f, session_duration_cap_min: 75 });
+        plans += 1;
+        const days = strengthDays(plan);
+        for (const a of days) for (const b of days) {
+          if (Date.parse(b.session_date) - Date.parse(a.session_date) === dayMs) backToBackPairs += 1;
+        }
+        const repeats = backToBackRepeats(plan);
+        if (repeats.length > 0) offenders.push(`${objective}/${training_age}/${f}d: ${repeats.slice(0, 2).join(', ')}`);
+      }
+    }
+  }
+  check('no movement is a main lift on two strength days in a row (full gym, 7 objectives x 2 tiers x 2-7 days)',
+    plans > 0 && backToBackPairs > 0 && offenders.length === 0,
+    offenders.length === 0 ? `${plans} plans, ${backToBackPairs} back-to-back strength-day pairs` : offenders.slice(0, 4).join(' | '));
+
+  // The walk's case (A-15/A-16): advanced, BUILD MUSCLE, 5 days. The upper day
+  // and the full day after it no longer open with the same press.
+  const walk = gen({ objective: 'hypertrophy', training_age: 'advanced', weekly_frequency: 5, session_duration_cap_min: 75 });
+  check('walk A-1 (advanced hypertrophy, 5 days): no back-to-back main-lift repeat, and the swap is disclosed',
+    backToBackRepeats(walk).length === 0
+      && walk.warnings.some((w) => /planned instead of .*, the main lift the day before or after/.test(w)),
+    walk.warnings.filter((w) => /main lift the day before/.test(w)).join('; ') || 'no disclosure');
+
+  // An explicit athlete choice always wins: the same movement chosen for both
+  // days is kept on both.
+  const squat = walk.sessions.find((s) => s.focus === 'lower').slots[0].movement_id;
+  const pattern = movements.find((m) => m.movement_id === squat).pattern;
+  const program = [
+    { day_index: 1, focus: 'lower', movement_preferences: [{ slot_index: 1, pattern, movement_id: squat }] },
+    { day_index: 2, focus: 'full', movement_preferences: [{ slot_index: 1, pattern, movement_id: squat }] },
+  ];
+  const chosen = generateBlock({ profile: prof({ objective: 'hypertrophy', training_age: 'advanced', weekly_frequency: 2 }), movements, startDate: START, programDays: program });
+  const week1 = chosen.sessions.filter((s) => s.week_index === 1);
+  check('an explicit choice of the same main lift on back-to-back days is kept (the athlete owns it)',
+    week1.length === 2 && week1.every((s) => s.slots.some((slot) => slot.movement_id === squat)),
+    `${squat} ${pattern}: ${week1.map((s) => `${s.focus}=${s.slots.map((slot) => slot.movement_id).join(',')}`).join(' ')} ${chosen.warnings.join('; ')}`);
+
+  // Spacing never reaches a non-adjacent pair: a 3-day week spread over
+  // non-consecutive days is byte-identical to a plan with no neighbours.
+  const spread = gen({ objective: 'strength', training_age: 'intermediate', weekly_frequency: 3 });
+  const spreadDays = strengthDays(spread).filter((s) => s.week_index === 1).map((s) => Date.parse(s.session_date));
+  const hasNeighbour = spreadDays.some((a) => spreadDays.includes(a + dayMs));
+  check('a week with no back-to-back strength days carries no spacing note',
+    hasNeighbour || !spread.warnings.some((w) => /main lift the day before/.test(w)));
 }
 
 try { verifyR05Blocks(); } catch (error) { check('R05 experience-only block workload', false, error.message); }

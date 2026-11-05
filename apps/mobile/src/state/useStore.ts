@@ -1167,7 +1167,13 @@ interface KineticsStore {
   refreshNiggles: () => void;
   refreshVector: () => void;
   freeFormStartIsEmpty: () => boolean;
-  startSession: (repeatPlanned?: boolean) => void;
+  /**
+   * Start today's session. `plannedSessionId` (#228) starts another
+   * unfinished planned session of the current block instead (the off-plan
+   * start on a day with no session of its own), through every check a
+   * planned start passes.
+   */
+  startSession: (repeatPlanned?: boolean, plannedSessionId?: number) => void;
   /** Append a logged set. `displayName` carries the prefix-engine
    *  concatenation (e.g. 'DB Bench Press') into the in-memory log payload;
    *  falls back to the movement's canonical name when absent. `appliedPrefixes`
@@ -1776,6 +1782,27 @@ const capabilityMovementAvailability = (
     equipment: new Set(profile.equipment_inventory),
     safetyExcludedMovementIds,
   });
+};
+
+/** A planned session's frozen routine stress review, or null for a generated
+ *  session. Shared by today's plan and the #228 off-plan start. */
+const readPlannedRoutineStress = (d: DB, plannedSessionId: number): TodayPlan['routineStress'] => {
+  const row = rowsOf<{
+    routine_day_index: number; family_decisions_json: string; warnings_json: string;
+    recommendations_json: string; adaptations_json: string;
+  }>(d.executeSync(
+    `SELECT routine_day_index, family_decisions_json, warnings_json,
+            recommendations_json, adaptations_json
+       FROM planned_session_routine_context WHERE planned_session_id = ?`,
+    [plannedSessionId],
+  ))[0];
+  return row === undefined ? null : {
+    routineDayIndex: row.routine_day_index,
+    familyDecisions: parseRoutineFamilyDecisions(row.family_decisions_json),
+    warnings: parseStringArray(row.warnings_json),
+    recommendations: parseStringArray(row.recommendations_json),
+    adaptations: parseStringArray(row.adaptations_json),
+  };
 };
 
 /** The finished count the runner keeps for a slot swapped after logged sets;
@@ -4953,15 +4980,6 @@ export const useStore = create<KineticsStore>()((set, get) => {
     // Rest-day fallback: no planned session today is a normal, renderable
     // state (todayPlan null) — never an error.
     const todayRow = blockSessions.find((s) => s.sessionDate === today);
-    const routineStressRow = todayRow === undefined ? undefined : rowsOf<{
-      routine_day_index: number; family_decisions_json: string; warnings_json: string;
-      recommendations_json: string; adaptations_json: string;
-    }>(d.executeSync(
-      `SELECT routine_day_index, family_decisions_json, warnings_json,
-              recommendations_json, adaptations_json
-         FROM planned_session_routine_context WHERE planned_session_id = ?`,
-      [todayRow.plannedSessionId],
-    ))[0];
     const todayPlan: TodayPlan | null = todayRow === undefined
       ? null
       : {
@@ -4969,13 +4987,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
           focus: todayRow.focus,
           phase: todayRow.phase,
           slots: get().loadSessionSlots(todayRow.plannedSessionId),
-          routineStress: routineStressRow === undefined ? null : {
-            routineDayIndex: routineStressRow.routine_day_index,
-            familyDecisions: parseRoutineFamilyDecisions(routineStressRow.family_decisions_json),
-            warnings: parseStringArray(routineStressRow.warnings_json),
-            recommendations: parseStringArray(routineStressRow.recommendations_json),
-            adaptations: parseStringArray(routineStressRow.adaptations_json),
-          },
+          routineStress: readPlannedRoutineStress(d, todayRow.plannedSessionId),
         };
     const pendingAutopilotAdjustments = get().getPendingAutopilotAdjustments();
     set({
@@ -6403,7 +6415,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
 
   freeFormStartIsEmpty: () => freeFormStartIsEmpty(),
 
-  startSession: (repeatPlanned) => {
+  startSession: (repeatPlanned, plannedSessionId) => {
     // Audit A2: double-start would orphan the first session's rows.
     if (get().session !== null) return;
     get().rolloverDay();
@@ -6413,13 +6425,33 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const startedAtMs = Date.now();
     const d = getDb();
 
-    const { prescription, todayPlan, movements, profile, uiPreferences } = get();
+    const { prescription, movements, profile, uiPreferences } = get();
+    // #228: an off-plan start names an unfinished planned session of this
+    // block; it is loaded exactly as today's plan is and then passes the same
+    // access, routine and support checks below.
+    const offPlanRow = plannedSessionId === undefined || plannedSessionId === get().todayPlan?.plannedSessionId
+      ? null
+      : get().blockSessions.find((row) => row.plannedSessionId === plannedSessionId && row.completionStatus === null) ?? null;
+    if (plannedSessionId !== undefined && plannedSessionId !== get().todayPlan?.plannedSessionId && offPlanRow === null) {
+      set({ error: 'That planned session is finished or no longer in your plan, so it was not started.' });
+      return;
+    }
+    const todayPlan: TodayPlan | null = offPlanRow === null ? get().todayPlan : {
+      plannedSessionId: offPlanRow.plannedSessionId,
+      focus: offPlanRow.focus,
+      phase: offPlanRow.phase,
+      slots: get().loadSessionSlots(offPlanRow.plannedSessionId),
+      routineStress: readPlannedRoutineStress(d, offPlanRow.plannedSessionId),
+    };
     const alreadyPlannedToday = todayPlan !== null ? rowsOf<{ c: number }>(d.executeSync(
       `SELECT COUNT(*) AS c FROM session_origin
        WHERE source_planned_session_id = ?`,
       [todayPlan.plannedSessionId]
     ))[0]?.c ?? 0 : 0;
-    const consumePlan = todayPlan !== null && (alreadyPlannedToday === 0 || repeatPlanned === true);
+    // An unfinished session named for an off-plan start is always taken
+    // forward, even if it was opened before and not finished.
+    const consumePlan = todayPlan !== null
+      && (offPlanRow !== null || alreadyPlannedToday === 0 || repeatPlanned === true);
     const planToConsume = consumePlan ? todayPlan : null;
     const executionContext: ExecutableMovementAccessContext = planToConsume === null
       ? 'weight_room'
