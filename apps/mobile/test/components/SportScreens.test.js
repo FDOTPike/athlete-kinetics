@@ -187,7 +187,7 @@ describe('the sport screen in the interview', () => {
     press('sport-practice-unsure');
     expect(screen.getByLabelText('PRACTICE SESSIONS A WEEK Not sure')).toBeTruthy();
     expect(screen.getByTestId('sport-competition-note').props.children)
-      .toBe('The date is used for reminders and for reviewing your goals. It does not make the plan peak, taper or test a maximum.');
+      .toBe('Your competition date is recorded. For now the plan does not peak, taper or test for it. The date is used for reminders and for reviewing your goals.');
     press('sport-outcome-bigger_competition_lifts');
     press('sport-experience-over_5_years');
     expect(nextDisabled()).toBe(false);
@@ -199,6 +199,24 @@ describe('the sport screen in the interview', () => {
     type('sport-minutes', '');
     type('sport-competition', '2099-03-01');
     expect(nextDisabled()).toBe(false);
+  });
+
+  test('the date note is shown above the date field, before any date is typed (#229)', () => {
+    openSportSlide();
+    press('sport-family-powerlifting');
+    expect(screen.getByTestId('sport-competition').props.value).toBe('');
+    expect(screen.getByTestId('sport-competition-note').props.children).toMatch(/does not peak, taper or test for it/);
+    // Render order: the note comes before the date field, so it is read first.
+    const order = [];
+    const walk = (node) => {
+      if (node === null || typeof node !== 'object') return;
+      if (Array.isArray(node)) { node.forEach(walk); return; }
+      if (node.props?.testID !== undefined) order.push(node.props.testID);
+      walk(node.children ?? null);
+    };
+    walk(screen.toJSON());
+    expect(order.indexOf('sport-competition-note')).toBeGreaterThan(-1);
+    expect(order.indexOf('sport-competition-note')).toBeLessThan(order.indexOf('sport-competition'));
   });
 
   test('a complete sport answer is saved with the rest of the interview, in one go', async () => {
