@@ -1014,6 +1014,36 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   // to the halt card below (halting has already recorded preparation as stopped).
   const preparationOpen = preparation !== null && preparation.sessionId === session.sessionId
     && !isTerminalPreparationStatus(preparation.status);
+  // Android walk (#213): the ramp sets read in kg when today's working load
+  // for the ramped movement is known. It comes from the same resolver as the
+  // set card, and only a load the app derived (from a 1RM or an override)
+  // counts as known. Display only: the frozen protocol is not changed.
+  const rampWorkingLoad = ((): { movementId: number; movementName: string; workingLoadKg: number } | null => {
+    if (!preparationOpen || preparation === null || preparation.protocol === null) return null;
+    if (typeof state.resolveSlotLoad !== 'function') return null;
+    const rampMovementId = preparation.protocol.items.find((item) => item.stage === 'ramp')?.movementId ?? null;
+    if (rampMovementId === null) return null;
+    const rampSlot = sessionPlan.find((slot) => slot.movementId === rampMovementId);
+    const rampMovement = byId.get(rampMovementId);
+    if (rampSlot === undefined || rampMovement === undefined) return null;
+    const rampTarget = targetFor(rampSlot);
+    try {
+      const selection = state.resolveSlotLoad({
+        movementId: rampSlot.movementId,
+        bodyweightMode: rampMovement.supportedPrefixes[0] === 'Bodyweight',
+        targetReps: rampTarget.kind === 'reps' ? rampTarget.reps : null,
+        targetRpe: rampSlot.targetRpe ?? 8,
+        overrideLoadKg: rampSlot.overrideLoadKg,
+        sessionPlanSlotId: rampSlot.sessionPlanSlotId,
+      });
+      const kg = selection.initialLoadKg;
+      if (selection.source !== 'derived' || kg === null || !Number.isFinite(kg) || kg <= 0) return null;
+      return { movementId: rampMovementId, movementName: rampMovement.name, workingLoadKg: kg };
+    } catch {
+      // The kilograms are a convenience; the percentages stay if they cannot be read.
+      return null;
+    }
+  })();
   if (preparationOpen && preparation !== null && !halted) {
     return (
       <View style={styles.screen}>
@@ -1034,6 +1064,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
             onRecordItem={recordPreparationItem}
             onFinish={finishPreparation}
             onStopSession={() => { runnerHalt('manual'); endSession(); }}
+            rampWorkingLoad={rampWorkingLoad}
           />
         </KeyboardAwareScrollView>
       </View>
