@@ -75,6 +75,16 @@ export const SESSION_FEEL_RECORD_ONLY_TEXT =
   + 'During a session, use "Report discomfort" on the lift.';
 
 /**
+ * The same sentence when the Plan screen has no "Something feels off" form:
+ * Plan shows that form only once readiness exists (BlockScreen's no-readiness
+ * screen has no report form), so the sentence names only the place that is
+ * there (#180). What a report does with no readiness is not changed here.
+ */
+export const SESSION_FEEL_RECORD_ONLY_TEXT_NO_PLAN_FORM =
+  'This is a record only. It does not adjust your training. If something hurts or you feel unwell, '
+  + 'use "Report discomfort" on the lift during a session.';
+
+/**
  * Note starters: six kinds of line worth writing, each with the words a tap
  * puts into the note and one example of a finished line. Order is display order.
  */
@@ -126,6 +136,9 @@ export interface SessionFeelPanelProps {
    *  may be saved on its own. Only changes the wording; the caller decides
    *  what a save with no answer does. */
   answerOptional?: boolean;
+  /** False when the Plan screen's "Something feels off" form is not shown
+   *  (no readiness yet), so the record-only sentence does not point at it. */
+  planReportAvailable?: boolean;
   /** Asks the store to save. Returns null when saved, otherwise why not. */
   onSave: (draft: SessionFeelDraft, note: string) => SessionFeelSaveResult;
   /** Leave without saving, or after a save. */
@@ -136,7 +149,8 @@ export interface SessionFeelPanelProps {
  * The sub-view that asks how a finished session went. Starts from the saved
  * answer when there is one, so it doubles as the way to correct it.
  */
-export function SessionFeelPanel({ saved, note, answerOptional = false, onSave, onClose }: SessionFeelPanelProps): React.JSX.Element {
+export function SessionFeelPanel({ saved, note, answerOptional = false, planReportAvailable = true, onSave, onClose }: SessionFeelPanelProps): React.JSX.Element {
+  const recordOnlyText = planReportAvailable ? SESSION_FEEL_RECORD_ONLY_TEXT : SESSION_FEEL_RECORD_ONLY_TEXT_NO_PLAN_FORM;
   const [feel, setFeel] = useState<SessionFeelKind | null>(saved?.feel ?? null);
   const [reasons, setReasons] = useState<readonly SessionFeelReason[]>(saved?.reasons ?? []);
   const [noteText, setNoteText] = useState(note ?? '');
@@ -180,10 +194,10 @@ export function SessionFeelPanel({ saved, note, answerOptional = false, onSave, 
   const stoodOut = useRef(aboutTheBody);
   useEffect(() => {
     if (aboutTheBody && !stoodOut.current) {
-      AccessibilityInfo.announceForAccessibility(SESSION_FEEL_RECORD_ONLY_TEXT);
+      AccessibilityInfo.announceForAccessibility(recordOnlyText);
     }
     stoodOut.current = aboutTheBody;
-  }, [aboutTheBody]);
+  }, [aboutTheBody, recordOnlyText]);
 
   return (
     <KeyboardAwareScrollView
@@ -230,7 +244,7 @@ export function SessionFeelPanel({ saved, note, answerOptional = false, onSave, 
         style={aboutTheBody ? styles.notice : styles.standing}
         testID="session-feel-record-only"
       >
-        {SESSION_FEEL_RECORD_ONLY_TEXT}
+        {recordOnlyText}
       </Text>
 
       <View style={styles.group}>
