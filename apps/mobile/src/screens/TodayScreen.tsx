@@ -491,7 +491,15 @@ function AvailableTodayScreen({
       {suspension != null && (
         <View style={styles.card} testID="today-paused">
           <Text style={styles.eyebrow}>PROGRAMME PAUSED</Text>
-          <Text style={styles.body}>Your place is being held. You can still train.</Text>
+          {/* #188: an injury pause never invites training. */}
+          <Text style={styles.body}>
+            {suspension.reason !== 'injury'
+              ? 'Your place is being held. You can still train.'
+              : vector !== null
+                ? 'Your place is being held. If something hurts, report it under "Something feels off" on your plan.'
+                // Plan shows that form only once readiness exists (#180).
+                : 'Your place is being held. If something hurts, use "Report discomfort" during a session.'}
+          </Text>
           <QuietAction
             label="Manage pause"
             onPress={() => onOpenPlan?.()}
