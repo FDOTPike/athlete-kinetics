@@ -36,6 +36,13 @@ const secondsText = (n: number): string => {
   return min > 0 ? `${min}:${String(sec).padStart(2, '0')}` : `${value}s`;
 };
 
+/** #183: a region as the athlete reads it ("Lower back"); the stored key
+ *  ("lower_back") is what is saved. */
+const regionDisplayName = (joint: string): string => {
+  const words = joint.replace(/_/g, ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+};
+
 const GENERIC_HALT_COPY = 'A safety concern paused this session.';
 const NON_SAFETY_HALT_COPY = {
   manual: 'You chose to stop this session.',
@@ -382,7 +389,9 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [niggleRegion, setNiggleRegion] = useState<string | null>(null);
-  const [niggleSeverity, setNiggleSeverity] = useState(4);
+  // #183: no severity is preselected; a report is saved only once the
+  // athlete has chosen one.
+  const [niggleSeverity, setNiggleSeverity] = useState<number | null>(null);
   const [niggleSavedNotice, setNiggleSavedNotice] = useState(false);
   const [bandLevel, setBandLevel] = useState<number | null>(null);
   // The runner stops on the tier it started with; fall back to the profile before it starts.
@@ -598,7 +607,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
 
   useEffect(() => {
     if (currentSlot === null || target === null) return;
-    setDetailsOpen(false); setSafetyOpen(false); setNiggleRegion(null); setNiggleSeverity(4); setNiggleSavedNotice(false); setBandLevel(null);
+    setDetailsOpen(false); setSafetyOpen(false); setNiggleRegion(null); setNiggleSeverity(null); setNiggleSavedNotice(false); setBandLevel(null);
     setReps(target.kind === 'reps' ? target.reps : 1);
     setSeconds(target.kind === 'time' ? target.seconds : 30);
     // Initialize the load draft ONCE per set key from the resolver output.
@@ -1033,7 +1042,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   };
 
   const submitNiggle = (): void => {
-    if (niggleRegion === null) return;
+    if (niggleRegion === null || niggleSeverity === null) return;
     // A report that did not save keeps the form open and claims nothing.
     if (reportNiggle(niggleRegion, niggleSeverity) !== true) {
       setNiggleSavedNotice(false);
@@ -1715,7 +1724,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                                 return (
                                   <Chip
                                     key={joint}
-                                    label={joint.replace(/_/g, ' ')}
+                                    label={regionDisplayName(joint)}
                                     selected={selectedJoint}
                                     onPress={() => setNiggleRegion(joint)}
                                     accessibilityLabel={joint.replace(/_/g, ' ')}
@@ -1741,17 +1750,17 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                                 );
                               })}
                             </View>
-                            {niggleSeverity >= haltMin && (
+                            {niggleSeverity !== null && niggleSeverity >= haltMin && (
                               <Text style={styles.loadEvidence}>
                                 At this level the session stops for today.
                               </Text>
                             )}
                             <View style={{ marginTop: theme.space[3] }}>
                               <PrimaryButton
-                                label={niggleSeverity >= haltMin ? 'Save report and stop session' : 'Save report'}
+                                label={niggleSeverity !== null && niggleSeverity >= haltMin ? 'Save report and stop session' : 'Save report'}
                                 onPress={submitNiggle}
-                                disabled={niggleRegion === null}
-                                accessibilityLabel={niggleSeverity >= haltMin ? 'Save discomfort report and stop session' : 'Save discomfort report'}
+                                disabled={niggleRegion === null || niggleSeverity === null}
+                                accessibilityLabel={niggleSeverity !== null && niggleSeverity >= haltMin ? 'Save discomfort report and stop session' : 'Save discomfort report'}
                               />
                             </View>
                           </View>
