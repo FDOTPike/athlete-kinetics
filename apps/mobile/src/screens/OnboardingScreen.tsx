@@ -101,6 +101,19 @@ const AGE_COPY: Record<TrainingAge, { label: string; blurb: string }> = {
   elite: { label: 'COMPETITIVE', blurb: 'Competing, or training at that level' },
 };
 
+/**
+ * #205: the week YOUR WEEK starts from, by experience. A prefill the athlete
+ * confirms or changes on that step, applied when experience is chosen and
+ * never after the athlete has edited the week. It does not change any
+ * prescription by itself: the plan is built from the week the athlete saves.
+ */
+export const WEEK_DEFAULT_BY_AGE: Record<TrainingAge, { readonly days: number; readonly minutes: number }> = {
+  beginner: { days: 3, minutes: 45 },
+  intermediate: { days: 4, minutes: 60 },
+  advanced: { days: 4, minutes: 75 },
+  elite: { days: 4, minutes: 75 },
+};
+
 const ENERGY_COPY: Record<EnergySystem, { label: string; blurb: string }> = {
   aerobic: { label: 'AEROBIC', blurb: 'Long, steady work — the endurance engine' },
   anaerobic: { label: 'ANAEROBIC', blurb: 'Hard rounds and repeats — grappling pace' },
@@ -262,7 +275,14 @@ export default function OnboardingScreen(): React.JSX.Element {
   const activeAthleteId = useStore((s) => s.activeAthleteId);
 
   const registryName = athletes.find((a) => a.id === activeAthleteId)?.name ?? '';
-  const [draft, setDraft] = useState<UserProfile>({ ...DEFAULT_PROFILE });
+  const [draft, setDraft] = useState<UserProfile>({
+    ...DEFAULT_PROFILE,
+    weekly_frequency: WEEK_DEFAULT_BY_AGE[DEFAULT_PROFILE.training_age].days,
+    session_duration_cap_min: WEEK_DEFAULT_BY_AGE[DEFAULT_PROFILE.training_age].minutes,
+  });
+  // #205: true once the athlete changes days or minutes; from then on a change
+  // of experience leaves their week alone.
+  const [weekEdited, setWeekEdited] = useState(false);
   const [name, setName] = useState(registryName === 'Athlete 1' ? '' : registryName);
   const [injuryText, setInjuryText] = useState('');
   const [mobilityText, setMobilityText] = useState('');
@@ -308,7 +328,9 @@ export default function OnboardingScreen(): React.JSX.Element {
 
   const selectTrainingAge = (age: TrainingAge): void => {
     const prior = draft.training_age;
-    patch({ training_age: age });
+    patch(weekEdited
+      ? { training_age: age }
+      : { training_age: age, weekly_frequency: WEEK_DEFAULT_BY_AGE[age].days, session_duration_cap_min: WEEK_DEFAULT_BY_AGE[age].minutes });
     setLoadPreference((current) => transitionLoadPreference(prior, age, current, loadPreferenceExplicit));
     if (age === 'beginner') setLoadPreferenceExplicit(false);
   };
@@ -616,17 +638,22 @@ export default function OnboardingScreen(): React.JSX.Element {
             <Stepper
               label="TRAINING DAYS PER WEEK"
               value={String(draft.weekly_frequency)}
-              onDecrement={() => patch({ weekly_frequency: Math.max(1, draft.weekly_frequency - 1) })}
-              onIncrement={() => patch({ weekly_frequency: Math.min(7, draft.weekly_frequency + 1) })}
+              onDecrement={() => { setWeekEdited(true); patch({ weekly_frequency: Math.max(1, draft.weekly_frequency - 1) }); }}
+              onIncrement={() => { setWeekEdited(true); patch({ weekly_frequency: Math.min(7, draft.weekly_frequency + 1) }); }}
               style={styles.stepperBlock}
             />
             <Stepper
               label="MINUTES IN A SESSION, TOPS"
               value={`${draft.session_duration_cap_min} min`}
-              onDecrement={() => patch({ session_duration_cap_min: Math.max(15, draft.session_duration_cap_min - 15) })}
-              onIncrement={() => patch({ session_duration_cap_min: Math.min(240, draft.session_duration_cap_min + 15) })}
+              onDecrement={() => { setWeekEdited(true); patch({ session_duration_cap_min: Math.max(15, draft.session_duration_cap_min - 15) }); }}
+              onIncrement={() => { setWeekEdited(true); patch({ session_duration_cap_min: Math.min(240, draft.session_duration_cap_min + 15) }); }}
               style={styles.stepperBlock}
             />
+            {!weekEdited && (
+              <Text style={styles.pDim} testID="onboarding-week-suggestion">
+                {`Suggested for ${AGE_COPY[draft.training_age].label}: ${draft.weekly_frequency} days a week, up to ${draft.session_duration_cap_min} minutes each. Change it to fit your week.`}
+              </Text>
+            )}
             <Text style={styles.pDim}>
               Choose a week that feels manageable. A realistic ceiling beats an optimistic one. You can change this later in Athlete Profile.
             </Text>
