@@ -43,6 +43,11 @@ try {
   assert.equal(argvRun.status, 2);
   assert.match(argvRun.stderr, /never accepted on the command line/);
   assert.equal(existsSync(join(work, 'cli-argv')), false);
+  const equalsRun = spawnSync(process.execPath, [cli, '--backup', pmbakPath, '--manifest', manifestPath, '--out', join(work, 'cli-equals'), `--password=${SYNTHETIC_PASSWORD}`], { encoding: 'utf8', input: '' });
+  assert.equal(equalsRun.status, 2);
+  assert.match(equalsRun.stderr, /never accepted on the command line/);
+  assert.equal(`${equalsRun.stdout}${equalsRun.stderr}`.includes(SYNTHETIC_PASSWORD), false, 'the password must never be echoed');
+  assert.equal(existsSync(join(work, 'cli-equals')), false);
   const envRun = spawnSync(process.execPath, [cli, '--backup', pmbakPath, '--manifest', manifestPath, '--out', join(work, 'cli-env')], {
     encoding: 'utf8', input: '', env: { ...process.env, AK_BACKUP_PASSWORD: SYNTHETIC_PASSWORD, BACKUP_PASSWORD: SYNTHETIC_PASSWORD },
   });

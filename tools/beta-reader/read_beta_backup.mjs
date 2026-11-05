@@ -25,7 +25,10 @@ const options = {};
 const argv = process.argv.slice(2);
 for (let index = 0; index < argv.length; index += 1) {
   const flag = argv[index];
-  if (REFUSED.has(flag)) fail('The password is never accepted on the command line. You will be asked for it at a hidden prompt.');
+  // The name is the part before any '='. A password written as --password=... is refused
+  // by name, and nothing after '=' is ever echoed back.
+  const name = flag.split('=')[0];
+  if (REFUSED.has(name)) fail('The password is never accepted on the command line. You will be asked for it at a hidden prompt.');
   if (BOOLEAN_FLAGS.has(flag)) { options[flag] = true; continue; }
   if (VALUE_FLAGS.has(flag)) {
     const value = argv[index + 1];
@@ -34,7 +37,8 @@ for (let index = 0; index < argv.length; index += 1) {
     index += 1;
     continue;
   }
-  fail(`Unknown option: ${flag.slice(0, 40)}`);
+  // Unknown arguments are not echoed: an unrecognised token may be a secret typed in the wrong place.
+  fail('Unknown argument. Usage: --backup <file.pmbak> --manifest <consent.json> --out <folder> [--label <name>] [--include-free-text]');
 }
 for (const required of ['--backup', '--manifest', '--out']) {
   if (!options[required]) fail(`Missing ${required}. Usage: --backup <file.pmbak> --manifest <consent.json> --out <folder>`);
