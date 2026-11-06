@@ -72,8 +72,21 @@ const scrollerOf = () => {
     .find((instance) => instance && typeof instance.scrollTo === 'function');
 };
 
-test('after Skip preparation the workout scrolls the current card into view once its layout is known', () => {
+// The current row is measured fresh when the scroll runs. Frames are run by the test.
+const measureCurrentRowAt = (y) => {
+  let node = screen.getByTestId('session-current-row');
+  while (node && !(node.instance && typeof node.instance.measureLayout === 'function')) node = node.parent;
+  node.instance.measureLayout = jest.fn((_relativeTo, onSuccess) => onSuccess(0, y, 0, 0));
+  return node.instance;
+};
+
+test('after Skip preparation the workout scrolls once, to the current row measured after the frame', () => {
   const { theme } = require('../../src/theme/theme');
+  const frames = new Map();
+  let nextId = 1;
+  jest.spyOn(global, 'requestAnimationFrame').mockImplementation((cb) => { const id = nextId; nextId += 1; frames.set(id, cb); return id; });
+  jest.spyOn(global, 'cancelAnimationFrame').mockImplementation((id) => { frames.delete(id); });
+
   startFromScreen();
   expect(screen.getByTestId('preparation-panel')).toBeTruthy();
   act(() => { fireEvent.press(screen.getByTestId('preparation-skip')); });
@@ -81,9 +94,14 @@ test('after Skip preparation the workout scrolls the current card into view once
   expect(screen.getByTestId('session-timeline')).toBeTruthy();
 
   const scrollTo = jest.spyOn(scrollerOf(), 'scrollTo');
-  fireEvent(screen.getByTestId('session-timeline'), 'layout', { nativeEvent: { layout: { x: 0, y: 100, width: 300, height: 500 } } });
+  const row = measureCurrentRowAt(250);
   expect(scrollTo).not.toHaveBeenCalled();
-  fireEvent(screen.getByTestId('session-current-row'), 'layout', { nativeEvent: { layout: { x: 0, y: 200, width: 300, height: 300 } } });
+  act(() => {
+    const pending = [...frames.values()];
+    frames.clear();
+    pending.forEach((cb) => cb(0));
+  });
+  expect(row.measureLayout).toHaveBeenCalledTimes(1);
   expect(scrollTo).toHaveBeenCalledTimes(1);
-  expect(scrollTo).toHaveBeenCalledWith({ y: 100 + 200 - theme.space[4], animated: true });
+  expect(scrollTo).toHaveBeenCalledWith({ y: 250 - theme.space[4], animated: true });
 });

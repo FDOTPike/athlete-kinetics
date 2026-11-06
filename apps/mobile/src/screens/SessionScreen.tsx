@@ -1,6 +1,6 @@
 /** Phase 17 utility-first active-session surface. */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View, findNodeHandle } from 'react-native';
 import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING_NOTE, EFFORT_STOP_GUIDANCE, effortCue, mapRirToRpe, RIR_OPTIONS, PREPARATION_STATUS_LABEL, isTerminalPreparationStatus, preparationDoseUnit, type EffortAnswer, type RunnerHaltReason } from '@ak/inference';
 import { EXPERIENCE_SEVERITY, runnerTierForTrainingAge } from '../../../../packages/inference/src/sessionRunner';
 import { formatTeachingOnlyReason, freeFormStartIsEmpty, useStore, type LoadSelection, type LoggedSet, type SetLoadShown, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
@@ -496,50 +496,6 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   const currentMovement: Movement | null = currentSlot === null ? null : byId.get(runnerCurrent?.movementId ?? currentSlot.movementId) ?? byId.get(currentSlot.movementId) ?? null;
   const currentLogged = currentSlot === null ? 0 : (runner !== null && (runner.slotIndex ?? -1) >= 0 && runner.slotSetCounts?.[runner.slotIndex] != null ? Math.max(loggedCount(currentSlot), runner.slotSetCounts[runner.slotIndex]) : loggedCount(currentSlot));
 
-  // Android walk 2026-11-03 (W6-4): after Log set, or when preparation ends, the
-  // scroll position stayed where it was, so the current card and its rest timer
-  // could sit off-screen. The workout scrolls to the current row when one of
-  // those changes. Positions are the last layouts of the timeline and of each row;
-  // a change waits only for the layouts it needs, and no later layout can scroll on its own.
-  const timelineTop = useRef<number | null>(null);
-  const rowTops = useRef(new Map<number, number>());
-  const pendingScrollSlotId = useRef<number | null>(null);
-  const scrollToRow = (slotId: number | null): boolean => {
-    const top = timelineTop.current;
-    const rowTop = slotId === null ? undefined : rowTops.current.get(slotId);
-    if (top === null || rowTop === undefined) return false;
-    timelineRef.current?.scrollTo({ y: Math.max(0, top + rowTop - theme.space[4]), animated: true });
-    return true;
-  };
-  const flushPendingScroll = (): void => {
-    if (pendingScrollSlotId.current !== null && scrollToRow(pendingScrollSlotId.current)) {
-      pendingScrollSlotId.current = null;
-    }
-  };
-  const measureRow = (slotId: number) => (event: { nativeEvent: { layout: { y: number } } }): void => {
-    rowTops.current.set(slotId, event.nativeEvent.layout.y);
-    flushPendingScroll();
-  };
-  const currentSlotId = currentSlot?.sessionPlanSlotId ?? null;
-  const scrollPreparationOpen = preparation !== null && preparation.sessionId === session?.sessionId
-    && !isTerminalPreparationStatus(preparation.status);
-  const scrollKey = `${scrollPreparationOpen}|${runnerPhase}|${currentLogged}|${currentSlotId}`;
-  const lastScrollKey = useRef<string | null>(null);
-  useEffect(() => {
-    if (lastScrollKey.current === scrollKey) return;
-    const mounting = lastScrollKey.current === null;
-    lastScrollKey.current = scrollKey;
-    if (mounting) return;
-    // The timeline is not on screen during preparation, so its positions are gone.
-    if (scrollPreparationOpen) {
-      timelineTop.current = null;
-      rowTops.current.clear();
-      pendingScrollSlotId.current = null;
-      return;
-    }
-    // Scroll now when the positions are known; otherwise the layouts of the new timeline do it.
-    pendingScrollSlotId.current = scrollToRow(currentSlotId) ? null : currentSlotId;
-  }, [scrollKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const subTargetSlot = substitution === null
     ? null
@@ -559,6 +515,45 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   const runnerComplete = runnerPhase === 'complete';
   const halted = runnerPhase === 'halted' || (!runnerComplete && triageHalted);
   const complete = !halted && sessionPlan.length > 0 && (runnerComplete || allDone);
+
+  // Android walk 2026-11-03 (W6-4): after Log set, or when preparation ends, the
+  // workout scroll position stayed where it was, so the current card and its rest
+  // timer could sit off-screen. When the scroll key changes, one scroll is
+  // scheduled for after the next frame. It measures the current row fresh, so no
+  // stored position can be stale. Nothing scrolls when the session is halted or
+  // complete, while preparation is open, or when the current row is not on screen.
+  const scrollPreparationOpen = preparation !== null && preparation.sessionId === session?.sessionId
+    && !isTerminalPreparationStatus(preparation.status);
+  const currentRowRef = useRef<View | null>(null);
+  const scrollState = useRef({ halted, complete, preparationOpen: scrollPreparationOpen });
+  useEffect(() => {
+    scrollState.current = { halted, complete, preparationOpen: scrollPreparationOpen };
+  });
+  const currentSlotId = currentSlot?.sessionPlanSlotId ?? null;
+  const scrollKey = `${scrollPreparationOpen}|${runnerPhase}|${currentLogged}|${currentSlotId}`;
+  const lastScrollKey = useRef<string | null>(null);
+  useEffect(() => {
+    if (lastScrollKey.current === null) {
+      lastScrollKey.current = scrollKey;
+      return undefined;
+    }
+    if (lastScrollKey.current === scrollKey) return undefined;
+    lastScrollKey.current = scrollKey;
+    const frame = requestAnimationFrame(() => {
+      const now = scrollState.current;
+      const row = currentRowRef.current;
+      const scroller = timelineRef.current;
+      if (now.halted || now.complete || now.preparationOpen || row === null || scroller === null) return;
+      const handle = findNodeHandle(scroller);
+      if (handle === null) return;
+      row.measureLayout(
+        handle,
+        (_x, y) => { scroller.scrollTo({ y: Math.max(0, y - theme.space[4]), animated: true }); },
+        () => undefined,
+      );
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [scrollKey]);
   const target = currentSlot === null ? null : targetFor(currentSlot);
   const oneRm = currentSlot === null ? undefined : oneRepMaxes[currentSlot.movementId];
   // P2-2 (Opus audit): bodyweightMode is true ONLY when the canonical first
@@ -1250,10 +1245,6 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
           <View
             style={styles.timeline}
             testID="session-timeline"
-            onLayout={(event) => {
-              timelineTop.current = event.nativeEvent.layout.y;
-              flushPendingScroll();
-            }}
           >
             {sessionPlan.map((slot) => {
               const movement = byId.get(slot.movementId);
@@ -1283,7 +1274,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                   <View
                     key={slot.sessionPlanSlotId}
                     style={[styles.timelineRow, styles.replacedRow]}
-                    onLayout={measureRow(slot.sessionPlanSlotId)}
+                   
                     accessibilityRole="text"
                     accessibilityLabel={swappedLabel}
                     accessibilityState={{ disabled: true }}
@@ -1315,7 +1306,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                 const includesSuffix = asNames.length > 0 ? ` · includes ${asNames.join(', ')}` : '';
 
                 return (
-                  <View key={slot.sessionPlanSlotId} style={styles.timelineRow} onLayout={measureRow(slot.sessionPlanSlotId)}>
+                  <View key={slot.sessionPlanSlotId} style={styles.timelineRow}>
                     <View style={styles.rail}>
                       <View style={[styles.dot, styles.dotComplete]}>
                         <Text style={styles.check}>✓</Text>
@@ -1343,7 +1334,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                   : `${name}, skipped, no sets logged`;
 
                 return (
-                  <View key={slot.sessionPlanSlotId} style={styles.timelineRow} onLayout={measureRow(slot.sessionPlanSlotId)}>
+                  <View key={slot.sessionPlanSlotId} style={styles.timelineRow}>
                     <View style={styles.rail}>
                       <View style={[styles.dot, styles.dotSkipped]}>
                         <Text style={styles.skipMark}>–</Text>
@@ -1369,7 +1360,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
 
               if (!active) {
                 return (
-                  <View key={slot.sessionPlanSlotId} style={styles.timelineRow} onLayout={measureRow(slot.sessionPlanSlotId)}>
+                  <View key={slot.sessionPlanSlotId} style={styles.timelineRow}>
                     <View style={styles.rail}>
                       <View style={styles.dot} />
                     </View>
@@ -1397,7 +1388,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                   key={slot.sessionPlanSlotId}
                   style={styles.timelineRow}
                   testID="session-current-row"
-                  onLayout={measureRow(slot.sessionPlanSlotId)}
+                  ref={currentRowRef}
                 >
                   {/* Left Active Spine (Chalk marks CURRENT/ACTIVE only) */}
                   <View style={[styles.rail, styles.railActive]}>

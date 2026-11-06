@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { RIR_OPTIONS } from '@ak/inference';
 import { resolveLoadSelection as actualResolveLoadSelection } from '../../../../packages/inference/src/loadSelection';
 import { isDifficultyAllowed as actualIsDifficultyAllowed } from '../../../../packages/inference/src/tierPolicy';
@@ -199,6 +199,27 @@ const makeState = ({ plannedSets = 3, loggedSets = [] } = {}) => {
     });
   return base;
 };
+
+// Frames are queued and run by the test, so each scroll happens at a known point.
+let frames;
+let nextFrameId = 1;
+beforeEach(() => {
+  frames = new Map();
+  jest.spyOn(global, 'requestAnimationFrame').mockImplementation((cb) => {
+    const id = nextFrameId;
+    nextFrameId += 1;
+    frames.set(id, cb);
+    return id;
+  });
+  jest.spyOn(global, 'cancelAnimationFrame').mockImplementation((id) => { frames.delete(id); });
+});
+afterEach(() => { jest.restoreAllMocks(); });
+const runFrames = () => act(() => {
+  const pending = [...frames.values()];
+  frames.clear();
+  pending.forEach((cb) => cb(0));
+});
+
 const scrollerOf = () => {
   const { ScrollView } = require('react-native');
   return screen.UNSAFE_getAllByType(ScrollView)
@@ -206,12 +227,17 @@ const scrollerOf = () => {
     .find((instance) => instance && typeof instance.scrollTo === 'function');
 };
 
-const measure = () => {
-  fireEvent(screen.getByTestId('session-timeline'), 'layout', { nativeEvent: { layout: { x: 0, y: 100, width: 300, height: 500 } } });
-  fireEvent(screen.getByTestId('session-current-row'), 'layout', { nativeEvent: { layout: { x: 0, y: 200, width: 300, height: 300 } } });
+// The current row's position is measured fresh when a scroll runs; nothing is stored.
+const measureCurrentRowAt = (y) => {
+  // The ref the screen holds is the component instance that owns the host node.
+  let node = screen.getByTestId('session-current-row');
+  while (node && !(node.instance && typeof node.instance.measureLayout === 'function')) node = node.parent;
+  const row = node.instance;
+  row.measureLayout = jest.fn((_relativeTo, onSuccess) => onSuccess(0, y, 0, 0));
+  return row;
 };
 
-// A Barbell movement with an empty load, so typing a load is needed before Log set.
+// A barbell movement with an empty load, so typing a load is needed before Log set.
 const barbellSetUp = () => {
   mockState = makeState({ plannedSets: 3, loggedSets: [] });
   mockState.substitution = null;
@@ -228,36 +254,91 @@ const barbellSetUp = () => {
   });
 };
 
-test('after Log set with the rest timer off, the current card scrolls into view once', () => {
+test('after Log set with the rest timer off, the current row is measured fresh and the workout scrolls once', () => {
   const { theme } = require('../../src/theme/theme');
   barbellSetUp();
   const { rerender } = render(<SessionScreen />);
-  measure();
   const scrollTo = jest.spyOn(scrollerOf(), 'scrollTo');
+  const row = measureCurrentRowAt(200);
 
   fireEvent.changeText(screen.getByTestId('session-load-input'), '77.5');
   rerender(<SessionScreen />);
+  runFrames();
   expect(scrollTo).not.toHaveBeenCalled();
 
   fireEvent.press(screen.getByLabelText('Log set 1 for Push-up'));
   rerender(<SessionScreen />);
+  runFrames();
   expect(mockState.logSet).toHaveBeenCalledTimes(1);
+  expect(row.measureLayout).toHaveBeenCalledTimes(1);
   expect(scrollTo).toHaveBeenCalledTimes(1);
-  expect(scrollTo).toHaveBeenCalledWith({ y: 100 + 200 - theme.space[4], animated: true });
+  expect(scrollTo).toHaveBeenCalledWith({ y: 200 - theme.space[4], animated: true });
 });
 
 test('typing a load and choosing effort do not scroll the workout', () => {
   barbellSetUp();
   const { rerender } = render(<SessionScreen />);
-  measure();
   const scrollTo = jest.spyOn(scrollerOf(), 'scrollTo');
+  const row = measureCurrentRowAt(200);
 
   fireEvent.changeText(screen.getByTestId('session-load-input'), '77.5');
   rerender(<SessionScreen />);
   fireEvent.press(screen.getByText(RIR_OPTIONS[0].label));
   rerender(<SessionScreen />);
-  fireEvent(screen.getByTestId('session-current-row'), 'layout', { nativeEvent: { layout: { x: 0, y: 200, width: 300, height: 340 } } });
+  runFrames();
 
+  expect(row.measureLayout).not.toHaveBeenCalled();
+  expect(scrollTo).not.toHaveBeenCalled();
+});
+
+test('moving from slot 1 to slot 2 scrolls to slot 2 at its fresh measured position, not an old one', () => {
+  const { theme } = require('../../src/theme/theme');
+  mockState = makeState({ plannedSets: 3, loggedSets: [] });
+  mockState.substitution = null;
+  mockState.uiPreferences = { ...mockState.uiPreferences, restTimerEnabled: false };
+  const { rerender } = render(<SessionScreen />);
+  const scrollTo = jest.spyOn(scrollerOf(), 'scrollTo');
+  measureCurrentRowAt(200);
+
+  // Slot 1 is finished (three logged sets); slot 2 is now current. Its row has moved down.
+  mockState.session = {
+    ...mockState.session,
+    sets: [1, 2, 3].map((n) => ({ ...loggedSet(300 + n, 1, 'Push-up', n, 1), load_kg: 60 })),
+  };
+  mockState.runner = { ...mockState.runner, slotIndex: 1, slotSetCounts: [3, 0], loggedSets: 3, setIndex: 1 };
+  mockState.activeSessionPlanSlotId = 2;
+  rerender(<SessionScreen />);
+  const row = measureCurrentRowAt(420);
+  runFrames();
+
+  expect(row.measureLayout).toHaveBeenCalledTimes(1);
+  expect(scrollTo).toHaveBeenCalledTimes(1);
+  expect(scrollTo).toHaveBeenCalledWith({ y: 420 - theme.space[4], animated: true });
+});
+
+test('a halted session does not scroll', () => {
+  barbellSetUp();
+  const { rerender } = render(<SessionScreen />);
+  // The timeline and its rows have been laid out on screen before the phase changes.
+  fireEvent(screen.getByTestId('session-timeline'), 'layout', { nativeEvent: { layout: { x: 0, y: 100, width: 300, height: 500 } } });
+  fireEvent(screen.getByTestId('session-current-row'), 'layout', { nativeEvent: { layout: { x: 0, y: 200, width: 300, height: 300 } } });
+  const scrollTo = jest.spyOn(scrollerOf(), 'scrollTo');
+  mockState.runner = { ...mockState.runner, phase: 'halted' };
+  rerender(<SessionScreen />);
+  runFrames();
+  expect(scrollTo).not.toHaveBeenCalled();
+});
+
+test('a complete session does not scroll', () => {
+  barbellSetUp();
+  const { rerender } = render(<SessionScreen />);
+  // The timeline and its rows have been laid out on screen before the phase changes.
+  fireEvent(screen.getByTestId('session-timeline'), 'layout', { nativeEvent: { layout: { x: 0, y: 100, width: 300, height: 500 } } });
+  fireEvent(screen.getByTestId('session-current-row'), 'layout', { nativeEvent: { layout: { x: 0, y: 200, width: 300, height: 300 } } });
+  const scrollTo = jest.spyOn(scrollerOf(), 'scrollTo');
+  mockState.runner = { ...mockState.runner, phase: 'complete' };
+  rerender(<SessionScreen />);
+  runFrames();
   expect(scrollTo).not.toHaveBeenCalled();
 });
 
