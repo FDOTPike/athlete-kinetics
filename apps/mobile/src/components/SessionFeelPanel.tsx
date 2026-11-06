@@ -151,6 +151,14 @@ export function SessionFeelPanel({ saved, note, answerOptional = false, onSave, 
   // Stays true once a "Body" line was started in this visit, whatever is tapped next.
   const [bodyLineStarted, setBodyLineStarted] = useState(false);
 
+  /** Choose an answer. A different answer starts with no reasons: a reason
+   *  tapped under the earlier answer, even one both lists offer, was given
+   *  for that answer, not this one. */
+  const chooseFeel = (kind: SessionFeelKind): void => {
+    if (kind !== feel) setReasons([]);
+    setFeel(kind);
+  };
+
   /** Tap a reason on or off. Any earlier "could not save" message is cleared. */
   const toggleReason = (reason: SessionFeelReason): void => {
     setProblem(null);
@@ -210,7 +218,7 @@ export function SessionFeelPanel({ saved, note, answerOptional = false, onSave, 
             key={kind}
             label={SESSION_FEEL_LABEL[kind]}
             selected={feel === kind}
-            onPress={() => { setProblem(null); setFeel(kind); }}
+            onPress={() => { setProblem(null); chooseFeel(kind); }}
             testID={`session-feel-${kind}`}
           />
         ))}

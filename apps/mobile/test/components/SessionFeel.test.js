@@ -143,6 +143,30 @@ describe('SessionFeelPanel: an answer by tapping', () => {
     expect(describeSessionFeel({ feel: 'harder', reasons: ['unwell', 'too_heavy'] })).toBe('Harder than planned. Unwell, load too heavy.');
   });
 
+  test('changing the answer clears the reasons tapped under the earlier one, even one both lists offer', () => {
+    const onSave = ruleOnly();
+    render(<SessionFeelPanel saved={null} note={null} onSave={onSave} onClose={jest.fn()} />);
+    fireEvent.press(screen.getByTestId('session-feel-harder'));
+    fireEvent.press(screen.getByTestId('session-feel-reason-other'));
+    fireEvent.press(screen.getByTestId('session-feel-easier'));
+    expect(screen.getByTestId('session-feel-reason-other').props.accessibilityState.selected).toBe(false);
+    fireEvent.press(screen.getByTestId('session-feel-save'));
+    expect(onSave).toHaveBeenLastCalledWith({ feel: 'easier', reasons: [] }, '');
+
+    // Harder and stopped early share a list; a reason for one is not assumed for the other.
+    fireEvent.press(screen.getByTestId('session-feel-harder'));
+    fireEvent.press(screen.getByTestId('session-feel-reason-tired'));
+    fireEvent.press(screen.getByTestId('session-feel-stopped_early'));
+    fireEvent.press(screen.getByTestId('session-feel-save'));
+    expect(onSave).toHaveBeenLastCalledWith({ feel: 'stopped_early', reasons: [] }, '');
+
+    // Tapping the answer that is already chosen keeps its reasons.
+    fireEvent.press(screen.getByTestId('session-feel-reason-pain'));
+    fireEvent.press(screen.getByTestId('session-feel-stopped_early'));
+    fireEvent.press(screen.getByTestId('session-feel-save'));
+    expect(onSave).toHaveBeenLastCalledWith({ feel: 'stopped_early', reasons: ['pain'] }, '');
+  });
+
   test('a reason can be untapped again', () => {
     const onSave = ruleOnly();
     render(<SessionFeelPanel saved={null} note={null} onSave={onSave} onClose={jest.fn()} />);
