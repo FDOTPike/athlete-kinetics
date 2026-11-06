@@ -216,9 +216,23 @@ export const matchPreviousFacts = (
 
 const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`;
 
+/** "3 of 4 sets", "1 of 1 set": the noun follows the planned count (Walk 2, W2-10). */
+export const setsOfPlanned = (logged: number, planned: number): string =>
+  `${logged} of ${planned} ${planned === 1 ? 'set' : 'sets'}`;
+
+/** A session focus as the athlete reads it: "Lower", "Full Body", "BJJ"
+ *  (Walk 2, W2-10: "Bjj session" on Today and in the summary). */
+export const sessionFocusName = (focus: string): string => {
+  if (focus.length === 0) return 'Session';
+  return focus.split('_').map((part) => (part.toLowerCase() === 'bjj'
+    ? 'BJJ'
+    : part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())).join(' ');
+};
+
+// Loads are logged in 0.25 kg steps (issue #233), so 22.75 kg is named as is.
 const loadCopy = (loadKg: number): string => {
-  const rounded = Math.round(loadKg * 10) / 10;
-  return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)} kg`;
+  const rounded = Math.round(loadKg * 100) / 100;
+  return `${String(rounded)} kg`;
 };
 
 /**
@@ -240,7 +254,7 @@ const exerciseLine = (exercise: SummaryExercise): SummaryLine => {
   const count = exercise.plannedSets === null
     ? plural(logged, 'set')
     : logged === exercise.plannedSets
-      ? `${logged} of ${exercise.plannedSets} sets`
+      ? setsOfPlanned(logged, exercise.plannedSets)
       : `${plural(logged, 'set')} logged · ${exercise.plannedSets} planned`;
   const reps = exercise.sets.filter((s) => s.reps > 0);
   const timed = exercise.sets.filter((s) => s.timeS !== null && s.timeS! > 0);
@@ -278,8 +292,27 @@ const comparisonLine = (exercise: SummaryExercise, facts: PreviousFacts): Summar
   };
 };
 
+/** A planned slot the athlete skipped, with what was logged for it first. */
+export interface SkippedExercise {
+  name: string;
+  plannedSets: number;
+  loggedSets: number;
+  /** Other movements logged in this slot (a swap), in logged order. */
+  loggedAs: readonly string[];
+}
+
+/** The session timeline's wording for a skipped exercise; one source for the
+ *  completion card and the summary. */
+export const skippedExerciseText = (skipped: SkippedExercise): string => {
+  if (skipped.loggedSets <= 0) return `Skipped: ${skipped.name} · no sets logged`;
+  const loggedSuffix = skipped.loggedAs.length > 0 ? ` as ${skipped.loggedAs.join(', ')}` : '';
+  return `Skipped: ${skipped.name} · ${setsOfPlanned(skipped.loggedSets, skipped.plannedSets)} logged${loggedSuffix}`;
+};
+
 export interface SessionSummaryView {
   exerciseLines: SummaryLine[];
+  /** One line per skipped exercise, in the session timeline's wording. */
+  skippedLines: SummaryLine[];
   comparisonLines: SummaryLine[];
   durationLine: string | null;
   nextLine: string | null;
@@ -292,6 +325,8 @@ export interface BuildSummaryInput {
   durationMin: number | null;
   blockSessions: readonly TodayBlockSession[];
   today: string;
+  /** The exercises the athlete skipped, in plan order. */
+  skippedExercises?: readonly SkippedExercise[];
 }
 
 export const buildSessionSummary = (input: BuildSummaryInput): SessionSummaryView => {
@@ -312,13 +347,18 @@ export const buildSessionSummary = (input: BuildSummaryInput): SessionSummaryVie
   // is exported as NO_NEXT_SESSION_TEXT (the single source of truth; the
   // screen renders it directly).
   const next: SessionRef | null = nextSessionAfter(input.blockSessions, input.today);
+  const skippedLines: SummaryLine[] = (input.skippedExercises ?? []).map((skipped, index) => ({
+    key: `skipped-${index}`,
+    text: skippedExerciseText(skipped),
+  }));
   return {
     exerciseLines,
+    skippedLines,
     comparisonLines,
     durationLine,
     nextLine: next === null
       ? null
-      : `Next: ${next.focus.charAt(0).toUpperCase()}${next.focus.slice(1).toLowerCase()} session on ${next.sessionDate} — ${plural(next.slotCount, 'movement')}.`,
+      : `Next: ${sessionFocusName(next.focus)} session on ${next.sessionDate} — ${plural(next.slotCount, 'movement')}.`,
   };
 };
 

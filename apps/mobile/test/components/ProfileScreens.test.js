@@ -174,7 +174,8 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
   });
 
   describe('Reset training data', () => {
-    const caption = "This removes training history, telemetry, blocks, and today's reports. Your profile and saved profile slots remain.";
+    // Walk W4-6: the reset names the active athlete, the only one it changes.
+    const caption = "This removes Default Athlete's training history, telemetry, blocks, and today's reports. Their profile, saved profile slots and other athletes are not changed.";
     const resetSection = () => within(screen.getByTestId('reset-training-data-section'));
 
     const openReset = async () => {
@@ -213,7 +214,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       expect(section.getByLabelText('Continue to reset training data')).toBeEnabled();
 
       fireEvent.press(section.getByTestId('reset-continue-button'));
-      expect(section.getByText('This cannot be undone. Reset the training data?')).toBeOnTheScreen();
+      expect(section.getByText("This cannot be undone. Reset Default Athlete's training data?")).toBeOnTheScreen();
       expect(section.getByTestId('reset-confirm-button')).toHaveTextContent('Reset training data');
       expect(section.getByLabelText('Confirm reset training data')).toBeOnTheScreen();
       expect(section.getByTestId('reset-keep-button')).toHaveTextContent('Keep my data');
@@ -675,7 +676,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     pressNext();
     fireEvent.press(screen.getByLabelText('Increase TRAINING DAYS PER WEEK'));
     pressNext();
-    fireEvent.press(screen.getByRole('button', { name: /MINIMAL\. No equipment/ }));
+    fireEvent.press(screen.getByRole('button', { name: /MINIMAL\. Bands and mats only/ }));
     pressNext();
     fireEvent.press(screen.getByLabelText('No, nothing to note'));
     pressNext();
@@ -749,6 +750,11 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     expect(screen.getByLabelText('SQUAT one rep max in kilograms, type to set').props.value).toBe('142.5');
     fireEvent(squat, 'endEditing', { nativeEvent: { text: '142.5' } });
     expect(mockState.saveOneRepMax).toHaveBeenCalledWith(11, 142.5);
+    // Issue #233: a quarter-kilogram max stays as typed (no snap to 2.5).
+    fireEvent.changeText(squat, '251.25');
+    fireEvent(squat, 'endEditing', { nativeEvent: { text: '251.25' } });
+    expect(mockState.saveOneRepMax).toHaveBeenLastCalledWith(11, 251.25);
+    expect(screen.getByLabelText('SQUAT one rep max in kilograms, type to set').props.value).toBe('251.25');
   });
 
   test('Profile load selection is disabled during an active session', () => {

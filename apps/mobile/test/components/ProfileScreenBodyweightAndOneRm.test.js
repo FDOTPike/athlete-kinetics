@@ -52,7 +52,7 @@ beforeEach(async () => {
 });
 
 describe('ProfileScreen OneRmRow and Bodyweight inputs preserve saved values and re-sync text on endEditing', () => {
-  test('OneRmRow resets displayed text to snapped valueKg ("100.0") when entered text ("101") snaps to existing valueKg', () => {
+  test('OneRmRow resets displayed text to snapped valueKg ("100.0") when entered text ("100.1") snaps to existing valueKg', () => {
     // Save Squat 1RM = 100.0 kg
     useStore.getState().saveOneRepMax(1, 100);
     expect(useStore.getState().oneRepMaxes[1]).toBe(100);
@@ -66,8 +66,9 @@ describe('ProfileScreen OneRmRow and Bodyweight inputs preserve saved values and
     const squatInput = screen.getAllByLabelText(/one rep max in kilograms, type to set/i)[0];
     expect(squatInput.props.value).toBe('100.0');
 
-    // Type "101" and finish editing: saveOneRepMax snaps 101 -> 100.0 (2.5 kg increment)
-    fireEvent.changeText(squatInput, '101');
+    // Type "100.1" and finish editing: saveOneRepMax snaps 100.1 -> 100.0
+    // (0.25 kg grid, issue #233; 101 is now a loggable max).
+    fireEvent.changeText(squatInput, '100.1');
     fireEvent(squatInput, 'endEditing');
 
     // Also enter invalid sub-20 bodyweight "15" into Bodyweight today in kilograms and finish editing
@@ -76,7 +77,7 @@ describe('ProfileScreen OneRmRow and Bodyweight inputs preserve saved values and
     fireEvent(bwInput, 'endEditing');
 
     expect(useStore.getState().oneRepMaxes[1]).toBe(100);
-    // Input values must reflect the persisted values ("100.0" and "") rather than leaving unsaved "101" and "15" on screen
+    // Input values must reflect the persisted values ("100.0" and "") rather than leaving unsaved "100.1" and "15" on screen
     expect({
       squatInputText: screen.getAllByLabelText(/one rep max in kilograms, type to set/i)[0].props.value,
       bodyweightInputText: screen.getByLabelText('Bodyweight today in kilograms').props.value,
@@ -109,5 +110,46 @@ describe('ProfileScreen OneRmRow and Bodyweight inputs preserve saved values and
     fireEvent(bwInput, 'endEditing');
     expect(useStore.getState().loadMeasuredHistory(14).find((r) => r.date === today)?.bodyweightKg).toBe(82.5);
     expect(screen.getByLabelText('Bodyweight today in kilograms').props.value).toBe('82.5');
+  });
+});
+
+// Review (PR 194): "Saved as 500.0 kg" describes one saved value. Once the
+// athlete types again, presses + or −, or clears the max, it no longer does.
+describe('ProfileScreen one-rep-max clamp notice', () => {
+  const renderProfile = () => render(
+    <NavigationProvider initialTab="athlete">
+      <ProfileScreen />
+    </NavigationProvider>,
+  );
+  const squat = () => screen.getAllByLabelText(/one rep max in kilograms, type to set/i)[0];
+  const clampTo500 = () => {
+    fireEvent.changeText(squat(), '999');
+    fireEvent(squat(), 'endEditing');
+    expect(screen.getByText(/^Saved as 500\.0 kg/)).toBeOnTheScreen();
+  };
+
+  test('typing a new value removes it', () => {
+    renderProfile();
+    clampTo500();
+    fireEvent.changeText(squat(), '120');
+    expect(screen.queryByText(/^Saved as 500\.0 kg/)).toBeNull();
+  });
+
+  test('pressing + or − removes it', () => {
+    renderProfile();
+    clampTo500();
+    fireEvent.press(screen.getAllByLabelText(/^Decrease .* one rep max$/)[0]);
+    expect(screen.queryByText(/^Saved as 500\.0 kg/)).toBeNull();
+    clampTo500();
+    fireEvent.press(screen.getAllByLabelText(/^Increase .* one rep max$/)[0]);
+    expect(screen.queryByText(/^Saved as 500\.0 kg/)).toBeNull();
+  });
+
+  test('clearing the max removes it', () => {
+    renderProfile();
+    clampTo500();
+    fireEvent.changeText(squat(), '');
+    fireEvent(squat(), 'endEditing');
+    expect(screen.queryByText(/^Saved as 500\.0 kg/)).toBeNull();
   });
 });

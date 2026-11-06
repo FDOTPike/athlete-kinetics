@@ -262,6 +262,23 @@ const bjjRoundId = movements.find((m) => m.name === 'BJJ Sparring Round').moveme
 check('mats removed: bjj days fall back without ever emitting BJJ Sparring Round',
   noMats.sessions.some((s) => s.focus === 'bjj') &&
   noMats.sessions.every((s) => s.slots.every((sl) => sl.movement_id !== bjjRoundId)));
+// Android walk 2026-11-03 (W1-3): owning mats is not grappling. A partner
+// sparring round is placed on a BJJ day only, never on a conditioning day.
+let conditioningDays = 0, sparringOffBjjDay = 0, sparringOnBjjDay = 0;
+for (const objective of ['gpp', 'endurance', 'weight_loss', 'strength', 'power', 'hybrid']) {
+  for (let f = 1; f <= 7; f++) {
+    const plan = gen({ objective, weekly_frequency: f, equipment_inventory: [...STANDARD_EQUIPMENT_ITEMS] });
+    for (const s of plan.sessions) {
+      const hasRound = s.slots.some((sl) => sl.movement_id === bjjRoundId);
+      if (s.focus === 'conditioning') conditioningDays += 1;
+      if (hasRound && s.focus !== 'bjj') sparringOffBjjDay += 1;
+      if (hasRound && s.focus === 'bjj') sparringOnBjjDay += 1;
+    }
+  }
+}
+check('with mats, BJJ Sparring Round appears on bjj days only (never on a conditioning day)',
+  conditioningDays > 0 && sparringOnBjjDay > 0 && sparringOffBjjDay === 0,
+  `${conditioningDays} conditioning days, ${sparringOnBjjDay} bjj-day rounds, ${sparringOffBjjDay} off-day rounds`);
 
 // --- [5] SQL contract: 007 literals == TS constants -----------------------------
 console.log('[5] SQL contract (007 <-> types.ts single source of truth)');

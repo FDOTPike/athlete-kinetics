@@ -21,7 +21,14 @@ export interface GlossaryEntry {
   readonly category: GlossaryCategory;
   readonly definition: string;
   readonly aliases?: readonly string[];
+  /** The name shown to the athlete when it differs from `term`. `term` and
+   *  `aliases` feed the bundled question index, so renaming them needs a
+   *  rebuilt index; a display name does not. */
+  readonly displayTerm?: string;
 }
+
+/** The name an athlete sees for a glossary entry. */
+export const glossaryTitle = (entry: GlossaryEntry): string => entry.displayTerm ?? entry.term;
 
 export const GLOSSARY_ENTRIES: readonly GlossaryEntry[] = [
   // --- Effort ---
@@ -88,8 +95,8 @@ export const GLOSSARY_ENTRIES: readonly GlossaryEntry[] = [
   { id: 'EXPERIENCED', term: 'EXPERIENCED', category: 'general', definition: 'Choose this if you have at least three years of consistent, structured training.' },
   { id: 'COMPETITIVE', term: 'COMPETITIVE', category: 'general', definition: 'Choose this if you compete, or your training is planned and monitored at a competitive level.' },
   { id: 'FULL GYM', term: 'FULL GYM', category: 'general', definition: 'Selects the standard equipment found in a broad commercial gym setup. You can customize individual items afterward.' },
-  { id: 'HOME BASIC', term: 'HOME BASIC', category: 'general', definition: 'Selects a compact home setup with dumbbells, a kettlebell, bands, and mats. You can customize individual items afterward.' },
-  { id: 'MINIMAL', term: 'MINIMAL', category: 'general', definition: 'Selects no equipment. The coach can still use movements that need only your bodyweight.' },
+  { id: 'HOME BASIC', term: 'HOME BASIC', category: 'general', definition: 'Selects a compact home setup with dumbbells, a kettlebell, a pull-up bar, bands, and mats. You can customize individual items afterward.' },
+  { id: 'MINIMAL', term: 'MINIMAL', category: 'general', definition: 'Selects bands and mats only. The coach can still use movements that need only your bodyweight.' },
   { id: 'BARBELL', term: 'BARBELL', category: 'movement', definition: 'A straight bar loaded with weight plates.' },
   { id: 'SQUAT RACK', term: 'SQUAT RACK', category: 'movement', definition: 'A stable rack that supports a barbell at adjustable heights.' },
   { id: 'BENCH', term: 'BENCH', category: 'movement', definition: 'A flat or adjustable weight-training bench.' },
@@ -277,7 +284,10 @@ export const GLOSSARY_ENTRIES: readonly GlossaryEntry[] = [
   },
   {
     id: 'INTENSIFICATION',
+    // Walk 2 (W2-14): Plan names this phase "Build strength"; its info
+    // button asked "What does INTENSIFICATION mean?".
     term: 'INTENSIFICATION',
+    displayTerm: 'BUILD STRENGTH',
     category: 'structure',
     definition:
       "Volume comes down, effort goes up. You do less work but it's harder.",
@@ -483,7 +493,8 @@ export function getGlossaryEntry(key: string): GlossaryEntry | undefined {
   const exact = GLOSSARY_ENTRIES.find(
     (entry) =>
       entry.id.toLowerCase() === normalized ||
-      entry.term.toLowerCase() === normalized,
+      entry.term.toLowerCase() === normalized ||
+      entry.displayTerm?.toLowerCase() === normalized,
   );
   if (exact) return exact;
 
@@ -512,10 +523,11 @@ export function getGlossaryEntry(key: string): GlossaryEntry | undefined {
 export function searchGlossary(query: string): readonly GlossaryEntry[] {
   const normalized = query.trim().toLowerCase();
   if (!normalized) {
-    return [...GLOSSARY_ENTRIES].sort((a, b) => a.term.localeCompare(b.term));
+    return [...GLOSSARY_ENTRIES].sort((a, b) => glossaryTitle(a).localeCompare(glossaryTitle(b)));
   }
 
   return GLOSSARY_ENTRIES.filter((entry) => {
+    if (glossaryTitle(entry).toLowerCase().includes(normalized)) return true;
     if (entry.term.toLowerCase().includes(normalized)) return true;
     if (entry.id.toLowerCase().includes(normalized)) return true;
     if (entry.category.toLowerCase().includes(normalized)) return true;
@@ -525,8 +537,8 @@ export function searchGlossary(query: string): readonly GlossaryEntry[] {
     }
     return false;
   }).sort((a, b) => {
-    const aTermLower = a.term.toLowerCase();
-    const bTermLower = b.term.toLowerCase();
+    const aTermLower = glossaryTitle(a).toLowerCase();
+    const bTermLower = glossaryTitle(b).toLowerCase();
     const aExact = aTermLower === normalized;
     const bExact = bTermLower === normalized;
     if (aExact && !bExact) return -1;
