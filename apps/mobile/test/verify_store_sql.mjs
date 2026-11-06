@@ -77,7 +77,8 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   // reads back for it and empties on reset. It depends only on 001.
   '070_session_feel.sql',
   // 071 adds session_skipped_slot and set_load_shown, which the store writes
-  // (at finalization and with each logged set) and empties on reset. It depends
+  // (at finalization and with each logged set) and empties on reset; the
+  // completion summary reads the skipped slots (owner ruling 2026-11-03). It depends
   // on 001 and 022.
   '071_beta_recording.sql', '072_question_log.sql', '073_session_slot_replaced_by.sql'];
 
@@ -1058,11 +1059,34 @@ if (resetTables.length >= 15) {
       'insert into Probe_Table (a) values (?)',
       'SELECT a FROM Probe_table WHERE b = ${}',
     ]), quotedNaming);
-  a('071: the store names session_skipped_slot in one INSERT and one DELETE only',
+  // Owner ruling (ledger Entry 0300; the original 2026-11-03 Entry 0286 is
+  // unrecovered, issue #297): the completion summary may
+  // read session_skipped_slot to list the skipped exercises. That display read
+  // is the one reader; no engine, readiness or progression code reads it.
+  // Walk 2 (W2-1): the read names the PLANNED movement of a swapped slot.
+  const SKIPPED_SUMMARY_READ = 'SELECT k.session_plan_slot_id, COALESCE(sps.original_movement_id, sps.movement_id) AS movement_id, '
+    + 'sps.movement_id AS current_movement_id, m.name AS movement_name, sps.planned_sets '
+    + 'FROM session_skipped_slot k JOIN session_plan_slot sps ON sps.session_plan_slot_id = k.session_plan_slot_id '
+    + 'JOIN movement m ON m.movement_id = COALESCE(sps.original_movement_id, sps.movement_id) WHERE sps.session_id = ? ORDER BY sps.slot_index';
+  a('071: the store names session_skipped_slot in one INSERT, one DELETE and the summary read only',
     JSON.stringify(sqlNaming('session_skipped_slot').sort()) === JSON.stringify([
       'DELETE FROM session_skipped_slot',
       'INSERT INTO session_skipped_slot (session_plan_slot_id) VALUES (?)',
+      SKIPPED_SUMMARY_READ,
     ]), sqlNaming('session_skipped_slot').join(' | '));
+  {
+    // The implementation, not the interface line of the same text.
+    const start = storeSrc.indexOf('loadSessionSummaryFacts: (sessionId: number) => {\n    const d = getDb();');
+    const end = storeSrc.indexOf('\n  refreshVector:', start);
+    // The slice is one property of the store's object literal; wrapped back in
+    // an object it parses on its own (the SQL check refuses source that does
+    // not parse).
+    const body = start >= 0 && end > start ? `const storeSlice = {\n${storeSrc.slice(start, end)}\n};` : '';
+    a('071: the session_skipped_slot read sits inside loadSessionSummaryFacts',
+      sqlNamingIn(body, 'session_skipped_slot').length === 1
+        && sqlNamingIn(body, 'session_skipped_slot')[0] === SKIPPED_SUMMARY_READ,
+      start < 0 ? 'loadSessionSummaryFacts not found' : String(sqlNamingIn(body, 'session_skipped_slot').length) + ' reads in the loader');
+  }
   a('071: the store names set_load_shown in one INSERT and one DELETE only',
     JSON.stringify(sqlNaming('set_load_shown').sort()) === JSON.stringify([
       'DELETE FROM set_load_shown',
@@ -1326,9 +1350,9 @@ if (resetTables.length >= 15) {
   // groupSummaryExercises to attribute planned_sets per SLOT.
   {
     const sqlStart = src.indexOf('`SELECT sr.movement_id, m.name AS movement_name, sr.reps, sr.load_kg,');
-    const sqlEnd = src.indexOf('ORDER BY sr.movement_id, sr.set_index`', sqlStart);
+    const sqlEnd = src.indexOf('ORDER BY sr.set_id`', sqlStart);
     const summarySql = sqlStart >= 0 && sqlEnd > sqlStart
-      ? src.slice(sqlStart + 1, sqlEnd + 'ORDER BY sr.movement_id, sr.set_index'.length)
+      ? src.slice(sqlStart + 1, sqlEnd + 'ORDER BY sr.set_id'.length)
       : '';
     check('F4: summary set SELECT located in useStore.ts', summarySql.length > 0);
     let summaryRows = [];
