@@ -1540,19 +1540,29 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
         // before or after gives way to the ranker's next eligible movement of
         // the same pattern, loading class and compound class, when one exists.
         // An explicit athlete choice or a goal exercise is never moved.
+        // Owner ruling on #228 (Option A): in a hypertrophy plan the spacing
+        // replacement follows the Round 5 competition-lift exclusion. The
+        // highest-ranked qualifying non-competition movement is taken; a
+        // competition lift is only the fallback when none qualifies.
         const mainSlot = (slots.length + 1) < ACCESSORY_SLOT_FROM;
         let spacedChoice: GeneratorMovement | null = null;
         if (mainSlot && coachDefault !== null && preferredMovement === undefined && goalMovement === undefined
             && neighbourMainLifts.has(coachDefault.movement_id)) {
+          let competitionFallback: GeneratorMovement | null = null;
           for (const id of ranking.rankedIds) {
             const candidate = pool.find((entry) => entry.movement_id === id);
             if (candidate === undefined || candidate.pattern !== pattern || usedIds.has(id)) continue;
             if (neighbourMainLifts.has(id) || PREPARATION_HELD_MOVEMENT_IDS.has(id)) continue;
             if (isPurelyBodyweight(candidate) !== isPurelyBodyweight(coachDefault)) continue;
             if (candidate.is_compound !== coachDefault.is_compound) continue;
+            if (profile.objective === 'hypertrophy' && ANCHOR_MOVEMENT_NAMES.includes(candidate.name)) {
+              competitionFallback ??= candidate;
+              continue;
+            }
             spacedChoice = candidate;
             break;
           }
+          spacedChoice ??= competitionFallback;
           if (spacedChoice !== null) {
             sessionRankingNotes.add(`${focus}: ${spacedChoice.name} planned instead of ${coachDefault.name}, the main lift the day before or after`);
           }

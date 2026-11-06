@@ -2718,6 +2718,67 @@ console.log('[MAIN_LIFT_SPACING] no same main lift on back-to-back days');
   const hasNeighbour = spreadDays.some((a) => spreadDays.includes(a + dayMs));
   check('a week with no back-to-back strength days carries no spacing note',
     hasNeighbour || !spread.warnings.some((w) => /main lift the day before/.test(w)));
+
+  // #228 owner ruling (Option A): in a hypertrophy plan, spacing follows the
+  // Round 5 competition-lift exclusion. It takes a non-competition movement of
+  // the same pattern, loading class and compound class when one qualifies, and
+  // falls back to a competition lift only when none does.
+  const { ANCHOR_MOVEMENT_NAMES } = require('./.build/movementRanking.js');
+  const { isPurelyBodyweight } = require('./.build/blockGenerator.js');
+  const byName = (name) => movements.find((m) => m.name === name);
+  const spacingSwaps = (plan) => plan.warnings
+    .map((w) => /^[a-z]+: (.+) planned instead of (.+), the main lift the day before or after$/.exec(w))
+    .filter((match) => match !== null)
+    .map(([, chosen, instead]) => ({ chosen, instead }));
+  const sameClassNonCompetition = (name, pool = movements) => {
+    const original = pool.find((m) => m.name === name);
+    return pool.filter((m) => m.movement_id !== original.movement_id
+      && m.pattern === original.pattern && m.is_compound === original.is_compound
+      && isPurelyBodyweight(m) === isPurelyBodyweight(original)
+      && !ANCHOR_MOVEMENT_NAMES.includes(m.name)).map((m) => m.name);
+  };
+
+  // Non-competition movement available: advanced hypertrophy, 7 days. The
+  // Sunday full day repeats Monday's Front Squat; Competition Squat ranks ahead
+  // of Goblet Squat, but Goblet Squat (loaded, compound, squat) qualifies.
+  const seven = gen({ objective: 'hypertrophy', training_age: 'advanced', weekly_frequency: 7, session_duration_cap_min: 75 });
+  const squatSwap = spacingSwaps(seven).find((swap) => swap.instead === 'Front Squat');
+  check('hypertrophy spacing: a qualifying non-competition movement exists for Front Squat (premise)',
+    sameClassNonCompetition('Front Squat').includes('Goblet Squat'), sameClassNonCompetition('Front Squat').join(', '));
+  check('hypertrophy spacing never picks a competition lift when a non-competition movement qualifies (Goblet Squat, not Competition Squat)',
+    squatSwap !== undefined && !ANCHOR_MOVEMENT_NAMES.includes(squatSwap.chosen) && squatSwap.chosen === 'Goblet Squat'
+      && backToBackRepeats(seven).length === 0,
+    spacingSwaps(seven).map((swap) => `${swap.chosen} for ${swap.instead}`).join('; ') || 'no swap');
+  const sweepOffenders = [];
+  for (const training_age of ['intermediate', 'advanced']) {
+    for (let f = 2; f <= 7; f += 1) {
+      const plan = gen({ objective: 'hypertrophy', training_age, weekly_frequency: f, session_duration_cap_min: 75 });
+      for (const swap of spacingSwaps(plan)) {
+        if (ANCHOR_MOVEMENT_NAMES.includes(swap.chosen) && sameClassNonCompetition(swap.instead).length > 0) {
+          sweepOffenders.push(`${training_age}/${f}d: ${swap.chosen} for ${swap.instead}`);
+        }
+      }
+    }
+  }
+  check('hypertrophy spacing sweep (2-7 days x 2 tiers): a competition lift is chosen only when no non-competition movement qualifies',
+    sweepOffenders.length === 0, sweepOffenders.slice(0, 3).join(' | '));
+
+  // No non-competition movement available. With Push-up planned as strictly
+  // bodyweight (a different loading class), the only other loaded compound
+  // horizontal push is Competition Bench, so the fallback takes it rather than
+  // repeating yesterday's Dumbbell Bench Press.
+  const pushUpBodyweight = movements.map((m) => (m.name === 'Push-up' ? { ...m, plannedImplement: 'Bodyweight' } : m));
+  check('hypertrophy spacing: no other non-competition movement of the same class exists for Dumbbell Bench Press (premise)',
+    sameClassNonCompetition('Dumbbell Bench Press', pushUpBodyweight).length === 0,
+    sameClassNonCompetition('Dumbbell Bench Press', pushUpBodyweight).join(', '));
+  const constrained = generateBlock({
+    profile: prof({ objective: 'hypertrophy', training_age: 'advanced', weekly_frequency: 5, session_duration_cap_min: 75 }),
+    movements: pushUpBodyweight, startDate: START,
+  });
+  check('hypertrophy spacing falls back to a competition lift when no non-competition movement qualifies (Competition Bench for Dumbbell Bench Press)',
+    spacingSwaps(constrained).some((swap) => swap.chosen === 'Competition Bench' && swap.instead === 'Dumbbell Bench Press')
+      && backToBackRepeats(constrained).length === 0,
+    spacingSwaps(constrained).map((swap) => `${swap.chosen} for ${swap.instead}`).join('; ') || 'no swap');
 }
 
 try { verifyR05Blocks(); } catch (error) { check('R05 experience-only block workload', false, error.message); }

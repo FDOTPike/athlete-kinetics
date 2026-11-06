@@ -22,13 +22,14 @@ Issue: #228
   - have the same compound class;
   - not be held for preparation;
   - not be a main lift on either neighbouring day.
+- In hypertrophy plans, main-lift spacing follows the Round 5 competition-lift exclusion: it selects the highest-ranked non-competition movement of the same pattern, loading class, and compound class when one exists, and falls back to a competition lift only when no non-competition movement qualifies.
 - If no such movement exists, the pick stays as it was. The rule never drops
   a slot and never fills one upward.
 - The days are calendar days. Each week makes the same choices, so day 7 and
   the next week's day 1 count as neighbours.
 - Each swap is disclosed in the plan's warnings and shown under "Coach
-  decisions in this plan", for example: "full: Competition Bench planned
-  instead of Dumbbell Bench Press, the main lift the day before or after".
+  decisions in this plan", for example: "full: Goblet Squat planned
+  instead of Front Squat, the main lift the day before or after".
 
 ## What does not change
 
@@ -52,7 +53,14 @@ Issue: #228
 - the walk's case (advanced, BUILD MUSCLE, 5 days) has no back-to-back
   repeat, and the swap is disclosed;
 - an explicit choice of the same lift on two consecutive days is kept;
-- a week with no back-to-back strength days carries no spacing note.
+- a week with no back-to-back strength days carries no spacing note;
+- in a hypertrophy plan where a non-competition movement qualifies, spacing
+  does not pick a competition lift (advanced, 7 days: Goblet Squat, not
+  Competition Squat, for Front Squat), across 2 to 7 days a week and both
+  tiers;
+- in a hypertrophy plan where no non-competition movement qualifies (Push-up
+  planned as strictly bodyweight), spacing falls back to Competition Bench
+  for Dumbbell Bench Press rather than repeating it.
 
 The full-inventory "no warnings" check now ignores this disclosure. It is a
 note about a choice, not a missing movement.
