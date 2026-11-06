@@ -1061,6 +1061,10 @@ test('a slot held back by a report does not ask for a weight', () => {
   expect(screen.getByTestId('session-slot-blocked')).toBeOnTheScreen();
   expect(screen.queryByTestId('session-load-source-line')).toBeNull();
   expect(screen.queryByText(/pick a weight/)).toBeNull();
+  // Nor any other load request: no "Enter a load" hint and no load field.
+  expect(screen.queryByTestId('session-load-hint')).toBeNull();
+  expect(screen.queryByText('Enter a load to log this set.')).toBeNull();
+  expect(screen.queryByTestId('session-load-input')).toBeNull();
 });
 
 test('thumbs-down delegates the durable Avoid plus substitution transition to the runner store action', () => {
@@ -2449,6 +2453,25 @@ describe('session-2: honest discomfort wording per tier and after-save outcomes'
     expect(screen.getByText('Choose an alternative')).toBeOnTheScreen();
     expect(screen.getByText('Report saved with this session.')).toBeOnTheScreen();
   };
+
+  // The report is already saved when OK is tapped; a failure to open the
+  // sheet must not throw out of the alert callback (it is recorded instead).
+  test('a failure to open the alternatives after OK is recorded, not thrown', () => {
+    mockState = discomfortFixture('beginner');
+    mockState.openSubstitution = jest.fn(() => { throw new Error('substitution preview failed'); });
+    const view = render(<SessionScreen />);
+    fireEvent.press(screen.getByLabelText('Report discomfort'));
+    fireEvent.press(screen.getByLabelText('knee'));
+    fireEvent.press(screen.getByLabelText('Moderate discomfort, 6 of 10'));
+    fireEvent.press(screen.getByLabelText('Save discomfort report'));
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+    const buttons = alertSpy.mock.calls[0][2];
+    expect(() => act(() => { buttons[0].onPress(); })).not.toThrow();
+    expect(mockState.openSubstitution).toHaveBeenCalledWith(1);
+    expect(mockState.error).toBe('substitution preview failed');
+    view.rerender(<SessionScreen />);
+    expect(screen.getByText('Report saved with this session.')).toBeOnTheScreen();
+  });
 
   test.each([
     [

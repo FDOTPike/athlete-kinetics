@@ -1040,7 +1040,15 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
       : (after?.sessionPlan ?? sessionPlan).find((planSlot) => planSlot.sessionPlanSlotId === offeredSlotId)?.movementId;
     if (offeredMovementId !== undefined) {
       Alert.alert('Report saved', 'Report saved with this session. Next, you can choose an alternative for this exercise.', [
-        { text: 'OK', onPress: () => openSubstitution(offeredMovementId) },
+        { text: 'OK', onPress: () => {
+          // The report is already saved: a failure to open the sheet is
+          // recorded, not thrown out of the alert callback.
+          try {
+            openSubstitution(offeredMovementId);
+          } catch (error) {
+            useStore.setState({ error: error instanceof Error ? error.message : String(error) });
+          }
+        } },
       ]);
     }
   };
@@ -1437,7 +1445,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                             Enter a load from 0 to 500 in 2.5 kg increments.
                           </Text>
                         )}
-                        {!loadInvalid && !loadLoggable && (
+                        {!loadInvalid && !loadLoggable && !heldByReport(slot.sessionPlanSlotId) && (
                           <Text style={styles.loadEvidence} testID="session-load-hint">Enter a load to log this set.</Text>
                         )}
                         {currentSlotBlockedReason !== null && (
@@ -1467,7 +1475,8 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                               Target: {target?.kind === 'reps' ? target.reps : '—'} reps. Log the reps you actually completed.
                             </Text>
                           )}
-                          {!bandOnly && (
+                          {/* #182: a slot a report holds back asks for no load. */}
+                          {!bandOnly && !heldByReport(slot.sessionPlanSlotId) && (
                           <View style={styles.loadField}>
                             <Text style={styles.loadFieldLabel} testID="session-load-label">{loadLabel.toUpperCase()}</Text>
                             <View style={styles.loadFieldRow}>
