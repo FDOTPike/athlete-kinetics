@@ -329,5 +329,31 @@ describe('Round 2: ProgramSetupScreen power explanation, capacity law, progressi
     expect(screen.getByTestId('weekly-progression-summary')).toBeOnTheScreen();
     expect(screen.getByText(/same work at a higher target effort/)).toBeOnTheScreen();
     expect(screen.getByText(/deload/)).toBeOnTheScreen();
+    // #169: the block's own week-to-week change, from the generated plan.
+    expect(screen.getByText('Week 2: the same working sets as week 1 (4), at a higher target effort (RPE 7 → 7.5).')).toBeOnTheScreen();
+    expect(screen.getByText('Week 4: fewer working sets than week 3 (4 → 2), at a lower target effort (RPE 8 → 6.5).')).toBeOnTheScreen();
+  });
+
+  test('#169 a hypertrophy block whose sets rise into week 3 is described as it is, by phase name', () => {
+    mockState.previewTrainingProgram = jest.fn(() => previewFixture({
+      plan: {
+        ...previewFixture().plan,
+        sessions: [
+          { week_index: 1, day_index: 1, focus: 'upper', phase: 'accumulation', slots: [{ slot_index: 1, movement_id: 1, sets: 3, reps: 10, target_rpe: 7 }] },
+          { week_index: 2, day_index: 1, focus: 'upper', phase: 'intensification', slots: [{ slot_index: 1, movement_id: 1, sets: 4, reps: 10, target_rpe: 7.5 }] },
+          { week_index: 3, day_index: 1, focus: 'upper', phase: 'realization', slots: [{ slot_index: 1, movement_id: 1, sets: 5, reps: 10, target_rpe: 8 }] },
+          { week_index: 4, day_index: 1, focus: 'upper', phase: 'deload', slots: [{ slot_index: 1, movement_id: 1, sets: 2, reps: 10, target_rpe: 6 }] },
+        ],
+      },
+    }));
+    mockState.movements = [{ movement_id: 1, name: 'Dumbbell Bench Press', pattern: 'push_h' }];
+    render(<ProgramSetupScreen />);
+    openProgramControls();
+    fireEvent.press(screen.getByText('Coach build'));
+    fireEvent.press(screen.getByText('Duration'));
+    fireEvent.press(screen.getByText('4 wk'));
+    fireEvent.press(screen.getByText('Linear'));
+    expect(screen.getByText('Week 3 (Realise): more working sets than week 2 (4 → 5), at a higher target effort (RPE 7.5 → 8).')).toBeOnTheScreen();
+    expect(screen.queryByText(/lowest volume|Volume comes down/i)).toBeNull();
   });
 });

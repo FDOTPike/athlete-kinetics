@@ -167,3 +167,27 @@ describe('Full-screen ProgramSetupScreen in AppShell intercepts hardware Back an
     }
   });
 });
+
+// Android walk 2026-11-03 (W1-10): an athlete added from the Profile tab
+// finished onboarding on ATHLETE PROFILE instead of Today.
+describe('Finishing onboarding opens Today', () => {
+  test('onboarding started with the Athlete tab underneath ends on Today', async () => {
+    let navRef = null;
+    render(
+      <NavigationProvider initialTab="today">
+        <NavProbe onRef={(r) => { navRef = r; }} />
+        <AppShell />
+      </NavigationProvider>,
+    );
+    await act(async () => { await settle(); });
+    expect(useStore.getState().onboarded).toBe(false);
+    act(() => { navRef.setTab('athlete'); });
+    expect(navRef.tab).toBe('athlete');
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Skip the questionnaire and load the demo athlete'));
+      await settle();
+    });
+    expect(useStore.getState().onboarded).toBe(true);
+    expect(navRef.tab).toBe('today');
+  });
+});
