@@ -732,7 +732,7 @@ describe('BlockScreen - Chooser Entry (Work Order E)', () => {
     // It opens the program's future preferences directly, never a "Start a new block" chooser.
     expect(screen.queryByText('Auto')).toBeNull();
     expect(screen.getByText('MANAGE PROGRAM')).toBeOnTheScreen();
-    expect(screen.getByText('Your current block stays as it is. These choices apply to future blocks.')).toBeOnTheScreen();
+    expect(screen.getByText('Your current block stays as it is. These choices apply to future blocks, except a change of training days also updates the weekly-day limit used for current targets.')).toBeOnTheScreen();
   });
 
   test('renders Plan a new block action when a standalone block IS active and opens chooser', () => {

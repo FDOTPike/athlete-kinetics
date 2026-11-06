@@ -675,7 +675,7 @@ export default function ProgramSetupScreen({
       <Text style={styles.caption}>
         {editing
           ? (block != null
-            ? 'Your current block stays as it is. These choices apply to future blocks.'
+            ? 'Your current block stays as it is. These choices apply to future blocks, except a change of training days also updates the weekly-day limit used for current targets.'
             : 'These choices apply to future blocks.')
           : `Program starts ${today}. Future blocks require confirmation.`}
       </Text>
