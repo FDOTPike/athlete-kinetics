@@ -9,6 +9,7 @@ import React, { useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { StateVectorRow } from '@ak/inference';
 import { useStore } from '../state/useStore';
+import { deriveTodayState } from '../state/todayState';
 import TrainingSupportNotice from '../components/TrainingSupportNotice';
 import { theme } from '../theme/theme';
 import { sessionFocusName } from '../state/sessionSummary';
@@ -146,6 +147,9 @@ function AvailableReadinessScreen({
   const trend = useStore((s) => s.trend);
   const session = useStore((s) => s.session);
   const todayPlan = useStore((s) => s.todayPlan);
+  const blockSessions = useStore((s) => s.blockSessions);
+  const block = useStore((s) => s.block);
+  const hasArchivedBlock = useStore((s) => s.hasArchivedBlock);
   const lastTriage = useStore((s) => s.lastTriage);
   const uiPreferences = useStore((s) => s.uiPreferences);
   const boot = useStore((s) => s.boot);
@@ -280,12 +284,27 @@ function AvailableReadinessScreen({
   const athleteState = classifyReadiness(vector);
   const meta = halted ? HALT_META : STATE_META[athleteState];
   const isRestDay = todayPlan === null && !halted && !hasLiveSession;
+  // #200: the same derivation Today uses. A planned session already finalized
+  // as complete is reported as recorded, not as still planned.
+  const todaySessionDone = todayPlan !== null && deriveTodayState({
+    today,
+    hasActiveSession: hasLiveSession,
+    halted,
+    todayPlan: {
+      plannedSessionId: todayPlan.plannedSessionId,
+      focus: todayPlan.focus,
+      slotCount: todayPlan.slots.length,
+    },
+    blockSessions: blockSessions ?? [],
+    hasActiveBlock: block != null,
+    hasArchivedBlock: hasArchivedBlock ?? false,
+  }).kind === 'completed_today';
 
   const primaryLabel = halted
     ? 'Review safety report'
     : hasLiveSession
       ? 'Open active session'
-      : todayPlan !== null
+      : todayPlan !== null && !todaySessionDone
         ? "Review today's plan"
         : athleteState === 'OVERREACHED'
           ? 'Review recovery plan'
@@ -440,7 +459,11 @@ function AvailableReadinessScreen({
         <Text style={styles.body}>{meta.recommendation}</Text>
         {hasLiveSession && <Text style={styles.caption}>Your active workout is ready to resume.</Text>}
         {!hasLiveSession && todayPlan !== null && (
-          <Text style={styles.caption}>{formatFocus(todayPlan.focus)} session planned today.</Text>
+          <Text style={styles.caption}>
+            {todaySessionDone
+              ? `Today's ${formatFocus(todayPlan.focus)} session is recorded.`
+              : `${formatFocus(todayPlan.focus)} session planned today.`}
+          </Text>
         )}
         {!hasLiveSession && todayPlan === null && !halted && (
           <Text style={styles.caption}>

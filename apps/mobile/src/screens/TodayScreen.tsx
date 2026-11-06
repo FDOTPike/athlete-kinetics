@@ -39,7 +39,7 @@
  */
 import React, { useMemo } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { applyPrescriptionToSlot } from '@ak/inference';
+import { addDaysIso, applyPrescriptionToSlot } from '@ak/inference';
 import { useStore, freeFormStartIsEmpty } from '../state/useStore';
 import { useNavigation } from '../navigation/navigation';
 import TrainingSupportNotice from '../components/TrainingSupportNotice';
@@ -107,6 +107,7 @@ function AvailableTodayScreen({
   const prescription = useStore((s) => s.prescription);
   const vector = useStore((s) => s.vector);
   const profile = useStore((s) => s.profile);
+  const program = useStore((s) => s.program);
   const startSession = useStore((s) => s.startSession);
   const storeFreeFormStartIsEmpty = useStore((s) => s.freeFormStartIsEmpty);
   const refreshVector = useStore((s) => s.refreshVector);
@@ -263,7 +264,38 @@ function AvailableTodayScreen({
     </View>
   );
 
+  // #221: the same test Plan uses for "Review next block" (BlockScreen
+  // programBlockExpired). Once a goal-program block has run its four weeks,
+  // the unfinished-sessions card no longer describes where the athlete is.
+  const programBlockEnded = program?.status === 'active' && block !== null
+    && today > addDaysIso(block.startDate, 27);
+
   const workoutCard = (): React.JSX.Element => {
+    if (programBlockEnded && (state.kind === 'overdue'
+      || (state.kind === 'unscheduled' && state.reason === 'block_ended'))) {
+      const lastBlock = program.currentSequenceIndex >= program.plannedBlockCount;
+      return (
+        <View style={styles.card} testID="today-card-block-ended">
+          <Text style={styles.eyebrow}>TODAY</Text>
+          <Text style={styles.title}>Your block has ended</Text>
+          <Text style={styles.body}>
+            Block {program.currentSequenceIndex} of {program.plannedBlockCount} has finished its four
+            weeks. {lastBlock ? 'Review your goal to finish the program.' : 'Review the next block to keep going.'}
+          </Text>
+          <PrimaryButton
+            label={lastBlock ? 'Review goal' : 'Review next block'}
+            onPress={() => onOpenPlan?.()}
+            accessibilityLabel={lastBlock ? 'Review your goal on your plan' : 'Review the next block on your plan'}
+            testID="today-primary-plan"
+          />
+          {renderUnplannedStartControl({
+            label: 'Start a session now',
+            accessibilityLabel: 'Start an unplanned session now',
+            testID: 'today-adhoc-session',
+          })}
+        </View>
+      );
+    }
     switch (state.kind) {
       case 'halted':
         return (

@@ -640,6 +640,8 @@ export {
   PreparationProtocolError,
   buildPreparationProtocol,
   describePreparationDose,
+  rampItemTitle,
+  rampLoadKg,
   isExtraPreparationWork,
   isTerminalPreparationStatus,
   parsePreparationProtocol,

@@ -33,6 +33,7 @@ import ProgramSetupScreen from './ProgramSetupScreen';
 import NewBlockChooserScreen from './NewBlockChooserScreen';
 import InfoTip from '../components/InfoTip';
 import { EmphasisReportCard } from '../components/EmphasisReportCard';
+import { deriveTodayState } from '../state/todayState';
 import { theme } from '../theme/theme';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { appliedAdjustmentLines, autopilotReasonCopy } from '../state/autopilotCopy';
@@ -157,6 +158,22 @@ function targetLabel(slot: TodaySlot): string {
     : `${slot.sets} x ${slot.target.reps}`;
 }
 
+/** The slot's load from the athlete's 1RM (or its load override), with the
+ *  readiness modifier applied when one is given. Null for a timed slot or a
+ *  movement with no 1RM and no override. */
+function slotLoadKg(
+  slot: TodaySlot,
+  oneRepMaxes: Record<number, number>,
+  vector: AdjustmentVector | null = null,
+): number | null {
+  if (slot.target.kind === 'time') return null;
+  const oneRepMax = oneRepMaxes[slot.movementId];
+  const derivedLoad = oneRepMax !== undefined
+    ? applyLoadModifier(targetLoadKg(oneRepMax, slot.target.reps, slot.targetRpe), vector)
+    : null;
+  return slot.overrideLoadKg ?? derivedLoad;
+}
+
 function slotTarget(
   slot: TodaySlot,
   oneRepMaxes: Record<number, number>,
@@ -166,11 +183,7 @@ function slotTarget(
   if (effective.target.kind === 'time') {
     return `${targetLabel(effective)} at RPE ${effective.targetRpe.toFixed(1)}`;
   }
-  const oneRepMax = oneRepMaxes[effective.movementId];
-  const derivedLoad = oneRepMax !== undefined
-    ? applyLoadModifier(targetLoadKg(oneRepMax, effective.target.reps, effective.targetRpe), vector)
-    : null;
-  const load = effective.overrideLoadKg ?? derivedLoad;
+  const load = slotLoadKg(effective, oneRepMaxes, vector);
   return `${targetLabel(effective)} at RPE ${effective.targetRpe.toFixed(1)}${
     load === null ? '' : `, ${load.toFixed(1)} kg`
   }`;
@@ -209,6 +222,15 @@ function AutopilotAttribution({
     </View>
   );
 }
+
+/** #227: a planned day before today with no finalized outcome. Same rule as
+ *  Today's overdue count (`missedSessions` in todayState): a stopped session
+ *  was attempted, so only a `null` status counts. Display only; the plan is
+ *  never moved or changed. */
+const isMissedSession = (
+  summary: Pick<BlockSessionSummary, 'sessionDate' | 'completionStatus'>,
+  today: string,
+): boolean => summary.completionStatus === null && summary.sessionDate < today;
 
 function weekRowsFor(sessions: readonly BlockSessionSummary[]): WeekRow[] {
   return [1, 2, 3, 4].map((week) => {
@@ -292,6 +314,8 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
     (s) => s.freezeRoutineTemplateToPlannedSession,
   );
   const deleteRoutineTemplate = useStore((s) => s.deleteRoutineTemplate);
+  // Same condition freezeRoutineTemplateToPlannedSession refuses on.
+  const goalProgramActive = program?.status === 'active';
 
   const [reportText, setReportText] = useState('');
   const [reportSeverity, setReportSeverity] = useState<number | null>(null);
@@ -313,6 +337,21 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
     kind: 'use' | 'delete'; routineTemplateId: number; routineDayIndex?: number;
   } | null>(null);
   const [routineActionMessage, setRoutineActionMessage] = useState<string | null>(null);
+  const [routineTemplatesOpen, setRoutineTemplatesOpen] = useState(false);
+  // After a save the screen remounts below the builder; scroll to Routine
+  // templates once both the section and the marker inside it have laid out.
+  const optionalDetailsY = useRef(0);
+  const routineTemplatesOffsetY = useRef(0);
+  const routineTemplatesScrollPending = useRef(0);
+  const routineTemplatesLaidOut = (): void => {
+    if (routineTemplatesScrollPending.current === 0) return;
+    routineTemplatesScrollPending.current -= 1;
+    if (routineTemplatesScrollPending.current > 0) return;
+    scrollRef.current?.scrollTo({
+      y: Math.max(0, optionalDetailsY.current + routineTemplatesOffsetY.current - theme.space[4]),
+      animated: true,
+    });
+  };
   const [blockArchivedNotice, setBlockArchivedNotice] = useState<string | null>(null);
   const [awaitingSessionStart, setAwaitingSessionStart] = useState(false);
   const [sessionStartError, setSessionStartError] = useState<string | null>(null);
@@ -355,6 +394,11 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
       setSessionStartError(storeError);
     }
   }, [awaitingSessionStart, session, storeError, onSessionStarted]);
+  // #223: a "Use day" confirmation chosen before a goal program started would
+  // stay on screen and call a store action that refuses the active program.
+  useEffect(() => {
+    if (goalProgramActive && confirmRoutineAction?.kind === 'use') setConfirmRoutineAction(null);
+  }, [goalProgramActive, confirmRoutineAction]);
   const [showChooser, setShowChooser] = useState(false);
 
   const hasSubView =
@@ -450,7 +494,15 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
     return (
       <RoutineTemplateBuilder
         initialTemplate={editingTemplate === 'new' ? null : editingTemplate}
-        onSaved={() => setEditingTemplate(null)}
+        onSaved={(saved) => {
+          // #225: back to the Routine templates section, open, with the
+          // confirmation where the saved routine is listed.
+          setEditingTemplate(null);
+          setRoutineActionMessage(`Saved: ${saved.name}`);
+          setBlockArchivedNotice(null);
+          setRoutineTemplatesOpen(true);
+          routineTemplatesScrollPending.current = 2;
+        }}
         onCancel={() => setEditingTemplate(null)}
       />
     );
@@ -458,12 +510,57 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
 
   const halted = lastTriage !== null && lastTriage.kind === 'matched' && lastTriage.directive.halt;
 
+  // Read before the readiness gate (#221): a new day has no state_vector row
+  // until a session ends, so a control that waited for readiness could never
+  // move an ended goal-program block on to the next one.
+  const programBlockExpired = program?.status === 'active' && block !== null
+    && today > addDaysIso(block.startDate, 27);
+  const continuationReviewDate = program?.status === 'active'
+    ? addDaysIso(today, (program.plannedBlockCount - program.currentSequenceIndex) * 28) : null;
+  const reviewContinuationLabel = program != null && program.currentSequenceIndex >= program.plannedBlockCount
+    ? 'Review goal' : 'Review next block';
+  const reviewContinuation = (): void => {
+    const preview = previewNextProgramBlock();
+    if (preview === null) continueTrainingProgram();
+    else setNextProgramPreview(preview);
+  };
+
+  const renderNextProgramPreview = (preview: BlockPlan): React.JSX.Element => (
+    <View style={styles.card}>
+      <Text style={styles.eyebrow}>NEXT BLOCK PREVIEW</Text>
+      <Text style={styles.cardTitle}>{SCHEMA_LABEL[preview.schemaType]} - {preview.macroPhase}</Text>
+      <Text style={styles.bodyText}>Starts today with {preview.sessions.filter((session) => session.week_index === 1).length} repeating training days.</Text>
+      {preview.warnings.map((warning) => (
+        <Text key={warning} style={styles.captionText}>{warning}</Text>
+      ))}
+      {program != null && continuationReviewDate !== null && continuationReviewDate !== program.plannedEndDate && (
+        <Text style={styles.adjustedText}>
+          Late confirmation moves the review boundary to {continuationReviewDate}, preserving four full weeks per remaining block.
+        </Text>
+      )}
+      {continuationError !== null && (
+        <Text style={styles.errorText}>{continuationError}</Text>
+      )}
+      {/* The preview is dismissed by the effect above, only once the
+          continuation has actually landed. */}
+      <PrimaryButton label="Confirm next block" onPress={() => {
+        setContinuationError(null);
+        setContinuationPending(true);
+        continueTrainingProgram();
+      }} accessibilityLabel="Confirm and start next program block" />
+      <SecondaryButton label="Not yet" onPress={() => {
+        setContinuationError(null);
+        setNextProgramPreview(null);
+      }} />
+    </View>
+  );
+
   if (vector === null) {
     return (
       // The no-vector gate is an early return INSIDE the real screen, so the
       // route identity (coach-screen) is still asserted by tests even when
       // readiness data has not arrived yet.
-      <View style={styles.center} testID="coach-screen">
+      <ScrollView style={styles.screen} contentContainerStyle={styles.gateContent} testID="coach-screen">
         {halted && lastTriage !== null && lastTriage.kind === 'matched' && (
           <View style={[styles.card, styles.haltCard]}>
             <Text style={styles.eyebrow}>SAFETY</Text>
@@ -474,6 +571,31 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
             )}
           </View>
         )}
+        {/* #221: the ended block's review does not need today's readiness.
+            Same priority as the full screen's action row: a safety halt or
+            an open session comes first, so neither rule changes here. */}
+        {programBlockExpired && !halted && session === null && (
+          <View style={styles.card}>
+            <Text style={styles.eyebrow}>GOAL PROGRAM</Text>
+            <Text style={styles.cardTitle}>Your block has ended</Text>
+            <Text style={styles.bodyText}>
+              Block {program.currentSequenceIndex} of {program.plannedBlockCount} has finished its four weeks.
+            </Text>
+            <PrimaryButton
+              label={reviewContinuationLabel}
+              onPress={reviewContinuation}
+              accessibilityLabel="Review program continuation"
+            />
+          </View>
+        )}
+        {program?.status === 'review_due' && (
+          <View style={styles.card}>
+            <Text style={styles.eyebrow}>GOAL PROGRAM</Text>
+            <Text style={styles.adjustedText}>Goal reassessment is due before another program starts.</Text>
+            <PrimaryButton label="Reassess goal" onPress={archiveTrainingProgram} accessibilityLabel="Archive completed program and reassess goal" />
+          </View>
+        )}
+        {nextProgramPreview !== null && renderNextProgramPreview(nextProgramPreview)}
         <View style={styles.card}>
           <Text style={styles.eyebrow}>COACH</Text>
           <Text style={styles.cardTitle}>Readiness is needed first</Text>
@@ -489,18 +611,18 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
               accessibilityLabel="Build a standalone routine template"
             />
           )}
+          {/* #225: a save made from here returns here, so confirm it here. */}
+          {routineActionMessage !== null && (
+            <Text style={styles.captionText}>{routineActionMessage}</Text>
+          )}
         </View>
-      </View>
+      </ScrollView>
     );
   }
 
   const current = prescription !== null && prescription.forDate === today ? prescription : null;
   const rows = weekRowsFor(blockSessions);
   const nextPlanned = blockSessions.find((planned) => planned.sessionDate > today);
-  const programBlockExpired = program?.status === 'active' && block !== null
-    && today > addDaysIso(block.startDate, 27);
-  const continuationReviewDate = program?.status === 'active'
-    ? addDaysIso(today, (program.plannedBlockCount - program.currentSequenceIndex) * 28) : null;
 
   const openDetail = (summary: BlockSessionSummary): void => {
     if (detail?.summary.plannedSessionId === summary.plannedSessionId) {
@@ -536,6 +658,22 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
     startSession();
   };
 
+  // #200: the same derivation Today uses, so a planned session that is already
+  // finalized as complete reads as done here too, not as still to start.
+  const todaySessionDone = todayPlan !== null && deriveTodayState({
+    today,
+    hasActiveSession: session !== null,
+    halted,
+    todayPlan: {
+      plannedSessionId: todayPlan.plannedSessionId,
+      focus: todayPlan.focus,
+      slotCount: todayPlan.slots.length,
+    },
+    blockSessions,
+    hasActiveBlock: block !== null,
+    hasArchivedBlock,
+  }).kind === 'completed_today';
+
   let todayTitle = 'Recovery day';
   let todayMessage = nextPlanned === undefined
     ? 'There is no session to complete today. Use the day to recover.'
@@ -547,6 +685,9 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
   } else if (session !== null) {
     todayTitle = 'Session in progress';
     todayMessage = 'Your active workout is ready to resume.';
+  } else if (todaySessionDone && todayPlan !== null) {
+    todayTitle = `Today: ${focusName(todayPlan.focus)} — done`;
+    todayMessage = 'Today\'s session is recorded. Recover well.';
   } else if (todayPlan !== null) {
     todayTitle = `Today: ${focusName(todayPlan.focus)}`;
     todayMessage = `${todayPlan.slots.length} ${todayPlan.slots.length === 1 ? 'movement is' : 'movements are'} planned. Start when you are ready.`;
@@ -743,11 +884,13 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                 ? 'Training paused'
                 : session !== null
                   ? 'Active session'
-                  : todayPlan !== null
-                    ? 'Planned session'
-                    : block === null
-                      ? 'Plan needed'
-                      : 'Recovery day'}
+                  : todaySessionDone
+                    ? 'Session done'
+                    : todayPlan !== null
+                      ? 'Planned session'
+                      : block === null
+                        ? 'Plan needed'
+                        : 'Recovery day'}
             </Text>
           </View>
         </View>
@@ -764,15 +907,11 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
             <PrimaryButton label="Open active session" onPress={() => onSessionStarted?.()} accessibilityLabel="Open active session" />
           ) : programBlockExpired ? (
             <PrimaryButton
-              label={program != null && program.currentSequenceIndex >= program.plannedBlockCount ? 'Review goal' : 'Review next block'}
-              onPress={() => {
-                const preview = previewNextProgramBlock();
-                if (preview === null) continueTrainingProgram();
-                else setNextProgramPreview(preview);
-              }}
+              label={reviewContinuationLabel}
+              onPress={reviewContinuation}
               accessibilityLabel="Review program continuation"
             />
-          ) : todayPlan !== null ? (
+          ) : todayPlan !== null && !todaySessionDone ? (
             <PrimaryButton label="Start session" onPress={startAndOpenSession} accessibilityLabel="Start session" />
           ) : block === null ? (
             <PrimaryButton
@@ -813,35 +952,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
         )}
       </View>
 
-      {nextProgramPreview !== null && (
-        <View style={styles.card}>
-          <Text style={styles.eyebrow}>NEXT BLOCK PREVIEW</Text>
-          <Text style={styles.cardTitle}>{SCHEMA_LABEL[nextProgramPreview.schemaType]} - {nextProgramPreview.macroPhase}</Text>
-          <Text style={styles.bodyText}>Starts today with {nextProgramPreview.sessions.filter((session) => session.week_index === 1).length} repeating training days.</Text>
-          {nextProgramPreview.warnings.map((warning) => (
-            <Text key={warning} style={styles.captionText}>{warning}</Text>
-          ))}
-          {program != null && continuationReviewDate !== null && continuationReviewDate !== program.plannedEndDate && (
-            <Text style={styles.adjustedText}>
-              Late confirmation moves the review boundary to {continuationReviewDate}, preserving four full weeks per remaining block.
-            </Text>
-          )}
-          {continuationError !== null && (
-            <Text style={styles.errorText}>{continuationError}</Text>
-          )}
-          {/* The preview is dismissed by the effect above, only once the
-              continuation has actually landed. */}
-          <PrimaryButton label="Confirm next block" onPress={() => {
-            setContinuationError(null);
-            setContinuationPending(true);
-            continueTrainingProgram();
-          }} accessibilityLabel="Confirm and start next program block" />
-          <SecondaryButton label="Not yet" onPress={() => {
-            setContinuationError(null);
-            setNextProgramPreview(null);
-          }} />
-        </View>
-      )}
+      {nextProgramPreview !== null && renderNextProgramPreview(nextProgramPreview)}
 
       {/* Four-week trajectory Section */}
       <View
@@ -932,6 +1043,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                         );
                       }
                       const isExpanded = detail?.summary.plannedSessionId === cell.plannedSessionId;
+                      const isMissed = isMissedSession(cell, today);
                       return (
                         <Pressable
                           key={cell.plannedSessionId}
@@ -942,13 +1054,16 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                               ? ', completed'
                               : cell.completionStatus === 'halted'
                                 ? ', stopped'
-                                : ''
+                                : isMissed
+                                  ? ', not done'
+                                  : ''
                           }`}
                           accessibilityState={{ expanded: isExpanded, selected: isToday }}
                           testID={isToday ? 'today-marker' : undefined}
                           style={({ pressed }) => [
                             styles.dayMark,
                             cell.completionStatus !== null && styles.dayMarkFinalized,
+                            isMissed && styles.dayMarkMissed,
                             isToday && styles.dayMarkToday,
                             isExpanded && styles.dayMarkExpanded,
                             pressed && styles.dayMarkPressed,
@@ -958,6 +1073,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                             style={[
                               styles.dayMarkText,
                               cell.completionStatus !== null && styles.dayMarkTextFinalized,
+                              isMissed && styles.dayMarkTextMissed,
                               isToday && styles.dayMarkTextToday,
                             ]}
                             numberOfLines={1}
@@ -968,9 +1084,11 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                               ? 'Done'
                               : cell.completionStatus === 'halted'
                                 ? 'Stopped'
-                                : isToday
-                                  ? 'Today'
-                                  : focusLabel(cell.focus)}
+                                : isMissed
+                                  ? 'Missed'
+                                  : isToday
+                                    ? 'Today'
+                                    : focusLabel(cell.focus)}
                           </Text>
                         </Pressable>
                       );
@@ -986,29 +1104,40 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                         ? ' - completed'
                         : detail.summary.completionStatus === 'halted'
                           ? ' - stopped'
-                          : ''}
+                          : isMissedSession(detail.summary, today)
+                            ? ' - not done'
+                            : ''}
                     </Text>
-                    {detail.slots.map((slot) => (
-                      <View key={slot.slotIndex} style={styles.slotRow}>
-                        <View style={styles.slotMain}>
-                          <Text style={styles.slotName}>{slot.movementName}</Text>
-                          <View style={styles.slotDetails}>
-                            <Text style={styles.slotValue}>{targetLabel(slot)}</Text>
-                            <Text style={styles.slotTarget}>RPE {slot.targetRpe.toFixed(1)}</Text>
+                    {detail.slots.map((slot) => {
+                      // #214: the planned load, from the same calculation as
+                      // today's preview but without today's readiness
+                      // modifier, since that day's readiness is not known.
+                      const plannedLoad = slotLoadKg(slot, oneRepMaxes);
+                      return (
+                        <View key={slot.slotIndex} style={styles.slotRow}>
+                          <View style={styles.slotMain}>
+                            <Text style={styles.slotName}>{slot.movementName}</Text>
+                            <View style={styles.slotDetails}>
+                              <Text style={styles.slotValue}>{targetLabel(slot)}</Text>
+                              <Text style={styles.slotTarget}>RPE {slot.targetRpe.toFixed(1)}</Text>
+                              {plannedLoad !== null && (
+                                <Text style={styles.slotTarget}>about {plannedLoad.toFixed(1)} kg</Text>
+                              )}
+                            </View>
+                            <AutopilotAttribution
+                              slot={slot}
+                              expanded={attributionSlotId === slot.plannedSlotId}
+                              onPress={() => setAttributionSlotId((currentId) => currentId === slot.plannedSlotId ? null : slot.plannedSlotId)}
+                            />
                           </View>
-                          <AutopilotAttribution
-                            slot={slot}
-                            expanded={attributionSlotId === slot.plannedSlotId}
-                            onPress={() => setAttributionSlotId((currentId) => currentId === slot.plannedSlotId ? null : slot.plannedSlotId)}
-                          />
+                          {slot.overrideReason != null && slot.overrideReason.trim() !== '' && (
+                            <View style={styles.overrideBadge} accessibilityRole="text">
+                              <Text style={styles.overrideBadgeText}>{slot.overrideReason}</Text>
+                            </View>
+                          )}
                         </View>
-                        {slot.overrideReason != null && slot.overrideReason.trim() !== '' && (
-                          <View style={styles.overrideBadge} accessibilityRole="text">
-                            <Text style={styles.overrideBadgeText}>{slot.overrideReason}</Text>
-                          </View>
-                        )}
-                      </View>
-                    ))}
+                      );
+                    })}
                     <SecondaryButton label="Close session preview" onPress={() => setDetail(null)} accessibilityLabel="Close session preview" />
                   </View>
                 )}
@@ -1043,7 +1172,13 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
       )}
 
       {/* Disclosures Section */}
-      <View style={styles.section}>
+      <View
+        style={styles.section}
+        onLayout={(event) => {
+          optionalDetailsY.current = event.nativeEvent.layout.y;
+          routineTemplatesLaidOut();
+        }}
+      >
         <Text style={styles.sectionTitle}>Optional details</Text>
         <Disclosure label="Why today changed" hint="Adjustment source and limits">
           {current === null ? (
@@ -1141,13 +1276,30 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           </Disclosure>
         )}
 
+        <View
+          style={styles.layoutMarker}
+          onLayout={(event) => {
+            routineTemplatesOffsetY.current = event.nativeEvent.layout.y;
+            routineTemplatesLaidOut();
+          }}
+        />
         <Disclosure
           label="Routine templates"
           hint={profile.training_age === 'beginner'
             ? 'Stored templates can be deleted; use and editing unlock later'
             : 'Create, edit, and freeze custom routine templates'}
+          open={routineTemplatesOpen}
+          onOpenChange={setRoutineTemplatesOpen}
         >
           <View style={styles.disclosureContent}>
+            {/* #223: the store refuses to freeze a routine over an active goal
+                program, so "Use day N today" is not offered then. Said once
+                here instead of after a tap that cannot work. */}
+            {goalProgramActive && profile.training_age !== 'beginner' && (
+              <Text style={styles.captionText}>
+                Routines can't replace your goal program's sessions. Edit them here, and use them when no goal program is active.
+              </Text>
+            )}
             {routineTemplates.length === 0 ? (
               <Text style={styles.captionText}>No saved routine templates yet.</Text>
             ) : (
@@ -1175,7 +1327,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                       <>
                         {profile.training_age !== 'beginner' && (
                           <>
-                            {[...new Set(t.slots.map((slot) => slot.dayIndex))].sort((a, b) => a - b).map((dayIndex) => (
+                            {!goalProgramActive && [...new Set(t.slots.map((slot) => slot.dayIndex))].sort((a, b) => a - b).map((dayIndex) => (
                               <Chip
                                 key={dayIndex}
                                 label={`Use day ${dayIndex} today`}
@@ -1469,11 +1621,11 @@ const styles = StyleSheet.create({
     gap: theme.space[4],
     paddingBottom: theme.space[6],
   },
-  center: {
-    flex: 1,
-    backgroundColor: theme.color.ink0,
+  gateContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     padding: theme.space[6],
+    gap: theme.space[4],
   },
   header: {
     marginBottom: theme.space[2],
@@ -1553,6 +1705,10 @@ const styles = StyleSheet.create({
   section: {
     gap: theme.space[3],
   },
+  /** Zero-height position marker inside a `section`; cancels the gap it adds. */
+  layoutMarker: {
+    marginBottom: -theme.space[3],
+  },
   sectionTitle: {
     ...theme.font.eyebrow,
     color: theme.color.textLow,
@@ -1620,6 +1776,11 @@ const styles = StyleSheet.create({
     borderColor: theme.color.line,
     backgroundColor: theme.color.ink1,
   },
+  dayMarkMissed: {
+    borderColor: theme.color.textLow,
+    borderStyle: 'dashed',
+    backgroundColor: 'transparent',
+  },
   dayMarkToday: {
     borderColor: theme.color.chalk,
     borderLeftWidth: 4,
@@ -1637,6 +1798,9 @@ const styles = StyleSheet.create({
   },
   dayMarkTextFinalized: {
     color: theme.color.textHi,
+  },
+  dayMarkTextMissed: {
+    color: theme.color.textLow,
   },
   dayMarkTextToday: {
     color: theme.color.chalk,
@@ -1682,6 +1846,7 @@ const styles = StyleSheet.create({
   },
   slotDetails: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: theme.space[2],
   },
   slotValue: {
