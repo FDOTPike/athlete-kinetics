@@ -2708,7 +2708,7 @@ console.log('[MAIN_LIFT_SPACING] no same main lift on back-to-back days');
   const chosen = generateBlock({ profile: prof({ objective: 'hypertrophy', training_age: 'advanced', weekly_frequency: 2 }), movements, startDate: START, programDays: program });
   const week1 = chosen.sessions.filter((s) => s.week_index === 1);
   check('an explicit choice of the same main lift on back-to-back days is kept (the athlete owns it)',
-    week1.length === 2 && week1.every((s) => s.slots.some((slot) => slot.movement_id === squat)),
+    week1.length === 2 && week1.every((s) => mainIds(s).includes(squat)),
     `${squat} ${pattern}: ${week1.map((s) => `${s.focus}=${s.slots.map((slot) => slot.movement_id).join(',')}`).join(' ')} ${chosen.warnings.join('; ')}`);
 
   // Spacing never reaches a non-adjacent pair: a 3-day week spread over
