@@ -475,8 +475,11 @@ test('COACH keeps trajectory labels on one line across recovery and finalized st
     flexDirection: 'column',
     alignItems: 'stretch',
   });
-  expect(StyleSheet.flatten(screen.getByTestId('trajectory-days-week-1').props.style)).toMatchObject({
-    width: '100%',
+  // Issue 163: the day cells sit in a horizontal scroll row, so they keep the
+  // 56 dp minimum at phone width instead of being squeezed.
+  expect(screen.getByTestId('trajectory-days-week-1').props.horizontal).toBe(true);
+  expect(StyleSheet.flatten(screen.getByTestId('trajectory-days-week-1').props.contentContainerStyle)).toMatchObject({
+    flexDirection: 'row',
   });
 
   for (const label of ['Done', 'Stopped', 'Today', 'UPR']) {

@@ -2098,8 +2098,8 @@ const styles = StyleSheet.create({
     marginTop: theme.space[2],
   },
   metricAdjust: {
-    minWidth: 54,
-    minHeight: 40,
+    minWidth: theme.touch.min,
+    minHeight: theme.touch.min,
     paddingHorizontal: theme.space[2],
     alignItems: 'center',
     justifyContent: 'center',
@@ -2622,6 +2622,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   halfStepChip: {
-    minWidth: 48,
+    minWidth: theme.touch.min,
   },
 });

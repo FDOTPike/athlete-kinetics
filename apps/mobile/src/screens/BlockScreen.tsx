@@ -975,7 +975,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                           {showPhaseTip && <InfoTip term={phaseTerm} />}
                         </View>
                       </View>
-                      <View testID={`trajectory-days-week-${row.week}`} style={styles.dayRail}>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} testID={`trajectory-days-week-${row.week}`} contentContainerStyle={styles.dayRail}>
                     {row.cells.map((cell, dayIndex) => {
                       // Every trajectory position owns a calendar date derived
                       // from the block start, week and day index (same formula
@@ -1063,7 +1063,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                         </Pressable>
                       );
                     })}
-                  </View>
+                  </ScrollView>
                 </View>
 
                 {detail !== null && detail.summary.weekIndex === row.week && (
@@ -1719,13 +1719,13 @@ const styles = StyleSheet.create({
     color: theme.color.textLow,
   },
   dayRail: {
-    width: '100%',
+    flexGrow: 1,
     flexDirection: 'row',
     gap: theme.space[1],
   },
   dayMark: {
     flex: 1,
-    minWidth: 0,
+    minWidth: theme.touch.min,
     minHeight: theme.touch.min,
     borderWidth: 1,
     borderColor: theme.color.line,
