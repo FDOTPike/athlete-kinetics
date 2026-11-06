@@ -217,7 +217,7 @@ test('past missed, past completed, halted, ordinary rest and future cells never 
   expect(todayCell.props.accessibilityState.selected).toBe(true);
   expect(StyleSheet.flatten(todayCell.props.style)).toMatchObject(CHALK_SPINE);
 
-  notChalked(screen.getByLabelText('Week 1, lower session on 2026-07-13'));
+  notChalked(screen.getByLabelText('Week 1, lower session on 2026-07-13, not done'));
   notChalked(screen.getByLabelText('Week 1, lower session on 2026-07-14, completed'));
   notChalked(screen.getByLabelText('Week 1, upper session on 2026-07-15, stopped'));
   notChalked(screen.getByLabelText('Week 1, full session on 2026-07-17'));
@@ -243,6 +243,6 @@ test('when today lies outside the block, zero today markers render anywhere in t
   // Rest cells fall back to the plain dash; no cell claims selected state.
   const restDashes = screen.queryAllByText('-');
   expect(restDashes.length).toBeGreaterThanOrEqual(20);
-  notChalked(screen.getByLabelText('Week 1, lower session on 2026-07-13'));
-  notChalked(screen.getByLabelText('Week 1, upper session on 2026-07-15'));
+  notChalked(screen.getByLabelText('Week 1, lower session on 2026-07-13, not done'));
+  notChalked(screen.getByLabelText('Week 1, upper session on 2026-07-15, not done'));
 });

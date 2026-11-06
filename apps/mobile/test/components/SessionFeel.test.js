@@ -449,6 +449,29 @@ describe('completion screen: asked only when the session did not go to plan', ()
     expectNoTrainingAction();
   });
 
+  // Android walk (#212): a followed plan that is asked (only effort drift can
+  // ask it) must not also say the session went differently from the plan.
+  test('a followed plan asked because of effort drift says so, not "went differently from the plan"', () => {
+    mockState = baseState({
+      profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+      loadSessionOutcome: jest.fn(() => ({ outcomeKind: 'followed_plan', finalizedAtMs: 1_757_000_000_000 })),
+    });
+    render(<SessionScreen />);
+    expect(screen.getByText('Plan followed.')).toBeOnTheScreen();
+    expect(screen.getByTestId('session-feel-ask')).toHaveTextContent('You did every set, but your effort was different from the targets.');
+    expect(screen.queryByText(/went differently from the plan/)).toBeNull();
+    expect(screen.getByTestId('session-feel-open')).toBeOnTheScreen();
+  });
+
+  test('an adapted session that is asked still says it went differently from the plan', () => {
+    mockState = baseState({
+      profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    });
+    render(<SessionScreen />);
+    expect(screen.getByText('Session adapted.')).toBeOnTheScreen();
+    expect(screen.getByTestId('session-feel-ask')).toHaveTextContent('This session went differently from the plan.');
+  });
+
   test('opening the panel writes nothing; saving asks the store once and returns to the screen', () => {
     const loadSessionFeel = jest.fn()
       .mockReturnValueOnce({ ask: true, saved: null, note: null })
