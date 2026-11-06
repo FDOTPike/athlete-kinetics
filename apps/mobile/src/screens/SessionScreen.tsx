@@ -208,6 +208,78 @@ const formatFinalizedDate = (ms: number): string => {
   return `${dayName} ${day} ${monthName} ${year}`;
 };
 
+/** Limits a corrected set must meet: the same reps range and load grid that
+ *  logCurrent applies before logSet. A correction never snaps a value. */
+const canSaveCorrection = (reps: number, loadKg: number): boolean =>
+  Number.isInteger(reps) && reps >= 1 && reps <= 50 && isOnLoadGrid(loadKg);
+
+/** Correct the reps and load of the last logged set of the current exercise.
+ *  Effort is not corrected here: it feeds the rest timer the runner already
+ *  started, so that stays a runner decision (#142). */
+function CorrectLastSet({
+  set,
+  onSave,
+}: {
+  set: LoggedSet;
+  onSave: (setId: number, reps: number, loadKg: number, rpe: number | null) => void;
+}): React.JSX.Element {
+  const [open, setOpen] = useState(false);
+  const [reps, setReps] = useState(set.reps);
+  const [loadKg, setLoadKg] = useState(set.load_kg);
+  const valid = canSaveCorrection(reps, loadKg);
+  return (
+    <View style={styles.correctionBlock}>
+      <Text style={styles.correctionText}>{`Set ${set.set_index} logged: ${set.reps} reps at ${set.load_kg.toFixed(1)} kg`}</Text>
+      {!open ? (
+        <QuietAction
+          label={`Correct set ${set.set_index}`}
+          accessibilityLabel={`Correct set ${set.set_index}`}
+          onPress={() => {
+            setReps(set.reps);
+            setLoadKg(set.load_kg);
+            setOpen(true);
+          }}
+        />
+      ) : (
+        <View style={{ gap: theme.space[3] }}>
+          <Stepper
+            testID="correction-reps-stepper"
+            label="Corrected reps"
+            value={String(reps)}
+            onDecrement={() => setReps((n) => clamp(n - 1, 1, 50))}
+            onIncrement={() => setReps((n) => clamp(n + 1, 1, 50))}
+          />
+          <Stepper
+            testID="correction-load-stepper"
+            label="Corrected load"
+            value={`${loadKg.toFixed(1)} kg`}
+            onDecrement={() => setLoadKg((n) => clamp(n - 2.5, 0, 500))}
+            onIncrement={() => setLoadKg((n) => clamp(n + 2.5, 0, 500))}
+          />
+          {!valid && (
+            <Text style={styles.loadEvidence}>Enter a load from 0 to 500 in 2.5 kg increments.</Text>
+          )}
+          <PrimaryButton
+            label="Save correction"
+            accessibilityLabel="Save correction"
+            disabled={!valid}
+            onPress={() => {
+              if (!canSaveCorrection(reps, loadKg)) return;
+              onSave(set.set_id, reps, loadKg, set.rpe);
+              setOpen(false);
+            }}
+          />
+          <QuietAction
+            label="Cancel"
+            accessibilityLabel="Cancel correction"
+            onPress={() => setOpen(false)}
+          />
+        </View>
+      )}
+    </View>
+  );
+}
+
 function CompletedMetrics({
   sets,
   bandLadder,
@@ -1337,6 +1409,10 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
               }
 
               // Active slot
+              // The last logged set of this exercise, the only one the athlete can correct here.
+              const correctable = (session?.sets ?? [])
+                .filter((set) => sameSlot(set, slot))
+                .reduce<LoggedSet | null>((best, set) => (best === null || set.set_id > best.set_id ? set : best), null);
               return (
                 <View key={slot.sessionPlanSlotId} style={styles.timelineRow}>
                   {/* Left Active Spine (Chalk marks CURRENT/ACTIVE only) */}
@@ -1345,6 +1421,9 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                   </View>
 
                   <View style={styles.currentCard}>
+                    {correctable !== null && !halted && slot.target.kind !== 'time' && (
+                      <CorrectLastSet key={correctable.set_id} set={correctable} onSave={editSet} />
+                    )}
                     {resting ? (
                       <View style={{ alignItems: 'center', gap: theme.space[3] }}>
                         {/* Draining chalk barRestTimerCard */}
@@ -2130,6 +2209,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginTop: theme.space[2],
+  },
+  correctionBlock: {
+    gap: theme.space[2],
+    marginBottom: theme.space[3],
+  },
+  correctionText: {
+    ...theme.font.label,
+    color: theme.color.textMid,
   },
   currentCard: {
     flex: 1,
