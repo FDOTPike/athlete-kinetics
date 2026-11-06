@@ -1,14 +1,20 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { theme } from '../theme/theme';
 import { useBackupStore } from '../state/backupStore';
+import { backupLimitText, measureBackupSize, type BackupSizeEstimate } from '../state/backupCapacity';
 import { QuietAction } from './ui';
 
 const dateLabel = (value: string | null): string => value === null
   ? 'No confirmed backup saved yet.'
   : `Last confirmed save: ${new Date(value).toLocaleString()}`;
 
-export default function BackupTransferPanel(): React.JSX.Element {
+export interface BackupTransferPanelProps {
+  /** The number of athletes on the phone; a change re-reads the backup total (#173). */
+  athleteCount?: number;
+}
+
+export default function BackupTransferPanel({ athleteCount }: BackupTransferPanelProps = {}): React.JSX.Element {
   const status = useBackupStore((state) => state.status);
   const message = useBackupStore((state) => state.message);
   const preview = useBackupStore((state) => state.preview);
@@ -22,6 +28,16 @@ export default function BackupTransferPanel(): React.JSX.Element {
   const cancelRestore = useBackupStore((state) => state.cancelRestore);
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
+  // #173: the limit and the current total, re-read after each backup action
+  // and whenever the athlete count changes (the panel stays mounted while
+  // athletes are added or deleted on the Profile screen).
+  const [sizeEstimate, setSizeEstimate] = useState<BackupSizeEstimate | null>(null);
+  useEffect(() => {
+    if (status === 'working') return undefined;
+    let live = true;
+    void measureBackupSize().then((estimate) => { if (live) setSizeEstimate(estimate); });
+    return () => { live = false; };
+  }, [status, athleteCount]);
 
   const working = status === 'working';
   const recoveryBlocked = startupSafe !== true;
@@ -32,8 +48,9 @@ export default function BackupTransferPanel(): React.JSX.Element {
     <View style={styles.section} testID="backup-transfer-section">
       <Text style={styles.heading}>BACK UP &amp; TRANSFER DATA</Text>
       <Text style={styles.body}>
-        An encrypted backup includes every athlete, profile, plan, routine, workout, activity, health-support record, preference, and identifier on this phone.
+        An encrypted backup includes each athlete&apos;s profile, plans, routines, workouts, activities, health-support records, preferences, and identifiers on this phone.
       </Text>
+      <Text style={styles.body} testID="backup-limit">{backupLimitText(sizeEstimate)}</Text>
       <Text style={styles.body}>
         New phone: create a backup, save it somewhere you can reach from the new phone, install pikeMethods there, then choose Restore backup.
         A copy kept only on this phone will not protect you if the phone is lost.

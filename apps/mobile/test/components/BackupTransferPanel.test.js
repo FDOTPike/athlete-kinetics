@@ -19,7 +19,9 @@ test('explains encrypted all-athlete backup, off-phone storage, and replace-only
     databaseCount: 2, totalBytes: 2_097_152, replaceOnly: true,
   };
   render(<BackupTransferPanel />);
-  expect(screen.getByText(/includes every athlete, profile, plan, routine, workout, activity, health-support record/)).toBeOnTheScreen();
+  // #173: "every athlete" became the stated limit (see BackupCapacity.test.js).
+  expect(screen.getByText(/includes each athlete's profile, plans, routines, workouts, activities, health-support records/)).toBeOnTheScreen();
+  expect(screen.getByText(/Backups cover up to about five athletes in this version/)).toBeOnTheScreen();
   expect(screen.getByText(/copy kept only on this phone will not protect you/)).toBeOnTheScreen();
   expect(screen.getByText(/Replace only: this removes all current athlete data/)).toBeOnTheScreen();
   expect(screen.getByText(/creates and verifies an encrypted recovery backup/)).toBeOnTheScreen();
