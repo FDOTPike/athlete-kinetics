@@ -30,6 +30,13 @@ export interface StepperProps {
   tip?: keyof typeof GLOSSARY & string;
 }
 
+// The name a screen reader speaks. The visual "3 · " numbering is dropped, and
+// an all-caps visible label is read in sentence case (issue 138).
+function spokenName(label: string): string {
+  const words = label.replace(/^\d+\s*·\s*/, '');
+  return words === words.toUpperCase() ? words.toLowerCase() : words;
+}
+
 export function Stepper({
   label,
   value,
@@ -40,6 +47,7 @@ export function Stepper({
   repeatOnHold = false,
   tip,
 }: StepperProps): React.JSX.Element {
+  const name = spokenName(label);
   const holdTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const repeatInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const didRepeat = useRef(false);
@@ -85,14 +93,14 @@ export function Stepper({
           onPressIn={repeatOnHold ? () => startRepeating(onDecrement) : undefined}
           onPressOut={repeatOnHold ? stopRepeating : undefined}
           accessibilityRole="button"
-          accessibilityLabel={`Decrease ${label}`}
+          accessibilityLabel={`Decrease ${name}`}
           style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
         >
           <Text style={styles.symbol}>−</Text>
         </Pressable>
         <Text
           style={styles.value}
-          accessibilityLabel={`${label} ${value}`}
+          accessibilityLabel={`${name} ${value}`}
         >
           {value}
         </Text>
@@ -101,7 +109,7 @@ export function Stepper({
           onPressIn={repeatOnHold ? () => startRepeating(onIncrement) : undefined}
           onPressOut={repeatOnHold ? stopRepeating : undefined}
           accessibilityRole="button"
-          accessibilityLabel={`Increase ${label}`}
+          accessibilityLabel={`Increase ${name}`}
           style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
         >
           <Text style={styles.symbol}>+</Text>
