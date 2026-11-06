@@ -6,7 +6,7 @@ import { isDifficultyAllowed as actualIsDifficultyAllowed } from '../../../../pa
 import { resolveMovementAvailability as actualResolveMovementAvailability } from '../../../../packages/inference/src/capabilityResolver';
 import { JOINTS as ACTUAL_JOINTS, PATTERN_JOINTS } from '../../../../packages/inference/src/substitution';
 import { EXPERIENCE_SEVERITY } from '../../../../packages/inference/src/types';
-import SessionScreen from '../../src/screens/SessionScreen';
+import SessionScreen, { aboveCeilingNote } from '../../src/screens/SessionScreen';
 import { RestTimerCard } from '../../src/components/ui/RestTimerCard';
 import { advance as advanceRunner, restSecondsFor as runnerRestSecondsFor } from '../../../../packages/inference/src/sessionRunner';
 
@@ -641,6 +641,99 @@ test('a rep-based set above the same ceiling keeps the reps-left sentence', () =
   fireEvent.press(screen.getByRole('button', { name: 'Effort 8.5' }));
   expect(screen.getByTestId('effort-above-ceiling-note'))
     .toHaveTextContent('That was above your ceiling of 7.5. Next set, stop with 3 reps left.');
+});
+
+// Owner ruling on #206 (review follow-up): a discomfort report today can set a
+// lower effort cap than the profile ceiling. The note then uses the lower of
+// the two, for both when it shows and the reps-left advice, and says "today's
+// ceiling", so it never advises an effort above today's cap.
+describe('aboveCeilingNote with today\'s discomfort report cap', () => {
+  test.each([
+    [9, false, "That was above today's ceiling of 7.5. Next set, stop with 3 reps left."],
+    [8, false, "That was above today's ceiling of 7.5. Next set, stop with 3 reps left."],
+    [8, true, "That was above today's ceiling of 7.5."],
+  ])('profile 8.5, report cap 7.5, rated %s (timed %s)', (rpe, timed, expected) => {
+    expect(aboveCeilingNote(rpe, 8.5, 7.5, timed)).toBe(expected);
+  });
+
+  test('at or below the lower report cap there is no note', () => {
+    expect(aboveCeilingNote(7.5, 8.5, 7.5)).toBeNull();
+    expect(aboveCeilingNote(7, 8.5, 7.5, true)).toBeNull();
+  });
+
+  test.each([
+    ['no report cap', null],
+    ['a report cap equal to the ceiling', 7.5],
+    ['a report cap above the ceiling', 8],
+  ])('%s keeps "your ceiling" from the profile', (_name, reportCap) => {
+    expect(aboveCeilingNote(8, 7.5, reportCap))
+      .toBe('That was above your ceiling of 7.5. Next set, stop with 3 reps left.');
+    expect(aboveCeilingNote(8, 7.5, reportCap, true)).toBe('That was above your ceiling of 7.5.');
+    expect(aboveCeilingNote(7.5, 7.5, reportCap)).toBeNull();
+  });
+});
+
+const reportCapTriage = (rpeCap) => ({
+  kind: 'matched',
+  directive: {
+    halt: false,
+    followUp: null,
+    matchedCue: 'my knee is a bit sore',
+    similarity: 0.9,
+    vector: { load_modifier: 0.9, set_modifier: 0, rpe_cap: rpeCap, coaching_cue: 'Keep effort easy today.' },
+  },
+});
+
+test.each([
+  [/^1 clean reps? left/i],
+  [/^2 clean reps? left/i],
+])('a beginner (ceiling 8.5) with a report cap of 7.5 sees "today\'s ceiling" for chip %s', (chip) => {
+  mockState = state({
+    profile: { training_age: 'beginner', objective: 'strength', base_rpe_cap: 9.5, equipment_inventory: [], session_duration_cap_min: 60 },
+    lastTriage: reportCapTriage(7.5),
+  });
+  render(<SessionScreen />);
+  fireEvent.press(screen.getByLabelText(chip));
+  expect(screen.getByTestId('effort-above-ceiling-note'))
+    .toHaveTextContent("That was above today's ceiling of 7.5. Next set, stop with 3 reps left.");
+});
+
+test('a timed set under a report cap of 7.5 (profile 8.5) shows only the first sentence', () => {
+  mockState = state({
+    profile: { training_age: 'beginner', objective: 'strength', base_rpe_cap: 9.5, equipment_inventory: [], session_duration_cap_min: 60 },
+    sessionPlan: [slot(1, 1, 5, { target: { kind: 'time', seconds: 30 }, targetRpe: 7 }), slot(2, 2, 8)],
+    lastTriage: reportCapTriage(7.5),
+  });
+  render(<SessionScreen />);
+  fireEvent.press(screen.getByRole('button', { name: 'Enter Effort directly' }));
+  fireEvent.press(screen.getByRole('button', { name: 'Effort 8.0' }));
+  expect(screen.getByTestId('effort-above-ceiling-note').props.children)
+    .toBe("That was above today's ceiling of 7.5.");
+});
+
+test('a report cap above the profile ceiling keeps "your ceiling" (cap 8.0, ceiling 7.5)', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', objective: 'strength', base_rpe_cap: 7.5, equipment_inventory: [], session_duration_cap_min: 60 },
+    lastTriage: reportCapTriage(8),
+  });
+  render(<SessionScreen />);
+  fireEvent.press(screen.getByLabelText(/^2 clean reps? left/i));
+  expect(screen.getByTestId('effort-above-ceiling-note'))
+    .toHaveTextContent('That was above your ceiling of 7.5. Next set, stop with 3 reps left.');
+});
+
+test('the "4+" chip still shows no note under a report cap of 6.0', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', objective: 'strength', base_rpe_cap: 8.5, equipment_inventory: [], session_duration_cap_min: 60 },
+    lastTriage: reportCapTriage(6),
+  });
+  render(<SessionScreen />);
+  fireEvent.press(screen.getByLabelText(/^4\+ clean reps left/i));
+  expect(screen.queryByTestId('effort-above-ceiling-note')).toBeNull();
+  // Any chip above the report cap does show it.
+  fireEvent.press(screen.getByLabelText(/^3 clean reps left/i));
+  expect(screen.getByTestId('effort-above-ceiling-note'))
+    .toHaveTextContent("That was above today's ceiling of 6.0. Next set, stop with 4 reps left.");
 });
 
 // ---------------------------------------------------------------------------

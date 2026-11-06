@@ -153,14 +153,25 @@ const loadCopyFor = (
  *  changes nothing: logging, the next-set target and next-session easing are
  *  untouched. Reps left is the whole number that keeps the set at or under
  *  the ceiling (8.5 → 2, 7.0 → 3). A timed set has no reps and is rated by
- *  direct effort, so it gets only the first sentence (owner ruling, #206). */
-const aboveCeilingNote = (rpe: number | null, ceiling: number, isTimed = false): string | null => {
+ *  direct effort, so it gets only the first sentence (owner ruling, #206).
+ *  When today's discomfort report set a lower effort cap than the profile
+ *  ceiling, that lower cap decides both when the note shows and the reps left,
+ *  and the note calls it "today's ceiling" (owner ruling, #206). */
+export const aboveCeilingNote = (
+  rpe: number | null,
+  profileCeiling: number,
+  reportCap: number | null = null,
+  isTimed = false,
+): string | null => {
+  const todayCapLower = reportCap !== null && Number.isFinite(reportCap) && reportCap < profileCeiling;
+  const ceiling = todayCapLower ? reportCap : profileCeiling;
   if (rpe === null || !Number.isFinite(rpe) || !Number.isFinite(ceiling) || rpe <= ceiling) return null;
+  const which = todayCapLower ? "today's ceiling" : 'your ceiling';
   if (isTimed) {
-    return `That was above your ceiling of ${ceiling.toFixed(1)}.`;
+    return `That was above ${which} of ${ceiling.toFixed(1)}.`;
   }
   const repsLeft = Math.max(1, Math.ceil(10 - ceiling));
-  return `That was above your ceiling of ${ceiling.toFixed(1)}. Next set, stop with ${repsLeft} ${repsLeft === 1 ? 'rep' : 'reps'} left.`;
+  return `That was above ${which} of ${ceiling.toFixed(1)}. Next set, stop with ${repsLeft} ${repsLeft === 1 ? 'rep' : 'reps'} left.`;
 };
 
 // Local rest when no runner owns the timer: the runner's RPE bands. Training
@@ -580,9 +591,14 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   // chip on the bar, so a "stop with N reps left" note could be false and no
   // other chip could satisfy it: no note for it (owner ruling, #206). It still
   // logs 6.0, and next-session easing is unchanged.
+  // Today's discomfort report cap: the operative (non-halt) report's effort
+  // cap. A halt zeroes the vector and ends the session, so it is not a cap.
+  const reportCap = lastTriage?.kind === 'matched' && !lastTriage.directive.halt
+    ? lastTriage.directive.vector.rpe_cap
+    : null;
   const ceilingNote = selectedChoice === '4+'
     ? null
-    : aboveCeilingNote(safeRpe, effectiveRpeCeiling(profile), target?.kind === 'time');
+    : aboveCeilingNote(safeRpe, effectiveRpeCeiling(profile), reportCap, target?.kind === 'time');
 
   const runnerResting = runnerPhase === 'resting';
   const rest = runnerResting ? {
