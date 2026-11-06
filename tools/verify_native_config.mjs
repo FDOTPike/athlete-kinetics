@@ -339,9 +339,14 @@ console.log('[N11] beta orientation lock (#168)');
   // A beta decision to revisit: landscape left too little room on every
   // screen (the rest card's countdown never fit). Tablets are not in the beta,
   // so the iPad list is kept as it was.
-  const manifest = stripXmlComments(read('apps/mobile/android/app/src/main/AndroidManifest.xml'));
+  const rawManifest = read('apps/mobile/android/app/src/main/AndroidManifest.xml');
+  const manifest = stripXmlComments(rawManifest);
   const mainActivity = manifest.match(/<activity\s[^>]*android:name="\.MainActivity"[^>]*>/)?.[0] ?? '';
   check('Android MainActivity is locked to portrait', /android:screenOrientation="portrait"/.test(mainActivity));
+  // Android 16 (API 36) ignores the lock on >= 600dp screens; the scope note
+  // sits directly above the activity (XML allows no comment inside a tag).
+  check('Android MainActivity carries the large-screen scope note',
+    /<!-- Locks portrait on phones \(< 600dp\); Android 16 \(API 36\) ignores portrait lock on >= 600dp tablets\/unfolded foldables, which are out of scope for the beta\. -->\s*<activity\s[^>]*android:name="\.MainActivity"/.test(rawManifest));
   const orientations = (key) => [...String(plist.get(key) ?? '').matchAll(/<string>([^<]+)<\/string>/g)].map((m) => m[1]);
   const iphone = orientations('UISupportedInterfaceOrientations');
   check('iPhone supports portrait only', iphone.length === 1 && iphone[0] === 'UIInterfaceOrientationPortrait', iphone.join(','));
