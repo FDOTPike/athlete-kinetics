@@ -247,6 +247,40 @@ describe('the form itself: what a stored or unstored answer shows', () => {
     expect(screen.getByText('No change')).toBeOnTheScreen();
   });
 
+  test('a second Apply while the first is pending sends nothing more, and the stored answer is not marked not sent', async () => {
+    let settle;
+    const onApply = jest.fn(() => new Promise((resolve) => { settle = resolve; }));
+    render(<SubjectiveReportPanel hasVector lastTriage={{ kind: 'rejected' }} triaging={false} triageReady onApply={onApply} onClose={jest.fn()} />);
+    fireEvent.changeText(screen.getByLabelText('Describe how your body feels today'), 'knee sore');
+    fireEvent.press(screen.getByLabelText('Severity 3 of 10'));
+    const apply = screen.getByTestId('completion-report-apply');
+    await act(async () => {
+      fireEvent.press(apply);
+      fireEvent.press(apply);
+    });
+    expect(onApply).toHaveBeenCalledTimes(1);
+    await act(async () => { settle(true); });
+    expect(screen.queryByTestId('completion-report-not-sent')).toBeNull();
+    expect(screen.getByText('No change')).toBeOnTheScreen();
+  });
+
+  test('a new report that is not sent does not keep the earlier result on screen', async () => {
+    const answers = [true, false];
+    const onApply = jest.fn(() => Promise.resolve(answers.shift()));
+    render(<SubjectiveReportPanel hasVector lastTriage={{ kind: 'rejected' }} triaging={false} triageReady onApply={onApply} onClose={jest.fn()} />);
+    fireEvent.changeText(screen.getByLabelText('Describe how your body feels today'), 'first report');
+    fireEvent.press(screen.getByLabelText('Severity 2 of 10'));
+    await act(async () => { fireEvent.press(screen.getByLabelText('Apply report')); });
+    expect(screen.getByText('No change')).toBeOnTheScreen();
+    fireEvent.changeText(screen.getByLabelText('Describe how your body feels today'), 'second report');
+    fireEvent.press(screen.getByLabelText('Severity 4 of 10'));
+    await act(async () => { fireEvent.press(screen.getByLabelText('Apply report')); });
+    expect(onApply).toHaveBeenCalledTimes(2);
+    expect(screen.getByTestId('completion-report-not-sent')).toBeOnTheScreen();
+    expect(screen.queryByText('No change')).toBeNull();
+    expect(screen.getByLabelText('Describe how your body feels today').props.value).toBe('second report');
+  });
+
   test('without triage the Plan form caption is shown, with the same words', () => {
     const block = source('screens/BlockScreen.tsx');
     const caption = 'Semantic matching is unavailable in this build. Injury-language safety checks still apply.';
