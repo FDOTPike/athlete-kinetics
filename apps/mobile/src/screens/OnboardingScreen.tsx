@@ -28,7 +28,7 @@
  * Law 3: Zero red/amber/green anywhere.
  * Law 4: Touch targets >= 56pt.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   BIG4_LIFTS,
@@ -60,7 +60,7 @@ import InfoTip from '../components/InfoTip';
 import { useStore } from '../state/useStore';
 import { useSubViewBack } from '../navigation/navigation';
 import { Chip, Stepper, QuietAction, PrimaryButton } from '../components/ui';
-import { OneRmRow, oneRmKeptKg } from '../components/OneRmRow';
+import { OneRmRow, oneRmKeptKg, parseOneRmText } from '../components/OneRmRow';
 import {
   BALANCED_FOCUS_DRAFT,
   EMPTY_GOAL_FIELDS,
@@ -307,7 +307,14 @@ export default function OnboardingScreen(): React.JSX.Element {
   // of the interview, never before.
   const [maxDraft, setMaxDraft] = useState<Record<number, number>>({});
   const asksMaxes = draft.training_age !== 'beginner';
+  // Review (PR 292): text typed into a max field that has not been committed
+  // yet. NEXT or BACK can be tapped while the field still has focus, and the
+  // field then leaves the screen with no end-of-editing event, so leaving the
+  // step commits this text by the field's own rule. Any commit from the field
+  // itself (end of editing, + or −) replaces it.
+  const pendingMaxText = useRef<Record<number, string>>({});
   const setMax = (movementId: number, kg: number | null): void => {
+    delete pendingMaxText.current[movementId];
     setMaxDraft((current) => {
       const nextDraft = { ...current };
       if (kg === null) delete nextDraft[movementId];
@@ -315,9 +322,27 @@ export default function OnboardingScreen(): React.JSX.Element {
       return nextDraft;
     });
   };
+  const commitPendingMaxes = (): void => {
+    const pending = Object.entries(pendingMaxText.current);
+    pendingMaxText.current = {};
+    if (pending.length === 0) return;
+    setMaxDraft((current) => {
+      const nextDraft = { ...current };
+      for (const [movementId, text] of pending) {
+        const kg = parseOneRmText(text);
+        if (kg === null) delete nextDraft[Number(movementId)];
+        else nextDraft[Number(movementId)] = oneRmKeptKg(kg);
+      }
+      return nextDraft;
+    });
+  };
   const today = localIsoToday();
 
-  useSubViewBack(stepIdx > 0, () => setStepIdx((i) => Math.max(0, i - 1)));
+  const goBack = (): void => {
+    commitPendingMaxes();
+    setStepIdx((i) => Math.max(0, i - 1));
+  };
+  useSubViewBack(stepIdx > 0, goBack);
 
   const patch = (p: Partial<UserProfile>): void => setDraft((d) => ({ ...d, ...p }));
 
@@ -383,6 +408,7 @@ export default function OnboardingScreen(): React.JSX.Element {
   const limitsGateOpen = step === 'limits' && limitsAnswered === null;
 
   const goNext = (): void => {
+    commitPendingMaxes();
     if (!editingFromReview) {
       setStepIdx((i) => Math.min(steps.length - 1, i + 1));
       return;
@@ -646,12 +672,14 @@ export default function OnboardingScreen(): React.JSX.Element {
                   label={label}
                   valueKg={maxDraft[movement.movement_id]}
                   onChange={(kg) => setMax(movement.movement_id, kg)}
+                  onTextChange={(text) => { pendingMaxText.current[movement.movement_id] = text; }}
                 />
               );
             })}
             <QuietAction
               label="Skip for now"
               onPress={() => {
+                pendingMaxText.current = {};
                 setMaxDraft({});
                 goNext();
               }}
@@ -954,7 +982,7 @@ export default function OnboardingScreen(): React.JSX.Element {
       <View style={styles.footer}>
         <QuietAction
           label="BACK"
-          onPress={() => setStepIdx((i) => Math.max(0, i - 1))}
+          onPress={goBack}
           disabled={stepIdx === 0}
           accessibilityLabel="Back"
         />

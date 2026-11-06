@@ -24,21 +24,32 @@ export const oneRmKeptKg = (kg: number): number =>
 export const oneRmClampNote = (typedKg: number): string | null =>
   typedKg > 500 ? `Saved as 500.0 kg, the highest one-rep max this field accepts. Check the number you typed.` : null;
 
+/** A typed max as the field commits it: null for empty, garbage or under
+ *  20 kg (which clears the max), otherwise the number as typed. */
+export const parseOneRmText = (text: string): number | null => {
+  const parsed = Number.parseFloat(text.replace(',', '.'));
+  return Number.isFinite(parsed) && parsed >= 20 ? parsed : null;
+};
+
 export interface OneRmRowProps {
   label: string;
   valueKg: number | undefined;
   onChange: (kg: number | null) => void;
+  /** Every keystroke, before it is committed. A screen that can remove the
+   *  field while it still has focus (the onboarding step's NEXT) uses it to
+   *  commit the typed text itself, since no end-of-editing event comes then. */
+  onTextChange?: (text: string) => void;
 }
 
-export function OneRmRow({ label, valueKg, onChange }: OneRmRowProps): React.JSX.Element {
+export function OneRmRow({ label, valueKg, onChange, onTextChange }: OneRmRowProps): React.JSX.Element {
   const [text, setText] = useState(valueKg !== undefined ? formatMaxKg(valueKg) : '');
   const [clampNote, setClampNote] = useState<string | null>(null);
   useEffect(() => {
     setText(valueKg !== undefined ? formatMaxKg(valueKg) : '');
   }, [valueKg]);
   const commitText = (): void => {
-    const parsed = Number.parseFloat(text.replace(',', '.'));
-    if (!Number.isFinite(parsed) || parsed < 20) {
+    const parsed = parseOneRmText(text);
+    if (parsed === null) {
       onChange(null); // empty/garbage/sub-20 clears the max
       setText('');
       setClampNote(null);
@@ -68,7 +79,7 @@ export function OneRmRow({ label, valueKg, onChange }: OneRmRowProps): React.JSX
           value={text}
           // Review (PR 194): the clamp notice describes one saved value; any
           // new edit, a + or −, or a cleared max makes it untrue, so it goes.
-          onChangeText={(next) => { setText(next); setClampNote(null); }}
+          onChangeText={(next) => { setText(next); setClampNote(null); onTextChange?.(next); }}
           onEndEditing={commitText}
           keyboardType="numeric"
           placeholder="—"
