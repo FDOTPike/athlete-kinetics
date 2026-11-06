@@ -12,6 +12,8 @@ import { useStore } from '../state/useStore';
 import { deriveTodayState } from '../state/todayState';
 import TrainingSupportNotice from '../components/TrainingSupportNotice';
 import { theme } from '../theme/theme';
+import { sessionFocusName } from '../state/sessionSummary';
+import { operativeReportLine } from '../state/operativeReportLine';
 import {
   PrimaryButton,
   SecondaryButton,
@@ -69,8 +71,7 @@ const format = (value: number | null, digits: number, suffix = ''): string =>
 const formatSigned = (value: number | null, digits: number): string =>
   value === null ? 'Not available' : `${value >= 0 ? '+' : ''}${value.toFixed(digits)}`;
 
-const formatFocus = (focus: string): string =>
-  focus ? focus.charAt(0).toUpperCase() + focus.slice(1).toLowerCase() : '';
+const formatFocus = (focus: string): string => (focus ? sessionFocusName(focus) : '');
 
 export const readinessCoverage = (vector: StateVectorRow): string => {
   const available = [vector.hrv_z !== null, vector.sleep_efficiency_pct !== null]
@@ -151,6 +152,7 @@ function AvailableReadinessScreen({
   const block = useStore((s) => s.block);
   const hasArchivedBlock = useStore((s) => s.hasArchivedBlock);
   const lastTriage = useStore((s) => s.lastTriage);
+  const prescription = useStore((s) => s.prescription);
   const uiPreferences = useStore((s) => s.uiPreferences);
   const boot = useStore((s) => s.boot);
   const refreshVector = useStore((s) => s.refreshVector);
@@ -282,7 +284,16 @@ function AvailableReadinessScreen({
   }
 
   const athleteState = classifyReadiness(vector);
-  const meta = halted ? HALT_META : STATE_META[athleteState];
+  // #186: a report shaping today is named with the change it applied, and
+  // READY no longer says the signals support the planned work.
+  const todaysReport = !halted && prescription != null && prescription.forDate === today
+    ? prescription.report ?? null : null;
+  const stateMeta = STATE_META[athleteState];
+  const meta = halted
+    ? HALT_META
+    : todaysReport !== null && athleteState === 'OPTIMAL'
+      ? { ...stateMeta, explanation: 'Your recovery signals are good, but a report you saved today changed the plan.' }
+      : stateMeta;
   const isRestDay = todayPlan === null && !halted && !hasLiveSession;
   // #200: the same derivation Today uses. A planned session already finalized
   // as complete is reported as recorded, not as still planned.
@@ -457,6 +468,9 @@ function AvailableReadinessScreen({
         </View>
         <Text style={styles.title}>{meta.title}</Text>
         <Text style={styles.body}>{meta.recommendation}</Text>
+        {todaysReport !== null && (
+          <Text style={styles.caption} testID="readiness-report-line">{operativeReportLine(todaysReport)}</Text>
+        )}
         {hasLiveSession && <Text style={styles.caption}>Your active workout is ready to resume.</Text>}
         {!hasLiveSession && todayPlan !== null && (
           <Text style={styles.caption}>

@@ -43,3 +43,49 @@ test('options without a base name are still searched by name', () => {
   search('push');
   expect(screen.getByTestId('goal-exercise-option-9')).toBeOnTheScreen();
 });
+
+// Android walk 2026-11-03 (W1-7): "pull up" and "pullups" found nothing,
+// "pull" listed the plain Pull-Up below five others, and RDL / OHP found nothing.
+describe('the goal search forgives spacing, plurals and short forms', () => {
+  const { goalExerciseMatches } = require('../../src/components/FocusGoalFields');
+  const pulls = [
+    { movement_id: 21, name: 'Weighted Pull-Up' },
+    { movement_id: 22, name: 'Chin-Up' },
+    { movement_id: 23, name: 'Lat Pulldown' },
+    { movement_id: 24, name: 'Band Pull-Apart' },
+    { movement_id: 25, name: 'Cable Pull-Through' },
+    { movement_id: 26, name: 'Face Pull' },
+    { movement_id: 27, name: 'Pull-Up' },
+    { movement_id: 28, name: 'V-Bar Pullup' },
+    { movement_id: 29, name: 'Romanian Deadlift' },
+    { movement_id: 30, name: 'Overhead Press' },
+    { movement_id: 31, name: 'Scapular Pull-Up' },
+  ];
+  const ids = (query) => goalExerciseMatches(pulls, query).map((m) => m.movement_id);
+
+  test.each(['pull up', 'pullup', 'Pull-Up', 'pullups', 'PULL UPS'])('"%s" finds every pull-up, the plain one first', (query) => {
+    expect(ids(query)).toEqual([27, 28, 21, 31]);
+  });
+
+  test('"pull" puts the plain Pull-Up in the first six', () => {
+    expect(ids('pull').slice(0, 6)).toContain(27);
+    expect(ids('pull')[0]).toBe(27);
+  });
+
+  test.each([['RDL', 29], ['rdls', 29], ['ohp', 30]])('the short form "%s" finds its exercise', (query, id) => {
+    expect(ids(query)).toContain(id);
+  });
+
+  test('one letter, spaces and punctuation alone find nothing', () => {
+    expect(ids('p')).toEqual([]);
+    expect(ids('  ')).toEqual([]);
+    expect(ids('--')).toEqual([]);
+  });
+
+  test('on screen, "pull up" lists Pull-Up and no "nothing found" line', () => {
+    render(<GoalExerciseField movements={pulls} movementId={null} onChange={() => {}} />);
+    search('pull up');
+    expect(screen.getByTestId('goal-exercise-option-27')).toBeOnTheScreen();
+    expect(screen.queryByTestId('goal-exercise-none')).toBeNull();
+  });
+});

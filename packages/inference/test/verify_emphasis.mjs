@@ -621,5 +621,15 @@ console.log('[10] time, determinism and honesty');
     /No focus, sport or goal exercise is set/.test(pe.NO_EMPHASIS_EXPLANATION));
 }
 
+// Android walk 2026-11-03 (W1-5): "one more training day" is not offered to an
+// athlete who already trains seven days a week.
+{
+  const atSeven = pe.describeEmphasisGap('upper_chest', 'no_room', 15, 7);
+  const atThree = pe.describeEmphasisGap('upper_chest', 'no_room', 15, 3);
+  check('the no-room line offers one more training day only below seven days',
+    !atSeven.includes('one more training day') && atSeven.includes('Longer sessions would make room')
+      && atThree.includes('one more training day'), atSeven);
+}
+
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

@@ -153,7 +153,7 @@ test('recorded items show what happened, including extra work, and the next item
   preparation.items[2] = { ...preparation.items[2], status: 'withheld', reasonCode: 'restricted_at_execution' };
   show(preparation);
   expect(screen.getByTestId('preparation-item-0-recorded').props.children).toBe('Done as written');
-  expect(screen.getByTestId('preparation-item-1-recorded').props.children).toBe('Changed: 120 seconds — recorded as extra work');
+  expect(screen.getByTestId('preparation-item-1-recorded').props.children).toBe('Changed: 120 seconds each side — recorded as extra work');
   expect(screen.getByTestId('preparation-item-2-recorded').props.children).toBe('Withheld: not available right now');
   expect(screen.queryByTestId('preparation-item-0-done')).toBeNull();
   expect(screen.getByTestId('preparation-item-3-done')).toBeTruthy();
@@ -237,4 +237,24 @@ test('accessibility: every control is labelled, headings are headings, and statu
   expect(screen.getAllByRole('header').length).toBeGreaterThanOrEqual(2);
   expect(screen.getByTestId('preparation-status').props.accessibilityLiveRegion).toBe('polite');
   expect(screen.getByTestId('preparation-panel').props.accessibilityLabel).toBe('Preparation');
+});
+
+// Android walk 2026-11-03 (W2-11): leg swings planned "30 seconds each side"
+// were recorded as "Changed: 20 seconds", with no side.
+test('a change to an each-side item is recorded per side', () => {
+  const protocol = protocolFor();
+  const preparation = preparationOf(protocol);
+  const index = preparation.items.findIndex((entry) => entry.item?.dose?.perSide === true
+    || protocol.items[preparation.items.indexOf(entry)]?.dose?.perSide === true);
+  expect(index).toBeGreaterThanOrEqual(0);
+  preparation.items[index] = { ...preparation.items[index], status: 'modified', performedAmount: 20 };
+  show(preparation);
+  expect(screen.getByTestId(`preparation-item-${index}-recorded`).props.children).toMatch(/^Changed: 20 (seconds|reps) each side$/);
+});
+
+test('the preparation basis gives the time limit once, not as a second duration', () => {
+  const protocol = protocolFor();
+  const lines = protocol.basis.join(' ');
+  expect(lines).not.toMatch(/protocol within \d+ minutes/);
+  expect(lines).toMatch(/protocol, fitted to a \d+-minute limit\./);
 });
