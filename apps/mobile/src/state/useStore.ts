@@ -6337,8 +6337,9 @@ export const useStore = create<KineticsStore>()((set, get) => {
     ));
     // Android walk 2026-11-03 (ux-8): a skipped exercise belongs in the
     // record of the session; it was left out because it has no sets.
-    // Owner ruling 2026-11-03 (Entry 0286): this display read is the one
-    // reader of 071 session_skipped_slot. No engine reads it.
+    // Owner ruling (PR #116, PROMPT_LEDGER.md Entry 0300; the original
+    // 2026-11-03 Entry 0286 is unrecovered, issue #297): this display read is
+    // the one reader of 071 session_skipped_slot. No engine reads it.
     // Walk 2 (W2-1): a swap rewrites sps.movement_id and keeps the planned
     // one in original_movement_id; the line names the planned movement.
     const skippedRows = rowsOf<{
