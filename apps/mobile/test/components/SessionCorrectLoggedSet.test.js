@@ -200,34 +200,127 @@ const makeState = ({ plannedSets = 3, loggedSets = [] } = {}) => {
 };
 const loggedWith = (overrides) => ({ ...loggedSet(101, 1, 'Push-up', 1, 1), reps: 8, load_kg: 80, rpe: 8, tonnage_kg: 640, ...overrides });
 
-test('the last logged set of the current exercise can be corrected: reps and load go through editSet and keep the effort', () => {
-  mockState = makeState({ plannedSets: 3, loggedSets: [loggedWith({})] });
+// A barbell movement, so the load field exists; its pre-fill follows the latest logged load of this session.
+const barbellState = ({ loggedSets = [loggedWith({})] } = {}) => {
+  mockState = makeState({ plannedSets: 3, loggedSets });
   mockState.substitution = null;
+  mockState.movements = mockState.movements.map((item) => (item.movement_id === 1 ? { ...item, supportedPrefixes: ['Barbell'] } : item));
+  mockState.resolveSlotLoad = (input) => actualResolveLoadSelection({
+    trainingAge: 'intermediate',
+    loadPreference: 'auto',
+    bodyweightMode: input.bodyweightMode,
+    targetReps: input.targetReps,
+    targetRpe: input.targetRpe,
+    oneRepMaxKg: null,
+    overrideLoadKg: input.overrideLoadKg,
+    currentSessionLoadKg: mockState.session.sets[0]?.load_kg ?? null,
+    historyLoadKg: null,
+  });
+  // The store rewrites the set; the screen re-renders from it.
+  mockState.editSet = jest.fn((setId, reps, loadKg) => {
+    mockState.session = {
+      ...mockState.session,
+      sets: mockState.session.sets.map((item) => (item.set_id === setId ? { ...item, reps, load_kg: loadKg } : item)),
+    };
+  });
+};
+
+test('the last logged set can be corrected: reps and a load typed on the quarter-kilogram grid go through editSet', () => {
+  barbellState();
   render(<SessionScreen />);
 
   fireEvent.press(screen.getByLabelText('Correct set 1'));
   fireEvent.press(screen.getByLabelText('Increase Corrected reps'));
-  fireEvent.press(screen.getByLabelText('Decrease Corrected load'));
+  fireEvent.changeText(screen.getByTestId('correction-load-input'), '77.25');
   fireEvent.press(screen.getByLabelText('Save correction'));
 
   expect(mockState.editSet).toHaveBeenCalledTimes(1);
-  expect(mockState.editSet).toHaveBeenCalledWith(101, 9, 77.5, 8);
-  expect(screen.getByLabelText('Correct set 1')).toBeOnTheScreen();
+  expect(mockState.editSet).toHaveBeenCalledWith(101, 9, 77.25, 8);
+});
+
+test('a correction load off the grid is rejected with the same sentence Log set shows, and Save stays disabled', () => {
+  barbellState();
+  render(<SessionScreen />);
+
+  fireEvent.press(screen.getByLabelText('Correct set 1'));
+  fireEvent.changeText(screen.getByTestId('correction-load-input'), '77.1');
+
+  expect(screen.getByText('Enter a load from 0 to 500 in 0.25 kg steps.')).toBeOnTheScreen();
+  expect(screen.getByLabelText('Save correction').props.accessibilityState.disabled).toBe(true);
+  fireEvent.press(screen.getByLabelText('Save correction'));
+  expect(mockState.editSet).not.toHaveBeenCalled();
+});
+
+test('a band-only movement corrects reps only and saves 0 kg, as Log set does', () => {
+  barbellState();
+  mockState.movements = mockState.movements.map((item) => (item.movement_id === 1 ? { ...item, supportedPrefixes: ['Banded'] } : item));
+  render(<SessionScreen />);
+
+  fireEvent.press(screen.getByLabelText('Correct set 1'));
+  expect(screen.queryByTestId('correction-load-input')).toBeNull();
+  fireEvent.press(screen.getByLabelText('Increase Corrected reps'));
+  fireEvent.press(screen.getByLabelText('Save correction'));
+
+  expect(mockState.editSet).toHaveBeenCalledWith(101, 9, 0, 8);
 });
 
 test('no correction is offered when the current exercise has no logged set', () => {
-  mockState = makeState({ plannedSets: 3, loggedSets: [] });
-  mockState.substitution = null;
+  barbellState({ loggedSets: [] });
+  render(<SessionScreen />);
+  expect(screen.queryByLabelText(/Correct set/)).toBeNull();
+});
+
+test('no correction is offered for a time-target slot', () => {
+  barbellState();
+  mockState.sessionPlan = [{ ...mockState.sessionPlan[0], target: { kind: 'time', seconds: 30 } }, mockState.sessionPlan[1]];
+  render(<SessionScreen />);
+  expect(screen.queryByLabelText(/Correct set/)).toBeNull();
+});
+
+test('no correction is offered in a halted session', () => {
+  barbellState();
+  mockState.runner = { ...mockState.runner, phase: 'halted' };
+  render(<SessionScreen />);
+  expect(screen.queryByLabelText(/Correct set/)).toBeNull();
+});
+
+test('no correction is offered for a set of another exercise', () => {
+  barbellState({ loggedSets: [loggedWith({ set_id: 102, movement_id: 4, movement_name: 'Barbell Row', session_plan_slot_id: 2 })] });
   render(<SessionScreen />);
   expect(screen.queryByLabelText(/Correct set/)).toBeNull();
 });
 
 test('cancelling a correction leaves the logged set untouched', () => {
-  mockState = makeState({ plannedSets: 3, loggedSets: [loggedWith({})] });
-  mockState.substitution = null;
+  barbellState();
   render(<SessionScreen />);
   fireEvent.press(screen.getByLabelText('Correct set 1'));
   fireEvent.press(screen.getByLabelText('Increase Corrected reps'));
   fireEvent.press(screen.getByLabelText('Cancel correction'));
   expect(mockState.editSet).not.toHaveBeenCalled();
+});
+
+test('after a correction the next set pre-fills the corrected load', () => {
+  barbellState();
+  const { rerender } = render(<SessionScreen />);
+  expect(screen.getByTestId('session-load-input').props.value).toBe('80.0');
+
+  fireEvent.press(screen.getByLabelText('Correct set 1'));
+  fireEvent.changeText(screen.getByTestId('correction-load-input'), '77.5');
+  fireEvent.press(screen.getByLabelText('Save correction'));
+  rerender(<SessionScreen />);
+
+  expect(screen.getByTestId('session-load-input').props.value).toBe('77.5');
+});
+
+test('a load the athlete is typing for the next set is not overwritten by a correction', () => {
+  barbellState();
+  const { rerender } = render(<SessionScreen />);
+  fireEvent.changeText(screen.getByTestId('session-load-input'), '60');
+
+  fireEvent.press(screen.getByLabelText('Correct set 1'));
+  fireEvent.changeText(screen.getByTestId('correction-load-input'), '77.5');
+  fireEvent.press(screen.getByLabelText('Save correction'));
+  rerender(<SessionScreen />);
+
+  expect(screen.getByTestId('session-load-input').props.value).toBe('60');
 });
