@@ -147,7 +147,7 @@ const loadSourceCopy = (
       // Issue #137: with no RPE-based aim, the fallback still names the
       // prescribed reps instead of a fixed count of ten.
       : aim ?? (targetReps !== null
-        ? `First time on this one — pick a weight you could lift for all ${targetReps} reps with plenty left.`
+        ? `First time on this one — pick a weight you could lift for all ${targetReps} ${targetReps === 1 ? 'rep' : 'reps'} with plenty left.`
         : 'First time on this one — pick a weight you could lift for the full set with plenty left.');
 };
 
