@@ -393,6 +393,11 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   useEffect(() => {
     if (substitution === null) scrolledToSubstitutionFor.current = null;
   }, [substitution]);
+  // After Log set or finishing preparation, the workout scroll position is
+  // kept from before, so the current card and its rest timer can sit off-screen
+  // (Android walk 2026-11-03, W6-4). Scroll the current card in once its layout is known.
+  const timelineOffsetY = useRef(0);
+  const scrollCurrentOnLayout = useRef(false);
 
   // Session feel (070): the sub-view that records how the ended session went.
   const [feelOpen, setFeelOpen] = useState(false);
@@ -985,6 +990,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
     const held = loadShownRef.current;
     // A band-only movement showed no load, so none is recorded as shown.
     const seededForThisSet = !bandOnly && held !== null && held.slotId === currentSlot.sessionPlanSlotId && held.logged === currentLogged ? held.seed : null;
+    scrollCurrentOnLayout.current = true;
     logSet(currentMovement.movement_id, target.kind === 'time' ? 1 : Math.round(clamp(reps, 1, 50)), safeLoad, safeRpe, undefined, undefined, undefined, metrics, currentSlot.sessionPlanSlotId, seededForThisSet);
     if (runner === null) {
       if (uiPreferences.restTimerEnabled) setLocalRest({
@@ -1102,7 +1108,10 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
             preparation={preparation}
             onBegin={beginPreparation}
             onRecordItem={recordPreparationItem}
-            onFinish={finishPreparation}
+            onFinish={(outcome, expectedRevision) => {
+              scrollCurrentOnLayout.current = true;
+              finishPreparation(outcome, expectedRevision);
+            }}
             onStopSession={() => { runnerHalt('manual'); endSession(); }}
             rampWorkingLoad={rampWorkingLoad}
           />
@@ -1200,7 +1209,11 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
         )}
 
         {!halted && !complete && sessionPlan.length > 0 && (
-          <View style={styles.timeline}>
+          <View
+            style={styles.timeline}
+            testID="session-timeline"
+            onLayout={(event) => { timelineOffsetY.current = event.nativeEvent.layout.y; }}
+          >
             {sessionPlan.map((slot) => {
               const movement = byId.get(slot.movementId);
               const fallbackVideoUrl = movement?.media?.status === 'external_fallback'
@@ -1338,7 +1351,19 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
 
               // Active slot
               return (
-                <View key={slot.sessionPlanSlotId} style={styles.timelineRow}>
+                <View
+                  key={slot.sessionPlanSlotId}
+                  style={styles.timelineRow}
+                  testID="session-current-row"
+                  onLayout={(event) => {
+                    if (!scrollCurrentOnLayout.current) return;
+                    scrollCurrentOnLayout.current = false;
+                    timelineRef.current?.scrollTo({
+                      y: Math.max(0, timelineOffsetY.current + event.nativeEvent.layout.y - theme.space[4]),
+                      animated: true,
+                    });
+                  }}
+                >
                   {/* Left Active Spine (Chalk marks CURRENT/ACTIVE only) */}
                   <View style={[styles.rail, styles.railActive]}>
                     <View style={[styles.dot, styles.dotCurrent]} />
@@ -1401,9 +1426,6 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                           >
                             Enter a load from 0 to 500 in 2.5 kg increments.
                           </Text>
-                        )}
-                        {!loadInvalid && !loadLoggable && (
-                          <Text style={styles.loadEvidence} testID="session-load-hint">Enter a load to log this set.</Text>
                         )}
                         {currentSlotBlockedReason !== null && (
                           <Text
@@ -1656,6 +1678,9 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                               ? `Log set ${Math.min(slot.plannedSets, currentLogged + 1)} for ${movement?.name ?? 'movement'}`
                               : `Log set ${Math.min(slot.plannedSets, currentLogged + 1)} for ${movement?.name ?? 'movement'}, unavailable — enter a load first`}
                         />
+                        {!loadInvalid && !loadLoggable && (
+                          <Text style={styles.loadEvidence} testID="session-load-hint">Enter a load to log this set.</Text>
+                        )}
 
                         {runner?.phase === 'working' && <QuietAction label="Skip this exercise" onPress={confirmSkipExercise} />}
 
