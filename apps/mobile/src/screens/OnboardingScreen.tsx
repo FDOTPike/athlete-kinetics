@@ -746,7 +746,7 @@ export default function OnboardingScreen(): React.JSX.Element {
                 {wantsTarget && goalValidation.ok && (
                   <View style={styles.reviewHeadingRow}>
                     <Text style={styles.reviewSupportLine} testID="onboarding-summary-target-row">
-                      {`TARGET — ${goalValidation.goal.specificOutcome}: ${goalValidation.goal.targetValue} ${goalValidation.goal.unit}${goalValidation.goal.requestedDeadline === null ? ', no deadline' : ` by ${goalValidation.goal.requestedDeadline}`}`}
+                      {`TARGET — ${goalValidation.goal.specificOutcome}: ${goalValidation.goal.baselineValue === null ? '' : `from ${goalValidation.goal.baselineValue} ${goalValidation.goal.unit} to `}${goalValidation.goal.targetValue} ${goalValidation.goal.unit}${goalValidation.goal.requestedDeadline === null ? ', no deadline' : ` by ${goalValidation.goal.requestedDeadline}`}`}
                     </Text>
                     <Pressable
                       onPress={() => goTo('target')}
@@ -846,8 +846,8 @@ export default function OnboardingScreen(): React.JSX.Element {
             </View>
 
             <Text style={styles.pDim}>
-              Change any of this later in Profile. Your first prescription is
-              waiting on Today.
+              Change any of this later in Profile. Next, check your first week,
+              then start on Today.
             </Text>
             <PrimaryButton
               label="START TRAINING"
@@ -893,6 +893,12 @@ export default function OnboardingScreen(): React.JSX.Element {
       )}
       {targetGateOpen && (
         <View style={styles.limitsGateNotice}>
+          {/* Issue #215: name the first missing field in the validator's words. */}
+          {!goalValidation.ok && goalValidation.errors.length > 0 && (
+            <Text style={styles.p} testID="onboarding-target-gate-missing" accessibilityLiveRegion="polite">
+              {goalValidation.errors[0]!.message}
+            </Text>
+          )}
           <Text style={styles.pDim} accessibilityLiveRegion="polite">
             Finish the target to continue, or choose "Skip this" to train with the focus only.
           </Text>
