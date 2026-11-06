@@ -489,7 +489,7 @@ function AvailableTodayScreen({
           and points to the same card to resume. */}
       {suspension != null && (
         <View style={styles.card} testID="today-paused">
-          <Text style={styles.eyebrow}>PROGRAMME PAUSED</Text>
+          <Text style={styles.eyebrow}>PROGRAM PAUSED</Text>
           <Text style={styles.body}>Your place is being held. You can still train.</Text>
           <QuietAction
             label="Manage pause"
