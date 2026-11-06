@@ -503,6 +503,16 @@ export type BootStatus = 'booting' | 'ready' | 'error';
  *  training history already exists (which the load must never touch). */
 export type DemoLoadResult = 'loaded' | 'blocked_existing_data';
 
+/** Copy facts beyond the resolver's source (#131). `adjusted` means today's
+ *  load modifier eased the shown load; `unadjustedHistoryKg` is the last
+ *  logged load before that easing; `historyFromThisSession` means the history
+ *  value is a set from the current session, not an earlier one. */
+export interface LoadCopyFacts {
+  adjusted?: boolean;
+  unadjustedHistoryKg?: number | null;
+  historyFromThisSession?: boolean;
+}
+
 export type TriageOutcome =
   | { kind: 'rejected' }
   /** Positive sentiment: identity pass-through, nothing changes — the UI
@@ -999,6 +1009,8 @@ interface KineticsStore {
     overrideLoadKg: number | null;
     sessionPlanSlotId: number;
   }) => LoadSelection;
+  /** Copy facts for the load field (#131). Never an input to the load. */
+  slotLoadCopyFacts: (input: { movementId: number }) => LoadCopyFacts;
   refreshBandLadder: () => void;
   saveBandLevel: (level: number, label: string) => void;
   deleteBandLevel: (level: number) => void;  /** Re-read the saved profile slots (013) into state. */
@@ -3533,6 +3545,21 @@ export const useStore = create<KineticsStore>()((set, get) => {
         ? base.initialLoadKg
         : applyLoadModifier(base.initialLoadKg, todaysVector),
       advisoryKg: applyLoadModifier(base.advisoryKg, todaysVector),
+    };
+  },
+
+  slotLoadCopyFacts: (input) => {
+    // Copy facts only (#131): they never change the load. The same "today's
+    // modifier eased the load" test as resolveSlotLoad, and a history value
+    // is from this session once this movement has a set logged in it.
+    const state = get();
+    const todaysVector = state.prescription !== null && state.prescription.forDate === state.today
+      ? state.prescription.vector
+      : null;
+    return {
+      adjusted: todaysVector !== null && todaysVector.load_modifier < 1,
+      unadjustedHistoryKg: state.lastLoggedLoads[input.movementId] ?? null,
+      historyFromThisSession: (state.session?.sets ?? []).some((set) => set.movement_id === input.movementId),
     };
   },
 

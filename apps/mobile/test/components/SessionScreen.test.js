@@ -2554,3 +2554,63 @@ describe('session-2: honest discomfort wording per tier and after-save outcomes'
   });
 });
 
+
+// Walk W2-4, W5-10 (#131): an eased load says "Coach suggests", names the
+// unadjusted load, and "last session" is never said of this session's load.
+test('an eased history load says Coach suggests today and names the last logged load', () => {
+  mockState = state({
+    movements: [movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }), movement(2, 'Later movement')],
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    lastLoggedLoads: { 1: 10 },
+  });
+  mockState.resolveSlotLoad = jest.fn(() => ({ source: 'history', initialLoadKg: 7.5, advisoryKg: null, advisoryKind: null }));
+  mockState.slotLoadCopyFacts = jest.fn(() => ({ adjusted: true, unadjustedHistoryKg: 10, historyFromThisSession: false }));
+
+  render(<SessionScreen />);
+
+  expect(screen.getByTestId('session-load-input').props.value).toBe('7.5');
+  expect(screen.getByLabelText('Load source. Coach suggests 7.5 kg today · last logged 10.0 kg')).toBeOnTheScreen();
+});
+
+test('an eased bodyweight added load keeps the added-load wording', () => {
+  mockState = state({
+    movements: [movement(1, 'First movement', { supportedPrefixes: ['Bodyweight'] }), movement(2, 'Later movement')],
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    lastLoggedLoads: { 1: 5 },
+  });
+  mockState.resolveSlotLoad = jest.fn(() => ({ source: 'history', initialLoadKg: 2.5, advisoryKg: null, advisoryKind: null }));
+  mockState.slotLoadCopyFacts = jest.fn(() => ({ adjusted: true, unadjustedHistoryKg: 5, historyFromThisSession: false }));
+
+  render(<SessionScreen />);
+
+  expect(screen.getByLabelText('Load source. Coach suggests 2.5 kg added load today · last logged 5.0 kg added load')).toBeOnTheScreen();
+});
+
+test('a manual advisory from this session after set 1 does not say last session', () => {
+  mockState = state({
+    movements: [movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }), movement(2, 'Later movement')],
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    loadPreference: 'manual',
+  });
+  mockState.resolveSlotLoad = jest.fn(() => ({ source: 'manual', initialLoadKg: null, advisoryKg: 12.5, advisoryKind: 'history' }));
+  mockState.slotLoadCopyFacts = jest.fn(() => ({ adjusted: false, unadjustedHistoryKg: 12.5, historyFromThisSession: true }));
+
+  render(<SessionScreen />);
+
+  expect(screen.getByLabelText('Load source. Coach suggests 12.5 kg from this session — your entry stands.')).toBeOnTheScreen();
+  expect(screen.queryByLabelText(/from your last session/)).toBeNull();
+});
+
+test('a manual advisory eased from last session says today and names the last session load', () => {
+  mockState = state({
+    movements: [movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }), movement(2, 'Later movement')],
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    loadPreference: 'manual',
+  });
+  mockState.resolveSlotLoad = jest.fn(() => ({ source: 'manual', initialLoadKg: null, advisoryKg: 12.5, advisoryKind: 'history' }));
+  mockState.slotLoadCopyFacts = jest.fn(() => ({ adjusted: true, unadjustedHistoryKg: 17.5, historyFromThisSession: false }));
+
+  render(<SessionScreen />);
+
+  expect(screen.getByLabelText('Load source. Coach suggests 12.5 kg today · logged 17.5 kg last session — your entry stands.')).toBeOnTheScreen();
+});
