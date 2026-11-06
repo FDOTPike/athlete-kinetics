@@ -2479,6 +2479,29 @@ describe('session-2: honest discomfort wording per tier and after-save outcomes'
     expect(screen.getByText('Report saved with this session.')).toBeOnTheScreen();
   });
 
+  // openSubstitution can also decline without throwing (a support hold or an
+  // unverifiable session context); that is shown the same way.
+  test('the alternatives not opening after OK (no throw) is shown', () => {
+    mockState = discomfortFixture('beginner');
+    mockState.openSubstitution = jest.fn(() => false);
+    const view = render(<SessionScreen />);
+    fireEvent.press(screen.getByLabelText('Report discomfort'));
+    fireEvent.press(screen.getByLabelText('knee'));
+    fireEvent.press(screen.getByLabelText('Moderate discomfort, 6 of 10'));
+    fireEvent.press(screen.getByLabelText('Save discomfort report'));
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+    const buttons = alertSpy.mock.calls[0][2];
+    act(() => { buttons[0].onPress(); });
+    expect(mockState.openSubstitution).toHaveBeenCalledWith(1);
+    expect(alertSpy).toHaveBeenCalledTimes(2);
+    expect(alertSpy.mock.calls[1][0]).toBe('Could not open options');
+    expect(alertSpy.mock.calls[1][1]).toBe(
+      'Your report is saved, but the options for this exercise could not be opened. You can skip this exercise on the session card.',
+    );
+    view.rerender(<SessionScreen />);
+    expect(screen.getByText('Report saved with this session.')).toBeOnTheScreen();
+  });
+
   test.each([
     [
       'beginner',

@@ -1042,15 +1042,20 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
       Alert.alert('Report saved', 'Report saved with this session. Next, see the options for this exercise.', [
         { text: 'OK', onPress: () => {
           // The report is already saved: a failure to open the sheet is
-          // recorded and shown, not thrown out of the alert callback.
-          try {
-            openSubstitution(offeredMovementId);
-          } catch (error) {
-            useStore.setState({ error: error instanceof Error ? error.message : String(error) });
+          // recorded and shown, not thrown out of the alert callback. The
+          // sheet can also stay closed without a throw (a support hold or an
+          // unverifiable session context); that is shown the same way.
+          const showCouldNotOpen = (): void => {
             Alert.alert(
               'Could not open options',
               'Your report is saved, but the options for this exercise could not be opened. You can skip this exercise on the session card.',
             );
+          };
+          try {
+            if (openSubstitution(offeredMovementId) === false) showCouldNotOpen();
+          } catch (error) {
+            useStore.setState({ error: error instanceof Error ? error.message : String(error) });
+            showCouldNotOpen();
           }
         } },
       ]);

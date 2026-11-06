@@ -1136,8 +1136,11 @@ interface KineticsStore {
   /** Open the deterministic substitution sheet for a SWAP target: assembles the
    *  engine inputs (library projection + the active block's future slots +
    *  today's active niggles, re-read fresh) and runs computeSubstitutions. The
-   *  niggles drive the injury guardrail and Layer 3 triage. */
-  openSubstitution: (targetMovementId: number) => void;
+   *  niggles drive the injury guardrail and Layer 3 triage. Returns true when
+   *  the sheet opened (an empty result still opens it with its no-option
+   *  message) and false when it did not (unknown movement, a support hold, or
+   *  an unverifiable session context). */
+  openSubstitution: (targetMovementId: number) => boolean;
   closeSubstitution: () => void;
   /** Apply a Layer-1 regression: swap the target slot for the chosen movement
    *  (logged sets stand as history). */
@@ -7205,7 +7208,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const state = get();
     const { movements, profile, block } = state;
     const target = movements.find((m) => m.movement_id === targetMovementId);
-    if (target === undefined) return;
+    if (target === undefined) return false;
     const activeTargetSlot = state.activeSessionPlanSlotId !== null
       ? state.sessionPlan.find((slot) => slot.sessionPlanSlotId === state.activeSessionPlanSlotId)
       : undefined;
@@ -7213,7 +7216,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       ? activeTargetSlot
       : state.sessionPlan.find((slot) => slot.movementId === targetMovementId);
     if (!get().requireTrainingSupport('substitution-preview', [targetMovementId],
-      `session:${state.session?.sessionId ?? `draft-${state.today}`}:slot:${targetSlot?.sessionPlanSlotId ?? 'pending'}:movement:${targetMovementId}`)) return;
+      `session:${state.session?.sessionId ?? `draft-${state.today}`}:slot:${targetSlot?.sessionPlanSlotId ?? 'pending'}:movement:${targetMovementId}`)) return false;
     // Re-read today's niggles from 011 so a midnight crossing while the app sat
     // foregrounded (no AppState 'active' -> no rolloverDay) can't feed the
     // engine yesterday's niggles. set() is synchronous, so get().niggles below
@@ -7225,7 +7228,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const accessContext = executionContextForState(get());
     if (accessContext === null) {
       set({ error: 'The active session access context cannot be verified. Reopen the session before substituting.' });
-      return;
+      return false;
     }
     const capabilityAvailable = capabilityAvailableMovementIds(
       d, movements, profile, accessContext,
@@ -7280,6 +7283,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       accessContext,
     });
     set({ substitution: { targetId: targetMovementId, result } });
+    return true;
   },
 
   closeSubstitution: () => set({ substitution: null }),
