@@ -95,3 +95,24 @@ describe('ProgramSetupScreen setDayFocus clears stale movementPreferences for th
     ]);
   });
 });
+
+// Review (PR 115): the wrap gate in ChipWrap.test.js finds this chip by its
+// source expression. This checks the rendered result instead, so a rename
+// of the label variable cannot take the movement choices out of coverage.
+describe('ProgramSetupScreen movement choices show their whole name', () => {
+  test('every movement-choice chip in the customized week has no line limit', () => {
+    const { Text } = require('react-native');
+    render(<ProgramSetupScreen />);
+    fireEvent.press(screen.getByText('Fine-tune your program (optional)'));
+    fireEvent.press(screen.getByText('Customize'));
+    expect(screen.getByText('5. Customize generated week')).toBeOnTheScreen();
+    const names = [...new Set(useStore.getState().movements.map((m) => m.name))];
+    const chips = names.flatMap((name) => screen.queryAllByLabelText(name)
+      .filter((node) => node.props.accessibilityRole === 'button'));
+    expect(chips.length).toBeGreaterThanOrEqual(3);
+    const limited = chips
+      .filter((chip) => chip.findByType(Text).props.numberOfLines !== undefined)
+      .map((chip) => chip.props.accessibilityLabel);
+    expect(limited).toEqual([]);
+  });
+});

@@ -123,6 +123,14 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
   const [entryDraftKept, setEntryDraftKept] = useState(false);
   const [keptCompletionOccurrenceId, setKeptCompletionOccurrenceId] = useState<string | null>(null);
 
+  // A shown validation message describes the values at the last Save. Once the
+  // athlete edits a typed field it may no longer be true, so it is cleared;
+  // Save validates again and shows a message if one still applies.
+  const editField = (setValue: (value: string) => void) => (value: string): void => {
+    setValue(value);
+    setError(null);
+  };
+
   const activeSeries = useMemo(
     () => ledger.series.filter((row) => row.effectiveEndDate === null),
     [ledger.series, today],
@@ -379,7 +387,7 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
             disableFullscreenUI
             style={styles.input}
             value={displayName}
-            onChangeText={setDisplayName}
+            onChangeText={editField(setDisplayName)}
             maxLength={160}
             accessibilityLabel="Activity name shown in the app"
             placeholder="For example, hobby horsing"
@@ -411,7 +419,7 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
           ) : (
             <>
               <Text style={styles.label}>DATE</Text>
-              <TextInput disableFullscreenUI style={styles.input} value={dateText} onChangeText={setDateText}
+              <TextInput disableFullscreenUI style={styles.input} value={dateText} onChangeText={editField(setDateText)}
                 accessibilityLabel="Activity date, YYYY-MM-DD" placeholder="YYYY-MM-DD"
                 placeholderTextColor={theme.color.textLow} autoCapitalize="none" />
               <Text style={styles.label}>WHAT HAPPENED?</Text>
@@ -436,20 +444,20 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
             Daylight-saving edge times are refused rather than guessed.
           </Text>
           <Text style={styles.label}>START TIME (OPTIONAL FOR FLEXIBLE)</Text>
-          <TextInput disableFullscreenUI style={styles.input} value={timeText} onChangeText={setTimeText}
+          <TextInput disableFullscreenUI style={styles.input} value={timeText} onChangeText={editField(setTimeText)}
             keyboardType="numbers-and-punctuation" accessibilityLabel="Start time in 24-hour HH:MM"
             placeholder="17:00" placeholderTextColor={theme.color.textLow} />
 
           <Text style={styles.label}>
             {entryMode === 'one_off' && oneOffState === 'completed' ? 'ACTUAL MINUTES (OPTIONAL)' : 'EXPECTED MINUTES (OPTIONAL)'}
           </Text>
-          <TextInput disableFullscreenUI style={styles.input} value={durationText} onChangeText={setDurationText}
+          <TextInput disableFullscreenUI style={styles.input} value={durationText} onChangeText={editField(setDurationText)}
             keyboardType="number-pad" accessibilityLabel="Whole activity duration in minutes"
             placeholder="Leave blank if unknown" placeholderTextColor={theme.color.textLow} />
           <Text style={styles.label}>
             {entryMode === 'one_off' && oneOffState === 'completed' ? 'ACTUAL EFFORT (OPTIONAL)' : 'EXPECTED EFFORT (OPTIONAL)'}
           </Text>
-          <TextInput disableFullscreenUI style={styles.input} value={effortText} onChangeText={setEffortText}
+          <TextInput disableFullscreenUI style={styles.input} value={effortText} onChangeText={editField(setEffortText)}
             keyboardType="decimal-pad" accessibilityLabel="Whole activity effort from 1 to 10"
             placeholder="1 very easy · 10 hardest effort" placeholderTextColor={theme.color.textLow} />
           <Text style={styles.hint}>Effort is for the whole activity. Blank stays unknown; it is never converted to RIR.</Text>
@@ -581,7 +589,7 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
           <Text accessibilityRole="header" style={styles.sectionTitle}>LOG {completionTarget.displayName.toUpperCase()}</Text>
           <Text style={styles.label}>ACTUAL MINUTES (OPTIONAL)</Text>
           <TextInput disableFullscreenUI style={styles.input} value={completionDuration}
-            onChangeText={setCompletionDuration} keyboardType="number-pad"
+            onChangeText={editField(setCompletionDuration)} keyboardType="number-pad"
             accessibilityLabel="Actual activity duration in minutes"
             placeholder={completionTarget.expectedDurationMin === null
               ? 'Leave blank if unknown'
@@ -589,7 +597,7 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
             placeholderTextColor={theme.color.textLow} />
           <Text style={styles.label}>ACTUAL EFFORT (OPTIONAL)</Text>
           <TextInput disableFullscreenUI style={styles.input} value={completionEffort}
-            onChangeText={setCompletionEffort} keyboardType="decimal-pad"
+            onChangeText={editField(setCompletionEffort)} keyboardType="decimal-pad"
             accessibilityLabel="Actual whole activity effort from 1 to 10"
             placeholder="1 very easy · 10 hardest effort" placeholderTextColor={theme.color.textLow} />
           {error !== null && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}

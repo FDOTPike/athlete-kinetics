@@ -505,6 +505,7 @@ export default function OnboardingScreen(): React.JSX.Element {
             <Text style={styles.fieldLabel}>A SPORT? (OPTIONAL)</Text>
             <Chip
               testID="onboarding-wants-sport"
+              wrap
               label="I PLAY OR COMPETE IN A SPORT — plan the gym around it"
               selected={wantsSport}
               onPress={() => setWantsSport((value) => !value)}
@@ -516,6 +517,7 @@ export default function OnboardingScreen(): React.JSX.Element {
             <Text style={styles.fieldLabel}>A SPECIFIC TARGET? (OPTIONAL)</Text>
             <Chip
               testID="onboarding-wants-target"
+              wrap
               label="I ALSO HAVE A SPECIFIC TARGET — a number and a date I want to reach"
               selected={wantsTarget}
               onPress={() => setWantsTarget((value) => !value)}
@@ -679,6 +681,7 @@ export default function OnboardingScreen(): React.JSX.Element {
             </Text>
             <View style={styles.cardGroup}>
               <Chip
+                wrap
                 label="NO — NOTHING TO NOTE"
                 selected={limitsAnswered === false}
                 onPress={() => answerLimits(false)}
@@ -686,6 +689,7 @@ export default function OnboardingScreen(): React.JSX.Element {
                 style={styles.cardChip}
               />
               <Chip
+                wrap
                 label="YES — LET ME ADD NOTES"
                 selected={limitsAnswered === true}
                 onPress={() => answerLimits(true)}
@@ -742,7 +746,7 @@ export default function OnboardingScreen(): React.JSX.Element {
                 {wantsTarget && goalValidation.ok && (
                   <View style={styles.reviewHeadingRow}>
                     <Text style={styles.reviewSupportLine} testID="onboarding-summary-target-row">
-                      {`TARGET — ${goalValidation.goal.specificOutcome}: ${goalValidation.goal.targetValue} ${goalValidation.goal.unit}${goalValidation.goal.requestedDeadline === null ? ', no deadline' : ` by ${goalValidation.goal.requestedDeadline}`}`}
+                      {`TARGET — ${goalValidation.goal.specificOutcome}: ${goalValidation.goal.baselineValue === null ? '' : `from ${goalValidation.goal.baselineValue} ${goalValidation.goal.unit} to `}${goalValidation.goal.targetValue} ${goalValidation.goal.unit}${goalValidation.goal.requestedDeadline === null ? ', no deadline' : ` by ${goalValidation.goal.requestedDeadline}`}`}
                     </Text>
                     <Pressable
                       onPress={() => goTo('target')}
@@ -819,6 +823,7 @@ export default function OnboardingScreen(): React.JSX.Element {
                     <Text style={styles.fieldLabel}>WHO PICKS THE WEIGHTS? (OPTIONAL)</Text>
                     {(['auto', 'manual'] as const).map((p) => (
                       <Chip
+                        wrap
                         key={p}
                         testID={p === 'auto' ? 'onboarding-loads-auto' : 'onboarding-loads-manual'}
                         label={`${LOAD_PREFERENCE_COPY[p].label} — ${LOAD_PREFERENCE_COPY[p].blurb}`}
@@ -841,8 +846,8 @@ export default function OnboardingScreen(): React.JSX.Element {
             </View>
 
             <Text style={styles.pDim}>
-              Change any of this later in Profile. Your first prescription is
-              waiting on Today.
+              Change any of this later in Profile. Next, check your first week,
+              then start on Today.
             </Text>
             <PrimaryButton
               label="START TRAINING"
@@ -888,6 +893,12 @@ export default function OnboardingScreen(): React.JSX.Element {
       )}
       {targetGateOpen && (
         <View style={styles.limitsGateNotice}>
+          {/* Issue #215: name the first missing field in the validator's words. */}
+          {!goalValidation.ok && goalValidation.errors.length > 0 && (
+            <Text style={styles.p} testID="onboarding-target-gate-missing" accessibilityLiveRegion="polite">
+              {goalValidation.errors[0]!.message}
+            </Text>
+          )}
           <Text style={styles.pDim} accessibilityLiveRegion="polite">
             Finish the target to continue, or choose "Skip this" to train with the focus only.
           </Text>

@@ -22,7 +22,7 @@ import { Chip, Disclosure, PrimaryButton, SecondaryButton } from '../components/
 import { theme } from '../theme/theme';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { EmphasisReportCard } from '../components/EmphasisReportCard';
-import { recommendedProgramDefaults } from '../state/programDefaults';
+import { programChoiceDisclosure, recommendedProgramDefaults } from '../state/programDefaults';
 import {
   useStore,
   type TrainingProgramDay,
@@ -132,7 +132,9 @@ export default function ProgramSetupScreen({
     } catch (error) {
       return { preview: null, error: error instanceof Error ? error.message : String(error) };
     }
-  }, [input, previewTrainingProgram]);
+    // previewTrainingProgram reads the prior-experience list from the store at
+    // call time, so a declaration (or revoke) must redraw the week (#211).
+  }, [input, previewTrainingProgram, movementAvailabilityRevision, activePriorExperienceMovementIds]);
 
   const availableIdsByContext = useMemo(() => ({
     weight_room: new Set(getVerdicts('weight_room')
@@ -367,7 +369,9 @@ export default function ProgramSetupScreen({
       {!editing && (
         <View style={styles.card} testID="program-recommendation-card">
           <Text style={styles.sectionTitle}>What the coach has picked for you</Text>
-          <Text style={styles.notice}>{recommended.disclosure}</Text>
+          <Text style={styles.notice} testID="program-choice-disclosure">
+            {programChoiceDisclosure({ buildMode, schemaType, horizonKind, blockCount, reviewDate })}
+          </Text>
           <Text style={styles.caption}>
             Your {dayIndices.length}-day week comes from the training days you already gave during
             setup. Nothing here is permanent — you can change all of it later in Athlete / Profile.
@@ -465,6 +469,7 @@ export default function ProgramSetupScreen({
                     history, not a coaching assessment.
                   </Text>
                   <Chip
+                    wrap
                     label={`I have trained ${anchor.name} before`}
                     selected={false}
                     onPress={() => confirmMovementPriorExperience(anchor.movementId, 'weight_room')}
@@ -605,13 +610,13 @@ export default function ProgramSetupScreen({
                   && availableIdsByContext[accessContext].has(item.movement_id));
                 return (
                   <View key={slot.slot_index} style={styles.slot}>
-                    <Text style={styles.slotTitle}>{movement.pattern.replace('_', ' ')}</Text>
-                    <View style={styles.wrap}>
-                      {choices.map((choice) => (
-                        <Chip key={choice.movement_id} label={choice.name} selected={selectedId === choice.movement_id}
-                          onPress={() => chooseMovement(session.day_index, slot.slot_index, movement.pattern as TrainingProgramMovementPreference['pattern'], choice.movement_id)} />
-                      ))}
-                    </View>
+                    <CustomizeSlot
+                      testID={`customize-slot-${session.day_index}-${slot.slot_index}`}
+                      pattern={movement.pattern}
+                      choices={choices}
+                      selectedId={selectedId}
+                      onChoose={(movementId) => chooseMovement(session.day_index, slot.slot_index, movement.pattern as TrainingProgramMovementPreference['pattern'], movementId)}
+                    />
                   </View>
                 );
               })}
@@ -682,6 +687,63 @@ export default function ProgramSetupScreen({
           || (sessionTime !== null && sessionTime.conflicts.length > 0)} />
       {onCancel !== undefined && <SecondaryButton label="Cancel" onPress={onCancel} />}
     </View>
+    </View>
+  );
+}
+
+// Android issue #216: slots were headed by the raw pattern code ("PUSH H") and
+// listed every allowed movement, 20 or more chips each. A slot now has a plain
+// title, starts with its current choice and a few alternatives, and "Show all"
+// opens the rest. Which movements are allowed is unchanged.
+const SLOT_TITLE: Record<string, string> = {
+  squat: 'Squat',
+  hinge: 'Hip hinge',
+  lunge: 'Lunge',
+  push_h: 'Horizontal push (bench, push-up)',
+  pull_h: 'Horizontal pull (rows)',
+  push_v: 'Vertical push (overhead)',
+  pull_v: 'Vertical pull (pull-up, pulldown)',
+  carry: 'Carry',
+  rotation: 'Core and trunk',
+  isolation: 'Isolation (single joint)',
+  locomotion: 'Locomotion',
+};
+
+export const slotTitle = (pattern: string): string =>
+  SLOT_TITLE[pattern] ?? pattern.replace(/_/g, ' ');
+
+/** Alternatives shown after the current choice before "Show all". */
+export const COLLAPSED_ALTERNATIVES = 4;
+
+interface CustomizeSlotProps {
+  testID: string;
+  pattern: string;
+  choices: readonly { movement_id: number; name: string }[];
+  selectedId: number;
+  onChoose: (movementId: number) => void;
+}
+
+function CustomizeSlot({ testID, pattern, choices, selectedId, onChoose }: CustomizeSlotProps): React.JSX.Element {
+  const [showAll, setShowAll] = useState(false);
+  const current = choices.filter((choice) => choice.movement_id === selectedId);
+  const others = choices.filter((choice) => choice.movement_id !== selectedId);
+  const collapsible = others.length > COLLAPSED_ALTERNATIVES;
+  const shown = [...current, ...(showAll || !collapsible ? others : others.slice(0, COLLAPSED_ALTERNATIVES))];
+  return (
+    <View testID={testID} style={styles.slot}>
+      <Text style={styles.slotTitle}>{slotTitle(pattern)}</Text>
+      <View style={styles.wrap}>
+        {shown.map((choice) => (
+          <Chip key={choice.movement_id} wrap label={choice.name} selected={selectedId === choice.movement_id}
+            onPress={() => onChoose(choice.movement_id)} />
+        ))}
+      </View>
+      {collapsible && (
+        <Pressable accessibilityRole="button" onPress={() => setShowAll((open) => !open)}
+          testID={`${testID}-show-all`} style={styles.showAll}>
+          <Text style={styles.showAllText}>{showAll ? 'Show fewer' : `Show all (${choices.length})`}</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -759,4 +821,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
   },
+  showAll: { minHeight: 56, justifyContent: 'center', alignSelf: 'flex-start' },
+  showAllText: { color: theme.color.textHi, fontSize: 13, fontWeight: '700', textDecorationLine: 'underline' },
 });

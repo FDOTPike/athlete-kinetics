@@ -14,10 +14,13 @@
 import XCTest
 
 final class AthleteKineticsUITests: XCTestCase {
+  private static var test3IterationsRun = 0
   private var app: XCUIApplication!
+  private var isInitialLaunchOfTest = true
 
   override func setUpWithError() throws {
     continueAfterFailure = false
+    isInitialLaunchOfTest = true
     app = XCUIApplication()
   }
 
@@ -186,7 +189,14 @@ final class AthleteKineticsUITests: XCTestCase {
   }
 
   private func launch(_ arguments: [String] = []) {
-    app.launchArguments = arguments
+    var effectiveArguments = arguments
+    if isInitialLaunchOfTest {
+      isInitialLaunchOfTest = false
+      if !effectiveArguments.contains("-AKUITestResetStorage") {
+        effectiveArguments += ["-AKUITestResetStorage", "1"]
+      }
+    }
+    app.launchArguments = effectiveArguments
     app.launch()
     wait(element("shell-root"), "the app shell", timeout: 90)
   }
@@ -559,6 +569,10 @@ final class AthleteKineticsUITests: XCTestCase {
   /// never claim it can read. Then Coach Mode: a second athlete is added (own
   /// onboarding) and switching athletes never reopens the permission sheet.
   func test3_healthDenialAndAthleteSwitching() throws {
+    if Self.test3IterationsRun > 0 {
+      app.resetAuthorizationStatus(for: .health)
+    }
+    Self.test3IterationsRun += 1
     // -AKUITestTrace: the app logs which branch its permission flow took
     // (content-free; captured from the system log by tools/ios_ui_tests.sh).
     launch(["-AKUITestTrace", "1"])

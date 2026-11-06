@@ -123,6 +123,24 @@ describe('OnboardingScreen review effort ceiling', () => {
   });
 });
 
+describe('OnboardingScreen long option chips wrap instead of cutting their sentence', () => {
+  test('focus bundles and the sport and target choices show their whole label', () => {
+    const { Text } = require('react-native');
+    render(<OnboardingScreen />);
+    next();
+    next();
+    const ids = [
+      ...screen.getAllByTestId(/^focus-bundle-/).map((node) => node.props.testID),
+      'onboarding-wants-sport',
+      'onboarding-wants-target',
+    ];
+    expect(ids.length).toBeGreaterThanOrEqual(6);
+    for (const id of ids) {
+      expect(screen.getByTestId(id).findByType(Text).props.numberOfLines).toBeUndefined();
+    }
+  });
+});
+
 // Android walk 2026-11-03 (ux-5): HOME BASIC claimed a pull-up bar its
 // description did not mention. A preset's description names every item in it.
 describe('OnboardingScreen HOME BASIC says what it adds', () => {

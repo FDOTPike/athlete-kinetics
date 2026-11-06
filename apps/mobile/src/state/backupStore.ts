@@ -604,6 +604,10 @@ async function pickerSave(sourcePath: string, fileName: string): Promise<boolean
   return saved.error === null && saved.uri.length > 0;
 }
 
+import { backupFileNameFor } from './backupFileName';
+
+export { backupFileNameFor };
+
 /** The Files import filter, per platform. The picker's iOS bridge resolves
  *  each entry with `UTType(identifier)` (PickerOptions.swift), so a MIME string
  *  resolves to nothing there and the sheet would offer no selectable file.
@@ -1041,7 +1045,7 @@ export const useBackupStore = create<BackupState>((set, get) => ({
       workDirectory = created.workDirectory;
       await ensurePlaintextSnapshotsRemoved(workDirectory);
       workDirectory = null;
-      const fileName = `pikeMethods-${new Date().toISOString().slice(0, 10)}.pmbak`;
+      const fileName = backupFileNameFor(new Date());
       // iOS saves under the SOURCE file's name (the picker's fileName is
       // Android-only), so the staged file carries the person-facing name inside
       // a private, uniquely named directory that is removed afterwards.

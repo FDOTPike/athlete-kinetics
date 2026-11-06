@@ -43,6 +43,7 @@ import {
 } from '@ak/inference';
 import { formatTeachingOnlyReason, useStore, type Movement, type RoutineTemplate } from '../state/useStore';
 import { theme } from '../theme/theme';
+import { useSubViewBack } from '../navigation/navigation';
 import KeyboardAwareScrollView, {
   KEYBOARD_DISMISS_MODE,
   KEYBOARD_TAP_BEHAVIOR,
@@ -175,6 +176,36 @@ function AvailableRoutineTemplateBuilder({
   });
   const [errorText, setErrorText] = useState<string | null>(null);
   const [doseDrafts, setDoseDrafts] = useState<Record<string, string>>({});
+
+  // #225: the draft as it was when the builder opened. Any difference, or a
+  // dose still being typed, is an unsaved change worth asking about.
+  const draftSnapshot = JSON.stringify({ name, schemaType, slots });
+  const initialDraftSnapshot = useRef(draftSnapshot);
+  const hasUnsavedChanges = draftSnapshot !== initialDraftSnapshot.current
+    || Object.keys(doseDrafts).length > 0;
+
+  const requestClose = (): void => {
+    if (onCancel === undefined) return;
+    if (!hasUnsavedChanges) {
+      onCancel();
+      return;
+    }
+    Alert.alert(
+      'Discard this routine?',
+      'Your changes to this routine have not been saved.',
+      [
+        { text: 'Keep editing', style: 'cancel' },
+        { text: 'Discard', style: 'destructive', onPress: onCancel },
+      ],
+      { cancelable: true },
+    );
+  };
+
+  // Registered only once there is something to lose. That is always after the
+  // host's own Back handler for this sub-view (registered when the builder
+  // opened), so this one runs first; with no changes the host closes the
+  // builder exactly as before.
+  useSubViewBack(hasUnsavedChanges && onCancel !== undefined, requestClose);
 
   const normalizedRpeSlots = initialTemplate?.slots.filter(
     (slot) => slot.targetRpe > profile.base_rpe_cap,
@@ -1366,7 +1397,7 @@ function AvailableRoutineTemplateBuilder({
         {onCancel && (
           <SecondaryButton
             label="Cancel"
-            onPress={onCancel}
+            onPress={requestClose}
             accessibilityLabel="Cancel editing"
           />
         )}
