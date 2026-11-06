@@ -17,7 +17,7 @@ Stop on an app halt, injury or concerning symptoms and tell the owner the same d
 
 ## What you share
 
-There is no automatic upload in this beta. You choose to hand the owner a password-protected encrypted backup in person, using USB/offline transfer, and give the password separately. Proposed schedule: a setup readability check, day 7 and day 14 or withdrawal. Ordinary contact with the coach for a safety concern is separate from log handover.
+There is no automatic upload in this beta. You choose to hand the owner a password-protected encrypted backup in person, using USB/offline transfer, and give the password separately. Proposed schedule: a setup readability check, day 7 and day 14. Ordinary contact with the coach for a safety concern is separate from log handover.
 
 **The backup covers every athlete on your phone**, including profiles, identifiers, plans, workouts, activities, preferences and health-support records. It is not limited to this test or the active athlete. The app warns about this scope (`apps/mobile/src/components/BackupTransferPanel.tsx:35`). Do not include anyone else's records without resolving consent and isolation with the owner first. Records can include symptoms, health information, effort, notes, session feel and, when the flagged box is verified for this build, your typed questions and the card shown. Do not put someone else's personal information into notes or questions.
 

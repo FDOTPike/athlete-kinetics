@@ -286,6 +286,8 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
     (s) => s.freezeRoutineTemplateToPlannedSession,
   );
   const deleteRoutineTemplate = useStore((s) => s.deleteRoutineTemplate);
+  // Same condition freezeRoutineTemplateToPlannedSession refuses on.
+  const goalProgramActive = program?.status === 'active';
 
   const [reportText, setReportText] = useState('');
   const [reportSeverity, setReportSeverity] = useState<number | null>(null);
@@ -364,6 +366,11 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
       setSessionStartError(storeError);
     }
   }, [awaitingSessionStart, session, storeError, onSessionStarted]);
+  // #223: a "Use day" confirmation chosen before a goal program started would
+  // stay on screen and call a store action that refuses the active program.
+  useEffect(() => {
+    if (goalProgramActive && confirmRoutineAction?.kind === 'use') setConfirmRoutineAction(null);
+  }, [goalProgramActive, confirmRoutineAction]);
   const [showChooser, setShowChooser] = useState(false);
 
   const hasSubView =
@@ -1255,6 +1262,14 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           onOpenChange={setRoutineTemplatesOpen}
         >
           <View style={styles.disclosureContent}>
+            {/* #223: the store refuses to freeze a routine over an active goal
+                program, so "Use day N today" is not offered then. Said once
+                here instead of after a tap that cannot work. */}
+            {goalProgramActive && profile.training_age !== 'beginner' && (
+              <Text style={styles.captionText}>
+                Routines can't replace your goal program's sessions. Edit them here, and use them when no goal program is active.
+              </Text>
+            )}
             {routineTemplates.length === 0 ? (
               <Text style={styles.captionText}>No saved routine templates yet.</Text>
             ) : (
@@ -1282,7 +1297,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                       <>
                         {profile.training_age !== 'beginner' && (
                           <>
-                            {[...new Set(t.slots.map((slot) => slot.dayIndex))].sort((a, b) => a - b).map((dayIndex) => (
+                            {!goalProgramActive && [...new Set(t.slots.map((slot) => slot.dayIndex))].sort((a, b) => a - b).map((dayIndex) => (
                               <Chip
                                 key={dayIndex}
                                 label={`Use day ${dayIndex} today`}
