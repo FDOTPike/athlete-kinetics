@@ -392,6 +392,7 @@ export {
   SESSION_FEEL_EASIER_REASONS,
   SESSION_FEEL_RPE_DRIFT_THRESHOLD,
   meanRpeDrift,
+  sessionFeelOfferedReasons,
   sessionFeelReasonRequired,
   sessionFeelReasonsFor,
   shouldAskSessionFeel,

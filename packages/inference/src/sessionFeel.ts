@@ -18,7 +18,9 @@
  *                              session_feel_extra_reason.reason_<name> (074)
  *
  * Issue #220: a reason is required only for "harder"; harder and easier each
- * have their own list. Still a record only.
+ * have their own list. A reason already saved for the same answer that its
+ * list does not offer (a row from before the lists) is kept while the answer
+ * is unchanged. Still a record only.
  */
 import type { SessionOutcomeKind } from './sessionOutcome';
 
@@ -99,8 +101,31 @@ export interface SessionFeelDraft {
 export interface SessionFeelRecord {
   readonly feel: SessionFeelKind;
   /** De-duplicated, in SESSION_FEEL_REASONS order, each from the answer's own
-   *  list. Always empty for 'as_planned'; never empty for 'harder'. */
+   *  list or from a record already saved for the same answer (a row saved
+   *  before the per-answer lists). Always empty for 'as_planned'; never empty
+   *  for 'harder'. */
   readonly reasons: readonly SessionFeelReason[];
+}
+
+/**
+ * The reasons to show for an answer: the answer's own list, in display order,
+ * followed by any reason already saved for this same answer that the list
+ * does not offer (in SESSION_FEEL_REASONS order). A row saved under 070 can
+ * hold such a reason (e.g. "easier" with "pain"); while the answer is
+ * unchanged it is shown and kept, so a saved "pain" is never silently dropped.
+ * A different answer offers only its own list. None for "as planned".
+ */
+export function sessionFeelOfferedReasons(
+  feel: SessionFeelKind | null,
+  saved?: SessionFeelDraft | null,
+): readonly SessionFeelReason[] {
+  if (feel === null || feel === 'as_planned') return [];
+  const base = sessionFeelReasonsFor(feel);
+  if (!saved || saved.feel !== feel || saved.reasons.length === 0) return base;
+  const preserved = SESSION_FEEL_REASONS.filter(
+    (reason) => !base.includes(reason) && saved.reasons.includes(reason),
+  );
+  return preserved.length === 0 ? base : [...base, ...preserved];
 }
 
 export type SessionFeelProblem = 'feel_required' | 'reason_required' | 'unknown_value';
@@ -111,19 +136,24 @@ export type SessionFeelValidation =
 
 /**
  * A session that went as planned carries no reasons (any tapped earlier are
- * dropped). Any other answer keeps only the reasons of its own list (one
- * tapped under another answer is dropped the same way). Only "harder" needs a
+ * dropped). Any other answer keeps only the reasons it offers (one tapped
+ * under another answer is dropped the same way): its own list, plus any
+ * reason already saved for this same answer (`saved`, the record read back
+ * for the session; see sessionFeelOfferedReasons). Only "harder" needs a
  * reason (issue #220): the record is mostly there to know why a session was
  * hard; easier and stopped early may be saved without one.
  */
-export function validateSessionFeel(draft: SessionFeelDraft): SessionFeelValidation {
+export function validateSessionFeel(
+  draft: SessionFeelDraft,
+  saved?: SessionFeelDraft | null,
+): SessionFeelValidation {
   if (draft.feel === null) return { ok: false, problem: 'feel_required' };
   if (!(SESSION_FEEL_KINDS as readonly string[]).includes(draft.feel)) return { ok: false, problem: 'unknown_value' };
   if (draft.reasons.some((reason) => !(SESSION_FEEL_REASONS as readonly string[]).includes(reason))) {
     return { ok: false, problem: 'unknown_value' };
   }
   if (draft.feel === 'as_planned') return { ok: true, record: { feel: draft.feel, reasons: [] } };
-  const offered = sessionFeelReasonsFor(draft.feel);
+  const offered = sessionFeelOfferedReasons(draft.feel, saved);
   const reasons = SESSION_FEEL_REASONS.filter((reason) => offered.includes(reason) && draft.reasons.includes(reason));
   if (reasons.length === 0 && sessionFeelReasonRequired(draft.feel)) return { ok: false, problem: 'reason_required' };
   return { ok: true, record: { feel: draft.feel, reasons } };

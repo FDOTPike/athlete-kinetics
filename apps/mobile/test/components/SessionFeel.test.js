@@ -379,6 +379,68 @@ describe('SessionFeelPanel: an answer by tapping', () => {
     expect(screen.getByTestId('session-feel-note').props.value).toBe('shoulder pinched on the press');
   });
 
+  // Owner ruling on #220: a saved reason the answer's new list does not offer
+  // (a row from before the per-answer lists) is shown as an extra selected
+  // chip while the answer is unchanged, so a saved "pain" is never hidden.
+  describe('a saved reason outside the answer\'s list', () => {
+    /** As the store does: the rule, with the saved answer the store reads back. */
+    const ruleWithSaved = (saved) => jest.fn((draft) => {
+      const checked = validateSessionFeel(draft, saved);
+      return checked.ok ? null : checked.problem;
+    });
+    const reasonOrder = () => screen.getAllByTestId(/^session-feel-reason-/).map((chip) => chip.props.testID.replace('session-feel-reason-', ''));
+
+    test('a saved "easier" + pain shows pain selected after the easier list, and saving unchanged keeps it', () => {
+      const saved = { feel: 'easier', reasons: ['pain'] };
+      const onSave = ruleWithSaved(saved);
+      const onClose = jest.fn();
+      render(<SessionFeelPanel saved={saved} note={null} onSave={onSave} onClose={onClose} />);
+      expect(screen.getByTestId('session-feel-easier').props.accessibilityState.selected).toBe(true);
+      expect(screen.getByTestId('session-feel-reason-pain').props.accessibilityState.selected).toBe(true);
+      expect(reasonOrder()).toEqual(['felt_good', 'too_light', 'rested_well', 'other', 'pain']);
+      // Pain is about the body, so the record-only sentence stands out.
+      expect(StyleSheet.flatten(screen.getByTestId('session-feel-record-only').props.style).color).toBe(theme.color.textHi);
+      fireEvent.press(screen.getByTestId('session-feel-save'));
+      expect(onSave).toHaveBeenLastCalledWith({ feel: 'easier', reasons: ['pain'] }, '');
+      expect(onSave).toHaveLastReturnedWith(null);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    test('the athlete can untap the saved pain', () => {
+      const saved = { feel: 'easier', reasons: ['pain'] };
+      const onSave = ruleWithSaved(saved);
+      render(<SessionFeelPanel saved={saved} note={null} onSave={onSave} onClose={jest.fn()} />);
+      fireEvent.press(screen.getByTestId('session-feel-reason-pain'));
+      expect(screen.getByTestId('session-feel-reason-pain').props.accessibilityState.selected).toBe(false);
+      fireEvent.press(screen.getByTestId('session-feel-save'));
+      expect(onSave).toHaveBeenLastCalledWith({ feel: 'easier', reasons: [] }, '');
+    });
+
+    test('a saved "harder" + felt good re-saves unchanged', () => {
+      const saved = { feel: 'harder', reasons: ['felt_good'] };
+      const onSave = ruleWithSaved(saved);
+      const onClose = jest.fn();
+      render(<SessionFeelPanel saved={saved} note={null} onSave={onSave} onClose={onClose} />);
+      expect(screen.getByTestId('session-feel-reason-felt_good').props.accessibilityState.selected).toBe(true);
+      fireEvent.press(screen.getByTestId('session-feel-save'));
+      expect(onSave).toHaveLastReturnedWith(null);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    test('a different answer neither offers nor carries it', () => {
+      const saved = { feel: 'harder', reasons: ['felt_good'] };
+      const onSave = ruleWithSaved(saved);
+      render(<SessionFeelPanel saved={saved} note={null} onSave={onSave} onClose={jest.fn()} />);
+      fireEvent.press(screen.getByTestId('session-feel-stopped_early'));
+      expect(screen.queryByTestId('session-feel-reason-felt_good')).toBeNull();
+      fireEvent.press(screen.getByTestId('session-feel-save'));
+      expect(onSave).toHaveBeenLastCalledWith({ feel: 'stopped_early', reasons: [] }, '');
+      // Back on the saved answer it is offered again, but not chosen for the athlete.
+      fireEvent.press(screen.getByTestId('session-feel-harder'));
+      expect(screen.getByTestId('session-feel-reason-felt_good').props.accessibilityState.selected).toBe(false);
+    });
+  });
+
   test('a failed save keeps the panel open and says the session itself is safe', () => {
     const onClose = jest.fn();
     render(<SessionFeelPanel saved={null} note={null} onSave={jest.fn(() => 'not_saved')} onClose={onClose} />);

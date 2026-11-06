@@ -5,7 +5,8 @@
  * progression. The athlete answers by tapping: one answer for how the session
  * went and, unless it went as planned, reasons from that answer's closed list
  * (issue #220: harder and easier have their own lists, and only "harder"
- * needs a reason).
+ * needs a reason). A reason already saved for the same answer that its list
+ * does not offer is shown as an extra chip while the answer is unchanged.
  * The typed note is optional, is stored word for word, and is never
  * interpreted by this component or by anything it calls. The note starters
  * only put a few words into the note for the athlete to finish: they are a
@@ -28,8 +29,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   SESSION_FEEL_KINDS,
+  sessionFeelOfferedReasons,
   sessionFeelReasonRequired,
-  sessionFeelReasonsFor,
   type SessionFeelDraft,
   type SessionFeelKind,
   type SessionFeelProblem,
@@ -186,7 +187,10 @@ export function SessionFeelPanel({ saved, note, answerOptional = false, onSave, 
   };
 
   const reasonsShown = feel !== null && feel !== 'as_planned';
-  const offeredReasons = feel === null ? [] : sessionFeelReasonsFor(feel);
+  // The answer's own list, plus a reason already saved for this same answer
+  // that the list does not offer (a row from before the per-answer lists):
+  // shown, still selected, so a saved "pain" is never hidden or dropped.
+  const offeredReasons = sessionFeelOfferedReasons(feel, saved);
   const bodyReasonChosen = reasonsShown && reasons.some((reason) => BODY_REASONS.includes(reason) && offeredReasons.includes(reason));
   // The sentence is always there; this only decides whether it stands out.
   const aboutTheBody = bodyReasonChosen || bodyLineStarted;

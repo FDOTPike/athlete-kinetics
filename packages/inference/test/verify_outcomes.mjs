@@ -280,6 +280,73 @@ check('session feel: harder and easier keep only the reasons of their own list (
     { ok: true, record: { feel: 'harder', reasons: ['too_heavy'] } });
 });
 
+// Owner ruling on #220: a row saved under 070 can hold a reason the new list
+// for its answer does not offer. While the answer is unchanged, that reason is
+// shown and kept; a saved "pain" is never silently dropped.
+check('session feel: a saved reason outside the answer\'s list is offered and kept while the answer is unchanged', () => {
+  assert.equal(typeof feel.sessionFeelOfferedReasons, 'function');
+  // With nothing saved, or no answer, the offered list is the answer's own.
+  assert.deepEqual([...feel.sessionFeelOfferedReasons(null)], []);
+  assert.deepEqual([...feel.sessionFeelOfferedReasons('as_planned', { feel: 'as_planned', reasons: ['pain'] })], []);
+  assert.deepEqual([...feel.sessionFeelOfferedReasons('easier')], [...feel.SESSION_FEEL_EASIER_REASONS]);
+  assert.deepEqual([...feel.sessionFeelOfferedReasons('easier', null)], [...feel.SESSION_FEEL_EASIER_REASONS]);
+  assert.deepEqual([...feel.sessionFeelOfferedReasons('easier', { feel: 'easier', reasons: ['felt_good'] })],
+    [...feel.SESSION_FEEL_EASIER_REASONS]);
+  // Legacy easier + pain: pain is offered after the easier list.
+  const offered = feel.sessionFeelOfferedReasons('easier', { feel: 'easier', reasons: ['pain'] });
+  assert.ok(offered.includes('pain'));
+  assert.deepEqual([...offered], ['felt_good', 'too_light', 'rested_well', 'other', 'pain']);
+  assert.deepEqual(
+    [...feel.sessionFeelOfferedReasons('easier', { feel: 'easier', reasons: ['time', 'pain', 'felt_good'] })],
+    ['felt_good', 'too_light', 'rested_well', 'other', 'pain', 'time'],
+  );
+  // A saved value this build does not know is never offered.
+  assert.deepEqual([...feel.sessionFeelOfferedReasons('easier', { feel: 'easier', reasons: ['weather'] })],
+    [...feel.SESSION_FEEL_EASIER_REASONS]);
+});
+
+check('session feel: a saved "pain" is never silently dropped on re-save (owner ruling, #220)', () => {
+  const saved = { feel: 'easier', reasons: ['pain'] };
+  assert.deepEqual(feel.validateSessionFeel({ feel: 'easier', reasons: ['pain'] }, saved),
+    { ok: true, record: { feel: 'easier', reasons: ['pain'] } });
+  assert.deepEqual(feel.validateSessionFeel({ feel: 'easier', reasons: ['too_light', 'pain'] }, saved),
+    { ok: true, record: { feel: 'easier', reasons: ['pain', 'too_light'] } });
+  // Without the saved row, the same draft keeps only the easier list.
+  assert.deepEqual(feel.validateSessionFeel({ feel: 'easier', reasons: ['pain'] }),
+    { ok: true, record: { feel: 'easier', reasons: [] } });
+});
+
+check('session feel: an unchanged legacy "harder" + felt good re-saves', () => {
+  const saved = { feel: 'harder', reasons: ['felt_good'] };
+  assert.deepEqual(feel.validateSessionFeel({ feel: 'harder', reasons: ['felt_good'] }, saved),
+    { ok: true, record: { feel: 'harder', reasons: ['felt_good'] } });
+});
+
+check('session feel: untapping the legacy reason removes it; harder then needs another reason', () => {
+  assert.deepEqual(feel.validateSessionFeel({ feel: 'easier', reasons: [] }, { feel: 'easier', reasons: ['pain'] }),
+    { ok: true, record: { feel: 'easier', reasons: [] } });
+  assert.deepEqual(feel.validateSessionFeel({ feel: 'harder', reasons: [] }, { feel: 'harder', reasons: ['felt_good'] }),
+    { ok: false, problem: 'reason_required' });
+});
+
+check('session feel: a saved out-of-list reason does not carry into a different answer', () => {
+  // easier + pain saved, answer changed to "as planned": no reasons.
+  assert.deepEqual(feel.validateSessionFeel({ feel: 'as_planned', reasons: ['pain'] }, { feel: 'easier', reasons: ['pain'] }),
+    { ok: true, record: { feel: 'as_planned', reasons: [] } });
+  // harder + felt good saved, answer changed to "stopped early": felt good is not offered there.
+  assert.deepEqual(
+    feel.validateSessionFeel({ feel: 'stopped_early', reasons: ['felt_good'] }, { feel: 'harder', reasons: ['felt_good'] }),
+    { ok: true, record: { feel: 'stopped_early', reasons: [] } },
+  );
+  assert.deepEqual([...feel.sessionFeelOfferedReasons('stopped_early', { feel: 'harder', reasons: ['felt_good'] })],
+    [...feel.SESSION_FEEL_HARDER_REASONS]);
+  // easier + too light saved, answer changed to harder: too light is not offered there.
+  assert.deepEqual(
+    feel.validateSessionFeel({ feel: 'harder', reasons: ['too_light'] }, { feel: 'easier', reasons: ['too_light'] }),
+    { ok: false, problem: 'reason_required' },
+  );
+});
+
 check('session feel: a value outside the closed lists is refused', () => {
   assert.deepEqual(feel.validateSessionFeel({ feel: 'terrible', reasons: ['tired'] }), { ok: false, problem: 'unknown_value' });
   assert.deepEqual(feel.validateSessionFeel({ feel: 'harder', reasons: ['weather'] }), { ok: false, problem: 'unknown_value' });
