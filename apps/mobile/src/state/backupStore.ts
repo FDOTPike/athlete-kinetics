@@ -37,7 +37,7 @@ import {
   type RestoreJournalV1,
 } from '@ak/core-db';
 import { REGISTRY_FILE, serializeRegistry, type AthleteRegistry } from './athleteRegistryCore';
-import { loadRegistry } from './athleteRegistry';
+import { loadRegistry, readRegistryOrThrow } from './athleteRegistry';
 import { closeStoreDatabaseForRestore, restartStoreAfterRestore } from './useStore';
 import { mobileBackupCrypto } from './backupCrypto';
 import {
@@ -546,10 +546,11 @@ async function readPreparedDatabaseSnapshot(prepared: PreparedDatabaseSnapshot):
 
 /** #173: the size of each athlete database a backup would read, in the
  * registry's order. Read-only (file stats); the limit is still enforced by
- * buildArchive below. */
+ * buildArchive below. A registry read failure is thrown (the caller treats it
+ * as unknown) rather than measured as the default one-athlete registry. */
 export async function measureAthleteDatabaseBytes(): Promise<number[]> {
   const io = fs();
-  const registry = await loadRegistry();
+  const registry = await readRegistryOrThrow();
   return Promise.all(registry.athletes.map(async (athlete) => Number((await io.stat(dbPath(athlete.dbName))).size)));
 }
 
