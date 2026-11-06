@@ -100,13 +100,23 @@ function ChipRow<T extends string>({ label, options, value, onSelect, tip, disab
  * one, the next block is built for the new objective. The current block never
  * changes. `programObjective` is the running program's own objective (null with
  * no program): after an earlier change it can differ from `from`.
+ * `programFinished` is a program in review_due: it has finished, so there is no
+ * current block or rest of the program to keep the old objective (owner ruling).
  */
 export const objectiveChangeText = (
-  from: string, to: string, programObjective: string | null, hasBlock: boolean, hasArchivedBlock = false,
+  from: string,
+  to: string,
+  programObjective: string | null,
+  hasBlock: boolean,
+  hasArchivedBlock = false,
+  programFinished = false,
 ): string => {
   const fromLabel = from.replace(/_/g, ' ');
   const toLabel = to.replace(/_/g, ' ');
   const question = `Change your objective from ${fromLabel} to ${toLabel}?`;
+  if (programFinished) {
+    return `${question} Your program has finished. Your next program will be built for ${toLabel}.`;
+  }
   if (programObjective !== null) {
     const programLabel = programObjective.replace(/_/g, ' ');
     return `${question} Your current block and the rest of your program stay ${programLabel}. ${toLabel.charAt(0).toUpperCase()}${toLabel.slice(1)} is used when you build your next program.`;
@@ -525,7 +535,7 @@ export default function ProfileScreen(): React.JSX.Element {
       {pendingObjective !== null && (
         <View style={styles.objectiveConfirm} testID="profile-objective-confirmation">
           <Text style={styles.confirmText} testID="profile-objective-change-text">
-            {objectiveChangeText(profile.objective, pendingObjective, activeProgram?.objective ?? null, activeBlock !== null, hasArchivedBlock)}
+            {objectiveChangeText(profile.objective, pendingObjective, activeProgram?.objective ?? null, activeBlock !== null, hasArchivedBlock, activeProgram?.status === 'review_due')}
           </Text>
           <PrimaryButton
             label="Change objective"

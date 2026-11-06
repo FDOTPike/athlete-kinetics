@@ -2,7 +2,7 @@ import React from 'react';
 import { BackHandler, StyleSheet } from 'react-native';
 import { act, fireEvent, render, renderAsync, screen, within } from '@testing-library/react-native';
 import { HISTORY_IMPORT_EXAMPLE, TRAINING_AGES } from '@ak/inference';
-import ProfileScreen from '../../src/screens/ProfileScreen';
+import ProfileScreen, { objectiveChangeText } from '../../src/screens/ProfileScreen';
 import OnboardingScreen from '../../src/screens/OnboardingScreen';
 import { NavigationProvider } from '../../src/navigation/navigation';
 import { PrimaryButton } from '../../src/components/ui';
@@ -935,6 +935,30 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: power'));
     expect(screen.getByTestId('profile-objective-change-text').props.children)
       .toBe('Change your objective from strength to power? Your current block and the rest of your program stay hybrid. Power is used when you build your next program.');
+  });
+
+  // Owner ruling on #176: a program in review_due has finished; there is no
+  // current block or rest of the program to keep the old objective.
+  test('objectiveChangeText says a finished program has finished', () => {
+    expect(objectiveChangeText('strength', 'hypertrophy', 'strength', false, false, true))
+      .toBe('Change your objective from strength to hypertrophy? Your program has finished. Your next program will be built for hypertrophy.');
+    // A finished program wins over a block or archived blocks.
+    expect(objectiveChangeText('strength', 'hypertrophy', 'strength', true, true, true))
+      .toBe('Change your objective from strength to hypertrophy? Your program has finished. Your next program will be built for hypertrophy.');
+  });
+
+  test('OBJECTIVE change when the program is due for review says the program has finished', () => {
+    mockState = {
+      ...mockState,
+      profile: { ...mockState.profile, objective: 'strength' },
+      block: null,
+      hasArchivedBlock: true,
+      program: { programId: 1, objective: 'strength', status: 'review_due', currentSequenceIndex: 2, plannedBlockCount: 2, days: [], movementPreferences: [] },
+    };
+    render(<ProfileScreen />);
+    fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: hypertrophy'));
+    expect(screen.getByTestId('profile-objective-change-text').props.children)
+      .toBe('Change your objective from strength to hypertrophy? Your program has finished. Your next program will be built for hypertrophy.');
   });
 
   test('OBJECTIVE change after earlier blocks ended does not call the next block the first', () => {
