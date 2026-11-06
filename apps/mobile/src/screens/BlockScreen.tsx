@@ -33,6 +33,7 @@ import ProgramSetupScreen from './ProgramSetupScreen';
 import NewBlockChooserScreen from './NewBlockChooserScreen';
 import InfoTip from '../components/InfoTip';
 import { EmphasisReportCard } from '../components/EmphasisReportCard';
+import { deriveTodayState } from '../state/todayState';
 import { theme } from '../theme/theme';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { appliedAdjustmentLines, autopilotReasonCopy } from '../state/autopilotCopy';
@@ -595,6 +596,22 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
     startSession();
   };
 
+  // #200: the same derivation Today uses, so a planned session that is already
+  // finalized as complete reads as done here too, not as still to start.
+  const todaySessionDone = todayPlan !== null && deriveTodayState({
+    today,
+    hasActiveSession: session !== null,
+    halted,
+    todayPlan: {
+      plannedSessionId: todayPlan.plannedSessionId,
+      focus: todayPlan.focus,
+      slotCount: todayPlan.slots.length,
+    },
+    blockSessions,
+    hasActiveBlock: block !== null,
+    hasArchivedBlock,
+  }).kind === 'completed_today';
+
   let todayTitle = 'Recovery day';
   let todayMessage = nextPlanned === undefined
     ? 'There is no session to complete today. Use the day to recover.'
@@ -606,6 +623,9 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
   } else if (session !== null) {
     todayTitle = 'Session in progress';
     todayMessage = 'Your active workout is ready to resume.';
+  } else if (todaySessionDone && todayPlan !== null) {
+    todayTitle = `Today: ${focusName(todayPlan.focus)} — done`;
+    todayMessage = 'Today\'s session is recorded. Recover well.';
   } else if (todayPlan !== null) {
     todayTitle = `Today: ${focusName(todayPlan.focus)}`;
     todayMessage = `${todayPlan.slots.length} movements are planned. Start when you are ready.`;
@@ -800,11 +820,13 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                 ? 'Training paused'
                 : session !== null
                   ? 'Active session'
-                  : todayPlan !== null
-                    ? 'Planned session'
-                    : block === null
-                      ? 'Plan needed'
-                      : 'Recovery day'}
+                  : todaySessionDone
+                    ? 'Session done'
+                    : todayPlan !== null
+                      ? 'Planned session'
+                      : block === null
+                        ? 'Plan needed'
+                        : 'Recovery day'}
             </Text>
           </View>
         </View>
@@ -825,7 +847,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
               onPress={reviewContinuation}
               accessibilityLabel="Review program continuation"
             />
-          ) : todayPlan !== null ? (
+          ) : todayPlan !== null && !todaySessionDone ? (
             <PrimaryButton label="Start session" onPress={startAndOpenSession} accessibilityLabel="Start session" />
           ) : block === null ? (
             <PrimaryButton
