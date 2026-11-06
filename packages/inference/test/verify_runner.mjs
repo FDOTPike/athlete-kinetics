@@ -261,6 +261,12 @@ check('R5b live runner: a bodyweight LOG_SET rests by load, keeps it through a c
     const working = advance(hard, event('SKIP_REST', 13));
     assert.equal(working.restBodyweight, undefined, `R5b marker cleared after rest ${tier}`);
     assert.equal(advance(working, event('LOG_SET', 14, { actualRpe: 9 })).restSecondsTarget, 240);
+    // A halt during a bodyweight rest drops the marker too, so the halted
+    // state is the one a checkpoint restores.
+    const halted = advance(hard, event('HALT', 15, { reason: 'manual' }));
+    assert.equal(halted.phase, 'halted', `R5b halt during bodyweight rest ${tier}`);
+    assert.equal(halted.restBodyweight, undefined, `R5b marker cleared on halt ${tier}`);
+    assert.deepEqual(deserializeRunner(serializeRunner(halted)), halted, `R5b halted checkpoint round trip ${tier}`);
   }
   // A checkpoint that claims a bodyweight rest with the wrong duration is refused.
   const hard = advance(startRunner([repSlot(902, 3, 10, 8)], { tier: 'beginner', startedAtMs: 0 }), event('LOG_SET', 10, { actualRpe: 9, bodyweightSet: true }));

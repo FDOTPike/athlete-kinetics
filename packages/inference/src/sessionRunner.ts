@@ -669,8 +669,11 @@ function completeAt(state: RunnerState, atMs: number): RunnerState {
 function haltAt(state: RunnerState, atMs: number, reason: RunnerHaltReason): RunnerState {
   if (!isNonNegativeTimestamp(atMs)) return state;
   const updatedAtMs = state.updatedAtMs === null ? atMs : Math.max(state.updatedAtMs, atMs);
+  // The bodyweight-rest marker ends with the rest (issue #209).
+  const { restBodyweight: _endedRest, ...rest } = state;
+  void _endedRest;
   return {
-    ...state,
+    ...rest,
     phase: 'halted',
     restSecondsTarget: 0,
     restStartedAtMs: null,
