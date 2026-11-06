@@ -13154,13 +13154,15 @@ Reply on each thread via `gh api -X POST repos/FDOTPike/athlete-kinetics/pulls/<
 - **PR 100, threads 4435090714 and 4435090720:** fixed on that branch. See Entry 0273's 2026-11-01 note there.
 - **Gates (PR 101 worktree):** `npm run typecheck` exit 0. `npm run verify:store`: ALL CHECKS PASSED. Panel suite: 7 of 7.
 
-## Entries 0276–0286 — 2026-11-01 to 2026-11-03 · Unrecovered local ledger gap
+## Entries 0276–0299 — from 2026-11-01 · Unrecovered local ledger gap
 
-**Status:** NOT VERIFIED. These entries were written in a local ledger and never pushed. On 2026-11-07 they were not on any pushed branch, nor in any local branch, stash or the main checkout on the owner's Windows PC.
+**Status:** NOT VERIFIED. Entries from 0276 onward were written in a local ledger and never pushed. On 2026-11-07 they were not on any pushed branch, nor in any local branch, stash or the main checkout on the owner's Windows PC.
 
-They are not rebuilt from code comments or PR text (`.agents/rules/coding-rules-general.md` rules 1 and 2; CodeRabbit on PR #116). Their numbers stay reserved, so references on existing branches don't collide. Tracked in issue #297.
+Code on pushed branches cites Entry 0286 and Entry 0288 (both 2026-11-03), so the local ledger ran at least to 0288; how far beyond is unknown. Numbers 0276–0299 are reserved for those entries, so existing references don't collide, and the next pushed entry is 0300.
 
-## Entry 0287 — 2026-11-07 · Delegated owner ruling: PR #116's read of `session_skipped_slot`, and the 0276–0286 gap
+They are not rebuilt from code comments or PR text (`.agents/rules/coding-rules-general.md` rules 1 and 2; CodeRabbit on PR #116). Tracked in issue #297.
+
+## Entry 0300 — 2026-11-07 · Delegated owner ruling: PR #116's read of `session_skipped_slot`, and the unrecovered gap
 
 **Executor:** a session working through the open pull requests on the owner's Windows PC.
 
@@ -13193,8 +13195,8 @@ The appendix held the code around the read, every match for `0286` and "record o
 - **The ruling:** `loadSessionSummaryFacts` in `apps/mobile/src/state/useStore.ts` is authorized as the single display-only reader of migration 071 `session_skipped_slot`. This lets the completed-session summary list exercises skipped during the session (ux-8, Android walk 2026-11-03).
   - No training, prescription or autopilot engine reads `session_skipped_slot`.
   - `apps/mobile/test/verify_store_sql.mjs` allows exactly this SELECT, and only inside `loadSessionSummaryFacts`.
-- **Entries 0276–0286** are recorded above as an unrecovered gap and are not rebuilt.
-- **Code:** comments that cited Entry 0286 now cite Entry 0287 and issue #297:
+- **Entries 0276–0299** are reserved above as an unrecovered gap (the local ledger reached at least 0288) and are not rebuilt.
+- **Code:** comments that cited Entry 0286 now cite Entry 0300 and issue #297:
   - `useStore.ts` (the summary read);
   - `SessionSummarySkipped.test.js` (file header);
   - `verify_store_sql.mjs` (the 071 check).
