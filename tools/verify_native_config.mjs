@@ -40,9 +40,12 @@ const check = (label, ok, detail = '') => {
   console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? `  [${detail}]` : ''}`);
   if (!ok) fail += 1;
 };
+// XML comments are not active configuration: a commented-out key must read as
+// absent, never as set (fail closed).
+const stripXmlComments = (xml) => xml.replace(/<!--[\s\S]*?-->/g, '');
 const plistKeys = (xml) => {
   const out = new Map();
-  for (const m of xml.matchAll(/<key>([^<]+)<\/key>\s*(<string>([^<]*)<\/string>|<true\/>|<false\/>|<array>([\s\S]*?)<\/array>|<array\/>|<dict>)/g)) {
+  for (const m of stripXmlComments(xml).matchAll(/<key>([^<]+)<\/key>\s*(<string>([^<]*)<\/string>|<true\/>|<false\/>|<array>([\s\S]*?)<\/array>|<array\/>|<dict>)/g)) {
     out.set(m[1], m[3] ?? (m[2] === '<true/>' ? true : m[2] === '<false/>' ? false : m[4] ?? m[2]));
   }
   return out;
@@ -336,7 +339,7 @@ console.log('[N11] beta orientation lock (#168)');
   // A beta decision to revisit: landscape left too little room on every
   // screen (the rest card's countdown never fit). Tablets are not in the beta,
   // so the iPad list is kept as it was.
-  const manifest = read('apps/mobile/android/app/src/main/AndroidManifest.xml');
+  const manifest = stripXmlComments(read('apps/mobile/android/app/src/main/AndroidManifest.xml'));
   const mainActivity = manifest.match(/<activity\s[^>]*android:name="\.MainActivity"[^>]*>/)?.[0] ?? '';
   check('Android MainActivity is locked to portrait', /android:screenOrientation="portrait"/.test(mainActivity));
   const orientations = (key) => [...String(plist.get(key) ?? '').matchAll(/<string>([^<]+)<\/string>/g)].map((m) => m[1]);
