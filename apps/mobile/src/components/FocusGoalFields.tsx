@@ -448,7 +448,7 @@ export function GoalEditor({ fields, onChange, today, trainingAge, showAllErrors
       />
       {fieldError('targetValue', fields.targetText.length > 0)}
 
-      <Text style={styles.label}>WHY DOES THIS MATTER TO YOU?</Text>
+      <Text style={styles.label}>WHY DOES THIS MATTER TO YOU? (REQUIRED)</Text>
       <TextInput
         disableFullscreenUI
         style={styles.input}
@@ -457,7 +457,7 @@ export function GoalEditor({ fields, onChange, today, trainingAge, showAllErrors
         maxLength={GOAL_TEXT_MAX}
         placeholder="In your own words"
         placeholderTextColor={theme.color.textLow}
-        accessibilityLabel="Why this goal matters to you"
+        accessibilityLabel="Why does this matter to you? (required)"
         testID="goal-reason"
       />
       {fieldError('reason', fields.reason.length > 0)}

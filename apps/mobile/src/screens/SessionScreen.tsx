@@ -66,6 +66,11 @@ const formatRunnerHaltReason = (
  *  and negatives. An empty/whitespace draft is ABSENT evidence (null), which
  *  is never coerced to zero. The literal "0" is a valid explicit zero. */
 const LOAD_DRAFT_RE = /^(?:\d+(?:[.,]\d*)?|[.,]\d+)$/;
+/** Android walk (#232): the line under the target for a band-only movement,
+ *  which asks for no kilograms. */
+const BAND_ONLY_NO_LADDER_TEXT = 'No bands named yet. You can name them in Profile > Band ladder.';
+const BAND_ONLY_CHOOSE_TEXT = 'Choose the band you used. No kilograms are needed.';
+
 const parseLoadDraft = (text: string): number | null => {
   const trimmed = text.trim();
   if (trimmed === '') return null;
@@ -171,6 +176,26 @@ const targetFor = (slot: PlanSlot): SlotTarget => {
 const targetText = (slot: PlanSlot): string => {
   const target = targetFor(slot);
   return target.kind === 'time' ? `${slot.plannedSets} × ${secondsText(target.seconds)}` : `${slot.plannedSets} × ${target.reps}`;
+};
+
+/** Android walk (#203): rep-based sets ask "how many more clean reps", so the
+ *  target says reps left first, with RPE kept as support. Reps left is the
+ *  inverse of the RIR answer mapping (mapRirToRpe: 3 → 7, 2 → 8, 4+ → 6); a
+ *  half-point target falls between two answers and is shown as a range.
+ *  Timed work asks for RPE directly and keeps the RPE target only. Display
+ *  only: the target itself is unchanged. */
+const targetEffortText = (slot: PlanSlot): string => {
+  const rpe = slot.targetRpe;
+  if (rpe === null || !Number.isFinite(rpe)) return '';
+  if (targetFor(slot).kind === 'time') return ` · RPE ${rpe.toFixed(1)}`;
+  const left = 10 - rpe;
+  const lo = Math.floor(left);
+  const hi = Math.ceil(left);
+  const repsLeft = left >= 4 ? 'at least 4 reps left'
+    : left <= 0 ? 'no reps left'
+      : lo !== hi ? `about ${lo}–${hi} reps left`
+        : lo === 1 ? 'about 1 rep left' : `about ${lo} reps left`;
+  return ` · ${repsLeft} (RPE ${rpe.toFixed(1)})`;
 };
 
 const lines = (text: string | null | undefined, max: number): string[] => {
@@ -524,8 +549,14 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
         overrideLoadKg: currentSlot.overrideLoadKg,
         sessionPlanSlotId: currentSlot.sessionPlanSlotId,
       });
-  const loadEvidence = loadSelection === null
-    ? ''
+  // Android walk (#232): a movement whose only implement is a band (Band Row,
+  // Band Pull-Apart) has no kilograms to enter. The set records reps, effort
+  // and, when bands are named, the band; its load is 0. Movements that take
+  // a load as well as a band keep the load field.
+  const bandOnly = currentMovement?.supportedPrefixes?.length === 1 && primaryImplement === 'Banded';
+  const loadEvidence = bandOnly
+    ? (bandLadder.length > 0 ? BAND_ONLY_CHOOSE_TEXT : BAND_ONLY_NO_LADDER_TEXT)
+    : loadSelection === null ? ''
     : loadCopyFor(
         loadSelection,
         bodyweightMode,
@@ -533,7 +564,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
         currentSlot?.overrideLoadKg ?? null,
         target?.kind === 'time',
       );
-  const loadLoggable = isLoadDraftLoggable(loadText) && !loadInvalid;
+  const loadLoggable = bandOnly || (isLoadDraftLoggable(loadText) && !loadInvalid);
 
   const safeRpe: number | null = selectedChoice !== null
     ? mapRirToRpe(selectedChoice)
@@ -757,7 +788,14 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                 </>
               ) : sessionFeel.ask ? (
                 <>
-                  <Text style={styles.summaryLine} testID="session-feel-ask">This session went differently from the plan.</Text>
+                  {/* Android walk (#212): a followed plan is asked only because the
+                      logged effort drifted from the targets; "went differently
+                      from the plan" contradicted "Plan followed." above it. */}
+                  <Text style={styles.summaryLine} testID="session-feel-ask">
+                    {outcome.kind === 'followed_plan'
+                      ? 'You did every set, but your effort was different from the targets.'
+                      : 'This session went differently from the plan.'}
+                  </Text>
                   <SecondaryButton
                     label="Record how it went"
                     onPress={() => setFeelOpen(true)}
@@ -938,7 +976,8 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
     // Equipment/safety/capability/attestation restrictions block execution of
     // this slot even though they no longer block the whole session.
     if (!currentSlotExecutable) return;
-    const parsed = parseLoadDraft(loadText);
+    // A band-only movement logs load 0 (#232): no kilograms were asked for.
+    const parsed = bandOnly ? 0 : parseLoadDraft(loadText);
     // Logging an external-load set requires an explicit finite, non-negative
     // entry; blank is absent evidence and never coerced to zero.
     if (parsed === null) {
@@ -957,7 +996,8 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
     // No seed is better than another set's seed: if the draft was not initialized for exactly this
     // slot and set (a press landing before the initializer has run), nothing is recorded as shown.
     const held = loadShownRef.current;
-    const seededForThisSet = held !== null && held.slotId === currentSlot.sessionPlanSlotId && held.logged === currentLogged ? held.seed : null;
+    // A band-only movement showed no load, so none is recorded as shown.
+    const seededForThisSet = !bandOnly && held !== null && held.slotId === currentSlot.sessionPlanSlotId && held.logged === currentLogged ? held.seed : null;
     logSet(currentMovement.movement_id, target.kind === 'time' ? 1 : Math.round(clamp(reps, 1, 50)), safeLoad, safeRpe, undefined, undefined, undefined, metrics, currentSlot.sessionPlanSlotId, seededForThisSet);
     if (runner === null) {
       if (uiPreferences.restTimerEnabled) setLocalRest({
@@ -1027,6 +1067,36 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   // to the halt card below (halting has already recorded preparation as stopped).
   const preparationOpen = preparation !== null && preparation.sessionId === session.sessionId
     && !isTerminalPreparationStatus(preparation.status);
+  // Android walk (#213): the ramp sets read in kg when today's working load
+  // for the ramped movement is known. It comes from the same resolver as the
+  // set card, and only a load the app derived (from a 1RM or an override)
+  // counts as known. Display only: the frozen protocol is not changed.
+  const rampWorkingLoad = ((): { movementId: number; movementName: string; workingLoadKg: number } | null => {
+    if (!preparationOpen || preparation === null || preparation.protocol === null) return null;
+    if (typeof state.resolveSlotLoad !== 'function') return null;
+    const rampMovementId = preparation.protocol.items.find((item) => item.stage === 'ramp')?.movementId ?? null;
+    if (rampMovementId === null) return null;
+    const rampSlot = sessionPlan.find((slot) => slot.movementId === rampMovementId);
+    const rampMovement = byId.get(rampMovementId);
+    if (rampSlot === undefined || rampMovement === undefined) return null;
+    const rampTarget = targetFor(rampSlot);
+    try {
+      const selection = state.resolveSlotLoad({
+        movementId: rampSlot.movementId,
+        bodyweightMode: rampMovement.supportedPrefixes[0] === 'Bodyweight',
+        targetReps: rampTarget.kind === 'reps' ? rampTarget.reps : null,
+        targetRpe: rampSlot.targetRpe ?? 8,
+        overrideLoadKg: rampSlot.overrideLoadKg,
+        sessionPlanSlotId: rampSlot.sessionPlanSlotId,
+      });
+      const kg = selection.initialLoadKg;
+      if (selection.source !== 'derived' || kg === null || !Number.isFinite(kg) || kg <= 0) return null;
+      return { movementId: rampMovementId, movementName: rampMovement.name, workingLoadKg: kg };
+    } catch {
+      // The kilograms are a convenience; the percentages stay if they cannot be read.
+      return null;
+    }
+  })();
   if (preparationOpen && preparation !== null && !halted) {
     return (
       <View style={styles.screen}>
@@ -1047,6 +1117,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
             onRecordItem={recordPreparationItem}
             onFinish={finishPreparation}
             onStopSession={() => { runnerHalt('manual'); endSession(); }}
+            rampWorkingLoad={rampWorkingLoad}
           />
         </KeyboardAwareScrollView>
       </View>
@@ -1326,11 +1397,11 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                       <View style={{ gap: theme.space[3] }}>
                         <Text style={styles.currentLabel}>CURRENT · SET {Math.min(slot.plannedSets, currentLogged + 1)} OF {slot.plannedSets}</Text>
                         <Text style={styles.movementName}>{movement?.name ?? 'Movement'}</Text>
-                        <Text style={styles.targetLine}>Target {targetText(slot)}{slot.targetRpe === null ? '' : ` · RPE ${slot.targetRpe.toFixed(1)}`}</Text>
+                        <Text style={styles.targetLine} testID="session-target-line">Target {targetText(slot)}{targetEffortText(slot)}</Text>
                         <Text
                           style={styles.loadEvidence}
                           testID="session-load-source-line"
-                          accessibilityLabel={`Load source. ${loadEvidence}`}
+                          accessibilityLabel={bandOnly ? loadEvidence : `Load source. ${loadEvidence}`}
                         >
                           {loadEvidence}
                         </Text>
@@ -1374,6 +1445,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                               Target: {target?.kind === 'reps' ? target.reps : '—'} reps. Log the reps you actually completed.
                             </Text>
                           )}
+                          {!bandOnly && (
                           <View style={styles.loadField}>
                             <Text style={styles.loadFieldLabel} testID="session-load-label">{loadLabel.toUpperCase()}</Text>
                             <View style={styles.loadFieldRow}>
@@ -1439,6 +1511,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                               </Pressable>
                             </View>
                           </View>
+                          )}
 
                           <Text style={styles.effortCue} testID="effort-scale-explanation">
                             How hard did that feel? The full effort scale runs from 1 (very easy) to 10 (your hardest effort). Direct working-set entry runs from 5 to 10.
