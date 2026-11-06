@@ -5,7 +5,7 @@ import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING
 import { EXPERIENCE_SEVERITY, runnerTierForTrainingAge } from '../../../../packages/inference/src/sessionRunner';
 import { formatTeachingOnlyReason, freeFormStartIsEmpty, useStore, type LoadSelection, type LoggedSet, type SetLoadShown, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
 import { useNavigation, useSubViewBack } from '../navigation/navigation';
-import { buildSessionSummary, NO_NEXT_SESSION_TEXT, setsOfPlanned, skippedExerciseText } from '../state/sessionSummary';
+import { buildSessionSummary, isDumbbellLoad, markPerDumbbell, NO_NEXT_SESSION_TEXT, setsOfPlanned, skippedExerciseText } from '../state/sessionSummary';
 import { SUPPORT_HELD_MESSAGE, SUPPORT_UNAVAILABLE_MESSAGE } from '../state/healthSupportStore';
 import { theme } from '../theme/theme';
 import InfoTip from '../components/InfoTip';
@@ -360,6 +360,9 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
     advanceRunnerRest, skipRunnerRest, setRunnerRestOverride, runnerThumbsDown, runnerHalt, lastEndedSessionId,
     loadSessionOutcome, dismissOutcome,
   } = state;
+  // OW-001: the athlete's declared implement per movement. Component tests
+  // drive this screen with partial store states, so absent reads as none.
+  const loadIntents = state.loadIntents;
   // Preparation (065). Component tests drive this screen with partial store
   // states, so an absent field reads as "no preparation recorded".
   const preparation = state.preparation ?? null;
@@ -464,10 +467,9 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
     if (lastEndedSessionId == null) return null;
     try {
       const facts = loadSessionSummaryFacts(lastEndedSessionId);
-      // Issue #218: a dumbbell exercise's loads are stated per dumbbell.
-      const dumbbellIds = new Set(movements.filter((m) => m.supportedPrefixes[0] === 'DB').map((m) => m.movement_id));
       return buildSessionSummary({
-        exercises: facts.exercises.map((exercise) => (dumbbellIds.has(exercise.movementId) ? { ...exercise, perDumbbell: true } : exercise)),
+        // Issue #218: a dumbbell exercise's loads are stated per dumbbell.
+        exercises: markPerDumbbell(facts.exercises, movements, loadIntents),
         skippedExercises: facts.skippedExercises ?? [],
         previousSets: facts.previousSets,
         durationMin: facts.durationMin,
@@ -479,7 +481,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
       // read stay unknown — the status line above is already persisted truth.
       return null;
     }
-  }, [lastEndedSessionId, loadSessionSummaryFacts, summaryBlockSessions, summaryToday, movements]);
+  }, [lastEndedSessionId, loadSessionSummaryFacts, summaryBlockSessions, summaryToday, movements, loadIntents]);
 
   // Session feel (070): whether to ask how the ended session went, and what is
   // already saved. Component tests drive this screen with partial store states,
@@ -557,8 +559,9 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   const primaryImplement = currentMovement?.supportedPrefixes[0];
   const bodyweightMode = primaryImplement === 'Bodyweight';
   // Issue #218: a dumbbell load is per dumbbell and is logged as typed;
-  // nothing multiplies it.
-  const dumbbellMode = primaryImplement === 'DB';
+  // nothing multiplies it. The declared implement, or a sole DB, decides;
+  // the first of several listed implements is only dropdown order.
+  const dumbbellMode = isDumbbellLoad(currentMovement ?? undefined, loadIntents);
   const loadLabel = bodyweightMode ? 'Added kg (0 = bodyweight)' : dumbbellMode ? 'Load kg per dumbbell' : 'Load kg';
   // P2-4 (Opus audit): one stable target-RPE value for load resolution —
   // the slot target when present, a fixed fallback when absent. Used by both

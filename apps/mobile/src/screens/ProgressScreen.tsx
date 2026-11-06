@@ -23,7 +23,7 @@ import { useStore } from '../state/useStore';
 import { theme } from '../theme/theme';
 import { ListRow } from '../components/ui';
 import { measuredDayDetail } from './measuredDayDetail';
-import { buildSessionSummary } from '../state/sessionSummary';
+import { buildSessionSummary, markPerDumbbell } from '../state/sessionSummary';
 
 const OUTCOME_LABELS: Record<string, string> = {
   followed_plan: 'Plan followed',
@@ -50,6 +50,10 @@ function PastSessionSummary({ sessionId, load }: {
   sessionId: number;
   load: (sessionId: number) => ReturnType<ReturnType<typeof useStore.getState>['loadSessionSummaryFacts']>;
 }): React.JSX.Element {
+  // Issue #218: dumbbell loads read per dumbbell here too, by the same rule
+  // as the completion summary. Tests may leave these out of the store.
+  const movements = useStore((s) => s.movements);
+  const loadIntents = useStore((s) => s.loadIntents);
   let lines: string[] = [];
   // Review (PR 194): a failed read is not an empty session. Only a summary
   // that was read and holds nothing says that no sets were logged.
@@ -57,7 +61,8 @@ function PastSessionSummary({ sessionId, load }: {
   try {
     const facts = load(sessionId);
     const view = buildSessionSummary({
-      exercises: facts.exercises, previousSets: facts.previousSets, durationMin: facts.durationMin,
+      exercises: markPerDumbbell(facts.exercises, movements, loadIntents),
+      previousSets: facts.previousSets, durationMin: facts.durationMin,
       blockSessions: [], today: '', skippedExercises: facts.skippedExercises,
     });
     lines = [

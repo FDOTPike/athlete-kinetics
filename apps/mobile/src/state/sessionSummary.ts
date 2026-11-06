@@ -69,6 +69,33 @@ export interface SummaryExercise {
   perDumbbell?: boolean;
 }
 
+/** Issue #218: whether a movement's load is entered per dumbbell. The
+ *  athlete's declared implement decides when the movement supports it;
+ *  otherwise only a movement whose sole supported implement is DB counts. The
+ *  first of several supported implements is dropdown order, never the
+ *  implement in use (OW-001). */
+export const isDumbbellLoad = (
+  movement: { readonly movement_id: number; readonly supportedPrefixes: readonly string[] } | undefined,
+  loadIntents: Readonly<Record<number, string>> | undefined,
+): boolean => {
+  if (movement === undefined) return false;
+  const prefixes = movement.supportedPrefixes ?? [];
+  const declared = loadIntents?.[movement.movement_id];
+  if (declared !== undefined && prefixes.includes(declared)) return declared === 'DB';
+  return prefixes.length === 1 && prefixes[0] === 'DB';
+};
+
+/** Marks the dumbbell exercises of a summary so their loads read per
+ *  dumbbell. Shared by the completion summary and the Progress tab. */
+export const markPerDumbbell = (
+  exercises: readonly SummaryExercise[],
+  movements: readonly { readonly movement_id: number; readonly supportedPrefixes: readonly string[] }[] | undefined,
+  loadIntents: Readonly<Record<number, string>> | undefined,
+): SummaryExercise[] => exercises.map((exercise) => (
+  isDumbbellLoad((movements ?? []).find((m) => m.movement_id === exercise.movementId), loadIntents)
+    ? { ...exercise, perDumbbell: true }
+    : exercise));
+
 /** One persisted set row as the store reads it, with its slot identity. */
 export interface SummarySetRow {
   movementId: number;

@@ -28,6 +28,7 @@ import {
   exerciseClassOf,
   groupSummaryExercises,
   implementClassOf,
+  markPerDumbbell,
   matchPreviousFacts,
   NO_NEXT_SESSION_TEXT,
 } from '../../src/state/sessionSummary';
@@ -331,6 +332,20 @@ describe('per-dumbbell loads in the summary (issue #218)', () => {
   test('a barbell load has no per-dumbbell wording', () => {
     const view = buildSessionSummary({ ...base, previousSets: [], exercises: [exercise()] });
     expect(view.exerciseLines[0].text).not.toContain('per dumbbell');
+  });
+  // Review (PR 292): the first listed implement is only dropdown order; the
+  // declared implement, or a sole one, decides.
+  test('markPerDumbbell marks a sole or declared dumbbell, never the first of several', () => {
+    const ex = (movementId) => exercise({ movementId });
+    const movements = [
+      { movement_id: 1, supportedPrefixes: ['DB'] },
+      { movement_id: 2, supportedPrefixes: ['DB', 'KB'] },
+      { movement_id: 3, supportedPrefixes: ['BB', 'DB'] },
+      { movement_id: 4, supportedPrefixes: ['DB', 'BB'] },
+    ];
+    const marked = markPerDumbbell([ex(1), ex(2), ex(3), ex(4), ex(5)], movements, { 3: 'DB', 4: 'BB' });
+    expect(marked.map((e) => e.perDumbbell === true)).toEqual([true, false, true, false, false]);
+    expect(markPerDumbbell([ex(1)], undefined, undefined)[0].perDumbbell).not.toBe(true);
   });
 });
 

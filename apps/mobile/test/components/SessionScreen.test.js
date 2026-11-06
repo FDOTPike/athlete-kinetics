@@ -1547,6 +1547,36 @@ test('a dumbbell movement labels the load per dumbbell and logs the number as ty
   expect(mockState.logSet.mock.calls[0][2]).toBe(22.5);
 });
 
+// Review (PR 292): the first listed implement is only dropdown order. The
+// label follows the athlete's declared implement, or the sole one.
+test('per dumbbell follows the declared implement, not the first listed one', () => {
+  const withPrefixes = (supportedPrefixes, loadIntents) => state({
+    movements: [
+      movement(1, 'First movement', { supportedPrefixes }),
+      movement(2, 'Later movement'),
+    ],
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    ...(loadIntents === undefined ? {} : { loadIntents }),
+  });
+  const label = () => screen.getByTestId('session-load-label').props.children;
+
+  mockState = withPrefixes(['DB', 'KB']);
+  let view = render(<SessionScreen />);
+  expect(label()).toBe('LOAD KG');
+  view.unmount();
+
+  mockState = withPrefixes(['DB', 'BB'], { 1: 'BB' });
+  view = render(<SessionScreen />);
+  expect(label()).toBe('LOAD KG');
+  view.unmount();
+
+  mockState = withPrefixes(['BB', 'DB'], { 1: 'DB' });
+  view = render(<SessionScreen />);
+  expect(label()).toBe('LOAD KG PER DUMBBELL');
+  expect(screen.getByTestId('session-load-input').props.accessibilityLabel).toMatch(/^Load in kilograms per dumbbell\./);
+  view.unmount();
+});
+
 // --- P2-2: unknown implement fails toward blank ------------------------------
 test('unknown implement (empty supportedPrefixes) is treated as external load', () => {
   mockState = state({

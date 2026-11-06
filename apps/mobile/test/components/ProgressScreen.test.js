@@ -113,6 +113,24 @@ describe('Recent sessions open to what was logged', () => {
     expect(screen.queryByTestId('progress-session-11-summary')).toBeNull();
   });
 
+  // Review (PR 292): a past summary states dumbbell loads per dumbbell, as the
+  // completion summary does (issue #218).
+  test('a past dumbbell session states its heaviest load per dumbbell', () => {
+    mockState.movements = [{ movement_id: 1, name: 'Goblet Squat', supportedPrefixes: ['DB'] }];
+    render(<ProgressScreen />);
+    fireEvent.press(screen.getByTestId('progress-session-11'));
+    expect(screen.getByText(/heaviest load used 16 kg per dumbbell/)).toBeOnTheScreen();
+  });
+
+  test('a past session of a lift with no dumbbell has no per-dumbbell wording', () => {
+    mockState.movements = [{ movement_id: 1, name: 'Goblet Squat', supportedPrefixes: ['DB', 'KB'] }];
+    mockState.loadIntents = { 1: 'KB' };
+    render(<ProgressScreen />);
+    fireEvent.press(screen.getByTestId('progress-session-11'));
+    expect(screen.getByText(/heaviest load used 16 kg/)).toBeOnTheScreen();
+    expect(screen.queryByText(/per dumbbell/)).toBeNull();
+  });
+
   // Review (PR 194): a read that fails is not an empty session.
   test('a summary that cannot be read does not say that no sets were logged', () => {
     mockState.loadSessionSummaryFacts = jest.fn(() => { throw new Error('synthetic read failure'); });
