@@ -27,6 +27,7 @@ import {
   SESSION_FEEL_REASON_LABEL,
   SESSION_FEEL_NOTE_MAX_LENGTH,
   SESSION_FEEL_RECORD_ONLY_TEXT,
+  SESSION_FEEL_RECORD_ONLY_TEXT_NO_PLAN_FORM,
   SESSION_NOTE_STARTERS,
   withNoteStarter,
 } from '../../src/components/SessionFeelPanel';
@@ -598,4 +599,56 @@ test('a note starter also focuses the note field, so the athlete can type straig
   const focus = jest.spyOn(input.instance, 'focus');
   fireEvent.press(screen.getByTestId('session-note-starter-body'));
   expect(focus).toHaveBeenCalled();
+});
+
+// ---------------------------------------------------------------------------
+// #180: the sentence never points at a Plan form that is not on the page.
+// The Plan screen shows "Something feels off" only once readiness exists.
+// ---------------------------------------------------------------------------
+
+describe('the record-only sentence names only a report place that exists', () => {
+  test('with the Plan form available, the sentence is unchanged', () => {
+    render(<SessionFeelPanel saved={null} note={null} planReportAvailable onSave={ruleOnly()} onClose={jest.fn()} />);
+    expect(screen.getByTestId('session-feel-record-only')).toHaveTextContent(SESSION_FEEL_RECORD_ONLY_TEXT);
+  });
+
+  test('without the Plan form, the sentence points only at "Report discomfort" in a workout', () => {
+    render(<SessionFeelPanel saved={null} note={null} planReportAvailable={false} onSave={ruleOnly()} onClose={jest.fn()} />);
+    const sentence = screen.getByTestId('session-feel-record-only');
+    expect(sentence).toHaveTextContent(SESSION_FEEL_RECORD_ONLY_TEXT_NO_PLAN_FORM);
+    expect(sentence).not.toHaveTextContent(/Something feels off/);
+    // "Report discomfort" takes only a joint and a severity, so this sentence
+    // does not send an unwell athlete there (owner ruling on #180).
+    expect(SESSION_FEEL_RECORD_ONLY_TEXT_NO_PLAN_FORM).toBe(
+      'This is a record only. It does not adjust your training. If something hurts, '
+      + 'use "Report discomfort" on the lift during a session.',
+    );
+    expect(sentence).not.toHaveTextContent(/unwell/);
+    expect(SESSION_FEEL_RECORD_ONLY_TEXT_NO_PLAN_FORM).toMatch(/^This is a record only\. It does not adjust your training\./);
+    expect(SESSION_FEEL_RECORD_ONLY_TEXT_NO_PLAN_FORM).toContain('"Report discomfort"');
+    expect(SESSION_FEEL_RECORD_ONLY_TEXT_NO_PLAN_FORM).not.toMatch(/\b(should|must|rest|doctor|physio|treat)\b/i);
+  });
+
+  test('without the Plan form, a screen reader hears the same sentence the panel shows', () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => {});
+    render(<SessionFeelPanel saved={null} note={null} planReportAvailable={false} onSave={ruleOnly()} onClose={jest.fn()} />);
+    fireEvent.press(screen.getByTestId('session-feel-stopped_early'));
+    fireEvent.press(screen.getByTestId('session-feel-reason-pain'));
+    expect(announce).toHaveBeenLastCalledWith(SESSION_FEEL_RECORD_ONLY_TEXT_NO_PLAN_FORM);
+    announce.mockRestore();
+  });
+
+  test('the completion screen with no readiness opens the panel without the Plan pointer', () => {
+    mockState = baseState({ vector: null });
+    render(<SessionScreen />);
+    fireEvent.press(screen.getByTestId('session-feel-open'));
+    expect(screen.getByTestId('session-feel-record-only')).toHaveTextContent(SESSION_FEEL_RECORD_ONLY_TEXT_NO_PLAN_FORM);
+  });
+
+  test('the completion screen with readiness keeps the Plan pointer', () => {
+    mockState = baseState({ vector: { date: '2026-10-09', readiness_score: 70 } });
+    render(<SessionScreen />);
+    fireEvent.press(screen.getByTestId('session-feel-open'));
+    expect(screen.getByTestId('session-feel-record-only')).toHaveTextContent(SESSION_FEEL_RECORD_ONLY_TEXT);
+  });
 });
