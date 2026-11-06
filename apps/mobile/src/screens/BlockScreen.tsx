@@ -430,12 +430,57 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
 
   const halted = lastTriage !== null && lastTriage.kind === 'matched' && lastTriage.directive.halt;
 
+  // Read before the readiness gate (#221): a new day has no state_vector row
+  // until a session ends, so a control that waited for readiness could never
+  // move an ended goal-program block on to the next one.
+  const programBlockExpired = program?.status === 'active' && block !== null
+    && today > addDaysIso(block.startDate, 27);
+  const continuationReviewDate = program?.status === 'active'
+    ? addDaysIso(today, (program.plannedBlockCount - program.currentSequenceIndex) * 28) : null;
+  const reviewContinuationLabel = program != null && program.currentSequenceIndex >= program.plannedBlockCount
+    ? 'Review goal' : 'Review next block';
+  const reviewContinuation = (): void => {
+    const preview = previewNextProgramBlock();
+    if (preview === null) continueTrainingProgram();
+    else setNextProgramPreview(preview);
+  };
+
+  const renderNextProgramPreview = (preview: BlockPlan): React.JSX.Element => (
+    <View style={styles.card}>
+      <Text style={styles.eyebrow}>NEXT BLOCK PREVIEW</Text>
+      <Text style={styles.cardTitle}>{SCHEMA_LABEL[preview.schemaType]} - {preview.macroPhase}</Text>
+      <Text style={styles.bodyText}>Starts today with {preview.sessions.filter((session) => session.week_index === 1).length} repeating training days.</Text>
+      {preview.warnings.map((warning) => (
+        <Text key={warning} style={styles.captionText}>{warning}</Text>
+      ))}
+      {program != null && continuationReviewDate !== null && continuationReviewDate !== program.plannedEndDate && (
+        <Text style={styles.adjustedText}>
+          Late confirmation moves the review boundary to {continuationReviewDate}, preserving four full weeks per remaining block.
+        </Text>
+      )}
+      {continuationError !== null && (
+        <Text style={styles.errorText}>{continuationError}</Text>
+      )}
+      {/* The preview is dismissed by the effect above, only once the
+          continuation has actually landed. */}
+      <PrimaryButton label="Confirm next block" onPress={() => {
+        setContinuationError(null);
+        setContinuationPending(true);
+        continueTrainingProgram();
+      }} accessibilityLabel="Confirm and start next program block" />
+      <SecondaryButton label="Not yet" onPress={() => {
+        setContinuationError(null);
+        setNextProgramPreview(null);
+      }} />
+    </View>
+  );
+
   if (vector === null) {
     return (
       // The no-vector gate is an early return INSIDE the real screen, so the
       // route identity (coach-screen) is still asserted by tests even when
       // readiness data has not arrived yet.
-      <View style={styles.center} testID="coach-screen">
+      <ScrollView style={styles.screen} contentContainerStyle={styles.gateContent} testID="coach-screen">
         {halted && lastTriage !== null && lastTriage.kind === 'matched' && (
           <View style={[styles.card, styles.haltCard]}>
             <Text style={styles.eyebrow}>SAFETY</Text>
@@ -446,6 +491,31 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
             )}
           </View>
         )}
+        {/* #221: the ended block's review does not need today's readiness.
+            Same priority as the full screen's action row: a safety halt or
+            an open session comes first, so neither rule changes here. */}
+        {programBlockExpired && !halted && session === null && (
+          <View style={styles.card}>
+            <Text style={styles.eyebrow}>GOAL PROGRAM</Text>
+            <Text style={styles.cardTitle}>Your block has ended</Text>
+            <Text style={styles.bodyText}>
+              Block {program.currentSequenceIndex} of {program.plannedBlockCount} has finished its four weeks.
+            </Text>
+            <PrimaryButton
+              label={reviewContinuationLabel}
+              onPress={reviewContinuation}
+              accessibilityLabel="Review program continuation"
+            />
+          </View>
+        )}
+        {program?.status === 'review_due' && (
+          <View style={styles.card}>
+            <Text style={styles.eyebrow}>GOAL PROGRAM</Text>
+            <Text style={styles.adjustedText}>Goal reassessment is due before another program starts.</Text>
+            <PrimaryButton label="Reassess goal" onPress={archiveTrainingProgram} accessibilityLabel="Archive completed program and reassess goal" />
+          </View>
+        )}
+        {nextProgramPreview !== null && renderNextProgramPreview(nextProgramPreview)}
         <View style={styles.card}>
           <Text style={styles.eyebrow}>COACH</Text>
           <Text style={styles.cardTitle}>Readiness is needed first</Text>
@@ -462,17 +532,13 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
             />
           )}
         </View>
-      </View>
+      </ScrollView>
     );
   }
 
   const current = prescription !== null && prescription.forDate === today ? prescription : null;
   const rows = weekRowsFor(blockSessions);
   const nextPlanned = blockSessions.find((planned) => planned.sessionDate > today);
-  const programBlockExpired = program?.status === 'active' && block !== null
-    && today > addDaysIso(block.startDate, 27);
-  const continuationReviewDate = program?.status === 'active'
-    ? addDaysIso(today, (program.plannedBlockCount - program.currentSequenceIndex) * 28) : null;
 
   const openDetail = (summary: BlockSessionSummary): void => {
     if (detail?.summary.plannedSessionId === summary.plannedSessionId) {
@@ -734,12 +800,8 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
             <PrimaryButton label="Open active session" onPress={() => onSessionStarted?.()} accessibilityLabel="Open active session" />
           ) : programBlockExpired ? (
             <PrimaryButton
-              label={program != null && program.currentSequenceIndex >= program.plannedBlockCount ? 'Review goal' : 'Review next block'}
-              onPress={() => {
-                const preview = previewNextProgramBlock();
-                if (preview === null) continueTrainingProgram();
-                else setNextProgramPreview(preview);
-              }}
+              label={reviewContinuationLabel}
+              onPress={reviewContinuation}
               accessibilityLabel="Review program continuation"
             />
           ) : todayPlan !== null ? (
@@ -783,35 +845,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
         )}
       </View>
 
-      {nextProgramPreview !== null && (
-        <View style={styles.card}>
-          <Text style={styles.eyebrow}>NEXT BLOCK PREVIEW</Text>
-          <Text style={styles.cardTitle}>{SCHEMA_LABEL[nextProgramPreview.schemaType]} - {nextProgramPreview.macroPhase}</Text>
-          <Text style={styles.bodyText}>Starts today with {nextProgramPreview.sessions.filter((session) => session.week_index === 1).length} repeating training days.</Text>
-          {nextProgramPreview.warnings.map((warning) => (
-            <Text key={warning} style={styles.captionText}>{warning}</Text>
-          ))}
-          {program != null && continuationReviewDate !== null && continuationReviewDate !== program.plannedEndDate && (
-            <Text style={styles.adjustedText}>
-              Late confirmation moves the review boundary to {continuationReviewDate}, preserving four full weeks per remaining block.
-            </Text>
-          )}
-          {continuationError !== null && (
-            <Text style={styles.errorText}>{continuationError}</Text>
-          )}
-          {/* The preview is dismissed by the effect above, only once the
-              continuation has actually landed. */}
-          <PrimaryButton label="Confirm next block" onPress={() => {
-            setContinuationError(null);
-            setContinuationPending(true);
-            continueTrainingProgram();
-          }} accessibilityLabel="Confirm and start next program block" />
-          <SecondaryButton label="Not yet" onPress={() => {
-            setContinuationError(null);
-            setNextProgramPreview(null);
-          }} />
-        </View>
-      )}
+      {nextProgramPreview !== null && renderNextProgramPreview(nextProgramPreview)}
 
       {/* Four-week trajectory Section */}
       <View
@@ -1439,11 +1473,11 @@ const styles = StyleSheet.create({
     gap: theme.space[4],
     paddingBottom: theme.space[6],
   },
-  center: {
-    flex: 1,
-    backgroundColor: theme.color.ink0,
+  gateContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     padding: theme.space[6],
+    gap: theme.space[4],
   },
   header: {
     marginBottom: theme.space[2],
