@@ -1,6 +1,6 @@
 /** Phase 17 utility-first active-session surface. */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING_NOTE, EFFORT_STOP_GUIDANCE, effortCue, mapRirToRpe, RIR_OPTIONS, PREPARATION_STATUS_LABEL, isTerminalPreparationStatus, preparationDoseUnit, type EffortAnswer, type RunnerHaltReason } from '@ak/inference';
 import { EXPERIENCE_SEVERITY, runnerTierForTrainingAge } from '../../../../packages/inference/src/sessionRunner';
 import { formatTeachingOnlyReason, freeFormStartIsEmpty, useStore, type LoadSelection, type LoggedSet, type SetLoadShown, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
@@ -319,6 +319,8 @@ export interface SessionScreenProps {
  * summary of what was done, and the optional record of how it went).
  */
 export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionScreenProps = {}): React.JSX.Element {
+  // Large text (issue 158): the two workout buttons stack so their words do not break.
+  const { fontScale } = useWindowDimensions();
   const state = useStore((s) => s);
   const nav = typeof useNavigation === 'function' ? useNavigation() : undefined;
   const [emptyStartPromptOpen, setEmptyStartPromptOpen] = useState(false);
@@ -778,7 +780,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                   {/* Android walk (#212): a followed plan is asked only because the
                       logged effort drifted from the targets; "went differently
                       from the plan" contradicted "Plan followed." above it. */}
-                  <Text style={styles.summaryLine} testID="session-feel-ask">
+                  <Text style={[styles.summaryLine, styles.completionGap]} testID="session-feel-ask">
                     {outcome.kind === 'followed_plan'
                       ? 'You did every set, but your effort was different from the targets.'
                       : 'This session went differently from the plan.'}
@@ -1327,7 +1329,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                       style={({ pressed }) => [styles.upcomingRow, selectable && styles.upcomingSelectable, pressed && selectable && styles.pressed]}
                     >
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.upcomingName} numberOfLines={1}>{movement?.name ?? 'Movement'}</Text>
+                        <Text style={styles.upcomingName}>{movement?.name ?? 'Movement'}</Text>
                         <Text style={styles.upcomingMeta}>{targetText(slot)}</Text>
                       </View>
                       {selectable && <Text style={styles.choose}>Choose</Text>}
@@ -1698,7 +1700,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                         </Disclosure>
 
                         {/* 56pt quick avoidance / discomfort trigger rows */}
-                        <View style={styles.quickRow}>
+                        <View style={[styles.quickRow, fontScale >= 1.3 && styles.quickRowStacked]}>
                           <SecondaryButton
                             label="Doesn’t feel right"
                             onPress={thumbsDown}
@@ -2267,6 +2269,7 @@ const styles = StyleSheet.create({
   },
   choose: {
     alignSelf: 'center',
+    marginLeft: theme.space[2],
     ...theme.font.label,
     color: theme.color.textHi,
   },
@@ -2316,6 +2319,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginTop: theme.space[3],
     gap: theme.space[2],
+  },
+  quickRowStacked: {
+    flexDirection: 'column',
+  },
+  completionGap: {
+    marginTop: theme.space[3],
   },
   safety: {
     marginTop: theme.space[3],
