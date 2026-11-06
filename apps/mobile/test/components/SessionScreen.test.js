@@ -1011,7 +1011,7 @@ test('final-set rest stays visible so the next movement can advance', () => {
 
 test('thumbs-down delegates the durable Avoid plus substitution transition to the runner store action', () => {
   render(<SessionScreen />);
-  fireEvent.press(screen.getByLabelText('Avoid First movement and find a substitution'));
+  fireEvent.press(screen.getByLabelText('Doesn’t feel right: avoid First movement and find a substitution'));
   expect(mockState.runnerThumbsDown).toHaveBeenCalledTimes(1);
   expect(mockState.setMovementPreference).not.toHaveBeenCalled();
   expect(mockState.openSubstitution).not.toHaveBeenCalled();
@@ -1333,7 +1333,7 @@ test('runner substitution offer: thumbs-down after an earlier set uses runner pa
     },
   });
   render(<SessionScreen />);
-  fireEvent.press(screen.getByLabelText('Avoid First movement and find a substitution'));
+  fireEvent.press(screen.getByLabelText('Doesn’t feel right: avoid First movement and find a substitution'));
   expect(mockState.runnerThumbsDown).toHaveBeenCalledTimes(1);
   // Must NOT touch the legacy paths
   expect(mockState.setMovementPreference).not.toHaveBeenCalled();

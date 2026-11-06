@@ -643,7 +643,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     expect(screen.getByRole('header', { name: 'NEW TO THIS' })).toBeOnTheScreen();
     expect(screen.getByText(/Choose this if structured training is still new/).props.accessible).toBe(true);
     expect(selection.props.accessibilityState.selected).toBe(false);
-    fireEvent.press(screen.getByLabelText('Dismiss explanation'));
+    fireEvent.press(screen.getByLabelText('Close, dismiss explanation'));
     fireEvent.press(selection);
     expect(screen.getByRole('button', { name: /NEW TO THIS\. Under a year/ }).props.accessibilityState.selected).toBe(true);
   });
@@ -1222,7 +1222,7 @@ describe('OW-001 load-intent declaration surface', () => {
     setup();
     expect(screen.getByLabelText('Plan Push-up with Bodyweight only')).toBeOnTheScreen();
     expect(screen.getByLabelText('Plan Walking Lunge with Dumbbell')).toBeOnTheScreen();
-    expect(screen.getByLabelText('Leave Push-up unset, so it is planned with added weight')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Not set: leave Push-up unset, so it is planned with added weight')).toBeOnTheScreen();
   });
 
   test('copy says the choice applies to FUTURE programming and what unset means', () => {

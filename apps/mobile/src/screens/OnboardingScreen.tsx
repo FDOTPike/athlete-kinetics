@@ -510,7 +510,7 @@ export default function OnboardingScreen(): React.JSX.Element {
               selected={wantsSport}
               onPress={() => setWantsSport((value) => !value)}
               accessibilityLabel={wantsSport
-                ? 'I play or compete in a sport, selected. One more screen will ask about it.'
+                ? 'I play or compete in a sport. One more screen will ask about it.'
                 : 'I play or compete in a sport. Adds one screen.'}
               style={styles.cardChip}
             />
@@ -522,7 +522,7 @@ export default function OnboardingScreen(): React.JSX.Element {
               selected={wantsTarget}
               onPress={() => setWantsTarget((value) => !value)}
               accessibilityLabel={wantsTarget
-                ? 'I have a specific target, selected. One more screen will ask for it.'
+                ? 'I also have a specific target. One more screen will ask for it.'
                 : 'I also have a specific target. Adds one screen.'}
               style={styles.cardChip}
             />

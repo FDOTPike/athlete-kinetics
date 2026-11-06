@@ -60,7 +60,7 @@ const HEADER_CONTROLS: readonly { key: Tab; label: string }[] = [
 
 /** D7: descriptive accessible names for the header controls. */
 const HEADER_ACCESS: Record<Tab, string> = {
-  readiness: 'Open readiness details',
+  readiness: 'Ready, open readiness details',
   session: 'Open the workout',
   library: 'Open the exercise library',
   athlete: 'Open profile and settings',
