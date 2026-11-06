@@ -1,5 +1,5 @@
 import React from 'react';
-import { BackHandler } from 'react-native';
+import { Alert, BackHandler } from 'react-native';
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import ActivitiesScreen from '../../src/screens/ActivitiesScreen';
 import { NavigationProvider } from '../../src/navigation/navigation';
@@ -203,6 +203,32 @@ describe('WO-05 factual activities screen', () => {
     }
   });
 
+  test('#148: a kept entry draft asks before Activities closes, and Discard closes it', () => {
+    const onClose = jest.fn();
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const hardwareBack = captureHardwareBack();
+    try {
+      render(<NavigationProvider initialTab="athlete"><ActivitiesScreen onClose={onClose} /></NavigationProvider>);
+      fireEvent.press(screen.getByRole('button', { name: 'Add an existing or one-off activity' }));
+      fireEvent.changeText(screen.getByLabelText('Activity name shown in the app'), 'Rock climbing');
+
+      expect(hardwareBack.press()).toBe(true);
+      expect(alert).not.toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
+
+      expect(hardwareBack.press()).toBe(true);
+      expect(alert).toHaveBeenCalledTimes(1);
+      expect(alert.mock.calls[0][0]).toBe('Discard this activity?');
+      expect(onClose).not.toHaveBeenCalled();
+
+      alert.mock.calls[0][2].find((button) => button.text === 'Discard').onPress();
+      expect(onClose).toHaveBeenCalledTimes(1);
+    } finally {
+      hardwareBack.restore();
+      alert.mockRestore();
+    }
+  });
+
   test('R2 hardware Back closes an open completion view before the entry form and keeps its typed minutes for that entry', () => {
     mockState.activityLedger = { ...emptyLedger, occurrences: [{
         occurrenceId: 'occurrence-plan', activityId: 'activity-1', displayName: 'Walk',
@@ -232,7 +258,11 @@ describe('WO-05 factual activities screen', () => {
       expect(hardwareBack.press()).toBe(true);
       expect(screen.queryByTestId('activity-entry-form')).toBeNull();
       expect(screen.getByTestId('activities-screen')).toBeOnTheScreen();
-      expect(hardwareBack.press()).toBe(false);
+      // #148: the kept entry draft is asked about before Activities closes.
+      const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+      expect(hardwareBack.press()).toBe(true);
+      expect(alert).toHaveBeenCalledTimes(1);
+      alert.mockRestore();
       expect(mockState.completeActivityOccurrence).not.toHaveBeenCalled();
     } finally {
       hardwareBack.restore();

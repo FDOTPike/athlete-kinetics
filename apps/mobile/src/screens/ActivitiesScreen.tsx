@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   ACTIVITY_DEMANDS,
   ACTIVITY_EQUIPMENT_KINDS,
@@ -282,13 +282,32 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
     }
   });
 
+  // #148: the kept or open entry lives only in this screen, so leaving
+  // Activities (BACK TO ATHLETE, or a later hardware Back) asks first.
+  const requestLeave = (): void => {
+    if (!formOpen && !entryDraftKept) {
+      onClose();
+      return;
+    }
+    Alert.alert(
+      'Discard this activity?',
+      'Your activity entry has not been saved.',
+      [
+        { text: 'Keep editing', style: 'cancel' },
+        { text: 'Discard', style: 'destructive', onPress: onClose },
+      ],
+      { cancelable: true },
+    );
+  };
+  useSubViewBack(!formOpen && entryDraftKept, requestLeave);
+
   return (
     <KeyboardAwareScrollView
       style={styles.screen}
       contentContainerStyle={styles.content}
       testID="activities-screen"
     >
-      <QuietAction label="BACK TO ATHLETE" onPress={onClose} accessibilityLabel="Back to athlete profile" />
+      <QuietAction label="BACK TO ATHLETE" onPress={requestLeave} accessibilityLabel="Back to athlete profile" />
       <Text accessibilityRole="header" style={styles.heading}>YOUR ACTIVITIES</Text>
       <Text style={styles.intro}>
         Record sport, walking, swimming, cycling, gym work, or another activity you already do.
