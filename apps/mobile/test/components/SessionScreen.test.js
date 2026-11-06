@@ -225,6 +225,22 @@ test('externally loaded movement keeps its normal load and 1RM suggestion', () =
   expect(screen.getByText('Based on your 100.0 kg 1RM')).toBeOnTheScreen();
 });
 
+test('issue #137: with no RPE aim, the first-time hint still names the prescribed reps', () => {
+  mockState = state({
+    movements: [
+      movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }),
+      movement(2, 'Later movement'),
+    ],
+    sessionPlan: [slot(1, 1, 14, { targetRpe: null }), slot(2, 2, 8)],
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+  });
+
+  render(<SessionScreen />);
+
+  expect(screen.getByText('First time on this one — pick a weight you could lift for all 14 reps with plenty left.')).toBeOnTheScreen();
+  expect(screen.queryByText(/about ten times/)).toBeNull();
+});
+
 test('seeded external load stays blank and cannot log until explicitly entered', () => {
   mockState = state({
     movements: [
