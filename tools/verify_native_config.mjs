@@ -43,10 +43,39 @@ const check = (label, ok, detail = '') => {
 // XML comments are not active configuration: a commented-out key must read as
 // absent, never as set (fail closed).
 const stripXmlComments = (xml) => xml.replace(/<!--[\s\S]*?-->/g, '');
+// Keys of the TOP-LEVEL plist dictionary only: a key nested in another
+// dictionary (NSAppTransportSecurity, UIApplicationSceneManifest) is not an
+// app-level setting and must read as absent (fail closed). Values: string
+// text, true/false, an array's inner XML, or the opening tag of anything else.
 const plistKeys = (xml) => {
   const out = new Map();
-  for (const m of stripXmlComments(xml).matchAll(/<key>([^<]+)<\/key>\s*(<string>([^<]*)<\/string>|<true\/>|<false\/>|<array>([\s\S]*?)<\/array>|<array\/>|<dict>)/g)) {
-    out.set(m[1], m[3] ?? (m[2] === '<true/>' ? true : m[2] === '<false/>' ? false : m[4] ?? m[2]));
+  const src = stripXmlComments(xml);
+  const tags = /<key>([^<]+)<\/key>|<string>([^<]*)<\/string>|<(dict|array)>|<\/(dict|array)>|<(true|false)\/>|<(?:dict|array|string)\/>|<(integer|real|date|data)>[^<]*<\/\6>/g;
+  let depth = 0; // 1 = inside the root dictionary
+  let pendingKey = null;
+  let arrayKey = null;
+  let arrayStart = 0;
+  for (const m of src.matchAll(tags)) {
+    const [whole, key, text, open, close, bool] = m;
+    if (key !== undefined) {
+      if (depth === 1) pendingKey = key;
+      continue;
+    }
+    const valueKey = depth === 1 ? pendingKey : null;
+    if (depth === 1) pendingKey = null;
+    if (open !== undefined) {
+      if (valueKey !== null && open === 'array') { arrayKey = valueKey; arrayStart = m.index + whole.length; }
+      else if (valueKey !== null) out.set(valueKey, whole);
+      depth += 1;
+    } else if (close !== undefined) {
+      depth -= 1;
+      if (depth === 1 && close === 'array' && arrayKey !== null) {
+        out.set(arrayKey, src.slice(arrayStart, m.index));
+        arrayKey = null;
+      }
+    } else if (valueKey !== null) {
+      out.set(valueKey, text ?? (bool === 'true' ? true : bool === 'false' ? false : whole === '<string/>' ? '' : whole));
+    }
   }
   return out;
 };
@@ -347,9 +376,28 @@ console.log('[N11] beta orientation lock (#168)');
   // sits directly above the activity (XML allows no comment inside a tag).
   check('Android MainActivity carries the large-screen scope note',
     /<!-- Locks portrait on phones \(< 600dp\); Android 16 \(API 36\) ignores portrait lock on >= 600dp tablets\/unfolded foldables, which are out of scope for the beta\. -->\s*<activity\s[^>]*android:name="\.MainActivity"/.test(rawManifest));
-  const orientations = (key) => [...String(plist.get(key) ?? '').matchAll(/<string>([^<]+)<\/string>/g)].map((m) => m[1]);
-  const iphone = orientations('UISupportedInterfaceOrientations');
-  check('iPhone supports portrait only', iphone.length === 1 && iphone[0] === 'UIInterfaceOrientationPortrait', iphone.join(','));
+  const orientationsIn = (keys, key) => [...String(keys.get(key) ?? '').matchAll(/<string>([^<]+)<\/string>/g)].map((m) => m[1]);
+  const orientations = (key) => orientationsIn(plist, key);
+  // iOS reads the device-qualified key over the plain one, so an iPhone
+  // override decides what an iPhone actually allows.
+  const iphoneOrientations = (keys) => orientationsIn(keys,
+    keys.has('UISupportedInterfaceOrientations~iphone') ? 'UISupportedInterfaceOrientations~iphone' : 'UISupportedInterfaceOrientations');
+  const portraitOnly = (list) => list.length === 1 && list[0] === 'UIInterfaceOrientationPortrait';
+  const iphone = iphoneOrientations(plist);
+  check('iPhone supports portrait only', portraitOnly(iphone), iphone.join(','));
+  // Falsifiers for the two ways the check above could pass on a plist that
+  // does not lock iPhone to portrait.
+  const fixture = (body) => `<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0">\n<dict>\n${body}\n</dict>\n</plist>\n`;
+  const portraitArray = '<array>\n<string>UIInterfaceOrientationPortrait</string>\n</array>';
+  const nestedOnly = plistKeys(fixture(
+    `<key>NSAppTransportSecurity</key>\n<dict>\n<key>UISupportedInterfaceOrientations</key>\n${portraitArray}\n</dict>`));
+  check('falsifier: an orientation key nested in another dictionary reads as absent, so the iPhone check fails',
+    !nestedOnly.has('UISupportedInterfaceOrientations') && !portraitOnly(iphoneOrientations(nestedOnly)));
+  const landscapeOverride = plistKeys(fixture(
+    `<key>UISupportedInterfaceOrientations</key>\n${portraitArray}\n`
+    + '<key>UISupportedInterfaceOrientations~iphone</key>\n<array>\n<string>UIInterfaceOrientationPortrait</string>\n<string>UIInterfaceOrientationLandscapeLeft</string>\n</array>'));
+  check('falsifier: a UISupportedInterfaceOrientations~iphone override with landscape fails the iPhone check',
+    !portraitOnly(iphoneOrientations(landscapeOverride)));
   const ipad = orientations('UISupportedInterfaceOrientations~ipad');
   check('iPad keeps portrait and both landscape orientations',
     ['UIInterfaceOrientationPortrait', 'UIInterfaceOrientationLandscapeLeft', 'UIInterfaceOrientationLandscapeRight']
