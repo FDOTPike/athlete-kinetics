@@ -8,8 +8,6 @@ import { fireEvent, render, screen } from '@testing-library/react-native';
 import BlockScreen, { pausedHeldText } from '../../src/screens/BlockScreen';
 import TodayScreen from '../../src/screens/TodayScreen';
 
-jest.setTimeout(30000);
-
 let mockState;
 
 jest.mock('@ak/inference', () => {
