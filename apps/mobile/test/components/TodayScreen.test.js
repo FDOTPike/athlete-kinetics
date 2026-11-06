@@ -617,8 +617,10 @@ describe('an extra session asks first', () => {
       fireEvent.press(screen.getByTestId(controlTestId));
       expect(mockState.startSession).not.toHaveBeenCalled();
       expect(alert).toHaveBeenCalledTimes(1);
-      const [title, , buttons] = alert.mock.calls[0];
+      const [title, message, buttons] = alert.mock.calls[0];
       expect(title).toBe('Start an extra session?');
+      // #165: an extra session stopped before any set is logged is discarded.
+      expect(message).toBe('It is unplanned. It is saved as its own session once you log a set.');
       expect(buttons.map((button) => button.text)).toEqual(['Not now', 'Start']);
       buttons[0].onPress?.();
       expect(mockState.startSession).not.toHaveBeenCalled();

@@ -187,7 +187,7 @@ function AvailableTodayScreen({
       setEmptyStartPromptOpen(true);
       return;
     }
-    Alert.alert('Start an extra session?', 'It is unplanned and is recorded as a session of its own.', [
+    Alert.alert('Start an extra session?', 'It is unplanned. It is saved as its own session once you log a set.', [
       { text: 'Not now', style: 'cancel' },
       { text: 'Start', onPress: startAndOpen },
     ]);
