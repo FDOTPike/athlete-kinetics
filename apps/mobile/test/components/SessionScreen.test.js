@@ -590,6 +590,33 @@ test('a beginner ceiling is the lower beginner ceiling, and a rehab ceiling of 7
   expect(screen.getByTestId('effort-above-ceiling-note')).toHaveTextContent('That was above your ceiling of 7.0. Next set, stop with 3 reps left.');
 });
 
+// Owner ruling on #206: "4+" is only a lower bound on reps left and the easiest
+// chip on the bar, so it gets no above-ceiling note. It still logs 6.0.
+test.each([5.0, 5.5])('the "4+" reps-left chip logs 6.0 but shows no above-ceiling note (ceiling %s)', (cap) => {
+  mockState = state({
+    profile: { training_age: 'intermediate', objective: 'strength', base_rpe_cap: cap, equipment_inventory: [], session_duration_cap_min: 60 },
+  });
+  render(<SessionScreen />);
+  fireEvent.press(screen.getByLabelText(/^4\+ clean reps left/i));
+  expect(screen.getByTestId('derived-rpe-display')).toHaveTextContent('Reported effort 6.0');
+  expect(screen.queryByTestId('effort-above-ceiling-note')).toBeNull();
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(mockState.logSet.mock.calls[0][3]).toBe(6);
+  expect(screen.queryByTestId('effort-above-ceiling-note')).toBeNull();
+});
+
+test.each([
+  [5.5, 'That was above your ceiling of 5.5. Next set, stop with 5 reps left.'],
+  [6.0, 'That was above your ceiling of 6.0. Next set, stop with 4 reps left.'],
+])('the "3" reps-left chip above a ceiling of %s still shows the note', (cap, note) => {
+  mockState = state({
+    profile: { training_age: 'intermediate', objective: 'strength', base_rpe_cap: cap, equipment_inventory: [], session_duration_cap_min: 60 },
+  });
+  render(<SessionScreen />);
+  fireEvent.press(screen.getByLabelText(/^3 clean reps left/i));
+  expect(screen.getByTestId('effort-above-ceiling-note')).toHaveTextContent(note);
+});
+
 // ---------------------------------------------------------------------------
 // §7.2 W1 — Unanchored RIR/RPE effort entry contract (Items 1–11)
 // ---------------------------------------------------------------------------

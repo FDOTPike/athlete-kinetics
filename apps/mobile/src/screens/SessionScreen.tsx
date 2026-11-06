@@ -572,7 +572,13 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
       ? clamp(Math.round(directRpe * 2) / 2, 5, 10)
       : null;
 
-  const ceilingNote = aboveCeilingNote(safeRpe, effectiveRpeCeiling(profile));
+  // "4+" is only a lower bound on reps left (6.0 or easier) and the easiest
+  // chip on the bar, so a "stop with N reps left" note could be false and no
+  // other chip could satisfy it: no note for it (owner ruling, #206). It still
+  // logs 6.0, and next-session easing is unchanged.
+  const ceilingNote = selectedChoice === '4+'
+    ? null
+    : aboveCeilingNote(safeRpe, effectiveRpeCeiling(profile));
 
   const runnerResting = runnerPhase === 'resting';
   const rest = runnerResting ? {
