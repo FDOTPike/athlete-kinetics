@@ -1,6 +1,6 @@
 /** Phase 17 utility-first active-session surface. */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type HostInstance } from 'react-native';
 import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING_NOTE, EFFORT_STOP_GUIDANCE, effortCue, mapRirToRpe, RIR_OPTIONS, PREPARATION_STATUS_LABEL, isTerminalPreparationStatus, preparationDoseUnit, type EffortAnswer, type RunnerHaltReason } from '@ak/inference';
 import { EXPERIENCE_SEVERITY, runnerTierForTrainingAge } from '../../../../packages/inference/src/sessionRunner';
 import { formatTeachingOnlyReason, freeFormStartIsEmpty, useStore, type LoadSelection, type LoggedSet, type SetLoadShown, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
@@ -495,6 +495,8 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   const currentSlot = runnerCurrentId !== null ? sessionPlan.find((slot) => slot.sessionPlanSlotId === runnerCurrentId) ?? fallback : fallback;
   const currentMovement: Movement | null = currentSlot === null ? null : byId.get(runnerCurrent?.movementId ?? currentSlot.movementId) ?? byId.get(currentSlot.movementId) ?? null;
   const currentLogged = currentSlot === null ? 0 : (runner !== null && (runner.slotIndex ?? -1) >= 0 && runner.slotSetCounts?.[runner.slotIndex] != null ? Math.max(loggedCount(currentSlot), runner.slotSetCounts[runner.slotIndex]) : loggedCount(currentSlot));
+
+
   const subTargetSlot = substitution === null
     ? null
     : (currentSlot !== null && currentSlot.movementId === substitution.targetId
@@ -513,6 +515,48 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   const runnerComplete = runnerPhase === 'complete';
   const halted = runnerPhase === 'halted' || (!runnerComplete && triageHalted);
   const complete = !halted && sessionPlan.length > 0 && (runnerComplete || allDone);
+
+  // Android walk 2026-11-03 (W6-4): after Log set, or when preparation ends, the
+  // workout scroll position stayed where it was, so the current card and its rest
+  // timer could sit off-screen. When the scroll key changes, one scroll is
+  // scheduled for after the next frame. It measures the current row fresh, so no
+  // stored position can be stale. Nothing scrolls when the session is halted or
+  // complete, while preparation is open, or when the current row is not on screen.
+  const scrollPreparationOpen = preparation !== null && preparation.sessionId === session?.sessionId
+    && !isTerminalPreparationStatus(preparation.status);
+  const currentRowRef = useRef<View | null>(null);
+  const scrollState = useRef({ halted, complete, preparationOpen: scrollPreparationOpen });
+  useEffect(() => {
+    scrollState.current = { halted, complete, preparationOpen: scrollPreparationOpen };
+  });
+  const currentSlotId = currentSlot?.sessionPlanSlotId ?? null;
+  const scrollKey = `${scrollPreparationOpen}|${runnerPhase}|${currentLogged}|${currentSlotId}`;
+  const lastScrollKey = useRef<string | null>(null);
+  useEffect(() => {
+    if (lastScrollKey.current === null) {
+      lastScrollKey.current = scrollKey;
+      return undefined;
+    }
+    if (lastScrollKey.current === scrollKey) return undefined;
+    lastScrollKey.current = scrollKey;
+    const frame = requestAnimationFrame(() => {
+      const now = scrollState.current;
+      const row = currentRowRef.current;
+      const scroller = timelineRef.current;
+      if (now.halted || now.complete || now.preparationOpen || row === null || scroller === null) return;
+      // The content view is a host ref, which Fabric's measureLayout requires (a node
+      // handle number is refused on the new architecture). Its y is content-relative.
+      // getInnerViewRef is on the runtime ScrollView (ScrollView.js) but not in the public typings.
+      const content = (scroller as ScrollView & { getInnerViewRef?: () => HostInstance | null }).getInnerViewRef?.() ?? null;
+      if (content === null) return;
+      row.measureLayout(
+        content,
+        (_x, y) => { scroller.scrollTo({ y: Math.max(0, y - theme.space[4]), animated: true }); },
+        () => undefined,
+      );
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [scrollKey]);
   const target = currentSlot === null ? null : targetFor(currentSlot);
   const oneRm = currentSlot === null ? undefined : oneRepMaxes[currentSlot.movementId];
   // P2-2 (Opus audit): bodyweightMode is true ONLY when the canonical first
@@ -1054,6 +1098,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   // to the halt card below (halting has already recorded preparation as stopped).
   const preparationOpen = preparation !== null && preparation.sessionId === session.sessionId
     && !isTerminalPreparationStatus(preparation.status);
+
   // Android walk (#213): the ramp sets read in kg when today's working load
   // for the ramped movement is known. It comes from the same resolver as the
   // set card, and only a load the app derived (from a 1RM or an override)
@@ -1200,7 +1245,10 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
         )}
 
         {!halted && !complete && sessionPlan.length > 0 && (
-          <View style={styles.timeline}>
+          <View
+            style={styles.timeline}
+            testID="session-timeline"
+          >
             {sessionPlan.map((slot) => {
               const movement = byId.get(slot.movementId);
               const fallbackVideoUrl = movement?.media?.status === 'external_fallback'
@@ -1229,6 +1277,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                   <View
                     key={slot.sessionPlanSlotId}
                     style={[styles.timelineRow, styles.replacedRow]}
+                   
                     accessibilityRole="text"
                     accessibilityLabel={swappedLabel}
                     accessibilityState={{ disabled: true }}
@@ -1338,7 +1387,12 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
 
               // Active slot
               return (
-                <View key={slot.sessionPlanSlotId} style={styles.timelineRow}>
+                <View
+                  key={slot.sessionPlanSlotId}
+                  style={styles.timelineRow}
+                  testID="session-current-row"
+                  ref={currentRowRef}
+                >
                   {/* Left Active Spine (Chalk marks CURRENT/ACTIVE only) */}
                   <View style={[styles.rail, styles.railActive]}>
                     <View style={[styles.dot, styles.dotCurrent]} />
@@ -1401,9 +1455,6 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                           >
                             Enter a load from 0 to 500 in 2.5 kg increments.
                           </Text>
-                        )}
-                        {!loadInvalid && !loadLoggable && (
-                          <Text style={styles.loadEvidence} testID="session-load-hint">Enter a load to log this set.</Text>
                         )}
                         {currentSlotBlockedReason !== null && (
                           <Text
@@ -1656,6 +1707,9 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                               ? `Log set ${Math.min(slot.plannedSets, currentLogged + 1)} for ${movement?.name ?? 'movement'}`
                               : `Log set ${Math.min(slot.plannedSets, currentLogged + 1)} for ${movement?.name ?? 'movement'}, unavailable — enter a load first`}
                         />
+                        {!loadInvalid && !loadLoggable && (
+                          <Text style={styles.loadEvidence} testID="session-load-hint">Enter a load to log this set.</Text>
+                        )}
 
                         {runner?.phase === 'working' && <QuietAction label="Skip this exercise" onPress={confirmSkipExercise} />}
 
