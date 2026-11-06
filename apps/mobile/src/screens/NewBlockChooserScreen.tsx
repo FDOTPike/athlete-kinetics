@@ -7,12 +7,17 @@ interface NewBlockChooserScreenProps {
   onSelectAuto: () => void;
   onSelectCustom: () => void;
   onCancel?: () => void;
+  /** True for a beginner: standalone routines unlock after the Beginner stage
+   *  (the same rule BlockScreen and the routine builder apply). Custom then
+   *  shows its reason and does not open the builder (issue #154). */
+  customLocked?: boolean;
 }
 
 export default function NewBlockChooserScreen({
   onSelectAuto,
   onSelectCustom,
   onCancel,
+  customLocked = false,
 }: NewBlockChooserScreenProps): React.JSX.Element {
   return (
     <ScrollView
@@ -44,19 +49,28 @@ export default function NewBlockChooserScreen({
           </Text>
         </Pressable>
 
-        {/* Mode 2: Custom */}
+        {/* Mode 2: Custom. Closed to a beginner: shown with the reason, not opened. */}
         <Pressable
-          style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-          onPress={onSelectCustom}
+          style={({ pressed }) => [styles.card, pressed && !customLocked && styles.cardPressed, customLocked && styles.cardLocked]}
+          onPress={customLocked ? undefined : onSelectCustom}
           accessibilityRole="button"
-          accessibilityLabel="Custom: You choose every movement, day by day. Full control — you'll need to know what you're doing."
+          accessibilityState={{ disabled: customLocked }}
+          accessibilityLabel={customLocked
+            ? 'Custom: not available yet. Standalone routines unlock after the Beginner stage.'
+            : "Custom: You choose every movement, day by day. Full control — you'll need to know what you're doing."}
         >
           <View style={styles.cardHeaderRow}>
             <Text style={styles.modeName}>Custom</Text>
           </View>
-          <Text style={styles.modeBlurb}>
-            You choose every movement, day by day. Full control — you'll need to know what you're doing.
-          </Text>
+          {customLocked ? (
+            <Text style={styles.modeBlurb}>
+              Not available yet. Standalone routines unlock after the Beginner stage.
+            </Text>
+          ) : (
+            <Text style={styles.modeBlurb}>
+              You choose every movement, day by day. Full control — you'll need to know what you're doing.
+            </Text>
+          )}
         </Pressable>
       </View>
 
@@ -90,6 +104,9 @@ const styles = StyleSheet.create({
   cardPressed: {
     borderColor: theme.color.textMid,
     backgroundColor: theme.color.ink1,
+  },
+  cardLocked: {
+    opacity: 0.6,
   },
   cardHeaderRow: {
     flexDirection: 'row',

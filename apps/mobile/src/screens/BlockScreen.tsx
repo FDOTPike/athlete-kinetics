@@ -421,6 +421,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
   if (showChooser) {
     return (
       <NewBlockChooserScreen
+        customLocked={profile.training_age === 'beginner'}
         onSelectAuto={() => {
           setShowChooser(false);
           setEditingProgram(true);
