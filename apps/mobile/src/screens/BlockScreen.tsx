@@ -420,10 +420,15 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
   };
 
   // #169: what this block's plan does from week to week, from its own slots.
+  // A session whose slots cannot be read adds nothing: the phase card then
+  // falls back to the glossary text instead of breaking the Plan tab.
   const weekTotals = useMemo(() => (block === null || typeof loadSessionSlots !== 'function' ? [] : blockWeekTotals(
-    blockSessions.flatMap((summary) => loadSessionSlots(summary.plannedSessionId).map((slot) => ({
-      week: summary.weekIndex, phase: summary.phase, sets: slot.sets, targetRpe: slot.targetRpe,
-    }))),
+    blockSessions.flatMap((summary) => {
+      const slots: unknown = loadSessionSlots(summary.plannedSessionId);
+      return Array.isArray(slots) ? (slots as TodaySlot[]).map((slot) => ({
+        week: summary.weekIndex, phase: summary.phase, sets: slot.sets, targetRpe: slot.targetRpe,
+      })) : [];
+    }),
   // eslint-disable-next-line react-hooks/exhaustive-deps
   )), [block, blockSessions]);
 
