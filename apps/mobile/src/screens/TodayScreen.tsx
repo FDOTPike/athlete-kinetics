@@ -85,7 +85,14 @@ export default function TodayScreen(props: TodayScreenProps): React.JSX.Element 
   const narrowScopeOnly = decision.status === 'held' && typeof state.isBroadHoldFromNarrowScopes === 'function'
     ? state.isBroadHoldFromNarrowScopes(movementIds, decision)
     : false;
-  if (state.status !== 'booting' && decision.status !== 'available') return <HeldScreenWithHalt lastTriage={state.lastTriage}>
+  // #177: the held Today screen names the active athlete in Coach mode too.
+  const heldAthleteName = coachModeAthleteName(state.athletes, state.activeAthleteId);
+  if (state.status !== 'booting' && decision.status !== 'available') return <HeldScreenWithHalt
+    lastTriage={state.lastTriage}
+    header={heldAthleteName !== null
+      ? <Text style={styles.eyebrow} testID="today-active-athlete">Athlete: {heldAthleteName}</Text>
+      : undefined}
+  >
     <TrainingSupportNotice
       unavailable={decision.status === 'support_unavailable'} narrowScopeOnly={narrowScopeOnly} onOpenSession={state.session !== null ? props.onOpenSession : undefined} />
   </HeldScreenWithHalt>;

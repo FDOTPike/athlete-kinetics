@@ -94,13 +94,19 @@ function CenteredState({ children }: { children: React.ReactNode }): React.JSX.E
  * above it: both can be active at once, and the halt is the stronger message.
  * Reuses the existing halt copy only.
  */
-export function HeldScreenWithHalt({ lastTriage, children }: {
+export function HeldScreenWithHalt({ lastTriage, header, children }: {
   lastTriage: ReturnType<typeof useStore.getState>['lastTriage'];
+  /** Shown above everything else, halt card included (Today's Coach-mode athlete name, #177). */
+  header?: React.ReactNode;
   children: React.ReactNode;
 }): React.JSX.Element {
-  if (lastTriage === null || lastTriage.kind !== 'matched' || !lastTriage.directive.halt) return <>{children}</>;
+  if (lastTriage === null || lastTriage.kind !== 'matched' || !lastTriage.directive.halt) {
+    // No scroll container here, so the header gets the notice's own side padding.
+    return <>{header !== undefined && <View style={{ paddingHorizontal: theme.space[4], paddingTop: theme.space[4] }}>{header}</View>}{children}</>;
+  }
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.contentContainer}>
+      {header}
       <View style={[styles.card, styles.cardActiveSpine]} testID="held-screen-halt-card">
         <View style={styles.statusBadge}>
           <Text style={styles.statusBadgeText}>{HALT_META.label.toUpperCase()}</Text>

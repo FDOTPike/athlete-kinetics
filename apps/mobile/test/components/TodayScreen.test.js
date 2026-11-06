@@ -655,4 +655,39 @@ describe('#177: Today names the active athlete only in Coach mode', () => {
     render(<TodayScreen />);
     expect(screen.queryByTestId('today-active-athlete')).toBeNull();
   });
+
+  const heldDecision = () => ({ status: 'held', holdIds: ['h1'] });
+  const twoAthletes = {
+    athletes: [{ id: 'default', name: 'Default Athlete' }, { id: 'ath-2', name: 'Sam' }],
+    activeAthleteId: 'ath-2',
+  };
+
+  test('with two athletes, the held Today screen also names the active one', () => {
+    mockState = baseState({ ...twoAthletes, getTrainingSupportDecision: heldDecision });
+    render(<TodayScreen />);
+    expect(screen.getByTestId('training-support-notice')).toBeOnTheScreen();
+    expect(screen.getByTestId('today-active-athlete')).toHaveTextContent('Athlete: Sam');
+  });
+
+  test('with two athletes, the held Today screen with a safety halt names the active one', () => {
+    mockState = baseState({
+      ...twoAthletes,
+      getTrainingSupportDecision: heldDecision,
+      lastTriage: { kind: 'matched', directive: { halt: true, vector: { coaching_cue: 'Stop and rest.' } } },
+    });
+    render(<TodayScreen />);
+    expect(screen.getByTestId('held-screen-halt-card')).toBeOnTheScreen();
+    expect(screen.getByTestId('today-active-athlete')).toHaveTextContent('Athlete: Sam');
+  });
+
+  test('with one athlete, the held Today screen names no one', () => {
+    mockState = baseState({
+      athletes: [{ id: 'default', name: 'Default Athlete' }],
+      activeAthleteId: 'default',
+      getTrainingSupportDecision: heldDecision,
+    });
+    render(<TodayScreen />);
+    expect(screen.getByTestId('training-support-notice')).toBeOnTheScreen();
+    expect(screen.queryByTestId('today-active-athlete')).toBeNull();
+  });
 });

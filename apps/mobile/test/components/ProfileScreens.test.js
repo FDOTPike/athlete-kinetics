@@ -1096,14 +1096,14 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       render(<ProfileScreen />);
       expect(screen.getByText('ATHLETE PROFILE')).toBeOnTheScreen();
       expect(screen.getByTestId('profile-active-athlete')).toHaveTextContent('Default Athlete');
-    }, 30000);
+    });
 
     test('with one athlete, Profile names no one', () => {
       mockState.athletes = [{ id: 'default', name: 'Default Athlete' }];
       render(<ProfileScreen />);
       expect(screen.getByText('ATHLETE PROFILE')).toBeOnTheScreen();
       expect(screen.queryByTestId('profile-active-athlete')).toBeNull();
-    }, 30000);
+    });
   });
 });
 
