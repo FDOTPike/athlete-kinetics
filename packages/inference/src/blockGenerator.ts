@@ -137,6 +137,13 @@ export interface GeneratorMovement {
    *
    *  Absent means NO declared intent and fails closed to the loaded path. */
   plannedImplement?: MovementPrefix;
+  /** #228 (owner ruling, Option B): true when the movement's supported
+   *  implements (movement_detail.supported_prefixes, the dropdown DOMAIN)
+   *  include 'Bodyweight'. It is never a declaration and never read as one; it
+   *  only says that an undeclared `plannedImplement` could still be bodyweight.
+   *  Read by main-lift spacing alone (`isLoadedForSpacing`). Absent = not known,
+   *  and an undeclared movement then keeps failing closed to loaded. */
+  bodyweightSupported?: boolean;
   /** L2(b): the capability chain this movement belongs to (movement_progression),
    *  or undefined when it is on no chain. Supplied as a typed planning input so
    *  the pure engine never reads the database (work order §7.3). */
@@ -163,6 +170,18 @@ export interface GeneratorMovement {
  *  channel, so an effort ramp alone is unobservable to the athlete. */
 export const isPurelyBodyweight = (m: GeneratorMovement): boolean =>
   m.plannedImplement === 'Bodyweight';
+
+/** Main-lift spacing's loading class (#228, owner ruling Option B). A planned
+ *  implement decides it: anything but 'Bodyweight' is loaded. A movement whose
+ *  implement is undeclared counts as loaded only when it cannot be done with
+ *  bodyweight at all (Dumbbell Bench Press, Competition Bench); one that can
+ *  (Push-up with no declared load) is not loaded, so it never replaces a
+ *  loaded main lift until the athlete declares an external load for it.
+ *  Dose routing is unaffected: it still reads `isPurelyBodyweight`. */
+export const isLoadedForSpacing = (m: GeneratorMovement): boolean =>
+  m.plannedImplement !== undefined
+    ? m.plannedImplement !== 'Bodyweight'
+    : m.bodyweightSupported !== true;
 
 export type BlockFocus = 'lower' | 'upper' | 'full' | 'conditioning' | 'bjj';
 export type BlockPhase = 'accumulation' | 'intensification' | 'realization' | 'deload';
@@ -1544,6 +1563,9 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
         // replacement follows the Round 5 competition-lift exclusion. The
         // highest-ranked qualifying non-competition movement is taken; a
         // competition lift is only the fallback when none qualifies.
+        // Owner ruling on #228 (Option B): the loading class is
+        // `isLoadedForSpacing`, so a movement that could be bodyweight and has
+        // no declared load (Push-up) never stands in for a loaded main lift.
         const mainSlot = (slots.length + 1) < ACCESSORY_SLOT_FROM;
         let spacedChoice: GeneratorMovement | null = null;
         if (mainSlot && coachDefault !== null && preferredMovement === undefined && goalMovement === undefined
@@ -1553,7 +1575,7 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
             const candidate = pool.find((entry) => entry.movement_id === id);
             if (candidate === undefined || candidate.pattern !== pattern || usedIds.has(id)) continue;
             if (neighbourMainLifts.has(id) || PREPARATION_HELD_MOVEMENT_IDS.has(id)) continue;
-            if (isPurelyBodyweight(candidate) !== isPurelyBodyweight(coachDefault)) continue;
+            if (isLoadedForSpacing(candidate) !== isLoadedForSpacing(coachDefault)) continue;
             if (candidate.is_compound !== coachDefault.is_compound) continue;
             if (profile.objective === 'hypertrophy' && ANCHOR_MOVEMENT_NAMES.includes(candidate.name)) {
               competitionFallback ??= candidate;

@@ -4476,6 +4476,9 @@ export const useStore = create<KineticsStore>()((set, get) => {
       // L1(a) 2026-08-29: the implement PLANNED for the slot, never dropdown
       // order. Ambiguous movements stay undeclared and fail closed to loaded.
       plannedImplement: plannedImplementFor(m, declaredIntents, profile.equipment_inventory),
+      // #228 (Option B): domain membership only, read by main-lift spacing so
+      // an undeclared movement that could be bodyweight is not counted loaded.
+      bodyweightSupported: m.supportedPrefixes.includes('Bodyweight'),
       // L2(b): chain membership and the chain's own bar, as typed inputs.
       progressionGroup: chainInputs.get(m.movement_id)?.group,
       chainAdvancementReps: chainInputs.get(m.movement_id)?.bar,
@@ -4637,6 +4640,9 @@ export const useStore = create<KineticsStore>()((set, get) => {
       // L1(a) 2026-08-29: the implement PLANNED for the slot, never dropdown
       // order. Ambiguous movements stay undeclared and fail closed to loaded.
       plannedImplement: plannedImplementFor(m, declaredIntents, profile.equipment_inventory),
+      // #228 (Option B): domain membership only, read by main-lift spacing so
+      // an undeclared movement that could be bodyweight is not counted loaded.
+      bodyweightSupported: m.supportedPrefixes.includes('Bodyweight'),
       // L2(b): chain membership and the chain's own bar, as typed inputs.
       progressionGroup: chainInputs.get(m.movement_id)?.group,
       chainAdvancementReps: chainInputs.get(m.movement_id)?.bar,

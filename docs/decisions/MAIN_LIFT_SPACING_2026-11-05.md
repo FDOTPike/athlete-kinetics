@@ -18,7 +18,12 @@ Issue: #228
   - have the same movement pattern;
   - be in the same gated pool (every gate still applies: equipment, tier,
     capability, niggles and attestation);
-  - have the same loading class (loaded or strictly bodyweight);
+  - have the same loading class (loaded or strictly bodyweight; a movement
+    whose implement is undeclared and that can be done with bodyweight, such
+    as Push-up, counts as loaded only when the athlete has declared a load
+    for it. The store tells the generator whether Bodyweight is one of a
+    movement's supported implements; that is never read as a declaration,
+    and dose routing does not use it);
   - have the same compound class;
   - not be held for preparation;
   - not be a main lift on either neighbouring day.
@@ -58,9 +63,10 @@ Issue: #228
   does not pick a competition lift (advanced, 7 days: Goblet Squat, not
   Competition Squat, for Front Squat), across 2 to 7 days a week and both
   tiers;
-- in a hypertrophy plan where no non-competition movement qualifies (Push-up
-  planned as strictly bodyweight), spacing falls back to Competition Bench
-  for Dumbbell Bench Press rather than repeating it;
+- in a hypertrophy plan where no loaded non-competition movement qualifies
+  (Push-up has an undeclared implement and no athlete-declared load), spacing
+  falls back to Competition Bench for Dumbbell Bench Press rather than
+  repeating it, and selects Push-up when the athlete declares a load for it;
 - a spacing replacement on a capability chain is prescribed its chain rep
   floor when the main lift it replaces is off-chain.
 

@@ -94,6 +94,9 @@ const movements = db.prepare(
     const p = JSON.parse(r.prefixes_json ?? '[]');
     return p.length === 1 ? p[0] : undefined;
   })(),
+  // #228 (Option B): the store's domain flag — 'Bodyweight' is one of the
+  // movement's supported implements. Membership, never a declaration.
+  bodyweightSupported: JSON.parse(r.prefixes_json ?? '[]').includes('Bodyweight'),
   // L2(b): this 001-015 fixture predates movement_progression, so it cannot
   // resolve real chain membership. It declares every movement a chain member so
   // the sections below keep exercising FLOOR MECHANICS. Chain SCOPING — that an
@@ -2724,17 +2727,26 @@ console.log('[MAIN_LIFT_SPACING] no same main lift on back-to-back days');
   // the same pattern, loading class and compound class when one qualifies, and
   // falls back to a competition lift only when none does.
   const { ANCHOR_MOVEMENT_NAMES } = require('./.build/movementRanking.js');
-  const { isPurelyBodyweight } = require('./.build/blockGenerator.js');
   const byName = (name) => movements.find((m) => m.name === name);
   const spacingSwaps = (plan) => plan.warnings
     .map((w) => /^[a-z]+: (.+) planned instead of (.+), the main lift the day before or after$/.exec(w))
     .filter((match) => match !== null)
     .map(([, chosen, instead]) => ({ chosen, instead }));
+  // #228 owner ruling (Option B): for spacing, a planned implement other than
+  // Bodyweight is loaded. A movement with an undeclared implement that could
+  // be done with bodyweight (Push-up with no declared load) is not loaded;
+  // one whose every supported implement is external (Dumbbell Bench Press:
+  // BB or DB) still is. Written out here from the ruling and the library's
+  // own supported implements rather than imported, so the check does not
+  // restate the code under test.
+  const loadedForSpacing = (m) => (m.plannedImplement !== undefined
+    ? m.plannedImplement !== 'Bodyweight'
+    : !(prefixesById.get(m.movement_id) ?? []).includes('Bodyweight'));
   const sameClassNonCompetition = (name, pool = movements) => {
     const original = pool.find((m) => m.name === name);
     return pool.filter((m) => m.movement_id !== original.movement_id
       && m.pattern === original.pattern && m.is_compound === original.is_compound
-      && isPurelyBodyweight(m) === isPurelyBodyweight(original)
+      && loadedForSpacing(m) === loadedForSpacing(original)
       && !ANCHOR_MOVEMENT_NAMES.includes(m.name)).map((m) => m.name);
   };
 
@@ -2779,6 +2791,40 @@ console.log('[MAIN_LIFT_SPACING] no same main lift on back-to-back days');
     spacingSwaps(constrained).some((swap) => swap.chosen === 'Competition Bench' && swap.instead === 'Dumbbell Bench Press')
       && backToBackRepeats(constrained).length === 0,
     spacingSwaps(constrained).map((swap) => `${swap.chosen} for ${swap.instead}`).join('; ') || 'no swap');
+
+  // #228 owner ruling (Option B): the walk's own pool. Push-up supports
+  // Bodyweight and Banded, so with nothing declared its implement is
+  // undeclared, and for spacing it does not count as loaded. No loaded
+  // non-competition movement qualifies for Dumbbell Bench Press, so the
+  // fallback is Competition Bench, not Push-up. The swap lands on the full
+  // day that follows the upper day, so the note carries that session's focus.
+  const walkNote = 'full: Competition Bench planned instead of Dumbbell Bench Press, the main lift the day before or after';
+  const benchId = byName('Competition Bench').movement_id;
+  check('walk spacing premise: Push-up has no declared load, and no loaded non-competition movement qualifies for Dumbbell Bench Press',
+    byName('Push-up').plannedImplement === undefined && byName('Push-up').bodyweightSupported === true
+      && sameClassNonCompetition('Dumbbell Bench Press').length === 0,
+    `Push-up=${String(byName('Push-up').plannedImplement)}; ${sameClassNonCompetition('Dumbbell Bench Press').join(', ')}`);
+  check('walk (advanced hypertrophy, 5 days): Competition Bench, not Push-up, replaces Dumbbell Bench Press, and the note names it',
+    spacingSwaps(walk).some((swap) => swap.chosen === 'Competition Bench' && swap.instead === 'Dumbbell Bench Press')
+      && !spacingSwaps(walk).some((swap) => swap.chosen === 'Push-up')
+      && walk.warnings.includes(walkNote)
+      && walk.sessions.some((s) => s.focus === 'full' && mainIds(s).includes(benchId))
+      && backToBackRepeats(walk).length === 0,
+    walk.warnings.filter((w) => /main lift the day before/.test(w)).join('; ') || 'no swap');
+
+  // The same input with a load declared for Push-up (Banded, one of its
+  // supported implements): Push-up now counts as loaded and is the
+  // non-competition replacement, ahead of Competition Bench.
+  const pushUpDeclared = movements.map((m) => (m.name === 'Push-up' ? { ...m, plannedImplement: 'Banded' } : m));
+  const declaredWalk = generateBlock({
+    profile: prof({ objective: 'hypertrophy', training_age: 'advanced', weekly_frequency: 5, session_duration_cap_min: 75 }),
+    movements: pushUpDeclared, startDate: START,
+  });
+  check('walk with a declared load on Push-up: Push-up, not Competition Bench, replaces Dumbbell Bench Press',
+    spacingSwaps(declaredWalk).some((swap) => swap.chosen === 'Push-up' && swap.instead === 'Dumbbell Bench Press')
+      && !spacingSwaps(declaredWalk).some((swap) => swap.chosen === 'Competition Bench')
+      && backToBackRepeats(declaredWalk).length === 0,
+    spacingSwaps(declaredWalk).map((swap) => `${swap.chosen} for ${swap.instead}`).join('; ') || 'no swap');
 
   // #228 owner ruling (Option A on the dose): the spacing replacement is
   // prescribed as that movement normally is. A replacement on a capability
