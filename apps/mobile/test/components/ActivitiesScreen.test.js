@@ -203,7 +203,27 @@ describe('WO-05 factual activities screen', () => {
     }
   });
 
-  test('#148: a kept entry draft asks before Activities closes, and Discard closes it', () => {
+  test('#148 an untouched entry closes without a question, and Back then goes to the host', () => {
+    const onClose = jest.fn();
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const hardwareBack = captureHardwareBack();
+    try {
+      render(<NavigationProvider initialTab="athlete"><ActivitiesScreen onClose={onClose} /></NavigationProvider>);
+      fireEvent.press(screen.getByRole('button', { name: 'Add an existing or one-off activity' }));
+
+      expect(hardwareBack.press()).toBe(true);
+      expect(screen.queryByTestId('activity-entry-form')).toBeNull();
+      // Nothing was typed: this screen does not take the Back, so the host closes it as before.
+      expect(hardwareBack.press()).toBe(false);
+      expect(alert).not.toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
+    } finally {
+      hardwareBack.restore();
+      alert.mockRestore();
+    }
+  });
+
+  test('#148 an edited entry asks before Activities closes, and Discard closes it', () => {
     const onClose = jest.fn();
     const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     const hardwareBack = captureHardwareBack();
@@ -223,6 +243,43 @@ describe('WO-05 factual activities screen', () => {
 
       alert.mock.calls[0][2].find((button) => button.text === 'Discard').onPress();
       expect(onClose).toHaveBeenCalledTimes(1);
+    } finally {
+      hardwareBack.restore();
+      alert.mockRestore();
+    }
+  });
+
+  test('#148 an untouched EDIT SCHEDULE leaves quietly, and an edited one asks first', () => {
+    mockState.activityLedger = {
+      ...emptyLedger,
+      definitions: [{
+        activityId: 'activity-1', kindId: 'walking', displayName: 'Walk', demand: 'low',
+        facilities: [], equipment: [],
+      }],
+      series: [{
+        seriesId: 'series-1', activityId: 'activity-1', displayName: 'Walk', revision: 1,
+        localWeekday: 5, localStartMinute: null, timezoneId: 'Australia/Sydney', timing: 'flexible',
+        expectedDurationMin: 30, expectedEffort: null, effectiveStartDate: '2026-09-01', effectiveEndDate: null,
+      }],
+      scheduledKnownMinutesPerWeek: 30,
+    };
+    const onClose = jest.fn();
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const hardwareBack = captureHardwareBack();
+    try {
+      render(<NavigationProvider initialTab="athlete"><ActivitiesScreen onClose={onClose} /></NavigationProvider>);
+      fireEvent.press(screen.getByRole('button', { name: 'Edit weekly schedule for Walk' }));
+      expect(hardwareBack.press()).toBe(true);
+      expect(alert).not.toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
+
+      fireEvent.press(screen.getByRole('button', { name: 'Edit weekly schedule for Walk' }));
+      fireEvent.changeText(screen.getByLabelText('Whole activity duration in minutes'), '45');
+      expect(hardwareBack.press()).toBe(true);
+      expect(hardwareBack.press()).toBe(true);
+      expect(alert).toHaveBeenCalledTimes(1);
+      expect(alert.mock.calls[0][0]).toBe('Discard this activity?');
+      expect(onClose).not.toHaveBeenCalled();
     } finally {
       hardwareBack.restore();
       alert.mockRestore();
@@ -258,11 +315,7 @@ describe('WO-05 factual activities screen', () => {
       expect(hardwareBack.press()).toBe(true);
       expect(screen.queryByTestId('activity-entry-form')).toBeNull();
       expect(screen.getByTestId('activities-screen')).toBeOnTheScreen();
-      // #148: the kept entry draft is asked about before Activities closes.
-      const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
-      expect(hardwareBack.press()).toBe(true);
-      expect(alert).toHaveBeenCalledTimes(1);
-      alert.mockRestore();
+      expect(hardwareBack.press()).toBe(false);
       expect(mockState.completeActivityOccurrence).not.toHaveBeenCalled();
     } finally {
       hardwareBack.restore();
