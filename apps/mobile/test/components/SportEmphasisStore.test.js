@@ -350,7 +350,7 @@ describe('a new block is planned with the focus, goal, sport and workload', () =
     createProgram();
     const withSchedule = weekOne();
     expect(state().blockEmphasis.report.applied.join(' '))
-      .toMatch(/Sport workload: 3 weekly sessions in your Activities schedule \(Club training\)\. To leave room for it, each accessory exercise has one fewer set\./);
+      .toMatch(/Sport workload: 3 weekly sessions in your Activities schedule \(Club training\)\. To leave room for it, most accessory exercises have one fewer set \(down to at least one set; goal-linked, locomotion, non-strength-day, and deload sets are kept\)\./);
 
     state().switchAthlete('athlete-b');
     await settle();

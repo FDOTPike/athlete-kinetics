@@ -329,7 +329,7 @@ describe('the plan explains itself', () => {
     expect(applied[0]).toBe('Focus — Beach muscles: upper chest, biceps, triceps.');
     expect(applied.join(' ')).toMatch(/is planned instead of .+: it trains upper chest directly \(your focus\)\./);
     expect(applied.join(' ')).toMatch(/Basketball — jump higher: Extra leg-strength work/);
-    expect(applied.join(' ')).toMatch(/Sport workload: 3 practice sessions and 0 matches a week, as you told the app\. To leave room for it, each accessory exercise has one fewer set\./);
+    expect(applied.join(' ')).toMatch(/Sport workload: 3 practice sessions and 0 matches a week, as you told the app\. To leave room for it, most accessory exercises have one fewer set \(down to at least one set; goal-linked, locomotion, non-strength-day, and deload sets are kept\)\./);
     expect(omitted.join(' ')).toMatch(/no jump or plyometric drills yet/);
     expect(screen.getByText('Safety, your equipment, your experience level and your session length always come first.')).toBeTruthy();
     // Nothing has been created by looking.
@@ -378,8 +378,8 @@ describe('the profile sport panel', () => {
       .toBe('Ice hockey — keep training and playing without long breaks. Played: more than 5 years.');
     // #176: said of the next block, in the future tense; nothing has changed yet.
     expect(screen.getByTestId('profile-sport-workload').props.children)
-      .toMatch(/^Sport workload: 4 practice sessions and 1 match a week, as you told the app\. That is a very full week, so your next block will have two fewer sets on each accessory exercise/);
-    expect(screen.getByTestId('profile-sport-workload').props.children).not.toMatch(/ has two fewer sets/);
+      .toMatch(/^Sport workload: 4 practice sessions and 1 match a week, as you told the app\. That is a very full week, so your next block will have up to two fewer sets on most accessory exercises \(down to at least one set; goal-linked, locomotion, non-strength-day, and deload sets are kept\), and its week 3 will repeat week 2/);
+    expect(screen.getByTestId('profile-sport-workload').props.children).not.toMatch(/ has two fewer sets| exercises have up to two fewer sets/);
     expect(plan()).toBe(before);
 
     // #176: removing asks first and says what will change.

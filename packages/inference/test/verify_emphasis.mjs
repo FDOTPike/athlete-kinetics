@@ -221,11 +221,24 @@ console.log('[3] scheduled sport workload');
   // already changed.
   check('the next-block wording is future tense and says the same thing as the plan wording',
     [0, 2, 3, 5].every((n) => /^Sport workload: /.test(effect(n).nextBlockExplanation))
-      && /your next block will have one fewer set on each accessory exercise\. Its main lifts and weekly progression will be unchanged\./.test(effect(3).nextBlockExplanation)
-      && /your next block will have two fewer sets on each accessory exercise, and its week 3 will repeat week 2 instead of stepping up/.test(effect(5).nextBlockExplanation)
+      && /your next block will have one fewer set on most accessory exercises \(down to at least one set; goal-linked, locomotion, non-strength-day, and deload sets are kept\)\. Its main lifts and weekly progression will be unchanged\./.test(effect(3).nextBlockExplanation)
+      && /your next block will have up to two fewer sets on most accessory exercises \(down to at least one set; goal-linked, locomotion, non-strength-day, and deload sets are kept\), and its week 3 will repeat week 2 instead of stepping up/.test(effect(5).nextBlockExplanation)
       && /That will not change your next block\./.test(effect(2).nextBlockExplanation)
-      && [0, 2, 3, 5].every((n) => !/ has (one|two) fewer set| are unchanged\.| does not change the gym plan/.test(effect(n).nextBlockExplanation))
+      && [0, 2, 3, 5].every((n) => !/ has (one|two) fewer set| exercises have (up to )?(one|two) fewer set| are unchanged\.| does not change the gym plan/.test(effect(n).nextBlockExplanation))
       && !/main lifts and weekly progression will be unchanged/i.test(effect(5).nextBlockExplanation));
+  // Owner ruling on #176: the cut skips non-strength days, the deload week,
+  // goal-linked and locomotion slots, and never goes below one set, so neither
+  // wording promises it on "each" accessory exercise.
+  {
+    const lead = `Sport workload: ${fromStated.description}.`;
+    const kept = '(down to at least one set; goal-linked, locomotion, non-strength-day, and deload sets are kept)';
+    check('the high and very high wording says "most accessory exercises" and names what is kept',
+      effect(3).explanation === `${lead} To leave room for it, most accessory exercises have one fewer set ${kept}. Your main lifts and the weekly progression are unchanged.`
+        && effect(3).nextBlockExplanation === `${lead} To leave room for it, your next block will have one fewer set on most accessory exercises ${kept}. Its main lifts and weekly progression will be unchanged.`
+        && effect(5).explanation === `${lead} That is a very full week, so most accessory exercises have up to two fewer sets ${kept}, and week 3 of the block repeats week 2 instead of stepping up — for every exercise, your main lifts included. Your main lifts keep their exercises and their sets.`
+        && effect(5).nextBlockExplanation === `${lead} That is a very full week, so your next block will have up to two fewer sets on most accessory exercises ${kept}, and its week 3 will repeat week 2 instead of stepping up — for every exercise, your main lifts included. Your main lifts will keep their exercises and their sets.`
+        && [3, 5].every((n) => !/each accessory exercise/.test(effect(n).explanation + effect(n).nextBlockExplanation)));
+  }
   check('no cross-sport load score is computed: the workload carries sessions and minutes only',
     Object.keys(fromSchedule).sort().join(',') === 'description,knownMinutesPerWeek,sessionsPerWeek,source,tier,unknownDurationSessions,weekdays');
 }

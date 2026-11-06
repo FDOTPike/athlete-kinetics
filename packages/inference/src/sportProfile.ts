@@ -541,15 +541,15 @@ export function sportWorkloadEffect(workload: SportWorkload): SportWorkloadEffec
       return {
         accessorySetCut: 2,
         holdHardestWeek: true,
-        explanation: `${lead} That is a very full week, so each accessory exercise has two fewer sets, and week 3 of the block repeats week 2 instead of stepping up — for every exercise, your main lifts included. Your main lifts keep their exercises and their sets.`,
-        nextBlockExplanation: `${lead} That is a very full week, so your next block will have two fewer sets on each accessory exercise, and its week 3 will repeat week 2 instead of stepping up — for every exercise, your main lifts included. Your main lifts will keep their exercises and their sets.`,
+        explanation: `${lead} That is a very full week, so most accessory exercises have up to two fewer sets (down to at least one set; goal-linked, locomotion, non-strength-day, and deload sets are kept), and week 3 of the block repeats week 2 instead of stepping up — for every exercise, your main lifts included. Your main lifts keep their exercises and their sets.`,
+        nextBlockExplanation: `${lead} That is a very full week, so your next block will have up to two fewer sets on most accessory exercises (down to at least one set; goal-linked, locomotion, non-strength-day, and deload sets are kept), and its week 3 will repeat week 2 instead of stepping up — for every exercise, your main lifts included. Your main lifts will keep their exercises and their sets.`,
       };
     case 'high':
       return {
         accessorySetCut: 1,
         holdHardestWeek: false,
-        explanation: `${lead} To leave room for it, each accessory exercise has one fewer set. Your main lifts and the weekly progression are unchanged.`,
-        nextBlockExplanation: `${lead} To leave room for it, your next block will have one fewer set on each accessory exercise. Its main lifts and weekly progression will be unchanged.`,
+        explanation: `${lead} To leave room for it, most accessory exercises have one fewer set (down to at least one set; goal-linked, locomotion, non-strength-day, and deload sets are kept). Your main lifts and the weekly progression are unchanged.`,
+        nextBlockExplanation: `${lead} To leave room for it, your next block will have one fewer set on most accessory exercises (down to at least one set; goal-linked, locomotion, non-strength-day, and deload sets are kept). Its main lifts and weekly progression will be unchanged.`,
       };
     case 'light':
       return {
