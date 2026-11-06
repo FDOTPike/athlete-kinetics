@@ -700,7 +700,7 @@ export default function OnboardingScreen(): React.JSX.Element {
             {limitsAnswered === true && (
               <View>
                 <Text style={styles.fieldLabel}>PAST INJURIES</Text>
-                <Text style={styles.pDim}>One per line, like &quot;knee: old ACL, careful with deep squats&quot;.</Text>
+                <Text style={styles.pDim}>One per line, like &quot;knee: old ACL repair, 2019&quot;.</Text>
                 <TextInput
                   disableFullscreenUI
                   style={styles.notesInput}
