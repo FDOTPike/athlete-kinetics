@@ -13,17 +13,45 @@ REFERENCE_COMMIT = '26f6557a793f1cafe9f609fb10e015cfc42d22b0'
 BETA_COMMIT = 'ee6dd8c49a642ec69396300c17d72480e3cadb41'
 QUESTION_LOG_SCHEMA = 'packages/core-db/src/schema/072_question_log.sql'
 cache = {}
-def source(path):
-    if path not in cache:
-        cache[path] = subprocess.check_output(['git', 'show', f'{REFERENCE_COMMIT}:{path}'], encoding='utf-8')
-    return cache[path]
+def at_commit(commit, path):
+    if (commit, path) not in cache:
+        cache[(commit, path)] = subprocess.check_output(['git', 'show', f'{commit}:{path}'], encoding='utf-8')
+    return cache[(commit, path)]
 
+def source(path):
+    return at_commit(REFERENCE_COMMIT, path)
+
+# Unprefixed citations are at BETA_COMMIT (LOG_READING_PLAN.md, "Reference and
+# receipt"). The device-validation tools land with these drafts and are not
+# at BETA_COMMIT, so citations of them are read from this checkout.
+LANDS_WITH_DRAFTS = 'tools/device-validation/'
+def cited(path):
+    if path.startswith(LANDS_WITH_DRAFTS):
+        return Path(path).read_text(encoding='utf-8-sig')
+    return at_commit(BETA_COMMIT, path)
+
+# Every document whose citations are checked must be present, non-empty and
+# cite something: a missing or emptied document must not pass by checking nothing.
+REQUIRED_DOCUMENTS = [
+    'docs/release/beta/plan/ATHLETE_GUIDE.md',
+    'docs/release/beta/plan/BETA_PLAN.md',
+    'docs/release/beta/plan/CONSENT_FORM.md',
+    'docs/release/beta/plan/LOG_READING_PLAN.md',
+    'tools/device-validation/README.md',
+]
 files = list(Path('docs/release/beta/plan').glob('*.md')) + list(Path('tools/device-validation').glob('*.md'))
+found = {file.as_posix() for file in files}
+missing = [document for document in REQUIRED_DOCUMENTS if document not in found or not Path(document).exists()]
+assert not missing, f'input documents missing: {missing}'
 count = 0
 for file in files:
     text = file.read_text(encoding='utf-8-sig')
-    for ref, path, line in re.findall(r'(origin/master:)?((?:apps|packages|tools)/[\w/.-]+|package\.json):(\d+)', text):
-        contents = source(path) if ref else Path(path).read_text(encoding='utf-8-sig')
+    citations = re.findall(r'(origin/master:)?((?:apps|packages|tools)/[\w/.-]+|package\.json):(\d+)', text)
+    if file.as_posix() in REQUIRED_DOCUMENTS:
+        assert text.strip(), f'{file} is empty'
+        assert citations, f'{file} cites nothing'
+    for ref, path, line in citations:
+        contents = source(path) if ref else cited(path)
         assert 1 <= int(line) <= len(contents.splitlines()), (file, path, line)
         count += 1
 
