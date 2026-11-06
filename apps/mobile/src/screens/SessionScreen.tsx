@@ -1016,7 +1016,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
           && latest.activeSessionPlanSlotId === currentSlot.sessionPlanSlotId
           && latest.runner?.phase === 'working') latest.runnerSkipSlot();
       } },
-    ]);
+    ], { cancelable: true });
   };
 
   const submitNiggle = (): void => {
