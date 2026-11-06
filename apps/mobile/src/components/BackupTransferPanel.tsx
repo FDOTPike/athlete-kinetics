@@ -78,6 +78,11 @@ export default function BackupTransferPanel(): React.JSX.Element {
         accessibilityLabel="Create encrypted backup of all athletes and choose where to save it"
         testID="create-backup-button"
       />
+      {/* Walk W4-1: the status (e.g. "Backup is too large…") was drawn below the
+          restore controls, off-screen; it now sits under the backup button. */}
+      {message !== null && (
+        <Text accessibilityLiveRegion="polite" style={styles.body} testID="backup-status-message">{message}</Text>
+      )}
       <QuietAction
         label="RESTORE ENCRYPTED BACKUP"
         onPress={() => { void chooseRestore(password); }}
@@ -98,9 +103,6 @@ export default function BackupTransferPanel(): React.JSX.Element {
             testID="review-recovery-button"
           />
         </>
-      )}
-      {message !== null && (
-        <Text accessibilityLiveRegion="polite" style={styles.body} testID="backup-status-message">{message}</Text>
       )}
       {preview !== null && (
         <View style={styles.preview} testID="restore-preview">

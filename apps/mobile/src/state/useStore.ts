@@ -100,6 +100,7 @@ import {
   generateBlock,
   groupRoutineTemplateDays,
   accessContextForBlockFocus,
+  movementFitsFocusDay,
   historyContentFingerprint,
   parseHistoryImport,
   defaultProgramDayIndices,
@@ -358,7 +359,7 @@ export const formatTeachingOnlyReason = (verdict: MovementAvailability | undefin
 // Codebase + pre-embedded vectors ride in the JS bundle (~1 MB total);
 // relative imports resolve via metro watchFolders / tsc include.
 import type { BiometricsBridge } from '@ak/biometrics';
-import { groupSummaryExercises } from './sessionSummary';
+import { groupSummaryExercises, type SkippedExercise } from './sessionSummary';
 import phraseCodebaseJson from '../../../../packages/inference/assets/phrase-codebase.json';
 import phraseVectorsJson from '../../../../packages/inference/assets/phrase-codebase.vectors.json';
 import { routeQuestion, type QuestionIndex, type QuestionResult } from '../../../../packages/inference/src/semantic/questionRouter';
@@ -502,6 +503,17 @@ export type BootStatus = 'booting' | 'ready' | 'error';
 /** Outcome of a demo-athlete load: seeded fresh, or refused because real
  *  training history already exists (which the load must never touch). */
 export type DemoLoadResult = 'loaded' | 'blocked_existing_data';
+
+/** One finalized session on the Progress list (#201). */
+export interface RecentSessionOutcome {
+  sessionId: number;
+  outcomeKind: string;
+  finalizedAtMs: number;
+  focus: string | null;
+  originKind: string;
+  exerciseCount: number;
+  loggedSetCount: number;
+}
 
 export type TriageOutcome =
   | { kind: 'rejected' }
@@ -706,6 +718,15 @@ export interface TrainingProgramInput {
   dayIndices: number[];
   movementPreferences?: TrainingProgramMovementPreference[];
   days?: TrainingProgramDay[];
+  /** A session length the athlete chose on the Build screen from the plan's
+   *  own offers (Android walk 2026-11-03, W1-4). The preview plans with it;
+   *  creating the program saves it to the profile. Absent = the profile's. */
+  sessionDurationCapMin?: number;
+  /** Continuation preview only (review, PR 194): saved preferences that no
+   *  longer pass the day, profile or capability gates are left out, as the
+   *  continuation generator leaves them out, instead of refused. New choices
+   *  are always checked strictly. */
+  keepPlaceablePreferencesOnly?: boolean;
 }
 
 export interface TrainingProgramPreview {
@@ -915,6 +936,9 @@ interface KineticsStore {
     durationMin: number | null;
     exercises: { movementId: number; movementName: string; plannedSets: number | null; sets: { reps: number; loadKg: number; timeS: number | null }[] }[];
     previousSets: { movementId: number; reps: number; loadKg: number; sessionId: number }[];
+    /** Exercises the athlete chose to skip (071 session_skipped_slot), in plan
+     *  order, with the sets logged for that slot before the skip. */
+    skippedExercises: SkippedExercise[];
   };
   /** Upsert (or clear with null) an absolute 1RM for a movement. */
   saveOneRepMax: (movementId: number, kg: number | null) => void;
@@ -1189,7 +1213,7 @@ interface KineticsStore {
   resetTrainingData: () => boolean;
   dismissOutcome: () => void;
   loadSessionOutcome: (sessionId: number) => { outcomeKind: string; finalizedAtMs: number } | null;
-  loadRecentOutcomes: (limit?: number) => { outcomeKind: string; finalizedAtMs: number }[];
+  loadRecentOutcomes: (limit?: number) => RecentSessionOutcome[];
   loadRoutineTemplates: () => void;
   saveRoutineTemplate: (input: {
     routineTemplateId?: number;
@@ -2708,6 +2732,9 @@ interface PendingProgramCreation {
   input: TrainingProgramInput;
   preview: TrainingProgramPreview;
   programDays: ProgramDayPreference[];
+  /** A session length chosen on the Build screen, saved to the profile in the
+   *  same transaction as the program (null: the profile's length is kept). */
+  sessionDurationCapMin: number | null;
 }
 
 let pendingProgramCreation: PendingProgramCreation | null = null;
@@ -4370,7 +4397,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const horizonAnchorDate = activeProgram === null
       ? startDate
       : programHorizonAnchor(activeProgram.plannedEndDate, activeProgram.plannedBlockCount);
-    const shape = trainingProgramShape(planningProfile, input, horizonAnchorDate);
+    let shape = trainingProgramShape(planningProfile, input, horizonAnchorDate);
     const byId = new Map(movements.map((movement) => [movement.movement_id, movement]));
     const d = getDb();
     const safetyExcluded = safetyExcludedMovementIdsFor(movements, profile, niggles);
@@ -4381,7 +4408,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const capabilityAvailableSport = capabilityAvailableMovementIds(
       d, movements, profile, 'sport_conditioning', priorExperience, safetyExcluded,
     );
-    for (const preference of shape.movementPreferences) {
+    const preferenceProblem = (preference: TrainingProgramMovementPreference): string | null => {
       const movement = byId.get(preference.movementId);
       const day = shape.days.find((candidate) => candidate.dayIndex === preference.dayIndex);
       const accessContext = day === undefined
@@ -4391,11 +4418,31 @@ export const useStore = create<KineticsStore>()((set, get) => {
         ? capabilityAvailableSport
         : capabilityAvailableWeightRoom;
       if (movement === undefined || movement.pattern !== preference.pattern) {
-        throw new Error('A preferred movement does not match that slot.');
+        return 'A preferred movement does not match that slot.';
+      }
+      // Review (PR 194): a choice the generator would drop from this day is
+      // refused here rather than replaced silently in the generated week.
+      if (day !== undefined && !movementFitsFocusDay(movement, day.focus as BlockFocus)) {
+        return 'A preferred movement does not belong on that day.';
       }
       if (!permittedForProfile(movement, profile, accessContext) || !capabilityAvailable.has(movement.movement_id)) {
-        throw new Error('A preferred movement is teaching-only for this athlete.');
+        return 'A preferred movement is teaching-only for this athlete.';
       }
+      return null;
+    };
+    if (input.keepPlaceablePreferencesOnly === true) {
+      // A saved preference can stop passing a gate after it was chosen (a new
+      // day rule, a profile change, a new safety exclusion). Continuation's
+      // generator falls back for it; the preview leaves out the same ones so
+      // it shows that week instead of throwing.
+      const placeable = shape.movementPreferences.filter((preference) => preferenceProblem(preference) === null);
+      if (placeable.length !== shape.movementPreferences.length) {
+        shape = trainingProgramShape(planningProfile, { ...input, movementPreferences: placeable }, horizonAnchorDate);
+      }
+    }
+    for (const preference of shape.movementPreferences) {
+      const problem = preferenceProblem(preference);
+      if (problem !== null) throw new Error(problem);
     }
     const chainInputs = chainPlanningInputs(d);
     // OW-001: the athlete's own declarations, read once and threaded in.
@@ -4430,7 +4477,13 @@ export const useStore = create<KineticsStore>()((set, get) => {
       // dated program takes the athlete's rotation position exactly as an
       // undated one does. Dedicated competition preparation is deferred.
       : nextMacroPosition(d).macroBlockIndex;
-    const effectiveProfile = { ...planningProfile, weekly_frequency: shape.days.length };
+    const effectiveProfile = {
+      ...planningProfile,
+      weekly_frequency: shape.days.length,
+      ...(input.sessionDurationCapMin === undefined ? {} : {
+        session_duration_cap_min: Math.round(clamp(input.sessionDurationCapMin, 15, 240)),
+      }),
+    };
     const previewEmphasis = programEmphasisFor(d, startDate);
     const plan = generateBlock({
       profile: effectiveProfile, movements: genMovements, startDate,
@@ -4457,10 +4510,21 @@ export const useStore = create<KineticsStore>()((set, get) => {
       set({ error: 'Archive the current block or program before creating another.' });
       return false;
     }
+    // W1-4: a session length chosen on the Build screen becomes the
+    // profile's, so the block, the profile and every later block agree.
+    // Review (PR 194): it is written inside the block-creation transaction,
+    // not committed ahead of it, so creation either saves both or neither.
+    const priorCapMin = get().profile.session_duration_cap_min;
+    const chosenCapMin = input.sessionDurationCapMin === undefined ? null
+      : Math.round(clamp(input.sessionDurationCapMin, 15, 240));
+    const capChanges = chosenCapMin !== null && chosenCapMin !== priorCapMin;
     try {
       const preview = get().previewTrainingProgram(input);
       const shape = trainingProgramShape(get().profile, input, preview.startDate);
-      pendingProgramCreation = { input, preview, programDays: shape.programDays };
+      pendingProgramCreation = {
+        input, preview, programDays: shape.programDays,
+        sessionDurationCapMin: capChanges ? chosenCapMin : null,
+      };
       set({ error: null });
       get().generateNewBlock(input.schemaType);
       get().refreshProgram();
@@ -4498,8 +4562,14 @@ export const useStore = create<KineticsStore>()((set, get) => {
       ?? pendingProgramContinuation?.weeklyFrequency;
     const pendingObjective = pendingProgramCreation?.preview.objective
       ?? pendingProgramContinuation?.objective;
-    const profile = pendingFrequency === undefined && pendingObjective === undefined ? storedProfile
-      : { ...storedProfile, weekly_frequency: pendingFrequency ?? storedProfile.weekly_frequency, objective: pendingObjective ?? storedProfile.objective };
+    const pendingCapMin = pendingProgramCreation?.sessionDurationCapMin ?? undefined;
+    const profile = pendingFrequency === undefined && pendingObjective === undefined && pendingCapMin === undefined ? storedProfile
+      : {
+        ...storedProfile,
+        weekly_frequency: pendingFrequency ?? storedProfile.weekly_frequency,
+        objective: pendingObjective ?? storedProfile.objective,
+        session_duration_cap_min: pendingCapMin ?? storedProfile.session_duration_cap_min,
+      };
     if (status !== 'ready') return;
     // Audit A2: regenerating mid-session archives the plan the live session
     // was built from — APRE completion would then read the WRONG plan.
@@ -4704,6 +4774,15 @@ export const useStore = create<KineticsStore>()((set, get) => {
           weeklyFrequency: programDraft.preview.days.length,
           now: Date.now(),
         });
+        // Review (PR 194): the chosen session length is written in the same
+        // transaction as the program, so a stop between two commits can no
+        // longer leave a changed length with no program.
+        if (programDraft.sessionDurationCapMin !== null) {
+          d.executeSync(
+            'UPDATE athlete_profile SET session_duration_cap_min = ?, updated_at_ms = ? WHERE profile_id = 1',
+            [programDraft.sessionDurationCapMin, Date.now()],
+          );
+        }
       }
       if (pendingProgramContinuation !== null) {
         updateTrainingProgramEndDate(d, pendingProgramContinuation.programId,
@@ -4811,7 +4890,9 @@ export const useStore = create<KineticsStore>()((set, get) => {
       set({ error: e instanceof Error ? e.message : String(e) });
       return;
     }
-    if (pendingFrequency !== undefined) set({ profile });
+    // State follows the commit: the chosen length (if any) is the profile's now.
+    if (pendingFrequency !== undefined || pendingCapMin !== undefined) set({ profile });
+    if (pendingCapMin !== undefined && get().prescription !== null) get().computePrescription([]);
     get().refreshBlock();
     get().refreshProgram();
     get().refreshReturnCheckin();
@@ -5039,7 +5120,14 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const input: TrainingProgramInput = {
       horizon: { kind: 'weeks', blockCount: current.plannedBlockCount },
       schemaType: current.schemaType, dayIndices: current.days.map((day) => day.dayIndex),
+      // The saved focuses, as continuation uses them: without them the preview
+      // would plan each day on the default focus and show a different week.
+      days: current.days,
+      // Saved preferences that no longer pass a gate (a new day rule, a
+      // profile change) are left out as continuation leaves them out, so the
+      // review button cannot throw on old data.
       movementPreferences: current.movementPreferences,
+      keepPlaceablePreferencesOnly: true,
     };
     return get().previewTrainingProgram(input).plan;
   },
@@ -6230,6 +6318,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
     }>(d.executeSync(
       // Sol R4 F4: the slot identity is read so the planned-set denominator is
       // attributed per SLOT, never copied onto every movement a slot held.
+      // Walk 2 (W2-6): rows come in logging order, so the summary lists the
+      // exercises in the order they were done, not by movement id.
       `SELECT sr.movement_id, m.name AS movement_name, sr.reps, sr.load_kg,
               tm.value AS time_s, st.session_plan_slot_id, sps.planned_sets
          FROM set_record sr
@@ -6239,7 +6329,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
          LEFT JOIN session_plan_slot sps
               ON sps.session_plan_slot_id = st.session_plan_slot_id
         WHERE sr.session_id = ?
-        ORDER BY sr.movement_id, sr.set_index`,
+        ORDER BY sr.set_id`,
       [sessionId],
     ));
     const previousRows = rowsOf<{
@@ -6256,8 +6346,39 @@ export const useStore = create<KineticsStore>()((set, get) => {
         ORDER BY sr.session_id, sr.set_index`,
       [sessionId, sessionId],
     ));
+    // Android walk 2026-11-03 (ux-8): a skipped exercise belongs in the
+    // record of the session; it was left out because it has no sets.
+    // Owner ruling 2026-11-03 (Entry 0286): this display read is the one
+    // reader of 071 session_skipped_slot. No engine reads it.
+    // Walk 2 (W2-1): a swap rewrites sps.movement_id and keeps the planned
+    // one in original_movement_id; the line names the planned movement.
+    const skippedRows = rowsOf<{
+      session_plan_slot_id: number; movement_id: number; current_movement_id: number;
+      movement_name: string; planned_sets: number;
+    }>(d.executeSync(
+      `SELECT k.session_plan_slot_id, COALESCE(sps.original_movement_id, sps.movement_id) AS movement_id,
+              sps.movement_id AS current_movement_id, m.name AS movement_name, sps.planned_sets
+         FROM session_skipped_slot k
+         JOIN session_plan_slot sps ON sps.session_plan_slot_id = k.session_plan_slot_id
+         JOIN movement m ON m.movement_id = COALESCE(sps.original_movement_id, sps.movement_id)
+        WHERE sps.session_id = ?
+        ORDER BY sps.slot_index`,
+      [sessionId],
+    ));
     return {
       durationMin: sessionRow?.duration_min ?? null,
+      // A set belongs to a skipped slot as the session timeline counts it: by
+      // its slot when it has one, else by movement.
+      skippedExercises: skippedRows.map((row) => {
+        const sets = setRows.filter((set) => (set.session_plan_slot_id != null
+          ? set.session_plan_slot_id === row.session_plan_slot_id
+          : set.movement_id === row.movement_id || set.movement_id === row.current_movement_id));
+        const loggedAs: string[] = [];
+        for (const set of sets) {
+          if (set.movement_id !== row.movement_id && !loggedAs.includes(set.movement_name)) loggedAs.push(set.movement_name);
+        }
+        return { name: row.movement_name, plannedSets: row.planned_sets, loggedSets: sets.length, loggedAs };
+      }),
       exercises: groupSummaryExercises(setRows.map((row) => ({
         movementId: row.movement_id,
         movementName: row.movement_name,
@@ -7793,7 +7914,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
     appliedPrefixes = (appliedPrefixes ?? []).filter((condition) => conditionApplies(condition, effImplement));
 
     const safeReps = timeMode ? 1 : Math.round(clamp(reps, 1, 50));
-    const safeLoad = clamp(Math.round(loadKg / 2.5) * 2.5, 0, 500);
+    // Owner ruling 2026-11-03 (Entry 0288): logged loads sit on a 0.5 kg grid.
+    const safeLoad = clamp(Math.round(loadKg / 0.5) * 0.5, 0, 500);
     const safeRpe = rpe === null ? null : clamp(Math.round(rpe * 2) / 2, 5, 10);
     const loggedAtMs = Date.now();
 
@@ -7958,7 +8080,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
       : metrics.bandLevel === null
         ? null
         : Math.round(clamp(metrics.bandLevel, 1, 20));
-    const safeLoad = clamp(Math.round(loadKg / 2.5) * 2.5, 0, 500);
+    // Owner ruling 2026-11-03 (Entry 0288): logged loads sit on a 0.5 kg grid.
+    const safeLoad = clamp(Math.round(loadKg / 0.5) * 0.5, 0, 500);
     const safeRpe = rpe === null ? null : clamp(Math.round(rpe * 2) / 2, 5, 10);
     // UPDATE OF reps, load_kg, rpe fires trg_set_record_au, which re-deltas
     // mech_daily (old contribution out, new in). tonnage_kg is a GENERATED
@@ -8651,14 +8774,34 @@ export const useStore = create<KineticsStore>()((set, get) => {
 
   loadRecentOutcomes: (limit = 20) => {
     try {
+      // Walk 2 (W2-9): the session id lets Progress open the session's summary.
+      // #201: each row also says what the session was (planned focus, or an
+      // extra session) and how many exercises and sets it had.
       const res = getDb().executeSync(
-        'SELECT outcome_kind, finalized_at_ms FROM session_outcome ORDER BY finalized_at_ms DESC LIMIT ?',
+        `SELECT so.session_id, so.outcome_kind, so.finalized_at_ms, so.origin_kind,
+                (SELECT COUNT(DISTINCT sr.movement_id) FROM set_record sr WHERE sr.session_id = so.session_id) AS exercise_count,
+                so.logged_set_count,
+                (SELECT MIN(ps.focus) FROM set_record sr
+                   JOIN set_target st ON st.set_id = sr.set_id
+                   JOIN planned_slot pl ON pl.planned_slot_id = st.source_planned_slot_id
+                   JOIN planned_session ps ON ps.planned_session_id = pl.planned_session_id
+                  WHERE sr.session_id = so.session_id) AS focus
+           FROM session_outcome so
+          ORDER BY so.finalized_at_ms DESC LIMIT ?`,
         [limit],
       );
-      const rows = rowsOf<{ outcome_kind: string; finalized_at_ms: number }>(res);
+      const rows = rowsOf<{
+        session_id: number; outcome_kind: string; finalized_at_ms: number; origin_kind: string;
+        exercise_count: number; logged_set_count: number; focus: string | null;
+      }>(res);
       return rows.map((r) => ({
+        sessionId: r.session_id,
         outcomeKind: r.outcome_kind,
         finalizedAtMs: r.finalized_at_ms,
+        focus: r.focus,
+        originKind: r.origin_kind,
+        exerciseCount: r.exercise_count,
+        loggedSetCount: r.logged_set_count,
       }));
     } catch (e) {
       console.error('Failed to load recent session outcomes:', e);
