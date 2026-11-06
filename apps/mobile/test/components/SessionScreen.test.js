@@ -617,6 +617,32 @@ test.each([
   expect(screen.getByTestId('effort-above-ceiling-note')).toHaveTextContent(note);
 });
 
+// Owner ruling on #206: a timed set has no reps, so its note is only the first
+// sentence; a rep-based set keeps the reps-left sentence.
+test('a timed set above the ceiling shows only "That was above your ceiling of X.X."', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', objective: 'strength', base_rpe_cap: 7.5, equipment_inventory: [], session_duration_cap_min: 60 },
+    sessionPlan: [slot(1, 1, 5, { target: { kind: 'time', seconds: 30 }, targetRpe: 7 }), slot(2, 2, 8)],
+  });
+  render(<SessionScreen />);
+  fireEvent.press(screen.getByRole('button', { name: 'Enter Effort directly' }));
+  fireEvent.press(screen.getByRole('button', { name: 'Effort 8.5' }));
+  const note = screen.getByTestId('effort-above-ceiling-note');
+  expect(note.props.children).toBe('That was above your ceiling of 7.5.');
+  expect(note).not.toHaveTextContent(/reps? left/);
+});
+
+test('a rep-based set above the same ceiling keeps the reps-left sentence', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', objective: 'strength', base_rpe_cap: 7.5, equipment_inventory: [], session_duration_cap_min: 60 },
+  });
+  render(<SessionScreen />);
+  fireEvent.press(screen.getByRole('button', { name: 'Enter Effort directly' }));
+  fireEvent.press(screen.getByRole('button', { name: 'Effort 8.5' }));
+  expect(screen.getByTestId('effort-above-ceiling-note'))
+    .toHaveTextContent('That was above your ceiling of 7.5. Next set, stop with 3 reps left.');
+});
+
 // ---------------------------------------------------------------------------
 // §7.2 W1 — Unanchored RIR/RPE effort entry contract (Items 1–11)
 // ---------------------------------------------------------------------------

@@ -152,9 +152,13 @@ const loadCopyFor = (
  *  (issue #206): a statement of fact and the reps to leave next time. It
  *  changes nothing: logging, the next-set target and next-session easing are
  *  untouched. Reps left is the whole number that keeps the set at or under
- *  the ceiling (8.5 → 2, 7.0 → 3). */
-const aboveCeilingNote = (rpe: number | null, ceiling: number): string | null => {
+ *  the ceiling (8.5 → 2, 7.0 → 3). A timed set has no reps and is rated by
+ *  direct effort, so it gets only the first sentence (owner ruling, #206). */
+const aboveCeilingNote = (rpe: number | null, ceiling: number, isTimed = false): string | null => {
   if (rpe === null || !Number.isFinite(rpe) || !Number.isFinite(ceiling) || rpe <= ceiling) return null;
+  if (isTimed) {
+    return `That was above your ceiling of ${ceiling.toFixed(1)}.`;
+  }
   const repsLeft = Math.max(1, Math.ceil(10 - ceiling));
   return `That was above your ceiling of ${ceiling.toFixed(1)}. Next set, stop with ${repsLeft} ${repsLeft === 1 ? 'rep' : 'reps'} left.`;
 };
@@ -578,7 +582,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   // logs 6.0, and next-session easing is unchanged.
   const ceilingNote = selectedChoice === '4+'
     ? null
-    : aboveCeilingNote(safeRpe, effectiveRpeCeiling(profile));
+    : aboveCeilingNote(safeRpe, effectiveRpeCeiling(profile), target?.kind === 'time');
 
   const runnerResting = runnerPhase === 'resting';
   const rest = runnerResting ? {
