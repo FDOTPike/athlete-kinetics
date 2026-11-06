@@ -851,6 +851,51 @@ test('§7.2 Item 10: timed/non-rep work does not present an RIR conversion', () 
   expect(screen.queryByLabelText(/Confirm actual RPE/i)).toBeNull();
 });
 
+// Android walk (#203): the target speaks the same terms as the effort question
+// (reps left), with RPE kept as support. A half-point target gives a range.
+describe('#203: set target in reps left', () => {
+  const targetLine = () => screen.getByTestId('session-target-line');
+
+  test('a rep target at RPE 7.0 says about 3 reps left and still shows RPE 7', () => {
+    mockState = state({ sessionPlan: [slot(1, 1, 8, { targetRpe: 7 }), slot(2, 2, 8)] });
+    render(<SessionScreen />);
+    expect(targetLine()).toHaveTextContent('Target 3 × 8 · about 3 reps left (RPE 7.0)');
+    expect(targetLine()).toHaveTextContent(/3 reps left/);
+    expect(targetLine()).toHaveTextContent(/RPE 7/);
+  });
+
+  test('a half-point target at RPE 7.5 says about 2–3 reps left (RPE 7.5)', () => {
+    mockState = state({ sessionPlan: [slot(1, 1, 5, { targetRpe: 7.5 }), slot(2, 2, 8)] });
+    render(<SessionScreen />);
+    expect(targetLine()).toHaveTextContent('Target 3 × 5 · about 2–3 reps left (RPE 7.5)');
+  });
+
+  test('RPE 8 and RPE 9 read as about 2 reps and about 1 rep left', () => {
+    mockState = state({ sessionPlan: [slot(1, 1, 5, { targetRpe: 8 }), slot(2, 2, 8)] });
+    const view = render(<SessionScreen />);
+    expect(targetLine()).toHaveTextContent('Target 3 × 5 · about 2 reps left (RPE 8.0)');
+    view.unmount();
+    mockState = state({ sessionPlan: [slot(1, 1, 5, { targetRpe: 9 }), slot(2, 2, 8)] });
+    render(<SessionScreen />);
+    expect(targetLine()).toHaveTextContent('Target 3 × 5 · about 1 rep left (RPE 9.0)');
+  });
+
+  test('a slot with no target RPE shows neither reps left nor RPE', () => {
+    mockState = state({ sessionPlan: [slot(1, 1, 8, { targetRpe: null }), slot(2, 2, 8)] });
+    render(<SessionScreen />);
+    expect(targetLine()).toHaveTextContent('Target 3 × 8');
+    expect(targetLine()).not.toHaveTextContent(/reps? left/);
+    expect(targetLine()).not.toHaveTextContent(/RPE/);
+  });
+
+  test('timed work, which asks no reps-left question, keeps the RPE target only', () => {
+    mockState = state({ sessionPlan: [slot(1, 1, 5, { target: { kind: 'time', seconds: 30 }, targetRpe: 7.5 }), slot(2, 2, 8)] });
+    render(<SessionScreen />);
+    expect(targetLine()).toHaveTextContent(/RPE 7\.5/);
+    expect(targetLine()).not.toHaveTextContent(/reps? left/);
+  });
+});
+
 test('§7.2 Item 11: existing bodyweight actual-reps behavior remains unchanged (invariant check)', () => {
   render(<SessionScreen />);
 
