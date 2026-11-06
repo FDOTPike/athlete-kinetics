@@ -76,10 +76,13 @@ export const SESSION_FEEL_RECORD_ONLY_TEXT =
  * The same sentence when the Plan screen has no "Something feels off" form:
  * Plan shows that form only once readiness exists (BlockScreen's no-readiness
  * screen has no report form), so the sentence names only the place that is
- * there (#180). What a report does with no readiness is not changed here.
+ * there (#180). "Report discomfort" takes only a joint and a severity, so this
+ * sentence names only something that hurts, not feeling unwell; reporting
+ * illness with no readiness is left to the clinical review under #180. What a
+ * report does with no readiness is not changed here.
  */
 export const SESSION_FEEL_RECORD_ONLY_TEXT_NO_PLAN_FORM =
-  'This is a record only. It does not adjust your training. If something hurts or you feel unwell, '
+  'This is a record only. It does not adjust your training. If something hurts, '
   + 'use "Report discomfort" on the lift during a session.';
 
 /**
