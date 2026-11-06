@@ -1042,11 +1042,15 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
       Alert.alert('Report saved', 'Report saved with this session. Next, see the options for this exercise.', [
         { text: 'OK', onPress: () => {
           // The report is already saved: a failure to open the sheet is
-          // recorded, not thrown out of the alert callback.
+          // recorded and shown, not thrown out of the alert callback.
           try {
             openSubstitution(offeredMovementId);
           } catch (error) {
             useStore.setState({ error: error instanceof Error ? error.message : String(error) });
+            Alert.alert(
+              'Could not open options',
+              'Your report is saved, but the options for this exercise could not be opened. You can skip this exercise on the session card.',
+            );
           }
         } },
       ]);

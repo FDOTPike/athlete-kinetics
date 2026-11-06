@@ -2455,8 +2455,8 @@ describe('session-2: honest discomfort wording per tier and after-save outcomes'
   };
 
   // The report is already saved when OK is tapped; a failure to open the
-  // sheet must not throw out of the alert callback (it is recorded instead).
-  test('a failure to open the alternatives after OK is recorded, not thrown', () => {
+  // sheet must not throw out of the alert callback (it is recorded and shown).
+  test('a failure to open the alternatives after OK is recorded and shown, not thrown', () => {
     mockState = discomfortFixture('beginner');
     mockState.openSubstitution = jest.fn(() => { throw new Error('substitution preview failed'); });
     const view = render(<SessionScreen />);
@@ -2469,6 +2469,12 @@ describe('session-2: honest discomfort wording per tier and after-save outcomes'
     expect(() => act(() => { buttons[0].onPress(); })).not.toThrow();
     expect(mockState.openSubstitution).toHaveBeenCalledWith(1);
     expect(mockState.error).toBe('substitution preview failed');
+    // The screen does not render store.error, so the failure is also shown.
+    expect(alertSpy).toHaveBeenCalledTimes(2);
+    expect(alertSpy.mock.calls[1][0]).toBe('Could not open options');
+    expect(alertSpy.mock.calls[1][1]).toBe(
+      'Your report is saved, but the options for this exercise could not be opened. You can skip this exercise on the session card.',
+    );
     view.rerender(<SessionScreen />);
     expect(screen.getByText('Report saved with this session.')).toBeOnTheScreen();
   });
