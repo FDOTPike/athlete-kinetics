@@ -348,7 +348,10 @@ export default function OnboardingScreen(): React.JSX.Element {
 
   const goNext = (): void => {
     if (!editingFromReview) {
-      setStepIdx((i) => Math.min(steps.length - 1, i + 1));
+      // Relative to the step this press was rendered for, not a functional
+      // update: two presses sent before a re-render advance one step, not two
+      // (Android walk W7-1, issue #152).
+      setStepIdx(Math.min(steps.length - 1, stepIdx + 1));
       return;
     }
     // Any later sport or target screen still unanswered comes first, even
