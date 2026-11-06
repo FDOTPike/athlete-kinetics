@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { theme } from '../../src/theme/theme';
 import { resolveLoadSelection as actualResolveLoadSelection } from '../../../../packages/inference/src/loadSelection';
 import { isDifficultyAllowed as actualIsDifficultyAllowed } from '../../../../packages/inference/src/tierPolicy';
 import { resolveMovementAvailability as actualResolveMovementAvailability } from '../../../../packages/inference/src/capabilityResolver';
@@ -40,6 +41,19 @@ jest.mock('@ak/inference', () => {
   };
 });
 const resolveLoadSelectionSpy = jest.fn((input) => actualResolveLoadSelection(input));
+// Issue 158: a test can set the font scale. Undefined keeps the real hook's value.
+let mockFontScale;
+jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => {
+  const actual = jest.requireActual('react-native/Libraries/Utilities/useWindowDimensions').default;
+  return {
+    __esModule: true,
+    default: () => {
+      const dims = actual();
+      return mockFontScale === undefined ? dims : { ...dims, fontScale: mockFontScale };
+    },
+  };
+});
+
 jest.mock('../../src/state/useStore', () => {
   const storeFunc = (selector) => selector({ getTrainingSupportDecision: () => ({ status: 'available', holdIds: [] }), ...mockState });
   storeFunc.setState = jest.fn((updates) => {
@@ -2554,3 +2568,33 @@ describe('session-2: honest discomfort wording per tier and after-save outcomes'
   });
 });
 
+describe('large text at font scale 2.0 (issue 158)', () => {
+  afterEach(() => {
+    mockFontScale = undefined;
+  });
+
+  test('at font scale 2.0 the two workout buttons stack, and each fills the row', () => {
+    mockFontScale = 2;
+    mockState = state();
+    render(<SessionScreen />);
+    expect(StyleSheet.flatten(screen.getByTestId('workout-quick-row').props.style)).toMatchObject({ flexDirection: 'column' });
+    expect(StyleSheet.flatten(screen.getByLabelText('Report discomfort').props.style)).toMatchObject({ alignSelf: 'stretch' });
+    expect(StyleSheet.flatten(screen.getByLabelText(/^Avoid .+ and find a substitution$/).props.style)).toMatchObject({ alignSelf: 'stretch' });
+  });
+
+  test('at the default font scale the two workout buttons stay side by side', () => {
+    mockFontScale = 1;
+    mockState = state();
+    render(<SessionScreen />);
+    expect(StyleSheet.flatten(screen.getByTestId('workout-quick-row').props.style)).toMatchObject({ flexDirection: 'row' });
+    expect(StyleSheet.flatten(screen.getByLabelText('Report discomfort').props.style)).toMatchObject({ alignSelf: 'flex-start' });
+  });
+
+  test('at font scale 2.0 an upcoming exercise name is not cut to one line, and Choose has a gap before it', () => {
+    mockFontScale = 2;
+    mockState = state({ sessionMode: 'self_directed' });
+    render(<SessionScreen />);
+    expect(screen.getByText('Later movement').props.numberOfLines).toBeUndefined();
+    expect(StyleSheet.flatten(screen.getByText('Choose').props.style)).toMatchObject({ marginLeft: theme.space[2] });
+  });
+});

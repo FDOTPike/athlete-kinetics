@@ -321,6 +321,7 @@ export interface SessionScreenProps {
 export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionScreenProps = {}): React.JSX.Element {
   // Large text (issue 158): the two workout buttons stack so their words do not break.
   const { fontScale } = useWindowDimensions();
+  const stackQuickRow = fontScale >= 1.3;
   const state = useStore((s) => s);
   const nav = typeof useNavigation === 'function' ? useNavigation() : undefined;
   const [emptyStartPromptOpen, setEmptyStartPromptOpen] = useState(false);
@@ -764,7 +765,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
           )}
         </View>
 
-        <View style={styles.outcomeFooter}>
+        <View style={styles.outcomeFooter} testID="session-outcome-footer">
           {sessionFeel !== null && (
             <View style={styles.feelBlock} testID="session-feel-summary">
               {sessionFeel.saved !== null ? (
@@ -780,7 +781,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                   {/* Android walk (#212): a followed plan is asked only because the
                       logged effort drifted from the targets; "went differently
                       from the plan" contradicted "Plan followed." above it. */}
-                  <Text style={[styles.summaryLine, styles.completionGap]} testID="session-feel-ask">
+                  <Text style={styles.summaryLine} testID="session-feel-ask">
                     {outcome.kind === 'followed_plan'
                       ? 'You did every set, but your effort was different from the targets.'
                       : 'This session went differently from the plan.'}
@@ -1700,11 +1701,12 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                         </Disclosure>
 
                         {/* 56pt quick avoidance / discomfort trigger rows */}
-                        <View style={[styles.quickRow, fontScale >= 1.3 && styles.quickRowStacked]}>
+                        <View testID="workout-quick-row" style={[styles.quickRow, stackQuickRow && styles.quickRowStacked]}>
                           <SecondaryButton
                             label="Doesn’t feel right"
                             onPress={thumbsDown}
                             accessibilityLabel={`Avoid ${movement?.name ?? 'this movement'} and find a substitution`}
+                            fullWidth={stackQuickRow}
                             style={{ flex: 1, minHeight: theme.touch.min }}
                           />
                           <SecondaryButton
@@ -1714,6 +1716,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                               setNiggleSavedNotice(false);
                             }}
                             accessibilityLabel="Report discomfort"
+                            fullWidth={stackQuickRow}
                             style={{ flex: 1, minHeight: theme.touch.min }}
                           />
                         </View>
@@ -2323,9 +2326,6 @@ const styles = StyleSheet.create({
   quickRowStacked: {
     flexDirection: 'column',
   },
-  completionGap: {
-    marginTop: theme.space[3],
-  },
   safety: {
     marginTop: theme.space[3],
     padding: theme.space[3],
@@ -2539,6 +2539,7 @@ const styles = StyleSheet.create({
     textAlign: 'left',
   },
   outcomeFooter: {
+    marginTop: theme.space[3],
     paddingBottom: theme.space[4],
   },
   feelBlock: {
