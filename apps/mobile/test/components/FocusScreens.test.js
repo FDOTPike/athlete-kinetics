@@ -757,6 +757,31 @@ describe('BlockScreen - Chooser Entry (Work Order E)', () => {
     expect(screen.queryByText('Coming soon')).toBeNull();
   });
 
+  test('with a program whose review is due and a standalone block, the button keeps "Plan a new block" and opens the chooser (#172)', () => {
+    // The program editor only saves for an active program, so a finished
+    // program must not route this button to it.
+    mockState = baseState({
+      block: { blockId: 1, startDate: '2026-07-01', objective: 'strength', createdAtMs: 1 },
+      program: {
+        programId: 1,
+        status: 'review_due',
+        currentSequenceIndex: 2,
+        plannedBlockCount: 2,
+        plannedEndDate: '2026-08-26',
+        days: [{ dayIndex: 1, focus: 'lower' }, { dayIndex: 2, focus: 'upper' }],
+        movementPreferences: [],
+      },
+    });
+
+    render(<BlockScreen />);
+
+    expect(screen.queryByText('Change future blocks')).toBeNull();
+    fireEvent.press(screen.getByText('Plan a new block'));
+    expect(screen.getByText('Start a new block')).toBeOnTheScreen();
+    expect(screen.getByText('Custom')).toBeOnTheScreen();
+    expect(screen.queryByText('MANAGE PROGRAM')).toBeNull();
+  });
+
   test('inter-block state with block === null and program !== null still opens chooser and routes to handlers', () => {
     mockState = baseState({
       block: null,

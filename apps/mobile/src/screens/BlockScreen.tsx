@@ -897,11 +897,13 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                 accessibilityLabel={program == null ? 'Manage current block' : 'Manage future program preferences'}
               />
               {/* #172: with an active program this changes future blocks only;
-                  the current block stays. Without a program it plans a new block. */}
+                  the current block stays. Without an active program (none, or
+                  one whose review is due) it plans a new block: the program
+                  editor only saves for an active program. */}
               <SecondaryButton
-                label={program == null ? 'Plan a new block' : 'Change future blocks'}
-                onPress={program == null ? () => setShowChooser(true) : () => setEditingProgram(true)}
-                accessibilityLabel={program == null ? 'Plan a new block' : 'Change future blocks'}
+                label={program?.status !== 'active' ? 'Plan a new block' : 'Change future blocks'}
+                onPress={program?.status !== 'active' ? () => setShowChooser(true) : () => setEditingProgram(true)}
+                accessibilityLabel={program?.status !== 'active' ? 'Plan a new block' : 'Change future blocks'}
               />
             </>
           )}
