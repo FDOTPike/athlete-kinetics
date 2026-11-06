@@ -1059,7 +1059,8 @@ if (resetTables.length >= 15) {
       'insert into Probe_Table (a) values (?)',
       'SELECT a FROM Probe_table WHERE b = ${}',
     ]), quotedNaming);
-  // Owner ruling 2026-11-03 (ledger Entry 0286): the completion summary may
+  // Owner ruling (ledger Entry 0287; the original 2026-11-03 Entry 0286 is
+  // unrecovered, issue #297): the completion summary may
   // read session_skipped_slot to list the skipped exercises. That display read
   // is the one reader; no engine, readiness or progression code reads it.
   const SKIPPED_SUMMARY_READ = 'SELECT k.session_plan_slot_id, sps.movement_id, m.name AS movement_name, sps.planned_sets '

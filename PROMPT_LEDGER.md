@@ -13153,3 +13153,55 @@ Reply on each thread via `gh api -X POST repos/FDOTPike/athlete-kinetics/pulls/<
   - The measured times are now in a comment.
 - **PR 100, threads 4435090714 and 4435090720:** fixed on that branch. See Entry 0273's 2026-11-01 note there.
 - **Gates (PR 101 worktree):** `npm run typecheck` exit 0. `npm run verify:store`: ALL CHECKS PASSED. Panel suite: 7 of 7.
+
+## Entries 0276–0286 — 2026-11-01 to 2026-11-03 · Unrecovered local ledger gap
+
+**Status:** NOT VERIFIED. These entries were written in a local ledger and never pushed. On 2026-11-07 they were not on any pushed branch, nor in any local branch, stash or the main checkout on the owner's Windows PC.
+
+They are not rebuilt from code comments or PR text (`.agents/rules/coding-rules-general.md` rules 1 and 2; CodeRabbit on PR #116). Their numbers stay reserved, so references on existing branches don't collide. Tracked in issue #297.
+
+## Entry 0287 — 2026-11-07 · Delegated owner ruling: PR #116's read of `session_skipped_slot`, and the 0276–0286 gap
+
+**Executor:** a session working through the open pull requests on the owner's Windows PC.
+
+On 2026-11-07 the owner told it to use a command-line assistant for decisions that need an owner ruling. When unsure, it was to have that assistant investigate and write work orders for it to carry out. The owner's message named the tool and model, so it is paraphrased here under the repository's no-model-names rule. This follows the delegation precedent in Entry 0274.
+
+### Prompt to the delegated assistant (verbatim, without the context appendix)
+
+```text
+You are acting for the repository owner of FDOTPike/athlete-kinetics (a React Native strength-coaching app). The owner has delegated owner rulings to you. Then output a WORK ORDER that another engineer will execute.
+
+Decision needed:
+PR #116 (branch claude/summary-skipped-2026-11-03 -> claude/beta-question-box-2026-10-28) is green on all CI checks. Its only unresolved review thread (CodeRabbit, on apps/mobile/src/state/useStore.ts around line 6270) says the code cites "PROMPT_LEDGER.md Entry 0286" as the owner authorization for a record-only behaviour, but PROMPT_LEDGER.md on every pushed branch ends at Entry 0275. Entries 0276-0286 existed only in the owner's local ledger, which cannot be found on this PC. CodeRabbit says do not reconstruct Entry 0286.
+#194 (claude/walk1-fixes-2026-11-03) waits for #116 to merge; 18 more fix PRs are stacked on #194.
+
+Options include (you may propose others):
+A. Merge #116 now with the thread open; file an issue to restore ledger entries 0276-0286 later.
+B. Change the code comment in #116 so it no longer cites a ledger entry that does not exist (e.g. cite the PR/issue where the ruling was recorded), resolve the thread, then merge.
+C. Hold the whole chain until the owner finds the entries.
+
+Do NOT use any tools. All the context you need is below; a search of every local branch, stash and the main checkout found no Entry 0276-0286 anywhere on this PC. Note the ledger's own precedent: Entry 0274 records the owner delegating design choices to another assistant and following its decisions.
+```
+
+The appendix held the code around the read, every match for `0286` and "record only" on the branch, this ledger's tail, the ledger rule in `AGENT_WORKFLOW.md`, PR #116's description, and the full review thread.
+
+### Output
+
+- **Ruling: option B, plus a recorded ruling.**
+  - Option C was rejected: the entries are nowhere on this PC, so holding #116 would block #194 and its stacked PRs indefinitely.
+  - Option A was rejected: it would ship a citation nobody can check, the same defect fixed on PR 100 (Entry 0275).
+- **The ruling:** `loadSessionSummaryFacts` in `apps/mobile/src/state/useStore.ts` is authorized as the single display-only reader of migration 071 `session_skipped_slot`. This lets the completed-session summary list exercises skipped during the session (ux-8, Android walk 2026-11-03).
+  - No training, prescription or autopilot engine reads `session_skipped_slot`.
+  - `apps/mobile/test/verify_store_sql.mjs` allows exactly this SELECT, and only inside `loadSessionSummaryFacts`.
+- **Entries 0276–0286** are recorded above as an unrecovered gap and are not rebuilt.
+- **Code:** comments that cited Entry 0286 now cite Entry 0287 and issue #297:
+  - `useStore.ts` (the summary read);
+  - `SessionSummarySkipped.test.js` (file header);
+  - `verify_store_sql.mjs` (the 071 check).
+  
+  The work order named only `useStore.ts`. The other two carried the same citation and were changed the same way. No SQL or runtime logic changed.
+- **Gates** (worktree on `claude/summary-skipped-2026-11-03`, after merging the current `claude/beta-question-box-2026-10-28`):
+  - `npm run typecheck`: exit 0.
+  - `npm run verify:store`: ALL CHECKS PASSED.
+  - Jest on `SessionSummarySkipped.test.js` and `SessionSummary.test.js`: 2 suites, 48 of 48 tests pass.
+- **Branch:** `claude/summary-skipped-2026-11-03`, PR #116 into `claude/beta-question-box-2026-10-28`.
