@@ -2779,6 +2779,38 @@ console.log('[MAIN_LIFT_SPACING] no same main lift on back-to-back days');
     spacingSwaps(constrained).some((swap) => swap.chosen === 'Competition Bench' && swap.instead === 'Dumbbell Bench Press')
       && backToBackRepeats(constrained).length === 0,
     spacingSwaps(constrained).map((swap) => `${swap.chosen} for ${swap.instead}`).join('; ') || 'no swap');
+
+  // #228 owner ruling (Option A on the dose): the spacing replacement is
+  // prescribed as that movement normally is. A replacement on a capability
+  // chain keeps its chain rep floor (chainScopedRepsFor), so the reps can rise
+  // when the original main lift was not on a chain.
+  const CHAIN_FLOOR = 20;
+  const offChain = movements.map((m) => ({ ...m, progressionGroup: undefined }));
+  const offChainPlan = generateBlock({
+    profile: prof({ objective: 'hypertrophy', training_age: 'advanced', weekly_frequency: 7, session_duration_cap_min: 75 }),
+    movements: offChain, startDate: START,
+  });
+  const chainSwap = spacingSwaps(offChainPlan)[0];
+  const chainPool = offChain.map((m) => (chainSwap !== undefined && m.name === chainSwap.chosen
+    ? { ...m, progressionGroup: 'spacing-chain', chainAdvancementReps: CHAIN_FLOOR } : m));
+  const chainPlan = generateBlock({
+    profile: prof({ objective: 'hypertrophy', training_age: 'advanced', weekly_frequency: 7, session_duration_cap_min: 75 }),
+    movements: chainPool, startDate: START,
+  });
+  const repsOf = (plan, name) => {
+    const id = byName(name).movement_id;
+    return plan.sessions.filter((s) => s.phase !== 'deload')
+      .flatMap((s) => s.slots.slice(0, 2).filter((slot) => slot.movement_id === id).map((slot) => slot.reps));
+  };
+  const replacementReps = chainSwap === undefined ? [] : repsOf(chainPlan, chainSwap.chosen);
+  const originalReps = chainSwap === undefined ? [] : repsOf(chainPlan, chainSwap.instead);
+  check('a spacing replacement on a capability chain keeps its chain rep floor (the original main lift is off-chain)',
+    chainSwap !== undefined
+      && spacingSwaps(chainPlan).some((swap) => swap.chosen === chainSwap.chosen && swap.instead === chainSwap.instead)
+      && originalReps.length > 0 && originalReps.every((reps) => reps < CHAIN_FLOOR)
+      && replacementReps.length > 0 && replacementReps.every((reps) => reps === CHAIN_FLOOR),
+    chainSwap === undefined ? 'no swap'
+      : `${chainSwap.chosen} reps ${replacementReps.join(',')} for ${chainSwap.instead} reps ${originalReps.join(',')}`);
 }
 
 try { verifyR05Blocks(); } catch (error) { check('R05 experience-only block workload', false, error.message); }

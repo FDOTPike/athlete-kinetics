@@ -36,9 +36,9 @@ Issue: #228
 - An explicit athlete choice for the slot (Customize) or a goal's named
   exercise is never moved. The athlete owns that choice, even when it puts
   the same lift on two days in a row.
-- Sets, reps, effort, the weekly progression, the deload and the
-  session-time contract are unchanged. Only which movement fills the slot
-  can change.
+- Sets, effort, the weekly progression, the deload and the session-time
+  contract are unchanged.
+- The spacing replacement is prescribed as that movement normally is. When the replacement belongs to a capability chain, it keeps its chain rep floor (chainScopedRepsFor), so target repetitions can rise if the original movement was not on a chain.
 - Conditioning and BJJ days are not touched.
 - Days that are not back to back are not touched.
 - No tier rule is involved (D02). The rule is the same for every training
@@ -60,7 +60,9 @@ Issue: #228
   tiers;
 - in a hypertrophy plan where no non-competition movement qualifies (Push-up
   planned as strictly bodyweight), spacing falls back to Competition Bench
-  for Dumbbell Bench Press rather than repeating it.
+  for Dumbbell Bench Press rather than repeating it;
+- a spacing replacement on a capability chain is prescribed its chain rep
+  floor when the main lift it replaces is off-chain.
 
 The full-inventory "no warnings" check now ignores this disclosure. It is a
 note about a choice, not a missing movement.
