@@ -200,34 +200,32 @@ const makeState = ({ plannedSets = 3, loggedSets = [] } = {}) => {
 };
 const NO_REPLACEMENT_OLD = 'No replacement is available under the current app checks. It is okay to finish here.';
 
-const emptySubstitution = (blockedByGuardrail) => ({
+const emptySubstitution = (heldByReportedArea) => ({
   targetId: 1,
+  heldByReportedArea,
   result: {
     haltAdvised: false,
-    blockedByGuardrail,
+    blockedByGuardrail: [],
     layer1Regression: { options: [] },
     layer2DaySwap: { options: [] },
   },
 });
 
-test('with no options and no reported-area holds, the sheet says what was checked and no longer uses the old wording', () => {
+test('with no options and no reported area removing candidates, the sheet claims no cause it did not check', () => {
   mockState = makeState({ plannedSets: 3, loggedSets: [] });
-  mockState.substitution = emptySubstitution([]);
+  mockState.substitution = emptySubstitution(false);
   render(<SessionScreen />);
 
-  expect(screen.getByText(
-    'No other exercise like Push-up is available with your equipment and experience level, and no later session in this block has one to bring forward. It is okay to finish here.',
-  )).toBeOnTheScreen();
+  expect(screen.getByText("No other exercise passes the app's checks for you right now. It is okay to finish here.")).toBeOnTheScreen();
   expect(screen.queryByText(NO_REPLACEMENT_OLD)).toBeNull();
+  expect(screen.queryByText(/held back/)).toBeNull();
 });
 
-test('with no options and some options held back by a reported area, the sheet names the reported area as the reason', () => {
+test('with no options and a reported area that removed candidates, the sheet names the reported area', () => {
   mockState = makeState({ plannedSets: 3, loggedSets: [] });
-  mockState.substitution = emptySubstitution([3]);
+  mockState.substitution = emptySubstitution(true);
   render(<SessionScreen />);
 
-  expect(screen.getByText(
-    'Some other exercises were held back because of an area you reported, and none is left to switch to. It is okay to finish here.',
-  )).toBeOnTheScreen();
+  expect(screen.getByText('Other exercises were held back because of an area you reported. None is left to switch to. It is okay to finish here.')).toBeOnTheScreen();
   expect(screen.queryByText(NO_REPLACEMENT_OLD)).toBeNull();
 });
