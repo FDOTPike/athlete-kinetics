@@ -554,7 +554,7 @@ export function sportWorkloadEffect(workload: SportWorkload): SportWorkloadEffec
       return {
         accessorySetCut: 0,
         holdHardestWeek: false,
-        explanation: `${lead} The gym plan is not adjusted for sport workload. Add your weekly sessions in Activities and the next block counts them. A light week does not change the gym plan. A full week takes one set off each accessory exercise, and a very full week also has week 3 repeat week 2.`,
+        explanation: `${lead} The gym plan is not adjusted for sport workload. Add your weekly sessions in Activities and the next block counts them. A light week does not change the gym plan. A full week takes one set off each accessory exercise. A very full week takes two sets off each accessory exercise, and week 3 repeats week 2 for every exercise, main lifts included.`,
       };
   }
 }
