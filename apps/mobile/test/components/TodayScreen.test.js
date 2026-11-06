@@ -676,6 +676,25 @@ describe('#228 the off-plan start opens a planned session and says which', () =>
     expect(mockState.startSession).toHaveBeenCalledWith(false, 2);
   });
 
+  // The ruling covers "Start a session anyway / now" only. After today's
+  // session is stopped or done, the extra session stays the free-form,
+  // unplanned start its label names, even with planned sessions ahead.
+  test.each([
+    ['stopped_today', 'halted', 'today-stopped-extra'],
+    ['completed_today', 'complete', 'today-extra-session'],
+  ])('on %s the extra session stays unplanned and does not take a planned session', (_label, status, controlTestId) => {
+    mockState = baseState({
+      blockSessions: [
+        blockSession({ plannedSessionId: 1, sessionDate: TODAY, completionStatus: status }),
+        blockSession({ plannedSessionId: 2, sessionDate: '2026-07-17', focus: 'upper' }),
+      ],
+    });
+    render(<TodayScreen />);
+    expect(screen.queryByTestId(`${controlTestId}-caption`)).toBeNull();
+    fireEvent.press(screen.getByTestId(controlTestId));
+    expect(mockState.startSession).toHaveBeenCalledWith();
+  });
+
   test('with nothing left in the plan it keeps the free-form start and says nothing extra', () => {
     mockState = baseState({ todayPlan: null, block: null, blockSessions: [] });
     render(<TodayScreen />);

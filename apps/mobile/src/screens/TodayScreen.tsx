@@ -180,10 +180,10 @@ function AvailableTodayScreen({
     () => offPlanStartTarget(blockSessions ?? [], today),
     [blockSessions, today],
   );
-  const startUnplannedAndOpen = React.useCallback(() => {
-    if (offPlanTarget !== null) {
+  const startUnplannedAndOpen = React.useCallback((target: typeof offPlanTarget) => {
+    if (target !== null) {
       setAwaitingStart(true);
-      startSession(false, offPlanTarget.session.plannedSessionId);
+      startSession(false, target.session.plannedSessionId);
       return;
     }
     if (checkFreeFormStartIsEmpty()) {
@@ -191,12 +191,16 @@ function AvailableTodayScreen({
       return;
     }
     startAndOpen();
-  }, [checkFreeFormStartIsEmpty, startAndOpen, offPlanTarget, startSession]);
+  }, [checkFreeFormStartIsEmpty, startAndOpen, startSession]);
   const renderUnplannedStartControl = (control: {
     label: string;
     accessibilityLabel: string;
     testID: string;
+    /** #228: only "Start a session anyway / now" takes the plan forward. The
+     *  extra session after today's stopped or finished one stays unplanned. */
+    takesPlanForward?: boolean;
   }): React.JSX.Element => {
+    const target = control.takesPlanForward === true ? offPlanTarget : null;
     if (emptyStartPromptOpen) {
       return (
         <View style={styles.card} testID="empty-free-form-start-card">
@@ -225,12 +229,12 @@ function AvailableTodayScreen({
       <>
         <QuietAction
           label={control.label}
-          onPress={startUnplannedAndOpen}
-          accessibilityLabel={offPlanTarget === null ? control.accessibilityLabel : offPlanStartCaption(offPlanTarget)}
+          onPress={() => startUnplannedAndOpen(target)}
+          accessibilityLabel={target === null ? control.accessibilityLabel : offPlanStartCaption(target)}
           testID={control.testID}
         />
-        {offPlanTarget !== null && (
-          <Text style={styles.caption} testID={`${control.testID}-caption`}>{offPlanStartCaption(offPlanTarget)}</Text>
+        {target !== null && (
+          <Text style={styles.caption} testID={`${control.testID}-caption`}>{offPlanStartCaption(target)}</Text>
         )}
       </>
     );
@@ -426,6 +430,7 @@ function AvailableTodayScreen({
               label: 'Start a session now',
               accessibilityLabel: 'Start an unplanned session now',
               testID: 'today-adhoc-session',
+              takesPlanForward: true,
             })}
           </View>
         );
@@ -442,6 +447,7 @@ function AvailableTodayScreen({
               label: 'Start a session anyway',
               accessibilityLabel: 'Start an unplanned session on a scheduled rest day',
               testID: 'today-adhoc-session',
+              takesPlanForward: true,
             })}
           </View>
         );
@@ -481,6 +487,7 @@ function AvailableTodayScreen({
               label: 'Start a session now',
               accessibilityLabel: 'Start an unplanned session now',
               testID: 'today-adhoc-session',
+              takesPlanForward: true,
             })}
           </View>
         );
