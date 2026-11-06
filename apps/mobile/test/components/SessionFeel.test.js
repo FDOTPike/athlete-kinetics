@@ -599,3 +599,10 @@ test('a note starter also focuses the note field, so the athlete can type straig
   fireEvent.press(screen.getByTestId('session-note-starter-body'));
   expect(focus).toHaveBeenCalled();
 });
+
+// Issue 158: the completion lines sit apart from the summary above them. The gap is on the outcome footer.
+test('the outcome footer is set apart from the summary above it, so the feel lines get a gap', () => {
+  mockState = baseState();
+  render(<SessionScreen />);
+  expect(StyleSheet.flatten(screen.getByTestId('session-outcome-footer').props.style)).toMatchObject({ marginTop: theme.space[3] });
+});

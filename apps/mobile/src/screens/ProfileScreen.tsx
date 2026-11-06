@@ -12,7 +12,7 @@
  * Law 4: Touch targets >= 56pt.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import {
   BIG4_LIFTS,
   ENERGY_SYSTEMS,
@@ -228,6 +228,8 @@ const inertWhileClosed = (): void => undefined;
 const refusedWhileClosed = (): boolean => false;
 
 export default function ProfileScreen(): React.JSX.Element {
+  // Large text (issue 158): an athlete's name gets a full row, so it is not cut inside a word.
+  const { fontScale } = useWindowDimensions();
   const profile = useStore((s) => s.profile);
   const saveProfile = useStore((s) => (s.status === 'ready' ? s.saveProfile : inertWhileClosed));
   const uiPreferences = useStore((s) => s.uiPreferences);
@@ -1297,7 +1299,7 @@ export default function ProfileScreen(): React.JSX.Element {
               }
               return (
                 <View key={a.id} style={styles.athleteBlock}>
-                  <View style={styles.athleteRow}>
+                  <View style={[styles.athleteRow, fontScale >= 1.3 && styles.athleteRowStacked]}>
                     <Pressable
                       style={styles.athleteMain}
                       disabled={isActive}
@@ -1574,6 +1576,7 @@ const styles = StyleSheet.create({
   coachToggle: { ...theme.font.body, color: theme.color.textMid },
   athleteBlock: { marginBottom: theme.space[2] },
   athleteRow: { flexDirection: 'row', alignItems: 'center', gap: theme.space[2], marginBottom: theme.space[2] },
+  athleteRowStacked: { flexDirection: 'column', alignItems: 'stretch' },
   athleteMain: {
     flex: 1,
     minHeight: theme.touch.min,
