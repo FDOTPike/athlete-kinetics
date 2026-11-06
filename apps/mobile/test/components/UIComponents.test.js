@@ -224,9 +224,9 @@ test('Stepper: spoken names drop the visual numbering and read in sentence case'
   render(
     <Stepper label="3 · TRAINING DAYS PER WEEK" value="3" onDecrement={() => {}} onIncrement={() => {}} />
   );
-  expect(screen.getByLabelText('Decrease Training days per week')).toBeOnTheScreen();
-  expect(screen.getByLabelText('Increase Training days per week')).toBeOnTheScreen();
-  expect(screen.getByLabelText('Training days per week 3')).toBeOnTheScreen();
+  expect(screen.getByLabelText('Decrease training days per week')).toBeOnTheScreen();
+  expect(screen.getByLabelText('Increase training days per week')).toBeOnTheScreen();
+  expect(screen.getByLabelText('training days per week 3')).toBeOnTheScreen();
   expect(screen.queryByLabelText(/·/)).toBeNull();
   // Mixed-case labels keep their wording, so existing names such as "Effort" hold.
   render(<Stepper label="Effort" value="7" onDecrement={() => {}} onIncrement={() => {}} />);

@@ -491,8 +491,8 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     expect(screen.getByLabelText(/Training guidance safety notice/)).toBeOnTheScreen();
     expect(screen.getByText(/pikeMethods provides training guidance, not medical advice/)).toBeOnTheScreen();
     // Steppers render with Decrease/Increase accessibility labels
-    expect(screen.getByLabelText('Decrease Training days per week')).toBeOnTheScreen();
-    expect(screen.getByLabelText('Increase Training days per week')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Decrease training days per week')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Increase training days per week')).toBeOnTheScreen();
   });
 
   test('b) Coach Mode athlete delete requires two presses before store action fires', () => {
@@ -673,7 +673,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     pressNext();
     fireEvent.press(screen.getByLabelText(/EXPERIENCED\./));
     pressNext();
-    fireEvent.press(screen.getByLabelText('Increase Training days per week'));
+    fireEvent.press(screen.getByLabelText('Increase training days per week'));
     pressNext();
     fireEvent.press(screen.getByRole('button', { name: /MINIMAL\. No equipment/ }));
     pressNext();

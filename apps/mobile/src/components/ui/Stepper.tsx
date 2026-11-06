@@ -30,16 +30,15 @@ export interface StepperProps {
   tip?: keyof typeof GLOSSARY & string;
 }
 
-// The name a screen reader speaks. The visual "3 · " numbering is dropped (issue 138).
-// An all-caps visible label becomes sentence case: the first letter is capital and
-// the rest lower case, except initialisms and units, which keep their capitals
-// so "RPE" is not read as the word "rpe".
+// The name a screen reader speaks, after "Decrease" or "Increase" (issue 138). The
+// visual "3 · " numbering is dropped. An all-caps visible label is spoken in lower
+// case, so it reads on from "Decrease": "Decrease training days per week". Initialisms
+// and units keep their capitals, so "RPE" is not read as the word "rpe".
 const KEEP_UPPER = new Set(['RPE', 'RIR', 'HRV', 'HR', 'BJJ', 'MMA', '1RM', 'KG', 'MIN']);
 function spokenName(label: string): string {
   const words = label.replace(/^\d+\s*·\s*/, '');
   if (words !== words.toUpperCase()) return words;
-  const lower = words.toLowerCase().replace(/[a-z0-9]+/g, (word) => (KEEP_UPPER.has(word.toUpperCase()) ? word.toUpperCase() : word));
-  return lower.charAt(0).toUpperCase() + lower.slice(1);
+  return words.toLowerCase().replace(/[a-z0-9]+/g, (word) => (KEEP_UPPER.has(word.toUpperCase()) ? word.toUpperCase() : word));
 }
 
 export function Stepper({
