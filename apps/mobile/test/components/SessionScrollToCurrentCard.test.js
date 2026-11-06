@@ -1,5 +1,6 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
+import { RIR_OPTIONS } from '@ak/inference';
 import { resolveLoadSelection as actualResolveLoadSelection } from '../../../../packages/inference/src/loadSelection';
 import { isDifficultyAllowed as actualIsDifficultyAllowed } from '../../../../packages/inference/src/tierPolicy';
 import SessionScreen from '../../src/screens/SessionScreen';
@@ -205,21 +206,59 @@ const scrollerOf = () => {
     .find((instance) => instance && typeof instance.scrollTo === 'function');
 };
 
-test('after Log set, the workout scrolls the current card (which holds the rest timer) into view', () => {
-  const { theme } = require('../../src/theme/theme');
-  mockState = makeState({ plannedSets: 3, loggedSets: [] });
-  mockState.substitution = null;
-  render(<SessionScreen />);
-  const scrollTo = jest.spyOn(scrollerOf(), 'scrollTo');
-
+const measure = () => {
   fireEvent(screen.getByTestId('session-timeline'), 'layout', { nativeEvent: { layout: { x: 0, y: 100, width: 300, height: 500 } } });
   fireEvent(screen.getByTestId('session-current-row'), 'layout', { nativeEvent: { layout: { x: 0, y: 200, width: 300, height: 300 } } });
+};
+
+// A Barbell movement with an empty load, so typing a load is needed before Log set.
+const barbellSetUp = () => {
+  mockState = makeState({ plannedSets: 3, loggedSets: [] });
+  mockState.substitution = null;
+  mockState.uiPreferences = { ...mockState.uiPreferences, restTimerEnabled: false };
+  mockState.movements = mockState.movements.map((item) => (item.movement_id === 1 ? { ...item, supportedPrefixes: ['Barbell'] } : item));
+  // The store records the set and advances the runner, as the real logSet does with the rest timer off.
+  mockState.logSet = jest.fn(() => {
+    const count = mockState.session.sets.length + 1;
+    mockState.session = {
+      ...mockState.session,
+      sets: [{ ...loggedSet(200 + count, 1, 'Push-up', count, 1), load_kg: 77.5 }, ...mockState.session.sets],
+    };
+    mockState.runner = { ...mockState.runner, slotSetCounts: [count, 0], loggedSets: count, setIndex: count + 1 };
+  });
+};
+
+test('after Log set with the rest timer off, the current card scrolls into view once', () => {
+  const { theme } = require('../../src/theme/theme');
+  barbellSetUp();
+  const { rerender } = render(<SessionScreen />);
+  measure();
+  const scrollTo = jest.spyOn(scrollerOf(), 'scrollTo');
+
+  fireEvent.changeText(screen.getByTestId('session-load-input'), '77.5');
+  rerender(<SessionScreen />);
   expect(scrollTo).not.toHaveBeenCalled();
 
   fireEvent.press(screen.getByLabelText('Log set 1 for Push-up'));
-  fireEvent(screen.getByTestId('session-current-row'), 'layout', { nativeEvent: { layout: { x: 0, y: 200, width: 300, height: 360 } } });
+  rerender(<SessionScreen />);
+  expect(mockState.logSet).toHaveBeenCalledTimes(1);
   expect(scrollTo).toHaveBeenCalledTimes(1);
   expect(scrollTo).toHaveBeenCalledWith({ y: 100 + 200 - theme.space[4], animated: true });
+});
+
+test('typing a load and choosing effort do not scroll the workout', () => {
+  barbellSetUp();
+  const { rerender } = render(<SessionScreen />);
+  measure();
+  const scrollTo = jest.spyOn(scrollerOf(), 'scrollTo');
+
+  fireEvent.changeText(screen.getByTestId('session-load-input'), '77.5');
+  rerender(<SessionScreen />);
+  fireEvent.press(screen.getByText(RIR_OPTIONS[0].label));
+  rerender(<SessionScreen />);
+  fireEvent(screen.getByTestId('session-current-row'), 'layout', { nativeEvent: { layout: { x: 0, y: 200, width: 300, height: 340 } } });
+
+  expect(scrollTo).not.toHaveBeenCalled();
 });
 
 test('a disabled Log set shows its reason as visible text under the button', () => {

@@ -393,11 +393,6 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   useEffect(() => {
     if (substitution === null) scrolledToSubstitutionFor.current = null;
   }, [substitution]);
-  // After Log set or finishing preparation, the workout scroll position is
-  // kept from before, so the current card and its rest timer can sit off-screen
-  // (Android walk 2026-11-03, W6-4). Scroll the current card in once its layout is known.
-  const timelineOffsetY = useRef(0);
-  const scrollCurrentOnLayout = useRef(false);
 
   // Session feel (070): the sub-view that records how the ended session went.
   const [feelOpen, setFeelOpen] = useState(false);
@@ -500,6 +495,52 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   const currentSlot = runnerCurrentId !== null ? sessionPlan.find((slot) => slot.sessionPlanSlotId === runnerCurrentId) ?? fallback : fallback;
   const currentMovement: Movement | null = currentSlot === null ? null : byId.get(runnerCurrent?.movementId ?? currentSlot.movementId) ?? byId.get(currentSlot.movementId) ?? null;
   const currentLogged = currentSlot === null ? 0 : (runner !== null && (runner.slotIndex ?? -1) >= 0 && runner.slotSetCounts?.[runner.slotIndex] != null ? Math.max(loggedCount(currentSlot), runner.slotSetCounts[runner.slotIndex]) : loggedCount(currentSlot));
+
+  // Android walk 2026-11-03 (W6-4): after Log set, or when preparation ends, the
+  // scroll position stayed where it was, so the current card and its rest timer
+  // could sit off-screen. The workout scrolls to the current row when one of
+  // those changes. Positions are the last layouts of the timeline and of each row;
+  // a change waits only for the layouts it needs, and no later layout can scroll on its own.
+  const timelineTop = useRef<number | null>(null);
+  const rowTops = useRef(new Map<number, number>());
+  const pendingScrollSlotId = useRef<number | null>(null);
+  const scrollToRow = (slotId: number | null): boolean => {
+    const top = timelineTop.current;
+    const rowTop = slotId === null ? undefined : rowTops.current.get(slotId);
+    if (top === null || rowTop === undefined) return false;
+    timelineRef.current?.scrollTo({ y: Math.max(0, top + rowTop - theme.space[4]), animated: true });
+    return true;
+  };
+  const flushPendingScroll = (): void => {
+    if (pendingScrollSlotId.current !== null && scrollToRow(pendingScrollSlotId.current)) {
+      pendingScrollSlotId.current = null;
+    }
+  };
+  const measureRow = (slotId: number) => (event: { nativeEvent: { layout: { y: number } } }): void => {
+    rowTops.current.set(slotId, event.nativeEvent.layout.y);
+    flushPendingScroll();
+  };
+  const currentSlotId = currentSlot?.sessionPlanSlotId ?? null;
+  const scrollPreparationOpen = preparation !== null && preparation.sessionId === session?.sessionId
+    && !isTerminalPreparationStatus(preparation.status);
+  const scrollKey = `${scrollPreparationOpen}|${runnerPhase}|${currentLogged}|${currentSlotId}`;
+  const lastScrollKey = useRef<string | null>(null);
+  useEffect(() => {
+    if (lastScrollKey.current === scrollKey) return;
+    const mounting = lastScrollKey.current === null;
+    lastScrollKey.current = scrollKey;
+    if (mounting) return;
+    // The timeline is not on screen during preparation, so its positions are gone.
+    if (scrollPreparationOpen) {
+      timelineTop.current = null;
+      rowTops.current.clear();
+      pendingScrollSlotId.current = null;
+      return;
+    }
+    // Scroll now when the positions are known; otherwise the layouts of the new timeline do it.
+    pendingScrollSlotId.current = scrollToRow(currentSlotId) ? null : currentSlotId;
+  }, [scrollKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const subTargetSlot = substitution === null
     ? null
     : (currentSlot !== null && currentSlot.movementId === substitution.targetId
@@ -990,7 +1031,6 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
     const held = loadShownRef.current;
     // A band-only movement showed no load, so none is recorded as shown.
     const seededForThisSet = !bandOnly && held !== null && held.slotId === currentSlot.sessionPlanSlotId && held.logged === currentLogged ? held.seed : null;
-    scrollCurrentOnLayout.current = true;
     logSet(currentMovement.movement_id, target.kind === 'time' ? 1 : Math.round(clamp(reps, 1, 50)), safeLoad, safeRpe, undefined, undefined, undefined, metrics, currentSlot.sessionPlanSlotId, seededForThisSet);
     if (runner === null) {
       if (uiPreferences.restTimerEnabled) setLocalRest({
@@ -1060,6 +1100,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   // to the halt card below (halting has already recorded preparation as stopped).
   const preparationOpen = preparation !== null && preparation.sessionId === session.sessionId
     && !isTerminalPreparationStatus(preparation.status);
+
   // Android walk (#213): the ramp sets read in kg when today's working load
   // for the ramped movement is known. It comes from the same resolver as the
   // set card, and only a load the app derived (from a 1RM or an override)
@@ -1108,10 +1149,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
             preparation={preparation}
             onBegin={beginPreparation}
             onRecordItem={recordPreparationItem}
-            onFinish={(outcome, expectedRevision) => {
-              scrollCurrentOnLayout.current = true;
-              finishPreparation(outcome, expectedRevision);
-            }}
+            onFinish={finishPreparation}
             onStopSession={() => { runnerHalt('manual'); endSession(); }}
             rampWorkingLoad={rampWorkingLoad}
           />
@@ -1212,7 +1250,10 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
           <View
             style={styles.timeline}
             testID="session-timeline"
-            onLayout={(event) => { timelineOffsetY.current = event.nativeEvent.layout.y; }}
+            onLayout={(event) => {
+              timelineTop.current = event.nativeEvent.layout.y;
+              flushPendingScroll();
+            }}
           >
             {sessionPlan.map((slot) => {
               const movement = byId.get(slot.movementId);
@@ -1242,6 +1283,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                   <View
                     key={slot.sessionPlanSlotId}
                     style={[styles.timelineRow, styles.replacedRow]}
+                    onLayout={measureRow(slot.sessionPlanSlotId)}
                     accessibilityRole="text"
                     accessibilityLabel={swappedLabel}
                     accessibilityState={{ disabled: true }}
@@ -1273,7 +1315,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                 const includesSuffix = asNames.length > 0 ? ` · includes ${asNames.join(', ')}` : '';
 
                 return (
-                  <View key={slot.sessionPlanSlotId} style={styles.timelineRow}>
+                  <View key={slot.sessionPlanSlotId} style={styles.timelineRow} onLayout={measureRow(slot.sessionPlanSlotId)}>
                     <View style={styles.rail}>
                       <View style={[styles.dot, styles.dotComplete]}>
                         <Text style={styles.check}>✓</Text>
@@ -1301,7 +1343,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                   : `${name}, skipped, no sets logged`;
 
                 return (
-                  <View key={slot.sessionPlanSlotId} style={styles.timelineRow}>
+                  <View key={slot.sessionPlanSlotId} style={styles.timelineRow} onLayout={measureRow(slot.sessionPlanSlotId)}>
                     <View style={styles.rail}>
                       <View style={[styles.dot, styles.dotSkipped]}>
                         <Text style={styles.skipMark}>–</Text>
@@ -1327,7 +1369,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
 
               if (!active) {
                 return (
-                  <View key={slot.sessionPlanSlotId} style={styles.timelineRow}>
+                  <View key={slot.sessionPlanSlotId} style={styles.timelineRow} onLayout={measureRow(slot.sessionPlanSlotId)}>
                     <View style={styles.rail}>
                       <View style={styles.dot} />
                     </View>
@@ -1355,14 +1397,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                   key={slot.sessionPlanSlotId}
                   style={styles.timelineRow}
                   testID="session-current-row"
-                  onLayout={(event) => {
-                    if (!scrollCurrentOnLayout.current) return;
-                    scrollCurrentOnLayout.current = false;
-                    timelineRef.current?.scrollTo({
-                      y: Math.max(0, timelineOffsetY.current + event.nativeEvent.layout.y - theme.space[4]),
-                      animated: true,
-                    });
-                  }}
+                  onLayout={measureRow(slot.sessionPlanSlotId)}
                 >
                   {/* Left Active Spine (Chalk marks CURRENT/ACTIVE only) */}
                   <View style={[styles.rail, styles.railActive]}>
