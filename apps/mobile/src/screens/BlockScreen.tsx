@@ -1544,7 +1544,9 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                   <Text style={styles.statusBadgeText}>No change</Text>
                 </View>
                 <Text style={styles.captionText}>
-                  Coach did not match this to a known scenario, so today's plan is unchanged.
+                  {triageReady
+                    ? "Coach did not match this to a known scenario, so today's plan is unchanged."
+                    : "Matching is unavailable, so this report was not matched to a known scenario and today's plan is unchanged. Injury-language safety checks still apply."}
                 </Text>
               </View>
             )}

@@ -8289,8 +8289,12 @@ export const useStore = create<KineticsStore>()((set, get) => {
       if (embedder !== null) {
         try {
           semantic = triage(await embedder.embed(raw), getCodebase());
+          set({ triageReady: true });
         } catch {
+          // Matching could not run (model or session unavailable): the
+          // readiness flag says so, so the report is not called "did not match".
           semantic = null;
+          set({ triageReady: false });
         }
       }
       // Defence in depth behind the lease: never resolve "the current
