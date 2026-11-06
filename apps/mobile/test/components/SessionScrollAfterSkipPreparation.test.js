@@ -65,6 +65,7 @@ const startFromScreen = () => {
   expect(state().session).not.toBeNull();
 };
 
+const innerViewRef = { name: 'scroll inner view' };
 const scrollerOf = () => {
   const { ScrollView } = require('react-native');
   return screen.UNSAFE_getAllByType(ScrollView)
@@ -93,7 +94,9 @@ test('after Skip preparation the workout scrolls once, to the current row measur
   expect(screen.queryByTestId('preparation-panel')).toBeNull();
   expect(screen.getByTestId('session-timeline')).toBeTruthy();
 
-  const scrollTo = jest.spyOn(scrollerOf(), 'scrollTo');
+  const scroller = scrollerOf();
+  scroller.getInnerViewRef = () => innerViewRef;
+  const scrollTo = jest.spyOn(scroller, 'scrollTo');
   const row = measureCurrentRowAt(250);
   expect(scrollTo).not.toHaveBeenCalled();
   act(() => {
@@ -102,6 +105,7 @@ test('after Skip preparation the workout scrolls once, to the current row measur
     pending.forEach((cb) => cb(0));
   });
   expect(row.measureLayout).toHaveBeenCalledTimes(1);
+  expect(row.measureLayout.mock.calls[0][0]).toBe(innerViewRef);
   expect(scrollTo).toHaveBeenCalledTimes(1);
   expect(scrollTo).toHaveBeenCalledWith({ y: 250 - theme.space[4], animated: true });
 });

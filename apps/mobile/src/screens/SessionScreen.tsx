@@ -1,6 +1,6 @@
 /** Phase 17 utility-first active-session surface. */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View, findNodeHandle } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type HostInstance } from 'react-native';
 import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING_NOTE, EFFORT_STOP_GUIDANCE, effortCue, mapRirToRpe, RIR_OPTIONS, PREPARATION_STATUS_LABEL, isTerminalPreparationStatus, preparationDoseUnit, type EffortAnswer, type RunnerHaltReason } from '@ak/inference';
 import { EXPERIENCE_SEVERITY, runnerTierForTrainingAge } from '../../../../packages/inference/src/sessionRunner';
 import { formatTeachingOnlyReason, freeFormStartIsEmpty, useStore, type LoadSelection, type LoggedSet, type SetLoadShown, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
@@ -544,10 +544,13 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
       const row = currentRowRef.current;
       const scroller = timelineRef.current;
       if (now.halted || now.complete || now.preparationOpen || row === null || scroller === null) return;
-      const handle = findNodeHandle(scroller);
-      if (handle === null) return;
+      // The content view is a host ref, which Fabric's measureLayout requires (a node
+      // handle number is refused on the new architecture). Its y is content-relative.
+      // getInnerViewRef is on the runtime ScrollView (ScrollView.js) but not in the public typings.
+      const content = (scroller as ScrollView & { getInnerViewRef?: () => HostInstance | null }).getInnerViewRef?.() ?? null;
+      if (content === null) return;
       row.measureLayout(
-        handle,
+        content,
         (_x, y) => { scroller.scrollTo({ y: Math.max(0, y - theme.space[4]), animated: true }); },
         () => undefined,
       );

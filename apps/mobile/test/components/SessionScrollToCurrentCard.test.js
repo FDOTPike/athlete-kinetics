@@ -227,6 +227,13 @@ const scrollerOf = () => {
     .find((instance) => instance && typeof instance.scrollTo === 'function');
 };
 
+// The content view the row is measured against: a host ref, as Fabric requires.
+const innerViewRef = { name: 'scroll inner view' };
+const withInnerView = (scroller) => {
+  scroller.getInnerViewRef = () => innerViewRef;
+  return scroller;
+};
+
 // The current row's position is measured fresh when a scroll runs; nothing is stored.
 const measureCurrentRowAt = (y) => {
   // The ref the screen holds is the component instance that owns the host node.
@@ -258,7 +265,7 @@ test('after Log set with the rest timer off, the current row is measured fresh a
   const { theme } = require('../../src/theme/theme');
   barbellSetUp();
   const { rerender } = render(<SessionScreen />);
-  const scrollTo = jest.spyOn(scrollerOf(), 'scrollTo');
+  const scrollTo = jest.spyOn(withInnerView(scrollerOf()), 'scrollTo');
   const row = measureCurrentRowAt(200);
 
   fireEvent.changeText(screen.getByTestId('session-load-input'), '77.5');
@@ -271,6 +278,7 @@ test('after Log set with the rest timer off, the current row is measured fresh a
   runFrames();
   expect(mockState.logSet).toHaveBeenCalledTimes(1);
   expect(row.measureLayout).toHaveBeenCalledTimes(1);
+  expect(row.measureLayout.mock.calls[0][0]).toBe(innerViewRef);
   expect(scrollTo).toHaveBeenCalledTimes(1);
   expect(scrollTo).toHaveBeenCalledWith({ y: 200 - theme.space[4], animated: true });
 });
@@ -278,7 +286,7 @@ test('after Log set with the rest timer off, the current row is measured fresh a
 test('typing a load and choosing effort do not scroll the workout', () => {
   barbellSetUp();
   const { rerender } = render(<SessionScreen />);
-  const scrollTo = jest.spyOn(scrollerOf(), 'scrollTo');
+  const scrollTo = jest.spyOn(withInnerView(scrollerOf()), 'scrollTo');
   const row = measureCurrentRowAt(200);
 
   fireEvent.changeText(screen.getByTestId('session-load-input'), '77.5');
@@ -297,7 +305,7 @@ test('moving from slot 1 to slot 2 scrolls to slot 2 at its fresh measured posit
   mockState.substitution = null;
   mockState.uiPreferences = { ...mockState.uiPreferences, restTimerEnabled: false };
   const { rerender } = render(<SessionScreen />);
-  const scrollTo = jest.spyOn(scrollerOf(), 'scrollTo');
+  const scrollTo = jest.spyOn(withInnerView(scrollerOf()), 'scrollTo');
   measureCurrentRowAt(200);
 
   // Slot 1 is finished (three logged sets); slot 2 is now current. Its row has moved down.
@@ -312,6 +320,7 @@ test('moving from slot 1 to slot 2 scrolls to slot 2 at its fresh measured posit
   runFrames();
 
   expect(row.measureLayout).toHaveBeenCalledTimes(1);
+  expect(row.measureLayout.mock.calls[0][0]).toBe(innerViewRef);
   expect(scrollTo).toHaveBeenCalledTimes(1);
   expect(scrollTo).toHaveBeenCalledWith({ y: 420 - theme.space[4], animated: true });
 });
@@ -322,7 +331,7 @@ test('a halted session does not scroll', () => {
   // The timeline and its rows have been laid out on screen before the phase changes.
   fireEvent(screen.getByTestId('session-timeline'), 'layout', { nativeEvent: { layout: { x: 0, y: 100, width: 300, height: 500 } } });
   fireEvent(screen.getByTestId('session-current-row'), 'layout', { nativeEvent: { layout: { x: 0, y: 200, width: 300, height: 300 } } });
-  const scrollTo = jest.spyOn(scrollerOf(), 'scrollTo');
+  const scrollTo = jest.spyOn(withInnerView(scrollerOf()), 'scrollTo');
   mockState.runner = { ...mockState.runner, phase: 'halted' };
   rerender(<SessionScreen />);
   runFrames();
@@ -335,7 +344,7 @@ test('a complete session does not scroll', () => {
   // The timeline and its rows have been laid out on screen before the phase changes.
   fireEvent(screen.getByTestId('session-timeline'), 'layout', { nativeEvent: { layout: { x: 0, y: 100, width: 300, height: 500 } } });
   fireEvent(screen.getByTestId('session-current-row'), 'layout', { nativeEvent: { layout: { x: 0, y: 200, width: 300, height: 300 } } });
-  const scrollTo = jest.spyOn(scrollerOf(), 'scrollTo');
+  const scrollTo = jest.spyOn(withInnerView(scrollerOf()), 'scrollTo');
   mockState.runner = { ...mockState.runner, phase: 'complete' };
   rerender(<SessionScreen />);
   runFrames();
