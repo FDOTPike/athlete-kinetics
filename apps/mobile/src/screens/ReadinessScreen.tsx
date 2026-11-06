@@ -12,6 +12,7 @@ import { useStore } from '../state/useStore';
 import { deriveTodayState } from '../state/todayState';
 import TrainingSupportNotice from '../components/TrainingSupportNotice';
 import { theme } from '../theme/theme';
+import { sessionFocusName } from '../state/sessionSummary';
 import {
   PrimaryButton,
   SecondaryButton,
@@ -69,8 +70,7 @@ const format = (value: number | null, digits: number, suffix = ''): string =>
 const formatSigned = (value: number | null, digits: number): string =>
   value === null ? 'Not available' : `${value >= 0 ? '+' : ''}${value.toFixed(digits)}`;
 
-const formatFocus = (focus: string): string =>
-  focus ? focus.charAt(0).toUpperCase() + focus.slice(1).toLowerCase() : '';
+const formatFocus = (focus: string): string => (focus ? sessionFocusName(focus) : '');
 
 export const readinessCoverage = (vector: StateVectorRow): string => {
   const available = [vector.hrv_z !== null, vector.sleep_efficiency_pct !== null]

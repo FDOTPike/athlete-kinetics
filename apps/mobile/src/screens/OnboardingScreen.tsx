@@ -57,6 +57,7 @@ import { theme } from '../theme/theme';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import InfoTip from '../components/InfoTip';
 import { useStore } from '../state/useStore';
+import { anchorDisplayName } from '../state/priorExperience';
 import { useSubViewBack } from '../navigation/navigation';
 import { Chip, Stepper, QuietAction, PrimaryButton } from '../components/ui';
 import {
@@ -147,7 +148,7 @@ const EQUIPMENT_DESCRIPTION: Record<EquipmentItem, string> = {
 const PRESET_COPY = {
   full_gym: { label: 'FULL GYM', blurb: 'A broad setup with racks, free weights, cables, bands, and mats.' },
   home_basic: { label: 'HOME BASIC', blurb: 'A compact setup with dumbbells, a kettlebell, a pull-up bar, bands, and mats.' },
-  minimal: { label: 'MINIMAL', blurb: 'No equipment required; bodyweight movements remain available.' },
+  minimal: { label: 'MINIMAL', blurb: 'Bands and mats only; bodyweight movements remain available.' },
 } as const;
 
 /** Plain-language read of an RPE effort cap, shown live under the stepper. */
@@ -231,6 +232,26 @@ function ReviewSection({ heading, description, onEdit, children }: ReviewSection
 // ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
+// Walk 1 (W1-15): STRENGTH + GRAPPLING found no grappling sport in the list.
+// The goal itself plans the BJJ days; the sport step is for another sport.
+export const HYBRID_SPORT_NOTE = 'Your Strength + Grappling goal already includes BJJ days. '
+  + 'Do you also train another sport? This step is optional.';
+
+// Walk 1 (W1-11): a blank name made every new athlete "Athlete 1", even
+// beside an existing "Athlete 1". A blank name takes the first free number.
+export const fallbackAthleteName = (
+  athletes: readonly { id: string; name: string }[], activeId: string | null,
+): string => {
+  const taken = new Set(athletes.filter((a) => a.id !== activeId).map((a) => a.name.trim().toLowerCase()));
+  let n = 1;
+  while (taken.has(`athlete ${n}`)) n += 1;
+  return `Athlete ${n}`;
+};
+
+// Walk 1 (W1-12): "1 limitation notes" read wrong.
+export const limitationNotesLine = (count: number): string =>
+  `${count} limitation ${count === 1 ? 'note' : 'notes'} recorded for your reference.`;
+
 export default function OnboardingScreen(): React.JSX.Element {
   const completeOnboarding = useStore((s) => s.completeOnboarding);
   const beginOnboardingDraft = useStore((s) => s.beginOnboardingDraft);
@@ -279,6 +300,26 @@ export default function OnboardingScreen(): React.JSX.Element {
   const [wantsSport, setWantsSport] = useState(false);
   const [sportFields, setSportFields] = useState<SportFieldsState>(EMPTY_SPORT_FIELDS);
   const movements = useStore((s) => s.movements) ?? [];
+  // #217: "Have you trained these before?" Only what the athlete could declare
+  // for the answers so far (the Library chip's own test); training age alone
+  // declares nothing.
+  const previewDeclarations = useStore((s) => s.previewPriorExperienceDeclarations);
+  const movementAvailabilityRevision = useStore((s) => s.movementAvailabilityRevision);
+  const [declaredAnchorIds, setDeclaredAnchorIds] = useState<readonly number[]>([]);
+  const [declaredBasics, setDeclaredBasics] = useState(false);
+  const declarationOptions = useMemo(
+    () => (typeof previewDeclarations === 'function'
+      ? previewDeclarations(draft)
+      : { anchors: [], basicMovementIds: [] }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [previewDeclarations, draft.training_age, draft.equipment_inventory, movementAvailabilityRevision],
+  );
+  const declaredMovementIds = [
+    ...declarationOptions.anchors.filter((anchor) => declaredAnchorIds.includes(anchor.movementId)).map((anchor) => anchor.movementId),
+    ...(declaredBasics ? declarationOptions.basicMovementIds : []),
+  ];
+  const toggleDeclaredAnchor = (movementId: number): void => setDeclaredAnchorIds((ids) =>
+    (ids.includes(movementId) ? ids.filter((id) => id !== movementId) : [...ids, movementId]));
   const [saveAttempted, setSaveAttempted] = useState(false);
   const today = localIsoToday();
 
@@ -387,7 +428,7 @@ export default function OnboardingScreen(): React.JSX.Element {
     setSaveAttempted(true);
     completeOnboarding(
       { ...draft, injury_flags: parseNotes(injuryText), mobility_limits: parseNotes(mobilityText) },
-      name.trim().length > 0 ? name : 'Athlete 1',
+      name.trim().length > 0 ? name : fallbackAthleteName(athletes, activeAthleteId),
       loadPreference,
       loadPreferenceExplicit,
       {
@@ -396,6 +437,7 @@ export default function OnboardingScreen(): React.JSX.Element {
         goal: wantsTarget ? goalDraftFromFields(goalFields) : null,
         goalMovementId: wantsTarget && GOAL_EXERCISE_METRICS.has(goalFields.metricId) ? goalExerciseId : null,
         sport: wantsSport ? sportDraftFromFields(sportFields) : null,
+        priorExperienceMovementIds: declaredMovementIds,
       },
     );
   };
@@ -433,7 +475,9 @@ export default function OnboardingScreen(): React.JSX.Element {
       <Text style={styles.wordmark}>pikeMethods</Text>
 
       {/* Progress dots (P4 ruling: keep as-is with chalk on current dot) */}
-      <View style={styles.dots} accessibilityLabel={`Step ${stepIdx + 1} of ${steps.length}`}>
+      {/* Walk W6-7: without `accessible` Android did not expose the step. */}
+      <View style={styles.dots} accessible accessibilityRole="text" testID="onboarding-progress"
+        accessibilityLabel={`Step ${stepIdx + 1} of ${steps.length}`}>
         {steps.map((k, i) => (
           <View key={k} style={[styles.dot, i === stepIdx && styles.dotActive, i < stepIdx && styles.dotDone]} />
         ))}
@@ -503,6 +547,11 @@ export default function OnboardingScreen(): React.JSX.Element {
               onToggleMuscles={() => setShowFocusMuscles((visible) => !visible)}
             />
             <Text style={styles.fieldLabel}>A SPORT? (OPTIONAL)</Text>
+            {draft.objective === 'hybrid' && (
+              <Text style={styles.pDim} testID="onboarding-hybrid-sport-note">
+                {HYBRID_SPORT_NOTE}
+              </Text>
+            )}
             <Chip
               testID="onboarding-wants-sport"
               wrap
@@ -535,6 +584,11 @@ export default function OnboardingScreen(): React.JSX.Element {
         {step === 'sport' && (
           <View>
             <Text style={styles.h2}>{SPORT_QUESTION.toUpperCase()}</Text>
+            {draft.objective === 'hybrid' && (
+              <Text style={styles.pDim} testID="onboarding-hybrid-sport-step-note">
+                {HYBRID_SPORT_NOTE}
+              </Text>
+            )}
             <SportEditor fields={sportFields} onChange={setSportFields} today={today} />
             <QuietAction
               label="Skip this — plan general gym training"
@@ -669,6 +723,39 @@ export default function OnboardingScreen(): React.JSX.Element {
                 </Text>
               </View>
             )}
+            {(declarationOptions.anchors.length > 0 || declarationOptions.basicMovementIds.length > 0) && (
+              <View testID="onboarding-prior-experience">
+                <Text style={styles.fieldLabel} accessibilityRole="header">HAVE YOU TRAINED THESE BEFORE? (OPTIONAL)</Text>
+                <Text style={styles.pDim}>
+                  Tap each one you have trained before and it can be in your plan. This is your own statement
+                  about your training history, not a coaching assessment. If you leave them, your plan starts
+                  with the movements that lead up to them.
+                </Text>
+                <View style={styles.choiceGroup}>
+                  {declarationOptions.anchors.map((anchor) => (
+                    <Chip
+                      key={anchor.movementId}
+                      wrap
+                      label={`I have trained ${anchorDisplayName(anchor.name)} before`}
+                      selected={declaredAnchorIds.includes(anchor.movementId)}
+                      onPress={() => toggleDeclaredAnchor(anchor.movementId)}
+                      accessibilityLabel={`I have trained ${anchorDisplayName(anchor.name)} before`}
+                      testID={`onboarding-declare-${anchor.movementId}`}
+                    />
+                  ))}
+                  {declarationOptions.basicMovementIds.length > 0 && (
+                    <Chip
+                      wrap
+                      label="I have done planks, carries and bodyweight basics before"
+                      selected={declaredBasics}
+                      onPress={() => setDeclaredBasics((value) => !value)}
+                      accessibilityLabel="I have done planks, carries and bodyweight basics before"
+                      testID="onboarding-declare-basics"
+                    />
+                  )}
+                </View>
+              </View>
+            )}
           </View>
         )}
 
@@ -749,7 +836,7 @@ export default function OnboardingScreen(): React.JSX.Element {
                       {`TARGET — ${goalValidation.goal.specificOutcome}: ${goalValidation.goal.baselineValue === null ? '' : `from ${goalValidation.goal.baselineValue} ${goalValidation.goal.unit} to `}${goalValidation.goal.targetValue} ${goalValidation.goal.unit}${goalValidation.goal.requestedDeadline === null ? ', no deadline' : ` by ${goalValidation.goal.requestedDeadline}`}`}
                     </Text>
                     <Pressable
-                      onPress={() => goTo('target')}
+                      onPress={() => editFromReview('target')}
                       accessibilityRole="button"
                       accessibilityLabel="Edit target"
                       style={styles.reviewEdit}
@@ -791,7 +878,7 @@ export default function OnboardingScreen(): React.JSX.Element {
               <ReviewSection
                 heading="TRAINING SUPPORT"
                 description={(parseNotes(injuryText).length + parseNotes(mobilityText).length) > 0
-                  ? `${parseNotes(injuryText).length + parseNotes(mobilityText).length} limitation notes recorded for your reference.`
+                  ? limitationNotesLine(parseNotes(injuryText).length + parseNotes(mobilityText).length)
                   : 'No limitations noted. You can add or change these later.'}
                 onEdit={() => editFromReview('limits')}
               >
