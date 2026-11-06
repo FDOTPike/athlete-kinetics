@@ -7273,12 +7273,12 @@ export const useStore = create<KineticsStore>()((set, get) => {
         return mv === undefined ? [] : [{ row: r, movement: mv }];
       });
     }
-    const inputFor = (available: ReadonlySet<number>): SubstitutionInput => ({
+    const inputFor = (available: ReadonlySet<number>, niggles: readonly NiggleInput[]): SubstitutionInput => ({
       target: toSubMovement(target, available),
       library: movements.filter((movement) => supportSnapshot.evaluate(movementSupportTargets([movement.movement_id])).status === 'available')
         .map((movement) => toSubMovement(movement, available)),
       inventory: profile.equipment_inventory,
-      niggles: get().niggles, // active niggles drive the guardrail + Layer 3
+      niggles, // active niggles drive the guardrail + Layer 3
       futureSlots: futureRows
         .filter(({ movement }) => supportSnapshot.evaluate(movementSupportTargets([movement.movement_id])).status === 'available')
         .map(({ row, movement }): FutureSlot => ({
@@ -7293,16 +7293,16 @@ export const useStore = create<KineticsStore>()((set, get) => {
       accessContext,
     });
     const offeredCount = (r: SubstitutionResult): number => r.layer1Regression.options.length + r.layer2DaySwap.options.length;
-    const result = computeSubstitutions(inputFor(capabilityAvailable));
-    // The sheet names the reported area only when it actually removed candidates.
-    // The first run already reports joint-guardrail blocks. When it offered
-    // nothing, a second run with the area exclusion lifted shows what it hid:
-    // either offers, or guardrail blocks on movements that passed every other check.
-    let heldByReportedArea = result.blockedByGuardrail.length > 0;
-    if (!heldByReportedArea && offeredCount(result) === 0 && safetyExcluded.size > 0) {
+    const result = computeSubstitutions(inputFor(capabilityAvailable, get().niggles));
+    // heldByReportedArea: the sheet shows only Layers 1 and 2. It is true only when
+    // both are empty AND a read-only second run, with the reported-area exclusion
+    // lifted and no niggles, would offer a Layer 1 or Layer 2 option. Layer 3 and
+    // the joint guardrail are not shown on the sheet, so they never set this flag.
+    // The second run's result is used for this boolean alone.
+    let heldByReportedArea = false;
+    if (offeredCount(result) === 0) {
       const withoutArea = capabilityAvailableMovementIds(d, movements, profile, accessContext, priorExperience, new Set<number>());
-      const restored = computeSubstitutions(inputFor(withoutArea));
-      heldByReportedArea = offeredCount(restored) > 0 || restored.blockedByGuardrail.length > 0;
+      heldByReportedArea = offeredCount(computeSubstitutions(inputFor(withoutArea, []))) > 0;
     }
     set({ substitution: { targetId: targetMovementId, result, heldByReportedArea } });
   },

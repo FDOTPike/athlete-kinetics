@@ -80,7 +80,42 @@ test('when a reported area removes every same-pattern alternative, the store say
   expect(heldByReportedArea).toBe(true);
 });
 
-test('when no alternative exists and no area is reported, the store does not claim an area held anything back', async () => {
+test('a niggle on an unrelated joint, when equipment is what empties the list, does not claim an area held anything back', async () => {
+  const { pushUpId } = await bootWithPushUpSession();
+  expect(state().reportNiggle('knee', 5)).toBe(true);
+  // Keep the target and the equipment-requiring push movements; with no equipment, every alternative is out.
+  useStore.setState({
+    profile: { ...state().profile, equipment_inventory: [] },
+    movements: state().movements.filter((movement) => movement.pattern !== 'push_h'
+      || movement.movement_id === pushUpId || (movement.required ?? []).length > 0),
+  });
+
+  state().openSubstitution(pushUpId);
+
+  const { result, heldByReportedArea } = state().substitution;
+  expect(result.layer1Regression.options).toEqual([]);
+  expect(result.layer2DaySwap.options).toEqual([]);
+  expect(heldByReportedArea).toBe(false);
+});
+
+test('a niggle on an unrelated joint does not make the flag true through an isolation movement the sheet never shows', async () => {
+  const { pushUpId } = await bootWithPushUpSession();
+  expect(state().reportNiggle('knee', 5)).toBe(true);
+  // No push alternative is in the library. A knee niggle still blocks knee isolation
+  // movements (Layer 3), which the sheet never shows.
+  useStore.setState({
+    movements: state().movements.filter((movement) => movement.pattern !== 'push_h' || movement.movement_id === pushUpId),
+  });
+
+  state().openSubstitution(pushUpId);
+
+  const { result, heldByReportedArea } = state().substitution;
+  expect(result.layer1Regression.options).toEqual([]);
+  expect(result.layer2DaySwap.options).toEqual([]);
+  expect(heldByReportedArea).toBe(false);
+});
+
+test('when no alternative exists and no niggle is reported, the store does not claim an area held anything back', async () => {
   const { pushUpId } = await bootWithPushUpSession();
   // Keep only the target from its pattern, so the library has no alternative at all.
   useStore.setState({
