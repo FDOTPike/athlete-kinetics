@@ -66,6 +66,11 @@ const formatRunnerHaltReason = (
  *  and negatives. An empty/whitespace draft is ABSENT evidence (null), which
  *  is never coerced to zero. The literal "0" is a valid explicit zero. */
 const LOAD_DRAFT_RE = /^(?:\d+(?:[.,]\d*)?|[.,]\d+)$/;
+/** Android walk (#232): the line under the target for a band-only movement,
+ *  which asks for no kilograms. */
+const BAND_ONLY_NO_LADDER_TEXT = 'No bands named yet. You can name them in Profile > Band ladder.';
+const BAND_ONLY_CHOOSE_TEXT = 'Choose the band you used. No kilograms are needed.';
+
 const parseLoadDraft = (text: string): number | null => {
   const trimmed = text.trim();
   if (trimmed === '') return null;
@@ -533,8 +538,14 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
         overrideLoadKg: currentSlot.overrideLoadKg,
         sessionPlanSlotId: currentSlot.sessionPlanSlotId,
       });
-  const loadEvidence = loadSelection === null
-    ? ''
+  // Android walk (#232): a movement whose only implement is a band (Band Row,
+  // Band Pull-Apart) has no kilograms to enter. The set records reps, effort
+  // and, when bands are named, the band; its load is 0. Movements that take
+  // a load as well as a band keep the load field.
+  const bandOnly = currentMovement?.supportedPrefixes?.length === 1 && primaryImplement === 'Banded';
+  const loadEvidence = bandOnly
+    ? (bandLadder.length > 0 ? BAND_ONLY_CHOOSE_TEXT : BAND_ONLY_NO_LADDER_TEXT)
+    : loadSelection === null ? ''
     : loadCopyFor(
         loadSelection,
         bodyweightMode,
@@ -542,7 +553,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
         currentSlot?.overrideLoadKg ?? null,
         target?.kind === 'time',
       );
-  const loadLoggable = isLoadDraftLoggable(loadText) && !loadInvalid;
+  const loadLoggable = bandOnly || (isLoadDraftLoggable(loadText) && !loadInvalid);
 
   const safeRpe: number | null = selectedChoice !== null
     ? mapRirToRpe(selectedChoice)
@@ -952,7 +963,8 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
     // Equipment/safety/capability/attestation restrictions block execution of
     // this slot even though they no longer block the whole session.
     if (!currentSlotExecutable) return;
-    const parsed = parseLoadDraft(loadText);
+    // A band-only movement logs load 0 (#232): no kilograms were asked for.
+    const parsed = bandOnly ? 0 : parseLoadDraft(loadText);
     // Logging an external-load set requires an explicit finite, non-negative
     // entry; blank is absent evidence and never coerced to zero.
     if (parsed === null) {
@@ -971,7 +983,8 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
     // No seed is better than another set's seed: if the draft was not initialized for exactly this
     // slot and set (a press landing before the initializer has run), nothing is recorded as shown.
     const held = loadShownRef.current;
-    const seededForThisSet = held !== null && held.slotId === currentSlot.sessionPlanSlotId && held.logged === currentLogged ? held.seed : null;
+    // A band-only movement showed no load, so none is recorded as shown.
+    const seededForThisSet = !bandOnly && held !== null && held.slotId === currentSlot.sessionPlanSlotId && held.logged === currentLogged ? held.seed : null;
     logSet(currentMovement.movement_id, target.kind === 'time' ? 1 : Math.round(clamp(reps, 1, 50)), safeLoad, safeRpe, undefined, undefined, undefined, metrics, currentSlot.sessionPlanSlotId, seededForThisSet);
     if (runner === null) {
       if (uiPreferences.restTimerEnabled) setLocalRest({
@@ -1375,7 +1388,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                         <Text
                           style={styles.loadEvidence}
                           testID="session-load-source-line"
-                          accessibilityLabel={`Load source. ${loadEvidence}`}
+                          accessibilityLabel={bandOnly ? loadEvidence : `Load source. ${loadEvidence}`}
                         >
                           {loadEvidence}
                         </Text>
@@ -1419,6 +1432,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                               Target: {target?.kind === 'reps' ? target.reps : '—'} reps. Log the reps you actually completed.
                             </Text>
                           )}
+                          {!bandOnly && (
                           <View style={styles.loadField}>
                             <Text style={styles.loadFieldLabel} testID="session-load-label">{loadLabel.toUpperCase()}</Text>
                             <View style={styles.loadFieldRow}>
@@ -1484,6 +1498,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                               </Pressable>
                             </View>
                           </View>
+                          )}
 
                           <Text style={styles.effortCue} testID="effort-scale-explanation">
                             How hard did that feel? The full effort scale runs from 1 (very easy) to 10 (your hardest effort). Direct working-set entry runs from 5 to 10.
