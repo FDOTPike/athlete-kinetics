@@ -177,15 +177,15 @@ describe('the sport screen in the interview', () => {
   test('"not sure" is the starting workload answer; the competition date is context only', () => {
     openSportSlide();
     press('sport-family-powerlifting');
-    expect(screen.getByLabelText('practice sessions a week Not sure')).toBeTruthy();
-    expect(screen.getByLabelText('matches or competitions a week Not sure')).toBeTruthy();
+    expect(screen.getByLabelText('Practice sessions a week Not sure')).toBeTruthy();
+    expect(screen.getByLabelText('Matches or competitions a week Not sure')).toBeTruthy();
     expect(selected('sport-practice-unsure')).toBe(true);
-    pressLabel('Increase practice sessions a week');
-    pressLabel('Increase practice sessions a week');
-    expect(screen.getByLabelText('practice sessions a week 2')).toBeTruthy();
+    pressLabel('Increase Practice sessions a week');
+    pressLabel('Increase Practice sessions a week');
+    expect(screen.getByLabelText('Practice sessions a week 2')).toBeTruthy();
     expect(selected('sport-practice-unsure')).toBe(false);
     press('sport-practice-unsure');
-    expect(screen.getByLabelText('practice sessions a week Not sure')).toBeTruthy();
+    expect(screen.getByLabelText('Practice sessions a week Not sure')).toBeTruthy();
     expect(screen.getByTestId('sport-competition-note').props.children)
       .toBe('The date is used for reminders and for reviewing your goals. It does not make the plan peak, taper or test a maximum.');
     press('sport-outcome-bigger_competition_lifts');
@@ -207,9 +207,9 @@ describe('the sport screen in the interview', () => {
     press('sport-football_association');
     press('sport-outcome-stay_available');
     press('sport-experience-2_to_5_years');
-    pressLabel('Increase practice sessions a week');
-    pressLabel('Increase practice sessions a week');
-    pressLabel('Increase matches or competitions a week');
+    pressLabel('Increase Practice sessions a week');
+    pressLabel('Increase Practice sessions a week');
+    pressLabel('Increase Matches or competitions a week');
     type('sport-minutes', '90');
     expect(nextDisabled()).toBe(false);
     next();
@@ -369,8 +369,8 @@ describe('the profile sport panel', () => {
     press('sport-hockey_ice');
     press('sport-outcome-stay_available');
     press('sport-experience-over_5_years');
-    for (let n = 0; n < 4; n += 1) pressLabel('Increase practice sessions a week');
-    pressLabel('Increase matches or competitions a week');
+    for (let n = 0; n < 4; n += 1) pressLabel('Increase Practice sessions a week');
+    pressLabel('Increase Matches or competitions a week');
     press('profile-sport-save');
     expect(screen.getByTestId('sport-panel-message').props.children)
       .toBe('Sport saved. Your current plan is unchanged; this is used when your next block is created.');
