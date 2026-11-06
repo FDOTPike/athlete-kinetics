@@ -218,7 +218,7 @@ test('Stepper: renders label and value, fires decrement and increment', () => {
   expect(inc).toHaveBeenCalledTimes(1);
 });
 
-// Android walk 2026-11-07 (issue 138): the visual "3 · " numbering and the
+// Android walk 2026-11-03 (issue 138): the visual "3 · " numbering and the
 // uppercase visible label were read out by screen readers.
 test('Stepper: spoken names drop the visual numbering and read in sentence case', () => {
   render(
