@@ -13,7 +13,7 @@ beforeEach(() => {
   };
 });
 
-test('explains encrypted all-athlete backup, off-phone storage, CSV separation, and replace-only restore', () => {
+test('explains encrypted all-athlete backup, off-phone storage, and replace-only restore', () => {
   mockState.preview = {
     backupId: 'one', createdAt: '2026-09-13T05:00:00.000Z', athleteNames: ['Athlete 1', 'Alex'],
     databaseCount: 2, totalBytes: 2_097_152, replaceOnly: true,
@@ -22,11 +22,25 @@ test('explains encrypted all-athlete backup, off-phone storage, CSV separation, 
   // #173: "every athlete" became the stated limit (see BackupCapacity.test.js).
   expect(screen.getByText(/includes each athlete's profile, plans, routines, workouts, activities, health-support records/)).toBeOnTheScreen();
   expect(screen.getByText(/Backups cover up to about five athletes in this version/)).toBeOnTheScreen();
-  expect(screen.getByText(/separate from readable CSV history export/)).toBeOnTheScreen();
   expect(screen.getByText(/copy kept only on this phone will not protect you/)).toBeOnTheScreen();
   expect(screen.getByText(/Replace only: this removes all current athlete data/)).toBeOnTheScreen();
   expect(screen.getByText(/creates and verifies an encrypted recovery backup/)).toBeOnTheScreen();
   expect(screen.getByText('Athletes: Athlete 1, Alex')).toBeOnTheScreen();
+});
+
+// #235: there is no CSV export, so the panel must not point to one.
+test('does not mention a CSV export with status, recovery and preview shown', () => {
+  mockState.recoveryAvailable = true;
+  mockState.message = 'Backup saved.';
+  mockState.lastSuccessfulBackupAt = '2026-09-13T05:00:00.000Z';
+  mockState.preview = {
+    backupId: 'one', createdAt: '2026-09-13T05:00:00.000Z', athleteNames: ['Athlete 1'],
+    databaseCount: 1, totalBytes: 1_048_576, replaceOnly: true,
+  };
+  render(<BackupTransferPanel />);
+  expect(screen.getByTestId('restore-preview')).toBeOnTheScreen();
+  expect(screen.queryAllByText(/CSV/i)).toHaveLength(0);
+  expect(JSON.stringify(screen.toJSON())).not.toMatch(/CSV/i);
 });
 
 test('requires a confirmed 12-character password to create but not to open a restore picker', () => {

@@ -11,8 +11,8 @@
  * Law 3: Zero red/amber/green anywhere.
  * Law 4: Touch targets >= 56pt.
  */
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   BIG4_LIFTS,
   ENERGY_SYSTEMS,
@@ -130,13 +130,17 @@ interface OneRmRowProps {
   label: string;
   valueKg: number | undefined;
   onChange: (kg: number | null) => void;
+  /** The athlete the row was drawn for: typed text is never saved to another. */
+  athleteId: string;
+  /** Lets the screen save typed text before a Coach Mode switch. */
+  registerCommit: (commit: () => void) => () => void;
 }
-function OneRmRow({ label, valueKg, onChange }: OneRmRowProps): React.JSX.Element {
+function OneRmRow({ label, valueKg, onChange, athleteId, registerCommit }: OneRmRowProps): React.JSX.Element {
   const [text, setText] = useState(valueKg !== undefined ? valueKg.toFixed(1) : '');
   useEffect(() => {
     setText(valueKg !== undefined ? valueKg.toFixed(1) : '');
   }, [valueKg]);
-  const commitText = (): void => {
+  const saveText = (): void => {
     const parsed = Number.parseFloat(text.replace(',', '.'));
     if (!Number.isFinite(parsed) || parsed < 20) {
       onChange(null); // empty/garbage/sub-20 clears the max
@@ -147,6 +151,33 @@ function OneRmRow({ label, valueKg, onChange }: OneRmRowProps): React.JSX.Elemen
     onChange(parsed); // store snaps to 2.5 and clamps 20..500
     setText(snapped.toFixed(1));
   };
+  // Walk A-12 (#224): Android Back hides the keyboard without ending editing,
+  // and the typed text was lost when Profile closed. Typed text is now saved
+  // on end of editing, blur, keyboard hide or unmount, whichever comes first.
+  // It is saved once: text that matches the saved value is not saved again,
+  // and neither is text already saved from this render (Enter fires end of
+  // editing and blur before the row re-renders with the saved value).
+  const savedThisRender = useRef(false);
+  useEffect(() => { savedThisRender.current = false; });
+  const commitText = (): void => {
+    const shown = valueKg !== undefined ? valueKg.toFixed(1) : '';
+    if (text === shown || savedThisRender.current) return;
+    // During or after a Coach Mode switch the store belongs to another athlete.
+    if (useStore.getState().activeAthleteId !== athleteId) return;
+    savedThisRender.current = true;
+    saveText();
+  };
+  const commitLatest = useRef(commitText);
+  commitLatest.current = commitText;
+  useEffect(() => {
+    const hide = Keyboard.addListener('keyboardDidHide', () => commitLatest.current());
+    const unregister = registerCommit(() => commitLatest.current());
+    return () => {
+      hide.remove();
+      unregister();
+      commitLatest.current();
+    };
+  }, [registerCommit]);
   return (
     <View style={styles.field}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -166,6 +197,7 @@ function OneRmRow({ label, valueKg, onChange }: OneRmRowProps): React.JSX.Elemen
           value={text}
           onChangeText={setText}
           onEndEditing={commitText}
+          onBlur={commitText}
           keyboardType="numeric"
           placeholder="—"
           placeholderTextColor={theme.color.textLow}
@@ -277,6 +309,13 @@ export default function ProfileScreen(): React.JSX.Element {
   const athletes = useStore((s) => s.athletes);
   const activeAthleteId = useStore((s) => s.activeAthleteId);
   const switchAthlete = useStore((s) => s.switchAthlete);
+  // #224: a one-rep max typed with the keyboard still open is saved for the
+  // current athlete before a Coach Mode switch closes its database.
+  const oneRmCommits = useRef(new Set<() => void>());
+  const registerOneRmCommit = useCallback((commit: () => void) => {
+    oneRmCommits.current.add(commit);
+    return () => { oneRmCommits.current.delete(commit); };
+  }, []);
   const createAthlete = useStore((s) => s.createAthlete);
   const renameAthleteEntry = useStore((s) => s.renameAthleteEntry);
   const deleteAthlete = useStore((s) => s.deleteAthlete);
@@ -591,6 +630,8 @@ export default function ProfileScreen(): React.JSX.Element {
               label={label}
               valueKg={oneRepMaxes[m.movement_id] as number | undefined}
               onChange={(kg) => saveOneRepMax(m.movement_id, kg)}
+              athleteId={activeAthleteId}
+              registerCommit={registerOneRmCommit}
             />
           );
         })}
@@ -1275,6 +1316,7 @@ export default function ProfileScreen(): React.JSX.Element {
                       disabled={isActive}
                       onPress={() => {
                         setCoachError(null);
+                        oneRmCommits.current.forEach((commit) => commit());
                         void (async () => {
                           const ok = await switchAthlete(a.id);
                           if (ok === false) {

@@ -42,7 +42,6 @@ export default function BackupTransferPanel(): React.JSX.Element {
       <Text style={styles.heading}>BACK UP &amp; TRANSFER DATA</Text>
       <Text style={styles.body}>
         An encrypted backup includes each athlete&apos;s profile, plans, routines, workouts, activities, health-support records, preferences, and identifiers on this phone.
-        It is separate from readable CSV history export.
       </Text>
       <Text style={styles.body} testID="backup-limit">{backupLimitText(sizeEstimate)}</Text>
       <Text style={styles.body}>
