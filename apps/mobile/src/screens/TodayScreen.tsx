@@ -55,6 +55,8 @@ import {
 import { classifyReadiness, HALT_META, HeldScreenWithHalt } from './ReadinessScreen';
 import { autopilotReasonCopy } from '../state/autopilotCopy';
 import { PrimaryButton, QuietAction, Disclosure, ListRow } from '../components/ui';
+import { sessionFocusName } from '../state/sessionSummary';
+import { offPlanStartCaption, offPlanStartTarget } from '../state/offPlanStart';
 
 export interface TodayScreenProps {
   /** Shell-supplied: go to the live session surface. */
@@ -63,8 +65,7 @@ export interface TodayScreenProps {
   onOpenPlan?: () => void;
 }
 
-const focusName = (focus: string): string =>
-  focus.length === 0 ? 'Session' : focus.charAt(0).toUpperCase() + focus.slice(1).toLowerCase();
+const focusName = (focus: string): string => sessionFocusName(focus);
 
 /** "Lower session · Fri 12 Sep" without pulling in a date library. */
 const shortDate = (iso: string): string => iso;
@@ -101,6 +102,7 @@ function AvailableTodayScreen({
   const todayPlan = useStore((s) => s.todayPlan);
   const blockSessions = useStore((s) => s.blockSessions);
   const block = useStore((s) => s.block);
+  const suspension = useStore((s) => s.suspension);
   const hasArchivedBlock = useStore((s) => s.hasArchivedBlock);
   const lastTriage = useStore((s) => s.lastTriage);
   const prescription = useStore((s) => s.prescription);
@@ -172,18 +174,34 @@ function AvailableTodayScreen({
     setAwaitingStart(true);
     startSession();
   }, [startSession]);
-  const startUnplannedAndOpen = React.useCallback(() => {
+  // #228: an off-plan start takes the plan forward (the earliest unfinished
+  // session, else the next planned one) and says which; with nothing left in
+  // the plan it stays a free-form start.
+  const offPlanTarget = useMemo(
+    () => offPlanStartTarget(blockSessions ?? [], today),
+    [blockSessions, today],
+  );
+  const startUnplannedAndOpen = React.useCallback((target: typeof offPlanTarget) => {
+    if (target !== null) {
+      setAwaitingStart(true);
+      startSession(false, target.session.plannedSessionId);
+      return;
+    }
     if (checkFreeFormStartIsEmpty()) {
       setEmptyStartPromptOpen(true);
       return;
     }
     startAndOpen();
-  }, [checkFreeFormStartIsEmpty, startAndOpen]);
+  }, [checkFreeFormStartIsEmpty, startAndOpen, startSession]);
   const renderUnplannedStartControl = (control: {
     label: string;
     accessibilityLabel: string;
     testID: string;
+    /** #228: only "Start a session anyway / now" takes the plan forward. The
+     *  extra session after today's stopped or finished one stays unplanned. */
+    takesPlanForward?: boolean;
   }): React.JSX.Element => {
+    const target = control.takesPlanForward === true ? offPlanTarget : null;
     if (emptyStartPromptOpen) {
       return (
         <View style={styles.card} testID="empty-free-form-start-card">
@@ -209,12 +227,17 @@ function AvailableTodayScreen({
       );
     }
     return (
-      <QuietAction
-        label={control.label}
-        onPress={startUnplannedAndOpen}
-        accessibilityLabel={control.accessibilityLabel}
-        testID={control.testID}
-      />
+      <>
+        <QuietAction
+          label={control.label}
+          onPress={() => startUnplannedAndOpen(target)}
+          accessibilityLabel={target === null ? control.accessibilityLabel : offPlanStartCaption(target)}
+          testID={control.testID}
+        />
+        {target !== null && (
+          <Text style={styles.caption} testID={`${control.testID}-caption`}>{offPlanStartCaption(target)}</Text>
+        )}
+      </>
     );
   };
   React.useEffect(() => {
@@ -439,6 +462,7 @@ function AvailableTodayScreen({
               label: 'Start a session now',
               accessibilityLabel: 'Start an unplanned session now',
               testID: 'today-adhoc-session',
+              takesPlanForward: true,
             })}
           </View>
         );
@@ -455,6 +479,7 @@ function AvailableTodayScreen({
               label: 'Start a session anyway',
               accessibilityLabel: 'Start an unplanned session on a scheduled rest day',
               testID: 'today-adhoc-session',
+              takesPlanForward: true,
             })}
           </View>
         );
@@ -494,6 +519,7 @@ function AvailableTodayScreen({
               label: 'Start a session now',
               accessibilityLabel: 'Start an unplanned session now',
               testID: 'today-adhoc-session',
+              takesPlanForward: true,
             })}
           </View>
         );
@@ -516,6 +542,20 @@ function AvailableTodayScreen({
       }
     >
       {workoutCard()}
+
+      {/* Walk W3-1b: a pause was visible only on Plan. Today now says so,
+          and points to the same card to resume. */}
+      {suspension != null && (
+        <View style={styles.card} testID="today-paused">
+          <Text style={styles.eyebrow}>PROGRAMME PAUSED</Text>
+          <Text style={styles.body}>Your place is being held. You can still train.</Text>
+          <QuietAction
+            label="Manage pause"
+            onPress={() => onOpenPlan?.()}
+            accessibilityLabel="Manage the pause on your plan"
+          />
+        </View>
+      )}
 
       {error !== null && (
         <Text style={styles.error} accessibilityLiveRegion="polite" testID="today-error">
@@ -560,7 +600,7 @@ function AvailableTodayScreen({
       {state.kind !== 'planned' && state.kind !== 'active_session' && state.kind !== 'halted' && (
         renderNext(
           'next' in state ? state.next : null,
-          'No further sessions are scheduled in this block.',
+          block === null ? 'No training block is set up.' : 'No further sessions are scheduled in this block.',
         )
       )}
 
