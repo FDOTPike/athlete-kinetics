@@ -214,7 +214,7 @@ describe('the detailed target is optional', () => {
     walkToReview();
     expect(stepLabel()).toBe('Step 9 of 9');
     expect(screen.getByTestId('onboarding-summary-target-row').props.children)
-      .toBe('TARGET — Squat 100 kg for 5 reps: 100 kg by 2099-01-08');
+      .toBe('TARGET — Squat 100 kg for 5 reps: from 80 kg to 100 kg by 2099-01-08');
     await startTraining();
     expect(state().error).toBeNull();
     expect(state().onboarded).toBe(true);
