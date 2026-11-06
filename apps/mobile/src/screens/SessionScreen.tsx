@@ -1944,7 +1944,11 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                     );
                   })}
                   {substitution.result.layer1Regression.options.length === 0 && substitution.result.layer2DaySwap.options.length === 0 && (
-                    <Text style={styles.noOptions}>No replacement is available under the current app checks. It is okay to finish here.</Text>
+                    <Text style={styles.noOptions}>
+                      {(substitution.result.blockedByGuardrail?.length ?? 0) > 0
+                        ? 'Some other exercises were held back because of an area you reported, and none is left to switch to. It is okay to finish here.'
+                        : `No other exercise like ${subTargetMovementName ?? 'this exercise'} is available with your equipment and experience level, and no later session in this block has one to bring forward. It is okay to finish here.`}
+                    </Text>
                   )}
                 </View>
               </>
