@@ -1,5 +1,5 @@
 import React from 'react';
-import { BackHandler, StyleSheet } from 'react-native';
+import { Alert, BackHandler, StyleSheet } from 'react-native';
 import { act, fireEvent, render, renderAsync, screen, within } from '@testing-library/react-native';
 import { HISTORY_IMPORT_EXAMPLE, TRAINING_AGES } from '@ak/inference';
 import ProfileScreen from '../../src/screens/ProfileScreen';
@@ -1080,7 +1080,14 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       expect(hardwareBack.press()).toBe(true);
       expect(hardwareBack.press()).toBe(true);
       expect(screen.getByTestId('activities-screen')).toBeOnTheScreen();
+      // #148: leaving Activities with a kept entry asks first; Discard leaves.
+      const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
       expect(hardwareBack.press()).toBe(true);
+      expect(alert).toHaveBeenCalledTimes(1);
+      expect(alert.mock.calls[0][0]).toBe('Discard this activity?');
+      expect(screen.getByTestId('activities-screen')).toBeOnTheScreen();
+      act(() => { alert.mock.calls[0][2].find((button) => button.text === 'Discard').onPress(); });
+      alert.mockRestore();
       expect(screen.queryByTestId('activities-screen')).toBeNull();
       expect(screen.getByText('ATHLETE PROFILE')).toBeOnTheScreen();
       expect(mockState.saveOneOffActivity).not.toHaveBeenCalled();

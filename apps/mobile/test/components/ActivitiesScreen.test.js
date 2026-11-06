@@ -1,5 +1,5 @@
 import React from 'react';
-import { BackHandler } from 'react-native';
+import { Alert, BackHandler } from 'react-native';
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import ActivitiesScreen from '../../src/screens/ActivitiesScreen';
 import { NavigationProvider } from '../../src/navigation/navigation';
@@ -200,6 +200,89 @@ describe('WO-05 factual activities screen', () => {
       expect(mockState.saveOneOffActivity).not.toHaveBeenCalled();
     } finally {
       hardwareBack.restore();
+    }
+  });
+
+  test('#148 an untouched entry closes without a question, and Back then goes to the host', () => {
+    const onClose = jest.fn();
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const hardwareBack = captureHardwareBack();
+    try {
+      render(<NavigationProvider initialTab="athlete"><ActivitiesScreen onClose={onClose} /></NavigationProvider>);
+      fireEvent.press(screen.getByRole('button', { name: 'Add an existing or one-off activity' }));
+
+      expect(hardwareBack.press()).toBe(true);
+      expect(screen.queryByTestId('activity-entry-form')).toBeNull();
+      // Nothing was typed: this screen does not take the Back, so the host closes it as before.
+      expect(hardwareBack.press()).toBe(false);
+      expect(alert).not.toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
+    } finally {
+      hardwareBack.restore();
+      alert.mockRestore();
+    }
+  });
+
+  test('#148 an edited entry asks before Activities closes, and Discard closes it', () => {
+    const onClose = jest.fn();
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const hardwareBack = captureHardwareBack();
+    try {
+      render(<NavigationProvider initialTab="athlete"><ActivitiesScreen onClose={onClose} /></NavigationProvider>);
+      fireEvent.press(screen.getByRole('button', { name: 'Add an existing or one-off activity' }));
+      fireEvent.changeText(screen.getByLabelText('Activity name shown in the app'), 'Rock climbing');
+
+      expect(hardwareBack.press()).toBe(true);
+      expect(alert).not.toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
+
+      expect(hardwareBack.press()).toBe(true);
+      expect(alert).toHaveBeenCalledTimes(1);
+      expect(alert.mock.calls[0][0]).toBe('Discard this activity?');
+      expect(onClose).not.toHaveBeenCalled();
+
+      alert.mock.calls[0][2].find((button) => button.text === 'Discard').onPress();
+      expect(onClose).toHaveBeenCalledTimes(1);
+    } finally {
+      hardwareBack.restore();
+      alert.mockRestore();
+    }
+  });
+
+  test('#148 an untouched EDIT SCHEDULE leaves quietly, and an edited one asks first', () => {
+    mockState.activityLedger = {
+      ...emptyLedger,
+      definitions: [{
+        activityId: 'activity-1', kindId: 'walking', displayName: 'Walk', demand: 'low',
+        facilities: [], equipment: [],
+      }],
+      series: [{
+        seriesId: 'series-1', activityId: 'activity-1', displayName: 'Walk', revision: 1,
+        localWeekday: 5, localStartMinute: null, timezoneId: 'Australia/Sydney', timing: 'flexible',
+        expectedDurationMin: 30, expectedEffort: null, effectiveStartDate: '2026-09-01', effectiveEndDate: null,
+      }],
+      scheduledKnownMinutesPerWeek: 30,
+    };
+    const onClose = jest.fn();
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const hardwareBack = captureHardwareBack();
+    try {
+      render(<NavigationProvider initialTab="athlete"><ActivitiesScreen onClose={onClose} /></NavigationProvider>);
+      fireEvent.press(screen.getByRole('button', { name: 'Edit weekly schedule for Walk' }));
+      expect(hardwareBack.press()).toBe(true);
+      expect(alert).not.toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
+
+      fireEvent.press(screen.getByRole('button', { name: 'Edit weekly schedule for Walk' }));
+      fireEvent.changeText(screen.getByLabelText('Whole activity duration in minutes'), '45');
+      expect(hardwareBack.press()).toBe(true);
+      expect(hardwareBack.press()).toBe(true);
+      expect(alert).toHaveBeenCalledTimes(1);
+      expect(alert.mock.calls[0][0]).toBe('Discard this activity?');
+      expect(onClose).not.toHaveBeenCalled();
+    } finally {
+      hardwareBack.restore();
+      alert.mockRestore();
     }
   });
 
