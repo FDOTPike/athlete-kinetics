@@ -2564,7 +2564,7 @@ test('an eased history load says Coach suggests today and names the last logged 
     lastLoggedLoads: { 1: 10 },
   });
   mockState.resolveSlotLoad = jest.fn(() => ({ source: 'history', initialLoadKg: 7.5, advisoryKg: null, advisoryKind: null }));
-  mockState.slotLoadCopyFacts = jest.fn(() => ({ adjusted: true, unadjustedHistoryKg: 10, historyFromThisSession: false }));
+  mockState.slotLoadCopyFacts = jest.fn(() => ({ historyFromThisSession: false, advisoryFromThisSession: false, unadjustedHistoryKg: 10 }));
 
   render(<SessionScreen />);
 
@@ -2579,21 +2579,37 @@ test('an eased bodyweight added load keeps the added-load wording', () => {
     lastLoggedLoads: { 1: 5 },
   });
   mockState.resolveSlotLoad = jest.fn(() => ({ source: 'history', initialLoadKg: 2.5, advisoryKg: null, advisoryKind: null }));
-  mockState.slotLoadCopyFacts = jest.fn(() => ({ adjusted: true, unadjustedHistoryKg: 5, historyFromThisSession: false }));
+  mockState.slotLoadCopyFacts = jest.fn(() => ({ historyFromThisSession: false, advisoryFromThisSession: false, unadjustedHistoryKg: 5 }));
 
   render(<SessionScreen />);
 
   expect(screen.getByLabelText('Load source. Coach suggests 2.5 kg added load today · last logged 5.0 kg added load')).toBeOnTheScreen();
 });
 
-test('a manual advisory from this session after set 1 does not say last session', () => {
+// #131 critic fix: a 0 kg added load is not eased, so it keeps "Last logged".
+test('a 0 kg added load on an eased day keeps Last logged, not Coach suggests', () => {
+  mockState = state({
+    movements: [movement(1, 'First movement', { supportedPrefixes: ['Bodyweight'] }), movement(2, 'Later movement')],
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    lastLoggedLoads: { 1: 0 },
+  });
+  mockState.resolveSlotLoad = jest.fn(() => ({ source: 'history', initialLoadKg: 0, advisoryKg: null, advisoryKind: null }));
+  mockState.slotLoadCopyFacts = jest.fn(() => ({ historyFromThisSession: false, advisoryFromThisSession: false, unadjustedHistoryKg: 0 }));
+
+  render(<SessionScreen />);
+
+  expect(screen.getByLabelText('Load source. Last logged 0.0 kg added load')).toBeOnTheScreen();
+  expect(screen.queryByLabelText(/Coach suggests 0\.0 kg/)).toBeNull();
+});
+
+test('a manual advisory from this session on a day with no load reduction does not say last session', () => {
   mockState = state({
     movements: [movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }), movement(2, 'Later movement')],
     profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
     loadPreference: 'manual',
   });
   mockState.resolveSlotLoad = jest.fn(() => ({ source: 'manual', initialLoadKg: null, advisoryKg: 12.5, advisoryKind: 'history' }));
-  mockState.slotLoadCopyFacts = jest.fn(() => ({ adjusted: false, unadjustedHistoryKg: 12.5, historyFromThisSession: true }));
+  mockState.slotLoadCopyFacts = jest.fn(() => ({ historyFromThisSession: true, advisoryFromThisSession: true, unadjustedHistoryKg: 12.5 }));
 
   render(<SessionScreen />);
 
@@ -2601,16 +2617,21 @@ test('a manual advisory from this session after set 1 does not say last session'
   expect(screen.queryByLabelText(/from your last session/)).toBeNull();
 });
 
-test('a manual advisory eased from last session says today and names the last session load', () => {
+// #131 critic fix: eased day, manual mode, Set 2. The advisory is still the
+// earlier session's load (logSet does not write lastLoggedLoads on an eased
+// day), so the label must name the earlier session, not this one.
+test('eased day, manual mode, Set 2: the advisory names the earlier session, not this one', () => {
   mockState = state({
     movements: [movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }), movement(2, 'Later movement')],
     profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
     loadPreference: 'manual',
+    lastLoggedLoads: { 1: 17.5 },
   });
   mockState.resolveSlotLoad = jest.fn(() => ({ source: 'manual', initialLoadKg: null, advisoryKg: 12.5, advisoryKind: 'history' }));
-  mockState.slotLoadCopyFacts = jest.fn(() => ({ adjusted: true, unadjustedHistoryKg: 17.5, historyFromThisSession: false }));
+  mockState.slotLoadCopyFacts = jest.fn(() => ({ historyFromThisSession: true, advisoryFromThisSession: false, unadjustedHistoryKg: 17.5 }));
 
   render(<SessionScreen />);
 
   expect(screen.getByLabelText('Load source. Coach suggests 12.5 kg today · logged 17.5 kg last session — your entry stands.')).toBeOnTheScreen();
+  expect(screen.queryByLabelText(/from this session/)).toBeNull();
 });

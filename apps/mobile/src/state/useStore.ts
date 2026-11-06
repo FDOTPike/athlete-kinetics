@@ -364,6 +364,8 @@ import phraseVectorsJson from '../../../../packages/inference/assets/phrase-code
 import { routeQuestion, type QuestionIndex, type QuestionResult } from '../../../../packages/inference/src/semantic/questionRouter';
 import { packVectors } from '../../../../packages/inference/src/semantic/cosine';
 import { scanRedFlags } from '../../../../packages/inference/src/semantic/redFlag';
+import { loadCopyFactsFor, type LoadCopyFacts } from './loadCopyFacts';
+export type { LoadCopyFacts } from './loadCopyFacts';
 
 // ---------------------------------------------------------------------------
 // Shared dark palette (sweaty-hands UI: high contrast, zero decoration)
@@ -502,16 +504,6 @@ export type BootStatus = 'booting' | 'ready' | 'error';
 /** Outcome of a demo-athlete load: seeded fresh, or refused because real
  *  training history already exists (which the load must never touch). */
 export type DemoLoadResult = 'loaded' | 'blocked_existing_data';
-
-/** Copy facts beyond the resolver's source (#131). `adjusted` means today's
- *  load modifier eased the shown load; `unadjustedHistoryKg` is the last
- *  logged load before that easing; `historyFromThisSession` means the history
- *  value is a set from the current session, not an earlier one. */
-export interface LoadCopyFacts {
-  adjusted?: boolean;
-  unadjustedHistoryKg?: number | null;
-  historyFromThisSession?: boolean;
-}
 
 export type TriageOutcome =
   | { kind: 'rejected' }
@@ -3549,18 +3541,25 @@ export const useStore = create<KineticsStore>()((set, get) => {
   },
 
   slotLoadCopyFacts: (input) => {
-    // Copy facts only (#131): they never change the load. The same "today's
-    // modifier eased the load" test as resolveSlotLoad, and a history value
-    // is from this session once this movement has a set logged in it.
+    // Copy facts only (#131): they never change the load. The latest set of
+    // this movement in the session is the same one resolveSlotLoad reads.
     const state = get();
     const todaysVector = state.prescription !== null && state.prescription.forDate === state.today
       ? state.prescription.vector
       : null;
-    return {
-      adjusted: todaysVector !== null && todaysVector.load_modifier < 1,
-      unadjustedHistoryKg: state.lastLoggedLoads[input.movementId] ?? null,
-      historyFromThisSession: (state.session?.sets ?? []).some((set) => set.movement_id === input.movementId),
-    };
+    const latestCurrentSessionSet = state.session?.sets.reduce<LoggedSet | null>(
+      (latest, candidate) => candidate.movement_id === input.movementId
+        && (latest === null || candidate.set_id > latest.set_id)
+        ? candidate
+        : latest,
+      null,
+    ) ?? null;
+    return loadCopyFactsFor({
+      currentSessionLoadKg: latestCurrentSessionSet?.load_kg ?? null,
+      hasSetThisSession: latestCurrentSessionSet !== null,
+      lastLoggedKg: state.lastLoggedLoads[input.movementId] ?? null,
+      easedToday: todaysVector !== null && todaysVector.load_modifier < 1,
+    });
   },
 
   refreshBandLadder: () => {

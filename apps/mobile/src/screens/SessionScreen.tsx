@@ -9,6 +9,7 @@ import { buildSessionSummary, NO_NEXT_SESSION_TEXT } from '../state/sessionSumma
 import { SUPPORT_HELD_MESSAGE, SUPPORT_UNAVAILABLE_MESSAGE } from '../state/healthSupportStore';
 import { theme } from '../theme/theme';
 import InfoTip from '../components/InfoTip';
+import { isEasedBelow } from '../state/loadCopyFacts';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import {
   PrimaryButton,
@@ -100,32 +101,32 @@ const isLoadDraftLoggable = (text: string): boolean => {
  *  this maps it to reviewed copy. An edited value keeps its source — there is
  *  no fifth "athlete-entered" source. */
 const loadSourceCopy = (
-  sel: LoadSelection & LoadCopyFacts,
+  sel: LoadSelection & Partial<LoadCopyFacts>,
   bodyweightMode: boolean,
   oneRmKg: number | undefined,
   timedTarget: boolean,
 ): string => {
-  // Walk W2-4, W5-10 (#131): an eased load says so and names the unadjusted
-  // load; "last session" is only ever said of an earlier session.
-  const easedFromKg = sel.adjusted === true && sel.unadjustedHistoryKg != null ? sel.unadjustedHistoryKg : null;
+  // Walk W2-4, W5-10 (#131): an eased load (shown lower than the unadjusted
+  // last-logged load) says so and names that load; "last session" is only said
+  // of an earlier session, never of a set logged in this one.
   const addedLoad = bodyweightMode ? ' added load' : '';
   if (sel.source === 'manual') {
     switch (sel.advisoryKind) {
       case 'apre': return `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg — your entry stands.`;
       case 'onerm': return `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg from your ${oneRmKg?.toFixed(1)} kg 1RM — your entry stands.`;
       case 'history':
-        if (easedFromKg !== null) {
-          return `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg today · logged ${easedFromKg.toFixed(1)} kg ${sel.historyFromThisSession === true ? 'earlier this session' : 'last session'} — your entry stands.`;
+        if (!sel.advisoryFromThisSession && isEasedBelow(sel.advisoryKg, sel.unadjustedHistoryKg)) {
+          return `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg today · logged ${sel.unadjustedHistoryKg?.toFixed(1)} kg last session — your entry stands.`;
         }
-        return sel.historyFromThisSession === true
+        return sel.advisoryFromThisSession === true
           ? `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg from this session — your entry stands.`
           : `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg from your last session — your entry stands.`;
       default: return 'Your call. The number you enter is what gets logged.';
     }
   }
   if (sel.source === 'history') {
-    if (easedFromKg !== null && sel.historyFromThisSession !== true) {
-      return `Coach suggests ${sel.initialLoadKg?.toFixed(1)} kg${addedLoad} today · last logged ${easedFromKg.toFixed(1)} kg${addedLoad}`;
+    if (!sel.historyFromThisSession && isEasedBelow(sel.initialLoadKg, sel.unadjustedHistoryKg)) {
+      return `Coach suggests ${sel.initialLoadKg?.toFixed(1)} kg${addedLoad} today · last logged ${sel.unadjustedHistoryKg?.toFixed(1)} kg${addedLoad}`;
     }
     return bodyweightMode
       ? `Last logged ${sel.initialLoadKg?.toFixed(1)} kg added load`
@@ -142,7 +143,7 @@ const loadSourceCopy = (
 /** Derived-source copy must distinguish APRE prescription from 1RM
  *  derivation; the resolver's source alone does not carry that. */
 const loadCopyFor = (
-  sel: LoadSelection & LoadCopyFacts,
+  sel: LoadSelection & Partial<LoadCopyFacts>,
   bodyweightMode: boolean,
   oneRmKg: number | undefined,
   apreOverrideKg: number | null,
@@ -543,7 +544,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   const stableTargetRpe = currentSlot?.targetRpe ?? 8;
   // #131: copy facts (eased today, this-session history) ride along with the
   // resolver's selection; they never change the load itself.
-  const loadSelection: (LoadSelection & LoadCopyFacts) | null = currentSlot === null || target === null
+  const loadSelection: (LoadSelection & Partial<LoadCopyFacts>) | null = currentSlot === null || target === null
     ? null
     : {
         ...state.resolveSlotLoad({
