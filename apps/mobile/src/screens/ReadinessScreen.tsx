@@ -304,11 +304,13 @@ function AvailableReadinessScreen({
     ? 'Review safety report'
     : hasLiveSession
       ? 'Open active session'
-      : todayPlan !== null && !todaySessionDone
-        ? "Review today's plan"
-        : athleteState === 'OVERREACHED'
-          ? 'Review recovery plan'
-          : 'Review your plan';
+      : todaySessionDone
+        ? 'Review your plan'
+        : todayPlan !== null
+          ? "Review today's plan"
+          : athleteState === 'OVERREACHED'
+            ? 'Review recovery plan'
+            : 'Review your plan';
 
   // Quiet readiness metrics rows
   const renderRawMetricsList = () => {

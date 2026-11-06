@@ -137,3 +137,42 @@ describe('#253: READY\'s main line once today\'s session is recorded', () => {
     expect(screen.queryByText("Today's session is done. Rest and recover.")).toBeNull();
   });
 });
+
+describe('#253: READY\'s button once today\'s session is recorded, at a low score', () => {
+  const lowVector = { ...vector, readiness_score: 30 }; // OVERREACHED band
+
+  test('today\'s session complete at a low score: "Review your plan", not "Review recovery plan"', () => {
+    mockState = baseState('complete', { vector: lowVector });
+    render(<ReadinessScreen onOpenCoach={jest.fn()} />);
+    expect(screen.getByText("Today's session is done. Rest and recover.")).toBeOnTheScreen();
+    expect(screen.getByText("Today's Lower session is recorded.")).toBeOnTheScreen();
+    expect(screen.getByText('Review your plan')).toBeOnTheScreen();
+    expect(screen.queryByText('Review recovery plan')).toBeNull();
+  });
+
+  test('rest day at a low score is unchanged: the rest-day card, with no plan button', () => {
+    // With no session planned today, READY shows the rest-day card, which has no primary button.
+    mockState = baseState(null, { vector: lowVector, todayPlan: null });
+    render(<ReadinessScreen onOpenCoach={jest.fn()} />);
+    expect(screen.getByText('Rest day.')).toBeOnTheScreen();
+    expect(screen.queryByText('Review your plan')).toBeNull();
+    expect(screen.queryByText("Today's session is done. Rest and recover.")).toBeNull();
+  });
+
+  test('a safety halt still comes first on a completed day', () => {
+    mockState = baseState('complete', {
+      vector: lowVector,
+      lastTriage: { kind: 'matched', directive: { halt: true, vector: { coaching_cue: 'Stop and recover today.' } } },
+    });
+    render(<ReadinessScreen onOpenCoach={jest.fn()} />);
+    expect(screen.getByText('Review safety report')).toBeOnTheScreen();
+    expect(screen.queryByText('Review your plan')).toBeNull();
+  });
+
+  test('a live session still comes first on a completed day', () => {
+    mockState = baseState('complete', { vector: lowVector, session: { sessionId: 99 } });
+    render(<ReadinessScreen onOpenSession={jest.fn()} onOpenCoach={jest.fn()} />);
+    expect(screen.getByText('Open active session')).toBeOnTheScreen();
+    expect(screen.queryByText('Review your plan')).toBeNull();
+  });
+});
