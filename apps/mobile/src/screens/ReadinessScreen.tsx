@@ -79,9 +79,10 @@ export const readinessCoverage = (vector: StateVectorRow): string => {
   return `${available} of 2 inputs`;
 };
 
-// #170: with no HRV or sleep input the score is the neutral default of 50
+// #170: with no scored HRV or sleep input the score is the neutral default of 50
 // (004_state_vector_materialize.sql). Say so instead of crediting "your signals".
-export const NEUTRAL_DEFAULT_EXPLANATION = 'No signals yet. Using a neutral default of 50.';
+// "Scored" because a first HRV reading has no baseline yet, so hrv_z stays null.
+export const NEUTRAL_DEFAULT_EXPLANATION = 'No scored signals yet. Using a neutral default of 50.';
 
 const hasNoReadinessInputs = (vector: StateVectorRow): boolean =>
   vector.hrv_z === null && vector.sleep_efficiency_pct === null;

@@ -829,16 +829,24 @@ describe('#170: the neutral default of 50 is named as a default', () => {
     mockState = baseState({ vector: noInputs });
     render(<ReadinessScreen />);
     fireEvent.press(screen.getByLabelText('Why this recommendation'));
-    expect(screen.getByText('No signals yet. Using a neutral default of 50.')).toBeOnTheScreen();
+    expect(screen.getByText('No scored signals yet. Using a neutral default of 50.')).toBeOnTheScreen();
     expect(screen.queryByText(/Your signals support/)).toBeNull();
     expect(screen.queryByText(/Your recovery signals support/)).toBeNull();
+  });
+
+  test('a first HRV reading with no baseline yet (hrv_z null) still reads as no scored signals', () => {
+    mockState = baseState({ vector: { ...noInputs, ln_rmssd: 4.1 } });
+    render(<ReadinessScreen />);
+    fireEvent.press(screen.getByLabelText('Why this recommendation'));
+    expect(screen.getByText('No scored signals yet. Using a neutral default of 50.')).toBeOnTheScreen();
+    expect(screen.queryByText(/^No signals yet/)).toBeNull();
   });
 
   test('with inputs, READY keeps the signal-based explanation', () => {
     render(<ReadinessScreen />);
     fireEvent.press(screen.getByLabelText('Why this recommendation'));
     expect(screen.getByText('Your recovery signals support the planned work.')).toBeOnTheScreen();
-    expect(screen.queryByText('No signals yet. Using a neutral default of 50.')).toBeNull();
+    expect(screen.queryByText('No scored signals yet. Using a neutral default of 50.')).toBeNull();
   });
 
   test('the HRV deviation shows its unit', () => {
