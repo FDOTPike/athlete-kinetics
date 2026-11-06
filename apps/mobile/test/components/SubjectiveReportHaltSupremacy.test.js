@@ -155,4 +155,57 @@ describe('reportSubjective returns true only when the report is stored', () => {
     expect(reportCount()).toBe(before);
     expect(useStore.getState().error).toContain('disk full');
   });
+
+  // Storage and the refresh that follows it are separate: once the report is
+  // committed, a failed read of today's prescription must not turn it into
+  // "not sent" (a retry would store it twice), and must not leave an earlier
+  // result on screen as if it answered this report. A halt is never hidden.
+  const failRefresh = () => {
+    const original = mockDriver.executeSync.bind(mockDriver);
+    return jest.spyOn(mockDriver, 'executeSync').mockImplementation((sql, params) => {
+      if (/SELECT sr\.matched_entry_id/.test(sql)) throw new Error('read failed');
+      return original(sql, params);
+    });
+  };
+
+  test('an unmatched report stored before a refresh failure returns true and drops the earlier result', async () => {
+    const before = reportCount();
+    useStore.setState({ lastTriage: { kind: 'positive', cue: 'an earlier answer' } });
+    const spy = failRefresh();
+    try {
+      await expect(useStore.getState().reportSubjective('no change yet', 5)).resolves.toBe(true);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(reportCount()).toBe(before + 1);
+    expect(useStore.getState().lastTriage).toBeNull();
+    expect(useStore.getState().error).toContain('read failed');
+    expect(useStore.getState().triaging).toBe(false);
+  });
+
+  test('a safety report stored before a refresh failure returns true and still shows the halt', async () => {
+    const before = reportCount();
+    const spy = failRefresh();
+    try {
+      await expect(useStore.getState().reportSubjective('feeling dizzy', 8)).resolves.toBe(true);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(reportCount()).toBe(before + 1);
+    expect(useStore.getState().lastTriage?.kind).toBe('matched');
+    expect(useStore.getState().lastTriage?.directive?.halt).toBe(true);
+  });
+
+  test('a refresh failure after a later unmatched report keeps an earlier halt on screen', async () => {
+    await expect(useStore.getState().reportSubjective('feeling dizzy', 8)).resolves.toBe(true);
+    expect(useStore.getState().lastTriage?.directive?.halt).toBe(true);
+    const spy = failRefresh();
+    try {
+      await expect(useStore.getState().reportSubjective('no change yet', 5)).resolves.toBe(true);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(useStore.getState().lastTriage?.kind).toBe('matched');
+    expect(useStore.getState().lastTriage?.directive?.halt).toBe(true);
+  });
 });
