@@ -744,7 +744,14 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                 </>
               ) : sessionFeel.ask ? (
                 <>
-                  <Text style={styles.summaryLine} testID="session-feel-ask">This session went differently from the plan.</Text>
+                  {/* Android walk (#212): a followed plan is asked only because the
+                      logged effort drifted from the targets; "went differently
+                      from the plan" contradicted "Plan followed." above it. */}
+                  <Text style={styles.summaryLine} testID="session-feel-ask">
+                    {outcome.kind === 'followed_plan'
+                      ? 'You did every set, but your effort was different from the targets.'
+                      : 'This session went differently from the plan.'}
+                  </Text>
                   <SecondaryButton
                     label="Record how it went"
                     onPress={() => setFeelOpen(true)}
