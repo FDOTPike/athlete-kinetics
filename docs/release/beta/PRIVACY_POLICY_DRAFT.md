@@ -3,7 +3,7 @@
 Effective date: [EFFECTIVE DATE]  
 Contact: [OWNER CONTACT]
 
-pikeMethods is an offline training app. Your information stays on the device unless you choose to export or otherwise hand it to someone. The release app does not send it to a server. A coach who receives your backup can open its contents with the password; agree how to transfer the file and password safely.
+pikeMethods is an offline training app. Your information stays on the device unless you choose to export or otherwise hand it to someone. The release app does not send it to a server. A coach who receives your backup can open its contents with the password; agree how to transfer the file and password safely. On iOS, excluding app data from automatic device backups is applied at app launch and can fail without stopping the app, in which case an automatic device backup could include athlete data.
 
 ## What the app stores
 
