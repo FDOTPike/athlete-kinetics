@@ -187,7 +187,7 @@ describe('the sport screen in the interview', () => {
     press('sport-practice-unsure');
     expect(screen.getByLabelText('PRACTICE SESSIONS A WEEK Not sure')).toBeTruthy();
     expect(screen.getByTestId('sport-competition-note').props.children)
-      .toBe('Your competition date is recorded. For now the plan does not peak, taper or test for it. The date is used for reminders and for reviewing your goals.');
+      .toBe('If you add a competition date, it is recorded. For now the plan does not peak, taper or test for it. The date is used for reminders and for reviewing your goals.');
     press('sport-outcome-bigger_competition_lifts');
     press('sport-experience-over_5_years');
     expect(nextDisabled()).toBe(false);
@@ -206,6 +206,10 @@ describe('the sport screen in the interview', () => {
     press('sport-family-powerlifting');
     expect(screen.getByTestId('sport-competition').props.value).toBe('');
     expect(screen.getByTestId('sport-competition-note').props.children).toMatch(/does not peak, taper or test for it/);
+    // The field is still blank, so the note must not claim a date is already recorded.
+    expect(screen.getByTestId('sport-competition-note').props.children)
+      .toBe('If you add a competition date, it is recorded. For now the plan does not peak, taper or test for it. The date is used for reminders and for reviewing your goals.');
+    expect(screen.getByTestId('sport-competition-note').props.children).not.toContain('Your competition date is recorded.');
     // Render order: the note comes before the date field, so it is read first.
     const order = [];
     const walk = (node) => {

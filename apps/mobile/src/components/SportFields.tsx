@@ -53,7 +53,7 @@ export const SPORT_QUESTION = 'Do you play or compete in a sport?';
  * plan. The generator's own "does not change this plan" lines are unchanged.
  */
 export const COMPETITION_DATE_FIRST_NOTE =
-  'Your competition date is recorded. For now the plan does not peak, taper or test for it. The date is used for reminders and for reviewing your goals.';
+  'If you add a competition date, it is recorded. For now the plan does not peak, taper or test for it. The date is used for reminders and for reviewing your goals.';
 
 export interface SportFieldsState {
   readonly family: SportFamilyId | null;
