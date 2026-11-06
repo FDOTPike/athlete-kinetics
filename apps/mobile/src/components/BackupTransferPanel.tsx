@@ -9,7 +9,12 @@ const dateLabel = (value: string | null): string => value === null
   ? 'No confirmed backup saved yet.'
   : `Last confirmed save: ${new Date(value).toLocaleString()}`;
 
-export default function BackupTransferPanel(): React.JSX.Element {
+export interface BackupTransferPanelProps {
+  /** The number of athletes on the phone; a change re-reads the backup total (#173). */
+  athleteCount?: number;
+}
+
+export default function BackupTransferPanel({ athleteCount }: BackupTransferPanelProps = {}): React.JSX.Element {
   const status = useBackupStore((state) => state.status);
   const message = useBackupStore((state) => state.message);
   const preview = useBackupStore((state) => state.preview);
@@ -23,14 +28,16 @@ export default function BackupTransferPanel(): React.JSX.Element {
   const cancelRestore = useBackupStore((state) => state.cancelRestore);
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
-  // #173: the limit and the current total, re-read after each backup action.
+  // #173: the limit and the current total, re-read after each backup action
+  // and whenever the athlete count changes (the panel stays mounted while
+  // athletes are added or deleted on the Profile screen).
   const [sizeEstimate, setSizeEstimate] = useState<BackupSizeEstimate | null>(null);
   useEffect(() => {
     if (status === 'working') return undefined;
     let live = true;
     void measureBackupSize().then((estimate) => { if (live) setSizeEstimate(estimate); });
     return () => { live = false; };
-  }, [status]);
+  }, [status, athleteCount]);
 
   const working = status === 'working';
   const recoveryBlocked = startupSafe !== true;

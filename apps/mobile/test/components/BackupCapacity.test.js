@@ -79,6 +79,16 @@ describe('the backup screen states the limit and the current total', () => {
       .toHaveTextContent('Backups cover up to about five athletes in this version (8.0 MB of athlete data in all). This phone holds 2 athletes, 2.7 MB.'));
   });
 
+  test('the panel re-reads the total when an athlete is added while it stays on screen', async () => {
+    mockEstimate = estimateFromSizes(athletes(2));
+    render(<BackupTransferPanel athleteCount={2} />);
+    await waitFor(() => expect(screen.getByTestId('backup-limit')).toHaveTextContent(/This phone holds 2 athletes, 2\.7 MB\./));
+
+    mockEstimate = estimateFromSizes(athletes(3));
+    screen.rerender(<BackupTransferPanel athleteCount={3} />);
+    await waitFor(() => expect(screen.getByTestId('backup-limit')).toHaveTextContent(/This phone holds 3 athletes, 4\.0 MB\./));
+  });
+
   test('the panel still states the limit when the total cannot be read', async () => {
     mockEstimate = null;
     render(<BackupTransferPanel />);

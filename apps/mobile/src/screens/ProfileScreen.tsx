@@ -406,7 +406,10 @@ export default function ProfileScreen(): React.JSX.Element {
     void measureBackupSize().then((estimate) => { if (live) setBackupEstimate(estimate); });
     return () => { live = false; };
   }, [coachOpen, athletes.length]);
-  const addWouldExceedBackup = addingAthleteExceedsBackupCap(backupEstimate, athletes.length);
+  // An estimate measured for a different athlete count is stale (an athlete was
+  // just added or deleted and the new reading has not finished): use the count.
+  const currentBackupEstimate = backupEstimate?.athleteCount === athletes.length ? backupEstimate : null;
+  const addWouldExceedBackup = addingAthleteExceedsBackupCap(currentBackupEstimate, athletes.length);
   const [newAthleteName, setNewAthleteName] = useState('');
   const [editingAthleteId, setEditingAthleteId] = useState<string | null>(null);
   const [editAthleteName, setEditAthleteName] = useState('');
@@ -1072,7 +1075,7 @@ export default function ProfileScreen(): React.JSX.Element {
         />
       </View>
 
-      <BackupTransferPanel />
+      <BackupTransferPanel athleteCount={athletes.length} />
 
       <View style={styles.mgmtSection} testID="reset-training-data-section">
         <Disclosure label="Reset training data">

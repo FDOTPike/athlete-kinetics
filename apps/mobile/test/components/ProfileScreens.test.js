@@ -1126,6 +1126,36 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       await act(async () => {});
       expect(screen.queryByText(WARNING)).toBeNull();
     }, 30000);
+
+    test('four athletes whose measured sizes would go over the cap: the warning shows (the count alone would not)', async () => {
+      const { estimateFromSizes, addingAthleteExceedsBackupCap } = jest.requireActual('../../src/state/backupCapacity');
+      const fourAthletes = fiveAthletes.slice(0, 4);
+      mockBackupEstimate = estimateFromSizes(fourAthletes.map(() => 2_000_000));
+      expect(addingAthleteExceedsBackupCap(null, 4)).toBe(false);
+      mockState.advancedToolsUnlocked = true;
+      mockState.athletes = fourAthletes;
+      render(<ProfileScreen />);
+      fireEvent.press(screen.getByLabelText('Coach mode, 4 athletes, collapsed'));
+      expect(await screen.findByText(WARNING)).toBeOnTheScreen();
+    }, 30000);
+
+    test('an estimate measured for fewer athletes is not used after an athlete is added', async () => {
+      const { estimateFromSizes } = jest.requireActual('../../src/state/backupCapacity');
+      const fourAthletes = fiveAthletes.slice(0, 4);
+      mockBackupEstimate = estimateFromSizes(fourAthletes.map(() => 1_400_832));
+      mockState.advancedToolsUnlocked = true;
+      mockState.athletes = fourAthletes;
+      render(<ProfileScreen />);
+      fireEvent.press(screen.getByLabelText('Coach mode, 4 athletes, collapsed'));
+      await act(async () => {});
+      expect(screen.queryByText(WARNING)).toBeNull();
+
+      // The fifth athlete is added; its new measurement has not finished yet.
+      mockBackupEstimate = new Promise(() => {});
+      mockState.athletes = fiveAthletes;
+      await screen.rerenderAsync(<ProfileScreen />);
+      expect(screen.getByText(WARNING)).toBeOnTheScreen();
+    }, 30000);
   });
 });
 
