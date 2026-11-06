@@ -215,6 +215,17 @@ try {
   pass('an athlete database that does not match the contract fails closed with schema_mismatch');
 
   assert.equal(readdirSync(work).filter((name) => name.startsWith('ak-beta-reader-')).length, 0, 'every run deletes its disposable copies');
+
+  // The reading plan describes this reader as it ships: it names the CLI and its
+  // crypto adapter, no longer says no reader is installed, and says the reader
+  // counts eligible effort pairs without forming an estimate.
+  const plan = textOf(join(repoRoot, 'docs', 'release', 'beta', 'plan', 'LOG_READING_PLAN.md'));
+  assert.equal(plan.includes('There is no claim that such a CLI is already installed'), false, 'the plan must not say no reader is installed');
+  assert.match(plan, /tools\/beta-reader\/read_beta_backup\.mjs/, 'the plan must name the reader CLI');
+  assert.match(plan, /tools\/beta-reader\/lib\/node_crypto\.mjs/, 'the plan must name the reader crypto adapter');
+  assert.match(plan, /does not call `estimateOneRepMax`/, 'the plan must say the reader forms no estimate');
+  pass('the reading plan describes the shipped reader and its effort counts');
+
   console.log(`verify:beta-reader PASS - ${checks} checks: synthetic backup sealed with the package's sealBackup, opened with openBackup, read-only analysis, de-identified outputs`);
 } finally {
   rmSync(work, { recursive: true, force: true });
