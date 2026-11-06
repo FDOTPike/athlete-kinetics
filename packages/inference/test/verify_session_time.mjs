@@ -446,5 +446,19 @@ console.log('[4] routine composer');
     lone.slots.length === 1 && lone.slots[0].sets === 4 && lone.slots[0].reps === 4);
 }
 
+// Android walk 2026-11-03 (W1-5): a fewer-days offer is rounded down, so it
+// can carry less weekly time than the athlete has now (7 x 15 = 105 -> 1 x 60).
+// The line states its own weekly minutes and never promises "the same".
+{
+  const offer = time.feasibleSessionAlternatives({ capMin: 15, requiredMin: 50, weeklyFrequency: 7 })
+    .find((alternative) => alternative.kind === 'fewer_longer_sessions');
+  const line = offer === undefined ? '' : time.describeSessionAlternative(offer);
+  check('a fewer-days offer names its own weekly minutes, not "the same weekly time"',
+    offer !== undefined && offer.weeklyFrequency === 1 && offer.capMin === 60
+      && line.includes('60 minutes a week') && !line.includes('same weekly time'), line);
+  const even = time.describeSessionAlternative({ kind: 'fewer_longer_sessions', weeklyFrequency: 2, capMin: 45 });
+  check('an exact fewer-days offer states the total it keeps', even.includes('90 minutes a week'), even);
+}
+
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);
