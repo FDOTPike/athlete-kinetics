@@ -1702,7 +1702,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                           <SecondaryButton
                             label="Doesn’t feel right"
                             onPress={thumbsDown}
-                            accessibilityLabel={`Avoid ${movement?.name ?? 'this movement'} and find a substitution`}
+                            accessibilityLabel={`Doesn’t feel right: avoid ${movement?.name ?? 'this movement'} and find a substitution`}
                             style={{ flex: 1, minHeight: theme.touch.min }}
                           />
                           <SecondaryButton

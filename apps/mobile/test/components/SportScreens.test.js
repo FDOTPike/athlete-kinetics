@@ -413,3 +413,21 @@ describe('the profile sport panel', () => {
     expect(state().goals).toHaveLength(1);
   });
 });
+
+// Android walk 2026-11-03 (W6-6, issue 160): a control's accessible name starts
+// with its visible words, and a selected chip does not also say "selected".
+test('onboarding sport and target chips: names start with the visible words, selected or not', () => {
+  render(<OnboardingScreen />);
+  next();
+  next();
+  const sportName = () => screen.getByTestId('onboarding-wants-sport').props.accessibilityLabel;
+  const targetName = () => screen.getByTestId('onboarding-wants-target').props.accessibilityLabel;
+  expect(sportName()).toMatch(/^I play or compete in a sport\. /);
+  expect(targetName()).toMatch(/^I also have a specific target\. /);
+  press('onboarding-wants-sport');
+  press('onboarding-wants-target');
+  expect(sportName()).toBe('I play or compete in a sport. One more screen will ask about it.');
+  expect(targetName()).toBe('I also have a specific target. One more screen will ask for it.');
+  expect(sportName()).not.toMatch(/selected/);
+  expect(targetName()).not.toMatch(/selected/);
+});

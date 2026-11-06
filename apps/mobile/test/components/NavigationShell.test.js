@@ -368,7 +368,7 @@ describe('Readiness, Session, Library and Profile remain reachable', () => {
     render(<AppShellTestHarness />);
     expect(screen.getByLabelText('Open the exercise library')).toBeOnTheScreen();
     expect(screen.getByLabelText('Open profile and settings')).toBeOnTheScreen();
-    expect(screen.getByLabelText('Open readiness details')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Ready, open readiness details')).toBeOnTheScreen();
     expect(screen.getByLabelText('Open the workout')).toBeOnTheScreen();
     expect(screen.getByText('READY')).toBeOnTheScreen();
     expect(screen.getByText('WORKOUT')).toBeOnTheScreen();
