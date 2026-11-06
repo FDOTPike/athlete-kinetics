@@ -1,12 +1,12 @@
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, within } from '@testing-library/react-native';
 import { resolveLoadSelection as actualResolveLoadSelection } from '../../../../packages/inference/src/loadSelection';
 import { isDifficultyAllowed as actualIsDifficultyAllowed } from '../../../../packages/inference/src/tierPolicy';
 import { resolveMovementAvailability as actualResolveMovementAvailability } from '../../../../packages/inference/src/capabilityResolver';
 import { JOINTS as ACTUAL_JOINTS, PATTERN_JOINTS } from '../../../../packages/inference/src/substitution';
 import { EXPERIENCE_SEVERITY } from '../../../../packages/inference/src/types';
-import SessionScreen from '../../src/screens/SessionScreen';
+import SessionScreen, { clearUnloggedLoadDraftsForTests, unloggedLoadDraftCountForTests } from '../../src/screens/SessionScreen';
 import { RestTimerCard } from '../../src/components/ui/RestTimerCard';
 import { advance as advanceRunner, restSecondsFor as runnerRestSecondsFor } from '../../../../packages/inference/src/sessionRunner';
 
@@ -155,7 +155,7 @@ const state = (overrides = {}) => {
   return base;
 };
 
-beforeEach(() => { mockState = state(); });
+beforeEach(() => { mockState = state(); clearUnloggedLoadDraftsForTests(); });
 
 test('keeps all current-set values visible in a phone-width vertical stack', () => {
   render(<SessionScreen />);
@@ -365,7 +365,7 @@ test('invalid draft is distinct from blank, while explicit zero is valid and log
 
   expect(screen.queryByTestId('session-load-validation')).toBeNull();
   fireEvent.changeText(screen.getByTestId('session-load-input'), '12kg');
-  expect(screen.getByLabelText('Load validation. Enter a load from 0 to 500 in 2.5 kg increments.')).toBeOnTheScreen();
+  expect(screen.getByLabelText('Load validation. Enter a load from 0 to 500 in 0.5 kg steps.')).toBeOnTheScreen();
   fireEvent.changeText(screen.getByTestId('session-load-input'), '0');
   expect(screen.queryByTestId('session-load-validation')).toBeNull();
   fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
@@ -946,6 +946,15 @@ test('rest is silent, previews the next deterministic set, and can end early', (
   fireEvent.press(screen.getByLabelText('Ready now, skip the rest timer'));
   expect(mockState.skipRunnerRest).toHaveBeenCalledTimes(1);
 });
+// Android walk 2026-11-03 (W2-12): the exercise just worked vanished from the
+// timeline during its rest and came back only after Ready now.
+test('during rest the exercise just worked stays named, with its set count', () => {
+  mockState = state({ runner: runner({ phase: 'resting', setIndex: 1, restSecondsTarget: 90, restStartedAtMs: Date.now(), restRpe: 8, slotSetCounts: [1, 0], loggedSets: 1 }) });
+  render(<SessionScreen />);
+  const card = within(screen.getByTestId('session-rest-exercise'));
+  expect(card.getByText('First movement')).toBeOnTheScreen();
+  expect(card.getByText(/^\d+ of 3 sets done$|^\d+ sets? complete$/)).toBeOnTheScreen();
+});
 test('session rest override changes by 15 seconds and persists through the runner action', () => {
   mockState = state({
     runner: runner({
@@ -962,13 +971,15 @@ test('session rest override changes by 15 seconds and persists through the runne
 
   render(<SessionScreen />);
 
-  expect(screen.getByLabelText('Session rest seconds 90')).toBeOnTheScreen();
+  // Issue #209: rest is shown in minutes and seconds with a plain label.
+  expect(screen.getByTestId('session-rest-between')).toHaveTextContent('Rest between sets: 1:30');
+  expect(screen.getByLabelText('Change rest (min:sec) 1:30')).toBeOnTheScreen();
   // Android walk 2026-11-03 (ux-8): the number follows the last set's effort,
   // so the caption says why it changes between rests.
-  expect(screen.getByText('Rest uses your effort rating, or the planned effort if you leave it blank. Harder sets get longer rests. Your changes apply for this session.')).toBeOnTheScreen();
-  fireEvent.press(screen.getByLabelText('Increase Session rest seconds'));
+  expect(screen.getByText('Rest uses your effort rating, or the planned effort if you leave it blank. Harder sets get longer rests; a bodyweight set gets 60 to 90 seconds. Your changes apply for this session.')).toBeOnTheScreen();
+  fireEvent.press(screen.getByLabelText('Increase Change rest (min:sec)'));
   expect(mockState.setRunnerRestOverride).toHaveBeenCalledWith(105);
-  fireEvent.press(screen.getByLabelText('Decrease Session rest seconds'));
+  fireEvent.press(screen.getByLabelText('Decrease Change rest (min:sec)'));
   expect(mockState.setRunnerRestOverride).toHaveBeenCalledWith(75);
 });
 
@@ -1405,9 +1416,9 @@ test('post-session Outcome view displays correct copy for all mappings (beginner
 
   const beginnerOutcomes = [
     { kind: 'followed_plan', expected: "You followed today's plan. Recover well." },
-    { kind: 'adapted_session', expected: "Session adjusted." },
+    { kind: 'adapted_session', expected: "Session adapted." },
     { kind: 'stopped_safely', expected: "Stopping was the right call. Recovery is part of the plan." },
-    { kind: 'session_recorded', expected: "Your session is saved. Continue from here next time." },
+    { kind: 'session_recorded', expected: "Your session is saved." },
   ];
 
   for (const { kind, expected } of beginnerOutcomes) {
@@ -1462,7 +1473,7 @@ test('post-session Outcome view displays correct copy for all mappings (beginner
   });
 
   const { unmount } = render(<SessionScreen />);
-  expect(screen.getByText("Your session is saved. Continue from here next time.")).toBeOnTheScreen();
+  expect(screen.getByText("Your session is saved.")).toBeOnTheScreen();
   expect(screen.getByText('Session saved')).toBeOnTheScreen();
   
   // Test dismissing the outcome screen (S2)
@@ -1473,18 +1484,20 @@ test('post-session Outcome view displays correct copy for all mappings (beginner
 });
 
 // --- P1-2: grid/range validation tests ---------------------------------------
-test('off-grid load 1 shows validation, disables Log set, and never calls logSet', () => {
+// Owner ruling 2026-11-03 (Entry 0288): the logging grid is 0.5 kg, so the
+// off-grid examples are now 1.3 and 61.2 (1 and 61 are loggable).
+test('off-grid load 1.3 shows validation, disables Log set, and never calls logSet', () => {
   render(<SessionScreen />);
-  fireEvent.changeText(screen.getByTestId('session-load-input'), '1');
+  fireEvent.changeText(screen.getByTestId('session-load-input'), '1.3');
   expect(screen.getByTestId('session-load-validation')).toBeOnTheScreen();
   expect(screen.getByLabelText('Log set 1 for First movement, unavailable — enter a load first')).toBeOnTheScreen();
   fireEvent.press(screen.getByLabelText(/Log set 1 for First movement/));
   expect(mockState.logSet).not.toHaveBeenCalled();
 });
 
-test('off-grid load 61 shows validation and never calls logSet', () => {
+test('off-grid load 61.2 shows validation and never calls logSet', () => {
   render(<SessionScreen />);
-  fireEvent.changeText(screen.getByTestId('session-load-input'), '61');
+  fireEvent.changeText(screen.getByTestId('session-load-input'), '61.2');
   expect(screen.getByTestId('session-load-validation')).toBeOnTheScreen();
   fireEvent.press(screen.getByLabelText(/Log set 1 for First movement/));
   expect(mockState.logSet).not.toHaveBeenCalled();
@@ -1505,6 +1518,12 @@ test.each([
   ['2,5', 2.5],
   ['60', 60],
   ['500', 500],
+  // Owner ruling 2026-11-03 (Entry 0288): dumbbell and kettlebell sizes.
+  ['12', 12],
+  ['16', 16],
+  ['24', 24],
+  ['12,5', 12.5],
+  ['1', 1],
 ])('valid grid value %s is loggable and reaches logSet unchanged', (value, expected) => {
   render(<SessionScreen />);
   fireEvent.changeText(screen.getByTestId('session-load-input'), value);
@@ -1898,8 +1917,14 @@ test('R5 local rest fallback is identical for every tier and equals the runner r
   const observed = new Map();
   for (const tier of ['beginner', 'intermediate', 'advanced', 'elite']) {
     for (const [answer, rpe] of answers) {
-      mockState = state({ runner: null, profile: { training_age: tier, equipment_inventory: [], session_duration_cap_min: 60 } });
+      // A loaded set (issue #209 gives bodyweight sets their own rest, below).
+      mockState = state({
+        runner: null,
+        movements: [movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }), movement(2, 'Later movement')],
+        profile: { training_age: tier, equipment_inventory: [], session_duration_cap_min: 60 },
+      });
       const view = render(<SessionScreen />);
+      fireEvent.changeText(screen.getByTestId('session-load-input'), '60');
       if (answer !== null) fireEvent.press(screen.getByLabelText(answer));
       fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
       expect(mockState.logSet.mock.calls[0][3]).toBe(rpe);
@@ -1911,6 +1936,32 @@ test('R5 local rest fallback is identical for every tier and equals the runner r
   }
   expect([...observed.values()].map((values) => new Set(values).size)).toEqual([1, 1, 1, 1, 1, 1]);
   expect([...observed.values()].map((values) => values[0])).toEqual([240, 240, 180, 120, 90, 180]);
+}, 60000);
+
+// Issue #209: with no runner, a 0 kg set on a bodyweight movement rests 60 s
+// below RPE 8 and 90 s at 8 or above, for every tier, equal to the runner.
+test('local rest after a bodyweight set is 60 or 90 seconds for every tier; added load keeps the RPE bands', () => {
+  const answers = [['0 clean reps left', 10, 90], ['2 clean reps left', 8, 90], ['3 clean reps left', 7, 60], ['4+ clean reps left', 6, 60]];
+  for (const tier of ['beginner', 'intermediate', 'advanced', 'elite']) {
+    for (const [answer, rpe, expected] of answers) {
+      mockState = state({ runner: null, profile: { training_age: tier, equipment_inventory: [], session_duration_cap_min: 60 } });
+      const view = render(<SessionScreen />);
+      fireEvent.press(screen.getByLabelText(answer));
+      fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+      expect(mockState.logSet.mock.calls[0][2]).toBe(0);
+      const seconds = screen.UNSAFE_getByType(RestTimerCard).props.totalSeconds;
+      expect(seconds).toBe(expected);
+      expect(seconds).toBe(runnerRestSecondsFor({ targetRpe: 8 }, 'intermediate', rpe, true));
+      view.unmount();
+    }
+  }
+  mockState = state({ runner: null });
+  render(<SessionScreen />);
+  fireEvent.changeText(screen.getByTestId('session-load-input'), '10');
+  fireEvent.press(screen.getByLabelText('3 clean reps left'));
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(screen.UNSAFE_getByType(RestTimerCard).props.totalSeconds).toBe(120);
+  expect(screen.getByTestId('session-rest-between')).toHaveTextContent('Rest between sets: 2:00');
 }, 60000);
 
 test('a skipped slot with one logged set shows the skipped meta line, CompletedMetrics, and skipped accessibility label', () => {
@@ -2292,6 +2343,45 @@ test('a finished slot whose logged sets include a different movement_id shows in
   expect(screen.getByText('4 sets complete · includes Box Squat')).toBeOnTheScreen();
 });
 
+// Review (PR 194): after an in-place swap the slot's movementId is the
+// replacement and originalMovementId the planned movement. A row never names
+// its own title movement again in "includes" / "logged as".
+describe('swapped slot names', () => {
+  const boxSet = (setId, index) => ({
+    set_id: setId, movement_id: 3, movement_name: 'Box Squat', set_index: index, reps: 7, load_kg: 60,
+    rpe: 8, tonnage_kg: 420, session_plan_slot_id: 1, timeS: null, bandLevel: null,
+  });
+  const swappedState = (sets, runnerOverrides) => state({
+    movements: [movement(1, 'Narrow Stance Squats'), movement(2, 'Later movement'), movement(3, 'Box Squat')],
+    session: { sessionId: 10, date: '2026-07-15', startedAtMs: Date.now(), sets },
+    sessionPlan: [slot(1, 3, 7, { plannedSets: 2, originalMovementId: 1 }), slot(2, 2, 8)],
+    activeSessionPlanSlotId: 2,
+    runner: runner({
+      slots: [
+        { sessionPlanSlotId: 1, movementId: 3, movementName: 'Box Squat', sets: 2, target: { kind: 'reps', reps: 7 }, targetRpe: 8 },
+        { sessionPlanSlotId: 2, movementId: 2, movementName: 'Later movement', sets: 3, target: { kind: 'reps', reps: 8 }, targetRpe: 8 },
+      ],
+      slotIndex: 1,
+      ...runnerOverrides,
+    }),
+  });
+
+  test('a finished swapped slot is titled with the replacement and does not repeat it as "includes"', () => {
+    mockState = swappedState([boxSet(77, 1), boxSet(78, 2)], { slotSetCounts: [2, 0], loggedSets: 2 });
+    render(<SessionScreen />);
+    expect(screen.getByText('Box Squat')).toBeOnTheScreen();
+    expect(screen.getByText('2 sets complete')).toBeOnTheScreen();
+    expect(screen.queryByText(/includes Box Squat/)).toBeNull();
+  });
+
+  test('a skipped swapped slot names the planned movement, as the completion card does', () => {
+    mockState = swappedState([boxSet(77, 1)], { slotSetCounts: [1, 0], loggedSets: 1, skippedSessionPlanSlotIds: [1] });
+    render(<SessionScreen />);
+    expect(screen.getByLabelText('Narrow Stance Squats, skipped, 1 of 2 sets logged as Box Squat')).toBeOnTheScreen();
+    expect(screen.getByText('Narrow Stance Squats')).toBeOnTheScreen();
+  });
+});
+
 test('a finished slot whose sets all match shows no includes', () => {
   mockState = state({
     movements: [
@@ -2425,6 +2515,20 @@ describe('session-2: honest discomfort wording per tier and after-save outcomes'
     }
   });
 
+  // Android walk 2026-11-03, W5-7: equal thirds cut "MODERATE" to "MODER…".
+  test('severity chips start at their label width and the row wraps instead of cutting a label', () => {
+    const { StyleSheet } = require('react-native');
+    mockState = discomfortFixture('beginner');
+    render(<SessionScreen />);
+    fireEvent.press(screen.getByLabelText('Report discomfort'));
+    const chip = StyleSheet.flatten(screen.getByTestId('niggle-severity-6').props.style);
+    expect(chip.flexGrow).toBe(1);
+    expect(chip.flex).toBeUndefined();
+    expect(chip.flexBasis).toBeUndefined();
+    const row = StyleSheet.flatten(screen.getByTestId('niggle-severity-row').props.style);
+    expect(row.flexWrap).toBe('wrap');
+  });
+
   test('beginner fixture: Mild (4) shows Report saved with this session., Moderate (6) opens substitution without the saved line, and Stop (8) halts without the saved line', () => {
     // 1. Beginner + Mild (4): below triageMin (5) and below haltMin (8) -> saved notice shown
     mockState = discomfortFixture('beginner');
@@ -2554,3 +2658,44 @@ describe('session-2: honest discomfort wording per tier and after-save outcomes'
   });
 });
 
+
+// Android walk 2026-11-03 (W2-13): a load typed but not logged was lost when
+// the athlete left the workout and came back.
+test('an unlogged load survives leaving the workout and coming back', () => {
+  const first = render(<SessionScreen />);
+  const seeded = screen.getByTestId('session-load-input').props.value;
+  const typed = seeded === '42.5' ? '47.5' : '42.5';
+  fireEvent.changeText(screen.getByTestId('session-load-input'), typed);
+  first.unmount();
+  render(<SessionScreen />);
+  expect(screen.getByTestId('session-load-input').props.value).toBe(typed);
+});
+
+// Review (PR 194): session and slot ids repeat between athletes (one database
+// each), so a draft typed for one athlete must not appear for another, and
+// drafts outside the athlete and session in hand are dropped.
+test('an unlogged load typed for one athlete never shows for another', () => {
+  mockState = { ...mockState, activeAthleteId: 'athlete-a' };
+  const first = render(<SessionScreen />);
+  const seeded = screen.getByTestId('session-load-input').props.value;
+  const typed = seeded === '42.5' ? '47.5' : '42.5';
+  fireEvent.changeText(screen.getByTestId('session-load-input'), typed);
+  first.unmount();
+  expect(unloggedLoadDraftCountForTests()).toBe(1);
+  mockState = { ...mockState, activeAthleteId: 'athlete-b' };
+  const second = render(<SessionScreen />);
+  expect(screen.getByTestId('session-load-input').props.value).toBe(seeded);
+  expect(unloggedLoadDraftCountForTests()).toBe(0);
+  second.unmount();
+  mockState = { ...mockState, activeAthleteId: 'athlete-a' };
+  render(<SessionScreen />);
+  expect(screen.getByTestId('session-load-input').props.value).toBe(seeded);
+});
+
+test('without an edit, coming back shows the seeded load', () => {
+  const first = render(<SessionScreen />);
+  const seeded = screen.getByTestId('session-load-input').props.value;
+  first.unmount();
+  render(<SessionScreen />);
+  expect(screen.getByTestId('session-load-input').props.value).toBe(seeded);
+});
