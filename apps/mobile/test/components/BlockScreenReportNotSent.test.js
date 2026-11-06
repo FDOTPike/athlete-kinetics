@@ -150,6 +150,7 @@ describe('Plan screen "Something feels off": a report the store does not take is
     await applyReport('knee sore', 3);
     await waitFor(() => expect(screen.getByText(NOT_SENT)).toBeOnTheScreen());
     expect(screen.getByLabelText('Describe how your body feels today').props.value).toBe('knee sore');
+    expect(screen.getByLabelText('Severity 3 of 10')).toBeSelected();
   });
 
   test('a later stored report clears the not-sent line and the text', async () => {
