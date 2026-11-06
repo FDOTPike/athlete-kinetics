@@ -2442,7 +2442,7 @@ describe('session-2: honest discomfort wording per tier and after-save outcomes'
     expect(alertSpy).toHaveBeenCalledTimes(1);
     const [title, message, buttons] = alertSpy.mock.calls[0];
     expect(title).toBe('Report saved');
-    expect(message).toContain('Report saved with this session.');
+    expect(message).toBe('Report saved with this session. Next, see the options for this exercise.');
     view.rerender(<SessionScreen />);
     expect(screen.getByText('Report saved with this session.')).toBeOnTheScreen();
     expect(screen.queryByText('Choose an alternative')).toBeNull();

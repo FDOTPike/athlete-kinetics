@@ -1039,7 +1039,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
       ? undefined
       : (after?.sessionPlan ?? sessionPlan).find((planSlot) => planSlot.sessionPlanSlotId === offeredSlotId)?.movementId;
     if (offeredMovementId !== undefined) {
-      Alert.alert('Report saved', 'Report saved with this session. Next, you can choose an alternative for this exercise.', [
+      Alert.alert('Report saved', 'Report saved with this session. Next, see the options for this exercise.', [
         { text: 'OK', onPress: () => {
           // The report is already saved: a failure to open the sheet is
           // recorded, not thrown out of the alert callback.
