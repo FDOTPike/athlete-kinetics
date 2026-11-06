@@ -152,7 +152,7 @@ export function pausedHeldText(
   // #188: an injury pause never tells the athlete to keep training; it points
   // to the report form instead. What a pause does is unchanged.
   if (reason === 'injury') {
-    return `Paused for ${reasonLabel}. ${place} and will come back to it. If something hurts, report it under "Something feels off" so Coach can adjust today's plan.`;
+    return `Paused for ${reasonLabel}. ${place} and will come back to it. If something hurts, report it under "Something feels off".`;
   }
   return `Paused for ${reasonLabel}. ${place} and will come back to it — training you do now will not use it up. Keep training if you can; everything else works as normal.`;
 }

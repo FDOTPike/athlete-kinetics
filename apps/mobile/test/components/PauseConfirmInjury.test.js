@@ -144,6 +144,14 @@ test('pausedHeldText: injury has no "keep training"; other reasons are unchanged
   expect(pausedHeldText('illness', null, 'illness')).toContain('Keep training if you can');
 });
 
+test('pausedHeldText: the injury sentence ends at "Something feels off" and promises no plan change (#188 owner ruling)', () => {
+  const injury = pausedHeldText('an injury', { currentSequenceIndex: 1, plannedBlockCount: 3 }, 'injury');
+  expect(injury).toBe('Paused for an injury. You are held at block 1 of 3 and will come back to it. If something hurts, report it under "Something feels off".');
+  expect(injury.endsWith('If something hurts, report it under "Something feels off".')).toBe(true);
+  expect(injury).not.toContain("so Coach can adjust today's plan");
+  expect(pausedHeldText('an injury', null, 'injury')).toBe('Paused for an injury. Your place is held and will come back to it. If something hurts, report it under "Something feels off".');
+});
+
 test('TODAY: an injury pause does not say "you can still train"', () => {
   mockState = baseState({ program, suspension: { reason: 'injury', frozen_macro_index: 1, started_at_ms: 1 } });
   const { unmount } = render(<TodayScreen />);
