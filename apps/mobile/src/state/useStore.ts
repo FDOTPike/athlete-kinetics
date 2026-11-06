@@ -1136,8 +1136,11 @@ interface KineticsStore {
   /** Open the deterministic substitution sheet for a SWAP target: assembles the
    *  engine inputs (library projection + the active block's future slots +
    *  today's active niggles, re-read fresh) and runs computeSubstitutions. The
-   *  niggles drive the injury guardrail and Layer 3 triage. */
-  openSubstitution: (targetMovementId: number) => void;
+   *  niggles drive the injury guardrail and Layer 3 triage. Returns true when
+   *  the sheet opened (an empty result still opens it with its no-option
+   *  message) and false when it did not (unknown movement, a support hold, or
+   *  an unverifiable session context). */
+  openSubstitution: (targetMovementId: number) => boolean;
   closeSubstitution: () => void;
   /** Apply a Layer-1 regression: swap the target slot for the chosen movement
    *  (logged sets stand as history). */
@@ -7205,7 +7208,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const state = get();
     const { movements, profile, block } = state;
     const target = movements.find((m) => m.movement_id === targetMovementId);
-    if (target === undefined) return;
+    if (target === undefined) return false;
     const activeTargetSlot = state.activeSessionPlanSlotId !== null
       ? state.sessionPlan.find((slot) => slot.sessionPlanSlotId === state.activeSessionPlanSlotId)
       : undefined;
@@ -7213,7 +7216,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       ? activeTargetSlot
       : state.sessionPlan.find((slot) => slot.movementId === targetMovementId);
     if (!get().requireTrainingSupport('substitution-preview', [targetMovementId],
-      `session:${state.session?.sessionId ?? `draft-${state.today}`}:slot:${targetSlot?.sessionPlanSlotId ?? 'pending'}:movement:${targetMovementId}`)) return;
+      `session:${state.session?.sessionId ?? `draft-${state.today}`}:slot:${targetSlot?.sessionPlanSlotId ?? 'pending'}:movement:${targetMovementId}`)) return false;
     // Re-read today's niggles from 011 so a midnight crossing while the app sat
     // foregrounded (no AppState 'active' -> no rolloverDay) can't feed the
     // engine yesterday's niggles. set() is synchronous, so get().niggles below
@@ -7225,7 +7228,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const accessContext = executionContextForState(get());
     if (accessContext === null) {
       set({ error: 'The active session access context cannot be verified. Reopen the session before substituting.' });
-      return;
+      return false;
     }
     const capabilityAvailable = capabilityAvailableMovementIds(
       d, movements, profile, accessContext,
@@ -7280,6 +7283,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       accessContext,
     });
     set({ substitution: { targetId: targetMovementId, result } });
+    return true;
   },
 
   closeSubstitution: () => set({ substitution: null }),
@@ -7291,7 +7295,6 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const loggedAtMs = Date.now();
     const id = `${loggedAtMs}-${niggleSeq++}-${Math.floor(Math.random() * 1e9).toString(36)}`;
     const state = get();
-    const current = state.runner === null ? null : currentRunnerSlot(state.runner);
     const nextRunner = state.runner === null
       ? null
       : advanceSessionRunner(state.runner, { kind: 'NIGGLE', atMs: loggedAtMs, severity: safe });
@@ -7334,18 +7337,11 @@ export const useStore = create<KineticsStore>()((set, get) => {
       ...(nextRunner !== null && nextRunner !== state.runner ? runnerSelection(nextRunner) : {}),
       ...preparationUpdate,
     });
-    // A qualifying (but not halt-level) niggle immediately offers a route
-    // around the movement. Halt-level reports block `logSet` at this boundary.
-    if (nextRunner !== null && nextRunner.phase === 'working' &&
-      nextRunner.substitutionOfferedForSessionPlanSlotId !== null && current !== null) {
-      // The report is already saved; a failure to open the sheet is shown, not
-      // turned into a failed save that a retry would duplicate.
-      try {
-        get().openSubstitution(current.movementId);
-      } catch (error) {
-        set({ error: error instanceof Error ? error.message : String(error) });
-      }
-    }
+    // A qualifying (but not halt-level) niggle offers a route around the
+    // movement: the runner records the offer (substitutionOfferedFor...).
+    // #182: the sheet is NOT opened here. The screen first confirms that the
+    // report was saved, and only then opens the sheet. Halt-level reports
+    // block `logSet` at this boundary.
     return true;
   },
   refreshNiggles: () => {

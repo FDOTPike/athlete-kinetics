@@ -134,6 +134,19 @@ test('all substitution layers are hidden for a held source; withdrawal restores 
   expect(state().substitution).not.toBeNull();
 });
 
+// #182: the report confirmation shows "Could not open options" when the sheet
+// does not open, so openSubstitution says whether it opened.
+test('openSubstitution returns false when a hold keeps the sheet closed, true when it opens', () => {
+  const target = state().movements.find((m) => m.name === 'Push-Up') ?? state().movements[0];
+  expect(state().openSubstitution(target.movement_id)).toBe(true);
+  hold(target.movement_id);
+  expect(state().openSubstitution(target.movement_id)).toBe(false);
+  expect(state().substitution).toBeNull();
+  unhold();
+  expect(state().openSubstitution(target.movement_id)).toBe(true);
+  expect(state().openSubstitution(-1)).toBe(false);
+});
+
 test('missing 064 contract fails closed for prescription and load, without deleting history', () => {
   state().loadDemoAthlete();
   const historyCount = mockDriver.raw.prepare('SELECT count(*) AS n FROM session').get().n;

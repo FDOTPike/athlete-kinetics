@@ -1,6 +1,6 @@
 import React from 'react';
-import { StyleSheet } from 'react-native';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { Alert, StyleSheet } from 'react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { resolveLoadSelection as actualResolveLoadSelection } from '../../../../packages/inference/src/loadSelection';
 import { isDifficultyAllowed as actualIsDifficultyAllowed } from '../../../../packages/inference/src/tierPolicy';
 import { resolveMovementAvailability as actualResolveMovementAvailability } from '../../../../packages/inference/src/capabilityResolver';
@@ -1007,6 +1007,64 @@ test('final-set rest stays visible so the next movement can advance', () => {
   expect(screen.getByText(/^Next up: Later movement .* set 1 of 3$/)).toBeOnTheScreen();
   fireEvent.press(screen.getByLabelText('Ready now, skip the rest timer'));
   expect(mockState.skipRunnerRest).toHaveBeenCalledTimes(1);
+});
+
+// #182 (walk A-11): after a report held back the Romanian deadlift, "Next up"
+// sent the athlete back to it. The timeline skips a slot a report holds back.
+test('Next up skips a slot held back by a report and names the next available slot', () => {
+  const completedSets = Array.from({ length: 3 }, (_, index) => ({
+    set_id: index + 1, movement_id: 1, movement_name: 'First movement', set_index: index + 1, reps: 5,
+    load_kg: 0, rpe: 8, tonnage_kg: 0, session_plan_slot_id: 1, timeS: null, bandLevel: null,
+  }));
+  const held = (movementId) => movementId === 2;
+  mockState = state({
+    movements: [movement(1, 'First movement'), movement(2, 'Held movement'), movement(3, 'Third movement')],
+    sessionPlan: [slot(1, 1), slot(2, 2), slot(3, 3)],
+    session: { sessionId: 10, date: '2026-07-15', startedAtMs: Date.now(), sets: completedSets },
+    niggles: [{ region: 'lower_back', severity: 4 }],
+    getMovementAvailabilityVerdicts: () => [1, 2, 3].map((movementId) => ({
+      movementId,
+      state: held(movementId) ? 'teaching_only' : 'available',
+      reasons: held(movementId) ? ['safety'] : [],
+      effectiveContext: 'weight_room', capabilitySource: 'not_required', blockingPrerequisiteMovementIds: [],
+      confirmationWouldClear: false, separateAttestationRequired: false,
+    })),
+    runner: runner({
+      slots: [
+        { sessionPlanSlotId: 1, movementId: 1, movementName: 'First movement', sets: 3, target: { kind: 'reps', reps: 5 }, targetRpe: 8 },
+        { sessionPlanSlotId: 2, movementId: 2, movementName: 'Held movement', sets: 3, target: { kind: 'reps', reps: 5 }, targetRpe: 8 },
+        { sessionPlanSlotId: 3, movementId: 3, movementName: 'Third movement', sets: 3, target: { kind: 'reps', reps: 5 }, targetRpe: 8 },
+      ],
+      phase: 'resting', setIndex: 3, restSecondsTarget: 120, restStartedAtMs: Date.now(), restRpe: 8,
+      slotSetCounts: [3, 1, 0], loggedSets: 4,
+    }),
+  });
+
+  render(<SessionScreen />);
+
+  expect(screen.getByText('Next up: Third movement · set 1 of 3')).toBeOnTheScreen();
+  expect(screen.queryByText(/^Next up: Held movement/)).toBeNull();
+});
+
+test('a slot held back by a report does not ask for a weight', () => {
+  mockState = state({
+    niggles: [{ region: 'knee', severity: 4 }],
+    getMovementAvailabilityVerdicts: () => [1, 2].map((movementId) => ({
+      movementId,
+      state: movementId === 1 ? 'teaching_only' : 'available',
+      reasons: movementId === 1 ? ['safety'] : [],
+      effectiveContext: 'weight_room', capabilitySource: 'not_required', blockingPrerequisiteMovementIds: [],
+      confirmationWouldClear: false, separateAttestationRequired: false,
+    })),
+  });
+  render(<SessionScreen />);
+  expect(screen.getByTestId('session-slot-blocked')).toBeOnTheScreen();
+  expect(screen.queryByTestId('session-load-source-line')).toBeNull();
+  expect(screen.queryByText(/pick a weight/)).toBeNull();
+  // Nor any other load request: no "Enter a load" hint and no load field.
+  expect(screen.queryByTestId('session-load-hint')).toBeNull();
+  expect(screen.queryByText('Enter a load to log this set.')).toBeNull();
+  expect(screen.queryByTestId('session-load-input')).toBeNull();
 });
 
 test('thumbs-down delegates the durable Avoid plus substitution transition to the runner store action', () => {
@@ -2354,11 +2412,12 @@ describe('session-2: honest discomfort wording per tier and after-save outcomes'
       });
       fixtureState.runner = next;
       fixtureState.niggles = [...fixtureState.niggles, { region, severity }];
-      if (
-        opensSubstitution &&
-        next.phase === 'working' &&
-        next.substitutionOfferedForSessionPlanSlotId !== null
-      ) {
+      return true;
+    });
+    // #182: the store records the offer; the screen opens the sheet only
+    // after the athlete has seen that the report was saved.
+    fixtureState.openSubstitution = jest.fn(() => {
+      if (opensSubstitution && fixtureState.runner.substitutionOfferedForSessionPlanSlotId !== null) {
         fixtureState.substitution = {
           targetId: 1,
           result: {
@@ -2370,10 +2429,78 @@ describe('session-2: honest discomfort wording per tier and after-save outcomes'
           },
         };
       }
-      return true;
     });
     return fixtureState;
   };
+
+  let alertSpy;
+  beforeEach(() => { alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => {}); });
+  afterEach(() => { alertSpy.mockRestore(); });
+
+  // #182: a report confirms it was saved before any sheet opens.
+  const expectSavedBeforeSheet = (view) => {
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+    const [title, message, buttons] = alertSpy.mock.calls[0];
+    expect(title).toBe('Report saved');
+    expect(message).toBe('Report saved with this session. Next, see the options for this exercise.');
+    view.rerender(<SessionScreen />);
+    expect(screen.getByText('Report saved with this session.')).toBeOnTheScreen();
+    expect(screen.queryByText('Choose an alternative')).toBeNull();
+    expect(mockState.openSubstitution).not.toHaveBeenCalled();
+    act(() => { buttons[0].onPress(); });
+    expect(mockState.openSubstitution).toHaveBeenCalledWith(1);
+    view.rerender(<SessionScreen />);
+    expect(screen.getByText('Choose an alternative')).toBeOnTheScreen();
+    expect(screen.getByText('Report saved with this session.')).toBeOnTheScreen();
+  };
+
+  // The report is already saved when OK is tapped; a failure to open the
+  // sheet must not throw out of the alert callback (it is recorded and shown).
+  test('a failure to open the alternatives after OK is recorded and shown, not thrown', () => {
+    mockState = discomfortFixture('beginner');
+    mockState.openSubstitution = jest.fn(() => { throw new Error('substitution preview failed'); });
+    const view = render(<SessionScreen />);
+    fireEvent.press(screen.getByLabelText('Report discomfort'));
+    fireEvent.press(screen.getByLabelText('knee'));
+    fireEvent.press(screen.getByLabelText('Moderate discomfort, 6 of 10'));
+    fireEvent.press(screen.getByLabelText('Save discomfort report'));
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+    const buttons = alertSpy.mock.calls[0][2];
+    expect(() => act(() => { buttons[0].onPress(); })).not.toThrow();
+    expect(mockState.openSubstitution).toHaveBeenCalledWith(1);
+    expect(mockState.error).toBe('substitution preview failed');
+    // The screen does not render store.error, so the failure is also shown.
+    expect(alertSpy).toHaveBeenCalledTimes(2);
+    expect(alertSpy.mock.calls[1][0]).toBe('Could not open options');
+    expect(alertSpy.mock.calls[1][1]).toBe(
+      'Your report is saved, but the options for this exercise could not be opened. You can skip this exercise on the session card.',
+    );
+    view.rerender(<SessionScreen />);
+    expect(screen.getByText('Report saved with this session.')).toBeOnTheScreen();
+  });
+
+  // openSubstitution can also decline without throwing (a support hold or an
+  // unverifiable session context); that is shown the same way.
+  test('the alternatives not opening after OK (no throw) is shown', () => {
+    mockState = discomfortFixture('beginner');
+    mockState.openSubstitution = jest.fn(() => false);
+    const view = render(<SessionScreen />);
+    fireEvent.press(screen.getByLabelText('Report discomfort'));
+    fireEvent.press(screen.getByLabelText('knee'));
+    fireEvent.press(screen.getByLabelText('Moderate discomfort, 6 of 10'));
+    fireEvent.press(screen.getByLabelText('Save discomfort report'));
+    expect(alertSpy).toHaveBeenCalledTimes(1);
+    const buttons = alertSpy.mock.calls[0][2];
+    act(() => { buttons[0].onPress(); });
+    expect(mockState.openSubstitution).toHaveBeenCalledWith(1);
+    expect(alertSpy).toHaveBeenCalledTimes(2);
+    expect(alertSpy.mock.calls[1][0]).toBe('Could not open options');
+    expect(alertSpy.mock.calls[1][1]).toBe(
+      'Your report is saved, but the options for this exercise could not be opened. You can skip this exercise on the session card.',
+    );
+    view.rerender(<SessionScreen />);
+    expect(screen.getByText('Report saved with this session.')).toBeOnTheScreen();
+  });
 
   test.each([
     [
@@ -2425,7 +2552,7 @@ describe('session-2: honest discomfort wording per tier and after-save outcomes'
     }
   });
 
-  test('beginner fixture: Mild (4) shows Report saved with this session., Moderate (6) opens substitution without the saved line, and Stop (8) halts without the saved line', () => {
+  test('beginner fixture: Mild (4) shows Report saved with this session., Moderate (6) confirms the save before the substitution sheet, and Stop (8) halts without the saved line', () => {
     // 1. Beginner + Mild (4): below triageMin (5) and below haltMin (8) -> saved notice shown
     mockState = discomfortFixture('beginner');
     const view1 = render(<SessionScreen />);
@@ -2448,9 +2575,7 @@ describe('session-2: honest discomfort wording per tier and after-save outcomes'
     fireEvent.press(screen.getByLabelText('Moderate discomfort, 6 of 10'));
     expect(screen.getByText('Save report')).toBeOnTheScreen();
     fireEvent.press(screen.getByLabelText('Save discomfort report'));
-    view2.rerender(<SessionScreen />);
-    expect(screen.getByText('Choose an alternative')).toBeOnTheScreen();
-    expect(screen.queryByText('Report saved with this session.')).toBeNull();
+    expectSavedBeforeSheet(view2);
     view2.unmount();
 
     // 3. Beginner + Stop (8): >= haltMin (8) -> halts, no saved line
@@ -2468,7 +2593,7 @@ describe('session-2: honest discomfort wording per tier and after-save outcomes'
     view3.unmount();
   });
 
-  test('intermediate fixture: Mild (4) opens substitution without the saved line, Mild (4) when substitution does not open shows Report saved with this session., and Stop (8) halts without the saved line', () => {
+  test('intermediate fixture: Mild (4) confirms the save before the substitution sheet, Mild (4) when substitution does not open shows Report saved with this session., and Stop (8) halts without the saved line', () => {
     // 1. Intermediate + Mild (4): >= triageMin (4) -> substitution opens, no saved line
     mockState = discomfortFixture('intermediate');
     const view1 = render(<SessionScreen />);
@@ -2477,9 +2602,7 @@ describe('session-2: honest discomfort wording per tier and after-save outcomes'
     fireEvent.press(screen.getByLabelText('Mild discomfort, 4 of 10'));
     expect(screen.getByText('Save report')).toBeOnTheScreen();
     fireEvent.press(screen.getByLabelText('Save discomfort report'));
-    view1.rerender(<SessionScreen />);
-    expect(screen.getByText('Choose an alternative')).toBeOnTheScreen();
-    expect(screen.queryByText('Report saved with this session.')).toBeNull();
+    expectSavedBeforeSheet(view1);
     view1.unmount();
 
     // 2. Intermediate + Mild (4) when neither substitution nor halt happens -> saved line shown
@@ -2510,7 +2633,7 @@ describe('session-2: honest discomfort wording per tier and after-save outcomes'
     view3.unmount();
   });
 
-  test('elite fixture: Mild (4) opens substitution, Mild (4) when substitution does not open shows Report saved with this session., and Moderate (6) halts with caption and stop button label', () => {
+  test('elite fixture: Mild (4) confirms the save before the substitution sheet, Mild (4) when substitution does not open shows Report saved with this session., and Moderate (6) halts with caption and stop button label', () => {
     // 1. Elite + Mild (4): >= triageMin (3), < haltMin (6) -> substitution opens
     mockState = discomfortFixture('elite');
     const view1 = render(<SessionScreen />);
@@ -2520,9 +2643,7 @@ describe('session-2: honest discomfort wording per tier and after-save outcomes'
     expect(screen.getByText('Save report')).toBeOnTheScreen();
     expect(screen.queryByText('At this level the session stops for today.')).toBeNull();
     fireEvent.press(screen.getByLabelText('Save discomfort report'));
-    view1.rerender(<SessionScreen />);
-    expect(screen.getByText('Choose an alternative')).toBeOnTheScreen();
-    expect(screen.queryByText('Report saved with this session.')).toBeNull();
+    expectSavedBeforeSheet(view1);
     view1.unmount();
 
     // 2. Elite + Mild (4) when neither substitution nor halt happens -> saved line shown
