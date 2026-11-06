@@ -1027,7 +1027,10 @@ test('the swap button reads "Swap or avoid this" and the sheet says the swap is 
   };
   screen.rerender(<SessionScreen />);
   expect(screen.getByText('Choose an alternative')).toBeOnTheScreen();
-  expect(screen.getByText('For today only. The plan keeps the original exercise.')).toBeOnTheScreen();
+  expect(screen.getByTestId('substitution-today-only')).toHaveTextContent(
+    'For today only. The plan keeps the original exercise; a pulled-forward exercise leaves its later session.',
+    { exact: true },
+  );
 });
 
 test('thumbs-down delegates the durable Avoid plus substitution transition to the runner store action', () => {
