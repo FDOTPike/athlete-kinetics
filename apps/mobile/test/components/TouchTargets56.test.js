@@ -78,7 +78,7 @@ describe('tap targets meet theme.touch.min in both directions', () => {
   test('the trajectory day cells are at least theme.touch.min wide, and the week row scrolls sideways', () => {
     const source = src('screens/BlockScreen.tsx');
     expect(widthFloor(styleBlock(source, 'dayMark'))).toBeGreaterThanOrEqual(theme.touch.min);
-    expect(source).toMatch(/<ScrollView\b[^>]*\bhorizontal\b[^>]*testID=\{`trajectory-days-week-\$\{row\.week\}`\}/);
+    expect(source).toMatch(/horizontal\n\s*showsHorizontalScrollIndicator[\s\S]*?testID=\{`trajectory-days-week-/);
   });
 });
 

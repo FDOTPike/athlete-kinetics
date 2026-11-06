@@ -975,7 +975,19 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                           {showPhaseTip && <InfoTip term={phaseTerm} />}
                         </View>
                       </View>
-                      <ScrollView horizontal showsHorizontalScrollIndicator={false} testID={`trajectory-days-week-${row.week}`} contentContainerStyle={styles.dayRail}>
+                      {/* Cells stay at the 56 dp minimum, so a week can be wider than the card. The bar
+                          shows that, and the row opens with today's cell in view (issue 163). */}
+                      <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator
+                        style={styles.dayScroll}
+                        contentOffset={{
+                          x: Math.max(0, row.cells.findIndex((_, dayIndex) => addDaysIso(block.startDate, (row.week - 1) * 7 + dayIndex) === today)) * (theme.touch.min + theme.space[1]),
+                          y: 0,
+                        }}
+                        testID={`trajectory-days-week-${row.week}`}
+                        contentContainerStyle={styles.dayRail}
+                      >
                     {row.cells.map((cell, dayIndex) => {
                       // Every trajectory position owns a calendar date derived
                       // from the block start, week and day index (same formula
@@ -1717,6 +1729,9 @@ const styles = StyleSheet.create({
   weekPhase: {
     ...theme.font.eyebrow,
     color: theme.color.textLow,
+  },
+  dayScroll: {
+    width: '100%',
   },
   dayRail: {
     flexGrow: 1,
