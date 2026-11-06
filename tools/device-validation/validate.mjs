@@ -180,14 +180,23 @@ Dry run supplies no physical-device or release-gate evidence.`);
     report.maxSampledPrivateDirtyBytes = maximum;
     report.memoryBand = memoryBand(maximum);
     report.harnessSummaryAvailable = Boolean(packet.summary);
-    if (!packet.summary) report.errors.push('No correlated harness summary; evidence incomplete.');
-    if (packet.summary?.lifecycle?.disposalIntegrity?.clean === false) report.errors.push('Disposal failure observed.');
+    // A missing summary, or disposal integrity that is not confirmed clean, fails closed.
+    report.errors.push(...harnessPacketErrors(packet));
     report.status = report.errors.length || maximum === null ? 'NOT VERIFIED' : 'EVIDENCE CAPTURED - OWNER REVIEW REQUIRED';
     save('results.json', report);
     const summary = `${report.status}\nMaximum sampled Private Dirty: ${maximum ?? 'NOT MEASURED'} B\n${report.memoryBand}; ceiling ${RATIFIED_CEILING_BYTES} B (512 MiB), preferred ${PREFERRED_TARGET_BYTES} B.\nSampling is not proof of the transient peak. This packet is not a sealed release-gate packet.\n${report.errors.join('\n')}\n`;
     save('SUMMARY.txt', summary); console.log(summary);
     if (report.errors.length || maximum === null || maximum > RATIFIED_CEILING_BYTES) process.exitCode = 1;
   }
+}
+// Fail closed: a summary counts only when the harness confirms clean disposal
+// (tools/memory-audit/lifecycle_correlator.mjs:248). Missing or non-boolean is not clean.
+export function harnessPacketErrors(packet) {
+  if (!packet?.summary) return ['No correlated harness summary; evidence incomplete.'];
+  const clean = packet.summary.lifecycle?.disposalIntegrity?.clean;
+  if (clean === false) return ['Disposal failure observed.'];
+  if (clean !== true) return ['Disposal integrity not confirmed in the harness summary; evidence incomplete.'];
+  return [];
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   try { await main(parseArgs(process.argv.slice(2))); }

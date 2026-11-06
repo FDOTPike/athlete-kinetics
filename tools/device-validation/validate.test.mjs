@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { captureEvidence, memoryBand, parseArgs, selectDevice } from './validate.mjs';
+import { captureEvidence, harnessPacketErrors, memoryBand, parseArgs, selectDevice } from './validate.mjs';
 
 test('ceiling boundaries and missing measurements fail closed', () => {
   assert.equal(memoryBand(null), 'NOT MEASURED');
@@ -47,5 +47,15 @@ test('capture accepts large screenshots and a stopped app, but preserves adb fai
   for (const detail of [{ status: 2 }, { stderr: 'device offline' }, { stdout: 'unexpected' }, { signal: 'SIGTERM' }, { status: null, code: 'ETIMEDOUT' }]) {
     const failure = Object.assign(new Error('adb failure'), stopped, detail);
     assert.throws(() => captureEvidence('failed', save, args => { if (args.includes('pidof')) throw failure; return '<hierarchy />'; }, {}, execute), e => e === failure);
+  }
+});
+
+test('a summary is accepted only when the harness confirms clean disposal', () => {
+  const withIntegrity = (disposalIntegrity) => ({ summary: { lifecycle: { disposalIntegrity } } });
+  assert.deepEqual(harnessPacketErrors(withIntegrity({ clean: true })), []);
+  assert.equal(harnessPacketErrors({}).length, 1);
+  assert.equal(harnessPacketErrors(withIntegrity({ clean: false })).length, 1);
+  for (const packet of [{ summary: {} }, { summary: { lifecycle: {} } }, withIntegrity({}), withIntegrity({ clean: 'true' }), withIntegrity({ clean: null })]) {
+    assert.equal(harnessPacketErrors(packet).length, 1, JSON.stringify(packet));
   }
 });
