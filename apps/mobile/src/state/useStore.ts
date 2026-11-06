@@ -504,6 +504,17 @@ export type BootStatus = 'booting' | 'ready' | 'error';
  *  training history already exists (which the load must never touch). */
 export type DemoLoadResult = 'loaded' | 'blocked_existing_data';
 
+/** One finalized session on the Progress list (#201). */
+export interface RecentSessionOutcome {
+  sessionId: number;
+  outcomeKind: string;
+  finalizedAtMs: number;
+  focus: string | null;
+  originKind: string;
+  exerciseCount: number;
+  loggedSetCount: number;
+}
+
 export type TriageOutcome =
   | { kind: 'rejected' }
   /** Positive sentiment: identity pass-through, nothing changes — the UI
@@ -1202,7 +1213,7 @@ interface KineticsStore {
   resetTrainingData: () => boolean;
   dismissOutcome: () => void;
   loadSessionOutcome: (sessionId: number) => { outcomeKind: string; finalizedAtMs: number } | null;
-  loadRecentOutcomes: (limit?: number) => { sessionId: number; outcomeKind: string; finalizedAtMs: number }[];
+  loadRecentOutcomes: (limit?: number) => RecentSessionOutcome[];
   loadRoutineTemplates: () => void;
   saveRoutineTemplate: (input: {
     routineTemplateId?: number;
@@ -8764,15 +8775,33 @@ export const useStore = create<KineticsStore>()((set, get) => {
   loadRecentOutcomes: (limit = 20) => {
     try {
       // Walk 2 (W2-9): the session id lets Progress open the session's summary.
+      // #201: each row also says what the session was (planned focus, or an
+      // extra session) and how many exercises and sets it had.
       const res = getDb().executeSync(
-        'SELECT session_id, outcome_kind, finalized_at_ms FROM session_outcome ORDER BY finalized_at_ms DESC LIMIT ?',
+        `SELECT so.session_id, so.outcome_kind, so.finalized_at_ms, so.origin_kind,
+                (SELECT COUNT(DISTINCT sr.movement_id) FROM set_record sr WHERE sr.session_id = so.session_id) AS exercise_count,
+                so.logged_set_count,
+                (SELECT MIN(ps.focus) FROM set_record sr
+                   JOIN set_target st ON st.set_id = sr.set_id
+                   JOIN planned_slot pl ON pl.planned_slot_id = st.source_planned_slot_id
+                   JOIN planned_session ps ON ps.planned_session_id = pl.planned_session_id
+                  WHERE sr.session_id = so.session_id) AS focus
+           FROM session_outcome so
+          ORDER BY so.finalized_at_ms DESC LIMIT ?`,
         [limit],
       );
-      const rows = rowsOf<{ session_id: number; outcome_kind: string; finalized_at_ms: number }>(res);
+      const rows = rowsOf<{
+        session_id: number; outcome_kind: string; finalized_at_ms: number; origin_kind: string;
+        exercise_count: number; logged_set_count: number; focus: string | null;
+      }>(res);
       return rows.map((r) => ({
         sessionId: r.session_id,
         outcomeKind: r.outcome_kind,
         finalizedAtMs: r.finalized_at_ms,
+        focus: r.focus,
+        originKind: r.origin_kind,
+        exerciseCount: r.exercise_count,
+        loggedSetCount: r.logged_set_count,
       }));
     } catch (e) {
       console.error('Failed to load recent session outcomes:', e);
