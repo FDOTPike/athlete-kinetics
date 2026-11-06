@@ -1100,7 +1100,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
 
   describe('#173: a warning before a sixth athlete is added', () => {
     const WARNING = 'Backups cover up to about five athletes in this version. You can still add this athlete, '
-      + 'but a backup will not be possible until a later version.';
+      + 'but a backup may not be possible until a later version.';
     const fiveAthletes = [1, 2, 3, 4, 5].map((n) => ({ id: n === 1 ? 'default' : `ath-${n}`, name: `Athlete ${n}` }));
 
     afterEach(() => { mockBackupEstimate = null; });

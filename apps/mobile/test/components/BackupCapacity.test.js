@@ -48,10 +48,12 @@ describe('the warning before a sixth athlete', () => {
     expect(addingAthleteExceedsBackupCap(null, 5)).toBe(true);
   });
 
-  test('the warning says the athlete can still be added', () => {
+  test('the warning says the athlete can still be added, and only that a backup may not be possible', () => {
+    // The add-athlete check is an estimate (or a count when sizes are unreadable),
+    // so the warning is hedged; the backup screen's measured over-limit text stays firm.
     expect(ADD_ATHLETE_BACKUP_WARNING).toBe(
       'Backups cover up to about five athletes in this version. You can still add this athlete, '
-      + 'but a backup will not be possible until a later version.',
+      + 'but a backup may not be possible until a later version.',
     );
   });
 

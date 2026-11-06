@@ -21,7 +21,7 @@ const ABOUT_FIVE_ATHLETES = 5;
 
 export const ADD_ATHLETE_BACKUP_WARNING =
   'Backups cover up to about five athletes in this version. You can still add this athlete, '
-  + 'but a backup will not be possible until a later version.';
+  + 'but a backup may not be possible until a later version.';
 
 const megabytes = (bytes: number): string => `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 
