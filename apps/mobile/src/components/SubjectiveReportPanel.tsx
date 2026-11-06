@@ -15,7 +15,7 @@
  * Law: zero hex literals — theme tokens only.
  * Law: touch targets >= 56pt (Chip, PrimaryButton and SecondaryButton carry it).
  */
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import type { TriageOutcome } from '../state/useStore';
 import { theme } from '../theme/theme';
@@ -57,17 +57,29 @@ export function SubjectiveReportPanel({
   const [notSent, setNotSent] = useState(false);
   const halted = lastTriage !== null && lastTriage.kind === 'matched' && lastTriage.directive.halt;
 
+  // One Apply at a time: a second press before the first answer arrives sends
+  // nothing (the store would refuse it, and its "not sent" would sit beside the
+  // first report's result). The ref is synchronous; `pending` disables the button.
+  const inFlight = useRef(false);
+  const [pending, setPending] = useState(false);
+
   const apply = (): void => {
-    if (reportSeverity === null) return;
+    if (reportSeverity === null || inFlight.current) return;
+    inFlight.current = true;
+    setPending(true);
     setNotSent(false);
+    // A new report starts without the previous report's result on screen.
+    setApplied(false);
+    const settled = (): void => { inFlight.current = false; setPending(false); };
     // The text is cleared only once the store has stored the report. Anything else
     // keeps it on screen and says so, so nothing typed is lost.
     onApply(reportText, reportSeverity).then((stored) => {
+      settled();
       if (!stored) { setNotSent(true); return; }
       setReportText('');
       setReportSeverity(null);
       setApplied(true);
-    }, () => { setNotSent(true); });
+    }, () => { settled(); setNotSent(true); });
   };
 
   const haltCard = halted && lastTriage !== null && lastTriage.kind === 'matched' ? (
@@ -134,7 +146,7 @@ export function SubjectiveReportPanel({
       </View>
       <PrimaryButton
         label={triaging ? 'Checking report' : 'Apply report'}
-        disabled={reportText.trim().length === 0 || reportSeverity === null || triaging}
+        disabled={reportText.trim().length === 0 || reportSeverity === null || triaging || pending}
         onPress={apply}
         accessibilityLabel={triaging ? 'Checking report' : 'Apply report'}
         testID="completion-report-apply"

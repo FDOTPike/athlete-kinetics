@@ -8284,6 +8284,18 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const contextRevision = athleteContextRevision;
     // The UI forces a 1-10 severity before processing; clamp at the boundary.
     const safeSeverity = Math.round(clamp(severity, 1, 10));
+    // Once the report is written it is stored. A refresh that fails after that
+    // is reported through `error`, never as "not sent" (a retry would store the
+    // report twice), and no earlier result is left on screen as this report's
+    // answer. A halt, this report's or an earlier one today, is never hidden.
+    const refreshFailedAfterStore = (error: unknown, ownHalt: SessionDirective | null): void => {
+      const previous = get().lastTriage;
+      const earlierHalt = previous !== null && previous.kind === 'matched' && previous.directive.halt ? previous : null;
+      set({
+        error: error instanceof Error ? error.message : String(error),
+        lastTriage: ownHalt !== null ? { kind: 'matched', directive: ownHalt } : earlierHalt,
+      });
+    };
     set({ triaging: true });
     try {
       // Semantic routing is OPTIONAL; the keyword safety layer inside
@@ -8314,10 +8326,14 @@ export const useStore = create<KineticsStore>()((set, get) => {
            VALUES (?, ?, ?, NULL, ?, 0, NULL, NULL, NULL)`,
           [today, Date.now(), raw, resolved.similarity],
         );
-        get().computePrescription([]);
-        const triageAfter = get().lastTriage;
-        if (triageAfter === null || triageAfter.kind !== 'matched' || !triageAfter.directive.halt) {
-          set({ lastTriage: { kind: 'rejected' } });
+        try {
+          get().computePrescription([]);
+          const triageAfter = get().lastTriage;
+          if (triageAfter === null || triageAfter.kind !== 'matched' || !triageAfter.directive.halt) {
+            set({ lastTriage: { kind: 'rejected' } });
+          }
+        } catch (error) {
+          refreshFailedAfterStore(error, null);
         }
         return true;
       }
@@ -8380,18 +8396,22 @@ export const useStore = create<KineticsStore>()((set, get) => {
       if (haltedRunner !== null && haltedRunner !== activeRunner) {
         set(runnerSelection(haltedRunner));
       }
-      if (auditHalt && activeSession !== null && get().session?.sessionId === activeSession.sessionId) {
-        set({ preparation: readSessionPreparation(d, activeSession.sessionId) });
-      }
-      // Re-derive the operative prescription from persistence (single source
-      // of truth; also sets lastTriage to the now-operative directive).
-      get().computePrescription([]);
-      // Acknowledge a confident match that did NOT become operative — either
-      // positive sentiment OR a complaint the severity gate de-escalated to
-      // benign (DOMS) — unless a restrictive report from earlier today still
-      // governs, in which case computePrescription kept that honest directive.
-      if (get().lastTriage === null) {
-        set({ lastTriage: { kind: 'positive', cue: resolved.entry.cue } });
+      try {
+        if (auditHalt && activeSession !== null && get().session?.sessionId === activeSession.sessionId) {
+          set({ preparation: readSessionPreparation(d, activeSession.sessionId) });
+        }
+        // Re-derive the operative prescription from persistence (single source
+        // of truth; also sets lastTriage to the now-operative directive).
+        get().computePrescription([]);
+        // Acknowledge a confident match that did NOT become operative — either
+        // positive sentiment OR a complaint the severity gate de-escalated to
+        // benign (DOMS) — unless a restrictive report from earlier today still
+        // governs, in which case computePrescription kept that honest directive.
+        if (get().lastTriage === null) {
+          set({ lastTriage: { kind: 'positive', cue: resolved.entry.cue } });
+        }
+      } catch (error) {
+        refreshFailedAfterStore(error, auditHalt ? audit.directive : null);
       }
       return true;
     } finally {
