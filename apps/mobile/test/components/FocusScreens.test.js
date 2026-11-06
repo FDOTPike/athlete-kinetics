@@ -544,6 +544,19 @@ test('COACH renders a rest-day placeholder when no session is scheduled today', 
   expect(screen.queryByText('Goblet Squat')).toBeNull();
 });
 
+test('READY with no block does not say Rest day; it says what Today says (issue #156)', () => {
+  mockState = baseState({
+    todayPlan: null,
+    block: null,
+    uiPreferences: { sessionModeOverride: null, readinessDetail: 'full', restTimerEnabled: true, textScale: 'system' },
+  });
+  render(<ReadinessScreen />);
+
+  expect(screen.getByText('No plan yet.')).toBeOnTheScreen();
+  expect(screen.getByText('Build a plan and today gets a workout with it.')).toBeOnTheScreen();
+  expect(screen.queryByText('Rest day.')).toBeNull();
+});
+
 test('READY renders rest-day statement and metrics list when no session is scheduled', () => {
   mockState = baseState({
     todayPlan: null,

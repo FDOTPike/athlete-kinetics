@@ -36,6 +36,7 @@ import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { useStore } from '../state/useStore';
 import { useBackupStore } from '../state/backupStore';
 import { useSubViewBack } from '../navigation/navigation';
+import { formatAthleteDate } from '../state/athleteDate';
 import { Chip, Stepper, QuietAction, Disclosure, ListRow, PrimaryButton, SecondaryButton } from '../components/ui';
 import { measuredDayDetail } from './measuredDayDetail';
 import InfoTip from '../components/InfoTip';
@@ -56,8 +57,7 @@ const OUTCOME_LABELS: Record<string, string> = {
 
 const formatFinalizedDate = (ms: number): string => {
   if (ms <= 0) return '—';
-  const d = new Date(ms);
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  return formatAthleteDate(ms);
 };
 
 // ---------------------------------------------------------------------------

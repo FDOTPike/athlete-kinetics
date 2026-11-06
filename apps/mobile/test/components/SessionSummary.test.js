@@ -19,6 +19,7 @@
  * 6. D5/D8/D9 — screen level: unknown outcome truth, Back to Today dismissing
  *    exactly once, no writes during render, plain RPE wording.
  */
+import { formatAthleteDate } from '../../src/state/athleteDate';
 import React from 'react';
 import { ScrollView, StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
@@ -296,7 +297,7 @@ describe('summary copy obeys D1, D2, and D3', () => {
       blockSessions: sessions(['2026-09-09', '2026-09-12']),
       today: '2026-09-10',
     });
-    expect(view.nextLine).toContain('2026-09-12');
+    expect(view.nextLine).toContain(formatAthleteDate('2026-09-12'));
     const strict = buildSessionSummary({ ...base, blockSessions: sessions(['2026-09-10']), today: '2026-09-10' });
     expect(strict.nextLine).toBeNull();
   });
@@ -427,7 +428,7 @@ describe('screen laws: D5, D6, D8, D9', () => {
       }
       return false;
     };
-    expect(inScrollFlow(screen.getByText(/2026-09-12/))).toBe(true);
+    expect(inScrollFlow(screen.getByText(formatAthleteDate('2026-09-12'), { exact: false }))).toBe(true);
     expect(inScrollFlow(screen.getByTestId('session-feel-saved'))).toBe(true);
     expect(inScrollFlow(screen.getByText('Your note is saved with this session.'))).toBe(true);
     expect(inScrollFlow(screen.getByLabelText('Back to Today'))).toBe(true);
@@ -513,7 +514,7 @@ describe('screen laws: D5, D6, D8, D9', () => {
     expect(screen.getByText(/Goblet Squat — 2 sets logged · 3 planned · most reps in one set 8 · heaviest load used 24 kg/)).toBeOnTheScreen();
     expect(screen.getByText('Saved duration: 38 min')).toBeOnTheScreen();
     expect(screen.getByText(/Goblet Squat — last time:/)).toBeOnTheScreen();
-    expect(screen.getByText(/Upper session on 2026-09-12/)).toBeOnTheScreen();
+    expect(screen.getByText(`Upper session on ${formatAthleteDate('2026-09-12')}`, { exact: false })).toBeOnTheScreen();
   });
 
   test('D5: an unknown outcome kind renders "Outcome unavailable", not a recorded claim', () => {

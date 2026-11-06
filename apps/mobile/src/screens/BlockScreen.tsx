@@ -653,13 +653,13 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           "stop training" affordance. */}
       {suspension != null ? (
         <View style={[styles.card, styles.haltCard]}>
-          <Text style={styles.eyebrow}>PROGRAMME PAUSED</Text>
+          <Text style={styles.eyebrow}>PROGRAM PAUSED</Text>
           <Text style={styles.cardTitle}>Your place is being held</Text>
           <Text style={styles.bodyText}>
             {pausedHeldText(SUSPENSION_REASON_LABEL[suspension.reason], program)}
           </Text>
           <PrimaryButton
-            label="Resume my programme"
+            label="Resume my program"
             onPress={() => {
               // Same action-scoped try/catch the pause controls use below. The
               // resume path had none, so a database failure escaped the handler
@@ -673,8 +673,8 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
               }
             }}
             accessibilityLabel={program != null
-              ? `Resume the programme and return to block ${program.currentSequenceIndex} of ${program.plannedBlockCount}`
-              : 'Resume the programme and return to your place'}
+              ? `Resume the program and return to block ${program.currentSequenceIndex} of ${program.plannedBlockCount}`
+              : 'Resume the program and return to your place'}
             testID="suspension-resume"
           />
           {/* Mounted INSIDE the suspended branch. The resume button exists only
@@ -692,7 +692,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           <Text style={styles.eyebrow}>PAUSE</Text>
           <Text style={styles.cardTitle}>Injured, ill, or life got in the way?</Text>
           <Text style={styles.bodyText}>
-            Pausing holds your place in the programme so a gap does not cost you a block. You can
+            Pausing holds your place in the program so a gap does not cost you a block. You can
             still train while paused.
           </Text>
           {SUSPENSION_REASONS.map((reason) => (
@@ -707,7 +707,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                   setSuspendError(e instanceof Error ? e.message : String(e));
                 }
               }}
-              accessibilityLabel={`Pause my programme for ${SUSPENSION_REASON_LABEL[reason]}`}
+              accessibilityLabel={`Pause my program for ${SUSPENSION_REASON_LABEL[reason]}`}
               testID={`suspension-begin-${reason}`}
             />
           ))}

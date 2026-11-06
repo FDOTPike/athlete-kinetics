@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { theme } from '../theme/theme';
 import { useBackupStore } from '../state/backupStore';
+import { formatAthleteDateTime } from '../state/athleteDate';
 import { QuietAction } from './ui';
 
 const dateLabel = (value: string | null): string => value === null
   ? 'No confirmed backup saved yet.'
-  : `Last confirmed save: ${new Date(value).toLocaleString()}`;
+  : `Last confirmed save: ${formatAthleteDateTime(value)}`;
 
 export default function BackupTransferPanel(): React.JSX.Element {
   const status = useBackupStore((state) => state.status);
@@ -108,7 +109,7 @@ export default function BackupTransferPanel(): React.JSX.Element {
       {preview !== null && (
         <View style={styles.preview} testID="restore-preview">
           <Text style={styles.label}>RESTORE PREVIEW</Text>
-          <Text style={styles.body}>Created {new Date(preview.createdAt).toLocaleString()}</Text>
+          <Text style={styles.body}>Created {formatAthleteDateTime(preview.createdAt)}</Text>
           <Text style={styles.body}>{preview.databaseCount} athlete database{preview.databaseCount === 1 ? '' : 's'} · {Math.ceil(preview.totalBytes / 1_048_576)} MB</Text>
           <Text style={styles.body}>Athletes: {preview.athleteNames.join(', ')}</Text>
           {preview.source === 'retained_recovery' ? (

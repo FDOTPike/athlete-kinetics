@@ -16,6 +16,7 @@
  *    button's label would pass while the button navigated to Coach — which is
  *    exactly the bug.
  */
+import { formatAthleteDate } from '../../src/state/athleteDate';
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import TodayScreen from '../../src/screens/TodayScreen';
@@ -423,7 +424,7 @@ describe('Today distinguishes the states rather than calling them all rest', () 
     expect(screen.getByTestId('today-card-rest')).toBeOnTheScreen();
     expect(screen.getByText('Rest day')).toBeOnTheScreen();
     expect(screen.queryByTestId('today-primary-start')).toBeNull();
-    expect(screen.getByTestId('today-next')).toHaveTextContent(/Upper on 2026-07-16/);
+    expect(screen.getByTestId('today-next')).toHaveTextContent(new RegExp(`Upper on ${formatAthleteDate('2026-07-16')}`));
   });
 
   test('an athlete with no program is NOT told to rest', () => {

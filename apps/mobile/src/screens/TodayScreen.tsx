@@ -54,6 +54,7 @@ import {
 } from '../state/todayState';
 import { classifyReadiness, HALT_META, HeldScreenWithHalt } from './ReadinessScreen';
 import { autopilotReasonCopy } from '../state/autopilotCopy';
+import { formatAthleteDate } from '../state/athleteDate';
 import { PrimaryButton, QuietAction, Disclosure, ListRow } from '../components/ui';
 import { sessionFocusName } from '../state/sessionSummary';
 
@@ -66,8 +67,6 @@ export interface TodayScreenProps {
 
 const focusName = (focus: string): string => sessionFocusName(focus);
 
-/** "Lower session · Fri 12 Sep" without pulling in a date library. */
-const shortDate = (iso: string): string => iso;
 
 const READINESS_LABEL: Record<'OPTIMAL' | 'RECOVERY' | 'OVERREACHED', string> = {
   OPTIMAL: 'Ready to train',
@@ -256,7 +255,7 @@ function AvailableTodayScreen({
         <Text style={styles.caption} testID="today-next-none">{emptyCopy}</Text>
       ) : (
         <Text style={styles.body} testID="today-next">
-          {focusName(next.focus)} on {shortDate(next.sessionDate)} — {next.slotCount} movement
+          {focusName(next.focus)} on {formatAthleteDate(next.sessionDate)} — {next.slotCount} movement
           {next.slotCount === 1 ? '' : 's'}.
         </Text>
       )}
@@ -389,7 +388,7 @@ function AvailableTodayScreen({
             <Text style={styles.body}>
               You have {state.missedCount} unfinished session
               {state.missedCount === 1 ? '' : 's'} in this block, the earliest from{' '}
-              {shortDate(state.earliest.sessionDate)} ({focusName(state.earliest.focus)}).
+              {formatAthleteDate(state.earliest.sessionDate)} ({focusName(state.earliest.focus)}).
             </Text>
             {/* Deliberately NOT offering "move it to today". Rescheduling is a
                 §2 Phase 2 item and would be a new schedule mutation rule. The
