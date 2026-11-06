@@ -923,6 +923,62 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     expect(mockState.saveProfile).not.toHaveBeenCalled();
   });
 
+  test('OBJECTIVE change with a program running names the objective the program was built with', () => {
+    // The profile objective was already changed once; the program keeps its own.
+    mockState = {
+      ...mockState,
+      profile: { ...mockState.profile, objective: 'strength' },
+      block: { blockId: 1, startDate: '2026-07-01', objective: 'hybrid', createdAtMs: 1 },
+      program: { programId: 1, objective: 'hybrid', status: 'active', currentSequenceIndex: 1, plannedBlockCount: 2, days: [], movementPreferences: [] },
+    };
+    render(<ProfileScreen />);
+    fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: power'));
+    expect(screen.getByTestId('profile-objective-change-text').props.children)
+      .toBe('Change your objective from strength to power? Your current block and the rest of your program stay hybrid. Power is used when you build your next program.');
+  });
+
+  test('OBJECTIVE change after earlier blocks ended does not call the next block the first', () => {
+    mockState = { ...mockState, block: null, program: null, hasArchivedBlock: true };
+    render(<ProfileScreen />);
+    fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: strength'));
+    expect(screen.getByTestId('profile-objective-change-text').props.children)
+      .toBe('Change your objective from hybrid to strength? Your next block will be built for strength.');
+  });
+
+  test('OBJECTIVE change with no block history still says first block', () => {
+    mockState = { ...mockState, block: null, program: null, hasArchivedBlock: false };
+    render(<ProfileScreen />);
+    fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: strength'));
+    expect(screen.getByTestId('profile-objective-change-text').props.children)
+      .toBe('Change your objective from hybrid to strength? Your first block will be built for strength.');
+  });
+
+  test('a pending OBJECTIVE change is dropped when the athlete or profile slot changes', () => {
+    mockState = { ...mockState, block: null, program: null };
+    render(<ProfileScreen />);
+    fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: strength'));
+    expect(screen.getByTestId('profile-objective-confirmation')).toBeOnTheScreen();
+    // Another athlete becomes active while the confirmation is open.
+    mockState = { ...mockState, activeAthleteId: 'ath-2' };
+    screen.rerender(<ProfileScreen />);
+    expect(screen.queryByTestId('profile-objective-confirmation')).toBeNull();
+    expect(mockState.saveProfile).not.toHaveBeenCalled();
+
+    fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: power'));
+    expect(screen.getByTestId('profile-objective-confirmation')).toBeOnTheScreen();
+    // Another profile slot becomes active while the confirmation is open.
+    mockState = {
+      ...mockState,
+      profileSlots: [
+        { slotId: 1, name: 'Main', isActive: false },
+        { slotId: 2, name: 'Secondary', isActive: true },
+      ],
+    };
+    screen.rerender(<ProfileScreen />);
+    expect(screen.queryByTestId('profile-objective-confirmation')).toBeNull();
+    expect(mockState.saveProfile).not.toHaveBeenCalled();
+  });
+
   test('TRAINING AGE ChipRow keeps shared semantics and disables every chip during a session', () => {
     mockState.session = { sessionId: 10, date: '2026-07-15', startedAtMs: Date.now(), sets: [] };
     const { getByRole } = render(<ProfileScreen />);

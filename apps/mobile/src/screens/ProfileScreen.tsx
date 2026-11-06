@@ -98,18 +98,22 @@ function ChipRow<T extends string>({ label, options, value, onSelect, tip, disab
  * #176: what an objective change will do, said before it is saved. A running
  * program keeps the objective it was built with (its next blocks too); without
  * one, the next block is built for the new objective. The current block never
- * changes.
+ * changes. `programObjective` is the running program's own objective (null with
+ * no program): after an earlier change it can differ from `from`.
  */
 export const objectiveChangeText = (
-  from: string, to: string, hasProgram: boolean, hasBlock: boolean,
+  from: string, to: string, programObjective: string | null, hasBlock: boolean, hasArchivedBlock = false,
 ): string => {
   const fromLabel = from.replace(/_/g, ' ');
   const toLabel = to.replace(/_/g, ' ');
   const question = `Change your objective from ${fromLabel} to ${toLabel}?`;
-  if (hasProgram) {
-    return `${question} Your current block and the rest of your program stay ${fromLabel}. ${toLabel.charAt(0).toUpperCase()}${toLabel.slice(1)} is used when you build your next program.`;
+  if (programObjective !== null) {
+    const programLabel = programObjective.replace(/_/g, ' ');
+    return `${question} Your current block and the rest of your program stay ${programLabel}. ${toLabel.charAt(0).toUpperCase()}${toLabel.slice(1)} is used when you build your next program.`;
   }
   if (hasBlock) return `${question} Your current block stays as it is. Your next block will be built for ${toLabel}.`;
+  // Earlier blocks ended: the next block is not the first.
+  if (hasArchivedBlock) return `${question} Your next block will be built for ${toLabel}.`;
   return `${question} Your first block will be built for ${toLabel}.`;
 };
 
@@ -322,7 +326,10 @@ export default function ProfileScreen(): React.JSX.Element {
   const session = useStore((s) => s.session);
   const activeProgram = useStore((s) => s.program) ?? null;
   const activeBlock = useStore((s) => s.block) ?? null;
-  const [pendingObjective, setPendingObjective] = useState<UserProfile['objective'] | null>(null);
+  const hasArchivedBlock = useStore((s) => s.hasArchivedBlock) === true;
+  // The objective chosen but not yet confirmed, tied to the athlete and profile
+  // slot it was chosen for, so a switch never confirms it for someone else.
+  const [pendingObjectiveChoice, setPendingObjectiveChoice] = useState<{ objective: UserProfile['objective']; scope: string } | null>(null);
   const resetTrainingData = useStore((s) => s.resetTrainingData);
   const backupWorking = useBackupStore((s) => s.status === 'working');
   const athletes = useStore((s) => s.athletes);
@@ -430,6 +437,14 @@ export default function ProfileScreen(): React.JSX.Element {
     profile.mobility_limits.map((f) => `${f.region}: ${f.note}`).join('\n'),
   );
   const activeSlotId = profileSlots.find((p) => p.isActive)?.slotId ?? null;
+  const objectiveScope = `${activeAthleteId ?? ''}|${activeSlotId ?? ''}`;
+  const pendingObjective = pendingObjectiveChoice !== null && pendingObjectiveChoice.scope === objectiveScope
+    ? pendingObjectiveChoice.objective
+    : null;
+  const setPendingObjective = (objective: UserProfile['objective'] | null): void => {
+    setPendingObjectiveChoice(objective === null ? null : { objective, scope: objectiveScope });
+  };
+  useEffect(() => { setPendingObjectiveChoice(null); }, [objectiveScope]);
   useEffect(() => {
     setInjuryText(profile.injury_flags.map((f) => `${f.region}: ${f.note}`).join('\n'));
     setMobilityText(profile.mobility_limits.map((f) => `${f.region}: ${f.note}`).join('\n'));
@@ -510,7 +525,7 @@ export default function ProfileScreen(): React.JSX.Element {
       {pendingObjective !== null && (
         <View style={styles.objectiveConfirm} testID="profile-objective-confirmation">
           <Text style={styles.confirmText} testID="profile-objective-change-text">
-            {objectiveChangeText(profile.objective, pendingObjective, activeProgram !== null, activeBlock !== null)}
+            {objectiveChangeText(profile.objective, pendingObjective, activeProgram?.objective ?? null, activeBlock !== null, hasArchivedBlock)}
           </Text>
           <PrimaryButton
             label="Change objective"
