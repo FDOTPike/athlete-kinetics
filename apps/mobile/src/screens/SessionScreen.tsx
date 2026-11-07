@@ -2039,7 +2039,11 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                     );
                   })}
                   {substitution.result.layer1Regression.options.length === 0 && substitution.result.layer2DaySwap.options.length === 0 && (
-                    <Text style={styles.noOptions}>No replacement is available under the current app checks. It is okay to finish here.</Text>
+                    <Text style={styles.noOptions}>
+                      {substitution.heldByReportedArea === true
+                        ? 'Other exercises were held back because of an area you reported. None is left to switch to. It is okay to finish here.'
+                        : "No other exercise passes the app's checks for you right now. It is okay to finish here."}
+                    </Text>
                   )}
                 </View>
               </>
