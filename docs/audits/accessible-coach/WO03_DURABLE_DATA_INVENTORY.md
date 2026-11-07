@@ -219,3 +219,9 @@ Migration `070` adds `session_feel` to the native workout/history group: 69 arra
 Final live durable tables: 123 (the 122 above, and `session_plan_slot_replacement`). The migration array has 72 entries through slot `073`, so `PRAGMA user_version = 72`. The current backup contract fingerprints 209 durable table/index/trigger objects; all earlier schema contracts remain registered unchanged.
 
 `session_plan_slot_replacement` links a `session_plan_slot` row swapped after logged sets to its newly inserted replacement `session_plan_slot` row. It is included in the encrypted physical backup, survives forward restoration and migration replay, and is cleared on empty-session discard and Reset training data.
+
+## Update 2026-11-06 — migration 074 (session feel reasons)
+
+Final live durable tables: 124 (the 123 above, and `session_feel_extra_reason`). The migration array has 73 entries through slot `074`, so `PRAGMA user_version = 73`. The current backup contract fingerprints 210 durable table/index/trigger objects; all earlier schema contracts remain registered unchanged.
+
+`074` rebuilds `session_feel` with the same columns and a looser CHECK (only "as planned" is held to no reasons; issue #220 requires a reason only for "harder", which the store's validation enforces), and adds `session_feel_extra_reason`, one row per session holding the newer reasons (load too heavy, load too light, rested well). Both are athlete-owned record-only data, never engine inputs. The side-car is included in the encrypted physical backup, survives forward restoration and migration replay, leaves with its session, and is cleared on Reset training data.

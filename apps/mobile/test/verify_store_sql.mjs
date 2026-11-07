@@ -80,7 +80,10 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   // (at finalization and with each logged set) and empties on reset; the
   // completion summary reads the skipped slots (owner ruling 2026-11-03). It depends
   // on 001 and 022.
-  '071_beta_recording.sql', '072_question_log.sql', '073_session_slot_replaced_by.sql'];
+  '071_beta_recording.sql', '072_question_log.sql', '073_session_slot_replaced_by.sql',
+  // 074 rebuilds session_feel and adds session_feel_extra_reason, which the
+  // store writes and reads with the answer and empties on reset.
+  '074_session_feel_reasons.sql'];
 
 
 const db = new DatabaseSync(':memory:');
@@ -873,6 +876,9 @@ a('reset explicitly clears both immutable Phase 18 side-cars',
   ['set_dose_target', 'session_outcome'].every((table) => resetTables.includes(table)));
 a('reset explicitly clears the autopilot attribution side-car',
   resetTables.includes('planned_slot_autopilot'));
+// 074 (issue #220): the newer session-feel reasons are cleared with the answers.
+a('reset explicitly clears session_feel and its 074 side-car session_feel_extra_reason',
+  ['session_feel', 'session_feel_extra_reason'].every((table) => resetTables.includes(table)));
 a('reset explicitly clears frozen legacy-role snapshots before their planned slots',
   resetTables.includes('planned_slot_legacy_role_allowance')
     && resetTables.indexOf('planned_slot_legacy_role_allowance') < resetTables.indexOf('planned_slot'));

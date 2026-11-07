@@ -69,7 +69,8 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '067_sport_and_emphasis.sql',
   '068_movement_content_correction_v2.sql',
   '069_resting_heart_rate.sql',
-  '070_session_feel.sql', '071_beta_recording.sql', '072_question_log.sql', '073_session_slot_replaced_by.sql'];
+  '070_session_feel.sql', '071_beta_recording.sql', '072_question_log.sql', '073_session_slot_replaced_by.sql',
+  '074_session_feel_reasons.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
@@ -1766,11 +1767,11 @@ console.log('[2u] 057 block_meta phase/index repair + enforcement');
     const db = freshDb();
     runMigrations(db, MIGRATIONS);
     // Slot 004 is the parameterized materialize script, never a migration:
-    // 72 files (slots 001-073, no 004) -> user_version 72. This count is
+    // 73 files (slots 001-074, no 004) -> user_version 73. This count is
     // pinned deliberately so adding a migration is a conscious act, not a
-    // silent one. Re-pinned for 073 (session_slot_replaced_by).
-    check('fresh install reaches user_version 72 (72 files, no slot 004)',
-      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 72,
+    // silent one. Re-pinned for 074 (session_feel_reasons).
+    check('fresh install reaches user_version 73 (73 files, no slot 004)',
+      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 73,
       String(uv(db)));
     const trig = db.raw.prepare(
       `SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'trigger'
@@ -4127,9 +4128,10 @@ const IDX_070 = FILES.indexOf('070_session_feel.sql');
   check('the upgrade leaves sessions, typed notes and reports byte-identical', sessionFacts(upgrade) === before);
   check('the upgrade invents no answer (the new table starts empty)', feelRows(upgrade).length === 0);
 
-  // Domain: the one rule is in the schema.
+  // Domain: the one rule is in the schema, as 070 shipped it. (074 loosens it;
+  // its own section below checks the rule after it.)
   const fresh = freshDb();
-  runMigrations(fresh, MIGRATIONS);
+  applyRaw(fresh, MIGRATIONS, 0, IDX_070 + 1);
   fresh.raw.exec('PRAGMA foreign_keys = ON');
   for (const day of ['01', '02', '03', '04', '05']) {
     fresh.raw.exec(`INSERT INTO session (micro_cycle_id, session_date, started_at_ms) VALUES (NULL, '2026-10-${day}', 1)`);
@@ -4376,7 +4378,7 @@ const IDX_072 = FILES.indexOf('072_question_log.sql');
 console.log('[073] session slot replaced by (session_plan_slot_replacement)');
 {
   const index = FILES.indexOf('073_session_slot_replaced_by.sql');
-  check('073 is appended after 072 and completes the chain', index === IDX_072 + 1 && index === MIGRATIONS.length - 1 && index === 71);
+  check('073 is appended after 072', index === IDX_072 + 1 && index === 71);
   const replacements = (db) => db.raw.prepare('SELECT * FROM session_plan_slot_replacement ORDER BY session_plan_slot_id').all();
   const upgraded = freshDb();
   applyRaw(upgraded, MIGRATIONS, 0, index);
@@ -4455,6 +4457,103 @@ console.log('[073] session slot replaced by (session_plan_slot_replacement)');
       && !sentinelsMissing(replayed).includes('session_plan_slot_replacement')
       && /duplicate column name: replaced_by_session_plan_slot_id/i.test(addColumnReplayError),
     addColumnReplayError);
+}
+
+// =============================================================================
+// [074] session feel: a reason only for "harder", separate lists (issue #220)
+// =============================================================================
+// session_feel is rebuilt (061 pattern) with the same columns and a looser
+// CHECK, and the newer reasons go in a side-car. Proves the rebuild keeps
+// every row byte-identical, that it and the side-car survive every replay
+// (the rebuild runs again on each one), that the new rule is the schema's, and
+// that each table, lost on its own, is detected and rebuilt.
+console.log('[074] session feel reasons (session_feel rebuilt, session_feel_extra_reason)');
+{
+  const index = FILES.indexOf('074_session_feel_reasons.sql');
+  const IDX_073 = FILES.indexOf('073_session_slot_replaced_by.sql');
+  check('074 is appended after 073 and completes the chain', index === IDX_073 + 1 && index === MIGRATIONS.length - 1 && index === 72);
+  const feelRows = (db) => db.raw.prepare('SELECT * FROM session_feel ORDER BY session_id').all();
+  const extraRows = (db) => db.raw.prepare('SELECT * FROM session_feel_extra_reason ORDER BY session_id').all();
+  const rejects = (fn) => { try { fn(); return false; } catch { return true; } };
+
+  // A populated pre-074 install holding every kind of answer 070 accepted.
+  const upgraded = freshDb();
+  applyRaw(upgraded, MIGRATIONS, 0, index);
+  for (const day of ['01', '02', '03', '04', '05', '06']) {
+    upgraded.raw.exec(`INSERT INTO session (micro_cycle_id, session_date, started_at_ms) VALUES (NULL, '2026-11-${day}', 1)`);
+  }
+  upgraded.raw.exec("INSERT INTO session_feel (session_id, feel, recorded_at_ms) VALUES (1, 'as_planned', 11)");
+  upgraded.raw.exec("INSERT INTO session_feel (session_id, feel, reason_tired, reason_unwell, recorded_at_ms) VALUES (2, 'harder', 1, 1, 12)");
+  upgraded.raw.exec("INSERT INTO session_feel (session_id, feel, reason_felt_good, recorded_at_ms) VALUES (3, 'easier', 1, 13)");
+  upgraded.raw.exec("INSERT INTO session_feel (session_id, feel, reason_pain, reason_other, recorded_at_ms) VALUES (4, 'stopped_early', 1, 1, 14)");
+  upgraded.raw.exec("INSERT INTO session_note (session_id, note, created_at_ms) VALUES (2, 'tired from a night shift', 15)");
+  const before = JSON.stringify(feelRows(upgraded));
+  const notesBefore = JSON.stringify(upgraded.raw.prepare('SELECT * FROM session_note').all());
+  runMigrations(upgraded, MIGRATIONS);
+  check('a populated pre-074 install upgrades with every sentinel present',
+    uv(upgraded) === MIGRATIONS.length && sentinelsMissing(upgraded).length === 0, `uv=${uv(upgraded)}`);
+  check('the rebuild keeps every session_feel row byte-identical, and the notes, and starts the side-car empty',
+    JSON.stringify(feelRows(upgraded)) === before
+      && JSON.stringify(upgraded.raw.prepare('SELECT * FROM session_note').all()) === notesBefore
+      && extraRows(upgraded).length === 0);
+  check('no staging table is left behind',
+    upgraded.raw.prepare("SELECT COUNT(*) AS c FROM sqlite_master WHERE name = 'session_feel_074'").get().c === 0);
+
+  // The new rule, in the schema.
+  const insertFeel = (sessionId, feel, reasons = {}) => {
+    const columns = Object.keys(reasons);
+    upgraded.raw.prepare(
+      `INSERT INTO session_feel (session_id, feel${columns.map((c) => `, reason_${c}`).join('')}, recorded_at_ms)
+       VALUES (?, ?${columns.map(() => ', ?').join('')}, 1)`,
+    ).run(sessionId, feel, ...Object.values(reasons));
+  };
+  const insertExtra = (sessionId, flags) => upgraded.raw.prepare(
+    'INSERT INTO session_feel_extra_reason (session_id, reason_too_heavy, reason_too_light, reason_rested_well) VALUES (?, ?, ?, ?)',
+  ).run(sessionId, ...flags);
+  check('"easier" with no reason is accepted', !rejects(() => insertFeel(5, 'easier')));
+  check('"as planned" with a reason is still rejected', rejects(() => insertFeel(6, 'as_planned', { tired: 1 })));
+  check('an unknown answer and a flag outside 0/1 are still rejected',
+    rejects(() => insertFeel(6, 'terrible')) && rejects(() => insertFeel(6, 'harder', { pain: 2 })));
+  check('a side-car row with a newer reason is accepted', !rejects(() => insertExtra(5, [0, 1, 1])));
+  check('a side-car row with no reason, a flag outside 0/1, a text flag or no session is rejected',
+    rejects(() => insertExtra(6, [0, 0, 0])) && rejects(() => insertExtra(6, [2, 0, 0]))
+      && rejects(() => insertExtra(6, ['yes', 0, 0])) && rejects(() => insertExtra(99, [1, 0, 0])));
+  check('a second side-car row for the same session is rejected', rejects(() => insertExtra(5, [1, 0, 0])));
+
+  // Every replay re-runs the rebuild: nothing may be lost, the side-car included.
+  const kept = JSON.stringify({ feel: feelRows(upgraded), extra: extraRows(upgraded) });
+  upgraded.executeSync(`PRAGMA user_version = ${index};`);
+  runMigrations(upgraded, MIGRATIONS);
+  const afterReplay = JSON.stringify({ feel: feelRows(upgraded), extra: extraRows(upgraded) });
+  upgraded.executeSync('PRAGMA user_version = 0;');
+  runMigrations(upgraded, MIGRATIONS);
+  check('answers and newer reasons survive a replay from 074 and a full re-apply from 0',
+    afterReplay === kept && JSON.stringify({ feel: feelRows(upgraded), extra: extraRows(upgraded) }) === kept
+      && uv(upgraded) === MIGRATIONS.length && sentinelsMissing(upgraded).length === 0);
+  check('the rule after a replay is still the looser one', !rejects(() => insertFeel(6, 'stopped_early')));
+
+  upgraded.raw.exec('DELETE FROM session WHERE session_id = 5');
+  check('an answer and its newer reasons leave with their session',
+    feelRows(upgraded).every((row) => row.session_id !== 5) && extraRows(upgraded).length === 0);
+
+  // Each table, lost on its own, is detected and rebuilt with the data kept.
+  insertExtra(3, [0, 0, 1]);
+  const keptAgain = JSON.stringify(feelRows(upgraded));
+  upgraded.raw.exec('DROP TABLE session_feel_extra_reason');
+  check('a lost session_feel_extra_reason table is detected',
+    sentinelsMissing(upgraded).includes('session_feel_extra_reason'));
+  runMigrations(upgraded, MIGRATIONS);
+  check('self-heal rebuilds session_feel_extra_reason and keeps every answer',
+    sentinelsMissing(upgraded).length === 0 && extraRows(upgraded).length === 0
+      && JSON.stringify(feelRows(upgraded)) === keptAgain);
+  const lost = freshDb();
+  runMigrations(lost, MIGRATIONS);
+  lost.raw.exec('DROP TABLE session_feel');
+  const detected = sentinelsMissing(lost).includes('session_feel');
+  runMigrations(lost, MIGRATIONS);
+  check('a lost session_feel table is detected and rebuilt with the looser rule',
+    detected && sentinelsMissing(lost).length === 0
+      && /feel <> 'as_planned'/.test(lost.raw.prepare("SELECT sql FROM sqlite_master WHERE name = 'session_feel'").get().sql));
 }
 
 // --- one statement per database call ------------------------------------------
