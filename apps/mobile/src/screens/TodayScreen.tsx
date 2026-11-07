@@ -54,6 +54,7 @@ import {
 } from '../state/todayState';
 import { classifyReadiness, HALT_META, HeldScreenWithHalt } from './ReadinessScreen';
 import { autopilotReasonCopy } from '../state/autopilotCopy';
+import { coachModeAthleteName } from '../state/coachModeAthlete';
 import { PrimaryButton, QuietAction, Disclosure, ListRow } from '../components/ui';
 
 export interface TodayScreenProps {
@@ -84,7 +85,14 @@ export default function TodayScreen(props: TodayScreenProps): React.JSX.Element 
   const narrowScopeOnly = decision.status === 'held' && typeof state.isBroadHoldFromNarrowScopes === 'function'
     ? state.isBroadHoldFromNarrowScopes(movementIds, decision)
     : false;
-  if (state.status !== 'booting' && decision.status !== 'available') return <HeldScreenWithHalt lastTriage={state.lastTriage}>
+  // #177: the held Today screen names the active athlete in Coach mode too.
+  const heldAthleteName = coachModeAthleteName(state.athletes, state.activeAthleteId);
+  if (state.status !== 'booting' && decision.status !== 'available') return <HeldScreenWithHalt
+    lastTriage={state.lastTriage}
+    header={heldAthleteName !== null
+      ? <Text style={styles.eyebrow} testID="today-active-athlete">Athlete: {heldAthleteName}</Text>
+      : undefined}
+  >
     <TrainingSupportNotice
       unavailable={decision.status === 'support_unavailable'} narrowScopeOnly={narrowScopeOnly} onOpenSession={state.session !== null ? props.onOpenSession : undefined} />
   </HeldScreenWithHalt>;
@@ -112,6 +120,9 @@ function AvailableTodayScreen({
   const refreshVector = useStore((s) => s.refreshVector);
   const recordedDurationsForFocus = useStore((s) => s.recordedDurationsForFocus);
   const error = useStore((s) => s.error);
+  const athletes = useStore((s) => s.athletes);
+  const activeAthleteId = useStore((s) => s.activeAthleteId);
+  const activeAthleteName = coachModeAthleteName(athletes, activeAthleteId);
   const nav = typeof useNavigation === 'function' ? useNavigation() : undefined;
 
   const [emptyStartPromptOpen, setEmptyStartPromptOpen] = React.useState(false);
@@ -532,6 +543,12 @@ function AvailableTodayScreen({
         />
       }
     >
+      {/* #177: in Coach mode (two or more athletes) Today names whose plan this is. */}
+      {activeAthleteName !== null && (
+        <Text style={styles.eyebrow} testID="today-active-athlete">
+          Athlete: {activeAthleteName}
+        </Text>
+      )}
       {workoutCard()}
 
       {error !== null && (
