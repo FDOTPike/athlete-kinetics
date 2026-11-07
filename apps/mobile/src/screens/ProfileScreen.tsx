@@ -99,21 +99,19 @@ interface NumberRowProps {
   display: string;
   onDec: () => void;
   onInc: () => void;
-  tip?: string;
+  tip?: React.ComponentProps<typeof Stepper>['tip'];
 }
 function NumberRow({ label, display, onDec, onInc, tip }: NumberRowProps): React.JSX.Element {
+  // #161: the info button rides on the stepper's own label row, beside its
+  // label, like every other "i" on this screen.
   return (
     <View style={styles.field}>
-      {tip !== undefined && (
-        <View style={styles.fieldLabelRow}>
-          <InfoTip term={tip} />
-        </View>
-      )}
       <Stepper
         label={label}
         value={display}
         onDecrement={onDec}
         onIncrement={onInc}
+        tip={tip}
       />
     </View>
   );
