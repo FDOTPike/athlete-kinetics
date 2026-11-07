@@ -157,6 +157,38 @@ const goodDraft = {
       && (fg.GOAL_METRIC_INFO[id].unit === null) === (id === 'custom')));
 }
 
+// --- [4b] implausible values and direction (issue #139) ---------------------------------
+console.log('[4b] implausible values, limits and a lower target needs a confirm');
+{
+  const msgs = (draft) => { const r = fg.validateSmartGoal(draft, TODAY); return r.ok ? [] : r.errors.map((e) => e.message); };
+  const fieldsOf = (draft) => { const r = fg.validateSmartGoal(draft, TODAY); return r.ok ? [] : r.errors.map((e) => e.field); };
+  check('a target of 0 is refused for a lift', fieldsOf({ ...goodDraft, targetValue: 0 }).includes('targetValue'));
+  check('a target of 0 is refused for reps too',
+    fieldsOf({ ...goodDraft, metricId: 'reps', measurementMethod: 'Strict pull-ups, bodyweight, full hang', baselineValue: 4, targetValue: 0 }).includes('targetValue'));
+  check('a 99999 kg lift target is refused (the app records loads up to 500 kg)',
+    fieldsOf({ ...goodDraft, targetValue: 99999 }).includes('targetValue'));
+  check('a 500 kg lift target is accepted',
+    fg.validateSmartGoal({ ...goodDraft, baselineValue: 400, targetValue: 500 }, TODAY).ok);
+  check('a 501 kg lift target is refused', fieldsOf({ ...goodDraft, baselineValue: 400, targetValue: 501 }).includes('targetValue'));
+  check('a 99999 kg baseline is refused', fieldsOf({ ...goodDraft, baselineValue: 99999 }).includes('baselineValue'));
+  const bodyweight = { ...goodDraft, metricId: 'bodyweight_kg', measurementMethod: 'Morning, same scale, before eating', baselineValue: 90 };
+  check('a body-weight target of 99999 is refused', fieldsOf({ ...bodyweight, targetValue: 99999 }).includes('targetValue'));
+  check('a body-weight target of 10 is refused (the app records body weight from 20 kg)',
+    fieldsOf({ ...bodyweight, targetValue: 10 }).includes('targetValue'));
+  check('a lower body-weight target needs no confirm', fg.validateSmartGoal({ ...bodyweight, targetValue: 84 }, TODAY).ok);
+  const lower = { ...goodDraft, targetValue: 60, baselineValue: 80 };
+  check('a lower lift target is refused until the athlete confirms it',
+    fieldsOf(lower).includes('targetValue') && msgs(lower).includes('Your target is lower than where you are now. Keep it?'));
+  check('a lower lift target is accepted once confirmed',
+    fg.validateSmartGoal({ ...lower, confirmLowerTarget: true }, TODAY).ok);
+  check('a lower reps target needs the same confirm',
+    fieldsOf({ ...goodDraft, metricId: 'reps', measurementMethod: 'Strict pull-ups, bodyweight, full hang', baselineValue: 12, targetValue: 10 }).includes('targetValue'));
+  check('a lower time target is not direction-checked',
+    fg.validateSmartGoal({ ...goodDraft, metricId: 'time_seconds', measurementMethod: 'Front plank, until the hips drop', baselineValue: 60, targetValue: 50 }, TODAY).ok);
+  check('the lower-target helper names the lift case and skips body weight',
+    fg.targetIsLowerThanStart(lower) === true && fg.targetIsLowerThanStart({ ...bodyweight, targetValue: 84 }) === false);
+}
+
 // --- [5] feasibility ---------------------------------------------------------------------
 console.log('[5] feasibility');
 {
