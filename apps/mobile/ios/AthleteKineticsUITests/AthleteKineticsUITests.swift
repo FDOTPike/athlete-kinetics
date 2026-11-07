@@ -723,7 +723,7 @@ final class AthleteKineticsUITests: XCTestCase {
     }
 
     let before = expandCoachMode()
-    XCTAssertTrue(before.hasPrefix("Coach mode, 1 athletes"), "expected one athlete before adding: \(before)")
+    XCTAssertTrue(before.hasPrefix("Coach mode, 1 athlete"), "expected one athlete before adding: \(before)")
     enterText(into: "New athlete's name", "UITest B")
     tap("Add a new athlete")
     completeOnboarding("athlete B")
@@ -780,7 +780,7 @@ final class AthleteKineticsUITests: XCTestCase {
 
     // A change after the backup: a second athlete (Coach Mode).
     let before = expandCoachMode()
-    XCTAssertTrue(before.hasPrefix("Coach mode, 1 athletes"), "expected one athlete at backup time: \(before)")
+    XCTAssertTrue(before.hasPrefix("Coach mode, 1 athlete"), "expected one athlete at backup time: \(before)")
     enterText(into: "New athlete's name", "After Backup")
     tap("Add a new athlete")
     completeOnboarding("athlete added after the backup")
@@ -837,7 +837,7 @@ final class AthleteKineticsUITests: XCTestCase {
     wait(element("shell-root"), "the app after restore")
     openProfile()
     let after = expandCoachMode()
-    XCTAssertTrue(after.hasPrefix("Coach mode, 1 athletes"), "the restore did not bring back the one-athlete snapshot: \(after)")
+    XCTAssertTrue(after.hasPrefix("Coach mode, 1 athlete"), "the restore did not bring back the one-athlete snapshot: \(after)")
     XCTAssertFalse(element(labelContains: "After Backup").exists, "the athlete added after the backup survived the restore")
   }
 
