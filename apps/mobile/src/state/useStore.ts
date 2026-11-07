@@ -364,6 +364,8 @@ import phraseVectorsJson from '../../../../packages/inference/assets/phrase-code
 import { routeQuestion, type QuestionIndex, type QuestionResult } from '../../../../packages/inference/src/semantic/questionRouter';
 import { packVectors } from '../../../../packages/inference/src/semantic/cosine';
 import { scanRedFlags } from '../../../../packages/inference/src/semantic/redFlag';
+import { loadCopyFactsFor, type LoadCopyFacts } from './loadCopyFacts';
+export type { LoadCopyFacts } from './loadCopyFacts';
 
 // ---------------------------------------------------------------------------
 // Shared dark palette (sweaty-hands UI: high contrast, zero decoration)
@@ -1002,6 +1004,8 @@ interface KineticsStore {
     overrideLoadKg: number | null;
     sessionPlanSlotId: number;
   }) => LoadSelection;
+  /** Copy facts for the load field (#131). Never an input to the load. */
+  slotLoadCopyFacts: (input: { movementId: number }) => LoadCopyFacts;
   refreshBandLadder: () => void;
   saveBandLevel: (level: number, label: string) => void;
   deleteBandLevel: (level: number) => void;  /** Re-read the saved profile slots (013) into state. */
@@ -3553,6 +3557,28 @@ export const useStore = create<KineticsStore>()((set, get) => {
         : applyLoadModifier(base.initialLoadKg, todaysVector),
       advisoryKg: applyLoadModifier(base.advisoryKg, todaysVector),
     };
+  },
+
+  slotLoadCopyFacts: (input) => {
+    // Copy facts only (#131): they never change the load. The latest set of
+    // this movement in the session is the same one resolveSlotLoad reads.
+    const state = get();
+    const todaysVector = state.prescription !== null && state.prescription.forDate === state.today
+      ? state.prescription.vector
+      : null;
+    const latestCurrentSessionSet = state.session?.sets.reduce<LoggedSet | null>(
+      (latest, candidate) => candidate.movement_id === input.movementId
+        && (latest === null || candidate.set_id > latest.set_id)
+        ? candidate
+        : latest,
+      null,
+    ) ?? null;
+    return loadCopyFactsFor({
+      currentSessionLoadKg: latestCurrentSessionSet?.load_kg ?? null,
+      hasSetThisSession: latestCurrentSessionSet !== null,
+      lastLoggedKg: state.lastLoggedLoads[input.movementId] ?? null,
+      easedToday: todaysVector !== null && todaysVector.load_modifier < 1,
+    });
   },
 
   refreshBandLadder: () => {

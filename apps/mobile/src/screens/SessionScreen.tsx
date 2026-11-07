@@ -3,12 +3,13 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING_NOTE, EFFORT_STOP_GUIDANCE, effortCue, effectiveRpeCeiling, mapRirToRpe, RIR_OPTIONS, PREPARATION_STATUS_LABEL, isTerminalPreparationStatus, preparationDoseUnit, type EffortAnswer, type RunnerHaltReason } from '@ak/inference';
 import { EXPERIENCE_SEVERITY, runnerTierForTrainingAge } from '../../../../packages/inference/src/sessionRunner';
-import { formatTeachingOnlyReason, freeFormStartIsEmpty, useStore, type LoadSelection, type LoggedSet, type SetLoadShown, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
+import { formatTeachingOnlyReason, freeFormStartIsEmpty, useStore, type LoadCopyFacts, type LoadSelection,type LoggedSet, type SetLoadShown, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
 import { useNavigation, useSubViewBack } from '../navigation/navigation';
 import { buildSessionSummary, NO_NEXT_SESSION_TEXT, skippedExerciseText } from '../state/sessionSummary';
 import { SUPPORT_HELD_MESSAGE, SUPPORT_UNAVAILABLE_MESSAGE } from '../state/healthSupportStore';
 import { theme } from '../theme/theme';
 import InfoTip from '../components/InfoTip';
+import { isEasedBelow } from '../state/loadCopyFacts';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import {
   PrimaryButton,
@@ -101,20 +102,33 @@ const isLoadDraftLoggable = (text: string): boolean => {
  *  this maps it to reviewed copy. An edited value keeps its source — there is
  *  no fifth "athlete-entered" source. */
 const loadSourceCopy = (
-  sel: LoadSelection,
+  sel: LoadSelection & Partial<LoadCopyFacts>,
   bodyweightMode: boolean,
   oneRmKg: number | undefined,
   timedTarget: boolean,
 ): string => {
+  // Walk W2-4, W5-10 (#131): an eased load (shown lower than the unadjusted
+  // last-logged load) says so and names that load; "last session" is only said
+  // of an earlier session, never of a set logged in this one.
+  const addedLoad = bodyweightMode ? ' added load' : '';
   if (sel.source === 'manual') {
     switch (sel.advisoryKind) {
       case 'apre': return `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg — your entry stands.`;
       case 'onerm': return `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg from your ${oneRmKg?.toFixed(1)} kg 1RM — your entry stands.`;
-      case 'history': return `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg from your last session — your entry stands.`;
+      case 'history':
+        if (!sel.advisoryFromThisSession && isEasedBelow(sel.advisoryKg, sel.unadjustedHistoryKg)) {
+          return `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg today · logged ${sel.unadjustedHistoryKg?.toFixed(1)} kg last session — your entry stands.`;
+        }
+        return sel.advisoryFromThisSession === true
+          ? `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg from this session — your entry stands.`
+          : `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg from your last session — your entry stands.`;
       default: return 'Your call. The number you enter is what gets logged.';
     }
   }
   if (sel.source === 'history') {
+    if (!sel.historyFromThisSession && isEasedBelow(sel.initialLoadKg, sel.unadjustedHistoryKg)) {
+      return `Coach suggests ${sel.initialLoadKg?.toFixed(1)} kg${addedLoad} today · last logged ${sel.unadjustedHistoryKg?.toFixed(1)} kg${addedLoad}`;
+    }
     return bodyweightMode
       ? `Last logged ${sel.initialLoadKg?.toFixed(1)} kg added load`
       : `Last logged ${sel.initialLoadKg?.toFixed(1)} kg`;
@@ -130,7 +144,7 @@ const loadSourceCopy = (
 /** Derived-source copy must distinguish APRE prescription from 1RM
  *  derivation; the resolver's source alone does not carry that. */
 const loadCopyFor = (
-  sel: LoadSelection,
+  sel: LoadSelection & Partial<LoadCopyFacts>,
   bodyweightMode: boolean,
   oneRmKg: number | undefined,
   apreOverrideKg: number | null,
@@ -562,16 +576,23 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   // never diverge. Mutable Actual RPE is completion evidence and must not
   // recalculate source/advisory copy or rewrite load draft state.
   const stableTargetRpe = currentSlot?.targetRpe ?? 8;
-  const loadSelection: LoadSelection | null = currentSlot === null || target === null
+  // #131: copy facts (eased today, this-session history) ride along with the
+  // resolver's selection; they never change the load itself.
+  const loadSelection: (LoadSelection & Partial<LoadCopyFacts>) | null = currentSlot === null || target === null
     ? null
-    : state.resolveSlotLoad({
-        movementId: currentSlot.movementId,
-        bodyweightMode,
-        targetReps: target.kind === 'reps' ? target.reps : null,
-        targetRpe: stableTargetRpe,
-        overrideLoadKg: currentSlot.overrideLoadKg,
-        sessionPlanSlotId: currentSlot.sessionPlanSlotId,
-      });
+    : {
+        ...state.resolveSlotLoad({
+          movementId: currentSlot.movementId,
+          bodyweightMode,
+          targetReps: target.kind === 'reps' ? target.reps : null,
+          targetRpe: stableTargetRpe,
+          overrideLoadKg: currentSlot.overrideLoadKg,
+          sessionPlanSlotId: currentSlot.sessionPlanSlotId,
+        }),
+        ...(typeof state.slotLoadCopyFacts === 'function'
+          ? state.slotLoadCopyFacts({ movementId: currentSlot.movementId })
+          : {}),
+      };
   // Android walk (#232): a movement whose only implement is a band (Band Row,
   // Band Pull-Apart) has no kilograms to enter. The set records reps, effort
   // and, when bands are named, the band; its load is 0. Movements that take
