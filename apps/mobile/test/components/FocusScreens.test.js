@@ -475,8 +475,14 @@ test('COACH keeps trajectory labels on one line across recovery and finalized st
     flexDirection: 'column',
     alignItems: 'stretch',
   });
+  // Issue 163: the week row spans the card, shows its scroll bar, and opens at today's cell.
+  expect(screen.getByTestId('trajectory-days-week-1').props.horizontal).toBe(true);
+  expect(screen.getByTestId('trajectory-days-week-1').props.showsHorizontalScrollIndicator).toBe(true);
   expect(StyleSheet.flatten(screen.getByTestId('trajectory-days-week-1').props.style)).toMatchObject({
     width: '100%',
+  });
+  expect(StyleSheet.flatten(screen.getByTestId('trajectory-days-week-1').props.contentContainerStyle)).toMatchObject({
+    flexDirection: 'row',
   });
 
   for (const label of ['Done', 'Stopped', 'Today', 'UPR']) {
@@ -490,6 +496,19 @@ test('COACH keeps trajectory labels on one line across recovery and finalized st
     });
   }
   expect(screen.getByLabelText('Week 1, lower session on 2026-07-14, stopped')).toBeOnTheScreen();
+});
+
+test('COACH opens the trajectory week row with today\'s cell in view', () => {
+  const planned = baseState().blockSessions[0];
+  mockState = baseState({
+    today: '2026-07-16',
+    todayPlan: null,
+    block: { blockId: 1, startDate: '2026-07-13', objective: 'strength', createdAtMs: 1 },
+    blockSessions: [{ ...planned, plannedSessionId: 1, dayIndex: 1, sessionDate: '2026-07-13', completionStatus: null }],
+  });
+  render(<BlockScreen />);
+  // Day index 3 (2026-07-16) starts 3 cells of 56 dp plus 3 gaps of 4 dp in: 180 dp.
+  expect(screen.getByTestId('trajectory-days-week-1').props.contentOffset).toEqual({ x: 180, y: 0 });
 });
 
 test('COACH leaves the safety form behind its explicit action even during a halt', () => {
