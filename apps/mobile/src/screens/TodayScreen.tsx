@@ -576,7 +576,7 @@ function AvailableTodayScreen({
         <Text style={styles.sectionTitle}>READINESS</Text>
         {vector === null ? (
           <Text style={styles.caption} testID="today-readiness-none">
-            No readiness estimate yet. It builds from logged sessions and any synced telemetry.
+            No estimate for today yet. It builds from logged sessions and any synced telemetry.
           </Text>
         ) : (
           <Disclosure label={state.kind === 'halted' ? HALT_META.title : READINESS_LABEL[classifyReadiness(vector)]} hint="The short explanation first">

@@ -542,6 +542,15 @@ describe('Today never manufactures a coaching message', () => {
     expect(screen.getByTestId('today-readiness-none')).toBeOnTheScreen();
     expect(screen.queryByText(/\/ 100/)).toBeNull();
   });
+
+  test('#170: a morning with no row yet says there is no estimate for today yet', () => {
+    mockState = baseState({ vector: null });
+    render(<TodayScreen />);
+    expect(
+      screen.getByText('No estimate for today yet. It builds from logged sessions and any synced telemetry.'),
+    ).toBeOnTheScreen();
+    expect(screen.queryByText(/No readiness estimate yet/)).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
