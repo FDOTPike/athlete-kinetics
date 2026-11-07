@@ -43,6 +43,7 @@ import { biometricsCopy, providerForPlatform } from '../state/biometricsCopy';
 import CoachVerificationLabScreen from './CoachVerificationLabScreen';
 import GlossaryScreen from './GlossaryScreen';
 import ActivitiesScreen from './ActivitiesScreen';
+import { OBJECTIVE_LABEL } from './OnboardingScreen';
 import HealthTrainingSupportForm from '../components/HealthTrainingSupportForm';
 import BackupTransferPanel from '../components/BackupTransferPanel';
 
@@ -65,6 +66,7 @@ const formatFinalizedDate = (ms: number): string => {
 interface ChipRowProps<T extends string> {
   label: string;
   options: readonly T[];
+  optionLabels?: Readonly<Record<T, string>>;
   value: T;
   onSelect: (v: T) => void;
   /** Glossary key — renders an ⓘ tooltip next to the label. */
@@ -72,7 +74,7 @@ interface ChipRowProps<T extends string> {
   /** When true, every chip renders disabled and onSelect is not called. */
   disabled?: boolean;
 }
-function ChipRow<T extends string>({ label, options, value, onSelect, tip, disabled = false }: ChipRowProps<T>): React.JSX.Element {
+function ChipRow<T extends string>({ label, options, optionLabels, value, onSelect, tip, disabled = false }: ChipRowProps<T>): React.JSX.Element {
   return (
     <View style={styles.field}>
       <View style={styles.fieldLabelRow}>
@@ -80,16 +82,20 @@ function ChipRow<T extends string>({ label, options, value, onSelect, tip, disab
         {tip !== undefined && <InfoTip term={tip} />}
       </View>
       <View style={styles.chipWrap}>
-        {options.map((opt) => (
-          <Chip
-            key={opt}
-            label={opt.replace(/_/g, ' ').toUpperCase()}
-            selected={opt === value}
-            disabled={disabled}
-            onPress={() => { if (!disabled) onSelect(opt); }}
-            accessibilityLabel={`${label}: ${opt.replace(/_/g, ' ')}`}
-          />
-        ))}
+        {options.map((opt) => {
+          const text = optionLabels?.[opt] ?? opt.replace(/_/g, ' ').toUpperCase();
+          const a11yOption = optionLabels?.[opt] ?? opt.replace(/_/g, ' ');
+          return (
+            <Chip
+              key={opt}
+              label={text}
+              selected={opt === value}
+              disabled={disabled}
+              onPress={() => { if (!disabled) onSelect(opt); }}
+              accessibilityLabel={`${label}: ${a11yOption}`}
+            />
+          );
+        })}
       </View>
     </View>
   );
@@ -489,6 +495,7 @@ export default function ProfileScreen(): React.JSX.Element {
         label="1 · OBJECTIVE"
         tip="GPP"
         options={OBJECTIVES}
+        optionLabels={OBJECTIVE_LABEL}
         value={profile.objective}
         onSelect={(objective) => saveProfile({ objective })}
       />
@@ -1170,14 +1177,14 @@ export default function ProfileScreen(): React.JSX.Element {
             return (
               <View key={slot.slotId} style={styles.slotBlock}>
                 <Chip
-                  label={`${slot.name.toUpperCase()}${slot.isActive ? ' ✓' : ''}`}
+                  label={`Saved profile: ${slot.name}${slot.isActive ? ' ✓' : ''}`}
                   selected={slot.isActive}
                   onPress={() => {
                     if (!slot.isActive) {
                       setConfirmingSwitchProfileId(isConfirming ? null : slot.slotId);
                     }
                   }}
-                  accessibilityLabel={`${slot.name} profile${slot.isActive ? ', active' : ''}`}
+                  accessibilityLabel={`Saved profile: ${slot.name}${slot.isActive ? ', active' : ''}`}
                 />
                 {isConfirming && (
                   <View style={styles.confirmBox}>

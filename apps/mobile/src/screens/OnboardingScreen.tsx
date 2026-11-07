@@ -82,7 +82,7 @@ import {
 // ---------------------------------------------------------------------------
 // Copy: plain-language labels + one-liners for every enum the wizard shows.
 // ---------------------------------------------------------------------------
-const OBJECTIVE_COPY: Record<Objective, { label: string; blurb: string }> = {
+export const OBJECTIVE_COPY: Record<Objective, { label: string; blurb: string }> = {
   strength: { label: 'GET STRONGER', blurb: 'Lift heavier on the big lifts' },
   hypertrophy: { label: 'BUILD MUSCLE', blurb: 'Size first, the numbers follow' },
   power: { label: 'GET EXPLOSIVE', blurb: 'Speed and force for sport' },
@@ -91,6 +91,17 @@ const OBJECTIVE_COPY: Record<Objective, { label: string; blurb: string }> = {
   hybrid: { label: 'STRENGTH + GRAPPLING', blurb: 'Lift heavy and keep mat time first' },
   rehab: { label: 'RETURN TO TRAINING', blurb: 'Coming back carefully, no diagnosis' },
   weight_loss: { label: 'WEIGHT-LOSS SUPPORT', blurb: 'Stay active and keep your muscle' },
+};
+
+export const OBJECTIVE_LABEL: Record<Objective, string> = {
+  strength: OBJECTIVE_COPY.strength.label,
+  hypertrophy: OBJECTIVE_COPY.hypertrophy.label,
+  power: OBJECTIVE_COPY.power.label,
+  endurance: OBJECTIVE_COPY.endurance.label,
+  gpp: OBJECTIVE_COPY.gpp.label,
+  hybrid: OBJECTIVE_COPY.hybrid.label,
+  rehab: OBJECTIVE_COPY.rehab.label,
+  weight_loss: OBJECTIVE_COPY.weight_loss.label,
 };
 
 const AGE_COPY: Record<TrainingAge, { label: string; blurb: string }> = {
