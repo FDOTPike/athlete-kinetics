@@ -1195,9 +1195,33 @@ test('final-set rest stays visible so the next movement can advance', () => {
   expect(mockState.skipRunnerRest).toHaveBeenCalledTimes(1);
 });
 
+// Issue #208: the button is neutral and the sheet says the swap is for today.
+test('the swap button reads "Swap or avoid this" and the sheet says the swap is for today only', () => {
+  render(<SessionScreen />);
+  expect(screen.getByText('Swap or avoid this')).toBeOnTheScreen();
+  expect(screen.queryByText('Doesn’t feel right')).toBeNull();
+  const button = screen.getByLabelText('Swap or avoid this: First movement');
+  fireEvent.press(button);
+  expect(mockState.runnerThumbsDown).toHaveBeenCalledTimes(1);
+  mockState.substitution = {
+    targetId: 1,
+    result: {
+      haltAdvised: false,
+      layer1Regression: { options: [{ movement_id: 2, name: 'Later movement', rationale: 'Same pattern, lighter load.' }] },
+      layer2DaySwap: { options: [] },
+    },
+  };
+  screen.rerender(<SessionScreen />);
+  expect(screen.getByText('Choose an alternative')).toBeOnTheScreen();
+  expect(screen.getByTestId('substitution-today-only')).toHaveTextContent(
+    'For today only. The plan keeps the original exercise; a pulled-forward exercise leaves its later session.',
+    { exact: true },
+  );
+});
+
 test('thumbs-down delegates the durable Avoid plus substitution transition to the runner store action', () => {
   render(<SessionScreen />);
-  fireEvent.press(screen.getByLabelText('Avoid First movement and find a substitution'));
+  fireEvent.press(screen.getByLabelText('Swap or avoid this: First movement'));
   expect(mockState.runnerThumbsDown).toHaveBeenCalledTimes(1);
   expect(mockState.setMovementPreference).not.toHaveBeenCalled();
   expect(mockState.openSubstitution).not.toHaveBeenCalled();
@@ -1533,7 +1557,7 @@ test('runner substitution offer: thumbs-down after an earlier set uses runner pa
     },
   });
   render(<SessionScreen />);
-  fireEvent.press(screen.getByLabelText('Avoid First movement and find a substitution'));
+  fireEvent.press(screen.getByLabelText('Swap or avoid this: First movement'));
   expect(mockState.runnerThumbsDown).toHaveBeenCalledTimes(1);
   // Must NOT touch the legacy paths
   expect(mockState.setMovementPreference).not.toHaveBeenCalled();

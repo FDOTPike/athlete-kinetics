@@ -1795,9 +1795,9 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                         {/* 56pt quick avoidance / discomfort trigger rows */}
                         <View style={styles.quickRow}>
                           <SecondaryButton
-                            label="Doesn’t feel right"
+                            label="Swap or avoid this"
                             onPress={thumbsDown}
-                            accessibilityLabel={`Avoid ${movement?.name ?? 'this movement'} and find a substitution`}
+                            accessibilityLabel={`Swap or avoid this: ${movement?.name ?? 'this movement'}`}
                             style={{ flex: 1, minHeight: theme.touch.min }}
                           />
                           <SecondaryButton
@@ -1949,6 +1949,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                 <View style={styles.subHeader}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.subTitle}>Choose an alternative</Text>
+                    <Text style={styles.subBody} testID="substitution-today-only">For today only. The plan keeps the original exercise; a pulled-forward exercise leaves its later session.</Text>
                     <Text style={styles.subBody}>Your completed sets stay recorded. The replacement carries the remaining work.</Text>
                   </View>
                   <Pressable onPress={closeSubstitution} accessibilityRole="button" accessibilityLabel="Close substitution options" style={styles.close}>
