@@ -30,7 +30,10 @@ import {
   implementClassOf,
   matchPreviousFacts,
   NO_NEXT_SESSION_TEXT,
+  topSetOf,
 } from '../../src/state/sessionSummary';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 
 // Explicit binding (PR #13 review): without it every assignment below created an
 // implicit global that leaked across suites sharing a worker.
@@ -316,6 +319,84 @@ describe('summary copy obeys D1, D2, and D3', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Issue #230: the top set is one logged set, named as logged. No estimate.
+// ---------------------------------------------------------------------------
+
+describe('the top set (issue #230)', () => {
+  const base = { previousSets: [], durationMin: null, blockSessions: [], today: '2026-09-10' };
+  const squat = (sets) => exercise({ movementId: 21, movementName: 'Back Squat', sets });
+
+  test('250 kg × 1 and 200 kg × 8: the top set is 250 kg × 1, at its logged effort', () => {
+    const view = buildSessionSummary({
+      ...base,
+      exercises: [squat([
+        { reps: 8, loadKg: 200, timeS: null, rpe: 8 },
+        { reps: 1, loadKg: 250, timeS: null, rpe: 9.5 },
+      ])],
+    });
+    expect(view.topSetByExercise['exercise-21']).toEqual({ key: 'top-set-21', text: 'Top set 250 kg × 1 at effort 9.5' });
+    // The existing maxima line is kept as it was.
+    expect(view.exerciseLines[0].text).toBe('Back Squat — 2 sets logged · 3 planned · most reps in one set 8 · heaviest load used 250 kg');
+  });
+
+  test('among equal loads the most reps wins; set order never changes it', () => {
+    const sets = [
+      { reps: 5, loadKg: 100, timeS: null, rpe: 7 },
+      { reps: 6, loadKg: 100, timeS: null, rpe: 9 },
+      { reps: 10, loadKg: 80, timeS: null, rpe: 8 },
+    ];
+    expect(topSetOf(squat(sets))).toEqual({ loadKg: 100, reps: 6, rpe: 9 });
+    expect(topSetOf(squat([...sets].reverse()))).toEqual({ loadKg: 100, reps: 6, rpe: 9 });
+  });
+
+  test('a set with no effort rating is named without one', () => {
+    const view = buildSessionSummary({ ...base, exercises: [squat([{ reps: 3, loadKg: 140, timeS: null, rpe: null }])] });
+    expect(view.topSetByExercise['exercise-21'].text).toBe('Top set 140 kg × 3');
+  });
+
+  test('bodyweight-only and timed work have no top set line', () => {
+    const view = buildSessionSummary({
+      ...base,
+      exercises: [
+        exercise({ movementId: 31, movementName: 'Push-up', sets: [{ reps: 12, loadKg: 0, timeS: null, rpe: 8 }] }),
+        exercise({ movementId: 32, movementName: 'Plank', sets: [{ reps: 0, loadKg: 0, timeS: 45, rpe: null }] }),
+      ],
+    });
+    expect(view.topSetByExercise).toEqual({});
+  });
+
+  test('no estimate, record or comparison with a stored max is said', () => {
+    const view = buildSessionSummary({
+      ...base,
+      exercises: [squat([{ reps: 1, loadKg: 250, timeS: null, rpe: 9.5 }])],
+      previousSets: [{ movementId: 21, reps: 1, loadKg: 240, sessionId: 3 }],
+    });
+    const text = Object.values(view.topSetByExercise).map((l) => l.text).join(' ');
+    expect(text).not.toMatch(/e1rm|estimate|1rm|one-rep|max|best|record|pr/i);
+  });
+
+  test('the summary module never reads the dormant e1RM code', () => {
+    const src = readFileSync(join(__dirname, '../../src/state/sessionSummary.ts'), 'utf8');
+    expect(src).not.toMatch(/e1rm|estimateOneRepMax|bestPerSession|epley|brzycki/i);
+  });
+
+  test('the completion screen names the top set under its exercise', () => {
+    mockState = baseState({
+      loadSessionSummaryFacts: () => ({
+        durationMin: 38,
+        exercises: [squat([
+          { reps: 8, loadKg: 200, timeS: null, rpe: 8 },
+          { reps: 1, loadKg: 250, timeS: null, rpe: 9.5 },
+        ])],
+        previousSets: [],
+      }),
+    });
+    render(<SessionScreen />);
+    expect(screen.getByTestId('session-summary-top-set')).toHaveTextContent('Top set 250 kg × 1 at effort 9.5');
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 3. Screen laws: D5, D6, D8, D9
 // ---------------------------------------------------------------------------
 
@@ -412,6 +493,21 @@ describe('screen laws: D5, D6, D8, D9', () => {
     expect(inScrollFlow(screen.getByTestId('session-feel-saved'))).toBe(true);
     expect(inScrollFlow(screen.getByText('Your note is saved with this session.'))).toBe(true);
     expect(inScrollFlow(screen.getByLabelText('Back to Today'))).toBe(true);
+  });
+
+  // Android walk 2026-11-03 (ux-8): a skipped exercise stays in the record.
+  test('the completion summary lists each skipped exercise', () => {
+    mockState = baseState({
+      loadSessionSummaryFacts: () => ({
+        durationMin: 20,
+        exercises: [exercise({ movementId: 1, movementName: 'Goblet Squat' })],
+        previousSets: [],
+        skippedExercises: [{ name: 'Push-up', plannedSets: 2, loggedSets: 0, loggedAs: [] }],
+      }),
+    });
+    render(<SessionScreen />);
+    expect(screen.getAllByTestId('session-summary-skipped').map((node) => node.props.children))
+      .toEqual(['Skipped: Push-up · no sets logged']);
   });
 
   test('render performs no endSession / plan / progression / log call (D8 guard)', () => {
