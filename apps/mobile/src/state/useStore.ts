@@ -171,6 +171,8 @@ import {
   type RungResolution,
   targetLoadKg,
   evaluateSessionOutcome,
+  evaluateAfterTheFactOutcome,
+  isDirectiveHalt,
   SESSION_FEEL_REASONS,
   meanRpeDrift,
   shouldAskSessionFeel,
@@ -857,6 +859,9 @@ interface KineticsStore {
   lastLoggedLoads: Record<number, number>;
   /** Most recently completed session (post-session note target). */
   lastEndedSessionId: number | null;
+  /** Workouts dated before today that the app never closed (issue 191). Not in
+   *  memory and not restored; Today offers Finish or Discard for each. */
+  earlierOpenSessions: readonly EarlierOpenSession[];
   /** Health Connect state: 'off' until probed; 'idle' = available but not
    *  yet authorized (CONNECT shown). Never blocks anything. */
   biometricsStatus: 'off' | 'unavailable' | 'idle' | 'denied' | 'ready';
@@ -1176,6 +1181,16 @@ interface KineticsStore {
    *  adding/deleting rows, not by editing one. */
   editSet: (setId: number, reps: number, loadKg: number, rpe: number | null, metrics?: SetMetricPatch) => void;
   endSession: () => void;
+  /** Re-read the workouts dated before today that are still open (issue 191). */
+  refreshEarlierOpenSessions: () => void;
+  /** Close an earlier open workout after the fact. Its logged sets and its date
+   *  are kept and it is recorded as a recorded session, unless a directive
+   *  safety halt happened (then it stays stopped safely). An empty workout with
+   *  no safety halt is refused here: discard it instead. */
+  finishEarlierSession: (sessionId: number) => boolean;
+  /** Remove an earlier open workout that has no logged sets and no safety stop,
+   *  with its rows. Refused otherwise. */
+  discardEarlierSession: (sessionId: number) => boolean;
   computePrescription: (patterns: readonly MovementPattern[]) => void;
   /** First-run affordance: 180-day deterministic demo athlete. Refuses to run
    *  unless the database is empty — it must never touch real training data.
@@ -2438,6 +2453,231 @@ const hydrateSessionFinalization = (d: DB, sessionId: number): SessionFinalizati
   };
 };
 
+/** A workout dated before today that the app never closed (issue 191). It is not
+ *  in memory and is not restored; the athlete finishes or discards it on Today. */
+export interface EarlierOpenSession {
+  sessionId: number;
+  sessionDate: string;
+  loggedSetCount: number;
+  /** A directive safety halt happened in it: it is kept, never discarded. */
+  safetyStop: boolean;
+  /** Empty and without a safety stop: the only kind Discard removes. */
+  canDiscard: boolean;
+}
+
+/** Start is refused while an earlier workout is open; the athlete resolves it. */
+const EARLIER_OPEN_SESSION_START_MESSAGE =
+  'Finish or discard your unfinished workout first, then start today\'s workout.';
+
+/** `stopped`: the athlete ended the workout in the app, through the runner.
+ *  `after_the_fact`: an earlier workout the app never closed, closed now and kept
+ *  as recorded (see evaluateAfterTheFactOutcome). */
+type SessionClosure = 'stopped' | 'after_the_fact';
+
+const safeRunnerState = (json: string | null): RunnerState | null => {
+  if (json === null) return null;
+  try {
+    return deserializeRunner(json);
+  } catch {
+    return null;
+  }
+};
+
+/** Open workouts dated before `today`, newest first. `excludeSessionId` is the
+ *  workout in memory, which is not earlier even when it began on a past day. */
+const earlierOpenSessionEntries = (
+  d: DB,
+  today: string,
+  excludeSessionId: number | null,
+): EarlierOpenSession[] => rowsOf<{
+  session_id: number;
+  session_date: string;
+  logged_sets: number;
+  runner_state_json: string | null;
+  persisted_halt: number;
+}>(d.executeSync(
+  `SELECT s.session_id, s.session_date,
+          (SELECT COUNT(*) FROM set_record sr WHERE sr.session_id = s.session_id) AS logged_sets,
+          c.runner_state_json,
+          EXISTS (SELECT 1 FROM subjective_report r WHERE r.date = s.session_date AND r.halt = 1) AS persisted_halt
+     FROM session s
+     LEFT JOIN session_runner_checkpoint c ON c.session_id = s.session_id
+    WHERE s.session_date < ? AND s.duration_min IS NULL AND s.started_at_ms IS NOT NULL
+      AND s.session_id IS NOT ?
+    ORDER BY s.session_date DESC, s.session_id DESC`,
+  [today, excludeSessionId],
+)).map((row) => {
+  const runner = safeRunnerState(row.runner_state_json);
+  const directiveHalt = runner?.phase === 'halted'
+    && runner.haltReason !== null
+    && isDirectiveHalt(runner.haltReason);
+  // Mid-workout with a persisted safety halt: the finaliser closes it as halted.
+  const midWorkoutSafetyHalt = (runner?.phase === 'working' || runner?.phase === 'resting')
+    && row.persisted_halt === 1;
+  const safetyStop = directiveHalt || midWorkoutSafetyHalt;
+  const loggedSetCount = Number(row.logged_sets);
+  return {
+    sessionId: row.session_id,
+    sessionDate: row.session_date,
+    loggedSetCount,
+    safetyStop,
+    canDiscard: loggedSetCount === 0 && !safetyStop,
+  };
+});
+
+/** Remove a workout that has no logged sets, with its dependent rows. Parent
+ *  first keeps 026's immutable side-cars legal; the explicit cleanup handles
+ *  test/dev connections with foreign keys off. The caller owns the transaction
+ *  and removes the runner checkpoint. */
+const deleteEmptySessionRows = (d: DB, sessionId: number): void => {
+  d.executeSync(
+    'DELETE FROM session_plan_slot_replacement WHERE session_plan_slot_id IN (SELECT session_plan_slot_id FROM session_plan_slot WHERE session_id = ?) OR replaced_by_session_plan_slot_id IN (SELECT session_plan_slot_id FROM session_plan_slot WHERE session_id = ?)',
+    [sessionId, sessionId],
+  );
+  d.executeSync('DELETE FROM session WHERE session_id = ?', [sessionId]);
+  // A discarded session takes its preparation with it. Named explicitly
+  // rather than left to the cascade: session ids are reused, and with
+  // foreign keys off a surviving protocol would sit under the next
+  // session's id.
+  deleteSessionPreparation(d, sessionId);
+  d.executeSync('DELETE FROM session_slot_target WHERE session_plan_slot_id IN (SELECT session_plan_slot_id FROM session_plan_slot WHERE session_id = ?)', [sessionId]);
+  d.executeSync('DELETE FROM planned_slot_disposition WHERE session_id = ?', [sessionId]);
+  d.executeSync('DELETE FROM session_plan_slot WHERE session_id = ?', [sessionId]);
+  d.executeSync('DELETE FROM session_origin WHERE session_id = ?', [sessionId]);
+};
+
+/** Finalise one open workout by id, inside the caller's transaction. Returns the
+ *  outcome kept, or null when an empty workout was removed. Used both for the
+ *  workout in memory (`stopped`) and for an earlier one (`after_the_fact`). */
+const finaliseOpenSessionRows = (
+  d: DB,
+  sessionId: number,
+  finalizedAtMs: number,
+  closure: SessionClosure,
+): SessionOutcomeDecision | null => {
+  const snapshot = hydrateSessionFinalization(d, sessionId);
+  let terminalRunner = snapshot.runner;
+  if (
+    (terminalRunner.phase === 'working' || terminalRunner.phase === 'resting') &&
+    snapshot.hasPersistedSafetyHalt
+  ) {
+    terminalRunner = advanceSessionRunner(terminalRunner, {
+      kind: 'HALT',
+      atMs: finalizedAtMs,
+      reason: 'safety',
+    });
+  }
+
+  let outcomeDecision: SessionOutcomeDecision | null;
+  // Duration runs to the last thing the athlete did. A workout closed after the
+  // fact must not be timed to the day it was closed.
+  let durationEndMs = finalizedAtMs;
+  if (closure === 'stopped') {
+    if (terminalRunner.phase !== 'complete' && terminalRunner.phase !== 'halted') {
+      throw new Error('Stop the active session before finishing it.');
+    }
+    const terminal = terminalRunner.phase === 'complete'
+      ? { phase: 'complete' as const, haltReason: null }
+      : { phase: 'halted' as const, haltReason: terminalRunner.haltReason! };
+    outcomeDecision = evaluateSessionOutcome({
+      originKind: snapshot.originKind,
+      terminal,
+      slots: snapshot.slots,
+      sets: snapshot.sets,
+      skippedSessionPlanSlotIds: terminalRunner.skippedSessionPlanSlotIds,
+      finalizedAtMs,
+    });
+  } else {
+    // The app never saw this workout stop, so an unfinished runner closes as
+    // complete. Only a directive halt keeps its halt (and its stopped-safely label).
+    const directiveHalt = terminalRunner.phase === 'halted'
+      && terminalRunner.haltReason !== null
+      && isDirectiveHalt(terminalRunner.haltReason);
+    const terminal = directiveHalt
+      ? { phase: 'halted' as const, haltReason: terminalRunner.haltReason! }
+      : { phase: 'complete' as const, haltReason: null };
+    outcomeDecision = evaluateAfterTheFactOutcome({
+      originKind: snapshot.originKind,
+      terminal,
+      slots: snapshot.slots,
+      sets: snapshot.sets,
+      skippedSessionPlanSlotIds: terminalRunner.skippedSessionPlanSlotIds,
+      finalizedAtMs,
+    });
+    durationEndMs = terminalRunner.updatedAtMs ?? snapshot.startedAtMs ?? finalizedAtMs;
+  }
+
+  if (outcomeDecision === null) {
+    if (snapshot.loggedSets.length !== 0) {
+      throw new Error('Only an empty session can be discarded.');
+    }
+    deleteEmptySessionRows(d, sessionId);
+  } else {
+    const ratedSets = snapshot.loggedSets.filter((loggedSet) => loggedSet.rpe !== null);
+    const avgRpe = ratedSets.length === 0
+      ? null
+      : Math.round(
+          (ratedSets.reduce((sum, loggedSet) => sum + (loggedSet.rpe ?? 0), 0) / ratedSets.length) * 2,
+        ) / 2;
+    const durationMin = Math.round(
+      (Math.max(0, durationEndMs - (snapshot.startedAtMs ?? durationEndMs)) / 60_000) * 10,
+    ) / 10;
+    d.executeSync(
+      'UPDATE session SET session_rpe = ?, duration_min = ? WHERE session_id = ?',
+      [avgRpe, durationMin, sessionId],
+    );
+    d.executeSync(
+      `INSERT INTO capability_session_evidence
+         (session_id, movement_id, qualifying_sets, minimum_value, maximum_rpe, verified)
+       SELECT sr.session_id, sr.movement_id, COUNT(*),
+              CAST(MIN(CASE WHEN lm.mode = 'time' THEN tm.value ELSE sr.reps END) AS INTEGER),
+              MAX(sr.rpe), 1
+       FROM set_record sr
+       LEFT JOIN movement_logging_mode lm ON lm.movement_id = sr.movement_id
+       LEFT JOIN set_metric tm ON tm.set_id = sr.set_id AND tm.metric = 'time_s'
+       WHERE sr.session_id = ?
+         AND (lm.mode <> 'time' OR tm.value IS NOT NULL)
+       GROUP BY sr.session_id, sr.movement_id
+       ON CONFLICT(session_id, movement_id) DO UPDATE SET
+         qualifying_sets = excluded.qualifying_sets,
+         minimum_value = excluded.minimum_value,
+         maximum_rpe = excluded.maximum_rpe,
+         verified = 1`,
+      [sessionId],
+    );
+    d.executeSync(MATERIALIZE_STATE_VECTOR_SQL, [snapshot.sessionDate]);
+    // A session that finishes with preparation still open records it as
+    // stopped: no outcome is invented. Preparation rows are not sets, so
+    // nothing here reaches APRE or capability evidence.
+    stopOpenSessionPreparation(d, sessionId, durationEndMs);
+    applyApreFinalization(
+      d,
+      snapshot.originKind === 'planned' ? snapshot.sourcePlannedSessionId : null,
+      snapshot.loggedSets,
+      finalizedAtMs,
+    );
+    persistSessionOutcome(
+      d,
+      sessionId,
+      snapshot.originKind,
+      snapshot.sessionMode,
+      terminalRunner.tier,
+      outcomeDecision,
+    );
+    // 071: which slots were skipped. The outcome above keeps their count;
+    // the ids lived only in the checkpoint deleted below. Same ids, same
+    // transaction, so the two cannot disagree.
+    for (const sessionPlanSlotId of terminalRunner.skippedSessionPlanSlotIds) {
+      d.executeSync('INSERT INTO session_skipped_slot (session_plan_slot_id) VALUES (?)', [sessionPlanSlotId]);
+    }
+  }
+
+  // Always the final DML before COMMIT. A fault here rolls session
+  // finalization, APRE, outcome, and the checkpoint delete back together.
+  d.executeSync('DELETE FROM session_runner_checkpoint WHERE session_id = ?', [sessionId]);
+  return outcomeDecision;
+};
+
 const persistSessionOutcome = (
   d: DB,
   sessionId: number,
@@ -2935,6 +3175,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
   oneRepMaxes: {},
   lastLoggedLoads: {},
   lastEndedSessionId: null,
+  earlierOpenSessions: [],
   biometricsStatus: 'off',
   profileSlots: [],
   uiPreferences: defaultUiPreferences(DEFAULT_PROFILE),
@@ -3092,6 +3333,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       get().refreshReturnCheckin();
       get().refreshFocusAndGoals();
       get().refreshSport();
+      get().refreshEarlierOpenSessions();
       // Audit B6: an app killed mid-session RESUMES it on restart instead of
       // permitting a duplicate shell. Unfinished = today's row with no
       // duration (endSession stamps duration or deletes empty shells).
@@ -4492,6 +4734,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
     get().refreshBlock();
     get().refreshProgram();
     get().refreshReturnCheckin();
+    get().refreshEarlierOpenSessions();
     get().computePrescription([]);
   },
 
@@ -6305,6 +6548,12 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const today = localToday();
     const startedAtMs = Date.now();
     const d = getDb();
+    // Issue 191: an earlier workout the app never closed is resolved by the
+    // athlete first. It is never closed silently here.
+    if (earlierOpenSessionEntries(d, today, null).length > 0) {
+      set({ error: EARLIER_OPEN_SESSION_START_MESSAGE });
+      return;
+    }
 
     const { prescription, todayPlan, movements, profile, uiPreferences } = get();
     const alreadyPlannedToday = todayPlan !== null ? rowsOf<{ c: number }>(d.executeSync(
@@ -8045,116 +8294,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
 
     d.executeSync('BEGIN');
     try {
-      const snapshot = hydrateSessionFinalization(d, activeSession.sessionId);
-      let terminalRunner = snapshot.runner;
-      if (
-        (terminalRunner.phase === 'working' || terminalRunner.phase === 'resting') &&
-        snapshot.hasPersistedSafetyHalt
-      ) {
-        terminalRunner = advanceSessionRunner(terminalRunner, {
-          kind: 'HALT',
-          atMs: finalizedAtMs,
-          reason: 'safety',
-        });
-      }
-      if (terminalRunner.phase !== 'complete' && terminalRunner.phase !== 'halted') {
-        throw new Error('Stop the active session before finishing it.');
-      }
-
-      const terminal = terminalRunner.phase === 'complete'
-        ? { phase: 'complete' as const, haltReason: null }
-        : { phase: 'halted' as const, haltReason: terminalRunner.haltReason! };
-      outcomeDecision = evaluateSessionOutcome({
-        originKind: snapshot.originKind,
-        terminal,
-        slots: snapshot.slots,
-        sets: snapshot.sets,
-        skippedSessionPlanSlotIds: terminalRunner.skippedSessionPlanSlotIds,
-        finalizedAtMs,
-      });
-
-      if (outcomeDecision === null) {
-        if (snapshot.loggedSets.length !== 0) {
-          throw new Error('Only an empty session can be discarded.');
-        }
-        d.executeSync(
-          'DELETE FROM session_plan_slot_replacement WHERE session_plan_slot_id IN (SELECT session_plan_slot_id FROM session_plan_slot WHERE session_id = ?) OR replaced_by_session_plan_slot_id IN (SELECT session_plan_slot_id FROM session_plan_slot WHERE session_id = ?)',
-          [activeSession.sessionId, activeSession.sessionId],
-        );
-        // Parent-first keeps 026's immutable side-cars legal. The explicit
-        // cleanup that follows also handles test/dev connections with FKs off.
-        d.executeSync('DELETE FROM session WHERE session_id = ?', [activeSession.sessionId]);
-        // A discarded session takes its preparation with it. Named explicitly
-        // rather than left to the cascade: session ids are reused, and with
-        // foreign keys off a surviving protocol would sit under the next
-        // session's id.
-        deleteSessionPreparation(d, activeSession.sessionId);
-        d.executeSync('DELETE FROM session_slot_target WHERE session_plan_slot_id IN (SELECT session_plan_slot_id FROM session_plan_slot WHERE session_id = ?)', [activeSession.sessionId]);
-        d.executeSync('DELETE FROM planned_slot_disposition WHERE session_id = ?', [activeSession.sessionId]);
-        d.executeSync('DELETE FROM session_plan_slot WHERE session_id = ?', [activeSession.sessionId]);
-        d.executeSync('DELETE FROM session_origin WHERE session_id = ?', [activeSession.sessionId]);
-      } else {
-        const ratedSets = snapshot.loggedSets.filter((loggedSet) => loggedSet.rpe !== null);
-        const avgRpe = ratedSets.length === 0
-          ? null
-          : Math.round(
-              (ratedSets.reduce((sum, loggedSet) => sum + (loggedSet.rpe ?? 0), 0) / ratedSets.length) * 2,
-            ) / 2;
-        const durationMin = Math.round(
-          (Math.max(0, finalizedAtMs - (snapshot.startedAtMs ?? finalizedAtMs)) / 60_000) * 10,
-        ) / 10;
-        d.executeSync(
-          'UPDATE session SET session_rpe = ?, duration_min = ? WHERE session_id = ?',
-          [avgRpe, durationMin, activeSession.sessionId],
-        );
-        d.executeSync(
-          `INSERT INTO capability_session_evidence
-             (session_id, movement_id, qualifying_sets, minimum_value, maximum_rpe, verified)
-           SELECT sr.session_id, sr.movement_id, COUNT(*),
-                  CAST(MIN(CASE WHEN lm.mode = 'time' THEN tm.value ELSE sr.reps END) AS INTEGER),
-                  MAX(sr.rpe), 1
-           FROM set_record sr
-           LEFT JOIN movement_logging_mode lm ON lm.movement_id = sr.movement_id
-           LEFT JOIN set_metric tm ON tm.set_id = sr.set_id AND tm.metric = 'time_s'
-           WHERE sr.session_id = ?
-             AND (lm.mode <> 'time' OR tm.value IS NOT NULL)
-           GROUP BY sr.session_id, sr.movement_id
-           ON CONFLICT(session_id, movement_id) DO UPDATE SET
-             qualifying_sets = excluded.qualifying_sets,
-             minimum_value = excluded.minimum_value,
-             maximum_rpe = excluded.maximum_rpe,
-             verified = 1`,
-          [activeSession.sessionId],
-        );        d.executeSync(MATERIALIZE_STATE_VECTOR_SQL, [snapshot.sessionDate]);
-        // A session that finishes with preparation still open records it as
-        // stopped: no outcome is invented. Preparation rows are not sets, so
-        // nothing here reaches APRE or capability evidence.
-        stopOpenSessionPreparation(d, activeSession.sessionId, finalizedAtMs);
-        applyApreFinalization(
-          d,
-          snapshot.originKind === 'planned' ? snapshot.sourcePlannedSessionId : null,
-          snapshot.loggedSets,
-          finalizedAtMs,
-        );
-        persistSessionOutcome(
-          d,
-          activeSession.sessionId,
-          snapshot.originKind,
-          snapshot.sessionMode,
-          terminalRunner.tier,
-          outcomeDecision,
-        );
-        // 071: which slots were skipped. The outcome above keeps their count;
-        // the ids lived only in the checkpoint deleted below. Same ids, same
-        // transaction, so the two cannot disagree.
-        for (const sessionPlanSlotId of terminalRunner.skippedSessionPlanSlotIds) {
-          d.executeSync('INSERT INTO session_skipped_slot (session_plan_slot_id) VALUES (?)', [sessionPlanSlotId]);
-        }
-      }
-
-      // Always the final DML before COMMIT. A fault here rolls session
-      // finalization, APRE, outcome, and the checkpoint delete back together.
-      d.executeSync('DELETE FROM session_runner_checkpoint WHERE session_id = ?', [activeSession.sessionId]);
+      outcomeDecision = finaliseOpenSessionRows(d, activeSession.sessionId, finalizedAtMs, 'stopped');
       d.executeSync('COMMIT');
     } catch (error) {
       try { d.executeSync('ROLLBACK'); } catch { /* retain resumable state */ }
@@ -8179,6 +8319,66 @@ export const useStore = create<KineticsStore>()((set, get) => {
     get().refreshVector();
     get().refreshBlock();
     get().computePrescription([]);
+  },
+  refreshEarlierOpenSessions: () => {
+    set({
+      earlierOpenSessions: earlierOpenSessionEntries(getDb(), localToday(), get().session?.sessionId ?? null),
+    });
+  },
+  finishEarlierSession: (sessionId) => {
+    const d = getDb();
+    const entry = earlierOpenSessionEntries(d, localToday(), get().session?.sessionId ?? null)
+      .find((row) => row.sessionId === sessionId);
+    if (entry === undefined) {
+      set({ error: 'That workout is no longer open.' });
+      get().refreshEarlierOpenSessions();
+      return false;
+    }
+    if (entry.loggedSetCount === 0 && !entry.safetyStop) {
+      set({ error: 'Nothing was logged in that workout, so there is nothing to keep. Discard it instead.' });
+      return false;
+    }
+    const finalizedAtMs = Date.now();
+    d.executeSync('BEGIN');
+    try {
+      finaliseOpenSessionRows(d, sessionId, finalizedAtMs, 'after_the_fact');
+      d.executeSync('COMMIT');
+    } catch (error) {
+      try { d.executeSync('ROLLBACK'); } catch { /* the workout stays open */ }
+      set({ error: error instanceof Error ? error.message : String(error) });
+      return false;
+    }
+    set({ error: null });
+    get().refreshBlock();
+    get().refreshEarlierOpenSessions();
+    return true;
+  },
+  discardEarlierSession: (sessionId) => {
+    const d = getDb();
+    const entry = earlierOpenSessionEntries(d, localToday(), get().session?.sessionId ?? null)
+      .find((row) => row.sessionId === sessionId);
+    if (entry === undefined) {
+      set({ error: 'That workout is no longer open.' });
+      get().refreshEarlierOpenSessions();
+      return false;
+    }
+    if (!entry.canDiscard) {
+      set({ error: 'Only an empty workout can be discarded.' });
+      return false;
+    }
+    d.executeSync('BEGIN');
+    try {
+      deleteEmptySessionRows(d, sessionId);
+      d.executeSync('DELETE FROM session_runner_checkpoint WHERE session_id = ?', [sessionId]);
+      d.executeSync('COMMIT');
+    } catch (error) {
+      try { d.executeSync('ROLLBACK'); } catch { /* the workout stays open */ }
+      set({ error: error instanceof Error ? error.message : String(error) });
+      return false;
+    }
+    set({ error: null });
+    get().refreshEarlierOpenSessions();
+    return true;
   },
   computePrescription: (_patterns) => {
     if (!get().requireTrainingSupport('daily-prescription', undefined, `session-date:${localToday()}`)) return;

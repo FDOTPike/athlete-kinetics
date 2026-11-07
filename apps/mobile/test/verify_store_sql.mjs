@@ -1082,7 +1082,8 @@ if (resetTables.length >= 15) {
   const endBody = storeSrc.slice(endStart, endEnd);
   a('071: skipped slots are written with the outcome, before the checkpoint is deleted and before COMMIT',
     endStart >= 0 && endEnd > endStart
-      && order(endBody, 'persistSessionOutcome(', 'INSERT INTO session_skipped_slot', "'DELETE FROM session_runner_checkpoint WHERE session_id = ?'", "d.executeSync('COMMIT')"));
+      && order(storeSrc.slice(storeSrc.indexOf('const finaliseOpenSessionRows ='), storeSrc.indexOf('const persistSessionOutcome =')), 'persistSessionOutcome(', 'INSERT INTO session_skipped_slot', "'DELETE FROM session_runner_checkpoint WHERE session_id = ?'")
+      && order(endBody, 'finaliseOpenSessionRows(', "d.executeSync('COMMIT')"));
   a('071: reset empties each table before its parent',
     order(resetBody, "'DELETE FROM session_skipped_slot'", "'DELETE FROM session_plan_slot'")
       && order(resetBody, "'DELETE FROM set_load_shown'", "'DELETE FROM set_record'"));
@@ -1447,7 +1448,10 @@ if (resetTables.length >= 15) {
   const hydrateBody = sliceBetween('const hydrateSessionFinalization =', 'const persistSessionOutcome =');
   const persistOutcomeBody = sliceBetween('const persistSessionOutcome =', 'const applyApreFinalization =');
   const applyApreBody = sliceBetween('const applyApreFinalization =', 'const runnerSelection =');
-  const endSessionBody = sliceBetween('endSession: () => {', 'computePrescription: (_patterns) => {');
+  const endSessionBody = sliceBetween('endSession: () => {', 'refreshEarlierOpenSessions: () => {');
+  // Issue 191: finalisation lives in one helper shared by endSession and the
+  // earlier-workout finish; the invariants below are checked on it.
+  const finaliseBody = sliceBetween('const finaliseOpenSessionRows =', 'const persistSessionOutcome =');
   const continueProgramBody = sliceBetween('continueTrainingProgram: () => {', 'archiveTrainingProgram: () => {');
 
   // `error` is SHARED store state and BlockScreen settles its continuation
@@ -1509,10 +1513,10 @@ if (resetTables.length >= 15) {
       && applyApreBody.includes('loggedSet.sourcePlannedSlotId === slot.planned_slot_id')
       && applyApreBody.includes('loggedSet.movementId === slot.movement_id'));
   a('finalization classifies exactly once from the hydrated snapshot',
-    (endSessionBody.match(/evaluateSessionOutcome\s*\(/g) ?? []).length === 1
-      && endSessionBody.includes('sets: snapshot.sets')
-      && endSessionBody.includes('persistSessionOutcome(')
-      && endSessionBody.includes('outcomeDecision,'));
+    (finaliseBody.match(/evaluateSessionOutcome\s*\(/g) ?? []).length === 1
+      && finaliseBody.includes('sets: snapshot.sets')
+      && finaliseBody.includes('persistSessionOutcome(')
+      && finaliseBody.includes('outcomeDecision,'));
 
   const evidenceFields = [
     'slotCount', 'plannedSetCount', 'loggedSetCount', 'exactDoseCount',
@@ -1529,16 +1533,17 @@ if (resetTables.length >= 15) {
   const endBegin = endSessionBody.indexOf("d.executeSync('BEGIN')");
   const endCommit = endSessionBody.indexOf("d.executeSync('COMMIT')", endBegin);
   const endTxn = endBegin >= 0 && endCommit > endBegin ? endSessionBody.slice(endBegin, endCommit) : '';
-  const checkpointDelete = endTxn.indexOf('DELETE FROM session_runner_checkpoint');
+  const checkpointDelete = finaliseBody.indexOf('DELETE FROM session_runner_checkpoint');
   const afterCheckpointDelete = checkpointDelete >= 0
-    ? endTxn.slice(checkpointDelete + 'DELETE FROM session_runner_checkpoint'.length)
+    ? finaliseBody.slice(checkpointDelete + 'DELETE FROM session_runner_checkpoint'.length)
     : '';
   const catchReturn = endSessionBody.indexOf('return;', endCommit);
   const successClear = endSessionBody.indexOf('session: null', catchReturn);
   a('outcome, session finalization, and checkpoint delete share one transaction',
     (endSessionBody.match(/d\.executeSync\('BEGIN'\)/g) ?? []).length === 1
       && (endSessionBody.match(/d\.executeSync\('COMMIT'\)/g) ?? []).length === 1
-      && ordered(endTxn, [
+      && ordered(endTxn, ['finaliseOpenSessionRows('])
+      && ordered(finaliseBody, [
         'hydrateSessionFinalization(',
         'evaluateSessionOutcome(',
         'UPDATE session SET session_rpe = ?, duration_min = ?',

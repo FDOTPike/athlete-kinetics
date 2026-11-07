@@ -40,7 +40,7 @@
 import React, { useMemo } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { addDaysIso, applyPrescriptionToSlot } from '@ak/inference';
-import { useStore, freeFormStartIsEmpty } from '../state/useStore';
+import { useStore, freeFormStartIsEmpty, type EarlierOpenSession } from '../state/useStore';
 import { useNavigation } from '../navigation/navigation';
 import TrainingSupportNotice from '../components/TrainingSupportNotice';
 import { theme } from '../theme/theme';
@@ -68,6 +68,9 @@ const focusName = (focus: string): string =>
 
 /** "Lower session · Fri 12 Sep" without pulling in a date library. */
 const shortDate = (iso: string): string => iso;
+
+/** Stable empty list for the earlier-workout card (issue 191). */
+const NO_EARLIER_OPEN_SESSIONS: readonly EarlierOpenSession[] = [];
 
 const READINESS_LABEL: Record<'OPTIMAL' | 'RECOVERY' | 'OVERREACHED', string> = {
   OPTIMAL: 'Ready to train',
@@ -112,6 +115,9 @@ function AvailableTodayScreen({
   const refreshVector = useStore((s) => s.refreshVector);
   const recordedDurationsForFocus = useStore((s) => s.recordedDurationsForFocus);
   const error = useStore((s) => s.error);
+  const earlierOpenSessions = useStore((s) => s.earlierOpenSessions) ?? NO_EARLIER_OPEN_SESSIONS;
+  const finishEarlierSession = useStore((s) => s.finishEarlierSession);
+  const discardEarlierSession = useStore((s) => s.discardEarlierSession);
   const nav = typeof useNavigation === 'function' ? useNavigation() : undefined;
 
   const [emptyStartPromptOpen, setEmptyStartPromptOpen] = React.useState(false);
@@ -515,6 +521,38 @@ function AvailableTodayScreen({
         />
       }
     >
+      {earlierOpenSessions.map((entry) => {
+        const sets = entry.loggedSetCount;
+        const finishLabel = sets > 0 ? 'Finish and keep logged sets' : 'Finish and keep the safety stop';
+        return (
+          <View key={`earlier-${entry.sessionId}`} style={styles.card} testID={`today-earlier-${entry.sessionId}`}>
+            <Text style={styles.eyebrow}>UNFINISHED</Text>
+            <Text style={styles.title}>An earlier workout was never finished</Text>
+            <Text style={styles.body}>
+              From {shortDate(entry.sessionDate)}. {sets === 0
+                ? 'No sets were logged.'
+                : `${sets} set${sets === 1 ? '' : 's'} logged.`}
+            </Text>
+            {(sets > 0 || entry.safetyStop) && (
+              <PrimaryButton
+                label={finishLabel}
+                onPress={() => { finishEarlierSession?.(entry.sessionId); }}
+                accessibilityLabel={finishLabel}
+                testID={`today-earlier-finish-${entry.sessionId}`}
+              />
+            )}
+            {entry.canDiscard && (
+              <QuietAction
+                label="Discard empty session"
+                onPress={() => { discardEarlierSession?.(entry.sessionId); }}
+                accessibilityLabel="Discard empty session"
+                testID={`today-earlier-discard-${entry.sessionId}`}
+              />
+            )}
+          </View>
+        );
+      })}
+
       {workoutCard()}
 
       {error !== null && (
