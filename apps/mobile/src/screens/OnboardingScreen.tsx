@@ -325,10 +325,14 @@ export default function OnboardingScreen(): React.JSX.Element {
   // goal is never carried forward silently.
   const targetGateOpen = step === 'target' && !goalValidation.ok;
   const skipTarget = (): void => {
-    // Removing the screen leaves the index pointing at the next one.
+    // Removing the screen leaves the index pointing at the next one, which is
+    // right mid-interview. From an EDIT started on the review the index must be
+    // recomputed against the array WITHOUT this screen, or it lands one past
+    // the review (a "Step 10 of 9" counter and a dead first Back).
     setWantsTarget(false);
     setGoalFields(EMPTY_GOAL_FIELDS);
     setGoalExerciseId(null);
+    returnAfterReviewEditSkip('target');
   };
   const sportValidation = useMemo(
     () => validateSportProfile(sportDraftFromFields(sportFields), today),
@@ -339,12 +343,31 @@ export default function OnboardingScreen(): React.JSX.Element {
   const skipSport = (): void => {
     setWantsSport(false);
     setSportFields(EMPTY_SPORT_FIELDS);
+    returnAfterReviewEditSkip('sport');
   };
   // R5 (Round 2, ledger 0060): the limitations decision is REQUIRED. The
   // athlete cannot leave this screen — NEXT stays disabled — until they have
   // explicitly chosen Yes or No. Silence is never an answer to a safety
   // question; a skip would silently claim "no limitations" in the profile.
   const limitsGateOpen = step === 'limits' && limitsAnswered === null;
+  // A15-01: a skip during an EDIT from the review must present any OTHER
+  // optional answer that is still incomplete (one added moments ago on the
+  // focus screen) before returning to the review; otherwise review would carry
+  // an invalid answer and START TRAINING would be refused. When nothing is
+  // pending, land on the review's index in the reduced array and leave edit
+  // mode so NEXT walks normally.
+  const returnAfterReviewEditSkip = (removed: 'sport' | 'target'): void => {
+    if (!editingFromReview) return;
+    const remaining = steps.filter((key) => key !== removed);
+    const pending = remaining.findIndex((key) =>
+      (key === 'sport' && !sportValidation.ok) || (key === 'target' && !goalValidation.ok));
+    if (pending !== -1) {
+      setStepIdx(pending);
+      return;
+    }
+    setStepIdx(remaining.indexOf('review'));
+    setEditingFromReview(false);
+  };
 
   const goNext = (): void => {
     if (!editingFromReview) {
@@ -749,7 +772,7 @@ export default function OnboardingScreen(): React.JSX.Element {
                       {`TARGET — ${goalValidation.goal.specificOutcome}: ${goalValidation.goal.baselineValue === null ? '' : `from ${goalValidation.goal.baselineValue} ${goalValidation.goal.unit} to `}${goalValidation.goal.targetValue} ${goalValidation.goal.unit}${goalValidation.goal.requestedDeadline === null ? ', no deadline' : ` by ${goalValidation.goal.requestedDeadline}`}`}
                     </Text>
                     <Pressable
-                      onPress={() => goTo('target')}
+                      onPress={() => editFromReview('target')}
                       accessibilityRole="button"
                       accessibilityLabel="Edit target"
                       style={styles.reviewEdit}
