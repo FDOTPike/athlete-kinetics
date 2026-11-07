@@ -109,12 +109,22 @@ function AvailableTodayScreen({
   const program = useStore((s) => s.program);
   const startSession = useStore((s) => s.startSession);
   const storeFreeFormStartIsEmpty = useStore((s) => s.freeFormStartIsEmpty);
+  const storeEquipmentConflict = useStore((s) => s.todayPlanEquipmentConflict);
+  const storeUpdateTodayWorkout = useStore((s) => s.updateTodayPlannedWorkout);
   const refreshVector = useStore((s) => s.refreshVector);
   const recordedDurationsForFocus = useStore((s) => s.recordedDurationsForFocus);
   const error = useStore((s) => s.error);
   const nav = typeof useNavigation === 'function' ? useNavigation() : undefined;
 
   const [emptyStartPromptOpen, setEmptyStartPromptOpen] = React.useState(false);
+  const [updateConfirmOpen, setUpdateConfirmOpen] = React.useState(false);
+  // The same access check Start runs, so this notice and Start's refusal agree.
+  // Read on every render; a profile (equipment) change re-renders this screen.
+  const equipmentConflict = typeof storeEquipmentConflict === 'function' && storeEquipmentConflict();
+  const confirmUpdateToday = React.useCallback(() => {
+    setUpdateConfirmOpen(false);
+    if (typeof storeUpdateTodayWorkout === 'function') storeUpdateTodayWorkout();
+  }, [storeUpdateTodayWorkout]);
   const checkFreeFormStartIsEmpty = React.useCallback((): boolean => {
     if (typeof storeFreeFormStartIsEmpty === 'function') return storeFreeFormStartIsEmpty();
     if (typeof freeFormStartIsEmpty === 'function') return freeFormStartIsEmpty();
@@ -356,6 +366,41 @@ function AvailableTodayScreen({
                 <Text style={styles.caption}>+{remaining} more</Text>
               )}
             </View>
+            {equipmentConflict && (
+              <View style={styles.preview} testID="today-equipment-conflict">
+                <Text style={styles.body} testID="today-equipment-conflict-text">
+                  Your equipment has changed. This workout includes a movement your current equipment
+                  does not cover, so it cannot start as planned.
+                </Text>
+                {updateConfirmOpen ? (
+                  <View testID="today-update-confirm">
+                    <Text style={styles.caption}>
+                      Only today&apos;s unstarted workout changes, using your current equipment. Your other
+                      days stay as they are.
+                    </Text>
+                    <PrimaryButton
+                      label="Update today's workout"
+                      onPress={confirmUpdateToday}
+                      accessibilityLabel="Confirm: update today's workout to fit your equipment"
+                      testID="today-update-confirm-yes"
+                    />
+                    <QuietAction
+                      label="Cancel"
+                      onPress={() => setUpdateConfirmOpen(false)}
+                      accessibilityLabel="Cancel updating today's workout"
+                      testID="today-update-confirm-no"
+                    />
+                  </View>
+                ) : (
+                  <QuietAction
+                    label="Update today's workout"
+                    onPress={() => setUpdateConfirmOpen(true)}
+                    accessibilityLabel="Update today's workout to fit your equipment"
+                    testID="today-update-workout"
+                  />
+                )}
+              </View>
+            )}
             <PrimaryButton
               label="Start workout"
               onPress={startAndOpen}
