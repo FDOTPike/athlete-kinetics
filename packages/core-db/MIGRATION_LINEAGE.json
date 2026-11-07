@@ -371,6 +371,11 @@
         "ordinal": 73,
         "file": "074_session_feel_reasons.sql",
         "sha256": "b4647b3d2bc15809f3f35b899991576a90f68614ba9ef84ee6234ef0ea9e2a6d"
+      },
+      {
+        "ordinal": 74,
+        "file": "075_session_plan_slot_planned_count.sql",
+        "sha256": "cea92e59d84c6b86540e142aaaf38c538d33bfa6eadc35ad378362990cf67e85"
       }
     ]
   },

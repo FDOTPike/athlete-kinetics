@@ -64,6 +64,9 @@ export interface SummaryExercise {
    * be stated honestly — see `groupSummaryExercises`.
    */
   plannedSets: number | null;
+  /** Set when this movement's slot was swapped after logged sets (075), so the
+   *  line can say "1 of 2 sets, then swapped to <movement>". */
+  swappedToMovementName?: string | null;
   sets: SummarySetFact[];
 }
 
@@ -78,6 +81,9 @@ export interface SummarySetRow {
   sessionPlanSlotId: number | null;
   /** `session_plan_slot.planned_sets` of that slot; null when unmapped. */
   plannedSets: number | null;
+  /** The movement this slot was swapped to after logged sets, when its original count
+   *  was recorded (075); null otherwise. */
+  swappedToMovementName?: string | null;
 }
 
 /**
@@ -102,14 +108,15 @@ export interface SummarySetRow {
 export const groupSummaryExercises = (rows: readonly SummarySetRow[]): SummaryExercise[] => {
   const movementsBySlot = new Map<number, Set<number>>();
   const plannedBySlot = new Map<number, number | null>();
-  const byMovement = new Map<number, { name: string; slots: Set<number>; sets: SummarySetFact[] }>();
+  const byMovement = new Map<number, { name: string; slots: Set<number>; sets: SummarySetFact[]; swappedTo: string | null }>();
   for (const row of rows) {
     let entry = byMovement.get(row.movementId);
     if (entry === undefined) {
-      entry = { name: row.movementName, slots: new Set(), sets: [] };
+      entry = { name: row.movementName, slots: new Set(), sets: [], swappedTo: null };
       byMovement.set(row.movementId, entry);
     }
     entry.sets.push({ reps: row.reps, loadKg: row.loadKg, timeS: row.timeS });
+    if (entry.swappedTo === null && row.swappedToMovementName != null) entry.swappedTo = row.swappedToMovementName;
     if (row.sessionPlanSlotId !== null) {
       entry.slots.add(row.sessionPlanSlotId);
       let members = movementsBySlot.get(row.sessionPlanSlotId);
@@ -132,7 +139,7 @@ export const groupSummaryExercises = (rows: readonly SummarySetRow[]): SummaryEx
         plannedSets = counts.reduce<number>((sum, c) => sum + (c as number), 0);
       }
     }
-    return { movementId, movementName: e.name, plannedSets, sets: e.sets };
+    return { movementId, movementName: e.name, plannedSets, swappedToMovementName: e.swappedTo, sets: e.sets };
   });
 };
 
@@ -239,6 +246,8 @@ const exerciseLine = (exercise: SummaryExercise): SummaryLine => {
   const logged = exercise.sets.length;
   const count = exercise.plannedSets === null
     ? plural(logged, 'set')
+    : exercise.swappedToMovementName != null
+      ? `${logged} of ${exercise.plannedSets} sets, then swapped to ${exercise.swappedToMovementName}`
     : logged === exercise.plannedSets
       ? `${logged} of ${exercise.plannedSets} sets`
       : `${plural(logged, 'set')} logged · ${exercise.plannedSets} planned`;

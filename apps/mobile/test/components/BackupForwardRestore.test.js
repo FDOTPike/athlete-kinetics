@@ -719,9 +719,14 @@ describe('every registered pre-upgrade schema restores, not only the first', () 
     expect([v72.migrationSlot, v72.tableCount]).toEqual([73, v71.tableCount + 1]);
     // 074 (issue #220): session_feel rebuilt, one side-car table added.
     const v73 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 73);
-    expect(v73).toBe(CURRENT);
+    expect(v73).not.toBe(CURRENT);
     expect(v73.fingerprint).not.toBe(v72.fingerprint);
     expect([v73.migrationSlot, v73.tableCount]).toEqual([74, v72.tableCount + 1]);
+    // 075 (issue #144): one side-car table added for the planned set count.
+    const v74 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 74);
+    expect(v74).toBe(CURRENT);
+    expect(v74.fingerprint).not.toBe(v73.fingerprint);
+    expect([v74.migrationSlot, v74.tableCount]).toEqual([75, v73.tableCount + 1]);
     expect(v70.fingerprint).not.toBe(v69.fingerprint);
     expect([v70.migrationSlot, v70.tableCount]).toEqual([71, v69.tableCount + 2]);
     expect(PRE_UPGRADE.length).toBeGreaterThanOrEqual(7);

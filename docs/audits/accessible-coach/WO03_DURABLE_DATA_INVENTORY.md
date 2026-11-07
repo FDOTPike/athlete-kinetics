@@ -225,3 +225,9 @@ Final live durable tables: 123 (the 122 above, and `session_plan_slot_replacemen
 Final live durable tables: 124 (the 123 above, and `session_feel_extra_reason`). The migration array has 73 entries through slot `074`, so `PRAGMA user_version = 73`. The current backup contract fingerprints 210 durable table/index/trigger objects; all earlier schema contracts remain registered unchanged.
 
 `074` rebuilds `session_feel` with the same columns and a looser CHECK (only "as planned" is held to no reasons; issue #220 requires a reason only for "harder", which the store's validation enforces), and adds `session_feel_extra_reason`, one row per session holding the newer reasons (load too heavy, load too light, rested well). Both are athlete-owned record-only data, never engine inputs. The side-car is included in the encrypted physical backup, survives forward restoration and migration replay, leaves with its session, and is cleared on Reset training data.
+
+## Update 2026-11-07 — migration 075 (planned set count for a swapped slot)
+
+Final live durable tables: 125 (the 124 above, and `session_plan_slot_planned_count`). The migration array has 74 entries through slot `075`, so `PRAGMA user_version = 74`. The current backup contract fingerprints 211 durable table/index/trigger objects; all earlier schema contracts remain registered unchanged.
+
+`session_plan_slot_planned_count` holds, for a `session_plan_slot` swapped after logged sets, the set count it was planned with before the swap (`original_planned_sets`). `session_plan_slot.planned_sets` keeps the runner's executable count, so the checkpoint check is unchanged. A slot with no row has no recorded original and is shown with the earlier wording. It is athlete-owned record-only data, included in the encrypted physical backup, survives forward restoration and migration replay, leaves with its session, and is cleared on empty-session discard and Reset training data.

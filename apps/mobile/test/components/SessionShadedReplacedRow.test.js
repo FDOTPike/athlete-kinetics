@@ -94,15 +94,15 @@ test('a replaced row after 1 logged set is drawn at opacity 0.4 with singular Sw
   expect(replacedSlot.replacedBySessionPlanSlotId).toBe(newSlot.sessionPlanSlotId);
   expect(newSlot.movementId).toBe(inclinePushUpId);
 
-  // Shaded row accessibility label starts with "Swapped for Incline Push-Up" and has opacity 0.4
-  const shadedRow = screen.getByLabelText(/^Swapped for Incline Push-Up/);
+  // Shaded row accessibility label names the original count and the swap (issue #144) and has opacity 0.4
+  const shadedRow = screen.getByLabelText(/^Push-up, 1 of 3 sets, then swapped to Incline Push-Up/);
   expect(shadedRow).toBeOnTheScreen();
   expect(StyleSheet.flatten(shadedRow.props.style)).toMatchObject({ opacity: 0.4 });
   expect(shadedRow.props.accessibilityState).toMatchObject({ disabled: true });
 
-  // Name and Swapped for line are shown
+  // Name and the swap line, with the original count, are shown
   expect(screen.getByText('Push-up')).toBeOnTheScreen();
-  expect(screen.getByText('Swapped for Incline Push-Up · 1 set logged')).toBeOnTheScreen();
+  expect(screen.getByText('1 of 3 sets, then swapped to Incline Push-Up')).toBeOnTheScreen();
 
   // Logged sets and their values stay readable
   fireEvent.press(screen.getByLabelText('Review logged details, collapsed'));
@@ -153,9 +153,9 @@ test('after swapping with 2 logged sets and completing the new row, the shaded r
   fireEvent.press(screen.getByLabelText('Move Incline Push-Up forward into this session'));
 
   // Shaded row shows plural line and opacity 0.4
-  const shadedRow = screen.getByLabelText(/^Swapped for Incline Push-Up/);
+  const shadedRow = screen.getByLabelText(/^Push-up, 2 of 3 sets, then swapped to Incline Push-Up/);
   expect(StyleSheet.flatten(shadedRow.props.style)).toMatchObject({ opacity: 0.4 });
-  expect(screen.getByText('Swapped for Incline Push-Up · 2 sets logged')).toBeOnTheScreen();
+  expect(screen.getByText('2 of 3 sets, then swapped to Incline Push-Up')).toBeOnTheScreen();
 
   // Log all 3 sets of Incline Push-Up
   const replacementSlot = state().sessionPlan[1];
@@ -171,6 +171,80 @@ test('after swapping with 2 logged sets and completing the new row, the shaded r
   fireEvent.press(screen.getByLabelText('Finish completed session'));
   expect(state().session).toBeNull();
   expect(screen.getByTestId('session-summary')).toBeOnTheScreen();
-  expect(screen.getByText('Push-up — 2 of 2 sets · most reps in one set 6')).toBeOnTheScreen();
+  expect(screen.getByText('Push-up — 2 of 3 sets, then swapped to Incline Push-Up · most reps in one set 6')).toBeOnTheScreen();
   expect(screen.getByText('Incline Push-Up — 3 of 3 sets · most reps in one set 9')).toBeOnTheScreen();
+});
+
+test('issue 144: a swap after one logged set of a 2-set exercise reads "1 of 2 sets, then swapped to", counts the chain as one of three planned exercises, keeps the runner count, and the summary says the same', () => {
+  const today = state().today;
+  const pushUpId = idOf('Push-up');
+  const inclinePushUpId = idOf('Incline Push-Up');
+  const squatId = idOf('Bodyweight Squat');
+  const bridgeId = idOf('Glute Bridge');
+
+  raw().prepare(
+    "INSERT INTO training_block (block_id, start_date, objective, created_at_ms, status) VALUES (1, ?, 'strength', 1000, 'active')",
+  ).run(today);
+  raw().prepare(
+    "INSERT INTO planned_session (planned_session_id, block_id, week_index, day_index, focus, phase, session_date) VALUES (100, 1, 1, 1, 'upper', 'accumulation', ?)",
+  ).run(today);
+  raw().prepare(
+    "INSERT INTO planned_slot (planned_slot_id, planned_session_id, slot_index, movement_id, sets, reps, target_rpe) VALUES (500, 100, 1, ?, 2, 5, 8)",
+  ).run(pushUpId);
+  raw().prepare(
+    "INSERT INTO planned_slot (planned_slot_id, planned_session_id, slot_index, movement_id, sets, reps, target_rpe) VALUES (501, 100, 2, ?, 3, 8, 8)",
+  ).run(squatId);
+  raw().prepare(
+    "INSERT INTO planned_slot (planned_slot_id, planned_session_id, slot_index, movement_id, sets, reps, target_rpe) VALUES (502, 100, 3, ?, 1, 8, 8)",
+  ).run(bridgeId);
+
+  state().refreshBlock();
+  state().startSession();
+  state().finishPreparation('already_warm', state().preparation.revision);
+
+  const firstSlot = state().sessionPlan[0];
+  state().logSet(firstSlot.movementId, 5, 0, 8, undefined, undefined, undefined, { bandLevel: 2 }, firstSlot.sessionPlanSlotId);
+  state().skipRunnerRest();
+
+  render(<SessionScreen />);
+  expect(screen.getByText('0 of 3 exercises complete')).toBeOnTheScreen();
+
+  fireEvent.press(screen.getByLabelText('Avoid Push-up and find a substitution'));
+  fireEvent.press(screen.getByLabelText('Use Incline Push-Up instead'));
+  fireEvent.press(screen.getByLabelText('Use Incline Push-Up instead'));
+
+  const replacedSlot = state().sessionPlan[0];
+  const newSlot = state().sessionPlan[1];
+  expect(replacedSlot.replacedBySessionPlanSlotId).toBe(newSlot.sessionPlanSlotId);
+  // The runner keeps 1 set (checkpoint-safe planned_sets); the planned count is kept beside it.
+  expect(replacedSlot.plannedSets).toBe(1);
+  expect(replacedSlot.originalPlannedSets).toBe(2);
+
+  // The chain is one planned exercise: three in all, not four.
+  expect(screen.getByText('0 of 3 exercises complete')).toBeOnTheScreen();
+  expect(screen.getByLabelText(/^Push-up, 1 of 2 sets, then swapped to Incline Push-Up/)).toBeOnTheScreen();
+  expect(screen.getByText('1 of 2 sets, then swapped to Incline Push-Up')).toBeOnTheScreen();
+
+  // Finish the replacement, then the other two exercises.
+  const replacementSets = newSlot.plannedSets;
+  act(() => {
+    for (let i = 0; i < replacementSets; i += 1) {
+      state().logSet(newSlot.movementId, 8, 0, 8, undefined, undefined, undefined, undefined, newSlot.sessionPlanSlotId);
+      state().skipRunnerRest();
+    }
+  });
+  expect(screen.getByText('1 of 3 exercises complete')).toBeOnTheScreen();
+
+  act(() => {
+    for (const slot of state().sessionPlan.slice(2)) {
+      for (let i = 0; i < slot.plannedSets; i += 1) {
+        state().logSet(slot.movementId, 8, 0, 8, undefined, undefined, undefined, undefined, slot.sessionPlanSlotId);
+        state().skipRunnerRest();
+      }
+    }
+  });
+
+  fireEvent.press(screen.getByLabelText('Finish completed session'));
+  expect(screen.getByTestId('session-summary')).toBeOnTheScreen();
+  expect(screen.getByText(/^Push-up — 1 of 2 sets, then swapped to Incline Push-Up · most reps in one set 5/)).toBeOnTheScreen();
 });
