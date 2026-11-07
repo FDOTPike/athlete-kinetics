@@ -101,6 +101,19 @@ const AGE_COPY: Record<TrainingAge, { label: string; blurb: string }> = {
   elite: { label: 'COMPETITIVE', blurb: 'Competing, or training at that level' },
 };
 
+/**
+ * #205: the week YOUR WEEK starts from, by experience. A prefill the athlete
+ * confirms or changes on that step, applied when experience is chosen and
+ * never after the athlete has edited the week. It does not change any
+ * prescription by itself: the plan is built from the week the athlete saves.
+ */
+export const WEEK_DEFAULT_BY_AGE: Record<TrainingAge, { readonly days: number; readonly minutes: number }> = {
+  beginner: { days: 3, minutes: 45 },
+  intermediate: { days: 4, minutes: 60 },
+  advanced: { days: 4, minutes: 75 },
+  elite: { days: 4, minutes: 75 },
+};
+
 const ENERGY_COPY: Record<EnergySystem, { label: string; blurb: string }> = {
   aerobic: { label: 'AEROBIC', blurb: 'Long, steady work — the endurance engine' },
   anaerobic: { label: 'ANAEROBIC', blurb: 'Hard rounds and repeats — grappling pace' },
@@ -147,7 +160,7 @@ const EQUIPMENT_DESCRIPTION: Record<EquipmentItem, string> = {
 const PRESET_COPY = {
   full_gym: { label: 'FULL GYM', blurb: 'A broad setup with racks, free weights, cables, bands, and mats.' },
   home_basic: { label: 'HOME BASIC', blurb: 'A compact setup with dumbbells, a kettlebell, a pull-up bar, bands, and mats.' },
-  minimal: { label: 'MINIMAL', blurb: 'No equipment required; bodyweight movements remain available.' },
+  minimal: { label: 'MINIMAL', blurb: 'Bands and mats only; bodyweight movements remain available.' },
 } as const;
 
 /** Plain-language read of an RPE effort cap, shown live under the stepper. */
@@ -231,6 +244,26 @@ function ReviewSection({ heading, description, onEdit, children }: ReviewSection
 // ---------------------------------------------------------------------------
 // Screen
 // ---------------------------------------------------------------------------
+// Walk 1 (W1-15): STRENGTH + GRAPPLING found no grappling sport in the list.
+// The goal itself plans the BJJ days; the sport step is for another sport.
+export const HYBRID_SPORT_NOTE = 'Your Strength + Grappling goal already includes BJJ days. '
+  + 'Do you also train another sport? This step is optional.';
+
+// Walk 1 (W1-11): a blank name made every new athlete "Athlete 1", even
+// beside an existing "Athlete 1". A blank name takes the first free number.
+export const fallbackAthleteName = (
+  athletes: readonly { id: string; name: string }[], activeId: string | null,
+): string => {
+  const taken = new Set(athletes.filter((a) => a.id !== activeId).map((a) => a.name.trim().toLowerCase()));
+  let n = 1;
+  while (taken.has(`athlete ${n}`)) n += 1;
+  return `Athlete ${n}`;
+};
+
+// Walk 1 (W1-12): "1 limitation notes" read wrong.
+export const limitationNotesLine = (count: number): string =>
+  `${count} limitation ${count === 1 ? 'note' : 'notes'} recorded for your reference.`;
+
 export default function OnboardingScreen(): React.JSX.Element {
   const completeOnboarding = useStore((s) => s.completeOnboarding);
   const beginOnboardingDraft = useStore((s) => s.beginOnboardingDraft);
@@ -242,7 +275,14 @@ export default function OnboardingScreen(): React.JSX.Element {
   const activeAthleteId = useStore((s) => s.activeAthleteId);
 
   const registryName = athletes.find((a) => a.id === activeAthleteId)?.name ?? '';
-  const [draft, setDraft] = useState<UserProfile>({ ...DEFAULT_PROFILE });
+  const [draft, setDraft] = useState<UserProfile>({
+    ...DEFAULT_PROFILE,
+    weekly_frequency: WEEK_DEFAULT_BY_AGE[DEFAULT_PROFILE.training_age].days,
+    session_duration_cap_min: WEEK_DEFAULT_BY_AGE[DEFAULT_PROFILE.training_age].minutes,
+  });
+  // #205: true once the athlete changes days or minutes; from then on a change
+  // of experience leaves their week alone.
+  const [weekEdited, setWeekEdited] = useState(false);
   const [name, setName] = useState(registryName === 'Athlete 1' ? '' : registryName);
   const [injuryText, setInjuryText] = useState('');
   const [mobilityText, setMobilityText] = useState('');
@@ -288,7 +328,9 @@ export default function OnboardingScreen(): React.JSX.Element {
 
   const selectTrainingAge = (age: TrainingAge): void => {
     const prior = draft.training_age;
-    patch({ training_age: age });
+    patch(weekEdited
+      ? { training_age: age }
+      : { training_age: age, weekly_frequency: WEEK_DEFAULT_BY_AGE[age].days, session_duration_cap_min: WEEK_DEFAULT_BY_AGE[age].minutes });
     setLoadPreference((current) => transitionLoadPreference(prior, age, current, loadPreferenceExplicit));
     if (age === 'beginner') setLoadPreferenceExplicit(false);
   };
@@ -387,7 +429,7 @@ export default function OnboardingScreen(): React.JSX.Element {
     setSaveAttempted(true);
     completeOnboarding(
       { ...draft, injury_flags: parseNotes(injuryText), mobility_limits: parseNotes(mobilityText) },
-      name.trim().length > 0 ? name : 'Athlete 1',
+      name.trim().length > 0 ? name : fallbackAthleteName(athletes, activeAthleteId),
       loadPreference,
       loadPreferenceExplicit,
       {
@@ -433,7 +475,9 @@ export default function OnboardingScreen(): React.JSX.Element {
       <Text style={styles.wordmark}>pikeMethods</Text>
 
       {/* Progress dots (P4 ruling: keep as-is with chalk on current dot) */}
-      <View style={styles.dots} accessibilityLabel={`Step ${stepIdx + 1} of ${steps.length}`}>
+      {/* Walk W6-7: without `accessible` Android did not expose the step. */}
+      <View style={styles.dots} accessible accessibilityRole="text" testID="onboarding-progress"
+        accessibilityLabel={`Step ${stepIdx + 1} of ${steps.length}`}>
         {steps.map((k, i) => (
           <View key={k} style={[styles.dot, i === stepIdx && styles.dotActive, i < stepIdx && styles.dotDone]} />
         ))}
@@ -503,6 +547,11 @@ export default function OnboardingScreen(): React.JSX.Element {
               onToggleMuscles={() => setShowFocusMuscles((visible) => !visible)}
             />
             <Text style={styles.fieldLabel}>A SPORT? (OPTIONAL)</Text>
+            {draft.objective === 'hybrid' && (
+              <Text style={styles.pDim} testID="onboarding-hybrid-sport-note">
+                {HYBRID_SPORT_NOTE}
+              </Text>
+            )}
             <Chip
               testID="onboarding-wants-sport"
               wrap
@@ -535,6 +584,11 @@ export default function OnboardingScreen(): React.JSX.Element {
         {step === 'sport' && (
           <View>
             <Text style={styles.h2}>{SPORT_QUESTION.toUpperCase()}</Text>
+            {draft.objective === 'hybrid' && (
+              <Text style={styles.pDim} testID="onboarding-hybrid-sport-step-note">
+                {HYBRID_SPORT_NOTE}
+              </Text>
+            )}
             <SportEditor fields={sportFields} onChange={setSportFields} today={today} />
             <QuietAction
               label="Skip this — plan general gym training"
@@ -584,17 +638,22 @@ export default function OnboardingScreen(): React.JSX.Element {
             <Stepper
               label="TRAINING DAYS PER WEEK"
               value={String(draft.weekly_frequency)}
-              onDecrement={() => patch({ weekly_frequency: Math.max(1, draft.weekly_frequency - 1) })}
-              onIncrement={() => patch({ weekly_frequency: Math.min(7, draft.weekly_frequency + 1) })}
+              onDecrement={() => { setWeekEdited(true); patch({ weekly_frequency: Math.max(1, draft.weekly_frequency - 1) }); }}
+              onIncrement={() => { setWeekEdited(true); patch({ weekly_frequency: Math.min(7, draft.weekly_frequency + 1) }); }}
               style={styles.stepperBlock}
             />
             <Stepper
               label="MINUTES IN A SESSION, TOPS"
               value={`${draft.session_duration_cap_min} min`}
-              onDecrement={() => patch({ session_duration_cap_min: Math.max(15, draft.session_duration_cap_min - 15) })}
-              onIncrement={() => patch({ session_duration_cap_min: Math.min(240, draft.session_duration_cap_min + 15) })}
+              onDecrement={() => { setWeekEdited(true); patch({ session_duration_cap_min: Math.max(15, draft.session_duration_cap_min - 15) }); }}
+              onIncrement={() => { setWeekEdited(true); patch({ session_duration_cap_min: Math.min(240, draft.session_duration_cap_min + 15) }); }}
               style={styles.stepperBlock}
             />
+            {!weekEdited && (
+              <Text style={styles.pDim} testID="onboarding-week-suggestion">
+                {`Suggested for ${AGE_COPY[draft.training_age].label}: ${draft.weekly_frequency} days a week, up to ${draft.session_duration_cap_min} minutes each. Change it to fit your week.`}
+              </Text>
+            )}
             <Text style={styles.pDim}>
               Choose a week that feels manageable. A realistic ceiling beats an optimistic one. You can change this later in Athlete Profile.
             </Text>
@@ -749,7 +808,7 @@ export default function OnboardingScreen(): React.JSX.Element {
                       {`TARGET — ${goalValidation.goal.specificOutcome}: ${goalValidation.goal.baselineValue === null ? '' : `from ${goalValidation.goal.baselineValue} ${goalValidation.goal.unit} to `}${goalValidation.goal.targetValue} ${goalValidation.goal.unit}${goalValidation.goal.requestedDeadline === null ? ', no deadline' : ` by ${goalValidation.goal.requestedDeadline}`}`}
                     </Text>
                     <Pressable
-                      onPress={() => goTo('target')}
+                      onPress={() => editFromReview('target')}
                       accessibilityRole="button"
                       accessibilityLabel="Edit target"
                       style={styles.reviewEdit}
@@ -791,7 +850,7 @@ export default function OnboardingScreen(): React.JSX.Element {
               <ReviewSection
                 heading="TRAINING SUPPORT"
                 description={(parseNotes(injuryText).length + parseNotes(mobilityText).length) > 0
-                  ? `${parseNotes(injuryText).length + parseNotes(mobilityText).length} limitation notes recorded for your reference.`
+                  ? limitationNotesLine(parseNotes(injuryText).length + parseNotes(mobilityText).length)
                   : 'No limitations noted. You can add or change these later.'}
                 onEdit={() => editFromReview('limits')}
               >

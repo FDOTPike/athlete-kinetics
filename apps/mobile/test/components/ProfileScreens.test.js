@@ -174,7 +174,8 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
   });
 
   describe('Reset training data', () => {
-    const caption = "This removes training history, telemetry, blocks, and today's reports. Your profile and saved profile slots remain.";
+    // Walk W4-6: the reset names the active athlete, the only one it changes.
+    const caption = "This removes Default Athlete's training history, telemetry, blocks, and today's reports. Their profile, saved profile slots and other athletes are not changed.";
     const resetSection = () => within(screen.getByTestId('reset-training-data-section'));
 
     const openReset = async () => {
@@ -213,7 +214,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       expect(section.getByLabelText('Continue to reset training data')).toBeEnabled();
 
       fireEvent.press(section.getByTestId('reset-continue-button'));
-      expect(section.getByText('This cannot be undone. Reset the training data?')).toBeOnTheScreen();
+      expect(section.getByText("This cannot be undone. Reset Default Athlete's training data?")).toBeOnTheScreen();
       expect(section.getByTestId('reset-confirm-button')).toHaveTextContent('Reset training data');
       expect(section.getByLabelText('Confirm reset training data')).toBeOnTheScreen();
       expect(section.getByTestId('reset-keep-button')).toHaveTextContent('Keep my data');
@@ -665,6 +666,48 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     expect(screen.getByText('A straight bar loaded with weight plates.').props.numberOfLines).toBeUndefined();
   });
 
+  // #205: the week is a prefill by experience, never applied after the athlete edits it.
+  test('YOUR WEEK is prefilled by experience: NEW TO THIS is 3 days of 45 minutes', () => {
+    render(<OnboardingScreen />);
+    pressNext(); // welcome -> goal
+    pressNext(); // goal -> (focus) -> experience
+    fireEvent.press(screen.getByLabelText(/NEW TO THIS\./));
+    pressNext();
+    expect(screen.getByText('YOUR WEEK')).toBeOnTheScreen();
+    expect(screen.getByLabelText('TRAINING DAYS PER WEEK 3')).toBeOnTheScreen();
+    expect(screen.getByLabelText('MINUTES IN A SESSION, TOPS 45 min')).toBeOnTheScreen();
+    expect(screen.getByText(/Choose a week that feels manageable\. A realistic ceiling beats an optimistic one\./)).toBeOnTheScreen();
+    expect(screen.getByTestId('onboarding-week-suggestion').props.children)
+      .toBe('Suggested for NEW TO THIS: 3 days a week, up to 45 minutes each. Change it to fit your week.');
+    pressBack();
+    fireEvent.press(screen.getByLabelText(/SOME MILEAGE\./));
+    pressNext();
+    expect(screen.getByLabelText('TRAINING DAYS PER WEEK 4')).toBeOnTheScreen();
+    expect(screen.getByLabelText('MINUTES IN A SESSION, TOPS 60 min')).toBeOnTheScreen();
+    pressBack();
+    fireEvent.press(screen.getByLabelText(/COMPETITIVE\./));
+    pressNext();
+    expect(screen.getByLabelText('TRAINING DAYS PER WEEK 4')).toBeOnTheScreen();
+    expect(screen.getByLabelText('MINUTES IN A SESSION, TOPS 75 min')).toBeOnTheScreen();
+  });
+
+  test('YOUR WEEK keeps the athlete edit when experience changes afterwards', () => {
+    render(<OnboardingScreen />);
+    pressNext(); // welcome -> goal
+    pressNext(); // goal -> (focus) -> experience
+    fireEvent.press(screen.getByLabelText(/EXPERIENCED\./));
+    pressNext();
+    expect(screen.getByLabelText('MINUTES IN A SESSION, TOPS 75 min')).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText('Increase TRAINING DAYS PER WEEK'));
+    expect(screen.getByLabelText('TRAINING DAYS PER WEEK 5')).toBeOnTheScreen();
+    expect(screen.queryByTestId('onboarding-week-suggestion')).toBeNull();
+    pressBack();
+    fireEvent.press(screen.getByLabelText(/NEW TO THIS\./));
+    pressNext();
+    expect(screen.getByLabelText('TRAINING DAYS PER WEEK 5')).toBeOnTheScreen();
+    expect(screen.getByLabelText('MINUTES IN A SESSION, TOPS 75 min')).toBeOnTheScreen();
+  });
+
   test('WO-02 review uses scrollable sections and edit routing preserves the complete draft', () => {
     render(<OnboardingScreen />);
     fireEvent.changeText(screen.getByLabelText('Your name'), 'Ari');
@@ -675,7 +718,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     pressNext();
     fireEvent.press(screen.getByLabelText('Increase TRAINING DAYS PER WEEK'));
     pressNext();
-    fireEvent.press(screen.getByRole('button', { name: /MINIMAL\. No equipment/ }));
+    fireEvent.press(screen.getByRole('button', { name: /MINIMAL\. Bands and mats only/ }));
     pressNext();
     fireEvent.press(screen.getByLabelText('No, nothing to note'));
     pressNext();
