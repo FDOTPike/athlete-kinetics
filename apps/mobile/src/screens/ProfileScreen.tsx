@@ -11,8 +11,8 @@
  * Law 3: Zero red/amber/green anywhere.
  * Law 4: Touch targets >= 56pt.
  */
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   BIG4_LIFTS,
   ENERGY_SYSTEMS,
@@ -34,8 +34,10 @@ import { SportPanel } from '../components/SportPanel';
 import { theme } from '../theme/theme';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { useStore } from '../state/useStore';
+import { coachModeAthleteName } from '../state/coachModeAthlete';
+import { useBackupStore } from '../state/backupStore';
 import { useSubViewBack } from '../navigation/navigation';
-import { Chip, Stepper, QuietAction, Disclosure, ListRow } from '../components/ui';
+import { Chip, Stepper, QuietAction, Disclosure, ListRow, PrimaryButton, SecondaryButton } from '../components/ui';
 import InfoTip from '../components/InfoTip';
 import { biometricsCopy, providerForPlatform } from '../state/biometricsCopy';
 import CoachVerificationLabScreen from './CoachVerificationLabScreen';
@@ -126,21 +128,54 @@ interface OneRmRowProps {
   label: string;
   valueKg: number | undefined;
   onChange: (kg: number | null) => void;
+  /** The athlete the row was drawn for: typed text is never saved to another. */
+  athleteId: string;
+  /** Lets the screen save typed text before a Coach Mode switch. */
+  registerCommit: (commit: () => void) => () => void;
 }
-function OneRmRow({ label, valueKg, onChange }: OneRmRowProps): React.JSX.Element {
+function OneRmRow({ label, valueKg, onChange, athleteId, registerCommit }: OneRmRowProps): React.JSX.Element {
   const [text, setText] = useState(valueKg !== undefined ? valueKg.toFixed(1) : '');
   useEffect(() => {
     setText(valueKg !== undefined ? valueKg.toFixed(1) : '');
   }, [valueKg]);
-  const commitText = (): void => {
+  const saveText = (): void => {
     const parsed = Number.parseFloat(text.replace(',', '.'));
     if (!Number.isFinite(parsed) || parsed < 20) {
       onChange(null); // empty/garbage/sub-20 clears the max
       setText('');
       return;
     }
+    const snapped = Math.min(500, Math.max(20, Math.round(parsed / 2.5) * 2.5));
     onChange(parsed); // store snaps to 2.5 and clamps 20..500
+    setText(snapped.toFixed(1));
   };
+  // Walk A-12 (#224): Android Back hides the keyboard without ending editing,
+  // and the typed text was lost when Profile closed. Typed text is now saved
+  // on end of editing, blur, keyboard hide or unmount, whichever comes first.
+  // It is saved once: text that matches the saved value is not saved again,
+  // and neither is text already saved from this render (Enter fires end of
+  // editing and blur before the row re-renders with the saved value).
+  const savedThisRender = useRef(false);
+  useEffect(() => { savedThisRender.current = false; });
+  const commitText = (): void => {
+    const shown = valueKg !== undefined ? valueKg.toFixed(1) : '';
+    if (text === shown || savedThisRender.current) return;
+    // During or after a Coach Mode switch the store belongs to another athlete.
+    if (useStore.getState().activeAthleteId !== athleteId) return;
+    savedThisRender.current = true;
+    saveText();
+  };
+  const commitLatest = useRef(commitText);
+  commitLatest.current = commitText;
+  useEffect(() => {
+    const hide = Keyboard.addListener('keyboardDidHide', () => commitLatest.current());
+    const unregister = registerCommit(() => commitLatest.current());
+    return () => {
+      hide.remove();
+      unregister();
+      commitLatest.current();
+    };
+  }, [registerCommit]);
   return (
     <View style={styles.field}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -160,6 +195,7 @@ function OneRmRow({ label, valueKg, onChange }: OneRmRowProps): React.JSX.Elemen
           value={text}
           onChangeText={setText}
           onEndEditing={commitText}
+          onBlur={commitText}
           keyboardType="numeric"
           placeholder="—"
           placeholderTextColor={theme.color.textLow}
@@ -266,9 +302,19 @@ export default function ProfileScreen(): React.JSX.Element {
   const switchProfile = useStore((s) => (s.status === 'ready' ? s.switchProfile : inertWhileClosed));
   const wipeActiveBlockState = useStore((s) => (s.status === 'ready' ? s.wipeActiveBlockState : inertWhileClosed));
   const session = useStore((s) => s.session);
+  const resetTrainingData = useStore((s) => s.resetTrainingData);
+  const backupWorking = useBackupStore((s) => s.status === 'working');
   const athletes = useStore((s) => s.athletes);
   const activeAthleteId = useStore((s) => s.activeAthleteId);
+  const activeAthleteName = coachModeAthleteName(athletes, activeAthleteId);
   const switchAthlete = useStore((s) => s.switchAthlete);
+  // #224: a one-rep max typed with the keyboard still open is saved for the
+  // current athlete before a Coach Mode switch closes its database.
+  const oneRmCommits = useRef(new Set<() => void>());
+  const registerOneRmCommit = useCallback((commit: () => void) => {
+    oneRmCommits.current.add(commit);
+    return () => { oneRmCommits.current.delete(commit); };
+  }, []);
   const createAthlete = useStore((s) => s.createAthlete);
   const renameAthleteEntry = useStore((s) => s.renameAthleteEntry);
   const deleteAthlete = useStore((s) => s.deleteAthlete);
@@ -289,13 +335,30 @@ export default function ProfileScreen(): React.JSX.Element {
   }, [activeAthleteId, session, loadRecentOutcomes, databaseReady]);
 
   useEffect(() => {
-    setRecentMeasures(databaseReady ? loadMeasuredHistory(14) : []);
-  }, [activeAthleteId, loadMeasuredHistory, databaseReady]);
+    const measures = databaseReady ? loadMeasuredHistory(14) : [];
+    setRecentMeasures(measures);
+    const todayBw = measures.find((row) => row.date === today)?.bodyweightKg ?? null;
+    const hydrated = todayBw !== null ? todayBw.toFixed(1) : '';
+    savedBodyweightText.current = hydrated;
+    setBodyweightText(hydrated);
+  }, [activeAthleteId, today, loadMeasuredHistory, databaseReady]);
   // In-canvas double-confirm states (P2 & P5)
   const [confirmingDeleteAthleteId, setConfirmingDeleteAthleteId] = useState<string | null>(null);
   const [confirmingWipeBlock, setConfirmingWipeBlock] = useState(false);
+  const [resetAthleteId, setResetAthleteId] = useState<string | null>(null);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [coachError, setCoachError] = useState<string | null>(null);
   const [confirmingSwitchProfileId, setConfirmingSwitchProfileId] = useState<number | null>(null);
   const [confirmingDeleteBandLevel, setConfirmingDeleteBandLevel] = useState<number | null>(null);
+  useEffect(() => {
+    setConfirmingDeleteAthleteId(null);
+    setConfirmingWipeBlock(false);
+    setResetAthleteId(null);
+    setResetError(null);
+    setConfirmingSwitchProfileId(null);
+    setConfirmingDeleteBandLevel(null);
+    setCoachError(null);
+  }, [activeAthleteId]);
   const [historyText, setHistoryText] = useState('');
   const [historyPreview, setHistoryPreview] = useState<HistoryParseResult | null>(null);
   const [historyNotice, setHistoryNotice] = useState<string | null>(null);
@@ -303,6 +366,7 @@ export default function ProfileScreen(): React.JSX.Element {
   const [includeImportReadiness, setIncludeImportReadiness] = useState(false);
   const [recentMeasures, setRecentMeasures] = useState<ReturnType<typeof loadMeasuredHistory>>([]);
   const [bodyweightText, setBodyweightText] = useState('');
+  const savedBodyweightText = useRef('');
   const [glossaryOpen, setGlossaryOpen] = useState(false);
   const [activitiesOpen, setActivitiesOpen] = useState(false);
   const [labOpen, setLabOpen] = useState(false);
@@ -349,7 +413,11 @@ export default function ProfileScreen(): React.JSX.Element {
   useEffect(() => {
     setInjuryText(profile.injury_flags.map((f) => `${f.region}: ${f.note}`).join('\n'));
     setMobilityText(profile.mobility_limits.map((f) => `${f.region}: ${f.note}`).join('\n'));
-  }, [activeSlotId]);
+    // Re-seed only when the source profile changes underneath the screen
+    // (slot switch, athlete switch, restore reopening the database). Not on
+    // profile edits: these fields save as you type, and re-seeding from the
+    // parsed notes would rewrite the text mid-keystroke.
+  }, [activeSlotId, activeAthleteId, databaseReady]);
 
   const parseNotes = (text: string): UserProfile['injury_flags'] =>
     text
@@ -392,6 +460,12 @@ export default function ProfileScreen(): React.JSX.Element {
     <KeyboardAwareScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <Text style={styles.wordmark}>pikeMethods</Text>
       <Text style={styles.heading}>ATHLETE PROFILE</Text>
+      {/* #177: in Coach mode (two or more athletes) the heading names the active athlete. */}
+      {activeAthleteName !== null && (
+        <Text style={styles.activeAthleteName} testID="profile-active-athlete">
+          {activeAthleteName}
+        </Text>
+      )}
       <Text style={styles.subheading}>
         Your training settings guide the coach. Health notes and preferences stay
         in your records; instructions can place coach suggestions on hold.
@@ -551,6 +625,8 @@ export default function ProfileScreen(): React.JSX.Element {
               label={label}
               valueKg={oneRepMaxes[m.movement_id] as number | undefined}
               onChange={(kg) => saveOneRepMax(m.movement_id, kg)}
+              athleteId={activeAthleteId}
+              registerCommit={registerOneRmCommit}
             />
           );
         })}
@@ -844,8 +920,24 @@ export default function ProfileScreen(): React.JSX.Element {
             onEndEditing={() => {
               // A focused input can still end editing after the database closed.
               if (!databaseReady) return;
-              const value = Number.parseFloat(bodyweightText.replace(',', '.'));
-              saveBodyweight(today, Number.isFinite(value) && value >= 20 ? value : null);
+              if (bodyweightText === savedBodyweightText.current) return;
+              const trimmed = bodyweightText.trim();
+              if (trimmed === '') {
+                saveBodyweight(today, null);
+                savedBodyweightText.current = '';
+                setBodyweightText('');
+                setRecentMeasures(loadMeasuredHistory(14));
+                return;
+              }
+              const value = Number.parseFloat(trimmed.replace(',', '.'));
+              if (!Number.isFinite(value) || value < 20 || value > 500) {
+                setBodyweightText(savedBodyweightText.current);
+                return;
+              }
+              const saved = (Math.round(value * 10) / 10).toFixed(1);
+              saveBodyweight(today, value);
+              savedBodyweightText.current = saved;
+              setBodyweightText(saved);
               setRecentMeasures(loadMeasuredHistory(14));
             }}
             keyboardType="numeric"
@@ -977,6 +1069,65 @@ export default function ProfileScreen(): React.JSX.Element {
 
       <BackupTransferPanel />
 
+      <View style={styles.mgmtSection} testID="reset-training-data-section">
+        <Disclosure label="Reset training data">
+          {resetAthleteId === null ? (
+            <View style={{ gap: theme.space[3] }}>
+              <Text style={styles.fieldHint}>
+                This removes training history, telemetry, blocks, and today's reports. Your profile and saved profile slots remain.
+              </Text>
+              <SecondaryButton
+                label="Continue to reset"
+                onPress={() => {
+                  setResetError(null);
+                  setResetAthleteId(activeAthleteId);
+                }}
+                disabled={session !== null || backupWorking || !databaseReady}
+                accessibilityLabel="Continue to reset training data"
+                testID="reset-continue-button"
+              />
+            </View>
+          ) : (
+            <View style={{ gap: theme.space[3] }}>
+              <Text style={styles.confirmText}>This cannot be undone. Reset the training data?</Text>
+              {resetError !== null && (
+                <Text style={styles.fieldHint} accessibilityRole="alert">{resetError}</Text>
+              )}
+              <PrimaryButton
+                label="Reset training data"
+                onPress={() => {
+                  if (resetAthleteId !== activeAthleteId || session !== null || backupWorking || !databaseReady) return;
+                  setResetError(null);
+                  resetTrainingData();
+                  const error = useStore.getState().error;
+                  setResetError(error);
+                  if (error === null) {
+                    setRecentOutcomes(loadRecentOutcomes(20));
+                    setRecentMeasures(loadMeasuredHistory(14));
+                    setResetAthleteId(null);
+                    // The reset deleted today's bodyweight, so nothing is saved now.
+                    savedBodyweightText.current = '';
+                    setBodyweightText('');
+                    setHistoryNotice(null);
+                  }
+                }}
+                disabled={session !== null || backupWorking || !databaseReady}
+                accessibilityLabel="Confirm reset training data"
+                testID="reset-confirm-button"
+              />
+              <SecondaryButton
+                label="Keep my data"
+                onPress={() => {
+                  setResetError(null);
+                  setResetAthleteId(null);
+                }}
+                testID="reset-keep-button"
+              />
+            </View>
+          )}
+        </Disclosure>
+      </View>
+
       {/* ---- Learning & Terminology Glossary ---- */}
       <View style={styles.mgmtSection} testID="learning-terminology-section">
         <Text style={styles.mgmtHeading}>LEARNING &amp; TERMINOLOGY</Text>
@@ -1104,6 +1255,9 @@ export default function ProfileScreen(): React.JSX.Element {
               profile switch above, NOTHING is shared. Built for coaching (or
               testing) several people on one phone.
             </Text>
+            {coachError !== null && (
+              <Text style={styles.fieldHint} accessibilityRole="alert">{coachError}</Text>
+            )}
             {athletes.map((a) => {
               const isActive = a.id === activeAthleteId;
               const deletable = !isActive && a.id !== 'default';
@@ -1115,7 +1269,10 @@ export default function ProfileScreen(): React.JSX.Element {
                       disableFullscreenUI
                       style={styles.athleteEditInput}
                       value={editAthleteName}
-                      onChangeText={setEditAthleteName}
+                      onChangeText={(t) => {
+                        setCoachError(null);
+                        setEditAthleteName(t);
+                      }}
                       maxLength={24}
                       autoFocus
                       accessibilityLabel={`New name for ${a.name}`}
@@ -1123,14 +1280,24 @@ export default function ProfileScreen(): React.JSX.Element {
                     <QuietAction
                       label="SAVE"
                       onPress={() => {
-                        renameAthleteEntry(a.id, editAthleteName);
-                        setEditingAthleteId(null);
+                        setCoachError(null);
+                        void (async () => {
+                          const ok = await renameAthleteEntry(a.id, editAthleteName);
+                          if (ok === false) {
+                            setCoachError(useStore.getState().error);
+                            return;
+                          }
+                          setEditingAthleteId(null);
+                        })();
                       }}
                       accessibilityLabel="Save name"
                     />
                     <QuietAction
                       label="CANCEL"
-                      onPress={() => setEditingAthleteId(null)}
+                      onPress={() => {
+                        setCoachError(null);
+                        setEditingAthleteId(null);
+                      }}
                       accessibilityLabel="Cancel rename"
                     />
                   </View>
@@ -1142,7 +1309,16 @@ export default function ProfileScreen(): React.JSX.Element {
                     <Pressable
                       style={styles.athleteMain}
                       disabled={isActive}
-                      onPress={() => switchAthlete(a.id)}
+                      onPress={() => {
+                        setCoachError(null);
+                        oneRmCommits.current.forEach((commit) => commit());
+                        void (async () => {
+                          const ok = await switchAthlete(a.id);
+                          if (ok === false) {
+                            setCoachError(useStore.getState().error);
+                          }
+                        })();
+                      }}
                       accessibilityRole="button"
                       accessibilityState={{ selected: isActive }}
                       accessibilityLabel={`Athlete ${a.name}${isActive ? ', active' : ', tap to switch'}`}
@@ -1154,6 +1330,7 @@ export default function ProfileScreen(): React.JSX.Element {
                     <QuietAction
                       label="RENAME"
                       onPress={() => {
+                        setCoachError(null);
                         setEditingAthleteId(a.id);
                         setEditAthleteName(a.name);
                       }}
@@ -1162,7 +1339,10 @@ export default function ProfileScreen(): React.JSX.Element {
                     {deletable && (
                       <QuietAction
                         label="DELETE"
-                        onPress={() => setConfirmingDeleteAthleteId(isConfirmingDelete ? null : a.id)}
+                        onPress={() => {
+                          setCoachError(null);
+                          setConfirmingDeleteAthleteId(isConfirmingDelete ? null : a.id);
+                        }}
                         accessibilityLabel={`Delete ${a.name} and their database`}
                       />
                     )}
@@ -1175,14 +1355,24 @@ export default function ProfileScreen(): React.JSX.Element {
                       <QuietAction
                         label={`Confirm delete ${a.name}`}
                         onPress={() => {
-                          deleteAthlete(a.id);
-                          setConfirmingDeleteAthleteId(null);
+                          setCoachError(null);
+                          void (async () => {
+                            const ok = await deleteAthlete(a.id);
+                            if (ok === false) {
+                              setCoachError(useStore.getState().error);
+                              return;
+                            }
+                            setConfirmingDeleteAthleteId(null);
+                          })();
                         }}
                         style={styles.confirmActionIsolated}
                       />
                       <QuietAction
                         label="Keep athlete"
-                        onPress={() => setConfirmingDeleteAthleteId(null)}
+                        onPress={() => {
+                          setCoachError(null);
+                          setConfirmingDeleteAthleteId(null);
+                        }}
                       />
                     </View>
                   )}
@@ -1194,7 +1384,10 @@ export default function ProfileScreen(): React.JSX.Element {
                 disableFullscreenUI
                 style={styles.athleteEditInput}
                 value={newAthleteName}
-                onChangeText={setNewAthleteName}
+                onChangeText={(t) => {
+                  setCoachError(null);
+                  setNewAthleteName(t);
+                }}
                 placeholder="New athlete's name"
                 placeholderTextColor={theme.color.textLow}
                 maxLength={24}
@@ -1203,9 +1396,16 @@ export default function ProfileScreen(): React.JSX.Element {
               <QuietAction
                 label="ADD ATHLETE"
                 onPress={() => {
+                  setCoachError(null);
                   const trimmed = newAthleteName.trim();
-                  createAthlete(trimmed.length > 0 ? trimmed : 'New Athlete');
-                  setNewAthleteName('');
+                  void (async () => {
+                    const ok = await createAthlete(trimmed.length > 0 ? trimmed : 'New Athlete');
+                    if (ok === false) {
+                      setCoachError(useStore.getState().error);
+                      return;
+                    }
+                    setNewAthleteName('');
+                  })();
                 }}
                 accessibilityLabel="Add a new athlete"
               />
@@ -1276,6 +1476,7 @@ const styles = StyleSheet.create({
     marginBottom: theme.space[1],
   },
   heading: { ...theme.font.title, color: theme.color.textHi },
+  activeAthleteName: { ...theme.font.body, color: theme.color.textHi, marginTop: theme.space[1] },
   safetyNotice: {
     backgroundColor: theme.color.ink1,
     borderColor: theme.color.line,
@@ -1295,7 +1496,9 @@ const styles = StyleSheet.create({
   mgmtHeading: { ...theme.font.cue, color: theme.color.textHi, marginBottom: theme.space[2] },
   subheading: { ...theme.font.body, color: theme.color.textMid, marginTop: theme.space[1], marginBottom: theme.space[4] },
   field: { marginBottom: theme.space[4] },
-  fieldLabel: { ...theme.font.eyebrow, color: theme.color.textLow },
+  // flexShrink: a long heading wraps instead of pushing its info button off
+  // screen at large font sizes (Android walk 2026-11-03, a11y-5).
+  fieldLabel: { ...theme.font.eyebrow, color: theme.color.textLow, flexShrink: 1 },
   fieldLabelRow: { flexDirection: 'row', alignItems: 'center', marginBottom: theme.space[2] },
   fieldHint: { ...theme.font.label, color: theme.color.textMid, marginBottom: theme.space[2] },
   inventoryWrap: { marginTop: theme.space[2] },

@@ -356,6 +356,21 @@
         "ordinal": 70,
         "file": "071_beta_recording.sql",
         "sha256": "42d51be93dd53ff6a60b6eb9a1c7cf5c72f9e1afb8dfc1a20472d3803f504d0f"
+      },
+      {
+        "ordinal": 71,
+        "file": "072_question_log.sql",
+        "sha256": "854309b3a2007b42d7a83f5b48070980ec572a4b2fa30fa3bedf52d198eee8c2"
+      },
+      {
+        "ordinal": 72,
+        "file": "073_session_slot_replaced_by.sql",
+        "sha256": "4be439ec4be24b97914b6dc57fa1f5ff1bed785e87a73349f8233e11b177e2ce"
+      },
+      {
+        "ordinal": 73,
+        "file": "074_session_feel_reasons.sql",
+        "sha256": "b4647b3d2bc15809f3f35b899991576a90f68614ba9ef84ee6234ef0ea9e2a6d"
       }
     ]
   },

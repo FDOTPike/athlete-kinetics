@@ -20,6 +20,7 @@
  *    exactly once, no writes during render, plain RPE wording.
  */
 import React from 'react';
+import { ScrollView, StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import SessionScreen from '../../src/screens/SessionScreen';
 import {
@@ -380,6 +381,54 @@ const baseState = (overrides = {}) => {
 };
 
 describe('screen laws: D5, D6, D8, D9', () => {
+  test('long completion summary and saved feel remain in a scrollable flow', () => {
+    mockState = baseState({
+      loadSessionSummaryFacts: () => ({
+        durationMin: 38,
+        exercises: Array.from({ length: 5 }, (_, i) => exercise({ movementId: i + 1, movementName: `Movement ${i + 1}` })),
+        previousSets: [],
+      }),
+      loadSessionFeel: () => ({ ask: false, saved: { feel: 'as_planned', reasons: [] }, note: 'A saved note' }),
+    });
+    render(<SessionScreen />);
+    for (let i = 1; i <= 5; i += 1) expect(screen.getByText(new RegExp(`Movement ${i}`))).toBeOnTheScreen();
+    expect(screen.getByTestId('session-feel-saved')).toHaveTextContent('How it went: As planned.');
+    expect(screen.getByText('Your note is saved with this session.')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Back to Today')).toBeOnTheScreen();
+    // The rule: the whole completion page scrolls as one flow, so a long
+    // summary can neither run under the footer nor push Back to Today off
+    // screen. Every piece must sit inside the one scrolling view, with no
+    // absolutely positioned layer between it and that view.
+    const scroll = screen.UNSAFE_getByType(ScrollView);
+    expect(scroll.props.scrollEnabled).not.toBe(false);
+    const inScrollFlow = (node) => {
+      for (let n = node; n !== null; n = n.parent) {
+        if (n === scroll) return true;
+        expect(StyleSheet.flatten(n.props.style)?.position).not.toBe('absolute');
+      }
+      return false;
+    };
+    expect(inScrollFlow(screen.getByText(/2026-09-12/))).toBe(true);
+    expect(inScrollFlow(screen.getByTestId('session-feel-saved'))).toBe(true);
+    expect(inScrollFlow(screen.getByText('Your note is saved with this session.'))).toBe(true);
+    expect(inScrollFlow(screen.getByLabelText('Back to Today'))).toBe(true);
+  });
+
+  // Android walk 2026-11-03 (ux-8): a skipped exercise stays in the record.
+  test('the completion summary lists each skipped exercise', () => {
+    mockState = baseState({
+      loadSessionSummaryFacts: () => ({
+        durationMin: 20,
+        exercises: [exercise({ movementId: 1, movementName: 'Goblet Squat' })],
+        previousSets: [],
+        skippedExercises: [{ name: 'Push-up', plannedSets: 2, loggedSets: 0, loggedAs: [] }],
+      }),
+    });
+    render(<SessionScreen />);
+    expect(screen.getAllByTestId('session-summary-skipped').map((node) => node.props.children))
+      .toEqual(['Skipped: Push-up · no sets logged']);
+  });
+
   test('render performs no endSession / plan / progression / log call (D8 guard)', () => {
     mockState = baseState();
     render(<SessionScreen />);
@@ -509,7 +558,10 @@ describe('screen laws: D5, D6, D8, D9', () => {
       resolveSlotLoadCalls: [],
     });
     render(<SessionScreen />);
-    expect(screen.getByText(/This effort rating will be saved with the set\.|Effort rating is optional; leave it blank if you are unsure\./)).toBeOnTheScreen();
+    // With no rating, the cue line carries the plain wording (ux-8 removed
+    // the second line that repeated it).
+    expect(screen.getByText('Effort is optional evidence — leave it untouched to skip.')).toBeOnTheScreen();
+    expect(screen.queryByText('This effort rating will be saved with the set.')).toBeNull();
     expect(screen.queryByText(/Coach evidence/)).toBeNull();
   });
 });

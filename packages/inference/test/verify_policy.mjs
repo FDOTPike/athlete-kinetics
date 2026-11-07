@@ -153,6 +153,24 @@ check(`never raises load/sets/RPE across ${n4} combinations`, raised === null,
 check('never touches the coaching cue', cueTouched === null);
 check('every numeric change carries a note', noteless === null);
 const boostV = baseVectors[0];
+const ceilingCases = [
+  ['beginner 9.0', { training_age: 'beginner', base_rpe_cap: 9.0, objective: 'strength' }, 8.5,
+    ['Profile effort ceiling: RPE capped at 9.0.', 'Beginner training age: RPE capped at 8.5.']],
+  ['intermediate 9.0', { training_age: 'intermediate', base_rpe_cap: 9.0, objective: 'strength' }, 9.0,
+    ['Profile effort ceiling: RPE capped at 9.0.']],
+  ['beginner 8.0', { training_age: 'beginner', base_rpe_cap: 8.0, objective: 'strength' }, 8.0,
+    ['Profile effort ceiling: RPE capped at 8.0.']],
+  ['rehab intermediate 9.0', { training_age: 'intermediate', base_rpe_cap: 9.0, objective: 'rehab' }, 7.0,
+    ['Profile effort ceiling: RPE capped at 9.0.', 'Rehab objective: RPE capped at 7.0.']],
+];
+for (const [label, fields, expected, notes] of ceilingCases) {
+  const profile = { ...DEFAULT_PROFILE, ...fields };
+  check(`effective ceiling ${label}`, typeof limits.effectiveRpeCeiling === 'function' &&
+    limits.effectiveRpeCeiling(profile) === expected);
+  const result = limits.applyProfileLimits(boostV, profile, { sessionsToday: 0, trainedDaysLast7: 0 });
+  check(`profile limits and notes ${label}`, result.vector.rpe_cap === expected &&
+    JSON.stringify(result.notes) === JSON.stringify(notes));
+}
 const capped = limits.applyProfileLimits(boostV, { ...DEFAULT_PROFILE, base_rpe_cap: 7.0 },
   { sessionsToday: 0, trainedDaysLast7: 0 });
 check('base RPE ceiling is a hard min', capped.vector.rpe_cap === 7.0 &&

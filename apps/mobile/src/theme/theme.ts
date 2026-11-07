@@ -18,7 +18,7 @@ export const theme = {
     line: '#262623',   // borders, dividers, disabled fill
     textHi: '#F7F6F3', // primary text + primary button fill · 18.9:1 (AAA)
     textMid: '#A9A7A0',// secondary text · 8.4:1 (AAA)
-    textLow: '#6B6963',// eyebrows, metadata · 4.6:1 (AA — metadata only)
+    textLow: '#828078',// eyebrows, metadata, placeholders · 5.0:1 on ink0, 4.7:1 on ink1 (AA)
     chalk: '#EFC94C',  // THE accent. Current/active marker ONLY. 12.2:1
     onChalk: '#171204',
     pressed: '#D9D8D3',// primary button pressed fill

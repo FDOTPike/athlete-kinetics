@@ -681,3 +681,66 @@ adds this entry. Rationale and the options not taken:
 `docs/decisions/SUSPENSION_RPE_RAISE_2026-10-13.md`. Machine-checked in
 verify:autopilot, verify:blocks, verify:store and
 `SuspensionRpeRaise.test.js`.
+
+## 2026-10-31 — Backup import copy failure wording (PR 86)
+
+CodeRabbit thread 4404278406 flagged two new user-facing strings with no ruling
+behind them: `'Safe backup import is unavailable. Update the app before restoring.'`
+in `apps/mobile/src/state/backupStore.ts` and `"The selected backup could not be copied safely."`
+in `apps/mobile/android/app/src/main/java/com/athletekinetics/BackupCopyPackage.kt`.
+The owner asked: can both reuse "The selected backup could not be copied into private app storage."?
+On 2026-10-31 the owner answered: "Yes, reuse it". Both locations now use
+`"The selected backup could not be copied into private app storage."`, and
+"Update the app" was dropped because a missing native module is not always
+caused by an old app.
+
+## 2026-10-31 — A goal program due for review does not block planning (PR 92)
+
+CodeRabbit thread 4428183136 asked whether a `review_due` program should open
+the program editor from "Plan the next block" and "Set up a four-week block",
+or keep the athlete on goal reassessment first. On 2026-10-31 the owner
+answered: "For now dont prompt the athlete". Both buttons open the program
+editor for any program, including `review_due`, as the card's secondary
+button already did. The existing "Reassess goal" card is unchanged. The owner
+also asked for a way to tell when an athlete is off track (for example,
+perceived effort climbing faster than the plan expects, with some allowance
+for normal variation) so the engine can realign the program; that is recorded
+as a separate design question, not built here. Onboarding now tells athletes
+they can change their goals at any time in Athlete Profile (PR 99).
+
+## 2026-10-31 — Beta product decisions: broad holds explained, honest discomfort wording, plan-first empty starts
+
+1. **One held exercise locks the whole Plan tab (safety-4):** "Explain it". Keep the broad hold. Explain it on screen.
+   - **Finding (`safety-4`):** A narrow movement-scoped or activity-scoped hold (`targetKind: 'movement'` or `'activity_*'`) matches `targetKind: 'all_prescription'` in `evaluateTrainingSupport`, placing whole-prescription surfaces (`BlockScreen` and unscheduled `TodayScreen`) on hold.
+   - **What changed:** Added store helper `isBroadHoldFromNarrowScopes` (backed by `healthSupportStore`'s captured holds and `getTrainingSupportDecision`'s `holdIds`) to detect when a held decision on a whole-prescription query comes only from narrow-scope holds (movement or activity scopes, not `all_prescription` and not `unresolved`). When true, `TrainingSupportNotice` renders the additional explanation line (`This note covers specific exercises or activities. The coach cannot yet tell which suggestions it affects, so all suggestions stay on hold.`) after `SUPPORT_HELD_MESSAGE` on `TodayScreen`, `BlockScreen` and `ReadinessScreen`.
+   - **Unchanged boundaries:** Thresholds, hold matching (`sameTarget`), and stops are unchanged pending the clinical review (D10, SC-06, SC-08). Never suggests deleting a note to release suggestions.
+
+2. **The discomfort button promises an alternative it doesn't always give (session-2):** "Honest wording now". Same numbers and same stops; honest labels and feedback. The thresholds wait for the clinical reviewer.
+   - **Finding (`session-2`):** The "Report discomfort" form in `SessionScreen.tsx` labelled its primary button `Find an alternative` below severity 8 and `Stop session` at 8, whereas the store and runner use `EXPERIENCE_SEVERITY` per tier (beginner triage 5 / halt 8, intermediate 4/8, advanced 3/7, elite 3/6).
+   - **What changed:** `SessionScreen.tsx` computes the athlete's halt threshold from `EXPERIENCE_SEVERITY` using the runner's `runnerTierForTrainingAge` mapping. The chips (`Mild` 4, `Moderate` 6, `Stop` 8) and their values are unchanged. The primary button reads `Save report and stop session` at or above the athlete's halt threshold and `Save report` below it; at or above the halt threshold the caption `At this level the session stops for today.` appears under the chips; and after saving, when neither the substitution sheet opened nor the session halted, `Report saved with this session.` is shown where the form was.
+   - **Unchanged boundaries:** Thresholds, hold matching (`sameTarget`), and stops are unchanged pending the clinical review (D10, SC-06, SC-08).
+
+3. **An empty free-form start dead-ends (session-5):** "Plan first". Before an empty session would start, offer Plan or Cancel.
+   - **Finding (`session-5`):** Starting an unplanned (`free_form`) session when there is no plan for today and no eligible prior logged session to repeat created an empty session with no way to add movements on the workout screen.
+   - **What changed:** Factored free-form history seeding in `useStore.ts` into `seedFreeFormSessionPlan` and exported the side-effect-free helper `freeFormStartIsEmpty(): boolean`. Unplanned session entry points (`TodayScreen.tsx`, `BlockScreen.tsx`, and `SessionScreen.tsx`) check `freeFormStartIsEmpty()` first and, when true, show the inline card (`Nothing to start yet` / `There is no plan for today and no earlier session to repeat. Build your plan first.`) with `Go to Plan` and `Cancel` instead of starting an empty session. Already-open empty sessions in `SessionScreen.tsx` now read `No movements are planned yet.` and `Finish this session, then build your plan on the PLAN tab.`.
+   - **Unchanged boundaries:** Thresholds, hold matching (`sameTarget`), and stops are unchanged pending the clinical review (D10, SC-06, SC-08).
+
+## 2026-10-31 — A swap after logged sets keeps them and adds a new row
+
+1. **Owner's ruling (2026-10-31, in chat):**
+   "if its already logged then it means it be executed so dont delete the data , just keep the data ... have the volume / tonnage count (say they dont bench press and swap to db bench, if they did 2 sets , then keep that, but for the swap just blank out the movement (make it like there is a shadow covering it but you can barely see the writting still to show that this movement had been changed but have the user select the number of sets remaining as the new movement set number"
+
+   Asked "a new row in today's session, or a whole new session?", the owner answered: "New row, same session".
+
+2. **What changed (supersedes the earlier `4ceb13f2` in-place replacement rule when at least one set is already logged in the slot):**
+   - **Store and schema:** Migration `073_session_slot_replaced_by.sql` adds the side-car table `session_plan_slot_replacement` (`session_plan_slot_id` primary key, `replaced_by_session_plan_slot_id` `UNIQUE`, both foreign keys `ON DELETE CASCADE`, and a CHECK that a slot cannot replace itself). `session_plan_slot` gets no new column: `ALTER TABLE ... ADD COLUMN` cannot be re-applied when self-heal replays the chain (`verify_migrations.mjs` replays it twice). It is wired through `migrations.ts`, the `migrationRunner.ts` sentinel, `schemaContract.ts`, `MIGRATION_LINEAGE.json`/`.md` and the database, migration and backup verifiers. When at least one set is already logged in the slot, both `swapMovement` (`applyRegression` → `swapMovement`) and `applyDaySwap` validate the athlete-chosen replacement set count as an integer from 1 to 6 (refusing anything else without writing), shift later `session_plan_slot.slot_index` rows up by one in descending order inside the same transaction, insert a new `session_plan_slot` row at `slot_index = original + 1` carrying the replacement movement and the same provenance, target, RPE, source planned slot, override load/reason, and `original_movement_id` as the in-place swap, set the original row's `planned_sets` to the count the runner keeps for it (the logged rows when there is no runner), insert one `session_plan_slot_replacement` link row, and advance the runner (`replaceSlotAfterLoggedSets`) so the original slot finishes at that count and `slotIndex`/`setIndex` point at set 1 of the new slot (while still applying `SUBSTITUTE`). The empty-session discard and the training-data reset delete the link rows explicitly. Restart (`restoreRunnerCheckpoint` and store boot/resume) reproduces the same state.
+   - **Choosing the set count (`SessionScreen.tsx`):** When the current slot has at least one logged set, selecting a day-swap option or an easier variant in the substitution sheet opens the set-count picker (`Sets of {new movement name}`, caption `{n} logged {set|sets} of {original movement name} {is|are} kept.`, chips `1` to `6` with preselected value `clamp(plannedSets - loggedSets, 1, 6)` and accessibility labels `{k} {set|sets} of {new movement name}`) before applying the swap on confirm; cancel/close changes nothing.
+   - **The shaded row (`SessionScreen.tsx`):** Any slot row with `replacedBySessionPlanSlotId !== null` renders at `opacity: 0.4`, keeps its movement name and logged set values readable, shows `Swapped for {new movement name} · {n} {set|sets} logged`, is not selectable as the current slot, and has an accessibility label starting with `Swapped for {new movement name}`. The completion screen and summary list both the original row (with its logged sets) and the new row (with its own).
+
+3. **What did not change:**
+   - Logged sets in `set_record` are never deleted, moved, or re-attributed; they continue counting toward volume and tonnage.
+   - When no set is logged in the slot, both `swapMovement` and `applyDaySwap` remain in-place on the existing `session_plan_slot` row and the substitution sheet behaves exactly as before.
+   - Future slot disposition (`planned_slot_disposition = 'swapped'`) for day swaps continues to be written inside the same transaction.
+   - Every hold and hard stop stays as it is: swaps still go through `requireTrainingSupport`, the access check, and `permittedForProfile` unchanged.
+
+

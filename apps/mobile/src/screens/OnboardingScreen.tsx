@@ -42,11 +42,11 @@ import {
   defaultLoadPreference,
   transitionLoadPreference,
   effortCue,
+  effectiveRpeCeiling,
   type EnergySystem,
   type EquipmentItem,
   type LoadPreference,
   type Objective,
-  type ProgressionMethod,
   type TrainingAge,
   type UserProfile,
   validateSmartGoal,
@@ -112,16 +112,6 @@ const LOAD_PREFERENCE_COPY: Record<LoadPreference, { label: string; blurb: strin
   manual: { label: 'I CHOOSE', blurb: 'You set every load. Coach suggestions appear as reference only.' },
 };
 
-/** Plain-language label for each persisted progression methodology (R6,
- * Round 2 — the review screen discloses the default like every other
- * removed advanced default). */
-const PROGRESSION_METHOD_LABEL: Record<ProgressionMethod, string> = {
-  linear: 'Linear',
-  undulating: 'Undulating',
-  conjugate: 'Conjugate',
-  autoregulated: 'Autoregulated',
-};
-
 const EQUIPMENT_LABEL: Record<EquipmentItem, string> = {
   barbell: 'BARBELL', squat_rack: 'SQUAT RACK', bench: 'BENCH', dumbbells: 'DUMBBELLS',
   kettlebell: 'KETTLEBELL', pullup_bar: 'PULL-UP BAR', nordic_bench: 'NORDIC BENCH',
@@ -145,7 +135,7 @@ const EQUIPMENT_DESCRIPTION: Record<EquipmentItem, string> = {
 
 const PRESET_COPY = {
   full_gym: { label: 'FULL GYM', blurb: 'A broad setup with racks, free weights, cables, bands, and mats.' },
-  home_basic: { label: 'HOME BASIC', blurb: 'A compact setup with dumbbells, a kettlebell, bands, and mats.' },
+  home_basic: { label: 'HOME BASIC', blurb: 'A compact setup with dumbbells, a kettlebell, a pull-up bar, bands, and mats.' },
   minimal: { label: 'MINIMAL', blurb: 'No equipment required; bodyweight movements remain available.' },
 } as const;
 
@@ -308,6 +298,14 @@ export default function OnboardingScreen(): React.JSX.Element {
   const step = steps[Math.min(stepIdx, steps.length - 1)];
   const isLast = step === 'review';
   const goTo = (key: StepKey): void => setStepIdx(Math.max(0, steps.indexOf(key)));
+  // EDIT on the review opens one screen; NEXT then returns to the review
+  // instead of walking every later screen again (Android walk 2026-11-03,
+  // ux-5). An edit that adds the sport or target screen walks into it first.
+  const [editingFromReview, setEditingFromReview] = useState(false);
+  const editFromReview = (key: StepKey): void => {
+    setEditingFromReview(true);
+    goTo(key);
+  };
   const goalValidation = useMemo(
     () => validateSmartGoal(goalDraftFromFields(goalFields), today),
     [goalFields, today],
@@ -336,6 +334,23 @@ export default function OnboardingScreen(): React.JSX.Element {
   // explicitly chosen Yes or No. Silence is never an answer to a safety
   // question; a skip would silently claim "no limitations" in the profile.
   const limitsGateOpen = step === 'limits' && limitsAnswered === null;
+
+  const goNext = (): void => {
+    if (!editingFromReview) {
+      setStepIdx((i) => Math.min(steps.length - 1, i + 1));
+      return;
+    }
+    // Any later sport or target screen still unanswered comes first, even
+    // when an answered one sits between (a valid sport before a new target).
+    const unansweredIdx = steps.findIndex((key, i) => i > stepIdx
+      && ((key === 'sport' && !sportValidation.ok) || (key === 'target' && !goalValidation.ok)));
+    if (unansweredIdx !== -1) {
+      setStepIdx(unansweredIdx);
+      return;
+    }
+    setEditingFromReview(false);
+    goTo('review');
+  };
 
   /** Truthful preset state: a preset chip reads selected only when the draft
    *  inventory is exactly that preset's bundle. */
@@ -454,6 +469,7 @@ export default function OnboardingScreen(): React.JSX.Element {
         {step === 'goal' && (
           <View style={styles.cardGroup}>
             <Text style={styles.h2}>WHAT ARE WE TRAINING FOR?</Text>
+            <Text style={styles.pDim}>You can change your goals at any time in Athlete Profile.</Text>
             {OBJECTIVES.map((o) => (
               <ChoiceRow
                 key={o}
@@ -478,6 +494,7 @@ export default function OnboardingScreen(): React.JSX.Element {
             <Text style={styles.fieldLabel}>A SPORT? (OPTIONAL)</Text>
             <Chip
               testID="onboarding-wants-sport"
+              wrap
               label="I PLAY OR COMPETE IN A SPORT — plan the gym around it"
               selected={wantsSport}
               onPress={() => setWantsSport((value) => !value)}
@@ -489,6 +506,7 @@ export default function OnboardingScreen(): React.JSX.Element {
             <Text style={styles.fieldLabel}>A SPECIFIC TARGET? (OPTIONAL)</Text>
             <Chip
               testID="onboarding-wants-target"
+              wrap
               label="I ALSO HAVE A SPECIFIC TARGET — a number and a date I want to reach"
               selected={wantsTarget}
               onPress={() => setWantsTarget((value) => !value)}
@@ -519,6 +537,7 @@ export default function OnboardingScreen(): React.JSX.Element {
         {step === 'target' && (
           <View>
             <Text style={styles.h2}>YOUR TARGET</Text>
+            <Text style={styles.pDim}>You can change your goals at any time in Athlete Profile.</Text>
             <GoalEditor fields={goalFields} onChange={setGoalFields} today={today} trainingAge={draft.training_age}
               exercise={{ movements, movementId: goalExerciseId, onChange: setGoalExerciseId }} />
             <QuietAction
@@ -651,6 +670,7 @@ export default function OnboardingScreen(): React.JSX.Element {
             </Text>
             <View style={styles.cardGroup}>
               <Chip
+                wrap
                 label="NO — NOTHING TO NOTE"
                 selected={limitsAnswered === false}
                 onPress={() => answerLimits(false)}
@@ -658,6 +678,7 @@ export default function OnboardingScreen(): React.JSX.Element {
                 style={styles.cardChip}
               />
               <Chip
+                wrap
                 label="YES — LET ME ADD NOTES"
                 selected={limitsAnswered === true}
                 onPress={() => answerLimits(true)}
@@ -704,17 +725,27 @@ export default function OnboardingScreen(): React.JSX.Element {
               <ReviewSection
                 heading="GOAL"
                 description={OBJECTIVE_COPY[draft.objective].label}
-                onEdit={() => goTo('goal')}
+                onEdit={() => editFromReview('goal')}
               />
               <ReviewSection
                 heading="FOCUS"
                 description={focusDraftSummary(focus)}
-                onEdit={() => goTo('focus')}
+                onEdit={() => editFromReview('focus')}
               >
                 {wantsTarget && goalValidation.ok && (
-                  <Text style={styles.reviewSupportLine} testID="onboarding-summary-target-row">
-                    {`TARGET — ${goalValidation.goal.specificOutcome}: ${goalValidation.goal.targetValue} ${goalValidation.goal.unit}${goalValidation.goal.requestedDeadline === null ? ', no deadline' : ` by ${goalValidation.goal.requestedDeadline}`}`}
-                  </Text>
+                  <View style={styles.reviewHeadingRow}>
+                    <Text style={styles.reviewSupportLine} testID="onboarding-summary-target-row">
+                      {`TARGET — ${goalValidation.goal.specificOutcome}: ${goalValidation.goal.baselineValue === null ? '' : `from ${goalValidation.goal.baselineValue} ${goalValidation.goal.unit} to `}${goalValidation.goal.targetValue} ${goalValidation.goal.unit}${goalValidation.goal.requestedDeadline === null ? ', no deadline' : ` by ${goalValidation.goal.requestedDeadline}`}`}
+                    </Text>
+                    <Pressable
+                      onPress={() => goTo('target')}
+                      accessibilityRole="button"
+                      accessibilityLabel="Edit target"
+                      style={styles.reviewEdit}
+                    >
+                      <Text style={styles.reviewEditText}>EDIT</Text>
+                    </Pressable>
+                  </View>
                 )}
                 {!wantsTarget && (
                   <Text style={styles.reviewDescription} testID="onboarding-summary-target-row">
@@ -726,32 +757,32 @@ export default function OnboardingScreen(): React.JSX.Element {
                 <ReviewSection
                   heading="SPORT"
                   description={sportFieldsSummary(sportFields)}
-                  onEdit={() => goTo('sport')}
+                  onEdit={() => editFromReview('sport')}
                 />
               )}
               <ReviewSection
                 heading="EXPERIENCE"
                 description={`${AGE_COPY[draft.training_age].label}. ${AGE_COPY[draft.training_age].blurb}`}
-                onEdit={() => goTo('experience')}
+                onEdit={() => editFromReview('experience')}
               />
               <ReviewSection
                 heading="YOUR WEEK"
                 description={`${draft.weekly_frequency} training days per week, up to ${draft.session_duration_cap_min} minutes each.`}
-                onEdit={() => goTo('logistics')}
+                onEdit={() => editFromReview('logistics')}
               />
               <ReviewSection
                 heading="EQUIPMENT"
                 description={draft.equipment_inventory.length === 0
                   ? 'No equipment selected.'
                   : draft.equipment_inventory.map((item) => EQUIPMENT_LABEL[item]).join(', ')}
-                onEdit={() => goTo('equipment')}
+                onEdit={() => editFromReview('equipment')}
               />
               <ReviewSection
                 heading="TRAINING SUPPORT"
                 description={(parseNotes(injuryText).length + parseNotes(mobilityText).length) > 0
                   ? `${parseNotes(injuryText).length + parseNotes(mobilityText).length} limitation notes recorded for your reference.`
                   : 'No limitations noted. You can add or change these later.'}
-                onEdit={() => goTo('limits')}
+                onEdit={() => editFromReview('limits')}
               >
                 <Text style={styles.reviewSupportLine} testID="onboarding-summary-limits-row">
                   LIMITATIONS — {(parseNotes(injuryText).length + parseNotes(mobilityText).length) > 0
@@ -768,11 +799,10 @@ export default function OnboardingScreen(): React.JSX.Element {
                 <View testID="onboarding-coach-defaults">
                   <Text style={styles.reviewSupportLine}>COACH DEFAULTS — EDIT ANYTIME IN ATHLETE PROFILE</Text>
                   <Text style={styles.reviewDescription}>
-                    Effort ceiling {draft.base_rpe_cap.toFixed(1)} — {effortBlurb(draft.base_rpe_cap)}
+                    Effort ceiling {effectiveRpeCeiling(draft).toFixed(1)} — {effortBlurb(effectiveRpeCeiling(draft))}
                     {'\n'}How hard did that feel? 1 is very easy. 10 is your hardest effort.
                     {'\n'}Up to {draft.max_sessions_per_day} session{draft.max_sessions_per_day === 1 ? '' : 's'} a day
                     {'\n'}Energy focus: {ENERGY_COPY[draft.target_energy_system].label}
-                    {'\n'}Progression method: {PROGRESSION_METHOD_LABEL[draft.progression_methodology]}
                   </Text>
                 </View>
 
@@ -781,6 +811,7 @@ export default function OnboardingScreen(): React.JSX.Element {
                     <Text style={styles.fieldLabel}>WHO PICKS THE WEIGHTS? (OPTIONAL)</Text>
                     {(['auto', 'manual'] as const).map((p) => (
                       <Chip
+                        wrap
                         key={p}
                         testID={p === 'auto' ? 'onboarding-loads-auto' : 'onboarding-loads-manual'}
                         label={`${LOAD_PREFERENCE_COPY[p].label} — ${LOAD_PREFERENCE_COPY[p].blurb}`}
@@ -803,8 +834,8 @@ export default function OnboardingScreen(): React.JSX.Element {
             </View>
 
             <Text style={styles.pDim}>
-              Change any of this later in Profile. Your first prescription is
-              waiting on Today.
+              Change any of this later in Profile. Next, check your first week,
+              then start on Today.
             </Text>
             <PrimaryButton
               label="START TRAINING"
@@ -835,7 +866,7 @@ export default function OnboardingScreen(): React.JSX.Element {
         {!isLast && (
           <PrimaryButton
             label="NEXT"
-            onPress={() => setStepIdx((i) => Math.min(steps.length - 1, i + 1))}
+            onPress={goNext}
             disabled={limitsGateOpen || targetGateOpen || sportGateOpen}
             accessibilityLabel="Next"
           />
@@ -850,6 +881,12 @@ export default function OnboardingScreen(): React.JSX.Element {
       )}
       {targetGateOpen && (
         <View style={styles.limitsGateNotice}>
+          {/* Issue #215: name the first missing field in the validator's words. */}
+          {!goalValidation.ok && goalValidation.errors.length > 0 && (
+            <Text style={styles.p} testID="onboarding-target-gate-missing" accessibilityLiveRegion="polite">
+              {goalValidation.errors[0]!.message}
+            </Text>
+          )}
           <Text style={styles.pDim} accessibilityLiveRegion="polite">
             Finish the target to continue, or choose "Skip this" to train with the focus only.
           </Text>
@@ -927,7 +964,7 @@ const styles = StyleSheet.create({
   reviewHeadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.space[2] },
   reviewHeading: { ...theme.font.eyebrow, color: theme.color.textHi, flexShrink: 1 },
   reviewDescription: { ...theme.font.body, color: theme.color.textMid },
-  reviewSupportLine: { ...theme.font.body, color: theme.color.textHi, fontWeight: '600' },
+  reviewSupportLine: { ...theme.font.body, color: theme.color.textHi, fontWeight: '600', flexShrink: 1 },
   reviewEdit: {
     minWidth: theme.touch.min,
     minHeight: theme.touch.min,

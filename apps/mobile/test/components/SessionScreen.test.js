@@ -1,14 +1,14 @@
 import React from 'react';
-import { StyleSheet } from 'react-native';
+import { Alert, StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { resolveLoadSelection as actualResolveLoadSelection } from '../../../../packages/inference/src/loadSelection';
 import { isDifficultyAllowed as actualIsDifficultyAllowed } from '../../../../packages/inference/src/tierPolicy';
 import { resolveMovementAvailability as actualResolveMovementAvailability } from '../../../../packages/inference/src/capabilityResolver';
 import { JOINTS as ACTUAL_JOINTS, PATTERN_JOINTS } from '../../../../packages/inference/src/substitution';
 import { EXPERIENCE_SEVERITY } from '../../../../packages/inference/src/types';
-import SessionScreen from '../../src/screens/SessionScreen';
+import SessionScreen, { aboveCeilingNote } from '../../src/screens/SessionScreen';
 import { RestTimerCard } from '../../src/components/ui/RestTimerCard';
-import { restSecondsFor as runnerRestSecondsFor } from '../../../../packages/inference/src/sessionRunner';
+import { advance as advanceRunner, restSecondsFor as runnerRestSecondsFor } from '../../../../packages/inference/src/sessionRunner';
 
 let mockState;
 
@@ -37,6 +37,7 @@ jest.mock('@ak/inference', () => {
     mapRirToRpe: actual.mapRirToRpe,
     RIR_CHOICES: actual.RIR_CHOICES,
     RIR_OPTIONS: actual.RIR_OPTIONS,
+    effectiveRpeCeiling: actual.effectiveRpeCeiling,
   };
 });
 const resolveLoadSelectionSpy = jest.fn((input) => actualResolveLoadSelection(input));
@@ -92,7 +93,7 @@ const state = (overrides = {}) => {
     oneRepMaxes: {}, lastLoggedLoads: {}, lastTriage: null, substitution: null,
     startSession: jest.fn(), selectMovementSlot: jest.fn(), setMovementPreference: jest.fn(),
     openSubstitution: jest.fn(), closeSubstitution: jest.fn(), applyRegression: jest.fn(), applyDaySwap: jest.fn(),
-    reportNiggle: jest.fn(), logSet: jest.fn(), editSet: jest.fn(), endSession: jest.fn(),
+    reportNiggle: jest.fn(() => true), logSet: jest.fn(), editSet: jest.fn(), endSession: jest.fn(),
     runner: runner(), sessionMode: 'guided',
     uiPreferences: { sessionModeOverride: null, readinessDetail: 'summary', restTimerEnabled: true, textScale: 'system' },
     bandLadder: [], advanceRunnerRest: jest.fn(), skipRunnerRest: jest.fn(), setRunnerRestOverride: jest.fn(), runnerThumbsDown: jest.fn(), runnerHalt: jest.fn(),
@@ -511,7 +512,10 @@ test('guided mode keeps only the current movement expanded and future work unava
 test('untouched actual RPE logs null instead of fabricating target equality', () => {
   render(<SessionScreen />);
 
-  expect(screen.getByText('Effort rating is optional; leave it blank if you are unsure.')).toBeOnTheScreen();
+  // One line says effort is optional; a second line saying the same thing
+  // was removed (Android walk 2026-11-03, ux-8).
+  expect(screen.getByTestId('rpe-cue').props.children).toBe('Effort is optional evidence — leave it untouched to skip.');
+  expect(screen.queryByText('Effort rating is optional; leave it blank if you are unsure.')).toBeNull();
   fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
 
   expect(mockState.logSet).toHaveBeenCalledWith(
@@ -545,6 +549,191 @@ test('WO-02 labels athlete-reported RPE as Effort with the exact scale explanati
   expect(screen.getByLabelText('Effort —')).toBeOnTheScreen();
   expect(screen.getByRole('button', { name: 'Effort 8.5' })).toBeOnTheScreen();
   expect(screen.queryByText('Actual RPE')).toBeNull();
+});
+
+// Issue #206: a set rated above the athlete's effort ceiling gets one plain
+// note on the set card; logging and the plan are unchanged.
+test('an effort above the ceiling shows one note; at or below it shows none', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', objective: 'strength', base_rpe_cap: 8.5, equipment_inventory: [], session_duration_cap_min: 60 },
+  });
+  render(<SessionScreen />);
+  const note = 'That was above your ceiling of 8.5. Next set, stop with 2 reps left.';
+  expect(screen.queryByText(note)).toBeNull();
+  fireEvent.press(screen.getByLabelText(/^0 clean reps? left/i));
+  expect(screen.getByTestId('effort-above-ceiling-note')).toHaveTextContent(note);
+  fireEvent.press(screen.getByLabelText(/^2 clean reps? left/i));
+  expect(screen.queryByTestId('effort-above-ceiling-note')).toBeNull();
+  fireEvent.press(screen.getByRole('button', { name: 'Enter Effort directly' }));
+  fireEvent.press(screen.getByRole('button', { name: 'Effort 8.5' }));
+  expect(screen.queryByTestId('effort-above-ceiling-note')).toBeNull();
+  fireEvent.press(screen.getByRole('button', { name: 'Effort 9.0' }));
+  expect(screen.getByTestId('effort-above-ceiling-note')).toHaveTextContent(note);
+  // Logging is unchanged: the rated effort is saved as chosen.
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(mockState.logSet.mock.calls[0][3]).toBe(9);
+});
+
+test('a beginner ceiling is the lower beginner ceiling, and a rehab ceiling of 7 asks for 3 reps left', () => {
+  mockState = state({
+    profile: { training_age: 'beginner', objective: 'strength', base_rpe_cap: 9.5, equipment_inventory: [], session_duration_cap_min: 60 },
+  });
+  const { unmount } = render(<SessionScreen />);
+  fireEvent.press(screen.getByLabelText(/^1 clean reps? left/i));
+  expect(screen.getByTestId('effort-above-ceiling-note')).toHaveTextContent('That was above your ceiling of 8.5. Next set, stop with 2 reps left.');
+  unmount();
+  mockState = state({
+    profile: { training_age: 'intermediate', objective: 'rehab', base_rpe_cap: 9, equipment_inventory: [], session_duration_cap_min: 60 },
+  });
+  render(<SessionScreen />);
+  fireEvent.press(screen.getByLabelText(/^2 clean reps? left/i));
+  expect(screen.getByTestId('effort-above-ceiling-note')).toHaveTextContent('That was above your ceiling of 7.0. Next set, stop with 3 reps left.');
+});
+
+// Owner ruling on #206: "4+" is only a lower bound on reps left and the easiest
+// chip on the bar, so it gets no above-ceiling note. It still logs 6.0.
+test.each([5.0, 5.5])('the "4+" reps-left chip logs 6.0 but shows no above-ceiling note (ceiling %s)', (cap) => {
+  mockState = state({
+    profile: { training_age: 'intermediate', objective: 'strength', base_rpe_cap: cap, equipment_inventory: [], session_duration_cap_min: 60 },
+  });
+  render(<SessionScreen />);
+  fireEvent.press(screen.getByLabelText(/^4\+ clean reps left/i));
+  expect(screen.getByTestId('derived-rpe-display')).toHaveTextContent('Reported effort 6.0');
+  expect(screen.queryByTestId('effort-above-ceiling-note')).toBeNull();
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(mockState.logSet.mock.calls[0][3]).toBe(6);
+  expect(screen.queryByTestId('effort-above-ceiling-note')).toBeNull();
+});
+
+test.each([
+  [5.5, 'That was above your ceiling of 5.5. Next set, stop with 5 reps left.'],
+  [6.0, 'That was above your ceiling of 6.0. Next set, stop with 4 reps left.'],
+])('the "3" reps-left chip above a ceiling of %s still shows the note', (cap, note) => {
+  mockState = state({
+    profile: { training_age: 'intermediate', objective: 'strength', base_rpe_cap: cap, equipment_inventory: [], session_duration_cap_min: 60 },
+  });
+  render(<SessionScreen />);
+  fireEvent.press(screen.getByLabelText(/^3 clean reps left/i));
+  expect(screen.getByTestId('effort-above-ceiling-note')).toHaveTextContent(note);
+});
+
+// Owner ruling on #206: a timed set has no reps, so its note is only the first
+// sentence; a rep-based set keeps the reps-left sentence.
+test('a timed set above the ceiling shows only "That was above your ceiling of X.X."', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', objective: 'strength', base_rpe_cap: 7.5, equipment_inventory: [], session_duration_cap_min: 60 },
+    sessionPlan: [slot(1, 1, 5, { target: { kind: 'time', seconds: 30 }, targetRpe: 7 }), slot(2, 2, 8)],
+  });
+  render(<SessionScreen />);
+  fireEvent.press(screen.getByRole('button', { name: 'Enter Effort directly' }));
+  fireEvent.press(screen.getByRole('button', { name: 'Effort 8.5' }));
+  const note = screen.getByTestId('effort-above-ceiling-note');
+  expect(note.props.children).toBe('That was above your ceiling of 7.5.');
+  expect(note).not.toHaveTextContent(/reps? left/);
+});
+
+test('a rep-based set above the same ceiling keeps the reps-left sentence', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', objective: 'strength', base_rpe_cap: 7.5, equipment_inventory: [], session_duration_cap_min: 60 },
+  });
+  render(<SessionScreen />);
+  fireEvent.press(screen.getByRole('button', { name: 'Enter Effort directly' }));
+  fireEvent.press(screen.getByRole('button', { name: 'Effort 8.5' }));
+  expect(screen.getByTestId('effort-above-ceiling-note'))
+    .toHaveTextContent('That was above your ceiling of 7.5. Next set, stop with 3 reps left.');
+});
+
+// Owner ruling on #206 (review follow-up): a discomfort report today can set a
+// lower effort cap than the profile ceiling. The note then uses the lower of
+// the two, for both when it shows and the reps-left advice, and says "today's
+// ceiling", so it never advises an effort above today's cap.
+describe('aboveCeilingNote with today\'s discomfort report cap', () => {
+  test.each([
+    [9, false, "That was above today's ceiling of 7.5. Next set, stop with 3 reps left."],
+    [8, false, "That was above today's ceiling of 7.5. Next set, stop with 3 reps left."],
+    [8, true, "That was above today's ceiling of 7.5."],
+  ])('profile 8.5, report cap 7.5, rated %s (timed %s)', (rpe, timed, expected) => {
+    expect(aboveCeilingNote(rpe, 8.5, 7.5, timed)).toBe(expected);
+  });
+
+  test('at or below the lower report cap there is no note', () => {
+    expect(aboveCeilingNote(7.5, 8.5, 7.5)).toBeNull();
+    expect(aboveCeilingNote(7, 8.5, 7.5, true)).toBeNull();
+  });
+
+  test.each([
+    ['no report cap', null],
+    ['a report cap equal to the ceiling', 7.5],
+    ['a report cap above the ceiling', 8],
+  ])('%s keeps "your ceiling" from the profile', (_name, reportCap) => {
+    expect(aboveCeilingNote(8, 7.5, reportCap))
+      .toBe('That was above your ceiling of 7.5. Next set, stop with 3 reps left.');
+    expect(aboveCeilingNote(8, 7.5, reportCap, true)).toBe('That was above your ceiling of 7.5.');
+    expect(aboveCeilingNote(7.5, 7.5, reportCap)).toBeNull();
+  });
+});
+
+const reportCapTriage = (rpeCap) => ({
+  kind: 'matched',
+  directive: {
+    halt: false,
+    followUp: null,
+    matchedCue: 'my knee is a bit sore',
+    similarity: 0.9,
+    vector: { load_modifier: 0.9, set_modifier: 0, rpe_cap: rpeCap, coaching_cue: 'Keep effort easy today.' },
+  },
+});
+
+test.each([
+  [/^1 clean reps? left/i],
+  [/^2 clean reps? left/i],
+])('a beginner (ceiling 8.5) with a report cap of 7.5 sees "today\'s ceiling" for chip %s', (chip) => {
+  mockState = state({
+    profile: { training_age: 'beginner', objective: 'strength', base_rpe_cap: 9.5, equipment_inventory: [], session_duration_cap_min: 60 },
+    lastTriage: reportCapTriage(7.5),
+  });
+  render(<SessionScreen />);
+  fireEvent.press(screen.getByLabelText(chip));
+  expect(screen.getByTestId('effort-above-ceiling-note'))
+    .toHaveTextContent("That was above today's ceiling of 7.5. Next set, stop with 3 reps left.");
+});
+
+test('a timed set under a report cap of 7.5 (profile 8.5) shows only the first sentence', () => {
+  mockState = state({
+    profile: { training_age: 'beginner', objective: 'strength', base_rpe_cap: 9.5, equipment_inventory: [], session_duration_cap_min: 60 },
+    sessionPlan: [slot(1, 1, 5, { target: { kind: 'time', seconds: 30 }, targetRpe: 7 }), slot(2, 2, 8)],
+    lastTriage: reportCapTriage(7.5),
+  });
+  render(<SessionScreen />);
+  fireEvent.press(screen.getByRole('button', { name: 'Enter Effort directly' }));
+  fireEvent.press(screen.getByRole('button', { name: 'Effort 8.0' }));
+  expect(screen.getByTestId('effort-above-ceiling-note').props.children)
+    .toBe("That was above today's ceiling of 7.5.");
+});
+
+test('a report cap above the profile ceiling keeps "your ceiling" (cap 8.0, ceiling 7.5)', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', objective: 'strength', base_rpe_cap: 7.5, equipment_inventory: [], session_duration_cap_min: 60 },
+    lastTriage: reportCapTriage(8),
+  });
+  render(<SessionScreen />);
+  fireEvent.press(screen.getByLabelText(/^2 clean reps? left/i));
+  expect(screen.getByTestId('effort-above-ceiling-note'))
+    .toHaveTextContent('That was above your ceiling of 7.5. Next set, stop with 3 reps left.');
+});
+
+test('the "4+" chip still shows no note under a report cap of 6.0', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', objective: 'strength', base_rpe_cap: 8.5, equipment_inventory: [], session_duration_cap_min: 60 },
+    lastTriage: reportCapTriage(6),
+  });
+  render(<SessionScreen />);
+  fireEvent.press(screen.getByLabelText(/^4\+ clean reps left/i));
+  expect(screen.queryByTestId('effort-above-ceiling-note')).toBeNull();
+  // Any chip above the report cap does show it.
+  fireEvent.press(screen.getByLabelText(/^3 clean reps left/i));
+  expect(screen.getByTestId('effort-above-ceiling-note'))
+    .toHaveTextContent("That was above today's ceiling of 6.0. Next set, stop with 4 reps left.");
 });
 
 // ---------------------------------------------------------------------------
@@ -848,6 +1037,51 @@ test('§7.2 Item 10: timed/non-rep work does not present an RIR conversion', () 
   expect(screen.queryByLabelText(/Confirm actual RPE/i)).toBeNull();
 });
 
+// Android walk (#203): the target speaks the same terms as the effort question
+// (reps left), with RPE kept as support. A half-point target gives a range.
+describe('#203: set target in reps left', () => {
+  const targetLine = () => screen.getByTestId('session-target-line');
+
+  test('a rep target at RPE 7.0 says about 3 reps left and still shows RPE 7', () => {
+    mockState = state({ sessionPlan: [slot(1, 1, 8, { targetRpe: 7 }), slot(2, 2, 8)] });
+    render(<SessionScreen />);
+    expect(targetLine()).toHaveTextContent('Target 3 × 8 · about 3 reps left (RPE 7.0)');
+    expect(targetLine()).toHaveTextContent(/3 reps left/);
+    expect(targetLine()).toHaveTextContent(/RPE 7/);
+  });
+
+  test('a half-point target at RPE 7.5 says about 2–3 reps left (RPE 7.5)', () => {
+    mockState = state({ sessionPlan: [slot(1, 1, 5, { targetRpe: 7.5 }), slot(2, 2, 8)] });
+    render(<SessionScreen />);
+    expect(targetLine()).toHaveTextContent('Target 3 × 5 · about 2–3 reps left (RPE 7.5)');
+  });
+
+  test('RPE 8 and RPE 9 read as about 2 reps and about 1 rep left', () => {
+    mockState = state({ sessionPlan: [slot(1, 1, 5, { targetRpe: 8 }), slot(2, 2, 8)] });
+    const view = render(<SessionScreen />);
+    expect(targetLine()).toHaveTextContent('Target 3 × 5 · about 2 reps left (RPE 8.0)');
+    view.unmount();
+    mockState = state({ sessionPlan: [slot(1, 1, 5, { targetRpe: 9 }), slot(2, 2, 8)] });
+    render(<SessionScreen />);
+    expect(targetLine()).toHaveTextContent('Target 3 × 5 · about 1 rep left (RPE 9.0)');
+  });
+
+  test('a slot with no target RPE shows neither reps left nor RPE', () => {
+    mockState = state({ sessionPlan: [slot(1, 1, 8, { targetRpe: null }), slot(2, 2, 8)] });
+    render(<SessionScreen />);
+    expect(targetLine()).toHaveTextContent('Target 3 × 8');
+    expect(targetLine()).not.toHaveTextContent(/reps? left/);
+    expect(targetLine()).not.toHaveTextContent(/RPE/);
+  });
+
+  test('timed work, which asks no reps-left question, keeps the RPE target only', () => {
+    mockState = state({ sessionPlan: [slot(1, 1, 5, { target: { kind: 'time', seconds: 30 }, targetRpe: 7.5 }), slot(2, 2, 8)] });
+    render(<SessionScreen />);
+    expect(targetLine()).toHaveTextContent(/RPE 7\.5/);
+    expect(targetLine()).not.toHaveTextContent(/reps? left/);
+  });
+});
+
 test('§7.2 Item 11: existing bodyweight actual-reps behavior remains unchanged (invariant check)', () => {
   render(<SessionScreen />);
 
@@ -915,7 +1149,9 @@ test('session rest override changes by 15 seconds and persists through the runne
   render(<SessionScreen />);
 
   expect(screen.getByLabelText('Session rest seconds 90')).toBeOnTheScreen();
-  expect(screen.getByText('Applies to this session.')).toBeOnTheScreen();
+  // Android walk 2026-11-03 (ux-8): the number follows the last set's effort,
+  // so the caption says why it changes between rests.
+  expect(screen.getByText('Rest uses your effort rating, or the planned effort if you leave it blank. Harder sets get longer rests. Your changes apply for this session.')).toBeOnTheScreen();
   fireEvent.press(screen.getByLabelText('Increase Session rest seconds'));
   expect(mockState.setRunnerRestOverride).toHaveBeenCalledWith(105);
   fireEvent.press(screen.getByLabelText('Decrease Session rest seconds'));
@@ -967,10 +1203,24 @@ test('thumbs-down delegates the durable Avoid plus substitution transition to th
   expect(mockState.openSubstitution).not.toHaveBeenCalled();
 });
 
-test('stop uses the runner’s valid manual halt reason', () => {
-  render(<SessionScreen />);
-  fireEvent.press(screen.getByLabelText('Stop this session'));
-  expect(mockState.runnerHalt).toHaveBeenCalledWith('manual');
+// #165: "Stop session" asks first; it stops only on Stop.
+test('stop asks "Stop this session?" first, then uses the runner’s valid manual halt reason', () => {
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  try {
+    render(<SessionScreen />);
+    fireEvent.press(screen.getByLabelText('Stop this session'));
+    expect(mockState.runnerHalt).not.toHaveBeenCalled();
+    expect(alert).toHaveBeenCalledTimes(1);
+    const [title, , buttons] = alert.mock.calls[0];
+    expect(title).toBe('Stop this session?');
+    expect(buttons.map((button) => button.text)).toEqual(['Keep going', 'Stop']);
+    buttons[0].onPress?.();
+    expect(mockState.runnerHalt).not.toHaveBeenCalled();
+    buttons[1].onPress();
+    expect(mockState.runnerHalt).toHaveBeenCalledWith('manual');
+  } finally {
+    alert.mockRestore();
+  }
 });
 
 test('a beginner never renders a legacy plan containing an advanced movement', () => {
@@ -1202,6 +1452,65 @@ test('completed timed and band metrics are disclosed and edit through the store'
   expect(mockState.editSet).toHaveBeenCalledWith(77, 1, 0, null, { timeS: 25 });
   fireEvent.press(screen.getByLabelText('Set 1 band Heavy'));
   expect(mockState.editSet).toHaveBeenLastCalledWith(77, 1, 0, null, { bandLevel: 2 });
+});
+
+// Android walk (#232): a movement whose only implement is a band (Band Row)
+// never asks for kilograms. With no bands named it says where to name them
+// and logs reps and effort with load 0; with bands named it offers the chips.
+describe('#232: band-only movement', () => {
+  const bandRow = () => [movement(1, 'Band Row', { supportedPrefixes: ['Banded'], pattern: 'pull_h' }), movement(2, 'Later movement')];
+
+  test('with no bands named: no Load kg field, the band-ladder hint, and the set logs with load 0 and no band', () => {
+    mockState = state({ movements: bandRow(), sessionPlan: [slot(1, 1, 7, { plannedSets: 4 }), slot(2, 2, 8)], bandLadder: [] });
+    render(<SessionScreen />);
+    expect(screen.queryByTestId('session-load-input')).toBeNull();
+    expect(screen.queryByTestId('session-load-label')).toBeNull();
+    expect(screen.queryByText(/load kg/i)).toBeNull();
+    expect(screen.queryByText(/pick a weight/i)).toBeNull();
+    expect(screen.queryByTestId('session-load-hint')).toBeNull();
+    expect(screen.getByTestId('session-load-source-line')).toHaveTextContent('No bands named yet. You can name them in Profile > Band ladder.');
+    expect(screen.getByLabelText('No bands named yet. You can name them in Profile > Band ladder.')).toBeOnTheScreen();
+    expect(screen.queryByLabelText(/^Band /)).toBeNull();
+
+    const logButton = screen.getByLabelText('Log set 1 for Band Row');
+    expect(logButton.props.accessibilityState?.disabled).toBeFalsy();
+    fireEvent.press(screen.getByLabelText(/^2 clean reps? left/i));
+    fireEvent.press(logButton);
+    expect(mockState.logSet).toHaveBeenCalledTimes(1);
+    const [movementId, reps, loadKg, rpe, , , , metrics, slotId, seed] = mockState.logSet.mock.calls[0];
+    expect([movementId, reps, loadKg, rpe, metrics, slotId, seed]).toEqual([1, 7, 0, 8, undefined, 1, null]);
+  });
+
+  test('with two bands named: two band chips, no Load kg field, and the chosen band is logged', () => {
+    mockState = state({
+      movements: bandRow(),
+      sessionPlan: [slot(1, 1, 7, { plannedSets: 4 }), slot(2, 2, 8)],
+      bandLadder: [{ level: 1, label: 'Light' }, { level: 2, label: 'Heavy' }],
+    });
+    render(<SessionScreen />);
+    expect(screen.queryByTestId('session-load-input')).toBeNull();
+    expect(screen.queryByText(/No bands named yet/)).toBeNull();
+    expect(screen.getByTestId('session-load-source-line')).toHaveTextContent('Choose the band you used. No kilograms are needed.');
+    expect(screen.getAllByLabelText(/^Band (Light|Heavy)$/)).toHaveLength(2);
+    fireEvent.press(screen.getByLabelText('Band Heavy'));
+    fireEvent.press(screen.getByLabelText('Log set 1 for Band Row'));
+    expect(mockState.logSet).toHaveBeenCalledTimes(1);
+    const call = mockState.logSet.mock.calls[0];
+    expect(call[2]).toBe(0);
+    expect(call[7]).toEqual({ bandLevel: 2 });
+  });
+
+  test('a movement that takes a load and a band keeps the Load kg field', () => {
+    mockState = state({
+      movements: [movement(1, 'Pallof Press', { supportedPrefixes: ['Cable', 'Banded'] }), movement(2, 'Later movement')],
+      bandLadder: [],
+    });
+    render(<SessionScreen />);
+    expect(screen.getByTestId('session-load-input')).toBeOnTheScreen();
+    expect(screen.getByTestId('session-load-label')).toHaveTextContent('LOAD KG');
+    expect(screen.queryByText(/No bands named yet/)).toBeNull();
+    expect(screen.queryByText(/No kilograms are needed/)).toBeNull();
+  });
 });
 
 test('idle state has one focused start action', () => {
@@ -1623,6 +1932,20 @@ const niggleCounterexampleState = () => state({
   getMovementAvailabilityVerdicts: realVerdictsFor,
 });
 
+test('a discomfort report that fails to save keeps the form open and does not say it was saved', () => {
+  mockState = niggleCounterexampleState();
+  mockState.reportNiggle = jest.fn(() => false);
+  render(<SessionScreen />);
+
+  fireEvent.press(screen.getByLabelText('Report discomfort'));
+  fireEvent.press(screen.getByLabelText('knee'));
+  fireEvent.press(screen.getByLabelText('Save discomfort report'));
+
+  expect(mockState.reportNiggle).toHaveBeenCalledWith('knee', 4);
+  expect(screen.queryByText('Report saved with this session.')).toBeNull();
+  expect(screen.getByLabelText('Save discomfort report')).toBeOnTheScreen();
+});
+
 test('a non-halting knee niggle keeps the session and opens substitution instead of blanking it', () => {
   mockState = niggleCounterexampleState();
   const view = render(<SessionScreen />);
@@ -1789,3 +2112,645 @@ test('R5 local rest fallback is identical for every tier and equals the runner r
   expect([...observed.values()].map((values) => new Set(values).size)).toEqual([1, 1, 1, 1, 1, 1]);
   expect([...observed.values()].map((values) => values[0])).toEqual([240, 240, 180, 120, 90, 180]);
 }, 60000);
+
+test('a skipped slot with one logged set shows the skipped meta line, CompletedMetrics, and skipped accessibility label', () => {
+  mockState = state({
+    movements: [
+      movement(1, 'Narrow Stance Squats', { supportedPrefixes: ['Banded'] }),
+      movement(2, 'Later movement'),
+    ],
+    session: {
+      sessionId: 10,
+      date: '2026-07-15',
+      startedAtMs: Date.now(),
+      sets: [{
+        set_id: 77,
+        movement_id: 1,
+        movement_name: 'Narrow Stance Squats',
+        set_index: 1,
+        reps: 7,
+        load_kg: 60,
+        rpe: 8,
+        tonnage_kg: 420,
+        session_plan_slot_id: 1,
+        timeS: 30,
+        bandLevel: 1,
+      }],
+    },
+    sessionPlan: [slot(1, 1, 7, { plannedSets: 4 }), slot(2, 2, 8)],
+    activeSessionPlanSlotId: 2,
+    runner: runner({
+      slots: [
+        { sessionPlanSlotId: 1, movementId: 1, movementName: 'Narrow Stance Squats', sets: 4, target: { kind: 'reps', reps: 7 }, targetRpe: 8 },
+        { sessionPlanSlotId: 2, movementId: 2, movementName: 'Later movement', sets: 3, target: { kind: 'reps', reps: 8 }, targetRpe: 8 },
+      ],
+      slotIndex: 1,
+      slotSetCounts: [1, 0],
+      loggedSets: 1,
+      skippedSessionPlanSlotIds: [1],
+    }),
+    bandLadder: [{ level: 1, label: 'Light' }, { level: 2, label: 'Heavy' }],
+  });
+
+  render(<SessionScreen />);
+
+  expect(screen.getByText('–')).toBeOnTheScreen();
+  expect(screen.getByText('Skipped · 1 of 4 sets logged')).toBeOnTheScreen();
+  const skippedRow = screen.getByLabelText('Narrow Stance Squats, skipped, 1 of 4 sets logged');
+  expect(skippedRow).toBeOnTheScreen();
+  expect(skippedRow.props.accessibilityRole).toBe('text');
+  expect(screen.queryByLabelText(/Narrow Stance Squats, upcoming,/)).toBeNull();
+
+  fireEvent.press(screen.getByLabelText('Review logged details, collapsed'));
+  fireEvent.press(screen.getByLabelText('Decrease logged duration for set 1'));
+  expect(mockState.editSet).toHaveBeenCalledWith(77, 7, 60, 8, { timeS: 25 });
+});
+
+test('a skipped slot with no logged sets shows the no-sets-logged copy and accessibility label', () => {
+  mockState = state({
+    movements: [
+      movement(1, 'Narrow Stance Squats'),
+      movement(2, 'Later movement'),
+    ],
+    sessionPlan: [slot(1, 1, 7, { plannedSets: 4 }), slot(2, 2, 8)],
+    activeSessionPlanSlotId: 2,
+    runner: runner({
+      slots: [
+        { sessionPlanSlotId: 1, movementId: 1, movementName: 'Narrow Stance Squats', sets: 4, target: { kind: 'reps', reps: 7 }, targetRpe: 8 },
+        { sessionPlanSlotId: 2, movementId: 2, movementName: 'Later movement', sets: 3, target: { kind: 'reps', reps: 8 }, targetRpe: 8 },
+      ],
+      slotIndex: 1,
+      slotSetCounts: [0, 0],
+      loggedSets: 0,
+      skippedSessionPlanSlotIds: [1],
+    }),
+  });
+
+  render(<SessionScreen />);
+
+  expect(screen.getByText('Skipped · no sets logged')).toBeOnTheScreen();
+  const skippedRow = screen.getByLabelText('Narrow Stance Squats, skipped, no sets logged');
+  expect(skippedRow).toBeOnTheScreen();
+  expect(skippedRow.props.accessibilityRole).toBe('text');
+  expect(screen.queryByLabelText(/Narrow Stance Squats, upcoming,/)).toBeNull();
+  expect(screen.queryByLabelText(/Review logged details/)).toBeNull();
+});
+
+test('the header appends the skipped count when slots are skipped and leaves the text unchanged when none are skipped', () => {
+  const fourSlotPlan = [
+    slot(1, 1, 7, { plannedSets: 4 }),
+    slot(2, 2, 8),
+    slot(3, 1, 5),
+    slot(4, 2, 8),
+  ];
+  const fourRunnerSlots = [
+    { sessionPlanSlotId: 1, movementId: 1, movementName: 'First movement', sets: 4, target: { kind: 'reps', reps: 7 }, targetRpe: 8 },
+    { sessionPlanSlotId: 2, movementId: 2, movementName: 'Later movement', sets: 3, target: { kind: 'reps', reps: 8 }, targetRpe: 8 },
+    { sessionPlanSlotId: 3, movementId: 1, movementName: 'First movement', sets: 3, target: { kind: 'reps', reps: 5 }, targetRpe: 8 },
+    { sessionPlanSlotId: 4, movementId: 2, movementName: 'Later movement', sets: 3, target: { kind: 'reps', reps: 8 }, targetRpe: 8 },
+  ];
+
+  mockState = state({
+    sessionPlan: fourSlotPlan,
+    activeSessionPlanSlotId: 2,
+    runner: runner({
+      slots: fourRunnerSlots,
+      slotIndex: 1,
+      slotSetCounts: [1, 0, 0, 0],
+      loggedSets: 1,
+      skippedSessionPlanSlotIds: [1],
+    }),
+  });
+  const view = render(<SessionScreen />);
+  expect(screen.getByText('0 of 4 exercises complete · 1 skipped')).toBeOnTheScreen();
+
+  mockState.runner = runner({
+    slots: fourRunnerSlots,
+    slotIndex: 0,
+    slotSetCounts: [0, 0, 0, 0],
+    loggedSets: 0,
+    skippedSessionPlanSlotIds: [],
+  });
+  mockState.activeSessionPlanSlotId = 1;
+  view.rerender(<SessionScreen />);
+  expect(screen.getByText('0 of 4 exercises complete')).toBeOnTheScreen();
+  expect(screen.queryByText(/skipped/i)).toBeNull();
+});
+
+test('a runner that is complete because its last slot was skipped shows Session complete and the skipped meta line, while a complete session with no skips has no exercises complete text', () => {
+  const completedFirstSlotSets = Array.from({ length: 3 }, (_, index) => ({
+    set_id: index + 1,
+    movement_id: 1,
+    movement_name: 'First movement',
+    set_index: index + 1,
+    reps: 5,
+    load_kg: 0,
+    rpe: 8,
+    tonnage_kg: 0,
+    session_plan_slot_id: 1,
+    timeS: null,
+    bandLevel: null,
+  }));
+
+  mockState = state({
+    session: {
+      sessionId: 10,
+      date: '2026-07-15',
+      startedAtMs: Date.now(),
+      sets: completedFirstSlotSets,
+    },
+    runner: runner({
+      phase: 'complete',
+      slotIndex: 1,
+      setIndex: 0,
+      slotSetCounts: [3, 0],
+      loggedSets: 3,
+      skippedSessionPlanSlotIds: [2],
+    }),
+  });
+
+  const view = render(<SessionScreen />);
+  expect(screen.getByText('Session complete')).toBeOnTheScreen();
+  expect(screen.getByText('1 of 2 exercises complete · 1 skipped')).toBeOnTheScreen();
+
+  mockState.runner = runner({
+    phase: 'complete',
+    slotIndex: 1,
+    setIndex: 0,
+    slotSetCounts: [3, 3],
+    loggedSets: 6,
+    skippedSessionPlanSlotIds: [],
+  });
+  view.rerender(<SessionScreen />);
+  expect(screen.getByText('Session complete')).toBeOnTheScreen();
+  expect(screen.queryByText(/exercises complete/i)).toBeNull();
+});
+
+test('the complete card lists skipped slots in plan order when slots were skipped and omits the list when none were skipped', () => {
+  mockState = state({
+    session: {
+      sessionId: 10,
+      date: '2026-07-15',
+      startedAtMs: Date.now(),
+      sets: [{
+        set_id: 1,
+        movement_id: 1,
+        movement_name: 'First movement',
+        set_index: 1,
+        reps: 5,
+        load_kg: 0,
+        rpe: 8,
+        tonnage_kg: 0,
+        session_plan_slot_id: 1,
+        timeS: null,
+        bandLevel: null,
+      }],
+    },
+    sessionPlan: [slot(1, 1, 5, { plannedSets: 4 }), slot(2, 2, 8)],
+    runner: runner({
+      slots: [
+        { sessionPlanSlotId: 1, movementId: 1, movementName: 'First movement', sets: 4, target: { kind: 'reps', reps: 5 }, targetRpe: 8 },
+        { sessionPlanSlotId: 2, movementId: 2, movementName: 'Later movement', sets: 3, target: { kind: 'reps', reps: 8 }, targetRpe: 8 },
+      ],
+      phase: 'complete',
+      slotIndex: 1,
+      setIndex: 0,
+      slotSetCounts: [1, 0],
+      loggedSets: 1,
+      skippedSessionPlanSlotIds: [2, 1],
+    }),
+  });
+
+  const view = render(<SessionScreen />);
+  const skippedList = screen.getByTestId('session-complete-skipped');
+  expect(skippedList).toBeOnTheScreen();
+  expect(screen.getByText('Skipped: First movement · 1 of 4 sets logged')).toBeOnTheScreen();
+  expect(screen.getByText('Skipped: Later movement · no sets logged')).toBeOnTheScreen();
+  expect(skippedList.children.map((child) => child.props.children)).toEqual([
+    'Skipped: First movement · 1 of 4 sets logged',
+    'Skipped: Later movement · no sets logged',
+  ]);
+
+  mockState.runner = runner({
+    phase: 'complete',
+    slotIndex: 1,
+    setIndex: 0,
+    slotSetCounts: [3, 3],
+    loggedSets: 6,
+    skippedSessionPlanSlotIds: [],
+  });
+  view.rerender(<SessionScreen />);
+  expect(screen.queryByTestId('session-complete-skipped')).toBeNull();
+});
+
+test('a skipped slot whose logged set was recorded under an earlier movement names that movement in the timeline and completion card', () => {
+  mockState = state({
+    movements: [
+      movement(1, 'Narrow Stance Squats'),
+      movement(2, 'Later movement'),
+      movement(3, 'Box Squat'),
+    ],
+    session: {
+      sessionId: 10,
+      date: '2026-07-15',
+      startedAtMs: Date.now(),
+      sets: [{
+        set_id: 77,
+        movement_id: 3,
+        movement_name: 'Box Squat',
+        set_index: 1,
+        reps: 7,
+        load_kg: 60,
+        rpe: 8,
+        tonnage_kg: 420,
+        session_plan_slot_id: 1,
+        timeS: null,
+        bandLevel: null,
+      }],
+    },
+    sessionPlan: [slot(1, 1, 7, { plannedSets: 4 }), slot(2, 2, 8)],
+    activeSessionPlanSlotId: 2,
+    runner: runner({
+      slots: [
+        { sessionPlanSlotId: 1, movementId: 1, movementName: 'Narrow Stance Squats', sets: 4, target: { kind: 'reps', reps: 7 }, targetRpe: 8 },
+        { sessionPlanSlotId: 2, movementId: 2, movementName: 'Later movement', sets: 3, target: { kind: 'reps', reps: 8 }, targetRpe: 8 },
+      ],
+      slotIndex: 1,
+      slotSetCounts: [1, 0],
+      loggedSets: 1,
+      skippedSessionPlanSlotIds: [1],
+    }),
+  });
+
+  const view = render(<SessionScreen />);
+
+  expect(screen.getByText('Skipped · 1 of 4 sets logged as Box Squat')).toBeOnTheScreen();
+  const skippedRow = screen.getByLabelText('Narrow Stance Squats, skipped, 1 of 4 sets logged as Box Squat');
+  expect(skippedRow).toBeOnTheScreen();
+  expect(skippedRow.props.accessibilityRole).toBe('text');
+
+  mockState.runner = runner({
+    slots: [
+      { sessionPlanSlotId: 1, movementId: 1, movementName: 'Narrow Stance Squats', sets: 4, target: { kind: 'reps', reps: 7 }, targetRpe: 8 },
+      { sessionPlanSlotId: 2, movementId: 2, movementName: 'Later movement', sets: 3, target: { kind: 'reps', reps: 8 }, targetRpe: 8 },
+    ],
+    phase: 'complete',
+    slotIndex: 1,
+    setIndex: 0,
+    slotSetCounts: [1, 0],
+    loggedSets: 1,
+    skippedSessionPlanSlotIds: [1, 2],
+  });
+  view.rerender(<SessionScreen />);
+
+  expect(screen.getByText('Skipped: Narrow Stance Squats · 1 of 4 sets logged as Box Squat')).toBeOnTheScreen();
+  expect(screen.getByText('Skipped: Later movement · no sets logged')).toBeOnTheScreen();
+});
+
+test('a finished slot whose logged sets include a different movement_id shows includes with that movement name', () => {
+  mockState = state({
+    movements: [
+      movement(1, 'Narrow Stance Squats'),
+      movement(2, 'Later movement'),
+      movement(3, 'Box Squat'),
+    ],
+    session: {
+      sessionId: 10,
+      date: '2026-07-15',
+      startedAtMs: Date.now(),
+      sets: [
+        {
+          set_id: 77,
+          movement_id: 3,
+          movement_name: 'Box Squat',
+          set_index: 1,
+          reps: 7,
+          load_kg: 60,
+          rpe: 8,
+          tonnage_kg: 420,
+          session_plan_slot_id: 1,
+          timeS: null,
+          bandLevel: null,
+        },
+        {
+          set_id: 78,
+          movement_id: 3,
+          movement_name: 'Box Squat',
+          set_index: 2,
+          reps: 7,
+          load_kg: 60,
+          rpe: 8,
+          tonnage_kg: 420,
+          session_plan_slot_id: 1,
+          timeS: null,
+          bandLevel: null,
+        },
+        {
+          set_id: 79,
+          movement_id: 1,
+          movement_name: 'Narrow Stance Squats',
+          set_index: 3,
+          reps: 7,
+          load_kg: 60,
+          rpe: 8,
+          tonnage_kg: 420,
+          session_plan_slot_id: 1,
+          timeS: null,
+          bandLevel: null,
+        },
+        {
+          set_id: 80,
+          movement_id: 1,
+          movement_name: 'Narrow Stance Squats',
+          set_index: 4,
+          reps: 7,
+          load_kg: 60,
+          rpe: 8,
+          tonnage_kg: 420,
+          session_plan_slot_id: 1,
+          timeS: null,
+          bandLevel: null,
+        },
+      ],
+    },
+    sessionPlan: [slot(1, 1, 7, { plannedSets: 4 }), slot(2, 2, 8)],
+    activeSessionPlanSlotId: 2,
+    runner: runner({
+      slots: [
+        { sessionPlanSlotId: 1, movementId: 1, movementName: 'Narrow Stance Squats', sets: 4, target: { kind: 'reps', reps: 7 }, targetRpe: 8 },
+        { sessionPlanSlotId: 2, movementId: 2, movementName: 'Later movement', sets: 3, target: { kind: 'reps', reps: 8 }, targetRpe: 8 },
+      ],
+      slotIndex: 1,
+      slotSetCounts: [4, 0],
+      loggedSets: 4,
+    }),
+  });
+
+  render(<SessionScreen />);
+
+  expect(screen.getByText('Narrow Stance Squats')).toBeOnTheScreen();
+  expect(screen.getByText('4 sets complete · includes Box Squat')).toBeOnTheScreen();
+});
+
+test('a finished slot whose sets all match shows no includes', () => {
+  mockState = state({
+    movements: [
+      movement(1, 'Narrow Stance Squats'),
+      movement(2, 'Later movement'),
+      movement(3, 'Box Squat'),
+    ],
+    session: {
+      sessionId: 10,
+      date: '2026-07-15',
+      startedAtMs: Date.now(),
+      sets: [1, 2, 3, 4].map((setIndex) => ({
+        set_id: 76 + setIndex,
+        movement_id: 1,
+        movement_name: 'Narrow Stance Squats',
+        set_index: setIndex,
+        reps: 7,
+        load_kg: 60,
+        rpe: 8,
+        tonnage_kg: 420,
+        session_plan_slot_id: 1,
+        timeS: null,
+        bandLevel: null,
+      })),
+    },
+    sessionPlan: [slot(1, 1, 7, { plannedSets: 4 }), slot(2, 2, 8)],
+    activeSessionPlanSlotId: 2,
+    runner: runner({
+      slots: [
+        { sessionPlanSlotId: 1, movementId: 1, movementName: 'Narrow Stance Squats', sets: 4, target: { kind: 'reps', reps: 7 }, targetRpe: 8 },
+        { sessionPlanSlotId: 2, movementId: 2, movementName: 'Later movement', sets: 3, target: { kind: 'reps', reps: 8 }, targetRpe: 8 },
+      ],
+      slotIndex: 1,
+      slotSetCounts: [4, 0],
+      loggedSets: 4,
+    }),
+  });
+
+  render(<SessionScreen />);
+
+  expect(screen.getByText('Narrow Stance Squats')).toBeOnTheScreen();
+  expect(screen.getByText('4 sets complete')).toBeOnTheScreen();
+  expect(screen.queryByText(/includes/)).toBeNull();
+});
+
+describe('session-2: honest discomfort wording per tier and after-save outcomes', () => {
+  const discomfortFixture = (tier, { opensSubstitution = true } = {}) => {
+    const fixtureState = state({
+      profile: { training_age: tier, equipment_inventory: [], session_duration_cap_min: 60 },
+      runner: runner({
+        tier,
+        phase: 'working',
+      }),
+    });
+    fixtureState.reportNiggle = jest.fn((region, severity) => {
+      const next = advanceRunner(fixtureState.runner, {
+        kind: 'NIGGLE',
+        atMs: Date.now() + 1000,
+        severity,
+      });
+      fixtureState.runner = next;
+      fixtureState.niggles = [...fixtureState.niggles, { region, severity }];
+      if (
+        opensSubstitution &&
+        next.phase === 'working' &&
+        next.substitutionOfferedForSessionPlanSlotId !== null
+      ) {
+        fixtureState.substitution = {
+          targetId: 1,
+          result: {
+            haltAdvised: false,
+            layer1Regression: {
+              options: [{ movement_id: 2, name: 'Later movement', rationale: 'Lighter option.' }],
+            },
+            layer2DaySwap: { options: [] },
+          },
+        };
+      }
+      return true;
+    });
+    return fixtureState;
+  };
+
+  test.each([
+    [
+      'beginner',
+      [
+        ['Mild discomfort, 4 of 10', 'Save report', false],
+        ['Moderate discomfort, 6 of 10', 'Save report', false],
+        ['Stop discomfort, 8 of 10', 'Save report and stop session', true],
+      ],
+    ],
+    [
+      'intermediate',
+      [
+        ['Mild discomfort, 4 of 10', 'Save report', false],
+        ['Moderate discomfort, 6 of 10', 'Save report', false],
+        ['Stop discomfort, 8 of 10', 'Save report and stop session', true],
+      ],
+    ],
+    [
+      'advanced',
+      [
+        ['Mild discomfort, 4 of 10', 'Save report', false],
+        ['Moderate discomfort, 6 of 10', 'Save report', false],
+        ['Stop discomfort, 8 of 10', 'Save report and stop session', true],
+      ],
+    ],
+    [
+      'elite',
+      [
+        ['Mild discomfort, 4 of 10', 'Save report', false],
+        ['Moderate discomfort, 6 of 10', 'Save report and stop session', true],
+        ['Stop discomfort, 8 of 10', 'Save report and stop session', true],
+      ],
+    ],
+  ])('button labels and halt caption for %s at Mild (4), Moderate (6) and Stop (8)', (tier, expectations) => {
+    mockState = discomfortFixture(tier);
+    render(<SessionScreen />);
+    fireEvent.press(screen.getByLabelText('Report discomfort'));
+
+    for (const [chipLabel, expectedButtonText, expectHaltCaption] of expectations) {
+      fireEvent.press(screen.getByLabelText(chipLabel));
+      expect(screen.getByText(expectedButtonText)).toBeOnTheScreen();
+      expect(screen.queryByText('Find an alternative')).toBeNull();
+      if (expectHaltCaption) {
+        expect(screen.getByText('At this level the session stops for today.')).toBeOnTheScreen();
+      } else {
+        expect(screen.queryByText('At this level the session stops for today.')).toBeNull();
+      }
+    }
+  });
+
+  test('beginner fixture: Mild (4) shows Report saved with this session., Moderate (6) opens substitution without the saved line, and Stop (8) halts without the saved line', () => {
+    // 1. Beginner + Mild (4): below triageMin (5) and below haltMin (8) -> saved notice shown
+    mockState = discomfortFixture('beginner');
+    const view1 = render(<SessionScreen />);
+    fireEvent.press(screen.getByLabelText('Report discomfort'));
+    fireEvent.press(screen.getByLabelText('knee'));
+    fireEvent.press(screen.getByLabelText('Mild discomfort, 4 of 10'));
+    expect(screen.getByText('Save report')).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText('Save discomfort report'));
+    view1.rerender(<SessionScreen />);
+    expect(screen.getByText('Report saved with this session.')).toBeOnTheScreen();
+    expect(screen.queryByText('Choose an alternative')).toBeNull();
+    expect(screen.queryByText('Stop training for today.')).toBeNull();
+    view1.unmount();
+
+    // 2. Beginner + Moderate (6): >= triageMin (5) and < haltMin (8) -> substitution opens, no saved line
+    mockState = discomfortFixture('beginner');
+    const view2 = render(<SessionScreen />);
+    fireEvent.press(screen.getByLabelText('Report discomfort'));
+    fireEvent.press(screen.getByLabelText('knee'));
+    fireEvent.press(screen.getByLabelText('Moderate discomfort, 6 of 10'));
+    expect(screen.getByText('Save report')).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText('Save discomfort report'));
+    view2.rerender(<SessionScreen />);
+    expect(screen.getByText('Choose an alternative')).toBeOnTheScreen();
+    expect(screen.queryByText('Report saved with this session.')).toBeNull();
+    view2.unmount();
+
+    // 3. Beginner + Stop (8): >= haltMin (8) -> halts, no saved line
+    mockState = discomfortFixture('beginner');
+    const view3 = render(<SessionScreen />);
+    fireEvent.press(screen.getByLabelText('Report discomfort'));
+    fireEvent.press(screen.getByLabelText('knee'));
+    fireEvent.press(screen.getByLabelText('Stop discomfort, 8 of 10'));
+    expect(screen.getByText('Save report and stop session')).toBeOnTheScreen();
+    expect(screen.getByText('At this level the session stops for today.')).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText('Save discomfort report and stop session'));
+    view3.rerender(<SessionScreen />);
+    expect(screen.getByText('Stop training for today.')).toBeOnTheScreen();
+    expect(screen.queryByText('Report saved with this session.')).toBeNull();
+    view3.unmount();
+  });
+
+  test('intermediate fixture: Mild (4) opens substitution without the saved line, Mild (4) when substitution does not open shows Report saved with this session., and Stop (8) halts without the saved line', () => {
+    // 1. Intermediate + Mild (4): >= triageMin (4) -> substitution opens, no saved line
+    mockState = discomfortFixture('intermediate');
+    const view1 = render(<SessionScreen />);
+    fireEvent.press(screen.getByLabelText('Report discomfort'));
+    fireEvent.press(screen.getByLabelText('shoulder'));
+    fireEvent.press(screen.getByLabelText('Mild discomfort, 4 of 10'));
+    expect(screen.getByText('Save report')).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText('Save discomfort report'));
+    view1.rerender(<SessionScreen />);
+    expect(screen.getByText('Choose an alternative')).toBeOnTheScreen();
+    expect(screen.queryByText('Report saved with this session.')).toBeNull();
+    view1.unmount();
+
+    // 2. Intermediate + Mild (4) when neither substitution nor halt happens -> saved line shown
+    mockState = discomfortFixture('intermediate', { opensSubstitution: false });
+    const view2 = render(<SessionScreen />);
+    fireEvent.press(screen.getByLabelText('Report discomfort'));
+    fireEvent.press(screen.getByLabelText('shoulder'));
+    fireEvent.press(screen.getByLabelText('Mild discomfort, 4 of 10'));
+    fireEvent.press(screen.getByLabelText('Save discomfort report'));
+    view2.rerender(<SessionScreen />);
+    expect(screen.getByText('Report saved with this session.')).toBeOnTheScreen();
+    expect(screen.queryByText('Choose an alternative')).toBeNull();
+    expect(screen.queryByText('Stop training for today.')).toBeNull();
+    view2.unmount();
+
+    // 3. Intermediate + Stop (8): >= haltMin (8) -> halts, no saved line
+    mockState = discomfortFixture('intermediate');
+    const view3 = render(<SessionScreen />);
+    fireEvent.press(screen.getByLabelText('Report discomfort'));
+    fireEvent.press(screen.getByLabelText('shoulder'));
+    fireEvent.press(screen.getByLabelText('Stop discomfort, 8 of 10'));
+    expect(screen.getByText('Save report and stop session')).toBeOnTheScreen();
+    expect(screen.getByText('At this level the session stops for today.')).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText('Save discomfort report and stop session'));
+    view3.rerender(<SessionScreen />);
+    expect(screen.getByText('Stop training for today.')).toBeOnTheScreen();
+    expect(screen.queryByText('Report saved with this session.')).toBeNull();
+    view3.unmount();
+  });
+
+  test('elite fixture: Mild (4) opens substitution, Mild (4) when substitution does not open shows Report saved with this session., and Moderate (6) halts with caption and stop button label', () => {
+    // 1. Elite + Mild (4): >= triageMin (3), < haltMin (6) -> substitution opens
+    mockState = discomfortFixture('elite');
+    const view1 = render(<SessionScreen />);
+    fireEvent.press(screen.getByLabelText('Report discomfort'));
+    fireEvent.press(screen.getByLabelText('knee'));
+    fireEvent.press(screen.getByLabelText('Mild discomfort, 4 of 10'));
+    expect(screen.getByText('Save report')).toBeOnTheScreen();
+    expect(screen.queryByText('At this level the session stops for today.')).toBeNull();
+    fireEvent.press(screen.getByLabelText('Save discomfort report'));
+    view1.rerender(<SessionScreen />);
+    expect(screen.getByText('Choose an alternative')).toBeOnTheScreen();
+    expect(screen.queryByText('Report saved with this session.')).toBeNull();
+    view1.unmount();
+
+    // 2. Elite + Mild (4) when neither substitution nor halt happens -> saved line shown
+    mockState = discomfortFixture('elite', { opensSubstitution: false });
+    const view2 = render(<SessionScreen />);
+    fireEvent.press(screen.getByLabelText('Report discomfort'));
+    fireEvent.press(screen.getByLabelText('knee'));
+    fireEvent.press(screen.getByLabelText('Mild discomfort, 4 of 10'));
+    fireEvent.press(screen.getByLabelText('Save discomfort report'));
+    view2.rerender(<SessionScreen />);
+    expect(screen.getByText('Report saved with this session.')).toBeOnTheScreen();
+    expect(screen.queryByText('Choose an alternative')).toBeNull();
+    expect(screen.queryByText('Stop training for today.')).toBeNull();
+    view2.unmount();
+
+    // 3. Elite + Moderate (6): >= haltMin (6) -> caption + Save report and stop session -> halts
+    mockState = discomfortFixture('elite');
+    const view3 = render(<SessionScreen />);
+    fireEvent.press(screen.getByLabelText('Report discomfort'));
+    fireEvent.press(screen.getByLabelText('knee'));
+    fireEvent.press(screen.getByLabelText('Moderate discomfort, 6 of 10'));
+    expect(screen.getByText('Save report and stop session')).toBeOnTheScreen();
+    expect(screen.getByText('At this level the session stops for today.')).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText('Save discomfort report and stop session'));
+    view3.rerender(<SessionScreen />);
+    expect(screen.getByText('Stop training for today.')).toBeOnTheScreen();
+    expect(screen.queryByText('Report saved with this session.')).toBeNull();
+    view3.unmount();
+  });
+});
+

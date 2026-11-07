@@ -27,6 +27,8 @@ import {
 import { theme } from '../theme/theme';
 import { Chip, QuietAction } from '../components/ui';
 import KeyboardAwareScrollView, { KEYBOARD_TAP_BEHAVIOR } from '../components/KeyboardAwareScrollView';
+import { QUESTION_BOX_ENABLED } from '../config/features';
+import QuestionBoxPanel from '../components/QuestionBoxPanel';
 
 export interface GlossaryScreenProps {
   readonly onClose?: () => void;
@@ -43,11 +45,13 @@ const CATEGORY_CHIPS: readonly { readonly id: FilterCategory; readonly label: st
   { id: 'goal', label: 'GOALS' },
   { id: 'role', label: 'ROLES' },
   { id: 'movement', label: 'PATTERNS' },
+  { id: 'general', label: 'GENERAL' },
 ];
 
 export default function GlossaryScreen({ onClose }: GlossaryScreenProps): React.JSX.Element {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<FilterCategory>('all');
+  const [questionOpen, setQuestionOpen] = useState(false);
 
   const searchResults = useMemo(() => {
     return searchGlossary(searchQuery);
@@ -80,6 +84,8 @@ export default function GlossaryScreen({ onClose }: GlossaryScreenProps): React.
         Offline reference for training concepts, loading methods, effort scales, and movement patterns.
       </Text>
 
+      {QUESTION_BOX_ENABLED && <QuietAction label="Question box" onPress={() => setQuestionOpen(!questionOpen)} />}
+      {QUESTION_BOX_ENABLED && questionOpen ? <QuestionBoxPanel onClose={() => setQuestionOpen(false)} /> : <>
       {/* Search Bar */}
       <View style={styles.searchSection}>
         <TextInput
@@ -161,6 +167,7 @@ export default function GlossaryScreen({ onClose }: GlossaryScreenProps): React.
           ))}
         </View>
       )}
+      </>}
     </KeyboardAwareScrollView>
   );
 }

@@ -13,18 +13,32 @@ beforeEach(() => {
   };
 });
 
-test('explains encrypted all-athlete backup, off-phone storage, CSV separation, and replace-only restore', () => {
+test('explains encrypted all-athlete backup, off-phone storage, and replace-only restore', () => {
   mockState.preview = {
     backupId: 'one', createdAt: '2026-09-13T05:00:00.000Z', athleteNames: ['Athlete 1', 'Alex'],
     databaseCount: 2, totalBytes: 2_097_152, replaceOnly: true,
   };
   render(<BackupTransferPanel />);
   expect(screen.getByText(/includes every athlete, profile, plan, routine, workout, activity, health-support record/)).toBeOnTheScreen();
-  expect(screen.getByText(/separate from readable CSV history export/)).toBeOnTheScreen();
   expect(screen.getByText(/copy kept only on this phone will not protect you/)).toBeOnTheScreen();
   expect(screen.getByText(/Replace only: this removes all current athlete data/)).toBeOnTheScreen();
   expect(screen.getByText(/creates and verifies an encrypted recovery backup/)).toBeOnTheScreen();
   expect(screen.getByText('Athletes: Athlete 1, Alex')).toBeOnTheScreen();
+});
+
+// #235: there is no CSV export, so the panel must not point to one.
+test('does not mention a CSV export with status, recovery and preview shown', () => {
+  mockState.recoveryAvailable = true;
+  mockState.message = 'Backup saved.';
+  mockState.lastSuccessfulBackupAt = '2026-09-13T05:00:00.000Z';
+  mockState.preview = {
+    backupId: 'one', createdAt: '2026-09-13T05:00:00.000Z', athleteNames: ['Athlete 1'],
+    databaseCount: 1, totalBytes: 1_048_576, replaceOnly: true,
+  };
+  render(<BackupTransferPanel />);
+  expect(screen.getByTestId('restore-preview')).toBeOnTheScreen();
+  expect(screen.queryAllByText(/CSV/i)).toHaveLength(0);
+  expect(JSON.stringify(screen.toJSON())).not.toMatch(/CSV/i);
 });
 
 test('requires a confirmed 12-character password to create but not to open a restore picker', () => {
@@ -44,18 +58,30 @@ test('requires a confirmed 12-character password to create but not to open a res
   expect(mockState.chooseRestore).not.toHaveBeenCalled();
 });
 
-test('preview confirmation is explicit and cancellation never invokes restore', () => {
-  mockState.preview = {
-    backupId: 'one', createdAt: '2026-09-13T05:00:00.000Z', athleteNames: ['Athlete 1'],
-    databaseCount: 1, totalBytes: 1_048_576, replaceOnly: true,
-  };
-  render(<BackupTransferPanel />);
-  fireEvent.changeText(screen.getByLabelText('Backup password, at least 12 characters'), 'restore-passphrase');
+const PREVIEW = {
+  backupId: 'one', createdAt: '2026-09-13T05:00:00.000Z', athleteNames: ['Athlete 1'],
+  databaseCount: 1, totalBytes: 1_048_576, replaceOnly: true,
+};
+
+test('cancelling the preview never invokes restore and removes the confirmation', () => {
+  mockState.preview = PREVIEW;
+  // Model the store: cancelling clears the preview.
+  mockState.cancelRestore = jest.fn(() => { mockState.preview = null; });
+  const view = render(<BackupTransferPanel />);
   fireEvent.press(screen.getByTestId('cancel-restore-button'));
+  view.rerender(<BackupTransferPanel />);
   expect(mockState.cancelRestore).toHaveBeenCalledTimes(1);
   expect(mockState.confirmRestore).not.toHaveBeenCalled();
+  expect(screen.queryByTestId('confirm-restore-button')).toBeNull();
+});
+
+test('preview confirmation is explicit and uses the pending candidate', () => {
+  mockState.preview = PREVIEW;
+  render(<BackupTransferPanel />);
+  expect(mockState.confirmRestore).not.toHaveBeenCalled();
+  expect(screen.getByTestId('confirm-restore-button').props.accessibilityState.disabled).toBe(false);
   fireEvent.press(screen.getByTestId('confirm-restore-button'));
-  expect(mockState.confirmRestore).toHaveBeenCalledWith('restore-passphrase');
+  expect(mockState.confirmRestore).toHaveBeenCalledWith();
 });
 
 test('offers a bounded password-gated path to review the previous encrypted recovery', () => {

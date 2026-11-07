@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Platform } from 'react-native';
+import { NativeModules, Platform } from 'react-native';
 import type { DB } from '@op-engineering/op-sqlite';
 import {
   BACKUP_RESTORE_POLICY,
@@ -331,7 +331,7 @@ function quickCheck(handle: DB): boolean {
 function schemaContract(handle: DB): BackupSchemaObject[] {
   const objects = rows<{ type: string; name: string; tbl_name: string; sql: string }>(handle.executeSync(
     "SELECT type,name,tbl_name,coalesce(sql,'') AS sql FROM sqlite_master "
-      + "WHERE type IN ('table','index','trigger') AND name NOT LIKE 'sqlite_%' ORDER BY type,name",
+      + "WHERE type IN ('table','index','trigger') AND name NOT GLOB 'sqlite_*' ORDER BY type,name",
   ));
   return objects.map((object): BackupSchemaObject => {
     const columns = object.type !== 'table' ? [] : rows<{
@@ -528,7 +528,7 @@ async function prepareDatabaseSnapshot(
   try {
     if (!quickCheck(snapshotHandle)) throw new Error('A database snapshot did not pass its integrity check. No backup was saved.');
     userVersion = oneNumber(snapshotHandle, 'PRAGMA user_version', 'user_version');
-    tableCount = oneNumber(snapshotHandle, "SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'", 'count');
+    tableCount = oneNumber(snapshotHandle, "SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name NOT GLOB 'sqlite_*'", 'count');
     requireCurrentSchema(snapshotHandle, 'A database snapshot does not match the verified app schema. No backup was saved.');
   } finally { snapshotHandle.close(); }
   if (userVersion !== SCHEMA_VERSION || tableCount !== TABLE_COUNT) throw new Error('A database uses an unsupported schema. Update the app before backing up.');
@@ -604,6 +604,10 @@ async function pickerSave(sourcePath: string, fileName: string): Promise<boolean
   return saved.error === null && saved.uri.length > 0;
 }
 
+import { backupFileNameFor } from './backupFileName';
+
+export { backupFileNameFor };
+
 /** The Files import filter, per platform. The picker's iOS bridge resolves
  *  each entry with `UTType(identifier)` (PickerOptions.swift), so a MIME string
  *  resolves to nothing there and the sheet would offer no selectable file.
@@ -620,10 +624,14 @@ async function pickerOpen(): Promise<string | null> {
     const [selected] = await picker.pick({
       mode: 'import', type: backupImportTypes(Platform.OS, picker.types.allFiles), allowMultiSelection: false, allowVirtualFiles: false,
     });
-    // The native import path copies before JavaScript regains control. Reject
-    // unknown or oversized provider metadata before asking it to make that
-    // private copy, then retain the post-copy stat as defence in depth.
+    // Metadata is only an early rejection; Android also enforces the byte
+    // limit while reading the provider, before writing private cache storage.
     validatePortableBackupFileSize(selected.size);
+    if (Platform.OS === 'android') {
+      const boundedCopy = NativeModules.AKBackupCopy as { copyBackup(uri: string): Promise<string> } | undefined;
+      if (boundedCopy === undefined) throw new Error('The selected backup could not be copied into private app storage.');
+      return await boundedCopy.copyBackup(selected.uri);
+    }
     const [copy] = await picker.keepLocalCopy({
       files: [{ uri: selected.uri, fileName: selected.name ?? 'selected.pmbak' }], destination: 'cachesDirectory',
     });
@@ -643,15 +651,16 @@ async function verifyStagedDatabase(
 ): Promise<void> {
   const handle = openDatabase(basename(path), dirname(path));
   try {
-    if (!quickCheck(handle)
-      || expected.userVersion !== sourceContract.userVersion
+    if (expected.userVersion !== sourceContract.userVersion
       || oneNumber(handle, 'PRAGMA user_version', 'user_version') !== sourceContract.userVersion
-      || oneNumber(handle, "SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'", 'count') !== sourceContract.tableCount) {
+      || oneNumber(handle, "SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name NOT GLOB 'sqlite_*'", 'count') !== sourceContract.tableCount) {
       throw new Error('A restored database failed validation. Existing data is unchanged.');
     }
+    // quick_check evaluates stored CHECK expressions, so only run trusted SQL.
     if (!matchesBackupSchemaContract(schemaContract(handle), sourceContract, mobileBackupCrypto)) {
       throw new Error('A restored database does not match the verified app schema. Existing data is unchanged.');
     }
+    if (!quickCheck(handle)) throw new Error('A restored database failed validation. Existing data is unchanged.');
   } finally { handle.close(); }
 }
 
@@ -922,7 +931,7 @@ interface BackupState {
   createBackup(password: string): Promise<void>;
   chooseRestore(password: string): Promise<void>;
   reviewRecovery(password: string): Promise<void>;
-  confirmRestore(password: string): Promise<void>;
+  confirmRestore(password?: string): Promise<void>;
   cancelRestore(): void;
 }
 
@@ -931,6 +940,7 @@ interface BackupState {
 interface PendingRestore {
   readonly archive: BackupArchiveV1;
   readonly source: RestoreSource;
+  readonly password: string;
 }
 
 let pendingRestore: PendingRestore | null = null;
@@ -1035,7 +1045,7 @@ export const useBackupStore = create<BackupState>((set, get) => ({
       workDirectory = created.workDirectory;
       await ensurePlaintextSnapshotsRemoved(workDirectory);
       workDirectory = null;
-      const fileName = `pikeMethods-${new Date().toISOString().slice(0, 10)}.pmbak`;
+      const fileName = backupFileNameFor(new Date());
       // iOS saves under the SOURCE file's name (the picker's fileName is
       // Android-only), so the staged file carries the person-facing name inside
       // a private, uniquely named directory that is removed afterwards.
@@ -1079,7 +1089,7 @@ export const useBackupStore = create<BackupState>((set, get) => ({
       if (!opened.ok) throw new Error(opened.message);
       const decision = decideRestore('replace', opened.archive, RESTORE_COMPATIBILITY);
       if (!decision.ok) throw new Error(decision.message);
-      const pending: PendingRestore = { archive: opened.archive, source: 'portable_backup' };
+      const pending: PendingRestore = { archive: opened.archive, source: 'portable_backup', password };
       pendingRestore = pending;
       set({ status: 'preview', message: 'Review this backup before replacing data.', preview: restorePreview(pending) });
     } catch (error) {
@@ -1121,7 +1131,7 @@ export const useBackupStore = create<BackupState>((set, get) => ({
       if (opened === null || !opened.ok) throw new Error('Previous data recovery could not be opened. Check the password from the previous restore.');
       const decision = decideRestore('replace', opened.archive, RESTORE_COMPATIBILITY);
       if (!decision.ok) throw new Error('Previous data recovery is not compatible with this app version.');
-      const pending: PendingRestore = { archive: opened.archive, source: 'retained_recovery' };
+      const pending: PendingRestore = { archive: opened.archive, source: 'retained_recovery', password };
       pendingRestore = pending;
       set({
         status: 'preview',
@@ -1139,10 +1149,11 @@ export const useBackupStore = create<BackupState>((set, get) => ({
       actionInFlight = false;
     }
   },
-  confirmRestore: async (password) => {
+  confirmRestore: async (_password) => {
     const pending = pendingRestore;
     if (actionInFlight || pending === null || get().status !== 'preview') return;
     actionInFlight = true;
+    const restorePassword = pending.password;
     const usesRetainedRecovery = pending.source === 'retained_recovery';
     set({
       status: 'working',
@@ -1152,19 +1163,30 @@ export const useBackupStore = create<BackupState>((set, get) => ({
     let releaseMaintenance: (() => void) | null = null;
     let safeToRestart = true;
     try {
-      if (!(await actionCanProceed(get(), set))) return;
-      releaseMaintenance = acquireDataMaintenanceLock('encrypted-restore');
+      if (!(await actionCanProceed(get(), set))) {
+        pendingRestore = null;
+        return;
+      }
+      try {
+        releaseMaintenance = acquireDataMaintenanceLock('encrypted-restore');
+      } catch (error) {
+        set({
+          status: 'preview',
+          message: error instanceof Error ? error.message : 'Athlete data is still being saved or opened. Try again in a moment.',
+        });
+        return;
+      }
       revokeAthleteDataBoot();
       closeStoreDatabaseForRestore();
       if (!usesRetainedRecovery) {
         // A portable restore may supersede the retained recovery only after this
         // current-data recovery is sealed, authenticated, and durably retained.
-        const recovery = await createEncryptedBytes(password, get().lastSuccessfulBackupAt);
+        const recovery = await createEncryptedBytes(restorePassword, get().lastSuccessfulBackupAt);
         recoveryWork = recovery.workDirectory;
         await ensurePlaintextSnapshotsRemoved(recoveryWork);
         recoveryWork = null;
         await publishRecoveryBackup(recoveryPublicationIo(), recoveryPublicationPaths(), recovery.text, async (text) => {
-          const opened = await openBackup(text, password, mobileBackupCrypto);
+          const opened = await openBackup(text, restorePassword, mobileBackupCrypto);
           return opened.ok ? opened.archive.backupId : null;
         });
         set({ recoveryAvailable: true });
@@ -1173,8 +1195,10 @@ export const useBackupStore = create<BackupState>((set, get) => ({
       // A retained previous-data recovery is the undo point being used: it is
       // never rewritten or superseded, and no replacement undo point is created.
       await replaceAllData(pending.archive);
+      pendingRestore = null;
       set({ status: 'success', message: 'Restore complete. All athlete data was replaced from the backup.', preview: null });
     } catch (error) {
+      pendingRestore = null;
       safeToRestart = !(error instanceof RestoreRecoveryRequiredError || error instanceof RecoveryPublicationUnresolvedError);
       if (!safeToRestart) revokeAthleteDataBoot();
       set({
@@ -1184,7 +1208,7 @@ export const useBackupStore = create<BackupState>((set, get) => ({
         preview: null,
       });
     } finally {
-      pendingRestore = null;
+      if (releaseMaintenance !== null) pendingRestore = null;
       try {
         if (recoveryWork !== null) await removeIfPresent(recoveryWork);
         if (releaseMaintenance !== null) releaseMaintenance();

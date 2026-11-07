@@ -33,7 +33,6 @@ export default function BackupTransferPanel(): React.JSX.Element {
       <Text style={styles.heading}>BACK UP &amp; TRANSFER DATA</Text>
       <Text style={styles.body}>
         An encrypted backup includes every athlete, profile, plan, routine, workout, activity, health-support record, preference, and identifier on this phone.
-        It is separate from readable CSV history export.
       </Text>
       <Text style={styles.body}>
         New phone: create a backup, save it somewhere you can reach from the new phone, install pikeMethods there, then choose Restore backup.
@@ -121,8 +120,8 @@ export default function BackupTransferPanel(): React.JSX.Element {
           )}
           <QuietAction
             label="CONFIRM REPLACE ALL DATA"
-            onPress={() => { void confirmRestore(password); }}
-            disabled={working || recoveryBlocked || !strongEnough}
+            onPress={() => { void confirmRestore(); }}
+            disabled={working || recoveryBlocked}
             accessibilityLabel="Confirm replace all current athlete data from this backup"
             testID="confirm-restore-button"
           />

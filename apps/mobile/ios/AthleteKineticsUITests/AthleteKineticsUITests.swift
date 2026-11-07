@@ -14,10 +14,13 @@
 import XCTest
 
 final class AthleteKineticsUITests: XCTestCase {
+  private static var test3IterationsRun = 0
   private var app: XCUIApplication!
+  private var isInitialLaunchOfTest = true
 
   override func setUpWithError() throws {
     continueAfterFailure = false
+    isInitialLaunchOfTest = true
     app = XCUIApplication()
   }
 
@@ -186,7 +189,14 @@ final class AthleteKineticsUITests: XCTestCase {
   }
 
   private func launch(_ arguments: [String] = []) {
-    app.launchArguments = arguments
+    var effectiveArguments = arguments
+    if isInitialLaunchOfTest {
+      isInitialLaunchOfTest = false
+      if !effectiveArguments.contains("-AKUITestResetStorage") {
+        effectiveArguments += ["-AKUITestResetStorage", "1"]
+      }
+    }
+    app.launchArguments = effectiveArguments
     app.launch()
     wait(element("shell-root"), "the app shell", timeout: 90)
   }
@@ -256,7 +266,7 @@ final class AthleteKineticsUITests: XCTestCase {
   /// active athlete (after onboarding, a switch or a restore); that offer
   /// covers the shell, so it is cancelled before navigating.
   private func dismissSetUpOfferIfShown(_ context: String) {
-    if element("Create program").exists && element("Cancel").exists {
+    if (try? element("Create program").snapshot()) != nil && (try? element("Cancel").snapshot()) != nil {
       element("Cancel").tap()
       log("program set-up offer: cancelled (\(context))")
     }
@@ -269,7 +279,7 @@ final class AthleteKineticsUITests: XCTestCase {
   }
 
   private func unlockAdvancedTools() {
-    if element("advanced-athlete-manager").exists { return }
+    if (try? element("advanced-athlete-manager").snapshot()) != nil { return }
     let build = element("Build 0.1.0")
     // The label sits at the foot of the full Profile form, beyond reveal()'s
     // fifteen slow swipes; scroll down at normal speed first.
@@ -325,12 +335,131 @@ final class AthleteKineticsUITests: XCTestCase {
       // athlete-kinetics-ios-simulator-unsigned-xcode27, XCTest runner log at 18:22:02.810:
       // the Don't Allow button node is absent, its static text remains, and the table has two pages.
       // A dismissed sheet leaves no text behind, so the "sheet stayed open" checks stay truthful.
-      if inApp.exists || app.staticTexts.matching(named).firstMatch.exists { log("health sheet: in the app"); return inApp }
+      if (try? inApp.snapshot()) != nil || (try? app.staticTexts.matching(named).firstMatch.snapshot()) != nil { log("health sheet: in the app"); return inApp }
       let inSpringboard = healthPermissionButton(title, in: springboard)
-      if inSpringboard.exists || springboard.staticTexts.matching(named).firstMatch.exists { log("health sheet: in SpringBoard"); return inSpringboard }
+      if (try? inSpringboard.snapshot()) != nil || (try? springboard.staticTexts.matching(named).firstMatch.snapshot()) != nil { log("health sheet: in SpringBoard"); return inSpringboard }
       sleep(1)
     } while Date() < deadline
     return nil
+  }
+
+  /// A system alert with an OK button left over HealthKit's sheet. Evidence:
+  /// Xcode 27.2 / iOS 26.5 run 2026-11-02: a Health Access alert with OK sat
+  /// over the permission sheet after Don't Allow; nothing tapped it, and the
+  /// test went on to log HEALTH-UNANSWERED and HEALTH-VIEW-STUCK. An alert left
+  /// open there would also explain CI's intermittent "the permission sheet
+  /// stayed open" and "Failed to determine hittability of Don't Allow".
+  /// The app's alerts and SpringBoard's are searched for at most `timeout`
+  /// seconds. Only an alert whose single button is OK is ever answered. One
+  /// that mentions Health is preferred, in either place (the app raises no
+  /// Health-named alert itself, and HealthKit may host its alert in the app).
+  /// Failing that, only a SpringBoard alert whose single button is OK
+  /// qualifies: the Health Access box is a system alert, and an alert the app
+  /// itself raises (an error, say) is never dismissed here, so it still shows
+  /// up in the checks that follow. OK is tapped at the centre read from a
+  /// snapshot, translated by `targetFrame.height - remoteContainer.height` when
+  /// the hosted `HealthPrivacyService` remote scene reports unshifted local
+  /// coordinates (`remoteContainer.minY == 0` inside a shorter modal card sheet),
+  /// and verified after 1 s and again 2 s later.
+  @discardableResult
+  private func dismissHealthAccessAlertIfShown(_ context: String, timeout: TimeInterval = 3) -> Bool {
+    let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+    let current: XCUIApplication = app
+    let places: [(String, XCUIApplication)] = [("the app", current), ("SpringBoard", springboard)]
+    let okNamed = NSPredicate(format: "label ==[c] %@", "OK")
+    let healthNamed = NSPredicate(format: "label CONTAINS[c] %@", "Health")
+    let deadline = Date().addingTimeInterval(timeout)
+    repeat {
+      var healthAlert: (place: String, target: XCUIApplication, alert: XCUIElement, ok: XCUIElement, frame: CGRect)?
+      var okOnlyAlert: (place: String, target: XCUIApplication, alert: XCUIElement, ok: XCUIElement, frame: CGRect)?
+      for (place, target) in places {
+        for alert in target.alerts.allElementsBoundByIndex {
+          let ok = alert.buttons.matching(okNamed).firstMatch
+          guard let frame = (try? ok.snapshot())?.frame else { continue }
+          let mentionsHealth = (currentLabel(alert) ?? "").localizedCaseInsensitiveContains("Health")
+            || ((try? alert.staticTexts.matching(healthNamed).firstMatch.snapshot()) != nil)
+          if mentionsHealth && healthAlert == nil && alert.buttons.count == 1 {
+            healthAlert = (place, target, alert, ok, frame)
+          } else if !mentionsHealth && okOnlyAlert == nil && place == "SpringBoard" && alert.buttons.count == 1 {
+            okOnlyAlert = (place, target, alert, ok, frame)
+          }
+        }
+      }
+      if let found = healthAlert ?? okOnlyAlert {
+        let title = currentLabel(found.alert).flatMap { $0.isEmpty ? nil : $0 }
+          ?? currentLabel(found.alert.staticTexts.firstMatch) ?? "<no title>"
+        let kind = healthAlert != nil ? "Health alert" : "SpringBoard alert whose only button is OK"
+        let alertFrame = (try? found.alert.snapshot())?.frame ?? .null
+        let targetSnap = try? found.target.snapshot()
+        let targetFrame = targetSnap?.frame ?? found.target.frame
+        func findAlertAncestors(_ node: XCUIElementSnapshot) -> [XCUIElementSnapshot]? {
+          if node.elementType == .alert { return [node] }
+          for child in node.children {
+            if let path = findAlertAncestors(child) { return [node] + path }
+          }
+          return nil
+        }
+        var measuredOffset: CGFloat = 0
+        var offsetSource = "none"
+        var remoteContainerMinY = -1
+        var remoteContainerHeight = -1
+        if found.place == "the app", !alertFrame.isNull, alertFrame.midY < targetFrame.midY {
+          if let root = targetSnap, let ancestors = findAlertAncestors(root) {
+            for node in ancestors.reversed() where node.elementType != .alert {
+              let nf = node.frame
+              if nf.minY == 0 && nf.height > targetFrame.midY && nf.height < targetFrame.height - 1 && abs(nf.width - targetFrame.width) <= 2 {
+                measuredOffset = targetFrame.height - nf.height
+                offsetSource = "targetHeight-remoteHeight"
+                remoteContainerMinY = Int(nf.minY.rounded())
+                remoteContainerHeight = Int(nf.height.rounded())
+                break
+              }
+            }
+          }
+        }
+        let rootOrigin = found.target.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
+        let initialOffsetY = found.frame.midY + measuredOffset
+        var tapY = initialOffsetY
+        var tapPath = measuredOffset > 0 ? "\(offsetSource)(+\(Int(measuredOffset.rounded()))pt)" : "direct"
+        func probeAlertOKStillShown(_ phase: String) -> Bool {
+          do {
+            _ = try found.ok.snapshot()
+            return true
+          } catch {
+            let okErrorText = String(describing: error)
+            do {
+              let root = try found.target.snapshot()
+              if findAlertAncestors(root) == nil {
+                return false
+              }
+              log("health alert probe (\(phase)) found alert still in \(found.place) tree after ok.snapshot() threw: \(okErrorText)")
+              return true
+            } catch let targetError {
+              log("health alert probe (\(phase)) query failed in \(found.place); ok error: \(okErrorText); target error: \(targetError)")
+              return true
+            }
+          }
+        }
+        rootOrigin.withOffset(CGVector(dx: found.frame.midX, dy: initialOffsetY)).tap()
+        sleep(1)
+        var stillShown = probeAlertOKStillShown("after-1s")
+        if stillShown && measuredOffset > 0 {
+          rootOrigin.withOffset(CGVector(dx: found.frame.midX, dy: found.frame.midY)).tap()
+          tapY = found.frame.midY
+          sleep(1)
+          stillShown = probeAlertOKStillShown("after-unshifted-retry")
+          tapPath = stillShown ? "\(tapPath),unshifted-retry" : "unshifted-after-\(offsetSource)"
+        }
+        sleep(2)
+        let stillShownAfter3s = probeAlertOKStillShown("after-3s")
+        log("HEALTH-ALERT-OK tapped OK on a system \(kind) in \(found.place) (\(context)); title: \(title.prefix(120)); tapPath=\(tapPath) okFrame=(\(Int(found.frame.midX)),\(Int(found.frame.midY))) tapY=\(Int(tapY.rounded())) remoteContainer=(minY:\(remoteContainerMinY),h:\(remoteContainerHeight)) alertMidY=\(alertFrame.isNull ? -1 : Int(alertFrame.midY)); still shown after 1 s: \(stillShown ? "yes" : "no"); still shown 2 s later: \(stillShownAfter3s ? "yes" : "no")")
+        XCTAssertFalse(stillShownAfter3s, "the Health Access alert stayed open after the OK tap")
+        return true
+      }
+      usleep(250_000)
+    } while Date() < deadline
+    log("health alert: no system alert with OK in the app or SpringBoard within \(Int(timeout)) s (\(context))")
+    return false
   }
 
   // MARK: - tests
@@ -440,6 +569,10 @@ final class AthleteKineticsUITests: XCTestCase {
   /// never claim it can read. Then Coach Mode: a second athlete is added (own
   /// onboarding) and switching athletes never reopens the permission sheet.
   func test3_healthDenialAndAthleteSwitching() throws {
+    if Self.test3IterationsRun > 0 {
+      app.resetAuthorizationStatus(for: .health)
+    }
+    Self.test3IterationsRun += 1
     // -AKUITestTrace: the app logs which branch its permission flow took
     // (content-free; captured from the system log by tools/ios_ui_tests.sh).
     launch(["-AKUITestTrace", "1"])
@@ -482,6 +615,9 @@ final class AthleteKineticsUITests: XCTestCase {
               dontAllow.tap()
               denialTapped = true
               log("health sheet: tapped Don't Allow (attempt \(attempt), after \(Int(Date().timeIntervalSince(started))) s)")
+              // Xcode 27.2 / iOS 26.5 run 2026-11-02: a Health Access alert with
+              // OK sat over the permission sheet after Don't Allow.
+              dismissHealthAccessAlertIfShown("after Don't Allow, attempt \(attempt)")
               break
             }
             if resolvedAgain { break }
@@ -520,6 +656,9 @@ final class AthleteKineticsUITests: XCTestCase {
         for claim in ["Connected", "granted"] where now.contains(claim) {
           XCTFail("the Health wording claimed access ('\(claim)') while the request was open: \(now)")
         }
+        if !denialTapped && now.hasPrefix("Apple Health access requested") {
+          XCTFail("Apple Health access requested appeared without tapping Don't Allow: \(now)")
+        }
         if now.hasPrefix("Apple Health access requested") { answered = denialTapped; break }
         if now.hasPrefix("The Apple Health request did not complete") { break }
         sleep(1)
@@ -553,6 +692,10 @@ final class AthleteKineticsUITests: XCTestCase {
     } else {
       log("HEALTH-UNANSWERED HealthKit returned no answer to the app on this simulator; the app kept its request pending and claimed nothing")
     }
+    // Xcode 27.2 / iOS 26.5 run 2026-11-02: a Health Access alert with OK sat
+    // over the permission sheet after Don't Allow. Any such alert still open
+    // (it may come up later than the check after the tap) is answered first.
+    dismissHealthAccessAlertIfShown("before the sheet check")
     XCTAssertNil(findHealthSheetButton("Don’t Allow", timeout: 2), "the permission sheet stayed open")
     // CI evidence (c4ef71b, 37c6022): when the sheet was answered but healthd
     // never closed the transaction, nothing in the app was hittable afterwards
@@ -672,7 +815,7 @@ final class AthleteKineticsUITests: XCTestCase {
       // program that athlete is offered set-up, which covers the Profile.
       // Checked first: while the offer is up, its text is not a status
       // (CI evidence c5cf82c: "Box Squat — 3×10" was read as the status).
-      if element("Cancel").exists && element("Create program").exists {
+      if (try? element("Cancel").snapshot()) != nil && (try? element("Create program").snapshot()) != nil {
         log("restore t=\(Int(Date().timeIntervalSince(restoreStart)))s: set-up offered for the restored athlete; cancelled")
         element("Cancel").tap()
         openProfile()
@@ -795,7 +938,7 @@ final class AthleteKineticsUITests: XCTestCase {
   private func filesControl(_ names: [String]) -> XCUIElement {
     let named = NSPredicate(format: "label IN %@ OR identifier IN %@", names, names)
     let button = app.buttons.matching(named).firstMatch
-    return button.exists ? button : app.descendants(matching: .any).matching(named).firstMatch
+    return ((try? button.snapshot()) != nil) ? button : app.descendants(matching: .any).matching(named).firstMatch
   }
 
   /// The Files sheet's own navigation bar ("FullDocumentManagerViewController
@@ -814,38 +957,62 @@ final class AthleteKineticsUITests: XCTestCase {
   /// at the instant RESTORE had been tapped (a Button of that name if one
   /// existed then, otherwise any element of the app carrying the name) and
   /// tapped as soon as it existed. It is now taken from the sheet's bar when
-  /// the bar holds a hittable one (otherwise as before), tapped only once it
-  /// is hittable and has stopped moving, recorded with its type, identifier
-  /// and frame, and the sheet must then close: its bar must go, or, when no
-  /// bar was found, the tapped control must go. Nothing is tapped twice.
+  /// the bar holds a hittable one, then from the whole-app lookup when
+  /// hittable, before falling back to an enabled non-hittable one; tapped only
+  /// once it has stopped moving within 30 s, recorded with its type,
+  /// identifier and frame, and the sheet must then close: its bar must go, or,
+  /// when no bar was found, the tapped control must go. Nothing is tapped twice.
   @discardableResult
   private func cancelFilesSheet(file: StaticString = #filePath, line: UInt = #line) -> Date {
     let names = ["Cancel", "Close"]
     let named = NSPredicate(format: "label IN %@ OR identifier IN %@", names, names)
     let opened = Date()
     var found: XCUIElement?
+    var foundSnap: XCUIElementSnapshot?
     var inBar = false
     var lastFrame = CGRect.null
     var lastIdentity = ""
-    while Date().timeIntervalSince(opened) < 30 {
-      // The first hittable of: a button in the sheet's bar, any element in
-      // that bar, then the earlier lookup over the whole app.
+    func readCandidate(_ candidate: XCUIElement, fromBar: Bool) -> (XCUIElementSnapshot, CGRect, String, Bool)? {
+      guard let snap = try? candidate.snapshot() else { return nil }
+      let f = snap.frame
+      guard snap.isEnabled, !f.isNull, !f.isEmpty, f.width > 1, f.height > 1 else { return nil }
+      return (snap, f, "\(snap.elementType.rawValue)|\(snap.identifier)|\(snap.label)|\(fromBar)", candidate.isHittable)
+    }
+    func currentChoice() -> (XCUIElement, XCUIElementSnapshot, CGRect, String, Bool)? {
       let bar = filesSheetBar()
-      let choices: [(XCUIElement, Bool)] = [
-        (bar.buttons.matching(named).firstMatch, true),
-        (bar.descendants(matching: .any).matching(named).firstMatch, true),
-        (filesControl(names), false),
+      let sources: [(() -> XCUIElement, Bool)] = [
+        ({ bar.buttons.matching(named).firstMatch }, true),
+        ({ bar.descendants(matching: .any).matching(named).firstMatch }, true),
+        ({ self.app.buttons.matching(named).firstMatch }, false),
+        ({ self.app.descendants(matching: .any).matching(named).firstMatch }, false),
       ]
-      if let choice = choices.first(where: { $0.0.exists && $0.0.isHittable }) {
-        let (candidate, fromBar) = choice
+      var fallback: (XCUIElement, XCUIElementSnapshot, CGRect, String, Bool)?
+      for (source, fromBar) in sources {
+        let el = source()
+        if let (snap, f, id, hittable) = readCandidate(el, fromBar: fromBar) {
+          if hittable {
+            return (el, snap, f, id, fromBar)
+          }
+          if fallback == nil {
+            fallback = (el, snap, f, id, fromBar)
+          }
+        }
+      }
+      return fallback
+    }
+    while Date().timeIntervalSince(opened) < 30 {
+      // Prefer the first enabled, hittable candidate in the sheet's bar, then
+      // the whole-app lookup (evaluated lazily so a full-tree scan is skipped
+      // whenever the bar already holds a hittable Cancel), before falling back
+      // to an enabled non-hittable candidate.
+      if let (candidate, snap, frame, identity, fromBar) = currentChoice() {
         // Settled: the same element (type, identifier, label, lookup) at the
-        // same frame on two reads half a second apart, so the tap is not
-        // aimed at a sheet still sliding in.
-        let frame = candidate.frame
-        let identity = "\(candidate.elementType.rawValue)|\(candidate.identifier)|\(candidate.label)|\(fromBar)"
-        if frame == lastFrame && identity == lastIdentity { found = candidate; inBar = fromBar; break }
-        lastFrame = frame
-        lastIdentity = identity
+        // same frame on two reads half a second apart, so the tap is not aimed
+        // at a sheet still sliding in.
+        if frame == lastFrame && identity == lastIdentity {
+          found = candidate; foundSnap = snap; inBar = fromBar; break
+        }
+        lastFrame = frame; lastIdentity = identity
       } else {
         lastFrame = .null
         lastIdentity = ""
@@ -858,15 +1025,19 @@ final class AthleteKineticsUITests: XCTestCase {
       return Date()
     }
     let shown = Date().timeIntervalSince(opened)
-    let barWasUp = filesSheetBar().exists
-    let f = cancel.frame
-    log("files sheet cancel: tapping \(cancel.elementType.rawValue):'\(cancel.label)'|'\(cancel.identifier)' at {{\(Int(f.minX)), \(Int(f.minY))}, {\(Int(f.width)), \(Int(f.height))}} found by \(inBar ? "the sheet's bar" : "the whole-app lookup") \(String(format: "%.1f", shown)) s after RESTORE")
+    let barWasUp = (try? filesSheetBar().snapshot()) != nil
+    let snap = foundSnap ?? (try? cancel.snapshot())
+    let f = snap?.frame ?? cancel.frame
+    let elType = snap?.elementType.rawValue ?? cancel.elementType.rawValue
+    let elLabel = snap?.label ?? cancel.label
+    let elId = snap?.identifier ?? cancel.identifier
+    log("files sheet cancel: tapping \(elType):'\(elLabel)'|'\(elId)' at {{\(Int(f.minX)), \(Int(f.minY))}, {\(Int(f.width)), \(Int(f.height))}} found by \(inBar ? "the sheet's bar" : "the whole-app lookup") \(String(format: "%.1f", shown)) s after RESTORE")
     cancel.tap()
     let tapped = Date()
     // Closed: the sheet's bar is gone, or, when no bar was found, the
     // tapped control (part of the sheet) is gone.
     let signal = barWasUp ? "its bar" : "the tapped control"
-    let stillOpen = { barWasUp ? self.filesSheetBar().exists : cancel.exists }
+    let stillOpen = { barWasUp ? ((try? self.filesSheetBar().snapshot()) != nil) : ((try? cancel.snapshot()) != nil) }
     let deadline = tapped.addingTimeInterval(30)
     while stillOpen() && Date() < deadline { usleep(250_000) }
     if stillOpen() {

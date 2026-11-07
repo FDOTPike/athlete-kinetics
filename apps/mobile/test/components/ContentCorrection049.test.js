@@ -9,6 +9,8 @@
  * re-export shim and carries no implementation.
  */
 import React from 'react';
+import { StyleSheet } from 'react-native';
+import { theme } from '../../src/theme/theme';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { EQUIPMENT_PRESETS, SPECIALIST_EQUIPMENT_ITEMS, STANDARD_EQUIPMENT_ITEMS } from '@ak/inference';
 import LibraryScreenV2 from '../../src/screens/LibraryScreenV2';
@@ -99,6 +101,12 @@ describe('049 full-body scope in the movement library', () => {
       movementAvailabilityRevision: 0,
       resolveGoalRung: () => null,
     };
+  });
+
+  test('the movement search input meets the minimum touch height', () => {
+    render(<LibraryScreenV2 />);
+    const style = StyleSheet.flatten(screen.getByLabelText('Search movements').props.style);
+    expect(style.minHeight).toBeGreaterThanOrEqual(theme.touch.min);
   });
 
   test('both Turkish Get-Ups carry a full-body badge in the list, and nothing else does', () => {

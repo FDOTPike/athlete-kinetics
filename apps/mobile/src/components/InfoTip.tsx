@@ -13,6 +13,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { palette } from '../state/useStore';
@@ -61,7 +62,14 @@ export interface InfoTipProps {
   term: string;
 }
 
+/** The circle is 18 dp at the default font size. It grows with the system
+ *  font scale so the "i" it holds is never clipped (Android walk 2026-11-03,
+ *  a11y-5: at 2.0 the glyph overflowed a fixed 18 dp circle). */
+const ICON_SIZE = 18;
+
 export default function InfoTip({ term }: InfoTipProps): React.JSX.Element | null {
+  const { fontScale } = useWindowDimensions();
+  const iconSize = Math.round(ICON_SIZE * Math.max(1, fontScale));
   const [open, setOpen] = useState(false);
   const titleRef = useRef<React.ElementRef<typeof Text>>(null);
   const close = useCallback(() => setOpen(false), []);
@@ -94,7 +102,10 @@ export default function InfoTip({ term }: InfoTipProps): React.JSX.Element | nul
         accessibilityLabel={`What does ${title} mean?`}
         style={styles.trigger}
       >
-        <View style={styles.icon}>
+        <View
+          testID="info-tip-icon"
+          style={[styles.icon, { width: iconSize, height: iconSize, borderRadius: iconSize / 2 }]}
+        >
           <Text style={styles.iconText}>i</Text>
         </View>
       </Pressable>
@@ -149,9 +160,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   icon: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
     borderWidth: 1,
     borderColor: colors.dim,
     alignItems: 'center',

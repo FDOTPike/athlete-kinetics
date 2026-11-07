@@ -18,7 +18,7 @@ import {
 import { tryCreateBiometricsBridge } from '@ak/biometrics';
 import { palette, useStore } from './state/useStore';
 import { tryCreateDeviceEmbedder } from './inference/deviceEmbedder';
-import { NavigationProvider, useNavigation, type Tab } from './navigation/navigation';
+import { NavigationProvider, useNavigation, useSubViewBack, type Tab } from './navigation/navigation';
 import TodayScreen from './screens/TodayScreen';
 import ReadinessScreen from './screens/ReadinessScreen';
 import SessionScreen from './screens/SessionScreen';
@@ -35,6 +35,7 @@ import { authorizeAthleteDataBoot } from './state/dataMaintenanceLock';
 import { startDeviceBackupExclusion } from './state/deviceBackupPolicy';
 import { nativeSmokeRequested, runNativeSmoke } from './diagnostics/nativeSmoke';
 import { QuietAction } from './components/ui';
+import { shellKeyboardAvoidance, useKeyboardShown } from './components/KeyboardAwareScrollView';
 
 /**
  * W4: exactly THREE primary destinations. PLAN is the coach/program-management
@@ -109,6 +110,8 @@ export default function App(): React.JSX.Element {
 }
 
 export function AppShell(): React.JSX.Element {
+  const keyboardShown = useKeyboardShown();
+  const keyboardAvoidance = shellKeyboardAvoidance(Platform.OS, keyboardShown);
   const programSetupPending = useStore((s) =>
     s.status === 'ready' && s.onboarded && s.block === null && s.program === null);
   // "No block and no program" is NOT only a first-run state: archiving a
@@ -133,6 +136,7 @@ export function AppShell(): React.JSX.Element {
     setSetupDismissed(false);
   }, [activeAthleteId]);
   const showProgramSetup = programSetupPending && !setupDismissed;
+  useSubViewBack(showProgramSetup, () => setSetupDismissed(true));
   const { tab, setTab } = useNavigation();
   const boot = useStore((s) => s.boot);
   const backupStartupSafe = useBackupStore((s) => s.startupSafe);
@@ -272,7 +276,8 @@ export function AppShell(): React.JSX.Element {
       )}
       <KeyboardAvoidingView
         style={styles.body}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={keyboardAvoidance.behavior}
+        enabled={keyboardAvoidance.enabled}
         testID="shell-body"
       >
         {showOnboarding ? (
@@ -303,7 +308,7 @@ export function AppShell(): React.JSX.Element {
                 database is ready. */}
             {tab === 'session' && status === 'ready' && (
               <View style={{ flex: 1 }} testID="session-screen-shown">
-                <SessionScreen onReturnToToday={() => setTab('today')} />
+                <SessionScreen onReturnToToday={() => setTab('today')} onOpenPlan={() => setTab('coach')} />
               </View>
             )}
             {/* PR #13 review: ProgressScreen's loaders read the database on
@@ -382,11 +387,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 4,
   },
+  // No letter spacing on header and tab labels: at system font size 2.0 the
+  // tracking made "WORKOUT" wrap to "WORKOU / T" (Android walk 2026-11-03).
+  // Labels keep full font scaling and may wrap, centred, rather than shrink.
   headerText: {
     color: palette.faint,
     fontSize: 10,
     fontWeight: '700',
-    letterSpacing: 1.2,
+    letterSpacing: 0,
+    textAlign: 'center',
   },
   headerTextActive: {
     color: palette.text,
@@ -401,7 +410,7 @@ const styles = StyleSheet.create({
   tabBtnPressed: {
     opacity: 0.7,
   },
-  tabText: { color: palette.faint, fontSize: 11, fontWeight: '700', letterSpacing: 1.6 },
+  tabText: { color: palette.faint, fontSize: 11, fontWeight: '700', letterSpacing: 0, textAlign: 'center' },
   tabTextActive: { color: palette.text, fontWeight: '800' },
   tabIndicator: { height: 3, width: 32, backgroundColor: 'transparent' },
   tabIndicatorActive: { backgroundColor: palette.chalk },

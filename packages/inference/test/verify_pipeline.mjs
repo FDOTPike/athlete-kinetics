@@ -8,7 +8,7 @@ import { join } from 'node:path';
 const require = createRequire(import.meta.url);
 const { resolveMovementAvailability } = require('./.build/capabilityResolver.js');
 const { isDifficultyAllowed } = require('./.build/tierPolicy.js');
-const { parseHistoryImport, HISTORY_IMPORT_EXAMPLE } = require('./.build/historyImport.js');
+const { parseHistoryImport, historyContentFingerprint, HISTORY_IMPORT_EXAMPLE } = require('./.build/historyImport.js');
 const {
   composeRoutine,
   groupRoutineTemplateDays,
@@ -278,6 +278,29 @@ check('history parser reports malformed, duplicate, and unknown records by line'
   const duplicate = parseHistoryImport('AK_HISTORY_V1\nSESSION|2026-02-20||\nSET|Pull-Up|1|5|0||\nSET|Pull-Up|1|5|0||\nEND_SESSION', library);
   assert.ok(duplicate.errors.some((issue) => issue.message.includes('Duplicate')));
 });
+check('history SET accepts 5, 6 or 7 fields and still rejects fewer than 5', () => {
+  const wrap = (setLine) => `AK_HISTORY_V1\nSESSION|2026-02-20||\n${setLine}\nEND_SESSION`;
+  for (const [setLine, rpe] of [['SET|Pull-Up|1|5|0', null], ['SET|Pull-Up|1|5|0|7', 7], ['SET|Pull-Up|1|5|0|7|', 7]]) {
+    const parsed = parseHistoryImport(wrap(setLine), library);
+    assert.deepEqual(parsed.errors, [], setLine);
+    assert.equal(parsed.sessions.length, 1, setLine);
+    assert.equal(parsed.sessions[0].sets.length, 1, setLine);
+    assert.equal(parsed.sessions[0].sets[0].rpe, rpe, setLine);
+    assert.equal(parsed.sessions[0].sets[0].seconds, null, setLine);
+  }
+  const short = parseHistoryImport(wrap('SET|Pull-Up|1|5'), library);
+  assert.ok(short.errors.some((issue) => issue.line === 3 && issue.message.startsWith('SET requires')));
+  const extra = parseHistoryImport(wrap('SET|Pull-Up|1|5|0|7|30|x'), library);
+  assert.ok(extra.errors.some((issue) => issue.line === 3 && issue.message.startsWith('SET requires')));
+});
+check('history 7-field import keeps its fingerprint and parsed sets', () => {
+  assert.equal(historyContentFingerprint(HISTORY_IMPORT_EXAMPLE), '9916ba50553b2ffc1b8c8b22d3ec62b0f3058c8e040620644f0ccac7e4f1f270');
+  const parsed = parseHistoryImport(HISTORY_IMPORT_EXAMPLE, library);
+  assert.deepEqual(parsed.sessions[0].sets.map(({ setIndex, reps, loadKg, rpe, seconds, sourceLine }) => ({ setIndex, reps, loadKg, rpe, seconds, sourceLine })), [
+    { setIndex: 1, reps: 5, loadKg: 0, rpe: 7, seconds: null, sourceLine: 3 },
+    { setIndex: 2, reps: 5, loadKg: 0, rpe: 7.5, seconds: null, sourceLine: 4 },
+  ]);
+});
 check('legacy routine composer preserves selected majors while enforcing availability and RPE cap', () => {
   const result = composeRoutine({ selections: [{ movementId: 1, role: 'major' }, { movementId: 2, role: 'major' }, { movementId: 3, role: 'supplementary' }], schemaType: 'LINEAR', objective: 'strength', trainingAge: 'beginner', durationCapMin: 30, baseRpeCap: 7, availableMovementIds: new Set([1, 2]) });
   assert.equal(result.slots.length, 2); assert.ok(result.slots.every((slot) => slot.targetRpe <= 7)); assert.ok(result.warnings.length >= 2);
@@ -513,10 +536,10 @@ check('AK_HISTORY_V1.md template parses with zero errors', () => {
   }
   for (const file of fullChain) db.exec(readFileSync(join(schemaDir, file), 'utf-8'));
 
-  check('the acceptance database is the real 001-071 chain, not a trimmed subset', () => {
+  check('the acceptance database is the real 001-074 chain, not a trimmed subset', () => {
     assert.equal(fullChain[0], '001_mechanical_input.sql');
-    assert.equal(fullChain[fullChain.length - 1], '071_beta_recording.sql');
-    assert.equal(fullChain.length, 70, `applied ${fullChain.length} migrations`);
+    assert.equal(fullChain[fullChain.length - 1], '074_session_feel_reasons.sql');
+    assert.equal(fullChain.length, 73, `applied ${fullChain.length} migrations`);
     assert.equal(Number(db.prepare('SELECT COUNT(*) AS c FROM movement').get().c), 300);
   });
 

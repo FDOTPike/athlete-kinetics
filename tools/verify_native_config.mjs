@@ -23,6 +23,8 @@
  *   [N9] Xcode 26 toolchain: the Podfile disables fmt's consteval for Apple
  *        clang (fmtlib/fmt#4740) while React Native pins fmt 11.0.2, and makes
  *        glog's namespace-included headers textual for Swift/C++ interop.
+ *   [N11] beta orientation lock (#168): the Android main activity and iPhone
+ *        are portrait only; iPad keeps its own orientation list.
  *
  * Run: npm run verify:native-config
  */
@@ -38,10 +40,42 @@ const check = (label, ok, detail = '') => {
   console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? `  [${detail}]` : ''}`);
   if (!ok) fail += 1;
 };
+// XML comments are not active configuration: a commented-out key must read as
+// absent, never as set (fail closed).
+const stripXmlComments = (xml) => xml.replace(/<!--[\s\S]*?-->/g, '');
+// Keys of the TOP-LEVEL plist dictionary only: a key nested in another
+// dictionary (NSAppTransportSecurity, UIApplicationSceneManifest) is not an
+// app-level setting and must read as absent (fail closed). Values: string
+// text, true/false, an array's inner XML, or the opening tag of anything else.
 const plistKeys = (xml) => {
   const out = new Map();
-  for (const m of xml.matchAll(/<key>([^<]+)<\/key>\s*(<string>([^<]*)<\/string>|<true\/>|<false\/>|<array>([\s\S]*?)<\/array>|<array\/>|<dict>)/g)) {
-    out.set(m[1], m[3] ?? (m[2] === '<true/>' ? true : m[2] === '<false/>' ? false : m[4] ?? m[2]));
+  const src = stripXmlComments(xml);
+  const tags = /<key>([^<]+)<\/key>|<string>([^<]*)<\/string>|<(dict|array)>|<\/(dict|array)>|<(true|false)\/>|<(?:dict|array|string)\/>|<(integer|real|date|data)>[^<]*<\/\6>/g;
+  let depth = 0; // 1 = inside the root dictionary
+  let pendingKey = null;
+  let arrayKey = null;
+  let arrayStart = 0;
+  for (const m of src.matchAll(tags)) {
+    const [whole, key, text, open, close, bool] = m;
+    if (key !== undefined) {
+      if (depth === 1) pendingKey = key;
+      continue;
+    }
+    const valueKey = depth === 1 ? pendingKey : null;
+    if (depth === 1) pendingKey = null;
+    if (open !== undefined) {
+      if (valueKey !== null && open === 'array') { arrayKey = valueKey; arrayStart = m.index + whole.length; }
+      else if (valueKey !== null) out.set(valueKey, whole);
+      depth += 1;
+    } else if (close !== undefined) {
+      depth -= 1;
+      if (depth === 1 && close === 'array' && arrayKey !== null) {
+        out.set(arrayKey, src.slice(arrayStart, m.index));
+        arrayKey = null;
+      }
+    } else if (valueKey !== null) {
+      out.set(valueKey, text ?? (bool === 'true' ? true : bool === 'false' ? false : whole === '<string/>' ? '' : whole));
+    }
   }
   return out;
 };
@@ -243,8 +277,32 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
   const suite = read('apps/mobile/ios/AthleteKineticsUITests/AthleteKineticsUITests.swift');
   const runner = read('tools/ios_ui_tests.sh');
   const tests = [...suite.matchAll(/func (test\w+)\(\)/g)].map((m) => m[1]);
-  check('every UI test in the suite is run by CI, none skipped',
-    tests.length >= 4 && tests.every((t) => runner.includes(`  ${t}\n`)) && !/XCTSkip|skipped = "YES"/.test(suite + scheme), tests.join(','));
+  // A test is either run (TESTS) or on hold by an owner decision (HELD_TESTS,
+  // each entry "<test>:<tracking issue>", and the CI notice prints that issue).
+  // Never both, never neither, and never skipped inside the suite or scheme.
+  // null = the array is not declared (the runner reads both under set -u, so a
+  // missing declaration fails the check rather than counting as empty).
+  const runnerArray = (name) => {
+    const m = runner.match(new RegExp(`^${name}=\\((?:\\n([\\s\\S]*?))?\\n?\\)`, 'm'));
+    if (m === null) return null;
+    return m[1] === undefined ? [] : m[1].split('\n').map((line) => line.trim()).filter((line) => line !== '' && !line.startsWith('#'));
+  };
+  const runTests = runnerArray('TESTS') ?? [];
+  const heldEntries = runnerArray('HELD_TESTS');
+  const held = (heldEntries ?? []).map((entry) => entry.match(/^(test\w+):(\d+)$/));
+  const heldTests = held.map((m, i) => (m === null ? heldEntries[i] : m[1]));
+  const heldNoticeNamesIssue = runner.includes('on hold::not run in CI (owner decision, issue #${held##*:})')
+    && runner.includes('if [ "${#HELD_TESTS[@]}" -gt 0 ]; then');
+  check('every UI test in the suite is run by CI or on hold with its own tracking issue, none skipped',
+    tests.length >= 4 && new Set(runTests).size >= 4 && heldEntries !== null
+      // No name listed twice, in one list or across both.
+      && new Set([...runTests, ...heldTests]).size === runTests.length + heldTests.length
+      && tests.every((t) => runTests.includes(t) !== heldTests.includes(t))
+      && [...runTests, ...heldTests].every((t) => tests.includes(t))
+      && held.every((m) => m !== null)
+      && heldNoticeNamesIssue
+      && !/XCTSkip|skipped = "YES"/.test(suite + scheme),
+    `run=${runTests.join(',')} held=${heldEntries === null ? 'NOT DECLARED' : (heldEntries.join(',') || 'none')}`);
   check('the suite covers the audit, Dynamic Type, Health denial + switching and Files backup/restore',
     suite.includes('performAccessibilityAudit(for: .all)') && suite.includes('UICTContentSizeCategoryAccessibilityXXXL')
       && suite.includes('Don’t Allow') && suite.includes('Athlete UITest B, active')
@@ -265,6 +323,9 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
       && /if now\.hasPrefix\("Apple Health access requested"\) \{ answered = denialTapped; break \}/.test(suite)
       && /\} else if denialTapSkipped \{\s+XCTFail\("the Health denial tap was skipped and no later attempt completed the denial"\)\s+\} else if healthHint\.exists/.test(suite));
   const denial = suite.slice(suite.indexOf('if var dontAllow = findHealthSheetButton'), suite.indexOf('// Every change of the wording'));
+  const lookup = suite
+    .slice(suite.indexOf('private func findHealthSheetButton('), suite.indexOf('/// A system alert with an OK button'))
+    .replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
   check('Health denial waits within the original sheet deadline, scrolls its own table and taps the element with one re-resolution',
     denial.includes('let deadline = started.addingTimeInterval(150)')
       && denial.includes('while Date() < deadline')
@@ -276,8 +337,8 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
       && denial.includes('springboard.tables.containing(named).firstMatch')
       && /if table\.exists && table\.isHittable \{\s+table\.swipeUp\(velocity: \.slow\)\s+scrolls \+= 1/.test(denial)
       && !/coordinate\(|snapshot\(/.test(denial)
-      && suite.includes('inApp.exists || app.staticTexts.matching(named).firstMatch.exists')
-      && suite.includes('inSpringboard.exists || springboard.staticTexts.matching(named).firstMatch.exists'));
+      && lookup.includes('(try? inApp.snapshot()) != nil || (try? app.staticTexts.matching(named).firstMatch.snapshot()) != nil')
+      && lookup.includes('(try? inSpringboard.snapshot()) != nil || (try? springboard.staticTexts.matching(named).firstMatch.snapshot()) != nil'));
   const reveal = suite.slice(suite.indexOf('private func reveal('), suite.indexOf('private func tap('));
   check('general reveal keeps the passing master app gestures without extra ScrollView queries',
     reveal.includes('app.swipeUp(velocity: .slow)') && reveal.includes('app.swipeDown(velocity: .slow)')
@@ -300,6 +361,47 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
   check('CI builds the tests ad-hoc for the simulator only (no team, no profile) and runs them fail-closed',
     /CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER=/.test(ci) && /-sdk iphonesimulator[\s\S]*build-for-testing/.test(ci)
       && ci.includes('tools/ios_ui_tests.sh') && runner.includes('exit "$FAILED"') && runner.includes('lsof -nP -a -i -p'));
+}
+
+console.log('[N11] beta orientation lock (#168)');
+{
+  // A beta decision to revisit: landscape left too little room on every
+  // screen (the rest card's countdown never fit). Tablets are not in the beta,
+  // so the iPad list is kept as it was.
+  const rawManifest = read('apps/mobile/android/app/src/main/AndroidManifest.xml');
+  const manifest = stripXmlComments(rawManifest);
+  const mainActivity = manifest.match(/<activity\s[^>]*android:name="\.MainActivity"[^>]*>/)?.[0] ?? '';
+  check('Android MainActivity is locked to portrait', /android:screenOrientation="portrait"/.test(mainActivity));
+  // Android 16 (API 36) ignores the lock on >= 600dp screens; the scope note
+  // sits directly above the activity (XML allows no comment inside a tag).
+  check('Android MainActivity carries the large-screen scope note',
+    /<!-- Locks portrait on phones \(< 600dp\); Android 16 \(API 36\) ignores portrait lock on >= 600dp tablets\/unfolded foldables, which are out of scope for the beta\. -->\s*<activity\s[^>]*android:name="\.MainActivity"/.test(rawManifest));
+  const orientationsIn = (keys, key) => [...String(keys.get(key) ?? '').matchAll(/<string>([^<]+)<\/string>/g)].map((m) => m[1]);
+  const orientations = (key) => orientationsIn(plist, key);
+  // iOS reads the device-qualified key over the plain one, so an iPhone
+  // override decides what an iPhone actually allows.
+  const iphoneOrientations = (keys) => orientationsIn(keys,
+    keys.has('UISupportedInterfaceOrientations~iphone') ? 'UISupportedInterfaceOrientations~iphone' : 'UISupportedInterfaceOrientations');
+  const portraitOnly = (list) => list.length === 1 && list[0] === 'UIInterfaceOrientationPortrait';
+  const iphone = iphoneOrientations(plist);
+  check('iPhone supports portrait only', portraitOnly(iphone), iphone.join(','));
+  // Falsifiers for the two ways the check above could pass on a plist that
+  // does not lock iPhone to portrait.
+  const fixture = (body) => `<?xml version="1.0" encoding="UTF-8"?>\n<plist version="1.0">\n<dict>\n${body}\n</dict>\n</plist>\n`;
+  const portraitArray = '<array>\n<string>UIInterfaceOrientationPortrait</string>\n</array>';
+  const nestedOnly = plistKeys(fixture(
+    `<key>NSAppTransportSecurity</key>\n<dict>\n<key>UISupportedInterfaceOrientations</key>\n${portraitArray}\n</dict>`));
+  check('falsifier: an orientation key nested in another dictionary reads as absent, so the iPhone check fails',
+    !nestedOnly.has('UISupportedInterfaceOrientations') && !portraitOnly(iphoneOrientations(nestedOnly)));
+  const landscapeOverride = plistKeys(fixture(
+    `<key>UISupportedInterfaceOrientations</key>\n${portraitArray}\n`
+    + '<key>UISupportedInterfaceOrientations~iphone</key>\n<array>\n<string>UIInterfaceOrientationPortrait</string>\n<string>UIInterfaceOrientationLandscapeLeft</string>\n</array>'));
+  check('falsifier: a UISupportedInterfaceOrientations~iphone override with landscape fails the iPhone check',
+    !portraitOnly(iphoneOrientations(landscapeOverride)));
+  const ipad = orientations('UISupportedInterfaceOrientations~ipad');
+  check('iPad keeps portrait and both landscape orientations',
+    ['UIInterfaceOrientationPortrait', 'UIInterfaceOrientationLandscapeLeft', 'UIInterfaceOrientationLandscapeRight']
+      .every((o) => ipad.includes(o)), ipad.join(','));
 }
 
 console.log(`\n${fail === 0 ? 'NATIVE CONFIG VERIFIED (static contract; native build evidence comes from the macOS CI job)' : `${fail} NATIVE CONFIG CHECK(S) FAILED`}`);

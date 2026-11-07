@@ -22,6 +22,15 @@ was edited. The first later append is `069_resting_heart_rate` (ordinal 68): a n
 The second is `070_session_feel` (ordinal 69): a new `session_feel` table only.
 The third is `071_beta_recording` (ordinal 70): two new record-only tables,
 `session_skipped_slot` and `set_load_shown`, and nothing else.
+The fourth is `072_question_log` (ordinal 71): local question text and its
+record-only routing outcome in `question_log`.
+The fifth is `073_session_slot_replaced_by` (ordinal 72): adds the
+`session_plan_slot_replacement` side-car table linking a slot swapped after
+logged sets to its replacement row.
+The sixth is `074_session_feel_reasons` (ordinal 73): rebuilds `session_feel`
+with the same columns and a looser CHECK (only "as planned" is held to no
+reasons), and adds the `session_feel_extra_reason` side-car table for three new
+reasons.
 `MIGRATION_LINEAGE.json` records the SHA-256 of every shipped file and its
 ordinal, and of master's 34-entry chain. Master's exact `034`/`058` bytes and its
 registry live under `test/fixtures/lineage/master-1da218d/`.

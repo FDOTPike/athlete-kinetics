@@ -104,6 +104,7 @@ export function FocusPicker({ value, onChange, showMuscles, onToggleMuscles }: F
             <Chip
               key={bundleId}
               testID={`focus-bundle-${bundleId}`}
+              wrap
               label={`${bundle.label.toUpperCase()} — ${bundle.description}`}
               selected={value.bundleId === bundleId}
               onPress={() => chooseBundle(bundleId)}
@@ -214,7 +215,11 @@ export const GOAL_EXERCISE_METRICS: ReadonlySet<GoalMetricId> = new Set<GoalMetr
 export interface ExerciseOption {
   readonly movement_id: number;
   readonly name: string;
+  /** The library's base name ("Back Squat" for Competition Squat), searched too. */
+  readonly baseName?: string;
 }
+
+const GOAL_EXERCISE_MATCH_LIMIT = 6;
 
 export interface GoalExerciseLink {
   readonly movements: readonly ExerciseOption[];
@@ -227,9 +232,11 @@ export function GoalExerciseField({ movements, movementId, onChange }: GoalExerc
   const [query, setQuery] = useState('');
   const linked = movementId === null ? undefined : movements.find((movement) => movement.movement_id === movementId);
   const needle = query.trim().toLowerCase();
-  const matches = needle.length < 2
+  const allMatches = needle.length < 2
     ? []
-    : movements.filter((movement) => movement.name.toLowerCase().includes(needle)).slice(0, 6);
+    : movements.filter((movement) => movement.name.toLowerCase().includes(needle)
+      || (movement.baseName ?? '').toLowerCase().includes(needle));
+  const matches = allMatches.slice(0, GOAL_EXERCISE_MATCH_LIMIT);
   return (
     <View testID="goal-exercise">
       <Text style={styles.label}>WHICH EXERCISE IS THIS ABOUT? (OPTIONAL)</Text>
@@ -260,6 +267,7 @@ export function GoalExerciseField({ movements, movementId, onChange }: GoalExerc
           <View style={styles.wrap}>
             {matches.map((movement) => (
               <Chip
+                wrap
                 key={movement.movement_id}
                 testID={`goal-exercise-option-${movement.movement_id}`}
                 label={movement.name.toUpperCase()}
@@ -270,6 +278,11 @@ export function GoalExerciseField({ movements, movementId, onChange }: GoalExerc
               />
             ))}
           </View>
+          {allMatches.length > matches.length && (
+            <Text style={styles.dim} testID="goal-exercise-more">
+              {`Showing ${matches.length} of ${allMatches.length}. Type more of the name to narrow the list.`}
+            </Text>
+          )}
           {needle.length >= 2 && matches.length === 0 && (
             <Text style={styles.dim} testID="goal-exercise-none">No exercise in the library has that in its name.</Text>
           )}
@@ -331,6 +344,7 @@ export function GoalEditor({ fields, onChange, today, trainingAge, showAllErrors
       <View style={styles.wrap}>
         {GOAL_METRICS.map((metricId) => (
           <Chip
+            wrap
             key={metricId}
             testID={`goal-metric-${metricId}`}
             label={GOAL_METRIC_INFO[metricId].label.toUpperCase()}
@@ -434,7 +448,7 @@ export function GoalEditor({ fields, onChange, today, trainingAge, showAllErrors
       />
       {fieldError('targetValue', fields.targetText.length > 0)}
 
-      <Text style={styles.label}>WHY DOES THIS MATTER TO YOU?</Text>
+      <Text style={styles.label}>WHY DOES THIS MATTER TO YOU? (REQUIRED)</Text>
       <TextInput
         disableFullscreenUI
         style={styles.input}
@@ -443,7 +457,7 @@ export function GoalEditor({ fields, onChange, today, trainingAge, showAllErrors
         maxLength={GOAL_TEXT_MAX}
         placeholder="In your own words"
         placeholderTextColor={theme.color.textLow}
-        accessibilityLabel="Why this goal matters to you"
+        accessibilityLabel="Why does this matter to you? (required)"
         testID="goal-reason"
       />
       {fieldError('reason', fields.reason.length > 0)}

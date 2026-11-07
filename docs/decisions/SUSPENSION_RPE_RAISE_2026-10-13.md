@@ -1,7 +1,7 @@
 # A block generated during a suspension gets no autopilot effort raise
 
 Date: 2026-10-13
-Status: **PROPOSED. It is ratified by the owner merging the pull request that carries this file, and not before.**
+Status: **Ratified by merge.** Ratified when the owner merged the pull request that carries this file: PR 74, merge commit fa52e378 (recorded 2026-11-06).
 
 ## The conflict
 

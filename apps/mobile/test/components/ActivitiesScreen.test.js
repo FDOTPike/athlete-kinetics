@@ -303,4 +303,76 @@ describe('WO-05 factual activities screen', () => {
     fireEvent.press(screen.getByRole('button', { name: 'Activity type: Rugby' }));
     expect(nameField().props.value).toBe('Hobby horsing');
   });
+
+  // Issue #147: a validation message must not stay next to a corrected value.
+  // The store's own message is used; the validation itself is unchanged.
+  const rejectEffortAboveTen = (input) => {
+    if (input.expectedEffort !== null && input.expectedEffort > 10) {
+      throw new Error('Effort must be between 1 and 10.');
+    }
+    return 'series-1';
+  };
+
+  test('#147: correcting the effort clears the effort error before Save is pressed', () => {
+    mockState.saveWeeklyActivity = jest.fn(rejectEffortAboveTen);
+    render(<ActivitiesScreen onClose={jest.fn()} />);
+    fireEvent.press(screen.getByRole('button', { name: 'Add an existing or one-off activity' }));
+    fireEvent.changeText(screen.getByLabelText('Whole activity effort from 1 to 10'), '11');
+    fireEvent.press(screen.getByRole('button', { name: 'Save activity facts' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Effort must be between 1 and 10.');
+
+    fireEvent.changeText(screen.getByLabelText('Whole activity effort from 1 to 10'), '6');
+    expect(screen.queryByText('Effort must be between 1 and 10.')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(mockState.saveWeeklyActivity).toHaveBeenCalledTimes(1);
+
+    // Save still validates: 6 is accepted, 11 again is refused again.
+    fireEvent.press(screen.getByRole('button', { name: 'Save activity facts' }));
+    expect(mockState.saveWeeklyActivity).toHaveBeenLastCalledWith(expect.objectContaining({ expectedEffort: 6 }));
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  test('#147: editing the duration or the start time also clears a shown form error', () => {
+    mockState.saveWeeklyActivity = jest.fn(rejectEffortAboveTen);
+    render(<ActivitiesScreen onClose={jest.fn()} />);
+    fireEvent.press(screen.getByRole('button', { name: 'Add an existing or one-off activity' }));
+
+    fireEvent.changeText(screen.getByLabelText('Whole activity duration in minutes'), 'abc');
+    fireEvent.press(screen.getByRole('button', { name: 'Save activity facts' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Use a number or leave the field blank.');
+    fireEvent.changeText(screen.getByLabelText('Whole activity duration in minutes'), '45');
+    expect(screen.queryByRole('alert')).toBeNull();
+
+    fireEvent.changeText(screen.getByLabelText('Start time in 24-hour HH:MM'), '25:00');
+    fireEvent.press(screen.getByRole('button', { name: 'Save activity facts' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter a real time between 00:00 and 23:59.');
+    fireEvent.changeText(screen.getByLabelText('Start time in 24-hour HH:MM'), '17:00');
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(mockState.saveWeeklyActivity).not.toHaveBeenCalled();
+  });
+
+  test('#147: correcting the effort in the completion form clears its error before Save', () => {
+    mockState.activityLedger = {
+      ...emptyLedger,
+      occurrences: [{
+        occurrenceId: 'occurrence-1', activityId: 'activity-1', displayName: 'Walk',
+        localDate: '2026-09-13', localStartMinute: null, timezoneId: 'Australia/Sydney',
+        state: 'planned', timing: 'flexible', modalityId: 'unknown', purposeId: 'recreation',
+        expectedDurationMin: 30, expectedEffort: null, actualDurationMin: null, actualEffort: null,
+      }],
+    };
+    mockState.completeActivityOccurrence = jest.fn((input) => {
+      if (input.actualEffort !== null && input.actualEffort > 10) throw new Error('Effort must be between 1 and 10.');
+    });
+    render(<ActivitiesScreen onClose={jest.fn()} />);
+    fireEvent.press(screen.getByRole('button', { name: 'Log actual completion for Walk' }));
+    fireEvent.changeText(screen.getByLabelText('Actual whole activity effort from 1 to 10'), '11');
+    fireEvent.press(screen.getByRole('button', { name: 'SAVE ACTUAL ACTIVITY' }));
+    expect(screen.getAllByText('Effort must be between 1 and 10.').length).toBeGreaterThan(0);
+
+    fireEvent.changeText(screen.getByLabelText('Actual whole activity effort from 1 to 10'), '6');
+    expect(screen.queryAllByText('Effort must be between 1 and 10.')).toHaveLength(0);
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(mockState.completeActivityOccurrence).toHaveBeenCalledTimes(1);
+  });
 });

@@ -71,7 +71,11 @@ function classifyPattern(ex) {
   if (/deadlift|hip thrust|swing|good morning|glute bridge|back extension|hyperextension|clean|snatch|pull[- ]?through/.test(n)) return 'hinge';
   if (/squat|leg press|hack squat|wall sit/.test(n)) return 'squat';
   if (/row|pulldown|pull[- ]?up|chin[- ]?up|face pull|shrug|pullover/.test(n)) return 'row';
-  if (/bench|press|push[- ]?up|dip|fly|flye|pushdown|raise.*front|overhead/.test(n)) return 'push';
+  if (/bench|press|push[- ]?up|dip|fly|flye|pushdown|overhead/.test(n)
+    || n.split(/[\r\n\u2028\u2029]/).some((line) => {
+      const raise = line.indexOf('raise');
+      return raise !== -1 && line.indexOf('front', raise + 5) !== -1;
+    })) return 'push';
   if (/plank|crunch|sit[- ]?up|ab |abs|oblique|russian twist|dead bug|bird dog|hollow|rollout|woodchop|pallof|l[- ]sit|leg raise|knee raise/.test(n)) return 'core';
   if (/curl|extension|raise|calf|forearm|wrist|neck|pull[- ]apart|rotation|rotator/.test(n)) return 'accessory';
   return null; // unmappable -> quarantine

@@ -38,8 +38,10 @@
  * is still a claim.
  */
 import React, { useMemo } from 'react';
-import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useStore } from '../state/useStore';
+import { Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { addDaysIso, applyPrescriptionToSlot } from '@ak/inference';
+import { useStore, freeFormStartIsEmpty } from '../state/useStore';
+import { useNavigation } from '../navigation/navigation';
 import TrainingSupportNotice from '../components/TrainingSupportNotice';
 import { theme } from '../theme/theme';
 import {
@@ -50,8 +52,9 @@ import {
   type SessionRef,
   type TodayState,
 } from '../state/todayState';
-import { classifyReadiness } from './ReadinessScreen';
+import { classifyReadiness, HALT_META, HeldScreenWithHalt } from './ReadinessScreen';
 import { autopilotReasonCopy } from '../state/autopilotCopy';
+import { coachModeAthleteName } from '../state/coachModeAthlete';
 import { PrimaryButton, QuietAction, Disclosure, ListRow } from '../components/ui';
 
 export interface TodayScreenProps {
@@ -75,11 +78,24 @@ const READINESS_LABEL: Record<'OPTIMAL' | 'RECOVERY' | 'OVERREACHED', string> = 
 
 export default function TodayScreen(props: TodayScreenProps): React.JSX.Element {
   const state = useStore((s) => s);
+  const movementIds = state.todayPlan?.slots.map((slot) => slot.movementId);
   const decision = typeof state.getTrainingSupportDecision === 'function'
-    ? state.getTrainingSupportDecision(state.todayPlan?.slots.map((slot) => slot.movementId))
+    ? state.getTrainingSupportDecision(movementIds)
     : { status: 'support_unavailable' as const };
-  if (state.status !== 'booting' && decision.status !== 'available') return <TrainingSupportNotice
-    unavailable={decision.status === 'support_unavailable'} onOpenSession={state.session !== null ? props.onOpenSession : undefined} />;
+  const narrowScopeOnly = decision.status === 'held' && typeof state.isBroadHoldFromNarrowScopes === 'function'
+    ? state.isBroadHoldFromNarrowScopes(movementIds, decision)
+    : false;
+  // #177: the held Today screen names the active athlete in Coach mode too.
+  const heldAthleteName = coachModeAthleteName(state.athletes, state.activeAthleteId);
+  if (state.status !== 'booting' && decision.status !== 'available') return <HeldScreenWithHalt
+    lastTriage={state.lastTriage}
+    header={heldAthleteName !== null
+      ? <Text style={styles.eyebrow} testID="today-active-athlete">Athlete: {heldAthleteName}</Text>
+      : undefined}
+  >
+    <TrainingSupportNotice
+      unavailable={decision.status === 'support_unavailable'} narrowScopeOnly={narrowScopeOnly} onOpenSession={state.session !== null ? props.onOpenSession : undefined} />
+  </HeldScreenWithHalt>;
   return <AvailableTodayScreen {...props} />;
 }
 
@@ -95,12 +111,30 @@ function AvailableTodayScreen({
   const block = useStore((s) => s.block);
   const hasArchivedBlock = useStore((s) => s.hasArchivedBlock);
   const lastTriage = useStore((s) => s.lastTriage);
+  const prescription = useStore((s) => s.prescription);
   const vector = useStore((s) => s.vector);
   const profile = useStore((s) => s.profile);
+  const program = useStore((s) => s.program);
   const startSession = useStore((s) => s.startSession);
+  const storeFreeFormStartIsEmpty = useStore((s) => s.freeFormStartIsEmpty);
   const refreshVector = useStore((s) => s.refreshVector);
   const recordedDurationsForFocus = useStore((s) => s.recordedDurationsForFocus);
   const error = useStore((s) => s.error);
+  const athletes = useStore((s) => s.athletes);
+  const activeAthleteId = useStore((s) => s.activeAthleteId);
+  const activeAthleteName = coachModeAthleteName(athletes, activeAthleteId);
+  const nav = typeof useNavigation === 'function' ? useNavigation() : undefined;
+
+  const [emptyStartPromptOpen, setEmptyStartPromptOpen] = React.useState(false);
+  const checkFreeFormStartIsEmpty = React.useCallback((): boolean => {
+    if (typeof storeFreeFormStartIsEmpty === 'function') return storeFreeFormStartIsEmpty();
+    if (typeof freeFormStartIsEmpty === 'function') return freeFormStartIsEmpty();
+    return false;
+  }, [storeFreeFormStartIsEmpty]);
+
+  const todaysVector = prescription != null && prescription.forDate === today
+    ? prescription.vector
+    : null;
 
   const [refreshing, setRefreshing] = React.useState(false);
   const handleRefresh = React.useCallback(() => {
@@ -149,6 +183,66 @@ function AvailableTodayScreen({
     setAwaitingStart(true);
     startSession();
   }, [startSession]);
+  const startUnplannedAndOpen = React.useCallback(() => {
+    if (checkFreeFormStartIsEmpty()) {
+      setEmptyStartPromptOpen(true);
+      return;
+    }
+    startAndOpen();
+  }, [checkFreeFormStartIsEmpty, startAndOpen]);
+  // #165 (walk I-15): an extra session after today's is one tap on a text
+  // link, so it asks first. An empty start still shows the plan-first card
+  // instead, without asking: nothing would start.
+  const confirmExtraSessionAndOpen = React.useCallback(() => {
+    if (checkFreeFormStartIsEmpty()) {
+      setEmptyStartPromptOpen(true);
+      return;
+    }
+    Alert.alert('Start an extra session?', 'It is unplanned. It is saved as its own session once you log a set.', [
+      { text: 'Not now', style: 'cancel' },
+      { text: 'Start', onPress: startAndOpen },
+    ]);
+  }, [checkFreeFormStartIsEmpty, startAndOpen]);
+  const renderUnplannedStartControl = (control: {
+    label: string;
+    accessibilityLabel: string;
+    testID: string;
+    /** An extra session after today's asks first (#165). */
+    confirmExtra?: boolean;
+  }): React.JSX.Element => {
+    if (emptyStartPromptOpen) {
+      return (
+        <View style={styles.card} testID="empty-free-form-start-card">
+          <Text style={styles.title}>Nothing to start yet</Text>
+          <Text style={styles.body}>
+            There is no plan for today and no earlier session to repeat. Build your plan first.
+          </Text>
+          <PrimaryButton
+            label="Go to Plan"
+            onPress={() => {
+              setEmptyStartPromptOpen(false);
+              onOpenPlan?.();
+              nav?.setTab('coach');
+            }}
+            accessibilityLabel="Go to Plan"
+          />
+          <QuietAction
+            label="Cancel"
+            onPress={() => setEmptyStartPromptOpen(false)}
+            accessibilityLabel="Cancel"
+          />
+        </View>
+      );
+    }
+    return (
+      <QuietAction
+        label={control.label}
+        onPress={control.confirmExtra === true ? confirmExtraSessionAndOpen : startUnplannedAndOpen}
+        accessibilityLabel={control.accessibilityLabel}
+        testID={control.testID}
+      />
+    );
+  };
   React.useEffect(() => {
     if (!awaitingStart) return;
     setAwaitingStart(false);
@@ -195,7 +289,38 @@ function AvailableTodayScreen({
     </View>
   );
 
+  // #221: the same test Plan uses for "Review next block" (BlockScreen
+  // programBlockExpired). Once a goal-program block has run its four weeks,
+  // the unfinished-sessions card no longer describes where the athlete is.
+  const programBlockEnded = program?.status === 'active' && block !== null
+    && today > addDaysIso(block.startDate, 27);
+
   const workoutCard = (): React.JSX.Element => {
+    if (programBlockEnded && (state.kind === 'overdue'
+      || (state.kind === 'unscheduled' && state.reason === 'block_ended'))) {
+      const lastBlock = program.currentSequenceIndex >= program.plannedBlockCount;
+      return (
+        <View style={styles.card} testID="today-card-block-ended">
+          <Text style={styles.eyebrow}>TODAY</Text>
+          <Text style={styles.title}>Your block has ended</Text>
+          <Text style={styles.body}>
+            Block {program.currentSequenceIndex} of {program.plannedBlockCount} has finished its four
+            weeks. {lastBlock ? 'Review your goal to finish the program.' : 'Review the next block to keep going.'}
+          </Text>
+          <PrimaryButton
+            label={lastBlock ? 'Review goal' : 'Review next block'}
+            onPress={() => onOpenPlan?.()}
+            accessibilityLabel={lastBlock ? 'Review your goal on your plan' : 'Review the next block on your plan'}
+            testID="today-primary-plan"
+          />
+          {renderUnplannedStartControl({
+            label: 'Start a session now',
+            accessibilityLabel: 'Start an unplanned session now',
+            testID: 'today-adhoc-session',
+          })}
+        </View>
+      );
+    }
     switch (state.kind) {
       case 'halted':
         return (
@@ -243,13 +368,16 @@ function AvailableTodayScreen({
             <Text style={styles.title}>{focusName(state.focus)}</Text>
             <Text style={styles.caption} testID="today-duration">{durationCopy(estimate)}</Text>
             <View style={styles.preview}>
-              {preview.map((slot) => (
-                <Text key={slot.plannedSlotId} style={styles.previewRow}>
-                  {slot.movementName} · {slot.sets}×{slot.target.kind === 'time'
-                    ? `${slot.target.seconds}s`
-                    : slot.target.reps}
-                </Text>
-              ))}
+              {preview.map((slot) => {
+                const effective = applyPrescriptionToSlot(slot, todaysVector);
+                return (
+                  <Text key={slot.plannedSlotId} style={styles.previewRow}>
+                    {slot.movementName} · {effective.sets}×{slot.target.kind === 'time'
+                      ? `${slot.target.seconds}s`
+                      : slot.target.reps}
+                  </Text>
+                );
+              })}
               {remaining > 0 && (
                 <Text style={styles.caption}>+{remaining} more</Text>
               )}
@@ -282,12 +410,12 @@ function AvailableTodayScreen({
             {/* Sol R4 F3: no "Start workout" here. The planned attempt is
                 closed, and the store starts any further session as free_form,
                 so the only start offered says plainly that it is unplanned. */}
-            <QuietAction
-              label="Start an extra unplanned session"
-              onPress={startAndOpen}
-              accessibilityLabel="Start an extra unplanned session today"
-              testID="today-stopped-extra"
-            />
+            {renderUnplannedStartControl({
+              label: 'Start an extra unplanned session',
+              accessibilityLabel: 'Start an extra unplanned session today',
+              testID: 'today-stopped-extra',
+              confirmExtra: true,
+            })}
           </View>
         );
 
@@ -303,12 +431,12 @@ function AvailableTodayScreen({
                 invites a duplicate of work already banked. The extra session
                 below is the SAME ad-hoc path Coach already offers, and it is
                 deliberately quiet. */}
-            <QuietAction
-              label="Start an extra session"
-              onPress={startAndOpen}
-              accessibilityLabel="Start an extra unplanned session today"
-              testID="today-extra-session"
-            />
+            {renderUnplannedStartControl({
+              label: 'Start an extra session',
+              accessibilityLabel: 'Start an extra unplanned session today',
+              testID: 'today-extra-session',
+              confirmExtra: true,
+            })}
           </View>
         );
 
@@ -335,12 +463,11 @@ function AvailableTodayScreen({
               accessibilityLabel="Open your plan to see unfinished sessions"
               testID="today-primary-plan"
             />
-            <QuietAction
-              label="Start a session now"
-              onPress={startAndOpen}
-              accessibilityLabel="Start an unplanned session now"
-              testID="today-adhoc-session"
-            />
+            {renderUnplannedStartControl({
+              label: 'Start a session now',
+              accessibilityLabel: 'Start an unplanned session now',
+              testID: 'today-adhoc-session',
+            })}
           </View>
         );
 
@@ -352,12 +479,11 @@ function AvailableTodayScreen({
             <Text style={styles.body}>
               Your plan schedules recovery today. That is the work.
             </Text>
-            <QuietAction
-              label="Start a session anyway"
-              onPress={startAndOpen}
-              accessibilityLabel="Start an unplanned session on a scheduled rest day"
-              testID="today-adhoc-session"
-            />
+            {renderUnplannedStartControl({
+              label: 'Start a session anyway',
+              accessibilityLabel: 'Start an unplanned session on a scheduled rest day',
+              testID: 'today-adhoc-session',
+            })}
           </View>
         );
 
@@ -392,12 +518,11 @@ function AvailableTodayScreen({
               accessibilityLabel="Open your plan"
               testID="today-primary-plan"
             />
-            <QuietAction
-              label="Start a session now"
-              onPress={startAndOpen}
-              accessibilityLabel="Start an unplanned session now"
-              testID="today-adhoc-session"
-            />
+            {renderUnplannedStartControl({
+              label: 'Start a session now',
+              accessibilityLabel: 'Start an unplanned session now',
+              testID: 'today-adhoc-session',
+            })}
           </View>
         );
       }
@@ -418,6 +543,12 @@ function AvailableTodayScreen({
         />
       }
     >
+      {/* #177: in Coach mode (two or more athletes) Today names whose plan this is. */}
+      {activeAthleteName !== null && (
+        <Text style={styles.eyebrow} testID="today-active-athlete">
+          Athlete: {activeAthleteName}
+        </Text>
+      )}
       {workoutCard()}
 
       {error !== null && (
@@ -445,10 +576,10 @@ function AvailableTodayScreen({
         <Text style={styles.sectionTitle}>READINESS</Text>
         {vector === null ? (
           <Text style={styles.caption} testID="today-readiness-none">
-            No readiness estimate yet. It builds from logged sessions and any synced telemetry.
+            No estimate for today yet. It builds from logged sessions and any synced telemetry.
           </Text>
         ) : (
-          <Disclosure label={READINESS_LABEL[classifyReadiness(vector)]} hint="The short explanation first">
+          <Disclosure label={state.kind === 'halted' ? HALT_META.title : READINESS_LABEL[classifyReadiness(vector)]} hint="The short explanation first">
             <ListRow
               label="Readiness estimate"
               detail={`${Math.round(vector.readiness_score)} / 100`}
