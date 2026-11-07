@@ -1090,6 +1090,21 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       hardwareBack.restore();
     }
   }, 30000);
+
+  describe('#177: the active athlete is named only in Coach mode', () => {
+    test('with two athletes, Profile names the active athlete under the heading', () => {
+      render(<ProfileScreen />);
+      expect(screen.getByText('ATHLETE PROFILE')).toBeOnTheScreen();
+      expect(screen.getByTestId('profile-active-athlete')).toHaveTextContent('Default Athlete');
+    });
+
+    test('with one athlete, Profile names no one', () => {
+      mockState.athletes = [{ id: 'default', name: 'Default Athlete' }];
+      render(<ProfileScreen />);
+      expect(screen.getByText('ATHLETE PROFILE')).toBeOnTheScreen();
+      expect(screen.queryByTestId('profile-active-athlete')).toBeNull();
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
