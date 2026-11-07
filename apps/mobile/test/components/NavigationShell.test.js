@@ -106,6 +106,7 @@ const state = (overrides = {}) => ({
   substitution: null,
   profileSlots: [],
   activeAthleteId: null,
+  athletes: [],
   pendingAutopilotAdjustments: [],
   startSession: jest.fn(),
   refreshVector: jest.fn(),
