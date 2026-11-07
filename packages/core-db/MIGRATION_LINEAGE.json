@@ -376,6 +376,11 @@
         "ordinal": 74,
         "file": "075_session_plan_slot_planned_count.sql",
         "sha256": "cea92e59d84c6b86540e142aaaf38c538d33bfa6eadc35ad378362990cf67e85"
+      },
+      {
+        "ordinal": 75,
+        "file": "076_sport_taxonomy_expansion.sql",
+        "sha256": "8d810403564852c14637096c47f39d4ac504574f3689dd58d904a28d50532b9f"
       }
     ]
   },

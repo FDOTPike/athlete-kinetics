@@ -135,6 +135,15 @@ export const SUPPORTED_BACKUP_SCHEMA_CONTRACTS: readonly BackupSchemaContract[] 
     objectCount: 211,
     fingerprint: 'ba1fe3146a91547dc3804f1ad765cc32d7f2cc5e389841fceac3a376045456d4',
   },
+  // Through 076_sport_taxonomy_expansion: athlete_sport_profile rebuilt with the
+  // 22 proposed SportIds. Same table and object counts, new schema fingerprint.
+  {
+    userVersion: 75,
+    migrationSlot: 76,
+    tableCount: 125,
+    objectCount: 211,
+    fingerprint: '00aca47da3d6e7be422b674e70d8ba000f4f685527b362f09089cda08f932be8',
+  },
 ];
 
 export const CURRENT_BACKUP_SCHEMA_CONTRACT: BackupSchemaContract =
