@@ -20,6 +20,7 @@ import {
 } from 'react-native';
 import {
   GLOSSARY_ENTRIES,
+  glossaryTitle,
   searchGlossary,
   type GlossaryCategory,
   type GlossaryEntry,
@@ -152,7 +153,7 @@ export default function GlossaryScreen({ onClose }: GlossaryScreenProps): React.
           {displayedEntries.map((entry) => (
             <View key={entry.id} style={styles.card} testID={`glossary-card-${entry.id}`}>
               <View style={styles.cardHeader}>
-                <Text style={styles.termTitle}>{entry.term}</Text>
+                <Text style={styles.termTitle}>{glossaryTitle(entry)}</Text>
                 <View style={styles.badge}>
                   <Text style={styles.badgeText}>{entry.category.toUpperCase()}</Text>
                 </View>

@@ -216,23 +216,23 @@ describe('session-5: plan-first empty free-form starts', () => {
     const openPlanFromToday = jest.fn();
     const todayView = render(<TodayScreen onOpenPlan={openPlanFromToday} />);
     fireEvent.press(screen.getByTestId('today-adhoc-session'));
-    expect(screen.getByText('Nothing to start yet')).toBeOnTheScreen();
+    expect(screen.getByText('No session is ready to start')).toBeOnTheScreen();
     expect(
-      screen.getByText('There is no plan for today and no earlier session to repeat. Build your plan first.'),
+      screen.getByText('Open your plan to see your next session.'),
     ).toBeOnTheScreen();
     expect(count('SELECT COUNT(*) AS c FROM session')).toBe(0);
     expect(state().session).toBeNull();
 
     // Cancel closes the card and restores the start control
     fireEvent.press(screen.getByLabelText('Cancel'));
-    expect(screen.queryByText('Nothing to start yet')).toBeNull();
+    expect(screen.queryByText('No session is ready to start')).toBeNull();
     expect(screen.getByTestId('today-adhoc-session')).toBeOnTheScreen();
 
     // Re-open and press Go to Plan
     fireEvent.press(screen.getByTestId('today-adhoc-session'));
     fireEvent.press(screen.getByLabelText('Go to Plan'));
     expect(openPlanFromToday).toHaveBeenCalledTimes(1);
-    expect(screen.queryByText('Nothing to start yet')).toBeNull();
+    expect(screen.queryByText('No session is ready to start')).toBeNull();
     expect(count('SELECT COUNT(*) AS c FROM session')).toBe(0);
     todayView.unmount();
 
@@ -240,15 +240,15 @@ describe('session-5: plan-first empty free-form starts', () => {
     const openPlanFromSession = jest.fn();
     const sessionView = render(<SessionScreen onOpenPlan={openPlanFromSession} />);
     fireEvent.press(screen.getByLabelText('Start a new workout session'));
-    expect(screen.getByText('Nothing to start yet')).toBeOnTheScreen();
+    expect(screen.getByText('No session is ready to start')).toBeOnTheScreen();
     expect(
-      screen.getByText('There is no plan for today and no earlier session to repeat. Build your plan first.'),
+      screen.getByText('Open your plan to see your next session.'),
     ).toBeOnTheScreen();
     expect(count('SELECT COUNT(*) AS c FROM session')).toBe(0);
     expect(state().session).toBeNull();
 
     fireEvent.press(screen.getByLabelText('Cancel'));
-    expect(screen.queryByText('Nothing to start yet')).toBeNull();
+    expect(screen.queryByText('No session is ready to start')).toBeNull();
     expect(screen.getByLabelText('Start a new workout session')).toBeOnTheScreen();
 
     fireEvent.press(screen.getByLabelText('Start a new workout session'));
@@ -269,14 +269,14 @@ describe('session-5: plan-first empty free-form starts', () => {
     const blockView = render(<BlockScreen />);
     fireEvent.press(screen.getByText('Start without a planned session'));
     fireEvent.press(screen.getByLabelText('Start an unplanned session'));
-    expect(screen.getByText('Nothing to start yet')).toBeOnTheScreen();
+    expect(screen.getByText('No session is ready to start')).toBeOnTheScreen();
     expect(
-      screen.getByText('There is no plan for today and no earlier session to repeat. Build your plan first.'),
+      screen.getByText('Open your plan to see your next session.'),
     ).toBeOnTheScreen();
     expect(count('SELECT COUNT(*) AS c FROM session')).toBe(0);
 
     fireEvent.press(screen.getByLabelText('Cancel'));
-    expect(screen.queryByText('Nothing to start yet')).toBeNull();
+    expect(screen.queryByText('No session is ready to start')).toBeNull();
     expect(screen.getByLabelText('Start an unplanned session')).toBeOnTheScreen();
     blockView.unmount();
   });

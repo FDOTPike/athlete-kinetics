@@ -613,13 +613,13 @@ describe('session-5: empty unplanned starts show the plan-first card instead of 
     render(<TodayScreen onOpenPlan={onOpenPlan} />);
     fireEvent.press(screen.getByTestId(controlTestId));
     expect(mockState.startSession).not.toHaveBeenCalled();
-    expect(screen.getByText('Nothing to start yet')).toBeOnTheScreen();
+    expect(screen.getByText('No session is ready to start')).toBeOnTheScreen();
     expect(
-      screen.getByText('There is no plan for today and no earlier session to repeat. Build your plan first.'),
+      screen.getByText('Open your plan to see your next session.'),
     ).toBeOnTheScreen();
 
     fireEvent.press(screen.getByLabelText('Cancel'));
-    expect(screen.queryByText('Nothing to start yet')).toBeNull();
+    expect(screen.queryByText('No session is ready to start')).toBeNull();
     expect(screen.getByTestId(controlTestId)).toBeOnTheScreen();
 
     fireEvent.press(screen.getByTestId(controlTestId));
@@ -633,6 +633,6 @@ describe('session-5: empty unplanned starts show the plan-first card instead of 
     render(<TodayScreen />);
     fireEvent.press(screen.getByTestId('today-primary-start'));
     expect(mockState.startSession).toHaveBeenCalledTimes(1);
-    expect(screen.queryByText('Nothing to start yet')).toBeNull();
+    expect(screen.queryByText('No session is ready to start')).toBeNull();
   });
 });

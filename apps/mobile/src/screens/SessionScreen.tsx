@@ -5,7 +5,8 @@ import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING
 import { EXPERIENCE_SEVERITY, runnerTierForTrainingAge } from '../../../../packages/inference/src/sessionRunner';
 import { formatTeachingOnlyReason, freeFormStartIsEmpty, useStore, type LoadSelection, type LoggedSet, type SetLoadShown, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
 import { useNavigation, useSubViewBack } from '../navigation/navigation';
-import { buildSessionSummary, NO_NEXT_SESSION_TEXT } from '../state/sessionSummary';
+import { buildSessionSummary, NO_NEXT_SESSION_TEXT, setsOfPlanned, skippedExerciseText } from '../state/sessionSummary';
+import { isSessionReportStop, SESSION_REPORT_STOP_SENTENCE } from '../state/sessionReportStop';
 import { SUPPORT_HELD_MESSAGE, SUPPORT_UNAVAILABLE_MESSAGE } from '../state/healthSupportStore';
 import { theme } from '../theme/theme';
 import InfoTip from '../components/InfoTip';
@@ -37,11 +38,13 @@ const secondsText = (n: number): string => {
   return min > 0 ? `${min}:${String(sec).padStart(2, '0')}` : `${value}s`;
 };
 
-const GENERIC_HALT_COPY = 'A safety concern paused this session.';
+const GENERIC_HALT_COPY = 'A safety concern stopped this session.';
+// #181: a report-driven stop is "stopped", never "paused"; a manual stop
+// keeps "paused" while the session can still be finished.
 const NON_SAFETY_HALT_COPY = {
   manual: 'You chose to stop this session.',
-  niggle: 'You reported that something felt off, so this session is paused.',
-  pain: 'You reported pain, so this session is paused.',
+  niggle: 'You reported discomfort, so this session has stopped for today.',
+  pain: 'You reported pain, so this session has stopped for today.',
 } satisfies Record<Exclude<RunnerHaltReason, 'safety'>, string>;
 
 /** Exhaustive athlete-facing copy for persisted runner halt reasons. The
@@ -80,10 +83,13 @@ const parseLoadDraft = (text: string): number | null => {
   return Number.isFinite(value) && value >= 0 ? value : null;
 };
 
-/** P1-2 (Opus audit): a loggable load must sit on the 2.5 kg rack grid and be
- *  within 0–500 inclusive. Reject — never silently snap — any draft that
- *  would change numerically at commit time. */
-const LOAD_GRID = 2.5;
+/** P1-2: a loggable load must sit on the logging grid and be within 0–500
+ *  inclusive. Reject — never silently snap — any draft that would change
+ *  numerically at commit time.
+ *  Owner ruling 2026-11-03 (Entry 0288): the grid is 0.5 kg, so 12, 14, 16
+ *  and 24 kg dumbbells and kettlebells can be logged. Load suggestions and
+ *  the ± steppers stay on the 2.5 kg plate grid. */
+const LOAD_GRID = 0.5;
 const LOAD_MAX = 500;
 const isOnLoadGrid = (kg: number): boolean =>
   Number.isFinite(kg) && kg >= 0 && kg <= LOAD_MAX
@@ -319,6 +325,30 @@ export interface SessionScreenProps {
  * completion screen shown after a session ends (its saved outcome, the
  * summary of what was done, and the optional record of how it went).
  */
+// Walk 2 (W2-13): a load typed but not yet logged was lost when the athlete
+// left the workout (the screen unmounts) and came back. Unlogged drafts are
+// kept here, in memory only, by session, slot, set and movement. They are
+// never logged evidence and never feed a suggestion.
+// Review (PR 194): each athlete has its own database, so session and slot
+// ids repeat between athletes; the athlete is part of the key. A draft is
+// kept only for the athlete and session in hand, and only for sets not yet
+// logged, so the map cannot grow with drafts nothing will read again.
+const unloggedLoadDrafts = new Map<string, string>();
+const loadDraftScope = (athleteId: string | null, sessionId: number | undefined): string =>
+  `${athleteId ?? 'none'}:${sessionId ?? 'none'}:`;
+const loadDraftKey = (athleteId: string | null, sessionId: number | undefined, slotId: number, logged: number, movementId: number | undefined): string =>
+  `${loadDraftScope(athleteId, sessionId)}${slotId}:${logged}:${movementId ?? 'none'}`;
+const pruneLoadDrafts = (athleteId: string | null, sessionId: number | undefined, slotId: number, logged: number): void => {
+  const scope = loadDraftScope(athleteId, sessionId);
+  for (const key of [...unloggedLoadDrafts.keys()]) {
+    if (!key.startsWith(scope)) { unloggedLoadDrafts.delete(key); continue; }
+    const [slot, setsLogged] = key.slice(scope.length).split(':');
+    if (Number(slot) === slotId && Number(setsLogged) < logged) unloggedLoadDrafts.delete(key);
+  }
+};
+export const clearUnloggedLoadDraftsForTests = (): void => { unloggedLoadDrafts.clear(); };
+export const unloggedLoadDraftCountForTests = (): number => unloggedLoadDrafts.size;
+
 export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionScreenProps = {}): React.JSX.Element {
   const state = useStore((s) => s);
   const nav = typeof useNavigation === 'function' ? useNavigation() : undefined;
@@ -448,6 +478,8 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
       const facts = loadSessionSummaryFacts(lastEndedSessionId);
       return buildSessionSummary({
         exercises: facts.exercises,
+        skippedExercises: facts.skippedExercises ?? [],
+        reports: facts.reports ?? [],
         previousSets: facts.previousSets,
         durationMin: facts.durationMin,
         blockSessions: summaryBlockSessions,
@@ -484,10 +516,17 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
 
   const byId = useMemo(() => new Map(movements.map((m) => [m.movement_id, m])), [movements]);
   const loggedCount = (slot: PlanSlot): number => session?.sets.filter((set) => sameSlot(set, slot)).length ?? 0;
-  const loggedAsNames = (slot: PlanSlot): string[] => {
+  // Walk 2 (W2-1): a swap rewrites the slot's movement. The skipped line
+  // names the PLANNED movement, and sets of anything else are "logged as".
+  const plannedMovementId = (slot: PlanSlot): number => slot.originalMovementId ?? slot.movementId;
+  // Review (PR 194): the "logged as"/"includes" names are the movements other
+  // than the one the row is titled with. A finished row is titled with the
+  // current movement; a skipped row and the completion card with the planned
+  // one, so after a swap no row repeats its own name.
+  const loggedAsNames = (slot: PlanSlot, baseMovementId: number = plannedMovementId(slot)): string[] => {
     const names: string[] = [];
     for (const set of session?.sets.filter((set) => sameSlot(set, slot)) ?? []) {
-      if (set.movement_id === slot.movementId) continue;
+      if (set.movement_id === baseMovementId) continue;
       const name = byId.get(set.movement_id)?.name ?? 'Movement';
       if (!names.includes(name)) names.push(name);
     }
@@ -630,9 +669,13 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
         advisoryKind: seed.advisoryKind,
       },
     };
-    setLoadText(initial === null ? '' : initial.toFixed(1));
+    pruneLoadDrafts(state.activeAthleteId, session?.sessionId, currentSlot.sessionPlanSlotId, currentLogged);
+    const draft = unloggedLoadDrafts.get(loadDraftKey(state.activeAthleteId, session?.sessionId, currentSlot.sessionPlanSlotId, currentLogged, currentMovement?.movement_id));
+    setLoadText(draft ?? (initial === null ? '' : initial.toFixed(1)));
     setLoadInvalid(false);
   }, [
+    state.activeAthleteId,
+    session?.sessionId,
     currentSlot?.sessionPlanSlotId,
     currentLogged,
     currentMovement?.movement_id,
@@ -640,6 +683,14 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
     target?.kind === 'reps' ? target.reps : target?.seconds,
     currentSlot?.overrideLoadKg,
   ]);
+
+  // The athlete's own edits of the load field, remembered until the set is logged.
+  const editLoadText = (text: string): void => {
+    setLoadText(text);
+    if (currentSlot !== null) {
+      unloggedLoadDrafts.set(loadDraftKey(state.activeAthleteId, session?.sessionId, currentSlot.sessionPlanSlotId, currentLogged, currentMovement?.movement_id), text);
+    }
+  };
 
   const moveLegacyForward = (): void => {
     if (currentSlot === null) return;
@@ -665,9 +716,12 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
     const outcomeCopy: Record<string, string> = isBeginner
       ? {
           followed_plan: "You followed today's plan. Recover well.",
-          adapted_session: "Session adjusted.",
+          // Walk 2 (W2-8): the same word Progress uses for this outcome.
+          adapted_session: "Session adapted.",
           stopped_safely: "Stopping was the right call. Recovery is part of the plan.",
-          session_recorded: "Your session is saved. Continue from here next time.",
+          // Walk 2 (W2-8): this shows after Finish session too; "continue from
+          // here next time" read as if the session were unfinished.
+          session_recorded: "Your session is saved.",
         }
       : {
           followed_plan: "Plan followed.",
@@ -771,6 +825,13 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
             <View style={styles.summaryBlock} testID="session-summary">
               {summary.exerciseLines.map((line) => (
                 <Text key={line.key} style={styles.summaryLine}>{line.text}</Text>
+              ))}
+              {summary.skippedLines.map((line) => (
+                <Text key={line.key} style={styles.summaryLine} testID="session-summary-skipped">{line.text}</Text>
+              ))}
+              {/* #181: the reports made during the session, region and severity. */}
+              {(summary.reportLines ?? []).map((line) => (
+                <Text key={line.key} style={styles.summaryLine} testID="session-summary-report">{line.text}</Text>
               ))}
               {summary.comparisonLines.map((line) => (
                 <Text key={line.key} style={styles.summaryComparison}>{line.text}</Text>
@@ -877,11 +938,14 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
         </View>
         <Text style={styles.kicker}>SESSION</Text>
         <Text style={styles.idleTitle}>
-          {blocked ? 'Training is paused.' : 'Ready when you are.'}
+          {blocked ? (isSessionReportStop(lastTriage) ? 'Training is stopped for today.' : 'Training is paused.') : 'Ready when you are.'}
         </Text>
         <Text style={styles.idleBody}>
           {blocked
-            ? 'Resolve today’s safety halt before starting another session.'
+            ? (isSessionReportStop(lastTriage)
+              // #187: the day was closed by the athlete's own Stop report.
+              ? SESSION_REPORT_STOP_SENTENCE
+              : 'Resolve today’s safety halt before starting another session.')
             : mode === 'guided'
             ? 'You will move one clear step at a time.'
             : 'Your session will stay in one clear vertical timeline.'}
@@ -889,9 +953,9 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
         {!blocked && (
           emptyStartPromptOpen ? (
             <View style={[styles.emptyCard, { marginTop: theme.space[5] }]} testID="empty-free-form-start-card">
-              <Text style={styles.emptyTitle}>Nothing to start yet</Text>
+              <Text style={styles.emptyTitle}>No session is ready to start</Text>
               <Text style={styles.emptyBody}>
-                There is no plan for today and no earlier session to repeat. Build your plan first.
+                Open your plan to see your next session.
               </Text>
               <PrimaryButton
                 label="Go to Plan"
@@ -1066,7 +1130,9 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
     }
     setSafetyOpen(false);
     const after = typeof useStore.getState === 'function' ? useStore.getState() : state;
-    const afterHalted = after?.runner?.phase === 'halted'
+    // A Stop-level report closes the session (#181): nothing is left to annotate.
+    const afterHalted = after?.session === null
+      || after?.runner?.phase === 'halted'
       || (after?.runner?.phase !== 'complete' && after?.lastTriage?.kind === 'matched' && after.lastTriage.directive.halt);
     const afterSubstitutionOpened = after?.substitution !== null && after?.substitution !== undefined;
     setNiggleSavedNotice(!afterHalted && !afterSubstitutionOpened);
@@ -1158,7 +1224,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
         <View style={styles.header}>
           <Text style={styles.wordmark}>pikeMethods</Text>
           <Text style={styles.kicker}>{mode === 'guided' ? 'GUIDED SESSION' : 'SELF-DIRECTED SESSION'}</Text>
-          <Text style={styles.headerTitle}>{halted ? 'Session paused' : complete ? 'Session complete' : 'Your next step'}</Text>
+          <Text style={styles.headerTitle}>{halted ? (runner?.haltReason === 'manual' ? 'Session paused' : 'Session stopped') : complete ? 'Session complete' : 'Your next step'}</Text>
           {!halted && (!complete || Boolean(runner?.skippedSessionPlanSlotIds.length)) && (
             <Text style={styles.headerMeta}>
               {sessionPlan.length === 0 ? 'No movements are planned yet.' : exercisesCompleteText}
@@ -1200,15 +1266,15 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                 {sessionPlan
                   .filter((slot) => runner?.skippedSessionPlanSlotIds.includes(slot.sessionPlanSlotId))
                   .map((slot) => {
-                    const name = byId.get(slot.movementId)?.name ?? 'Movement';
-                    const logged = loggedCount(slot);
-                    const asNames = loggedAsNames(slot);
-                    const loggedSuffix = asNames.length > 0 ? ` as ${asNames.join(', ')}` : '';
+                    const text = skippedExerciseText({
+                      name: byId.get(plannedMovementId(slot))?.name ?? 'Movement',
+                      plannedSets: slot.plannedSets,
+                      loggedSets: loggedCount(slot),
+                      loggedAs: loggedAsNames(slot),
+                    });
                     return (
                       <Text key={slot.sessionPlanSlotId} style={styles.completeRowMeta}>
-                        {logged > 0
-                          ? `Skipped: ${name} · ${logged} of ${slot.plannedSets} sets logged${loggedSuffix}`
-                          : `Skipped: ${name} · no sets logged`}
+                        {text}
                       </Text>
                     );
                   })}
@@ -1294,7 +1360,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                 const metricSummary = latestCompleted?.timeS !== null && latestCompleted?.timeS !== undefined
                   ? ` · ${secondsText(latestCompleted.timeS)} logged`
                   : bandLabel === null ? '' : ` · ${bandLabel}`;
-                const asNames = loggedAsNames(slot);
+                const asNames = loggedAsNames(slot, slot.movementId);
                 const includesSuffix = asNames.length > 0 ? ` · includes ${asNames.join(', ')}` : '';
 
                 return (
@@ -1306,7 +1372,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                     </View>
                     <View style={styles.completeRow}>
                       <Text style={styles.completeRowName} numberOfLines={1}>{movement?.name ?? 'Movement'}</Text>
-                      <Text style={styles.completeRowMeta}>{logged} sets complete{metricSummary}{includesSuffix}</Text>
+                      <Text style={styles.completeRowMeta}>{logged} {logged === 1 ? 'set' : 'sets'} complete{metricSummary}{includesSuffix}</Text>
                       <CompletedMetrics sets={completedSets} bandLadder={bandLadder} movementsById={byId} onEdit={editSet} />
                     </View>
                   </View>
@@ -1315,14 +1381,14 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
 
               if (skipped && !active) {
                 const skippedSets = session?.sets.filter((set) => sameSlot(set, slot)) ?? [];
-                const name = movement?.name ?? 'Movement';
+                const name = byId.get(plannedMovementId(slot))?.name ?? 'Movement';
                 const asNames = loggedAsNames(slot);
                 const loggedSuffix = asNames.length > 0 ? ` as ${asNames.join(', ')}` : '';
                 const skippedMeta = logged > 0
-                  ? `Skipped · ${logged} of ${slot.plannedSets} sets logged${loggedSuffix}`
+                  ? `Skipped · ${setsOfPlanned(logged, slot.plannedSets)} logged${loggedSuffix}`
                   : 'Skipped · no sets logged';
                 const skippedLabel = logged > 0
-                  ? `${name}, skipped, ${logged} of ${slot.plannedSets} sets logged${loggedSuffix}`
+                  ? `${name}, skipped, ${setsOfPlanned(logged, slot.plannedSets)} logged${loggedSuffix}`
                   : `${name}, skipped, no sets logged`;
 
                 return (
@@ -1385,6 +1451,16 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                   <View style={styles.currentCard}>
                     {resting ? (
                       <View style={{ alignItems: 'center', gap: theme.space[3] }}>
+                        {/* Walk 2 (W2-12): the exercise just worked stays named during
+                            its rest; it vanished from the timeline until Ready now. */}
+                        <View style={{ alignSelf: 'stretch' }} testID="session-rest-exercise">
+                          <Text style={styles.completeRowName} numberOfLines={1}>{movement?.name ?? 'Movement'}</Text>
+                          <Text style={styles.completeRowMeta}>
+                            {finished
+                              ? `${logged} ${logged === 1 ? 'set' : 'sets'} complete`
+                              : `${setsOfPlanned(logged, slot.plannedSets)} done`}
+                          </Text>
+                        </View>
                         {/* Draining chalk barRestTimerCard */}
                         <RestTimerCard
                           totalSeconds={rest.seconds}
@@ -1435,9 +1511,9 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                             style={styles.loadEvidence}
                             testID="session-load-validation"
                             accessibilityRole="alert"
-                            accessibilityLabel="Load validation. Enter a load from 0 to 500 in 2.5 kg increments."
+                            accessibilityLabel="Load validation. Enter a load from 0 to 500 in 0.5 kg steps."
                           >
-                            Enter a load from 0 to 500 in 2.5 kg increments.
+                            Enter a load from 0 to 500 in 0.5 kg steps.
                           </Text>
                         )}
                         {!loadInvalid && !loadLoggable && (
@@ -1479,7 +1555,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                                 onPress={() => {
                                   const current = parseLoadDraft(loadText);
                                   if (current === null) return;
-                                  setLoadText(clamp(current - 2.5, 0, 500).toFixed(1));
+                                  editLoadText(clamp(current - 2.5, 0, 500).toFixed(1));
                                   setLoadInvalid(false);
                                 }}
                                 disabled={!isLoadDraftLoggable(loadText)}
@@ -1500,7 +1576,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                                 style={styles.loadInput}
                                 value={loadText}
                                 onChangeText={(t) => {
-                                  setLoadText(t);
+                                  editLoadText(t);
                                   const parsed = parseLoadDraft(t);
                                   setLoadInvalid(t.trim() !== '' && (parsed === null || !isOnLoadGrid(parsed)));
                                 }}
@@ -1519,7 +1595,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                                 onPress={() => {
                                   const current = parseLoadDraft(loadText);
                                   if (current === null) return;
-                                  setLoadText(clamp(current + 2.5, 0, 500).toFixed(1));
+                                  editLoadText(clamp(current + 2.5, 0, 500).toFixed(1));
                                   setLoadInvalid(false);
                                 }}
                                 disabled={!isLoadDraftLoggable(loadText)}
@@ -1772,7 +1848,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                                 );
                               })}
                             </View>
-                            <View style={styles.severity}>
+                            <View style={styles.severity} testID="niggle-severity-row">
                               {[4, 6, 8].map((severity) => {
                                 const selectedSeverity = niggleSeverity === severity;
                                 const label = severity === 4 ? 'Mild' : severity === 6 ? 'Moderate' : 'Stop';
@@ -1783,7 +1859,8 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                                     selected={selectedSeverity}
                                     onPress={() => setNiggleSeverity(severity)}
                                     accessibilityLabel={`${label} discomfort, ${severity} of 10`}
-                                    style={{ flex: 1, marginHorizontal: theme.space[1] }}
+                                    testID={`niggle-severity-${severity}`}
+                                    style={styles.severityChip}
                                   />
                                 );
                               })}
@@ -2375,8 +2452,13 @@ const styles = StyleSheet.create({
   },
   severity: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     marginTop: theme.space[3],
   },
+  // Walk W5-7: equal thirds (flex: 1) cut "MODERATE" to "MODER…". Each chip
+  // now starts at its label's width and shares what is left; at large text
+  // the row wraps instead of cutting a label.
+  severityChip: { flexGrow: 1, margin: theme.space[1] },
   haltCard: {
     padding: theme.space[4],
     borderWidth: 1,

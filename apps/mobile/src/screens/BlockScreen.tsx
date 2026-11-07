@@ -39,6 +39,8 @@ import { theme } from '../theme/theme';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { appliedAdjustmentLines, autopilotReasonCopy } from '../state/autopilotCopy';
 import { EMPTY_ACTIVITY_LEDGER } from '../state/activityStore';
+import { sessionFocusName } from '../state/sessionSummary';
+import { isSessionReportStop, SESSION_REPORT_STOP_SENTENCE } from '../state/sessionReportStop';
 import {
   PrimaryButton,
   SecondaryButton,
@@ -104,14 +106,10 @@ interface WeekRow {
   cells: (BlockSessionSummary | null)[];
 }
 
-const signed = (value: number): string => (value > 0 ? `+${value}` : String(value));
 
 const focusLabel = (focus: string): string => FOCUS_ABBREV[focus] ?? focus.slice(0, 3).toUpperCase();
 
-const focusName = (focus: string): string => focus
-  .split('_')
-  .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-  .join(' ');
+const focusName = (focus: string): string => sessionFocusName(focus);
 
 const phaseLabel = (phase: string): string => PHASE_LABEL[phase] ?? phase;
 
@@ -124,6 +122,37 @@ const SUSPENSION_REASON_LABEL: Record<(typeof SUSPENSION_REASONS)[number], strin
   illness: 'illness',
   life: 'life events',
 };
+
+/** Walk W3-7: "Why today changed" showed raw values ("profile", "x0.77",
+ *  "-1"). These say the same thing in words. */
+const ADJUSTMENT_SOURCE_TEXT: Record<string, string> = {
+  profile: 'Based on your profile',
+  policy: 'Based on your readiness',
+  guardrail: 'A safety limit',
+};
+export const loadChangeText = (modifier: number): string => {
+  const pct = Math.round((1 - modifier) * 100);
+  if (pct === 0) return 'No change';
+  return pct > 0 ? `Planned load reduced by ${pct}%` : `Planned load raised by ${-pct}%`;
+};
+export const setChangeText = (delta: number): string => {
+  if (delta === 0) return 'No change';
+  const n = Math.abs(delta);
+  return `${n} ${delta < 0 ? 'fewer' : 'more'} ${n === 1 ? 'set' : 'sets'}`;
+};
+
+/** The paused card names the block the athlete can see on this screen (the
+ *  goal program's "Block N of M"), never the internal 8-position cycle index,
+ *  which is a different counter and read as a contradiction (walk W3-1). */
+export function pausedHeldText(
+  reasonLabel: string,
+  program: { currentSequenceIndex: number; plannedBlockCount: number } | null | undefined,
+): string {
+  const place = program != null
+    ? `You are held at block ${program.currentSequenceIndex} of ${program.plannedBlockCount}`
+    : 'Your place is held';
+  return `Paused for ${reasonLabel}. ${place} and will come back to it — training you do now will not use it up. Keep training if you can; everything else works as normal.`;
+}
 
 function targetLabel(slot: TodaySlot): string {
   return slot.target.kind === 'time'
@@ -653,7 +682,11 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
     ? 'There is no session to complete today. Use the day to recover.'
     : `There is no session to complete today. Your next session is ${focusName(nextPlanned.focus)}.`;
 
-  if (halted) {
+  if (halted && isSessionReportStop(lastTriage)) {
+    // #187: the day was closed by the athlete's own Stop report in a workout.
+    todayTitle = 'Training is stopped for today';
+    todayMessage = SESSION_REPORT_STOP_SENTENCE;
+  } else if (halted) {
     todayTitle = 'Training is paused';
     todayMessage = 'Today\'s safety report paused training. Review it before doing more work.';
   } else if (session !== null) {
@@ -664,7 +697,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
     todayMessage = 'Today\'s session is recorded. Recover well.';
   } else if (todayPlan !== null) {
     todayTitle = `Today: ${focusName(todayPlan.focus)}`;
-    todayMessage = `${todayPlan.slots.length} movements are planned. Start when you are ready.`;
+    todayMessage = `${todayPlan.slots.length} ${todayPlan.slots.length === 1 ? 'movement is' : 'movements are'} planned. Start when you are ready.`;
   } else if (block === null) {
     todayTitle = hasArchivedBlock ? 'Your previous block had ended.' : 'Build your first block';
     todayMessage = 'A short four-week block gives Coach a clear trajectory to follow.';
@@ -771,9 +804,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           <Text style={styles.eyebrow}>PROGRAMME PAUSED</Text>
           <Text style={styles.cardTitle}>Your place is being held</Text>
           <Text style={styles.bodyText}>
-            Paused for {SUSPENSION_REASON_LABEL[suspension.reason]}. You are held at block{' '}
-            {suspension.frozen_macro_index} of 8 and will come back to it — training you do now
-            will not use it up. Keep training if you can; everything else works as normal.
+            {pausedHeldText(SUSPENSION_REASON_LABEL[suspension.reason], program)}
           </Text>
           <PrimaryButton
             label="Resume my programme"
@@ -789,7 +820,9 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                 setSuspendError(e instanceof Error ? e.message : String(e));
               }
             }}
-            accessibilityLabel={`Resume the programme and return to block ${suspension.frozen_macro_index} of 8`}
+            accessibilityLabel={program != null
+              ? `Resume the programme and return to block ${program.currentSequenceIndex} of ${program.plannedBlockCount}`
+              : 'Resume the programme and return to your place'}
             testID="suspension-resume"
           />
           {/* Mounted INSIDE the suspended branch. The resume button exists only
@@ -800,7 +833,9 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
             <Text style={styles.adjustedText} testID="suspension-error">{suspendError}</Text>
           )}
         </View>
-      ) : (
+      ) : block !== null || program != null ? (
+        /* Walk W3-7: with no block and no program there is nothing to hold,
+           so the pause buttons are not offered. An open pause still shows. */
         <View style={styles.card}>
           <Text style={styles.eyebrow}>PAUSE</Text>
           <Text style={styles.cardTitle}>Injured, ill, or life got in the way?</Text>
@@ -830,7 +865,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
             <Text style={styles.adjustedText} testID="suspension-error">{suspendError}</Text>
           )}
         </View>
-      )}
+      ) : null}
 
       {program != null && (
         <View style={styles.card}>
@@ -868,7 +903,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
         </View>
         <Text style={styles.cardTitle}>{todayTitle}</Text>
         <Text style={styles.bodyText}>{todayMessage}</Text>
-        {current !== null && !halted && isPrescriptionReduced(current.vector, profile) && (
+        {current !== null && !halted && (todayPlan !== null || session !== null) && isPrescriptionReduced(current.vector, profile) && (
           <Text style={styles.adjustedText}>Coach adjusted today's plan.</Text>
         )}
 
@@ -1159,15 +1194,15 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
             <View style={styles.disclosureContent}>
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Source</Text>
-                <Text style={styles.infoValue}>{current.source}</Text>
+                <Text style={styles.infoValue}>{ADJUSTMENT_SOURCE_TEXT[current.source] ?? current.source}</Text>
               </View>
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Load</Text>
-                <Text style={styles.infoValue}>x{current.vector.load_modifier.toFixed(2)}</Text>
+                <Text style={styles.infoValue}>{loadChangeText(current.vector.load_modifier)}</Text>
               </View>
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>Sets</Text>
-                <Text style={styles.infoValue}>{signed(current.vector.set_modifier)}</Text>
+                <Text style={styles.infoValue}>{setChangeText(current.vector.set_modifier)}</Text>
               </View>
               <View style={styles.infoRow}>
                 <Text style={styles.infoLabel}>RPE cap</Text>
@@ -1348,7 +1383,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
               <Text style={styles.captionText}>
                 {block.objective.replace(/_/g, ' ')} block, started {block.startDate}
                 {blockMeta !== null
-                  ? ` - ${blockMeta.schemaType} - macro block ${blockMeta.macroBlockIndex} of 8`
+                  ? ` - ${blockMeta.schemaType}`
                   : ''}
               </Text>
             ) : (
@@ -1426,9 +1461,9 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
             <View style={styles.disclosureContent}>
               {emptyStartPromptOpen ? (
                 <View style={styles.card} testID="empty-free-form-start-card">
-                  <Text style={styles.cardTitle}>Nothing to start yet</Text>
+                  <Text style={styles.cardTitle}>No session is ready to start</Text>
                   <Text style={styles.bodyText}>
-                    There is no plan for today and no earlier session to repeat. Build your plan first.
+                    Open your plan to see your next session.
                   </Text>
                   <PrimaryButton
                     label="Go to Plan"
