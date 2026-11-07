@@ -323,7 +323,10 @@ export function feasibleSessionAlternatives(input: {
 export const describeSessionAlternative = (alternative: SessionTimeAlternative): string =>
   alternative.kind === 'extend_session'
     ? `Lengthen sessions to ${alternative.capMin} minutes.`
-    : `Train ${alternative.weeklyFrequency} day${alternative.weeklyFrequency === 1 ? '' : 's'} a week at ${alternative.capMin} minutes — the same weekly time in fewer, longer sessions.`;
+    // Android walk 2026-11-03 (W1-5): the day count is rounded down, so the
+    // weekly total can fall below today's (7 x 15 = 105 -> 1 x 60). The line
+    // states the weekly minutes it offers instead of promising the same time.
+    : `Train ${alternative.weeklyFrequency} day${alternative.weeklyFrequency === 1 ? '' : 's'} a week at ${alternative.capMin} minutes — ${alternative.weeklyFrequency * alternative.capMin} minutes a week in fewer, longer sessions.`;
 
 /** One honest sentence for a session that does not fit its cap. */
 export function describeSessionTimeConflict(input: {
