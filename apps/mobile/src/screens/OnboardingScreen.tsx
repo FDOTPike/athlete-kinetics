@@ -47,7 +47,6 @@ import {
   type EquipmentItem,
   type LoadPreference,
   type Objective,
-  type ProgressionMethod,
   type TrainingAge,
   type UserProfile,
   validateSmartGoal,
@@ -111,16 +110,6 @@ const ENERGY_COPY: Record<EnergySystem, { label: string; blurb: string }> = {
 const LOAD_PREFERENCE_COPY: Record<LoadPreference, { label: string; blurb: string }> = {
   auto: { label: 'COACH SUGGESTS', blurb: 'Targets come from your numbers and history. You can always adjust before logging.' },
   manual: { label: 'I CHOOSE', blurb: 'You set every load. Coach suggestions appear as reference only.' },
-};
-
-/** Plain-language label for each persisted progression methodology (R6,
- * Round 2 — the review screen discloses the default like every other
- * removed advanced default). */
-const PROGRESSION_METHOD_LABEL: Record<ProgressionMethod, string> = {
-  linear: 'Linear',
-  undulating: 'Undulating',
-  conjugate: 'Conjugate',
-  autoregulated: 'Autoregulated',
 };
 
 const EQUIPMENT_LABEL: Record<EquipmentItem, string> = {
@@ -814,7 +803,6 @@ export default function OnboardingScreen(): React.JSX.Element {
                     {'\n'}How hard did that feel? 1 is very easy. 10 is your hardest effort.
                     {'\n'}Up to {draft.max_sessions_per_day} session{draft.max_sessions_per_day === 1 ? '' : 's'} a day
                     {'\n'}Energy focus: {ENERGY_COPY[draft.target_energy_system].label}
-                    {'\n'}Progression method: {PROGRESSION_METHOD_LABEL[draft.progression_methodology]}
                   </Text>
                 </View>
 
