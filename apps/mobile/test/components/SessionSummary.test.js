@@ -414,6 +414,21 @@ describe('screen laws: D5, D6, D8, D9', () => {
     expect(inScrollFlow(screen.getByLabelText('Back to Today'))).toBe(true);
   });
 
+  // Android walk 2026-11-03 (ux-8): a skipped exercise stays in the record.
+  test('the completion summary lists each skipped exercise', () => {
+    mockState = baseState({
+      loadSessionSummaryFacts: () => ({
+        durationMin: 20,
+        exercises: [exercise({ movementId: 1, movementName: 'Goblet Squat' })],
+        previousSets: [],
+        skippedExercises: [{ name: 'Push-up', plannedSets: 2, loggedSets: 0, loggedAs: [] }],
+      }),
+    });
+    render(<SessionScreen />);
+    expect(screen.getAllByTestId('session-summary-skipped').map((node) => node.props.children))
+      .toEqual(['Skipped: Push-up · no sets logged']);
+  });
+
   test('render performs no endSession / plan / progression / log call (D8 guard)', () => {
     mockState = baseState();
     render(<SessionScreen />);

@@ -5,7 +5,7 @@ import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING
 import { EXPERIENCE_SEVERITY, runnerTierForTrainingAge } from '../../../../packages/inference/src/sessionRunner';
 import { formatTeachingOnlyReason, freeFormStartIsEmpty, useStore, type LoadSelection, type LoggedSet, type SetLoadShown, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
 import { useNavigation, useSubViewBack } from '../navigation/navigation';
-import { buildSessionSummary, NO_NEXT_SESSION_TEXT } from '../state/sessionSummary';
+import { buildSessionSummary, NO_NEXT_SESSION_TEXT, skippedExerciseText } from '../state/sessionSummary';
 import { SUPPORT_HELD_MESSAGE, SUPPORT_UNAVAILABLE_MESSAGE } from '../state/healthSupportStore';
 import { theme } from '../theme/theme';
 import InfoTip from '../components/InfoTip';
@@ -474,6 +474,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
       const facts = loadSessionSummaryFacts(lastEndedSessionId);
       return buildSessionSummary({
         exercises: facts.exercises,
+        skippedExercises: facts.skippedExercises ?? [],
         previousSets: facts.previousSets,
         durationMin: facts.durationMin,
         blockSessions: summaryBlockSessions,
@@ -810,6 +811,9 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
             <View style={styles.summaryBlock} testID="session-summary">
               {summary.exerciseLines.map((line) => (
                 <Text key={line.key} style={styles.summaryLine}>{line.text}</Text>
+              ))}
+              {summary.skippedLines.map((line) => (
+                <Text key={line.key} style={styles.summaryLine} testID="session-summary-skipped">{line.text}</Text>
               ))}
               {summary.comparisonLines.map((line) => (
                 <Text key={line.key} style={styles.summaryComparison}>{line.text}</Text>
@@ -1239,15 +1243,15 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                 {sessionPlan
                   .filter((slot) => runner?.skippedSessionPlanSlotIds.includes(slot.sessionPlanSlotId))
                   .map((slot) => {
-                    const name = byId.get(slot.movementId)?.name ?? 'Movement';
-                    const logged = loggedCount(slot);
-                    const asNames = loggedAsNames(slot);
-                    const loggedSuffix = asNames.length > 0 ? ` as ${asNames.join(', ')}` : '';
+                    const text = skippedExerciseText({
+                      name: byId.get(slot.movementId)?.name ?? 'Movement',
+                      plannedSets: slot.plannedSets,
+                      loggedSets: loggedCount(slot),
+                      loggedAs: loggedAsNames(slot),
+                    });
                     return (
                       <Text key={slot.sessionPlanSlotId} style={styles.completeRowMeta}>
-                        {logged > 0
-                          ? `Skipped: ${name} · ${logged} of ${slot.plannedSets} sets logged${loggedSuffix}`
-                          : `Skipped: ${name} · no sets logged`}
+                        {text}
                       </Text>
                     );
                   })}
