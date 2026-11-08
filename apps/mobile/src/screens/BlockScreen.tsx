@@ -529,6 +529,206 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
     </View>
   );
 
+  const current = prescription !== null && prescription.forDate === today ? prescription : null;
+  const rows = weekRowsFor(blockSessions);
+  const nextPlanned = blockSessions.find((planned) => planned.sessionDate > today);
+
+  const openDetail = (summary: BlockSessionSummary): void => {
+    if (detail?.summary.plannedSessionId === summary.plannedSessionId) {
+      setDetail(null);
+      return;
+    }
+    setDetail({ summary, slots: loadSessionSlots(summary.plannedSessionId) });
+  };
+
+  const renderTrajectorySection = (): React.JSX.Element => (
+    <View
+      style={styles.section}
+      onLayout={(event) => { trajectorySectionY.current = event.nativeEvent.layout.y; }}
+    >
+      <View style={styles.trajectoryHeaderRow}>
+        <Text style={styles.sectionTitle}>Four-week trajectory</Text>
+        {block !== null && blockEndDate !== null && (
+          <View style={styles.fixedBadge} accessibilityRole="text" accessibilityLabel={`Fixed until ${blockEndDate}`}>
+            <Text style={styles.fixedBadgeText}>FIXED UNTIL {blockEndDate}</Text>
+          </View>
+        )}
+      </View>
+      {blockMeta !== null && blockMeta.macroBlockIndex >= 6 && (
+        <View style={styles.blockAttribution}>
+          <Pressable
+            onPress={() => setMacroBudgetOpen((open) => !open)}
+            style={styles.attributionTouchTarget}
+            accessibilityRole="button"
+            accessibilityLabel="Why effort is held steady"
+            accessibilityState={{ expanded: macroBudgetOpen }}
+          >
+            <Text style={styles.attributionMarker}>·</Text>
+          </Pressable>
+          {macroBudgetOpen && <Text style={styles.attributionText}>{AUTOPILOT_BUDGET_NOTE}</Text>}
+        </View>
+      )}
+      {block === null ? (
+        <View style={styles.emptyTrajectory}>
+          <Text style={styles.bodyText}>No block is active yet.</Text>
+          <Text style={styles.captionText}>Set one up below when you are ready to train with a trajectory.</Text>
+        </View>
+      ) : (
+        <>
+          {(() => {
+            const seenPhaseTerms = new Set<string>();
+            return rows.map((row) => {
+              const phaseTerm = GLOSSARY_PHASE_TERM[row.phase.toLowerCase()];
+              const showPhaseTip = phaseTerm !== undefined && !seenPhaseTerms.has(phaseTerm);
+              if (phaseTerm) seenPhaseTerms.add(phaseTerm);
+
+              return (
+                <View key={row.week} style={styles.weekContainer}>
+                  <View testID={`trajectory-week-${row.week}`} style={styles.weekRow}>
+                    <View style={styles.weekMeta}>
+                      <Text style={styles.weekTitle}>Week {row.week}</Text>
+                      <View style={styles.weekPhaseRow}>
+                        <Text style={styles.weekPhase}>{phaseLabel(row.phase)}</Text>
+                        {showPhaseTip && <InfoTip term={phaseTerm} />}
+                      </View>
+                    </View>
+                    <View testID={`trajectory-days-week-${row.week}`} style={styles.dayRail}>
+                      {row.cells.map((cell, dayIndex) => {
+                        const cellDate = addDaysIso(block.startDate, (row.week - 1) * 7 + dayIndex);
+                        const isToday = cellDate === today;
+                        if (cell === null) {
+                          if (!isToday) {
+                            return (
+                              <View key={`rest-${dayIndex}`} style={[styles.dayMark, styles.dayMarkRest]}>
+                                <Text style={styles.dayMarkRestText}>-</Text>
+                              </View>
+                            );
+                          }
+                          return (
+                            <View
+                              key={`rest-${dayIndex}`}
+                              testID="today-marker"
+                              accessibilityRole="text"
+                              accessibilityLabel="Today — recovery day"
+                              style={[styles.dayMark, styles.dayMarkRest, styles.dayMarkToday]}
+                            >
+                              <Text
+                                style={[styles.dayMarkRestText, styles.dayMarkTextToday]}
+                                numberOfLines={1}
+                                adjustsFontSizeToFit
+                                minimumFontScale={0.7}
+                              >
+                                Today
+                              </Text>
+                            </View>
+                          );
+                        }
+                        const isExpanded = detail?.summary.plannedSessionId === cell.plannedSessionId;
+                        const isMissed = isMissedSession(cell, today);
+                        return (
+                          <Pressable
+                            key={cell.plannedSessionId}
+                            onPress={() => openDetail(cell)}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Week ${cell.weekIndex}, ${cell.focus} session on ${cell.sessionDate}${
+                              cell.completionStatus === 'complete'
+                                ? ', completed'
+                                : cell.completionStatus === 'halted'
+                                  ? ', stopped'
+                                  : isMissed
+                                    ? ', not done'
+                                    : ''
+                            }`}
+                            accessibilityState={{ expanded: isExpanded, selected: isToday }}
+                            testID={isToday ? 'today-marker' : undefined}
+                            style={({ pressed }) => [
+                              styles.dayMark,
+                              cell.completionStatus !== null && styles.dayMarkFinalized,
+                              isMissed && styles.dayMarkMissed,
+                              isToday && styles.dayMarkToday,
+                              isExpanded && styles.dayMarkExpanded,
+                              pressed && styles.dayMarkPressed,
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.dayMarkText,
+                                cell.completionStatus !== null && styles.dayMarkTextFinalized,
+                                isMissed && styles.dayMarkTextMissed,
+                                isToday && styles.dayMarkTextToday,
+                              ]}
+                              numberOfLines={1}
+                              adjustsFontSizeToFit
+                              minimumFontScale={0.7}
+                            >
+                              {cell.completionStatus === 'complete'
+                                ? 'Done'
+                                : cell.completionStatus === 'halted'
+                                  ? 'Stopped'
+                                  : isMissed
+                                    ? 'Missed'
+                                    : isToday
+                                      ? 'Today'
+                                      : focusLabel(cell.focus)}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </View>
+
+                  {detail !== null && detail.summary.weekIndex === row.week && (
+                    <View style={styles.sessionDetail}>
+                      <Text style={styles.sessionDetailTitle}>
+                        {detail.summary.sessionDate} - {focusName(detail.summary.focus)}
+                        {detail.summary.completionStatus === 'complete'
+                          ? ' - completed'
+                          : detail.summary.completionStatus === 'halted'
+                            ? ' - stopped'
+                            : isMissedSession(detail.summary, today)
+                              ? ' - not done'
+                              : ''}
+                      </Text>
+                      {detail.slots.map((slot) => {
+                        const plannedLoad = slotLoadKg(slot, oneRepMaxes);
+                        return (
+                          <View key={slot.slotIndex} style={styles.slotRow}>
+                            <View style={styles.slotMain}>
+                              <Text style={styles.slotName}>{slot.movementName}</Text>
+                              <View style={styles.slotDetails}>
+                                <Text style={styles.slotValue}>{targetLabel(slot)}</Text>
+                                <Text style={styles.slotTarget}>RPE {slot.targetRpe.toFixed(1)}</Text>
+                                {plannedLoad !== null && (
+                                  <Text style={styles.slotTarget}>about {plannedLoad.toFixed(1)} kg</Text>
+                                )}
+                              </View>
+                              <AutopilotAttribution
+                                slot={slot}
+                                expanded={attributionSlotId === slot.plannedSlotId}
+                                onPress={() => setAttributionSlotId((currentId) => currentId === slot.plannedSlotId ? null : slot.plannedSlotId)}
+                              />
+                            </View>
+                            {slot.overrideReason != null && slot.overrideReason.trim() !== '' && (
+                              <View style={styles.overrideBadge} accessibilityRole="text">
+                                <Text style={styles.overrideBadgeText}>{slot.overrideReason}</Text>
+                              </View>
+                            )}
+                          </View>
+                        );
+                      })}
+                      <SecondaryButton label="Close session preview" onPress={() => setDetail(null)} accessibilityLabel="Close session preview" />
+                    </View>
+                  )}
+                </View>
+              );
+            });
+          })()}
+          <Text style={styles.trajectoryHint}>Tap a planned day to see its movements.</Text>
+        </>
+      )}
+    </View>
+  );
+
   if (vector === null) {
     return (
       // The no-vector gate is an early return INSIDE the real screen, so the
@@ -570,6 +770,35 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           </View>
         )}
         {nextProgramPreview !== null && renderNextProgramPreview(nextProgramPreview)}
+        {block === null && hasArchivedBlock && (
+          <View style={styles.card}>
+            <Text style={styles.eyebrow}>PERIODIZATION</Text>
+            <Text style={styles.cardTitle}>Your previous block had ended.</Text>
+            <Text style={styles.bodyText}>
+              A short four-week block gives Coach a clear trajectory to follow.
+            </Text>
+            <PrimaryButton
+              label="Start a new block"
+              onPress={() => setShowChooser(true)}
+              accessibilityLabel="Start a new block"
+            />
+          </View>
+        )}
+        {block === null && !hasArchivedBlock && (
+          <View style={styles.card}>
+            <Text style={styles.eyebrow}>PERIODIZATION</Text>
+            <Text style={styles.cardTitle}>Build your first block</Text>
+            <Text style={styles.bodyText}>
+              A short four-week block gives Coach a clear trajectory to follow.
+            </Text>
+            <PrimaryButton
+              label="Start a new block"
+              onPress={() => setShowChooser(true)}
+              accessibilityLabel="Start a new block"
+            />
+          </View>
+        )}
+        {block !== null && renderTrajectorySection()}
         <View style={styles.card}>
           <Text style={styles.eyebrow}>COACH</Text>
           <Text style={styles.cardTitle}>Readiness is needed first</Text>
@@ -593,18 +822,6 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
       </ScrollView>
     );
   }
-
-  const current = prescription !== null && prescription.forDate === today ? prescription : null;
-  const rows = weekRowsFor(blockSessions);
-  const nextPlanned = blockSessions.find((planned) => planned.sessionDate > today);
-
-  const openDetail = (summary: BlockSessionSummary): void => {
-    if (detail?.summary.plannedSessionId === summary.plannedSessionId) {
-      setDetail(null);
-      return;
-    }
-    setDetail({ summary, slots: loadSessionSlots(summary.plannedSessionId) });
-  };
 
   const openManageBlock = (): void => {
     setManageOpen(true);
@@ -931,200 +1148,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
       {nextProgramPreview !== null && renderNextProgramPreview(nextProgramPreview)}
 
       {/* Four-week trajectory Section */}
-      <View
-        style={styles.section}
-        onLayout={(event) => { trajectorySectionY.current = event.nativeEvent.layout.y; }}
-      >
-        <View style={styles.trajectoryHeaderRow}>
-          <Text style={styles.sectionTitle}>Four-week trajectory</Text>
-          {block !== null && blockEndDate !== null && (
-            <View style={styles.fixedBadge} accessibilityRole="text" accessibilityLabel={`Fixed until ${blockEndDate}`}>
-              <Text style={styles.fixedBadgeText}>FIXED UNTIL {blockEndDate}</Text>
-            </View>
-          )}
-        </View>
-        {blockMeta !== null && blockMeta.macroBlockIndex >= 6 && (
-          <View style={styles.blockAttribution}>
-            <Pressable
-              onPress={() => setMacroBudgetOpen((open) => !open)}
-              style={styles.attributionTouchTarget}
-              accessibilityRole="button"
-              accessibilityLabel="Why effort is held steady"
-              accessibilityState={{ expanded: macroBudgetOpen }}
-            >
-              <Text style={styles.attributionMarker}>·</Text>
-            </Pressable>
-            {macroBudgetOpen && <Text style={styles.attributionText}>{AUTOPILOT_BUDGET_NOTE}</Text>}
-          </View>
-        )}
-        {block === null ? (
-          <View style={styles.emptyTrajectory}>
-            <Text style={styles.bodyText}>No block is active yet.</Text>
-            <Text style={styles.captionText}>Set one up below when you are ready to train with a trajectory.</Text>
-          </View>
-        ) : (
-          <>
-            {(() => {
-              const seenPhaseTerms = new Set<string>();
-              return rows.map((row) => {
-                const phaseTerm = GLOSSARY_PHASE_TERM[row.phase.toLowerCase()];
-                const showPhaseTip = phaseTerm !== undefined && !seenPhaseTerms.has(phaseTerm);
-                if (phaseTerm) seenPhaseTerms.add(phaseTerm);
-
-                return (
-                  <View key={row.week} style={styles.weekContainer}>
-                    <View testID={`trajectory-week-${row.week}`} style={styles.weekRow}>
-                      <View style={styles.weekMeta}>
-                        <Text style={styles.weekTitle}>Week {row.week}</Text>
-                        <View style={styles.weekPhaseRow}>
-                          <Text style={styles.weekPhase}>{phaseLabel(row.phase)}</Text>
-                          {showPhaseTip && <InfoTip term={phaseTerm} />}
-                        </View>
-                      </View>
-                      <View testID={`trajectory-days-week-${row.week}`} style={styles.dayRail}>
-                    {row.cells.map((cell, dayIndex) => {
-                      // Every trajectory position owns a calendar date derived
-                      // from the block start, week and day index (same formula
-                      // as the generator's session_date), so rest cells can be
-                      // today-aware too.
-                      const cellDate = addDaysIso(block.startDate, (row.week - 1) * 7 + dayIndex);
-                      const isToday = cellDate === today;
-                      if (cell === null) {
-                        if (!isToday) {
-                          return (
-                            <View key={`rest-${dayIndex}`} style={[styles.dayMark, styles.dayMarkRest]}>
-                              <Text style={styles.dayMarkRestText}>-</Text>
-                            </View>
-                          );
-                        }
-                        // Today on a recovery/rest day: exactly one today-marker,
-                        // chalk left spine, accessible label, 'Today' not '-'.
-                        return (
-                          <View
-                            key={`rest-${dayIndex}`}
-                            testID="today-marker"
-                            accessibilityRole="text"
-                            accessibilityLabel="Today — recovery day"
-                            style={[styles.dayMark, styles.dayMarkRest, styles.dayMarkToday]}
-                          >
-                            <Text
-                              style={[styles.dayMarkRestText, styles.dayMarkTextToday]}
-                              numberOfLines={1}
-                              adjustsFontSizeToFit
-                              minimumFontScale={0.7}
-                            >
-                              Today
-                            </Text>
-                          </View>
-                        );
-                      }
-                      const isExpanded = detail?.summary.plannedSessionId === cell.plannedSessionId;
-                      const isMissed = isMissedSession(cell, today);
-                      return (
-                        <Pressable
-                          key={cell.plannedSessionId}
-                          onPress={() => openDetail(cell)}
-                          accessibilityRole="button"
-                          accessibilityLabel={`Week ${cell.weekIndex}, ${cell.focus} session on ${cell.sessionDate}${
-                            cell.completionStatus === 'complete'
-                              ? ', completed'
-                              : cell.completionStatus === 'halted'
-                                ? ', stopped'
-                                : isMissed
-                                  ? ', not done'
-                                  : ''
-                          }`}
-                          accessibilityState={{ expanded: isExpanded, selected: isToday }}
-                          testID={isToday ? 'today-marker' : undefined}
-                          style={({ pressed }) => [
-                            styles.dayMark,
-                            cell.completionStatus !== null && styles.dayMarkFinalized,
-                            isMissed && styles.dayMarkMissed,
-                            isToday && styles.dayMarkToday,
-                            isExpanded && styles.dayMarkExpanded,
-                            pressed && styles.dayMarkPressed,
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.dayMarkText,
-                              cell.completionStatus !== null && styles.dayMarkTextFinalized,
-                              isMissed && styles.dayMarkTextMissed,
-                              isToday && styles.dayMarkTextToday,
-                            ]}
-                            numberOfLines={1}
-                            adjustsFontSizeToFit
-                            minimumFontScale={0.7}
-                          >
-                            {cell.completionStatus === 'complete'
-                              ? 'Done'
-                              : cell.completionStatus === 'halted'
-                                ? 'Stopped'
-                                : isMissed
-                                  ? 'Missed'
-                                  : isToday
-                                    ? 'Today'
-                                    : focusLabel(cell.focus)}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                </View>
-
-                {detail !== null && detail.summary.weekIndex === row.week && (
-                  <View style={styles.sessionDetail}>
-                    <Text style={styles.sessionDetailTitle}>
-                      {detail.summary.sessionDate} - {focusName(detail.summary.focus)}
-                      {detail.summary.completionStatus === 'complete'
-                        ? ' - completed'
-                        : detail.summary.completionStatus === 'halted'
-                          ? ' - stopped'
-                          : isMissedSession(detail.summary, today)
-                            ? ' - not done'
-                            : ''}
-                    </Text>
-                    {detail.slots.map((slot) => {
-                      // #214: the planned load, from the same calculation as
-                      // today's preview but without today's readiness
-                      // modifier, since that day's readiness is not known.
-                      const plannedLoad = slotLoadKg(slot, oneRepMaxes);
-                      return (
-                        <View key={slot.slotIndex} style={styles.slotRow}>
-                          <View style={styles.slotMain}>
-                            <Text style={styles.slotName}>{slot.movementName}</Text>
-                            <View style={styles.slotDetails}>
-                              <Text style={styles.slotValue}>{targetLabel(slot)}</Text>
-                              <Text style={styles.slotTarget}>RPE {slot.targetRpe.toFixed(1)}</Text>
-                              {plannedLoad !== null && (
-                                <Text style={styles.slotTarget}>about {plannedLoad.toFixed(1)} kg</Text>
-                              )}
-                            </View>
-                            <AutopilotAttribution
-                              slot={slot}
-                              expanded={attributionSlotId === slot.plannedSlotId}
-                              onPress={() => setAttributionSlotId((currentId) => currentId === slot.plannedSlotId ? null : slot.plannedSlotId)}
-                            />
-                          </View>
-                          {slot.overrideReason != null && slot.overrideReason.trim() !== '' && (
-                            <View style={styles.overrideBadge} accessibilityRole="text">
-                              <Text style={styles.overrideBadgeText}>{slot.overrideReason}</Text>
-                            </View>
-                          )}
-                        </View>
-                      );
-                    })}
-                    <SecondaryButton label="Close session preview" onPress={() => setDetail(null)} accessibilityLabel="Close session preview" />
-                  </View>
-                )}
-              </View>
-            );
-          });
-        })()}
-            <Text style={styles.trajectoryHint}>Tap a planned day to see its movements.</Text>
-          </>
-        )}
-      </View>
+      {renderTrajectorySection()}
 
       {/* Changed in this block: the autopilot changes stored when the active
           block was built. Hidden when there is nothing to show, because an
