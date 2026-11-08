@@ -580,6 +580,68 @@ describe('F3: a stopped day never re-offers the planned workout', () => {
 // Sol R4 F5 — a refused start never navigates
 // ---------------------------------------------------------------------------
 
+describe('an earlier workout the app never closed has a way out (issue 191)', () => {
+  const earlier = (overrides = {}) => ({
+    sessionId: 42,
+    sessionDate: '2026-07-13',
+    loggedSetCount: 0,
+    safetyStop: false,
+    canDiscard: true,
+    ...overrides,
+  });
+
+  test('an earlier workout with logged sets is finished and kept, and cannot be discarded', () => {
+    const finishEarlierSession = jest.fn(() => true);
+    const discardEarlierSession = jest.fn(() => true);
+    mockState = baseState({
+      earlierOpenSessions: [earlier({ loggedSetCount: 3, canDiscard: false })],
+      finishEarlierSession,
+      discardEarlierSession,
+    });
+    render(<TodayScreen />);
+
+    expect(screen.getByText('An earlier workout was never finished')).toBeOnTheScreen();
+    expect(screen.getByText(/2026-07-13.*3 sets logged/)).toBeOnTheScreen();
+    expect(screen.queryByText('Discard empty session')).toBeNull();
+
+    fireEvent.press(screen.getByText('Finish and keep logged sets'));
+    expect(finishEarlierSession).toHaveBeenCalledWith(42);
+    expect(discardEarlierSession).not.toHaveBeenCalled();
+  });
+
+  test('an earlier workout with no logged sets offers Discard, and no finish', () => {
+    const discardEarlierSession = jest.fn(() => true);
+    mockState = baseState({
+      earlierOpenSessions: [earlier()],
+      finishEarlierSession: jest.fn(() => true),
+      discardEarlierSession,
+    });
+    render(<TodayScreen />);
+
+    expect(screen.queryByText('Finish and keep logged sets')).toBeNull();
+    fireEvent.press(screen.getByText('Discard empty session'));
+    expect(discardEarlierSession).toHaveBeenCalledWith(42);
+  });
+
+  test('a safety stop with no sets is never offered for discard', () => {
+    mockState = baseState({
+      earlierOpenSessions: [earlier({ safetyStop: true, canDiscard: false })],
+      finishEarlierSession: jest.fn(() => true),
+      discardEarlierSession: jest.fn(() => true),
+    });
+    render(<TodayScreen />);
+
+    expect(screen.queryByText('Discard empty session')).toBeNull();
+    expect(screen.getByText('Finish and keep the safety stop')).toBeOnTheScreen();
+  });
+
+  test('with no earlier workout open, no such card is shown', () => {
+    mockState = baseState({ earlierOpenSessions: [] });
+    render(<TodayScreen />);
+    expect(screen.queryByText('An earlier workout was never finished')).toBeNull();
+  });
+});
+
 describe('F5: Today opens the workout only after a session actually exists', () => {
   test('a refused start (store sets error, no session) stays on Today and shows why', () => {
     mockState.startSession = jest.fn(() => {

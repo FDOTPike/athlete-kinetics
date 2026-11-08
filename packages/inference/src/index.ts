@@ -374,6 +374,8 @@ export {
   SESSION_OUTCOME_ENGINE_VERSION,
   SessionOutcomeValidationError,
   evaluateSessionOutcome,
+  evaluateAfterTheFactOutcome,
+  isDirectiveHalt,
   type SessionOutcomeDecision,
   type SessionOutcomeEvidence,
   type SessionOutcomeInput,

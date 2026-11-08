@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 const require = createRequire(import.meta.url);
 const {
   evaluateSessionOutcome,
+  evaluateAfterTheFactOutcome,
   SESSION_OUTCOME_ENGINE_VERSION,
   SessionOutcomeValidationError,
 } = require('./.build/sessionOutcome.js');
@@ -375,6 +376,43 @@ check('session feel: the module reads no clock, no randomness and no free text',
   const source = readFileSync(new URL('../src/sessionFeel.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /Date\.now\s*\(|new\s+Date\s*\(|Math\.random\s*\(|performance\.now\s*\(/);
   assert.doesNotMatch(source, /resolveReport|scanRedFlags|triage\s*\(|embed\s*\(/);
+});
+
+// Issue 191: a workout the app never closed is finished after the fact. The
+// athlete's choice keeps what was logged as "session recorded"; only a directive
+// safety halt keeps "stopped safely". A manual stop is not a safety halt.
+check('after the fact: logged work of any shape is recorded, never a positive label', () => {
+  const afterTheFact = (patch) => evaluateAfterTheFactOutcome(input(patch));
+  assert.equal(afterTheFact({})?.kind, 'session_recorded');
+  assert.equal(afterTheFact({ originKind: 'free_form' })?.kind, 'session_recorded');
+  assert.equal(afterTheFact({ sets: [logged(1, 1, reps(4))] })?.kind, 'session_recorded');
+  const kept = afterTheFact({ sets: [logged(1, 1, reps(5))] });
+  assert.equal(kept.terminalPhase, 'complete');
+  assert.equal(kept.haltReason, null);
+  assert.equal(kept.finalizedAtMs, 1000);
+});
+
+check('after the fact: a directive safety halt keeps stopped_safely, with logs or without', () => {
+  for (const haltReason of ['safety', 'pain', 'niggle']) {
+    const withSets = evaluateAfterTheFactOutcome(input({ terminal: { phase: 'halted', haltReason } }));
+    assert.equal(withSets.kind, 'stopped_safely', haltReason);
+    assert.equal(withSets.terminalPhase, 'halted');
+    assert.equal(withSets.haltReason, haltReason);
+    const empty = evaluateAfterTheFactOutcome(input({ terminal: { phase: 'halted', haltReason }, sets: [] }));
+    assert.equal(empty.kind, 'stopped_safely', haltReason);
+  }
+});
+
+check('after the fact: an empty session with no safety halt is nothing to keep', () => {
+  assert.equal(evaluateAfterTheFactOutcome(input({ sets: [] })), null);
+  assert.equal(evaluateAfterTheFactOutcome(input({ sets: [], originKind: 'free_form' })), null);
+});
+
+check('after the fact: a manual halt is refused rather than recorded as halted', () => {
+  assert.throws(
+    () => evaluateAfterTheFactOutcome(input({ terminal: { phase: 'halted', haltReason: 'manual' } })),
+    SessionOutcomeValidationError,
+  );
 });
 
 console.log(`verify:outcomes - all ${n} checks green`);
