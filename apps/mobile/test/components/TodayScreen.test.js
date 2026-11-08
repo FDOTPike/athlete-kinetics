@@ -17,7 +17,8 @@
  *    exactly the bug.
  */
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { Alert } from 'react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import TodayScreen from '../../src/screens/TodayScreen';
 import {
   deriveTodayState,
@@ -541,6 +542,15 @@ describe('Today never manufactures a coaching message', () => {
     expect(screen.getByTestId('today-readiness-none')).toBeOnTheScreen();
     expect(screen.queryByText(/\/ 100/)).toBeNull();
   });
+
+  test('#170: a morning with no row yet says there is no estimate for today yet', () => {
+    mockState = baseState({ vector: null });
+    render(<TodayScreen />);
+    expect(
+      screen.getByText('No estimate for today yet. It builds from logged sessions and any synced telemetry.'),
+    ).toBeOnTheScreen();
+    expect(screen.queryByText(/No readiness estimate yet/)).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -590,10 +600,44 @@ describe('F5: Today opens the workout only after a session actually exists', () 
     });
     mockState.startSession = jest.fn(() => { mockState.error = 'Refused.'; });
     const onOpenSession = jest.fn();
-    render(<TodayScreen onOpenSession={onOpenSession} />);
-    fireEvent.press(screen.getByTestId('today-stopped-extra'));
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    try {
+      render(<TodayScreen onOpenSession={onOpenSession} />);
+      fireEvent.press(screen.getByTestId('today-stopped-extra'));
+      act(() => { alert.mock.calls[0][2].find((button) => button.text === 'Start').onPress(); });
+    } finally {
+      alert.mockRestore();
+    }
     expect(onOpenSession).not.toHaveBeenCalled();
     expect(screen.getByText('Refused.')).toBeOnTheScreen();
+  });
+});
+
+// #165 (walk I-15): an extra session started on one tap of a text link.
+describe('an extra session asks first', () => {
+  test.each([
+    ['completed_today', { blockSessions: [blockSession({ sessionDate: TODAY, completionStatus: 'complete' })] }, 'today-extra-session'],
+    ['stopped_today', { blockSessions: [blockSession({ sessionDate: TODAY, completionStatus: 'halted' })] }, 'today-stopped-extra'],
+  ])('on %s, "Start an extra session?" with Start and Not now; nothing starts before Start', (_label, overrides, controlTestId) => {
+    mockState = baseState(overrides);
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    try {
+      render(<TodayScreen />);
+      fireEvent.press(screen.getByTestId(controlTestId));
+      expect(mockState.startSession).not.toHaveBeenCalled();
+      expect(alert).toHaveBeenCalledTimes(1);
+      const [title, message, buttons] = alert.mock.calls[0];
+      expect(title).toBe('Start an extra session?');
+      // #165: an extra session stopped before any set is logged is discarded.
+      expect(message).toBe('It is unplanned. It is saved as its own session once you log a set.');
+      expect(buttons.map((button) => button.text)).toEqual(['Not now', 'Start']);
+      buttons[0].onPress?.();
+      expect(mockState.startSession).not.toHaveBeenCalled();
+      act(() => { buttons[1].onPress(); });
+      expect(mockState.startSession).toHaveBeenCalledTimes(1);
+    } finally {
+      alert.mockRestore();
+    }
   });
 });
 
@@ -634,5 +678,60 @@ describe('session-5: empty unplanned starts show the plan-first card instead of 
     fireEvent.press(screen.getByTestId('today-primary-start'));
     expect(mockState.startSession).toHaveBeenCalledTimes(1);
     expect(screen.queryByText('Nothing to start yet')).toBeNull();
+  });
+});
+
+describe('#177: Today names the active athlete only in Coach mode', () => {
+  test('with two athletes, Today names the active one', () => {
+    mockState = baseState({
+      athletes: [{ id: 'default', name: 'Default Athlete' }, { id: 'ath-2', name: 'Sam' }],
+      activeAthleteId: 'ath-2',
+    });
+    render(<TodayScreen />);
+    expect(screen.getByTestId('today-active-athlete')).toHaveTextContent('Athlete: Sam');
+  });
+
+  test('with one athlete, Today names no one', () => {
+    mockState = baseState({
+      athletes: [{ id: 'default', name: 'Default Athlete' }],
+      activeAthleteId: 'default',
+    });
+    render(<TodayScreen />);
+    expect(screen.queryByTestId('today-active-athlete')).toBeNull();
+  });
+
+  const heldDecision = () => ({ status: 'held', holdIds: ['h1'] });
+  const twoAthletes = {
+    athletes: [{ id: 'default', name: 'Default Athlete' }, { id: 'ath-2', name: 'Sam' }],
+    activeAthleteId: 'ath-2',
+  };
+
+  test('with two athletes, the held Today screen also names the active one', () => {
+    mockState = baseState({ ...twoAthletes, getTrainingSupportDecision: heldDecision });
+    render(<TodayScreen />);
+    expect(screen.getByTestId('training-support-notice')).toBeOnTheScreen();
+    expect(screen.getByTestId('today-active-athlete')).toHaveTextContent('Athlete: Sam');
+  });
+
+  test('with two athletes, the held Today screen with a safety halt names the active one', () => {
+    mockState = baseState({
+      ...twoAthletes,
+      getTrainingSupportDecision: heldDecision,
+      lastTriage: { kind: 'matched', directive: { halt: true, vector: { coaching_cue: 'Stop and rest.' } } },
+    });
+    render(<TodayScreen />);
+    expect(screen.getByTestId('held-screen-halt-card')).toBeOnTheScreen();
+    expect(screen.getByTestId('today-active-athlete')).toHaveTextContent('Athlete: Sam');
+  });
+
+  test('with one athlete, the held Today screen names no one', () => {
+    mockState = baseState({
+      athletes: [{ id: 'default', name: 'Default Athlete' }],
+      activeAthleteId: 'default',
+      getTrainingSupportDecision: heldDecision,
+    });
+    render(<TodayScreen />);
+    expect(screen.getByTestId('training-support-notice')).toBeOnTheScreen();
+    expect(screen.queryByTestId('today-active-athlete')).toBeNull();
   });
 });

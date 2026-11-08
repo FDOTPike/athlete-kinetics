@@ -32,6 +32,7 @@ import { useNavigation, useSubViewBack } from '../navigation/navigation';
 import ProgramSetupScreen from './ProgramSetupScreen';
 import NewBlockChooserScreen from './NewBlockChooserScreen';
 import InfoTip from '../components/InfoTip';
+import { REPORT_NOT_SENT_TEXT } from '../components/SubjectiveReportPanel';
 import { EmphasisReportCard } from '../components/EmphasisReportCard';
 import { deriveTodayState } from '../state/todayState';
 import { theme } from '../theme/theme';
@@ -286,9 +287,12 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
     (s) => s.freezeRoutineTemplateToPlannedSession,
   );
   const deleteRoutineTemplate = useStore((s) => s.deleteRoutineTemplate);
+  // Same condition freezeRoutineTemplateToPlannedSession refuses on.
+  const goalProgramActive = program?.status === 'active';
 
   const [reportText, setReportText] = useState('');
   const [reportSeverity, setReportSeverity] = useState<number | null>(null);
+  const [reportNotSent, setReportNotSent] = useState(false);
   const [schema, setSchema] = useState<SchemaType>('LINEAR');
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [attributionSlotId, setAttributionSlotId] = useState<number | null>(null);
@@ -364,6 +368,11 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
       setSessionStartError(storeError);
     }
   }, [awaitingSessionStart, session, storeError, onSessionStarted]);
+  // #223: a "Use day" confirmation chosen before a goal program started would
+  // stay on screen and call a store action that refuses the active program.
+  useEffect(() => {
+    if (goalProgramActive && confirmRoutineAction?.kind === 'use') setConfirmRoutineAction(null);
+  }, [goalProgramActive, confirmRoutineAction]);
   const [showChooser, setShowChooser] = useState(false);
 
   const hasSubView =
@@ -896,10 +905,14 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                 onPress={program == null ? openManageBlock : () => setEditingProgram(true)}
                 accessibilityLabel={program == null ? 'Manage current block' : 'Manage future program preferences'}
               />
+              {/* #172: with an active program this changes future blocks only;
+                  the current block stays. Without an active program (none, or
+                  one whose review is due) it plans a new block: the program
+                  editor only saves for an active program. */}
               <SecondaryButton
-                label="Plan a new block"
-                onPress={() => setShowChooser(true)}
-                accessibilityLabel="Plan a new block"
+                label={program?.status !== 'active' ? 'Plan a new block' : 'Change future blocks'}
+                onPress={program?.status !== 'active' ? () => setShowChooser(true) : () => setEditingProgram(true)}
+                accessibilityLabel={program?.status !== 'active' ? 'Plan a new block' : 'Change future blocks'}
               />
             </>
           )}
@@ -1255,6 +1268,14 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           onOpenChange={setRoutineTemplatesOpen}
         >
           <View style={styles.disclosureContent}>
+            {/* #223: the store refuses to freeze a routine over an active goal
+                program, so "Use day N today" is not offered then. Said once
+                here instead of after a tap that cannot work. */}
+            {goalProgramActive && profile.training_age !== 'beginner' && (
+              <Text style={styles.captionText}>
+                Routines can't replace your goal program's sessions. Edit them here, and use them when no goal program is active.
+              </Text>
+            )}
             {routineTemplates.length === 0 ? (
               <Text style={styles.captionText}>No saved routine templates yet.</Text>
             ) : (
@@ -1282,7 +1303,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                       <>
                         {profile.training_age !== 'beginner' && (
                           <>
-                            {[...new Set(t.slots.map((slot) => slot.dayIndex))].sort((a, b) => a - b).map((dayIndex) => (
+                            {!goalProgramActive && [...new Set(t.slots.map((slot) => slot.dayIndex))].sort((a, b) => a - b).map((dayIndex) => (
                               <Chip
                                 key={dayIndex}
                                 label={`Use day ${dayIndex} today`}
@@ -1322,7 +1343,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
         >
         <Disclosure
           label="Manage block"
-          hint={block === null ? 'Choose a structure for your first block' : 'Block settings and regeneration'}
+          hint={block === null ? 'Start your first block' : 'Block settings and regeneration'}
           open={manageOpen}
           onOpenChange={setManageOpen}
         >
@@ -1344,6 +1365,10 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                 Coach inserted a deload week before the peak because fatigue was high.
               </Text>
             )}
+            {/* #171: with no block, "Start a new block" opens the chooser and
+                never reads a loading structure, so the chips are not shown. */}
+            {block !== null && (
+            <>
             <Text style={styles.schemaLabel}>Choose a loading structure</Text>
             <View style={styles.schemaRow}>
               {SELECTABLE_SCHEMA_TYPES.map((type) => {
@@ -1364,6 +1389,8 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                 );
               })}
             </View>
+            </>
+            )}
 
             {!confirmRegenerate ? (
               <PrimaryButton
@@ -1522,13 +1549,22 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
               disabled={reportText.trim().length === 0 || reportSeverity === null || triaging}
               onPress={() => {
                 if (reportSeverity === null) return;
-                void reportSubjective(reportText, reportSeverity).then(() => {
+                setReportNotSent(false);
+                // The text and severity clear only once the store has stored the report.
+                // Anything else keeps them on screen and says so, so nothing typed is lost.
+                void reportSubjective(reportText, reportSeverity).then((stored) => {
+                  if (!stored) { setReportNotSent(true); return; }
                   setReportText('');
                   setReportSeverity(null);
-                });
+                }, () => { setReportNotSent(true); });
               }}
               accessibilityLabel={triaging ? 'Checking report' : 'Apply report'}
             />
+            {reportNotSent && (
+              <Text style={styles.captionText} accessibilityRole="alert" testID="plan-report-not-sent">
+                {REPORT_NOT_SENT_TEXT}
+              </Text>
+            )}
 
             {lastTriage !== null && lastTriage.kind === 'positive' && (
               <View style={styles.reportResult}>
