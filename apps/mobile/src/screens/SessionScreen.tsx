@@ -135,16 +135,21 @@ const loadCopyFor = (
   oneRmKg: number | undefined,
   apreOverrideKg: number | null,
   timedTarget: boolean,
+  carriedSlotLoadKg: number | null = null,
 ): string => {
   if (sel.source === 'derived') {
     const hasValidApre = apreOverrideKg !== null
       && Number.isFinite(apreOverrideKg)
       && apreOverrideKg >= 0;
-    return hasValidApre
-      ? bodyweightMode
+    if (hasValidApre) {
+      return bodyweightMode
         ? `Prescribed ${apreOverrideKg.toFixed(1)} kg added load`
-        : `Prescribed ${apreOverrideKg.toFixed(1)} kg`
-      : `Based on your ${oneRmKg?.toFixed(1)} kg 1RM`;
+        : `Prescribed ${apreOverrideKg.toFixed(1)} kg`;
+    }
+    if (carriedSlotLoadKg !== null && sel.initialLoadKg !== null && Number.isFinite(sel.initialLoadKg)) {
+      return `Coach suggests ${sel.initialLoadKg.toFixed(1)} kg · Based on your ${oneRmKg?.toFixed(1)} kg 1RM`;
+    }
+    return `Based on your ${oneRmKg?.toFixed(1)} kg 1RM`;
   }
   return loadSourceCopy(sel, bodyweightMode, oneRmKg, timedTarget);
 };
@@ -572,6 +577,25 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
         overrideLoadKg: currentSlot.overrideLoadKg,
         sessionPlanSlotId: currentSlot.sessionPlanSlotId,
       });
+  // Android walk (#231): within the same slot, after a set has been logged in
+  // this session, start the next set's field at the load of the previous set
+  // while keeping today's coach suggestion visible next to it.
+  const latestSlotSet = currentSlot === null
+    ? null
+    : (session?.sets.filter((set) => sameSlot(set, currentSlot)) ?? [])
+        .reduce<LoggedSet | null>(
+          (latest, candidate) => latest === null
+            || candidate.set_index > latest.set_index
+            || (candidate.set_index === latest.set_index && candidate.set_id > latest.set_id)
+            ? candidate
+            : latest,
+          null,
+        );
+  const previousSlotLoadKg = latestSlotSet !== null
+    && Number.isFinite(latestSlotSet.load_kg)
+    && latestSlotSet.load_kg >= 0
+    ? latestSlotSet.load_kg
+    : null;
   // Android walk (#232): a movement whose only implement is a band (Band Row,
   // Band Pull-Apart) has no kilograms to enter. The set records reps, effort
   // and, when bands are named, the band; its load is 0. Movements that take
@@ -586,6 +610,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
         oneRm,
         currentSlot?.overrideLoadKg ?? null,
         target?.kind === 'time',
+        previousSlotLoadKg,
       );
   const loadLoggable = bandOnly || (isLoadDraftLoggable(loadText) && !loadInvalid);
 
@@ -657,7 +682,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
       overrideLoadKg: currentSlot.overrideLoadKg,
       sessionPlanSlotId: currentSlot.sessionPlanSlotId,
     });
-    const initial = seed.initialLoadKg;
+    const initial = previousSlotLoadKg ?? seed.initialLoadKg;
     // The record holds the number the field showed (one decimal), not the
     // resolver's unrounded value; null stays null (a blank field).
     loadShownRef.current = {
