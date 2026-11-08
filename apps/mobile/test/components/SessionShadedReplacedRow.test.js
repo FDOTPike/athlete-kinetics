@@ -209,7 +209,7 @@ test('issue 144: a swap after one logged set of a 2-set exercise reads "1 of 2 s
   render(<SessionScreen />);
   expect(screen.getByText('0 of 3 exercises complete')).toBeOnTheScreen();
 
-  fireEvent.press(screen.getByLabelText('Avoid Push-up and find a substitution'));
+  fireEvent.press(screen.getByLabelText('Swap or avoid this: Push-up'));
   fireEvent.press(screen.getByLabelText('Use Incline Push-Up instead'));
   fireEvent.press(screen.getByLabelText('Use Incline Push-Up instead'));
 
