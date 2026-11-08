@@ -117,6 +117,15 @@ export const SUPPORTED_BACKUP_SCHEMA_CONTRACTS: readonly BackupSchemaContract[] 
     objectCount: 209,
     fingerprint: 'ddb63af34a12943836b43c5392ac22ceb5f1a720e92d14280e35483ec531164c',
   },
+  // Through 074_session_feel_reasons: session_feel rebuilt with a looser CHECK,
+  // and the session_feel_extra_reason side-car table.
+  {
+    userVersion: 73,
+    migrationSlot: 74,
+    tableCount: 124,
+    objectCount: 210,
+    fingerprint: 'bddf9047a966fd3bdb50db09d99754130cc506f69c4625e171c4cf3ec0402ee0',
+  },
 ];
 
 export const CURRENT_BACKUP_SCHEMA_CONTRACT: BackupSchemaContract =

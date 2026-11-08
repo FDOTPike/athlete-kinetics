@@ -34,6 +34,7 @@ import { SportPanel } from '../components/SportPanel';
 import { theme } from '../theme/theme';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { useStore } from '../state/useStore';
+import { coachModeAthleteName } from '../state/coachModeAthlete';
 import { useBackupStore } from '../state/backupStore';
 import { useSubViewBack } from '../navigation/navigation';
 import { Chip, Stepper, QuietAction, Disclosure, ListRow, PrimaryButton, SecondaryButton } from '../components/ui';
@@ -305,6 +306,7 @@ export default function ProfileScreen(): React.JSX.Element {
   const backupWorking = useBackupStore((s) => s.status === 'working');
   const athletes = useStore((s) => s.athletes);
   const activeAthleteId = useStore((s) => s.activeAthleteId);
+  const activeAthleteName = coachModeAthleteName(athletes, activeAthleteId);
   const switchAthlete = useStore((s) => s.switchAthlete);
   // #224: a one-rep max typed with the keyboard still open is saved for the
   // current athlete before a Coach Mode switch closes its database.
@@ -458,6 +460,12 @@ export default function ProfileScreen(): React.JSX.Element {
     <KeyboardAwareScrollView style={styles.screen} contentContainerStyle={styles.content}>
       <Text style={styles.wordmark}>pikeMethods</Text>
       <Text style={styles.heading}>ATHLETE PROFILE</Text>
+      {/* #177: in Coach mode (two or more athletes) the heading names the active athlete. */}
+      {activeAthleteName !== null && (
+        <Text style={styles.activeAthleteName} testID="profile-active-athlete">
+          {activeAthleteName}
+        </Text>
+      )}
       <Text style={styles.subheading}>
         Your training settings guide the coach. Health notes and preferences stay
         in your records; instructions can place coach suggestions on hold.
@@ -1468,6 +1476,7 @@ const styles = StyleSheet.create({
     marginBottom: theme.space[1],
   },
   heading: { ...theme.font.title, color: theme.color.textHi },
+  activeAthleteName: { ...theme.font.body, color: theme.color.textHi, marginTop: theme.space[1] },
   safetyNotice: {
     backgroundColor: theme.color.ink1,
     borderColor: theme.color.line,

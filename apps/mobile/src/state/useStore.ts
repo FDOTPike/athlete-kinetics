@@ -360,7 +360,7 @@ export const formatTeachingOnlyReason = (verdict: MovementAvailability | undefin
 // Codebase + pre-embedded vectors ride in the JS bundle (~1 MB total);
 // relative imports resolve via metro watchFolders / tsc include.
 import type { BiometricsBridge } from '@ak/biometrics';
-import { groupSummaryExercises } from './sessionSummary';
+import { groupSummaryExercises, type SkippedExercise } from './sessionSummary';
 import phraseCodebaseJson from '../../../../packages/inference/assets/phrase-codebase.json';
 import phraseVectorsJson from '../../../../packages/inference/assets/phrase-codebase.vectors.json';
 import { routeQuestion, type QuestionIndex, type QuestionResult } from '../../../../packages/inference/src/semantic/questionRouter';
@@ -920,6 +920,9 @@ interface KineticsStore {
     durationMin: number | null;
     exercises: { movementId: number; movementName: string; plannedSets: number | null; sets: { reps: number; loadKg: number; timeS: number | null }[] }[];
     previousSets: { movementId: number; reps: number; loadKg: number; sessionId: number }[];
+    /** Exercises the athlete chose to skip (071 session_skipped_slot), in plan
+     *  order, with the sets logged for that slot before the skip. */
+    skippedExercises: SkippedExercise[];
   };
   /** Upsert (or clear with null) an absolute 1RM for a movement. */
   saveOneRepMax: (movementId: number, kg: number | null) => void;
@@ -1361,6 +1364,19 @@ const rowsOf = <T>(res: unknown): T[] => {
   if (Array.isArray(r)) return r as T[];
   const arr = (r as { _array?: unknown } | undefined)?._array;
   return Array.isArray(arr) ? (arr as T[]) : [];
+};
+
+/** The session-feel answer saved for a session (070 and its 074 side-car), or
+ *  null when there is none. May throw; callers decide what a failed read means. */
+const readSavedSessionFeel = (d: DB, sessionId: number): SessionFeelRecord | null => {
+  const row = rowsOf<Record<string, number | string>>(d.executeSync(
+    'SELECT f.feel, f.reason_pain, f.reason_tired, f.reason_unwell, f.reason_technique, f.reason_equipment, f.reason_time, f.reason_felt_good, f.reason_other, x.reason_too_heavy, x.reason_too_light, x.reason_rested_well FROM session_feel f LEFT JOIN session_feel_extra_reason x ON x.session_id = f.session_id WHERE f.session_id = ?',
+    [sessionId],
+  ))[0];
+  return row === undefined ? null : {
+    feel: row.feel as SessionFeelKind,
+    reasons: SESSION_FEEL_REASONS.filter((reason) => row[`reason_${reason}`] === 1),
+  };
 };
 
 export const localToday = (): string => {
@@ -6248,13 +6264,25 @@ export const useStore = create<KineticsStore>()((set, get) => {
     );
   },
 
-  /** Save how the last ended session went (070) and, when one was typed, its
-   *  note, in one transaction. A record only: writes session_feel and
-   *  session_note and nothing a prescription, block or progression reads. */
+  /** Save how the last ended session went (070, 074) and, when one was typed,
+   *  its note, in one transaction. A record only: writes session_feel, its
+   *  074 side-car session_feel_extra_reason and session_note, and nothing a
+   *  prescription, block or progression reads. */
   saveSessionFeel: (draft, note) => {
     const sessionId = get().lastEndedSessionId;
     if (sessionId === null) return 'not_saved';
-    const checked = validateSessionFeel(draft);
+    // The answer already saved for this session: a reason it holds that the
+    // answer's list no longer offers (a row from before the per-answer lists)
+    // is kept while the answer is unchanged, so a saved "pain" is never
+    // silently dropped. If it cannot be read, nothing is written.
+    let saved: SessionFeelRecord | null;
+    try {
+      saved = readSavedSessionFeel(getDb(), sessionId);
+    } catch (error) {
+      set({ error: error instanceof Error ? error.message : String(error) });
+      return 'not_saved';
+    }
+    const checked = validateSessionFeel(draft, saved);
     if (!checked.ok) return checked.problem;
     const flag = (reason: SessionFeelReason): number => (checked.record.reasons.includes(reason) ? 1 : 0);
     const typed = note.trim().slice(0, 1000);
@@ -6279,6 +6307,16 @@ export const useStore = create<KineticsStore>()((set, get) => {
           now,
         ],
       );
+      // Issue #220: the three newer reasons live in the 074 side-car, one row
+      // only while at least one of them is chosen.
+      if (flag('too_heavy') + flag('too_light') + flag('rested_well') > 0) {
+        d.executeSync(
+          'INSERT INTO session_feel_extra_reason (session_id, reason_too_heavy, reason_too_light, reason_rested_well) VALUES (?, ?, ?, ?) ON CONFLICT(session_id) DO UPDATE SET reason_too_heavy = excluded.reason_too_heavy, reason_too_light = excluded.reason_too_light, reason_rested_well = excluded.reason_rested_well',
+          [sessionId, flag('too_heavy'), flag('too_light'), flag('rested_well')],
+        );
+      } else {
+        d.executeSync('DELETE FROM session_feel_extra_reason WHERE session_id = ?', [sessionId]);
+      }
       // The note is stored as typed. An empty note leaves an earlier one alone.
       if (typed.length > 0) {
         d.executeSync(
@@ -6314,17 +6352,10 @@ export const useStore = create<KineticsStore>()((set, get) => {
         outcomeKind: outcome.outcome_kind as SessionOutcomeKind,
         meanRpeDrift: meanRpeDrift(effort.map((row) => ({ rpe: row.rpe, targetRpe: row.target_rpe }))),
       });
-      const row = rowsOf<Record<string, number | string>>(d.executeSync(
-        'SELECT feel, reason_pain, reason_tired, reason_unwell, reason_technique, reason_equipment, reason_time, reason_felt_good, reason_other FROM session_feel WHERE session_id = ?',
-        [sessionId],
-      ))[0];
+      const saved = readSavedSessionFeel(d, sessionId);
       const noteRow = rowsOf<{ note: string }>(d.executeSync(
         'SELECT note FROM session_note WHERE session_id = ?', [sessionId],
       ))[0];
-      const saved: SessionFeelRecord | null = row === undefined ? null : {
-        feel: row.feel as SessionFeelKind,
-        reasons: SESSION_FEEL_REASONS.filter((reason) => row[`reason_${reason}`] === 1),
-      };
       return { ask, saved, note: noteRow === undefined ? null : noteRow.note };
     } catch {
       // Reading the answer must never block the completion screen.
@@ -6502,8 +6533,36 @@ export const useStore = create<KineticsStore>()((set, get) => {
         ORDER BY sr.session_id, sr.set_index`,
       [sessionId, sessionId],
     ));
+    // Android walk 2026-11-03 (ux-8): a skipped exercise belongs in the
+    // record of the session; it was left out because it has no sets.
+    // Owner ruling (PR #116, PROMPT_LEDGER.md Entry 0300; the original
+    // 2026-11-03 Entry 0286 is unrecovered, issue #297): this display read is
+    // the one reader of 071 session_skipped_slot. No engine reads it.
+    const skippedRows = rowsOf<{
+      session_plan_slot_id: number; movement_id: number; movement_name: string; planned_sets: number;
+    }>(d.executeSync(
+      `SELECT k.session_plan_slot_id, sps.movement_id, m.name AS movement_name, sps.planned_sets
+         FROM session_skipped_slot k
+         JOIN session_plan_slot sps ON sps.session_plan_slot_id = k.session_plan_slot_id
+         JOIN movement m ON m.movement_id = sps.movement_id
+        WHERE sps.session_id = ?
+        ORDER BY sps.slot_index`,
+      [sessionId],
+    ));
     return {
       durationMin: sessionRow?.duration_min ?? null,
+      // A set belongs to a skipped slot as the session timeline counts it: by
+      // its slot when it has one, else by movement.
+      skippedExercises: skippedRows.map((row) => {
+        const sets = setRows.filter((set) => (set.session_plan_slot_id != null
+          ? set.session_plan_slot_id === row.session_plan_slot_id
+          : set.movement_id === row.movement_id));
+        const loggedAs: string[] = [];
+        for (const set of sets) {
+          if (set.movement_id !== row.movement_id && !loggedAs.includes(set.movement_name)) loggedAs.push(set.movement_name);
+        }
+        return { name: row.movement_name, plannedSets: row.planned_sets, loggedSets: sets.length, loggedAs };
+      }),
       exercises: groupSummaryExercises(setRows.map((row) => ({
         movementId: row.movement_id,
         movementName: row.movement_name,
@@ -8644,7 +8703,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
           + ' + (SELECT count(*) FROM session_preparation)'
           + ' + (SELECT count(*) FROM block_emphasis) AS c';
         had = rowsOf<{ c: number }>(d.executeSync(
-          'SELECT (SELECT count(*) FROM history_import_capability_evidence) + (SELECT count(*) FROM history_import_set) + (SELECT count(*) FROM history_import_session) + (SELECT count(*) FROM history_import) + (SELECT count(*) FROM import_readiness_daily) + (SELECT count(*) FROM bodyweight_daily) + (SELECT count(*) FROM movement_capability_attestation) + (SELECT count(*) FROM movement_prior_experience) + (SELECT count(*) FROM capability_session_evidence) + (SELECT count(*) FROM set_target) + (SELECT count(*) FROM session_runner_checkpoint) + (SELECT count(*) FROM session_slot_target) + (SELECT count(*) FROM planned_slot_disposition) + (SELECT count(*) FROM planned_slot_autopilot) + (SELECT count(*) FROM planned_slot_legacy_role_allowance) + (SELECT count(*) FROM planned_slot_routine_decision) + (SELECT count(*) FROM planned_slot_target) + (SELECT count(*) FROM planned_slot_load_intent) + (SELECT count(*) FROM planned_session_routine_context) + (SELECT count(*) FROM planned_session_method) + (SELECT count(*) FROM session_plan_slot) + (SELECT count(*) FROM session_origin) + (SELECT count(*) FROM set_prefix) + (SELECT count(*) FROM set_metric) + (SELECT count(*) FROM set_record) + (SELECT count(*) FROM set_dose_target) + (SELECT count(*) FROM session_note) + (SELECT count(*) FROM session_feel) + (SELECT count(*) FROM question_log) + (SELECT count(*) FROM report_severity) + (SELECT count(*) FROM slot_override) + (SELECT count(*) FROM planned_slot) + (SELECT count(*) FROM planned_session) + (SELECT count(*) FROM block_meta) + (SELECT count(*) FROM suspension_episode WHERE ended_at_ms IS NULL) + (SELECT count(*) FROM training_program_movement_preference) + (SELECT count(*) FROM training_program_day) + (SELECT count(*) FROM training_block_program) + (SELECT count(*) FROM training_program) + (SELECT count(*) FROM session) + (SELECT count(*) FROM session_outcome) + (SELECT count(*) FROM micro_cycle) + (SELECT count(*) FROM macro_cycle) + (SELECT count(*) FROM training_block) + (SELECT count(*) FROM suspension_episode_program) + (SELECT count(*) FROM block_suspension_origin) + (SELECT count(*) FROM subjective_report) + (SELECT count(*) FROM niggle) + (SELECT count(*) FROM one_rep_max) + (SELECT count(*) FROM return_checkin_ack) + (SELECT count(*) FROM hrv_daily) + (SELECT count(*) FROM resting_hr_daily) + (SELECT count(*) FROM sleep_daily) + (SELECT count(*) FROM spo2_daily) + (SELECT count(*) FROM spo2_sample) + (SELECT count(*) FROM mech_daily) + (SELECT count(*) FROM state_vector) AS c',
+          'SELECT (SELECT count(*) FROM history_import_capability_evidence) + (SELECT count(*) FROM history_import_set) + (SELECT count(*) FROM history_import_session) + (SELECT count(*) FROM history_import) + (SELECT count(*) FROM import_readiness_daily) + (SELECT count(*) FROM bodyweight_daily) + (SELECT count(*) FROM movement_capability_attestation) + (SELECT count(*) FROM movement_prior_experience) + (SELECT count(*) FROM capability_session_evidence) + (SELECT count(*) FROM set_target) + (SELECT count(*) FROM session_runner_checkpoint) + (SELECT count(*) FROM session_slot_target) + (SELECT count(*) FROM planned_slot_disposition) + (SELECT count(*) FROM planned_slot_autopilot) + (SELECT count(*) FROM planned_slot_legacy_role_allowance) + (SELECT count(*) FROM planned_slot_routine_decision) + (SELECT count(*) FROM planned_slot_target) + (SELECT count(*) FROM planned_slot_load_intent) + (SELECT count(*) FROM planned_session_routine_context) + (SELECT count(*) FROM planned_session_method) + (SELECT count(*) FROM session_plan_slot) + (SELECT count(*) FROM session_origin) + (SELECT count(*) FROM set_prefix) + (SELECT count(*) FROM set_metric) + (SELECT count(*) FROM set_record) + (SELECT count(*) FROM set_dose_target) + (SELECT count(*) FROM session_note) + (SELECT count(*) FROM session_feel) + (SELECT count(*) FROM session_feel_extra_reason) + (SELECT count(*) FROM question_log) + (SELECT count(*) FROM report_severity) + (SELECT count(*) FROM slot_override) + (SELECT count(*) FROM planned_slot) + (SELECT count(*) FROM planned_session) + (SELECT count(*) FROM block_meta) + (SELECT count(*) FROM suspension_episode WHERE ended_at_ms IS NULL) + (SELECT count(*) FROM training_program_movement_preference) + (SELECT count(*) FROM training_program_day) + (SELECT count(*) FROM training_block_program) + (SELECT count(*) FROM training_program) + (SELECT count(*) FROM session) + (SELECT count(*) FROM session_outcome) + (SELECT count(*) FROM micro_cycle) + (SELECT count(*) FROM macro_cycle) + (SELECT count(*) FROM training_block) + (SELECT count(*) FROM suspension_episode_program) + (SELECT count(*) FROM block_suspension_origin) + (SELECT count(*) FROM subjective_report) + (SELECT count(*) FROM niggle) + (SELECT count(*) FROM one_rep_max) + (SELECT count(*) FROM return_checkin_ack) + (SELECT count(*) FROM hrv_daily) + (SELECT count(*) FROM resting_hr_daily) + (SELECT count(*) FROM sleep_daily) + (SELECT count(*) FROM spo2_daily) + (SELECT count(*) FROM spo2_sample) + (SELECT count(*) FROM mech_daily) + (SELECT count(*) FROM state_vector) AS c',
         ))[0];
         hadModuleTables = rowsOf<{ c: number }>(d.executeSync(moduleTablesCountSql))[0];
         d.executeSync('BEGIN');
@@ -8707,6 +8766,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       d.executeSync('DELETE FROM set_dose_target');
       d.executeSync('DELETE FROM session_note');
       d.executeSync('DELETE FROM session_feel');
+      d.executeSync('DELETE FROM session_feel_extra_reason');
       d.executeSync('DELETE FROM question_log');
       d.executeSync('DELETE FROM report_severity');
       d.executeSync('DELETE FROM slot_override');

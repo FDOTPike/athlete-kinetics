@@ -77,9 +77,13 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   // reads back for it and empties on reset. It depends only on 001.
   '070_session_feel.sql',
   // 071 adds session_skipped_slot and set_load_shown, which the store writes
-  // (at finalization and with each logged set) and empties on reset. It depends
+  // (at finalization and with each logged set) and empties on reset; the
+  // completion summary reads the skipped slots (owner ruling 2026-11-03). It depends
   // on 001 and 022.
-  '071_beta_recording.sql', '072_question_log.sql', '073_session_slot_replaced_by.sql'];
+  '071_beta_recording.sql', '072_question_log.sql', '073_session_slot_replaced_by.sql',
+  // 074 rebuilds session_feel and adds session_feel_extra_reason, which the
+  // store writes and reads with the answer and empties on reset.
+  '074_session_feel_reasons.sql'];
 
 
 const db = new DatabaseSync(':memory:');
@@ -872,6 +876,9 @@ a('reset explicitly clears both immutable Phase 18 side-cars',
   ['set_dose_target', 'session_outcome'].every((table) => resetTables.includes(table)));
 a('reset explicitly clears the autopilot attribution side-car',
   resetTables.includes('planned_slot_autopilot'));
+// 074 (issue #220): the newer session-feel reasons are cleared with the answers.
+a('reset explicitly clears session_feel and its 074 side-car session_feel_extra_reason',
+  ['session_feel', 'session_feel_extra_reason'].every((table) => resetTables.includes(table)));
 a('reset explicitly clears frozen legacy-role snapshots before their planned slots',
   resetTables.includes('planned_slot_legacy_role_allowance')
     && resetTables.indexOf('planned_slot_legacy_role_allowance') < resetTables.indexOf('planned_slot'));
@@ -1058,11 +1065,32 @@ if (resetTables.length >= 15) {
       'insert into Probe_Table (a) values (?)',
       'SELECT a FROM Probe_table WHERE b = ${}',
     ]), quotedNaming);
-  a('071: the store names session_skipped_slot in one INSERT and one DELETE only',
+  // Owner ruling (ledger Entry 0300; the original 2026-11-03 Entry 0286 is
+  // unrecovered, issue #297): the completion summary may
+  // read session_skipped_slot to list the skipped exercises. That display read
+  // is the one reader; no engine, readiness or progression code reads it.
+  const SKIPPED_SUMMARY_READ = 'SELECT k.session_plan_slot_id, sps.movement_id, m.name AS movement_name, sps.planned_sets '
+    + 'FROM session_skipped_slot k JOIN session_plan_slot sps ON sps.session_plan_slot_id = k.session_plan_slot_id '
+    + 'JOIN movement m ON m.movement_id = sps.movement_id WHERE sps.session_id = ? ORDER BY sps.slot_index';
+  a('071: the store names session_skipped_slot in one INSERT, one DELETE and the summary read only',
     JSON.stringify(sqlNaming('session_skipped_slot').sort()) === JSON.stringify([
       'DELETE FROM session_skipped_slot',
       'INSERT INTO session_skipped_slot (session_plan_slot_id) VALUES (?)',
+      SKIPPED_SUMMARY_READ,
     ]), sqlNaming('session_skipped_slot').join(' | '));
+  {
+    // The implementation, not the interface line of the same text.
+    const start = storeSrc.indexOf('loadSessionSummaryFacts: (sessionId: number) => {\n    const d = getDb();');
+    const end = storeSrc.indexOf('\n  refreshVector:', start);
+    // The slice is one property of the store's object literal; wrapped back in
+    // an object it parses on its own (the SQL check refuses source that does
+    // not parse).
+    const body = start >= 0 && end > start ? `const storeSlice = {\n${storeSrc.slice(start, end)}\n};` : '';
+    a('071: the session_skipped_slot read sits inside loadSessionSummaryFacts',
+      sqlNamingIn(body, 'session_skipped_slot').length === 1
+        && sqlNamingIn(body, 'session_skipped_slot')[0] === SKIPPED_SUMMARY_READ,
+      start < 0 ? 'loadSessionSummaryFacts not found' : String(sqlNamingIn(body, 'session_skipped_slot').length) + ' reads in the loader');
+  }
   a('071: the store names set_load_shown in one INSERT and one DELETE only',
     JSON.stringify(sqlNaming('set_load_shown').sort()) === JSON.stringify([
       'DELETE FROM set_load_shown',
