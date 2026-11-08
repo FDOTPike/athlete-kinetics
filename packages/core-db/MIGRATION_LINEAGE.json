@@ -381,6 +381,11 @@
         "ordinal": 75,
         "file": "076_sport_taxonomy_expansion.sql",
         "sha256": "8d810403564852c14637096c47f39d4ac504574f3689dd58d904a28d50532b9f"
+      },
+      {
+        "ordinal": 76,
+        "file": "077_multisport_and_flexibility.sql",
+        "sha256": "5f69c01523e09cf03dc8572a0c5798fcf0f7f8ff1856ab8ab96c6a81768d62f9"
       }
     ]
   },
