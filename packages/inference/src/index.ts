@@ -668,3 +668,6 @@ export {
   type PreparationStatus,
   type PreparationVariant,
 } from './preparationPolicy';
+
+export * from './prehabCatalog';
+export * from './flexibilityPolicy';
