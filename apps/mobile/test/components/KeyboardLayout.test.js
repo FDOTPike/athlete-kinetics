@@ -38,7 +38,8 @@ describe('KeyboardAwareScrollView contract', () => {
     // +4: the sport editor (3) and the goal exercise search (1) (work order 3).
     // +1: the optional note on the session-feel panel (070).
     // +1: the flagged glossary question box (072).
-    expect(inputTags).toHaveLength(39 + 2 + 4 + 1 + 1);
+    // +1: "Something feels off" on the completion screen (SubjectiveReportPanel, #180).
+    expect(inputTags).toHaveLength(39 + 2 + 4 + 1 + 1 + 1);
     expect(backupInputs).toHaveLength(2);
     expect(backupInputs.map(({ tag }) => tag)).toEqual(expect.arrayContaining([
       expect.stringContaining('accessibilityLabel="Backup password, at least 12 characters"'),

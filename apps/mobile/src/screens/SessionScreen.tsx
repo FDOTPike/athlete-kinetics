@@ -1,11 +1,11 @@
 /** Phase 17 utility-first active-session surface. */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING_NOTE, EFFORT_STOP_GUIDANCE, effortCue, mapRirToRpe, RIR_OPTIONS, PREPARATION_STATUS_LABEL, isTerminalPreparationStatus, preparationDoseUnit, type EffortAnswer, type RunnerHaltReason } from '@ak/inference';
+import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING_NOTE, EFFORT_STOP_GUIDANCE, effortCue, effectiveRpeCeiling, mapRirToRpe, RIR_OPTIONS, PREPARATION_STATUS_LABEL, isTerminalPreparationStatus, preparationDoseUnit, type EffortAnswer, type RunnerHaltReason } from '@ak/inference';
 import { EXPERIENCE_SEVERITY, runnerTierForTrainingAge } from '../../../../packages/inference/src/sessionRunner';
 import { formatTeachingOnlyReason, freeFormStartIsEmpty, useStore, type LoadSelection, type LoggedSet, type SetLoadShown, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
 import { useNavigation, useSubViewBack } from '../navigation/navigation';
-import { buildSessionSummary, NO_NEXT_SESSION_TEXT } from '../state/sessionSummary';
+import { buildSessionSummary, NO_NEXT_SESSION_TEXT, skippedExerciseText } from '../state/sessionSummary';
 import { SUPPORT_HELD_MESSAGE, SUPPORT_UNAVAILABLE_MESSAGE } from '../state/healthSupportStore';
 import { theme } from '../theme/theme';
 import InfoTip from '../components/InfoTip';
@@ -23,6 +23,7 @@ import {
 import { PreparationPanel } from '../components/PreparationPanel';
 import { MovementPreview } from '../components/movementPreview/MovementPreview';
 import { SessionFeelPanel, describeSessionFeel } from '../components/SessionFeelPanel';
+import { SubjectiveReportPanel } from '../components/SubjectiveReportPanel';
 
 
 type SessionMode = 'guided' | 'self_directed';
@@ -146,6 +147,32 @@ const loadCopyFor = (
       : `Based on your ${oneRmKg?.toFixed(1)} kg 1RM`;
   }
   return loadSourceCopy(sel, bodyweightMode, oneRmKg, timedTarget);
+};
+
+/** One plain line when a rated set went above the athlete's effort ceiling
+ *  (issue #206): a statement of fact and the reps to leave next time. It
+ *  changes nothing: logging, the next-set target and next-session easing are
+ *  untouched. Reps left is the whole number that keeps the set at or under
+ *  the ceiling (8.5 → 2, 7.0 → 3). A timed set has no reps and is rated by
+ *  direct effort, so it gets only the first sentence (owner ruling, #206).
+ *  When today's discomfort report set a lower effort cap than the profile
+ *  ceiling, that lower cap decides both when the note shows and the reps left,
+ *  and the note calls it "today's ceiling" (owner ruling, #206). */
+export const aboveCeilingNote = (
+  rpe: number | null,
+  profileCeiling: number,
+  reportCap: number | null = null,
+  isTimed = false,
+): string | null => {
+  const todayCapLower = reportCap !== null && Number.isFinite(reportCap) && reportCap < profileCeiling;
+  const ceiling = todayCapLower ? reportCap : profileCeiling;
+  if (rpe === null || !Number.isFinite(rpe) || !Number.isFinite(ceiling) || rpe <= ceiling) return null;
+  const which = todayCapLower ? "today's ceiling" : 'your ceiling';
+  if (isTimed) {
+    return `That was above ${which} of ${ceiling.toFixed(1)}.`;
+  }
+  const repsLeft = Math.max(1, Math.ceil(10 - ceiling));
+  return `That was above ${which} of ${ceiling.toFixed(1)}. Next set, stop with ${repsLeft} ${repsLeft === 1 ? 'rep' : 'reps'} left.`;
 };
 
 // Local rest when no runner owns the timer: the runner's RPE bands. Training
@@ -398,6 +425,11 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   const [feelOpen, setFeelOpen] = useState(false);
   const [feelRevision, setFeelRevision] = useState(0);
   useEffect(() => { setFeelOpen(false); }, [lastEndedSessionId]);
+  // Issue #180, S5: "Something feels off" on the completion screen. The same form
+  // as the Plan screen; with no readiness vector it shows the Plan screen's gate.
+  const [reportOpen, setReportOpen] = useState(false);
+  useEffect(() => { setReportOpen(false); }, [lastEndedSessionId]);
+  const vector = state.vector ?? null;
 
   type PendingSubstitution =
     | { kind: 'regression'; option: NonNullable<typeof substitution>['result']['layer1Regression']['options'][number] }
@@ -406,9 +438,10 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   const [pendingSubSets, setPendingSubSets] = useState<number>(1);
   useEffect(() => { setPendingSub(null); }, [substitution]);
 
-  const hasSubView = feelOpen || detailsOpen || safetyOpen || niggleRegion !== null || substitution !== null;
+  const hasSubView = feelOpen || reportOpen || detailsOpen || safetyOpen || niggleRegion !== null || substitution !== null;
   useSubViewBack(hasSubView, () => {
-    if (feelOpen) setFeelOpen(false);
+    if (reportOpen) setReportOpen(false);
+    else if (feelOpen) setFeelOpen(false);
     else if (detailsOpen) setDetailsOpen(false);
     else if (safetyOpen) setSafetyOpen(false);
     else if (niggleRegion !== null) setNiggleRegion(null);
@@ -441,6 +474,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
       const facts = loadSessionSummaryFacts(lastEndedSessionId);
       return buildSessionSummary({
         exercises: facts.exercises,
+        skippedExercises: facts.skippedExercises ?? [],
         previousSets: facts.previousSets,
         durationMin: facts.durationMin,
         blockSessions: summaryBlockSessions,
@@ -561,6 +595,19 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
       ? clamp(Math.round(directRpe * 2) / 2, 5, 10)
       : null;
 
+  // "4+" is only a lower bound on reps left (6.0 or easier) and the easiest
+  // chip on the bar, so a "stop with N reps left" note could be false and no
+  // other chip could satisfy it: no note for it (owner ruling, #206). It still
+  // logs 6.0, and next-session easing is unchanged.
+  // Today's discomfort report cap: the operative (non-halt) report's effort
+  // cap. A halt zeroes the vector and ends the session, so it is not a cap.
+  const reportCap = lastTriage?.kind === 'matched' && !lastTriage.directive.halt
+    ? lastTriage.directive.vector.rpe_cap
+    : null;
+  const ceilingNote = selectedChoice === '4+'
+    ? null
+    : aboveCeilingNote(safeRpe, effectiveRpeCeiling(profile), reportCap, target?.kind === 'time');
+
   const runnerResting = runnerPhase === 'resting';
   const rest = runnerResting ? {
     seconds: runner?.restSecondsTarget ?? restSecondsFor(safeRpe ?? currentSlot?.targetRpe ?? 8),
@@ -674,6 +721,25 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
     // their existing honest copy.
     const displayMsg = outcomeCopy[outcome.kind] ?? 'Outcome unavailable';
 
+    if (reportOpen) {
+      // Issue #180, S5: the Plan screen's "Something feels off" form, opened here.
+      // Apply hands the text and severity to the same store action (reportSubjective).
+      return (
+        <SubjectiveReportPanel
+          hasVector={vector !== null}
+          lastTriage={lastTriage ?? null}
+          triaging={state.triaging ?? false}
+          triageReady={state.triageReady ?? false}
+          onApply={(text, severity) => {
+            // Resolves true only when the store stored the report; the form keeps the text otherwise.
+            if (typeof state.reportSubjective !== 'function') return Promise.resolve(false);
+            return state.reportSubjective(text, severity);
+          }}
+          onClose={() => setReportOpen(false)}
+        />
+      );
+    }
+
     if (feelOpen && sessionFeel !== null) {
       // A session that went to plan is not asked anything, so its note may be
       // saved on its own. Once an answer exists, or the question was asked,
@@ -684,6 +750,8 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
           saved={sessionFeel.saved}
           note={sessionFeel.note}
           answerOptional={answerOptional}
+          // Plan's "Something feels off" form exists only once readiness does.
+          planReportAvailable={state.vector != null}
           onSave={(draft, noteText) => {
             if (answerOptional && draft.feel === null) {
               if (noteText.trim().length === 0) return 'nothing_to_save';
@@ -744,6 +812,9 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
               {summary.exerciseLines.map((line) => (
                 <Text key={line.key} style={styles.summaryLine}>{line.text}</Text>
               ))}
+              {summary.skippedLines.map((line) => (
+                <Text key={line.key} style={styles.summaryLine} testID="session-summary-skipped">{line.text}</Text>
+              ))}
               {summary.comparisonLines.map((line) => (
                 <Text key={line.key} style={styles.summaryComparison}>{line.text}</Text>
               ))}
@@ -801,6 +872,16 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
               )}
             </View>
           )}
+          <View style={styles.feelBlock} testID="completion-report-block">
+            <Text style={styles.summaryComparison}>Add a subjective report only when you need Coach to adapt</Text>
+            <SecondaryButton
+              label="Something feels off"
+              onPress={() => { setFeelOpen(false); setReportOpen(true); }}
+              accessibilityLabel="Something feels off"
+              testID="completion-report-open"
+              style={{ alignSelf: 'stretch' }}
+            />
+          </View>
           <SecondaryButton
             label="Back to Today"
             onPress={() => {
@@ -1006,6 +1087,15 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
     openSubstitution(currentMovement.movement_id);
   };
 
+  // #165: a manual "Stop session" asks first; Keep going changes nothing.
+  // An empty stopped session is still discarded by endSession, as before.
+  const confirmStopSession = (stop: () => void): void => {
+    Alert.alert('Stop this session?', 'Sets you have logged are kept.', [
+      { text: 'Keep going', style: 'cancel' },
+      { text: 'Stop', style: 'destructive', onPress: stop },
+    ]);
+  };
+
   const confirmSkipExercise = (): void => {
     if (runner?.phase !== 'working' || currentSlot === null) return;
     Alert.alert('Skip this exercise', 'Skip the remaining sets for this exercise? Sets already logged will be kept.', [
@@ -1103,7 +1193,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
             onBegin={beginPreparation}
             onRecordItem={recordPreparationItem}
             onFinish={finishPreparation}
-            onStopSession={() => { runnerHalt('manual'); endSession(); }}
+            onStopSession={() => confirmStopSession(() => { runnerHalt('manual'); endSession(); })}
             rampWorkingLoad={rampWorkingLoad}
           />
         </KeyboardAwareScrollView>
@@ -1165,15 +1255,15 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                 {sessionPlan
                   .filter((slot) => runner?.skippedSessionPlanSlotIds.includes(slot.sessionPlanSlotId))
                   .map((slot) => {
-                    const name = byId.get(slot.movementId)?.name ?? 'Movement';
-                    const logged = loggedCount(slot);
-                    const asNames = loggedAsNames(slot);
-                    const loggedSuffix = asNames.length > 0 ? ` as ${asNames.join(', ')}` : '';
+                    const text = skippedExerciseText({
+                      name: byId.get(slot.movementId)?.name ?? 'Movement',
+                      plannedSets: slot.plannedSets,
+                      loggedSets: loggedCount(slot),
+                      loggedAs: loggedAsNames(slot),
+                    });
                     return (
                       <Text key={slot.sessionPlanSlotId} style={styles.completeRowMeta}>
-                        {logged > 0
-                          ? `Skipped: ${name} · ${logged} of ${slot.plannedSets} sets logged${loggedSuffix}`
-                          : `Skipped: ${name} · no sets logged`}
+                        {text}
                       </Text>
                     );
                   })}
@@ -1624,6 +1714,11 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                               ? (effortCue(safeRpe) ?? 'Effort is optional evidence — leave it untouched to skip.')
                               : 'Effort is optional evidence — leave it untouched to skip.'}
                           </Text>
+                          {ceilingNote !== null && (
+                            <Text style={styles.effortCue} testID="effort-above-ceiling-note" accessibilityLiveRegion="polite">
+                              {ceilingNote}
+                            </Text>
+                          )}
                           <Text style={styles.effortCue}>{EFFORT_BREATHING_NOTE}</Text>
                           <Text style={styles.effortStop} testID="effort-stop-guidance">{EFFORT_STOP_GUIDANCE}</Text>
                           {/* With no rating, the cue above already says effort is
@@ -1710,9 +1805,9 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                         {/* 56pt quick avoidance / discomfort trigger rows */}
                         <View style={styles.quickRow}>
                           <SecondaryButton
-                            label="Doesn’t feel right"
+                            label="Swap or avoid this"
                             onPress={thumbsDown}
-                            accessibilityLabel={`Avoid ${movement?.name ?? 'this movement'} and find a substitution`}
+                            accessibilityLabel={`Swap or avoid this: ${movement?.name ?? 'this movement'}`}
                             style={{ flex: 1, minHeight: theme.touch.min }}
                           />
                           <SecondaryButton
@@ -1783,7 +1878,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                         <View style={{ marginTop: theme.space[3] }}>
                           <SecondaryButton
                             label="Stop session"
-                            onPress={() => runnerHalt('manual')}
+                            onPress={() => confirmStopSession(() => runnerHalt('manual'))}
                             accessibilityLabel="Stop this session"
                             fullWidth={true}
                           />
@@ -1864,6 +1959,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                 <View style={styles.subHeader}>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.subTitle}>Choose an alternative</Text>
+                    <Text style={styles.subBody} testID="substitution-today-only">For today only. The plan keeps the original exercise; a pulled-forward exercise leaves its later session.</Text>
                     <Text style={styles.subBody}>Your completed sets stay recorded. The replacement carries the remaining work.</Text>
                   </View>
                   <Pressable onPress={closeSubstitution} accessibilityRole="button" accessibilityLabel="Close substitution options" style={styles.close}>

@@ -83,7 +83,7 @@ test('a replaced row after 1 logged set is drawn at opacity 0.4 with singular Sw
   render(<SessionScreen />);
 
   // Open substitution and swap to Incline Push-Up with 2 sets
-  fireEvent.press(screen.getByLabelText('Avoid Push-up and find a substitution'));
+  fireEvent.press(screen.getByLabelText('Swap or avoid this: Push-up'));
   fireEvent.press(screen.getByLabelText('Use Incline Push-Up instead'));
   expect(screen.getByText('Sets of Incline Push-Up')).toBeOnTheScreen();
   expect(screen.getByText('1 logged set of Push-up is kept.')).toBeOnTheScreen();
@@ -147,7 +147,7 @@ test('after swapping with 2 logged sets and completing the new row, the shaded r
 
   render(<SessionScreen />);
 
-  fireEvent.press(screen.getByLabelText('Avoid Push-up and find a substitution'));
+  fireEvent.press(screen.getByLabelText('Swap or avoid this: Push-up'));
   fireEvent.press(screen.getByLabelText('Move Incline Push-Up forward into this session'));
   fireEvent.press(screen.getByLabelText('3 sets of Incline Push-Up'));
   fireEvent.press(screen.getByLabelText('Move Incline Push-Up forward into this session'));
@@ -209,7 +209,7 @@ test('issue 144: a swap after one logged set of a 2-set exercise reads "1 of 2 s
   render(<SessionScreen />);
   expect(screen.getByText('0 of 3 exercises complete')).toBeOnTheScreen();
 
-  fireEvent.press(screen.getByLabelText('Avoid Push-up and find a substitution'));
+  fireEvent.press(screen.getByLabelText('Swap or avoid this: Push-up'));
   fireEvent.press(screen.getByLabelText('Use Incline Push-Up instead'));
   fireEvent.press(screen.getByLabelText('Use Incline Push-Up instead'));
 
