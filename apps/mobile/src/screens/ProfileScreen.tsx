@@ -12,7 +12,7 @@
  * Law 4: Touch targets >= 56pt.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   BIG4_LIFTS,
   effectiveRpeCeiling,
@@ -355,6 +355,9 @@ export default function ProfileScreen(): React.JSX.Element {
   const [resetAthleteId, setResetAthleteId] = useState<string | null>(null);
   const [resetError, setResetError] = useState<string | null>(null);
   const [coachError, setCoachError] = useState<string | null>(null);
+  const [coachErrorAthleteId, setCoachErrorAthleteId] = useState<string | null>(null);
+  const profileScrollRef = useRef<ScrollView | null>(null);
+  const profileScrollOffsetY = useRef<number>(0);
   const [confirmingSwitchProfileId, setConfirmingSwitchProfileId] = useState<number | null>(null);
   const [confirmingDeleteBandLevel, setConfirmingDeleteBandLevel] = useState<number | null>(null);
   useEffect(() => {
@@ -365,6 +368,7 @@ export default function ProfileScreen(): React.JSX.Element {
     setConfirmingSwitchProfileId(null);
     setConfirmingDeleteBandLevel(null);
     setCoachError(null);
+    setCoachErrorAthleteId(null);
   }, [activeAthleteId]);
   const [historyText, setHistoryText] = useState('');
   const [historyPreview, setHistoryPreview] = useState<HistoryParseResult | null>(null);
@@ -451,6 +455,12 @@ export default function ProfileScreen(): React.JSX.Element {
     buildTapReset.current = setTimeout(() => { buildTapCount.current = 0; }, 5000);
   };
 
+  useEffect(() => {
+    if (!glossaryOpen && !activitiesOpen && !labOpen && profileScrollOffsetY.current > 0) {
+      profileScrollRef.current?.scrollTo({ y: profileScrollOffsetY.current, animated: false });
+    }
+  }, [glossaryOpen, activitiesOpen, labOpen]);
+
   if (glossaryOpen) {
     return <GlossaryScreen onClose={() => setGlossaryOpen(false)} />;
   }
@@ -464,7 +474,13 @@ export default function ProfileScreen(): React.JSX.Element {
   }
 
   return (
-    <KeyboardAwareScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <KeyboardAwareScrollView
+      ref={profileScrollRef}
+      style={styles.screen}
+      contentContainerStyle={styles.content}
+      onScroll={(e) => { profileScrollOffsetY.current = e.nativeEvent.contentOffset.y; }}
+      scrollEventThrottle={16}
+    >
       <Text style={styles.wordmark}>pikeMethods</Text>
       <Text style={styles.heading}>ATHLETE PROFILE</Text>
       {/* #177: in Coach mode (two or more athletes) the heading names the active athlete. */}
@@ -1270,7 +1286,7 @@ export default function ProfileScreen(): React.JSX.Element {
               profile switch above, NOTHING is shared. Built for coaching (or
               testing) several people on one phone.
             </Text>
-            {coachError !== null && (
+            {coachError !== null && coachErrorAthleteId === null && (
               <Text style={styles.fieldHint} accessibilityRole="alert">{coachError}</Text>
             )}
             {athletes.map((a) => {
@@ -1279,57 +1295,68 @@ export default function ProfileScreen(): React.JSX.Element {
               const isConfirmingDelete = confirmingDeleteAthleteId === a.id;
               if (editingAthleteId === a.id) {
                 return (
-                  <View key={a.id} style={styles.athleteRow}>
-                    <TextInput
-                      disableFullscreenUI
-                      style={styles.athleteEditInput}
-                      value={editAthleteName}
-                      onChangeText={(t) => {
-                        setCoachError(null);
-                        setEditAthleteName(t);
-                      }}
-                      maxLength={24}
-                      autoFocus
-                      accessibilityLabel={`New name for ${a.name}`}
-                    />
-                    <QuietAction
-                      label="SAVE"
-                      onPress={() => {
-                        setCoachError(null);
-                        void (async () => {
-                          const ok = await renameAthleteEntry(a.id, editAthleteName);
-                          if (ok === false) {
-                            setCoachError(useStore.getState().error);
-                            return;
-                          }
+                  <View key={a.id} style={styles.athleteBlock} testID={`athlete-block-${a.id}`}>
+                    <View style={styles.athleteRow}>
+                      <TextInput
+                        disableFullscreenUI
+                        style={styles.athleteEditInput}
+                        value={editAthleteName}
+                        onChangeText={(t) => {
+                          setCoachError(null);
+                          setCoachErrorAthleteId(null);
+                          setEditAthleteName(t);
+                        }}
+                        maxLength={24}
+                        autoFocus
+                        accessibilityLabel={`New name for ${a.name}`}
+                      />
+                      <QuietAction
+                        label="SAVE"
+                        onPress={() => {
+                          setCoachError(null);
+                          setCoachErrorAthleteId(null);
+                          void (async () => {
+                            const ok = await renameAthleteEntry(a.id, editAthleteName);
+                            if (ok === false) {
+                              setCoachErrorAthleteId(a.id);
+                              setCoachError(useStore.getState().error);
+                              return;
+                            }
+                            setEditingAthleteId(null);
+                          })();
+                        }}
+                        accessibilityLabel="Save name"
+                      />
+                      <QuietAction
+                        label="CANCEL"
+                        onPress={() => {
+                          setCoachError(null);
+                          setCoachErrorAthleteId(null);
                           setEditingAthleteId(null);
-                        })();
-                      }}
-                      accessibilityLabel="Save name"
-                    />
-                    <QuietAction
-                      label="CANCEL"
-                      onPress={() => {
-                        setCoachError(null);
-                        setEditingAthleteId(null);
-                      }}
-                      accessibilityLabel="Cancel rename"
-                    />
+                        }}
+                        accessibilityLabel="Cancel rename"
+                      />
+                    </View>
+                    {coachError !== null && coachErrorAthleteId === a.id && (
+                      <Text style={styles.fieldHint} accessibilityRole="alert">{coachError}</Text>
+                    )}
                   </View>
                 );
               }
               return (
-                <View key={a.id} style={styles.athleteBlock}>
+                <View key={a.id} style={styles.athleteBlock} testID={`athlete-block-${a.id}`}>
                   <View style={styles.athleteRow}>
                     <Pressable
                       style={styles.athleteMain}
                       disabled={isActive}
                       onPress={() => {
                         setCoachError(null);
+                        setCoachErrorAthleteId(null);
                         oneRmCommits.current.forEach((commit) => commit());
                         void (async () => {
                           const ok = await switchAthlete(a.id);
                           if (ok === false) {
+                            setCoachErrorAthleteId(a.id);
                             setCoachError(useStore.getState().error);
                           }
                         })();
@@ -1346,6 +1373,7 @@ export default function ProfileScreen(): React.JSX.Element {
                       label="RENAME"
                       onPress={() => {
                         setCoachError(null);
+                        setCoachErrorAthleteId(null);
                         setEditingAthleteId(a.id);
                         setEditAthleteName(a.name);
                       }}
@@ -1356,12 +1384,16 @@ export default function ProfileScreen(): React.JSX.Element {
                         label="DELETE"
                         onPress={() => {
                           setCoachError(null);
+                          setCoachErrorAthleteId(null);
                           setConfirmingDeleteAthleteId(isConfirmingDelete ? null : a.id);
                         }}
                         accessibilityLabel={`Delete ${a.name} and their database`}
                       />
                     )}
                   </View>
+                  {coachError !== null && coachErrorAthleteId === a.id && (
+                    <Text style={styles.fieldHint} accessibilityRole="alert">{coachError}</Text>
+                  )}
                   {isConfirmingDelete && (
                     <View style={styles.confirmBox}>
                       <Text style={styles.confirmText}>
@@ -1371,9 +1403,11 @@ export default function ProfileScreen(): React.JSX.Element {
                         label={`Confirm delete ${a.name}`}
                         onPress={() => {
                           setCoachError(null);
+                          setCoachErrorAthleteId(null);
                           void (async () => {
                             const ok = await deleteAthlete(a.id);
                             if (ok === false) {
+                              setCoachErrorAthleteId(a.id);
                               setCoachError(useStore.getState().error);
                               return;
                             }
@@ -1386,6 +1420,7 @@ export default function ProfileScreen(): React.JSX.Element {
                         label="Keep athlete"
                         onPress={() => {
                           setCoachError(null);
+                          setCoachErrorAthleteId(null);
                           setConfirmingDeleteAthleteId(null);
                         }}
                       />
@@ -1401,6 +1436,7 @@ export default function ProfileScreen(): React.JSX.Element {
                 value={newAthleteName}
                 onChangeText={(t) => {
                   setCoachError(null);
+                  setCoachErrorAthleteId(null);
                   setNewAthleteName(t);
                 }}
                 placeholder="New athlete's name"
@@ -1412,10 +1448,12 @@ export default function ProfileScreen(): React.JSX.Element {
                 label="ADD ATHLETE"
                 onPress={() => {
                   setCoachError(null);
+                  setCoachErrorAthleteId(null);
                   const trimmed = newAthleteName.trim();
                   void (async () => {
                     const ok = await createAthlete(trimmed.length > 0 ? trimmed : 'New Athlete');
                     if (ok === false) {
+                      setCoachErrorAthleteId(null);
                       setCoachError(useStore.getState().error);
                       return;
                     }
