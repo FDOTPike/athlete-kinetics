@@ -614,14 +614,8 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
     startedAtMs: runner?.restStartedAtMs ?? nowMs,
     slotId: currentSlot?.sessionPlanSlotId ?? -1,
   } : localRest;
-  const restRemaining = rest === null ? 0 : Math.max(0, rest.seconds - Math.floor((nowMs - rest.startedAtMs) / 1000));
+  const restRemaining = rest === null ? 0 : Math.max(0, rest.seconds - Math.floor((Date.now() - rest.startedAtMs) / 1000));
   const resting = rest !== null && !halted && !complete;
-
-  useEffect(() => {
-    if (!resting) return undefined;
-    const id = setInterval(() => setNowMs(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, [resting]);
 
   const runnerSetIndex = runner?.setIndex ?? 1;
   const runnerSlotCompleted = runner?.slotSetCounts?.[runner?.slotIndex ?? 0] ?? 0;
@@ -690,13 +684,18 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
     if (next !== null) selectMovementSlot(next.sessionPlanSlotId);
   };
 
-  useEffect(() => {
-    if (!resting || restRemaining !== 0 || rest === null) return;
+  const completeRest = (): void => {
+    if (!resting || rest === null) return;
     const key = `${rest.slotId}:${rest.startedAtMs}`;
     if (advancedRest.current === key) return;
     advancedRest.current = key;
     if (runnerResting) advanceRunnerRest();
     else { setLocalRest(null); moveLegacyForward(); }
+  };
+
+  useEffect(() => {
+    if (!resting || restRemaining !== 0 || rest === null) return;
+    completeRest();
   }, [resting, restRemaining, rest?.slotId, rest?.startedAtMs, runnerResting]);
 
   if (session === null && lastEndedSessionId != null && outcome !== null) {
@@ -1441,6 +1440,8 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                         <RestTimerCard
                           totalSeconds={rest.seconds}
                           elapsedSeconds={rest.seconds - restRemaining}
+                          startedAtMs={rest.startedAtMs}
+                          onComplete={completeRest}
                           style={{ alignSelf: 'stretch' }}
                         />
                         {runnerResting && (
