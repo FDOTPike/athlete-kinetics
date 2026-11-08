@@ -5930,6 +5930,15 @@ export const useStore = create<KineticsStore>()((set, get) => {
           );
         }
       }
+      if (verified && readinessEligible && preview.sessions.length > 0) {
+        d.executeSync(
+          `INSERT INTO import_readiness_daily (date, tonnage_kg, updated_at_ms)
+           VALUES (?, ?, ?)
+           ON CONFLICT(date) DO UPDATE SET tonnage_kg = import_readiness_daily.tonnage_kg + excluded.tonnage_kg,
+             updated_at_ms = excluded.updated_at_ms`,
+          [localToday(), 0, Date.now()],
+        );
+      }
       d.executeSync('COMMIT');
       set((state) => ({ movementAvailabilityRevision: state.movementAvailabilityRevision + 1 }));
       if (verified && readinessEligible) {
