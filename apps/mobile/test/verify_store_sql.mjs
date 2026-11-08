@@ -711,7 +711,16 @@ if (slotHydrationSql && attributionInsertSql) {
 console.log('[autopilot wiring invariants]');
 const stripComments = (s) => s.replace(/\/\/[^\n]*/g, '');
 // Anchor on the IMPLEMENTATION (it has a default param) — not the interface decl.
-const gnbRaw = (() => { const i = src.indexOf('generateNewBlock: (schemaType ='); const j = src.indexOf('refreshBlock:', i); return i >= 0 && j > i ? src.slice(i, j) : ''; })();
+// Issue 149 moved the generator-input block out of generateNewBlock into
+// generateBlockFromStoredState (shared with the single-day rebuild). The same
+// invariants apply to that code, so its text is appended to the body under test.
+const gnbRaw = (() => {
+  const i = src.indexOf('generateNewBlock: (schemaType ='); const j = src.indexOf('refreshBlock:', i);
+  const own = i >= 0 && j > i ? src.slice(i, j) : '';
+  const h0 = src.indexOf('const generateBlockFromStoredState = (args: {');
+  const h1 = src.indexOf('const plannedSessionStarted = (', h0);
+  return own + (h0 >= 0 && h1 > h0 ? src.slice(h0, h1) : '');
+})();
 const gnb = stripComments(gnbRaw);
 a('generateNewBlock body located', gnb.length > 0);
 a('IMMUTABILITY: generateNewBlock writes NO past/raw table (session/set_record/set_prefix/mech_daily/niggle/state_vector)',

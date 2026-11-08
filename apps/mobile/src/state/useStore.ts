@@ -897,6 +897,10 @@ interface KineticsStore {
    *  SQLite transaction). Deterministic: profile + equipment + schema +
    *  macro position + today. Continues the 32-week macro-cycle. */
   generateNewBlock: (schemaType?: SchemaType) => void;
+  /** True when today's unstarted planned workout has a movement the current equipment does not cover. */
+  todayPlanEquipmentConflict: () => boolean;
+  /** Rebuilds only today's unstarted planned workout with the current equipment. Returns true when it was rebuilt. */
+  updateTodayPlannedWorkout: () => boolean;
   refreshReturnCheckin: () => void;
   confirmReturnCheckin: (action: ReturnAction) => void;
   dismissReturnCheckin: () => void;
@@ -4548,130 +4552,12 @@ export const useStore = create<KineticsStore>()((set, get) => {
       : nextMacroPosition(d).macroBlockIndex; // R3: no date-derived peak anchor
     // The generator is pure; everything stateful happens in ONE transaction
     // below so a mid-write crash leaves the previous block fully active.
-    const safetyExcluded = safetyExcludedMovementIdsFor(movements, profile, get().niggles);
-    const priorExperience = new Set(get().activePriorExperienceMovementIds);
-    const capabilityAvailableWeightRoom = capabilityAvailableMovementIds(
-      d, movements, profile, 'weight_room', priorExperience, safetyExcluded,
-    );
-    const capabilityAvailableSport = capabilityAvailableMovementIds(
-      d, movements, profile, 'sport_conditioning', priorExperience, safetyExcluded,
-    );
-    const chainInputs = chainPlanningInputs(d);
-    // OW-001: the athlete's own declarations, read once and threaded in.
     const declaredIntents = readMovementLoadIntents(d);
-    const powerNamesGenerate = powerPreferredMovementNames(d);
-    const genMovements: GeneratorMovement[] = movements.map((m) => ({
-      movement_id: m.movement_id,
-      name: m.name,
-      pattern: m.pattern as MovementPattern,
-      is_compound: m.is_compound,
-      required: m.required,
-      // Phase 16: tier gating — beginners see Beginner + whitelisted staples.
-      difficulty: m.difficulty,
-      beginner_ok: m.beginnerOk,
-      sportTracking: m.sportTracking,
-      capability_available_weight_room: capabilityAvailableWeightRoom.has(m.movement_id),
-      capability_available_sport_conditioning: capabilityAvailableSport.has(m.movement_id),
-      // Store-side null <-> generator-side "absent" (see blockGenerator).
-      scope: m.scope ?? undefined,
-      // L1(a) 2026-08-29: the implement PLANNED for the slot, never dropdown
-      // order. Ambiguous movements stay undeclared and fail closed to loaded.
-      plannedImplement: plannedImplementFor(m, declaredIntents, profile.equipment_inventory),
-      // L2(b): chain membership and the chain's own bar, as typed inputs.
-      progressionGroup: chainInputs.get(m.movement_id)?.group,
-      chainAdvancementReps: chainInputs.get(m.movement_id)?.bar,
-      // Session-time contract: a time-based slot is frozen from its own policy.
-      timePolicy: m.loggingMode === 'time' && m.timePolicy !== null ? m.timePolicy : undefined,
-    }));
-    // Phase 13 Step 4 — autopilot hydration. A bounded, READ-ONLY, n+1-free pull
-    // of the trailing 3-week window: ONE grouped per-(date,pattern) set aggregate
-    // (set_record ⋈ session ⋈ movement ⋈ set_prefix ⋈ the per-set set_target
-    // snapshot) + ONE windowed niggle scan. mech_daily is the cross-movement raw
-    // rollup (no per-pattern dimension) so it is NOT the per-pattern source and
-    // stays untouched; state_vector supplies the calendar. detectFlaws then feeds
-    // the generator, which auto-corrects the next (entirely forward-dated) block.
-    const today = localToday();
-    const AUTOPILOT_WINDOW_DAYS = 21;
-    // The window is the FIXED 21-calendar-day grid (gap-tolerant, oldest first),
-    // NOT the sparse set of materialized state_vector dates — so rest-day niggles
-    // are not dropped and detectFlaws' EMA recency stays per-calendar-day.
-    const winCalendar = demoDates(today, AUTOPILOT_WINDOW_DAYS);
-    const winStart = winCalendar[0];
-    const svByDate = new Map(rowsOf<StateVectorRow>(d.executeSync(
-      'SELECT * FROM state_vector WHERE date >= ? AND date <= ? ORDER BY date',
-      [winStart, today],
-    )).map((r) => [r.date, r] as const));
-    // Align state_vector to the calendar (rest day → neutral placeholder); F reads
-    // only the length, so the placeholders are inert but keep the grid fixed at 21.
-    const windowVectors: StateVectorRow[] = winCalendar.map((dt) => svByDate.get(dt) ?? blankVector(dt));
-    const setAgg = rowsOf<{
-      date: string; pattern: MovementPattern; set_count: number;
-      sum_delta_rpe: number; delta_count: number; sum_attenuation: number;
-    }>(d.executeSync(
-      `SELECT s.session_date AS date, m.pattern AS pattern, COUNT(*) AS set_count,
-              COALESCE(SUM(CASE WHEN sr.rpe IS NOT NULL AND st.target_rpe IS NOT NULL THEN sr.rpe - st.target_rpe END), 0) AS sum_delta_rpe,
-              SUM(CASE WHEN sr.rpe IS NOT NULL AND st.target_rpe IS NOT NULL THEN 1 ELSE 0 END) AS delta_count,
-              SUM(1.0 / MAX(1.0, COALESCE(sp.effective_load_kg, sr.load_kg) / MAX(sr.load_kg, 0.01))) AS sum_attenuation
-       FROM set_record sr
-       JOIN session s ON s.session_id = sr.session_id
-       JOIN movement m ON m.movement_id = sr.movement_id
-       LEFT JOIN set_prefix sp ON sp.set_id = sr.set_id
-       LEFT JOIN set_target st ON st.set_id = sr.set_id
-       WHERE s.session_date >= ? AND s.session_date <= ?
-       GROUP BY s.session_date, m.pattern`,
-      [winStart, today],
-    ));
-    // Niggles are bucketed to LOCAL calendar days in JS (mirroring startOfTodayMs),
-    // never via SQLite UTC date() — so they agree with session/state_vector dates.
-    // Over-fetch by ms then let buildPatternWindow keep only in-calendar dates.
-    // Calendar-anchored lower bound: local midnight of the window's OLDEST day,
-    // NOT a fixed (WINDOW-1)x24h ms subtraction — that over/under-shoots across a
-    // DST transition inside the window and can under-fetch day 0's niggles.
-    // buildPatternWindow keeps only in-calendar dates, so any over-fetch is inert.
-    const [wsY, wsM, wsD] = winCalendar[0].split('-').map(Number);
-    const winStartMs = new Date(wsY, wsM - 1, wsD, 0, 0, 0, 0).getTime();
-    const niggleRows = rowsOf<{ region: string; severity: number; reported_at_ms: number }>(d.executeSync(
-      'SELECT region, severity, reported_at_ms FROM niggle WHERE reported_at_ms >= ?',
-      [winStartMs],
-    ));
-    const patternWindow = buildPatternWindow(
-      winCalendar,
-      setAgg.map((r) => ({
-        date: r.date, pattern: r.pattern, setCount: r.set_count,
-        sumDeltaRpe: r.sum_delta_rpe, deltaCount: r.delta_count, sumAttenuation: r.sum_attenuation,
-      })),
-      niggleRows.map((r) => ({ date: localDateOf(r.reported_at_ms), region: r.region as Joint, severity: r.severity })),
-    );
-    // Severe ACTIVE joint load (>= the experience-weighted halt threshold) is a
-    // block-level halt → the generator snaps to the recovery template. Uses the
-    // SAME local-midnight bound as the active-niggle path (runBlockWipe).
-    const haltMin = EXPERIENCE_SEVERITY[profile.training_age].haltMin;
-    const maxNiggleToday = rowsOf<{ s: number }>(d.executeSync(
-      'SELECT COALESCE(MAX(severity), 0) AS s FROM niggle WHERE reported_at_ms >= ?',
-      [startOfTodayMs()],
-    ))[0]?.s ?? 0;
-    const autopilotGuardrail: Guardrail | null = maxNiggleToday >= haltMin
-      ? { load_multiplier: 1, set_delta: 0, rpe_cap_max: 10, halt: true, follow_up: null }
-      : null;
-    const flawReport = detectFlaws(windowVectors, patternWindow, profile.training_age, autopilotGuardrail);
-
-    const blockEmphasisInput = programEmphasisFor(d, today);
-    // Decision of 2026-10-13: a block generated while a suspension is open gets
-    // no autopilot effort raise. It consumes no macro position (S6(b)), so the
-    // per-position ceiling on raises would not count it. Read once here and
-    // checked again at commit, where the block is attributed to the episode.
-    const suspensionBeforeGeneration = openSuspension(d);
-    const plan = generateBlock({
-      profile,
-      movements: genMovements,
-      startDate: today,
-      schemaType,
-      macroBlockIndex,
-      autopilotRpeRaisePermitted: suspensionBeforeGeneration === null,
+    const { plan, suspensionBeforeGeneration, blockEmphasisInput } = generateBlockFromStoredState({
+      d, profile, movements, niggles: get().niggles,
+      priorExperience: new Set(get().activePriorExperienceMovementIds),
+      today: localToday(), startDate: localToday(), schemaType, macroBlockIndex,
       programDays: pendingProgramCreation?.programDays ?? pendingProgramContinuation?.programDays,
-      flawReport,
-      powerPreferredMovementNames: powerNamesGenerate,
-      ...(blockEmphasisInput === null ? {} : { emphasis: blockEmphasisInput }),
     });
     // Session-time contract: a block whose sessions cannot fit preparation,
     // rest and changeovers inside the session limit is not committed. The
@@ -4790,46 +4676,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
         const sessionId = rowsOf<{ id: number }>(
           d.executeSync('SELECT last_insert_rowid() AS id'),
         )[0]!.id;
-        for (const sl of s.slots) {
-          const movement = movements.find((m) => m.movement_id === sl.movement_id);
-          const target = targetForMovement(movement, sl.reps);
-          // Time policies own their default set count. The generated plan may
-          // still be reduced later by readiness, but never grown past policy.
-          const plannedSets = defaultSetsForTarget(movement, sl.sets);
-          const legacyReps = target.kind === 'reps' ? target.reps : sl.reps;
-          d.executeSync(
-            'INSERT INTO planned_slot (planned_session_id, slot_index, movement_id, sets, reps, target_rpe) VALUES (?, ?, ?, ?, ?, ?)',
-            [sessionId, sl.slot_index, sl.movement_id, plannedSets, legacyReps, sl.target_rpe],
-          );
-          const plannedSlotId = rowsOf<{ id: number }>(d.executeSync('SELECT last_insert_rowid() AS id'))[0]!.id;
-          // L1(a): record the PROSPECTIVE load intent for this slot (059). Only
-          // when it is actually declared — an absent row means "undeclared" and
-          // is read as the conservative loaded path, which is why nothing is
-          // written for an ambiguous movement.
-          const slotImplement = movement === undefined ? undefined : plannedImplementFor(movement, declaredIntents, profile.equipment_inventory);
-          if (slotImplement !== undefined) {
-            d.executeSync(
-              'INSERT INTO planned_slot_load_intent (planned_slot_id, planned_implement) VALUES (?, ?)',
-              [plannedSlotId, slotImplement],
-            );
-          }
-          if (sl.autopilotDelta !== undefined) {
-            d.executeSync(
-              'INSERT INTO planned_slot_autopilot (planned_slot_id, rpe_delta, set_delta, reason) VALUES (?, ?, ?, ?)',
-              [plannedSlotId, sl.autopilotDelta.rpe_delta, sl.autopilotDelta.set_delta, sl.autopilotDelta.reason],
-            );
-          }
-          d.executeSync(
-            `INSERT INTO planned_slot_target (planned_slot_id, target_kind, target_reps, target_seconds)
-             VALUES (?, ?, ?, ?)`,
-            [
-              plannedSlotId,
-              target.kind,
-              target.kind === 'reps' ? target.reps : null,
-              target.kind === 'time' ? target.seconds : null,
-            ],
-          );
-        }
+        insertPlannedSlots(d, sessionId, s.slots, { movements, declaredIntents, profile });
       }
       d.executeSync('COMMIT');
     } catch (e) {
@@ -4841,6 +4688,139 @@ export const useStore = create<KineticsStore>()((set, get) => {
     get().refreshBlock();
     get().refreshProgram();
     get().refreshReturnCheckin();
+  },
+
+  todayPlanEquipmentConflict: () => {
+    const state = get();
+    const plan = state.todayPlan;
+    if (state.status !== 'ready' || plan === null) return false;
+    const d = getDb();
+    if (plannedSessionStarted(d, plan.plannedSessionId)) return false;
+    return todayPlanOutsideAccessBoundary(
+      d, plan, state.movements, state.profile,
+      new Set(state.activePriorExperienceMovementIds), state.niggles,
+    );
+  },
+
+  updateTodayPlannedWorkout: () => {
+    const state = get();
+    if (state.status !== 'ready' || state.block === null) return false;
+    if (state.session !== null) {
+      set({ error: "End the active session before updating today's workout." });
+      return false;
+    }
+    const plan = state.todayPlan;
+    if (plan === null) {
+      set({ error: 'There is no planned workout today to update.' });
+      return false;
+    }
+    const d = getDb();
+    if (plannedSessionStarted(d, plan.plannedSessionId)) {
+      set({ error: "Today's workout has already started, so it is not changed." });
+      return false;
+    }
+    // A routine-frozen session answers to its frozen routine, not the generator.
+    const fromRoutine = rowsOf<{ planned_session_id: number }>(d.executeSync(
+      'SELECT planned_session_id FROM planned_session_method WHERE planned_session_id = ?',
+      [plan.plannedSessionId],
+    )).length > 0;
+    if (fromRoutine) {
+      set({ error: "Today's workout comes from a routine. Edit the routine to change it." });
+      return false;
+    }
+    const priorExperience = new Set(state.activePriorExperienceMovementIds);
+    if (!todayPlanOutsideAccessBoundary(d, plan, state.movements, state.profile, priorExperience, state.niggles)) {
+      set({ error: "Today's workout already fits your equipment." });
+      return false;
+    }
+    const row = rowsOf<{
+      week_index: number; day_index: number; focus: string; phase: string; session_date: string;
+    }>(d.executeSync(
+      'SELECT week_index, day_index, focus, phase, session_date FROM planned_session WHERE planned_session_id = ?',
+      [plan.plannedSessionId],
+    ))[0];
+    const meta = rowsOf<{ macro_block_index: number; schema_type: string }>(d.executeSync(
+      'SELECT macro_block_index, schema_type FROM block_meta WHERE block_id = ?',
+      [state.block.blockId],
+    ))[0];
+    if (row === undefined || meta === undefined) {
+      set({ error: "Today's workout cannot be rebuilt because its block's plan details are missing. Nothing was changed." });
+      return false;
+    }
+    const program = state.program;
+    const programDays: ProgramDayPreference[] | undefined = program?.status === 'active'
+      ? program.days.map((day) => ({
+          day_index: day.dayIndex,
+          focus: day.focus as ProgramDayPreference['focus'],
+          movement_preferences: program.movementPreferences
+            .filter((p) => p.dayIndex === day.dayIndex)
+            .map((p) => ({ slot_index: p.slotIndex, pattern: p.pattern, movement_id: p.movementId })),
+        }))
+      : undefined;
+    // The same generator and the same inputs a block generation uses, run on
+    // the block's own start date. Only today's day is taken from the result.
+    let rebuilt: BlockPlan['sessions'][number] | undefined;
+    try {
+      const { plan: generated } = generateBlockFromStoredState({
+        d, profile: state.profile, movements: state.movements, niggles: state.niggles,
+        priorExperience, today: localToday(), startDate: state.block.startDate,
+        schemaType: meta.schema_type as SchemaType, macroBlockIndex: meta.macro_block_index, programDays,
+      });
+      if (generated.timeBudget.conflicts.length > 0) {
+        set({ error: generated.timeBudget.conflicts.join(' ') });
+        return false;
+      }
+      rebuilt = generated.sessions.find((s) => s.week_index === row.week_index && s.day_index === row.day_index);
+    } catch (e) {
+      set({ error: e instanceof Error ? e.message : String(e) });
+      return false;
+    }
+    if (rebuilt === undefined || rebuilt.session_date !== row.session_date
+      || rebuilt.focus !== row.focus || rebuilt.phase !== row.phase) {
+      set({ error: "Today's workout could not be rebuilt in its place. Nothing was changed." });
+      return false;
+    }
+    // No load goes up. A movement kept from today's plan keeps at most its planned
+    // sets and target RPE, and a raised autopilot change is not written, because
+    // it would describe a raise that no longer exists.
+    const planned = rowsOf<{ movement_id: number; sets: number; target_rpe: number | null }>(d.executeSync(
+      'SELECT movement_id, sets, target_rpe FROM planned_slot WHERE planned_session_id = ?',
+      [plan.plannedSessionId],
+    ));
+    const slots = rebuilt.slots.map((sl) => {
+      const autopilotDelta = sl.autopilotDelta?.reason === 'raised' ? undefined : sl.autopilotDelta;
+      const before = planned.filter((p) => p.movement_id === sl.movement_id);
+      if (before.length === 0) return { ...sl, autopilotDelta };
+      const priorRpes = before.flatMap((p) => (p.target_rpe === null ? [] : [p.target_rpe]));
+      return {
+        ...sl,
+        sets: Math.min(sl.sets, ...before.map((p) => p.sets)),
+        target_rpe: priorRpes.length === 0 ? sl.target_rpe : Math.min(sl.target_rpe, ...priorRpes),
+        autopilotDelta,
+      };
+    });
+    const movementIds = slots.map((sl) => sl.movement_id);
+    const identity = `planned-session-rebuild:${plan.plannedSessionId}:${supportMovementIdentity(movementIds)}`;
+    if (!get().requireTrainingSupport('block-generate', movementIds, identity)) return false;
+    const declaredIntents = readMovementLoadIntents(d);
+    d.executeSync('BEGIN');
+    try {
+      if (plannedSessionStarted(d, plan.plannedSessionId)) {
+        throw new Error("Today's workout has already started, so it is not changed.");
+      }
+      d.executeSync('DELETE FROM planned_slot WHERE planned_session_id = ?', [plan.plannedSessionId]);
+      insertPlannedSlots(d, plan.plannedSessionId, slots, {
+        movements: state.movements, declaredIntents, profile: state.profile,
+      });
+      d.executeSync('COMMIT');
+    } catch (e) {
+      d.executeSync('ROLLBACK');
+      set({ error: e instanceof Error ? e.message : String(e) });
+      return false;
+    }
+    get().refreshBlock();
+    set({ error: null });
+    return true;
   },
 
   refreshBlock: () => {
@@ -6409,13 +6389,9 @@ export const useStore = create<KineticsStore>()((set, get) => {
       safetyExcludedMovementIdsFor(movements, profile, get().niggles),
     );
     if (planToConsume !== null && planToConsume.slots.some((slot) =>
-      !permittedForProfile(
-        movements.find((movement) => movement.movement_id === slot.movementId),
-        profile,
-        executionContext,
-      ) || !capabilityAvailable.has(slot.movementId)
+      slotOutsideAccessBoundary(slot, movements, profile, executionContext, capabilityAvailable)
     )) {
-      set({ error: 'This plan contains a movement outside the current access boundary. Regenerate or edit it before starting.' });
+      set({ error: "Today's workout includes a movement your current equipment does not cover. Update today's workout before starting." });
       return;
     }
     if (planToConsume !== null) {
@@ -8878,3 +8854,241 @@ export const useStore = create<KineticsStore>()((set, get) => {
   },
 };
 });
+
+/** The block generator's input, built from stored state. Generate and the single-day
+ *  rebuild both call this, so a rebuilt day obeys the same equipment, capability,
+ *  safety and autopilot rules as a freshly generated block. Reads only. */
+const generateBlockFromStoredState = (args: {
+  d: DB;
+  profile: UserProfile;
+  movements: readonly Movement[];
+  niggles: readonly NiggleInput[];
+  priorExperience: ReadonlySet<number>;
+  today: string;
+  startDate: string;
+  schemaType: SchemaType;
+  macroBlockIndex: number;
+  programDays: ProgramDayPreference[] | undefined;
+}): {
+  plan: BlockPlan;
+  suspensionBeforeGeneration: ReturnType<typeof openSuspension>;
+  blockEmphasisInput: ProgramEmphasis | null;
+} => {
+  const { d, profile, movements, niggles, priorExperience, today, startDate, schemaType, macroBlockIndex, programDays } = args;
+  const safetyExcluded = safetyExcludedMovementIdsFor(movements, profile, niggles);
+  const capabilityAvailableWeightRoom = capabilityAvailableMovementIds(
+    d, movements, profile, 'weight_room', priorExperience, safetyExcluded,
+  );
+  const capabilityAvailableSport = capabilityAvailableMovementIds(
+    d, movements, profile, 'sport_conditioning', priorExperience, safetyExcluded,
+  );
+  const chainInputs = chainPlanningInputs(d);
+  // OW-001: the athlete's own declarations, read once and threaded in.
+  const declaredIntents = readMovementLoadIntents(d);
+  const powerNamesGenerate = powerPreferredMovementNames(d);
+  const genMovements: GeneratorMovement[] = movements.map((m) => ({
+    movement_id: m.movement_id,
+    name: m.name,
+    pattern: m.pattern as MovementPattern,
+    is_compound: m.is_compound,
+    required: m.required,
+    // Phase 16: tier gating — beginners see Beginner + whitelisted staples.
+    difficulty: m.difficulty,
+    beginner_ok: m.beginnerOk,
+    sportTracking: m.sportTracking,
+    capability_available_weight_room: capabilityAvailableWeightRoom.has(m.movement_id),
+    capability_available_sport_conditioning: capabilityAvailableSport.has(m.movement_id),
+    // Store-side null <-> generator-side "absent" (see blockGenerator).
+    scope: m.scope ?? undefined,
+    // L1(a) 2026-08-29: the implement PLANNED for the slot, never dropdown
+    // order. Ambiguous movements stay undeclared and fail closed to loaded.
+    plannedImplement: plannedImplementFor(m, declaredIntents, profile.equipment_inventory),
+    // L2(b): chain membership and the chain's own bar, as typed inputs.
+    progressionGroup: chainInputs.get(m.movement_id)?.group,
+    chainAdvancementReps: chainInputs.get(m.movement_id)?.bar,
+    // Session-time contract: a time-based slot is frozen from its own policy.
+    timePolicy: m.loggingMode === 'time' && m.timePolicy !== null ? m.timePolicy : undefined,
+  }));
+  // Phase 13 Step 4 — autopilot hydration. A bounded, READ-ONLY, n+1-free pull
+  // of the trailing 3-week window: ONE grouped per-(date,pattern) set aggregate
+  // (set_record ⋈ session ⋈ movement ⋈ set_prefix ⋈ the per-set set_target
+  // snapshot) + ONE windowed niggle scan. mech_daily is the cross-movement raw
+  // rollup (no per-pattern dimension) so it is NOT the per-pattern source and
+  // stays untouched; state_vector supplies the calendar. detectFlaws then feeds
+  // the generator, which auto-corrects the next (entirely forward-dated) block.
+  const AUTOPILOT_WINDOW_DAYS = 21;
+  // The window is the FIXED 21-calendar-day grid (gap-tolerant, oldest first),
+  // NOT the sparse set of materialized state_vector dates — so rest-day niggles
+  // are not dropped and detectFlaws' EMA recency stays per-calendar-day.
+  const winCalendar = demoDates(today, AUTOPILOT_WINDOW_DAYS);
+  const winStart = winCalendar[0];
+  const svByDate = new Map(rowsOf<StateVectorRow>(d.executeSync(
+    'SELECT * FROM state_vector WHERE date >= ? AND date <= ? ORDER BY date',
+    [winStart, today],
+  )).map((r) => [r.date, r] as const));
+  // Align state_vector to the calendar (rest day → neutral placeholder); F reads
+  // only the length, so the placeholders are inert but keep the grid fixed at 21.
+  const windowVectors: StateVectorRow[] = winCalendar.map((dt) => svByDate.get(dt) ?? blankVector(dt));
+  const setAgg = rowsOf<{
+    date: string; pattern: MovementPattern; set_count: number;
+    sum_delta_rpe: number; delta_count: number; sum_attenuation: number;
+  }>(d.executeSync(
+    `SELECT s.session_date AS date, m.pattern AS pattern, COUNT(*) AS set_count,
+            COALESCE(SUM(CASE WHEN sr.rpe IS NOT NULL AND st.target_rpe IS NOT NULL THEN sr.rpe - st.target_rpe END), 0) AS sum_delta_rpe,
+            SUM(CASE WHEN sr.rpe IS NOT NULL AND st.target_rpe IS NOT NULL THEN 1 ELSE 0 END) AS delta_count,
+            SUM(1.0 / MAX(1.0, COALESCE(sp.effective_load_kg, sr.load_kg) / MAX(sr.load_kg, 0.01))) AS sum_attenuation
+     FROM set_record sr
+     JOIN session s ON s.session_id = sr.session_id
+     JOIN movement m ON m.movement_id = sr.movement_id
+     LEFT JOIN set_prefix sp ON sp.set_id = sr.set_id
+     LEFT JOIN set_target st ON st.set_id = sr.set_id
+     WHERE s.session_date >= ? AND s.session_date <= ?
+     GROUP BY s.session_date, m.pattern`,
+    [winStart, today],
+  ));
+  // Niggles are bucketed to LOCAL calendar days in JS (mirroring startOfTodayMs),
+  // never via SQLite UTC date() — so they agree with session/state_vector dates.
+  // Over-fetch by ms then let buildPatternWindow keep only in-calendar dates.
+  // Calendar-anchored lower bound: local midnight of the window's OLDEST day,
+  // NOT a fixed (WINDOW-1)x24h ms subtraction — that over/under-shoots across a
+  // DST transition inside the window and can under-fetch day 0's niggles.
+  // buildPatternWindow keeps only in-calendar dates, so any over-fetch is inert.
+  const [wsY, wsM, wsD] = winCalendar[0].split('-').map(Number);
+  const winStartMs = new Date(wsY, wsM - 1, wsD, 0, 0, 0, 0).getTime();
+  const niggleRows = rowsOf<{ region: string; severity: number; reported_at_ms: number }>(d.executeSync(
+    'SELECT region, severity, reported_at_ms FROM niggle WHERE reported_at_ms >= ?',
+    [winStartMs],
+  ));
+  const patternWindow = buildPatternWindow(
+    winCalendar,
+    setAgg.map((r) => ({
+      date: r.date, pattern: r.pattern, setCount: r.set_count,
+      sumDeltaRpe: r.sum_delta_rpe, deltaCount: r.delta_count, sumAttenuation: r.sum_attenuation,
+    })),
+    niggleRows.map((r) => ({ date: localDateOf(r.reported_at_ms), region: r.region as Joint, severity: r.severity })),
+  );
+  // Severe ACTIVE joint load (>= the experience-weighted halt threshold) is a
+  // block-level halt → the generator snaps to the recovery template. Uses the
+  // SAME local-midnight bound as the active-niggle path (runBlockWipe).
+  const haltMin = EXPERIENCE_SEVERITY[profile.training_age].haltMin;
+  const maxNiggleToday = rowsOf<{ s: number }>(d.executeSync(
+    'SELECT COALESCE(MAX(severity), 0) AS s FROM niggle WHERE reported_at_ms >= ?',
+    [startOfTodayMs()],
+  ))[0]?.s ?? 0;
+  const autopilotGuardrail: Guardrail | null = maxNiggleToday >= haltMin
+    ? { load_multiplier: 1, set_delta: 0, rpe_cap_max: 10, halt: true, follow_up: null }
+    : null;
+  const flawReport = detectFlaws(windowVectors, patternWindow, profile.training_age, autopilotGuardrail);
+
+  const blockEmphasisInput = programEmphasisFor(d, today);
+  // Decision of 2026-10-13: a block generated while a suspension is open gets
+  // no autopilot effort raise. It consumes no macro position (S6(b)), so the
+  // per-position ceiling on raises would not count it. Read once here and
+  // checked again at commit, where the block is attributed to the episode.
+  const suspensionBeforeGeneration = openSuspension(d);
+  const plan = generateBlock({
+    profile,
+    movements: genMovements,
+    startDate,
+    schemaType,
+    macroBlockIndex,
+    autopilotRpeRaisePermitted: suspensionBeforeGeneration === null,
+    programDays,
+    flawReport,
+    powerPreferredMovementNames: powerNamesGenerate,
+    ...(blockEmphasisInput === null ? {} : { emphasis: blockEmphasisInput }),
+  });
+  return { plan, suspensionBeforeGeneration, blockEmphasisInput };
+};
+
+/** True once any session has been started from this planned session. */
+const plannedSessionStarted = (d: DB, plannedSessionId: number): boolean =>
+  Number(rowsOf<{ c: number }>(d.executeSync(
+    'SELECT COUNT(*) AS c FROM session_origin WHERE source_planned_session_id = ?',
+    [plannedSessionId],
+  ))[0]?.c ?? 0) > 0;
+
+/** One slot against the access boundary: the profile must permit the movement in
+ *  this day's context, and the capability check must make it available. startSession
+ *  and Today both judge slots with this, so the conflict Today shows is the refusal
+ *  Start would give. */
+const slotOutsideAccessBoundary = (
+  slot: { movementId: number },
+  movements: readonly Movement[],
+  profile: UserProfile,
+  executionContext: ExecutableMovementAccessContext,
+  capabilityAvailable: ReadonlySet<number>,
+): boolean => !permittedForProfile(
+    movements.find((movement) => movement.movement_id === slot.movementId),
+    profile,
+    executionContext,
+  ) || !capabilityAvailable.has(slot.movementId);
+
+/** The access boundary for a planned day, judged the same way startSession judges it. */
+const todayPlanOutsideAccessBoundary = (
+  d: DB,
+  plan: Pick<TodayPlan, 'focus' | 'slots'>,
+  movements: readonly Movement[],
+  profile: UserProfile,
+  priorExperience: ReadonlySet<number>,
+  niggles: readonly NiggleInput[],
+): boolean => {
+  const executionContext = accessContextForBlockFocus(plan.focus as BlockFocus);
+  const capabilityAvailable = capabilityAvailableMovementIds(
+    d, movements, profile, executionContext, priorExperience,
+    safetyExcludedMovementIdsFor(movements, profile, niggles),
+  );
+  return plan.slots.some((slot) => slotOutsideAccessBoundary(
+    slot, movements, profile, executionContext, capabilityAvailable,
+  ));
+};
+
+/** Writes one planned session's slots, each with the attribution rows that go with it. */
+const insertPlannedSlots = (
+  d: DB,
+  plannedSessionId: number,
+  slots: BlockPlan['sessions'][number]['slots'],
+  ctx: { movements: readonly Movement[]; declaredIntents: ReadonlyMap<number, MovementPrefix>; profile: UserProfile },
+): void => {
+  const { movements, declaredIntents, profile } = ctx;
+  for (const sl of slots) {
+    const movement = movements.find((m) => m.movement_id === sl.movement_id);
+    const target = targetForMovement(movement, sl.reps);
+    // Time policies own their default set count. The generated plan may
+    // still be reduced later by readiness, but never grown past policy.
+    const plannedSets = defaultSetsForTarget(movement, sl.sets);
+    const legacyReps = target.kind === 'reps' ? target.reps : sl.reps;
+    d.executeSync(
+      'INSERT INTO planned_slot (planned_session_id, slot_index, movement_id, sets, reps, target_rpe) VALUES (?, ?, ?, ?, ?, ?)',
+      [plannedSessionId, sl.slot_index, sl.movement_id, plannedSets, legacyReps, sl.target_rpe],
+    );
+    const plannedSlotId = rowsOf<{ id: number }>(d.executeSync('SELECT last_insert_rowid() AS id'))[0]!.id;
+    // L1(a): record the PROSPECTIVE load intent for this slot (059). Only
+    // when it is actually declared — an absent row means "undeclared" and
+    // is read as the conservative loaded path, which is why nothing is
+    // written for an ambiguous movement.
+    const slotImplement = movement === undefined ? undefined : plannedImplementFor(movement, declaredIntents, profile.equipment_inventory);
+    if (slotImplement !== undefined) {
+      d.executeSync(
+        'INSERT INTO planned_slot_load_intent (planned_slot_id, planned_implement) VALUES (?, ?)',
+        [plannedSlotId, slotImplement],
+      );
+    }
+    if (sl.autopilotDelta !== undefined) {
+      d.executeSync(
+        'INSERT INTO planned_slot_autopilot (planned_slot_id, rpe_delta, set_delta, reason) VALUES (?, ?, ?, ?)',
+        [plannedSlotId, sl.autopilotDelta.rpe_delta, sl.autopilotDelta.set_delta, sl.autopilotDelta.reason],
+      );
+    }
+    d.executeSync(
+      `INSERT INTO planned_slot_target (planned_slot_id, target_kind, target_reps, target_seconds)
+       VALUES (?, ?, ?, ?)`,
+      [
+        plannedSlotId,
+        target.kind,
+        target.kind === 'reps' ? target.reps : null,
+        target.kind === 'time' ? target.seconds : null,
+      ],
+    );
+  }
+};
