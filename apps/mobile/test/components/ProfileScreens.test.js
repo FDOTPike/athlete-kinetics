@@ -872,18 +872,27 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     const { getByRole } = render(<ProfileScreen />);
 
     // OBJECTIVES renders one chip per objective; 'hybrid' is baseProfile's value.
-    const objectives = ['strength', 'hypertrophy', 'power', 'endurance', 'gpp', 'hybrid', 'rehab', 'weight_loss'];
-    const selected = getByRole('button', { name: '1 · OBJECTIVE: hybrid' });
+    const objectiveLabels = [
+      'GET STRONGER',
+      'BUILD MUSCLE',
+      'GET EXPLOSIVE',
+      'LAST LONGER',
+      'ALL-ROUND FITNESS',
+      'STRENGTH + GRAPPLING',
+      'RETURN TO TRAINING',
+      'WEIGHT-LOSS SUPPORT',
+    ];
+    const selected = getByRole('button', { name: '1 · OBJECTIVE: STRENGTH + GRAPPLING' });
     expect(selected.props.accessibilityState.selected).toBe(true);
 
-    const unselected = getByRole('button', { name: '1 · OBJECTIVE: strength' });
+    const unselected = getByRole('button', { name: '1 · OBJECTIVE: GET STRONGER' });
     expect(unselected.props.accessibilityState.selected).toBe(false);
     expect(unselected.props.accessibilityState.disabled).toBe(false);
 
     // Exactly ONE of the row's chips claims the selected state.
-    const selectedCount = objectives.filter(
-      (o) => getByRole('button', {
-        name: `1 · OBJECTIVE: ${o.replace(/_/g, ' ')}`,
+    const selectedCount = objectiveLabels.filter(
+      (label) => getByRole('button', {
+        name: `1 · OBJECTIVE: ${label}`,
       }).props.accessibilityState.selected,
     ).length;
     expect(selectedCount).toBe(1);
