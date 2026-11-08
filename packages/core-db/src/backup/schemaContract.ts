@@ -144,6 +144,14 @@ export const SUPPORTED_BACKUP_SCHEMA_CONTRACTS: readonly BackupSchemaContract[] 
     objectCount: 211,
     fingerprint: '00aca47da3d6e7be422b674e70d8ba000f4f685527b362f09089cda08f932be8',
   },
+  // Through 077_multisport_and_flexibility: two side-car tables and six guards.
+  {
+    userVersion: 76,
+    migrationSlot: 77,
+    tableCount: 127,
+    objectCount: 216,
+    fingerprint: '88daea365fb6f4d9d6414c1ab2c267af5aa0aa0149c7b5b3a69a3b0b804be294',
+  },
 ];
 
 export const CURRENT_BACKUP_SCHEMA_CONTRACT: BackupSchemaContract =

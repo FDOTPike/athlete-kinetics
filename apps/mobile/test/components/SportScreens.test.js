@@ -116,7 +116,7 @@ describe('the sport screen in the interview', () => {
     next();
     expect(screen.getByText('DO YOU PLAY OR COMPETE IN A SPORT?')).toBeTruthy();
     expect(stepLabel()).toBe('Step 4 of 9');
-    for (const family of ['basketball', 'football', 'hockey', 'powerlifting', 'muay_thai', 'other']) {
+    for (const family of ['court', 'football', 'hockey', 'strength', 'striking', 'other']) {
       expect(screen.getByTestId(`sport-family-${family}`)).toBeTruthy();
     }
     // A started sport answer is finished or skipped: nothing half-answered is carried forward.
@@ -152,14 +152,16 @@ describe('the sport screen in the interview', () => {
     press('sport-family-hockey');
     expect(screen.getByLabelText('Field hockey. Played on grass or turf.')).toBeTruthy();
     expect(screen.getByLabelText('Ice hockey. Played on ice, on skates.')).toBeTruthy();
-    press('sport-family-basketball');
+    // strength is the single-code family in the 22-sport catalog: powerlifting only.
+    press('sport-family-strength');
     expect(screen.queryByText(/WHICH KIND OF/)).toBeNull();
-    expect(screen.getByTestId('sport-outcome-jump_higher')).toBeTruthy();
+    expect(screen.getByTestId('sport-outcome-bigger_competition_lifts')).toBeTruthy();
   });
 
   test('choosing an outcome says what the plan will do, what it cannot do, and on what basis', () => {
     openSportSlide();
-    press('sport-family-basketball');
+    press('sport-family-court');
+    press('sport-basketball');
     expect(screen.queryByTestId('sport-emphasis')).toBeNull();
     press('sport-outcome-jump_higher');
     expect(screen.getByTestId('sport-emphasis-summary').props.children)
@@ -167,7 +169,8 @@ describe('the sport screen in the interview', () => {
     expect(textsOf('sport-emphasis-limit').join(' ')).toMatch(/no jump or plyometric drills yet.*does not include jump training itself/);
     expect(screen.getByTestId('sport-emphasis-basis').props.children).toMatch(/Suchomel.*Markovic/);
     // An outcome with no reviewed basis says so and adds nothing.
-    press('sport-family-muay_thai');
+    press('sport-family-striking');
+    press('sport-muay_thai');
     press('sport-outcome-striking_and_clinch');
     expect(screen.getByTestId('sport-emphasis-summary').props.children).toMatch(/^No extra emphasis\. The app has no reviewed evidence/);
     expect(textsOf('sport-emphasis-limit').join(' ')).toMatch(/hip-flexor raises are not added by default/);
@@ -176,7 +179,7 @@ describe('the sport screen in the interview', () => {
 
   test('"not sure" is the starting workload answer; the competition date is context only', () => {
     openSportSlide();
-    press('sport-family-powerlifting');
+    press('sport-family-strength');
     expect(screen.getByLabelText('PRACTICE SESSIONS A WEEK Not sure')).toBeTruthy();
     expect(screen.getByLabelText('MATCHES OR COMPETITIONS A WEEK Not sure')).toBeTruthy();
     expect(selected('sport-practice-unsure')).toBe(true);
@@ -267,7 +270,8 @@ describe('the sport screen in the interview', () => {
     press('onboarding-wants-target');
     expect(stepLabel()).toBe('Step 3 of 10');
     next();
-    press('sport-family-basketball');
+    press('sport-family-court');
+    press('sport-basketball');
     press('sport-outcome-general_support');
     press('sport-experience-new');
     next();

@@ -741,6 +741,106 @@ export function resolveSportWorkload(input: {
   };
 }
 
+// MULTISPORT_WORKLOAD: sessions are summed across active sports; the mobility
+// tag is excluded upstream by the store query. Interference follows v13: with a
+// running/sprinting/swimming sport beside a contact, court or grappling sport
+// and a strength objective, main lifts keep their sets and lower-body
+// accessories lose 1 set at high and 2 at very high workload.
+export interface MultiSportInterference {
+  readonly activeSports: readonly SportId[];
+  readonly endurancePlusContact: boolean;
+  readonly mainLiftsKeepSets: true;
+  readonly lowBodyAccessorySetDelta: 0 | -1 | -2;
+  readonly spacingNote: string | null;
+}
+
+export interface MultiSportWorkload extends SportWorkload {
+  readonly interference: MultiSportInterference;
+}
+
+const ENDURANCE_SPORTS: ReadonlySet<SportId> = new Set(['running_sprinting', 'running_endurance', 'swimming']);
+const CONTACT_OR_COURT_SPORTS: ReadonlySet<SportId> = new Set([
+  'basketball', 'court_netball', 'football_association', 'football_australian', 'football_rugby',
+  'football_american', 'hockey_field', 'hockey_ice', 'grappling_bjj', 'grappling_wrestling', 'grappling_judo',
+  'combat_boxing', 'combat_mma',
+]);
+const STRENGTH_OUTCOMES: ReadonlySet<SportOutcomeId> = new Set(['strength_for_contact', 'bigger_competition_lifts']);
+
+/** v13's UNIQUE(sport_id) across ranks, enforced in code because 076's
+ *  table rebuild makes a cross-table SQL trigger unsafe (see 077). */
+/** Rank-1 must exist and the two sports must differ. This is the single
+ *  production guard a secondary-profile save path must call; the schema cannot
+ *  carry it (see 077: 076 rebuilds the primary table, so an FK with CASCADE
+ *  would delete the Rank-2 row and a RESTRICT/trigger would break the rename). */
+export function assertSecondarySportAllowed(
+  primarySportId: SportId | null,
+  secondarySportId: SportId | null,
+): void {
+  if (secondarySportId === null) return;
+  if (primarySportId === null) throw new Error('secondary sport requires a primary sport');
+  assertDistinctSecondarySport(primarySportId, secondarySportId);
+}
+
+export function assertDistinctSecondarySport(
+  primarySportId: SportId,
+  secondarySportId: SportId | null,
+): void {
+  if (secondarySportId !== null && secondarySportId === primarySportId) {
+    throw new Error('secondary sport must differ from primary sport');
+  }
+}
+
+export function resolveMultiSportWorkload(input: {
+  readonly scheduled: readonly ScheduledSportSession[];
+  readonly profiles: readonly SportProfile[];
+}): MultiSportWorkload {
+  if (input.profiles.length >= 2) {
+    assertSecondarySportAllowed(input.profiles[0].sportId, input.profiles[1].sportId);
+  }
+  const activeSports = [...new Set(input.profiles.map((profile) => profile.sportId))];
+  let sessionsPerWeek: number;
+  let source: SportWorkload['source'];
+  if (input.scheduled.length > 0) {
+    sessionsPerWeek = input.scheduled.length;
+    source = 'schedule';
+  } else if (input.profiles.length > 0) {
+    sessionsPerWeek = input.profiles.reduce(
+      (sum, profile) => sum + (profile.practiceSessionsPerWeek ?? 0) + (profile.matchesPerWeek ?? 0), 0);
+    source = 'stated';
+  } else {
+    sessionsPerWeek = 0;
+    source = 'none';
+  }
+  const tier = sportWorkloadTier(sessionsPerWeek);
+  const known = input.scheduled.filter((session) => session.expectedDurationMin !== null);
+  const endurancePlusContact = activeSports.some((sport) => ENDURANCE_SPORTS.has(sport))
+    && activeSports.some((sport) => CONTACT_OR_COURT_SPORTS.has(sport));
+  const strengthObjective = input.profiles.some((profile) => STRENGTH_OUTCOMES.has(profile.outcomeId));
+  const lowBodyAccessorySetDelta: 0 | -1 | -2 = !endurancePlusContact || !strengthObjective
+    ? 0
+    : tier === 'very_high' ? -2 : tier === 'high' ? -1 : 0;
+  return {
+    source,
+    sessionsPerWeek,
+    knownMinutesPerWeek: known.reduce((sum, session) => sum + (session.expectedDurationMin ?? 0), 0),
+    unknownDurationSessions: input.scheduled.length - known.length,
+    weekdays: [...new Set(input.scheduled.map((session) => session.weekday))].sort((a, b) => a - b),
+    tier,
+    description: sessionsPerWeek === 0
+      ? 'no sport sessions recorded'
+      : `${plural(sessionsPerWeek, 'weekly session')} across ${plural(activeSports.length, 'active sport')}`,
+    interference: {
+      activeSports,
+      endurancePlusContact,
+      mainLiftsKeepSets: true,
+      lowBodyAccessorySetDelta,
+      spacingNote: lowBodyAccessorySetDelta === 0
+        ? null
+        : 'Separate heavy lower-body strength and hard runs or sparring by at least 6-24 hours where possible.',
+    },
+  };
+}
+
 export interface SportWorkloadEffect {
   /** Working sets removed from each accessory exercise on strength days. */
   readonly accessorySetCut: 0 | 1 | 2;

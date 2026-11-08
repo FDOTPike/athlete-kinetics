@@ -730,9 +730,14 @@ describe('every registered pre-upgrade schema restores, not only the first', () 
     // 076 (WO-02 v12): athlete_sport_profile rebuilt with the 22 sport ids.
     // A rebuild keeps the table count and changes only the schema fingerprint.
     const v75 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 75);
-    expect(v75).toBe(CURRENT);
+    expect(v75).not.toBe(CURRENT);
     expect(v75.fingerprint).not.toBe(v74.fingerprint);
     expect([v75.migrationSlot, v75.tableCount]).toEqual([76, v74.tableCount]);
+    // 077 adds two side-car tables.
+    const v76 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 76);
+    expect(v76).toBe(CURRENT);
+    expect(v76.fingerprint).not.toBe(v75.fingerprint);
+    expect([v76.migrationSlot, v76.tableCount]).toEqual([77, v75.tableCount + 2]);
     expect(v70.fingerprint).not.toBe(v69.fingerprint);
     expect([v70.migrationSlot, v70.tableCount]).toEqual([71, v69.tableCount + 2]);
     expect(PRE_UPGRADE.length).toBeGreaterThanOrEqual(7);

@@ -305,7 +305,9 @@ export const SENTINELS: readonly MigrationSentinel[] = [
   // athlete_sport_profile would silently turn a sport athlete's next block
   // into the standard plan, and losing block_emphasis (or its immutability
   // guard) would lose or let someone rewrite the explanation of a frozen plan.
-  { type: 'table', name: 'athlete_sport_profile' },                           // 067
+  { type: 'table', name: 'athlete_sport_profile' },
+  { type: 'table', name: 'athlete_secondary_sport_profile' },   // 077
+  { type: 'table', name: 'activity_flexibility_tag' },          // 077                           // 067
   { type: 'table', name: 'athlete_goal_movement' },                           // 067
   { type: 'table', name: 'block_emphasis' },                                  // 067
   { type: 'trigger', name: 'trg_block_emphasis_immutable_bu' },               // 067
@@ -390,6 +392,10 @@ const REPLAY_BLOCKING_TRIGGERS: readonly string[] = [
   // Drop them only during a full self-heal replay; 064 recreates them before
   // sentinel validation returns control to the app.
   'trg_activity_completion_completed_bi',        // 064 -> activity_occurrence
+  // 077: every trigger names a table created after the rename point.
+  'trg_activity_flexibility_tag_low_demand_bi',   // 077 -> activity_definition
+  'trg_activity_flexibility_tag_low_demand_bu',   // 077 -> activity_definition
+  'trg_activity_definition_flexibility_low_demand_bu', // 077 -> activity_flexibility_tag
   'trg_activity_completion_completed_bu',        // 064 -> activity_occurrence
   // This trigger lives on activity_occurrence and names the later-in-064
   // activity_completion table, so it has the same replay constraint.

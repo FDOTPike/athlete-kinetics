@@ -671,3 +671,5 @@ export {
 
 export * from './prehabCatalog';
 export * from './flexibilityPolicy';
+export { makeMultiSportEmphasisIndex, MAX_EMPHASIS_MUSCLES, SECONDARY_SPORT_WEIGHT } from './programEmphasis';
+export { assertDistinctSecondarySport, assertSecondarySportAllowed, resolveMultiSportWorkload, type MultiSportWorkload, type MultiSportInterference } from './sportProfile';
