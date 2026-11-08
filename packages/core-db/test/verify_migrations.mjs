@@ -70,7 +70,7 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '068_movement_content_correction_v2.sql',
   '069_resting_heart_rate.sql',
   '070_session_feel.sql', '071_beta_recording.sql', '072_question_log.sql', '073_session_slot_replaced_by.sql',
-  '074_session_feel_reasons.sql', '075_session_plan_slot_planned_count.sql'];
+  '074_session_feel_reasons.sql', '075_session_plan_slot_planned_count.sql', '076_sport_taxonomy_expansion.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
@@ -1767,11 +1767,11 @@ console.log('[2u] 057 block_meta phase/index repair + enforcement');
     const db = freshDb();
     runMigrations(db, MIGRATIONS);
     // Slot 004 is the parameterized materialize script, never a migration:
-    // 74 files (slots 001-075, no 004) -> user_version 74. This count is
+    // 75 files (slots 001-076, no 004) -> user_version 75. This count is
     // pinned deliberately so adding a migration is a conscious act, not a
-    // silent one. Re-pinned for 075 (session_plan_slot_planned_count).
-    check('fresh install reaches user_version 74 (74 files, no slot 004)',
-      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 74,
+    // silent one. Re-pinned for 076 (sport_taxonomy_expansion).
+    check('fresh install reaches user_version 75 (75 files, no slot 004)',
+      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 75,
       String(uv(db)));
     const trig = db.raw.prepare(
       `SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'trigger'
@@ -4565,7 +4565,7 @@ console.log('[074] session feel reasons (session_feel rebuilt, session_feel_extr
 console.log('[075] session plan slot planned count (session_plan_slot_planned_count)');
 {
   const index = FILES.indexOf('075_session_plan_slot_planned_count.sql');
-  check('075 is appended after 074 and completes the chain', index === 73 && index === MIGRATIONS.length - 1);
+  check('075 is appended after 074', index === 73 && FILES[index + 1] === '076_sport_taxonomy_expansion.sql');
   const counts = (db) => db.raw.prepare('SELECT * FROM session_plan_slot_planned_count ORDER BY session_plan_slot_id').all();
   const rejects = (fn) => { try { fn(); return false; } catch { return true; } };
   const upgraded = freshDb();
@@ -4697,6 +4697,28 @@ console.log('\n[one statement per database call]');
   check('scanner: blank pieces are dropped and names that merely contain keywords are plain names',
     split(';; CREATE TABLE end_log(trigger_name, constructor); ; -- done\n')
       === JSON.stringify(['CREATE TABLE end_log(trigger_name, constructor);']));
+}
+
+// =============================================================================
+// [076] sport taxonomy expansion (22 proposed SportIds)
+// =============================================================================
+console.log('[076] sport taxonomy expansion (athlete_sport_profile CHECK widened)');
+{
+  const index = FILES.indexOf('076_sport_taxonomy_expansion.sql');
+  check('076 is the last migration in the chain', index === MIGRATIONS.length - 1);
+  const upgraded = freshDb();
+  applyRaw(upgraded, MIGRATIONS, 0, index); // through 075
+  upgraded.raw.exec("INSERT INTO athlete_sport_profile (sport_profile_id, sport_id, outcome_id, experience_id, revision, updated_at_ms) VALUES (1, 'basketball', 'general_support', 'new', 1, 0)");
+  applyRaw(upgraded, MIGRATIONS, index, index + 1); // 076 only
+  const kept = upgraded.raw.prepare('SELECT sport_id FROM athlete_sport_profile WHERE sport_profile_id = 1').get();
+  check('076 preserves the existing profile row', kept && kept.sport_id === 'basketball');
+  upgraded.raw.exec("UPDATE athlete_sport_profile SET sport_id = 'grappling_bjj', outcome_id = 'stay_available' WHERE sport_profile_id = 1");
+  check('076 accepts a new proposed sport id', upgraded.raw.prepare('SELECT sport_id FROM athlete_sport_profile').get().sport_id === 'grappling_bjj');
+  let rejected = false;
+  try { upgraded.raw.exec("UPDATE athlete_sport_profile SET sport_id = 'cricket' WHERE sport_profile_id = 1"); } catch { rejected = true; }
+  check('076 still rejects an unlisted sport id', rejected);
+  const cols = upgraded.raw.prepare('PRAGMA table_info(athlete_sport_profile)').all().map((c) => c.name);
+  check('076 keeps all eleven columns', cols.length === 11 && cols.includes('competition_date') && cols.includes('updated_at_ms'), String(cols.length));
 }
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
