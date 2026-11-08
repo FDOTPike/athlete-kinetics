@@ -1576,6 +1576,12 @@ const styles = StyleSheet.create({
   },
   numBtnPressed: { backgroundColor: theme.color.ink0 },
   numBtnText: { color: theme.color.textHi, fontSize: 28, fontWeight: '700', lineHeight: 32 },
+  // Android walk W7-2 (#153): a single-line Android EditText (mSingleLine = true,
+  // mLayout.getWidth() = VERY_WIDE = 1,048,576) only reports mLayout.getLineWidth(0)
+  // in TextView.computeHorizontalScrollRange() when horizontal gravity is LEFT.
+  // With textAlign: 'center', computeHorizontalScrollRange() returns VERY_WIDE so
+  // canScrollHorizontally(1) is always true and ReactEditText.onTouchEvent never
+  // releases parent.requestDisallowInterceptTouchEvent(true) on vertical drags.
   oneRmInput: {
     flex: 1,
     minHeight: theme.touch.min,
@@ -1586,8 +1592,9 @@ const styles = StyleSheet.create({
     color: theme.color.textHi,
     fontSize: 26,
     fontWeight: '800',
-    textAlign: 'center',
+    includeFontPadding: false,
     fontVariant: ['tabular-nums'],
+    paddingHorizontal: theme.space[3],
     paddingVertical: theme.space[1],
   },
   notesInput: {
