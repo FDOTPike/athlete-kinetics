@@ -558,6 +558,10 @@ export interface PlanSlot {
   overrideLoadKg: number | null;
   overrideReason: string | null;
   replacedBySessionPlanSlotId: number | null;
+  /** The set count the slot was planned with, kept when a swap after logged sets
+   *  overwrote plannedSets with the sets the runner keeps (075). Null, or absent on a
+   *  slot built before this was recorded: the screens then use the earlier wording. */
+  originalPlannedSets?: number | null;
 }
 
 // --- 4-week block (007 tables) ----------------------------------------------
@@ -3169,16 +3173,18 @@ export const useStore = create<KineticsStore>()((set, get) => {
           override_load_kg: number | null;
           override_reason: string | null;
           replaced_by_session_plan_slot_id: number | null;
+          original_planned_sets: number | null;
         }>(
           db!.executeSync(
             `SELECT sps.session_plan_slot_id, sps.movement_id, sps.planned_sets, sps.planned_reps,
                     sst.target_kind, sst.target_reps, sst.target_seconds,
                     sps.provenance_kind, sps.target_rpe, sps.source_planned_slot_id,
                     sps.original_movement_id, sps.original_session_date, sps.override_load_kg, sps.override_reason,
-                    spsr.replaced_by_session_plan_slot_id
+                    spsr.replaced_by_session_plan_slot_id, spc.original_planned_sets
              FROM session_plan_slot sps
              LEFT JOIN session_slot_target sst ON sst.session_plan_slot_id = sps.session_plan_slot_id
              LEFT JOIN session_plan_slot_replacement spsr ON spsr.session_plan_slot_id = sps.session_plan_slot_id
+             LEFT JOIN session_plan_slot_planned_count spc ON spc.session_plan_slot_id = sps.session_plan_slot_id
              WHERE sps.session_id = ?
              ORDER BY sps.slot_index`,
             [openSession.session_id]
@@ -3198,6 +3204,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
           overrideLoadKg: ps.override_load_kg,
           overrideReason: ps.override_reason,
           replacedBySessionPlanSlotId: ps.replaced_by_session_plan_slot_id ?? null,
+          originalPlannedSets: ps.original_planned_sets ?? null,
         }));
         const checkpoint = rowsOf<{
           session_mode: string;
@@ -6261,17 +6268,24 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const setRows = rowsOf<{
       movement_id: number; movement_name: string; reps: number; load_kg: number;
       time_s: number | null; session_plan_slot_id: number | null; planned_sets: number | null;
+      swapped_to_name: string | null;
     }>(d.executeSync(
       // Sol R4 F4: the slot identity is read so the planned-set denominator is
       // attributed per SLOT, never copied onto every movement a slot held.
       `SELECT sr.movement_id, m.name AS movement_name, sr.reps, sr.load_kg,
-              tm.value AS time_s, st.session_plan_slot_id, sps.planned_sets
+              tm.value AS time_s, st.session_plan_slot_id,
+              COALESCE(spc.original_planned_sets, sps.planned_sets) AS planned_sets,
+              CASE WHEN spc.original_planned_sets IS NOT NULL THEN rm.name END AS swapped_to_name
          FROM set_record sr
          JOIN movement m ON m.movement_id = sr.movement_id
          LEFT JOIN set_metric tm ON tm.set_id = sr.set_id AND tm.metric = 'time_s'
          LEFT JOIN set_target st ON st.set_id = sr.set_id
          LEFT JOIN session_plan_slot sps
               ON sps.session_plan_slot_id = st.session_plan_slot_id
+         LEFT JOIN session_plan_slot_planned_count spc ON spc.session_plan_slot_id = sps.session_plan_slot_id
+         LEFT JOIN session_plan_slot_replacement spsr ON spsr.session_plan_slot_id = sps.session_plan_slot_id
+         LEFT JOIN session_plan_slot rsps ON rsps.session_plan_slot_id = spsr.replaced_by_session_plan_slot_id
+         LEFT JOIN movement rm ON rm.movement_id = rsps.movement_id
         WHERE sr.session_id = ?
         ORDER BY sr.movement_id, sr.set_index`,
       [sessionId],
@@ -6328,6 +6342,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
         timeS: row.time_s,
         sessionPlanSlotId: row.session_plan_slot_id,
         plannedSets: row.planned_sets,
+        swappedToMovementName: row.swapped_to_name,
       }))),
       previousSets: previousRows.map((r) => ({
         movementId: r.movement_id, reps: r.reps, loadKg: r.load_kg, sessionId: r.session_id,
@@ -7085,6 +7100,12 @@ export const useStore = create<KineticsStore>()((set, get) => {
         if (originalSlotRow === undefined) {
           throw new Error('Target session slot is missing.');
         }
+        // 075 (issue #144): keep the count planned before this swap. planned_sets
+        // below becomes the runner's count and the checkpoint check still reads it.
+        d.executeSync(
+          'INSERT OR IGNORE INTO session_plan_slot_planned_count (session_plan_slot_id, original_planned_sets) SELECT session_plan_slot_id, planned_sets FROM session_plan_slot WHERE session_plan_slot_id = ?',
+          [slot.sessionPlanSlotId],
+        );
         d.executeSync(
           'UPDATE session_plan_slot SET planned_sets = ? WHERE session_plan_slot_id = ?',
           [retainedSets, slot.sessionPlanSlotId],
@@ -7178,7 +7199,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       };
       const nextPlan = sessionPlan.flatMap((candidate) =>
         candidate.sessionPlanSlotId === slot.sessionPlanSlotId
-          ? [{ ...candidate, plannedSets: retainedSets, replacedBySessionPlanSlotId: newSlotId }, newSlot]
+          ? [{ ...candidate, plannedSets: retainedSets, replacedBySessionPlanSlotId: newSlotId, originalPlannedSets: candidate.originalPlannedSets ?? candidate.plannedSets }, newSlot]
           : [candidate],
       );
       set({
@@ -7547,6 +7568,11 @@ export const useStore = create<KineticsStore>()((set, get) => {
         if (originalSlotRow === undefined) {
           throw new Error('Target session slot is missing.');
         }
+        // 075 (issue #144): keep the count planned before this swap, as the swap above does.
+        d.executeSync(
+          'INSERT OR IGNORE INTO session_plan_slot_planned_count (session_plan_slot_id, original_planned_sets) SELECT session_plan_slot_id, planned_sets FROM session_plan_slot WHERE session_plan_slot_id = ?',
+          [targetSlot.sessionPlanSlotId],
+        );
         d.executeSync(
           'UPDATE session_plan_slot SET planned_sets = ? WHERE session_plan_slot_id = ?',
           [retainedSets, targetSlot.sessionPlanSlotId],
@@ -7640,7 +7666,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       };
       const nextPlan = sessionPlan.flatMap((slot) =>
         slot.sessionPlanSlotId === targetSlot.sessionPlanSlotId
-          ? [{ ...slot, plannedSets: retainedSets, replacedBySessionPlanSlotId: newSlotId }, newSlot]
+          ? [{ ...slot, plannedSets: retainedSets, replacedBySessionPlanSlotId: newSlotId, originalPlannedSets: slot.originalPlannedSets ?? slot.plannedSets }, newSlot]
           : [slot],
       );
       set({
@@ -8137,6 +8163,10 @@ export const useStore = create<KineticsStore>()((set, get) => {
           throw new Error('Only an empty session can be discarded.');
         }
         d.executeSync(
+          'DELETE FROM session_plan_slot_planned_count WHERE session_plan_slot_id IN (SELECT session_plan_slot_id FROM session_plan_slot WHERE session_id = ?)',
+          [activeSession.sessionId],
+        );
+        d.executeSync(
           'DELETE FROM session_plan_slot_replacement WHERE session_plan_slot_id IN (SELECT session_plan_slot_id FROM session_plan_slot WHERE session_id = ?) OR replaced_by_session_plan_slot_id IN (SELECT session_plan_slot_id FROM session_plan_slot WHERE session_id = ?)',
           [activeSession.sessionId, activeSession.sessionId],
         );
@@ -8553,6 +8583,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       // and an orphan surviving an FK-OFF reset would attach an old record to
       // new work.
       d.executeSync('DELETE FROM session_skipped_slot');
+      d.executeSync('DELETE FROM session_plan_slot_planned_count');
       d.executeSync('DELETE FROM session_plan_slot_replacement');
       d.executeSync('DELETE FROM session_plan_slot');
       d.executeSync('DELETE FROM session_origin');

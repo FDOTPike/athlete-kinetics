@@ -31,6 +31,9 @@ The sixth is `074_session_feel_reasons` (ordinal 73): rebuilds `session_feel`
 with the same columns and a looser CHECK (only "as planned" is held to no
 reasons), and adds the `session_feel_extra_reason` side-car table for three new
 reasons.
+The seventh is `075_session_plan_slot_planned_count` (ordinal 74): adds the
+`session_plan_slot_planned_count` side-car table, which keeps the set count a
+slot was planned with when a swap after logged sets overwrites `planned_sets`.
 `MIGRATION_LINEAGE.json` records the SHA-256 of every shipped file and its
 ordinal, and of master's 34-entry chain. Master's exact `034`/`058` bytes and its
 registry live under `test/fixtures/lineage/master-1da218d/`.

@@ -681,3 +681,32 @@ describe('matchPreviousFacts skips prior sessions that mix implement classes', (
     expect(facts.mostRepsInOneSet).toBe(11);
   });
 });
+
+describe('issue 144: a swap after logged sets keeps the planned count and names the chain', () => {
+  const row = (movementId, movementName, sessionPlanSlotId, plannedSets, extra = {}) => ({
+    movementId, movementName, reps: 5, loadKg: 20, timeS: null, sessionPlanSlotId, plannedSets, ...extra,
+  });
+  const lines = (exercises) => buildSessionSummary({
+    exercises, previousSets: [], durationMin: null, blockSessions: [], today: '2026-09-11',
+  }).exerciseLines.map((l) => l.text);
+
+  test('the swapped-from line reads "1 of 2 sets, then swapped to" with the replacement named', () => {
+    const exercises = groupSummaryExercises([
+      row(1, 'Floor Back Extension', 50, 2, { swappedToMovementName: 'Glute Bridge' }),
+      row(2, 'Glute Bridge', 51, 1),
+    ]);
+    expect(lines(exercises)).toEqual([
+      'Floor Back Extension — 1 of 2 sets, then swapped to Glute Bridge · most reps in one set 5 · heaviest load used 20 kg',
+      'Glute Bridge — 1 of 1 sets · most reps in one set 5 · heaviest load used 20 kg',
+    ]);
+  });
+
+  test('without a recorded original (older records) the line keeps today\'s wording', () => {
+    const exercises = groupSummaryExercises([
+      row(1, 'Floor Back Extension', 50, 1),
+      row(2, 'Glute Bridge', 51, 1),
+    ]);
+    expect(lines(exercises)[0]).toMatch(/^Floor Back Extension — 1 of 1 sets /);
+    expect(lines(exercises)[0]).not.toMatch(/swapped/);
+  });
+});
