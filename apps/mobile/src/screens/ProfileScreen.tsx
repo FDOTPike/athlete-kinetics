@@ -15,6 +15,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   BIG4_LIFTS,
+  effectiveRpeCeiling,
   ENERGY_SYSTEMS,
   STANDARD_EQUIPMENT_ITEMS,
   SPECIALIST_EQUIPMENT_ITEMS,
@@ -535,6 +536,13 @@ export default function ProfileScreen(): React.JSX.Element {
         onDec={() => saveProfile({ base_rpe_cap: profile.base_rpe_cap - 0.5 })}
         onInc={() => saveProfile({ base_rpe_cap: profile.base_rpe_cap + 0.5 })}
       />
+      <Text style={styles.fieldHint} testID="profile-effective-effort-ceiling">
+        {effectiveRpeCeiling(profile) < effectiveRpeCeiling({ ...profile, objective: 'gpp' })
+          ? `Effort ceiling ${effectiveRpeCeiling(profile).toFixed(1)} — Your upper setting is ${profile.base_rpe_cap.toFixed(1)}. Return to training caps effort at ${effectiveRpeCeiling(profile).toFixed(1)}.`
+          : effectiveRpeCeiling(profile) < profile.base_rpe_cap
+            ? `Effort ceiling ${effectiveRpeCeiling(profile).toFixed(1)} — Your upper setting is ${profile.base_rpe_cap.toFixed(1)}. Beginner experience caps effort at ${effectiveRpeCeiling(profile).toFixed(1)}.`
+            : `Effort ceiling ${effectiveRpeCeiling(profile).toFixed(1)} — Your upper setting (${profile.base_rpe_cap.toFixed(1)}) is the ceiling in use.`}
+      </Text>
       <ChipRow
         label="7 · TARGET ENERGY SYSTEM"
         tip="ATP-PC"
