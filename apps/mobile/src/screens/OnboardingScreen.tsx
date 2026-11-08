@@ -866,7 +866,7 @@ export default function OnboardingScreen(): React.JSX.Element {
                 )}
                 {draft.training_age === 'beginner' && (
                   <Text style={styles.reviewDescription}>
-                    You choose the first weight. Next time starts from what you logged. Your effort ceiling starts at 8.5 and can change as your experience grows.
+                    You choose the first weight. Next time starts from what you logged. Your effort ceiling starts at {effectiveRpeCeiling(draft).toFixed(1)} and can change as your experience grows.
                   </Text>
                 )}
               </ReviewSection>
