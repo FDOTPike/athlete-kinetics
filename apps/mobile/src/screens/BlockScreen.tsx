@@ -529,9 +529,10 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
     </View>
   );
 
-  const current = prescription !== null && prescription.forDate === today ? prescription : null;
-  const rows = weekRowsFor(blockSessions);
-  const nextPlanned = blockSessions.find((planned) => planned.sessionDate > today);
+  const current = prescription != null && prescription.forDate === today ? prescription : null;
+  const safeBlockSessions = blockSessions ?? [];
+  const rows = weekRowsFor(safeBlockSessions);
+  const nextPlanned = safeBlockSessions.find((planned) => planned.sessionDate > today);
 
   const openDetail = (summary: BlockSessionSummary): void => {
     if (detail?.summary.plannedSessionId === summary.plannedSessionId) {
@@ -548,13 +549,13 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
     >
       <View style={styles.trajectoryHeaderRow}>
         <Text style={styles.sectionTitle}>Four-week trajectory</Text>
-        {block !== null && blockEndDate !== null && (
+        {block != null && blockEndDate != null && (
           <View style={styles.fixedBadge} accessibilityRole="text" accessibilityLabel={`Fixed until ${blockEndDate}`}>
             <Text style={styles.fixedBadgeText}>FIXED UNTIL {blockEndDate}</Text>
           </View>
         )}
       </View>
-      {blockMeta !== null && blockMeta.macroBlockIndex >= 6 && (
+      {blockMeta != null && blockMeta.macroBlockIndex >= 6 && (
         <View style={styles.blockAttribution}>
           <Pressable
             onPress={() => setMacroBudgetOpen((open) => !open)}
@@ -568,7 +569,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           {macroBudgetOpen && <Text style={styles.attributionText}>{AUTOPILOT_BUDGET_NOTE}</Text>}
         </View>
       )}
-      {block === null ? (
+      {block == null ? (
         <View style={styles.emptyTrajectory}>
           <Text style={styles.bodyText}>No block is active yet.</Text>
           <Text style={styles.captionText}>Set one up below when you are ready to train with a trajectory.</Text>
@@ -770,7 +771,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           </View>
         )}
         {nextProgramPreview !== null && renderNextProgramPreview(nextProgramPreview)}
-        {block === null && hasArchivedBlock && (
+        {block == null && hasArchivedBlock && (
           <View style={styles.card}>
             <Text style={styles.eyebrow}>PERIODIZATION</Text>
             <Text style={styles.cardTitle}>Your previous block had ended.</Text>
@@ -784,7 +785,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
             />
           </View>
         )}
-        {block === null && !hasArchivedBlock && (
+        {block == null && !hasArchivedBlock && (
           <View style={styles.card}>
             <Text style={styles.eyebrow}>PERIODIZATION</Text>
             <Text style={styles.cardTitle}>Build your first block</Text>
@@ -798,7 +799,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
             />
           </View>
         )}
-        {block !== null && renderTrajectorySection()}
+        {block != null && renderTrajectorySection()}
         <View style={styles.card}>
           <Text style={styles.eyebrow}>COACH</Text>
           <Text style={styles.cardTitle}>Readiness is needed first</Text>
