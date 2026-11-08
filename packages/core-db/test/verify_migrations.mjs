@@ -70,7 +70,7 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '068_movement_content_correction_v2.sql',
   '069_resting_heart_rate.sql',
   '070_session_feel.sql', '071_beta_recording.sql', '072_question_log.sql', '073_session_slot_replaced_by.sql',
-  '074_session_feel_reasons.sql'];
+  '074_session_feel_reasons.sql', '075_session_plan_slot_planned_count.sql', '076_sport_taxonomy_expansion.sql', '077_multisport_and_flexibility.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
@@ -1767,11 +1767,11 @@ console.log('[2u] 057 block_meta phase/index repair + enforcement');
     const db = freshDb();
     runMigrations(db, MIGRATIONS);
     // Slot 004 is the parameterized materialize script, never a migration:
-    // 73 files (slots 001-074, no 004) -> user_version 73. This count is
+    // 75 files (slots 001-076, no 004) -> user_version 75. This count is
     // pinned deliberately so adding a migration is a conscious act, not a
-    // silent one. Re-pinned for 074 (session_feel_reasons).
-    check('fresh install reaches user_version 73 (73 files, no slot 004)',
-      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 73,
+    // silent one. Re-pinned for 076 (sport_taxonomy_expansion).
+    check('fresh install reaches user_version 76 (76 files, no slot 004)',
+      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 76,
       String(uv(db)));
     const trig = db.raw.prepare(
       `SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'trigger'
@@ -4471,7 +4471,7 @@ console.log('[074] session feel reasons (session_feel rebuilt, session_feel_extr
 {
   const index = FILES.indexOf('074_session_feel_reasons.sql');
   const IDX_073 = FILES.indexOf('073_session_slot_replaced_by.sql');
-  check('074 is appended after 073 and completes the chain', index === IDX_073 + 1 && index === MIGRATIONS.length - 1 && index === 72);
+  check('074 is appended after 073', index === IDX_073 + 1 && index === 72);
   const feelRows = (db) => db.raw.prepare('SELECT * FROM session_feel ORDER BY session_id').all();
   const extraRows = (db) => db.raw.prepare('SELECT * FROM session_feel_extra_reason ORDER BY session_id').all();
   const rejects = (fn) => { try { fn(); return false; } catch { return true; } };
@@ -4556,6 +4556,72 @@ console.log('[074] session feel reasons (session_feel rebuilt, session_feel_extr
       && /feel <> 'as_planned'/.test(lost.raw.prepare("SELECT sql FROM sqlite_master WHERE name = 'session_feel'").get().sql));
 }
 
+// =============================================================================
+// [075] planned set count kept beside a swapped slot (issue #144)
+// =============================================================================
+// session_plan_slot_planned_count keeps the count a slot was planned with when a
+// swap after logged sets overwrote planned_sets with the runner's count. It is
+// a side-car (no ADD COLUMN), so every replay re-applies it safely.
+console.log('[075] session plan slot planned count (session_plan_slot_planned_count)');
+{
+  const index = FILES.indexOf('075_session_plan_slot_planned_count.sql');
+  check('075 is appended after 074', index === 73 && FILES[index + 1] === '076_sport_taxonomy_expansion.sql');
+  const counts = (db) => db.raw.prepare('SELECT * FROM session_plan_slot_planned_count ORDER BY session_plan_slot_id').all();
+  const rejects = (fn) => { try { fn(); return false; } catch { return true; } };
+  const upgraded = freshDb();
+  applyRaw(upgraded, MIGRATIONS, 0, index);
+  upgraded.raw.exec('PRAGMA foreign_keys = ON');
+  const firstMoveId = Number(upgraded.raw.prepare('SELECT movement_id FROM movement ORDER BY movement_id LIMIT 1').get().movement_id);
+  upgraded.raw.exec("INSERT INTO session (session_id, session_date, started_at_ms) VALUES (75, '2026-11-07', 1)");
+  // A pre-075 swap: slot 1 was planned for 2 sets, kept 1 after a logged set, and
+  // slot 2 is its replacement.
+  upgraded.raw.prepare(
+    "INSERT INTO session_plan_slot (session_plan_slot_id, session_id, slot_index, movement_id, planned_sets, planned_reps, provenance_kind) VALUES (1, 75, 0, ?, 1, 5, 'free_form')",
+  ).run(firstMoveId);
+  upgraded.raw.prepare(
+    "INSERT INTO session_plan_slot (session_plan_slot_id, session_id, slot_index, movement_id, planned_sets, planned_reps, provenance_kind) VALUES (2, 75, 1, ?, 1, 5, 'free_form')",
+  ).run(firstMoveId);
+  const slotsBefore = JSON.stringify(upgraded.raw.prepare('SELECT * FROM session_plan_slot ORDER BY session_plan_slot_id').all());
+  runMigrations(upgraded, MIGRATIONS);
+  check('a populated pre-075 install retains its slots untouched and has no recorded originals (old rows read NULL)',
+    JSON.stringify(upgraded.raw.prepare('SELECT * FROM session_plan_slot ORDER BY session_plan_slot_id').all()) === slotsBefore
+      && counts(upgraded).length === 0);
+  upgraded.raw.exec('PRAGMA foreign_keys = ON');
+  upgraded.raw.exec('INSERT INTO session_plan_slot_planned_count (session_plan_slot_id, original_planned_sets) VALUES (1, 2)');
+  check('the original count sits beside the runner count, which is unchanged',
+    JSON.stringify(counts(upgraded)) === JSON.stringify([{ session_plan_slot_id: 1, original_planned_sets: 2 }])
+      && Number(upgraded.raw.prepare('SELECT planned_sets FROM session_plan_slot WHERE session_plan_slot_id = 1').get().planned_sets) === 1);
+  check('an original below 1, a second row for one slot, and a missing slot are all rejected',
+    rejects(() => upgraded.raw.exec('INSERT INTO session_plan_slot_planned_count (session_plan_slot_id, original_planned_sets) VALUES (2, 0)'))
+      && rejects(() => upgraded.raw.exec('INSERT INTO session_plan_slot_planned_count (session_plan_slot_id, original_planned_sets) VALUES (1, 3)'))
+      && rejects(() => upgraded.raw.exec('INSERT INTO session_plan_slot_planned_count (session_plan_slot_id, original_planned_sets) VALUES (999, 2)')));
+
+  // Every replay re-applies the chain; the recorded original survives it.
+  upgraded.executeSync(`PRAGMA user_version = ${index};`);
+  runMigrations(upgraded, MIGRATIONS);
+  upgraded.executeSync('PRAGMA user_version = 0;');
+  runMigrations(upgraded, MIGRATIONS);
+  check('the recorded original survives a replay from 075 and a full re-apply from 0',
+    JSON.stringify(counts(upgraded)) === JSON.stringify([{ session_plan_slot_id: 1, original_planned_sets: 2 }])
+      && uv(upgraded) === MIGRATIONS.length && sentinelsMissing(upgraded).length === 0);
+
+  upgraded.raw.exec('DELETE FROM session_plan_slot WHERE session_plan_slot_id = 1');
+  check('deleting the slot cascades to its recorded original', counts(upgraded).length === 0);
+
+  // A lost side-car is detected and rebuilt, and the slots are kept.
+  upgraded.raw.prepare(
+    "INSERT INTO session_plan_slot (session_plan_slot_id, session_id, slot_index, movement_id, planned_sets, planned_reps, provenance_kind) VALUES (3, 75, 2, ?, 1, 5, 'free_form')",
+  ).run(firstMoveId);
+  upgraded.raw.exec('INSERT INTO session_plan_slot_planned_count (session_plan_slot_id, original_planned_sets) VALUES (3, 4)');
+  upgraded.raw.exec('DROP TABLE session_plan_slot_planned_count');
+  check('a lost session_plan_slot_planned_count table is detected',
+    sentinelsMissing(upgraded).includes('session_plan_slot_planned_count'));
+  runMigrations(upgraded, MIGRATIONS);
+  check('self-heal rebuilds session_plan_slot_planned_count and keeps the slot',
+    sentinelsMissing(upgraded).length === 0 && counts(upgraded).length === 0
+      && Number(upgraded.raw.prepare('SELECT COUNT(*) AS c FROM session_plan_slot WHERE session_plan_slot_id = 3').get().c) === 1);
+}
+
 // --- one statement per database call ------------------------------------------
 // CI evidence (run 37877632952, iOS test3): op-sqlite 16.2.0 reads the rows of
 // one executeSync call at the combined column count of every statement in that
@@ -4631,6 +4697,59 @@ console.log('\n[one statement per database call]');
   check('scanner: blank pieces are dropped and names that merely contain keywords are plain names',
     split(';; CREATE TABLE end_log(trigger_name, constructor); ; -- done\n')
       === JSON.stringify(['CREATE TABLE end_log(trigger_name, constructor);']));
+}
+
+// =============================================================================
+// [076] sport taxonomy expansion (22 proposed SportIds)
+// =============================================================================
+console.log('[076] sport taxonomy expansion (athlete_sport_profile CHECK widened)');
+{
+  const index = FILES.indexOf('076_sport_taxonomy_expansion.sql');
+  check('076 is appended before 077', index === MIGRATIONS.length - 2 && FILES[index + 1] === '077_multisport_and_flexibility.sql');
+  const upgraded = freshDb();
+  applyRaw(upgraded, MIGRATIONS, 0, index); // through 075
+  upgraded.raw.exec("INSERT INTO athlete_sport_profile (sport_profile_id, sport_id, outcome_id, experience_id, revision, updated_at_ms) VALUES (1, 'basketball', 'general_support', 'new', 1, 0)");
+  applyRaw(upgraded, MIGRATIONS, index, index + 1); // 076 only
+  const kept = upgraded.raw.prepare('SELECT sport_id FROM athlete_sport_profile WHERE sport_profile_id = 1').get();
+  check('076 preserves the existing profile row', kept && kept.sport_id === 'basketball');
+  upgraded.raw.exec("UPDATE athlete_sport_profile SET sport_id = 'grappling_bjj', outcome_id = 'stay_available' WHERE sport_profile_id = 1");
+  check('076 accepts a new proposed sport id', upgraded.raw.prepare('SELECT sport_id FROM athlete_sport_profile').get().sport_id === 'grappling_bjj');
+  let rejected = false;
+  try { upgraded.raw.exec("UPDATE athlete_sport_profile SET sport_id = 'cricket' WHERE sport_profile_id = 1"); } catch { rejected = true; }
+  check('076 still rejects an unlisted sport id', rejected);
+  const cols = upgraded.raw.prepare('PRAGMA table_info(athlete_sport_profile)').all().map((c) => c.name);
+  check('076 keeps all eleven columns', cols.length === 11 && cols.includes('competition_date') && cols.includes('updated_at_ms'), String(cols.length));
+}
+
+
+// =============================================================================
+// [077] multisport and flexibility side-cars
+// =============================================================================
+console.log('[077] multisport and flexibility (secondary sport + flexibility tag)');
+{
+  const index = FILES.indexOf('077_multisport_and_flexibility.sql');
+  check('077 is the last migration in the chain', index === MIGRATIONS.length - 1);
+  const d = freshDb();
+  runMigrations(d, MIGRATIONS);
+  const has = (name) => d.raw.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name=?").get(name).c === 1;
+  check('077 creates both side-car tables', has('athlete_secondary_sport_profile') && has('activity_flexibility_tag'));
+  const throws = (fn) => { try { fn(); return false; } catch { return true; } };
+  const insertSecondary = (sport) => d.raw.prepare(
+    "INSERT INTO athlete_secondary_sport_profile (priority_rank, sport_id, other_sport_name, outcome_id, experience_id, revision, updated_at_ms) VALUES (2, ?, NULL, 'general_support', 'new', 1, 0)",
+  ).run(sport);
+  d.raw.prepare("INSERT INTO athlete_sport_profile (sport_profile_id, sport_id, other_sport_name, outcome_id, experience_id, revision, updated_at_ms) VALUES (1, 'powerlifting', NULL, 'general_support', 'new', 1, 0)").run();
+  insertSecondary('grappling_bjj');
+  check('077 accepts a secondary sport beside the primary', d.raw.prepare('SELECT sport_id FROM athlete_secondary_sport_profile').get().sport_id === 'grappling_bjj');
+  const insertActivity = (id, demand) => d.raw.prepare(
+    "INSERT INTO activity_definition (activity_id, kind_id, display_name, demand_class, demand_source, provenance, created_at_ms, updated_at_ms) VALUES (?, 'custom', ?, ?, 'user_reported', 'user_reported', 0, 0)",
+  ).run(id, id, demand);
+  insertActivity('flex1', 'low');
+  insertActivity('hard1', 'high');
+  const tag = (id) => d.raw.prepare("INSERT INTO activity_flexibility_tag (activity_id, template_id, recorded_at_ms) VALUES (?, 'hips_lower_body', 0)").run(id);
+  check('077 rejects tagging a high-demand activity', throws(() => tag('hard1')));
+  tag('flex1');
+  check('077 accepts tagging a low-demand activity', d.raw.prepare('SELECT COUNT(*) c FROM activity_flexibility_tag').get().c === 1);
+  check('077 blocks reclassifying a tagged activity away from low demand', throws(() => d.raw.exec("UPDATE activity_definition SET demand_class = 'moderate' WHERE activity_id = 'flex1'")));
 }
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);

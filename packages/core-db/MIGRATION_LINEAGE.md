@@ -31,6 +31,16 @@ The sixth is `074_session_feel_reasons` (ordinal 73): rebuilds `session_feel`
 with the same columns and a looser CHECK (only "as planned" is held to no
 reasons), and adds the `session_feel_extra_reason` side-car table for three new
 reasons.
+The seventh is `075_session_plan_slot_planned_count` (ordinal 74): adds the
+`session_plan_slot_planned_count` side-car table, which keeps the set count a
+slot was planned with when a swap after logged sets overwrites `planned_sets`.
+The eighth is `076_sport_taxonomy_expansion` (ordinal 75): rebuilds
+`athlete_sport_profile` with the widened sport CHECK (22 SportIds from the WO-02
+v12 proposal), preserving every column and row.
+The ninth is `077_multisport_and_flexibility` (ordinal 76): adds the
+`athlete_secondary_sport_profile` and `activity_flexibility_tag` side-car tables
+and their guards, leaving `activity_definition` and the singleton sport profile
+byte-identical for the 067 verifier.
 `MIGRATION_LINEAGE.json` records the SHA-256 of every shipped file and its
 ordinal, and of master's 34-entry chain. Master's exact `034`/`058` bytes and its
 registry live under `test/fixtures/lineage/master-1da218d/`.

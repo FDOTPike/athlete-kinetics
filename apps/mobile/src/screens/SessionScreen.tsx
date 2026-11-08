@@ -1201,7 +1201,10 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
     );
   }
 
-  const exercisesCompleteText = `${sessionPlan.filter((slot) => loggedCount(slot) >= slot.plannedSets).length} of ${sessionPlan.length} exercises complete${runner?.skippedSessionPlanSlotIds.length ? ` · ${runner.skippedSessionPlanSlotIds.length} skipped` : ''}`;
+  // A swap after logged sets is one planned exercise (issue #144). Its chain counts once,
+  // through the row that was not swapped on: only that row has no replacedBySessionPlanSlotId.
+  const plannedExercises = sessionPlan.filter((slot) => slot.replacedBySessionPlanSlotId == null);
+  const exercisesCompleteText = `${plannedExercises.filter((slot) => loggedCount(slot) >= slot.plannedSets).length} of ${plannedExercises.length} exercises complete${runner?.skippedSessionPlanSlotIds.length ? ` · ${runner.skippedSessionPlanSlotIds.length} skipped` : ''}`;
 
   return (
     <View style={styles.screen}>
@@ -1312,8 +1315,15 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                 const completedSets = session?.sets.filter((set) => sameSlot(set, slot)) ?? [];
                 const name = movement?.name ?? 'Movement';
                 const replacementName = (replacedBySlot !== null ? byId.get(replacedBySlot.movementId)?.name : undefined) ?? 'Movement';
-                const swappedMeta = `Swapped for ${replacementName} · ${logged} ${logged === 1 ? 'set' : 'sets'} logged`;
-                const swappedLabel = `Swapped for ${replacementName} · ${name} · ${logged} ${logged === 1 ? 'set' : 'sets'} logged`;
+                // 075 (issue #144): with the original count recorded the row reads "1 of 2 sets,
+                // then swapped to <movement>". Without it (older records) it keeps the earlier wording.
+                const originalSets = slot.originalPlannedSets ?? null;
+                const swappedMeta = originalSets !== null
+                  ? `${logged} of ${originalSets} sets, then swapped to ${replacementName}`
+                  : `Swapped for ${replacementName} · ${logged} ${logged === 1 ? 'set' : 'sets'} logged`;
+                const swappedLabel = originalSets !== null
+                  ? `${name}, ${logged} of ${originalSets} sets, then swapped to ${replacementName}`
+                  : `Swapped for ${replacementName} · ${name} · ${logged} ${logged === 1 ? 'set' : 'sets'} logged`;
 
                 return (
                   <View

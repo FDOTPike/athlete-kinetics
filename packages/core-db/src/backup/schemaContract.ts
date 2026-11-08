@@ -126,6 +126,32 @@ export const SUPPORTED_BACKUP_SCHEMA_CONTRACTS: readonly BackupSchemaContract[] 
     objectCount: 210,
     fingerprint: 'bddf9047a966fd3bdb50db09d99754130cc506f69c4625e171c4cf3ec0402ee0',
   },
+  // Through 075_session_plan_slot_planned_count: adds the
+  // session_plan_slot_planned_count side-car table.
+  {
+    userVersion: 74,
+    migrationSlot: 75,
+    tableCount: 125,
+    objectCount: 211,
+    fingerprint: 'ba1fe3146a91547dc3804f1ad765cc32d7f2cc5e389841fceac3a376045456d4',
+  },
+  // Through 076_sport_taxonomy_expansion: athlete_sport_profile rebuilt with the
+  // 22 proposed SportIds. Same table and object counts, new schema fingerprint.
+  {
+    userVersion: 75,
+    migrationSlot: 76,
+    tableCount: 125,
+    objectCount: 211,
+    fingerprint: '00aca47da3d6e7be422b674e70d8ba000f4f685527b362f09089cda08f932be8',
+  },
+  // Through 077_multisport_and_flexibility: two side-car tables and six guards.
+  {
+    userVersion: 76,
+    migrationSlot: 77,
+    tableCount: 127,
+    objectCount: 216,
+    fingerprint: '88daea365fb6f4d9d6414c1ab2c267af5aa0aa0149c7b5b3a69a3b0b804be294',
+  },
 ];
 
 export const CURRENT_BACKUP_SCHEMA_CONTRACT: BackupSchemaContract =

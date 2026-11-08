@@ -225,3 +225,15 @@ Final live durable tables: 123 (the 122 above, and `session_plan_slot_replacemen
 Final live durable tables: 124 (the 123 above, and `session_feel_extra_reason`). The migration array has 73 entries through slot `074`, so `PRAGMA user_version = 73`. The current backup contract fingerprints 210 durable table/index/trigger objects; all earlier schema contracts remain registered unchanged.
 
 `074` rebuilds `session_feel` with the same columns and a looser CHECK (only "as planned" is held to no reasons; issue #220 requires a reason only for "harder", which the store's validation enforces), and adds `session_feel_extra_reason`, one row per session holding the newer reasons (load too heavy, load too light, rested well). Both are athlete-owned record-only data, never engine inputs. The side-car is included in the encrypted physical backup, survives forward restoration and migration replay, leaves with its session, and is cleared on Reset training data.
+
+## Update 2026-11-07 — migration 075 (planned set count for a swapped slot)
+
+Final live durable tables: 125 (the 124 above, and `session_plan_slot_planned_count`). The migration array has 74 entries through slot `075`, so `PRAGMA user_version = 74`. The current backup contract fingerprints 211 durable table/index/trigger objects; all earlier schema contracts remain registered unchanged.
+
+`session_plan_slot_planned_count` holds, for a `session_plan_slot` swapped after logged sets, the set count it was planned with before the swap (`original_planned_sets`). `session_plan_slot.planned_sets` keeps the runner's executable count, so the checkpoint check is unchanged. A slot with no row has no recorded original and is shown with the earlier wording. It is athlete-owned record-only data, included in the encrypted physical backup, survives forward restoration and migration replay, leaves with its session, and is cleared on empty-session discard and Reset training data.
+
+## Update 2026-11-08 — migrations 076 and 077 (sport taxonomy, multi-sport, flexibility tag)
+
+Final live durable tables: 127 (the 125 above, and `athlete_secondary_sport_profile` and `activity_flexibility_tag`). The migration array has 76 entries through slot `077`, so `PRAGMA user_version = 76`. The current backup contract fingerprints 216 durable table/index/trigger objects; all earlier schema contracts remain registered unchanged.
+
+`076` rebuilds `athlete_sport_profile` with the widened sport CHECK (22 proposed SportIds) and preserves every column and row. `077` adds the two side-cars: `athlete_secondary_sport_profile` holds the Rank-2 sport (rank fixed at 2; presence of a Rank-1 profile is a TypeScript guard, not an FK) and `activity_flexibility_tag` marks a low-demand activity as a mobility/flexibility session. Both are athlete-owned record-only data, included in the encrypted physical backup, survive forward restoration and migration replay, and are cleared by Reset training data. The tag is excluded from sport workload counting.

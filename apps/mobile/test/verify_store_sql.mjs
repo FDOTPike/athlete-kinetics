@@ -83,7 +83,10 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   '071_beta_recording.sql', '072_question_log.sql', '073_session_slot_replaced_by.sql',
   // 074 rebuilds session_feel and adds session_feel_extra_reason, which the
   // store writes and reads with the answer and empties on reset.
-  '074_session_feel_reasons.sql'];
+  '074_session_feel_reasons.sql',
+  // 075 adds session_plan_slot_planned_count, which the store writes when a swap
+  // after logged sets overwrites planned_sets, and empties on reset and discard.
+  '075_session_plan_slot_planned_count.sql', '077_multisport_and_flexibility.sql'];
 
 
 const db = new DatabaseSync(':memory:');
@@ -879,6 +882,10 @@ a('reset explicitly clears the autopilot attribution side-car',
 // 074 (issue #220): the newer session-feel reasons are cleared with the answers.
 a('reset explicitly clears session_feel and its 074 side-car session_feel_extra_reason',
   ['session_feel', 'session_feel_extra_reason'].every((table) => resetTables.includes(table)));
+// 075 (issue #144): the planned count kept beside a swapped slot is cleared with the slots.
+a('reset explicitly clears session_plan_slot_planned_count before session_plan_slot',
+  resetTables.includes('session_plan_slot_planned_count')
+    && resetTables.indexOf('session_plan_slot_planned_count') < resetTables.indexOf('session_plan_slot'));
 a('reset explicitly clears frozen legacy-role snapshots before their planned slots',
   resetTables.includes('planned_slot_legacy_role_allowance')
     && resetTables.indexOf('planned_slot_legacy_role_allowance') < resetTables.indexOf('planned_slot'));
@@ -1205,7 +1212,9 @@ if (resetTables.length >= 15) {
     '028_capability_graph.sql', '029_routine_history_analytics.sql',
     '030_readiness_import_integration.sql', '031_planned_session_method.sql',
     '032_capability_content.sql', '033_goal_program.sql', '034_autopilot_attribution.sql',
-    '035_profile_load_preference.sql'
+    '035_profile_load_preference.sql',
+    // The post-session summary SELECT joins the 073 replacement and the 075 planned count (issue #144).
+    '073_session_slot_replaced_by.sql', '075_session_plan_slot_planned_count.sql'
   ];
 
   // 1. Schema shape test: applying 022 on a fresh DB produces the correct set_target schema.
