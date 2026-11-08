@@ -19,6 +19,7 @@ import React, { useRef, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import type { TriageOutcome } from '../state/useStore';
 import { theme } from '../theme/theme';
+import { IS_BETA_BUILD } from '../config/features';
 import { Chip, PrimaryButton, SecondaryButton } from './ui';
 import KeyboardAwareScrollView from './KeyboardAwareScrollView';
 
@@ -101,7 +102,9 @@ export function SubjectiveReportPanel({
           <Text style={styles.eyebrow}>COACH</Text>
           <Text style={styles.cardTitle}>Readiness is needed first</Text>
           <Text style={styles.bodyText}>
-            Sync telemetry or load the demo athlete before asking Coach to adjust today's plan.
+            {IS_BETA_BUILD
+              ? "Sync telemetry before asking Coach to adjust today's plan."
+              : "Sync telemetry or load the demo athlete before asking Coach to adjust today's plan."}
           </Text>
         </View>
         <SecondaryButton label="Back" onPress={onClose} accessibilityLabel="Back to the summary" testID="completion-report-close" />

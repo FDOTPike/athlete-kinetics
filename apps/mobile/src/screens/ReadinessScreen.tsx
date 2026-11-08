@@ -9,6 +9,7 @@ import React, { useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { StateVectorRow } from '@ak/inference';
 import { useStore } from '../state/useStore';
+import { IS_BETA_BUILD } from '../config/features';
 import { deriveTodayState } from '../state/todayState';
 import TrainingSupportNotice from '../components/TrainingSupportNotice';
 import { theme } from '../theme/theme';
@@ -248,48 +249,54 @@ function AvailableReadinessScreen({
           <Text style={styles.body}>
             Log a session and sync any available telemetry to build today's recommendation.
           </Text>
-          <PrimaryButton
-            label="Load demo athlete"
-            onPress={attemptDemoLoad}
-            accessibilityLabel="Load the 180 day demo athlete"
-          />
-          {demoBlocked && (
-            <Text style={styles.caption} accessibilityLiveRegion="polite">
-              Demo not loaded because training history already exists. Use “Reset and load demo” if you want to replace it.
-            </Text>
+          {!IS_BETA_BUILD && (
+            <>
+              <PrimaryButton
+                label="Load demo athlete"
+                onPress={attemptDemoLoad}
+                accessibilityLabel="Load the 180 day demo athlete"
+              />
+              {demoBlocked && (
+                <Text style={styles.caption} accessibilityLiveRegion="polite">
+                  Demo not loaded because training history already exists. Use “Reset and load demo” if you want to replace it.
+                </Text>
+              )}
+            </>
           )}
           <SecondaryButton label="Refresh" onPress={refreshVector} />
-          <View style={{ marginTop: theme.space[3] }}>
-            <Disclosure label="Reset and load demo">
-              {!confirmReset ? (
-                <View style={{ gap: theme.space[3] }}>
-                  <Text style={styles.caption}>
-                    This removes training history, telemetry, blocks, and today's reports. Your
-                    profile and saved profile slots remain.
-                  </Text>
-                  <SecondaryButton
-                    label="Continue to reset"
-                    onPress={() => setConfirmReset(true)}
-                    accessibilityLabel="Continue to reset training data and load demo"
-                  />
-                </View>
-              ) : (
-                <View style={{ gap: theme.space[3] }}>
-                  <Text style={styles.body}>This cannot be undone. Reset the training data and load the demo athlete?</Text>
-                  <PrimaryButton
-                    label="Reset training data and load demo"
-                    onPress={() => {
-                      resetTrainingData();
-                      attemptDemoLoad();
-                      setConfirmReset(false);
-                    }}
-                    accessibilityLabel="Confirm reset training data and load demo athlete"
-                  />
-                  <SecondaryButton label="Keep my data" onPress={() => setConfirmReset(false)} />
-                </View>
-              )}
-            </Disclosure>
-          </View>
+          {!IS_BETA_BUILD && (
+            <View style={{ marginTop: theme.space[3] }}>
+              <Disclosure label="Reset and load demo">
+                {!confirmReset ? (
+                  <View style={{ gap: theme.space[3] }}>
+                    <Text style={styles.caption}>
+                      This removes training history, telemetry, blocks, and today's reports. Your
+                      profile and saved profile slots remain.
+                    </Text>
+                    <SecondaryButton
+                      label="Continue to reset"
+                      onPress={() => setConfirmReset(true)}
+                      accessibilityLabel="Continue to reset training data and load demo"
+                    />
+                  </View>
+                ) : (
+                  <View style={{ gap: theme.space[3] }}>
+                    <Text style={styles.body}>This cannot be undone. Reset the training data and load the demo athlete?</Text>
+                    <PrimaryButton
+                      label="Reset training data and load demo"
+                      onPress={() => {
+                        resetTrainingData();
+                        attemptDemoLoad();
+                        setConfirmReset(false);
+                      }}
+                      accessibilityLabel="Confirm reset training data and load demo athlete"
+                    />
+                    <SecondaryButton label="Keep my data" onPress={() => setConfirmReset(false)} />
+                  </View>
+                )}
+              </Disclosure>
+            </View>
+          )}
         </View>
       </ScrollView>
     );

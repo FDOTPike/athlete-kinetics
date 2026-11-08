@@ -36,6 +36,7 @@ import { REPORT_NOT_SENT_TEXT } from '../components/SubjectiveReportPanel';
 import { EmphasisReportCard } from '../components/EmphasisReportCard';
 import { deriveTodayState } from '../state/todayState';
 import { theme } from '../theme/theme';
+import { IS_BETA_BUILD } from '../config/features';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { appliedAdjustmentLines, autopilotReasonCopy } from '../state/autopilotCopy';
 import { EMPTY_ACTIVITY_LEDGER } from '../state/activityStore';
@@ -804,7 +805,9 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           <Text style={styles.eyebrow}>COACH</Text>
           <Text style={styles.cardTitle}>Readiness is needed first</Text>
           <Text style={styles.bodyText}>
-            Sync telemetry or load the demo athlete before asking Coach to adjust today's plan.
+            {IS_BETA_BUILD
+              ? "Sync telemetry before asking Coach to adjust today's plan."
+              : "Sync telemetry or load the demo athlete before asking Coach to adjust today's plan."}
           </Text>
           {profile.training_age === 'beginner' ? (
             <Text style={styles.captionText}>Standalone routines unlock after the Beginner stage. Generated training remains available.</Text>

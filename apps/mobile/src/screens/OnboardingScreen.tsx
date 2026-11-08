@@ -78,6 +78,7 @@ import {
   sportFieldsSummary,
   type SportFieldsState,
 } from '../components/SportFields';
+import { IS_BETA_BUILD } from '../config/features';
 
 // ---------------------------------------------------------------------------
 // Copy: plain-language labels + one-liners for every enum the wizard shows.
@@ -452,16 +453,20 @@ export default function OnboardingScreen(): React.JSX.Element {
               maxLength={24}
               accessibilityLabel="Your name"
             />
-            <QuietAction
-              label="Just exploring? Load the demo athlete →"
-              onPress={finishWithDemo}
-              accessibilityLabel="Skip the questionnaire and load the demo athlete"
-              style={styles.demoLink}
-            />
-            {demoNotice !== null && (
-              <Text style={styles.p} accessibilityLiveRegion="polite">
-                {demoNotice}
-              </Text>
+            {!IS_BETA_BUILD && (
+              <>
+                <QuietAction
+                  label="Just exploring? Load the demo athlete →"
+                  onPress={finishWithDemo}
+                  accessibilityLabel="Skip the questionnaire and load the demo athlete"
+                  style={styles.demoLink}
+                />
+                {demoNotice !== null && (
+                  <Text style={styles.p} accessibilityLiveRegion="polite">
+                    {demoNotice}
+                  </Text>
+                )}
+              </>
             )}
           </View>
         )}
