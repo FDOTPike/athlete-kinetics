@@ -69,7 +69,19 @@ const SCHEMA_LABEL: Record<SchemaType, string> = {
   LINEAR: 'Linear', WAVE: 'Undulating', STEP: 'Step loading', APRE: 'Autoregulated',
 };
 
-const DAY_NAME = ['Today', 'Tomorrow', 'Day 3', 'Day 4', 'Day 5', 'Day 6', 'Day 7'];
+const WEEKDAY_NAME = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+/**
+ * #228: a training day as the athlete reads it. Day 1 is the day the program
+ * starts, so with a known start date each day carries its weekday
+ * ("Day 1, Saturday"); without one it is "Day 1".
+ */
+export const programDayLabel = (dayIndex: number, dayOneIso: string | null): string => {
+  const dayOneMs = dayOneIso === null ? Number.NaN : Date.parse(`${dayOneIso}T00:00:00Z`);
+  if (!Number.isFinite(dayOneMs)) return `Day ${dayIndex}`;
+  const weekday = new Date(dayOneMs + (dayIndex - 1) * 86_400_000).getUTCDay();
+  return `Day ${dayIndex}, ${WEEKDAY_NAME[weekday]}`;
+};
 
 interface ProgramSetupScreenProps {
   editing?: boolean;
@@ -250,6 +262,10 @@ export default function ProgramSetupScreen({
   // beside the raw persisted objective so the label can never silently
   // misrepresent the split actually scheduled.
   const styleLabel = objectiveStyleLabel(profile.objective);
+  // #228: weekday names where Day 1 is known (a new program starts today). A
+  // saved program's next block starts the day it is made, so in editing the
+  // days stay numbered.
+  const dayLabel = (dayIndex: number): string => programDayLabel(dayIndex, editing ? null : today);
   // R1 (Round 2, ledger 0060): the POWER explanation. Athletic power is
   // explosive-force work — the coach plans fast, speed-purpose rungs of the
   // big lifts (the curated 'speed' rows) and keeps every gate intact. The
@@ -293,7 +309,6 @@ export default function ProgramSetupScreen({
       focus: (dayFocuses[dayIndex] ?? 'full') as BlockFocus,
     }));
     const fixes: string[] = [];
-    const DAY_NAME_FIX = ['Today', 'Tomorrow', 'Day 3', 'Day 4', 'Day 5', 'Day 6', 'Day 7'];
     for (const day of draft) {
       for (const candidate of BLOCK_FOCUS_LIST) {
         if (candidate === day.focus) continue;
@@ -302,12 +317,12 @@ export default function ProgramSetupScreen({
           draft.map((d) => (d.dayIndex === day.dayIndex ? { ...d, focus: candidate } : d)),
         );
         if (simulated === 3) {
-          fixes.push(`set ${DAY_NAME_FIX[day.dayIndex - 1]}'s focus to ${candidate}`);
+          fixes.push(`set ${dayLabel(day.dayIndex)}'s focus to ${candidate}`);
         }
       }
     }
     return fixes;
-  }, [missingAnchorRoles, dayIndices, dayFocuses, planningProfile]);
+  }, [missingAnchorRoles, dayIndices, dayFocuses, planningProfile, today, editing]);
   const durationConstrained = useMemo(() => {
     // Duration is the constraint when a longer session would let a drafted
     // day's menu reach a role the budget currently trims away.
@@ -393,7 +408,8 @@ export default function ProgramSetupScreen({
       ? `Use ${alternative.capMin}-minute sessions`
       : `Train ${alternative.weeklyFrequency} day${alternative.weeklyFrequency === 1 ? '' : 's'} a week at ${alternative.capMin} minutes`;
   const rankingNotes = previewResult.preview?.plan?.warnings?.filter((w) =>
-    w.includes('unavailable for') || w.includes('no loaded')) ?? [];
+    w.includes('unavailable for') || w.includes('no loaded')
+    || w.includes('the main lift the day before or after')) ?? [];
 
   // R3 (Round 2, ledger 0060): the weekly progression summary rendered in the
   // ACTUAL preview. The pure classifier explains the week-1 -> 2 and
@@ -473,7 +489,7 @@ export default function ProgramSetupScreen({
           {weekOne.map((session) => (
             <View key={session.day_index} style={styles.session}>
               <Text style={styles.sessionTitle}>
-                {DAY_NAME[session.day_index - 1] ?? `Day ${session.day_index}`} · {session.focus}
+                {dayLabel(session.day_index)} · {session.focus}
               </Text>
               {session.slots.map((slot) => {
                 const movement = movements.find((item) => item.movement_id === slot.movement_id);
@@ -635,10 +651,14 @@ export default function ProgramSetupScreen({
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>3. Training days</Text>
-        <Text style={styles.caption}>Day 1 is today. These days repeat every week.</Text>
+        <Text style={styles.caption} testID="program-days-caption">
+          {editing
+            ? 'Day 1 is the day your next block starts. These days repeat every week.'
+            : `Day 1 is today, ${programDayLabel(1, today).replace('Day 1, ', '')}. These days repeat every week.`}
+        </Text>
         <View style={styles.wrap}>
           {[1, 2, 3, 4, 5, 6, 7].map((day) => (
-            <Chip key={day} label={DAY_NAME[day - 1]} selected={dayIndices.includes(day)} onPress={() => toggleDay(day)} />
+            <Chip key={day} label={dayLabel(day)} selected={dayIndices.includes(day)} onPress={() => toggleDay(day)} />
           ))}
         </View>
 
@@ -660,7 +680,7 @@ export default function ProgramSetupScreen({
             const currentFocus = dayFocuses[dayIndex] ?? programFocuses(profile.objective, dayIndices.length)[dayIndices.indexOf(dayIndex)] ?? 'full';
             return (
               <View key={dayIndex} style={styles.dayRow}>
-                <Text style={styles.dayRowTitle}>{DAY_NAME[dayIndex - 1]}</Text>
+                <Text style={styles.dayRowTitle}>{dayLabel(dayIndex)}</Text>
                 <View style={styles.focusChipRow}>
                   {BLOCK_FOCUS_LIST.map((focus) => (
                     <Chip

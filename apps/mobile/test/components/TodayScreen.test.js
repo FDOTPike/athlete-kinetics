@@ -706,8 +706,10 @@ describe('an extra session asks first', () => {
 describe('session-5: empty unplanned starts show the plan-first card instead of starting', () => {
   test.each([
     ['unscheduled', { todayPlan: null, block: null, blockSessions: [] }, 'today-adhoc-session'],
-    ['scheduled_rest', { todayPlan: null, blockSessions: [blockSession({ sessionDate: '2026-07-17' })] }, 'today-adhoc-session'],
-    ['overdue', { todayPlan: null, blockSessions: [blockSession({ sessionDate: '2026-07-14', completionStatus: null })] }, 'today-adhoc-session'],
+    // #228: a rest day or an overdue day with a planned session to take
+    // forward starts that session instead (see the #228 block below); with
+    // every session finished the free-form path, and this card, remain.
+    ['scheduled_rest', { todayPlan: null, blockSessions: [blockSession({ sessionDate: '2026-07-17', completionStatus: 'complete' }), blockSession({ plannedSessionId: 2, sessionDate: '2026-07-14', completionStatus: 'complete' })] }, 'today-adhoc-session'],
     ['completed_today', { blockSessions: [blockSession({ sessionDate: TODAY, completionStatus: 'complete' })] }, 'today-extra-session'],
     ['stopped_today', { blockSessions: [blockSession({ sessionDate: TODAY, completionStatus: 'halted' })] }, 'today-stopped-extra'],
   ])('on %s when freeFormStartIsEmpty() is true, pressing start shows the inline card, Go to Plan navigates, Cancel closes, and startSession is not called', (_label, overrides, controlTestId) => {
@@ -795,5 +797,78 @@ describe('#177: Today names the active athlete only in Coach mode', () => {
     render(<TodayScreen />);
     expect(screen.getByTestId('training-support-notice')).toBeOnTheScreen();
     expect(screen.queryByTestId('today-active-athlete')).toBeNull();
+  });
+});
+
+// #228: "Start a session anyway / now" takes the plan forward: the earliest
+// unfinished session first, else the next planned one, and it says which.
+describe('#228 the off-plan start opens a planned session and says which', () => {
+  test('on a rest day it starts the next planned session', () => {
+    mockState = baseState({
+      todayPlan: null,
+      blockSessions: [
+        blockSession({ plannedSessionId: 1, sessionDate: '2026-07-14', completionStatus: 'complete' }),
+        blockSession({ plannedSessionId: 2, sessionDate: '2026-07-17', focus: 'upper' }),
+        blockSession({ plannedSessionId: 3, sessionDate: '2026-07-18', focus: 'full' }),
+      ],
+      freeFormStartIsEmpty: () => true,
+    });
+    render(<TodayScreen />);
+    expect(screen.getByTestId('today-adhoc-session-caption'))
+      .toHaveTextContent("This starts Friday's upper-body session (2026-07-17), your next planned session.");
+    fireEvent.press(screen.getByTestId('today-adhoc-session'));
+    expect(mockState.startSession).toHaveBeenCalledWith(false, 2);
+    expect(screen.queryByText('Nothing to start yet')).toBeNull();
+  });
+
+  test('with a missed session it starts the earliest unfinished one', () => {
+    mockState = baseState({
+      todayPlan: null,
+      blockSessions: [
+        blockSession({ plannedSessionId: 1, sessionDate: '2026-07-13', completionStatus: 'complete' }),
+        blockSession({ plannedSessionId: 2, sessionDate: '2026-07-14', focus: 'lower' }),
+        blockSession({ plannedSessionId: 3, sessionDate: '2026-07-17', focus: 'upper' }),
+      ],
+    });
+    render(<TodayScreen />);
+    expect(screen.getByTestId('today-adhoc-session-caption'))
+      .toHaveTextContent("This starts Tuesday's lower-body session (2026-07-14), the earliest one you have not finished.");
+    fireEvent.press(screen.getByTestId('today-adhoc-session'));
+    expect(mockState.startSession).toHaveBeenCalledWith(false, 2);
+  });
+
+  // The ruling covers "Start a session anyway / now" only. After today's
+  // session is stopped or done, the extra session stays the free-form,
+  // unplanned start its label names, even with planned sessions ahead.
+  test.each([
+    ['stopped_today', 'halted', 'today-stopped-extra'],
+    ['completed_today', 'complete', 'today-extra-session'],
+  ])('on %s the extra session stays unplanned and does not take a planned session', (_label, status, controlTestId) => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    mockState = baseState({
+      blockSessions: [
+        blockSession({ plannedSessionId: 1, sessionDate: TODAY, completionStatus: status }),
+        blockSession({ plannedSessionId: 2, sessionDate: '2026-07-17', focus: 'upper' }),
+      ],
+    });
+    render(<TodayScreen />);
+    expect(screen.queryByTestId(`${controlTestId}-caption`)).toBeNull();
+    fireEvent.press(screen.getByTestId(controlTestId));
+    expect(alert).toHaveBeenCalledWith(
+      'Start an extra session?',
+      'It is unplanned. It is saved as its own session once you log a set.',
+      expect.any(Array),
+    );
+    act(() => { alert.mock.calls[0][2].find((b) => b.text === 'Start').onPress(); });
+    alert.mockRestore();
+    expect(mockState.startSession).toHaveBeenCalledWith();
+  });
+
+  test('with nothing left in the plan it keeps the free-form start and says nothing extra', () => {
+    mockState = baseState({ todayPlan: null, block: null, blockSessions: [] });
+    render(<TodayScreen />);
+    expect(screen.queryByTestId('today-adhoc-session-caption')).toBeNull();
+    fireEvent.press(screen.getByTestId('today-adhoc-session'));
+    expect(mockState.startSession).toHaveBeenCalledWith();
   });
 });

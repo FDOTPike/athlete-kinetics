@@ -57,6 +57,7 @@ import { autopilotReasonCopy } from '../state/autopilotCopy';
 import { coachModeAthleteName } from '../state/coachModeAthlete';
 import { PrimaryButton, QuietAction, Disclosure, ListRow } from '../components/ui';
 import { sessionFocusName } from '../state/sessionSummary';
+import { offPlanStartCaption, offPlanStartTarget } from '../state/offPlanStart';
 import { isSessionReportStop, SESSION_REPORT_STOP_SENTENCE } from '../state/sessionReportStop';
 
 export interface TodayScreenProps {
@@ -202,13 +203,25 @@ function AvailableTodayScreen({
     setAwaitingStart(true);
     startSession();
   }, [startSession]);
-  const startUnplannedAndOpen = React.useCallback(() => {
+  // #228: an off-plan start takes the plan forward (the earliest unfinished
+  // session, else the next planned one) and says which; with nothing left in
+  // the plan it stays a free-form start.
+  const offPlanTarget = useMemo(
+    () => offPlanStartTarget(blockSessions ?? [], today),
+    [blockSessions, today],
+  );
+  const startUnplannedAndOpen = React.useCallback((target: typeof offPlanTarget) => {
+    if (target !== null) {
+      setAwaitingStart(true);
+      startSession(false, target.session.plannedSessionId);
+      return;
+    }
     if (checkFreeFormStartIsEmpty()) {
       setEmptyStartPromptOpen(true);
       return;
     }
     startAndOpen();
-  }, [checkFreeFormStartIsEmpty, startAndOpen]);
+  }, [checkFreeFormStartIsEmpty, startAndOpen, startSession]);
   // #165 (walk I-15): an extra session after today's is one tap on a text
   // link, so it asks first. An empty start still shows the plan-first card
   // instead, without asking: nothing would start.
@@ -226,9 +239,13 @@ function AvailableTodayScreen({
     label: string;
     accessibilityLabel: string;
     testID: string;
+    /** #228: only "Start a session anyway / now" takes the plan forward. The
+     *  extra session after today's stopped or finished one stays unplanned. */
+    takesPlanForward?: boolean;
     /** An extra session after today's asks first (#165). */
     confirmExtra?: boolean;
   }): React.JSX.Element => {
+    const target = control.takesPlanForward === true ? offPlanTarget : null;
     if (emptyStartPromptOpen) {
       return (
         <View style={styles.card} testID="empty-free-form-start-card">
@@ -254,12 +271,17 @@ function AvailableTodayScreen({
       );
     }
     return (
-      <QuietAction
-        label={control.label}
-        onPress={control.confirmExtra === true ? confirmExtraSessionAndOpen : startUnplannedAndOpen}
-        accessibilityLabel={control.accessibilityLabel}
-        testID={control.testID}
-      />
+      <>
+        <QuietAction
+          label={control.label}
+          onPress={control.confirmExtra === true ? confirmExtraSessionAndOpen : () => startUnplannedAndOpen(target)}
+          accessibilityLabel={target === null ? control.accessibilityLabel : offPlanStartCaption(target)}
+          testID={control.testID}
+        />
+        {target !== null && (
+          <Text style={styles.caption} testID={`${control.testID}-caption`}>{offPlanStartCaption(target)}</Text>
+        )}
+      </>
     );
   };
   React.useEffect(() => {
@@ -524,6 +546,7 @@ function AvailableTodayScreen({
               label: 'Start a session now',
               accessibilityLabel: 'Start an unplanned session now',
               testID: 'today-adhoc-session',
+              takesPlanForward: true,
             })}
           </View>
         );
@@ -540,6 +563,7 @@ function AvailableTodayScreen({
               label: 'Start a session anyway',
               accessibilityLabel: 'Start an unplanned session on a scheduled rest day',
               testID: 'today-adhoc-session',
+              takesPlanForward: true,
             })}
           </View>
         );
@@ -579,6 +603,7 @@ function AvailableTodayScreen({
               label: 'Start a session now',
               accessibilityLabel: 'Start an unplanned session now',
               testID: 'today-adhoc-session',
+              takesPlanForward: true,
             })}
           </View>
         );
