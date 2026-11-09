@@ -88,8 +88,8 @@ test('applying a day-swap option on Set 3 of 3 when the pulled-forward slot has 
 
   render(<SessionScreen />);
 
-  // Open substitution via "Doesn't feel right" and tap the Layer-2 Day-Swap option.
-  fireEvent.press(screen.getByLabelText('Avoid Push-up and find a substitution'));
+  // Open substitution via "Swap or avoid this" and tap the Layer-2 Day-Swap option.
+  fireEvent.press(screen.getByLabelText('Swap or avoid this: Push-up'));
   expect(screen.getByText('Your completed sets stay recorded. The replacement carries the remaining work.')).toBeOnTheScreen();
 
   const daySwapButton = screen.getByLabelText('Move Incline Push-Up forward into this session');

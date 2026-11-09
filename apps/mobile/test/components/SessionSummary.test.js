@@ -414,6 +414,21 @@ describe('screen laws: D5, D6, D8, D9', () => {
     expect(inScrollFlow(screen.getByLabelText('Back to Today'))).toBe(true);
   });
 
+  // Android walk 2026-11-03 (ux-8): a skipped exercise stays in the record.
+  test('the completion summary lists each skipped exercise', () => {
+    mockState = baseState({
+      loadSessionSummaryFacts: () => ({
+        durationMin: 20,
+        exercises: [exercise({ movementId: 1, movementName: 'Goblet Squat' })],
+        previousSets: [],
+        skippedExercises: [{ name: 'Push-up', plannedSets: 2, loggedSets: 0, loggedAs: [] }],
+      }),
+    });
+    render(<SessionScreen />);
+    expect(screen.getAllByTestId('session-summary-skipped').map((node) => node.props.children))
+      .toEqual(['Skipped: Push-up · no sets logged']);
+  });
+
   test('render performs no endSession / plan / progression / log call (D8 guard)', () => {
     mockState = baseState();
     render(<SessionScreen />);
@@ -664,5 +679,34 @@ describe('matchPreviousFacts skips prior sessions that mix implement classes', (
     ]);
     expect(facts.sourceSessionId).toBe(4);
     expect(facts.mostRepsInOneSet).toBe(11);
+  });
+});
+
+describe('issue 144: a swap after logged sets keeps the planned count and names the chain', () => {
+  const row = (movementId, movementName, sessionPlanSlotId, plannedSets, extra = {}) => ({
+    movementId, movementName, reps: 5, loadKg: 20, timeS: null, sessionPlanSlotId, plannedSets, ...extra,
+  });
+  const lines = (exercises) => buildSessionSummary({
+    exercises, previousSets: [], durationMin: null, blockSessions: [], today: '2026-09-11',
+  }).exerciseLines.map((l) => l.text);
+
+  test('the swapped-from line reads "1 of 2 sets, then swapped to" with the replacement named', () => {
+    const exercises = groupSummaryExercises([
+      row(1, 'Floor Back Extension', 50, 2, { swappedToMovementName: 'Glute Bridge' }),
+      row(2, 'Glute Bridge', 51, 1),
+    ]);
+    expect(lines(exercises)).toEqual([
+      'Floor Back Extension — 1 of 2 sets, then swapped to Glute Bridge · most reps in one set 5 · heaviest load used 20 kg',
+      'Glute Bridge — 1 of 1 sets · most reps in one set 5 · heaviest load used 20 kg',
+    ]);
+  });
+
+  test('without a recorded original (older records) the line keeps today\'s wording', () => {
+    const exercises = groupSummaryExercises([
+      row(1, 'Floor Back Extension', 50, 1),
+      row(2, 'Glute Bridge', 51, 1),
+    ]);
+    expect(lines(exercises)[0]).toMatch(/^Floor Back Extension — 1 of 1 sets /);
+    expect(lines(exercises)[0]).not.toMatch(/swapped/);
   });
 });

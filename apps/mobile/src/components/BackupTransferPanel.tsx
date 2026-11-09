@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { AccessibilityInfo, ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
 import { theme } from '../theme/theme';
 import { useBackupStore } from '../state/backupStore';
 import { QuietAction } from './ui';
@@ -7,6 +7,12 @@ import { QuietAction } from './ui';
 const dateLabel = (value: string | null): string => value === null
   ? 'No confirmed backup saved yet.'
   : `Last confirmed save: ${new Date(value).toLocaleString()}`;
+
+/** m:ss for a run that can take minutes on a slow phone (#135). */
+const elapsedLabel = (ms: number): string => {
+  const seconds = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+};
 
 export default function BackupTransferPanel(): React.JSX.Element {
   const status = useBackupStore((state) => state.status);
@@ -22,8 +28,29 @@ export default function BackupTransferPanel(): React.JSX.Element {
   const cancelRestore = useBackupStore((state) => state.cancelRestore);
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
+  // #135: while a run is working, the athlete sees that it is still going and
+  // how long it has taken. Key derivation can take minutes on a slow phone.
+  const [runStart, setRunStart] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
 
   const working = status === 'working';
+
+  useEffect(() => {
+    if (!working) {
+      setRunStart(null);
+      return undefined;
+    }
+    const started = Date.now();
+    setRunStart(started);
+    setNow(started);
+    const tick = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(tick);
+  }, [working]);
+
+  // Announced once when the run starts; the ticking time is not announced.
+  useEffect(() => {
+    if (working) AccessibilityInfo.announceForAccessibility(message ?? 'Working.');
+  }, [working]);
   const recoveryBlocked = startupSafe !== true;
   const strongEnough = password.length >= 12;
   const confirmed = strongEnough && password === confirmation;
@@ -99,7 +126,15 @@ export default function BackupTransferPanel(): React.JSX.Element {
           />
         </>
       )}
-      {message !== null && (
+      {working && (
+        <View style={styles.progress} testID="backup-working-indicator">
+          <ActivityIndicator color={theme.color.textMid} />
+          <Text style={styles.body} testID="backup-working-elapsed">
+            {`${message ?? 'Working…'} ${elapsedLabel(now - (runStart ?? now))}`}
+          </Text>
+        </View>
+      )}
+      {!working && message !== null && (
         <Text accessibilityLiveRegion="polite" style={styles.body} testID="backup-status-message">{message}</Text>
       )}
       {preview !== null && (
@@ -148,6 +183,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.control,
     paddingHorizontal: theme.space[4],
   },
+  progress: { flexDirection: 'row', alignItems: 'center', gap: theme.space[3] },
   preview: { borderWidth: 1, borderColor: theme.color.line, padding: theme.space[4], gap: theme.space[3] },
   warning: { ...theme.font.body, color: theme.color.textHi },
 });
