@@ -2862,8 +2862,6 @@ describe('session-2: honest discomfort wording per tier and after-save outcomes'
   });
 });
 
-<<<<<<< HEAD
-
 // Android walk 2026-11-03 (W2-13): a load typed but not logged was lost when
 // the athlete left the workout and came back.
 test('an unlogged load survives leaving the workout and coming back', () => {
@@ -2903,7 +2901,8 @@ test('without an edit, coming back shows the seeded load', () => {
   first.unmount();
   render(<SessionScreen />);
   expect(screen.getByTestId('session-load-input').props.value).toBe(seeded);
-=======
+});
+
 describe('large text at font scale 2.0 (issue 158)', () => {
   afterEach(() => {
     mockFontScale = undefined;
