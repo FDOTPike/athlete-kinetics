@@ -146,3 +146,49 @@ test('an in-flight backup or restore keeps every action disabled', () => {
     expect(screen.getByTestId(id).props.accessibilityState.disabled).toBe(true);
   }
 });
+
+describe('#135 a working backup or restore shows an indicator with elapsed time', () => {
+  const { act } = require('@testing-library/react-native');
+  const { AccessibilityInfo } = require('react-native');
+  beforeEach(() => { jest.useFakeTimers(); });
+  afterEach(() => { jest.useRealTimers(); jest.restoreAllMocks(); });
+
+  test('shows an indicator with elapsed time that advances each second, and clears when the run ends', () => {
+    mockState.status = 'working';
+    mockState.message = 'Creating an encrypted snapshot…';
+    const { rerender } = render(<BackupTransferPanel />);
+    expect(screen.getByTestId('backup-working-indicator')).toBeOnTheScreen();
+    expect(screen.getByTestId('backup-working-elapsed').props.children).toBe('Creating an encrypted snapshot… 0:00');
+    act(() => { jest.advanceTimersByTime(65_000); });
+    expect(screen.getByTestId('backup-working-elapsed').props.children).toBe('Creating an encrypted snapshot… 1:05');
+
+    mockState.status = 'success';
+    mockState.message = 'Encrypted backup saved to the location you chose. Keep a copy off this phone.';
+    rerender(<BackupTransferPanel />);
+    expect(screen.queryByTestId('backup-working-indicator')).toBeNull();
+    expect(screen.getByTestId('backup-status-message').props.children).toBe(mockState.message);
+  });
+
+  test('a failed run clears the indicator too', () => {
+    mockState.status = 'working';
+    mockState.message = 'Opening encrypted backup…';
+    const { rerender } = render(<BackupTransferPanel />);
+    expect(screen.getByTestId('backup-working-indicator')).toBeOnTheScreen();
+    mockState.status = 'error';
+    mockState.message = 'The backup could not be opened.';
+    rerender(<BackupTransferPanel />);
+    expect(screen.queryByTestId('backup-working-indicator')).toBeNull();
+  });
+
+  test('the start is announced once, not on every elapsed-time tick, and the start buttons stay disabled', () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => {});
+    mockState.status = 'working';
+    mockState.message = 'Opening encrypted backup…';
+    render(<BackupTransferPanel />);
+    act(() => { jest.advanceTimersByTime(5_000); });
+    expect(announce).toHaveBeenCalledTimes(1);
+    expect(announce).toHaveBeenCalledWith('Opening encrypted backup…');
+    expect(screen.getByTestId('create-backup-button').props.accessibilityState.disabled).toBe(true);
+    expect(screen.getByTestId('choose-restore-button').props.accessibilityState.disabled).toBe(true);
+  });
+});

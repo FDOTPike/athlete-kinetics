@@ -22,7 +22,7 @@ import { Chip, Disclosure, PrimaryButton, SecondaryButton } from '../components/
 import { theme } from '../theme/theme';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { EmphasisReportCard } from '../components/EmphasisReportCard';
-import { recommendedProgramDefaults } from '../state/programDefaults';
+import { programChoiceDisclosure, recommendedProgramDefaults } from '../state/programDefaults';
 import {
   useStore,
   type TrainingProgramDay,
@@ -48,6 +48,7 @@ export default function ProgramSetupScreen({
   const profile = useStore((s) => s.profile);
   const today = useStore((s) => s.today);
   const program = useStore((s) => s.program);
+  const block = useStore((s) => s.block);
   const movements = useStore((s) => s.movements);
   const niggles = useStore((s) => s.niggles);
   const previewTrainingProgram = useStore((s) => s.previewTrainingProgram);
@@ -369,7 +370,9 @@ export default function ProgramSetupScreen({
       {!editing && (
         <View style={styles.card} testID="program-recommendation-card">
           <Text style={styles.sectionTitle}>What the coach has picked for you</Text>
-          <Text style={styles.notice}>{recommended.disclosure}</Text>
+          <Text style={styles.notice} testID="program-choice-disclosure">
+            {programChoiceDisclosure({ buildMode, schemaType, horizonKind, blockCount, reviewDate })}
+          </Text>
           <Text style={styles.caption}>
             Your {dayIndices.length}-day week comes from the training days you already gave during
             setup. Nothing here is permanent — you can change all of it later in Athlete / Profile.
@@ -669,7 +672,13 @@ export default function ProgramSetupScreen({
           ))}
         </View>
       )}
-      <Text style={styles.caption}>Program starts {today}. Future blocks require confirmation.</Text>
+      <Text style={styles.caption}>
+        {editing
+          ? (block != null
+            ? 'Your current block stays as it is. These choices apply to future blocks, except a change of training days also updates the weekly-day limit used for current targets.'
+            : 'These choices apply to future blocks.')
+          : `Program starts ${today}. Future blocks require confirmation.`}
+      </Text>
     </KeyboardAwareScrollView>
     {/* The actions stay on screen below the plan: reaching them never takes
         scrolling past the whole generated week (issue #38). The blocking
