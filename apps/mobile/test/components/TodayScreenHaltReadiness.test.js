@@ -157,6 +157,27 @@ beforeEach(() => {
   mockState = baseState();
 });
 
+// #187: after the athlete's own Stop report, Today says so.
+test('TodayScreen names a day closed by an in-session Stop report', () => {
+  const { SESSION_REPORT_STOP_ENTRY } = jest.requireActual('../../src/state/sessionReportStop');
+  mockState = baseState({
+    lastTriage: {
+      kind: 'matched',
+      directive: {
+        similarity: 1,
+        matchedCue: SESSION_REPORT_STOP_ENTRY.text,
+        halt: true,
+        followUp: null,
+        vector: { load_modifier: 0, set_modifier: -3, rpe_cap: 0, coaching_cue: SESSION_REPORT_STOP_ENTRY.cue },
+      },
+    },
+  });
+  render(<TodayScreen />);
+  expect(screen.getByTestId('today-card-halted')).toBeOnTheScreen();
+  expect(screen.getByText('Training is stopped for today')).toBeOnTheScreen();
+  expect(screen.getByText("You stopped today's session after a report.")).toBeOnTheScreen();
+});
+
 test('TodayScreen does not display "Ready to train" under READINESS while a safety halt is active', () => {
   mockState = baseState({
     lastTriage: {

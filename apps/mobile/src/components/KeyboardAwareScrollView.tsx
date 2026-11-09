@@ -110,8 +110,14 @@ const KeyboardAwareScrollView = forwardRef<ScrollView, KeyboardAwareScrollViewPr
           scheduleFocusedScroll(lastFocusedTarget.current);
         }
       });
+      const hideSubscription = Keyboard.addListener('keyboardDidHide', () => {
+        if (lastFocusedTarget.current !== null) {
+          scheduleFocusedScroll(lastFocusedTarget.current);
+        }
+      });
       return () => {
         showSubscription.remove();
+        hideSubscription.remove();
       };
     }, [scheduleFocusedScroll]);
 

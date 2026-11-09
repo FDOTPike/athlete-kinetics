@@ -52,6 +52,7 @@ import {
 // additive side-car. It is consulted only AFTER every gate and every explicit
 // athlete choice, and only among movements that already passed them.
 import {
+  type EmphasisOrigin,
   PROGRAM_EMPHASIS_VERSION,
   describeCompetitionLifts,
   describeEmphasisGap,
@@ -1318,7 +1319,7 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
         return null;
       };
       const slotReason = (need: { muscle: MuscleGroupId | null; goalLabel: string | null }):
-        { muscle: MuscleGroupId; origin: 'focus' | 'sport' } | { goalLabel: string } =>
+        { muscle: MuscleGroupId; origin: EmphasisOrigin } | { goalLabel: string } =>
         need.muscle !== null
           ? { muscle: need.muscle, origin: emphasisIndex?.originOf(need.muscle) ?? 'focus' }
           : { goalLabel: need.goalLabel ?? '' };
