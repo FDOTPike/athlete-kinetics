@@ -207,11 +207,21 @@ export const aboveCeilingNote = (
   return `That was above ${which} of ${ceiling.toFixed(1)}. Next set, stop with ${repsLeft} ${repsLeft === 1 ? 'rep' : 'reps'} left.`;
 };
 
-// Local rest when no runner owns the timer: the runner's RPE bands. Training
-// tier does not change rest (2026-09-15 tier-neutral rest ruling).
-const restSecondsFor = (rpe: number): number => {
-  const base = rpe >= 9 ? 240 : rpe >= 8 ? 180 : rpe >= 7 ? 120 : 90;
+// Local rest when no runner owns the timer: the runner's rule. Training tier
+// does not change rest (2026-09-15 tier-neutral rest ruling); a bodyweight set
+// (0 kg on a bodyweight movement) rests 60 s below RPE 8 and 90 s at 8 or
+// above (issue #209, by load, never by tier).
+const restSecondsFor = (rpe: number, bodyweightSet = false): number => {
+  const base = bodyweightSet
+    ? (rpe >= 8 ? 90 : 60)
+    : rpe >= 9 ? 240 : rpe >= 8 ? 180 : rpe >= 7 ? 120 : 90;
   return clamp(Math.round(base / 15) * 15, 45, 300);
+};
+
+/** Rest as the athlete reads it: minutes and seconds ("3:00", "0:45"). */
+const minutesSeconds = (totalSeconds: number): string => {
+  const value = Math.max(0, Math.round(totalSeconds));
+  return `${Math.floor(value / 60)}:${String(value % 60).padStart(2, '0')}`;
 };
 
 const targetFor = (slot: PlanSlot): SlotTarget => {
@@ -1231,7 +1241,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
     if (runner === null) {
       if (uiPreferences.restTimerEnabled) setLocalRest({
         startedAtMs: Date.now(),
-        seconds: restSecondsFor(safeRpe ?? currentSlot.targetRpe ?? 8),
+        seconds: restSecondsFor(safeRpe ?? currentSlot.targetRpe ?? 8, bodyweightMode && safeLoad === 0),
         slotId: currentSlot.sessionPlanSlotId,
       });
       else moveLegacyForward();
@@ -1713,12 +1723,15 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                           onComplete={completeRest}
                           style={{ alignSelf: 'stretch' }}
                         />
+                        <Text style={styles.nextUp} testID="session-rest-between">
+                          {`Rest between sets: ${minutesSeconds(rest.seconds)}`}
+                        </Text>
                         {runnerResting && (
                           <>
                             <Stepper
                               testID="session-rest-stepper"
-                              label="Session rest seconds"
-                              value={String(rest.seconds)}
+                              label="Change rest (min:sec)"
+                              value={minutesSeconds(rest.seconds)}
                               onDecrement={() => setRunnerRestOverride(clamp(rest.seconds - 15, 45, 300))}
                               onIncrement={() => setRunnerRestOverride(clamp(rest.seconds + 15, 45, 300))}
                               repeatOnHold={true}
@@ -1728,7 +1741,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                                 say so, or the number reads as a setting that changed by
                                 itself (Android walk 2026-11-03, ux-8). */}
                             <Text style={styles.nextUp}>
-                              Rest uses your effort rating, or the planned effort if you leave it blank. Harder sets get longer rests. Your changes apply for this session.
+                              Rest uses your effort rating, or the planned effort if you leave it blank. Harder sets get longer rests; a bodyweight set gets 60 to 90 seconds. Your changes apply for this session.
                             </Text>
                           </>
                         )}

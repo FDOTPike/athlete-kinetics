@@ -360,6 +360,9 @@ export default function ProgramSetupScreen({
       capMin: budget.capMin,
       preparationMin: Math.min(...budget.sessions.map((session) => session.preparationMin)),
       longestMin: Math.max(...budget.sessions.map((session) => session.estimatedMin)),
+      // Issue #209: the lifting part of the longest session (sets, rest and
+      // changeovers, without preparation).
+      liftingMin: Math.max(...budget.sessions.map((session) => session.estimatedMin - session.preparationMin)),
       trimmed: budget.sessions.some((session) => session.trimmedSlotIndexes.length > 0),
       conflicts: budget.conflicts,
       alternatives: budget.alternatives ?? [],
@@ -717,6 +720,11 @@ export default function ProgramSetupScreen({
           <Text style={styles.caption} testID="session-time-summary">
             {`Each session counts preparation (${sessionTime.preparationMin} min), your sets, rest and changeovers inside your ${sessionTime.capMin}-minute limit. The longest session is about ${Math.ceil(sessionTime.longestMin)} minutes.`}
           </Text>
+          {profile.training_age === 'beginner' && (
+            <Text style={styles.caption} testID="session-time-beginner">
+              {`Beginner sessions are kept short on purpose: about ${Math.max(1, Math.ceil(sessionTime.liftingMin))} minutes of lifting, plus ${sessionTime.preparationMin} minutes of preparation.`}
+            </Text>
+          )}
           {sessionTime.trimmed && (
             <Text style={styles.caption} testID="session-time-trimmed">
               Some sets were reduced so sessions fit your limit. Preparation was not shortened below its minimum.
