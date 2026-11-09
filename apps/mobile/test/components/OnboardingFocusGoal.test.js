@@ -1,5 +1,5 @@
-/**
- * OnboardingFocusGoal.test.js — the focus and target questions an athlete
+﻿/**
+ * OnboardingFocusGoal.test.js â€” the focus and target questions an athlete
  * actually sees, with the REAL store behind the screen (production boot path
  * and migration chain; node:sqlite stands in for the op-sqlite handle only).
  *
@@ -114,7 +114,7 @@ describe('the focus slide', () => {
     }
     // Nothing is assumed about the athlete: no bundle is pre-selected for them.
     expect(selected('focus-bundle-balanced')).toBe(true);
-    expect(screen.getByTestId('focus-summary').props.children).toBe('Selected — Balanced whole body');
+    expect(screen.getByTestId('focus-summary').props.children).toBe('Selected â€” Balanced whole body');
     expect(screen.getByLabelText('Posture. Upper back, core and controlled movement.')).toBeTruthy();
     expect(screen.getByLabelText('Beach muscles. Arms and upper chest.')).toBeTruthy();
     // The athlete is told what a focus does and does not do.
@@ -124,7 +124,7 @@ describe('the focus slide', () => {
   test('a bundle can be edited: areas are added and removed, and the summary says so', () => {
     openFocusSlide();
     press('focus-bundle-lower_body');
-    expect(screen.getByTestId('focus-summary').props.children).toBe('Selected — Lower body: glutes, quads, hamstrings, calves');
+    expect(screen.getByTestId('focus-summary').props.children).toBe('Selected â€” Lower body: glutes, quads, hamstrings, calves');
     expect(screen.queryByTestId('focus-muscle-groups')).toBeNull();
     pressLabel('Choose individual muscle groups');
     expect(selected('focus-muscle-glutes')).toBe(true);
@@ -132,7 +132,7 @@ describe('the focus slide', () => {
     press('focus-muscle-calves');
     press('focus-muscle-core');
     expect(screen.getByTestId('focus-summary').props.children)
-      .toBe('Selected — Lower body (edited): core and abs, glutes, quads, hamstrings');
+      .toBe('Selected â€” Lower body (edited): core and abs, glutes, quads, hamstrings');
     expect(selected('focus-bundle-lower_body')).toBe(true);
   });
 
@@ -144,7 +144,7 @@ describe('the focus slide', () => {
     }
     press('focus-muscle-biceps');
     expect(selected('focus-bundle-balanced')).toBe(false);
-    expect(screen.getByTestId('focus-summary').props.children).toBe('Selected — Your own selection: biceps');
+    expect(screen.getByTestId('focus-summary').props.children).toBe('Selected â€” Your own selection: biceps');
     for (const muscle of ['triceps', 'chest', 'shoulders', 'lats', 'core']) press(`focus-muscle-${muscle}`);
     expect(screen.getByText(/That is 6 areas, the most that still counts as an emphasis/)).toBeTruthy();
     expect(screen.getByTestId('focus-muscle-glutes').props.accessibilityState.disabled).toBe(true);
@@ -168,7 +168,7 @@ describe('the detailed target is optional', () => {
     expect(stepLabel()).toBe('Step 8 of 8');
     expect(screen.getByText('Posture: rear shoulders, upper back, core and abs')).toBeTruthy();
     expect(screen.getByTestId('onboarding-summary-target-row').props.children)
-      .toBe('No specific target — training with the focus only.');
+      .toBe('No specific target â€” training with the focus only.');
     await startTraining();
     expect(state().error).toBeNull();
     expect(state().onboarded).toBe(true);
@@ -214,7 +214,7 @@ describe('the detailed target is optional', () => {
     walkToReview();
     expect(stepLabel()).toBe('Step 9 of 9');
     expect(screen.getByTestId('onboarding-summary-target-row').props.children)
-      .toBe('TARGET — Squat 100 kg for 5 reps: from 80 kg to 100 kg by 2099-01-08');
+      .toBe('TARGET â€” Squat 100 kg for 5 reps: from 80 kg to 100 kg by 2099-01-08');
     await startTraining();
     expect(state().error).toBeNull();
     expect(state().onboarded).toBe(true);
@@ -255,7 +255,7 @@ describe('the detailed target is optional', () => {
     expect(stepLabel()).toBe('Step 4 of 8');
     walkToReview();
     expect(screen.getByTestId('onboarding-summary-target-row').props.children)
-      .toBe('No specific target — training with the focus only.');
+      .toBe('No specific target â€” training with the focus only.');
     await startTraining();
     expect(state().onboarded).toBe(true);
     expect(state().focus).toMatchObject({ bundleId: 'beach_muscles' });
@@ -278,7 +278,7 @@ describe('the detailed target is optional', () => {
     expect(screen.getByLabelText('START TRAINING')).toBeTruthy();
     expect(screen.queryByText('HOW LONG HAVE YOU BEEN TRAINING?')).toBeNull();
     // Nine screens include the target; skipping it leaves eight, and the
-    // review must be step 8 of 8 — never an out-of-range index.
+    // review must be step 8 of 8 â€” never an out-of-range index.
     expect(stepLabel()).toBe('Step 8 of 8');
   });
 
@@ -345,7 +345,7 @@ describe('the detailed target is optional', () => {
     press('onboarding-wants-sport');
     press('onboarding-wants-target');
     next();
-    press('sport-family-powerlifting');
+    press('sport-family-strength');
     press('sport-outcome-bigger_competition_lifts');
     press('sport-experience-new');
     press('sport-practice-unsure');
@@ -467,7 +467,7 @@ describe('the profile panel', () => {
     pressLabel('Retire the goal Squat 100 kg for 5 reps. It is kept, not deleted.');
     expect(state().goals[0].status).toBe('retired');
     expect(count('athlete_goal')).toBe(1);
-    expect(screen.getByText('Target 100 kg, no deadline · retired')).toBeTruthy();
+    expect(screen.getByText('Target 100 kg, no deadline Â· retired')).toBeTruthy();
     expect(screen.getByLabelText('Make the goal Squat 100 kg for 5 reps active again')).toBeTruthy();
   });
 });
