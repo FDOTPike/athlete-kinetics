@@ -283,8 +283,8 @@ const beach = plan(profile(), { focus: fg.focusFromBundle('beach_muscles') });
       && beach.emphasis.applied.includes('Incline Dumbbell Press is planned instead of Dumbbell Bench Press: it trains upper chest directly (your focus).')
       && beach.emphasis.applied.includes('Barbell Curl takes the place of Overhead Press on one upper day a week, for biceps (your focus). Overhead Press is still trained on another day.'));
   check('and what could not be done, with a way to change it',
-    beach.emphasis.omitted.length === 1 && /^No room for extra triceps work in your 60-minute sessions/.test(beach.emphasis.omitted[0])
-      && /Longer sessions or one more training day would make room/.test(beach.emphasis.omitted[0]));
+    beach.emphasis.omitted.length === 1 && /^No room for extra triceps work in this plan: what is already planned is a main lift/.test(beach.emphasis.omitted[0])
+      && !/minute/.test(beach.emphasis.omitted[0]));
 
   const long = plan(profile({ session_duration_cap_min: 90 }), { focus: fg.focusFromBundle('beach_muscles') });
   check('with longer sessions all three areas get direct work and nothing is omitted',
@@ -292,7 +292,7 @@ const beach = plan(profile(), { focus: fg.focusFromBundle('beach_muscles') });
   const short = plan(profile({ session_duration_cap_min: 45 }), { focus: fg.focusFromBundle('beach_muscles') });
   check('45-minute sessions hold only main lifts: the press still changes, nothing is displaced, the gap is stated',
     week(short).every((s) => s.slots.length === 2) && names(day(short, 2))[0] === 'Incline Dumbbell Press'
-      && short.emphasis.omitted.length === 2 && short.emphasis.omitted.every((line) => /45-minute sessions/.test(line)));
+      && short.emphasis.omitted.length === 2 && short.emphasis.omitted.every((line) => /in this plan: what is already planned/.test(line) && !/minute/.test(line)));
 
   const lower = plan(profile(), { focus: fg.focusFromBundle('lower_body') });
   check('lower body: one lower day gives its last slot to glutes; squat and hinge stay; upper days untouched',
@@ -652,9 +652,23 @@ console.log('[10] time, determinism and honesty');
 {
   const atSeven = pe.describeEmphasisGap('upper_chest', 'no_room', 15, 7);
   const atThree = pe.describeEmphasisGap('upper_chest', 'no_room', 15, 3);
-  check('the no-room line offers one more training day only below seven days',
-    !atSeven.includes('one more training day') && atSeven.includes('Longer sessions would make room')
-      && atThree.includes('one more training day'), atSeven);
+  // Issue #154: the line names the slot rule, so no session length or extra
+  // training day is offered, at any weekly frequency.
+  check('the no-room line offers no extra training day and no session length (issue #154)',
+    !atSeven.includes('one more training day') && !atThree.includes('one more training day')
+      && !/minute|Longer sessions/.test(atThree) && /in this plan: what is already planned/.test(atSeven), atSeven);
+}
+
+// --- [11] the no-room gap copy names the rule, not the session length (issue #154) -----------------
+console.log('[11] gap copy');
+{
+  const noRoom = pe.describeEmphasisGap('triceps', 'no_room', 75);
+  check('no_room copy does not blame the session length', !/minute|75/.test(noRoom), noRoom);
+  check('no_room copy names the slot rule that applied',
+    noRoom.includes('a main lift, already serves your emphasis, or is the only time that movement is trained in the week'));
+  check('the no-exercise and no-day copy are unchanged',
+    pe.describeEmphasisGap('triceps', 'no_exercise', 75).startsWith('No extra triceps work: no exercise')
+      && pe.describeEmphasisGap('triceps', 'no_day', 75).startsWith('No extra triceps work: this plan has no strength day'));
 }
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);

@@ -321,7 +321,7 @@ export const describeEmphasisSlot = (input: {
 export type EmphasisGap = 'no_exercise' | 'no_room' | 'no_day';
 
 export const describeEmphasisGap = (
-  muscle: MuscleGroupId, gap: EmphasisGap, capMin: number, weeklyFrequency = 1,
+  muscle: MuscleGroupId, gap: EmphasisGap, _capMin: number, _weeklyFrequency = 1,
 ): string => {
   const name = muscleName(muscle);
   switch (gap) {
@@ -331,7 +331,9 @@ export const describeEmphasisGap = (
       return `No extra ${name} work: this plan has no strength day that trains that part of the body.`;
     case 'no_room':
     default:
-      return `No room for extra ${name} work in your ${capMin}-minute sessions: what is already planned is a main lift, already serves your emphasis, or is the only time that movement is trained in the week. ${weeklyFrequency >= 7 ? 'Longer sessions would make room.' : 'Longer sessions or one more training day would make room.'}`;
+      // Names the slot rule, not the session length: the generator does not
+      // record whether time was the limit (issue #154).
+      return `No room for extra ${name} work in this plan: what is already planned is a main lift, already serves your emphasis, or is the only time that movement is trained in the week.`;
   }
 };
 

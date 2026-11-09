@@ -4,6 +4,23 @@ import NewBlockChooserScreen from '../../src/screens/NewBlockChooserScreen';
 import { splitExplainer, SPLIT_EXPLAINER_FOOTER } from '@ak/inference';
 
 describe('NewBlockChooserScreen', () => {
+  test('issue #154: a beginner sees Custom with the reason, and it does not open the builder', () => {
+    const onSelectCustom = jest.fn();
+    render(
+      <NewBlockChooserScreen onSelectAuto={jest.fn()} onSelectCustom={onSelectCustom} customLocked />,
+    );
+
+    expect(screen.getByText('Not available yet. Standalone routines unlock after the Beginner stage.')).toBeOnTheScreen();
+    const customCard = screen.getAllByRole('button').find((button) => /^Custom: /.test(button.props.accessibilityLabel ?? ''));
+    expect(customCard.props.accessibilityLabel).toBe('Custom: not available yet. Standalone routines unlock after the Beginner stage.');
+    expect(customCard.props.accessibilityState.disabled).toBe(true);
+    fireEvent.press(screen.getByText('Custom'));
+    expect(onSelectCustom).not.toHaveBeenCalled();
+    // Auto stays open to a beginner.
+    expect(screen.getAllByRole('button').find((button) => /^Auto: /.test(button.props.accessibilityLabel ?? ''))
+      .props.accessibilityState?.disabled ?? false).toBe(false);
+  });
+
   test('renders two mode options, Auto then Custom, with exact approved copy and no Guided card', () => {
     const onSelectAuto = jest.fn();
     const onSelectCustom = jest.fn();

@@ -250,7 +250,7 @@ describe('a new block is planned with the focus, goal, sport and workload', () =
     expect(report.applied).toContain(`${press} is planned instead of ${control.find((entry) => entry.day === 2 && entry.slot === 1).name}: it trains upper chest directly (your focus).`);
     expect(report.applied.some((line) => line.startsWith(`${armWork} takes the place of ${standardLast} on one upper day a week, for `)
       && line.endsWith(`(your focus). ${standardLast} is still trained on another day.`))).toBe(true);
-    expect(report.omitted.join(' ')).toMatch(/No room for extra (biceps|triceps) work in your 60-minute sessions/);
+    expect(report.omitted.join(' ')).toMatch(/No room for extra (biceps|triceps) work in this plan: what is already planned is a main lift/);
     expect(state().blockEmphasis).toMatchObject({ blockId, report });
     // The frozen inputs describe the emphasis; the 794-row library mapping is not copied into every block.
     const inputs = JSON.parse(row[0].inputs_json);
