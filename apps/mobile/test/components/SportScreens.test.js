@@ -385,6 +385,10 @@ describe('the profile sport panel', () => {
     render(<SportPanel />);
     expect(screen.getByTestId('profile-sport-summary').props.children).toBe('No sport set. The plan is general gym training.');
     expect(screen.getByTestId('profile-sport-workload').props.children).toMatch(/^Sport workload: no sport sessions recorded\./);
+    // #146: with no sessions yet, the copy must not promise that Activities
+    // change the next block; one weekly session does not change the gym plan.
+    expect(screen.getByTestId('profile-sport-workload').props.children).not.toMatch(/will take them into account/);
+    expect(screen.getByTestId('profile-sport-workload').props.children).toMatch(/A light week does not change the gym plan\./);
     press('profile-sport-edit');
     expect(screen.getByText('Do you play or compete in a sport?')).toBeTruthy();
     // Saving an unfinished answer explains what is missing instead of saving.
