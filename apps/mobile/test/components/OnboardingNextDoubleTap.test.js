@@ -60,7 +60,7 @@ afterEach(async () => {
 test('two NEXT presses sent together advance one step, not two', () => {
   render(<OnboardingScreen />);
   pressLabel('Next'); // welcome -> goal
-  expect(stepLabel()).toBe('Step 2 of 8');
+  expect(stepLabel()).toBe('Step 2 of 9');
   pressLabel('GET STRONGER. Lift heavier on the big lifts');
 
   // Both presses arrive before the screen re-renders: one act, two presses.
@@ -69,7 +69,7 @@ test('two NEXT presses sent together advance one step, not two', () => {
     fireEvent.press(screen.getByLabelText('Next'));
   });
 
-  // The focus step (Step 3 of 8) is shown; the experience step is not skipped to.
-  expect(stepLabel()).toBe('Step 3 of 8');
+  // The focus step (Step 3 of 9) is shown; the experience step is not skipped to.
+  expect(stepLabel()).toBe('Step 3 of 9');
   expect(screen.queryByText('HOW LONG HAVE YOU BEEN TRAINING?')).toBeNull();
 });

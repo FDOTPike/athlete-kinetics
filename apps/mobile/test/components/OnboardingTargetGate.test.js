@@ -103,7 +103,8 @@ test('the summary shows the starting value and the target, and says what comes n
   fillAllButReason();
   type('goal-reason', 'To be stronger for football');
   next(); // target -> experience
-  next(); // experience -> logistics
+  next(); // experience -> maxes
+  next(); // maxes -> logistics
   next(); // logistics -> equipment
   next(); // equipment -> limits
   pressLabel('No, nothing to note');

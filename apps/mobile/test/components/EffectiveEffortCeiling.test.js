@@ -127,7 +127,8 @@ describe('#129 Effective effort ceiling across Onboarding review and Profile', (
     next();
     next();
     pressLabel(/^SOME MILEAGE\./);
-    // experience -> logistics -> equipment -> limits -> review
+    // experience -> maxes -> logistics -> equipment -> limits -> review
+    next();
     next();
     next();
     next();

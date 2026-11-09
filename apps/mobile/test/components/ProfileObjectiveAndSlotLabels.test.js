@@ -114,6 +114,7 @@ describe('ProfileScreen objective chip labels and saved profile slot labels (#15
 
     const gppChip = screen.getByRole('button', { name: '1 · OBJECTIVE: ALL-ROUND FITNESS' });
     fireEvent.press(gppChip);
+    fireEvent.press(screen.getByTestId('profile-objective-confirm'));
     expect(mockState.saveProfile).toHaveBeenCalledWith({ objective: 'gpp' });
   });
 

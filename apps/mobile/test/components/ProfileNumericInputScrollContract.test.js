@@ -116,6 +116,7 @@ describe('ProfileScreen single-line numeric inputs allow parent ScrollView drag 
         <ProfileScreen />
       </NavigationProvider>,
     );
+    fireEvent.press(screen.getByLabelText('One-rep maxes (optional)'));
 
     const squatInput = screen.getByLabelText('SQUAT one rep max in kilograms, type to set');
     const benchInput = screen.getByLabelText('BENCH one rep max in kilograms, type to set');

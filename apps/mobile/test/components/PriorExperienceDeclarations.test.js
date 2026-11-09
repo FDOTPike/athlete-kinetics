@@ -80,7 +80,7 @@ const availableIds = () => sorted(state().getMovementAvailabilityVerdicts('weigh
   .filter((v) => v.state === 'available').map((v) => v.movementId));
 const verdictOf = (id) => state().getMovementAvailabilityVerdicts('weight_room').find((v) => v.movementId === id);
 
-/** welcome -> goal (chosen) -> focus -> experience (chosen) -> logistics -> equipment (chosen). */
+/** welcome -> goal (chosen) -> focus -> experience (chosen) -> (optional maxes) -> logistics -> equipment (chosen). */
 const walkToEquipment = (goalLabel, ageLabel, presetLabel) => {
   render(<OnboardingScreen />);
   next();
@@ -89,6 +89,7 @@ const walkToEquipment = (goalLabel, ageLabel, presetLabel) => {
   next();
   pressLabel(ageLabel);
   next();
+  if (screen.queryByTestId('onboarding-maxes-step') !== null) next();
   next();
   pressLabel(presetLabel);
 };
