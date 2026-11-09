@@ -77,9 +77,16 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   // reads back for it and empties on reset. It depends only on 001.
   '070_session_feel.sql',
   // 071 adds session_skipped_slot and set_load_shown, which the store writes
-  // (at finalization and with each logged set) and empties on reset. It depends
+  // (at finalization and with each logged set) and empties on reset; the
+  // completion summary reads the skipped slots (owner ruling 2026-11-03). It depends
   // on 001 and 022.
-  '071_beta_recording.sql', '072_question_log.sql', '073_session_slot_replaced_by.sql'];
+  '071_beta_recording.sql', '072_question_log.sql', '073_session_slot_replaced_by.sql',
+  // 074 rebuilds session_feel and adds session_feel_extra_reason, which the
+  // store writes and reads with the answer and empties on reset.
+  '074_session_feel_reasons.sql',
+  // 075 adds session_plan_slot_planned_count, which the store writes when a swap
+  // after logged sets overwrites planned_sets, and empties on reset and discard.
+  '075_session_plan_slot_planned_count.sql', '077_multisport_and_flexibility.sql'];
 
 
 const db = new DatabaseSync(':memory:');
@@ -387,7 +394,9 @@ const blockSrc = readFileSync(join(ROOT, 'apps', 'mobile', 'src', 'screens', 'Bl
 const manageGateAt = blockSrc.indexOf('{program == null && (');
 const gateCloseAt = blockSrc.indexOf('\n        )}\n', manageGateAt);
 const unplannedAt = blockSrc.indexOf('<Disclosure label="Start without a planned session">');
-const feelsOffAt = blockSrc.indexOf('label="Something feels off"');
+// Anchor on the disclosure element itself: the injury pause card has a button
+// with the same label that opens it (#188), and that button sits higher up.
+const feelsOffAt = blockSrc.search(/<Disclosure\s+label="Something feels off"/);
 check(
   'the ad-hoc session path is never gated behind an active program',
   manageGateAt >= 0
@@ -704,7 +713,16 @@ if (slotHydrationSql && attributionInsertSql) {
 console.log('[autopilot wiring invariants]');
 const stripComments = (s) => s.replace(/\/\/[^\n]*/g, '');
 // Anchor on the IMPLEMENTATION (it has a default param) — not the interface decl.
-const gnbRaw = (() => { const i = src.indexOf('generateNewBlock: (schemaType ='); const j = src.indexOf('refreshBlock:', i); return i >= 0 && j > i ? src.slice(i, j) : ''; })();
+// Issue 149 moved the generator-input block out of generateNewBlock into
+// generateBlockFromStoredState (shared with the single-day rebuild). The same
+// invariants apply to that code, so its text is appended to the body under test.
+const gnbRaw = (() => {
+  const i = src.indexOf('generateNewBlock: (schemaType ='); const j = src.indexOf('refreshBlock:', i);
+  const own = i >= 0 && j > i ? src.slice(i, j) : '';
+  const h0 = src.indexOf('const generateBlockFromStoredState = (args: {');
+  const h1 = src.indexOf('const plannedSessionStarted = (', h0);
+  return own + (h0 >= 0 && h1 > h0 ? src.slice(h0, h1) : '');
+})();
 const gnb = stripComments(gnbRaw);
 a('generateNewBlock body located', gnb.length > 0);
 a('IMMUTABILITY: generateNewBlock writes NO past/raw table (session/set_record/set_prefix/mech_daily/niggle/state_vector)',
@@ -872,6 +890,13 @@ a('reset explicitly clears both immutable Phase 18 side-cars',
   ['set_dose_target', 'session_outcome'].every((table) => resetTables.includes(table)));
 a('reset explicitly clears the autopilot attribution side-car',
   resetTables.includes('planned_slot_autopilot'));
+// 074 (issue #220): the newer session-feel reasons are cleared with the answers.
+a('reset explicitly clears session_feel and its 074 side-car session_feel_extra_reason',
+  ['session_feel', 'session_feel_extra_reason'].every((table) => resetTables.includes(table)));
+// 075 (issue #144): the planned count kept beside a swapped slot is cleared with the slots.
+a('reset explicitly clears session_plan_slot_planned_count before session_plan_slot',
+  resetTables.includes('session_plan_slot_planned_count')
+    && resetTables.indexOf('session_plan_slot_planned_count') < resetTables.indexOf('session_plan_slot'));
 a('reset explicitly clears frozen legacy-role snapshots before their planned slots',
   resetTables.includes('planned_slot_legacy_role_allowance')
     && resetTables.indexOf('planned_slot_legacy_role_allowance') < resetTables.indexOf('planned_slot'));
@@ -1058,11 +1083,34 @@ if (resetTables.length >= 15) {
       'insert into Probe_Table (a) values (?)',
       'SELECT a FROM Probe_table WHERE b = ${}',
     ]), quotedNaming);
-  a('071: the store names session_skipped_slot in one INSERT and one DELETE only',
+  // Owner ruling (ledger Entry 0300; the original 2026-11-03 Entry 0286 is
+  // unrecovered, issue #297): the completion summary may
+  // read session_skipped_slot to list the skipped exercises. That display read
+  // is the one reader; no engine, readiness or progression code reads it.
+  // Walk 2 (W2-1): the read names the PLANNED movement of a swapped slot.
+  const SKIPPED_SUMMARY_READ = 'SELECT k.session_plan_slot_id, COALESCE(sps.original_movement_id, sps.movement_id) AS movement_id, '
+    + 'sps.movement_id AS current_movement_id, m.name AS movement_name, sps.planned_sets '
+    + 'FROM session_skipped_slot k JOIN session_plan_slot sps ON sps.session_plan_slot_id = k.session_plan_slot_id '
+    + 'JOIN movement m ON m.movement_id = COALESCE(sps.original_movement_id, sps.movement_id) WHERE sps.session_id = ? ORDER BY sps.slot_index';
+  a('071: the store names session_skipped_slot in one INSERT, one DELETE and the summary read only',
     JSON.stringify(sqlNaming('session_skipped_slot').sort()) === JSON.stringify([
       'DELETE FROM session_skipped_slot',
       'INSERT INTO session_skipped_slot (session_plan_slot_id) VALUES (?)',
+      SKIPPED_SUMMARY_READ,
     ]), sqlNaming('session_skipped_slot').join(' | '));
+  {
+    // The implementation, not the interface line of the same text.
+    const start = storeSrc.indexOf('loadSessionSummaryFacts: (sessionId: number) => {\n    const d = getDb();');
+    const end = storeSrc.indexOf('\n  refreshVector:', start);
+    // The slice is one property of the store's object literal; wrapped back in
+    // an object it parses on its own (the SQL check refuses source that does
+    // not parse).
+    const body = start >= 0 && end > start ? `const storeSlice = {\n${storeSrc.slice(start, end)}\n};` : '';
+    a('071: the session_skipped_slot read sits inside loadSessionSummaryFacts',
+      sqlNamingIn(body, 'session_skipped_slot').length === 1
+        && sqlNamingIn(body, 'session_skipped_slot')[0] === SKIPPED_SUMMARY_READ,
+      start < 0 ? 'loadSessionSummaryFacts not found' : String(sqlNamingIn(body, 'session_skipped_slot').length) + ' reads in the loader');
+  }
   a('071: the store names set_load_shown in one INSERT and one DELETE only',
     JSON.stringify(sqlNaming('set_load_shown').sort()) === JSON.stringify([
       'DELETE FROM set_load_shown',
@@ -1082,7 +1130,8 @@ if (resetTables.length >= 15) {
   const endBody = storeSrc.slice(endStart, endEnd);
   a('071: skipped slots are written with the outcome, before the checkpoint is deleted and before COMMIT',
     endStart >= 0 && endEnd > endStart
-      && order(endBody, 'persistSessionOutcome(', 'INSERT INTO session_skipped_slot', "'DELETE FROM session_runner_checkpoint WHERE session_id = ?'", "d.executeSync('COMMIT')"));
+      && order(storeSrc.slice(storeSrc.indexOf('const finaliseOpenSessionRows ='), storeSrc.indexOf('const persistSessionOutcome =')), 'persistSessionOutcome(', 'INSERT INTO session_skipped_slot', "'DELETE FROM session_runner_checkpoint WHERE session_id = ?'")
+      && order(endBody, 'finaliseOpenSessionRows(', "d.executeSync('COMMIT')"));
   a('071: reset empties each table before its parent',
     order(resetBody, "'DELETE FROM session_skipped_slot'", "'DELETE FROM session_plan_slot'")
       && order(resetBody, "'DELETE FROM set_load_shown'", "'DELETE FROM set_record'"));
@@ -1176,7 +1225,9 @@ if (resetTables.length >= 15) {
     '028_capability_graph.sql', '029_routine_history_analytics.sql',
     '030_readiness_import_integration.sql', '031_planned_session_method.sql',
     '032_capability_content.sql', '033_goal_program.sql', '034_autopilot_attribution.sql',
-    '035_profile_load_preference.sql'
+    '035_profile_load_preference.sql',
+    // The post-session summary SELECT joins the 073 replacement and the 075 planned count (issue #144).
+    '073_session_slot_replaced_by.sql', '075_session_plan_slot_planned_count.sql'
   ];
 
   // 1. Schema shape test: applying 022 on a fresh DB produces the correct set_target schema.
@@ -1326,9 +1377,9 @@ if (resetTables.length >= 15) {
   // groupSummaryExercises to attribute planned_sets per SLOT.
   {
     const sqlStart = src.indexOf('`SELECT sr.movement_id, m.name AS movement_name, sr.reps, sr.load_kg,');
-    const sqlEnd = src.indexOf('ORDER BY sr.movement_id, sr.set_index`', sqlStart);
+    const sqlEnd = src.indexOf('ORDER BY sr.set_id`', sqlStart);
     const summarySql = sqlStart >= 0 && sqlEnd > sqlStart
-      ? src.slice(sqlStart + 1, sqlEnd + 'ORDER BY sr.movement_id, sr.set_index'.length)
+      ? src.slice(sqlStart + 1, sqlEnd + 'ORDER BY sr.set_id'.length)
       : '';
     check('F4: summary set SELECT located in useStore.ts', summarySql.length > 0);
     let summaryRows = [];
@@ -1337,6 +1388,9 @@ if (resetTables.length >= 15) {
       && summaryRows.every((r) => 'session_plan_slot_id' in r)
       && summaryRows.some((r) => r.session_plan_slot_id === 1)
       && summaryRows.some((r) => r.session_plan_slot_id === 2);
+    // Issue #230: the top set names the effort logged with it, so the same
+    // read carries each set's own rpe column (a fact, never an estimate).
+    check('#230: summary SELECT returns each set\'s logged rpe', summaryRows.length >= 2 && summaryRows.every((r) => 'rpe' in r));
     check('F4: summary SELECT returns each set\'s session_plan_slot_id (planned slot 1 and substituted slot 2)', slotIdsOk);
 
     // PR #13 review: the lifecycle's two slots both plan 3 sets, so a wrong
@@ -1447,7 +1501,10 @@ if (resetTables.length >= 15) {
   const hydrateBody = sliceBetween('const hydrateSessionFinalization =', 'const persistSessionOutcome =');
   const persistOutcomeBody = sliceBetween('const persistSessionOutcome =', 'const applyApreFinalization =');
   const applyApreBody = sliceBetween('const applyApreFinalization =', 'const runnerSelection =');
-  const endSessionBody = sliceBetween('endSession: () => {', 'computePrescription: (_patterns) => {');
+  const endSessionBody = sliceBetween('endSession: () => {', 'refreshEarlierOpenSessions: () => {');
+  // Issue 191: finalisation lives in one helper shared by endSession and the
+  // earlier-workout finish; the invariants below are checked on it.
+  const finaliseBody = sliceBetween('const finaliseOpenSessionRows =', 'const persistSessionOutcome =');
   const continueProgramBody = sliceBetween('continueTrainingProgram: () => {', 'archiveTrainingProgram: () => {');
 
   // `error` is SHARED store state and BlockScreen settles its continuation
@@ -1509,10 +1566,10 @@ if (resetTables.length >= 15) {
       && applyApreBody.includes('loggedSet.sourcePlannedSlotId === slot.planned_slot_id')
       && applyApreBody.includes('loggedSet.movementId === slot.movement_id'));
   a('finalization classifies exactly once from the hydrated snapshot',
-    (endSessionBody.match(/evaluateSessionOutcome\s*\(/g) ?? []).length === 1
-      && endSessionBody.includes('sets: snapshot.sets')
-      && endSessionBody.includes('persistSessionOutcome(')
-      && endSessionBody.includes('outcomeDecision,'));
+    (finaliseBody.match(/evaluateSessionOutcome\s*\(/g) ?? []).length === 1
+      && finaliseBody.includes('sets: snapshot.sets')
+      && finaliseBody.includes('persistSessionOutcome(')
+      && finaliseBody.includes('outcomeDecision,'));
 
   const evidenceFields = [
     'slotCount', 'plannedSetCount', 'loggedSetCount', 'exactDoseCount',
@@ -1529,16 +1586,17 @@ if (resetTables.length >= 15) {
   const endBegin = endSessionBody.indexOf("d.executeSync('BEGIN')");
   const endCommit = endSessionBody.indexOf("d.executeSync('COMMIT')", endBegin);
   const endTxn = endBegin >= 0 && endCommit > endBegin ? endSessionBody.slice(endBegin, endCommit) : '';
-  const checkpointDelete = endTxn.indexOf('DELETE FROM session_runner_checkpoint');
+  const checkpointDelete = finaliseBody.indexOf('DELETE FROM session_runner_checkpoint');
   const afterCheckpointDelete = checkpointDelete >= 0
-    ? endTxn.slice(checkpointDelete + 'DELETE FROM session_runner_checkpoint'.length)
+    ? finaliseBody.slice(checkpointDelete + 'DELETE FROM session_runner_checkpoint'.length)
     : '';
   const catchReturn = endSessionBody.indexOf('return;', endCommit);
   const successClear = endSessionBody.indexOf('session: null', catchReturn);
   a('outcome, session finalization, and checkpoint delete share one transaction',
     (endSessionBody.match(/d\.executeSync\('BEGIN'\)/g) ?? []).length === 1
       && (endSessionBody.match(/d\.executeSync\('COMMIT'\)/g) ?? []).length === 1
-      && ordered(endTxn, [
+      && ordered(endTxn, ['finaliseOpenSessionRows('])
+      && ordered(finaliseBody, [
         'hydrateSessionFinalization(',
         'evaluateSessionOutcome(',
         'UPDATE session SET session_rpe = ?, duration_min = ?',
@@ -1933,7 +1991,7 @@ if (resetTables.length >= 15) {
         src.indexOf('  // --- Coach Mode (Phase 15)'),
       )
         .includes('refreshVector()'));
-  const startBody = src.slice(src.indexOf('startSession: (repeatPlanned)'), src.indexOf('selectMovement: (movementId)'));
+  const startBody = src.slice(src.indexOf('startSession: (repeatPlanned, plannedSessionId)'), src.indexOf('selectMovement: (movementId)'));
   a('start computes consumePlan before validating only the plan it will consume',
     startBody.indexOf('const consumePlan') >= 0
       && startBody.indexOf('const planToConsume') > startBody.indexOf('const consumePlan')

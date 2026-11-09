@@ -19,9 +19,11 @@
  */
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useStore } from '../state/useStore';
+import { useStore, type RecentSessionOutcome } from '../state/useStore';
 import { theme } from '../theme/theme';
 import { ListRow } from '../components/ui';
+import { measuredDayDetail } from './measuredDayDetail';
+import { buildSessionSummary, sessionFocusName } from '../state/sessionSummary';
 
 const OUTCOME_LABELS: Record<string, string> = {
   followed_plan: 'Plan followed',
@@ -39,12 +41,69 @@ const formatFinalizedDate = (ms: number): string => {
   });
 };
 
+/** Issue #201: "Session recorded" on three rows told nothing apart. The row
+ *  says what the session was (focus or extra), how many exercises and sets. */
+const sessionDescriptor = (row: {
+  focus?: string | null; originKind?: string | null; exerciseCount?: number | null; loggedSetCount?: number | null;
+}): string => {
+  const kind = row.focus ? sessionFocusName(row.focus) : row.originKind === 'free_form' ? 'Extra session' : 'Session';
+  const counts = row.exerciseCount == null || row.loggedSetCount == null
+    ? []
+    : [
+        `${row.exerciseCount} ${row.exerciseCount === 1 ? 'exercise' : 'exercises'}`,
+        `${row.loggedSetCount} ${row.loggedSetCount === 1 ? 'set' : 'sets'}`,
+      ];
+  return [kind, ...counts].join(' · ');
+};
+
+// Two sessions on one day were identical rows; the time tells them apart.
+const formatFinalizedTime = (ms: number): string => (ms <= 0 ? '' : ` · ${new Date(ms).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`);
+
+/** The logged facts of one past session: no plan context, no completion
+ *  actions, only what was recorded. */
+function PastSessionSummary({ sessionId, load }: {
+  sessionId: number;
+  load: (sessionId: number) => ReturnType<ReturnType<typeof useStore.getState>['loadSessionSummaryFacts']>;
+}): React.JSX.Element {
+  let lines: string[] = [];
+  // Review (PR 194): a failed read is not an empty session. Only a summary
+  // that was read and holds nothing says that no sets were logged.
+  let readFailed = false;
+  try {
+    const facts = load(sessionId);
+    const view = buildSessionSummary({
+      exercises: facts.exercises, previousSets: facts.previousSets, durationMin: facts.durationMin,
+      blockSessions: [], today: '', skippedExercises: facts.skippedExercises,
+    });
+    lines = [
+      ...view.exerciseLines.map((line) => line.text),
+      ...view.skippedLines.map((line) => line.text),
+      ...(view.durationLine === null ? [] : [view.durationLine]),
+    ];
+  } catch {
+    lines = [];
+    readFailed = true;
+  }
+  return (
+    <View style={styles.pastSummary} testID={`progress-session-${sessionId}-summary`}>
+      {readFailed
+        ? <Text style={styles.caption}>This session's summary could not be read.</Text>
+        : lines.length === 0
+        ? <Text style={styles.caption}>No sets were logged in this session.</Text>
+        : lines.map((text, index) => <Text key={`${index}-${text}`} style={styles.caption}>{text}</Text>)}
+    </View>
+  );
+}
+
 export default function ProgressScreen(): React.JSX.Element {
   const loadRecentOutcomes = useStore((s) => s.loadRecentOutcomes);
   const loadMeasuredHistory = useStore((s) => s.loadMeasuredHistory);
+  const loadSessionSummaryFacts = useStore((s) => s.loadSessionSummaryFacts);
   const session = useStore((s) => s.session);
 
-  const [recentOutcomes, setRecentOutcomes] = useState<{ outcomeKind: string; finalizedAtMs: number }[]>([]);
+  const [recentOutcomes, setRecentOutcomes] = useState<RecentSessionOutcome[]>([]);
+  // Walk 2 (W2-9): a recent session opens in place to its own summary.
+  const [openSessionId, setOpenSessionId] = useState<number | null>(null);
   const [recentMeasures, setRecentMeasures] = useState<ReturnType<typeof loadMeasuredHistory>>([]);
 
   useEffect(() => {
@@ -67,13 +126,24 @@ export default function ProgressScreen(): React.JSX.Element {
             No finalized session outcomes recorded yet.
           </Text>
         ) : (
-          recentOutcomes.map((row, i) => (
-            <ListRow
-              key={`${row.finalizedAtMs}-${i}`}
-              label={OUTCOME_LABELS[row.outcomeKind] ?? 'Outcome unavailable'}
-              detail={formatFinalizedDate(row.finalizedAtMs)}
-            />
-          ))
+          recentOutcomes.map((row, i) => {
+            const label = OUTCOME_LABELS[row.outcomeKind] ?? 'Outcome unavailable';
+            const when = `${formatFinalizedDate(row.finalizedAtMs)}${formatFinalizedTime(row.finalizedAtMs)}`;
+            const detail = `${sessionDescriptor(row)} · ${when}`;
+            const open = openSessionId === row.sessionId;
+            return (
+              <View key={`${row.sessionId}-${row.finalizedAtMs}-${i}`}>
+                <ListRow
+                  label={label}
+                  detail={detail}
+                  testID={`progress-session-${row.sessionId}`}
+                  accessibilityLabel={`${label}, ${detail}. ${open ? 'Hide' : 'Show'} what was logged.`}
+                  onPress={() => setOpenSessionId(open ? null : row.sessionId)}
+                />
+                {open && <PastSessionSummary sessionId={row.sessionId} load={loadSessionSummaryFacts} />}
+              </View>
+            );
+          })
         )}
       </View>
 
@@ -88,7 +158,7 @@ export default function ProgressScreen(): React.JSX.Element {
             <ListRow
               key={row.date}
               label={row.date}
-              detail={`${Math.round(row.tonnageKg)} kg load · ${row.setCount} sets${row.bodyweightKg === null ? '' : ` · ${row.bodyweightKg.toFixed(1)} kg BW`}${row.restingHr === null ? '' : ` · ${Math.round(row.restingHr)} bpm resting HR`}`}
+              detail={measuredDayDetail(row)}
             />
           ))
         )}
@@ -104,4 +174,5 @@ const styles = StyleSheet.create({
   caption: { ...theme.font.label, color: theme.color.textMid, marginTop: theme.space[1] },
   section: { marginTop: theme.space[5], gap: theme.space[2] },
   sectionTitle: { ...theme.font.eyebrow, color: theme.color.textLow },
+  pastSummary: { paddingLeft: theme.space[4], paddingBottom: theme.space[2], gap: theme.space[1] },
 });

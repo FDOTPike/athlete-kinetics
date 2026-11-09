@@ -657,7 +657,10 @@ describe('a discomfort report that cannot open its transaction', () => {
     expect(saved).toBe(true);
     expect(count('SELECT COUNT(*) AS c FROM niggle')).toBe(1);
     expect(state().niggles).toEqual([{ region: 'knee', severity: 9 }]);
-    expect(state().runner.phase).toBe('halted');
+    // #181: a Stop-level report closes the session, recorded as stopped.
+    expect(state().session).toBeNull();
+    expect(raw().prepare('SELECT outcome_kind FROM session_outcome WHERE session_id = ?').get(sessionId).outcome_kind)
+      .toBe('stopped_safely');
     expect(prepRow(sessionId).status).toBe('stopped');
   });
 

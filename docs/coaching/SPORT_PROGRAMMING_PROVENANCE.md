@@ -37,7 +37,7 @@ Nothing in the app promises fewer injuries or better performance.
 | Keep training and playing | hamstrings | `vanDyk2019` (+ `haroy2019` for football, `tyler2002` for ice hockey) | No adductor-strengthening exercise in the library; the Nordic curl is Advanced-tier and is planned only when the tier allows; no promise. |
 | Lift more in squat, bench, deadlift | the three competition lifts are promoted as main lifts | `ipfRules` | No peak, taper or maximum test is planned. Not forced for a beginner or a return-to-training plan. |
 | Stronger in contact | none | `suchomel2016` (whole-body strength) | No contact drills. |
-| Last the whole game | none | `wilson2012` (the gym plan is kept from crowding the sport) | No conditioning is planned by the app. |
+| Last to the end without fading (was "Last the whole game") | none | `wilson2012` (the gym plan is kept from crowding the sport) | No conditioning is planned by the app. |
 | Stronger in striking and the clinch | none | **none found** | The app says it has no reviewed evidence. High-repetition hip-flexor raises (the "25–50 a side" example) are not added: no reviewed source supports a dose. |
 | General strength for my sport | none | — | — |
 

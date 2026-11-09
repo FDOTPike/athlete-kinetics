@@ -60,6 +60,49 @@ test('shows the frozen protocol: estimate, basis, every item with its dose, and 
   expect(screen.getByText(/6 reps at about 40% of today's working load|5 reps at about 40% of today's working load/)).toBeTruthy();
 });
 
+// Android walk (#213): the app knows today's working load, so the ramp sets
+// say it in kilograms (2.5 kg step), with the percentage as support.
+describe('#213: ramp sets in kilograms when the working load is known', () => {
+  const rampIndexes = (protocol) => protocol.items
+    .map((item, index) => ({ item, index }))
+    .filter(({ item }) => item.stage === 'ramp');
+
+  test('with a working load of 87.5 kg, the 40% and 80% ramp items show 35 kg and 70 kg', () => {
+    const protocol = protocolFor();
+    const ramps = rampIndexes(protocol);
+    expect(ramps.map(({ item }) => item.dose.percentOfWorkingLoad)).toEqual([40, 80]);
+    render(<PreparationPanel preparation={preparationOf(protocol)} {...handlers()}
+      rampWorkingLoad={{ movementId: 7, movementName: 'Back Squat', workingLoadKg: 87.5 }} />);
+    const [low, high] = ramps;
+    const lowCard = within(screen.getByTestId(`preparation-item-${low.index}`));
+    const highCard = within(screen.getByTestId(`preparation-item-${high.index}`));
+    expect(lowCard.getByText('Preparation set: Back Squat, about 35 kg (40%)')).toBeTruthy();
+    expect(highCard.getByText('Preparation set: Back Squat, about 70 kg (80%)')).toBeTruthy();
+    expect(screen.getByTestId(`preparation-item-${low.index}-dose`).props.children).toBe("5 reps at about 35 kg (40% of today's working load)");
+    expect(screen.getByTestId(`preparation-item-${high.index}-dose`).props.children).toBe("5 reps at about 70 kg (80% of today's working load)");
+    expect(screen.queryByText(/Preparation set: Back Squat at about \d+% of today's working load/)).toBeNull();
+  });
+
+  test('with no working load, the ramp items keep the percentage text', () => {
+    const protocol = protocolFor();
+    const ramps = rampIndexes(protocol);
+    render(<PreparationPanel preparation={preparationOf(protocol)} {...handlers()} rampWorkingLoad={null} />);
+    for (const { item, index } of ramps) {
+      expect(within(screen.getByTestId(`preparation-item-${index}`)).getByText(item.title)).toBeTruthy();
+      expect(screen.getByTestId(`preparation-item-${index}-dose`).props.children)
+        .toBe(`5 reps at about ${item.dose.percentOfWorkingLoad}% of today's working load`);
+    }
+    expect(screen.queryByText(/ kg/)).toBeNull();
+  });
+
+  test('a working load for a different movement is not applied to the ramp', () => {
+    const protocol = protocolFor();
+    render(<PreparationPanel preparation={preparationOf(protocol)} {...handlers()}
+      rampWorkingLoad={{ movementId: 9, movementName: 'Romanian Deadlift', workingLoadKg: 87.5 }} />);
+    expect(screen.queryByText(/ kg/)).toBeNull();
+  });
+});
+
 test('before starting, one tap begins preparation and carries the rendered revision', () => {
   const props = show(preparationOf(protocolFor(), { status: 'pending', revision: 1 }));
   expect(screen.getByTestId('preparation-status').props.children).toBe('Not started');
@@ -110,7 +153,7 @@ test('recorded items show what happened, including extra work, and the next item
   preparation.items[2] = { ...preparation.items[2], status: 'withheld', reasonCode: 'restricted_at_execution' };
   show(preparation);
   expect(screen.getByTestId('preparation-item-0-recorded').props.children).toBe('Done as written');
-  expect(screen.getByTestId('preparation-item-1-recorded').props.children).toBe('Changed: 120 seconds — recorded as extra work');
+  expect(screen.getByTestId('preparation-item-1-recorded').props.children).toBe('Changed: 120 seconds each side — recorded as extra work');
   expect(screen.getByTestId('preparation-item-2-recorded').props.children).toBe('Withheld: not available right now');
   expect(screen.queryByTestId('preparation-item-0-done')).toBeNull();
   expect(screen.getByTestId('preparation-item-3-done')).toBeTruthy();
@@ -194,4 +237,24 @@ test('accessibility: every control is labelled, headings are headings, and statu
   expect(screen.getAllByRole('header').length).toBeGreaterThanOrEqual(2);
   expect(screen.getByTestId('preparation-status').props.accessibilityLiveRegion).toBe('polite');
   expect(screen.getByTestId('preparation-panel').props.accessibilityLabel).toBe('Preparation');
+});
+
+// Android walk 2026-11-03 (W2-11): leg swings planned "30 seconds each side"
+// were recorded as "Changed: 20 seconds", with no side.
+test('a change to an each-side item is recorded per side', () => {
+  const protocol = protocolFor();
+  const preparation = preparationOf(protocol);
+  const index = preparation.items.findIndex((entry) => entry.item?.dose?.perSide === true
+    || protocol.items[preparation.items.indexOf(entry)]?.dose?.perSide === true);
+  expect(index).toBeGreaterThanOrEqual(0);
+  preparation.items[index] = { ...preparation.items[index], status: 'modified', performedAmount: 20 };
+  show(preparation);
+  expect(screen.getByTestId(`preparation-item-${index}-recorded`).props.children).toMatch(/^Changed: 20 (seconds|reps) each side$/);
+});
+
+test('the preparation basis gives the time limit once, not as a second duration', () => {
+  const protocol = protocolFor();
+  const lines = protocol.basis.join(' ');
+  expect(lines).not.toMatch(/protocol within \d+ minutes/);
+  expect(lines).toMatch(/protocol, fitted to a \d+-minute limit\./);
 });

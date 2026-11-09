@@ -247,6 +247,38 @@ test('editing opens the controls, because fine-tuning IS the task there', () => 
   expect(screen.queryByTestId('program-recommendation-card')).toBeNull();
 });
 
+describe('the footer says what a save changes (#172)', () => {
+  const activeProgram = {
+    programId: 1, objective: 'strength', startDate: '2026-06-01',
+    horizonKind: 'weeks', requestedReviewDate: null, plannedEndDate: '2026-09-01',
+    plannedBlockCount: 2, startingMacroBlockIndex: 1, schemaType: 'LINEAR',
+    status: 'active', currentSequenceIndex: 1,
+    days: [{ dayIndex: 1, focus: 'full' }], movementPreferences: [],
+  };
+
+  test('editing with an active block: the block stays, but a change of training days updates the weekly-day limit', () => {
+    mockState = stateFor('advanced');
+    mockState.program = activeProgram;
+    mockState.block = { blockId: 1, startDate: '2026-07-01', objective: 'strength', createdAtMs: 1 };
+    render(<ProgramSetupScreen editing />);
+    expect(screen.getByText('Your current block stays as it is. These choices apply to future blocks, except a change of training days also updates the weekly-day limit used for current targets.')).toBeOnTheScreen();
+  });
+
+  test('editing with no active block: the choices apply to future blocks', () => {
+    mockState = stateFor('advanced');
+    mockState.program = activeProgram;
+    mockState.block = null;
+    render(<ProgramSetupScreen editing />);
+    expect(screen.getByText('These choices apply to future blocks.')).toBeOnTheScreen();
+  });
+
+  test('first setup: the start date and the confirmation of future blocks', () => {
+    mockState = stateFor('intermediate');
+    render(<ProgramSetupScreen />);
+    expect(screen.getByText('Program starts 2026-08-03. Future blocks require confirmation.')).toBeOnTheScreen();
+  });
+});
+
 // ---------------------------------------------------------------------------
 // The surviving R8 §2.3 rule
 // ---------------------------------------------------------------------------

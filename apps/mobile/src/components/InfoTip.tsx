@@ -33,6 +33,7 @@ const colors = palette ?? {
 import {
   GLOSSARY_ENTRIES,
   getGlossaryEntry,
+  glossaryTitle,
   type GlossaryEntry,
 } from '../data/glossary';
 
@@ -60,6 +61,12 @@ export const GLOSSARY: Record<string, string> = Object.freeze(
 export interface InfoTipProps {
   /** Glossary key, term, or alias; the card shows the canonical term as its title. */
   term: string;
+  /**
+   * #169: the card's text when the caller knows what the term means HERE
+   * (a phase card says what this block's plan does). The glossary definition
+   * is shown when it is absent.
+   */
+  body?: string | null;
 }
 
 /** The circle is 18 dp at the default font size. It grows with the system
@@ -67,7 +74,7 @@ export interface InfoTipProps {
  *  a11y-5: at 2.0 the glyph overflowed a fixed 18 dp circle). */
 const ICON_SIZE = 18;
 
-export default function InfoTip({ term }: InfoTipProps): React.JSX.Element | null {
+export default function InfoTip({ term, body = null }: InfoTipProps): React.JSX.Element | null {
   const { fontScale } = useWindowDimensions();
   const iconSize = Math.round(ICON_SIZE * Math.max(1, fontScale));
   const [open, setOpen] = useState(false);
@@ -92,7 +99,7 @@ export default function InfoTip({ term }: InfoTipProps): React.JSX.Element | nul
     return null;
   }
 
-  const title = entry.term;
+  const title = glossaryTitle(entry);
 
   return (
     <>
@@ -128,18 +135,21 @@ export default function InfoTip({ term }: InfoTipProps): React.JSX.Element | nul
             onPress={close}
             accessible={false}
             importantForAccessibility="no"
+            // Walk W6-5: Pressable is focusable by default, so the full-screen
+            // backdrop was an unlabelled focus stop on Android.
+            focusable={false}
           />
           <View style={styles.card}>
             <Text ref={titleRef} accessible accessibilityRole="header" style={styles.cardTerm}>
               {title}
             </Text>
-            <Text accessible style={styles.cardBody}>{entry.definition}</Text>
+            <Text accessible style={styles.cardBody} testID="info-tip-body">{body ?? entry.definition}</Text>
             <Text accessible style={styles.cardHint}>Tap outside or use Close to return.</Text>
             <Pressable
               style={styles.closeButton}
               onPress={close}
               accessibilityRole="button"
-              accessibilityLabel="Dismiss explanation"
+              accessibilityLabel="Close, dismiss explanation"
             >
               <Text style={styles.closeButtonText}>CLOSE</Text>
             </Pressable>

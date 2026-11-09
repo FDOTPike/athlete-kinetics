@@ -20,6 +20,7 @@ import {
   preparationDoseUnit,
   preparationEstimateMinutes,
   prescribedAmount,
+  rampItemTitle,
   type PreparationItem,
   type PreparationStage,
 } from '@ak/inference';
@@ -34,6 +35,11 @@ export interface PreparationPanelProps {
   onFinish: (outcome: 'finished' | 'already_warm' | 'skipped', expectedRevision: number) => void;
   /** Stop the whole session. Always reachable from this panel. */
   onStopSession: () => void;
+  /** Android walk (#213): today's working load for the ramped movement, when
+   *  the app knows it (the same load the set card shows). Ramp sets for that
+   *  movement then read in kg, with the percentage as support. Display only:
+   *  the frozen protocol is not changed. Absent or null keeps the percentages. */
+  rampWorkingLoad?: { movementId: number; movementName: string; workingLoadKg: number } | null;
 }
 
 const STAGE_LABEL: Record<PreparationStage, string> = {
@@ -45,7 +51,9 @@ const STAGE_LABEL: Record<PreparationStage, string> = {
 };
 
 const recordedText = (item: PreparationItem | undefined, record: PreparationItemRecord): string => {
-  const unit = item === undefined ? '' : preparationDoseUnit(item.dose) === 'seconds' ? ' seconds' : ' reps';
+  // Walk 2 (W2-11): an item planned "each side" records its change per side too.
+  const side = item !== undefined && 'perSide' in item.dose && item.dose.perSide ? ' each side' : '';
+  const unit = (item === undefined ? '' : preparationDoseUnit(item.dose) === 'seconds' ? ' seconds' : ' reps') + side;
   switch (record.status) {
     case 'pending': return 'Not recorded';
     case 'done': return 'Done as written';
@@ -57,7 +65,7 @@ const recordedText = (item: PreparationItem | undefined, record: PreparationItem
 };
 
 export function PreparationPanel({
-  preparation, onBegin, onRecordItem, onFinish, onStopSession,
+  preparation, onBegin, onRecordItem, onFinish, onStopSession, rampWorkingLoad = null,
 }: PreparationPanelProps): React.JSX.Element {
   const { protocol, items, revision, status } = preparation;
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
@@ -132,13 +140,19 @@ export function PreparationPanel({
           const current = !finished && status === 'in_progress' && currentIndex === index;
           const editing = editingIndex === index && record.status === 'pending' && !finished;
           const unit = preparationDoseUnit(item.dose);
+          const workingLoadKg = item.dose.kind === 'ramp' && rampWorkingLoad !== null && item.movementId === rampWorkingLoad.movementId
+            ? rampWorkingLoad.workingLoadKg
+            : null;
+          const title = item.dose.kind === 'ramp' && workingLoadKg !== null && rampWorkingLoad !== null
+            ? rampItemTitle(rampWorkingLoad.movementName, item.dose.percentOfWorkingLoad, workingLoadKg)
+            : item.title;
           const step = unit === 'seconds' ? (prescribedAmount(item.dose) >= 120 ? 30 : 5) : 1;
           return (
             <View key={`${item.itemId}:${index}`} style={[styles.item, current && styles.itemCurrent]}
               testID={`preparation-item-${index}`}>
               <Text style={styles.stage}>{STAGE_LABEL[item.stage]}</Text>
-              <Text style={styles.itemTitle} accessibilityRole="header">{item.title}</Text>
-              <Text style={styles.dose} testID={`preparation-item-${index}-dose`}>{describePreparationDose(item.dose)}</Text>
+              <Text style={styles.itemTitle} accessibilityRole="header">{title}</Text>
+              <Text style={styles.dose} testID={`preparation-item-${index}-dose`}>{describePreparationDose(item.dose, workingLoadKg)}</Text>
               {record.status !== 'pending' && (
                 <Text style={styles.recorded} testID={`preparation-item-${index}-recorded`}>
                   {recordedText(item, record)}
@@ -155,18 +169,18 @@ export function PreparationPanel({
                   {!editing && (
                     <View style={styles.actions}>
                       <PrimaryButton label="Done" onPress={() => onRecordItem(index, { status: 'done' }, revision)}
-                        accessibilityLabel={`Mark ${item.title} done as written`}
+                        accessibilityLabel={`Mark ${title} done as written`}
                         testID={`preparation-item-${index}-done`} />
                       <SecondaryButton label="I did it differently" fullWidth onPress={() => openEditor(index, item)}
-                        accessibilityLabel={`Record a different amount or exercise for ${item.title}`}
+                        accessibilityLabel={`Record a different amount or exercise for ${title}`}
                         testID={`preparation-item-${index}-change`} />
                       <SecondaryButton label="Skip this" fullWidth
                         onPress={() => onRecordItem(index, { status: 'skipped', reasonCode: 'athlete_choice' }, revision)}
-                        accessibilityLabel={`Skip ${item.title}`}
+                        accessibilityLabel={`Skip ${title}`}
                         testID={`preparation-item-${index}-skip`} />
                       <SecondaryButton label="It does not feel right" fullWidth
                         onPress={() => onRecordItem(index, { status: 'skipped', reasonCode: 'discomfort' }, revision)}
-                        accessibilityLabel={`Skip ${item.title} because it does not feel right`}
+                        accessibilityLabel={`Skip ${title} because it does not feel right`}
                         testID={`preparation-item-${index}-discomfort`} />
                     </View>
                   )}
@@ -202,7 +216,7 @@ export function PreparationPanel({
                             : { status: 'modified', performedAmount: amount, reasonCode: 'athlete_choice' }, revision);
                           closeEditor();
                         }}
-                        accessibilityLabel={`Save what you did for ${item.title}`}
+                        accessibilityLabel={`Save what you did for ${title}`}
                         testID={`preparation-item-${index}-save`} />
                       <SecondaryButton label="Cancel" fullWidth onPress={closeEditor}
                         accessibilityLabel="Cancel the change" testID={`preparation-item-${index}-cancel`} />
