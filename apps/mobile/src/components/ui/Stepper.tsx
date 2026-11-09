@@ -30,6 +30,17 @@ export interface StepperProps {
   tip?: keyof typeof GLOSSARY & string;
 }
 
+// The name a screen reader speaks, after "Decrease" or "Increase" (issue 138). The
+// visual "3 · " numbering is dropped. An all-caps visible label is spoken in lower
+// case, so it reads on from "Decrease": "Decrease training days per week". Initialisms
+// and units keep their capitals, so "RPE" is not read as the word "rpe".
+const KEEP_UPPER = new Set(['RPE', 'RIR', 'HRV', 'HR', 'BJJ', 'MMA', '1RM', 'KG', 'MIN']);
+function spokenName(label: string): string {
+  const words = label.replace(/^\d+\s*·\s*/, '');
+  if (words !== words.toUpperCase()) return words;
+  return words.toLowerCase().replace(/[a-z0-9]+/g, (word) => (KEEP_UPPER.has(word.toUpperCase()) ? word.toUpperCase() : word));
+}
+
 export function Stepper({
   label,
   value,
@@ -40,6 +51,7 @@ export function Stepper({
   repeatOnHold = false,
   tip,
 }: StepperProps): React.JSX.Element {
+  const name = spokenName(label);
   const holdTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const repeatInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const didRepeat = useRef(false);
@@ -85,14 +97,14 @@ export function Stepper({
           onPressIn={repeatOnHold ? () => startRepeating(onDecrement) : undefined}
           onPressOut={repeatOnHold ? stopRepeating : undefined}
           accessibilityRole="button"
-          accessibilityLabel={`Decrease ${label}`}
+          accessibilityLabel={`Decrease ${name}`}
           style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
         >
           <Text style={styles.symbol}>−</Text>
         </Pressable>
         <Text
           style={styles.value}
-          accessibilityLabel={`${label} ${value}`}
+          accessibilityLabel={`${name} ${value}`}
         >
           {value}
         </Text>
@@ -101,7 +113,7 @@ export function Stepper({
           onPressIn={repeatOnHold ? () => startRepeating(onIncrement) : undefined}
           onPressOut={repeatOnHold ? stopRepeating : undefined}
           accessibilityRole="button"
-          accessibilityLabel={`Increase ${label}`}
+          accessibilityLabel={`Increase ${name}`}
           style={({ pressed }) => [styles.button, pressed && styles.buttonPressed]}
         >
           <Text style={styles.symbol}>+</Text>

@@ -11,8 +11,8 @@
  *   - what the plan will do about the chosen outcome, and what it cannot do,
  *     is stated before and after saving.
  */
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import {
   SPORT_EXPERIENCE_LABEL,
   SPORT_OUTCOME_LABEL,
@@ -24,6 +24,7 @@ import {
   type SportWorkload,
 } from '@ak/inference';
 import { useStore } from '../state/useStore';
+import { useSubViewBack } from '../navigation/navigation';
 import { theme } from '../theme/theme';
 import { PrimaryButton, SecondaryButton } from './ui';
 import { localIsoToday } from './FocusGoalFields';
@@ -61,11 +62,37 @@ export function SportPanel(): React.JSX.Element | null {
   const [showErrors, setShowErrors] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [confirmingRemove, setConfirmingRemove] = useState(false);
+  // What the editor held when it opened: an unchanged editor closes quietly.
+  const openedWith = useRef<string | null>(null);
 
   // The schedule may have changed on another screen since this one was shown.
   useEffect(() => {
     if (ready && typeof refreshSport === 'function') refreshSport();
   }, [ready, refreshSport]);
+
+  // #148: Android back closes the sport editor first. Unsaved changes are
+  // confirmed before they are thrown away, as the routine builder does.
+  const editorChanged = fields !== null && JSON.stringify(fields) !== openedWith.current;
+  const discardEditor = (): void => {
+    setFields(null);
+    setShowErrors(false);
+  };
+  const requestCloseEditor = (): void => {
+    if (!editorChanged) {
+      discardEditor();
+      return;
+    }
+    Alert.alert(
+      'Discard this sport?',
+      'Your changes to the sport answer have not been saved.',
+      [
+        { text: 'Keep editing', style: 'cancel' },
+        { text: 'Discard', style: 'destructive', onPress: discardEditor },
+      ],
+      { cancelable: true },
+    );
+  };
+  useSubViewBack(fields !== null, requestCloseEditor);
 
   // Component tests drive the profile screen with partial store states; the
   // panel needs the real actions to be useful and renders nothing without them.
@@ -76,7 +103,9 @@ export function SportPanel(): React.JSX.Element | null {
   const NEXT_BLOCK = 'Your current plan is unchanged; this is used when your next block is created.';
 
   const beginEdit = (): void => {
-    setFields(sport === null ? EMPTY_SPORT_FIELDS : sportFieldsFromProfile(sport));
+    const initial = sport === null ? EMPTY_SPORT_FIELDS : sportFieldsFromProfile(sport);
+    openedWith.current = JSON.stringify(initial);
+    setFields(initial);
     setShowErrors(false);
     setMessage(null);
     setConfirmingRemove(false);
@@ -110,7 +139,7 @@ export function SportPanel(): React.JSX.Element | null {
       ) : (
         <>
           <Text style={styles.body} testID="profile-sport-summary">
-            {`${sportDisplayName(sport)} — ${SPORT_OUTCOME_LABEL[sport.outcomeId].toLowerCase()}. Played: ${SPORT_EXPERIENCE_LABEL[sport.experienceId].toLowerCase()}.`}
+            {`${sportDisplayName(sport)} — ${SPORT_OUTCOME_LABEL[sport.outcomeId].toLowerCase()}. Played: ${SPORT_EXPERIENCE_LABEL[sport.experienceId].toLowerCase().replace(/\bi\b/g, 'I')}.`}
           </Text>
           {emphasis !== null && <Text style={styles.dim} testID="profile-sport-emphasis">{emphasis.summary}</Text>}
           {sport.competitionDate !== null && (

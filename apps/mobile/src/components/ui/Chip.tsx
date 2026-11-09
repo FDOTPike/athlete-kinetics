@@ -84,6 +84,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: theme.space[4], // 16
+    // Vertical padding keeps a wrapped label off the border at large text (issue 158).
+    paddingVertical: theme.space[2],
     borderRadius: theme.radius.chip,
     borderWidth: 1,
     borderColor: theme.color.line,

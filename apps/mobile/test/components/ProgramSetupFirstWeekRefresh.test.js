@@ -11,7 +11,10 @@ import ProgramSetupScreen from '../../src/screens/ProgramSetupScreen';
 
 let mockState;
 
+// The anchor rows word their reasons with the store's REASON_TEXT_MAP, so the
+// mock keeps the real map and replaces only the hook.
 jest.mock('../../src/state/useStore', () => ({
+  REASON_TEXT_MAP: jest.requireActual('../../src/state/useStore').REASON_TEXT_MAP,
   useStore: (selector) => selector(mockState),
 }));
 

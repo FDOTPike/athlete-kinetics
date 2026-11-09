@@ -262,6 +262,23 @@ const bjjRoundId = movements.find((m) => m.name === 'BJJ Sparring Round').moveme
 check('mats removed: bjj days fall back without ever emitting BJJ Sparring Round',
   noMats.sessions.some((s) => s.focus === 'bjj') &&
   noMats.sessions.every((s) => s.slots.every((sl) => sl.movement_id !== bjjRoundId)));
+// Android walk 2026-11-03 (W1-3): owning mats is not grappling. A partner
+// sparring round is placed on a BJJ day only, never on a conditioning day.
+let conditioningDays = 0, sparringOffBjjDay = 0, sparringOnBjjDay = 0;
+for (const objective of ['gpp', 'endurance', 'weight_loss', 'strength', 'power', 'hybrid']) {
+  for (let f = 1; f <= 7; f++) {
+    const plan = gen({ objective, weekly_frequency: f, equipment_inventory: [...STANDARD_EQUIPMENT_ITEMS] });
+    for (const s of plan.sessions) {
+      const hasRound = s.slots.some((sl) => sl.movement_id === bjjRoundId);
+      if (s.focus === 'conditioning') conditioningDays += 1;
+      if (hasRound && s.focus !== 'bjj') sparringOffBjjDay += 1;
+      if (hasRound && s.focus === 'bjj') sparringOnBjjDay += 1;
+    }
+  }
+}
+check('with mats, BJJ Sparring Round appears on bjj days only (never on a conditioning day)',
+  conditioningDays > 0 && sparringOnBjjDay > 0 && sparringOffBjjDay === 0,
+  `${conditioningDays} conditioning days, ${sparringOnBjjDay} bjj-day rounds, ${sparringOffBjjDay} off-day rounds`);
 
 // --- [5] SQL contract: 007 literals == TS constants -----------------------------
 console.log('[5] SQL contract (007 <-> types.ts single source of truth)');
@@ -2533,6 +2550,10 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
   // 065 (session preparation side-car), 066 (focus and goals) and 067 (sport
   // profile and block emphasis record) add no
   // library rows and advance it to 65.
+  // 075 (session plan slot planned count side-car) adds no library rows and
+  // advances the chain to 74.
+  // 076 (sport taxonomy expansion to 22 sports) adds no library rows and
+  // advances the chain to 75.
   const chain = readdirSync(SCHEMA_DIR)
     .filter((f) => f.endsWith('.sql') && !f.startsWith('004_'))
     .sort((a, b) => Number(a.slice(0, 3)) - Number(b.slice(0, 3)));
@@ -2545,7 +2566,7 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
   // Pin the corpus itself, so a library change cannot move the figures below
   // without announcing itself.
   check('[F2-corpus] the shipped catalogue is the one being measured',
-    rows.length === 300 && chain.length === 72,
+    rows.length === 300 && chain.length === 76,
     `${rows.length} movements from ${chain.length} migrations`);
 
   // Round-2 finding 1. Gate [11] validates supported_prefixes tokens against

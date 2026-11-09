@@ -511,7 +511,8 @@ export function buildPreparationProtocol(input: PreparationInput): PreparationPr
       instruction: timed
         ? `Do one short, easy effort of ${anchor.movementName} at well below working effort to check your position and setup.`
         : anchor.externallyLoaded
-          ? `Do one set of ${anchor.movementName} with no added load or the empty bar. Use the same stance, grip and range you will use for your working sets.`
+          // Walk 2 (W2-11): a goblet squat has no bar to leave empty.
+          ? `Do one set of ${anchor.movementName} with no added load (for a barbell lift, the empty bar). Use the same stance, grip and range you will use for your working sets.`
           : `Do one easy set of ${anchor.movementName} using a shorter range or a supported version. Use the same positions you will use for your working sets.`,
       cue: 'Same technique, no strain.',
       stopInstruction: STOP_JOINT,
@@ -590,8 +591,10 @@ export function buildPreparationProtocol(input: PreparationInput): PreparationPr
     : `Session movements: ${patternsInOrder.map((pattern) => PATTERN_LABEL[pattern]).join(', ')}.`);
   if (anchor !== null) basis.push(`First movement prepared: ${anchor.movementName}.`);
   basis.push(variant === 'standard'
-    ? `Full protocol within ${Math.round(budgetMin)} minutes.`
-    : `Short protocol within ${Math.round(budgetMin)} minutes.`);
+    // Walk 2 (W2-11): "within 10 minutes" beside "About 8 minutes" read as two
+    // durations. This is the time limit the protocol was fitted to.
+    ? `Full protocol, fitted to a ${Math.round(budgetMin)}-minute limit.`
+    : `Short protocol, fitted to a ${Math.round(budgetMin)}-minute limit.`);
   if (input.tier === 'beginner') basis.push('Experience: beginner — move slowly and use the easier option whenever unsure.');
   if (sportContext) basis.push('Sport or conditioning session: balance is included.');
   if (restricted.size > 0) basis.push('Active niggles: drills that load those areas are withheld.');

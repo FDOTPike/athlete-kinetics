@@ -1510,8 +1510,8 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   orderButton: {
-    minHeight: 36,
-    minWidth: 44,
+    minHeight: theme.touch.min,
+    minWidth: theme.touch.min,
     paddingHorizontal: theme.space[2],
     alignItems: 'center',
     justifyContent: 'center',
