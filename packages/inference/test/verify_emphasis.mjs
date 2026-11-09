@@ -105,8 +105,8 @@ const reportText = (block) => [...block.emphasis.applied, ...block.emphasis.omit
 // --- [1] the sport question ---------------------------------------------------------
 console.log('[1] the sport question');
 {
-  check('asked by family: basketball, football, hockey, powerlifting, Muay Thai, another sport',
-    sp.SPORT_FAMILIES.join(',') === 'basketball,football,hockey,powerlifting,muay_thai,other');
+  check('asked by family: grappling, striking, court, football, hockey, strength, other, racquet, running, swimming',
+    sp.SPORT_FAMILIES.join(',') === 'grappling,striking,court,football,hockey,strength,other,racquet,running,swimming');
   check('football is told apart explicitly: association, Australian, rugby, American',
     sp.sportsInFamily('football').join(',') === 'football_association,football_australian,football_rugby,football_american'
       && sp.sportsInFamily('football').every((id) => sp.SPORT_INFO[id].distinction.length > 20));
@@ -148,8 +148,9 @@ console.log('[2] outcomes, basis and limits');
   const of = (sportId, outcomeId) => sp.sportEmphasisFor({ sportId, outcomeId, otherSportName: null });
   const jump = of('basketball', 'jump_higher');
   check('jump higher: quads, glutes, calves, citing the strength review and the plyometric meta-analysis',
-    jump.muscles.join(',') === 'quadriceps,glutes,calves' && jump.basis.length === 2
-      && /Suchomel/.test(jump.basis[0].citation) && /Markovic/.test(jump.basis[1].citation));
+    jump.muscles.join(',') === 'quadriceps,glutes,calves' && jump.basis.length === 3
+      && /Suchomel/.test(jump.basis[0].citation) && /Markovic/.test(jump.basis[1].citation)
+      && /Collings/.test(jump.basis[2].citation));
   check('jump higher says plainly that the library has no jump training',
     jump.limits.some((line) => /no jump or plyometric drills/.test(line) && /does not include jump training itself/.test(line)));
   const stay = of('football_association', 'stay_available');
@@ -159,7 +160,9 @@ console.log('[2] outcomes, basis and limits');
     stay.limits.some((line) => /no adductor-strengthening exercise/.test(line)) && !stay.muscles.includes('inner_thighs'));
   check('ice hockey cites its own adductor study; basketball gets no groin claim',
     /ice hockey players/.test(of('hockey_ice', 'stay_available').basis[1].citation)
-      && of('basketball', 'stay_available').basis.length === 1
+      && of('basketball', 'stay_available').basis.length === 2
+      && /van Dyk/.test(of('basketball', 'stay_available').basis[0].citation)
+      && !of('basketball', 'stay_available').basis.some((b) => /adductor|groin/i.test(`${b.citation} ${b.finding}`))
       && !of('basketball', 'stay_available').limits.some((line) => /adductor/.test(line)));
   const lifts = of('powerlifting', 'bigger_competition_lifts');
   check('powerlifting promotes the three competition lifts, citing the rule book', lifts.competitionLifts === true
