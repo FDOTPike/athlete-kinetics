@@ -57,6 +57,7 @@ import { autopilotReasonCopy } from '../state/autopilotCopy';
 import { coachModeAthleteName } from '../state/coachModeAthlete';
 import { PrimaryButton, QuietAction, Disclosure, ListRow } from '../components/ui';
 import { sessionFocusName } from '../state/sessionSummary';
+import { HALT_NEXT_TEXT } from '../state/haltCopy';
 import { operativeReportLine } from '../state/operativeReportLine';
 import { offPlanStartCaption, offPlanStartTarget } from '../state/offPlanStart';
 import { isSessionReportStop, SESSION_REPORT_STOP_SENTENCE } from '../state/sessionReportStop';
@@ -376,6 +377,7 @@ function AvailableTodayScreen({
                 ? SESSION_REPORT_STOP_SENTENCE
                 : 'A safety report paused training for today. Review it before doing more work.'}
             </Text>
+            <Text style={styles.body}>{HALT_NEXT_TEXT}</Text>
             <QuietAction
               label="Open your plan"
               onPress={() => onOpenPlan?.()}
@@ -676,14 +678,16 @@ function AvailableTodayScreen({
       {suspension != null && (
         <View style={styles.card} testID="today-paused">
           <Text style={styles.eyebrow}>PROGRAMME PAUSED</Text>
-          {/* #188: an injury pause never invites training. */}
+          {/* #188: an injury pause never invites training. #178: a halt never invites training. */}
           <Text style={styles.body}>
-            {suspension.reason !== 'injury'
-              ? 'Your place is being held. You can still train.'
-              : vector !== null
-                ? 'Your place is being held. If something hurts, report it under "Something feels off" on your plan.'
-                // Plan shows that form only once readiness exists (#180).
-                : 'Your place is being held. If something hurts, use "Report discomfort" during a session.'}
+            {halted
+              ? 'Your place is being held.'
+              : suspension.reason !== 'injury'
+                ? 'Your place is being held. You can still train.'
+                : vector !== null
+                  ? 'Your place is being held. If something hurts, report it under "Something feels off" on your plan.'
+                  // Plan shows that form only once readiness exists (#180).
+                  : 'Your place is being held. If something hurts, use "Report discomfort" during a session.'}
           </Text>
           <QuietAction
             label="Manage pause"

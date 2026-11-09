@@ -10,6 +10,7 @@ import { EXPERIENCE_SEVERITY } from '../../../../packages/inference/src/types';
 import SessionScreen, { aboveCeilingNote, clearUnloggedLoadDraftsForTests, unloggedLoadDraftCountForTests } from '../../src/screens/SessionScreen';
 import { RestTimerCard } from '../../src/components/ui/RestTimerCard';
 import { advance as advanceRunner, restSecondsFor as runnerRestSecondsFor } from '../../../../packages/inference/src/sessionRunner';
+import { HALT_NEXT_TEXT } from '../../src/state/haltCopy';
 
 let mockState;
 
@@ -1512,7 +1513,8 @@ test.each([
   ['manual', 'You chose to stop this session.', null],
   ['niggle', 'You reported discomfort, so this session has stopped for today.', null],
   ['pain', 'You reported pain, so this session has stopped for today.', null],
-  ['safety', 'Stop and reassess this symptom.', 'Stop and reassess this symptom.'],
+  // #178: a safety halt shows halt-only wording, never the entry's cue.
+  ['safety', 'A safety concern stopped this session.', 'Pain language detected: load drops 40% and effort caps at RPE 6 until you can localize it.'],
 ])('halt reason %s renders athlete-facing copy and never the raw token', (haltReason, expected, coachingCue) => {
   mockState = state({
     runner: runner({ phase: 'halted', haltReason }),
@@ -1525,6 +1527,10 @@ test.each([
 
   expect(screen.getByText(expected)).toBeOnTheScreen();
   expect(screen.queryByText(new RegExp(`^${haltReason}$`, 'i'))).toBeNull();
+  if (coachingCue !== null) {
+    expect(screen.queryByText(coachingCue)).toBeNull();
+    expect(screen.getByText(HALT_NEXT_TEXT)).toBeOnTheScreen();
+  }
 });
 
 test.each([

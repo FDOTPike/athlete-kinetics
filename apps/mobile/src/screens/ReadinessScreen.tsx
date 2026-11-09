@@ -14,6 +14,7 @@ import { deriveTodayState } from '../state/todayState';
 import TrainingSupportNotice from '../components/TrainingSupportNotice';
 import { theme } from '../theme/theme';
 import { sessionFocusName } from '../state/sessionSummary';
+import { HALT_NEXT_TEXT, HALT_TODAY_TEXT } from '../state/haltCopy';
 import { operativeReportLine } from '../state/operativeReportLine';
 import { SafetyReportView } from '../components/SafetyReportView';
 import {
@@ -124,7 +125,8 @@ export function HeldScreenWithHalt({ lastTriage, header, children }: {
         </View>
         <Text style={styles.title}>{HALT_META.title}</Text>
         <Text style={styles.body}>{HALT_META.recommendation}</Text>
-        <Text style={styles.haltCue}>{lastTriage.directive.vector.coaching_cue}</Text>
+        {/* Halt-only wording (#178): never the entry's adjustment cue. */}
+        <Text style={styles.haltCue}>{HALT_NEXT_TEXT}</Text>
       </View>
       {children}
     </ScrollView>
@@ -237,9 +239,8 @@ function AvailableReadinessScreen({
             </View>
             <Text style={styles.title}>{HALT_META.title}</Text>
             <Text style={styles.body}>{HALT_META.recommendation}</Text>
-            {!hasLiveSession && todayPlan !== null && (
-              <Text style={styles.caption}>{formatFocus(todayPlan.focus)} session planned today.</Text>
-            )}
+            {/* No "planned today" while halted (#178): no session may start. */}
+            <Text style={styles.caption}>{HALT_NEXT_TEXT}</Text>
             {/* #185: the saved reports, read-only, wherever READY is opened from. */}
             <PrimaryButton label="Review safety report" onPress={() => setReportViewOpen(true)} />
           </View>
@@ -501,8 +502,10 @@ function AvailableReadinessScreen({
         {todaysReport !== null && (
           <Text style={styles.caption} testID="readiness-report-line">{operativeReportLine(todaysReport)}</Text>
         )}
-        {hasLiveSession && <Text style={styles.caption}>Your active workout is ready to resume.</Text>}
-        {!hasLiveSession && todayPlan !== null && (
+        {/* While halted, READY names no planned or resumable session (#178). */}
+        {halted && <Text style={styles.caption}>{HALT_NEXT_TEXT}</Text>}
+        {!halted && hasLiveSession && <Text style={styles.caption}>Your active workout is ready to resume.</Text>}
+        {!halted && !hasLiveSession && todayPlan !== null && (
           <Text style={styles.caption}>
             {todaySessionDone
               ? `Today's ${formatFocus(todayPlan.focus)} session is recorded.`
@@ -532,7 +535,7 @@ function AvailableReadinessScreen({
         <Disclosure label="Why this recommendation" hint="The short explanation first">
           <Text style={styles.body}>{explanation}</Text>
           {halted && lastTriage !== null && lastTriage.kind === 'matched' && (
-            <Text style={styles.haltCue}>{lastTriage.directive.vector.coaching_cue}</Text>
+            <Text style={styles.haltCue}>{HALT_TODAY_TEXT}</Text>
           )}
           <View style={{ marginTop: theme.space[3] }}>
             {uiPreferences.readinessDetail === 'full' ? (

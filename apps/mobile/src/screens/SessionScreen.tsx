@@ -25,6 +25,7 @@ import {
 import { PreparationPanel } from '../components/PreparationPanel';
 import { MovementPreview } from '../components/movementPreview/MovementPreview';
 import { SessionFeelPanel, describeSessionFeel } from '../components/SessionFeelPanel';
+import { HALT_NEXT_TEXT } from '../state/haltCopy';
 import { operativeReportLine } from '../state/operativeReportLine';
 import { SubjectiveReportPanel } from '../components/SubjectiveReportPanel';
 
@@ -58,16 +59,13 @@ const NON_SAFETY_HALT_COPY = {
 
 /** Exhaustive athlete-facing copy for persisted runner halt reasons. The
  * Record above makes a newly added non-safety RunnerHaltReason a type error
- * until copy is supplied. Runtime-unknown, absent, and blank safety evidence
- * all fail closed to one generic safety message; raw tokens are never output. */
+ * until copy is supplied. Runtime-unknown and absent reasons fail closed to
+ * one generic safety message; raw tokens are never output. A safety halt
+ * never prints the matched entry's adjustment cue (#178): the cue describes a
+ * reduced session, and a halt allows none. */
 const formatRunnerHaltReason = (
   reason: RunnerHaltReason | null | undefined,
-  matchedTriageCue: string | null | undefined,
 ): string => {
-  if (reason === 'safety') {
-    const cue = matchedTriageCue?.trim();
-    return cue === undefined || cue.length === 0 ? GENERIC_HALT_COPY : cue;
-  }
   if (reason === 'manual' || reason === 'niggle' || reason === 'pain') {
     return NON_SAFETY_HALT_COPY[reason];
   }
@@ -1540,11 +1538,11 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
           <View style={styles.haltCard} accessibilityRole="alert">
             <Text style={styles.haltTitle}>Stop training for today.</Text>
             <Text style={styles.haltBody}>
-              {formatRunnerHaltReason(
-                runner?.haltReason,
-                lastTriage?.kind === 'matched' ? lastTriage.directive.vector.coaching_cue : null,
-              )}
+              {formatRunnerHaltReason(runner?.haltReason)}
             </Text>
+            {(triageHalted || runner?.haltReason === 'safety') && (
+              <Text style={styles.haltBody}>{HALT_NEXT_TEXT}</Text>
+            )}
             <View style={{ marginTop: theme.space[4], alignSelf: 'stretch' }}>
               <SecondaryButton
                 label="Finish session"
