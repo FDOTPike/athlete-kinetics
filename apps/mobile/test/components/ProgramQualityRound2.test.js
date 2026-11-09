@@ -152,7 +152,7 @@ describe('Round 2 R6: the review screen discloses progression methodology', () =
     };
   });
 
-  test('the coach-defaults block names the progression methodology', () => {
+  test('the coach-defaults block does not show a progression method nothing reads (#171)', () => {
     render(<OnboardingScreen />);
     for (let i = 0; i < 5; i += 1) pressNext();
     fireEvent.press(screen.getByLabelText('No, nothing to note'));
@@ -167,7 +167,9 @@ describe('Round 2 R6: the review screen discloses progression methodology', () =
       return '';
     };
     const block = screen.getByTestId('onboarding-coach-defaults');
-    expect(joinTexts(block)).toContain('Progression method: Autoregulated');
+    expect(joinTexts(block)).toContain('Energy focus:');
+    // OW-008: no planner reads progression_methodology yet, so it is not shown.
+    expect(joinTexts(block)).not.toContain('Progression method');
   });
 });
 

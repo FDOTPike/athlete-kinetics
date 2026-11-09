@@ -201,6 +201,82 @@ check('R5 tier-neutral rest: every tier gets the same RPE-band rest for target, 
   assert.throws(() => startRunner([repSlot(1, 2, 5, 8)], { tier: 'novice', startedAtMs: 0 }), RunnerCheckpointError);
 });
 
+// R5b - issue #209 (docs/decisions/REST_AFTER_BODYWEIGHT_SETS_2026-11-05.md,
+// PROPOSED): after a bodyweight set (0 kg on a bodyweight movement) the rest
+// is 60 s below RPE 8 and 90 s at RPE 8 or above. The rule is by load, never
+// by tier: the R5 matrix must hold for both kinds of set, and a rest function
+// that scales by tier must be caught by the same check.
+const R5B_BODYWEIGHT_BANDS = [
+  [0, 60], [5, 60], [6, 60], [7, 60], [7.5, 60], [7.99, 60], [8, 90], [8.5, 90], [9, 90], [10, 90],
+];
+const tierNeutralRestViolations = (restFn) => {
+  const violations = [];
+  for (const [bands, bodyweight] of [[R5_REST_BANDS, false], [R5B_BODYWEIGHT_BANDS, true]]) {
+    for (const [rpe, expected] of bands) {
+      for (const tier of R5_TIERS) {
+        const got = restFn({ targetRpe: rpe }, tier, rpe, bodyweight);
+        if (got !== expected) violations.push(`${tier} RPE ${rpe}${bodyweight ? ' bodyweight' : ''}: ${got} != ${expected}`);
+      }
+    }
+  }
+  return violations;
+};
+
+check('R5b rest after a bodyweight set: 60 s below RPE 8, 90 s at 8 or above, the same for every tier', () => {
+  assert.deepEqual(tierNeutralRestViolations(restSecondsFor), [], 'R5b: the real rest function is tier-neutral for both kinds of set');
+  // The default is a loaded set: an omitted flag keeps the RPE bands.
+  assert.equal(restSecondsFor({ targetRpe: 8 }, 'beginner'), 180);
+  assert.equal(restSecondsFor({ targetRpe: 8 }, 'beginner', 8, false), 180);
+  assert.equal(restSecondsFor({ targetRpe: 8 }, 'beginner', 8, true), 90);
+  assert.equal(restSecondsFor({ targetRpe: 9 }, 'elite', 6, true), 60, 'R5b: the actual effort decides, not the target');
+});
+
+check('R5b non-vacuity: a rest function with a tier multiplier fails the tier-neutral check', () => {
+  const scale = { beginner: 1.25, intermediate: 1, advanced: 1, elite: 0.9 };
+  const snap = (s) => Math.min(300, Math.max(45, Math.round(s / 15) * 15));
+  const loadedMutant = (slot, tier, rpe, bodyweight) => (bodyweight
+    ? restSecondsFor(slot, tier, rpe, true)
+    : snap(restSecondsFor(slot, tier, rpe, false) * scale[tier]));
+  const bodyweightMutant = (slot, tier, rpe, bodyweight) => (bodyweight
+    ? snap(restSecondsFor(slot, tier, rpe, true) * scale[tier])
+    : restSecondsFor(slot, tier, rpe, false));
+  assert.ok(tierNeutralRestViolations(loadedMutant).length > 0, 'R5b: a tier multiplier on loaded rest is caught');
+  assert.ok(tierNeutralRestViolations(bodyweightMutant).length > 0, 'R5b: a tier multiplier on bodyweight rest is caught');
+});
+
+check('R5b live runner: a bodyweight LOG_SET rests by load, keeps it through a checkpoint, and an override still wins', () => {
+  for (const tier of R5_TIERS) {
+    const started = startRunner([repSlot(901, 3, 10, 8)], { tier, startedAtMs: 0 });
+    const easy = advance(started, event('LOG_SET', 10, { actualRpe: 7, bodyweightSet: true }));
+    const hard = advance(started, event('LOG_SET', 10, { actualRpe: 9, bodyweightSet: true }));
+    const loaded = advance(started, event('LOG_SET', 10, { actualRpe: 9 }));
+    assert.deepEqual([easy.restSecondsTarget, hard.restSecondsTarget, loaded.restSecondsTarget], [60, 90, 240], `R5b live ${tier}`);
+    const restored = deserializeRunner(serializeRunner(hard));
+    assert.deepEqual(restored, hard, `R5b checkpoint round trip ${tier}`);
+    // Clearing an override during rest goes back to the bodyweight rest.
+    const overridden = advance(hard, event('SET_REST_OVERRIDE', 11, { seconds: 150 }));
+    assert.equal(overridden.restSecondsTarget, 150);
+    assert.equal(advance(overridden, event('SET_REST_OVERRIDE', 12, { seconds: null })).restSecondsTarget, 90);
+    // Leaving rest drops the marker; the next loaded set rests by RPE band.
+    const working = advance(hard, event('SKIP_REST', 13));
+    assert.equal(working.restBodyweight, undefined, `R5b marker cleared after rest ${tier}`);
+    assert.equal(advance(working, event('LOG_SET', 14, { actualRpe: 9 })).restSecondsTarget, 240);
+    // A halt during a bodyweight rest drops the marker too, so the halted
+    // state is the one a checkpoint restores.
+    const halted = advance(hard, event('HALT', 15, { reason: 'manual' }));
+    assert.equal(halted.phase, 'halted', `R5b halt during bodyweight rest ${tier}`);
+    assert.equal(halted.restBodyweight, undefined, `R5b marker cleared on halt ${tier}`);
+    assert.deepEqual(deserializeRunner(serializeRunner(halted)), halted, `R5b halted checkpoint round trip ${tier}`);
+  }
+  // A checkpoint that claims a bodyweight rest with the wrong duration is refused.
+  const hard = advance(startRunner([repSlot(902, 3, 10, 8)], { tier: 'beginner', startedAtMs: 0 }), event('LOG_SET', 10, { actualRpe: 9, bodyweightSet: true }));
+  assert.throws(() => restoreRunnerCheckpoint({ version: RUNNER_CHECKPOINT_VERSION, state: { ...hard, restSecondsTarget: 240 } }), RunnerCheckpointError);
+  assert.throws(() => restoreRunnerCheckpoint({ version: RUNNER_CHECKPOINT_VERSION, state: { ...hard, restBodyweight: 'yes' } }), RunnerCheckpointError);
+  // An older checkpoint without the marker restores as a loaded-set rest.
+  const legacy = advance(startRunner([repSlot(903, 3, 10, 8)], { tier: 'beginner', startedAtMs: 0 }), event('LOG_SET', 10, { actualRpe: 9 }));
+  assert.deepEqual(restoreRunnerCheckpoint({ version: RUNNER_CHECKPOINT_VERSION, state: legacy }), legacy);
+});
+
 check('R5 tier-neutral rest: live logged-set rests and explicit overrides are identical across tiers', () => {
   for (const [rpe, expected] of R5_REST_BANDS) {
     for (const tier of R5_TIERS) {

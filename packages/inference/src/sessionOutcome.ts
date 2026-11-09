@@ -130,7 +130,8 @@ const validateDose = (dose: RunnerTarget | null, label: string): void => {
   throw new SessionOutcomeValidationError(`${label} has an unknown dose kind`);
 };
 
-const isDirectiveHalt = (reason: RunnerHaltReason): boolean =>
+/** A halt for niggle, pain or safety. A manual stop is not a directive halt. */
+export const isDirectiveHalt = (reason: RunnerHaltReason): boolean =>
   reason === 'niggle' || reason === 'pain' || reason === 'safety';
 
 type DoseComparison = 'exact' | 'under' | 'over' | 'unknown';
@@ -308,6 +309,33 @@ const decision = (
   finalizedAtMs: input.finalizedAtMs,
   evidence,
 });
+
+/**
+ * Classify a session the athlete closes after the fact (an earlier workout the
+ * app never closed). It is deliberately not a dose judgement: logged work is
+ * recorded as `session_recorded` whatever its shape, and only a directive
+ * safety halt keeps `stopped_safely`. The terminal must be `complete` for
+ * `session_recorded` (the 026 schema requires it), so a manual halt is refused
+ * here rather than stored as halted. Null means an empty session with no
+ * safety halt: nothing durable to keep.
+ */
+export function evaluateAfterTheFactOutcome(
+  input: SessionOutcomeInput,
+): SessionOutcomeDecision | null {
+  validateInput(input);
+  const evidence = buildEvidence(input);
+
+  if (input.terminal.phase === 'halted' && isDirectiveHalt(input.terminal.haltReason)) {
+    return decision(input, evidence, 'stopped_safely');
+  }
+  if (evidence.loggedSetCount === 0) return null;
+  if (input.terminal.phase === 'halted') {
+    throw new SessionOutcomeValidationError(
+      'a non-safety halt cannot be recorded after the fact; close it as complete',
+    );
+  }
+  return decision(input, evidence, 'session_recorded');
+}
 
 /**
  * Classify a finalized session. Null means there was no durable training
