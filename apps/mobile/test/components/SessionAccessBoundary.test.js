@@ -271,7 +271,7 @@ describe('logSet access boundary (real store, real production chain)', () => {
     );
 
     expect(useStore.getState().error).toBe(
-      'Teaching only — prior-experience confirmation is available',
+      'Teaching only — you can add it if you have trained it before',
     );
     expect(writeFingerprint(raw, sessionId)).toEqual(before);
     expect(runnerSnapshot(useStore)).toEqual(runnerBefore);
