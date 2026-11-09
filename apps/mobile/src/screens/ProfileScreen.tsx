@@ -804,7 +804,7 @@ export default function ProfileScreen(): React.JSX.Element {
                       setIntentError(`Could not clear your choice for ${m.name}. Try again.`);
                     }
                   }}
-                  accessibilityLabel={`Leave ${m.name} unset, so it is planned with added weight`}
+                  accessibilityLabel={`Not set: leave ${m.name} unset, so it is planned with added weight`}
                 />
               </View>
             </View>
