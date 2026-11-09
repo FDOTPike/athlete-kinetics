@@ -42,6 +42,7 @@ import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { appliedAdjustmentLines, autopilotReasonCopy } from '../state/autopilotCopy';
 import { EMPTY_ACTIVITY_LEDGER } from '../state/activityStore';
 import { sessionFocusName } from '../state/sessionSummary';
+import { SafetyReportView } from '../components/SafetyReportView';
 import { isSessionReportStop, SESSION_REPORT_STOP_SENTENCE } from '../state/sessionReportStop';
 import {
   PrimaryButton,
@@ -339,6 +340,8 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
   const trajectorySectionY = useRef(0);
   const manageSectionOffsetY = useRef(0);
   const [reportOpen, setReportOpen] = useState(false);
+  // #185: "Review safety report" shows the saved reports, read-only.
+  const [reportViewOpen, setReportViewOpen] = useState(false);
   // #188: the reason a pause button was pressed for, until it is confirmed.
   const [confirmPauseReason, setConfirmPauseReason] = useState<(typeof SUSPENSION_REASONS)[number] | null>(null);
   const disclosuresSectionY = useRef(0);
@@ -422,6 +425,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
     nextProgramPreview !== null ||
     detail !== null ||
     reportOpen ||
+    reportViewOpen ||
     confirmPauseReason !== null ||
     confirmRegenerate ||
     confirmUnplannedStart ||
@@ -435,6 +439,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
     else if (editingTemplate !== null) setEditingTemplate(null);
     else if (confirmRoutineAction !== null) setConfirmRoutineAction(null);
     else if (detail !== null) setDetail(null);
+    else if (reportViewOpen) setReportViewOpen(false);
     else if (reportOpen) setReportOpen(false);
     else if (confirmPauseReason !== null) setConfirmPauseReason(null);
     else if (confirmRegenerate) setConfirmRegenerate(false);
@@ -1211,7 +1216,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
 
         <View style={styles.cardActionRow}>
           {halted ? (
-            <PrimaryButton label="Review safety report" onPress={() => setReportOpen(true)} accessibilityLabel="Review safety report" />
+            <PrimaryButton label="Review safety report" onPress={() => setReportViewOpen(true)} accessibilityLabel="Review safety report" />
           ) : session !== null ? (
             <PrimaryButton label="Open active session" onPress={() => onSessionStarted?.()} accessibilityLabel="Open active session" />
           ) : programBlockExpired ? (
@@ -1264,6 +1269,10 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           </Text>
         )}
       </View>
+
+      {reportViewOpen && (
+        <SafetyReportView onClose={() => setReportViewOpen(false)} />
+      )}
 
       {nextProgramPreview !== null && renderNextProgramPreview(nextProgramPreview)}
 

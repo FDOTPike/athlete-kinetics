@@ -185,7 +185,7 @@ test('READY renders the full vector only for profiles that explicitly request it
   expect(screen.getByText('82 / 100')).toBeOnTheScreen();
 });
 
-test('READY keeps a safety halt visible and routes its single action to Coach', () => {
+test('READY keeps a safety halt visible and opens the read-only report view from its single action', () => {
   const openCoach = jest.fn();
   mockState = baseState({
     lastTriage: {
@@ -197,8 +197,10 @@ test('READY keeps a safety halt visible and routes its single action to Coach', 
 
   expect(screen.getByText('Resolve today\'s safety report')).toBeOnTheScreen();
   expect(screen.getByText('Training is paused for today. Review the report before doing more work.')).toBeOnTheScreen();
+  // #185: the link opens the read-only report view, not another screen.
   fireEvent.press(screen.getByLabelText('Review safety report'));
-  expect(openCoach).toHaveBeenCalledTimes(1);
+  expect(screen.getByTestId('safety-report-view')).toBeOnTheScreen();
+  expect(openCoach).not.toHaveBeenCalled();
 });
 
 test('COACH keeps the trajectory compact and expands a session only when its day is requested', () => {
@@ -523,7 +525,7 @@ test('COACH opens the trajectory week row with today\'s cell in view', () => {
   expect(screen.getByTestId('trajectory-days-week-1').props.contentOffset).toEqual({ x: 180, y: 0 });
 });
 
-test('COACH leaves the safety form behind its explicit action even during a halt', () => {
+test('COACH opens the read-only report view, not the report form, during a halt', () => {
   mockState = baseState({
     lastTriage: {
       kind: 'matched',
@@ -538,9 +540,12 @@ test('COACH leaves the safety form behind its explicit action even during a halt
 
   expect(screen.getByText('Stop training today')).toBeOnTheScreen();
   expect(screen.queryByLabelText('Describe how your body feels today')).toBeNull();
+  // #185: "Review safety report" opens the read-only report view; the
+  // report form stays behind its own "Something feels off" disclosure.
   fireEvent.press(screen.getByLabelText('Review safety report'));
   expect(screen.getByTestId('coach-screen').props.keyboardShouldPersistTaps).toBe('handled');
-  expect(screen.getByLabelText('Describe how your body feels today')).toBeOnTheScreen();
+  expect(screen.getByTestId('safety-report-view')).toBeOnTheScreen();
+  expect(screen.queryByLabelText('Describe how your body feels today')).toBeNull();
 });
 
 test('READY recovery state lowers the primary action prominence and shows a reduced-effort label', () => {
