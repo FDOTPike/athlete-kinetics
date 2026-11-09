@@ -185,6 +185,8 @@ import {
   replaceSlotAfterLoggedSets,
   serializeRunner,
   startRunner,
+  runnerTierForTrainingAge,
+  applyGuardrail,
   type RunnerHaltReason,
   type RunnerState,
   type RunnerTarget,
@@ -362,7 +364,8 @@ export const formatTeachingOnlyReason = (verdict: MovementAvailability | undefin
 // Codebase + pre-embedded vectors ride in the JS bundle (~1 MB total);
 // relative imports resolve via metro watchFolders / tsc include.
 import type { BiometricsBridge } from '@ak/biometrics';
-import { groupSummaryExercises, type SkippedExercise } from './sessionSummary';
+import { groupSummaryExercises, type SessionReportFact, type SkippedExercise } from './sessionSummary';
+import { SESSION_REPORT_STOP_ENTRY, sessionReportStopText } from './sessionReportStop';
 import phraseCodebaseJson from '../../../../packages/inference/assets/phrase-codebase.json';
 import phraseVectorsJson from '../../../../packages/inference/assets/phrase-codebase.vectors.json';
 import { routeQuestion, type QuestionIndex, type QuestionResult } from '../../../../packages/inference/src/semantic/questionRouter';
@@ -947,6 +950,10 @@ interface KineticsStore {
     /** Exercises the athlete chose to skip (071 session_skipped_slot), in plan
      *  order, with the sets logged for that slot before the skip. */
     skippedExercises: SkippedExercise[];
+    /** "Report discomfort" reports made during the session, in report order
+     *  (#181). A niggle has no session id; sessions never overlap, so a
+     *  report belongs to the session whose start and finish enclose it. */
+    reports: SessionReportFact[];
   };
   /** Upsert (or clear with null) an absolute 1RM for a movement. */
   saveOneRepMax: (movementId: number, kg: number | null) => void;
@@ -6666,8 +6673,20 @@ export const useStore = create<KineticsStore>()((set, get) => {
         ORDER BY sps.slot_index`,
       [sessionId],
     ));
+    const reportRows = rowsOf<{ region: string; severity: number }>(d.executeSync(
+      `SELECT n.region, n.severity
+         FROM niggle n
+         JOIN session s ON s.session_id = ?
+         LEFT JOIN session_outcome o ON o.session_id = s.session_id
+        WHERE s.started_at_ms IS NOT NULL
+          AND n.reported_at_ms >= s.started_at_ms
+          AND n.reported_at_ms <= COALESCE(o.finalized_at_ms, s.started_at_ms + CAST(COALESCE(s.duration_min, 0) * 60000 AS INTEGER))
+        ORDER BY n.reported_at_ms, n.id`,
+      [sessionId],
+    ));
     return {
       durationMin: sessionRow?.duration_min ?? null,
+      reports: reportRows.map((row) => ({ region: row.region, severity: row.severity })),
       // A set belongs to a skipped slot as the session timeline counts it: by
       // its slot when it has one, else by movement.
       skippedExercises: skippedRows.map((row) => {
@@ -7747,6 +7766,11 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const nextRunner = state.runner === null
       ? null
       : advanceSessionRunner(state.runner, { kind: 'NIGGLE', atMs: loggedAtMs, severity: safe });
+    // #179: a report at the stop level (the level at which the form says "the
+    // session stops for today") closes the day as a Plan halt does. The same
+    // experience-weighted level the screen and the runner use.
+    const stopTier = runnerTierForTrainingAge(state.runner?.tier ?? state.profile.training_age);
+    const closesDay = safe >= EXPERIENCE_SEVERITY[stopTier].haltMin;
     const d = getDb();
     try {
       d.executeSync('BEGIN');
@@ -7760,6 +7784,21 @@ export const useStore = create<KineticsStore>()((set, get) => {
         'INSERT INTO niggle (id, region, severity, reported_at_ms) VALUES (?, ?, ?, ?)',
         [id, region, safe, loggedAtMs],
       );
+      if (closesDay) {
+        // The day halt, in the table and shape a Plan halt uses (halt = 1), so
+        // every halt check sees it. The report is a region and a severity, not
+        // matched text: no matched entry. Same transaction as the niggle, so
+        // a relaunch can never find the report without its halt.
+        d.executeSync(
+          `INSERT INTO subjective_report (date, reported_at_ms, raw_text, matched_entry_id, similarity, halt, load_modifier, set_modifier, rpe_cap)
+           VALUES (?, ?, ?, NULL, NULL, 1, 0, ?, 0)`,
+          [localToday(), loggedAtMs, sessionReportStopText(region, safe), SESSION_REPORT_STOP_ENTRY.guardrail.set_delta],
+        );
+        const reportId = rowsOf<{ id: number }>(d.executeSync('SELECT last_insert_rowid() AS id'))[0]?.id;
+        if (reportId !== undefined) {
+          d.executeSync('INSERT INTO report_severity (report_id, severity) VALUES (?, ?)', [reportId, safe]);
+        }
+      }
       if (nextRunner !== null && state.session !== null && state.sessionMode !== null && nextRunner !== state.runner) {
         persistRunnerCheckpoint(d, state.session.sessionId, state.sessionMode, nextRunner);
       }
@@ -7786,6 +7825,15 @@ export const useStore = create<KineticsStore>()((set, get) => {
       ...(nextRunner !== null && nextRunner !== state.runner ? runnerSelection(nextRunner) : {}),
       ...preparationUpdate,
     });
+    if (closesDay) {
+      // #179: the halt now governs every screen and every start today.
+      get().computePrescription([]);
+      // #181: a report-driven Stop closes the session; it is not left
+      // "paused". If closing fails the session stays halted, with its
+      // Finish button, and the error is shown.
+      if (get().session !== null && get().runner?.phase === 'halted') get().endSession();
+      return true;
+    }
     // A qualifying (but not halt-level) niggle immediately offers a route
     // around the movement. Halt-level reports block `logSet` at this boundary.
     if (nextRunner !== null && nextRunner.phase === 'working' &&
@@ -8590,12 +8638,31 @@ export const useStore = create<KineticsStore>()((set, get) => {
   computePrescription: (_patterns) => {
     if (!get().requireTrainingSupport('daily-prescription', undefined, `session-date:${localToday()}`)) return;
     const { vector, profile, session } = get();
-    // No readiness vector -> no adjustment; NEVER leave yesterday's on screen.
-    if (vector === null) { set({ prescription: null }); return; }
     const d = getDb();
     // ALWAYS the real current date — a store snapshot can be yesterday's
     // (app open past midnight) and would re-read yesterday's reports.
     const today = localToday();
+    // #179: a Stop-level in-session report leaves a halt row with no matched
+    // entry (sessionReportStop.ts). It is read as a recorded halt.
+    const sessionStopHalts = rowsOf<{ report_id: number }>(d.executeSync(
+      'SELECT report_id FROM subjective_report WHERE date = ? AND matched_entry_id IS NULL AND halt = 1 ORDER BY report_id',
+      [today],
+    ));
+    // No readiness vector -> no adjustment; NEVER leave yesterday's on screen.
+    if (vector === null) { set({ prescription: null });
+      // A halt does not depend on the plan or on readiness: an in-session
+      // Stop with no readiness yet still halts the day. Only the halt is set
+      // here; with no halt, lastTriage is left as before.
+      if (sessionStopHalts.length > 0) {
+        const halt = applyGuardrail(
+          { load_modifier: 0, set_modifier: -3, rpe_cap: 0, coaching_cue: '' },
+          SESSION_REPORT_STOP_ENTRY,
+          1,
+        );
+        set({ lastTriage: { kind: 'matched', directive: halt }, today });
+      }
+      return;
+    }
 
     // The whole three-layer derivation is the pure, machine-verified
     // derivePrescription (verify:policy [6]); this is only its SQL adapter.
@@ -8615,6 +8682,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
         return entry === undefined ? null : { entry, severity: r.severity, wasHalt: r.halt === 1 };
       })
       .filter((r): r is { entry: PhraseEntry; severity: number | null; wasHalt: boolean } => r !== null);
+    // One is enough: every such row carries the same recorded halt.
+    if (sessionStopHalts.length > 0) reports.push({ entry: SESSION_REPORT_STOP_ENTRY, severity: null, wasHalt: true });
     const derived = derivePrescription({
       vector,
       profile,

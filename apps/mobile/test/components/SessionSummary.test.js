@@ -429,6 +429,23 @@ describe('screen laws: D5, D6, D8, D9', () => {
       .toEqual(['Skipped: Push-up · no sets logged']);
   });
 
+  // #181: the summary of a session stopped by a report names the reports.
+  test('the completion summary lists each report, its region and severity', () => {
+    mockState = baseState({
+      loadSessionOutcome: jest.fn(() => ({ outcomeKind: 'stopped_safely', finalizedAtMs: 1_757_000_000_000 })),
+      loadSessionSummaryFacts: () => ({
+        durationMin: 20,
+        exercises: [exercise({ movementId: 1, movementName: 'Goblet Squat' })],
+        previousSets: [],
+        skippedExercises: [],
+        reports: [{ region: 'wrist', severity: 4 }, { region: 'lower_back', severity: 8 }],
+      }),
+    });
+    render(<SessionScreen />);
+    expect(screen.getAllByTestId('session-summary-report').map((node) => node.props.children))
+      .toEqual(['Report: Wrist · Mild (4 of 10)', 'Report: Lower back · Stop (8 of 10)']);
+  });
+
   test('render performs no endSession / plan / progression / log call (D8 guard)', () => {
     mockState = baseState();
     render(<SessionScreen />);

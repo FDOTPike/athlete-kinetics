@@ -57,6 +57,7 @@ import { autopilotReasonCopy } from '../state/autopilotCopy';
 import { coachModeAthleteName } from '../state/coachModeAthlete';
 import { PrimaryButton, QuietAction, Disclosure, ListRow } from '../components/ui';
 import { sessionFocusName } from '../state/sessionSummary';
+import { isSessionReportStop, SESSION_REPORT_STOP_SENTENCE } from '../state/sessionReportStop';
 
 export interface TodayScreenProps {
   /** Shell-supplied: go to the live session surface. */
@@ -166,6 +167,7 @@ function AvailableTodayScreen({
   const halted = lastTriage !== null
     && lastTriage.kind === 'matched'
     && lastTriage.directive.halt;
+  const reportStop = isSessionReportStop(lastTriage);
 
   const state: TodayState = useMemo(() => deriveTodayState({
     today,
@@ -230,9 +232,9 @@ function AvailableTodayScreen({
     if (emptyStartPromptOpen) {
       return (
         <View style={styles.card} testID="empty-free-form-start-card">
-          <Text style={styles.title}>Nothing to start yet</Text>
+          <Text style={styles.title}>No session is ready to start</Text>
           <Text style={styles.body}>
-            There is no plan for today and no earlier session to repeat. Build your plan first.
+            Open your plan to see your next session.
           </Text>
           <PrimaryButton
             label="Go to Plan"
@@ -343,9 +345,12 @@ function AvailableTodayScreen({
         return (
           <View style={[styles.card, styles.cardActive]} testID="today-card-halted">
             <Text style={styles.eyebrow}>TODAY</Text>
-            <Text style={styles.title}>Training is paused</Text>
+            {/* #187: after the athlete's own Stop report the card says so. */}
+            <Text style={styles.title}>{reportStop ? 'Training is stopped for today' : 'Training is paused'}</Text>
             <Text style={styles.body}>
-              A safety report paused training for today. Review it before doing more work.
+              {reportStop
+                ? SESSION_REPORT_STOP_SENTENCE
+                : 'A safety report paused training for today. Review it before doing more work.'}
             </Text>
             <QuietAction
               label="Open your plan"

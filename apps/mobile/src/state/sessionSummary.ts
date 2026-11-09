@@ -41,6 +41,7 @@
  * lines carry stable movement-based keys, never rendered text or indexes.
  */
 import { nextSessionAfter, type SessionRef, type TodayBlockSession } from './todayState';
+import { regionLabel, reportSeverityLabel } from './sessionReportStop';
 
 export type ImplementClass = 'bodyweight' | 'loaded';
 
@@ -317,8 +318,22 @@ export const skippedExerciseText = (skipped: SkippedExercise): string => {
   return `Skipped: ${skipped.name} · ${setsOfPlanned(skipped.loggedSets, skipped.plannedSets)} logged${loggedSuffix}`;
 };
 
+/** A "Report discomfort" report made during the session (#181). */
+export interface SessionReportFact {
+  /** The stored region key ("lower_back"). */
+  region: string;
+  /** 1-10, as saved. */
+  severity: number;
+}
+
+/** "Report: Lower back · Stop (8 of 10)". */
+export const sessionReportText = (report: SessionReportFact): string =>
+  `Report: ${regionLabel(report.region)} · ${reportSeverityLabel(report.severity)}`;
+
 export interface SessionSummaryView {
   exerciseLines: SummaryLine[];
+  /** One line per report made during the session, in report order (#181). */
+  reportLines: SummaryLine[];
   /** One line per skipped exercise, in the session timeline's wording. */
   skippedLines: SummaryLine[];
   comparisonLines: SummaryLine[];
@@ -335,6 +350,8 @@ export interface BuildSummaryInput {
   today: string;
   /** The exercises the athlete skipped, in plan order. */
   skippedExercises?: readonly SkippedExercise[];
+  /** Reports made during the session, in report order. */
+  reports?: readonly SessionReportFact[];
 }
 
 export const buildSessionSummary = (input: BuildSummaryInput): SessionSummaryView => {
@@ -359,8 +376,13 @@ export const buildSessionSummary = (input: BuildSummaryInput): SessionSummaryVie
     key: `skipped-${index}`,
     text: skippedExerciseText(skipped),
   }));
+  const reportLines: SummaryLine[] = (input.reports ?? []).map((report, index) => ({
+    key: `report-${index}`,
+    text: sessionReportText(report),
+  }));
   return {
     exerciseLines,
+    reportLines,
     skippedLines,
     comparisonLines,
     durationLine,

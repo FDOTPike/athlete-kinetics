@@ -1404,8 +1404,8 @@ test('a triage halt on a live runner persists safety before ending the session',
 
 test.each([
   ['manual', 'You chose to stop this session.', null],
-  ['niggle', 'You reported that something felt off, so this session is paused.', null],
-  ['pain', 'You reported pain, so this session is paused.', null],
+  ['niggle', 'You reported discomfort, so this session has stopped for today.', null],
+  ['pain', 'You reported pain, so this session has stopped for today.', null],
   ['safety', 'Stop and reassess this symptom.', 'Stop and reassess this symptom.'],
 ])('halt reason %s renders athlete-facing copy and never the raw token', (haltReason, expected, coachingCue) => {
   mockState = state({
@@ -1435,7 +1435,7 @@ test.each([
   });
   render(<SessionScreen />);
 
-  expect(screen.getByText('A safety concern paused this session.')).toBeOnTheScreen();
+  expect(screen.getByText('A safety concern stopped this session.')).toBeOnTheScreen();
   if (typeof haltReason === 'string') {
     expect(screen.queryByText(new RegExp(`^${haltReason}$`, 'i'))).toBeNull();
   }
@@ -1564,6 +1564,33 @@ test('idle state has one focused start action', () => {
   mockState = state({ session: null, sessionPlan: [], activeSessionPlanSlotId: null, runner: null, sessionMode: null });
   render(<SessionScreen />);
   expect(screen.getByLabelText('Start a new workout session')).toBeOnTheScreen();
+});
+
+// #181: a report-driven stop says "stopped"; a manual stop keeps "paused".
+test.each([
+  ['manual', 'Session paused'],
+  ['niggle', 'Session stopped'],
+  ['pain', 'Session stopped'],
+])('a %s halt is titled %s', (haltReason, title) => {
+  mockState = state({ runner: runner({ phase: 'halted', haltReason }), lastTriage: null });
+  render(<SessionScreen />);
+  expect(screen.getByText(title)).toBeOnTheScreen();
+});
+
+// #187: after a report-driven Stop the start prompt says why nothing starts.
+test('idle after a Stop report says the athlete stopped today\'s session after a report', () => {
+  const { SESSION_REPORT_STOP_ENTRY } = jest.requireActual('../../src/state/sessionReportStop');
+  mockState = state({
+    session: null, sessionPlan: [], activeSessionPlanSlotId: null, runner: null, sessionMode: null,
+    lastTriage: { kind: 'matched', directive: {
+      halt: true, followUp: null, similarity: 1, matchedCue: SESSION_REPORT_STOP_ENTRY.text,
+      vector: { load_modifier: 0, set_modifier: -3, rpe_cap: 0, coaching_cue: SESSION_REPORT_STOP_ENTRY.cue },
+    } },
+  });
+  render(<SessionScreen />);
+  expect(screen.getByText('Training is stopped for today.')).toBeOnTheScreen();
+  expect(screen.getByText("You stopped today's session after a report.")).toBeOnTheScreen();
+  expect(screen.queryByLabelText('Start a new workout session')).toBeNull();
 });
 
 test('runner substitution offer: thumbs-down after an earlier set uses runner path and not the legacy preference path', () => {

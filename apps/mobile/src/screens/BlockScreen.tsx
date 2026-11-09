@@ -41,6 +41,7 @@ import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { appliedAdjustmentLines, autopilotReasonCopy } from '../state/autopilotCopy';
 import { EMPTY_ACTIVITY_LEDGER } from '../state/activityStore';
 import { sessionFocusName } from '../state/sessionSummary';
+import { isSessionReportStop, SESSION_REPORT_STOP_SENTENCE } from '../state/sessionReportStop';
 import {
   PrimaryButton,
   SecondaryButton,
@@ -914,7 +915,11 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
     ? 'There is no session to complete today. Use the day to recover.'
     : `There is no session to complete today. Your next session is ${focusName(nextPlanned.focus)}.`;
 
-  if (halted) {
+  if (halted && isSessionReportStop(lastTriage)) {
+    // #187: the day was closed by the athlete's own Stop report in a workout.
+    todayTitle = 'Training is stopped for today';
+    todayMessage = SESSION_REPORT_STOP_SENTENCE;
+  } else if (halted) {
     todayTitle = 'Training is paused';
     todayMessage = 'Today\'s safety report paused training. Review it before doing more work.';
   } else if (session !== null) {
@@ -1506,9 +1511,9 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
             <View style={styles.disclosureContent}>
               {emptyStartPromptOpen ? (
                 <View style={styles.card} testID="empty-free-form-start-card">
-                  <Text style={styles.cardTitle}>Nothing to start yet</Text>
+                  <Text style={styles.cardTitle}>No session is ready to start</Text>
                   <Text style={styles.bodyText}>
-                    There is no plan for today and no earlier session to repeat. Build your plan first.
+                    Open your plan to see your next session.
                   </Text>
                   <PrimaryButton
                     label="Go to Plan"
