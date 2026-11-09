@@ -16,6 +16,7 @@
  *    button's label would pass while the button navigated to Coach — which is
  *    exactly the bug.
  */
+import { formatAthleteDate } from '../../src/state/athleteDate';
 import React from 'react';
 import { Alert } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
@@ -424,7 +425,7 @@ describe('Today distinguishes the states rather than calling them all rest', () 
     expect(screen.getByTestId('today-card-rest')).toBeOnTheScreen();
     expect(screen.getByText('Rest day')).toBeOnTheScreen();
     expect(screen.queryByTestId('today-primary-start')).toBeNull();
-    expect(screen.getByTestId('today-next')).toHaveTextContent(/Upper on 2026-07-16/);
+    expect(screen.getByTestId('today-next')).toHaveTextContent(new RegExp(`Upper on ${formatAthleteDate('2026-07-16')}`));
   });
 
   test('an athlete with no program is NOT told to rest', () => {
@@ -601,7 +602,7 @@ describe('an earlier workout the app never closed has a way out (issue 191)', ()
     render(<TodayScreen />);
 
     expect(screen.getByText('An earlier workout was never finished')).toBeOnTheScreen();
-    expect(screen.getByText(/2026-07-13.*3 sets logged/)).toBeOnTheScreen();
+    expect(screen.getByText(new RegExp(`${formatAthleteDate('2026-07-13')}.*3 sets logged`))).toBeOnTheScreen();
     expect(screen.queryByText('Discard empty session')).toBeNull();
 
     fireEvent.press(screen.getByText('Finish and keep logged sets'));

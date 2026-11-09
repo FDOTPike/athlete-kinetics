@@ -24,6 +24,7 @@ import {
 } from '../components/ui';
 import { PreparationPanel } from '../components/PreparationPanel';
 import { MovementPreview } from '../components/movementPreview/MovementPreview';
+import { formatAthleteDate } from '../state/athleteDate';
 import { SessionFeelPanel, describeSessionFeel } from '../components/SessionFeelPanel';
 import { HALT_NEXT_TEXT } from '../state/haltCopy';
 import { operativeReportLine } from '../state/operativeReportLine';
@@ -293,17 +294,8 @@ const lines = (text: string | null | undefined, max: number): string[] => {
 const sameSlot = (logged: { session_plan_slot_id: number | null; movement_id: number }, slot: PlanSlot): boolean =>
   logged.session_plan_slot_id != null ? logged.session_plan_slot_id === slot.sessionPlanSlotId : logged.movement_id === slot.movementId;
 
-const formatFinalizedDate = (ms: number): string => {
-  const date = new Date(ms);
-  const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-  const day = date.getDate();
-  const dayName = weekdays[date.getDay()];
-  const monthName = months[date.getMonth()];
-  // R3: the year is included so a prior-year completion cannot read as recent.
-  const year = date.getFullYear();
-  return `${dayName} ${day} ${monthName} ${year}`;
-};
+// R3: the year is included so a prior-year completion cannot read as recent.
+const formatFinalizedDate = (ms: number): string => formatAthleteDate(ms);
 
 /** Limits a corrected set must meet: the same reps range and load grid the
  *  Log set path applies (logCurrent, isOnLoadGrid). A correction never snaps a value. */

@@ -21,6 +21,7 @@ import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useStore, type RecentSessionOutcome } from '../state/useStore';
 import { theme } from '../theme/theme';
+import { formatAthleteDate } from '../state/athleteDate';
 import { ListRow } from '../components/ui';
 import { measuredDayDetail } from './measuredDayDetail';
 import { buildSessionSummary, markPerDumbbell, sessionFocusName } from '../state/sessionSummary';
@@ -33,12 +34,10 @@ const OUTCOME_LABELS: Record<string, string> = {
 };
 
 // D5: dates include the year — a January session read in December must not
-// masquerade as recent.
+// masquerade as recent. The shared athlete date format (issue #156).
 const formatFinalizedDate = (ms: number): string => {
   if (ms <= 0) return '—';
-  return new Date(ms).toLocaleDateString(undefined, {
-    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-  });
+  return formatAthleteDate(ms);
 };
 
 /** Issue #201: "Session recorded" on three rows told nothing apart. The row

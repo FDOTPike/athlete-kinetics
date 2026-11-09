@@ -580,6 +580,19 @@ test('COACH renders a rest-day placeholder when no session is scheduled today', 
   expect(screen.queryByText('Goblet Squat')).toBeNull();
 });
 
+test('READY with no block does not say Rest day; it says what Today says (issue #156)', () => {
+  mockState = baseState({
+    todayPlan: null,
+    block: null,
+    uiPreferences: { sessionModeOverride: null, readinessDetail: 'full', restTimerEnabled: true, textScale: 'system' },
+  });
+  render(<ReadinessScreen />);
+
+  expect(screen.getByText('No plan yet.')).toBeOnTheScreen();
+  expect(screen.getByText('Build a plan and today gets a workout with it.')).toBeOnTheScreen();
+  expect(screen.queryByText('Rest day.')).toBeNull();
+});
+
 test('READY renders rest-day statement and metrics list when no session is scheduled', () => {
   mockState = baseState({
     todayPlan: null,
@@ -955,12 +968,12 @@ describe('#210: the Pause card comes after the plan, for everyone', () => {
   );
 
   test.each(['beginner', 'intermediate', 'advanced', 'elite'])(
-    'while paused, a %s athlete sees GOAL PROGRAM, TODAY and the trajectory before PROGRAMME PAUSED',
+    'while paused, a %s athlete sees GOAL PROGRAM, TODAY and the trajectory before PROGRAM PAUSED',
     (trainingAge) => {
       mockState = withProgram(trainingAge, { suspension: OPEN_EPISODE, endSuspension: jest.fn() });
       render(<BlockScreen />);
       const json = order();
-      expectInOrder(json, ['"GOAL PROGRAM"', '"TODAY"', 'Four-week trajectory', '"PROGRAMME PAUSED"']);
+      expectInOrder(json, ['"GOAL PROGRAM"', '"TODAY"', 'Four-week trajectory', '"PROGRAM PAUSED"']);
       expect(json.indexOf('Injured, ill, or life got in the way?')).toBe(-1);
     },
   );

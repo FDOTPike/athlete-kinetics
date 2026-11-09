@@ -54,6 +54,7 @@ import {
 } from '../state/todayState';
 import { classifyReadiness, HALT_META, HeldScreenWithHalt } from './ReadinessScreen';
 import { autopilotReasonCopy } from '../state/autopilotCopy';
+import { formatAthleteDate } from '../state/athleteDate';
 import { coachModeAthleteName } from '../state/coachModeAthlete';
 import { PrimaryButton, QuietAction, Disclosure, ListRow } from '../components/ui';
 import { sessionFocusName } from '../state/sessionSummary';
@@ -71,8 +72,6 @@ export interface TodayScreenProps {
 
 const focusName = (focus: string): string => sessionFocusName(focus);
 
-/** "Lower session · Fri 12 Sep" without pulling in a date library. */
-const shortDate = (iso: string): string => iso;
 
 /** Stable empty list for the earlier-workout card (issue 191). */
 const NO_EARLIER_OPEN_SESSIONS: readonly EarlierOpenSession[] = [];
@@ -326,7 +325,7 @@ function AvailableTodayScreen({
         <Text style={styles.caption} testID="today-next-none">{emptyCopy}</Text>
       ) : (
         <Text style={styles.body} testID="today-next">
-          {focusName(next.focus)} on {shortDate(next.sessionDate)} — {next.slotCount} movement
+          {focusName(next.focus)} on {formatAthleteDate(next.sessionDate)} — {next.slotCount} movement
           {next.slotCount === 1 ? '' : 's'}.
         </Text>
       )}
@@ -531,7 +530,7 @@ function AvailableTodayScreen({
             <Text style={styles.body}>
               You have {state.missedCount} unfinished session
               {state.missedCount === 1 ? '' : 's'} in this block, the earliest from{' '}
-              {shortDate(state.earliest.sessionDate)} ({focusName(state.earliest.focus)}).
+              {formatAthleteDate(state.earliest.sessionDate)} ({focusName(state.earliest.focus)}).
             </Text>
             {/* Deliberately NOT offering "move it to today". Rescheduling is a
                 §2 Phase 2 item and would be a new schedule mutation rule. The
@@ -643,7 +642,7 @@ function AvailableTodayScreen({
             <Text style={styles.eyebrow}>UNFINISHED</Text>
             <Text style={styles.title}>An earlier workout was never finished</Text>
             <Text style={styles.body}>
-              From {shortDate(entry.sessionDate)}. {sets === 0
+              From {formatAthleteDate(entry.sessionDate)}. {sets === 0
                 ? 'No sets were logged.'
                 : `${sets} set${sets === 1 ? '' : 's'} logged.`}
             </Text>
@@ -677,7 +676,7 @@ function AvailableTodayScreen({
           and points to the same card to resume. */}
       {suspension != null && (
         <View style={styles.card} testID="today-paused">
-          <Text style={styles.eyebrow}>PROGRAMME PAUSED</Text>
+          <Text style={styles.eyebrow}>PROGRAM PAUSED</Text>
           {/* #188: an injury pause never invites training. #178: a halt never invites training. */}
           <Text style={styles.body}>
             {halted

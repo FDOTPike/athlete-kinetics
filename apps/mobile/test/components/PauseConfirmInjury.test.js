@@ -103,7 +103,7 @@ test.each(['injury', 'illness', 'life'])('the %s pause asks first and pauses onl
   fireEvent.press(screen.getByTestId(`suspension-begin-${reason}`));
   expect(mockState.beginSuspension).not.toHaveBeenCalled();
   const label = { injury: 'an injury', illness: 'illness', life: 'life events' }[reason];
-  expect(screen.getByText(`Pause your programme (${label})?`)).toBeOnTheScreen();
+  expect(screen.getByText(`Pause your program (${label})?`)).toBeOnTheScreen();
   fireEvent.press(screen.getByTestId('suspension-confirm'));
   expect(mockState.beginSuspension).toHaveBeenCalledTimes(1);
   expect(mockState.beginSuspension).toHaveBeenCalledWith(reason, expect.any(Number));
@@ -115,7 +115,7 @@ test('cancelling the question pauses nothing and brings the choices back', () =>
   fireEvent.press(screen.getByTestId('suspension-cancel'));
   expect(mockState.beginSuspension).not.toHaveBeenCalled();
   expect(screen.getByTestId('suspension-begin-injury')).toBeOnTheScreen();
-  expect(screen.queryByText(/Pause your programme \(/)).toBeNull();
+  expect(screen.queryByText(/Pause your program \(/)).toBeNull();
 });
 
 test('the injury pause has its own text with no "keep training", and links to "Something feels off"', () => {

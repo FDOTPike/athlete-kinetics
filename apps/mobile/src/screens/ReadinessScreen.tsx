@@ -447,9 +447,10 @@ function AvailableReadinessScreen({
 
         {renderReturnCheckinCard()}
 
-        {/* Display-type Rest day statement */}
-        <Text style={styles.displayMain}>Rest day.</Text>
-        <Text style={styles.displaySub}>That's the work.</Text>
+        {/* Rest day only when a block exists and today is unplanned. With no
+            block, say what Today says (issue #156). */}
+        <Text style={styles.displayMain}>{block != null ? 'Rest day.' : 'No plan yet.'}</Text>
+        <Text style={styles.displaySub}>{block != null ? "That's the work." : 'Build a plan and today gets a workout with it.'}</Text>
 
         <View style={styles.section}>
           <Disclosure label="Why this recommendation" hint="The short explanation first">

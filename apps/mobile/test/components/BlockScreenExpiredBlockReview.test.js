@@ -139,6 +139,6 @@ test('#221: a safety halt keeps its card, and the review control stays hidden as
   mockState = baseState({ lastTriage: haltTriage });
   render(<BlockScreen />);
   expect(screen.getByText('Stop training today')).toBeOnTheScreen();
-  expect(screen.getByText('Systemic symptom reported. Stop the session and rest.')).toBeOnTheScreen();
+  expect(screen.getByText('Stop training for today. Do no more sets or sessions today.')).toBeOnTheScreen();
   expect(screen.queryByRole('button', { name: 'Review program continuation' })).toBeNull();
 });

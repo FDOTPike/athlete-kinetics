@@ -165,8 +165,9 @@ const styles = StyleSheet.create({
     color: theme.color.textHi,
     fontSize: 26,
     fontWeight: '800',
-    textAlign: 'center',
     fontVariant: ['tabular-nums'],
+    includeFontPadding: false,
+    paddingHorizontal: theme.space[3],
     paddingVertical: theme.space[1],
   },
 });

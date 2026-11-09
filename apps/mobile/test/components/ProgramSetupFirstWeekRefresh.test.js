@@ -82,7 +82,8 @@ test('declaring prior experience redraws "Your first week" from a new preview', 
   // The mocked store has no subscription; re-render as the store update would.
   rerender(<ProgramSetupScreen />);
 
-  expect(screen.getByText('Competition Squat: ready')).toBeOnTheScreen();
+  expect(screen.getByText('Big-lift strength')).toBeOnTheScreen();
+  expect(screen.queryByTestId('anchor-coverage-card')).toBeNull();
   expect(mockState.previewTrainingProgram.mock.calls.length).toBeGreaterThan(callsBefore);
   expect(week().getByText('Competition Squat — 3×5')).toBeOnTheScreen();
   expect(week().queryByText('Box Squat — 3×5')).toBeNull();

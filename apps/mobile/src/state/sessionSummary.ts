@@ -44,6 +44,7 @@
  * lines carry stable movement-based keys, never rendered text or indexes.
  */
 import { nextSessionAfter, type SessionRef, type TodayBlockSession } from './todayState';
+import { formatAthleteDate } from './athleteDate';
 import { regionLabel, reportSeverityLabel } from './sessionReportStop';
 
 export type ImplementClass = 'bodyweight' | 'loaded';
@@ -460,7 +461,7 @@ export const buildSessionSummary = (input: BuildSummaryInput): SessionSummaryVie
     durationLine,
     nextLine: next === null
       ? null
-      : `Next: ${sessionFocusName(next.focus)} session on ${next.sessionDate} — ${plural(next.slotCount, 'movement')}.`,
+      : `Next: ${sessionFocusName(next.focus)} session on ${formatAthleteDate(next.sessionDate)} — ${plural(next.slotCount, 'movement')}.`,
   };
 };
 

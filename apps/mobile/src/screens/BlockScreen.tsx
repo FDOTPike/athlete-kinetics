@@ -1201,7 +1201,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           "stop training" affordance. */}
       {suspension != null ? (
         <View style={[styles.card, styles.haltCard]}>
-          <Text style={styles.eyebrow}>PROGRAMME PAUSED</Text>
+          <Text style={styles.eyebrow}>PROGRAM PAUSED</Text>
           <Text style={styles.cardTitle}>Your place is being held</Text>
           <Text style={styles.bodyText}>
             {pausedHeldText(SUSPENSION_REASON_LABEL[suspension.reason], program, suspension.reason, halted)}
@@ -1215,7 +1215,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
             />
           )}
           <PrimaryButton
-            label="Resume my programme"
+            label="Resume my program"
             onPress={() => {
               // Same action-scoped try/catch the pause controls use below. The
               // resume path had none, so a database failure escaped the handler
@@ -1229,8 +1229,8 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
               }
             }}
             accessibilityLabel={program != null
-              ? `Resume the programme and return to block ${program.currentSequenceIndex} of ${program.plannedBlockCount}`
-              : 'Resume the programme and return to your place'}
+              ? `Resume the program and return to block ${program.currentSequenceIndex} of ${program.plannedBlockCount}`
+              : 'Resume the program and return to your place'}
             testID="suspension-resume"
           />
           {/* Mounted INSIDE the suspended branch. The resume button exists only
@@ -1250,7 +1250,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           <Text style={styles.bodyText}>
             {halted
               ? HALT_PAUSE_CARD_TEXT
-              : 'Pausing holds your place in the programme so a gap does not cost you a block. You can still train while paused.'}
+              : 'Pausing holds your place in the program so a gap does not cost you a block. You can still train while paused.'}
           </Text>
           {/* #188: every pause asks first; the pause itself is unchanged. */}
           {confirmPauseReason === null ? SUSPENSION_REASONS.map((reason) => (
@@ -1261,16 +1261,16 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                 setSuspendError(null);
                 setConfirmPauseReason(reason);
               }}
-              accessibilityLabel={`Pause my programme for ${SUSPENSION_REASON_LABEL[reason]}`}
+              accessibilityLabel={`Pause my program for ${SUSPENSION_REASON_LABEL[reason]}`}
               testID={`suspension-begin-${reason}`}
             />
           )) : (
             <>
               <Text style={styles.bodyText}>
-                {`Pause your programme (${SUSPENSION_REASON_LABEL[confirmPauseReason]})?`}
+                {`Pause your program (${SUSPENSION_REASON_LABEL[confirmPauseReason]})?`}
               </Text>
               <PrimaryButton
-                label="Pause my programme"
+                label="Pause my program"
                 onPress={() => {
                   const reason = confirmPauseReason;
                   setConfirmPauseReason(null);
@@ -1281,13 +1281,13 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                     setSuspendError(e instanceof Error ? e.message : String(e));
                   }
                 }}
-                accessibilityLabel={`Confirm: pause my programme for ${SUSPENSION_REASON_LABEL[confirmPauseReason]}`}
+                accessibilityLabel={`Confirm: pause my program for ${SUSPENSION_REASON_LABEL[confirmPauseReason]}`}
                 testID="suspension-confirm"
               />
               <SecondaryButton
                 label="Cancel"
                 onPress={() => setConfirmPauseReason(null)}
-                accessibilityLabel="Cancel and keep the programme running"
+                accessibilityLabel="Cancel and keep the program running"
                 testID="suspension-cancel"
               />
             </>

@@ -56,8 +56,8 @@ afterEach(async () => {
 
 test('the notes example is a plain record and the record-only sentence is unchanged', () => {
   render(<OnboardingScreen />);
-  // welcome -> goal -> focus -> experience -> logistics -> equipment -> limits
-  for (let n = 0; n < 6; n += 1) next();
+  // welcome -> goal -> focus -> experience -> maxes -> logistics -> equipment -> limits
+  for (let n = 0; n < 7; n += 1) next();
   pressLabel('Yes, let me add notes');
 
   expect(screen.getByText('One per line, like "knee: old ACL repair, 2019".')).toBeTruthy();

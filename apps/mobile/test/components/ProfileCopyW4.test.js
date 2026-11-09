@@ -16,8 +16,8 @@ test('a day with no sets says no training was logged, and keeps its measures', (
     .toBe('No training logged · 72.4 kg BW · 51 bpm resting HR');
   expect(measuredDayDetail({ tonnageKg: 0, setCount: 0, bodyweightKg: null })).toBe('No training logged');
   expect(measuredDayDetail({ tonnageKg: 1234.4, setCount: 12, bodyweightKg: null, restingHr: null }))
-    .toBe('1234 kg load · 12 sets');
-  expect(measuredDayDetail({ tonnageKg: 0, setCount: 1, bodyweightKg: null })).toBe('0 kg load · 1 set');
+    .toBe(`${(1234).toLocaleString()} kg lifted in total · 12 sets`);
+  expect(measuredDayDetail({ tonnageKg: 0, setCount: 1, bodyweightKg: null })).toBe('0 kg lifted in total · 1 set');
 });
 
 // W4-9: the energy system "i" always explained ATP-PC.

@@ -1,3 +1,4 @@
+import { formatAthleteDate } from '../../src/state/athleteDate';
 import React from 'react';
 import { Alert, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
@@ -1882,7 +1883,7 @@ test('post-session Outcome view displays correct copy for all mappings (beginner
 
     const { unmount } = render(<SessionScreen />);
     expect(screen.getByText(expected)).toBeOnTheScreen();
-    expect(screen.getByText('Session saved · Tuesday 21 July 2026')).toBeOnTheScreen();
+    expect(screen.getByText(`Session saved · ${formatAthleteDate(testTimestamp)}`)).toBeOnTheScreen();
     unmount();
   }
 

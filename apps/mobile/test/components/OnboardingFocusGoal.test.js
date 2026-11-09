@@ -278,9 +278,9 @@ describe('the detailed target is optional', () => {
     // index is the review's index in the array WITHOUT the removed screen.
     expect(screen.getByLabelText('START TRAINING')).toBeTruthy();
     expect(screen.queryByText('HOW LONG HAVE YOU BEEN TRAINING?')).toBeNull();
-    // Nine screens include the target; skipping it leaves eight, and the
-    // review must be step 8 of 8 — never an out-of-range index.
-    expect(stepLabel()).toBe('Step 8 of 8');
+    // Ten screens include the target and maxes; skipping target leaves nine,
+    // and the review must be step 9 of 9 — never an out-of-range index.
+    expect(stepLabel()).toBe('Step 9 of 9');
   });
 
   test('after a review-edit skip, Back moves one step and NEXT returns to the review', () => {
@@ -296,10 +296,10 @@ describe('the detailed target is optional', () => {
     expect(screen.getByLabelText('START TRAINING')).toBeTruthy();
     pressLabel('Back');
     expect(screen.getByText('ANY TRAINING NOTES TO RECORD?')).toBeTruthy();
-    expect(stepLabel()).toBe('Step 7 of 8');
+    expect(stepLabel()).toBe('Step 8 of 9');
     next();
     expect(screen.getByLabelText('START TRAINING')).toBeTruthy();
-    expect(stepLabel()).toBe('Step 8 of 8');
+    expect(stepLabel()).toBe('Step 9 of 9');
   });
 
   test('after a skip, a later EDIT still returns to the review on NEXT', () => {
@@ -337,7 +337,7 @@ describe('the detailed target is optional', () => {
     fillTarget();
     next();
     expect(screen.getByLabelText('START TRAINING')).toBeTruthy();
-    expect(stepLabel()).toBe('Step 9 of 9');
+    expect(stepLabel()).toBe('Step 10 of 10');
   });
 
   test('skip from EDIT returns to the review when both optional screens exist', () => {
@@ -355,11 +355,11 @@ describe('the detailed target is optional', () => {
     fillTarget();
     next();
     walkToReview();
-    expect(stepLabel()).toBe('Step 10 of 10');
+    expect(stepLabel()).toBe('Step 11 of 11');
     pressLabel('Edit target');
     press('onboarding-skip-target');
     expect(screen.getByLabelText('START TRAINING')).toBeTruthy();
-    expect(stepLabel()).toBe('Step 9 of 9');
+    expect(stepLabel()).toBe('Step 10 of 10');
   });
 
   test('a custom measurement asks for its unit', () => {

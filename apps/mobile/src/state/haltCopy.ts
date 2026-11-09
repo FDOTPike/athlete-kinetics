@@ -10,6 +10,6 @@ export const HALT_TODAY_TEXT = 'Stop training for today. Do no more sets or sess
 export const HALT_NEXT_TEXT =
   'Next: rest today and check in tomorrow. If it has not settled, or it gets worse, seek qualified professional advice.';
 
-/** Replaces "You can still train while paused" on the programme pause card while a halt is active. */
+/** Replaces "You can still train while paused" on the program pause card while a halt is active. */
 export const HALT_PAUSE_CARD_TEXT =
-  'Pausing holds your place in the programme so a gap does not cost you a block. Today\'s safety report has stopped training for today.';
+  'Pausing holds your place in the program so a gap does not cost you a block. Today\'s safety report has stopped training for today.';
