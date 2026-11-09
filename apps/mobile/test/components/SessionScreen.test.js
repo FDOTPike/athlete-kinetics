@@ -2014,6 +2014,38 @@ const niggleCounterexampleState = () => state({
   getMovementAvailabilityVerdicts: realVerdictsFor,
 });
 
+// #183: one region tap saved a Mild report the athlete never chose.
+test('no severity is preselected and Save waits for a region and a severity', () => {
+  render(<SessionScreen />);
+  fireEvent.press(screen.getByLabelText('Report discomfort'));
+  for (const label of ['Mild discomfort, 4 of 10', 'Moderate discomfort, 6 of 10', 'Stop discomfort, 8 of 10']) {
+    expect(screen.getByLabelText(label).props.accessibilityState?.selected).toBeFalsy();
+  }
+  const save = () => screen.getByLabelText('Save discomfort report');
+  expect(save().props.accessibilityState?.disabled).toBe(true);
+  fireEvent.press(screen.getByLabelText('knee'));
+  expect(save().props.accessibilityState?.disabled).toBe(true);
+  fireEvent.press(save());
+  expect(mockState.reportNiggle).not.toHaveBeenCalled();
+  fireEvent.press(screen.getByLabelText('Moderate discomfort, 6 of 10'));
+  expect(save().props.accessibilityState?.disabled).toBe(false);
+  fireEvent.press(save());
+  expect(mockState.reportNiggle).toHaveBeenCalledWith('knee', 6);
+});
+
+test('regions are capitalised on screen and saved under their stored keys', () => {
+  render(<SessionScreen />);
+  fireEvent.press(screen.getByLabelText('Report discomfort'));
+  expect(screen.getByText('Knee')).toBeOnTheScreen();
+  expect(screen.getByText('Shoulder')).toBeOnTheScreen();
+  expect(screen.queryByText('knee')).toBeNull();
+  expect(screen.queryByText(/^other$/i)).toBeNull();
+  fireEvent.press(screen.getByLabelText('shoulder'));
+  fireEvent.press(screen.getByLabelText('Mild discomfort, 4 of 10'));
+  fireEvent.press(screen.getByLabelText('Save discomfort report'));
+  expect(mockState.reportNiggle).toHaveBeenCalledWith('shoulder', 4);
+});
+
 test('a discomfort report that fails to save keeps the form open and does not say it was saved', () => {
   mockState = niggleCounterexampleState();
   mockState.reportNiggle = jest.fn(() => false);
@@ -2021,6 +2053,7 @@ test('a discomfort report that fails to save keeps the form open and does not sa
 
   fireEvent.press(screen.getByLabelText('Report discomfort'));
   fireEvent.press(screen.getByLabelText('knee'));
+  fireEvent.press(screen.getByLabelText('Mild discomfort, 4 of 10'));
   fireEvent.press(screen.getByLabelText('Save discomfort report'));
 
   expect(mockState.reportNiggle).toHaveBeenCalledWith('knee', 4);
@@ -2036,9 +2069,10 @@ test('a non-halting knee niggle keeps the session and opens substitution instead
   expect(screen.getByText('Front Squat')).toBeOnTheScreen();
   expect(screen.getByLabelText('Log set 1 for Front Squat')).toBeOnTheScreen();
 
-  // Report knee discomfort at the intermediate triage minimum (default 4).
+  // Report knee discomfort at the intermediate triage minimum (Mild, 4).
   fireEvent.press(screen.getByLabelText('Report discomfort'));
   fireEvent.press(screen.getByLabelText('knee'));
+  fireEvent.press(screen.getByLabelText('Mild discomfort, 4 of 10'));
   expect(EXPERIENCE_SEVERITY.intermediate.triageMin).toBe(4);
   fireEvent.press(screen.getByLabelText('Save discomfort report'));
   expect(mockState.reportNiggle).toHaveBeenCalledWith('knee', 4);
