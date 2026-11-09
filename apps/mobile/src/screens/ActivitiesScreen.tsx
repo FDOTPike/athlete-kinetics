@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   ACTIVITY_DEMANDS,
   ACTIVITY_EQUIPMENT_KINDS,
@@ -122,6 +122,10 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
   // Cancel still clears it.
   const [entryDraftKept, setEntryDraftKept] = useState(false);
   const [keptCompletionOccurrenceId, setKeptCompletionOccurrenceId] = useState<string | null>(null);
+  // #148: what the entry looked like when it was started fresh. Leaving with
+  // an UNCHANGED entry closes quietly; only a real unsaved change is confirmed.
+  const [entryStart, setEntryStart] = useState(0);
+  const [entryBaseline, setEntryBaseline] = useState<string | null>(null);
 
   // A shown validation message describes the values at the last Save. Once the
   // athlete edits a typed field it may no longer be true, so it is cleared;
@@ -136,7 +140,18 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
     [ledger.series, today],
   );
 
+  const entrySnapshot = (): string => JSON.stringify([
+    entryMode, activityId, seriesId, kindId, displayName, demand, facilityCode, equipmentCode,
+    weekday, timing, timeText, dateText, durationText, effortText, oneOffState, modalityId, purposeId,
+  ]);
+  useEffect(() => {
+    setEntryBaseline(entrySnapshot());
+    // entrySnapshot reads the values of the render that started the entry.
+  }, [entryStart]);
+  const entryChanged = entryBaseline !== null && entrySnapshot() !== entryBaseline;
+
   const resetForm = (): void => {
+    setEntryStart((n) => n + 1);
     setEntryDraftKept(false);
     setEntryMode('weekly');
     setActivityId(undefined);
@@ -186,6 +201,7 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
       : `${String(Math.floor(row.localStartMinute / 60)).padStart(2, '0')}:${String(row.localStartMinute % 60).padStart(2, '0')}`);
     setDurationText(row.expectedDurationMin?.toString() ?? '');
     setEffortText(row.expectedEffort?.toString() ?? '');
+    setEntryStart((n) => n + 1);
     setError(null);
     setNotice(null);
     setFormOpen(true);
@@ -282,13 +298,34 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
     }
   });
 
+  // #148: the kept or open entry lives only in this screen, so leaving
+  // Activities (BACK TO ATHLETE, or a later hardware Back) asks first.
+  const requestLeave = (): void => {
+    if (!entryChanged) {
+      onClose();
+      return;
+    }
+    Alert.alert(
+      'Discard this activity?',
+      'Your activity entry has not been saved.',
+      [
+        { text: 'Keep editing', style: 'cancel' },
+        { text: 'Discard', style: 'destructive', onPress: onClose },
+      ],
+      { cancelable: true },
+    );
+  };
+  // Only a kept entry that really changed takes the Back; otherwise the host
+  // closes Activities exactly as it did before this change.
+  useSubViewBack(!formOpen && entryDraftKept && entryChanged, requestLeave);
+
   return (
     <KeyboardAwareScrollView
       style={styles.screen}
       contentContainerStyle={styles.content}
       testID="activities-screen"
     >
-      <QuietAction label="BACK TO ATHLETE" onPress={onClose} accessibilityLabel="Back to athlete profile" />
+      <QuietAction label="BACK TO ATHLETE" onPress={requestLeave} accessibilityLabel="Back to athlete profile" />
       <Text accessibilityRole="header" style={styles.heading}>YOUR ACTIVITIES</Text>
       <Text style={styles.intro}>
         Record sport, walking, swimming, cycling, gym work, or another activity you already do.

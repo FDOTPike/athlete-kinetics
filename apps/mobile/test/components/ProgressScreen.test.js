@@ -130,3 +130,22 @@ describe('Recent sessions open to what was logged', () => {
     expect(screen.queryByText("This session's summary could not be read.")).toBeNull();
   });
 });
+
+describe('recent session rows (#201)', () => {
+  test('sessions on one day are told apart by focus, exercise and set counts, with the outcome on each row', () => {
+    const sameDay = new SpyDate('2026-11-04T10:30:00').getTime();
+    mockState = state({
+      loadRecentOutcomes: jest.fn(() => [
+        { sessionId: 3, outcomeKind: 'followed_plan', finalizedAtMs: sameDay + 7200000, focus: 'upper', originKind: 'planned', exerciseCount: 3, loggedSetCount: 9 },
+        { sessionId: 2, outcomeKind: 'session_recorded', finalizedAtMs: sameDay + 3600000, focus: null, originKind: 'free_form', exerciseCount: 1, loggedSetCount: 4 },
+        { sessionId: 1, outcomeKind: 'followed_plan', finalizedAtMs: sameDay, focus: 'lower', originKind: 'planned', exerciseCount: 2, loggedSetCount: 6 },
+      ]),
+    });
+    render(<ProgressScreen />);
+    expect(screen.getByText(/^Upper · 3 exercises · 9 sets/)).toBeOnTheScreen();
+    expect(screen.getByText(/^Extra session · 1 exercise · 4 sets/)).toBeOnTheScreen();
+    expect(screen.getByText(/^Lower · 2 exercises · 6 sets/)).toBeOnTheScreen();
+    expect(screen.getAllByText('Plan followed')).toHaveLength(2);
+    expect(screen.getByText('Session recorded')).toBeOnTheScreen();
+  });
+});
