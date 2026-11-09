@@ -43,6 +43,7 @@ import { appliedAdjustmentLines, autopilotReasonCopy } from '../state/autopilotC
 import { EMPTY_ACTIVITY_LEDGER } from '../state/activityStore';
 import { sessionFocusName } from '../state/sessionSummary';
 import { operativeReportLine } from '../state/operativeReportLine';
+import { reportEffectText, reportEntryName } from '../state/reportCopy';
 import { SafetyReportView } from '../components/SafetyReportView';
 import { isSessionReportStop, SESSION_REPORT_STOP_SENTENCE } from '../state/sessionReportStop';
 import {
@@ -1667,6 +1668,51 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
             onOpenChange={setReportOpen}
           >
             <View style={styles.disclosureContent}>
+              {/* The reply to a report sits ABOVE the form, so it is in view
+                  after Apply (#207). It says, in this order: what the report
+                  matched, what changed today with the applied figures (after the
+                  severity gate and the experience scaling), then the entry's cue. */}
+              {lastTriage !== null && lastTriage.kind === 'positive' && (
+                <View style={styles.reportResult} testID="report-result-noted">
+                  <View style={styles.statusBadge}>
+                    <Text style={styles.statusBadgeText}>Noted</Text>
+                  </View>
+                  {lastTriage.entryId !== undefined && (
+                    <Text style={styles.captionText}>{`Matched: ${reportEntryName(lastTriage.entryId)}`}</Text>
+                  )}
+                  <Text style={styles.bodyText}>Today's plan is unchanged.</Text>
+                  <Text style={styles.captionText}>{lastTriage.cue}</Text>
+                </View>
+              )}
+              {lastTriage !== null && lastTriage.kind === 'rejected' && (
+                <View style={styles.reportResult}>
+                  <View style={styles.statusBadge}>
+                    <Text style={styles.statusBadgeText}>No change</Text>
+                  </View>
+                  <Text style={styles.captionText}>
+                    {triageReady
+                      ? "Coach did not match this to a known scenario, so today's plan is unchanged."
+                      : "Matching is unavailable, so this report was not matched to a known scenario and today's plan is unchanged. Injury-language safety checks still apply."}
+                  </Text>
+                </View>
+              )}
+              {lastTriage !== null && lastTriage.kind === 'matched' && !lastTriage.directive.halt && (
+                <View style={styles.reportResult} testID="report-result-adjusted">
+                  <View style={styles.statusBadge}>
+                    <Text style={styles.statusBadgeText}>Plan adjusted</Text>
+                  </View>
+                  {current?.report != null && (
+                    <>
+                      <Text style={styles.captionText}>{`Matched: ${reportEntryName(current.report.entryId)}`}</Text>
+                      <Text style={styles.bodyText}>{reportEffectText(current.report.effect)}</Text>
+                    </>
+                  )}
+                  <Text style={styles.captionText}>{lastTriage.directive.vector.coaching_cue}</Text>
+                  {lastTriage.directive.followUp !== null && (
+                    <Text style={styles.captionText}>{lastTriage.directive.followUp}</Text>
+                  )}
+                </View>
+              )}
               {!triageReady && (
                 <Text style={styles.captionText}>
                   Semantic matching is unavailable in this build. Injury-language safety checks still apply.
@@ -1716,6 +1762,11 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                     if (!stored) { setReportNotSent(true); return; }
                     setReportText('');
                     setReportSeverity(null);
+                    // Bring the reply (above the form) into view (#207).
+                    scrollRef.current?.scrollTo({
+                      y: Math.max(0, disclosuresSectionY.current + reportDisclosureOffsetY.current - theme.space[4]),
+                      animated: true,
+                    });
                   }, () => { setReportNotSent(true); });
                 }}
                 accessibilityLabel={triaging ? 'Checking report' : 'Apply report'}
@@ -1724,38 +1775,6 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                 <Text style={styles.captionText} accessibilityRole="alert" testID="plan-report-not-sent">
                   {REPORT_NOT_SENT_TEXT}
                 </Text>
-              )}
-
-              {lastTriage !== null && lastTriage.kind === 'positive' && (
-                <View style={styles.reportResult}>
-                  <View style={styles.statusBadge}>
-                    <Text style={styles.statusBadgeText}>Noted</Text>
-                  </View>
-                  <Text style={styles.bodyText}>{lastTriage.cue}</Text>
-                </View>
-              )}
-              {lastTriage !== null && lastTriage.kind === 'rejected' && (
-                <View style={styles.reportResult}>
-                  <View style={styles.statusBadge}>
-                    <Text style={styles.statusBadgeText}>No change</Text>
-                  </View>
-                  <Text style={styles.captionText}>
-                    {triageReady
-                      ? "Coach did not match this to a known scenario, so today's plan is unchanged."
-                      : "Matching is unavailable, so this report was not matched to a known scenario and today's plan is unchanged. Injury-language safety checks still apply."}
-                  </Text>
-                </View>
-              )}
-              {lastTriage !== null && lastTriage.kind === 'matched' && !lastTriage.directive.halt && (
-                <View style={styles.reportResult}>
-                  <View style={styles.statusBadge}>
-                    <Text style={styles.statusBadgeText}>Plan adjusted</Text>
-                  </View>
-                  <Text style={styles.bodyText}>{lastTriage.directive.vector.coaching_cue}</Text>
-                  {lastTriage.directive.followUp !== null && (
-                    <Text style={styles.captionText}>{lastTriage.directive.followUp}</Text>
-                  )}
-                </View>
               )}
             </View>
           </Disclosure>

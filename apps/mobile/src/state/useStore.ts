@@ -543,7 +543,12 @@ export type TriageOutcome =
   | { kind: 'rejected' }
   /** Positive sentiment: identity pass-through, nothing changes — the UI
    *  shows a minimal acknowledgment, never a guardrail card. */
-  | { kind: 'positive'; cue: string }
+  | {
+    kind: 'positive';
+    cue: string;
+    /** The matched entry, so the reply can name it in plain words (#207). */
+    entryId?: string;
+  }
   | { kind: 'matched'; directive: SessionDirective };
 
 /** Per-profile utility-first presentation preferences (023). A null mode is
@@ -9121,7 +9126,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
         // benign (DOMS) — unless a restrictive report from earlier today still
         // governs, in which case computePrescription kept that honest directive.
         if (get().lastTriage === null) {
-          set({ lastTriage: { kind: 'positive', cue: resolved.entry.cue } });
+          set({ lastTriage: { kind: 'positive', cue: resolved.entry.cue, entryId: resolved.entry.id } });
         }
       } catch (error) {
         refreshFailedAfterStore(error, auditHalt ? audit.directive : null);
