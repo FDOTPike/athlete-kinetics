@@ -345,7 +345,7 @@ describe('the detailed target is optional', () => {
     press('onboarding-wants-sport');
     press('onboarding-wants-target');
     next();
-    press('sport-family-powerlifting');
+    press('sport-family-strength');
     press('sport-outcome-bigger_competition_lifts');
     press('sport-experience-new');
     press('sport-practice-unsure');
