@@ -285,6 +285,95 @@ const formatFinalizedDate = (ms: number): string => {
   return `${dayName} ${day} ${monthName} ${year}`;
 };
 
+/** Limits a corrected set must meet: the same reps range and load grid the
+ *  Log set path applies (logCurrent, isOnLoadGrid). A correction never snaps a value. */
+const canSaveCorrection = (reps: number, loadKg: number): boolean =>
+  Number.isInteger(reps) && reps >= 1 && reps <= 50 && isOnLoadGrid(loadKg);
+
+/** Correct the reps and load of the last logged set of the current exercise.
+ *  The load is typed on the same grid, with the same sentence, as the Log set
+ *  field. A band-only movement has no load (Log set logs 0 kg), so it gets reps only.
+ *  Effort is kept as logged: it feeds the rest timer the runner already started (#142). */
+function CorrectLastSet({
+  set,
+  bandOnly,
+  onSave,
+}: {
+  set: LoggedSet;
+  bandOnly: boolean;
+  onSave: (setId: number, reps: number, loadKg: number, rpe: number | null) => void;
+}): React.JSX.Element {
+  const [open, setOpen] = useState(false);
+  const [reps, setReps] = useState(set.reps);
+  const [loadText, setLoadText] = useState(formatLoadKg(set.load_kg));
+  const parsedLoad = bandOnly ? 0 : parseLoadDraft(loadText);
+  const loadOk = parsedLoad !== null && isOnLoadGrid(parsedLoad);
+  const valid = canSaveCorrection(reps, parsedLoad ?? -1) && (bandOnly || loadOk);
+  return (
+    <View style={styles.correctionBlock}>
+      <Text style={styles.correctionText}>{`Set ${set.set_index} logged: ${set.reps} reps${bandOnly ? '' : ` at ${formatLoadKg(set.load_kg)} kg`}`}</Text>
+      {!open ? (
+        <QuietAction
+          label={`Correct set ${set.set_index}`}
+          accessibilityLabel={`Correct set ${set.set_index}`}
+          onPress={() => {
+            setReps(set.reps);
+            setLoadText(formatLoadKg(set.load_kg));
+            setOpen(true);
+          }}
+        />
+      ) : (
+        <View style={{ gap: theme.space[3] }}>
+          <Stepper
+            testID="correction-reps-stepper"
+            label="Corrected reps"
+            value={String(reps)}
+            onDecrement={() => setReps((n) => clamp(n - 1, 1, 50))}
+            onIncrement={() => setReps((n) => clamp(n + 1, 1, 50))}
+          />
+          {!bandOnly && (
+            <View style={{ gap: theme.space[2] }}>
+              <Text style={styles.loadFieldLabel}>CORRECTED LOAD (KG)</Text>
+              <TextInput
+                disableFullscreenUI
+                testID="correction-load-input"
+                style={styles.loadInput}
+                value={loadText}
+                onChangeText={setLoadText}
+                keyboardType="numeric"
+                placeholder="—"
+                placeholderTextColor={theme.color.textLow}
+                maxLength={6}
+                accessibilityLabel="Corrected load in kilograms"
+              />
+              {!loadOk && loadText.trim() !== '' && (
+                <Text style={styles.loadEvidence} testID="correction-load-validation" accessibilityRole="alert">
+                  Enter a load from 0 to 500 in 0.25 kg steps.
+                </Text>
+              )}
+            </View>
+          )}
+          <PrimaryButton
+            label="Save correction"
+            accessibilityLabel="Save correction"
+            disabled={!valid}
+            onPress={() => {
+              if (!valid) return;
+              onSave(set.set_id, reps, bandOnly ? 0 : parsedLoad as number, set.rpe);
+              setOpen(false);
+            }}
+          />
+          <QuietAction
+            label="Cancel"
+            accessibilityLabel="Cancel correction"
+            onPress={() => setOpen(false)}
+          />
+        </View>
+      )}
+    </View>
+  );
+}
+
 function CompletedMetrics({
   sets,
   bandLadder,
@@ -837,6 +926,47 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
     target?.kind === 'reps' ? target.reps : target?.seconds,
     currentSlot?.overrideLoadKg,
   ]);
+
+  // The last logged set of the current exercise, the only one a correction can
+  // change. Not offered for a time target, in a halted session, or for another exercise.
+  const correctableSet = currentSlot === null || session === null || halted || target?.kind === 'time'
+    ? null
+    : session.sets
+      .filter((set) => sameSlot(set, currentSlot))
+      .reduce<LoggedSet | null>((best, set) => (best === null || set.set_id > best.set_id ? set : best), null);
+  // A corrected load is what the next set starts from, unless the athlete has
+  // already typed a load for that set. Re-seed only on a correction of the same
+  // set (a new logged set is seeded by the effect above).
+  const lastCorrection = useRef<{ setId: number; loadKg: number } | null>(null);
+  useEffect(() => {
+    const seen = lastCorrection.current;
+    lastCorrection.current = correctableSet === null ? null : { setId: correctableSet.set_id, loadKg: correctableSet.load_kg };
+    if (seen === null || correctableSet === null || seen.setId !== correctableSet.set_id || seen.loadKg === correctableSet.load_kg) return;
+    if (currentSlot === null || target === null || bandOnly) return;
+    const typed = unloggedLoadDrafts.get(loadDraftKey(state.activeAthleteId, session?.sessionId, currentSlot.sessionPlanSlotId, currentLogged, currentMovement?.movement_id));
+    if (typed !== undefined) return;
+    const seed = state.resolveSlotLoad({
+      movementId: currentSlot.movementId,
+      bodyweightMode,
+      targetReps: target.kind === 'reps' ? target.reps : null,
+      targetRpe: stableTargetRpe,
+      overrideLoadKg: currentSlot.overrideLoadKg,
+      sessionPlanSlotId: currentSlot.sessionPlanSlotId,
+    });
+    const initial = seed.initialLoadKg;
+    loadShownRef.current = {
+      slotId: currentSlot.sessionPlanSlotId,
+      logged: currentLogged,
+      seed: {
+        source: seed.source,
+        shownLoadKg: initial === null ? null : Number(formatLoadKg(initial)),
+        advisoryKg: seed.advisoryKg,
+        advisoryKind: seed.advisoryKind,
+      },
+    };
+    setLoadText(initial === null ? '' : formatLoadKg(initial));
+    setLoadInvalid(false);
+  }, [correctableSet?.set_id, correctableSet?.load_kg]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // The athlete's own edits of the load field, remembered until the set is logged.
   const editLoadText = (text: string): void => {
@@ -1772,6 +1902,9 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                   </View>
 
                   <View style={styles.currentCard}>
+                    {correctableSet !== null && (
+                      <CorrectLastSet key={correctableSet.set_id} set={correctableSet} bandOnly={bandOnly} onSave={editSet} />
+                    )}
                     {resting ? (
                       <View style={{ alignItems: 'center', gap: theme.space[3] }}>
                         {/* Walk 2 (W2-12): the exercise just worked stays named during
@@ -2540,6 +2673,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginTop: theme.space[2],
+  },
+  correctionBlock: {
+    gap: theme.space[2],
+    marginBottom: theme.space[3],
+  },
+  correctionText: {
+    ...theme.font.label,
+    color: theme.color.textMid,
   },
   currentCard: {
     flex: 1,
