@@ -1,12 +1,12 @@
 import React from 'react';
-import { StyleSheet } from 'react-native';
+import { Alert, StyleSheet } from 'react-native';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { resolveLoadSelection as actualResolveLoadSelection } from '../../../../packages/inference/src/loadSelection';
 import { isDifficultyAllowed as actualIsDifficultyAllowed } from '../../../../packages/inference/src/tierPolicy';
 import { resolveMovementAvailability as actualResolveMovementAvailability } from '../../../../packages/inference/src/capabilityResolver';
 import { JOINTS as ACTUAL_JOINTS, PATTERN_JOINTS } from '../../../../packages/inference/src/substitution';
 import { EXPERIENCE_SEVERITY } from '../../../../packages/inference/src/types';
-import SessionScreen from '../../src/screens/SessionScreen';
+import SessionScreen, { aboveCeilingNote } from '../../src/screens/SessionScreen';
 import { RestTimerCard } from '../../src/components/ui/RestTimerCard';
 import { advance as advanceRunner, restSecondsFor as runnerRestSecondsFor } from '../../../../packages/inference/src/sessionRunner';
 
@@ -37,6 +37,7 @@ jest.mock('@ak/inference', () => {
     mapRirToRpe: actual.mapRirToRpe,
     RIR_CHOICES: actual.RIR_CHOICES,
     RIR_OPTIONS: actual.RIR_OPTIONS,
+    effectiveRpeCeiling: actual.effectiveRpeCeiling,
   };
 });
 const resolveLoadSelectionSpy = jest.fn((input) => actualResolveLoadSelection(input));
@@ -550,6 +551,191 @@ test('WO-02 labels athlete-reported RPE as Effort with the exact scale explanati
   expect(screen.queryByText('Actual RPE')).toBeNull();
 });
 
+// Issue #206: a set rated above the athlete's effort ceiling gets one plain
+// note on the set card; logging and the plan are unchanged.
+test('an effort above the ceiling shows one note; at or below it shows none', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', objective: 'strength', base_rpe_cap: 8.5, equipment_inventory: [], session_duration_cap_min: 60 },
+  });
+  render(<SessionScreen />);
+  const note = 'That was above your ceiling of 8.5. Next set, stop with 2 reps left.';
+  expect(screen.queryByText(note)).toBeNull();
+  fireEvent.press(screen.getByLabelText(/^0 clean reps? left/i));
+  expect(screen.getByTestId('effort-above-ceiling-note')).toHaveTextContent(note);
+  fireEvent.press(screen.getByLabelText(/^2 clean reps? left/i));
+  expect(screen.queryByTestId('effort-above-ceiling-note')).toBeNull();
+  fireEvent.press(screen.getByRole('button', { name: 'Enter Effort directly' }));
+  fireEvent.press(screen.getByRole('button', { name: 'Effort 8.5' }));
+  expect(screen.queryByTestId('effort-above-ceiling-note')).toBeNull();
+  fireEvent.press(screen.getByRole('button', { name: 'Effort 9.0' }));
+  expect(screen.getByTestId('effort-above-ceiling-note')).toHaveTextContent(note);
+  // Logging is unchanged: the rated effort is saved as chosen.
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(mockState.logSet.mock.calls[0][3]).toBe(9);
+});
+
+test('a beginner ceiling is the lower beginner ceiling, and a rehab ceiling of 7 asks for 3 reps left', () => {
+  mockState = state({
+    profile: { training_age: 'beginner', objective: 'strength', base_rpe_cap: 9.5, equipment_inventory: [], session_duration_cap_min: 60 },
+  });
+  const { unmount } = render(<SessionScreen />);
+  fireEvent.press(screen.getByLabelText(/^1 clean reps? left/i));
+  expect(screen.getByTestId('effort-above-ceiling-note')).toHaveTextContent('That was above your ceiling of 8.5. Next set, stop with 2 reps left.');
+  unmount();
+  mockState = state({
+    profile: { training_age: 'intermediate', objective: 'rehab', base_rpe_cap: 9, equipment_inventory: [], session_duration_cap_min: 60 },
+  });
+  render(<SessionScreen />);
+  fireEvent.press(screen.getByLabelText(/^2 clean reps? left/i));
+  expect(screen.getByTestId('effort-above-ceiling-note')).toHaveTextContent('That was above your ceiling of 7.0. Next set, stop with 3 reps left.');
+});
+
+// Owner ruling on #206: "4+" is only a lower bound on reps left and the easiest
+// chip on the bar, so it gets no above-ceiling note. It still logs 6.0.
+test.each([5.0, 5.5])('the "4+" reps-left chip logs 6.0 but shows no above-ceiling note (ceiling %s)', (cap) => {
+  mockState = state({
+    profile: { training_age: 'intermediate', objective: 'strength', base_rpe_cap: cap, equipment_inventory: [], session_duration_cap_min: 60 },
+  });
+  render(<SessionScreen />);
+  fireEvent.press(screen.getByLabelText(/^4\+ clean reps left/i));
+  expect(screen.getByTestId('derived-rpe-display')).toHaveTextContent('Reported effort 6.0');
+  expect(screen.queryByTestId('effort-above-ceiling-note')).toBeNull();
+  fireEvent.press(screen.getByLabelText('Log set 1 for First movement'));
+  expect(mockState.logSet.mock.calls[0][3]).toBe(6);
+  expect(screen.queryByTestId('effort-above-ceiling-note')).toBeNull();
+});
+
+test.each([
+  [5.5, 'That was above your ceiling of 5.5. Next set, stop with 5 reps left.'],
+  [6.0, 'That was above your ceiling of 6.0. Next set, stop with 4 reps left.'],
+])('the "3" reps-left chip above a ceiling of %s still shows the note', (cap, note) => {
+  mockState = state({
+    profile: { training_age: 'intermediate', objective: 'strength', base_rpe_cap: cap, equipment_inventory: [], session_duration_cap_min: 60 },
+  });
+  render(<SessionScreen />);
+  fireEvent.press(screen.getByLabelText(/^3 clean reps left/i));
+  expect(screen.getByTestId('effort-above-ceiling-note')).toHaveTextContent(note);
+});
+
+// Owner ruling on #206: a timed set has no reps, so its note is only the first
+// sentence; a rep-based set keeps the reps-left sentence.
+test('a timed set above the ceiling shows only "That was above your ceiling of X.X."', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', objective: 'strength', base_rpe_cap: 7.5, equipment_inventory: [], session_duration_cap_min: 60 },
+    sessionPlan: [slot(1, 1, 5, { target: { kind: 'time', seconds: 30 }, targetRpe: 7 }), slot(2, 2, 8)],
+  });
+  render(<SessionScreen />);
+  fireEvent.press(screen.getByRole('button', { name: 'Enter Effort directly' }));
+  fireEvent.press(screen.getByRole('button', { name: 'Effort 8.5' }));
+  const note = screen.getByTestId('effort-above-ceiling-note');
+  expect(note.props.children).toBe('That was above your ceiling of 7.5.');
+  expect(note).not.toHaveTextContent(/reps? left/);
+});
+
+test('a rep-based set above the same ceiling keeps the reps-left sentence', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', objective: 'strength', base_rpe_cap: 7.5, equipment_inventory: [], session_duration_cap_min: 60 },
+  });
+  render(<SessionScreen />);
+  fireEvent.press(screen.getByRole('button', { name: 'Enter Effort directly' }));
+  fireEvent.press(screen.getByRole('button', { name: 'Effort 8.5' }));
+  expect(screen.getByTestId('effort-above-ceiling-note'))
+    .toHaveTextContent('That was above your ceiling of 7.5. Next set, stop with 3 reps left.');
+});
+
+// Owner ruling on #206 (review follow-up): a discomfort report today can set a
+// lower effort cap than the profile ceiling. The note then uses the lower of
+// the two, for both when it shows and the reps-left advice, and says "today's
+// ceiling", so it never advises an effort above today's cap.
+describe('aboveCeilingNote with today\'s discomfort report cap', () => {
+  test.each([
+    [9, false, "That was above today's ceiling of 7.5. Next set, stop with 3 reps left."],
+    [8, false, "That was above today's ceiling of 7.5. Next set, stop with 3 reps left."],
+    [8, true, "That was above today's ceiling of 7.5."],
+  ])('profile 8.5, report cap 7.5, rated %s (timed %s)', (rpe, timed, expected) => {
+    expect(aboveCeilingNote(rpe, 8.5, 7.5, timed)).toBe(expected);
+  });
+
+  test('at or below the lower report cap there is no note', () => {
+    expect(aboveCeilingNote(7.5, 8.5, 7.5)).toBeNull();
+    expect(aboveCeilingNote(7, 8.5, 7.5, true)).toBeNull();
+  });
+
+  test.each([
+    ['no report cap', null],
+    ['a report cap equal to the ceiling', 7.5],
+    ['a report cap above the ceiling', 8],
+  ])('%s keeps "your ceiling" from the profile', (_name, reportCap) => {
+    expect(aboveCeilingNote(8, 7.5, reportCap))
+      .toBe('That was above your ceiling of 7.5. Next set, stop with 3 reps left.');
+    expect(aboveCeilingNote(8, 7.5, reportCap, true)).toBe('That was above your ceiling of 7.5.');
+    expect(aboveCeilingNote(7.5, 7.5, reportCap)).toBeNull();
+  });
+});
+
+const reportCapTriage = (rpeCap) => ({
+  kind: 'matched',
+  directive: {
+    halt: false,
+    followUp: null,
+    matchedCue: 'my knee is a bit sore',
+    similarity: 0.9,
+    vector: { load_modifier: 0.9, set_modifier: 0, rpe_cap: rpeCap, coaching_cue: 'Keep effort easy today.' },
+  },
+});
+
+test.each([
+  [/^1 clean reps? left/i],
+  [/^2 clean reps? left/i],
+])('a beginner (ceiling 8.5) with a report cap of 7.5 sees "today\'s ceiling" for chip %s', (chip) => {
+  mockState = state({
+    profile: { training_age: 'beginner', objective: 'strength', base_rpe_cap: 9.5, equipment_inventory: [], session_duration_cap_min: 60 },
+    lastTriage: reportCapTriage(7.5),
+  });
+  render(<SessionScreen />);
+  fireEvent.press(screen.getByLabelText(chip));
+  expect(screen.getByTestId('effort-above-ceiling-note'))
+    .toHaveTextContent("That was above today's ceiling of 7.5. Next set, stop with 3 reps left.");
+});
+
+test('a timed set under a report cap of 7.5 (profile 8.5) shows only the first sentence', () => {
+  mockState = state({
+    profile: { training_age: 'beginner', objective: 'strength', base_rpe_cap: 9.5, equipment_inventory: [], session_duration_cap_min: 60 },
+    sessionPlan: [slot(1, 1, 5, { target: { kind: 'time', seconds: 30 }, targetRpe: 7 }), slot(2, 2, 8)],
+    lastTriage: reportCapTriage(7.5),
+  });
+  render(<SessionScreen />);
+  fireEvent.press(screen.getByRole('button', { name: 'Enter Effort directly' }));
+  fireEvent.press(screen.getByRole('button', { name: 'Effort 8.0' }));
+  expect(screen.getByTestId('effort-above-ceiling-note').props.children)
+    .toBe("That was above today's ceiling of 7.5.");
+});
+
+test('a report cap above the profile ceiling keeps "your ceiling" (cap 8.0, ceiling 7.5)', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', objective: 'strength', base_rpe_cap: 7.5, equipment_inventory: [], session_duration_cap_min: 60 },
+    lastTriage: reportCapTriage(8),
+  });
+  render(<SessionScreen />);
+  fireEvent.press(screen.getByLabelText(/^2 clean reps? left/i));
+  expect(screen.getByTestId('effort-above-ceiling-note'))
+    .toHaveTextContent('That was above your ceiling of 7.5. Next set, stop with 3 reps left.');
+});
+
+test('the "4+" chip still shows no note under a report cap of 6.0', () => {
+  mockState = state({
+    profile: { training_age: 'intermediate', objective: 'strength', base_rpe_cap: 8.5, equipment_inventory: [], session_duration_cap_min: 60 },
+    lastTriage: reportCapTriage(6),
+  });
+  render(<SessionScreen />);
+  fireEvent.press(screen.getByLabelText(/^4\+ clean reps left/i));
+  expect(screen.queryByTestId('effort-above-ceiling-note')).toBeNull();
+  // Any chip above the report cap does show it.
+  fireEvent.press(screen.getByLabelText(/^3 clean reps left/i));
+  expect(screen.getByTestId('effort-above-ceiling-note'))
+    .toHaveTextContent("That was above today's ceiling of 6.0. Next set, stop with 4 reps left.");
+});
+
 // ---------------------------------------------------------------------------
 // §7.2 W1 — Unanchored RIR/RPE effort entry contract (Items 1–11)
 // ---------------------------------------------------------------------------
@@ -1009,18 +1195,56 @@ test('final-set rest stays visible so the next movement can advance', () => {
   expect(mockState.skipRunnerRest).toHaveBeenCalledTimes(1);
 });
 
+// Issue #208: the button is neutral and the sheet says the swap is for today.
+test('the swap button reads "Swap or avoid this" and the sheet says the swap is for today only', () => {
+  render(<SessionScreen />);
+  expect(screen.getByText('Swap or avoid this')).toBeOnTheScreen();
+  expect(screen.queryByText('Doesn’t feel right')).toBeNull();
+  const button = screen.getByLabelText('Swap or avoid this: First movement');
+  fireEvent.press(button);
+  expect(mockState.runnerThumbsDown).toHaveBeenCalledTimes(1);
+  mockState.substitution = {
+    targetId: 1,
+    result: {
+      haltAdvised: false,
+      layer1Regression: { options: [{ movement_id: 2, name: 'Later movement', rationale: 'Same pattern, lighter load.' }] },
+      layer2DaySwap: { options: [] },
+    },
+  };
+  screen.rerender(<SessionScreen />);
+  expect(screen.getByText('Choose an alternative')).toBeOnTheScreen();
+  expect(screen.getByTestId('substitution-today-only')).toHaveTextContent(
+    'For today only. The plan keeps the original exercise; a pulled-forward exercise leaves its later session.',
+    { exact: true },
+  );
+});
+
 test('thumbs-down delegates the durable Avoid plus substitution transition to the runner store action', () => {
   render(<SessionScreen />);
-  fireEvent.press(screen.getByLabelText('Avoid First movement and find a substitution'));
+  fireEvent.press(screen.getByLabelText('Swap or avoid this: First movement'));
   expect(mockState.runnerThumbsDown).toHaveBeenCalledTimes(1);
   expect(mockState.setMovementPreference).not.toHaveBeenCalled();
   expect(mockState.openSubstitution).not.toHaveBeenCalled();
 });
 
-test('stop uses the runner’s valid manual halt reason', () => {
-  render(<SessionScreen />);
-  fireEvent.press(screen.getByLabelText('Stop this session'));
-  expect(mockState.runnerHalt).toHaveBeenCalledWith('manual');
+// #165: "Stop session" asks first; it stops only on Stop.
+test('stop asks "Stop this session?" first, then uses the runner’s valid manual halt reason', () => {
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  try {
+    render(<SessionScreen />);
+    fireEvent.press(screen.getByLabelText('Stop this session'));
+    expect(mockState.runnerHalt).not.toHaveBeenCalled();
+    expect(alert).toHaveBeenCalledTimes(1);
+    const [title, , buttons] = alert.mock.calls[0];
+    expect(title).toBe('Stop this session?');
+    expect(buttons.map((button) => button.text)).toEqual(['Keep going', 'Stop']);
+    buttons[0].onPress?.();
+    expect(mockState.runnerHalt).not.toHaveBeenCalled();
+    buttons[1].onPress();
+    expect(mockState.runnerHalt).toHaveBeenCalledWith('manual');
+  } finally {
+    alert.mockRestore();
+  }
 });
 
 test('a beginner never renders a legacy plan containing an advanced movement', () => {
@@ -1333,7 +1557,7 @@ test('runner substitution offer: thumbs-down after an earlier set uses runner pa
     },
   });
   render(<SessionScreen />);
-  fireEvent.press(screen.getByLabelText('Avoid First movement and find a substitution'));
+  fireEvent.press(screen.getByLabelText('Swap or avoid this: First movement'));
   expect(mockState.runnerThumbsDown).toHaveBeenCalledTimes(1);
   // Must NOT touch the legacy paths
   expect(mockState.setMovementPreference).not.toHaveBeenCalled();
