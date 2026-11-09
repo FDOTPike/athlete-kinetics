@@ -140,6 +140,7 @@ const loadSourceCopy = (
   oneRmKg: number | undefined,
   timedTarget: boolean,
   aim: string | null = null,
+  targetReps: number | null = null,
 ): string => {
   // Walk W2-4, W5-10 (#131): an eased load (shown lower than the unadjusted
   // last-logged load) says so and names that load; "last session" is only said
@@ -172,7 +173,11 @@ const loadSourceCopy = (
     ? '0 kg means bodyweight only. Add weight when you need it.'
     : timedTarget
       ? 'First time on this one — choose a load you can control for the full interval.'
-      : aim ?? 'First time on this one — pick a weight you could lift about ten times.';
+      // Issue #137: with no RPE-based aim, the fallback still names the
+      // prescribed reps instead of a fixed count of ten.
+      : aim ?? (targetReps !== null
+        ? `First time on this one — pick a weight you could lift for all ${targetReps} ${targetReps === 1 ? 'rep' : 'reps'} with plenty left.`
+        : 'First time on this one — pick a weight you could lift for the full set with plenty left.');
 };
 
 /** Derived-source copy must distinguish APRE prescription from 1RM
@@ -184,6 +189,7 @@ const loadCopyFor = (
   apreOverrideKg: number | null,
   timedTarget: boolean,
   aim: string | null = null,
+  targetReps: number | null = null,
   carriedSlotLoadKg: number | null = null,
 ): string => {
   if (sel.source === 'derived') {
@@ -200,7 +206,7 @@ const loadCopyFor = (
     }
     return `Based on your ${oneRmKg === undefined ? '' : formatLoadKg(oneRmKg)} kg 1RM`;
   }
-  return loadSourceCopy(sel, bodyweightMode, oneRmKg, timedTarget, aim);
+  return loadSourceCopy(sel, bodyweightMode, oneRmKg, timedTarget, aim, targetReps);
 };
 
 /** One plain line when a rated set went above the athlete's effort ceiling
@@ -855,6 +861,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
         currentSlot?.overrideLoadKg ?? null,
         target?.kind === 'time',
         firstTimeAim(target?.kind === 'reps' ? target.reps : null, currentSlot?.targetRpe ?? null),
+        target?.kind === 'reps' ? target.reps : null,
         previousSlotLoadKg,
       );
   const loadLoggable = bandOnly || (isLoadDraftLoggable(loadText) && !loadInvalid);
