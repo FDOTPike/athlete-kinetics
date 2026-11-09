@@ -244,9 +244,10 @@ export const sessionFocusName = (focus: string): string => {
     : part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())).join(' ');
 };
 
+// Loads are logged in 0.25 kg steps (issue #233), so 22.75 kg is named as is.
 const loadCopy = (loadKg: number): string => {
-  const rounded = Math.round(loadKg * 10) / 10;
-  return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)} kg`;
+  const rounded = Math.round(loadKg * 100) / 100;
+  return `${String(rounded)} kg`;
 };
 
 /**

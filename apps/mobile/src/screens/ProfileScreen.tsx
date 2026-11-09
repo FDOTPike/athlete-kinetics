@@ -209,11 +209,16 @@ interface OneRmRowProps {
   /** Lets the screen save typed text before a Coach Mode switch. */
   registerCommit: (commit: () => void) => () => void;
 }
+/** A max as the field shows it: one decimal, or two for a quarter kilogram. */
+const formatMaxKg = (kg: number): string => {
+  const hundredths = Math.round(kg * 100);
+  return (hundredths / 100).toFixed(hundredths % 10 === 0 ? 1 : 2);
+};
 function OneRmRow({ label, valueKg, onChange, athleteId, registerCommit }: OneRmRowProps): React.JSX.Element {
-  const [text, setText] = useState(valueKg !== undefined ? valueKg.toFixed(1) : '');
+  const [text, setText] = useState(valueKg !== undefined ? formatMaxKg(valueKg) : '');
   const [clampNote, setClampNote] = useState<string | null>(null);
   useEffect(() => {
-    setText(valueKg !== undefined ? valueKg.toFixed(1) : '');
+    setText(valueKg !== undefined ? formatMaxKg(valueKg) : '');
   }, [valueKg]);
   const saveText = (): void => {
     const parsed = Number.parseFloat(text.replace(',', '.'));
@@ -223,9 +228,10 @@ function OneRmRow({ label, valueKg, onChange, athleteId, registerCommit }: OneRm
       setClampNote(null);
       return;
     }
-    const snapped = Math.min(500, Math.max(20, Math.round(parsed / 2.5) * 2.5));
-    onChange(parsed); // store snaps to 2.5 and clamps 20..500
-    setText(snapped.toFixed(1));
+    // One-rep maxes sit on the 0.25 kg logging grid (issue #233).
+    const snapped = Math.min(500, Math.max(20, Math.round(parsed / 0.25) * 0.25));
+    onChange(parsed); // store snaps to 0.25 and clamps 20..500
+    setText(formatMaxKg(snapped));
     // Walk W4-7: 999 became 500.0 with no word. Say what was saved.
     setClampNote(oneRmClampNote(parsed));
   };
@@ -238,7 +244,7 @@ function OneRmRow({ label, valueKg, onChange, athleteId, registerCommit }: OneRm
   const savedThisRender = useRef(false);
   useEffect(() => { savedThisRender.current = false; });
   const commitText = (): void => {
-    const shown = valueKg !== undefined ? valueKg.toFixed(1) : '';
+    const shown = valueKg !== undefined ? formatMaxKg(valueKg) : '';
     if (text === shown || savedThisRender.current) return;
     // During or after a Coach Mode switch the store belongs to another athlete.
     if (useStore.getState().activeAthleteId !== athleteId) return;
@@ -779,7 +785,7 @@ export default function ProfileScreen(): React.JSX.Element {
           </View>
           <Text style={styles.fieldHint}>
             With a max set, SESSION shows real target kilograms for every planned
-            lift. Type the number directly (snapped to 2.5 kg); ± fine-tunes.
+            lift. Type the number directly (kept in 0.25 kg steps); ± moves 2.5 kg.
             Clear it by typing 0.
           </Text>
           {BIG4_LIFTS.map(({ name, label }) => {

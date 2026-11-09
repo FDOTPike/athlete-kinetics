@@ -52,7 +52,7 @@ beforeEach(async () => {
 });
 
 describe('ProfileScreen OneRmRow and Bodyweight inputs preserve saved values and re-sync text on endEditing', () => {
-  test('OneRmRow resets displayed text to snapped valueKg ("100.0") when entered text ("101") snaps to existing valueKg', () => {
+  test('OneRmRow resets displayed text to snapped valueKg ("100.0") when entered text ("100.1") snaps to existing valueKg', () => {
     // Save Squat 1RM = 100.0 kg
     useStore.getState().saveOneRepMax(1, 100);
     expect(useStore.getState().oneRepMaxes[1]).toBe(100);
@@ -68,8 +68,9 @@ describe('ProfileScreen OneRmRow and Bodyweight inputs preserve saved values and
     const squatInput = screen.getAllByLabelText(/one rep max in kilograms, type to set/i)[0];
     expect(squatInput.props.value).toBe('100.0');
 
-    // Type "101" and finish editing: saveOneRepMax snaps 101 -> 100.0 (2.5 kg increment)
-    fireEvent.changeText(squatInput, '101');
+    // Type "100.1" and finish editing: saveOneRepMax snaps 100.1 -> 100.0
+    // (0.25 kg grid, issue #233; 101 is now a loggable max).
+    fireEvent.changeText(squatInput, '100.1');
     fireEvent(squatInput, 'endEditing');
 
     // Also enter invalid sub-20 bodyweight "15" into Bodyweight today in kilograms and finish editing
@@ -78,7 +79,7 @@ describe('ProfileScreen OneRmRow and Bodyweight inputs preserve saved values and
     fireEvent(bwInput, 'endEditing');
 
     expect(useStore.getState().oneRepMaxes[1]).toBe(100);
-    // Input values must reflect the persisted values ("100.0" and "") rather than leaving unsaved "101" and "15" on screen
+    // Input values must reflect the persisted values ("100.0" and "") rather than leaving unsaved "100.1" and "15" on screen
     expect({
       squatInputText: screen.getAllByLabelText(/one rep max in kilograms, type to set/i)[0].props.value,
       bodyweightInputText: screen.getByLabelText('Bodyweight today in kilograms').props.value,
