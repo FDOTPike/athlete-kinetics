@@ -394,7 +394,9 @@ const blockSrc = readFileSync(join(ROOT, 'apps', 'mobile', 'src', 'screens', 'Bl
 const manageGateAt = blockSrc.indexOf('{program == null && (');
 const gateCloseAt = blockSrc.indexOf('\n        )}\n', manageGateAt);
 const unplannedAt = blockSrc.indexOf('<Disclosure label="Start without a planned session">');
-const feelsOffAt = blockSrc.indexOf('label="Something feels off"');
+// Anchor on the disclosure element itself: the injury pause card has a button
+// with the same label that opens it (#188), and that button sits higher up.
+const feelsOffAt = blockSrc.search(/<Disclosure\s+label="Something feels off"/);
 check(
   'the ad-hoc session path is never gated behind an active program',
   manageGateAt >= 0
