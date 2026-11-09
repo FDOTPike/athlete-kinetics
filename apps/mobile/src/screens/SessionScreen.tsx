@@ -1272,6 +1272,9 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
 
   const submitNiggle = (): void => {
     if (niggleRegion === null || niggleSeverity === null) return;
+    // #184: during rest the report belongs to the next set, so the rest ends
+    // first and the report is handled exactly as on the next set card.
+    if (resting) readyNow();
     // A report that did not save keeps the form open and claims nothing.
     if (reportNiggle(niggleRegion, niggleSeverity) !== true) {
       setNiggleSavedNotice(false);
@@ -1286,6 +1289,78 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
     const afterSubstitutionOpened = after?.substitution !== null && after?.substitution !== undefined;
     setNiggleSavedNotice(!afterHalted && !afterSubstitutionOpened);
   };
+
+  // #184: the discomfort form, its saved line and "Stop session" are on the
+  // set card and on the rest card, with the same handlers. A report made
+  // during rest is handled as one made on the next set card (submitNiggle
+  // ends the rest first).
+  const renderDiscomfortFormAndStop = (): React.JSX.Element => (
+    <>
+      {safetyOpen && (
+        <View style={styles.safety}>
+          <Text style={styles.safetyPrompt}>Where, and how strong is it?</Text>
+          <View style={styles.joints}>
+            {(JOINTS as readonly string[]).map((joint) => {
+              const selectedJoint = niggleRegion === joint;
+              return (
+                <Chip
+                  key={joint}
+                  label={regionDisplayName(joint)}
+                  selected={selectedJoint}
+                  onPress={() => setNiggleRegion(joint)}
+                  accessibilityLabel={joint.replace(/_/g, ' ')}
+                  style={{ margin: theme.space[1] }}
+                />
+              );
+            })}
+          </View>
+          <View style={styles.severity} testID="niggle-severity-row">
+            {[4, 6, 8].map((severity) => {
+              const selectedSeverity = niggleSeverity === severity;
+              const label = severity === 4 ? 'Mild' : severity === 6 ? 'Moderate' : 'Stop';
+              return (
+                <Chip
+                  key={severity}
+                  label={label}
+                  selected={selectedSeverity}
+                  onPress={() => setNiggleSeverity(severity)}
+                  accessibilityLabel={`${label} discomfort, ${severity} of 10`}
+                  testID={`niggle-severity-${severity}`}
+                  style={styles.severityChip}
+                />
+              );
+            })}
+          </View>
+          {niggleSeverity !== null && niggleSeverity >= haltMin && (
+            <Text style={styles.loadEvidence}>
+              At this level the session stops for today.
+            </Text>
+          )}
+          <View style={{ marginTop: theme.space[3] }}>
+            <PrimaryButton
+              label={niggleSeverity !== null && niggleSeverity >= haltMin ? 'Save report and stop session' : 'Save report'}
+              onPress={submitNiggle}
+              disabled={niggleRegion === null || niggleSeverity === null}
+              accessibilityLabel={niggleSeverity !== null && niggleSeverity >= haltMin ? 'Save discomfort report and stop session' : 'Save discomfort report'}
+            />
+          </View>
+        </View>
+      )}
+      {!safetyOpen && niggleSavedNotice && substitution === null && !halted && (
+        <Text style={styles.loadEvidence}>Report saved with this session.</Text>
+      )}
+
+      {/* Stop Session outlined full-width SecondaryButton */}
+      <View style={{ marginTop: theme.space[3] }}>
+        <SecondaryButton
+          label="Stop session"
+          onPress={() => confirmStopSession(() => runnerHalt('manual'))}
+          accessibilityLabel="Stop this session"
+          fullWidth={true}
+        />
+      </View>
+    </>
+  );
 
   const setup = lines(currentMovement?.instructions, 4);
   const cues = lines(currentMovement?.cues, 3);
@@ -1664,6 +1739,19 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                           style={{ alignSelf: 'stretch' }}
                         />
                         {upcomingText !== null && <Text style={styles.nextUp}>Next up: {upcomingText}</Text>}
+                        {/* #184: the safety controls are reachable during rest too. */}
+                        <View style={{ alignSelf: 'stretch' }} testID="session-rest-safety">
+                          <SecondaryButton
+                            label="Report discomfort"
+                            onPress={() => {
+                              setSafetyOpen((value) => !value);
+                              setNiggleSavedNotice(false);
+                            }}
+                            accessibilityLabel="Report discomfort"
+                            fullWidth={true}
+                          />
+                          {renderDiscomfortFormAndStop()}
+                        </View>
                       </View>
                     ) : (
                       <View style={{ gap: theme.space[3] }}>
@@ -2008,69 +2096,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                           />
                         </View>
 
-                        {safetyOpen && (
-                          <View style={styles.safety}>
-                            <Text style={styles.safetyPrompt}>Where, and how strong is it?</Text>
-                            <View style={styles.joints}>
-                              {(JOINTS as readonly string[]).map((joint) => {
-                                const selectedJoint = niggleRegion === joint;
-                                return (
-                                  <Chip
-                                    key={joint}
-                                    label={regionDisplayName(joint)}
-                                    selected={selectedJoint}
-                                    onPress={() => setNiggleRegion(joint)}
-                                    accessibilityLabel={joint.replace(/_/g, ' ')}
-                                    style={{ margin: theme.space[1] }}
-                                  />
-                                );
-                              })}
-                            </View>
-                            <View style={styles.severity} testID="niggle-severity-row">
-                              {[4, 6, 8].map((severity) => {
-                                const selectedSeverity = niggleSeverity === severity;
-                                const label = severity === 4 ? 'Mild' : severity === 6 ? 'Moderate' : 'Stop';
-                                return (
-                                  <Chip
-                                    key={severity}
-                                    label={label}
-                                    selected={selectedSeverity}
-                                    onPress={() => setNiggleSeverity(severity)}
-                                    accessibilityLabel={`${label} discomfort, ${severity} of 10`}
-                                    testID={`niggle-severity-${severity}`}
-                                    style={styles.severityChip}
-                                  />
-                                );
-                              })}
-                            </View>
-                            {niggleSeverity !== null && niggleSeverity >= haltMin && (
-                              <Text style={styles.loadEvidence}>
-                                At this level the session stops for today.
-                              </Text>
-                            )}
-                            <View style={{ marginTop: theme.space[3] }}>
-                              <PrimaryButton
-                                label={niggleSeverity !== null && niggleSeverity >= haltMin ? 'Save report and stop session' : 'Save report'}
-                                onPress={submitNiggle}
-                                disabled={niggleRegion === null || niggleSeverity === null}
-                                accessibilityLabel={niggleSeverity !== null && niggleSeverity >= haltMin ? 'Save discomfort report and stop session' : 'Save discomfort report'}
-                              />
-                            </View>
-                          </View>
-                        )}
-                        {!safetyOpen && niggleSavedNotice && substitution === null && !halted && (
-                          <Text style={styles.loadEvidence}>Report saved with this session.</Text>
-                        )}
-
-                        {/* Stop Session outlined full-width SecondaryButton */}
-                        <View style={{ marginTop: theme.space[3] }}>
-                          <SecondaryButton
-                            label="Stop session"
-                            onPress={() => confirmStopSession(() => runnerHalt('manual'))}
-                            accessibilityLabel="Stop this session"
-                            fullWidth={true}
-                          />
-                        </View>
+                        {renderDiscomfortFormAndStop()}
                       </View>
                     )}
                   </View>

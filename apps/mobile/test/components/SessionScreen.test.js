@@ -1218,6 +1218,52 @@ test('final-set rest stays visible so the next movement can advance', () => {
   expect(mockState.skipRunnerRest).toHaveBeenCalledTimes(1);
 });
 
+// #184: right after a painful set is when the athlete looks for these.
+describe('safety controls on the rest card', () => {
+  const restingState = () => state({
+    session: {
+      sessionId: 10, date: '2026-07-15', startedAtMs: Date.now(),
+      sets: [{ set_id: 1, movement_id: 1, movement_name: 'First movement', set_index: 1, reps: 5, load_kg: 0, rpe: 8, tonnage_kg: 0, session_plan_slot_id: 1, timeS: null, bandLevel: null }],
+    },
+    runner: runner({
+      phase: 'resting', setIndex: 1, restSecondsTarget: 120, restStartedAtMs: Date.now(), restRpe: 8,
+      slotSetCounts: [1, 0], loggedSets: 1,
+    }),
+  });
+
+  test('Report discomfort during rest ends the rest, then saves through the same store action as the set card', () => {
+    mockState = restingState();
+    const calls = [];
+    mockState.skipRunnerRest = jest.fn(() => { calls.push('skipRunnerRest'); });
+    mockState.reportNiggle = jest.fn(() => { calls.push('reportNiggle'); return true; });
+    render(<SessionScreen />);
+    expect(screen.getByText('REST')).toBeOnTheScreen();
+    const restControls = within(screen.getByTestId('session-rest-safety'));
+    fireEvent.press(restControls.getByLabelText('Report discomfort'));
+    fireEvent.press(restControls.getByLabelText('knee'));
+    fireEvent.press(restControls.getByLabelText('Moderate discomfort, 6 of 10'));
+    fireEvent.press(restControls.getByLabelText('Save discomfort report'));
+    expect(mockState.reportNiggle).toHaveBeenCalledWith('knee', 6);
+    // Handled as a report on the next set card: the rest ends first.
+    expect(calls).toEqual(['skipRunnerRest', 'reportNiggle']);
+  });
+
+  test('Stop session during rest calls the same manual halt as the set card', () => {
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    try {
+      mockState = restingState();
+      render(<SessionScreen />);
+      fireEvent.press(within(screen.getByTestId('session-rest-safety')).getByLabelText('Stop this session'));
+      expect(alert).toHaveBeenCalledTimes(1);
+      const [, , buttons] = alert.mock.calls[0];
+      buttons[1].onPress();
+      expect(mockState.runnerHalt).toHaveBeenCalledWith('manual');
+    } finally {
+      alert.mockRestore();
+    }
+  });
+});
+
 // Issue #208: the button is neutral and the sheet says the swap is for today.
 test('the swap button reads "Swap or avoid this" and the sheet says the swap is for today only', () => {
   render(<SessionScreen />);
