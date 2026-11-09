@@ -3,7 +3,7 @@ import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { RIR_OPTIONS } from '@ak/inference';
 import { resolveLoadSelection as actualResolveLoadSelection } from '../../../../packages/inference/src/loadSelection';
 import { isDifficultyAllowed as actualIsDifficultyAllowed } from '../../../../packages/inference/src/tierPolicy';
-import SessionScreen from '../../src/screens/SessionScreen';
+import SessionScreen, { clearUnloggedLoadDraftsForTests } from '../../src/screens/SessionScreen';
 
 let mockState;
 
@@ -204,6 +204,7 @@ const makeState = ({ plannedSets = 3, loggedSets = [] } = {}) => {
 let frames;
 let nextFrameId = 1;
 beforeEach(() => {
+  clearUnloggedLoadDraftsForTests();
   frames = new Map();
   jest.spyOn(global, 'requestAnimationFrame').mockImplementation((cb) => {
     const id = nextFrameId;
