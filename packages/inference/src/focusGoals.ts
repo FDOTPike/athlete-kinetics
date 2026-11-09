@@ -301,6 +301,11 @@ export interface SmartGoalDraft {
   readonly baselineKnown: boolean;
   readonly baselineValue?: number | null;
   readonly targetValue: number;
+  /**
+   * The athlete has confirmed a target below where they are now (lift, reps,
+   * distance and jump height only). Without it a lower target is refused.
+   */
+  readonly confirmLowerTarget?: boolean;
   readonly reason: string;
   /** ISO YYYY-MM-DD, or null for "no deadline". */
   readonly requestedDeadline: string | null;
@@ -344,6 +349,47 @@ const isMeasurable = (value: unknown): value is number =>
   typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= GOAL_VALUE_MAX;
 
 /**
+ * Plausible limits per metric, only where the app already enforces one.
+ *   - load_kg: 500 kg is the one-rep-max cap (ProfileScreen OneRmRow clamps
+ *     20..500; the store's saveOneRepMax clamps 20..500) and the session load
+ *     check says "Enter a load from 0 to 500 in 2.5 kg increments."
+ *   - bodyweight_kg: the store's saveBodyweight clamps 20..500 kg.
+ * Other metrics have no source for a limit yet, so they keep GOAL_VALUE_MAX.
+ */
+export const GOAL_LOAD_MAX_KG = 500;
+export const GOAL_BODYWEIGHT_MIN_KG = 20;
+export const GOAL_BODYWEIGHT_MAX_KG = 500;
+const METRIC_RANGE: Partial<Record<GoalMetricId, { readonly min: number; readonly max: number }>> = {
+  load_kg: { min: 0, max: GOAL_LOAD_MAX_KG },
+  bodyweight_kg: { min: GOAL_BODYWEIGHT_MIN_KG, max: GOAL_BODYWEIGHT_MAX_KG },
+};
+const rangeFor = (metricId: string): { readonly min: number; readonly max: number } =>
+  (isGoalMetricId(metricId) ? METRIC_RANGE[metricId] : undefined) ?? { min: 0, max: GOAL_VALUE_MAX };
+const inRange = (value: unknown, metricId: string): value is number => {
+  if (!isMeasurable(value)) return false;
+  const range = rangeFor(metricId);
+  return value >= range.min && value <= range.max;
+};
+
+/** Metrics where a lower target than the start is an unusual goal worth a confirm. */
+const DIRECTION_CHECKED: ReadonlySet<string> = new Set(['load_kg', 'reps', 'distance_m', 'height_cm']);
+
+/** The message shown until the athlete confirms a lower target. */
+export const LOWER_TARGET_CONFIRM_MESSAGE = 'Your target is lower than where you are now. Keep it?';
+
+/**
+ * True when the draft's target is below a known starting value for a metric
+ * where that needs confirming. Body weight, time, body measurement and custom
+ * goals can go either way, so they are never flagged here.
+ */
+export function targetIsLowerThanStart(draft: SmartGoalDraft): boolean {
+  const baseline = draft.baselineKnown ? draft.baselineValue ?? null : null;
+  return isGoalMetricId(draft.metricId) && DIRECTION_CHECKED.has(draft.metricId)
+    && isMeasurable(baseline) && isMeasurable(draft.targetValue)
+    && draft.targetValue < baseline;
+}
+
+/**
  * Validate a goal draft. Every SMART element is required: a specific outcome,
  * a measurement method with units, a baseline or an explicit unknown, a
  * target, a personal reason, and a deadline or an explicit "none".
@@ -363,14 +409,23 @@ export function validateSmartGoal(draft: SmartGoalDraft, today: string): GoalVal
   }
   if (measurementMethod.length < 5) errors.push({ field: 'measurementMethod', message: 'Describe how you will measure it, so every measurement is taken the same way.' });
   if (measurementMethod.length > GOAL_METHOD_MAX) errors.push({ field: 'measurementMethod', message: `Keep it under ${GOAL_METHOD_MAX} characters.` });
+  const range = rangeFor(draft.metricId);
+  const rangeWords = `from ${range.min} to ${range.max}${metric?.unit ? ` ${metric.unit}` : ''}`;
   if (!isMeasurable(draft.targetValue)) errors.push({ field: 'targetValue', message: 'Enter the number you are aiming for.' });
+  else if (draft.targetValue <= 0) errors.push({ field: 'targetValue', message: 'Enter a target above 0.' });
+  else if (!inRange(draft.targetValue, draft.metricId)) errors.push({ field: 'targetValue', message: `Enter a target ${rangeWords}.` });
   const baselineValue = draft.baselineKnown ? draft.baselineValue ?? null : null;
   if (draft.baselineKnown && !isMeasurable(baselineValue)) {
     errors.push({ field: 'baselineValue', message: 'Enter where you are now, or choose "I do not know yet".' });
+  } else if (draft.baselineKnown && !inRange(baselineValue, draft.metricId)) {
+    errors.push({ field: 'baselineValue', message: `Enter where you are now ${rangeWords}.` });
   }
   if (draft.baselineKnown && isMeasurable(baselineValue) && isMeasurable(draft.targetValue)
     && baselineValue === draft.targetValue) {
     errors.push({ field: 'targetValue', message: 'The target is the same as where you are now.' });
+  }
+  if (targetIsLowerThanStart(draft) && draft.confirmLowerTarget !== true) {
+    errors.push({ field: 'targetValue', message: LOWER_TARGET_CONFIRM_MESSAGE });
   }
   if (reason.length < 3) errors.push({ field: 'reason', message: 'Say why this matters to you. It is what you will read when it gets hard.' });
   if (reason.length > GOAL_TEXT_MAX) errors.push({ field: 'reason', message: `Keep it under ${GOAL_TEXT_MAX} characters.` });

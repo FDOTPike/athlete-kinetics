@@ -32,6 +32,13 @@ const widthFloor = (block) => {
   return Math.min(...values);
 };
 
+// The height floor a style block sets, read the same way as the width floor.
+const heightFloor = (block) => {
+  const values = [...stripComments(block).matchAll(/\b(minHeight|height):([^,\n}]*)/g)].map((m) => resolveWidth(m[2]));
+  if (values.length === 0) throw new Error('style sets no height');
+  return Math.min(...values);
+};
+
 describe('tap targets meet theme.touch.min in both directions', () => {
   test('every Chip is at least 56 wide, so one-character chips (1-6, 0-4+, bjj, hip) are too', () => {
     render(<Chip label="1" selected={false} onPress={() => {}} accessibilityLabel="one" />);
@@ -48,6 +55,30 @@ describe('tap targets meet theme.touch.min in both directions', () => {
   test('the "Something feels off" severity chips are at least theme.touch.min wide', () => {
     expect(widthFloor(styleBlock(src('screens/BlockScreen.tsx'), 'severityChip')))
       .toBeGreaterThanOrEqual(theme.touch.min);
+  });
+
+  // Android walk 2026-11-03 (issue 163, a11y-4): these four were still under 56 dp.
+  test('the direct effort chips (halfStepChip) keep the Chip minimum width', () => {
+    expect(widthFloor(styleBlock(src('screens/SessionScreen.tsx'), 'halfStepChip')))
+      .toBeGreaterThanOrEqual(theme.touch.min);
+  });
+
+  test('the +5s / -5s metric adjust buttons are at least theme.touch.min wide and tall', () => {
+    const block = styleBlock(src('screens/SessionScreen.tsx'), 'metricAdjust');
+    expect(widthFloor(block)).toBeGreaterThanOrEqual(theme.touch.min);
+    expect(heightFloor(block)).toBeGreaterThanOrEqual(theme.touch.min);
+  });
+
+  test('the routine builder Up / Down order buttons are at least theme.touch.min wide and tall', () => {
+    const block = styleBlock(src('components/RoutineTemplateBuilder.tsx'), 'orderButton');
+    expect(widthFloor(block)).toBeGreaterThanOrEqual(theme.touch.min);
+    expect(heightFloor(block)).toBeGreaterThanOrEqual(theme.touch.min);
+  });
+
+  test('the trajectory day cells are at least theme.touch.min wide, and the week row scrolls sideways', () => {
+    const source = src('screens/BlockScreen.tsx');
+    expect(widthFloor(styleBlock(source, 'dayMark'))).toBeGreaterThanOrEqual(theme.touch.min);
+    expect(source).toMatch(/horizontal\n\s*showsHorizontalScrollIndicator[\s\S]*?testID=\{`trajectory-days-week-/);
   });
 });
 

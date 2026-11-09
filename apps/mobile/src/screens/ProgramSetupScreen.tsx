@@ -24,7 +24,7 @@ import { Chip, Disclosure, PrimaryButton, SecondaryButton } from '../components/
 import { theme } from '../theme/theme';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { EmphasisReportCard } from '../components/EmphasisReportCard';
-import { recommendedProgramDefaults } from '../state/programDefaults';
+import { programChoiceDisclosure, recommendedProgramDefaults } from '../state/programDefaults';
 import { anchorDisplayName, priorExperienceWouldClear } from '../state/priorExperience';
 import {
   REASON_TEXT_MAP,
@@ -82,6 +82,7 @@ export default function ProgramSetupScreen({
   const profile = useStore((s) => s.profile);
   const today = useStore((s) => s.today);
   const program = useStore((s) => s.program);
+  const block = useStore((s) => s.block);
   const movements = useStore((s) => s.movements);
   const niggles = useStore((s) => s.niggles);
   const previewTrainingProgram = useStore((s) => s.previewTrainingProgram);
@@ -175,7 +176,9 @@ export default function ProgramSetupScreen({
     } catch (error) {
       return { preview: null, error: error instanceof Error ? error.message : String(error) };
     }
-  }, [input, previewTrainingProgram]);
+    // previewTrainingProgram reads the prior-experience list from the store at
+    // call time, so a declaration (or revoke) must redraw the week (#211).
+  }, [input, previewTrainingProgram, movementAvailabilityRevision, activePriorExperienceMovementIds]);
 
   const availableIdsByContext = useMemo(() => ({
     weight_room: new Set(getVerdicts('weight_room')
@@ -361,6 +364,9 @@ export default function ProgramSetupScreen({
       capMin: budget.capMin,
       preparationMin: Math.min(...budget.sessions.map((session) => session.preparationMin)),
       longestMin: Math.max(...budget.sessions.map((session) => session.estimatedMin)),
+      // Issue #209: the lifting part of the longest session (sets, rest and
+      // changeovers, without preparation).
+      liftingMin: Math.max(...budget.sessions.map((session) => session.estimatedMin - session.preparationMin)),
       trimmed: budget.sessions.some((session) => session.trimmedSlotIndexes.length > 0),
       conflicts: budget.conflicts,
       alternatives: budget.alternatives ?? [],
@@ -436,7 +442,9 @@ export default function ProgramSetupScreen({
       {!editing && (
         <View style={styles.card} testID="program-recommendation-card">
           <Text style={styles.sectionTitle}>What the coach has picked for you</Text>
-          <Text style={styles.notice}>{recommended.disclosure}</Text>
+          <Text style={styles.notice} testID="program-choice-disclosure">
+            {programChoiceDisclosure({ buildMode, schemaType, horizonKind, blockCount, reviewDate })}
+          </Text>
           <Text style={styles.caption}>
             Your {dayIndices.length}-day week comes from the training days you already gave during
             setup. Nothing here is permanent — you can change all of it later in Athlete / Profile.
@@ -688,13 +696,13 @@ export default function ProgramSetupScreen({
                   && movementFitsFocusDay(item, session.focus as BlockFocus));
                 return (
                   <View key={slot.slot_index} style={styles.slot}>
-                    <Text style={styles.slotTitle}>{movement.pattern.replace('_', ' ')}</Text>
-                    <View style={styles.wrap}>
-                      {choices.map((choice) => (
-                        <Chip key={choice.movement_id} wrap label={choice.name} selected={selectedId === choice.movement_id}
-                          onPress={() => chooseMovement(session.day_index, slot.slot_index, movement.pattern as TrainingProgramMovementPreference['pattern'], choice.movement_id)} />
-                      ))}
-                    </View>
+                    <CustomizeSlot
+                      testID={`customize-slot-${session.day_index}-${slot.slot_index}`}
+                      pattern={movement.pattern}
+                      choices={choices}
+                      selectedId={selectedId}
+                      onChoose={(movementId) => chooseMovement(session.day_index, slot.slot_index, movement.pattern as TrainingProgramMovementPreference['pattern'], movementId)}
+                    />
                   </View>
                 );
               })}
@@ -722,6 +730,11 @@ export default function ProgramSetupScreen({
           <Text style={styles.caption} testID="session-time-summary">
             {`Each session counts preparation (${sessionTime.preparationMin} min), your sets, rest and changeovers inside your ${sessionTime.capMin}-minute limit. The longest session is about ${Math.ceil(sessionTime.longestMin)} minutes.`}
           </Text>
+          {profile.training_age === 'beginner' && (
+            <Text style={styles.caption} testID="session-time-beginner">
+              {`Beginner sessions are kept short on purpose: about ${Math.max(1, Math.ceil(sessionTime.liftingMin))} minutes of lifting, plus ${sessionTime.preparationMin} minutes of preparation.`}
+            </Text>
+          )}
           {sessionTime.trimmed && (
             <Text style={styles.caption} testID="session-time-trimmed">
               Some sets were reduced so sessions fit your limit. Preparation was not shortened below its minimum.
@@ -772,7 +785,13 @@ export default function ProgramSetupScreen({
           ))}
         </View>
       )}
-      <Text style={styles.caption}>Program starts {today}. Future blocks require confirmation.</Text>
+      <Text style={styles.caption}>
+        {editing
+          ? (block != null
+            ? 'Your current block stays as it is. These choices apply to future blocks, except a change of training days also updates the weekly-day limit used for current targets.'
+            : 'These choices apply to future blocks.')
+          : `Program starts ${today}. Future blocks require confirmation.`}
+      </Text>
     </KeyboardAwareScrollView>
     {/* The actions stay on screen below the plan: reaching them never takes
         scrolling past the whole generated week (issue #38). The blocking
@@ -788,6 +807,63 @@ export default function ProgramSetupScreen({
           || (sessionTime !== null && sessionTime.conflicts.length > 0)} />
       {onCancel !== undefined && <SecondaryButton label="Cancel" onPress={onCancel} />}
     </View>
+    </View>
+  );
+}
+
+// Android issue #216: slots were headed by the raw pattern code ("PUSH H") and
+// listed every allowed movement, 20 or more chips each. A slot now has a plain
+// title, starts with its current choice and a few alternatives, and "Show all"
+// opens the rest. Which movements are allowed is unchanged.
+const SLOT_TITLE: Record<string, string> = {
+  squat: 'Squat',
+  hinge: 'Hip hinge',
+  lunge: 'Lunge',
+  push_h: 'Horizontal push (bench, push-up)',
+  pull_h: 'Horizontal pull (rows)',
+  push_v: 'Vertical push (overhead)',
+  pull_v: 'Vertical pull (pull-up, pulldown)',
+  carry: 'Carry',
+  rotation: 'Core and trunk',
+  isolation: 'Isolation (single joint)',
+  locomotion: 'Locomotion',
+};
+
+export const slotTitle = (pattern: string): string =>
+  SLOT_TITLE[pattern] ?? pattern.replace(/_/g, ' ');
+
+/** Alternatives shown after the current choice before "Show all". */
+export const COLLAPSED_ALTERNATIVES = 4;
+
+interface CustomizeSlotProps {
+  testID: string;
+  pattern: string;
+  choices: readonly { movement_id: number; name: string }[];
+  selectedId: number;
+  onChoose: (movementId: number) => void;
+}
+
+function CustomizeSlot({ testID, pattern, choices, selectedId, onChoose }: CustomizeSlotProps): React.JSX.Element {
+  const [showAll, setShowAll] = useState(false);
+  const current = choices.filter((choice) => choice.movement_id === selectedId);
+  const others = choices.filter((choice) => choice.movement_id !== selectedId);
+  const collapsible = others.length > COLLAPSED_ALTERNATIVES;
+  const shown = [...current, ...(showAll || !collapsible ? others : others.slice(0, COLLAPSED_ALTERNATIVES))];
+  return (
+    <View testID={testID} style={styles.slot}>
+      <Text style={styles.slotTitle}>{slotTitle(pattern)}</Text>
+      <View style={styles.wrap}>
+        {shown.map((choice) => (
+          <Chip key={choice.movement_id} wrap label={choice.name} selected={selectedId === choice.movement_id}
+            onPress={() => onChoose(choice.movement_id)} />
+        ))}
+      </View>
+      {collapsible && (
+        <Pressable accessibilityRole="button" onPress={() => setShowAll((open) => !open)}
+          testID={`${testID}-show-all`} style={styles.showAll}>
+          <Text style={styles.showAllText}>{showAll ? 'Show fewer' : `Show all (${choices.length})`}</Text>
+        </Pressable>
+      )}
     </View>
   );
 }
@@ -866,4 +942,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
   },
+  showAll: { minHeight: 56, justifyContent: 'center', alignSelf: 'flex-start' },
+  showAllText: { color: theme.color.textHi, fontSize: 13, fontWeight: '700', textDecorationLine: 'underline' },
 });
