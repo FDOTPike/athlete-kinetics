@@ -135,11 +135,7 @@ const loadSourceCopy = (
   if (sel.source === 'manual') {
     switch (sel.advisoryKind) {
       case 'apre': return `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg — your entry stands.`;
-<<<<<<< HEAD
       case 'onerm': return `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg from your ${oneRmKg === undefined ? '' : formatLoadKg(oneRmKg)} kg 1RM — your entry stands.`;
-      case 'history': return `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg from your last session — your entry stands.`;
-=======
-      case 'onerm': return `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg from your ${oneRmKg?.toFixed(1)} kg 1RM — your entry stands.`;
       case 'history':
         if (!sel.advisoryFromThisSession && isEasedBelow(sel.advisoryKg, sel.unadjustedHistoryKg)) {
           return `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg today · logged ${sel.unadjustedHistoryKg?.toFixed(1)} kg last session — your entry stands.`;
@@ -147,7 +143,6 @@ const loadSourceCopy = (
         return sel.advisoryFromThisSession === true
           ? `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg from this session — your entry stands.`
           : `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg from your last session — your entry stands.`;
->>>>>>> fix/android-210-collapse-expert-sections
       default: return 'Your call. The number you enter is what gets logged.';
     }
   }
