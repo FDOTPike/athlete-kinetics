@@ -67,7 +67,7 @@ describe('ProfileScreen disarms destructive confirmations across Coach Mode athl
     expect(screen.getByLabelText('Confirm delete current block & state')).toBeOnTheScreen();
 
     // Also arm profile slot switch to Advanced on Athlete A
-    fireEvent.press(screen.getByLabelText('Advanced profile'));
+    fireEvent.press(screen.getByLabelText('Saved profile: Advanced'));
     expect(screen.getByLabelText('Confirm switch to Advanced')).toBeOnTheScreen();
 
     // Switch to Athlete B (Bob) via the real Coach Mode switchAthlete action

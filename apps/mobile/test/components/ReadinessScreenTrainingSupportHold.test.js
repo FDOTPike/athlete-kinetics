@@ -1,6 +1,7 @@
 import React from 'react';
 import { render, screen } from '@testing-library/react-native';
 import ReadinessScreen from '../../src/screens/ReadinessScreen';
+import { HALT_NEXT_TEXT } from '../../src/state/haltCopy';
 import TodayScreen from '../../src/screens/TodayScreen';
 
 let mockState;
@@ -204,7 +205,9 @@ test('a same-day halt stays visible above the training-support hold on Readiness
   expect(screen.getByTestId('held-screen-halt-card')).toBeOnTheScreen();
   expect(screen.getByText("Resolve today's safety report")).toBeOnTheScreen();
   expect(screen.getByText('Training is paused for today. Review the report before doing more work.')).toBeOnTheScreen();
-  expect(screen.getByText('Stop loading the knee today.')).toBeOnTheScreen();
+  // #178: halt-only wording, never the entry's cue.
+  expect(screen.getByText(HALT_NEXT_TEXT)).toBeOnTheScreen();
+  expect(screen.queryByText('Stop loading the knee today.')).toBeNull();
 });
 
 test('a same-day halt stays visible above the training-support hold on Today', () => {
@@ -216,7 +219,9 @@ test('a same-day halt stays visible above the training-support hold on Today', (
 
   expect(screen.getByTestId('training-support-notice')).toBeOnTheScreen();
   expect(screen.getByTestId('held-screen-halt-card')).toBeOnTheScreen();
-  expect(screen.getByText('Stop loading the knee today.')).toBeOnTheScreen();
+  // #178: halt-only wording, never the entry's cue.
+  expect(screen.getByText(HALT_NEXT_TEXT)).toBeOnTheScreen();
+  expect(screen.queryByText('Stop loading the knee today.')).toBeNull();
 });
 
 test('without a halt, the hold notice is shown alone', () => {
