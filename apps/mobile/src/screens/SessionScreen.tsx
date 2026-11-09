@@ -1311,8 +1311,25 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
       ? undefined
       : (after?.sessionPlan ?? sessionPlan).find((planSlot) => planSlot.sessionPlanSlotId === offeredSlotId)?.movementId;
     if (offeredMovementId !== undefined) {
-      Alert.alert('Report saved', 'Report saved with this session. Next, you can choose an alternative for this exercise.', [
-        { text: 'OK', onPress: () => openSubstitution(offeredMovementId) },
+      Alert.alert('Report saved', 'Report saved with this session. Next, see the options for this exercise.', [
+        { text: 'OK', onPress: () => {
+          // The report is already saved: a failure to open the sheet is
+          // recorded and shown, not thrown out of the alert callback. The
+          // sheet can also stay closed without a throw (a support hold or an
+          // unverifiable session context); that is shown the same way.
+          const showCouldNotOpen = (): void => {
+            Alert.alert(
+              'Could not open options',
+              'Your report is saved, but the options for this exercise could not be opened. You can skip this exercise on the session card.',
+            );
+          };
+          try {
+            if (openSubstitution(offeredMovementId) === false) showCouldNotOpen();
+          } catch (error) {
+            useStore.setState({ error: error instanceof Error ? error.message : String(error) });
+            showCouldNotOpen();
+          }
+        } },
       ]);
     }
   };
@@ -1862,7 +1879,8 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                               Target: {target?.kind === 'reps' ? target.reps : '—'} reps. Log the reps you actually completed.
                             </Text>
                           )}
-                          {!bandOnly && (
+                          {/* #182: a slot a report holds back asks for no load. */}
+                          {!bandOnly && !heldByReport(slot.sessionPlanSlotId) && (
                           <View style={styles.loadField}>
                             <Text style={styles.loadFieldLabel} testID="session-load-label">{loadLabel.toUpperCase()}</Text>
                             <View style={styles.loadFieldRow}>
@@ -2091,7 +2109,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                               ? `Log set ${Math.min(slot.plannedSets, currentLogged + 1)} for ${movement?.name ?? 'movement'}`
                               : `Log set ${Math.min(slot.plannedSets, currentLogged + 1)} for ${movement?.name ?? 'movement'}, unavailable — enter a load first`}
                         />
-                        {!loadInvalid && !loadLoggable && (
+                        {!loadInvalid && !loadLoggable && !heldByReport(slot.sessionPlanSlotId) && (
                           <Text style={styles.loadEvidence} testID="session-load-hint">Enter a load to log this set.</Text>
                         )}
 
