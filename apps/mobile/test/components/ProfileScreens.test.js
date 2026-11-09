@@ -666,6 +666,48 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     expect(screen.getByText('A straight bar loaded with weight plates.').props.numberOfLines).toBeUndefined();
   });
 
+  // #205: the week is a prefill by experience, never applied after the athlete edits it.
+  test('YOUR WEEK is prefilled by experience: NEW TO THIS is 3 days of 45 minutes', () => {
+    render(<OnboardingScreen />);
+    pressNext(); // welcome -> goal
+    pressNext(); // goal -> (focus) -> experience
+    fireEvent.press(screen.getByLabelText(/NEW TO THIS\./));
+    pressNext();
+    expect(screen.getByText('YOUR WEEK')).toBeOnTheScreen();
+    expect(screen.getByLabelText('TRAINING DAYS PER WEEK 3')).toBeOnTheScreen();
+    expect(screen.getByLabelText('MINUTES IN A SESSION, TOPS 45 min')).toBeOnTheScreen();
+    expect(screen.getByText(/Choose a week that feels manageable\. A realistic ceiling beats an optimistic one\./)).toBeOnTheScreen();
+    expect(screen.getByTestId('onboarding-week-suggestion').props.children)
+      .toBe('Suggested for NEW TO THIS: 3 days a week, up to 45 minutes each. Change it to fit your week.');
+    pressBack();
+    fireEvent.press(screen.getByLabelText(/SOME MILEAGE\./));
+    pressNext();
+    expect(screen.getByLabelText('TRAINING DAYS PER WEEK 4')).toBeOnTheScreen();
+    expect(screen.getByLabelText('MINUTES IN A SESSION, TOPS 60 min')).toBeOnTheScreen();
+    pressBack();
+    fireEvent.press(screen.getByLabelText(/COMPETITIVE\./));
+    pressNext();
+    expect(screen.getByLabelText('TRAINING DAYS PER WEEK 4')).toBeOnTheScreen();
+    expect(screen.getByLabelText('MINUTES IN A SESSION, TOPS 75 min')).toBeOnTheScreen();
+  });
+
+  test('YOUR WEEK keeps the athlete edit when experience changes afterwards', () => {
+    render(<OnboardingScreen />);
+    pressNext(); // welcome -> goal
+    pressNext(); // goal -> (focus) -> experience
+    fireEvent.press(screen.getByLabelText(/EXPERIENCED\./));
+    pressNext();
+    expect(screen.getByLabelText('MINUTES IN A SESSION, TOPS 75 min')).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText('Increase TRAINING DAYS PER WEEK'));
+    expect(screen.getByLabelText('TRAINING DAYS PER WEEK 5')).toBeOnTheScreen();
+    expect(screen.queryByTestId('onboarding-week-suggestion')).toBeNull();
+    pressBack();
+    fireEvent.press(screen.getByLabelText(/NEW TO THIS\./));
+    pressNext();
+    expect(screen.getByLabelText('TRAINING DAYS PER WEEK 5')).toBeOnTheScreen();
+    expect(screen.getByLabelText('MINUTES IN A SESSION, TOPS 75 min')).toBeOnTheScreen();
+  });
+
   test('WO-02 review uses scrollable sections and edit routing preserves the complete draft', () => {
     render(<OnboardingScreen />);
     fireEvent.changeText(screen.getByLabelText('Your name'), 'Ari');
