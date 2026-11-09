@@ -657,26 +657,34 @@ describe('a discomfort report that cannot open its transaction', () => {
     expect(saved).toBe(true);
     expect(count('SELECT COUNT(*) AS c FROM niggle')).toBe(1);
     expect(state().niggles).toEqual([{ region: 'knee', severity: 9 }]);
-    expect(state().runner.phase).toBe('halted');
+    // #181: a Stop-level report closes the session, recorded as stopped.
+    expect(state().session).toBeNull();
+    expect(raw().prepare('SELECT outcome_kind FROM session_outcome WHERE session_id = ?').get(sessionId).outcome_kind)
+      .toBe('stopped_safely');
     expect(prepRow(sessionId).status).toBe('stopped');
   });
 
-  test('a saved report is still saved when opening the substitution sheet fails', () => {
+  // #182: a report confirms it was saved before any sheet opens. The store
+  // records the offer and leaves opening the sheet to the screen, after the
+  // confirmation, so a sheet that cannot open cannot touch the saved report.
+  test('a saved report records the offer of alternatives without opening the sheet', () => {
     startPlanned();
-    const openSubstitution = state().openSubstitution;
-    useStore.setState({ openSubstitution: () => { throw new Error('substitution unavailable'); } });
+    const openSubstitution = jest.fn();
+    const realOpen = state().openSubstitution;
+    useStore.setState({ openSubstitution });
     let saved;
     try {
       expect(() => { saved = state().reportNiggle('knee', 6); }).not.toThrow();
     } finally {
-      useStore.setState({ openSubstitution });
+      useStore.setState({ openSubstitution: realOpen });
     }
-    // Committed before the sheet is opened: reported as saved, with the error shown.
     expect(saved).toBe(true);
     expect(count('SELECT COUNT(*) AS c FROM niggle')).toBe(1);
     expect(state().niggles).toEqual([{ region: 'knee', severity: 6 }]);
     expect(state().runner.substitutionOfferedForSessionPlanSlotId).not.toBeNull();
-    expect(state().error).toMatch(/substitution unavailable/);
+    expect(openSubstitution).not.toHaveBeenCalled();
+    expect(state().substitution).toBeNull();
+    expect(state().error).toBeNull();
   });
 
   test('does not roll back a transaction it did not open', () => {

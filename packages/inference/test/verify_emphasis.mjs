@@ -105,8 +105,8 @@ const reportText = (block) => [...block.emphasis.applied, ...block.emphasis.omit
 // --- [1] the sport question ---------------------------------------------------------
 console.log('[1] the sport question');
 {
-  check('asked by family: basketball, football, hockey, powerlifting, Muay Thai, another sport',
-    sp.SPORT_FAMILIES.join(',') === 'basketball,football,hockey,powerlifting,muay_thai,other');
+  check('asked by family: grappling, striking, court, football, hockey, strength, other, racquet, running, swimming',
+    sp.SPORT_FAMILIES.join(',') === 'grappling,striking,court,football,hockey,strength,other,racquet,running,swimming');
   check('football is told apart explicitly: association, Australian, rugby, American',
     sp.sportsInFamily('football').join(',') === 'football_association,football_australian,football_rugby,football_american'
       && sp.sportsInFamily('football').every((id) => sp.SPORT_INFO[id].distinction.length > 20));
@@ -148,8 +148,9 @@ console.log('[2] outcomes, basis and limits');
   const of = (sportId, outcomeId) => sp.sportEmphasisFor({ sportId, outcomeId, otherSportName: null });
   const jump = of('basketball', 'jump_higher');
   check('jump higher: quads, glutes, calves, citing the strength review and the plyometric meta-analysis',
-    jump.muscles.join(',') === 'quadriceps,glutes,calves' && jump.basis.length === 2
-      && /Suchomel/.test(jump.basis[0].citation) && /Markovic/.test(jump.basis[1].citation));
+    jump.muscles.join(',') === 'quadriceps,glutes,calves' && jump.basis.length === 3
+      && /Suchomel/.test(jump.basis[0].citation) && /Markovic/.test(jump.basis[1].citation)
+      && /Collings/.test(jump.basis[2].citation));
   check('jump higher says plainly that the library has no jump training',
     jump.limits.some((line) => /no jump or plyometric drills/.test(line) && /does not include jump training itself/.test(line)));
   const stay = of('football_association', 'stay_available');
@@ -159,7 +160,9 @@ console.log('[2] outcomes, basis and limits');
     stay.limits.some((line) => /no adductor-strengthening exercise/.test(line)) && !stay.muscles.includes('inner_thighs'));
   check('ice hockey cites its own adductor study; basketball gets no groin claim',
     /ice hockey players/.test(of('hockey_ice', 'stay_available').basis[1].citation)
-      && of('basketball', 'stay_available').basis.length === 1
+      && of('basketball', 'stay_available').basis.length === 2
+      && /van Dyk/.test(of('basketball', 'stay_available').basis[0].citation)
+      && !of('basketball', 'stay_available').basis.some((b) => /adductor|groin/i.test(`${b.citation} ${b.finding}`))
       && !of('basketball', 'stay_available').limits.some((line) => /adductor/.test(line)));
   const lifts = of('powerlifting', 'bigger_competition_lifts');
   check('powerlifting promotes the three competition lifts, citing the rule book', lifts.competitionLifts === true
@@ -216,6 +219,29 @@ console.log('[3] scheduled sport workload');
       // The week-3 hold applies to every slot, so "unchanged" would be false here.
       && /for every exercise, your main lifts included\. Your main lifts keep their exercises and their sets\./.test(effect(5).explanation)
       && !/main lifts are unchanged/i.test(effect(5).explanation));
+  // #176: the profile panel shows the effect before any block is made, so it
+  // speaks of the NEXT block in the future tense, never of a plan that has
+  // already changed.
+  check('the next-block wording is future tense and says the same thing as the plan wording',
+    [0, 2, 3, 5].every((n) => /^Sport workload: /.test(effect(n).nextBlockExplanation))
+      && /your next block will have one fewer set on most accessory exercises \(down to at least one set; goal-linked, locomotion, non-strength-day, and deload sets are kept\)\. Its main lifts and weekly progression will be unchanged\./.test(effect(3).nextBlockExplanation)
+      && /your next block will have up to two fewer sets on most accessory exercises \(down to at least one set; goal-linked, locomotion, non-strength-day, and deload sets are kept\), and its week 3 will repeat week 2 instead of stepping up/.test(effect(5).nextBlockExplanation)
+      && /That will not change your next block\./.test(effect(2).nextBlockExplanation)
+      && [0, 2, 3, 5].every((n) => !/ has (one|two) fewer set| exercises have (up to )?(one|two) fewer set| are unchanged\.| does not change the gym plan/.test(effect(n).nextBlockExplanation))
+      && !/main lifts and weekly progression will be unchanged/i.test(effect(5).nextBlockExplanation));
+  // Owner ruling on #176: the cut skips non-strength days, the deload week,
+  // goal-linked and locomotion slots, and never goes below one set, so neither
+  // wording promises it on "each" accessory exercise.
+  {
+    const lead = `Sport workload: ${fromStated.description}.`;
+    const kept = '(down to at least one set; goal-linked, locomotion, non-strength-day, and deload sets are kept)';
+    check('the high and very high wording says "most accessory exercises" and names what is kept',
+      effect(3).explanation === `${lead} To leave room for it, most accessory exercises have one fewer set ${kept}. Your main lifts and the weekly progression are unchanged.`
+        && effect(3).nextBlockExplanation === `${lead} To leave room for it, your next block will have one fewer set on most accessory exercises ${kept}. Its main lifts and weekly progression will be unchanged.`
+        && effect(5).explanation === `${lead} That is a very full week, so most accessory exercises have up to two fewer sets ${kept}, and week 3 of the block repeats week 2 instead of stepping up — for every exercise, your main lifts included. Your main lifts keep their exercises and their sets.`
+        && effect(5).nextBlockExplanation === `${lead} That is a very full week, so your next block will have up to two fewer sets on most accessory exercises ${kept}, and its week 3 will repeat week 2 instead of stepping up — for every exercise, your main lifts included. Your main lifts will keep their exercises and their sets.`
+        && [3, 5].every((n) => !/each accessory exercise/.test(effect(n).explanation + effect(n).nextBlockExplanation)));
+  }
   check('no cross-sport load score is computed: the workload carries sessions and minutes only',
     Object.keys(fromSchedule).sort().join(',') === 'description,knownMinutesPerWeek,sessionsPerWeek,source,tier,unknownDurationSessions,weekdays');
 }
@@ -257,8 +283,8 @@ const beach = plan(profile(), { focus: fg.focusFromBundle('beach_muscles') });
       && beach.emphasis.applied.includes('Incline Dumbbell Press is planned instead of Dumbbell Bench Press: it trains upper chest directly (your focus).')
       && beach.emphasis.applied.includes('Barbell Curl takes the place of Overhead Press on one upper day a week, for biceps (your focus). Overhead Press is still trained on another day.'));
   check('and what could not be done, with a way to change it',
-    beach.emphasis.omitted.length === 1 && /^No room for extra triceps work in your 60-minute sessions/.test(beach.emphasis.omitted[0])
-      && /Longer sessions or one more training day would make room/.test(beach.emphasis.omitted[0]));
+    beach.emphasis.omitted.length === 1 && /^No room for extra triceps work in this plan: what is already planned is a main lift/.test(beach.emphasis.omitted[0])
+      && !/minute/.test(beach.emphasis.omitted[0]));
 
   const long = plan(profile({ session_duration_cap_min: 90 }), { focus: fg.focusFromBundle('beach_muscles') });
   check('with longer sessions all three areas get direct work and nothing is omitted',
@@ -266,7 +292,7 @@ const beach = plan(profile(), { focus: fg.focusFromBundle('beach_muscles') });
   const short = plan(profile({ session_duration_cap_min: 45 }), { focus: fg.focusFromBundle('beach_muscles') });
   check('45-minute sessions hold only main lifts: the press still changes, nothing is displaced, the gap is stated',
     week(short).every((s) => s.slots.length === 2) && names(day(short, 2))[0] === 'Incline Dumbbell Press'
-      && short.emphasis.omitted.length === 2 && short.emphasis.omitted.every((line) => /45-minute sessions/.test(line)));
+      && short.emphasis.omitted.length === 2 && short.emphasis.omitted.every((line) => /in this plan: what is already planned/.test(line) && !/minute/.test(line)));
 
   const lower = plan(profile(), { focus: fg.focusFromBundle('lower_body') });
   check('lower body: one lower day gives its last slot to glutes; squat and hinge stay; upper days untouched',
@@ -626,9 +652,23 @@ console.log('[10] time, determinism and honesty');
 {
   const atSeven = pe.describeEmphasisGap('upper_chest', 'no_room', 15, 7);
   const atThree = pe.describeEmphasisGap('upper_chest', 'no_room', 15, 3);
-  check('the no-room line offers one more training day only below seven days',
-    !atSeven.includes('one more training day') && atSeven.includes('Longer sessions would make room')
-      && atThree.includes('one more training day'), atSeven);
+  // Issue #154: the line names the slot rule, so no session length or extra
+  // training day is offered, at any weekly frequency.
+  check('the no-room line offers no extra training day and no session length (issue #154)',
+    !atSeven.includes('one more training day') && !atThree.includes('one more training day')
+      && !/minute|Longer sessions/.test(atThree) && /in this plan: what is already planned/.test(atSeven), atSeven);
+}
+
+// --- [11] the no-room gap copy names the rule, not the session length (issue #154) -----------------
+console.log('[11] gap copy');
+{
+  const noRoom = pe.describeEmphasisGap('triceps', 'no_room', 75);
+  check('no_room copy does not blame the session length', !/minute|75/.test(noRoom), noRoom);
+  check('no_room copy names the slot rule that applied',
+    noRoom.includes('a main lift, already serves your emphasis, or is the only time that movement is trained in the week'));
+  check('the no-exercise and no-day copy are unchanged',
+    pe.describeEmphasisGap('triceps', 'no_exercise', 75).startsWith('No extra triceps work: no exercise')
+      && pe.describeEmphasisGap('triceps', 'no_day', 75).startsWith('No extra triceps work: this plan has no strength day'));
 }
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);

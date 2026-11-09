@@ -78,7 +78,7 @@ test('switching the active exercise in self-directed mode clears an open substit
   render(<SessionScreen />);
 
   // Open substitution on Slot 1 (Push-up).
-  fireEvent.press(screen.getByLabelText('Avoid Push-up and find a substitution'));
+  fireEvent.press(screen.getByLabelText('Swap or avoid this: Push-up'));
   expect(screen.getByLabelText('Use Incline Push-Up instead')).toBeOnTheScreen();
 
   // Switch active exercise to Slot 2 (Push-Up Wide).

@@ -191,7 +191,8 @@ describe('OnboardingScreen EDIT from review returns to the review', () => {
     next();
     press('onboarding-wants-sport');
     next();
-    press('sport-family-basketball');
+    press('sport-family-court');
+    press('sport-basketball');
     press('sport-outcome-general_support');
     press('sport-experience-new');
     next();

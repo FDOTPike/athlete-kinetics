@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react-native';
 import ReadinessScreen from '../../src/screens/ReadinessScreen';
 import TodayScreen from '../../src/screens/TodayScreen';
 import BlockScreen from '../../src/screens/BlockScreen';
+import { HALT_TODAY_TEXT } from '../../src/state/haltCopy';
 
 let mockState;
 
@@ -186,7 +187,9 @@ test('when vector is null during a safety halt, BlockScreen and ReadinessScreen 
 
   const { unmount: unmountBlock } = render(<BlockScreen />);
   expect(screen.getByText('Stop training today')).toBeOnTheScreen();
-  expect(screen.getByText('Systemic symptom reported. Stop the session and rest.')).toBeOnTheScreen();
+  // #178: the halt card shows halt-only wording, never the entry's cue.
+  expect(screen.getByText(HALT_TODAY_TEXT)).toBeOnTheScreen();
+  expect(screen.queryByText('Systemic symptom reported. Stop the session and rest.')).toBeNull();
   expect(screen.getByText('Readiness is needed first')).toBeOnTheScreen();
   unmountBlock();
 

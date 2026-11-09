@@ -19,12 +19,12 @@
  */
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useStore } from '../state/useStore';
+import { useStore, type RecentSessionOutcome } from '../state/useStore';
 import { theme } from '../theme/theme';
 import { formatAthleteDate } from '../state/athleteDate';
 import { ListRow } from '../components/ui';
 import { measuredDayDetail } from './measuredDayDetail';
-import { buildSessionSummary } from '../state/sessionSummary';
+import { buildSessionSummary, markPerDumbbell, sessionFocusName } from '../state/sessionSummary';
 
 const OUTCOME_LABELS: Record<string, string> = {
   followed_plan: 'Plan followed',
@@ -40,6 +40,21 @@ const formatFinalizedDate = (ms: number): string => {
   return formatAthleteDate(ms);
 };
 
+/** Issue #201: "Session recorded" on three rows told nothing apart. The row
+ *  says what the session was (focus or extra), how many exercises and sets. */
+const sessionDescriptor = (row: {
+  focus?: string | null; originKind?: string | null; exerciseCount?: number | null; loggedSetCount?: number | null;
+}): string => {
+  const kind = row.focus ? sessionFocusName(row.focus) : row.originKind === 'free_form' ? 'Extra session' : 'Session';
+  const counts = row.exerciseCount == null || row.loggedSetCount == null
+    ? []
+    : [
+        `${row.exerciseCount} ${row.exerciseCount === 1 ? 'exercise' : 'exercises'}`,
+        `${row.loggedSetCount} ${row.loggedSetCount === 1 ? 'set' : 'sets'}`,
+      ];
+  return [kind, ...counts].join(' · ');
+};
+
 // Two sessions on one day were identical rows; the time tells them apart.
 const formatFinalizedTime = (ms: number): string => (ms <= 0 ? '' : ` · ${new Date(ms).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`);
 
@@ -49,6 +64,10 @@ function PastSessionSummary({ sessionId, load }: {
   sessionId: number;
   load: (sessionId: number) => ReturnType<ReturnType<typeof useStore.getState>['loadSessionSummaryFacts']>;
 }): React.JSX.Element {
+  // Issue #218: dumbbell loads read per dumbbell here too, by the same rule
+  // as the completion summary. Tests may leave these out of the store.
+  const movements = useStore((s) => s.movements);
+  const loadIntents = useStore((s) => s.loadIntents);
   let lines: string[] = [];
   // Review (PR 194): a failed read is not an empty session. Only a summary
   // that was read and holds nothing says that no sets were logged.
@@ -56,7 +75,8 @@ function PastSessionSummary({ sessionId, load }: {
   try {
     const facts = load(sessionId);
     const view = buildSessionSummary({
-      exercises: facts.exercises, previousSets: facts.previousSets, durationMin: facts.durationMin,
+      exercises: markPerDumbbell(facts.exercises, movements, loadIntents),
+      previousSets: facts.previousSets, durationMin: facts.durationMin,
       blockSessions: [], today: '', skippedExercises: facts.skippedExercises,
     });
     lines = [
@@ -85,7 +105,7 @@ export default function ProgressScreen(): React.JSX.Element {
   const loadSessionSummaryFacts = useStore((s) => s.loadSessionSummaryFacts);
   const session = useStore((s) => s.session);
 
-  const [recentOutcomes, setRecentOutcomes] = useState<{ sessionId: number; outcomeKind: string; finalizedAtMs: number }[]>([]);
+  const [recentOutcomes, setRecentOutcomes] = useState<RecentSessionOutcome[]>([]);
   // Walk 2 (W2-9): a recent session opens in place to its own summary.
   const [openSessionId, setOpenSessionId] = useState<number | null>(null);
   const [recentMeasures, setRecentMeasures] = useState<ReturnType<typeof loadMeasuredHistory>>([]);
@@ -113,14 +133,15 @@ export default function ProgressScreen(): React.JSX.Element {
           recentOutcomes.map((row, i) => {
             const label = OUTCOME_LABELS[row.outcomeKind] ?? 'Outcome unavailable';
             const when = `${formatFinalizedDate(row.finalizedAtMs)}${formatFinalizedTime(row.finalizedAtMs)}`;
+            const detail = `${sessionDescriptor(row)} · ${when}`;
             const open = openSessionId === row.sessionId;
             return (
               <View key={`${row.sessionId}-${row.finalizedAtMs}-${i}`}>
                 <ListRow
                   label={label}
-                  detail={when}
+                  detail={detail}
                   testID={`progress-session-${row.sessionId}`}
-                  accessibilityLabel={`${label}, ${when}. ${open ? 'Hide' : 'Show'} what was logged.`}
+                  accessibilityLabel={`${label}, ${detail}. ${open ? 'Hide' : 'Show'} what was logged.`}
                   onPress={() => setOpenSessionId(open ? null : row.sessionId)}
                 />
                 {open && <PastSessionSummary sessionId={row.sessionId} load={loadSessionSummaryFacts} />}

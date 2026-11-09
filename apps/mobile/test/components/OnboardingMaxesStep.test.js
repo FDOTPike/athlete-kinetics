@@ -131,6 +131,52 @@ test('skipping the step saves no maxes, even ones typed before the skip', async 
   expect(savedMaxes()).toEqual([]);
 });
 
+// Review (PR 292): NEXT can be tapped while a max field still has focus. The
+// field then leaves the screen without an end-of-editing event, and the typed
+// max must still be saved.
+test('a max still being typed when NEXT is tapped is saved', async () => {
+  openExperience();
+  next();
+  act(() => { fireEvent.changeText(maxField('SQUAT'), '140'); });
+  next();
+  expect(screen.getByText('YOUR WEEK')).toBeTruthy();
+  logisticsToReview();
+  await startTraining();
+  expect(savedMaxes()).toEqual([[idOf('Competition Squat'), 140]]);
+});
+
+test('a max still being typed when BACK is tapped is kept on the step', () => {
+  openExperience();
+  next();
+  act(() => { fireEvent.changeText(maxField('BENCH'), '102.5'); });
+  act(() => { fireEvent.press(screen.getByLabelText('Back')); });
+  next();
+  expect(maxField('BENCH').props.value).toBe('102.5');
+});
+
+test('a + after a typed max saves the stepped value, not the typed text', async () => {
+  openExperience();
+  next();
+  typeMax('SQUAT', '140');
+  pressLabel('Increase SQUAT one rep max');
+  expect(maxField('SQUAT').props.value).toBe('142.5');
+  next();
+  logisticsToReview();
+  await startTraining();
+  expect(savedMaxes()).toEqual([[idOf('Competition Squat'), 142.5]]);
+});
+
+test('skipping saves nothing, even a max still being typed', async () => {
+  openExperience();
+  next();
+  act(() => { fireEvent.changeText(maxField('SQUAT'), '140'); });
+  pressLabel('Skip one-rep maxes for now');
+  logisticsToReview();
+  await startTraining();
+  expect(state().onboarded).toBe(true);
+  expect(savedMaxes()).toEqual([]);
+});
+
 test('NEW TO THIS never sees the step, and maxes typed before switching to it are not saved', async () => {
   openExperience();
   next();

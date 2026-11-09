@@ -4,7 +4,8 @@
  * from the record of the session, although the timeline had shown
  * "Skipped: Bodyweight Squat · no sets logged" a moment before.
  *
- * Owner ruling 2026-11-03 (Entry 0286): the completion summary may read 071
+ * Owner ruling (PROMPT_LEDGER.md Entry 0300; the original 2026-11-03 Entry
+ * 0286 is unrecovered, issue #297): the completion summary may read 071
  * session_skipped_slot. It is the one reader; no engine reads it.
  *
  * Store tests run the REAL store over the production migration chain

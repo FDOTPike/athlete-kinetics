@@ -28,7 +28,7 @@
  * Law 3: Zero red/amber/green anywhere.
  * Law 4: Touch targets >= 56pt.
  */
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   BIG4_LIFTS,
@@ -48,7 +48,6 @@ import {
   type EquipmentItem,
   type LoadPreference,
   type Objective,
-  type ProgressionMethod,
   type TrainingAge,
   type UserProfile,
   validateSmartGoal,
@@ -58,9 +57,10 @@ import { theme } from '../theme/theme';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import InfoTip from '../components/InfoTip';
 import { useStore } from '../state/useStore';
+import { anchorDisplayName } from '../state/priorExperience';
 import { useSubViewBack } from '../navigation/navigation';
 import { Chip, Stepper, QuietAction, PrimaryButton } from '../components/ui';
-import { OneRmRow, oneRmKeptKg } from '../components/OneRmRow';
+import { OneRmRow, oneRmKeptKg, parseOneRmText } from '../components/OneRmRow';
 import {
   BALANCED_FOCUS_DRAFT,
   EMPTY_GOAL_FIELDS,
@@ -81,11 +81,12 @@ import {
   sportFieldsSummary,
   type SportFieldsState,
 } from '../components/SportFields';
+import { IS_BETA_BUILD } from '../config/features';
 
 // ---------------------------------------------------------------------------
 // Copy: plain-language labels + one-liners for every enum the wizard shows.
 // ---------------------------------------------------------------------------
-const OBJECTIVE_COPY: Record<Objective, { label: string; blurb: string }> = {
+export const OBJECTIVE_COPY: Record<Objective, { label: string; blurb: string }> = {
   strength: { label: 'GET STRONGER', blurb: 'Lift heavier on the big lifts' },
   hypertrophy: { label: 'BUILD MUSCLE', blurb: 'Size first, the numbers follow' },
   power: { label: 'GET EXPLOSIVE', blurb: 'Speed and force for sport' },
@@ -96,11 +97,35 @@ const OBJECTIVE_COPY: Record<Objective, { label: string; blurb: string }> = {
   weight_loss: { label: 'WEIGHT-LOSS SUPPORT', blurb: 'Stay active and keep your muscle' },
 };
 
+export const OBJECTIVE_LABEL: Record<Objective, string> = {
+  strength: OBJECTIVE_COPY.strength.label,
+  hypertrophy: OBJECTIVE_COPY.hypertrophy.label,
+  power: OBJECTIVE_COPY.power.label,
+  endurance: OBJECTIVE_COPY.endurance.label,
+  gpp: OBJECTIVE_COPY.gpp.label,
+  hybrid: OBJECTIVE_COPY.hybrid.label,
+  rehab: OBJECTIVE_COPY.rehab.label,
+  weight_loss: OBJECTIVE_COPY.weight_loss.label,
+};
+
 const AGE_COPY: Record<TrainingAge, { label: string; blurb: string }> = {
   beginner: { label: 'NEW TO THIS', blurb: 'Under a year of consistent training, or returning after a long break' },
   intermediate: { label: 'SOME MILEAGE', blurb: '1–3 years — the basic lifts feel familiar' },
   advanced: { label: 'EXPERIENCED', blurb: '3+ years of structured training' },
   elite: { label: 'COMPETITIVE', blurb: 'Competing, or training at that level' },
+};
+
+/**
+ * #205: the week YOUR WEEK starts from, by experience. A prefill the athlete
+ * confirms or changes on that step, applied when experience is chosen and
+ * never after the athlete has edited the week. It does not change any
+ * prescription by itself: the plan is built from the week the athlete saves.
+ */
+export const WEEK_DEFAULT_BY_AGE: Record<TrainingAge, { readonly days: number; readonly minutes: number }> = {
+  beginner: { days: 3, minutes: 45 },
+  intermediate: { days: 4, minutes: 60 },
+  advanced: { days: 4, minutes: 75 },
+  elite: { days: 4, minutes: 75 },
 };
 
 const ENERGY_COPY: Record<EnergySystem, { label: string; blurb: string }> = {
@@ -113,16 +138,6 @@ const ENERGY_COPY: Record<EnergySystem, { label: string; blurb: string }> = {
 const LOAD_PREFERENCE_COPY: Record<LoadPreference, { label: string; blurb: string }> = {
   auto: { label: 'COACH SUGGESTS', blurb: 'Targets come from your numbers and history. You can always adjust before logging.' },
   manual: { label: 'I CHOOSE', blurb: 'You set every load. Coach suggestions appear as reference only.' },
-};
-
-/** Plain-language label for each persisted progression methodology (R6,
- * Round 2 — the review screen discloses the default like every other
- * removed advanced default). */
-const PROGRESSION_METHOD_LABEL: Record<ProgressionMethod, string> = {
-  linear: 'Linear',
-  undulating: 'Undulating',
-  conjugate: 'Conjugate',
-  autoregulated: 'Autoregulated',
 };
 
 const EQUIPMENT_LABEL: Record<EquipmentItem, string> = {
@@ -264,7 +279,14 @@ export default function OnboardingScreen(): React.JSX.Element {
   const activeAthleteId = useStore((s) => s.activeAthleteId);
 
   const registryName = athletes.find((a) => a.id === activeAthleteId)?.name ?? '';
-  const [draft, setDraft] = useState<UserProfile>({ ...DEFAULT_PROFILE });
+  const [draft, setDraft] = useState<UserProfile>({
+    ...DEFAULT_PROFILE,
+    weekly_frequency: WEEK_DEFAULT_BY_AGE[DEFAULT_PROFILE.training_age].days,
+    session_duration_cap_min: WEEK_DEFAULT_BY_AGE[DEFAULT_PROFILE.training_age].minutes,
+  });
+  // #205: true once the athlete changes days or minutes; from then on a change
+  // of experience leaves their week alone.
+  const [weekEdited, setWeekEdited] = useState(false);
   const [name, setName] = useState(registryName === 'Athlete 1' ? '' : registryName);
   const [injuryText, setInjuryText] = useState('');
   const [mobilityText, setMobilityText] = useState('');
@@ -301,13 +323,40 @@ export default function OnboardingScreen(): React.JSX.Element {
   const [wantsSport, setWantsSport] = useState(false);
   const [sportFields, setSportFields] = useState<SportFieldsState>(EMPTY_SPORT_FIELDS);
   const movements = useStore((s) => s.movements) ?? [];
+  // #217: "Have you trained these before?" Only what the athlete could declare
+  // for the answers so far (the Library chip's own test); training age alone
+  // declares nothing.
+  const previewDeclarations = useStore((s) => s.previewPriorExperienceDeclarations);
+  const movementAvailabilityRevision = useStore((s) => s.movementAvailabilityRevision);
+  const [declaredAnchorIds, setDeclaredAnchorIds] = useState<readonly number[]>([]);
+  const [declaredBasics, setDeclaredBasics] = useState(false);
+  const declarationOptions = useMemo(
+    () => (typeof previewDeclarations === 'function'
+      ? previewDeclarations(draft)
+      : { anchors: [], basicMovementIds: [] }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [previewDeclarations, draft.training_age, draft.equipment_inventory, movementAvailabilityRevision],
+  );
+  const declaredMovementIds = [
+    ...declarationOptions.anchors.filter((anchor) => declaredAnchorIds.includes(anchor.movementId)).map((anchor) => anchor.movementId),
+    ...(declaredBasics ? declarationOptions.basicMovementIds : []),
+  ];
+  const toggleDeclaredAnchor = (movementId: number): void => setDeclaredAnchorIds((ids) =>
+    (ids.includes(movementId) ? ids.filter((id) => id !== movementId) : [...ids, movementId]));
   const [saveAttempted, setSaveAttempted] = useState(false);
   // Issue #218: optional one-rep maxes, from SOME MILEAGE up. Held as the
   // value the store will keep (movement id -> kg) and written with the rest
   // of the interview, never before.
   const [maxDraft, setMaxDraft] = useState<Record<number, number>>({});
   const asksMaxes = draft.training_age !== 'beginner';
+  // Review (PR 292): text typed into a max field that has not been committed
+  // yet. NEXT or BACK can be tapped while the field still has focus, and the
+  // field then leaves the screen with no end-of-editing event, so leaving the
+  // step commits this text by the field's own rule. Any commit from the field
+  // itself (end of editing, + or −) replaces it.
+  const pendingMaxText = useRef<Record<number, string>>({});
   const setMax = (movementId: number, kg: number | null): void => {
+    delete pendingMaxText.current[movementId];
     setMaxDraft((current) => {
       const nextDraft = { ...current };
       if (kg === null) delete nextDraft[movementId];
@@ -315,15 +364,35 @@ export default function OnboardingScreen(): React.JSX.Element {
       return nextDraft;
     });
   };
+  const commitPendingMaxes = (): void => {
+    const pending = Object.entries(pendingMaxText.current);
+    pendingMaxText.current = {};
+    if (pending.length === 0) return;
+    setMaxDraft((current) => {
+      const nextDraft = { ...current };
+      for (const [movementId, text] of pending) {
+        const kg = parseOneRmText(text);
+        if (kg === null) delete nextDraft[Number(movementId)];
+        else nextDraft[Number(movementId)] = oneRmKeptKg(kg);
+      }
+      return nextDraft;
+    });
+  };
   const today = localIsoToday();
 
-  useSubViewBack(stepIdx > 0, () => setStepIdx((i) => Math.max(0, i - 1)));
+  const goBack = (): void => {
+    commitPendingMaxes();
+    setStepIdx((i) => Math.max(0, i - 1));
+  };
+  useSubViewBack(stepIdx > 0, goBack);
 
   const patch = (p: Partial<UserProfile>): void => setDraft((d) => ({ ...d, ...p }));
 
   const selectTrainingAge = (age: TrainingAge): void => {
     const prior = draft.training_age;
-    patch({ training_age: age });
+    patch(weekEdited
+      ? { training_age: age }
+      : { training_age: age, weekly_frequency: WEEK_DEFAULT_BY_AGE[age].days, session_duration_cap_min: WEEK_DEFAULT_BY_AGE[age].minutes });
     setLoadPreference((current) => transitionLoadPreference(prior, age, current, loadPreferenceExplicit));
     if (age === 'beginner') setLoadPreferenceExplicit(false);
   };
@@ -361,10 +430,14 @@ export default function OnboardingScreen(): React.JSX.Element {
   // goal is never carried forward silently.
   const targetGateOpen = step === 'target' && !goalValidation.ok;
   const skipTarget = (): void => {
-    // Removing the screen leaves the index pointing at the next one.
+    // Removing the screen leaves the index pointing at the next one, which is
+    // right mid-interview. From an EDIT started on the review the index must be
+    // recomputed against the array WITHOUT this screen, or it lands one past
+    // the review (a "Step 10 of 9" counter and a dead first Back).
     setWantsTarget(false);
     setGoalFields(EMPTY_GOAL_FIELDS);
     setGoalExerciseId(null);
+    returnAfterReviewEditSkip('target');
   };
   const sportValidation = useMemo(
     () => validateSportProfile(sportDraftFromFields(sportFields), today),
@@ -375,16 +448,39 @@ export default function OnboardingScreen(): React.JSX.Element {
   const skipSport = (): void => {
     setWantsSport(false);
     setSportFields(EMPTY_SPORT_FIELDS);
+    returnAfterReviewEditSkip('sport');
   };
   // R5 (Round 2, ledger 0060): the limitations decision is REQUIRED. The
   // athlete cannot leave this screen — NEXT stays disabled — until they have
   // explicitly chosen Yes or No. Silence is never an answer to a safety
   // question; a skip would silently claim "no limitations" in the profile.
   const limitsGateOpen = step === 'limits' && limitsAnswered === null;
+  // A15-01: a skip during an EDIT from the review must present any OTHER
+  // optional answer that is still incomplete (one added moments ago on the
+  // focus screen) before returning to the review; otherwise review would carry
+  // an invalid answer and START TRAINING would be refused. When nothing is
+  // pending, land on the review's index in the reduced array and leave edit
+  // mode so NEXT walks normally.
+  const returnAfterReviewEditSkip = (removed: 'sport' | 'target'): void => {
+    if (!editingFromReview) return;
+    const remaining = steps.filter((key) => key !== removed);
+    const pending = remaining.findIndex((key) =>
+      (key === 'sport' && !sportValidation.ok) || (key === 'target' && !goalValidation.ok));
+    if (pending !== -1) {
+      setStepIdx(pending);
+      return;
+    }
+    setStepIdx(remaining.indexOf('review'));
+    setEditingFromReview(false);
+  };
 
   const goNext = (): void => {
+    commitPendingMaxes();
     if (!editingFromReview) {
-      setStepIdx((i) => Math.min(steps.length - 1, i + 1));
+      // Relative to the step this press was rendered for, not a functional
+      // update: two presses sent before a re-render advance one step, not two
+      // (Android walk W7-1, issue #152).
+      setStepIdx(Math.min(steps.length - 1, stepIdx + 1));
       return;
     }
     // Any later sport or target screen still unanswered comes first, even
@@ -437,6 +533,7 @@ export default function OnboardingScreen(): React.JSX.Element {
         oneRepMaxes: asksMaxes
           ? Object.entries(maxDraft).map(([movementId, kg]) => ({ movementId: Number(movementId), kg }))
           : [],
+        priorExperienceMovementIds: declaredMovementIds,
       },
     );
   };
@@ -506,16 +603,20 @@ export default function OnboardingScreen(): React.JSX.Element {
               maxLength={24}
               accessibilityLabel="Your name"
             />
-            <QuietAction
-              label="Just exploring? Load the demo athlete →"
-              onPress={finishWithDemo}
-              accessibilityLabel="Skip the questionnaire and load the demo athlete"
-              style={styles.demoLink}
-            />
-            {demoNotice !== null && (
-              <Text style={styles.p} accessibilityLiveRegion="polite">
-                {demoNotice}
-              </Text>
+            {!IS_BETA_BUILD && (
+              <>
+                <QuietAction
+                  label="Just exploring? Load the demo athlete →"
+                  onPress={finishWithDemo}
+                  accessibilityLabel="Skip the questionnaire and load the demo athlete"
+                  style={styles.demoLink}
+                />
+                {demoNotice !== null && (
+                  <Text style={styles.p} accessibilityLiveRegion="polite">
+                    {demoNotice}
+                  </Text>
+                )}
+              </>
             )}
           </View>
         )}
@@ -558,7 +659,7 @@ export default function OnboardingScreen(): React.JSX.Element {
               selected={wantsSport}
               onPress={() => setWantsSport((value) => !value)}
               accessibilityLabel={wantsSport
-                ? 'I play or compete in a sport, selected. One more screen will ask about it.'
+                ? 'I play or compete in a sport. One more screen will ask about it.'
                 : 'I play or compete in a sport. Adds one screen.'}
               style={styles.cardChip}
             />
@@ -570,7 +671,7 @@ export default function OnboardingScreen(): React.JSX.Element {
               selected={wantsTarget}
               onPress={() => setWantsTarget((value) => !value)}
               accessibilityLabel={wantsTarget
-                ? 'I have a specific target, selected. One more screen will ask for it.'
+                ? 'I also have a specific target. One more screen will ask for it.'
                 : 'I also have a specific target. Adds one screen.'}
               style={styles.cardChip}
             />
@@ -646,12 +747,14 @@ export default function OnboardingScreen(): React.JSX.Element {
                   label={label}
                   valueKg={maxDraft[movement.movement_id]}
                   onChange={(kg) => setMax(movement.movement_id, kg)}
+                  onTextChange={(text) => { pendingMaxText.current[movement.movement_id] = text; }}
                 />
               );
             })}
             <QuietAction
               label="Skip for now"
               onPress={() => {
+                pendingMaxText.current = {};
                 setMaxDraft({});
                 goNext();
               }}
@@ -667,17 +770,22 @@ export default function OnboardingScreen(): React.JSX.Element {
             <Stepper
               label="TRAINING DAYS PER WEEK"
               value={String(draft.weekly_frequency)}
-              onDecrement={() => patch({ weekly_frequency: Math.max(1, draft.weekly_frequency - 1) })}
-              onIncrement={() => patch({ weekly_frequency: Math.min(7, draft.weekly_frequency + 1) })}
+              onDecrement={() => { setWeekEdited(true); patch({ weekly_frequency: Math.max(1, draft.weekly_frequency - 1) }); }}
+              onIncrement={() => { setWeekEdited(true); patch({ weekly_frequency: Math.min(7, draft.weekly_frequency + 1) }); }}
               style={styles.stepperBlock}
             />
             <Stepper
               label="MINUTES IN A SESSION, TOPS"
               value={`${draft.session_duration_cap_min} min`}
-              onDecrement={() => patch({ session_duration_cap_min: Math.max(15, draft.session_duration_cap_min - 15) })}
-              onIncrement={() => patch({ session_duration_cap_min: Math.min(240, draft.session_duration_cap_min + 15) })}
+              onDecrement={() => { setWeekEdited(true); patch({ session_duration_cap_min: Math.max(15, draft.session_duration_cap_min - 15) }); }}
+              onIncrement={() => { setWeekEdited(true); patch({ session_duration_cap_min: Math.min(240, draft.session_duration_cap_min + 15) }); }}
               style={styles.stepperBlock}
             />
+            {!weekEdited && (
+              <Text style={styles.pDim} testID="onboarding-week-suggestion">
+                {`Suggested for ${AGE_COPY[draft.training_age].label}: ${draft.weekly_frequency} days a week, up to ${draft.session_duration_cap_min} minutes each. Change it to fit your week.`}
+              </Text>
+            )}
             <Text style={styles.pDim}>
               Choose a week that feels manageable. A realistic ceiling beats an optimistic one. You can change this later in Athlete Profile.
             </Text>
@@ -752,6 +860,39 @@ export default function OnboardingScreen(): React.JSX.Element {
                 </Text>
               </View>
             )}
+            {(declarationOptions.anchors.length > 0 || declarationOptions.basicMovementIds.length > 0) && (
+              <View testID="onboarding-prior-experience">
+                <Text style={styles.fieldLabel} accessibilityRole="header">HAVE YOU TRAINED THESE BEFORE? (OPTIONAL)</Text>
+                <Text style={styles.pDim}>
+                  Tap each one you have trained before and it can be in your plan. This is your own statement
+                  about your training history, not a coaching assessment. If you leave them, your plan starts
+                  with the movements that lead up to them.
+                </Text>
+                <View style={styles.choiceGroup}>
+                  {declarationOptions.anchors.map((anchor) => (
+                    <Chip
+                      key={anchor.movementId}
+                      wrap
+                      label={`I have trained ${anchorDisplayName(anchor.name)} before`}
+                      selected={declaredAnchorIds.includes(anchor.movementId)}
+                      onPress={() => toggleDeclaredAnchor(anchor.movementId)}
+                      accessibilityLabel={`I have trained ${anchorDisplayName(anchor.name)} before`}
+                      testID={`onboarding-declare-${anchor.movementId}`}
+                    />
+                  ))}
+                  {declarationOptions.basicMovementIds.length > 0 && (
+                    <Chip
+                      wrap
+                      label="I have done planks, carries and bodyweight basics before"
+                      selected={declaredBasics}
+                      onPress={() => setDeclaredBasics((value) => !value)}
+                      accessibilityLabel="I have done planks, carries and bodyweight basics before"
+                      testID="onboarding-declare-basics"
+                    />
+                  )}
+                </View>
+              </View>
+            )}
           </View>
         )}
 
@@ -783,7 +924,7 @@ export default function OnboardingScreen(): React.JSX.Element {
             {limitsAnswered === true && (
               <View>
                 <Text style={styles.fieldLabel}>PAST INJURIES</Text>
-                <Text style={styles.pDim}>One per line, like &quot;knee: old ACL, careful with deep squats&quot;.</Text>
+                <Text style={styles.pDim}>One per line, like &quot;knee: old ACL repair, 2019&quot;.</Text>
                 <TextInput
                   disableFullscreenUI
                   style={styles.notesInput}
@@ -829,7 +970,7 @@ export default function OnboardingScreen(): React.JSX.Element {
                 {wantsTarget && goalValidation.ok && (
                   <View style={styles.reviewHeadingRow}>
                     <Text style={styles.reviewSupportLine} testID="onboarding-summary-target-row">
-                      {`TARGET — ${goalValidation.goal.specificOutcome}: ${goalValidation.goal.targetValue} ${goalValidation.goal.unit}${goalValidation.goal.requestedDeadline === null ? ', no deadline' : ` by ${goalValidation.goal.requestedDeadline}`}`}
+                      {`TARGET — ${goalValidation.goal.specificOutcome}: ${goalValidation.goal.baselineValue === null ? '' : `from ${goalValidation.goal.baselineValue} ${goalValidation.goal.unit} to `}${goalValidation.goal.targetValue} ${goalValidation.goal.unit}${goalValidation.goal.requestedDeadline === null ? ', no deadline' : ` by ${goalValidation.goal.requestedDeadline}`}`}
                     </Text>
                     <Pressable
                       onPress={() => editFromReview('target')}
@@ -897,7 +1038,6 @@ export default function OnboardingScreen(): React.JSX.Element {
                     {'\n'}How hard did that feel? 1 is very easy. 10 is your hardest effort.
                     {'\n'}Up to {draft.max_sessions_per_day} session{draft.max_sessions_per_day === 1 ? '' : 's'} a day
                     {'\n'}Energy focus: {ENERGY_COPY[draft.target_energy_system].label}
-                    {'\n'}Progression method: {PROGRESSION_METHOD_LABEL[draft.progression_methodology]}
                   </Text>
                 </View>
 
@@ -922,15 +1062,15 @@ export default function OnboardingScreen(): React.JSX.Element {
                 )}
                 {draft.training_age === 'beginner' && (
                   <Text style={styles.reviewDescription}>
-                    You choose the first weight. Next time starts from what you logged. Your effort ceiling starts at 8.5 and can change as your experience grows.
+                    You choose the first weight. Next time starts from what you logged. Your effort ceiling starts at {effectiveRpeCeiling(draft).toFixed(1)} and can change as your experience grows.
                   </Text>
                 )}
               </ReviewSection>
             </View>
 
             <Text style={styles.pDim}>
-              Change any of this later in Profile. Your first prescription is
-              waiting on Today.
+              Change any of this later in Profile. Next, check your first week,
+              then start on Today.
             </Text>
             <PrimaryButton
               label="START TRAINING"
@@ -954,7 +1094,7 @@ export default function OnboardingScreen(): React.JSX.Element {
       <View style={styles.footer}>
         <QuietAction
           label="BACK"
-          onPress={() => setStepIdx((i) => Math.max(0, i - 1))}
+          onPress={goBack}
           disabled={stepIdx === 0}
           accessibilityLabel="Back"
         />
@@ -976,6 +1116,12 @@ export default function OnboardingScreen(): React.JSX.Element {
       )}
       {targetGateOpen && (
         <View style={styles.limitsGateNotice}>
+          {/* Issue #215: name the first missing field in the validator's words. */}
+          {!goalValidation.ok && goalValidation.errors.length > 0 && (
+            <Text style={styles.p} testID="onboarding-target-gate-missing" accessibilityLiveRegion="polite">
+              {goalValidation.errors[0]!.message}
+            </Text>
+          )}
           <Text style={styles.pDim} accessibilityLiveRegion="polite">
             Finish the target to continue, or choose "Skip this" to train with the focus only.
           </Text>
