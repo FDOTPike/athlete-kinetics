@@ -4,7 +4,7 @@
 // (The header and tab labels are covered in NavigationShell.test.js.)
 import React from 'react';
 import { StyleSheet } from 'react-native';
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 
 let mockFontScale = 1;
 jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => ({
@@ -91,6 +91,8 @@ describe('profile headings shrink before they push an info button off screen', (
     ['7 · TARGET ENERGY SYSTEM', 'ATP-PC'],
   ])('the label "%s" may shrink beside its %s info button, and the button may not', (labelText, term) => {
     render(<ProfileScreen />);
+    // #210: the energy system sits behind a collapsed heading.
+    if (labelText.startsWith('7 ')) fireEvent.press(screen.getByLabelText('Energy system focus (optional)'));
     const label = screen.getByText(labelText);
     const tip = screen.getByLabelText(`What does ${term} mean?`);
     // Both sit in the same row: walk up from the label to the first row and
@@ -103,5 +105,22 @@ describe('profile headings shrink before they push an info button off screen', (
     expect(inRow).toBe(true);
     expect(StyleSheet.flatten(label.props.style).flexShrink).toBe(1);
     expect(StyleSheet.flatten(tip.props.style).flexShrink).toBe(0);
+  });
+
+  // Issue 158, Manage athletes: at font scale 2.0 an athlete's name gets its own row,
+  // so a long name such as "W1-BLANK1" is not broken inside a word beside RENAME and DELETE.
+  test('at font scale 2.0 an athlete row stacks, so the name has the full width', () => {
+    mockState.advancedToolsUnlocked = true;
+    mockState.athletes = [
+      { id: 'default', name: 'Default Athlete' },
+      { id: 'a2', name: 'W1-BLANK1' },
+    ];
+    render(<ProfileScreen />);
+    fireEvent.press(screen.getByLabelText('Coach mode, 2 athletes, collapsed'));
+    let row = screen.getByLabelText('Athlete W1-BLANK1, tap to switch');
+    const flexOf = (node) => (typeof node.props.style === 'function' || !node.props.style ? undefined : StyleSheet.flatten(node.props.style).flexDirection);
+    while (row && flexOf(row) === undefined) row = row.parent;
+    expect(row).toBeTruthy();
+    expect(StyleSheet.flatten(row.props.style).flexDirection).toBe('column');
   });
 });

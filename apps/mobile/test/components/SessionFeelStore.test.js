@@ -183,3 +183,89 @@ describe('a record, not a decision', () => {
     expect(count('SELECT COUNT(*) AS c FROM session_feel')).toBe(0);
   });
 });
+
+// Issue #220 (074): separate lists, the newer reasons in a side-car, and a
+// reason required only for "harder". Still a record only.
+describe('074: the newer reasons and the optional easier reason', () => {
+  const extraRow = (sessionId) => raw().prepare('SELECT * FROM session_feel_extra_reason WHERE session_id = ?').get(sessionId);
+
+  test('"easier" saves with no reason, and with the newer reasons, which read back', () => {
+    const sessionId = finishOneSession();
+    const before = trainingFacts();
+    expect(state().saveSessionFeel({ feel: 'easier', reasons: [] }, '')).toBeNull();
+    expect(feelRow(sessionId)).toMatchObject({ feel: 'easier', reason_felt_good: 0, reason_other: 0 });
+    expect(extraRow(sessionId)).toBeUndefined();
+    expect(state().saveSessionFeel({ feel: 'easier', reasons: ['rested_well', 'too_light', 'felt_good'] }, '')).toBeNull();
+    expect(extraRow(sessionId)).toEqual({ session_id: sessionId, reason_too_heavy: 0, reason_too_light: 1, reason_rested_well: 1 });
+    expect(state().loadSessionFeel(sessionId).saved).toEqual({ feel: 'easier', reasons: ['felt_good', 'too_light', 'rested_well'] });
+    expect(trainingFacts()).toBe(before);
+  });
+
+  test('"harder" may name only a newer reason; correcting to "as planned" clears the side-car', () => {
+    const sessionId = finishOneSession();
+    expect(state().saveSessionFeel({ feel: 'harder', reasons: ['too_heavy'] }, '')).toBeNull();
+    expect(state().loadSessionFeel(sessionId).saved).toEqual({ feel: 'harder', reasons: ['too_heavy'] });
+    expect(state().saveSessionFeel({ feel: 'as_planned', reasons: ['too_heavy'] }, '')).toBeNull();
+    expect(extraRow(sessionId)).toBeUndefined();
+    expect(state().loadSessionFeel(sessionId).saved).toEqual({ feel: 'as_planned', reasons: [] });
+  });
+
+  test('"stopped early" saves with no reason', () => {
+    const sessionId = finishOneSession();
+    expect(state().saveSessionFeel({ feel: 'stopped_early', reasons: [] }, '')).toBeNull();
+    expect(state().loadSessionFeel(sessionId).saved).toEqual({ feel: 'stopped_early', reasons: [] });
+  });
+
+  // Owner ruling on #220: a row saved before the per-answer lists can hold a
+  // reason the new list for its answer does not offer. A saved "pain" must
+  // never be silently dropped when the unchanged answer is saved again.
+  const legacyRow = (sessionId, feel, column) => {
+    raw().prepare(`INSERT INTO session_feel (session_id, feel, ${column}, recorded_at_ms) VALUES (?, ?, 1, 1)`)
+      .run(sessionId, feel);
+  };
+
+  test('a legacy "easier" + pain row reads back with pain, and re-saving it unchanged keeps pain', () => {
+    const sessionId = finishOneSession();
+    legacyRow(sessionId, 'easier', 'reason_pain');
+    expect(state().loadSessionFeel(sessionId).saved).toEqual({ feel: 'easier', reasons: ['pain'] });
+    expect(state().saveSessionFeel({ feel: 'easier', reasons: ['pain'] }, '')).toBeNull();
+    expect(feelRow(sessionId)).toMatchObject({ feel: 'easier', reason_pain: 1 });
+    expect(state().loadSessionFeel(sessionId).saved).toEqual({ feel: 'easier', reasons: ['pain'] });
+    // Adding an easier reason keeps pain too.
+    expect(state().saveSessionFeel({ feel: 'easier', reasons: ['pain', 'too_light'] }, '')).toBeNull();
+    expect(state().loadSessionFeel(sessionId).saved).toEqual({ feel: 'easier', reasons: ['pain', 'too_light'] });
+  });
+
+  test('a legacy "harder" + felt good row re-saves unchanged instead of asking for a reason', () => {
+    const sessionId = finishOneSession();
+    legacyRow(sessionId, 'harder', 'reason_felt_good');
+    expect(state().saveSessionFeel({ feel: 'harder', reasons: ['felt_good'] }, '')).toBeNull();
+    expect(feelRow(sessionId)).toMatchObject({ feel: 'harder', reason_felt_good: 1 });
+    // Untapped, "harder" needs a reason again.
+    expect(state().saveSessionFeel({ feel: 'harder', reasons: [] }, '')).toBe('reason_required');
+    expect(feelRow(sessionId)).toMatchObject({ feel: 'harder', reason_felt_good: 1 });
+  });
+
+  test('untapping the legacy pain removes it', () => {
+    const sessionId = finishOneSession();
+    legacyRow(sessionId, 'easier', 'reason_pain');
+    expect(state().saveSessionFeel({ feel: 'easier', reasons: [] }, '')).toBeNull();
+    expect(feelRow(sessionId)).toMatchObject({ feel: 'easier', reason_pain: 0 });
+  });
+
+  test('a different answer does not carry the legacy reason', () => {
+    const sessionId = finishOneSession();
+    legacyRow(sessionId, 'harder', 'reason_felt_good');
+    expect(state().saveSessionFeel({ feel: 'stopped_early', reasons: ['felt_good'] }, '')).toBeNull();
+    expect(feelRow(sessionId)).toMatchObject({ feel: 'stopped_early', reason_felt_good: 0 });
+  });
+
+  test('reset clears the side-car with the answers', () => {
+    finishOneSession();
+    expect(state().saveSessionFeel({ feel: 'easier', reasons: ['too_light'] }, '')).toBeNull();
+    expect(count('SELECT COUNT(*) AS c FROM session_feel_extra_reason')).toBe(1);
+    state().resetTrainingData();
+    expect(count('SELECT COUNT(*) AS c FROM session_feel_extra_reason')).toBe(0);
+    expect(count('SELECT COUNT(*) AS c FROM session_feel')).toBe(0);
+  });
+});

@@ -160,7 +160,7 @@ const REGIONS_FOR_DAY: Record<EmphasisDayRegion, ReadonlySet<MuscleRegion>> = {
   full: new Set<MuscleRegion>(['lower', 'upper', 'trunk']),
 };
 
-export type EmphasisOrigin = 'focus' | 'sport';
+export type EmphasisOrigin = 'focus' | 'sport' | 'secondary_sport';
 
 /** Lower is better. Uncovered muscles come first so the emphasis is spread
  *  across the athlete's whole selection instead of piling onto one muscle. */
@@ -193,10 +193,10 @@ export interface EmphasisIndex {
   readonly movementControl: boolean;
 }
 
-export function makeEmphasisIndex(emphasis: ProgramEmphasis): EmphasisIndex {
-  const origin = new Map<MuscleGroupId, EmphasisOrigin>();
-  for (const muscle of emphasis.focus?.muscles ?? []) origin.set(muscle, 'focus');
-  for (const muscle of emphasis.sport?.muscles ?? []) if (!origin.has(muscle)) origin.set(muscle, 'sport');
+const buildEmphasisIndex = (
+  emphasis: ProgramEmphasis,
+  origin: ReadonlyMap<MuscleGroupId, EmphasisOrigin>,
+): EmphasisIndex => {
   const muscles = [...origin.keys()];
   const primary = new Map<number, MuscleGroupId[]>();
   const supporting = new Map<number, MuscleGroupId[]>();
@@ -244,8 +244,11 @@ export function makeEmphasisIndex(emphasis: ProgramEmphasis): EmphasisIndex {
         [primaries, 'sport', covered],
         [primaries, 'focus', null],
         [primaries, 'sport', null],
+        [primaries, 'secondary_sport', covered],
+        [primaries, 'secondary_sport', null],
         [supports, 'focus', null],
         [supports, 'sport', null],
+        [supports, 'secondary_sport', null],
       ];
       for (const [rank, [list, wanted, uncoveredOnly]] of tiers.entries()) {
         const muscle = first(list, wanted, uncoveredOnly);
@@ -255,6 +258,31 @@ export function makeEmphasisIndex(emphasis: ProgramEmphasis): EmphasisIndex {
     },
     movementControl: emphasis.focus?.movementControl === true,
   };
+};
+
+export function makeEmphasisIndex(emphasis: ProgramEmphasis): EmphasisIndex {
+  const origin = new Map<MuscleGroupId, EmphasisOrigin>();
+  for (const muscle of emphasis.focus?.muscles ?? []) origin.set(muscle, 'focus');
+  for (const muscle of emphasis.sport?.muscles ?? []) if (!origin.has(muscle)) origin.set(muscle, 'sport');
+  return buildEmphasisIndex(emphasis, origin);
+}
+
+// MULTISPORT_FN: v13 caps emphasis at 8 muscles and gives the second sport a
+// 0.5 tie-break weight. The order below IS the weight: focus, primary sport,
+// secondary sport. A muscle already owned is never relabelled.
+export const MAX_EMPHASIS_MUSCLES = 8;
+export const SECONDARY_SPORT_WEIGHT = 0.5;
+
+export function makeMultiSportEmphasisIndex(input: {
+  readonly emphasis: ProgramEmphasis;
+  readonly secondaryMuscles: readonly MuscleGroupId[];
+}): EmphasisIndex {
+  const origin = new Map<MuscleGroupId, EmphasisOrigin>();
+  for (const muscle of input.emphasis.focus?.muscles ?? []) origin.set(muscle, 'focus');
+  for (const muscle of input.emphasis.sport?.muscles ?? []) if (!origin.has(muscle)) origin.set(muscle, 'sport');
+  for (const muscle of input.secondaryMuscles) if (!origin.has(muscle)) origin.set(muscle, 'secondary_sport');
+  const capped = new Map([...origin.entries()].slice(0, MAX_EMPHASIS_MUSCLES));
+  return buildEmphasisIndex(input.emphasis, capped);
 }
 
 // ---------------------------------------------------------------------------
@@ -266,7 +294,9 @@ const muscleName = (muscle: MuscleGroupId): string => MUSCLE_GROUP_INFO[muscle].
 export const emphasisReason = (origin: EmphasisOrigin, emphasis: ProgramEmphasis): string =>
   origin === 'focus'
     ? 'your focus'
-    : `your ${emphasis.sport?.name ?? 'sport'} outcome`;
+    : origin === 'secondary_sport'
+      ? 'your second sport outcome'
+      : `your ${emphasis.sport?.name ?? 'sport'} outcome`;
 
 export const describeEmphasisSwap = (input: {
   readonly chosen: string; readonly instead: string; readonly muscle: MuscleGroupId;
@@ -291,7 +321,7 @@ export const describeEmphasisSlot = (input: {
 export type EmphasisGap = 'no_exercise' | 'no_room' | 'no_day';
 
 export const describeEmphasisGap = (
-  muscle: MuscleGroupId, gap: EmphasisGap, capMin: number, weeklyFrequency = 1,
+  muscle: MuscleGroupId, gap: EmphasisGap, _capMin: number, _weeklyFrequency = 1,
 ): string => {
   const name = muscleName(muscle);
   switch (gap) {
@@ -301,7 +331,9 @@ export const describeEmphasisGap = (
       return `No extra ${name} work: this plan has no strength day that trains that part of the body.`;
     case 'no_room':
     default:
-      return `No room for extra ${name} work in your ${capMin}-minute sessions: what is already planned is a main lift, already serves your emphasis, or is the only time that movement is trained in the week. ${weeklyFrequency >= 7 ? 'Longer sessions would make room.' : 'Longer sessions or one more training day would make room.'}`;
+      // Names the slot rule, not the session length: the generator does not
+      // record whether time was the limit (issue #154).
+      return `No room for extra ${name} work in this plan: what is already planned is a main lift, already serves your emphasis, or is the only time that movement is trained in the week.`;
   }
 };
 

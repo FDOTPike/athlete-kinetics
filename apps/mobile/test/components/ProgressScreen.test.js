@@ -113,6 +113,24 @@ describe('Recent sessions open to what was logged', () => {
     expect(screen.queryByTestId('progress-session-11-summary')).toBeNull();
   });
 
+  // Review (PR 292): a past summary states dumbbell loads per dumbbell, as the
+  // completion summary does (issue #218).
+  test('a past dumbbell session states its heaviest load per dumbbell', () => {
+    mockState.movements = [{ movement_id: 1, name: 'Goblet Squat', supportedPrefixes: ['DB'] }];
+    render(<ProgressScreen />);
+    fireEvent.press(screen.getByTestId('progress-session-11'));
+    expect(screen.getByText(/heaviest load used 16 kg per dumbbell/)).toBeOnTheScreen();
+  });
+
+  test('a past session of a lift with no dumbbell has no per-dumbbell wording', () => {
+    mockState.movements = [{ movement_id: 1, name: 'Goblet Squat', supportedPrefixes: ['DB', 'KB'] }];
+    mockState.loadIntents = { 1: 'KB' };
+    render(<ProgressScreen />);
+    fireEvent.press(screen.getByTestId('progress-session-11'));
+    expect(screen.getByText(/heaviest load used 16 kg/)).toBeOnTheScreen();
+    expect(screen.queryByText(/per dumbbell/)).toBeNull();
+  });
+
   // Review (PR 194): a read that fails is not an empty session.
   test('a summary that cannot be read does not say that no sets were logged', () => {
     mockState.loadSessionSummaryFacts = jest.fn(() => { throw new Error('synthetic read failure'); });
@@ -128,5 +146,24 @@ describe('Recent sessions open to what was logged', () => {
     fireEvent.press(screen.getByTestId('progress-session-11'));
     expect(screen.getByText('No sets were logged in this session.')).toBeOnTheScreen();
     expect(screen.queryByText("This session's summary could not be read.")).toBeNull();
+  });
+});
+
+describe('recent session rows (#201)', () => {
+  test('sessions on one day are told apart by focus, exercise and set counts, with the outcome on each row', () => {
+    const sameDay = new SpyDate('2026-11-04T10:30:00').getTime();
+    mockState = state({
+      loadRecentOutcomes: jest.fn(() => [
+        { sessionId: 3, outcomeKind: 'followed_plan', finalizedAtMs: sameDay + 7200000, focus: 'upper', originKind: 'planned', exerciseCount: 3, loggedSetCount: 9 },
+        { sessionId: 2, outcomeKind: 'session_recorded', finalizedAtMs: sameDay + 3600000, focus: null, originKind: 'free_form', exerciseCount: 1, loggedSetCount: 4 },
+        { sessionId: 1, outcomeKind: 'followed_plan', finalizedAtMs: sameDay, focus: 'lower', originKind: 'planned', exerciseCount: 2, loggedSetCount: 6 },
+      ]),
+    });
+    render(<ProgressScreen />);
+    expect(screen.getByText(/^Upper · 3 exercises · 9 sets/)).toBeOnTheScreen();
+    expect(screen.getByText(/^Extra session · 1 exercise · 4 sets/)).toBeOnTheScreen();
+    expect(screen.getByText(/^Lower · 2 exercises · 6 sets/)).toBeOnTheScreen();
+    expect(screen.getAllByText('Plan followed')).toHaveLength(2);
+    expect(screen.getByText('Session recorded')).toBeOnTheScreen();
   });
 });
