@@ -956,7 +956,7 @@ interface KineticsStore {
   /** Read-only persisted facts for one ended session (W3 summary). No writes. */
   loadSessionSummaryFacts: (sessionId: number) => {
     durationMin: number | null;
-    exercises: { movementId: number; movementName: string; plannedSets: number | null; sets: { reps: number; loadKg: number; timeS: number | null }[] }[];
+    exercises: { movementId: number; movementName: string; plannedSets: number | null; sets: { reps: number; loadKg: number; timeS: number | null; rpe?: number | null }[] }[];
     previousSets: { movementId: number; reps: number; loadKg: number; sessionId: number }[];
     /** Exercises the athlete chose to skip (071 session_skipped_slot), in plan
      *  order, with the sets logged for that slot before the skip. */
@@ -6626,6 +6626,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const setRows = rowsOf<{
       movement_id: number; movement_name: string; reps: number; load_kg: number;
       time_s: number | null; session_plan_slot_id: number | null; planned_sets: number | null;
+      rpe: number | null;
       swapped_to_name: string | null;
     }>(d.executeSync(
       // Sol R4 F4: the slot identity is read so the planned-set denominator is
@@ -6635,7 +6636,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
       `SELECT sr.movement_id, m.name AS movement_name, sr.reps, sr.load_kg,
               tm.value AS time_s, st.session_plan_slot_id,
               COALESCE(spc.original_planned_sets, sps.planned_sets) AS planned_sets,
-              CASE WHEN spc.original_planned_sets IS NOT NULL THEN rm.name END AS swapped_to_name
+              CASE WHEN spc.original_planned_sets IS NOT NULL THEN rm.name END AS swapped_to_name,
+              sr.rpe
          FROM set_record sr
          JOIN movement m ON m.movement_id = sr.movement_id
          LEFT JOIN set_metric tm ON tm.set_id = sr.set_id AND tm.metric = 'time_s'
@@ -6716,6 +6718,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
         reps: row.reps,
         loadKg: row.load_kg,
         timeS: row.time_s,
+        // Issue #230: the top set names the effort logged with it.
+        rpe: row.rpe,
         sessionPlanSlotId: row.session_plan_slot_id,
         plannedSets: row.planned_sets,
         swappedToMovementName: row.swapped_to_name,

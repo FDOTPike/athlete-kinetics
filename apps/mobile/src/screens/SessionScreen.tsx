@@ -974,7 +974,12 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
           {summary !== null && (
             <View style={styles.summaryBlock} testID="session-summary">
               {summary.exerciseLines.map((line) => (
-                <Text key={line.key} style={styles.summaryLine}>{line.text}</Text>
+                <React.Fragment key={line.key}>
+                  <Text style={styles.summaryLine}>{line.text}</Text>
+                  {summary.topSetByExercise[line.key] !== undefined && (
+                    <Text style={styles.summaryComparison} testID="session-summary-top-set">{summary.topSetByExercise[line.key]!.text}</Text>
+                  )}
+                </React.Fragment>
               ))}
               {summary.skippedLines.map((line) => (
                 <Text key={line.key} style={styles.summaryLine} testID="session-summary-skipped">{line.text}</Text>
