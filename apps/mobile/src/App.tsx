@@ -165,6 +165,15 @@ export function AppShell(): React.JSX.Element {
   // First run (or a fresh Coach Mode athlete): the questionnaire replaces the
   // tabbed app until the profile is saved once. Existing installs never see it.
   const showOnboarding = status === 'ready' && !onboarded;
+  // Walk 1 (W1-10): an athlete added from the Profile tab finished
+  // onboarding on ATHLETE PROFILE, because the tab under the questionnaire was
+  // still Profile. Finishing onboarding opens Today, where the review says the
+  // first prescription is waiting.
+  const wasOnboarding = useRef(showOnboarding);
+  useEffect(() => {
+    if (wasOnboarding.current && !showOnboarding && status === 'ready') setTab('today');
+    wasOnboarding.current = showOnboarding;
+  }, [showOnboarding, status]);
 
   useEffect(() => {
     // iOS: keep health databases, registry and recovery files out of iCloud

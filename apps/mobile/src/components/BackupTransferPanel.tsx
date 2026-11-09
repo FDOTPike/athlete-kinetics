@@ -105,6 +105,19 @@ export default function BackupTransferPanel(): React.JSX.Element {
         accessibilityLabel="Create encrypted backup of all athletes and choose where to save it"
         testID="create-backup-button"
       />
+      {/* Walk W4-1: the status (e.g. "Backup is too large…") was drawn below the
+          restore controls, off-screen; it now sits under the backup button. */}
+      {working && (
+        <View style={styles.progress} testID="backup-working-indicator">
+          <ActivityIndicator color={theme.color.textMid} />
+          <Text style={styles.body} testID="backup-working-elapsed">
+            {`${message ?? 'Working…'} ${elapsedLabel(now - (runStart ?? now))}`}
+          </Text>
+        </View>
+      )}
+      {!working && message !== null && (
+        <Text accessibilityLiveRegion="polite" style={styles.body} testID="backup-status-message">{message}</Text>
+      )}
       <QuietAction
         label="RESTORE ENCRYPTED BACKUP"
         onPress={() => { void chooseRestore(password); }}
@@ -125,17 +138,6 @@ export default function BackupTransferPanel(): React.JSX.Element {
             testID="review-recovery-button"
           />
         </>
-      )}
-      {working && (
-        <View style={styles.progress} testID="backup-working-indicator">
-          <ActivityIndicator color={theme.color.textMid} />
-          <Text style={styles.body} testID="backup-working-elapsed">
-            {`${message ?? 'Working…'} ${elapsedLabel(now - (runStart ?? now))}`}
-          </Text>
-        </View>
-      )}
-      {!working && message !== null && (
-        <Text accessibilityLiveRegion="polite" style={styles.body} testID="backup-status-message">{message}</Text>
       )}
       {preview !== null && (
         <View style={styles.preview} testID="restore-preview">

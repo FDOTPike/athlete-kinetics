@@ -102,6 +102,29 @@ test('sets logged before a skip are counted, by slot or else by movement', () =>
   ]);
 });
 
+// Android walk 2026-11-03 (W2-1): a swap before any set rewrites the slot's
+// movement and keeps the planned one in original_movement_id. The line named
+// the replacement as if it were the skipped plan ("Skipped: Dumbbell Romanian
+// Deadlift · 1 of 3 sets logged"); it names the planned exercise.
+test('a slot swapped before its first set is named by its planned exercise', () => {
+  seedSession();
+  const swap = raw().prepare(
+    // An added slot keeps its provenance when swapped, as the store does.
+    'UPDATE session_plan_slot SET movement_id = ?, original_movement_id = ? WHERE session_plan_slot_id = ?',
+  );
+  swap.run(idOf('Bodyweight Squat'), idOf('Walking Lunge'), slotId(2));
+  swap.run(idOf('Dumbbell Squat'), idOf('Push-up'), slotId(1));
+  logSet('Bodyweight Squat', 2);
+  logSet('Dumbbell Squat');           // no slot link: counted by the slot's current movement
+  skip(1);
+  skip(2);
+  const facts = state().loadSessionSummaryFacts(7000);
+  expect(facts.skippedExercises).toEqual([
+    { name: 'Push-up', plannedSets: 2, loggedSets: 1, loggedAs: ['Dumbbell Squat'] },
+    { name: 'Walking Lunge', plannedSets: 2, loggedSets: 1, loggedAs: ['Bodyweight Squat'] },
+  ]);
+});
+
 test('a session with nothing skipped reports an empty list', () => {
   raw().exec("INSERT INTO session (session_id, micro_cycle_id, session_date, started_at_ms, duration_min) VALUES (7001, NULL, '2026-11-03', 1000, 30)");
   expect(state().loadSessionSummaryFacts(7001).skippedExercises).toEqual([]);
@@ -138,4 +161,27 @@ test('without skipped exercises the view has no skipped lines', () => {
     exercises: [], previousSets: [], durationMin: null, blockSessions: [], today: '2026-11-03',
   });
   expect(view.skippedLines).toEqual([]);
+});
+
+// Android walk 2026-11-03 (W2-6): the summary listed exercises by movement
+// id, not in the order they were done.
+test('the summary lists exercises in the order they were logged', () => {
+  seedSession();                      // logs Goblet Squat first
+  const later = ['Walking Lunge', 'Push-up', 'Bodyweight Squat'].sort((a, b) => idOf(b) - idOf(a));
+  for (const name of later) logSet(name);
+  const facts = state().loadSessionSummaryFacts(7000);
+  expect(facts.exercises.map((exercise) => exercise.movementName)).toEqual(['Goblet Squat', ...later]);
+});
+
+// Android walk 2026-11-03 (W2-10): "1 of 1 sets" and "Bjj session".
+test('set counts and focus names read correctly', () => {
+  const { setsOfPlanned, sessionFocusName, skippedExerciseText } = require('../../src/state/sessionSummary');
+  expect(setsOfPlanned(1, 1)).toBe('1 of 1 set');
+  expect(setsOfPlanned(0, 3)).toBe('0 of 3 sets');
+  expect(skippedExerciseText({ name: 'Plank', plannedSets: 1, loggedSets: 1, loggedAs: [] }))
+    .toBe('Skipped: Plank · 1 of 1 set logged');
+  expect(sessionFocusName('bjj')).toBe('BJJ');
+  expect(sessionFocusName('lower')).toBe('Lower');
+  expect(sessionFocusName('full_body')).toBe('Full Body');
+  expect(sessionFocusName('')).toBe('Session');
 });

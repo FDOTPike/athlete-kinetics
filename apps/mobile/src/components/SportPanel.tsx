@@ -120,7 +120,7 @@ export function SportPanel(): React.JSX.Element | null {
       ) : (
         <>
           <Text style={styles.body} testID="profile-sport-summary">
-            {`${sportDisplayName(sport)} — ${SPORT_OUTCOME_LABEL[sport.outcomeId].toLowerCase()}. Played: ${SPORT_EXPERIENCE_LABEL[sport.experienceId].toLowerCase()}.`}
+            {`${sportDisplayName(sport)} — ${SPORT_OUTCOME_LABEL[sport.outcomeId].toLowerCase()}. Played: ${SPORT_EXPERIENCE_LABEL[sport.experienceId].toLowerCase().replace(/\bi\b/g, 'I')}.`}
           </Text>
           {emphasis !== null && <Text style={styles.dim} testID="profile-sport-emphasis">{emphasis.summary}</Text>}
           {sport.competitionDate !== null && (

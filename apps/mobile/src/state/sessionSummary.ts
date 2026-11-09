@@ -223,6 +223,19 @@ export const matchPreviousFacts = (
 
 const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`;
 
+/** "3 of 4 sets", "1 of 1 set": the noun follows the planned count (Walk 2, W2-10). */
+export const setsOfPlanned = (logged: number, planned: number): string =>
+  `${logged} of ${planned} ${planned === 1 ? 'set' : 'sets'}`;
+
+/** A session focus as the athlete reads it: "Lower", "Full Body", "BJJ"
+ *  (Walk 2, W2-10: "Bjj session" on Today and in the summary). */
+export const sessionFocusName = (focus: string): string => {
+  if (focus.length === 0) return 'Session';
+  return focus.split('_').map((part) => (part.toLowerCase() === 'bjj'
+    ? 'BJJ'
+    : part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())).join(' ');
+};
+
 const loadCopy = (loadKg: number): string => {
   const rounded = Math.round(loadKg * 10) / 10;
   return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)} kg`;
@@ -249,7 +262,7 @@ const exerciseLine = (exercise: SummaryExercise): SummaryLine => {
     : exercise.swappedToMovementName != null
       ? `${logged} of ${exercise.plannedSets} sets, then swapped to ${exercise.swappedToMovementName}`
     : logged === exercise.plannedSets
-      ? `${logged} of ${exercise.plannedSets} sets`
+      ? setsOfPlanned(logged, exercise.plannedSets)
       : `${plural(logged, 'set')} logged · ${exercise.plannedSets} planned`;
   const reps = exercise.sets.filter((s) => s.reps > 0);
   const timed = exercise.sets.filter((s) => s.timeS !== null && s.timeS! > 0);
@@ -301,7 +314,7 @@ export interface SkippedExercise {
 export const skippedExerciseText = (skipped: SkippedExercise): string => {
   if (skipped.loggedSets <= 0) return `Skipped: ${skipped.name} · no sets logged`;
   const loggedSuffix = skipped.loggedAs.length > 0 ? ` as ${skipped.loggedAs.join(', ')}` : '';
-  return `Skipped: ${skipped.name} · ${skipped.loggedSets} of ${skipped.plannedSets} sets logged${loggedSuffix}`;
+  return `Skipped: ${skipped.name} · ${setsOfPlanned(skipped.loggedSets, skipped.plannedSets)} logged${loggedSuffix}`;
 };
 
 export interface SessionSummaryView {
@@ -353,7 +366,7 @@ export const buildSessionSummary = (input: BuildSummaryInput): SessionSummaryVie
     durationLine,
     nextLine: next === null
       ? null
-      : `Next: ${next.focus.charAt(0).toUpperCase()}${next.focus.slice(1).toLowerCase()} session on ${next.sessionDate} — ${plural(next.slotCount, 'movement')}.`,
+      : `Next: ${sessionFocusName(next.focus)} session on ${next.sessionDate} — ${plural(next.slotCount, 'movement')}.`,
   };
 };
 

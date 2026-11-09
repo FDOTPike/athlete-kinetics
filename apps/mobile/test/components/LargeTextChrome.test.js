@@ -41,7 +41,7 @@ describe('profile headings shrink before they push an info button off screen', (
       status: 'ready',
       profile: {
         objective: 'gpp', training_age: 'intermediate', weekly_frequency: 4, max_sessions_per_day: 1,
-        session_duration_cap_min: 60, base_rpe_cap: 8.5, target_energy_system: 'hybrid',
+        session_duration_cap_min: 60, base_rpe_cap: 8.5, target_energy_system: 'atp_pc', // the energy "i" follows the choice (W4-9)
         progression_methodology: 'autoregulated', injury_flags: [], mobility_limits: [],
         equipment_inventory: ['barbell', 'dumbbells', 'bench'],
       },

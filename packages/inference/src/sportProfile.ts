@@ -138,7 +138,8 @@ export const SPORT_OUTCOME_LABEL: Record<SportOutcomeId, string> = {
   faster_running: 'Run faster and change direction',
   strength_for_contact: 'Be stronger in contact',
   stay_available: 'Keep training and playing without long breaks',
-  last_the_whole_game: 'Last the whole game',
+  // Walk 1 (W1-15): offered for Muay Thai too, where there is no "game".
+  last_the_whole_game: 'Last to the end without fading',
   bigger_competition_lifts: 'Lift more in the squat, bench press and deadlift',
   striking_and_clinch: 'Be stronger in striking and the clinch',
   general_support: 'General strength for my sport',
@@ -280,7 +281,8 @@ export function validateSportProfile(draft: SportProfileDraft, today: string): S
   }
   if (draft.typicalSessionMinutes !== null
       && (!isCount(draft.typicalSessionMinutes, SPORT_SESSION_MINUTES_MAX) || draft.typicalSessionMinutes < 1)) {
-    errors.push({ field: 'typicalSessionMinutes', message: 'Enter the usual length in minutes, or choose "Not sure".' });
+    // Walk 1 (W1-9): this field has no "Not sure" choice; it is optional.
+    errors.push({ field: 'typicalSessionMinutes', message: `Enter the usual length in minutes (1 to ${SPORT_SESSION_MINUTES_MAX}), or leave it empty.` });
   }
   if (draft.competitionDate !== null) {
     if (!isRealIsoDate(draft.competitionDate)) {

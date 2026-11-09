@@ -226,8 +226,8 @@ test('non-halting pain restriction reaches BlockScreen session preview and Today
 
   const { unmount } = render(<BlockScreen />);
   fireEvent.press(screen.getByLabelText('Why today changed'));
-  expect(screen.getByText('x0.60')).toBeOnTheScreen();
-  expect(screen.getByText('-1')).toBeOnTheScreen();
+  expect(screen.getByText('Planned load reduced by 40%')).toBeOnTheScreen();
+  expect(screen.getByText('1 fewer set')).toBeOnTheScreen();
   expect(screen.getByText('6.0')).toBeOnTheScreen();
 
   fireEvent.press(screen.getByLabelText("Preview today's session"));
