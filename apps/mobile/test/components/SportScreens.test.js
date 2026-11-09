@@ -116,7 +116,7 @@ describe('the sport screen in the interview', () => {
     next();
     expect(screen.getByText('DO YOU PLAY OR COMPETE IN A SPORT?')).toBeTruthy();
     expect(stepLabel()).toBe('Step 4 of 9');
-    for (const family of ['basketball', 'football', 'hockey', 'powerlifting', 'muay_thai', 'other']) {
+    for (const family of ['court', 'football', 'hockey', 'strength', 'striking', 'other']) {
       expect(screen.getByTestId(`sport-family-${family}`)).toBeTruthy();
     }
     // A started sport answer is finished or skipped: nothing half-answered is carried forward.
@@ -152,14 +152,16 @@ describe('the sport screen in the interview', () => {
     press('sport-family-hockey');
     expect(screen.getByLabelText('Field hockey. Played on grass or turf.')).toBeTruthy();
     expect(screen.getByLabelText('Ice hockey. Played on ice, on skates.')).toBeTruthy();
-    press('sport-family-basketball');
+    // strength is the single-code family in the 22-sport catalog: powerlifting only.
+    press('sport-family-strength');
     expect(screen.queryByText(/WHICH KIND OF/)).toBeNull();
-    expect(screen.getByTestId('sport-outcome-jump_higher')).toBeTruthy();
+    expect(screen.getByTestId('sport-outcome-bigger_competition_lifts')).toBeTruthy();
   });
 
   test('choosing an outcome says what the plan will do, what it cannot do, and on what basis', () => {
     openSportSlide();
-    press('sport-family-basketball');
+    press('sport-family-court');
+    press('sport-basketball');
     expect(screen.queryByTestId('sport-emphasis')).toBeNull();
     press('sport-outcome-jump_higher');
     expect(screen.getByTestId('sport-emphasis-summary').props.children)
@@ -167,7 +169,8 @@ describe('the sport screen in the interview', () => {
     expect(textsOf('sport-emphasis-limit').join(' ')).toMatch(/no jump or plyometric drills yet.*does not include jump training itself/);
     expect(screen.getByTestId('sport-emphasis-basis').props.children).toMatch(/Suchomel.*Markovic/);
     // An outcome with no reviewed basis says so and adds nothing.
-    press('sport-family-muay_thai');
+    press('sport-family-striking');
+    press('sport-muay_thai');
     press('sport-outcome-striking_and_clinch');
     expect(screen.getByTestId('sport-emphasis-summary').props.children).toMatch(/^No extra emphasis\. The app has no reviewed evidence/);
     expect(textsOf('sport-emphasis-limit').join(' ')).toMatch(/hip-flexor raises are not added by default/);
@@ -176,7 +179,7 @@ describe('the sport screen in the interview', () => {
 
   test('"not sure" is the starting workload answer; the competition date is context only', () => {
     openSportSlide();
-    press('sport-family-powerlifting');
+    press('sport-family-strength');
     expect(screen.getByLabelText('PRACTICE SESSIONS A WEEK Not sure')).toBeTruthy();
     expect(screen.getByLabelText('MATCHES OR COMPETITIONS A WEEK Not sure')).toBeTruthy();
     expect(selected('sport-practice-unsure')).toBe(true);
@@ -187,7 +190,7 @@ describe('the sport screen in the interview', () => {
     press('sport-practice-unsure');
     expect(screen.getByLabelText('PRACTICE SESSIONS A WEEK Not sure')).toBeTruthy();
     expect(screen.getByTestId('sport-competition-note').props.children)
-      .toBe('The date is used for reminders and for reviewing your goals. It does not make the plan peak, taper or test a maximum.');
+      .toBe('If you add a competition date, it is recorded. For now the plan does not peak, taper or test for it. The date is used for reminders and for reviewing your goals.');
     press('sport-outcome-bigger_competition_lifts');
     press('sport-experience-over_5_years');
     expect(nextDisabled()).toBe(false);
@@ -199,6 +202,28 @@ describe('the sport screen in the interview', () => {
     type('sport-minutes', '');
     type('sport-competition', '2099-03-01');
     expect(nextDisabled()).toBe(false);
+  });
+
+  test('the date note is shown above the date field, before any date is typed (#229)', () => {
+    openSportSlide();
+    press('sport-family-strength');
+    expect(screen.getByTestId('sport-competition').props.value).toBe('');
+    expect(screen.getByTestId('sport-competition-note').props.children).toMatch(/does not peak, taper or test for it/);
+    // The field is still blank, so the note must not claim a date is already recorded.
+    expect(screen.getByTestId('sport-competition-note').props.children)
+      .toBe('If you add a competition date, it is recorded. For now the plan does not peak, taper or test for it. The date is used for reminders and for reviewing your goals.');
+    expect(screen.getByTestId('sport-competition-note').props.children).not.toContain('Your competition date is recorded.');
+    // Render order: the note comes before the date field, so it is read first.
+    const order = [];
+    const walk = (node) => {
+      if (node === null || typeof node !== 'object') return;
+      if (Array.isArray(node)) { node.forEach(walk); return; }
+      if (node.props?.testID !== undefined) order.push(node.props.testID);
+      walk(node.children ?? null);
+    };
+    walk(screen.toJSON());
+    expect(order.indexOf('sport-competition-note')).toBeGreaterThan(-1);
+    expect(order.indexOf('sport-competition-note')).toBeLessThan(order.indexOf('sport-competition'));
   });
 
   test('a complete sport answer is saved with the rest of the interview, in one go', async () => {
@@ -267,7 +292,8 @@ describe('the sport screen in the interview', () => {
     press('onboarding-wants-target');
     expect(stepLabel()).toBe('Step 3 of 10');
     next();
-    press('sport-family-basketball');
+    press('sport-family-court');
+    press('sport-basketball');
     press('sport-outcome-general_support');
     press('sport-experience-new');
     next();
@@ -359,6 +385,10 @@ describe('the profile sport panel', () => {
     render(<SportPanel />);
     expect(screen.getByTestId('profile-sport-summary').props.children).toBe('No sport set. The plan is general gym training.');
     expect(screen.getByTestId('profile-sport-workload').props.children).toMatch(/^Sport workload: no sport sessions recorded\./);
+    // #146: with no sessions yet, the copy must not promise that Activities
+    // change the next block; one weekly session does not change the gym plan.
+    expect(screen.getByTestId('profile-sport-workload').props.children).not.toMatch(/will take them into account/);
+    expect(screen.getByTestId('profile-sport-workload').props.children).toMatch(/A light week does not change the gym plan\./);
     press('profile-sport-edit');
     expect(screen.getByText('Do you play or compete in a sport?')).toBeTruthy();
     // Saving an unfinished answer explains what is missing instead of saving.
