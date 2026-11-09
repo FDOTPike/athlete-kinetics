@@ -818,6 +818,14 @@ export interface ReturnCheckinState {
   readonly options: readonly ReturnAction[];
   readonly isDismissed: boolean;
 }
+/** The report behind today's prescription, for display (#186). */
+export interface OperativeReportSummary {
+  /** The words as typed. */
+  text: string;
+  entryId: string;
+  /** What this report changed today, against the same day without it. */
+  effect: ReportEffect;
+}
 /** One saved report as the read-only report view shows it (#185). */
 export interface TodaySafetyReport {
   reportId: number;
@@ -861,7 +869,14 @@ interface KineticsStore {
   trend: TrendPoint[];           // trailing 14 days, ascending
   movements: Movement[];
   session: ActiveSession | null;
-  prescription: (Prescription & { forDate: string }) | null;
+  prescription: (Prescription & {
+    forDate: string;
+    /** The operative non-halting report behind today's prescription and the
+     *  change it actually applied (after the severity gate and the experience
+     *  scaling), so screens name the report and its real figures (#186).
+     *  Null or absent when no report shapes today. Display only. */
+    report?: OperativeReportSummary | null;
+  }) | null;
   /** Profile-limit notes attached to the current prescription. */
   profileNotes: string[];
   profile: UserProfile;
@@ -8831,14 +8846,35 @@ export const useStore = create<KineticsStore>()((set, get) => {
       .filter((r): r is { entry: PhraseEntry; severity: number | null; wasHalt: boolean } => r !== null);
     // One is enough: every such row carries the same recorded halt.
     if (sessionStopHalts.length > 0) reports.push({ entry: SESSION_REPORT_STOP_ENTRY, severity: null, wasHalt: true });
+    const ctx = profileCtx(d, today, session !== null ? session.sessionId : -1);
     const derived = derivePrescription({
       vector,
       profile,
-      ctx: profileCtx(d, today, session !== null ? session.sessionId : -1),
+      ctx,
       reports,
     });
+    // Display only (#186): what the operative report itself changed, read as
+    // today's prescription with the reports against the same derivation
+    // without them. Nothing below feeds back into the prescription.
+    let report: OperativeReportSummary | null = null;
+    if (derived.directive !== null && !derived.directive.halt) {
+      const operativeText = derived.directive.matchedCue;
+      const rows = rowsOf<{ raw_text: string; matched_entry_id: string }>(d.executeSync(
+        'SELECT raw_text, matched_entry_id FROM subjective_report WHERE date = ? AND matched_entry_id IS NOT NULL ORDER BY report_id',
+        [today],
+      )).filter((row) => entryById(row.matched_entry_id)?.text === operativeText);
+      const row = rows[rows.length - 1];
+      if (row !== undefined) {
+        const baseline = derivePrescription({ vector, profile, ctx, reports: [] });
+        report = {
+          text: row.raw_text,
+          entryId: row.matched_entry_id,
+          effect: reportEffectBetween(derived.vector, baseline.vector, false),
+        };
+      }
+    }
     set({
-      prescription: { vector: derived.vector, source: derived.source, forDate: today },
+      prescription: { vector: derived.vector, source: derived.source, forDate: today, report },
       profileNotes: derived.notes,
       // Mirror persistence exactly: no operative report today means no
       // banner — a stale in-memory halt must never outlive its day.

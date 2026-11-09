@@ -1489,6 +1489,27 @@ test.each([
   }
 });
 
+test('#186: the workout names the report shaping today and the change it applied', () => {
+  const report = {
+    text: 'sharp pain in my knee when I squat',
+    entryId: 'red-flag-pain',
+    effect: { halt: false, loadReductionPct: 46, setDelta: -1, rpeCap: 6 },
+  };
+  mockState = state({
+    prescription: { forDate: '2026-07-15', source: 'guardrail', vector: { load_modifier: 0.54, set_modifier: -1, rpe_cap: 6 }, report },
+  });
+  const { unmount } = render(<SessionScreen />);
+  expect(screen.getByTestId('session-report-line')).toHaveTextContent(
+    'Load reduced by 46%, one set fewer and effort capped at RPE 6 today, because of your report: “sharp pain in my knee when I squat”.',
+  );
+  unmount();
+  mockState = state({
+    prescription: { forDate: '2026-07-15', source: 'policy', vector: { load_modifier: 1, set_modifier: 0, rpe_cap: 8.5 }, report: null },
+  });
+  render(<SessionScreen />);
+  expect(screen.queryByTestId('session-report-line')).toBeNull();
+});
+
 test('a completed runner takes precedence over a later triage halt', () => {
   mockState = state({
     runner: runner({ phase: 'complete', slotIndex: 1, setIndex: 0, slotSetCounts: [3, 3], loggedSets: 6 }),
