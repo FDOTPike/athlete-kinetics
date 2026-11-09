@@ -105,6 +105,8 @@ const state = (overrides = {}) => ({
   runner: null,
   substitution: null,
   profileSlots: [],
+  // The store always holds the athlete list (empty before boot).
+  athletes: [],
   activeAthleteId: null,
   athletes: [],
   pendingAutopilotAdjustments: [],
