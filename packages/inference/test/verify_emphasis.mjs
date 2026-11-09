@@ -105,8 +105,8 @@ const reportText = (block) => [...block.emphasis.applied, ...block.emphasis.omit
 // --- [1] the sport question ---------------------------------------------------------
 console.log('[1] the sport question');
 {
-  check('asked by family: basketball, football, hockey, powerlifting, Muay Thai, another sport',
-    sp.SPORT_FAMILIES.join(',') === 'basketball,football,hockey,powerlifting,muay_thai,other');
+  check('asked by family: grappling, striking, court, football, hockey, strength, other, racquet, running, swimming',
+    sp.SPORT_FAMILIES.join(',') === 'grappling,striking,court,football,hockey,strength,other,racquet,running,swimming');
   check('football is told apart explicitly: association, Australian, rugby, American',
     sp.sportsInFamily('football').join(',') === 'football_association,football_australian,football_rugby,football_american'
       && sp.sportsInFamily('football').every((id) => sp.SPORT_INFO[id].distinction.length > 20));
@@ -148,8 +148,9 @@ console.log('[2] outcomes, basis and limits');
   const of = (sportId, outcomeId) => sp.sportEmphasisFor({ sportId, outcomeId, otherSportName: null });
   const jump = of('basketball', 'jump_higher');
   check('jump higher: quads, glutes, calves, citing the strength review and the plyometric meta-analysis',
-    jump.muscles.join(',') === 'quadriceps,glutes,calves' && jump.basis.length === 2
-      && /Suchomel/.test(jump.basis[0].citation) && /Markovic/.test(jump.basis[1].citation));
+    jump.muscles.join(',') === 'quadriceps,glutes,calves' && jump.basis.length === 3
+      && /Suchomel/.test(jump.basis[0].citation) && /Markovic/.test(jump.basis[1].citation)
+      && /Collings/.test(jump.basis[2].citation));
   check('jump higher says plainly that the library has no jump training',
     jump.limits.some((line) => /no jump or plyometric drills/.test(line) && /does not include jump training itself/.test(line)));
   const stay = of('football_association', 'stay_available');
@@ -159,7 +160,9 @@ console.log('[2] outcomes, basis and limits');
     stay.limits.some((line) => /no adductor-strengthening exercise/.test(line)) && !stay.muscles.includes('inner_thighs'));
   check('ice hockey cites its own adductor study; basketball gets no groin claim',
     /ice hockey players/.test(of('hockey_ice', 'stay_available').basis[1].citation)
-      && of('basketball', 'stay_available').basis.length === 1
+      && of('basketball', 'stay_available').basis.length === 2
+      && /van Dyk/.test(of('basketball', 'stay_available').basis[0].citation)
+      && !of('basketball', 'stay_available').basis.some((b) => /adductor|groin/i.test(`${b.citation} ${b.finding}`))
       && !of('basketball', 'stay_available').limits.some((line) => /adductor/.test(line)));
   const lifts = of('powerlifting', 'bigger_competition_lifts');
   check('powerlifting promotes the three competition lifts, citing the rule book', lifts.competitionLifts === true
@@ -216,6 +219,29 @@ console.log('[3] scheduled sport workload');
       // The week-3 hold applies to every slot, so "unchanged" would be false here.
       && /for every exercise, your main lifts included\. Your main lifts keep their exercises and their sets\./.test(effect(5).explanation)
       && !/main lifts are unchanged/i.test(effect(5).explanation));
+  // #176: the profile panel shows the effect before any block is made, so it
+  // speaks of the NEXT block in the future tense, never of a plan that has
+  // already changed.
+  check('the next-block wording is future tense and says the same thing as the plan wording',
+    [0, 2, 3, 5].every((n) => /^Sport workload: /.test(effect(n).nextBlockExplanation))
+      && /your next block will have one fewer set on most accessory exercises \(down to at least one set; goal-linked, locomotion, non-strength-day, and deload sets are kept\)\. Its main lifts and weekly progression will be unchanged\./.test(effect(3).nextBlockExplanation)
+      && /your next block will have up to two fewer sets on most accessory exercises \(down to at least one set; goal-linked, locomotion, non-strength-day, and deload sets are kept\), and its week 3 will repeat week 2 instead of stepping up/.test(effect(5).nextBlockExplanation)
+      && /That will not change your next block\./.test(effect(2).nextBlockExplanation)
+      && [0, 2, 3, 5].every((n) => !/ has (one|two) fewer set| exercises have (up to )?(one|two) fewer set| are unchanged\.| does not change the gym plan/.test(effect(n).nextBlockExplanation))
+      && !/main lifts and weekly progression will be unchanged/i.test(effect(5).nextBlockExplanation));
+  // Owner ruling on #176: the cut skips non-strength days, the deload week,
+  // goal-linked and locomotion slots, and never goes below one set, so neither
+  // wording promises it on "each" accessory exercise.
+  {
+    const lead = `Sport workload: ${fromStated.description}.`;
+    const kept = '(down to at least one set; goal-linked, locomotion, non-strength-day, and deload sets are kept)';
+    check('the high and very high wording says "most accessory exercises" and names what is kept',
+      effect(3).explanation === `${lead} To leave room for it, most accessory exercises have one fewer set ${kept}. Your main lifts and the weekly progression are unchanged.`
+        && effect(3).nextBlockExplanation === `${lead} To leave room for it, your next block will have one fewer set on most accessory exercises ${kept}. Its main lifts and weekly progression will be unchanged.`
+        && effect(5).explanation === `${lead} That is a very full week, so most accessory exercises have up to two fewer sets ${kept}, and week 3 of the block repeats week 2 instead of stepping up — for every exercise, your main lifts included. Your main lifts keep their exercises and their sets.`
+        && effect(5).nextBlockExplanation === `${lead} That is a very full week, so your next block will have up to two fewer sets on most accessory exercises ${kept}, and its week 3 will repeat week 2 instead of stepping up — for every exercise, your main lifts included. Your main lifts will keep their exercises and their sets.`
+        && [3, 5].every((n) => !/each accessory exercise/.test(effect(n).explanation + effect(n).nextBlockExplanation)));
+  }
   check('no cross-sport load score is computed: the workload carries sessions and minutes only',
     Object.keys(fromSchedule).sort().join(',') === 'description,knownMinutesPerWeek,sessionsPerWeek,source,tier,unknownDurationSessions,weekdays');
 }

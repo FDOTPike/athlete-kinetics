@@ -106,4 +106,21 @@ describe('profile headings shrink before they push an info button off screen', (
     expect(StyleSheet.flatten(label.props.style).flexShrink).toBe(1);
     expect(StyleSheet.flatten(tip.props.style).flexShrink).toBe(0);
   });
+
+  // Issue 158, Manage athletes: at font scale 2.0 an athlete's name gets its own row,
+  // so a long name such as "W1-BLANK1" is not broken inside a word beside RENAME and DELETE.
+  test('at font scale 2.0 an athlete row stacks, so the name has the full width', () => {
+    mockState.advancedToolsUnlocked = true;
+    mockState.athletes = [
+      { id: 'default', name: 'Default Athlete' },
+      { id: 'a2', name: 'W1-BLANK1' },
+    ];
+    render(<ProfileScreen />);
+    fireEvent.press(screen.getByLabelText('Coach mode, 2 athletes, collapsed'));
+    let row = screen.getByLabelText('Athlete W1-BLANK1, tap to switch');
+    const flexOf = (node) => (typeof node.props.style === 'function' || !node.props.style ? undefined : StyleSheet.flatten(node.props.style).flexDirection);
+    while (row && flexOf(row) === undefined) row = row.parent;
+    expect(row).toBeTruthy();
+    expect(StyleSheet.flatten(row.props.style).flexDirection).toBe('column');
+  });
 });

@@ -430,7 +430,7 @@ export default function LibraryScreenV2({ initialMovementId }: LibraryScreenProp
           label="All patterns"
           selected={patternFilter === null}
           onPress={() => setPatternFilter(null)}
-          accessibilityLabel="Clear pattern filter"
+          accessibilityLabel="All patterns, clear pattern filter"
         />
         {patternOptions.map((pattern) => (
           <Chip
@@ -448,7 +448,7 @@ export default function LibraryScreenV2({ initialMovementId }: LibraryScreenProp
           label="All equipment"
           selected={equipmentFilter === null}
           onPress={() => setEquipmentFilter(null)}
-          accessibilityLabel="Clear equipment filter"
+          accessibilityLabel="All equipment, clear equipment filter"
         />
         {equipmentOptions.map((equipment) => (
           <Chip
@@ -468,7 +468,7 @@ export default function LibraryScreenV2({ initialMovementId }: LibraryScreenProp
             label={difficulty === 'all' ? 'All tiers' : difficulty}
             selected={difficultyFilter === difficulty}
             onPress={() => setDifficultyFilter(difficulty)}
-            accessibilityLabel={difficulty === 'all' ? 'Clear tier filter' : `Filter tier by ${difficulty}`}
+            accessibilityLabel={difficulty === 'all' ? 'All tiers, clear tier filter' : `Filter tier by ${difficulty}`}
           />
         ))}
       </View>
@@ -480,7 +480,7 @@ export default function LibraryScreenV2({ initialMovementId }: LibraryScreenProp
             label={kind === 'all' ? 'All types' : kind === 'compound' ? 'Compound' : 'Isolation'}
             selected={kindFilter === kind}
             onPress={() => setKindFilter(kind)}
-            accessibilityLabel={kind === 'all' ? 'Clear movement type filter' : `Filter type by ${kind}`}
+            accessibilityLabel={kind === 'all' ? 'All types, clear movement type filter' : `Filter type by ${kind}`}
           />
         ))}
       </View>
