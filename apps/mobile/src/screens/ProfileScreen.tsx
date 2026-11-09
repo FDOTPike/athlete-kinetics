@@ -1268,7 +1268,7 @@ export default function ProfileScreen(): React.JSX.Element {
           onPress={() => setCoachOpen((o) => !o)}
           accessibilityRole="button"
           accessibilityState={{ expanded: coachOpen }}
-          accessibilityLabel={`Coach mode, ${athletes.length} athletes, ${coachOpen ? 'expanded' : 'collapsed'}`}
+          accessibilityLabel={`Coach mode, ${athletes.length} ${athletes.length === 1 ? 'athlete' : 'athletes'}, ${coachOpen ? 'expanded' : 'collapsed'}`}
           style={styles.coachHeader}
         >
           <Text style={styles.mgmtHeading}>MANAGE ATHLETES</Text>
