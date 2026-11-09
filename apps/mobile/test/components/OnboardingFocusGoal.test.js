@@ -215,7 +215,7 @@ describe('the detailed target is optional', () => {
     walkToReview();
     expect(stepLabel()).toBe('Step 10 of 10');
     expect(screen.getByTestId('onboarding-summary-target-row').props.children)
-      .toBe('TARGET — Squat 100 kg for 5 reps: 100 kg by 2099-01-08');
+      .toBe('TARGET — Squat 100 kg for 5 reps: from 80 kg to 100 kg by 2099-01-08');
     await startTraining();
     expect(state().error).toBeNull();
     expect(state().onboarded).toBe(true);
@@ -261,6 +261,105 @@ describe('the detailed target is optional', () => {
     expect(state().onboarded).toBe(true);
     expect(state().focus).toMatchObject({ bundleId: 'beach_muscles' });
     expect(count('athlete_goal')).toBe(0);
+  });
+
+  test('skip from EDIT on the review returns to the review, not the next screen', async () => {
+    openFocusSlide();
+    press('focus-bundle-beach_muscles');
+    press('onboarding-wants-target');
+    next();
+    fillTarget();
+    next();
+    walkToReview();
+    pressLabel('Edit target');
+    expect(screen.getByTestId('goal-editor')).toBeTruthy();
+    press('onboarding-skip-target');
+    // QA-001: an edit started from the review returns to the review, and the
+    // index is the review's index in the array WITHOUT the removed screen.
+    expect(screen.getByLabelText('START TRAINING')).toBeTruthy();
+    expect(screen.queryByText('HOW LONG HAVE YOU BEEN TRAINING?')).toBeNull();
+    // Nine screens include the target; skipping it leaves eight, and the
+    // review must be step 8 of 8 — never an out-of-range index.
+    expect(stepLabel()).toBe('Step 8 of 8');
+  });
+
+  test('after a review-edit skip, Back moves one step and NEXT returns to the review', () => {
+    openFocusSlide();
+    press('focus-bundle-beach_muscles');
+    press('onboarding-wants-target');
+    next();
+    fillTarget();
+    next();
+    walkToReview();
+    pressLabel('Edit target');
+    press('onboarding-skip-target');
+    expect(screen.getByLabelText('START TRAINING')).toBeTruthy();
+    pressLabel('Back');
+    expect(screen.getByText('ANY TRAINING NOTES TO RECORD?')).toBeTruthy();
+    expect(stepLabel()).toBe('Step 7 of 8');
+    next();
+    expect(screen.getByLabelText('START TRAINING')).toBeTruthy();
+    expect(stepLabel()).toBe('Step 8 of 8');
+  });
+
+  test('after a skip, a later EDIT still returns to the review on NEXT', () => {
+    openFocusSlide();
+    press('focus-bundle-beach_muscles');
+    press('onboarding-wants-target');
+    next();
+    fillTarget();
+    next();
+    walkToReview();
+    pressLabel('Edit target');
+    press('onboarding-skip-target');
+    expect(screen.getByLabelText('START TRAINING')).toBeTruthy();
+    // A second edit proves the cleared flag re-enters and NEXT returns.
+    pressLabel('Edit focus');
+    expect(screen.getByTestId('focus-picker')).toBeTruthy();
+    next();
+    expect(screen.getByLabelText('START TRAINING')).toBeTruthy();
+  });
+
+  test('skipping sport from a review edit presents the still-unanswered target', () => {
+    openFocusSlide();
+    press('focus-bundle-beach_muscles');
+    next();
+    walkToReview();
+    pressLabel('Edit focus');
+    press('onboarding-wants-sport');
+    press('onboarding-wants-target');
+    next();
+    expect(screen.getByTestId('sport-editor')).toBeTruthy();
+    press('onboarding-skip-sport');
+    // The target was added in the same edit and is still unanswered: present it
+    // instead of jumping to a review that would refuse START TRAINING.
+    expect(screen.getByTestId('goal-editor')).toBeTruthy();
+    fillTarget();
+    next();
+    expect(screen.getByLabelText('START TRAINING')).toBeTruthy();
+    expect(stepLabel()).toBe('Step 9 of 9');
+  });
+
+  test('skip from EDIT returns to the review when both optional screens exist', () => {
+    openFocusSlide();
+    press('focus-bundle-beach_muscles');
+    press('onboarding-wants-sport');
+    press('onboarding-wants-target');
+    next();
+    press('sport-family-strength');
+    press('sport-outcome-bigger_competition_lifts');
+    press('sport-experience-new');
+    press('sport-practice-unsure');
+    press('sport-matches-unsure');
+    next();
+    fillTarget();
+    next();
+    walkToReview();
+    expect(stepLabel()).toBe('Step 10 of 10');
+    pressLabel('Edit target');
+    press('onboarding-skip-target');
+    expect(screen.getByLabelText('START TRAINING')).toBeTruthy();
+    expect(stepLabel()).toBe('Step 9 of 9');
   });
 
   test('a custom measurement asks for its unit', () => {

@@ -743,4 +743,8 @@ they can change their goals at any time in Athlete Profile (PR 99).
    - Future slot disposition (`planned_slot_disposition = 'swapped'`) for day swaps continues to be written inside the same transaction.
    - Every hold and hard stop stays as it is: swaps still go through `requireTrainingSupport`, the access check, and `permittedForProfile` unchanged.
 
+## 2026-11-05 — A halt row with no matched entry: the in-session Stop day halt (#179)
 
+1. **Ruling (2026-11-05):** "a Stop reached through 'Report discomfort' sets the day halt that a Plan report at halt level sets: every start is blocked today and every screen shows the halt. A manual 'Stop session' does not halt the day." Decision record: `docs/decisions/IN_SESSION_STOP_DAY_HALT_2026-11-05.md` (PROPOSED).
+2. **The deviation in the halt data model:** until now every `subjective_report` row with `halt = 1` had a matched phrase entry, and `computePrescription` read only rows with `matched_entry_id IS NOT NULL`. A Stop-level in-session report is a region and a severity, not matched text, so its halt row has `matched_entry_id = NULL`. `computePrescription` now reads those rows too and applies them as a recorded halt under one fixed in-app entry (`SESSION_REPORT_STOP_ENTRY`, `apps/mobile/src/state/sessionReportStop.ts`), and sets that halt even when there is no readiness vector. A NULL-match row with `halt = 0` is still a rejected report kept for curation; only `halt = 1` rows are read as a halt.
+3. **Not changed:** no migration (the 005 schema already allows the row), no change to `phrase-codebase.json`, the keyword layer, the severity gate, `EXPERIENCE_SEVERITY`, the runner or `derivePrescription`.

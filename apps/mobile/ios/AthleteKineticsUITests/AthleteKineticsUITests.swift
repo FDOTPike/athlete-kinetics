@@ -278,6 +278,17 @@ final class AthleteKineticsUITests: XCTestCase {
     wait(element("athlete-screen-shown"), "the Profile screen")
   }
 
+  /// #210: Profile's Apple Health wording and its CONNECT control sit in the
+  /// "Heart rate and sleep data (optional)" section, which starts collapsed.
+  /// Opens it unless its title already shows (it stays open while Profile
+  /// stays mounted).
+  private func openHealthSection() {
+    let title = element("HEALTH DATA — APPLE HEALTH")
+    if (try? title.snapshot()) != nil { return }
+    tap("Heart rate and sleep data (optional)", "the Heart rate and sleep data heading")
+    wait(title, "the Apple Health section after opening its heading")
+  }
+
   private func unlockAdvancedTools() {
     if (try? element("advanced-athlete-manager").snapshot()) != nil { return }
     let build = element("Build 0.1.0")
@@ -578,6 +589,7 @@ final class AthleteKineticsUITests: XCTestCase {
     launch(["-AKUITestTrace", "1"])
     completeOnboarding("athlete A")
     openProfile()
+    openHealthSection()
     let idle = element(labelBeginsWith: "Apple Health is available.")
     // CI evidence c3e7de5 (Xcode 27 row, iOS 27.0 simulator): 30 s after the
     // Profile opened the app still read "Checking Apple Health…"; the same
@@ -723,11 +735,12 @@ final class AthleteKineticsUITests: XCTestCase {
     }
 
     let before = expandCoachMode()
-    XCTAssertTrue(before.hasPrefix("Coach mode, 1 athletes"), "expected one athlete before adding: \(before)")
+    XCTAssertTrue(before.hasPrefix("Coach mode, 1 athlete"), "expected one athlete before adding: \(before)")
     enterText(into: "New athlete's name", "UITest B")
     tap("Add a new athlete")
     completeOnboarding("athlete B")
     openProfile()
+    openHealthSection()
     XCTAssertNil(findHealthSheetButton("Don’t Allow", timeout: 5),
                    "a new athlete reopened the Health permission sheet")
     let hintB = element(labelBeginsWith: "Apple Health")
@@ -746,6 +759,7 @@ final class AthleteKineticsUITests: XCTestCase {
     log("switched: \(otherLabel)")
     wait(element("shell-root"), "the shell after switching back")
     openProfile()
+    openHealthSection()
     XCTAssertNil(findHealthSheetButton("Don’t Allow", timeout: 5),
                    "switching athlete reopened the Health permission sheet")
     let hintBack = answered
@@ -780,7 +794,7 @@ final class AthleteKineticsUITests: XCTestCase {
 
     // A change after the backup: a second athlete (Coach Mode).
     let before = expandCoachMode()
-    XCTAssertTrue(before.hasPrefix("Coach mode, 1 athletes"), "expected one athlete at backup time: \(before)")
+    XCTAssertTrue(before.hasPrefix("Coach mode, 1 athlete"), "expected one athlete at backup time: \(before)")
     enterText(into: "New athlete's name", "After Backup")
     tap("Add a new athlete")
     completeOnboarding("athlete added after the backup")
@@ -837,7 +851,7 @@ final class AthleteKineticsUITests: XCTestCase {
     wait(element("shell-root"), "the app after restore")
     openProfile()
     let after = expandCoachMode()
-    XCTAssertTrue(after.hasPrefix("Coach mode, 1 athletes"), "the restore did not bring back the one-athlete snapshot: \(after)")
+    XCTAssertTrue(after.hasPrefix("Coach mode, 1 athlete"), "the restore did not bring back the one-athlete snapshot: \(after)")
     XCTAssertFalse(element(labelContains: "After Backup").exists, "the athlete added after the backup survived the restore")
   }
 

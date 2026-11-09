@@ -5,9 +5,10 @@
  * (issue #218), so both keep the same 20–500 kg clamp, the same 0.25 kg grid
  * and the same saved-as message.
  */
-import React, { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Keyboard, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { theme } from '../theme/theme';
+import { useStore } from '../state/useStore';
 
 /** A max as the field shows it: one decimal, or two for a quarter kilogram. */
 export const formatMaxKg = (kg: number): string => {
@@ -39,15 +40,19 @@ export interface OneRmRowProps {
    *  field while it still has focus (the onboarding step's NEXT) uses it to
    *  commit the typed text itself, since no end-of-editing event comes then. */
   onTextChange?: (text: string) => void;
+  /** The athlete the row was drawn for: typed text is never saved to another. */
+  athleteId?: string;
+  /** Lets the screen save typed text before a Coach Mode switch. */
+  registerCommit?: (commit: () => void) => () => void;
 }
 
-export function OneRmRow({ label, valueKg, onChange, onTextChange }: OneRmRowProps): React.JSX.Element {
+export function OneRmRow({ label, valueKg, onChange, onTextChange, athleteId, registerCommit }: OneRmRowProps): React.JSX.Element {
   const [text, setText] = useState(valueKg !== undefined ? formatMaxKg(valueKg) : '');
   const [clampNote, setClampNote] = useState<string | null>(null);
   useEffect(() => {
     setText(valueKg !== undefined ? formatMaxKg(valueKg) : '');
   }, [valueKg]);
-  const commitText = (): void => {
+  const saveText = (): void => {
     const parsed = parseOneRmText(text);
     if (parsed === null) {
       onChange(null); // empty/garbage/sub-20 clears the max
@@ -60,6 +65,34 @@ export function OneRmRow({ label, valueKg, onChange, onTextChange }: OneRmRowPro
     // Walk W4-7: 999 became 500.0 with no word. Say what was saved.
     setClampNote(oneRmClampNote(parsed));
   };
+  // Walk A-12 (#224): Android Back hides the keyboard without ending editing,
+  // and the typed text was lost when Profile closed. Typed text is now saved
+  // on end of editing, blur, keyboard hide or unmount, whichever comes first.
+  // It is saved once: text that matches the saved value is not saved again,
+  // and neither is text already saved from this render (Enter fires end of
+  // editing and blur before the row re-renders with the saved value).
+  const savedThisRender = useRef(false);
+  useEffect(() => { savedThisRender.current = false; });
+  const commitText = (): void => {
+    const shown = valueKg !== undefined ? formatMaxKg(valueKg) : '';
+    if (text === shown || savedThisRender.current) return;
+    // During or after a Coach Mode switch the store belongs to another athlete.
+    if (athleteId !== undefined && useStore.getState().activeAthleteId !== athleteId) return;
+    savedThisRender.current = true;
+    saveText();
+  };
+  const commitLatest = useRef(commitText);
+  commitLatest.current = commitText;
+  useEffect(() => {
+    if (registerCommit === undefined) return undefined;
+    const hide = Keyboard.addListener('keyboardDidHide', () => commitLatest.current());
+    const unregister = registerCommit(() => commitLatest.current());
+    return () => {
+      hide.remove();
+      unregister();
+      commitLatest.current();
+    };
+  }, [registerCommit]);
   return (
     <View style={styles.field}>
       <Text style={styles.fieldLabel}>{label}</Text>
@@ -81,6 +114,7 @@ export function OneRmRow({ label, valueKg, onChange, onTextChange }: OneRmRowPro
           // new edit, a + or −, or a cleared max makes it untrue, so it goes.
           onChangeText={(next) => { setText(next); setClampNote(null); onTextChange?.(next); }}
           onEndEditing={commitText}
+          onBlur={commitText}
           keyboardType="numeric"
           placeholder="—"
           placeholderTextColor={theme.color.textLow}
