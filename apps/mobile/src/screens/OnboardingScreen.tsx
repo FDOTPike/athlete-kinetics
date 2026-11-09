@@ -47,7 +47,6 @@ import {
   type EquipmentItem,
   type LoadPreference,
   type Objective,
-  type ProgressionMethod,
   type TrainingAge,
   type UserProfile,
   validateSmartGoal,
@@ -79,11 +78,12 @@ import {
   sportFieldsSummary,
   type SportFieldsState,
 } from '../components/SportFields';
+import { IS_BETA_BUILD } from '../config/features';
 
 // ---------------------------------------------------------------------------
 // Copy: plain-language labels + one-liners for every enum the wizard shows.
 // ---------------------------------------------------------------------------
-const OBJECTIVE_COPY: Record<Objective, { label: string; blurb: string }> = {
+export const OBJECTIVE_COPY: Record<Objective, { label: string; blurb: string }> = {
   strength: { label: 'GET STRONGER', blurb: 'Lift heavier on the big lifts' },
   hypertrophy: { label: 'BUILD MUSCLE', blurb: 'Size first, the numbers follow' },
   power: { label: 'GET EXPLOSIVE', blurb: 'Speed and force for sport' },
@@ -92,6 +92,17 @@ const OBJECTIVE_COPY: Record<Objective, { label: string; blurb: string }> = {
   hybrid: { label: 'STRENGTH + GRAPPLING', blurb: 'Lift heavy and keep mat time first' },
   rehab: { label: 'RETURN TO TRAINING', blurb: 'Coming back carefully, no diagnosis' },
   weight_loss: { label: 'WEIGHT-LOSS SUPPORT', blurb: 'Stay active and keep your muscle' },
+};
+
+export const OBJECTIVE_LABEL: Record<Objective, string> = {
+  strength: OBJECTIVE_COPY.strength.label,
+  hypertrophy: OBJECTIVE_COPY.hypertrophy.label,
+  power: OBJECTIVE_COPY.power.label,
+  endurance: OBJECTIVE_COPY.endurance.label,
+  gpp: OBJECTIVE_COPY.gpp.label,
+  hybrid: OBJECTIVE_COPY.hybrid.label,
+  rehab: OBJECTIVE_COPY.rehab.label,
+  weight_loss: OBJECTIVE_COPY.weight_loss.label,
 };
 
 const AGE_COPY: Record<TrainingAge, { label: string; blurb: string }> = {
@@ -111,16 +122,6 @@ const ENERGY_COPY: Record<EnergySystem, { label: string; blurb: string }> = {
 const LOAD_PREFERENCE_COPY: Record<LoadPreference, { label: string; blurb: string }> = {
   auto: { label: 'COACH SUGGESTS', blurb: 'Targets come from your numbers and history. You can always adjust before logging.' },
   manual: { label: 'I CHOOSE', blurb: 'You set every load. Coach suggestions appear as reference only.' },
-};
-
-/** Plain-language label for each persisted progression methodology (R6,
- * Round 2 — the review screen discloses the default like every other
- * removed advanced default). */
-const PROGRESSION_METHOD_LABEL: Record<ProgressionMethod, string> = {
-  linear: 'Linear',
-  undulating: 'Undulating',
-  conjugate: 'Conjugate',
-  autoregulated: 'Autoregulated',
 };
 
 const EQUIPMENT_LABEL: Record<EquipmentItem, string> = {
@@ -345,10 +346,14 @@ export default function OnboardingScreen(): React.JSX.Element {
   // goal is never carried forward silently.
   const targetGateOpen = step === 'target' && !goalValidation.ok;
   const skipTarget = (): void => {
-    // Removing the screen leaves the index pointing at the next one.
+    // Removing the screen leaves the index pointing at the next one, which is
+    // right mid-interview. From an EDIT started on the review the index must be
+    // recomputed against the array WITHOUT this screen, or it lands one past
+    // the review (a "Step 10 of 9" counter and a dead first Back).
     setWantsTarget(false);
     setGoalFields(EMPTY_GOAL_FIELDS);
     setGoalExerciseId(null);
+    returnAfterReviewEditSkip('target');
   };
   const sportValidation = useMemo(
     () => validateSportProfile(sportDraftFromFields(sportFields), today),
@@ -359,16 +364,38 @@ export default function OnboardingScreen(): React.JSX.Element {
   const skipSport = (): void => {
     setWantsSport(false);
     setSportFields(EMPTY_SPORT_FIELDS);
+    returnAfterReviewEditSkip('sport');
   };
   // R5 (Round 2, ledger 0060): the limitations decision is REQUIRED. The
   // athlete cannot leave this screen — NEXT stays disabled — until they have
   // explicitly chosen Yes or No. Silence is never an answer to a safety
   // question; a skip would silently claim "no limitations" in the profile.
   const limitsGateOpen = step === 'limits' && limitsAnswered === null;
+  // A15-01: a skip during an EDIT from the review must present any OTHER
+  // optional answer that is still incomplete (one added moments ago on the
+  // focus screen) before returning to the review; otherwise review would carry
+  // an invalid answer and START TRAINING would be refused. When nothing is
+  // pending, land on the review's index in the reduced array and leave edit
+  // mode so NEXT walks normally.
+  const returnAfterReviewEditSkip = (removed: 'sport' | 'target'): void => {
+    if (!editingFromReview) return;
+    const remaining = steps.filter((key) => key !== removed);
+    const pending = remaining.findIndex((key) =>
+      (key === 'sport' && !sportValidation.ok) || (key === 'target' && !goalValidation.ok));
+    if (pending !== -1) {
+      setStepIdx(pending);
+      return;
+    }
+    setStepIdx(remaining.indexOf('review'));
+    setEditingFromReview(false);
+  };
 
   const goNext = (): void => {
     if (!editingFromReview) {
-      setStepIdx((i) => Math.min(steps.length - 1, i + 1));
+      // Relative to the step this press was rendered for, not a functional
+      // update: two presses sent before a re-render advance one step, not two
+      // (Android walk W7-1, issue #152).
+      setStepIdx(Math.min(steps.length - 1, stepIdx + 1));
       return;
     }
     // Any later sport or target screen still unanswered comes first, even
@@ -485,16 +512,20 @@ export default function OnboardingScreen(): React.JSX.Element {
               maxLength={24}
               accessibilityLabel="Your name"
             />
-            <QuietAction
-              label="Just exploring? Load the demo athlete →"
-              onPress={finishWithDemo}
-              accessibilityLabel="Skip the questionnaire and load the demo athlete"
-              style={styles.demoLink}
-            />
-            {demoNotice !== null && (
-              <Text style={styles.p} accessibilityLiveRegion="polite">
-                {demoNotice}
-              </Text>
+            {!IS_BETA_BUILD && (
+              <>
+                <QuietAction
+                  label="Just exploring? Load the demo athlete →"
+                  onPress={finishWithDemo}
+                  accessibilityLabel="Skip the questionnaire and load the demo athlete"
+                  style={styles.demoLink}
+                />
+                {demoNotice !== null && (
+                  <Text style={styles.p} accessibilityLiveRegion="polite">
+                    {demoNotice}
+                  </Text>
+                )}
+              </>
             )}
           </View>
         )}
@@ -732,7 +763,7 @@ export default function OnboardingScreen(): React.JSX.Element {
             {limitsAnswered === true && (
               <View>
                 <Text style={styles.fieldLabel}>PAST INJURIES</Text>
-                <Text style={styles.pDim}>One per line, like &quot;knee: old ACL, careful with deep squats&quot;.</Text>
+                <Text style={styles.pDim}>One per line, like &quot;knee: old ACL repair, 2019&quot;.</Text>
                 <TextInput
                   disableFullscreenUI
                   style={styles.notesInput}
@@ -846,7 +877,6 @@ export default function OnboardingScreen(): React.JSX.Element {
                     {'\n'}How hard did that feel? 1 is very easy. 10 is your hardest effort.
                     {'\n'}Up to {draft.max_sessions_per_day} session{draft.max_sessions_per_day === 1 ? '' : 's'} a day
                     {'\n'}Energy focus: {ENERGY_COPY[draft.target_energy_system].label}
-                    {'\n'}Progression method: {PROGRESSION_METHOD_LABEL[draft.progression_methodology]}
                   </Text>
                 </View>
 
@@ -871,7 +901,7 @@ export default function OnboardingScreen(): React.JSX.Element {
                 )}
                 {draft.training_age === 'beginner' && (
                   <Text style={styles.reviewDescription}>
-                    You choose the first weight. Next time starts from what you logged. Your effort ceiling starts at 8.5 and can change as your experience grows.
+                    You choose the first weight. Next time starts from what you logged. Your effort ceiling starts at {effectiveRpeCeiling(draft).toFixed(1)} and can change as your experience grows.
                   </Text>
                 )}
               </ReviewSection>

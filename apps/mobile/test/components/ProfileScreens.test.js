@@ -1,5 +1,5 @@
 import React from 'react';
-import { BackHandler, StyleSheet } from 'react-native';
+import { Alert, BackHandler, StyleSheet } from 'react-native';
 import { act, fireEvent, render, renderAsync, screen, within } from '@testing-library/react-native';
 import { HISTORY_IMPORT_EXAMPLE, TRAINING_AGES } from '@ak/inference';
 import ProfileScreen from '../../src/screens/ProfileScreen';
@@ -873,18 +873,27 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     const { getByRole } = render(<ProfileScreen />);
 
     // OBJECTIVES renders one chip per objective; 'hybrid' is baseProfile's value.
-    const objectives = ['strength', 'hypertrophy', 'power', 'endurance', 'gpp', 'hybrid', 'rehab', 'weight_loss'];
-    const selected = getByRole('button', { name: '1 · OBJECTIVE: hybrid' });
+    const objectiveLabels = [
+      'GET STRONGER',
+      'BUILD MUSCLE',
+      'GET EXPLOSIVE',
+      'LAST LONGER',
+      'ALL-ROUND FITNESS',
+      'STRENGTH + GRAPPLING',
+      'RETURN TO TRAINING',
+      'WEIGHT-LOSS SUPPORT',
+    ];
+    const selected = getByRole('button', { name: '1 · OBJECTIVE: STRENGTH + GRAPPLING' });
     expect(selected.props.accessibilityState.selected).toBe(true);
 
-    const unselected = getByRole('button', { name: '1 · OBJECTIVE: strength' });
+    const unselected = getByRole('button', { name: '1 · OBJECTIVE: GET STRONGER' });
     expect(unselected.props.accessibilityState.selected).toBe(false);
     expect(unselected.props.accessibilityState.disabled).toBe(false);
 
     // Exactly ONE of the row's chips claims the selected state.
-    const selectedCount = objectives.filter(
-      (o) => getByRole('button', {
-        name: `1 · OBJECTIVE: ${o.replace(/_/g, ' ')}`,
+    const selectedCount = objectiveLabels.filter(
+      (label) => getByRole('button', {
+        name: `1 · OBJECTIVE: ${label}`,
       }).props.accessibilityState.selected,
     ).length;
     expect(selectedCount).toBe(1);
@@ -1081,7 +1090,14 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       expect(hardwareBack.press()).toBe(true);
       expect(hardwareBack.press()).toBe(true);
       expect(screen.getByTestId('activities-screen')).toBeOnTheScreen();
+      // #148: leaving Activities with a kept entry asks first; Discard leaves.
+      const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
       expect(hardwareBack.press()).toBe(true);
+      expect(alert).toHaveBeenCalledTimes(1);
+      expect(alert.mock.calls[0][0]).toBe('Discard this activity?');
+      expect(screen.getByTestId('activities-screen')).toBeOnTheScreen();
+      act(() => { alert.mock.calls[0][2].find((button) => button.text === 'Discard').onPress(); });
+      alert.mockRestore();
       expect(screen.queryByTestId('activities-screen')).toBeNull();
       expect(screen.getByText('ATHLETE PROFILE')).toBeOnTheScreen();
       expect(mockState.saveOneOffActivity).not.toHaveBeenCalled();
@@ -1091,6 +1107,21 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       hardwareBack.restore();
     }
   }, 30000);
+
+  describe('#177: the active athlete is named only in Coach mode', () => {
+    test('with two athletes, Profile names the active athlete under the heading', () => {
+      render(<ProfileScreen />);
+      expect(screen.getByText('ATHLETE PROFILE')).toBeOnTheScreen();
+      expect(screen.getByTestId('profile-active-athlete')).toHaveTextContent('Default Athlete');
+    });
+
+    test('with one athlete, Profile names no one', () => {
+      mockState.athletes = [{ id: 'default', name: 'Default Athlete' }];
+      render(<ProfileScreen />);
+      expect(screen.getByText('ATHLETE PROFILE')).toBeOnTheScreen();
+      expect(screen.queryByTestId('profile-active-athlete')).toBeNull();
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

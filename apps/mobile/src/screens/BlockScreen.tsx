@@ -32,9 +32,11 @@ import { useNavigation, useSubViewBack } from '../navigation/navigation';
 import ProgramSetupScreen from './ProgramSetupScreen';
 import NewBlockChooserScreen from './NewBlockChooserScreen';
 import InfoTip from '../components/InfoTip';
+import { REPORT_NOT_SENT_TEXT } from '../components/SubjectiveReportPanel';
 import { EmphasisReportCard } from '../components/EmphasisReportCard';
 import { deriveTodayState } from '../state/todayState';
 import { theme } from '../theme/theme';
+import { IS_BETA_BUILD } from '../config/features';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { appliedAdjustmentLines, autopilotReasonCopy } from '../state/autopilotCopy';
 import { EMPTY_ACTIVITY_LEDGER } from '../state/activityStore';
@@ -319,6 +321,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
 
   const [reportText, setReportText] = useState('');
   const [reportSeverity, setReportSeverity] = useState<number | null>(null);
+  const [reportNotSent, setReportNotSent] = useState(false);
   const [schema, setSchema] = useState<SchemaType>('LINEAR');
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [attributionSlotId, setAttributionSlotId] = useState<number | null>(null);
@@ -555,6 +558,207 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
     </View>
   );
 
+  const current = prescription != null && prescription.forDate === today ? prescription : null;
+  const safeBlockSessions = blockSessions ?? [];
+  const rows = weekRowsFor(safeBlockSessions);
+  const nextPlanned = safeBlockSessions.find((planned) => planned.sessionDate > today);
+
+  const openDetail = (summary: BlockSessionSummary): void => {
+    if (detail?.summary.plannedSessionId === summary.plannedSessionId) {
+      setDetail(null);
+      return;
+    }
+    setDetail({ summary, slots: loadSessionSlots(summary.plannedSessionId) });
+  };
+
+  const renderTrajectorySection = (): React.JSX.Element => (
+    <View
+      style={styles.section}
+      onLayout={(event) => { trajectorySectionY.current = event.nativeEvent.layout.y; }}
+    >
+      <View style={styles.trajectoryHeaderRow}>
+        <Text style={styles.sectionTitle}>Four-week trajectory</Text>
+        {block != null && blockEndDate != null && (
+          <View style={styles.fixedBadge} accessibilityRole="text" accessibilityLabel={`Fixed until ${blockEndDate}`}>
+            <Text style={styles.fixedBadgeText}>FIXED UNTIL {blockEndDate}</Text>
+          </View>
+        )}
+      </View>
+      {blockMeta != null && blockMeta.macroBlockIndex >= 6 && (
+        <View style={styles.blockAttribution}>
+          <Pressable
+            onPress={() => setMacroBudgetOpen((open) => !open)}
+            style={styles.attributionTouchTarget}
+            accessibilityRole="button"
+            accessibilityLabel="Why effort is held steady"
+            accessibilityState={{ expanded: macroBudgetOpen }}
+          >
+            <Text style={styles.attributionMarker}>·</Text>
+          </Pressable>
+          {macroBudgetOpen && <Text style={styles.attributionText}>{AUTOPILOT_BUDGET_NOTE}</Text>}
+        </View>
+      )}
+      {block == null ? (
+        <View style={styles.emptyTrajectory}>
+          <Text style={styles.bodyText}>No block is active yet.</Text>
+          <Text style={styles.captionText}>Set one up below when you are ready to train with a trajectory.</Text>
+        </View>
+      ) : (
+        <>
+          {(() => {
+            const seenPhaseTerms = new Set<string>();
+            return rows.map((row) => {
+              const phaseTerm = GLOSSARY_PHASE_TERM[row.phase.toLowerCase()];
+              const showPhaseTip = phaseTerm !== undefined && !seenPhaseTerms.has(phaseTerm);
+              if (phaseTerm) seenPhaseTerms.add(phaseTerm);
+
+              return (
+                <View key={row.week} style={styles.weekContainer}>
+                  <View testID={`trajectory-week-${row.week}`} style={styles.weekRow}>
+                    <View style={styles.weekMeta}>
+                      <Text style={styles.weekTitle}>Week {row.week}</Text>
+                      <View style={styles.weekPhaseRow}>
+                        <Text style={styles.weekPhase}>{phaseLabel(row.phase)}</Text>
+                        {showPhaseTip && <InfoTip term={phaseTerm} />}
+                      </View>
+                    </View>
+                    <View testID={`trajectory-days-week-${row.week}`} style={styles.dayRail}>
+                      {row.cells.map((cell, dayIndex) => {
+                        const cellDate = addDaysIso(block.startDate, (row.week - 1) * 7 + dayIndex);
+                        const isToday = cellDate === today;
+                        if (cell === null) {
+                          if (!isToday) {
+                            return (
+                              <View key={`rest-${dayIndex}`} style={[styles.dayMark, styles.dayMarkRest]}>
+                                <Text style={styles.dayMarkRestText}>-</Text>
+                              </View>
+                            );
+                          }
+                          return (
+                            <View
+                              key={`rest-${dayIndex}`}
+                              testID="today-marker"
+                              accessibilityRole="text"
+                              accessibilityLabel="Today — recovery day"
+                              style={[styles.dayMark, styles.dayMarkRest, styles.dayMarkToday]}
+                            >
+                              <Text
+                                style={[styles.dayMarkRestText, styles.dayMarkTextToday]}
+                                numberOfLines={1}
+                                adjustsFontSizeToFit
+                                minimumFontScale={0.7}
+                              >
+                                Today
+                              </Text>
+                            </View>
+                          );
+                        }
+                        const isExpanded = detail?.summary.plannedSessionId === cell.plannedSessionId;
+                        const isMissed = isMissedSession(cell, today);
+                        return (
+                          <Pressable
+                            key={cell.plannedSessionId}
+                            onPress={() => openDetail(cell)}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Week ${cell.weekIndex}, ${cell.focus} session on ${cell.sessionDate}${
+                              cell.completionStatus === 'complete'
+                                ? ', completed'
+                                : cell.completionStatus === 'halted'
+                                  ? ', stopped'
+                                  : isMissed
+                                    ? ', not done'
+                                    : ''
+                            }`}
+                            accessibilityState={{ expanded: isExpanded, selected: isToday }}
+                            testID={isToday ? 'today-marker' : undefined}
+                            style={({ pressed }) => [
+                              styles.dayMark,
+                              cell.completionStatus !== null && styles.dayMarkFinalized,
+                              isMissed && styles.dayMarkMissed,
+                              isToday && styles.dayMarkToday,
+                              isExpanded && styles.dayMarkExpanded,
+                              pressed && styles.dayMarkPressed,
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.dayMarkText,
+                                cell.completionStatus !== null && styles.dayMarkTextFinalized,
+                                isMissed && styles.dayMarkTextMissed,
+                                isToday && styles.dayMarkTextToday,
+                              ]}
+                              numberOfLines={1}
+                              adjustsFontSizeToFit
+                              minimumFontScale={0.7}
+                            >
+                              {cell.completionStatus === 'complete'
+                                ? 'Done'
+                                : cell.completionStatus === 'halted'
+                                  ? 'Stopped'
+                                  : isMissed
+                                    ? 'Missed'
+                                    : isToday
+                                      ? 'Today'
+                                      : focusLabel(cell.focus)}
+                            </Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </View>
+
+                  {detail !== null && detail.summary.weekIndex === row.week && (
+                    <View style={styles.sessionDetail}>
+                      <Text style={styles.sessionDetailTitle}>
+                        {detail.summary.sessionDate} - {focusName(detail.summary.focus)}
+                        {detail.summary.completionStatus === 'complete'
+                          ? ' - completed'
+                          : detail.summary.completionStatus === 'halted'
+                            ? ' - stopped'
+                            : isMissedSession(detail.summary, today)
+                              ? ' - not done'
+                              : ''}
+                      </Text>
+                      {detail.slots.map((slot) => {
+                        const plannedLoad = slotLoadKg(slot, oneRepMaxes);
+                        return (
+                          <View key={slot.slotIndex} style={styles.slotRow}>
+                            <View style={styles.slotMain}>
+                              <Text style={styles.slotName}>{slot.movementName}</Text>
+                              <View style={styles.slotDetails}>
+                                <Text style={styles.slotValue}>{targetLabel(slot)}</Text>
+                                <Text style={styles.slotTarget}>RPE {slot.targetRpe.toFixed(1)}</Text>
+                                {plannedLoad !== null && (
+                                  <Text style={styles.slotTarget}>about {plannedLoad.toFixed(1)} kg</Text>
+                                )}
+                              </View>
+                              <AutopilotAttribution
+                                slot={slot}
+                                expanded={attributionSlotId === slot.plannedSlotId}
+                                onPress={() => setAttributionSlotId((currentId) => currentId === slot.plannedSlotId ? null : slot.plannedSlotId)}
+                              />
+                            </View>
+                            {slot.overrideReason != null && slot.overrideReason.trim() !== '' && (
+                              <View style={styles.overrideBadge} accessibilityRole="text">
+                                <Text style={styles.overrideBadgeText}>{slot.overrideReason}</Text>
+                              </View>
+                            )}
+                          </View>
+                        );
+                      })}
+                      <SecondaryButton label="Close session preview" onPress={() => setDetail(null)} accessibilityLabel="Close session preview" />
+                    </View>
+                  )}
+                </View>
+              );
+            });
+          })()}
+          <Text style={styles.trajectoryHint}>Tap a planned day to see its movements.</Text>
+        </>
+      )}
+    </View>
+  );
+
   if (vector === null) {
     return (
       // The no-vector gate is an early return INSIDE the real screen, so the
@@ -596,11 +800,42 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           </View>
         )}
         {nextProgramPreview !== null && renderNextProgramPreview(nextProgramPreview)}
+        {block == null && hasArchivedBlock && (
+          <View style={styles.card}>
+            <Text style={styles.eyebrow}>PERIODIZATION</Text>
+            <Text style={styles.cardTitle}>Your previous block had ended.</Text>
+            <Text style={styles.bodyText}>
+              A short four-week block gives Coach a clear trajectory to follow.
+            </Text>
+            <PrimaryButton
+              label="Start a new block"
+              onPress={() => setShowChooser(true)}
+              accessibilityLabel="Start a new block"
+            />
+          </View>
+        )}
+        {block == null && !hasArchivedBlock && (
+          <View style={styles.card}>
+            <Text style={styles.eyebrow}>PERIODIZATION</Text>
+            <Text style={styles.cardTitle}>Build your first block</Text>
+            <Text style={styles.bodyText}>
+              A short four-week block gives Coach a clear trajectory to follow.
+            </Text>
+            <PrimaryButton
+              label="Start a new block"
+              onPress={() => setShowChooser(true)}
+              accessibilityLabel="Start a new block"
+            />
+          </View>
+        )}
+        {block != null && renderTrajectorySection()}
         <View style={styles.card}>
           <Text style={styles.eyebrow}>COACH</Text>
           <Text style={styles.cardTitle}>Readiness is needed first</Text>
           <Text style={styles.bodyText}>
-            Sync telemetry or load the demo athlete before asking Coach to adjust today's plan.
+            {IS_BETA_BUILD
+              ? "Sync telemetry before asking Coach to adjust today's plan."
+              : "Sync telemetry or load the demo athlete before asking Coach to adjust today's plan."}
           </Text>
           {profile.training_age === 'beginner' ? (
             <Text style={styles.captionText}>Standalone routines unlock after the Beginner stage. Generated training remains available.</Text>
@@ -619,18 +854,6 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
       </ScrollView>
     );
   }
-
-  const current = prescription !== null && prescription.forDate === today ? prescription : null;
-  const rows = weekRowsFor(blockSessions);
-  const nextPlanned = blockSessions.find((planned) => planned.sessionDate > today);
-
-  const openDetail = (summary: BlockSessionSummary): void => {
-    if (detail?.summary.plannedSessionId === summary.plannedSessionId) {
-      setDetail(null);
-      return;
-    }
-    setDetail({ summary, slots: loadSessionSlots(summary.plannedSessionId) });
-  };
 
   const openManageBlock = (): void => {
     setManageOpen(true);
@@ -933,10 +1156,14 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                 onPress={program == null ? openManageBlock : () => setEditingProgram(true)}
                 accessibilityLabel={program == null ? 'Manage current block' : 'Manage future program preferences'}
               />
+              {/* #172: with an active program this changes future blocks only;
+                  the current block stays. Without an active program (none, or
+                  one whose review is due) it plans a new block: the program
+                  editor only saves for an active program. */}
               <SecondaryButton
-                label="Plan a new block"
-                onPress={() => setShowChooser(true)}
-                accessibilityLabel="Plan a new block"
+                label={program?.status !== 'active' ? 'Plan a new block' : 'Change future blocks'}
+                onPress={program?.status !== 'active' ? () => setShowChooser(true) : () => setEditingProgram(true)}
+                accessibilityLabel={program?.status !== 'active' ? 'Plan a new block' : 'Change future blocks'}
               />
             </>
           )}
@@ -955,200 +1182,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
       {nextProgramPreview !== null && renderNextProgramPreview(nextProgramPreview)}
 
       {/* Four-week trajectory Section */}
-      <View
-        style={styles.section}
-        onLayout={(event) => { trajectorySectionY.current = event.nativeEvent.layout.y; }}
-      >
-        <View style={styles.trajectoryHeaderRow}>
-          <Text style={styles.sectionTitle}>Four-week trajectory</Text>
-          {block !== null && blockEndDate !== null && (
-            <View style={styles.fixedBadge} accessibilityRole="text" accessibilityLabel={`Fixed until ${blockEndDate}`}>
-              <Text style={styles.fixedBadgeText}>FIXED UNTIL {blockEndDate}</Text>
-            </View>
-          )}
-        </View>
-        {blockMeta !== null && blockMeta.macroBlockIndex >= 6 && (
-          <View style={styles.blockAttribution}>
-            <Pressable
-              onPress={() => setMacroBudgetOpen((open) => !open)}
-              style={styles.attributionTouchTarget}
-              accessibilityRole="button"
-              accessibilityLabel="Why effort is held steady"
-              accessibilityState={{ expanded: macroBudgetOpen }}
-            >
-              <Text style={styles.attributionMarker}>·</Text>
-            </Pressable>
-            {macroBudgetOpen && <Text style={styles.attributionText}>{AUTOPILOT_BUDGET_NOTE}</Text>}
-          </View>
-        )}
-        {block === null ? (
-          <View style={styles.emptyTrajectory}>
-            <Text style={styles.bodyText}>No block is active yet.</Text>
-            <Text style={styles.captionText}>Set one up below when you are ready to train with a trajectory.</Text>
-          </View>
-        ) : (
-          <>
-            {(() => {
-              const seenPhaseTerms = new Set<string>();
-              return rows.map((row) => {
-                const phaseTerm = GLOSSARY_PHASE_TERM[row.phase.toLowerCase()];
-                const showPhaseTip = phaseTerm !== undefined && !seenPhaseTerms.has(phaseTerm);
-                if (phaseTerm) seenPhaseTerms.add(phaseTerm);
-
-                return (
-                  <View key={row.week} style={styles.weekContainer}>
-                    <View testID={`trajectory-week-${row.week}`} style={styles.weekRow}>
-                      <View style={styles.weekMeta}>
-                        <Text style={styles.weekTitle}>Week {row.week}</Text>
-                        <View style={styles.weekPhaseRow}>
-                          <Text style={styles.weekPhase}>{phaseLabel(row.phase)}</Text>
-                          {showPhaseTip && <InfoTip term={phaseTerm} />}
-                        </View>
-                      </View>
-                      <View testID={`trajectory-days-week-${row.week}`} style={styles.dayRail}>
-                    {row.cells.map((cell, dayIndex) => {
-                      // Every trajectory position owns a calendar date derived
-                      // from the block start, week and day index (same formula
-                      // as the generator's session_date), so rest cells can be
-                      // today-aware too.
-                      const cellDate = addDaysIso(block.startDate, (row.week - 1) * 7 + dayIndex);
-                      const isToday = cellDate === today;
-                      if (cell === null) {
-                        if (!isToday) {
-                          return (
-                            <View key={`rest-${dayIndex}`} style={[styles.dayMark, styles.dayMarkRest]}>
-                              <Text style={styles.dayMarkRestText}>-</Text>
-                            </View>
-                          );
-                        }
-                        // Today on a recovery/rest day: exactly one today-marker,
-                        // chalk left spine, accessible label, 'Today' not '-'.
-                        return (
-                          <View
-                            key={`rest-${dayIndex}`}
-                            testID="today-marker"
-                            accessibilityRole="text"
-                            accessibilityLabel="Today — recovery day"
-                            style={[styles.dayMark, styles.dayMarkRest, styles.dayMarkToday]}
-                          >
-                            <Text
-                              style={[styles.dayMarkRestText, styles.dayMarkTextToday]}
-                              numberOfLines={1}
-                              adjustsFontSizeToFit
-                              minimumFontScale={0.7}
-                            >
-                              Today
-                            </Text>
-                          </View>
-                        );
-                      }
-                      const isExpanded = detail?.summary.plannedSessionId === cell.plannedSessionId;
-                      const isMissed = isMissedSession(cell, today);
-                      return (
-                        <Pressable
-                          key={cell.plannedSessionId}
-                          onPress={() => openDetail(cell)}
-                          accessibilityRole="button"
-                          accessibilityLabel={`Week ${cell.weekIndex}, ${cell.focus} session on ${cell.sessionDate}${
-                            cell.completionStatus === 'complete'
-                              ? ', completed'
-                              : cell.completionStatus === 'halted'
-                                ? ', stopped'
-                                : isMissed
-                                  ? ', not done'
-                                  : ''
-                          }`}
-                          accessibilityState={{ expanded: isExpanded, selected: isToday }}
-                          testID={isToday ? 'today-marker' : undefined}
-                          style={({ pressed }) => [
-                            styles.dayMark,
-                            cell.completionStatus !== null && styles.dayMarkFinalized,
-                            isMissed && styles.dayMarkMissed,
-                            isToday && styles.dayMarkToday,
-                            isExpanded && styles.dayMarkExpanded,
-                            pressed && styles.dayMarkPressed,
-                          ]}
-                        >
-                          <Text
-                            style={[
-                              styles.dayMarkText,
-                              cell.completionStatus !== null && styles.dayMarkTextFinalized,
-                              isMissed && styles.dayMarkTextMissed,
-                              isToday && styles.dayMarkTextToday,
-                            ]}
-                            numberOfLines={1}
-                            adjustsFontSizeToFit
-                            minimumFontScale={0.7}
-                          >
-                            {cell.completionStatus === 'complete'
-                              ? 'Done'
-                              : cell.completionStatus === 'halted'
-                                ? 'Stopped'
-                                : isMissed
-                                  ? 'Missed'
-                                  : isToday
-                                    ? 'Today'
-                                    : focusLabel(cell.focus)}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                </View>
-
-                {detail !== null && detail.summary.weekIndex === row.week && (
-                  <View style={styles.sessionDetail}>
-                    <Text style={styles.sessionDetailTitle}>
-                      {detail.summary.sessionDate} - {focusName(detail.summary.focus)}
-                      {detail.summary.completionStatus === 'complete'
-                        ? ' - completed'
-                        : detail.summary.completionStatus === 'halted'
-                          ? ' - stopped'
-                          : isMissedSession(detail.summary, today)
-                            ? ' - not done'
-                            : ''}
-                    </Text>
-                    {detail.slots.map((slot) => {
-                      // #214: the planned load, from the same calculation as
-                      // today's preview but without today's readiness
-                      // modifier, since that day's readiness is not known.
-                      const plannedLoad = slotLoadKg(slot, oneRepMaxes);
-                      return (
-                        <View key={slot.slotIndex} style={styles.slotRow}>
-                          <View style={styles.slotMain}>
-                            <Text style={styles.slotName}>{slot.movementName}</Text>
-                            <View style={styles.slotDetails}>
-                              <Text style={styles.slotValue}>{targetLabel(slot)}</Text>
-                              <Text style={styles.slotTarget}>RPE {slot.targetRpe.toFixed(1)}</Text>
-                              {plannedLoad !== null && (
-                                <Text style={styles.slotTarget}>about {plannedLoad.toFixed(1)} kg</Text>
-                              )}
-                            </View>
-                            <AutopilotAttribution
-                              slot={slot}
-                              expanded={attributionSlotId === slot.plannedSlotId}
-                              onPress={() => setAttributionSlotId((currentId) => currentId === slot.plannedSlotId ? null : slot.plannedSlotId)}
-                            />
-                          </View>
-                          {slot.overrideReason != null && slot.overrideReason.trim() !== '' && (
-                            <View style={styles.overrideBadge} accessibilityRole="text">
-                              <Text style={styles.overrideBadgeText}>{slot.overrideReason}</Text>
-                            </View>
-                          )}
-                        </View>
-                      );
-                    })}
-                    <SecondaryButton label="Close session preview" onPress={() => setDetail(null)} accessibilityLabel="Close session preview" />
-                  </View>
-                )}
-              </View>
-            );
-          });
-        })()}
-            <Text style={styles.trajectoryHint}>Tap a planned day to see its movements.</Text>
-          </>
-        )}
-      </View>
+      {renderTrajectorySection()}
 
       {/* Changed in this block: the autopilot changes stored when the active
           block was built. Hidden when there is nothing to show, because an
@@ -1367,7 +1401,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
         >
         <Disclosure
           label="Manage block"
-          hint={block === null ? 'Choose a structure for your first block' : 'Block settings and regeneration'}
+          hint={block === null ? 'Start your first block' : 'Block settings and regeneration'}
           open={manageOpen}
           onOpenChange={setManageOpen}
         >
@@ -1389,6 +1423,10 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                 Coach inserted a deload week before the peak because fatigue was high.
               </Text>
             )}
+            {/* #171: with no block, "Start a new block" opens the chooser and
+                never reads a loading structure, so the chips are not shown. */}
+            {block !== null && (
+            <>
             <Text style={styles.schemaLabel}>Choose a loading structure</Text>
             <View style={styles.schemaRow}>
               {SELECTABLE_SCHEMA_TYPES.map((type) => {
@@ -1409,6 +1447,8 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                 );
               })}
             </View>
+            </>
+            )}
 
             {!confirmRegenerate ? (
               <PrimaryButton
@@ -1567,13 +1607,22 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
               disabled={reportText.trim().length === 0 || reportSeverity === null || triaging}
               onPress={() => {
                 if (reportSeverity === null) return;
-                void reportSubjective(reportText, reportSeverity).then(() => {
+                setReportNotSent(false);
+                // The text and severity clear only once the store has stored the report.
+                // Anything else keeps them on screen and says so, so nothing typed is lost.
+                void reportSubjective(reportText, reportSeverity).then((stored) => {
+                  if (!stored) { setReportNotSent(true); return; }
                   setReportText('');
                   setReportSeverity(null);
-                });
+                }, () => { setReportNotSent(true); });
               }}
               accessibilityLabel={triaging ? 'Checking report' : 'Apply report'}
             />
+            {reportNotSent && (
+              <Text style={styles.captionText} accessibilityRole="alert" testID="plan-report-not-sent">
+                {REPORT_NOT_SENT_TEXT}
+              </Text>
+            )}
 
             {lastTriage !== null && lastTriage.kind === 'positive' && (
               <View style={styles.reportResult}>
@@ -1589,7 +1638,9 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                   <Text style={styles.statusBadgeText}>No change</Text>
                 </View>
                 <Text style={styles.captionText}>
-                  Coach did not match this to a known scenario, so today's plan is unchanged.
+                  {triageReady
+                    ? "Coach did not match this to a known scenario, so today's plan is unchanged."
+                    : "Matching is unavailable, so this report was not matched to a known scenario and today's plan is unchanged. Injury-language safety checks still apply."}
                 </Text>
               </View>
             )}

@@ -35,6 +35,7 @@ import {
   type GoalField,
   type GoalMetricId,
   type MuscleGroupId,
+  targetIsLowerThanStart,
   type SmartGoalDraft,
   type TrainingAge,
 } from '@ak/inference';
@@ -162,6 +163,8 @@ export interface GoalFields {
   readonly baselineKnown: boolean;
   readonly baselineText: string;
   readonly targetText: string;
+  /** The athlete chose to keep a target below where they are now. */
+  readonly confirmLowerTarget: boolean;
   readonly reason: string;
   readonly deadlineSet: boolean;
   readonly deadlineText: string;
@@ -169,7 +172,7 @@ export interface GoalFields {
 
 export const EMPTY_GOAL_FIELDS: GoalFields = {
   specificOutcome: '', metricId: 'load_kg', unit: '', measurementMethod: '',
-  baselineKnown: true, baselineText: '', targetText: '', reason: '',
+  baselineKnown: true, baselineText: '', targetText: '', confirmLowerTarget: false, reason: '',
   deadlineSet: false, deadlineText: '',
 };
 
@@ -187,6 +190,7 @@ export const goalDraftFromFields = (fields: GoalFields): SmartGoalDraft => ({
   baselineKnown: fields.baselineKnown,
   baselineValue: fields.baselineKnown ? parseNumber(fields.baselineText) : null,
   targetValue: parseNumber(fields.targetText),
+  confirmLowerTarget: fields.confirmLowerTarget,
   reason: fields.reason,
   requestedDeadline: fields.deadlineSet ? fields.deadlineText.trim() : null,
 });
@@ -203,6 +207,7 @@ export const goalFieldsFromGoal = (goal: {
   baselineKnown: goal.baselineKnown,
   baselineText: goal.baselineValue === null ? '' : String(goal.baselineValue),
   targetText: String(goal.targetValue),
+  confirmLowerTarget: false,
   reason: goal.reason,
   deadlineSet: goal.requestedDeadline !== null,
   deadlineText: goal.requestedDeadline ?? '',
@@ -479,7 +484,7 @@ export function GoalEditor({ fields, onChange, today, trainingAge, showAllErrors
         disableFullscreenUI
         style={styles.input}
         value={fields.targetText}
-        onChangeText={(targetText) => patch({ targetText })}
+        onChangeText={(targetText) => patch({ targetText, confirmLowerTarget: false })}
         keyboardType="decimal-pad"
         maxLength={10}
         placeholder={`The number you are aiming for, in ${unit}`}
@@ -488,6 +493,17 @@ export function GoalEditor({ fields, onChange, today, trainingAge, showAllErrors
         testID="goal-target"
       />
       {fieldError('targetValue', fields.targetText.length > 0)}
+      {targetIsLowerThanStart(goalDraftFromFields(fields)) && (
+        <Chip
+          testID="goal-confirm-lower-target"
+          wrap
+          label="KEEP A TARGET BELOW WHERE I AM NOW"
+          selected={fields.confirmLowerTarget}
+          onPress={() => patch({ confirmLowerTarget: !fields.confirmLowerTarget })}
+          accessibilityLabel="Keep a target below where you are now. Tap to confirm."
+          style={styles.wrapChip}
+        />
+      )}
 
       <Text style={styles.label}>WHY DOES THIS MATTER TO YOU? (REQUIRED)</Text>
       <TextInput

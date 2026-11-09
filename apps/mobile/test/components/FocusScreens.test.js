@@ -223,6 +223,18 @@ test('COACH keeps the trajectory compact and expands a session only when its day
   expect(screen.getByText('Choose a loading structure')).toBeOnTheScreen();
 });
 
+// #171: with no block there is nothing for a loading structure to apply to,
+// and "Start a new block" never reads the chips, so they are not shown.
+test('Manage block shows no loading-structure chips when there is no block (#171)', () => {
+  mockState = baseState({ block: null, blockMeta: null, blockSessions: [], program: null });
+  render(<BlockScreen />);
+  // Manage block starts open when there is no block.
+  expect(screen.getByText('Coach will build from your objective, equipment, and weekly frequency.')).toBeOnTheScreen();
+  expect(screen.queryByText('Choose a loading structure')).toBeNull();
+  expect(screen.queryByText('Choose a structure for your first block')).toBeNull();
+  expect(screen.queryByLabelText('Linear loading structure')).toBeNull();
+});
+
 describe('Plan session starts navigate only after the store creates a session', () => {
   test('a refused planned start stays on Plan, exposes the store error, and never navigates', () => {
     const onSessionStarted = jest.fn();
@@ -699,7 +711,7 @@ test('READY hides return check-in card when dismissed or absent', () => {
 });
 
 describe('BlockScreen - Chooser Entry (Work Order E)', () => {
-  test('renders Plan a new block action when a block IS active and opens chooser', () => {
+  test('with an active program the button reads "Change future blocks" and says the current block stays (#172)', () => {
     mockState = baseState({
       block: { blockId: 1, startDate: '2026-07-01', objective: 'strength', createdAtMs: 1 },
       program: {
@@ -708,7 +720,25 @@ describe('BlockScreen - Chooser Entry (Work Order E)', () => {
         currentSequenceIndex: 1,
         plannedBlockCount: 2,
         plannedEndDate: '2026-08-26',
+        days: [{ dayIndex: 1, focus: 'lower' }, { dayIndex: 2, focus: 'upper' }],
+        movementPreferences: [],
       },
+    });
+
+    render(<BlockScreen />);
+
+    expect(screen.queryByText('Plan a new block')).toBeNull();
+    fireEvent.press(screen.getByText('Change future blocks'));
+    // It opens the program's future preferences directly, never a "Start a new block" chooser.
+    expect(screen.queryByText('Auto')).toBeNull();
+    expect(screen.getByText('MANAGE PROGRAM')).toBeOnTheScreen();
+    expect(screen.getByText('Your current block stays as it is. These choices apply to future blocks, except a change of training days also updates the weekly-day limit used for current targets.')).toBeOnTheScreen();
+  });
+
+  test('renders Plan a new block action when a standalone block IS active and opens chooser', () => {
+    mockState = baseState({
+      block: { blockId: 1, startDate: '2026-07-01', objective: 'strength', createdAtMs: 1 },
+      program: null,
     });
 
     render(<BlockScreen />);
@@ -725,6 +755,31 @@ describe('BlockScreen - Chooser Entry (Work Order E)', () => {
     expect(screen.getByText('Custom')).toBeOnTheScreen();
     expect(screen.queryByText('Guided')).toBeNull();
     expect(screen.queryByText('Coming soon')).toBeNull();
+  });
+
+  test('with a program whose review is due and a standalone block, the button keeps "Plan a new block" and opens the chooser (#172)', () => {
+    // The program editor only saves for an active program, so a finished
+    // program must not route this button to it.
+    mockState = baseState({
+      block: { blockId: 1, startDate: '2026-07-01', objective: 'strength', createdAtMs: 1 },
+      program: {
+        programId: 1,
+        status: 'review_due',
+        currentSequenceIndex: 2,
+        plannedBlockCount: 2,
+        plannedEndDate: '2026-08-26',
+        days: [{ dayIndex: 1, focus: 'lower' }, { dayIndex: 2, focus: 'upper' }],
+        movementPreferences: [],
+      },
+    });
+
+    render(<BlockScreen />);
+
+    expect(screen.queryByText('Change future blocks')).toBeNull();
+    fireEvent.press(screen.getByText('Plan a new block'));
+    expect(screen.getByText('Start a new block')).toBeOnTheScreen();
+    expect(screen.getByText('Custom')).toBeOnTheScreen();
+    expect(screen.queryByText('MANAGE PROGRAM')).toBeNull();
   });
 
   test('inter-block state with block === null and program !== null still opens chooser and routes to handlers', () => {
@@ -812,4 +867,50 @@ test('OW-007 the resume error is action-scoped: an unrelated store error does no
 
   // The global error channel must never read as a refusal of this control.
   expect(screen.queryByTestId('suspension-error')).toBeNull();
+});
+
+describe('#170: the neutral default of 50 is named as a default', () => {
+  const noInputs = {
+    ...vector,
+    readiness_score: 50,
+    hrv_component: 50,
+    sleep_component: 50,
+    ln_rmssd: null,
+    hrv_z: null,
+    sleep_efficiency_pct: null,
+  };
+
+  test('with no inputs, READY says it uses a neutral default and drops "Your signals support"', () => {
+    mockState = baseState({ vector: noInputs });
+    render(<ReadinessScreen />);
+    fireEvent.press(screen.getByLabelText('Why this recommendation'));
+    expect(screen.getByText('No scored signals yet. Using a neutral default of 50.')).toBeOnTheScreen();
+    expect(screen.queryByText(/Your signals support/)).toBeNull();
+    expect(screen.queryByText(/Your recovery signals support/)).toBeNull();
+  });
+
+  test('a first HRV reading with no baseline yet (hrv_z null) still reads as no scored signals', () => {
+    mockState = baseState({ vector: { ...noInputs, ln_rmssd: 4.1 } });
+    render(<ReadinessScreen />);
+    fireEvent.press(screen.getByLabelText('Why this recommendation'));
+    expect(screen.getByText('No scored signals yet. Using a neutral default of 50.')).toBeOnTheScreen();
+    expect(screen.queryByText(/^No signals yet/)).toBeNull();
+  });
+
+  test('with inputs, READY keeps the signal-based explanation', () => {
+    render(<ReadinessScreen />);
+    fireEvent.press(screen.getByLabelText('Why this recommendation'));
+    expect(screen.getByText('Your recovery signals support the planned work.')).toBeOnTheScreen();
+    expect(screen.queryByText('No scored signals yet. Using a neutral default of 50.')).toBeNull();
+  });
+
+  test('the HRV deviation shows its unit', () => {
+    mockState = baseState({
+      uiPreferences: { sessionModeOverride: null, readinessDetail: 'full', restTimerEnabled: true, textScale: 'system' },
+    });
+    render(<ReadinessScreen />);
+    fireEvent.press(screen.getByLabelText('Why this recommendation'));
+    fireEvent.press(screen.getByLabelText('Full readiness metrics'));
+    expect(screen.getByText('+0.4 SD from your baseline')).toBeOnTheScreen();
+  });
 });

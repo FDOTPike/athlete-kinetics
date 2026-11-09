@@ -279,6 +279,23 @@ describe('which slots were skipped', () => {
     expect(raw().prepare('SELECT skipped_slot_count FROM session_outcome WHERE session_id = ?').get(sessionId).skipped_slot_count).toBe(ids.length);
   });
 
+  test('#193: the skip confirmation is cancelable, so Android back closes it and skips nothing', () => {
+    startTwoSlotSession();
+    const [first] = state().sessionPlan;
+    const confirm = jest.spyOn(Alert, 'alert');
+    render(<SessionScreen />);
+    act(() => logOn(first, 0));
+    fireEvent.press(screen.getByRole('button', { name: 'Ready now, skip the rest timer' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Skip this exercise' }));
+
+    // Without cancelable, React Native's Android Alert ignores Back (the dialog stays open).
+    expect(confirm.mock.calls.at(-1)[0]).toBe('Skip this exercise');
+    expect(confirm.mock.calls.at(-1)[3]).toEqual({ cancelable: true });
+    // Back dismisses the native dialog without running any of its buttons.
+    expect(state().runner.skippedSessionPlanSlotIds).toEqual([]);
+    confirm.mockRestore();
+  });
+
   test('finishing a session stores the id of every skipped slot, and their number is the outcome\'s own count', () => {
     const sessionId = startTwoSlotSession();
     const [first] = state().sessionPlan;
