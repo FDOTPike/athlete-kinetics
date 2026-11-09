@@ -355,7 +355,7 @@ describe('the plan explains itself', () => {
     expect(applied[0]).toBe('Focus — Beach muscles: upper chest, biceps, triceps.');
     expect(applied.join(' ')).toMatch(/is planned instead of .+: it trains upper chest directly \(your focus\)\./);
     expect(applied.join(' ')).toMatch(/Basketball — jump higher: Extra leg-strength work/);
-    expect(applied.join(' ')).toMatch(/Sport workload: 3 practice sessions and 0 matches a week, as you told the app\. To leave room for it, each accessory exercise has one fewer set\./);
+    expect(applied.join(' ')).toMatch(/Sport workload: 3 practice sessions and 0 matches a week, as you told the app\. To leave room for it, most accessory exercises have one fewer set \(down to at least one set; goal-linked, locomotion, non-strength-day, and deload sets are kept\)\./);
     expect(omitted.join(' ')).toMatch(/no jump or plyometric drills yet/);
     expect(screen.getByText('Safety, your equipment, your experience level and your session length always come first.')).toBeTruthy();
     // Nothing has been created by looking.
@@ -388,7 +388,7 @@ describe('the profile sport panel', () => {
     // #146: with no sessions yet, the copy must not promise that Activities
     // change the next block; one weekly session does not change the gym plan.
     expect(screen.getByTestId('profile-sport-workload').props.children).not.toMatch(/will take them into account/);
-    expect(screen.getByTestId('profile-sport-workload').props.children).toMatch(/A light week does not change the gym plan\./);
+    expect(screen.getByTestId('profile-sport-workload').props.children).toMatch(/A light week will not change your next block\./);
     press('profile-sport-edit');
     expect(screen.getByText('Do you play or compete in a sport?')).toBeTruthy();
     // Saving an unfinished answer explains what is missing instead of saving.
@@ -406,11 +406,22 @@ describe('the profile sport panel', () => {
       .toBe('Sport saved. Your current plan is unchanged; this is used when your next block is created.');
     expect(screen.getByTestId('profile-sport-summary').props.children)
       .toBe('Ice hockey — keep training and playing without long breaks. Played: more than 5 years.');
+    // #176: said of the next block, in the future tense; nothing has changed yet.
     expect(screen.getByTestId('profile-sport-workload').props.children)
-      .toMatch(/^Sport workload: 4 practice sessions and 1 match a week, as you told the app\. That is a very full week/);
+      .toMatch(/^Sport workload: 4 practice sessions and 1 match a week, as you told the app\. That is a very full week, so your next block will have up to two fewer sets on most accessory exercises \(down to at least one set; goal-linked, locomotion, non-strength-day, and deload sets are kept\), and its week 3 will repeat week 2/);
+    expect(screen.getByTestId('profile-sport-workload').props.children).not.toMatch(/ has two fewer sets| exercises have up to two fewer sets/);
     expect(plan()).toBe(before);
 
+    // #176: removing asks first and says what will change.
     press('profile-sport-remove');
+    expect(state().sport).not.toBeNull();
+    expect(screen.getByTestId('profile-sport-remove-text').props.children)
+      .toBe('Remove Ice hockey? Your next block will be planned without your sport, and the weekly sport numbers you gave will no longer be counted. Your current plan is unchanged.');
+    press('profile-sport-remove-keep');
+    expect(screen.queryByTestId('profile-sport-remove-text')).toBeNull();
+    expect(state().sport).not.toBeNull();
+    press('profile-sport-remove');
+    press('profile-sport-remove-confirm');
     expect(screen.getByTestId('sport-panel-message').props.children)
       .toBe('Sport removed. Your current plan is unchanged; this is used when your next block is created.');
     expect(state().sport).toBeNull();

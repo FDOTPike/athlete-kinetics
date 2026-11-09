@@ -140,6 +140,39 @@ function ChipRow<T extends string>({ label, options, optionLabels, value, onSele
   );
 }
 
+/**
+ * #176: what an objective change will do, said before it is saved. A running
+ * program keeps the objective it was built with (its next blocks too); without
+ * one, the next block is built for the new objective. The current block never
+ * changes. `programObjective` is the running program's own objective (null with
+ * no program): after an earlier change it can differ from `from`.
+ * `programFinished` is a program in review_due: it has finished, so there is no
+ * current block or rest of the program to keep the old objective (owner ruling).
+ */
+export const objectiveChangeText = (
+  from: string,
+  to: string,
+  programObjective: string | null,
+  hasBlock: boolean,
+  hasArchivedBlock = false,
+  programFinished = false,
+): string => {
+  const fromLabel = from.replace(/_/g, ' ');
+  const toLabel = to.replace(/_/g, ' ');
+  const question = `Change your objective from ${fromLabel} to ${toLabel}?`;
+  if (programFinished) {
+    return `${question} Your program has finished. Your next program will be built for ${toLabel}.`;
+  }
+  if (programObjective !== null) {
+    const programLabel = programObjective.replace(/_/g, ' ');
+    return `${question} Your current block and the rest of your program stay ${programLabel}. ${toLabel.charAt(0).toUpperCase()}${toLabel.slice(1)} is used when you build your next program.`;
+  }
+  if (hasBlock) return `${question} Your current block stays as it is. Your next block will be built for ${toLabel}.`;
+  // Earlier blocks ended: the next block is not the first.
+  if (hasArchivedBlock) return `${question} Your next block will be built for ${toLabel}.`;
+  return `${question} Your first block will be built for ${toLabel}.`;
+};
+
 interface NumberRowProps {
   label: string;
   display: string;
@@ -358,6 +391,12 @@ export default function ProfileScreen(): React.JSX.Element {
   const switchProfile = useStore((s) => (s.status === 'ready' ? s.switchProfile : inertWhileClosed));
   const wipeActiveBlockState = useStore((s) => (s.status === 'ready' ? s.wipeActiveBlockState : inertWhileClosed));
   const session = useStore((s) => s.session);
+  const activeProgram = useStore((s) => s.program) ?? null;
+  const activeBlock = useStore((s) => s.block) ?? null;
+  const hasArchivedBlock = useStore((s) => s.hasArchivedBlock) === true;
+  // The objective chosen but not yet confirmed, tied to the athlete and profile
+  // slot it was chosen for, so a switch never confirms it for someone else.
+  const [pendingObjectiveChoice, setPendingObjectiveChoice] = useState<{ objective: UserProfile['objective']; scope: string } | null>(null);
   const resetTrainingData = useStore((s) => s.resetTrainingData);
   const backupWorking = useBackupStore((s) => s.status === 'working');
   const athletes = useStore((s) => s.athletes);
@@ -483,6 +522,14 @@ export default function ProfileScreen(): React.JSX.Element {
     profile.mobility_limits.map((f) => `${f.region}: ${f.note}`).join('\n'),
   );
   const activeSlotId = profileSlots.find((p) => p.isActive)?.slotId ?? null;
+  const objectiveScope = `${activeAthleteId ?? ''}|${activeSlotId ?? ''}`;
+  const pendingObjective = pendingObjectiveChoice !== null && pendingObjectiveChoice.scope === objectiveScope
+    ? pendingObjectiveChoice.objective
+    : null;
+  const setPendingObjective = (objective: UserProfile['objective'] | null): void => {
+    setPendingObjectiveChoice(objective === null ? null : { objective, scope: objectiveScope });
+  };
+  useEffect(() => { setPendingObjectiveChoice(null); }, [objectiveScope]);
   useEffect(() => {
     setInjuryText(profile.injury_flags.map((f) => `${f.region}: ${f.note}`).join('\n'));
     setMobilityText(profile.mobility_limits.map((f) => `${f.region}: ${f.note}`).join('\n'));
@@ -576,8 +623,28 @@ export default function ProfileScreen(): React.JSX.Element {
         options={OBJECTIVES}
         optionLabels={OBJECTIVE_LABEL}
         value={profile.objective}
-        onSelect={(objective) => saveProfile({ objective })}
+        onSelect={(objective) => setPendingObjective(objective === profile.objective ? null : objective)}
       />
+      {/* #176: an objective change asks first and says what will change. */}
+      {pendingObjective !== null && (
+        <View style={styles.objectiveConfirm} testID="profile-objective-confirmation">
+          <Text style={styles.confirmText} testID="profile-objective-change-text">
+            {objectiveChangeText(profile.objective, pendingObjective, activeProgram?.objective ?? null, activeBlock !== null, hasArchivedBlock, activeProgram?.status === 'review_due')}
+          </Text>
+          <PrimaryButton
+            label="Change objective"
+            onPress={() => { saveProfile({ objective: pendingObjective }); setPendingObjective(null); }}
+            accessibilityLabel={`Change objective to ${pendingObjective.replace(/_/g, ' ')}`}
+            testID="profile-objective-confirm"
+          />
+          <SecondaryButton
+            label={`Keep ${profile.objective.replace(/_/g, ' ')}`}
+            onPress={() => setPendingObjective(null)}
+            accessibilityLabel={`Keep ${profile.objective.replace(/_/g, ' ')}`}
+            testID="profile-objective-keep"
+          />
+        </View>
+      )}
       {/* Work order 2: the focus question and SMART goals, reviewable and
           editable here without rewriting any existing plan. */}
       <FocusGoalsPanel />
@@ -1619,6 +1686,7 @@ const styles = StyleSheet.create({
   fieldLabel: { ...theme.font.eyebrow, color: theme.color.textLow, flexShrink: 1 },
   fieldLabelRow: { flexDirection: 'row', alignItems: 'center', marginBottom: theme.space[2] },
   fieldHint: { ...theme.font.label, color: theme.color.textMid, marginBottom: theme.space[2] },
+  objectiveConfirm: { gap: theme.space[3], marginBottom: theme.space[4] },
   inventoryWrap: { marginTop: theme.space[2] },
   preferenceLabel: { marginTop: theme.space[4], marginBottom: theme.space[2] },
   bandRow: { flexDirection: 'row', alignItems: 'center', gap: theme.space[2], marginBottom: theme.space[2] },

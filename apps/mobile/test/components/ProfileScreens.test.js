@@ -2,7 +2,7 @@ import React from 'react';
 import { Alert, BackHandler, StyleSheet } from 'react-native';
 import { act, fireEvent, render, renderAsync, screen, within } from '@testing-library/react-native';
 import { HISTORY_IMPORT_EXAMPLE, TRAINING_AGES } from '@ak/inference';
-import ProfileScreen from '../../src/screens/ProfileScreen';
+import ProfileScreen, { objectiveChangeText } from '../../src/screens/ProfileScreen';
 import OnboardingScreen from '../../src/screens/OnboardingScreen';
 import { NavigationProvider } from '../../src/navigation/navigation';
 import { PrimaryButton } from '../../src/components/ui';
@@ -946,6 +946,120 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       }).props.accessibilityState.selected,
     ).length;
     expect(selectedCount).toBe(1);
+  });
+
+  // #176: changing the objective asks first and says what will change.
+  test('OBJECTIVE asks first, says what will change, and saves only on confirm', () => {
+    mockState = { ...mockState, block: { blockId: 1, startDate: '2026-07-01', objective: 'hybrid', createdAtMs: 1 }, program: null };
+    render(<ProfileScreen />);
+    fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: GET STRONGER'));
+    expect(mockState.saveProfile).not.toHaveBeenCalled();
+    expect(screen.getByTestId('profile-objective-change-text').props.children)
+      .toBe('Change your objective from hybrid to strength? Your current block stays as it is. Your next block will be built for strength.');
+    fireEvent.press(screen.getByTestId('profile-objective-keep'));
+    expect(screen.queryByTestId('profile-objective-change-text')).toBeNull();
+    expect(mockState.saveProfile).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: WEIGHT-LOSS SUPPORT'));
+    fireEvent.press(screen.getByTestId('profile-objective-confirm'));
+    expect(mockState.saveProfile).toHaveBeenCalledWith({ objective: 'weight_loss' });
+    expect(screen.queryByTestId('profile-objective-change-text')).toBeNull();
+  });
+
+  test('OBJECTIVE change with a program running says the program keeps its objective', () => {
+    mockState = {
+      ...mockState,
+      block: { blockId: 1, startDate: '2026-07-01', objective: 'hybrid', createdAtMs: 1 },
+      program: { programId: 1, objective: 'hybrid', status: 'active', currentSequenceIndex: 1, plannedBlockCount: 2, days: [], movementPreferences: [] },
+    };
+    render(<ProfileScreen />);
+    fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: BUILD MUSCLE'));
+    expect(screen.getByTestId('profile-objective-change-text').props.children)
+      .toBe('Change your objective from hybrid to hypertrophy? Your current block and the rest of your program stay hybrid. Hypertrophy is used when you build your next program.');
+    // Tapping the chip that is already selected asks nothing.
+    fireEvent.press(screen.getByTestId('profile-objective-keep'));
+    fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: STRENGTH + GRAPPLING'));
+    expect(screen.queryByTestId('profile-objective-change-text')).toBeNull();
+    expect(mockState.saveProfile).not.toHaveBeenCalled();
+  });
+
+  test('OBJECTIVE change with a program running names the objective the program was built with', () => {
+    // The profile objective was already changed once; the program keeps its own.
+    mockState = {
+      ...mockState,
+      profile: { ...mockState.profile, objective: 'strength' },
+      block: { blockId: 1, startDate: '2026-07-01', objective: 'hybrid', createdAtMs: 1 },
+      program: { programId: 1, objective: 'hybrid', status: 'active', currentSequenceIndex: 1, plannedBlockCount: 2, days: [], movementPreferences: [] },
+    };
+    render(<ProfileScreen />);
+    fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: GET EXPLOSIVE'));
+    expect(screen.getByTestId('profile-objective-change-text').props.children)
+      .toBe('Change your objective from strength to power? Your current block and the rest of your program stay hybrid. Power is used when you build your next program.');
+  });
+
+  // Owner ruling on #176: a program in review_due has finished; there is no
+  // current block or rest of the program to keep the old objective.
+  test('objectiveChangeText says a finished program has finished', () => {
+    expect(objectiveChangeText('strength', 'hypertrophy', 'strength', false, false, true))
+      .toBe('Change your objective from strength to hypertrophy? Your program has finished. Your next program will be built for hypertrophy.');
+    // A finished program wins over a block or archived blocks.
+    expect(objectiveChangeText('strength', 'hypertrophy', 'strength', true, true, true))
+      .toBe('Change your objective from strength to hypertrophy? Your program has finished. Your next program will be built for hypertrophy.');
+  });
+
+  test('OBJECTIVE change when the program is due for review says the program has finished', () => {
+    mockState = {
+      ...mockState,
+      profile: { ...mockState.profile, objective: 'strength' },
+      block: null,
+      hasArchivedBlock: true,
+      program: { programId: 1, objective: 'strength', status: 'review_due', currentSequenceIndex: 2, plannedBlockCount: 2, days: [], movementPreferences: [] },
+    };
+    render(<ProfileScreen />);
+    fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: BUILD MUSCLE'));
+    expect(screen.getByTestId('profile-objective-change-text').props.children)
+      .toBe('Change your objective from strength to hypertrophy? Your program has finished. Your next program will be built for hypertrophy.');
+  });
+
+  test('OBJECTIVE change after earlier blocks ended does not call the next block the first', () => {
+    mockState = { ...mockState, block: null, program: null, hasArchivedBlock: true };
+    render(<ProfileScreen />);
+    fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: GET STRONGER'));
+    expect(screen.getByTestId('profile-objective-change-text').props.children)
+      .toBe('Change your objective from hybrid to strength? Your next block will be built for strength.');
+  });
+
+  test('OBJECTIVE change with no block history still says first block', () => {
+    mockState = { ...mockState, block: null, program: null, hasArchivedBlock: false };
+    render(<ProfileScreen />);
+    fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: GET STRONGER'));
+    expect(screen.getByTestId('profile-objective-change-text').props.children)
+      .toBe('Change your objective from hybrid to strength? Your first block will be built for strength.');
+  });
+
+  test('a pending OBJECTIVE change is dropped when the athlete or profile slot changes', () => {
+    mockState = { ...mockState, block: null, program: null };
+    render(<ProfileScreen />);
+    fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: GET STRONGER'));
+    expect(screen.getByTestId('profile-objective-confirmation')).toBeOnTheScreen();
+    // Another athlete becomes active while the confirmation is open.
+    mockState = { ...mockState, activeAthleteId: 'ath-2' };
+    screen.rerender(<ProfileScreen />);
+    expect(screen.queryByTestId('profile-objective-confirmation')).toBeNull();
+    expect(mockState.saveProfile).not.toHaveBeenCalled();
+
+    fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: GET EXPLOSIVE'));
+    expect(screen.getByTestId('profile-objective-confirmation')).toBeOnTheScreen();
+    // Another profile slot becomes active while the confirmation is open.
+    mockState = {
+      ...mockState,
+      profileSlots: [
+        { slotId: 1, name: 'Main', isActive: false },
+        { slotId: 2, name: 'Secondary', isActive: true },
+      ],
+    };
+    screen.rerender(<ProfileScreen />);
+    expect(screen.queryByTestId('profile-objective-confirmation')).toBeNull();
+    expect(mockState.saveProfile).not.toHaveBeenCalled();
   });
 
   test('TRAINING AGE ChipRow keeps shared semantics and disables every chip during a session', () => {

@@ -48,8 +48,8 @@ describe('#146 Profile sport copy matches the workload effect', () => {
   });
 
   test('the tier explanations use the same effect the copy names', () => {
-    expect(sportWorkloadEffect(workloadWith(3)).explanation).toMatch(/each accessory exercise has one fewer set/);
-    expect(sportWorkloadEffect(workloadWith(5)).explanation).toMatch(/each accessory exercise has two fewer sets/);
+    expect(sportWorkloadEffect(workloadWith(3)).explanation).toMatch(/most accessory exercises have one fewer set/);
+    expect(sportWorkloadEffect(workloadWith(5)).explanation).toMatch(/most accessory exercises have up to two fewer sets/);
     expect(sportWorkloadEffect(workloadWith(5)).explanation).toMatch(/week 3 of the block repeats week 2/);
   });
 });
