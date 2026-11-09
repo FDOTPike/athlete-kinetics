@@ -714,7 +714,7 @@ describe('issue 144: a swap after logged sets keeps the planned count and names 
     ]);
     expect(lines(exercises)).toEqual([
       'Floor Back Extension — 1 of 2 sets, then swapped to Glute Bridge · most reps in one set 5 · heaviest load used 20 kg',
-      'Glute Bridge — 1 of 1 sets · most reps in one set 5 · heaviest load used 20 kg',
+      'Glute Bridge — 1 of 1 set · most reps in one set 5 · heaviest load used 20 kg',
     ]);
   });
 
@@ -723,7 +723,7 @@ describe('issue 144: a swap after logged sets keeps the planned count and names 
       row(1, 'Floor Back Extension', 50, 1),
       row(2, 'Glute Bridge', 51, 1),
     ]);
-    expect(lines(exercises)[0]).toMatch(/^Floor Back Extension — 1 of 1 sets /);
+    expect(lines(exercises)[0]).toMatch(/^Floor Back Extension — 1 of 1 set /);
     expect(lines(exercises)[0]).not.toMatch(/swapped/);
   });
 });
