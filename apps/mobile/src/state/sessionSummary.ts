@@ -44,6 +44,7 @@
  * lines carry stable movement-based keys, never rendered text or indexes.
  */
 import { nextSessionAfter, type SessionRef, type TodayBlockSession } from './todayState';
+import { regionLabel, reportSeverityLabel } from './sessionReportStop';
 
 export type ImplementClass = 'bodyweight' | 'loaded';
 
@@ -69,6 +70,9 @@ export interface SummaryExercise {
    * be stated honestly — see `groupSummaryExercises`.
    */
   plannedSets: number | null;
+  /** Set when this movement's slot was swapped after logged sets (075), so the
+   *  line can say "1 of 2 sets, then swapped to <movement>". */
+  swappedToMovementName?: string | null;
   sets: SummarySetFact[];
 }
 
@@ -85,6 +89,9 @@ export interface SummarySetRow {
   sessionPlanSlotId: number | null;
   /** `session_plan_slot.planned_sets` of that slot; null when unmapped. */
   plannedSets: number | null;
+  /** The movement this slot was swapped to after logged sets, when its original count
+   *  was recorded (075); null otherwise. */
+  swappedToMovementName?: string | null;
 }
 
 /**
@@ -109,14 +116,15 @@ export interface SummarySetRow {
 export const groupSummaryExercises = (rows: readonly SummarySetRow[]): SummaryExercise[] => {
   const movementsBySlot = new Map<number, Set<number>>();
   const plannedBySlot = new Map<number, number | null>();
-  const byMovement = new Map<number, { name: string; slots: Set<number>; sets: SummarySetFact[] }>();
+  const byMovement = new Map<number, { name: string; slots: Set<number>; sets: SummarySetFact[]; swappedTo: string | null }>();
   for (const row of rows) {
     let entry = byMovement.get(row.movementId);
     if (entry === undefined) {
-      entry = { name: row.movementName, slots: new Set(), sets: [] };
+      entry = { name: row.movementName, slots: new Set(), sets: [], swappedTo: null };
       byMovement.set(row.movementId, entry);
     }
     entry.sets.push({ reps: row.reps, loadKg: row.loadKg, timeS: row.timeS, rpe: row.rpe ?? null });
+    if (entry.swappedTo === null && row.swappedToMovementName != null) entry.swappedTo = row.swappedToMovementName;
     if (row.sessionPlanSlotId !== null) {
       entry.slots.add(row.sessionPlanSlotId);
       let members = movementsBySlot.get(row.sessionPlanSlotId);
@@ -139,7 +147,7 @@ export const groupSummaryExercises = (rows: readonly SummarySetRow[]): SummaryEx
         plannedSets = counts.reduce<number>((sum, c) => sum + (c as number), 0);
       }
     }
-    return { movementId, movementName: e.name, plannedSets, sets: e.sets };
+    return { movementId, movementName: e.name, plannedSets, swappedToMovementName: e.swappedTo, sets: e.sets };
   });
 };
 
@@ -259,6 +267,8 @@ const exerciseLine = (exercise: SummaryExercise): SummaryLine => {
   const logged = exercise.sets.length;
   const count = exercise.plannedSets === null
     ? plural(logged, 'set')
+    : exercise.swappedToMovementName != null
+      ? `${logged} of ${exercise.plannedSets} sets, then swapped to ${exercise.swappedToMovementName}`
     : logged === exercise.plannedSets
       ? setsOfPlanned(logged, exercise.plannedSets)
       : `${plural(logged, 'set')} logged · ${exercise.plannedSets} planned`;
@@ -341,11 +351,25 @@ export const skippedExerciseText = (skipped: SkippedExercise): string => {
   return `Skipped: ${skipped.name} · ${setsOfPlanned(skipped.loggedSets, skipped.plannedSets)} logged${loggedSuffix}`;
 };
 
+/** A "Report discomfort" report made during the session (#181). */
+export interface SessionReportFact {
+  /** The stored region key ("lower_back"). */
+  region: string;
+  /** 1-10, as saved. */
+  severity: number;
+}
+
+/** "Report: Lower back · Stop (8 of 10)". */
+export const sessionReportText = (report: SessionReportFact): string =>
+  `Report: ${regionLabel(report.region)} · ${reportSeverityLabel(report.severity)}`;
+
 export interface SessionSummaryView {
   exerciseLines: SummaryLine[];
   /** The top set line shown under an exercise line, keyed by that exercise
    *  line's key; absent for an exercise with no loaded set. */
   topSetByExercise: Record<string, SummaryLine>;
+  /** One line per report made during the session, in report order (#181). */
+  reportLines: SummaryLine[];
   /** One line per skipped exercise, in the session timeline's wording. */
   skippedLines: SummaryLine[];
   comparisonLines: SummaryLine[];
@@ -362,6 +386,8 @@ export interface BuildSummaryInput {
   today: string;
   /** The exercises the athlete skipped, in plan order. */
   skippedExercises?: readonly SkippedExercise[];
+  /** Reports made during the session, in report order. */
+  reports?: readonly SessionReportFact[];
 }
 
 export const buildSessionSummary = (input: BuildSummaryInput): SessionSummaryView => {
@@ -391,9 +417,14 @@ export const buildSessionSummary = (input: BuildSummaryInput): SessionSummaryVie
     key: `skipped-${index}`,
     text: skippedExerciseText(skipped),
   }));
+  const reportLines: SummaryLine[] = (input.reports ?? []).map((report, index) => ({
+    key: `report-${index}`,
+    text: sessionReportText(report),
+  }));
   return {
     exerciseLines,
     topSetByExercise,
+    reportLines,
     skippedLines,
     comparisonLines,
     durationLine,

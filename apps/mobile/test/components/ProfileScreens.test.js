@@ -1,5 +1,5 @@
 import React from 'react';
-import { BackHandler, StyleSheet } from 'react-native';
+import { Alert, BackHandler, StyleSheet } from 'react-native';
 import { act, fireEvent, render, renderAsync, screen, within } from '@testing-library/react-native';
 import { HISTORY_IMPORT_EXAMPLE, TRAINING_AGES } from '@ak/inference';
 import ProfileScreen from '../../src/screens/ProfileScreen';
@@ -492,8 +492,8 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     expect(screen.getByLabelText(/Training guidance safety notice/)).toBeOnTheScreen();
     expect(screen.getByText(/pikeMethods provides training guidance, not medical advice/)).toBeOnTheScreen();
     // Steppers render with Decrease/Increase accessibility labels
-    expect(screen.getByLabelText('Decrease 3 · TRAINING DAYS PER WEEK')).toBeOnTheScreen();
-    expect(screen.getByLabelText('Increase 3 · TRAINING DAYS PER WEEK')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Decrease training days per week')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Increase training days per week')).toBeOnTheScreen();
   });
 
   test('b) Coach Mode athlete delete requires two presses before store action fires', () => {
@@ -644,7 +644,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     expect(screen.getByRole('header', { name: 'NEW TO THIS' })).toBeOnTheScreen();
     expect(screen.getByText(/Choose this if structured training is still new/).props.accessible).toBe(true);
     expect(selection.props.accessibilityState.selected).toBe(false);
-    fireEvent.press(screen.getByLabelText('Dismiss explanation'));
+    fireEvent.press(screen.getByLabelText('Close, dismiss explanation'));
     fireEvent.press(selection);
     expect(screen.getByRole('button', { name: /NEW TO THIS\. Under a year/ }).props.accessibilityState.selected).toBe(true);
   });
@@ -666,6 +666,48 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     expect(screen.getByText('A straight bar loaded with weight plates.').props.numberOfLines).toBeUndefined();
   });
 
+  // #205: the week is a prefill by experience, never applied after the athlete edits it.
+  test('YOUR WEEK is prefilled by experience: NEW TO THIS is 3 days of 45 minutes', () => {
+    render(<OnboardingScreen />);
+    pressNext(); // welcome -> goal
+    pressNext(); // goal -> (focus) -> experience
+    fireEvent.press(screen.getByLabelText(/NEW TO THIS\./));
+    pressNext();
+    expect(screen.getByText('YOUR WEEK')).toBeOnTheScreen();
+    expect(screen.getByLabelText('TRAINING DAYS PER WEEK 3')).toBeOnTheScreen();
+    expect(screen.getByLabelText('MINUTES IN A SESSION, TOPS 45 min')).toBeOnTheScreen();
+    expect(screen.getByText(/Choose a week that feels manageable\. A realistic ceiling beats an optimistic one\./)).toBeOnTheScreen();
+    expect(screen.getByTestId('onboarding-week-suggestion').props.children)
+      .toBe('Suggested for NEW TO THIS: 3 days a week, up to 45 minutes each. Change it to fit your week.');
+    pressBack();
+    fireEvent.press(screen.getByLabelText(/SOME MILEAGE\./));
+    pressNext();
+    expect(screen.getByLabelText('TRAINING DAYS PER WEEK 4')).toBeOnTheScreen();
+    expect(screen.getByLabelText('MINUTES IN A SESSION, TOPS 60 min')).toBeOnTheScreen();
+    pressBack();
+    fireEvent.press(screen.getByLabelText(/COMPETITIVE\./));
+    pressNext();
+    expect(screen.getByLabelText('TRAINING DAYS PER WEEK 4')).toBeOnTheScreen();
+    expect(screen.getByLabelText('MINUTES IN A SESSION, TOPS 75 min')).toBeOnTheScreen();
+  });
+
+  test('YOUR WEEK keeps the athlete edit when experience changes afterwards', () => {
+    render(<OnboardingScreen />);
+    pressNext(); // welcome -> goal
+    pressNext(); // goal -> (focus) -> experience
+    fireEvent.press(screen.getByLabelText(/EXPERIENCED\./));
+    pressNext();
+    expect(screen.getByLabelText('MINUTES IN A SESSION, TOPS 75 min')).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText('Increase TRAINING DAYS PER WEEK'));
+    expect(screen.getByLabelText('TRAINING DAYS PER WEEK 5')).toBeOnTheScreen();
+    expect(screen.queryByTestId('onboarding-week-suggestion')).toBeNull();
+    pressBack();
+    fireEvent.press(screen.getByLabelText(/NEW TO THIS\./));
+    pressNext();
+    expect(screen.getByLabelText('TRAINING DAYS PER WEEK 5')).toBeOnTheScreen();
+    expect(screen.getByLabelText('MINUTES IN A SESSION, TOPS 75 min')).toBeOnTheScreen();
+  });
+
   test('WO-02 review uses scrollable sections and edit routing preserves the complete draft', () => {
     render(<OnboardingScreen />);
     fireEvent.changeText(screen.getByLabelText('Your name'), 'Ari');
@@ -674,7 +716,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     pressNext();
     fireEvent.press(screen.getByLabelText(/EXPERIENCED\./));
     pressNext();
-    fireEvent.press(screen.getByLabelText('Increase TRAINING DAYS PER WEEK'));
+    fireEvent.press(screen.getByLabelText('Increase training days per week'));
     pressNext();
     fireEvent.press(screen.getByRole('button', { name: /MINIMAL\. Bands and mats only/ }));
     pressNext();
@@ -873,18 +915,27 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     const { getByRole } = render(<ProfileScreen />);
 
     // OBJECTIVES renders one chip per objective; 'hybrid' is baseProfile's value.
-    const objectives = ['strength', 'hypertrophy', 'power', 'endurance', 'gpp', 'hybrid', 'rehab', 'weight_loss'];
-    const selected = getByRole('button', { name: '1 · OBJECTIVE: hybrid' });
+    const objectiveLabels = [
+      'GET STRONGER',
+      'BUILD MUSCLE',
+      'GET EXPLOSIVE',
+      'LAST LONGER',
+      'ALL-ROUND FITNESS',
+      'STRENGTH + GRAPPLING',
+      'RETURN TO TRAINING',
+      'WEIGHT-LOSS SUPPORT',
+    ];
+    const selected = getByRole('button', { name: '1 · OBJECTIVE: STRENGTH + GRAPPLING' });
     expect(selected.props.accessibilityState.selected).toBe(true);
 
-    const unselected = getByRole('button', { name: '1 · OBJECTIVE: strength' });
+    const unselected = getByRole('button', { name: '1 · OBJECTIVE: GET STRONGER' });
     expect(unselected.props.accessibilityState.selected).toBe(false);
     expect(unselected.props.accessibilityState.disabled).toBe(false);
 
     // Exactly ONE of the row's chips claims the selected state.
-    const selectedCount = objectives.filter(
-      (o) => getByRole('button', {
-        name: `1 · OBJECTIVE: ${o.replace(/_/g, ' ')}`,
+    const selectedCount = objectiveLabels.filter(
+      (label) => getByRole('button', {
+        name: `1 · OBJECTIVE: ${label}`,
       }).props.accessibilityState.selected,
     ).length;
     expect(selectedCount).toBe(1);
@@ -1081,7 +1132,14 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       expect(hardwareBack.press()).toBe(true);
       expect(hardwareBack.press()).toBe(true);
       expect(screen.getByTestId('activities-screen')).toBeOnTheScreen();
+      // #148: leaving Activities with a kept entry asks first; Discard leaves.
+      const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
       expect(hardwareBack.press()).toBe(true);
+      expect(alert).toHaveBeenCalledTimes(1);
+      expect(alert.mock.calls[0][0]).toBe('Discard this activity?');
+      expect(screen.getByTestId('activities-screen')).toBeOnTheScreen();
+      act(() => { alert.mock.calls[0][2].find((button) => button.text === 'Discard').onPress(); });
+      alert.mockRestore();
       expect(screen.queryByTestId('activities-screen')).toBeNull();
       expect(screen.getByText('ATHLETE PROFILE')).toBeOnTheScreen();
       expect(mockState.saveOneOffActivity).not.toHaveBeenCalled();
@@ -1091,6 +1149,21 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       hardwareBack.restore();
     }
   }, 30000);
+
+  describe('#177: the active athlete is named only in Coach mode', () => {
+    test('with two athletes, Profile names the active athlete under the heading', () => {
+      render(<ProfileScreen />);
+      expect(screen.getByText('ATHLETE PROFILE')).toBeOnTheScreen();
+      expect(screen.getByTestId('profile-active-athlete')).toHaveTextContent('Default Athlete');
+    });
+
+    test('with one athlete, Profile names no one', () => {
+      mockState.athletes = [{ id: 'default', name: 'Default Athlete' }];
+      render(<ProfileScreen />);
+      expect(screen.getByText('ATHLETE PROFILE')).toBeOnTheScreen();
+      expect(screen.queryByTestId('profile-active-athlete')).toBeNull();
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1223,7 +1296,7 @@ describe('OW-001 load-intent declaration surface', () => {
     setup();
     expect(screen.getByLabelText('Plan Push-up with Bodyweight only')).toBeOnTheScreen();
     expect(screen.getByLabelText('Plan Walking Lunge with Dumbbell')).toBeOnTheScreen();
-    expect(screen.getByLabelText('Leave Push-up unset, so it is planned with added weight')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Not set: leave Push-up unset, so it is planned with added weight')).toBeOnTheScreen();
   });
 
   test('copy says the choice applies to FUTURE programming and what unset means', () => {

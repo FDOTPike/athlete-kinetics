@@ -510,6 +510,23 @@ describe('screen laws: D5, D6, D8, D9', () => {
       .toEqual(['Skipped: Push-up · no sets logged']);
   });
 
+  // #181: the summary of a session stopped by a report names the reports.
+  test('the completion summary lists each report, its region and severity', () => {
+    mockState = baseState({
+      loadSessionOutcome: jest.fn(() => ({ outcomeKind: 'stopped_safely', finalizedAtMs: 1_757_000_000_000 })),
+      loadSessionSummaryFacts: () => ({
+        durationMin: 20,
+        exercises: [exercise({ movementId: 1, movementName: 'Goblet Squat' })],
+        previousSets: [],
+        skippedExercises: [],
+        reports: [{ region: 'wrist', severity: 4 }, { region: 'lower_back', severity: 8 }],
+      }),
+    });
+    render(<SessionScreen />);
+    expect(screen.getAllByTestId('session-summary-report').map((node) => node.props.children))
+      .toEqual(['Report: Wrist · Mild (4 of 10)', 'Report: Lower back · Stop (8 of 10)']);
+  });
+
   test('render performs no endSession / plan / progression / log call (D8 guard)', () => {
     mockState = baseState();
     render(<SessionScreen />);
@@ -760,5 +777,34 @@ describe('matchPreviousFacts skips prior sessions that mix implement classes', (
     ]);
     expect(facts.sourceSessionId).toBe(4);
     expect(facts.mostRepsInOneSet).toBe(11);
+  });
+});
+
+describe('issue 144: a swap after logged sets keeps the planned count and names the chain', () => {
+  const row = (movementId, movementName, sessionPlanSlotId, plannedSets, extra = {}) => ({
+    movementId, movementName, reps: 5, loadKg: 20, timeS: null, sessionPlanSlotId, plannedSets, ...extra,
+  });
+  const lines = (exercises) => buildSessionSummary({
+    exercises, previousSets: [], durationMin: null, blockSessions: [], today: '2026-09-11',
+  }).exerciseLines.map((l) => l.text);
+
+  test('the swapped-from line reads "1 of 2 sets, then swapped to" with the replacement named', () => {
+    const exercises = groupSummaryExercises([
+      row(1, 'Floor Back Extension', 50, 2, { swappedToMovementName: 'Glute Bridge' }),
+      row(2, 'Glute Bridge', 51, 1),
+    ]);
+    expect(lines(exercises)).toEqual([
+      'Floor Back Extension — 1 of 2 sets, then swapped to Glute Bridge · most reps in one set 5 · heaviest load used 20 kg',
+      'Glute Bridge — 1 of 1 set · most reps in one set 5 · heaviest load used 20 kg',
+    ]);
+  });
+
+  test('without a recorded original (older records) the line keeps today\'s wording', () => {
+    const exercises = groupSummaryExercises([
+      row(1, 'Floor Back Extension', 50, 1),
+      row(2, 'Glute Bridge', 51, 1),
+    ]);
+    expect(lines(exercises)[0]).toMatch(/^Floor Back Extension — 1 of 1 set /);
+    expect(lines(exercises)[0]).not.toMatch(/swapped/);
   });
 });

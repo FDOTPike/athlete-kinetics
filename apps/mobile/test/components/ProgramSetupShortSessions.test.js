@@ -175,3 +175,25 @@ describe('ProgramSetupScreen: a session that does not fit offers choices', () =>
     expect(useStore.getState().profile.session_duration_cap_min).toBe(minutes);
   });
 });
+
+// Issue #209: beginner sessions stay short and the build screen says so, with
+// the expected lifting time. Session size itself is unchanged.
+describe('ProgramSetupScreen: a beginner is told the session is short on purpose', () => {
+  test('a beginner sees the expected lifting time; an intermediate does not', () => {
+    act(() => {
+      useStore.getState().saveProfile({ training_age: 'beginner', session_duration_cap_min: 60 });
+    });
+    const view = render(<ProgramSetupScreen onComplete={jest.fn()} />);
+    const line = screen.getByTestId('session-time-beginner').props.children;
+    expect(line).toMatch(/^Beginner sessions are kept short on purpose: about \d+ minutes of lifting, plus \d+ minutes of preparation\.$/);
+    const lifting = Number(line.match(/about (\d+) minutes of lifting/)[1]);
+    expect(lifting).toBeGreaterThan(0);
+    expect(lifting).toBeLessThanOrEqual(60);
+    view.unmount();
+    act(() => {
+      useStore.getState().saveProfile({ training_age: 'intermediate', session_duration_cap_min: 60 });
+    });
+    render(<ProgramSetupScreen onComplete={jest.fn()} />);
+    expect(screen.queryByTestId('session-time-beginner')).toBeNull();
+  });
+});
