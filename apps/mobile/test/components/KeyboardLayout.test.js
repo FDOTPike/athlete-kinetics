@@ -38,7 +38,8 @@ describe('KeyboardAwareScrollView contract', () => {
     // +4: the sport editor (3) and the goal exercise search (1) (work order 3).
     // +1: the optional note on the session-feel panel (070).
     // +1: the flagged glossary question box (072).
-    expect(inputTags).toHaveLength(39 + 2 + 4 + 1 + 1);
+    // +1: "Something feels off" on the completion screen (SubjectiveReportPanel, #180).
+    expect(inputTags).toHaveLength(39 + 2 + 4 + 1 + 1 + 1);
     expect(backupInputs).toHaveLength(2);
     expect(backupInputs.map(({ tag }) => tag)).toEqual(expect.arrayContaining([
       expect.stringContaining('accessibilityLabel="Backup password, at least 12 characters"'),
@@ -73,6 +74,60 @@ describe('KeyboardAwareScrollView contract', () => {
 
     expect(scrollResponder.scrollResponderScrollNativeHandleToKeyboard)
       .toHaveBeenCalledWith(42, 128, true);
+  });
+
+  test('#141 re-scrolls the last focused input back into view after keyboardDidHide', () => {
+    const { Keyboard } = require('react-native');
+    const { act, fireEvent } = require('@testing-library/react-native');
+    const originalOs = Platform.OS;
+    Platform.OS = 'android';
+    const listeners = {};
+    const addListenerSpy = jest.spyOn(Keyboard, 'addListener').mockImplementation((event, handler) => {
+      listeners[event] = handler;
+      return { remove: jest.fn() };
+    });
+    const rafSpy = jest.spyOn(global, 'requestAnimationFrame').mockImplementation((cb) => {
+      cb(0);
+      return 1;
+    });
+    const scrollToKeyboard = jest.fn();
+
+    try {
+      render(
+        <KeyboardAwareScrollView
+          ref={(node) => {
+            if (node !== null) {
+              node.scrollResponderScrollNativeHandleToKeyboard = scrollToKeyboard;
+            }
+          }}
+        >
+          <TextInput disableFullscreenUI accessibilityLabel="Target input" />
+        </KeyboardAwareScrollView>,
+      );
+
+      const scroll = screen.getByTestId('keyboard-aware-scroll-view');
+      act(() => {
+        fireEvent(scroll, 'focus', { nativeEvent: { target: 77 } });
+      });
+      expect(scrollToKeyboard).toHaveBeenCalledTimes(1);
+      expect(scrollToKeyboard).toHaveBeenLastCalledWith(77, DEFAULT_KEYBOARD_EXTRA_SCROLL_HEIGHT, true);
+
+      act(() => {
+        listeners.keyboardDidShow?.();
+      });
+      expect(scrollToKeyboard).toHaveBeenCalledTimes(2);
+      expect(scrollToKeyboard).toHaveBeenLastCalledWith(77, DEFAULT_KEYBOARD_EXTRA_SCROLL_HEIGHT, true);
+
+      act(() => {
+        listeners.keyboardDidHide?.();
+      });
+      expect(scrollToKeyboard).toHaveBeenCalledTimes(3);
+      expect(scrollToKeyboard).toHaveBeenLastCalledWith(77, DEFAULT_KEYBOARD_EXTRA_SCROLL_HEIGHT, true);
+    } finally {
+      Platform.OS = originalOs;
+      rafSpy.mockRestore();
+      addListenerSpy.mockRestore();
+    }
   });
 });
 

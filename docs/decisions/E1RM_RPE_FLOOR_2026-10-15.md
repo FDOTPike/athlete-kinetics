@@ -1,7 +1,7 @@
 # Estimated 1RM Effort Floor Decision Record
 
 Date: 2026-10-15
-Status: PROPOSED (ratified when the owner merges the pull request)
+Status: Ratified by merge. Ratified when the owner merged the pull request that carries this file: PR 76, merge commit 09c1e19e (recorded 2026-11-06).
 
 ## Rule (2026-10-15)
 

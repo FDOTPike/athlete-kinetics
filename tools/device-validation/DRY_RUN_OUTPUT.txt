@@ -1,0 +1,15 @@
+DRY RUN - no adb, APK access, install, prompts, or device measurements.
+1. Check adb and aapt; require exactly one authorized USB device.
+2. Check APK package com.pikemethods.training.qa; record SHA-256, badging, device and installed metadata.
+3. Install with adb install -r (no clear/uninstall); launch; pause for sandbox onboarding.
+4. Capture continuous epoch logcat; harness start --package com.pikemethods.training.qa.
+5. Repeat harness watch --interval-ms 250 --duration-s 30 (proposed chunk) while human logs a full session.
+6. Pause at active rest; capture before/home/return observations and UI evidence.
+7. Drain watch; force-stop and relaunch; restart watch; confirm same unfinished session/rest.
+8. Finish all prescribed work and session feel; record completion evidence.
+9. Drain watch; open Android settings; human denies Health Connect and confirms denial.
+10. Watch throughout another manual session with Health Connect denied; record function and UI.
+11. Drain watch and logcat; harness finish; retain failures, raw samples and summary.
+12. Timestamped results outside repository; sampled Private Dirty compared with 536870912 B (512 MiB).
+Preferred target 450000000 B; review above target; block above ceiling.
+Dry run supplies no physical-device or release-gate evidence.
