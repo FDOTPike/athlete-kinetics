@@ -161,6 +161,7 @@ import {
   type MovementPreference,
   type NiggleInput,
   type PhraseCodebase,
+  type SubstitutionInput,
   type SubstitutionMovement,
   type SubstitutionResult,
   type PhraseEntry,
@@ -834,7 +835,10 @@ interface KineticsStore {
   preparation: ActivePreparation | null;
   /** Open substitution sheet: the deterministic engine's 3-tier result for a
    *  SWAP target (null = closed). */
-  substitution: { targetId: number; result: SubstitutionResult } | null;
+  /** heldByReportedArea: the reported-area safety exclusion removed candidates
+   *  the engine would otherwise have offered (or the joint guardrail blocked
+   *  some). Only the empty sheet's wording reads it. */
+  substitution: { targetId: number; result: SubstitutionResult; heldByReportedArea?: boolean } | null;
   /** Today's active niggles (region + severity), fed verbatim into
    *  computeSubstitutions — they drive the injury guardrail and Layer 3. */
   niggles: NiggleInput[];
@@ -7548,16 +7552,19 @@ export const useStore = create<KineticsStore>()((set, get) => {
       set({ error: 'The active session access context cannot be verified. Reopen the session before substituting.' });
       return;
     }
+    // The reported-area exclusion is the only safety filter that removes
+    // candidates before the engine sees them. Keep its set so the empty sheet
+    // can tell whether it removed anything (see heldByReportedArea below).
+    const priorExperience = new Set(get().activePriorExperienceMovementIds);
+    const safetyExcluded = safetyExcludedMovementIdsFor(movements, profile, get().niggles);
     const capabilityAvailable = capabilityAvailableMovementIds(
-      d, movements, profile, accessContext,
-      new Set(get().activePriorExperienceMovementIds),
-      safetyExcludedMovementIdsFor(movements, profile, get().niggles),
+      d, movements, profile, accessContext, priorExperience, safetyExcluded,
     );
     // Candidate publication is one preview operation: capture decisive support
     // rows once, then evaluate every candidate in memory. Actual substitutions
     // still re-check through requireTrainingSupport at their tap/commit boundary.
     const supportSnapshot = supportAdapter().captureEvaluation();
-    let futureSlots: FutureSlot[] = [];
+    let futureRows: { row: { planned_slot_id: number; session_date: string; sets: number; day_index: number }; movement: Movement }[] = [];
     let currentDayIndex = 0;
     // Layer 2 (day-swap) needs the active block's later days. With no block,
     // futureSlots stays empty and only Layer 1 (regression) can yield options.
@@ -7582,25 +7589,43 @@ export const useStore = create<KineticsStore>()((set, get) => {
           [block.startDate, block.blockId, today],
         ),
       );
-      futureSlots = rows.flatMap((r) => {
+      futureRows = rows.flatMap((r) => {
         const mv = byId.get(r.movement_id);
-        return mv === undefined
-          ? []
-          : [{ plannedSlotId: r.planned_slot_id, dayIndex: r.day_index, sessionDate: r.session_date, movement: toSubMovement(mv, capabilityAvailable), sets: r.sets }];
+        return mv === undefined ? [] : [{ row: r, movement: mv }];
       });
     }
-    const result = computeSubstitutions({
-      target: toSubMovement(target, capabilityAvailable),
+    const inputFor = (available: ReadonlySet<number>, niggles: readonly NiggleInput[]): SubstitutionInput => ({
+      target: toSubMovement(target, available),
       library: movements.filter((movement) => supportSnapshot.evaluate(movementSupportTargets([movement.movement_id])).status === 'available')
-        .map((movement) => toSubMovement(movement, capabilityAvailable)),
+        .map((movement) => toSubMovement(movement, available)),
       inventory: profile.equipment_inventory,
-      niggles: get().niggles, // active niggles drive the guardrail + Layer 3
-      futureSlots: futureSlots.filter((slot) => supportSnapshot.evaluate(movementSupportTargets([slot.movement.movement_id])).status === 'available'),
+      niggles, // active niggles drive the guardrail + Layer 3
+      futureSlots: futureRows
+        .filter(({ movement }) => supportSnapshot.evaluate(movementSupportTargets([movement.movement_id])).status === 'available')
+        .map(({ row, movement }): FutureSlot => ({
+          plannedSlotId: row.planned_slot_id,
+          dayIndex: row.day_index,
+          sessionDate: row.session_date,
+          movement: toSubMovement(movement, available),
+          sets: row.sets,
+        })),
       currentDayIndex,
       trainingAge: profile.training_age, // experience-weighted severity thresholds
       accessContext,
     });
-    set({ substitution: { targetId: targetMovementId, result } });
+    const offeredCount = (r: SubstitutionResult): number => r.layer1Regression.options.length + r.layer2DaySwap.options.length;
+    const result = computeSubstitutions(inputFor(capabilityAvailable, get().niggles));
+    // heldByReportedArea: the sheet shows only Layers 1 and 2. It is true only when
+    // both are empty AND a read-only second run, with the reported-area exclusion
+    // lifted and no niggles, would offer a Layer 1 or Layer 2 option. Layer 3 and
+    // the joint guardrail are not shown on the sheet, so they never set this flag.
+    // The second run's result is used for this boolean alone.
+    let heldByReportedArea = false;
+    if (offeredCount(result) === 0) {
+      const withoutArea = capabilityAvailableMovementIds(d, movements, profile, accessContext, priorExperience, new Set<number>());
+      heldByReportedArea = offeredCount(computeSubstitutions(inputFor(withoutArea, []))) > 0;
+    }
+    set({ substitution: { targetId: targetMovementId, result, heldByReportedArea } });
   },
 
   closeSubstitution: () => set({ substitution: null }),
