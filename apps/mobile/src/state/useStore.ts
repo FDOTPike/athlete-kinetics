@@ -340,6 +340,9 @@ export interface OnboardingExtras {
   readonly goalMovementId?: number | null;
   /** The sport answer, or null/absent when the athlete plays no sport. */
   readonly sport?: SportProfileDraft | null;
+  /** One-rep maxes from the optional onboarding step (issue #218), written to
+   *  the same one_rep_max rows Profile writes, in the same save. */
+  readonly oneRepMaxes?: readonly { readonly movementId: number; readonly kg: number }[];
   /**
    * #217: movements the athlete said they have trained before ("Have you
    * trained these before?"). Each is written exactly as the Library's chip
@@ -3249,6 +3252,23 @@ const PER_ATHLETE_RESET: Partial<KineticsStore> = {
 // ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
+/** Upsert one one-rep max as Profile and the onboarding maxes step save it:
+ *  on the 0.25 kg grid (issue #233), clamped to 20-500 kg. */
+function persistOneRepMaxRow(d: DB, movementId: number, kg: number, atMs: number): void {
+  const safe = clamp(Math.round(kg / 0.25) * 0.25, 20, 500);
+  d.executeSync(
+    'INSERT INTO one_rep_max (movement_id, load_kg, updated_at_ms) VALUES (?, ?, ?) ON CONFLICT(movement_id) DO UPDATE SET load_kg = excluded.load_kg, updated_at_ms = excluded.updated_at_ms',
+    [movementId, safe, atMs],
+  );
+}
+
+function readOneRepMaxes(d: DB): Record<number, number> {
+  const rms = rowsOf<{ movement_id: number; load_kg: number }>(
+    d.executeSync('SELECT movement_id, load_kg FROM one_rep_max'),
+  );
+  return Object.fromEntries(rms.map((r) => [r.movement_id, r.load_kg]));
+}
+
 export const useStore = create<KineticsStore>()((set, get) => {
   /** The ONE automatic sync after a grant settles for the current context. It
    *  only reads once the athlete's database is hydrated and boot is allowed. */
@@ -4707,6 +4727,12 @@ export const useStore = create<KineticsStore>()((set, get) => {
       set({ error: 'That exercise is not in the library.' });
       return;
     }
+    const onboardingMaxes = extras?.oneRepMaxes ?? [];
+    if (onboardingMaxes.some((max) => !Number.isFinite(max.kg)
+        || !get().movements.some((movement) => movement.movement_id === max.movementId))) {
+      set({ error: 'A one-rep max is not for a lift in the library.' });
+      return;
+    }
     let sportProfile: SportProfile | null = null;
     if (extras?.sport !== undefined && extras.sport !== null) {
       const validatedSport = validateSportProfile(extras.sport, localToday());
@@ -4759,6 +4785,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       const savedAtMs = Date.now();
       if (focusSelection !== null) writeAthleteFocus(d, focusSelection, savedAtMs);
       if (sportProfile !== null) writeSportProfile(d, sportProfile, savedAtMs);
+      for (const max of onboardingMaxes) persistOneRepMaxRow(d, max.movementId, max.kg, savedAtMs);
       if (validatedGoal !== null && validatedGoal.ok) {
         const goalId = `goal-${savedAtMs}-${Math.floor(Math.random() * 1e9).toString(36)}`;
         insertAthleteGoal(d, goalId, validatedGoal.goal, savedAtMs);
@@ -4802,6 +4829,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       onboarded: true,
       focus: readAthleteFocus(d),
       goals: readAthleteGoals(d),
+      ...(onboardingMaxes.length > 0 ? { oneRepMaxes: readOneRepMaxes(d) } : {}),
     });
     if (declaredInOnboarding.length > 0) {
       set((state) => ({
@@ -6328,17 +6356,9 @@ export const useStore = create<KineticsStore>()((set, get) => {
     if (kg === null) {
       d.executeSync('DELETE FROM one_rep_max WHERE movement_id = ?', [movementId]);
     } else {
-      // One-rep maxes sit on the same 0.25 kg grid as logged loads (issue #233).
-      const safe = clamp(Math.round(kg / 0.25) * 0.25, 20, 500);
-      d.executeSync(
-        'INSERT INTO one_rep_max (movement_id, load_kg, updated_at_ms) VALUES (?, ?, ?) ON CONFLICT(movement_id) DO UPDATE SET load_kg = excluded.load_kg, updated_at_ms = excluded.updated_at_ms',
-        [movementId, safe, Date.now()],
-      );
+      persistOneRepMaxRow(d, movementId, kg, Date.now());
     }
-    const rms = rowsOf<{ movement_id: number; load_kg: number }>(
-      d.executeSync('SELECT movement_id, load_kg FROM one_rep_max'),
-    );
-    set({ oneRepMaxes: Object.fromEntries(rms.map((r) => [r.movement_id, r.load_kg])) });
+    set({ oneRepMaxes: readOneRepMaxes(d) });
   },
 
   importHistory: (text, verified, readinessEligible) => {

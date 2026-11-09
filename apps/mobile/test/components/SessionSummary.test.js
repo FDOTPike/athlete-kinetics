@@ -28,6 +28,7 @@ import {
   exerciseClassOf,
   groupSummaryExercises,
   implementClassOf,
+  markPerDumbbell,
   matchPreviousFacts,
   NO_NEXT_SESSION_TEXT,
   topSetOf,
@@ -315,6 +316,39 @@ describe('summary copy obeys D1, D2, and D3', () => {
       ...view.comparisonLines.map((l) => l.text),
     ].join(' ');
     expect(all).not.toMatch(/\bpr\b|personal best|record|improve|improved|better|new best|up from|progress/i);
+  });
+});
+
+// Issue #218: a dumbbell load is stated per dumbbell, as logged.
+describe('per-dumbbell loads in the summary (issue #218)', () => {
+  const base = { durationMin: null, blockSessions: [], today: '2026-09-10' };
+  test('the heaviest load says "per dumbbell" today and last time, and is never doubled', () => {
+    const view = buildSessionSummary({
+      ...base,
+      exercises: [exercise({ perDumbbell: true, sets: [{ reps: 8, loadKg: 22.5, timeS: null }] })],
+      previousSets: [{ movementId: 11, reps: 8, loadKg: 20, sessionId: 3 }],
+    });
+    expect(view.exerciseLines[0].text).toContain('heaviest load used 22.5 kg per dumbbell');
+    expect(view.comparisonLines[0].text).toContain('heaviest load used 20 kg per dumbbell');
+    expect(view.exerciseLines[0].text).not.toContain('45 kg');
+  });
+  test('a barbell load has no per-dumbbell wording', () => {
+    const view = buildSessionSummary({ ...base, previousSets: [], exercises: [exercise()] });
+    expect(view.exerciseLines[0].text).not.toContain('per dumbbell');
+  });
+  // Review (PR 292): the first listed implement is only dropdown order; the
+  // declared implement, or a sole one, decides.
+  test('markPerDumbbell marks a sole or declared dumbbell, never the first of several', () => {
+    const ex = (movementId) => exercise({ movementId });
+    const movements = [
+      { movement_id: 1, supportedPrefixes: ['DB'] },
+      { movement_id: 2, supportedPrefixes: ['DB', 'KB'] },
+      { movement_id: 3, supportedPrefixes: ['BB', 'DB'] },
+      { movement_id: 4, supportedPrefixes: ['DB', 'BB'] },
+    ];
+    const marked = markPerDumbbell([ex(1), ex(2), ex(3), ex(4), ex(5)], movements, { 3: 'DB', 4: 'BB' });
+    expect(marked.map((e) => e.perDumbbell === true)).toEqual([true, false, true, false, false]);
+    expect(markPerDumbbell([ex(1)], undefined, undefined)[0].perDumbbell).not.toBe(true);
   });
 });
 

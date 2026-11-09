@@ -44,6 +44,7 @@ import { useSubViewBack } from '../navigation/navigation';
 import { Chip, Stepper, QuietAction, Disclosure, ListRow, PrimaryButton, SecondaryButton } from '../components/ui';
 import { measuredDayDetail } from './measuredDayDetail';
 import InfoTip from '../components/InfoTip';
+import { OneRmRow, oneRmClampNote } from '../components/OneRmRow';
 import { biometricsCopy, providerForPlatform } from '../state/biometricsCopy';
 import CoachVerificationLabScreen from './CoachVerificationLabScreen';
 import GlossaryScreen from './GlossaryScreen';
@@ -196,118 +197,9 @@ function NumberRow({ label, display, onDec, onInc, tip }: NumberRowProps): React
   );
 }
 
-// ---------------------------------------------------------------------------
-// One-rep-max row: type the number directly (a 300 kg deadlifter must not
-// tap +2.5 a hundred times); ± buttons remain for fine adjustment.
-// ---------------------------------------------------------------------------
-interface OneRmRowProps {
-  label: string;
-  valueKg: number | undefined;
-  onChange: (kg: number | null) => void;
-  /** The athlete the row was drawn for: typed text is never saved to another. */
-  athleteId: string;
-  /** Lets the screen save typed text before a Coach Mode switch. */
-  registerCommit: (commit: () => void) => () => void;
-}
-/** A max as the field shows it: one decimal, or two for a quarter kilogram. */
-const formatMaxKg = (kg: number): string => {
-  const hundredths = Math.round(kg * 100);
-  return (hundredths / 100).toFixed(hundredths % 10 === 0 ? 1 : 2);
-};
-function OneRmRow({ label, valueKg, onChange, athleteId, registerCommit }: OneRmRowProps): React.JSX.Element {
-  const [text, setText] = useState(valueKg !== undefined ? formatMaxKg(valueKg) : '');
-  const [clampNote, setClampNote] = useState<string | null>(null);
-  useEffect(() => {
-    setText(valueKg !== undefined ? formatMaxKg(valueKg) : '');
-  }, [valueKg]);
-  const saveText = (): void => {
-    const parsed = Number.parseFloat(text.replace(',', '.'));
-    if (!Number.isFinite(parsed) || parsed < 20) {
-      onChange(null); // empty/garbage/sub-20 clears the max
-      setText('');
-      setClampNote(null);
-      return;
-    }
-    // One-rep maxes sit on the 0.25 kg logging grid (issue #233).
-    const snapped = Math.min(500, Math.max(20, Math.round(parsed / 0.25) * 0.25));
-    onChange(parsed); // store snaps to 0.25 and clamps 20..500
-    setText(formatMaxKg(snapped));
-    // Walk W4-7: 999 became 500.0 with no word. Say what was saved.
-    setClampNote(oneRmClampNote(parsed));
-  };
-  // Walk A-12 (#224): Android Back hides the keyboard without ending editing,
-  // and the typed text was lost when Profile closed. Typed text is now saved
-  // on end of editing, blur, keyboard hide or unmount, whichever comes first.
-  // It is saved once: text that matches the saved value is not saved again,
-  // and neither is text already saved from this render (Enter fires end of
-  // editing and blur before the row re-renders with the saved value).
-  const savedThisRender = useRef(false);
-  useEffect(() => { savedThisRender.current = false; });
-  const commitText = (): void => {
-    const shown = valueKg !== undefined ? formatMaxKg(valueKg) : '';
-    if (text === shown || savedThisRender.current) return;
-    // During or after a Coach Mode switch the store belongs to another athlete.
-    if (useStore.getState().activeAthleteId !== athleteId) return;
-    savedThisRender.current = true;
-    saveText();
-  };
-  const commitLatest = useRef(commitText);
-  commitLatest.current = commitText;
-  useEffect(() => {
-    const hide = Keyboard.addListener('keyboardDidHide', () => commitLatest.current());
-    const unregister = registerCommit(() => commitLatest.current());
-    return () => {
-      hide.remove();
-      unregister();
-      commitLatest.current();
-    };
-  }, [registerCommit]);
-  return (
-    <View style={styles.field}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <View style={styles.numberRow}>
-        <Pressable
-          onPress={() => { setClampNote(null); if (valueKg !== undefined) onChange(valueKg - 2.5 < 20 ? null : valueKg - 2.5); }}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={`Decrease ${label} one rep max`}
-          style={({ pressed }) => [styles.numBtn, pressed && styles.numBtnPressed]}
-        >
-          <Text style={styles.numBtnText}>−</Text>
-        </Pressable>
-        <TextInput
-          disableFullscreenUI
-          style={styles.oneRmInput}
-          value={text}
-          // Review (PR 194): the clamp notice describes one saved value; any
-          // new edit, a + or −, or a cleared max makes it untrue, so it goes.
-          onChangeText={(next) => { setText(next); setClampNote(null); }}
-          onEndEditing={commitText}
-          onBlur={commitText}
-          keyboardType="numeric"
-          placeholder="—"
-          placeholderTextColor={theme.color.textLow}
-          maxLength={6}
-          accessibilityLabel={`${label} one rep max in kilograms, type to set`}
-        />
-        <Pressable
-          onPress={() => { setClampNote(null); onChange((valueKg ?? 57.5) + 2.5); }}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel={`Increase ${label} one rep max`}
-          style={({ pressed }) => [styles.numBtn, pressed && styles.numBtnPressed]}
-        >
-          <Text style={styles.numBtnText}>+</Text>
-        </Pressable>
-      </View>
-      {clampNote !== null && <Text style={styles.fieldHint} accessibilityLiveRegion="polite">{clampNote}</Text>}
-    </View>
-  );
-}
-
-/** What to say when a typed one-rep max is outside what the field keeps. */
-export const oneRmClampNote = (typedKg: number): string | null =>
-  typedKg > 500 ? `Saved as 500.0 kg, the highest one-rep max this field accepts. Check the number you typed.` : null;
+// One-rep-max rows live in ../components/OneRmRow (shared with onboarding,
+// issue #218); the clamp note stays exported here for existing callers.
+export { oneRmClampNote };
 
 // ---------------------------------------------------------------------------
 // Screen

@@ -72,11 +72,16 @@ afterEach(() => {
   keyboardSpy.mockRestore();
 });
 
-const renderProfile = () => render(
-  <NavigationProvider initialTab="athlete">
-    <ProfileScreen />
-  </NavigationProvider>,
-);
+const renderProfile = () => {
+  const view = render(
+    <NavigationProvider initialTab="athlete">
+      <ProfileScreen />
+    </NavigationProvider>,
+  );
+  // #210: the one-rep maxes sit behind a collapsed heading.
+  fireEvent.press(screen.getByLabelText('One-rep maxes (optional)'));
+  return view;
+};
 const ohp = () => screen.getByLabelText('OHP one rep max in kilograms, type to set');
 const hideKeyboard = () => act(() => { (keyboardListeners.keyboardDidHide ?? []).forEach((handler) => handler({})); });
 
