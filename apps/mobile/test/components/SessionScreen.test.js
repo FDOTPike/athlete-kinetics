@@ -2803,7 +2803,7 @@ describe('large text at font scale 2.0 (issue 158)', () => {
     render(<SessionScreen />);
     expect(StyleSheet.flatten(screen.getByTestId('workout-quick-row').props.style)).toMatchObject({ flexDirection: 'column' });
     expect(StyleSheet.flatten(screen.getByLabelText('Report discomfort').props.style)).toMatchObject({ alignSelf: 'stretch' });
-    expect(StyleSheet.flatten(screen.getByLabelText(/^Avoid .+ and find a substitution$/).props.style)).toMatchObject({ alignSelf: 'stretch' });
+    expect(StyleSheet.flatten(screen.getByLabelText(/^Swap or avoid this: .+$/).props.style)).toMatchObject({ alignSelf: 'stretch' });
   });
 
   test('at the default font scale the two workout buttons stay side by side', () => {
