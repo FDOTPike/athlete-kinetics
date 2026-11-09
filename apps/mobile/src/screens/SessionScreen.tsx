@@ -1,14 +1,15 @@
 /** Phase 17 utility-first active-session surface. */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions, type HostInstance } from 'react-native';
 import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING_NOTE, EFFORT_STOP_GUIDANCE, effortCue, effectiveRpeCeiling, mapRirToRpe, RIR_OPTIONS, PREPARATION_STATUS_LABEL, isTerminalPreparationStatus, preparationDoseUnit, type EffortAnswer, type RunnerHaltReason } from '@ak/inference';
 import { EXPERIENCE_SEVERITY, runnerTierForTrainingAge } from '../../../../packages/inference/src/sessionRunner';
-import { formatTeachingOnlyReason, freeFormStartIsEmpty, useStore, type LoadSelection, type LoggedSet, type SetLoadShown, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
+import { formatTeachingOnlyReason, freeFormStartIsEmpty, useStore, type LoadCopyFacts, type LoadSelection,type LoggedSet, type SetLoadShown, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
 import { useNavigation, useSubViewBack } from '../navigation/navigation';
 import { buildSessionSummary, NO_NEXT_SESSION_TEXT, setsOfPlanned, skippedExerciseText } from '../state/sessionSummary';
 import { SUPPORT_HELD_MESSAGE, SUPPORT_UNAVAILABLE_MESSAGE } from '../state/healthSupportStore';
 import { theme } from '../theme/theme';
 import InfoTip from '../components/InfoTip';
+import { isEasedBelow } from '../state/loadCopyFacts';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import {
   PrimaryButton,
@@ -104,20 +105,33 @@ const isLoadDraftLoggable = (text: string): boolean => {
  *  this maps it to reviewed copy. An edited value keeps its source — there is
  *  no fifth "athlete-entered" source. */
 const loadSourceCopy = (
-  sel: LoadSelection,
+  sel: LoadSelection & Partial<LoadCopyFacts>,
   bodyweightMode: boolean,
   oneRmKg: number | undefined,
   timedTarget: boolean,
 ): string => {
+  // Walk W2-4, W5-10 (#131): an eased load (shown lower than the unadjusted
+  // last-logged load) says so and names that load; "last session" is only said
+  // of an earlier session, never of a set logged in this one.
+  const addedLoad = bodyweightMode ? ' added load' : '';
   if (sel.source === 'manual') {
     switch (sel.advisoryKind) {
       case 'apre': return `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg — your entry stands.`;
       case 'onerm': return `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg from your ${oneRmKg?.toFixed(1)} kg 1RM — your entry stands.`;
-      case 'history': return `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg from your last session — your entry stands.`;
+      case 'history':
+        if (!sel.advisoryFromThisSession && isEasedBelow(sel.advisoryKg, sel.unadjustedHistoryKg)) {
+          return `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg today · logged ${sel.unadjustedHistoryKg?.toFixed(1)} kg last session — your entry stands.`;
+        }
+        return sel.advisoryFromThisSession === true
+          ? `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg from this session — your entry stands.`
+          : `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg from your last session — your entry stands.`;
       default: return 'Your call. The number you enter is what gets logged.';
     }
   }
   if (sel.source === 'history') {
+    if (!sel.historyFromThisSession && isEasedBelow(sel.initialLoadKg, sel.unadjustedHistoryKg)) {
+      return `Coach suggests ${sel.initialLoadKg?.toFixed(1)} kg${addedLoad} today · last logged ${sel.unadjustedHistoryKg?.toFixed(1)} kg${addedLoad}`;
+    }
     return bodyweightMode
       ? `Last logged ${sel.initialLoadKg?.toFixed(1)} kg added load`
       : `Last logged ${sel.initialLoadKg?.toFixed(1)} kg`;
@@ -133,7 +147,7 @@ const loadSourceCopy = (
 /** Derived-source copy must distinguish APRE prescription from 1RM
  *  derivation; the resolver's source alone does not carry that. */
 const loadCopyFor = (
-  sel: LoadSelection,
+  sel: LoadSelection & Partial<LoadCopyFacts>,
   bodyweightMode: boolean,
   oneRmKg: number | undefined,
   apreOverrideKg: number | null,
@@ -378,6 +392,9 @@ export const clearUnloggedLoadDraftsForTests = (): void => { unloggedLoadDrafts.
 export const unloggedLoadDraftCountForTests = (): number => unloggedLoadDrafts.size;
 
 export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionScreenProps = {}): React.JSX.Element {
+  // Large text (issue 158): the two workout buttons stack so their words do not break.
+  const { fontScale } = useWindowDimensions();
+  const stackQuickRow = fontScale >= 1.3;
   const state = useStore((s) => s);
   const nav = typeof useNavigation === 'function' ? useNavigation() : undefined;
   const [emptyStartPromptOpen, setEmptyStartPromptOpen] = useState(false);
@@ -568,6 +585,8 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   const currentSlot = runnerCurrentId !== null ? sessionPlan.find((slot) => slot.sessionPlanSlotId === runnerCurrentId) ?? fallback : fallback;
   const currentMovement: Movement | null = currentSlot === null ? null : byId.get(runnerCurrent?.movementId ?? currentSlot.movementId) ?? byId.get(currentSlot.movementId) ?? null;
   const currentLogged = currentSlot === null ? 0 : (runner !== null && (runner.slotIndex ?? -1) >= 0 && runner.slotSetCounts?.[runner.slotIndex] != null ? Math.max(loggedCount(currentSlot), runner.slotSetCounts[runner.slotIndex]) : loggedCount(currentSlot));
+
+
   const subTargetSlot = substitution === null
     ? null
     : (currentSlot !== null && currentSlot.movementId === substitution.targetId
@@ -586,6 +605,48 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   const runnerComplete = runnerPhase === 'complete';
   const halted = runnerPhase === 'halted' || (!runnerComplete && triageHalted);
   const complete = !halted && sessionPlan.length > 0 && (runnerComplete || allDone);
+
+  // Android walk 2026-11-03 (W6-4): after Log set, or when preparation ends, the
+  // workout scroll position stayed where it was, so the current card and its rest
+  // timer could sit off-screen. When the scroll key changes, one scroll is
+  // scheduled for after the next frame. It measures the current row fresh, so no
+  // stored position can be stale. Nothing scrolls when the session is halted or
+  // complete, while preparation is open, or when the current row is not on screen.
+  const scrollPreparationOpen = preparation !== null && preparation.sessionId === session?.sessionId
+    && !isTerminalPreparationStatus(preparation.status);
+  const currentRowRef = useRef<View | null>(null);
+  const scrollState = useRef({ halted, complete, preparationOpen: scrollPreparationOpen });
+  useEffect(() => {
+    scrollState.current = { halted, complete, preparationOpen: scrollPreparationOpen };
+  });
+  const currentSlotId = currentSlot?.sessionPlanSlotId ?? null;
+  const scrollKey = `${scrollPreparationOpen}|${runnerPhase}|${currentLogged}|${currentSlotId}`;
+  const lastScrollKey = useRef<string | null>(null);
+  useEffect(() => {
+    if (lastScrollKey.current === null) {
+      lastScrollKey.current = scrollKey;
+      return undefined;
+    }
+    if (lastScrollKey.current === scrollKey) return undefined;
+    lastScrollKey.current = scrollKey;
+    const frame = requestAnimationFrame(() => {
+      const now = scrollState.current;
+      const row = currentRowRef.current;
+      const scroller = timelineRef.current;
+      if (now.halted || now.complete || now.preparationOpen || row === null || scroller === null) return;
+      // The content view is a host ref, which Fabric's measureLayout requires (a node
+      // handle number is refused on the new architecture). Its y is content-relative.
+      // getInnerViewRef is on the runtime ScrollView (ScrollView.js) but not in the public typings.
+      const content = (scroller as ScrollView & { getInnerViewRef?: () => HostInstance | null }).getInnerViewRef?.() ?? null;
+      if (content === null) return;
+      row.measureLayout(
+        content,
+        (_x, y) => { scroller.scrollTo({ y: Math.max(0, y - theme.space[4]), animated: true }); },
+        () => undefined,
+      );
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [scrollKey]);
   const target = currentSlot === null ? null : targetFor(currentSlot);
   const oneRm = currentSlot === null ? undefined : oneRepMaxes[currentSlot.movementId];
   // P2-2 (Opus audit): bodyweightMode is true ONLY when the canonical first
@@ -601,16 +662,23 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   // never diverge. Mutable Actual RPE is completion evidence and must not
   // recalculate source/advisory copy or rewrite load draft state.
   const stableTargetRpe = currentSlot?.targetRpe ?? 8;
-  const loadSelection: LoadSelection | null = currentSlot === null || target === null
+  // #131: copy facts (eased today, this-session history) ride along with the
+  // resolver's selection; they never change the load itself.
+  const loadSelection: (LoadSelection & Partial<LoadCopyFacts>) | null = currentSlot === null || target === null
     ? null
-    : state.resolveSlotLoad({
-        movementId: currentSlot.movementId,
-        bodyweightMode,
-        targetReps: target.kind === 'reps' ? target.reps : null,
-        targetRpe: stableTargetRpe,
-        overrideLoadKg: currentSlot.overrideLoadKg,
-        sessionPlanSlotId: currentSlot.sessionPlanSlotId,
-      });
+    : {
+        ...state.resolveSlotLoad({
+          movementId: currentSlot.movementId,
+          bodyweightMode,
+          targetReps: target.kind === 'reps' ? target.reps : null,
+          targetRpe: stableTargetRpe,
+          overrideLoadKg: currentSlot.overrideLoadKg,
+          sessionPlanSlotId: currentSlot.sessionPlanSlotId,
+        }),
+        ...(typeof state.slotLoadCopyFacts === 'function'
+          ? state.slotLoadCopyFacts({ movementId: currentSlot.movementId })
+          : {}),
+      };
   // Android walk (#231): within the same slot, after a set has been logged in
   // this session, start the next set's field at the load of the previous set
   // while keeping today's coach suggestion visible next to it.
@@ -906,7 +974,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
           )}
         </View>
 
-        <View style={styles.outcomeFooter}>
+        <View style={styles.outcomeFooter} testID="session-outcome-footer">
           {sessionFeel !== null && (
             <View style={styles.feelBlock} testID="session-feel-summary">
               {sessionFeel.saved !== null ? (
@@ -1217,6 +1285,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   // to the halt card below (halting has already recorded preparation as stopped).
   const preparationOpen = preparation !== null && preparation.sessionId === session.sessionId
     && !isTerminalPreparationStatus(preparation.status);
+
   // Android walk (#213): the ramp sets read in kg when today's working load
   // for the ramped movement is known. It comes from the same resolver as the
   // set card, and only a load the app derived (from a 1RM or an override)
@@ -1366,7 +1435,10 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
         )}
 
         {!halted && !complete && sessionPlan.length > 0 && (
-          <View style={styles.timeline}>
+          <View
+            style={styles.timeline}
+            testID="session-timeline"
+          >
             {sessionPlan.map((slot) => {
               const movement = byId.get(slot.movementId);
               const fallbackVideoUrl = movement?.media?.status === 'external_fallback'
@@ -1402,6 +1474,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                   <View
                     key={slot.sessionPlanSlotId}
                     style={[styles.timelineRow, styles.replacedRow]}
+                   
                     accessibilityRole="text"
                     accessibilityLabel={swappedLabel}
                     accessibilityState={{ disabled: true }}
@@ -1500,7 +1573,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                       style={({ pressed }) => [styles.upcomingRow, selectable && styles.upcomingSelectable, pressed && selectable && styles.pressed]}
                     >
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.upcomingName} numberOfLines={1}>{movement?.name ?? 'Movement'}</Text>
+                        <Text style={styles.upcomingName}>{movement?.name ?? 'Movement'}</Text>
                         <Text style={styles.upcomingMeta}>{targetText(slot)}</Text>
                       </View>
                       {selectable && <Text style={styles.choose}>Choose</Text>}
@@ -1511,7 +1584,12 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
 
               // Active slot
               return (
-                <View key={slot.sessionPlanSlotId} style={styles.timelineRow}>
+                <View
+                  key={slot.sessionPlanSlotId}
+                  style={styles.timelineRow}
+                  testID="session-current-row"
+                  ref={currentRowRef}
+                >
                   {/* Left Active Spine (Chalk marks CURRENT/ACTIVE only) */}
                   <View style={[styles.rail, styles.railActive]}>
                     <View style={[styles.dot, styles.dotCurrent]} />
@@ -1586,9 +1664,6 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                           >
                             Enter a load from 0 to 500 in 0.5 kg steps.
                           </Text>
-                        )}
-                        {!loadInvalid && !loadLoggable && (
-                          <Text style={styles.loadEvidence} testID="session-load-hint">Enter a load to log this set.</Text>
                         )}
                         {currentSlotBlockedReason !== null && (
                           <Text
@@ -1846,6 +1921,9 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                               ? `Log set ${Math.min(slot.plannedSets, currentLogged + 1)} for ${movement?.name ?? 'movement'}`
                               : `Log set ${Math.min(slot.plannedSets, currentLogged + 1)} for ${movement?.name ?? 'movement'}, unavailable — enter a load first`}
                         />
+                        {!loadInvalid && !loadLoggable && (
+                          <Text style={styles.loadEvidence} testID="session-load-hint">Enter a load to log this set.</Text>
+                        )}
 
                         {runner?.phase === 'working' && <QuietAction label="Skip this exercise" onPress={confirmSkipExercise} />}
 
@@ -1888,11 +1966,12 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                         </Disclosure>
 
                         {/* 56pt quick avoidance / discomfort trigger rows */}
-                        <View style={styles.quickRow}>
+                        <View testID="workout-quick-row" style={[styles.quickRow, stackQuickRow && styles.quickRowStacked]}>
                           <SecondaryButton
                             label="Swap or avoid this"
                             onPress={thumbsDown}
                             accessibilityLabel={`Swap or avoid this: ${movement?.name ?? 'this movement'}`}
+                            fullWidth={stackQuickRow}
                             style={{ flex: 1, minHeight: theme.touch.min }}
                           />
                           <SecondaryButton
@@ -1902,6 +1981,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                               setNiggleSavedNotice(false);
                             }}
                             accessibilityLabel="Report discomfort"
+                            fullWidth={stackQuickRow}
                             style={{ flex: 1, minHeight: theme.touch.min }}
                           />
                         </View>
@@ -2463,6 +2543,7 @@ const styles = StyleSheet.create({
   },
   choose: {
     alignSelf: 'center',
+    marginLeft: theme.space[2],
     ...theme.font.label,
     color: theme.color.textHi,
   },
@@ -2512,6 +2593,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginTop: theme.space[3],
     gap: theme.space[2],
+  },
+  quickRowStacked: {
+    flexDirection: 'column',
   },
   safety: {
     marginTop: theme.space[3],
@@ -2731,6 +2815,7 @@ const styles = StyleSheet.create({
     textAlign: 'left',
   },
   outcomeFooter: {
+    marginTop: theme.space[3],
     paddingBottom: theme.space[4],
   },
   feelBlock: {

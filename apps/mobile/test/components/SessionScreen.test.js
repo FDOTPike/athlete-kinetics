@@ -1,6 +1,7 @@
 import React from 'react';
 import { Alert, StyleSheet } from 'react-native';
 import { fireEvent, render, screen, within } from '@testing-library/react-native';
+import { theme } from '../../src/theme/theme';
 import { resolveLoadSelection as actualResolveLoadSelection } from '../../../../packages/inference/src/loadSelection';
 import { isDifficultyAllowed as actualIsDifficultyAllowed } from '../../../../packages/inference/src/tierPolicy';
 import { resolveMovementAvailability as actualResolveMovementAvailability } from '../../../../packages/inference/src/capabilityResolver';
@@ -41,6 +42,19 @@ jest.mock('@ak/inference', () => {
   };
 });
 const resolveLoadSelectionSpy = jest.fn((input) => actualResolveLoadSelection(input));
+// Issue 158: a test can set the font scale. Undefined keeps the real hook's value.
+let mockFontScale;
+jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => {
+  const actual = jest.requireActual('react-native/Libraries/Utilities/useWindowDimensions').default;
+  return {
+    __esModule: true,
+    default: () => {
+      const dims = actual();
+      return mockFontScale === undefined ? dims : { ...dims, fontScale: mockFontScale };
+    },
+  };
+});
+
 jest.mock('../../src/state/useStore', () => {
   const storeFunc = (selector) => selector({ getTrainingSupportDecision: () => ({ status: 'available', holdIds: [] }), ...mockState });
   storeFunc.setState = jest.fn((updates) => {
@@ -2848,6 +2862,7 @@ describe('session-2: honest discomfort wording per tier and after-save outcomes'
   });
 });
 
+<<<<<<< HEAD
 
 // Android walk 2026-11-03 (W2-13): a load typed but not logged was lost when
 // the athlete left the workout and came back.
@@ -2888,4 +2903,115 @@ test('without an edit, coming back shows the seeded load', () => {
   first.unmount();
   render(<SessionScreen />);
   expect(screen.getByTestId('session-load-input').props.value).toBe(seeded);
+=======
+describe('large text at font scale 2.0 (issue 158)', () => {
+  afterEach(() => {
+    mockFontScale = undefined;
+  });
+
+  test('at font scale 2.0 the two workout buttons stack, and each fills the row', () => {
+    mockFontScale = 2;
+    mockState = state();
+    render(<SessionScreen />);
+    expect(StyleSheet.flatten(screen.getByTestId('workout-quick-row').props.style)).toMatchObject({ flexDirection: 'column' });
+    expect(StyleSheet.flatten(screen.getByLabelText('Report discomfort').props.style)).toMatchObject({ alignSelf: 'stretch' });
+    expect(StyleSheet.flatten(screen.getByLabelText(/^Swap or avoid this: .+$/).props.style)).toMatchObject({ alignSelf: 'stretch' });
+  });
+
+  test('at the default font scale the two workout buttons stay side by side', () => {
+    mockFontScale = 1;
+    mockState = state();
+    render(<SessionScreen />);
+    expect(StyleSheet.flatten(screen.getByTestId('workout-quick-row').props.style)).toMatchObject({ flexDirection: 'row' });
+    expect(StyleSheet.flatten(screen.getByLabelText('Report discomfort').props.style)).toMatchObject({ alignSelf: 'flex-start' });
+  });
+
+  test('at font scale 2.0 an upcoming exercise name is not cut to one line, and Choose has a gap before it', () => {
+    mockFontScale = 2;
+    mockState = state({ sessionMode: 'self_directed' });
+    render(<SessionScreen />);
+    expect(screen.getByText('Later movement').props.numberOfLines).toBeUndefined();
+    expect(StyleSheet.flatten(screen.getByText('Choose').props.style)).toMatchObject({ marginLeft: theme.space[2] });
+  });
+});
+
+// Walk W2-4, W5-10 (#131): an eased load says "Coach suggests", names the
+// unadjusted load, and "last session" is never said of this session's load.
+test('an eased history load says Coach suggests today and names the last logged load', () => {
+  mockState = state({
+    movements: [movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }), movement(2, 'Later movement')],
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    lastLoggedLoads: { 1: 10 },
+  });
+  mockState.resolveSlotLoad = jest.fn(() => ({ source: 'history', initialLoadKg: 7.5, advisoryKg: null, advisoryKind: null }));
+  mockState.slotLoadCopyFacts = jest.fn(() => ({ historyFromThisSession: false, advisoryFromThisSession: false, unadjustedHistoryKg: 10 }));
+
+  render(<SessionScreen />);
+
+  expect(screen.getByTestId('session-load-input').props.value).toBe('7.5');
+  expect(screen.getByLabelText('Load source. Coach suggests 7.5 kg today · last logged 10.0 kg')).toBeOnTheScreen();
+});
+
+test('an eased bodyweight added load keeps the added-load wording', () => {
+  mockState = state({
+    movements: [movement(1, 'First movement', { supportedPrefixes: ['Bodyweight'] }), movement(2, 'Later movement')],
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    lastLoggedLoads: { 1: 5 },
+  });
+  mockState.resolveSlotLoad = jest.fn(() => ({ source: 'history', initialLoadKg: 2.5, advisoryKg: null, advisoryKind: null }));
+  mockState.slotLoadCopyFacts = jest.fn(() => ({ historyFromThisSession: false, advisoryFromThisSession: false, unadjustedHistoryKg: 5 }));
+
+  render(<SessionScreen />);
+
+  expect(screen.getByLabelText('Load source. Coach suggests 2.5 kg added load today · last logged 5.0 kg added load')).toBeOnTheScreen();
+});
+
+// #131 critic fix: a 0 kg added load is not eased, so it keeps "Last logged".
+test('a 0 kg added load on an eased day keeps Last logged, not Coach suggests', () => {
+  mockState = state({
+    movements: [movement(1, 'First movement', { supportedPrefixes: ['Bodyweight'] }), movement(2, 'Later movement')],
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    lastLoggedLoads: { 1: 0 },
+  });
+  mockState.resolveSlotLoad = jest.fn(() => ({ source: 'history', initialLoadKg: 0, advisoryKg: null, advisoryKind: null }));
+  mockState.slotLoadCopyFacts = jest.fn(() => ({ historyFromThisSession: false, advisoryFromThisSession: false, unadjustedHistoryKg: 0 }));
+
+  render(<SessionScreen />);
+
+  expect(screen.getByLabelText('Load source. Last logged 0.0 kg added load')).toBeOnTheScreen();
+  expect(screen.queryByLabelText(/Coach suggests 0\.0 kg/)).toBeNull();
+});
+
+test('a manual advisory from this session on a day with no load reduction does not say last session', () => {
+  mockState = state({
+    movements: [movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }), movement(2, 'Later movement')],
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    loadPreference: 'manual',
+  });
+  mockState.resolveSlotLoad = jest.fn(() => ({ source: 'manual', initialLoadKg: null, advisoryKg: 12.5, advisoryKind: 'history' }));
+  mockState.slotLoadCopyFacts = jest.fn(() => ({ historyFromThisSession: true, advisoryFromThisSession: true, unadjustedHistoryKg: 12.5 }));
+
+  render(<SessionScreen />);
+
+  expect(screen.getByLabelText('Load source. Coach suggests 12.5 kg from this session — your entry stands.')).toBeOnTheScreen();
+  expect(screen.queryByLabelText(/from your last session/)).toBeNull();
+});
+
+// #131 critic fix: eased day, manual mode, Set 2. The advisory is still the
+// earlier session's load (logSet does not write lastLoggedLoads on an eased
+// day), so the label must name the earlier session, not this one.
+test('eased day, manual mode, Set 2: the advisory names the earlier session, not this one', () => {
+  mockState = state({
+    movements: [movement(1, 'First movement', { supportedPrefixes: ['Barbell'] }), movement(2, 'Later movement')],
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    loadPreference: 'manual',
+    lastLoggedLoads: { 1: 17.5 },
+  });
+  mockState.resolveSlotLoad = jest.fn(() => ({ source: 'manual', initialLoadKg: null, advisoryKg: 12.5, advisoryKind: 'history' }));
+  mockState.slotLoadCopyFacts = jest.fn(() => ({ historyFromThisSession: true, advisoryFromThisSession: false, unadjustedHistoryKg: 17.5 }));
+
+  render(<SessionScreen />);
+
+  expect(screen.getByLabelText('Load source. Coach suggests 12.5 kg today · logged 17.5 kg last session — your entry stands.')).toBeOnTheScreen();
+  expect(screen.queryByLabelText(/from this session/)).toBeNull();
 });
