@@ -243,7 +243,7 @@ test('ADD ATHLETE: Profile never reads the closed database, then reads the new a
   for (let i = 0; i < 7; i += 1) fireEvent.press(screen.getByLabelText('Build 0.1.0'));
   await settle();
   expect(store().advancedToolsUnlocked).toBe(true);
-  fireEvent.press(screen.getByLabelText('Coach mode, 1 athletes, collapsed'));
+  fireEvent.press(screen.getByLabelText('Coach mode, 1 athlete, collapsed'));
   fireEvent.changeText(screen.getByLabelText("New athlete's name"), 'Second');
 
   mockHoldBootRead = true;

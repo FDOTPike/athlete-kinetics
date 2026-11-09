@@ -112,6 +112,7 @@ export function readScheduledSportSessions(db: SportDb, onDate: string): Schedul
         AND (s.effective_end_date IS NULL OR s.effective_end_date >= ?)
         AND d.kind_id <> 'strength_training'
         AND d.demand_class <> 'low'
+        AND NOT EXISTS (SELECT 1 FROM activity_flexibility_tag f WHERE f.activity_id = d.activity_id)
       ORDER BY s.local_weekday, s.local_start_minute, d.display_name, s.series_id`,
     [onDate, onDate],
   )).map((row) => ({

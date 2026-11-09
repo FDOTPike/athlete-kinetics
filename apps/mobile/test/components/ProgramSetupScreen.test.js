@@ -247,6 +247,38 @@ test('editing opens the controls, because fine-tuning IS the task there', () => 
   expect(screen.queryByTestId('program-recommendation-card')).toBeNull();
 });
 
+describe('the footer says what a save changes (#172)', () => {
+  const activeProgram = {
+    programId: 1, objective: 'strength', startDate: '2026-06-01',
+    horizonKind: 'weeks', requestedReviewDate: null, plannedEndDate: '2026-09-01',
+    plannedBlockCount: 2, startingMacroBlockIndex: 1, schemaType: 'LINEAR',
+    status: 'active', currentSequenceIndex: 1,
+    days: [{ dayIndex: 1, focus: 'full' }], movementPreferences: [],
+  };
+
+  test('editing with an active block: the block stays, but a change of training days updates the weekly-day limit', () => {
+    mockState = stateFor('advanced');
+    mockState.program = activeProgram;
+    mockState.block = { blockId: 1, startDate: '2026-07-01', objective: 'strength', createdAtMs: 1 };
+    render(<ProgramSetupScreen editing />);
+    expect(screen.getByText('Your current block stays as it is. These choices apply to future blocks, except a change of training days also updates the weekly-day limit used for current targets.')).toBeOnTheScreen();
+  });
+
+  test('editing with no active block: the choices apply to future blocks', () => {
+    mockState = stateFor('advanced');
+    mockState.program = activeProgram;
+    mockState.block = null;
+    render(<ProgramSetupScreen editing />);
+    expect(screen.getByText('These choices apply to future blocks.')).toBeOnTheScreen();
+  });
+
+  test('first setup: the start date and the confirmation of future blocks', () => {
+    mockState = stateFor('intermediate');
+    render(<ProgramSetupScreen />);
+    expect(screen.getByText('Program starts 2026-08-03. Future blocks require confirmation.')).toBeOnTheScreen();
+  });
+});
+
 // ---------------------------------------------------------------------------
 // The surviving R8 §2.3 rule
 // ---------------------------------------------------------------------------
@@ -369,4 +401,61 @@ test('custom week-one rows use the middle dot between day number and focus', () 
   // The literal separator is U+00B7 MIDDLE DOT, never '?'.
   expect(screen.getAllByText(/Day \d+ · /).length).toBeGreaterThan(0);
   expect(screen.queryByText(/Day \d+ \? /)).toBeNull();
+});
+
+// ---------------------------------------------------------------------------
+// #210 — expert sections collapsed for everyone; no "bjj" chip without a
+// grappling goal or sport
+// ---------------------------------------------------------------------------
+
+test.each(['beginner', 'intermediate', 'advanced', 'elite'])(
+  '#210 Fine-tune starts collapsed for a %s athlete',
+  (trainingAge) => {
+    mockState = stateFor(trainingAge);
+    render(<ProgramSetupScreen />);
+    expect(screen.getByLabelText('Fine-tune your program (optional)').props.accessibilityState)
+      .toMatchObject({ expanded: false });
+    expect(screen.queryByText('2. Review horizon')).toBeNull();
+    expect(screen.queryByText('4. Training method')).toBeNull();
+  },
+);
+
+test('#210 no "bjj" day chip for a strength athlete with no sport', () => {
+  mockState = stateFor('intermediate');
+  mockState.sport = null;
+  render(<ProgramSetupScreen />);
+  openAdvanced();
+  expect(screen.getAllByText('lower').length).toBeGreaterThan(0);
+  expect(screen.queryAllByText('bjj')).toHaveLength(0);
+});
+
+test('#210 the "bjj" day chip shows for the strength + grappling goal', () => {
+  mockState = stateFor('intermediate');
+  mockState.profile.objective = 'hybrid';
+  mockState.sport = null;
+  render(<ProgramSetupScreen />);
+  openAdvanced();
+  expect(screen.queryAllByText('bjj').length).toBeGreaterThan(0);
+});
+
+test('#210 the "bjj" day chip shows for a grappling sport named under Other', () => {
+  mockState = stateFor('intermediate');
+  mockState.sport = { sportId: 'other', otherSportName: 'Brazilian Jiu-Jitsu' };
+  render(<ProgramSetupScreen />);
+  openAdvanced();
+  expect(screen.queryAllByText('bjj').length).toBeGreaterThan(0);
+});
+
+test('#210 a day already set to bjj keeps its chip so the choice stays visible', () => {
+  mockState = stateFor('advanced');
+  mockState.sport = null;
+  mockState.program = {
+    programId: 1, objective: 'strength', startDate: '2026-06-01',
+    horizonKind: 'weeks', requestedReviewDate: null, plannedEndDate: '2026-09-01',
+    plannedBlockCount: 2, startingMacroBlockIndex: 1, schemaType: 'LINEAR',
+    status: 'active', currentSequenceIndex: 1,
+    days: [{ dayIndex: 1, focus: 'bjj' }], movementPreferences: [],
+  };
+  render(<ProgramSetupScreen editing />);
+  expect(screen.queryAllByText('bjj')).toHaveLength(1);
 });

@@ -343,6 +343,17 @@ describe('a new block is planned with the focus, goal, sport and workload', () =
     expect(state().goalMovements).toEqual({ [goalId]: idOf('Front Squat') });
   });
 
+  test('#146: one weekly activity is counted in the NEW block, and the block says it does not change the gym plan', () => {
+    state().saveProfile({ objective: 'gpp' });
+    schedule('bb', { weekday: 4, minutes: 60, name: 'Basketball' });
+    state().refreshSport();
+    createProgram();
+    expect(state().sportWorkload).toMatchObject({ source: 'schedule', sessionsPerWeek: 1, tier: 'light' });
+    const report = state().blockEmphasis.report;
+    expect(report.omitted.join(' ')).toMatch(/Sport workload: 1 weekly session in your Activities schedule \(Basketball\)\. That does not change the gym plan\./);
+    expect(report.applied.join(' ')).not.toMatch(/Basketball/);
+  });
+
   test('a full sport week in the schedule takes one set off accessories in a NEW block and says why', async () => {
     // Control: the same athlete profile in a second database, with no schedule.
     state().saveProfile({ objective: 'gpp' });
@@ -350,7 +361,7 @@ describe('a new block is planned with the focus, goal, sport and workload', () =
     createProgram();
     const withSchedule = weekOne();
     expect(state().blockEmphasis.report.applied.join(' '))
-      .toMatch(/Sport workload: 3 weekly sessions in your Activities schedule \(Club training\)\. To leave room for it, each accessory exercise has one fewer set\./);
+      .toMatch(/Sport workload: 3 weekly sessions in your Activities schedule \(Club training\)\. To leave room for it, most accessory exercises have one fewer set \(down to at least one set; goal-linked, locomotion, non-strength-day, and deload sets are kept\)\./);
 
     state().switchAthlete('athlete-b');
     await settle();

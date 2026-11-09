@@ -25,6 +25,8 @@ import { theme } from '../theme/theme';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { EmphasisReportCard } from '../components/EmphasisReportCard';
 import { programChoiceDisclosure, recommendedProgramDefaults } from '../state/programDefaults';
+import { anchorDisplayName, priorExperienceWouldClear } from '../state/priorExperience';
+import { blockWeekTotals, describeBlockWeek } from '../state/blockWeekChanges';
 import {
   REASON_TEXT_MAP,
   useStore,
@@ -63,11 +65,38 @@ export const anchorReasonText = (reasons: readonly string[]): string => {
   return text.length > 0 ? `${text.charAt(0).toUpperCase()}${text.slice(1)}.` : '';
 };
 
+/** #210: the sport list has no grappling sport, so a grappling sport can only
+ *  be one the athlete named under "Other". These words only decide whether a
+ *  day-type chip is offered; they change nothing the generator does. */
+const GRAPPLING_SPORT_NAME = /\b(bjj|jiu[\s-]?jitsu|ju[\s-]?jitsu|jujitsu|judo|wrestl\w*|grappl\w*|sambo)\b/i;
+
+/** #210: the "bjj" day type is offered only with the Strength + Grappling goal
+ *  or a grappling sport. A day already set to bjj keeps the chip (see below),
+ *  so an existing choice is never hidden. */
+export const offersGrapplingDays = (
+  objective: string,
+  sport: { sportId: string; otherSportName: string | null } | null | undefined,
+): boolean => objective === 'hybrid'
+  || (sport != null && sport.sportId === 'other' && sport.otherSportName != null
+    && GRAPPLING_SPORT_NAME.test(sport.otherSportName));
+
 const SCHEMA_LABEL: Record<SchemaType, string> = {
   LINEAR: 'Linear', WAVE: 'Undulating', STEP: 'Step loading', APRE: 'Autoregulated',
 };
 
-const DAY_NAME = ['Today', 'Tomorrow', 'Day 3', 'Day 4', 'Day 5', 'Day 6', 'Day 7'];
+const WEEKDAY_NAME = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+/**
+ * #228: a training day as the athlete reads it. Day 1 is the day the program
+ * starts, so with a known start date each day carries its weekday
+ * ("Day 1, Saturday"); without one it is "Day 1".
+ */
+export const programDayLabel = (dayIndex: number, dayOneIso: string | null): string => {
+  const dayOneMs = dayOneIso === null ? Number.NaN : Date.parse(`${dayOneIso}T00:00:00Z`);
+  if (!Number.isFinite(dayOneMs)) return `Day ${dayIndex}`;
+  const weekday = new Date(dayOneMs + (dayIndex - 1) * 86_400_000).getUTCDay();
+  return `Day ${dayIndex}, ${WEEKDAY_NAME[weekday]}`;
+};
 
 interface ProgramSetupScreenProps {
   editing?: boolean;
@@ -81,6 +110,8 @@ export default function ProgramSetupScreen({
   const profile = useStore((s) => s.profile);
   const today = useStore((s) => s.today);
   const program = useStore((s) => s.program);
+  const sport = useStore((s) => s.sport);
+  const block = useStore((s) => s.block);
   const movements = useStore((s) => s.movements);
   const niggles = useStore((s) => s.niggles);
   const previewTrainingProgram = useStore((s) => s.previewTrainingProgram);
@@ -247,6 +278,10 @@ export default function ProgramSetupScreen({
   // beside the raw persisted objective so the label can never silently
   // misrepresent the split actually scheduled.
   const styleLabel = objectiveStyleLabel(profile.objective);
+  // #228: weekday names where Day 1 is known (a new program starts today). A
+  // saved program's next block starts the day it is made, so in editing the
+  // days stay numbered.
+  const dayLabel = (dayIndex: number): string => programDayLabel(dayIndex, editing ? null : today);
   // R1 (Round 2, ledger 0060): the POWER explanation. Athletic power is
   // explosive-force work — the coach plans fast, speed-purpose rungs of the
   // big lifts (the curated 'speed' rows) and keeps every gate intact. The
@@ -290,7 +325,6 @@ export default function ProgramSetupScreen({
       focus: (dayFocuses[dayIndex] ?? 'full') as BlockFocus,
     }));
     const fixes: string[] = [];
-    const DAY_NAME_FIX = ['Today', 'Tomorrow', 'Day 3', 'Day 4', 'Day 5', 'Day 6', 'Day 7'];
     for (const day of draft) {
       for (const candidate of BLOCK_FOCUS_LIST) {
         if (candidate === day.focus) continue;
@@ -299,12 +333,12 @@ export default function ProgramSetupScreen({
           draft.map((d) => (d.dayIndex === day.dayIndex ? { ...d, focus: candidate } : d)),
         );
         if (simulated === 3) {
-          fixes.push(`set ${DAY_NAME_FIX[day.dayIndex - 1]}'s focus to ${candidate}`);
+          fixes.push(`set ${dayLabel(day.dayIndex)}'s focus to ${candidate}`);
         }
       }
     }
     return fixes;
-  }, [missingAnchorRoles, dayIndices, dayFocuses, planningProfile]);
+  }, [missingAnchorRoles, dayIndices, dayFocuses, planningProfile, today, editing]);
   const durationConstrained = useMemo(() => {
     // Duration is the constraint when a longer session would let a drafted
     // day's menu reach a role the budget currently trims away.
@@ -317,12 +351,11 @@ export default function ProgramSetupScreen({
     return strengthAnchorCapacity(longer, programFocuses, defaultProgramDayIndices, draft)
       > anchorCapacity;
   }, [missingAnchorRoles, planningProfile, dayIndices, dayFocuses, anchorCapacity]);
-  // Anchor coverage for strength: which of the big three are gated-available
-  // this week, which are blocked (with reasons), and whether a local
-  // prior-experience declaration would clear an ordinary capability gap
-  // (shared verdict: capability is the ONLY blocker and confirmationWouldClear).
+  // Anchor coverage, for every goal (#217): which of the big three are
+  // gated-available this week, which are blocked (with reasons), and whether a
+  // local prior-experience declaration would clear an ordinary capability gap
+  // (the shared test the Library's chip uses: priorExperienceWouldClear).
   const anchorCoverage = useMemo(() => {
-    if (profile.objective !== 'strength') return [];
     return ANCHOR_MOVEMENT_NAMES.map((name) => {
       const movement = movements.find((m) => m.name === name);
       if (movement === undefined) {
@@ -330,11 +363,7 @@ export default function ProgramSetupScreen({
       }
       const verdict = getVerdicts('weight_room').find((v) => v.movementId === movement.movement_id);
       const reasons = verdict?.reasons ?? [];
-      const confirmWouldClear = (verdict?.state === 'teaching_only'
-        && verdict.confirmationWouldClear
-        && !verdict.separateAttestationRequired
-        && verdict.reasons.length === 1
-        && verdict.reasons[0] === 'capability');
+      const confirmWouldClear = priorExperienceWouldClear(verdict);
       const confirmed = activePriorExperienceMovementIds.includes(movement.movement_id);
       return {
         name,
@@ -345,7 +374,15 @@ export default function ProgramSetupScreen({
         confirmed,
       };
     });
-  }, [profile.objective, profile, movements, getVerdicts, movementAvailabilityRevision, activePriorExperienceMovementIds, niggles]);
+  }, [profile, movements, getVerdicts, movementAvailabilityRevision, activePriorExperienceMovementIds, niggles]);
+  // #204: the section is shown only when there is something to declare.
+  const showAnchorDeclarations = anchorCoverage.some((anchor) => anchor.confirmWouldClear);
+  // #204/#217: the title names what the program is. A strength plan with no
+  // competition lift available is not yet a big-lift plan.
+  const programTitle = profile.objective === 'strength'
+    && !anchorCoverage.some((anchor) => anchor.state === 'available')
+    ? 'Strength foundations'
+    : styleLabel;
 
   // Ranking decisions from the generated preview: anchor substitutions and
   // reasoned bodyweight fallbacks surface verbatim in the preview card.
@@ -359,6 +396,9 @@ export default function ProgramSetupScreen({
       capMin: budget.capMin,
       preparationMin: Math.min(...budget.sessions.map((session) => session.preparationMin)),
       longestMin: Math.max(...budget.sessions.map((session) => session.estimatedMin)),
+      // Issue #209: the lifting part of the longest session (sets, rest and
+      // changeovers, without preparation).
+      liftingMin: Math.max(...budget.sessions.map((session) => session.estimatedMin - session.preparationMin)),
       trimmed: budget.sessions.some((session) => session.trimmedSlotIndexes.length > 0),
       conflicts: budget.conflicts,
       alternatives: budget.alternatives ?? [],
@@ -384,7 +424,8 @@ export default function ProgramSetupScreen({
       ? `Use ${alternative.capMin}-minute sessions`
       : `Train ${alternative.weeklyFrequency} day${alternative.weeklyFrequency === 1 ? '' : 's'} a week at ${alternative.capMin} minutes`;
   const rankingNotes = previewResult.preview?.plan?.warnings?.filter((w) =>
-    w.includes('unavailable for') || w.includes('no loaded')) ?? [];
+    w.includes('unavailable for') || w.includes('no loaded')
+    || w.includes('the main lift the day before or after')) ?? [];
 
   // R3 (Round 2, ledger 0060): the weekly progression summary rendered in the
   // ACTUAL preview. The pure classifier explains the week-1 -> 2 and
@@ -404,6 +445,17 @@ export default function ProgramSetupScreen({
       },
     ))];
   }, [previewResult.preview, movements]);
+  // #169: the block's own week-to-week change, read from the generated plan
+  // (working sets and target effort per week), named by phase.
+  const weekChanges = useMemo(() => {
+    const plan = previewResult.preview?.plan;
+    if (plan == null) return [];
+    const totals = blockWeekTotals(plan.sessions.flatMap((session) => session.slots.map((slot) => ({
+      week: session.week_index, phase: session.phase ?? '', sets: slot.sets, targetRpe: slot.target_rpe,
+    }))));
+    return totals.map((row) => describeBlockWeek(totals, row.week, true))
+      .filter((line): line is string => line !== null);
+  }, [previewResult.preview]);
 
   // R8 §2.3 said a rule must never be enforced invisibly. That contract is kept
   // in full — what changed is how many rules there are left to enforce. Four of
@@ -421,7 +473,7 @@ export default function ProgramSetupScreen({
     <View style={styles.root}>
     <KeyboardAwareScrollView style={styles.scroll} contentContainerStyle={styles.content}>
       <Text style={styles.eyebrow}>{editing ? 'MANAGE PROGRAM' : 'BUILD YOUR PROGRAM'}</Text>
-      <Text style={styles.title}>{styleLabel}</Text>
+      <Text style={styles.title}>{programTitle}</Text>
       {/* Walk 1 (W1-15): the title already names the goal in the athlete's
           words; the internal code ("hypertrophy", "gpp") is not shown. */}
       <Text style={styles.body}>
@@ -453,7 +505,7 @@ export default function ProgramSetupScreen({
           {weekOne.map((session) => (
             <View key={session.day_index} style={styles.session}>
               <Text style={styles.sessionTitle}>
-                {DAY_NAME[session.day_index - 1] ?? `Day ${session.day_index}`} · {session.focus}
+                {dayLabel(session.day_index)} · {session.focus}
               </Text>
               {session.slots.map((slot) => {
                 const movement = movements.find((item) => item.movement_id === slot.movement_id);
@@ -516,28 +568,34 @@ export default function ProgramSetupScreen({
         </View>
       )}
 
-      {anchorCoverage.length > 0 && (
+      {showAnchorDeclarations && (
         <View style={styles.card} testID="anchor-coverage-card">
-          <Text style={styles.sectionTitle}>Big-lift availability</Text>
+          <Text style={styles.sectionTitle}>Squat, bench press and deadlift</Text>
           {anchorCoverage.map((anchor) => (
             <View key={anchor.name} style={styles.anchorRow}>
               <Text style={styles.anchorName}>
-                {anchor.name}: {anchor.state === 'available' ? 'ready' : anchor.state === 'missing_from_library' ? 'not in your library' : 'not available yet'}
+                {anchor.state === 'available'
+                  ? `${anchorDisplayName(anchor.name)}: can be in your plan.`
+                  : anchor.state === 'missing_from_library'
+                    ? `${anchorDisplayName(anchor.name)}: not in your library.`
+                    : anchor.confirmWouldClear
+                      ? `${anchorDisplayName(anchor.name)}: not in your plan yet. Tap below if you have trained it before.`
+                      : `${anchorDisplayName(anchor.name)}: not in your plan yet.`}
               </Text>
-              {anchor.state === 'blocked' && anchor.reasons.length > 0 && (
+              {anchor.state === 'blocked' && !anchor.confirmWouldClear && anchor.reasons.length > 0 && (
                 <Text style={styles.caption}>{anchorReasonText(anchor.reasons)}</Text>
               )}
               {anchor.confirmWouldClear && (
                 <>
                   <Text style={styles.caption}>
-                    You can declare you have trained this lift before — a local statement about your own
-                    history, not a coaching assessment.
+                    This is your own statement about your training history, not a coaching assessment.
                   </Text>
                   <Chip
                     wrap
-                    label={`I have trained ${anchor.name} before`}
+                    label={`I have trained ${anchorDisplayName(anchor.name)} before`}
                     selected={false}
                     onPress={() => confirmMovementPriorExperience(anchor.movementId, 'weight_room')}
+                    accessibilityLabel={`I have trained ${anchorDisplayName(anchor.name)} before`}
                     testID={`anchor-confirm-${anchor.movementId}`}
                   />
                 </>
@@ -609,10 +667,14 @@ export default function ProgramSetupScreen({
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>3. Training days</Text>
-        <Text style={styles.caption}>Day 1 is today. These days repeat every week.</Text>
+        <Text style={styles.caption} testID="program-days-caption">
+          {editing
+            ? 'Day 1 is the day your next block starts. These days repeat every week.'
+            : `Day 1 is today, ${programDayLabel(1, today).replace('Day 1, ', '')}. These days repeat every week.`}
+        </Text>
         <View style={styles.wrap}>
           {[1, 2, 3, 4, 5, 6, 7].map((day) => (
-            <Chip key={day} label={DAY_NAME[day - 1]} selected={dayIndices.includes(day)} onPress={() => toggleDay(day)} />
+            <Chip key={day} label={dayLabel(day)} selected={dayIndices.includes(day)} onPress={() => toggleDay(day)} />
           ))}
         </View>
 
@@ -634,9 +696,10 @@ export default function ProgramSetupScreen({
             const currentFocus = dayFocuses[dayIndex] ?? programFocuses(profile.objective, dayIndices.length)[dayIndices.indexOf(dayIndex)] ?? 'full';
             return (
               <View key={dayIndex} style={styles.dayRow}>
-                <Text style={styles.dayRowTitle}>{DAY_NAME[dayIndex - 1]}</Text>
+                <Text style={styles.dayRowTitle}>{dayLabel(dayIndex)}</Text>
                 <View style={styles.focusChipRow}>
-                  {BLOCK_FOCUS_LIST.map((focus) => (
+                  {BLOCK_FOCUS_LIST.filter((focus) => focus !== 'bjj' || currentFocus === 'bjj'
+                    || offersGrapplingDays(profile.objective, sport)).map((focus) => (
                     <Chip
                       key={focus}
                       label={focus}
@@ -704,6 +767,11 @@ export default function ProgramSetupScreen({
       {progressionSummary.length > 0 && (
         <View style={styles.card} testID="weekly-progression-summary">
           <Text style={styles.sectionTitle}>How the weeks progress</Text>
+          <View testID="program-week-changes">
+            {weekChanges.map((line) => (
+              <Text key={line} style={styles.caption}>{line}</Text>
+            ))}
+          </View>
           {progressionSummary.map((line, index) => (
             <Text key={`${index}:${line}`} style={styles.caption}>{line}</Text>
           ))}
@@ -716,6 +784,11 @@ export default function ProgramSetupScreen({
           <Text style={styles.caption} testID="session-time-summary">
             {`Each session counts preparation (${sessionTime.preparationMin} min), your sets, rest and changeovers inside your ${sessionTime.capMin}-minute limit. The longest session is about ${Math.ceil(sessionTime.longestMin)} minutes.`}
           </Text>
+          {profile.training_age === 'beginner' && (
+            <Text style={styles.caption} testID="session-time-beginner">
+              {`Beginner sessions are kept short on purpose: about ${Math.max(1, Math.ceil(sessionTime.liftingMin))} minutes of lifting, plus ${sessionTime.preparationMin} minutes of preparation.`}
+            </Text>
+          )}
           {sessionTime.trimmed && (
             <Text style={styles.caption} testID="session-time-trimmed">
               Some sets were reduced so sessions fit your limit. Preparation was not shortened below its minimum.
@@ -766,7 +839,13 @@ export default function ProgramSetupScreen({
           ))}
         </View>
       )}
-      <Text style={styles.caption}>Program starts {today}. Future blocks require confirmation.</Text>
+      <Text style={styles.caption}>
+        {editing
+          ? (block != null
+            ? 'Your current block stays as it is. These choices apply to future blocks, except a change of training days also updates the weekly-day limit used for current targets.'
+            : 'These choices apply to future blocks.')
+          : `Program starts ${today}. Future blocks require confirmation.`}
+      </Text>
     </KeyboardAwareScrollView>
     {/* The actions stay on screen below the plan: reaching them never takes
         scrolling past the whole generated week (issue #38). The blocking

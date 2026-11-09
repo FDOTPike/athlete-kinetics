@@ -12,9 +12,10 @@
  * Law 4: Touch targets >= 56pt.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Keyboard, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import {
   BIG4_LIFTS,
+  effectiveRpeCeiling,
   ENERGY_SYSTEMS,
   STANDARD_EQUIPMENT_ITEMS,
   SPECIALIST_EQUIPMENT_ITEMS,
@@ -34,7 +35,11 @@ import { SportPanel } from '../components/SportPanel';
 import { theme } from '../theme/theme';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { useStore } from '../state/useStore';
+import { coachModeAthleteName } from '../state/coachModeAthlete';
 import { useBackupStore } from '../state/backupStore';
+import {
+  ADD_ATHLETE_BACKUP_WARNING, addingAthleteExceedsBackupCap, measureBackupSize, type BackupSizeEstimate,
+} from '../state/backupCapacity';
 import { useSubViewBack } from '../navigation/navigation';
 import { Chip, Stepper, QuietAction, Disclosure, ListRow, PrimaryButton, SecondaryButton } from '../components/ui';
 import { measuredDayDetail } from './measuredDayDetail';
@@ -43,6 +48,7 @@ import { biometricsCopy, providerForPlatform } from '../state/biometricsCopy';
 import CoachVerificationLabScreen from './CoachVerificationLabScreen';
 import GlossaryScreen from './GlossaryScreen';
 import ActivitiesScreen from './ActivitiesScreen';
+import { OBJECTIVE_LABEL } from './OnboardingScreen';
 import HealthTrainingSupportForm from '../components/HealthTrainingSupportForm';
 import BackupTransferPanel from '../components/BackupTransferPanel';
 
@@ -99,6 +105,7 @@ export const OBJECTIVE_TIP: Partial<Record<(typeof OBJECTIVES)[number], string>>
 interface ChipRowProps<T extends string> {
   label: string;
   options: readonly T[];
+  optionLabels?: Readonly<Record<T, string>>;
   value: T;
   onSelect: (v: T) => void;
   /** Glossary key — renders an ⓘ tooltip next to the label. */
@@ -106,7 +113,7 @@ interface ChipRowProps<T extends string> {
   /** When true, every chip renders disabled and onSelect is not called. */
   disabled?: boolean;
 }
-function ChipRow<T extends string>({ label, options, value, onSelect, tip, disabled = false }: ChipRowProps<T>): React.JSX.Element {
+function ChipRow<T extends string>({ label, options, optionLabels, value, onSelect, tip, disabled = false }: ChipRowProps<T>): React.JSX.Element {
   return (
     <View style={styles.field}>
       <View style={styles.fieldLabelRow}>
@@ -114,41 +121,76 @@ function ChipRow<T extends string>({ label, options, value, onSelect, tip, disab
         {tip !== undefined && <InfoTip term={tip} />}
       </View>
       <View style={styles.chipWrap}>
-        {options.map((opt) => (
-          <Chip
-            key={opt}
-            label={opt.replace(/_/g, ' ').toUpperCase()}
-            selected={opt === value}
-            disabled={disabled}
-            onPress={() => { if (!disabled) onSelect(opt); }}
-            accessibilityLabel={`${label}: ${opt.replace(/_/g, ' ')}`}
-          />
-        ))}
+        {options.map((opt) => {
+          const text = optionLabels?.[opt] ?? opt.replace(/_/g, ' ').toUpperCase();
+          const a11yOption = optionLabels?.[opt] ?? opt.replace(/_/g, ' ');
+          return (
+            <Chip
+              key={opt}
+              label={text}
+              selected={opt === value}
+              disabled={disabled}
+              onPress={() => { if (!disabled) onSelect(opt); }}
+              accessibilityLabel={`${label}: ${a11yOption}`}
+            />
+          );
+        })}
       </View>
     </View>
   );
 }
+
+/**
+ * #176: what an objective change will do, said before it is saved. A running
+ * program keeps the objective it was built with (its next blocks too); without
+ * one, the next block is built for the new objective. The current block never
+ * changes. `programObjective` is the running program's own objective (null with
+ * no program): after an earlier change it can differ from `from`.
+ * `programFinished` is a program in review_due: it has finished, so there is no
+ * current block or rest of the program to keep the old objective (owner ruling).
+ */
+export const objectiveChangeText = (
+  from: string,
+  to: string,
+  programObjective: string | null,
+  hasBlock: boolean,
+  hasArchivedBlock = false,
+  programFinished = false,
+): string => {
+  const fromLabel = from.replace(/_/g, ' ');
+  const toLabel = to.replace(/_/g, ' ');
+  const question = `Change your objective from ${fromLabel} to ${toLabel}?`;
+  if (programFinished) {
+    return `${question} Your program has finished. Your next program will be built for ${toLabel}.`;
+  }
+  if (programObjective !== null) {
+    const programLabel = programObjective.replace(/_/g, ' ');
+    return `${question} Your current block and the rest of your program stay ${programLabel}. ${toLabel.charAt(0).toUpperCase()}${toLabel.slice(1)} is used when you build your next program.`;
+  }
+  if (hasBlock) return `${question} Your current block stays as it is. Your next block will be built for ${toLabel}.`;
+  // Earlier blocks ended: the next block is not the first.
+  if (hasArchivedBlock) return `${question} Your next block will be built for ${toLabel}.`;
+  return `${question} Your first block will be built for ${toLabel}.`;
+};
 
 interface NumberRowProps {
   label: string;
   display: string;
   onDec: () => void;
   onInc: () => void;
-  tip?: string;
+  tip?: React.ComponentProps<typeof Stepper>['tip'];
 }
 function NumberRow({ label, display, onDec, onInc, tip }: NumberRowProps): React.JSX.Element {
+  // #161: the info button rides on the stepper's own label row, beside its
+  // label, like every other "i" on this screen.
   return (
     <View style={styles.field}>
-      {tip !== undefined && (
-        <View style={styles.fieldLabelRow}>
-          <InfoTip term={tip} />
-        </View>
-      )}
       <Stepper
         label={label}
         value={display}
         onDecrement={onDec}
         onIncrement={onInc}
+        tip={tip}
       />
     </View>
   );
@@ -280,6 +322,8 @@ const inertWhileClosed = (): void => undefined;
 const refusedWhileClosed = (): boolean => false;
 
 export default function ProfileScreen(): React.JSX.Element {
+  // Large text (issue 158): an athlete's name gets a full row, so it is not cut inside a word.
+  const { fontScale } = useWindowDimensions();
   const profile = useStore((s) => s.profile);
   const saveProfile = useStore((s) => (s.status === 'ready' ? s.saveProfile : inertWhileClosed));
   const uiPreferences = useStore((s) => s.uiPreferences);
@@ -353,10 +397,17 @@ export default function ProfileScreen(): React.JSX.Element {
   const switchProfile = useStore((s) => (s.status === 'ready' ? s.switchProfile : inertWhileClosed));
   const wipeActiveBlockState = useStore((s) => (s.status === 'ready' ? s.wipeActiveBlockState : inertWhileClosed));
   const session = useStore((s) => s.session);
+  const activeProgram = useStore((s) => s.program) ?? null;
+  const activeBlock = useStore((s) => s.block) ?? null;
+  const hasArchivedBlock = useStore((s) => s.hasArchivedBlock) === true;
+  // The objective chosen but not yet confirmed, tied to the athlete and profile
+  // slot it was chosen for, so a switch never confirms it for someone else.
+  const [pendingObjectiveChoice, setPendingObjectiveChoice] = useState<{ objective: UserProfile['objective']; scope: string } | null>(null);
   const resetTrainingData = useStore((s) => s.resetTrainingData);
   const backupWorking = useBackupStore((s) => s.status === 'working');
   const athletes = useStore((s) => s.athletes);
   const activeAthleteId = useStore((s) => s.activeAthleteId);
+  const activeAthleteName = coachModeAthleteName(athletes, activeAthleteId);
   const switchAthlete = useStore((s) => s.switchAthlete);
   // #224: a one-rep max typed with the keyboard still open is saved for the
   // current athlete before a Coach Mode switch closes its database.
@@ -398,6 +449,9 @@ export default function ProfileScreen(): React.JSX.Element {
   const [resetAthleteId, setResetAthleteId] = useState<string | null>(null);
   const [resetError, setResetError] = useState<string | null>(null);
   const [coachError, setCoachError] = useState<string | null>(null);
+  const [coachErrorAthleteId, setCoachErrorAthleteId] = useState<string | null>(null);
+  const profileScrollRef = useRef<ScrollView | null>(null);
+  const profileScrollOffsetY = useRef<number>(0);
   const [confirmingSwitchProfileId, setConfirmingSwitchProfileId] = useState<number | null>(null);
   const [confirmingDeleteBandLevel, setConfirmingDeleteBandLevel] = useState<number | null>(null);
   useEffect(() => {
@@ -408,6 +462,7 @@ export default function ProfileScreen(): React.JSX.Element {
     setConfirmingSwitchProfileId(null);
     setConfirmingDeleteBandLevel(null);
     setCoachError(null);
+    setCoachErrorAthleteId(null);
   }, [activeAthleteId]);
   const [historyText, setHistoryText] = useState('');
   const [historyPreview, setHistoryPreview] = useState<HistoryParseResult | null>(null);
@@ -446,6 +501,19 @@ export default function ProfileScreen(): React.JSX.Element {
 
   // Coach Mode local UI state (collapsed by default — a beginner never needs it).
   const [coachOpen, setCoachOpen] = useState(false);
+  // #173: read the athlete database sizes whenever Coach mode is open, so the
+  // warning before another athlete is added reflects the athletes on the phone.
+  const [backupEstimate, setBackupEstimate] = useState<BackupSizeEstimate | null>(null);
+  useEffect(() => {
+    if (!coachOpen) return undefined;
+    let live = true;
+    void measureBackupSize().then((estimate) => { if (live) setBackupEstimate(estimate); });
+    return () => { live = false; };
+  }, [coachOpen, athletes.length]);
+  // An estimate measured for a different athlete count is stale (an athlete was
+  // just added or deleted and the new reading has not finished): use the count.
+  const currentBackupEstimate = backupEstimate?.athleteCount === athletes.length ? backupEstimate : null;
+  const addWouldExceedBackup = addingAthleteExceedsBackupCap(currentBackupEstimate, athletes.length);
   const [newAthleteName, setNewAthleteName] = useState('');
   const [editingAthleteId, setEditingAthleteId] = useState<string | null>(null);
   const [editAthleteName, setEditAthleteName] = useState('');
@@ -460,6 +528,14 @@ export default function ProfileScreen(): React.JSX.Element {
     profile.mobility_limits.map((f) => `${f.region}: ${f.note}`).join('\n'),
   );
   const activeSlotId = profileSlots.find((p) => p.isActive)?.slotId ?? null;
+  const objectiveScope = `${activeAthleteId ?? ''}|${activeSlotId ?? ''}`;
+  const pendingObjective = pendingObjectiveChoice !== null && pendingObjectiveChoice.scope === objectiveScope
+    ? pendingObjectiveChoice.objective
+    : null;
+  const setPendingObjective = (objective: UserProfile['objective'] | null): void => {
+    setPendingObjectiveChoice(objective === null ? null : { objective, scope: objectiveScope });
+  };
+  useEffect(() => { setPendingObjectiveChoice(null); }, [objectiveScope]);
   useEffect(() => {
     setInjuryText(profile.injury_flags.map((f) => `${f.region}: ${f.note}`).join('\n'));
     setMobilityText(profile.mobility_limits.map((f) => `${f.region}: ${f.note}`).join('\n'));
@@ -494,6 +570,12 @@ export default function ProfileScreen(): React.JSX.Element {
     buildTapReset.current = setTimeout(() => { buildTapCount.current = 0; }, 5000);
   };
 
+  useEffect(() => {
+    if (!glossaryOpen && !activitiesOpen && !labOpen && profileScrollOffsetY.current > 0) {
+      profileScrollRef.current?.scrollTo({ y: profileScrollOffsetY.current, animated: false });
+    }
+  }, [glossaryOpen, activitiesOpen, labOpen]);
+
   if (glossaryOpen) {
     return <GlossaryScreen onClose={() => setGlossaryOpen(false)} />;
   }
@@ -507,9 +589,21 @@ export default function ProfileScreen(): React.JSX.Element {
   }
 
   return (
-    <KeyboardAwareScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <KeyboardAwareScrollView
+      ref={profileScrollRef}
+      style={styles.screen}
+      contentContainerStyle={styles.content}
+      onScroll={(e) => { profileScrollOffsetY.current = e.nativeEvent.contentOffset.y; }}
+      scrollEventThrottle={16}
+    >
       <Text style={styles.wordmark}>pikeMethods</Text>
       <Text style={styles.heading}>ATHLETE PROFILE</Text>
+      {/* #177: in Coach mode (two or more athletes) the heading names the active athlete. */}
+      {activeAthleteName !== null && (
+        <Text style={styles.activeAthleteName} testID="profile-active-athlete">
+          {activeAthleteName}
+        </Text>
+      )}
       <Text style={styles.subheading}>
         Your training settings guide the coach. Health notes and preferences stay
         in your records; instructions can place coach suggestions on hold.
@@ -533,9 +627,30 @@ export default function ProfileScreen(): React.JSX.Element {
         label="1 · OBJECTIVE"
         tip={OBJECTIVE_TIP[profile.objective]}
         options={OBJECTIVES}
+        optionLabels={OBJECTIVE_LABEL}
         value={profile.objective}
-        onSelect={(objective) => saveProfile({ objective })}
+        onSelect={(objective) => setPendingObjective(objective === profile.objective ? null : objective)}
       />
+      {/* #176: an objective change asks first and says what will change. */}
+      {pendingObjective !== null && (
+        <View style={styles.objectiveConfirm} testID="profile-objective-confirmation">
+          <Text style={styles.confirmText} testID="profile-objective-change-text">
+            {objectiveChangeText(profile.objective, pendingObjective, activeProgram?.objective ?? null, activeBlock !== null, hasArchivedBlock, activeProgram?.status === 'review_due')}
+          </Text>
+          <PrimaryButton
+            label="Change objective"
+            onPress={() => { saveProfile({ objective: pendingObjective }); setPendingObjective(null); }}
+            accessibilityLabel={`Change objective to ${pendingObjective.replace(/_/g, ' ')}`}
+            testID="profile-objective-confirm"
+          />
+          <SecondaryButton
+            label={`Keep ${profile.objective.replace(/_/g, ' ')}`}
+            onPress={() => setPendingObjective(null)}
+            accessibilityLabel={`Keep ${profile.objective.replace(/_/g, ' ')}`}
+            testID="profile-objective-keep"
+          />
+        </View>
+      )}
       {/* Work order 2: the focus question and SMART goals, reviewable and
           editable here without rewriting any existing plan. */}
       <FocusGoalsPanel />
@@ -579,13 +694,24 @@ export default function ProfileScreen(): React.JSX.Element {
         onDec={() => saveProfile({ base_rpe_cap: profile.base_rpe_cap - 0.5 })}
         onInc={() => saveProfile({ base_rpe_cap: profile.base_rpe_cap + 0.5 })}
       />
-      <ChipRow
-        label="7 · TARGET ENERGY SYSTEM"
-        tip={ENERGY_SYSTEM_TIP[profile.target_energy_system]}
-        options={ENERGY_SYSTEMS}
-        value={profile.target_energy_system}
-        onSelect={(target_energy_system) => saveProfile({ target_energy_system })}
-      />
+      <Text style={styles.fieldHint} testID="profile-effective-effort-ceiling">
+        {effectiveRpeCeiling(profile) < effectiveRpeCeiling({ ...profile, objective: 'gpp' })
+          ? `Effort ceiling ${effectiveRpeCeiling(profile).toFixed(1)} — Your upper setting is ${profile.base_rpe_cap.toFixed(1)}. Return to training caps effort at ${effectiveRpeCeiling(profile).toFixed(1)}.`
+          : effectiveRpeCeiling(profile) < profile.base_rpe_cap
+            ? `Effort ceiling ${effectiveRpeCeiling(profile).toFixed(1)} — Your upper setting is ${profile.base_rpe_cap.toFixed(1)}. Beginner experience caps effort at ${effectiveRpeCeiling(profile).toFixed(1)}.`
+            : `Effort ceiling ${effectiveRpeCeiling(profile).toFixed(1)} — Your upper setting (${profile.base_rpe_cap.toFixed(1)}) is the ceiling in use.`}
+      </Text>
+      {/* #210: expert sections (energy system, health data, one-rep maxes)
+          start collapsed behind a plain heading for every athlete. */}
+      <Disclosure label="Energy system focus (optional)" style={styles.expertSection} testID="profile-energy-system">
+        <ChipRow
+          label="7 · TARGET ENERGY SYSTEM"
+          tip={ENERGY_SYSTEM_TIP[profile.target_energy_system]}
+          options={ENERGY_SYSTEMS}
+          value={profile.target_energy_system}
+          onSelect={(target_energy_system) => saveProfile({ target_energy_system })}
+        />
+      </Disclosure>
 
 
       <View style={styles.field}>
@@ -626,55 +752,58 @@ export default function ProfileScreen(): React.JSX.Element {
           Example — ankle: limited dorsiflexion. Saved as you type.
         </Text>
       </View>
-      <View style={styles.field}>
-        <View style={styles.fieldLabelRow}>
-          <Text style={styles.fieldLabel}>{healthCopy.title}</Text>
-          {healthCopy.showHrvTip && <InfoTip term="HRV" />}
-        </View>
-        <Text style={styles.fieldHint}>{healthCopy.hint}</Text>
-        {healthCopy.connectLabel !== null && (
-          <Chip
-            label={healthCopy.connectLabel}
-            selected={false}
-            onPress={() => { void requestBiometricsAccess(); }}
-            accessibilityLabel={healthCopy.connectAccessibilityLabel}
-          />
-        )}
-        {biometricsStatus === 'ready' && (
-          <Chip
-            label="SYNC NOW"
-            selected={false}
-            onPress={() => { void syncBiometrics(); }}
-            accessibilityLabel={healthCopy.syncAccessibilityLabel}
-          />
-        )}
-      </View>
-
-      <View style={styles.field}>
-        <View style={styles.fieldLabelRow}>
-          <Text style={styles.fieldLabel}>ONE-REP MAXES (KG)</Text>
-          <InfoTip term="1RM" />
-        </View>
-        <Text style={styles.fieldHint}>
-          With a max set, SESSION shows real target kilograms for every planned
-          lift. Type the number directly (kept in 0.25 kg steps); ± moves 2.5 kg.
-          Clear it by typing 0.
-        </Text>
-        {BIG4_LIFTS.map(({ name, label }) => {
-          const m = movements.find((x) => x.name === name);
-          if (m === undefined) return null;
-          return (
-            <OneRmRow
-              key={name}
-              label={label}
-              valueKg={oneRepMaxes[m.movement_id] as number | undefined}
-              onChange={(kg) => saveOneRepMax(m.movement_id, kg)}
-              athleteId={activeAthleteId}
-              registerCommit={registerOneRmCommit}
+      <Disclosure label="Heart rate and sleep data (optional)" style={styles.expertSection} testID="profile-health-data">
+        <View style={styles.field}>
+          <View style={styles.fieldLabelRow}>
+            <Text style={styles.fieldLabel}>{healthCopy.title}</Text>
+            {healthCopy.showHrvTip && <InfoTip term="HRV" />}
+          </View>
+          <Text style={styles.fieldHint}>{healthCopy.hint}</Text>
+          {healthCopy.connectLabel !== null && (
+            <Chip
+              label={healthCopy.connectLabel}
+              selected={false}
+              onPress={() => { void requestBiometricsAccess(); }}
+              accessibilityLabel={healthCopy.connectAccessibilityLabel}
             />
-          );
-        })}
-      </View>
+          )}
+          {biometricsStatus === 'ready' && (
+            <Chip
+              label="SYNC NOW"
+              selected={false}
+              onPress={() => { void syncBiometrics(); }}
+              accessibilityLabel={healthCopy.syncAccessibilityLabel}
+            />
+          )}
+        </View>
+      </Disclosure>
+      <Disclosure label="One-rep maxes (optional)" style={styles.expertSection} testID="profile-one-rep-maxes">
+        <View style={styles.field}>
+          <View style={styles.fieldLabelRow}>
+            <Text style={styles.fieldLabel}>ONE-REP MAXES (KG)</Text>
+            <InfoTip term="1RM" />
+          </View>
+          <Text style={styles.fieldHint}>
+            With a max set, SESSION shows real target kilograms for every planned
+            lift. Type the number directly (kept in 0.25 kg steps); ± moves 2.5 kg.
+            Clear it by typing 0.
+          </Text>
+          {BIG4_LIFTS.map(({ name, label }) => {
+            const m = movements.find((x) => x.name === name);
+            if (m === undefined) return null;
+            return (
+              <OneRmRow
+                key={name}
+                label={label}
+                valueKg={oneRepMaxes[m.movement_id] as number | undefined}
+                onChange={(kg) => saveOneRepMax(m.movement_id, kg)}
+                athleteId={activeAthleteId}
+                registerCommit={registerOneRmCommit}
+              />
+            );
+          })}
+        </View>
+      </Disclosure>
 
       <View style={styles.mgmtSection}>
         <Text style={styles.mgmtHeading}>SESSION &amp; DISPLAY</Text>
@@ -819,7 +948,7 @@ export default function ProfileScreen(): React.JSX.Element {
                       setIntentError(`Could not clear your choice for ${m.name}. Try again.`);
                     }
                   }}
-                  accessibilityLabel={`Leave ${m.name} unset, so it is planned with added weight`}
+                  accessibilityLabel={`Not set: leave ${m.name} unset, so it is planned with added weight`}
                 />
               </View>
             </View>
@@ -1111,7 +1240,7 @@ export default function ProfileScreen(): React.JSX.Element {
         />
       </View>
 
-      <BackupTransferPanel />
+      <BackupTransferPanel athleteCount={athletes.length} />
 
       <View style={styles.mgmtSection} testID="reset-training-data-section">
         <Disclosure label="Reset training data">
@@ -1214,14 +1343,14 @@ export default function ProfileScreen(): React.JSX.Element {
             return (
               <View key={slot.slotId} style={styles.slotBlock}>
                 <Chip
-                  label={`${slot.name.toUpperCase()}${slot.isActive ? ' ✓' : ''}`}
+                  label={`Saved profile: ${slot.name}${slot.isActive ? ' ✓' : ''}`}
                   selected={slot.isActive}
                   onPress={() => {
                     if (!slot.isActive) {
                       setConfirmingSwitchProfileId(isConfirming ? null : slot.slotId);
                     }
                   }}
-                  accessibilityLabel={`${slot.name} profile${slot.isActive ? ', active' : ''}`}
+                  accessibilityLabel={`Saved profile: ${slot.name}${slot.isActive ? ', active' : ''}`}
                 />
                 {isConfirming && (
                   <View style={styles.confirmBox}>
@@ -1283,7 +1412,7 @@ export default function ProfileScreen(): React.JSX.Element {
           onPress={() => setCoachOpen((o) => !o)}
           accessibilityRole="button"
           accessibilityState={{ expanded: coachOpen }}
-          accessibilityLabel={`Coach mode, ${athletes.length} athletes, ${coachOpen ? 'expanded' : 'collapsed'}`}
+          accessibilityLabel={`Coach mode, ${athletes.length} ${athletes.length === 1 ? 'athlete' : 'athletes'}, ${coachOpen ? 'expanded' : 'collapsed'}`}
           style={styles.coachHeader}
         >
           <Text style={styles.mgmtHeading}>MANAGE ATHLETES</Text>
@@ -1299,7 +1428,7 @@ export default function ProfileScreen(): React.JSX.Element {
               profile switch above, NOTHING is shared. Built for coaching (or
               testing) several people on one phone.
             </Text>
-            {coachError !== null && (
+            {coachError !== null && coachErrorAthleteId === null && (
               <Text style={styles.fieldHint} accessibilityRole="alert">{coachError}</Text>
             )}
             {athletes.map((a) => {
@@ -1308,57 +1437,68 @@ export default function ProfileScreen(): React.JSX.Element {
               const isConfirmingDelete = confirmingDeleteAthleteId === a.id;
               if (editingAthleteId === a.id) {
                 return (
-                  <View key={a.id} style={styles.athleteRow}>
-                    <TextInput
-                      disableFullscreenUI
-                      style={styles.athleteEditInput}
-                      value={editAthleteName}
-                      onChangeText={(t) => {
-                        setCoachError(null);
-                        setEditAthleteName(t);
-                      }}
-                      maxLength={24}
-                      autoFocus
-                      accessibilityLabel={`New name for ${a.name}`}
-                    />
-                    <QuietAction
-                      label="SAVE"
-                      onPress={() => {
-                        setCoachError(null);
-                        void (async () => {
-                          const ok = await renameAthleteEntry(a.id, editAthleteName);
-                          if (ok === false) {
-                            setCoachError(useStore.getState().error);
-                            return;
-                          }
+                  <View key={a.id} style={styles.athleteBlock} testID={`athlete-block-${a.id}`}>
+                    <View style={styles.athleteRow}>
+                      <TextInput
+                        disableFullscreenUI
+                        style={styles.athleteEditInput}
+                        value={editAthleteName}
+                        onChangeText={(t) => {
+                          setCoachError(null);
+                          setCoachErrorAthleteId(null);
+                          setEditAthleteName(t);
+                        }}
+                        maxLength={24}
+                        autoFocus
+                        accessibilityLabel={`New name for ${a.name}`}
+                      />
+                      <QuietAction
+                        label="SAVE"
+                        onPress={() => {
+                          setCoachError(null);
+                          setCoachErrorAthleteId(null);
+                          void (async () => {
+                            const ok = await renameAthleteEntry(a.id, editAthleteName);
+                            if (ok === false) {
+                              setCoachErrorAthleteId(a.id);
+                              setCoachError(useStore.getState().error);
+                              return;
+                            }
+                            setEditingAthleteId(null);
+                          })();
+                        }}
+                        accessibilityLabel="Save name"
+                      />
+                      <QuietAction
+                        label="CANCEL"
+                        onPress={() => {
+                          setCoachError(null);
+                          setCoachErrorAthleteId(null);
                           setEditingAthleteId(null);
-                        })();
-                      }}
-                      accessibilityLabel="Save name"
-                    />
-                    <QuietAction
-                      label="CANCEL"
-                      onPress={() => {
-                        setCoachError(null);
-                        setEditingAthleteId(null);
-                      }}
-                      accessibilityLabel="Cancel rename"
-                    />
+                        }}
+                        accessibilityLabel="Cancel rename"
+                      />
+                    </View>
+                    {coachError !== null && coachErrorAthleteId === a.id && (
+                      <Text style={styles.fieldHint} accessibilityRole="alert">{coachError}</Text>
+                    )}
                   </View>
                 );
               }
               return (
-                <View key={a.id} style={styles.athleteBlock}>
-                  <View style={styles.athleteRow}>
+                <View key={a.id} style={styles.athleteBlock} testID={`athlete-block-${a.id}`}>
+                  <View style={[styles.athleteRow, fontScale >= 1.3 && styles.athleteRowStacked]}>
                     <Pressable
                       style={styles.athleteMain}
                       disabled={isActive}
                       onPress={() => {
                         setCoachError(null);
+                        setCoachErrorAthleteId(null);
                         oneRmCommits.current.forEach((commit) => commit());
                         void (async () => {
                           const ok = await switchAthlete(a.id);
                           if (ok === false) {
+                            setCoachErrorAthleteId(a.id);
                             setCoachError(useStore.getState().error);
                           }
                         })();
@@ -1375,6 +1515,7 @@ export default function ProfileScreen(): React.JSX.Element {
                       label="RENAME"
                       onPress={() => {
                         setCoachError(null);
+                        setCoachErrorAthleteId(null);
                         setEditingAthleteId(a.id);
                         setEditAthleteName(a.name);
                       }}
@@ -1385,12 +1526,16 @@ export default function ProfileScreen(): React.JSX.Element {
                         label="DELETE"
                         onPress={() => {
                           setCoachError(null);
+                          setCoachErrorAthleteId(null);
                           setConfirmingDeleteAthleteId(isConfirmingDelete ? null : a.id);
                         }}
                         accessibilityLabel={`Delete ${a.name} and their database`}
                       />
                     )}
                   </View>
+                  {coachError !== null && coachErrorAthleteId === a.id && (
+                    <Text style={styles.fieldHint} accessibilityRole="alert">{coachError}</Text>
+                  )}
                   {isConfirmingDelete && (
                     <View style={styles.confirmBox}>
                       <Text style={styles.confirmText}>
@@ -1400,9 +1545,11 @@ export default function ProfileScreen(): React.JSX.Element {
                         label={`Confirm delete ${a.name}`}
                         onPress={() => {
                           setCoachError(null);
+                          setCoachErrorAthleteId(null);
                           void (async () => {
                             const ok = await deleteAthlete(a.id);
                             if (ok === false) {
+                              setCoachErrorAthleteId(a.id);
                               setCoachError(useStore.getState().error);
                               return;
                             }
@@ -1415,6 +1562,7 @@ export default function ProfileScreen(): React.JSX.Element {
                         label="Keep athlete"
                         onPress={() => {
                           setCoachError(null);
+                          setCoachErrorAthleteId(null);
                           setConfirmingDeleteAthleteId(null);
                         }}
                       />
@@ -1423,6 +1571,9 @@ export default function ProfileScreen(): React.JSX.Element {
                 </View>
               );
             })}
+            {addWouldExceedBackup && (
+              <Text style={styles.fieldHint} testID="add-athlete-backup-warning">{ADD_ATHLETE_BACKUP_WARNING}</Text>
+            )}
             <View style={styles.athleteRow}>
               <TextInput
                 disableFullscreenUI
@@ -1430,6 +1581,7 @@ export default function ProfileScreen(): React.JSX.Element {
                 value={newAthleteName}
                 onChangeText={(t) => {
                   setCoachError(null);
+                  setCoachErrorAthleteId(null);
                   setNewAthleteName(t);
                 }}
                 placeholder="New athlete's name"
@@ -1441,10 +1593,12 @@ export default function ProfileScreen(): React.JSX.Element {
                 label="ADD ATHLETE"
                 onPress={() => {
                   setCoachError(null);
+                  setCoachErrorAthleteId(null);
                   const trimmed = newAthleteName.trim();
                   void (async () => {
                     const ok = await createAthlete(trimmed.length > 0 ? trimmed : 'New Athlete');
                     if (ok === false) {
+                      setCoachErrorAthleteId(null);
                       setCoachError(useStore.getState().error);
                       return;
                     }
@@ -1520,6 +1674,8 @@ const styles = StyleSheet.create({
     marginBottom: theme.space[1],
   },
   heading: { ...theme.font.title, color: theme.color.textHi },
+  expertSection: { marginBottom: theme.space[4] },
+  activeAthleteName: { ...theme.font.body, color: theme.color.textHi, marginTop: theme.space[1] },
   safetyNotice: {
     backgroundColor: theme.color.ink1,
     borderColor: theme.color.line,
@@ -1544,6 +1700,7 @@ const styles = StyleSheet.create({
   fieldLabel: { ...theme.font.eyebrow, color: theme.color.textLow, flexShrink: 1 },
   fieldLabelRow: { flexDirection: 'row', alignItems: 'center', marginBottom: theme.space[2] },
   fieldHint: { ...theme.font.label, color: theme.color.textMid, marginBottom: theme.space[2] },
+  objectiveConfirm: { gap: theme.space[3], marginBottom: theme.space[4] },
   inventoryWrap: { marginTop: theme.space[2] },
   preferenceLabel: { marginTop: theme.space[4], marginBottom: theme.space[2] },
   bandRow: { flexDirection: 'row', alignItems: 'center', gap: theme.space[2], marginBottom: theme.space[2] },
@@ -1566,6 +1723,12 @@ const styles = StyleSheet.create({
   },
   numBtnPressed: { backgroundColor: theme.color.ink0 },
   numBtnText: { color: theme.color.textHi, fontSize: 28, fontWeight: '700', lineHeight: 32 },
+  // Android walk W7-2 (#153): a single-line Android EditText (mSingleLine = true,
+  // mLayout.getWidth() = VERY_WIDE = 1,048,576) only reports mLayout.getLineWidth(0)
+  // in TextView.computeHorizontalScrollRange() when horizontal gravity is LEFT.
+  // With textAlign: 'center', computeHorizontalScrollRange() returns VERY_WIDE so
+  // canScrollHorizontally(1) is always true and ReactEditText.onTouchEvent never
+  // releases parent.requestDisallowInterceptTouchEvent(true) on vertical drags.
   oneRmInput: {
     flex: 1,
     minHeight: theme.touch.min,
@@ -1576,8 +1739,9 @@ const styles = StyleSheet.create({
     color: theme.color.textHi,
     fontSize: 26,
     fontWeight: '800',
-    textAlign: 'center',
+    includeFontPadding: false,
     fontVariant: ['tabular-nums'],
+    paddingHorizontal: theme.space[3],
     paddingVertical: theme.space[1],
   },
   notesInput: {
@@ -1626,6 +1790,7 @@ const styles = StyleSheet.create({
   coachToggle: { ...theme.font.body, color: theme.color.textMid },
   athleteBlock: { marginBottom: theme.space[2] },
   athleteRow: { flexDirection: 'row', alignItems: 'center', gap: theme.space[2], marginBottom: theme.space[2] },
+  athleteRowStacked: { flexDirection: 'column', alignItems: 'stretch' },
   athleteMain: {
     flex: 1,
     minHeight: theme.touch.min,
