@@ -11,8 +11,8 @@
  *   - what the plan will do about the chosen outcome, and what it cannot do,
  *     is stated before and after saving.
  */
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import {
   SPORT_EXPERIENCE_LABEL,
   SPORT_OUTCOME_LABEL,
@@ -20,8 +20,11 @@ import {
   sportEmphasisFor,
   sportWorkloadEffect,
   validateSportProfile,
+  type SportProfile,
+  type SportWorkload,
 } from '@ak/inference';
 import { useStore } from '../state/useStore';
+import { useSubViewBack } from '../navigation/navigation';
 import { theme } from '../theme/theme';
 import { PrimaryButton, SecondaryButton } from './ui';
 import { localIsoToday } from './FocusGoalFields';
@@ -34,6 +37,20 @@ import {
   type SportFieldsState,
 } from './SportFields';
 
+/**
+ * #176: what removing the sport will change, said before it happens. Only the
+ * next block is affected; the competition date goes with the sport answer.
+ */
+export const removeSportText = (sport: SportProfile, workload: SportWorkload): string => {
+  const counted = workload.source === 'stated'
+    ? ', and the weekly sport numbers you gave will no longer be counted'
+    : workload.source === 'schedule'
+      ? '. Your Activities schedule is kept and still counted'
+      : '';
+  const date = sport.competitionDate === null ? '' : ` Your competition date (${sport.competitionDate}) is removed too.`;
+  return `Remove ${sportDisplayName(sport)}? Your next block will be planned without your sport${counted}.${date} Your current plan is unchanged.`;
+};
+
 export function SportPanel(): React.JSX.Element | null {
   const ready = useStore((s) => s.status === 'ready');
   const sport = useStore((s) => s.sport) ?? null;
@@ -44,11 +61,38 @@ export function SportPanel(): React.JSX.Element | null {
   const [fields, setFields] = useState<SportFieldsState | null>(null);
   const [showErrors, setShowErrors] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [confirmingRemove, setConfirmingRemove] = useState(false);
+  // What the editor held when it opened: an unchanged editor closes quietly.
+  const openedWith = useRef<string | null>(null);
 
   // The schedule may have changed on another screen since this one was shown.
   useEffect(() => {
     if (ready && typeof refreshSport === 'function') refreshSport();
   }, [ready, refreshSport]);
+
+  // #148: Android back closes the sport editor first. Unsaved changes are
+  // confirmed before they are thrown away, as the routine builder does.
+  const editorChanged = fields !== null && JSON.stringify(fields) !== openedWith.current;
+  const discardEditor = (): void => {
+    setFields(null);
+    setShowErrors(false);
+  };
+  const requestCloseEditor = (): void => {
+    if (!editorChanged) {
+      discardEditor();
+      return;
+    }
+    Alert.alert(
+      'Discard this sport?',
+      'Your changes to the sport answer have not been saved.',
+      [
+        { text: 'Keep editing', style: 'cancel' },
+        { text: 'Discard', style: 'destructive', onPress: discardEditor },
+      ],
+      { cancelable: true },
+    );
+  };
+  useSubViewBack(fields !== null, requestCloseEditor);
 
   // Component tests drive the profile screen with partial store states; the
   // panel needs the real actions to be useful and renders nothing without them.
@@ -59,9 +103,12 @@ export function SportPanel(): React.JSX.Element | null {
   const NEXT_BLOCK = 'Your current plan is unchanged; this is used when your next block is created.';
 
   const beginEdit = (): void => {
-    setFields(sport === null ? EMPTY_SPORT_FIELDS : sportFieldsFromProfile(sport));
+    const initial = sport === null ? EMPTY_SPORT_FIELDS : sportFieldsFromProfile(sport);
+    openedWith.current = JSON.stringify(initial);
+    setFields(initial);
     setShowErrors(false);
     setMessage(null);
+    setConfirmingRemove(false);
   };
   const commit = (): void => {
     if (fields === null) return;
@@ -73,6 +120,7 @@ export function SportPanel(): React.JSX.Element | null {
     } else setMessage(storeError());
   };
   const remove = (): void => {
+    setConfirmingRemove(false);
     if (saveSport(null)) {
       setFields(null);
       setMessage(`Sport removed. ${NEXT_BLOCK}`);
@@ -101,14 +149,23 @@ export function SportPanel(): React.JSX.Element | null {
           )}
         </>
       )}
-      <Text style={styles.dim} testID="profile-sport-workload">{sportWorkloadEffect(workload).explanation}</Text>
+      {/* #176: said of the next block, in the future tense: nothing changes until one is made. */}
+      <Text style={styles.dim} testID="profile-sport-workload">{sportWorkloadEffect(workload).nextBlockExplanation}</Text>
 
-      {fields === null ? (
+      {fields === null && confirmingRemove && sport !== null ? (
+        <View style={styles.actions} testID="profile-sport-remove-confirmation">
+          <Text style={styles.body} testID="profile-sport-remove-text">{removeSportText(sport, workload)}</Text>
+          <PrimaryButton label="REMOVE SPORT" onPress={remove}
+            accessibilityLabel="Remove the sport" testID="profile-sport-remove-confirm" />
+          <SecondaryButton label="KEEP SPORT" fullWidth onPress={() => setConfirmingRemove(false)}
+            accessibilityLabel="Keep the sport" testID="profile-sport-remove-keep" />
+        </View>
+      ) : fields === null ? (
         <View style={styles.actions}>
           <SecondaryButton label={sport === null ? 'ADD A SPORT' : 'CHANGE SPORT'} fullWidth onPress={beginEdit}
             accessibilityLabel={sport === null ? 'Add a sport' : 'Change your sport answer'} testID="profile-sport-edit" />
           {sport !== null && (
-            <SecondaryButton label="I NO LONGER PLAY A SPORT" fullWidth onPress={remove}
+            <SecondaryButton label="I NO LONGER PLAY A SPORT" fullWidth onPress={() => { setMessage(null); setConfirmingRemove(true); }}
               accessibilityLabel="Remove the sport. Your plan becomes general gym training from the next block."
               testID="profile-sport-remove" />
           )}
@@ -117,7 +174,7 @@ export function SportPanel(): React.JSX.Element | null {
         <View>
           <Text style={styles.question} accessibilityRole="header">{SPORT_QUESTION}</Text>
           <SportEditor fields={fields} onChange={setFields} today={today} showAllErrors={showErrors} />
-          <Text style={styles.dim}>{`Saving does not change your current plan. ${NEXT_BLOCK}`}</Text>
+          <Text style={styles.dim}>Saving does not change your current plan. It is used when your next block is created.</Text>
           <View style={styles.actions}>
             <PrimaryButton label="SAVE SPORT" onPress={commit}
               accessibilityLabel="Save your sport answer" testID="profile-sport-save" />

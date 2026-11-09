@@ -27,6 +27,7 @@ import {
   SESSION_FEEL_REASON_LABEL,
   SESSION_FEEL_NOTE_MAX_LENGTH,
   SESSION_FEEL_RECORD_ONLY_TEXT,
+  SESSION_FEEL_RECORD_ONLY_TEXT_NO_PLAN_FORM,
   SESSION_NOTE_STARTERS,
   withNoteStarter,
 } from '../../src/components/SessionFeelPanel';
@@ -97,7 +98,7 @@ describe('SessionFeelPanel: an answer by tapping', () => {
     render(<SessionFeelPanel saved={null} note={null} onSave={onSave} onClose={onClose} />);
     fireEvent.press(screen.getByTestId('session-feel-harder'));
     fireEvent.press(screen.getByTestId('session-feel-save'));
-    expect(screen.getByTestId('session-feel-problem')).toHaveTextContent('Choose at least one reason.');
+    expect(screen.getByTestId('session-feel-problem')).toHaveTextContent('Choose at least one reason it was harder.');
     expect(onClose).not.toHaveBeenCalled();
 
     fireEvent.press(screen.getByTestId('session-feel-reason-unwell'));
@@ -106,6 +107,65 @@ describe('SessionFeelPanel: an answer by tapping', () => {
     fireEvent.press(screen.getByTestId('session-feel-save'));
     expect(onSave).toHaveBeenLastCalledWith({ feel: 'harder', reasons: ['unwell', 'tired'] }, '');
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  // Issue #220: harder and easier have their own lists; only harder needs a reason.
+  test('harder and easier offer their own reasons', () => {
+    render(<SessionFeelPanel saved={null} note={null} onSave={ruleOnly()} onClose={jest.fn()} />);
+    const shown = () => SESSION_FEEL_REASONS.filter((reason) => screen.queryByTestId(`session-feel-reason-${reason}`) !== null);
+    fireEvent.press(screen.getByTestId('session-feel-harder'));
+    expect(shown()).toEqual(['pain', 'tired', 'unwell', 'technique', 'equipment', 'time', 'other', 'too_heavy']);
+    expect(screen.getByTestId('session-feel-reasons-label')).toHaveTextContent('Why? Choose at least one.');
+    fireEvent.press(screen.getByTestId('session-feel-easier'));
+    expect(shown()).toEqual(['felt_good', 'other', 'too_light', 'rested_well']);
+    expect(screen.getByTestId('session-feel-reasons-label')).toHaveTextContent('Why? Optional. Choose any that apply.');
+    expect(screen.getByTestId('session-feel-reason-too_light')).toHaveTextContent('Load too light');
+    expect(screen.getByTestId('session-feel-reason-rested_well')).toHaveTextContent('Rested well');
+  });
+
+  test('"easier" and "stopped early" save without a reason; "harder" still needs one', () => {
+    for (const kind of ['easier', 'stopped_early']) {
+      const onSave = ruleOnly();
+      const onClose = jest.fn();
+      const view = render(<SessionFeelPanel saved={null} note={null} onSave={onSave} onClose={onClose} />);
+      fireEvent.press(screen.getByTestId(`session-feel-${kind}`));
+      fireEvent.press(screen.getByTestId('session-feel-save'));
+      expect(onSave).toHaveBeenLastCalledWith({ feel: kind, reasons: [] }, '');
+      expect(onClose).toHaveBeenCalledTimes(1);
+      view.unmount();
+    }
+    expect(validateSessionFeel({ feel: 'harder', reasons: [] })).toEqual({ ok: false, problem: 'reason_required' });
+    expect(validateSessionFeel({ feel: 'harder', reasons: ['too_heavy'] })).toEqual({ ok: true, record: { feel: 'harder', reasons: ['too_heavy'] } });
+  });
+
+  test('the saved sentence reads naturally', () => {
+    expect(describeSessionFeel({ feel: 'easier', reasons: ['felt_good'] })).toBe('Easier than planned. Felt good.');
+    expect(describeSessionFeel({ feel: 'easier', reasons: [] })).toBe('Easier than planned.');
+    expect(describeSessionFeel({ feel: 'harder', reasons: ['unwell', 'too_heavy'] })).toBe('Harder than planned. Unwell, load too heavy.');
+  });
+
+  test('changing the answer clears the reasons tapped under the earlier one, even one both lists offer', () => {
+    const onSave = ruleOnly();
+    render(<SessionFeelPanel saved={null} note={null} onSave={onSave} onClose={jest.fn()} />);
+    fireEvent.press(screen.getByTestId('session-feel-harder'));
+    fireEvent.press(screen.getByTestId('session-feel-reason-other'));
+    fireEvent.press(screen.getByTestId('session-feel-easier'));
+    expect(screen.getByTestId('session-feel-reason-other').props.accessibilityState.selected).toBe(false);
+    fireEvent.press(screen.getByTestId('session-feel-save'));
+    expect(onSave).toHaveBeenLastCalledWith({ feel: 'easier', reasons: [] }, '');
+
+    // Harder and stopped early share a list; a reason for one is not assumed for the other.
+    fireEvent.press(screen.getByTestId('session-feel-harder'));
+    fireEvent.press(screen.getByTestId('session-feel-reason-tired'));
+    fireEvent.press(screen.getByTestId('session-feel-stopped_early'));
+    fireEvent.press(screen.getByTestId('session-feel-save'));
+    expect(onSave).toHaveBeenLastCalledWith({ feel: 'stopped_early', reasons: [] }, '');
+
+    // Tapping the answer that is already chosen keeps its reasons.
+    fireEvent.press(screen.getByTestId('session-feel-reason-pain'));
+    fireEvent.press(screen.getByTestId('session-feel-stopped_early'));
+    fireEvent.press(screen.getByTestId('session-feel-save'));
+    expect(onSave).toHaveBeenLastCalledWith({ feel: 'stopped_early', reasons: ['pain'] }, '');
   });
 
   test('a reason can be untapped again', () => {
@@ -163,7 +223,8 @@ describe('SessionFeelPanel: an answer by tapping', () => {
     expect(colour()).toBe(theme.color.textMid);
 
     fireEvent.press(screen.getByTestId('session-feel-harder'));
-    for (const reason of ['tired', 'technique', 'equipment', 'time', 'felt_good', 'other']) {
+    // Every non-body reason on the harder list (issue #220: felt_good is on the easier list).
+    for (const reason of ['tired', 'technique', 'equipment', 'time', 'too_heavy', 'other']) {
       fireEvent.press(screen.getByTestId(`session-feel-reason-${reason}`));
     }
     expect(colour()).toBe(theme.color.textMid);
@@ -282,8 +343,12 @@ describe('SessionFeelPanel: an answer by tapping', () => {
   test('the places it names exist under those names, the one usable after a session comes first, and it gives no advice', () => {
     const source = (file) => fs.readFileSync(path.join(__dirname, '..', '..', 'src', file), 'utf8');
     expect(SESSION_FEEL_RECORD_ONLY_TEXT).toMatch(/^This is a record only\. It does not adjust your training\./);
-    expect(SESSION_FEEL_RECORD_ONLY_TEXT).toContain('"Something feels off" on the Plan screen');
+    // With readiness, both places named under "Something feels off" exist. Without it,
+    // the no-plan-form sentence is used instead (#263), so this one never names an absent form.
+    expect(SESSION_FEEL_RECORD_ONLY_TEXT).toContain('"Something feels off" here or on the Plan screen.');
+    expect(SESSION_FEEL_RECORD_ONLY_TEXT).not.toContain("Both need today's readiness first.");
     expect(source('screens/BlockScreen.tsx')).toContain('label="Something feels off"');
+    expect(source('screens/SessionScreen.tsx')).toContain('label="Something feels off"');
     // "Plan" is the tab that shows the screen holding that control.
     expect(source('App.tsx')).toContain("coach: 'Plan'");
     expect(source('App.tsx')).toMatch(/tab === 'coach'[\s\S]{0,80}<BlockScreen/);
@@ -319,6 +384,68 @@ describe('SessionFeelPanel: an answer by tapping', () => {
     expect(screen.getByTestId('session-feel-note').props.value).toBe('shoulder pinched on the press');
   });
 
+  // Owner ruling on #220: a saved reason the answer's new list does not offer
+  // (a row from before the per-answer lists) is shown as an extra selected
+  // chip while the answer is unchanged, so a saved "pain" is never hidden.
+  describe('a saved reason outside the answer\'s list', () => {
+    /** As the store does: the rule, with the saved answer the store reads back. */
+    const ruleWithSaved = (saved) => jest.fn((draft) => {
+      const checked = validateSessionFeel(draft, saved);
+      return checked.ok ? null : checked.problem;
+    });
+    const reasonOrder = () => screen.getAllByTestId(/^session-feel-reason-/).map((chip) => chip.props.testID.replace('session-feel-reason-', ''));
+
+    test('a saved "easier" + pain shows pain selected after the easier list, and saving unchanged keeps it', () => {
+      const saved = { feel: 'easier', reasons: ['pain'] };
+      const onSave = ruleWithSaved(saved);
+      const onClose = jest.fn();
+      render(<SessionFeelPanel saved={saved} note={null} onSave={onSave} onClose={onClose} />);
+      expect(screen.getByTestId('session-feel-easier').props.accessibilityState.selected).toBe(true);
+      expect(screen.getByTestId('session-feel-reason-pain').props.accessibilityState.selected).toBe(true);
+      expect(reasonOrder()).toEqual(['felt_good', 'too_light', 'rested_well', 'other', 'pain']);
+      // Pain is about the body, so the record-only sentence stands out.
+      expect(StyleSheet.flatten(screen.getByTestId('session-feel-record-only').props.style).color).toBe(theme.color.textHi);
+      fireEvent.press(screen.getByTestId('session-feel-save'));
+      expect(onSave).toHaveBeenLastCalledWith({ feel: 'easier', reasons: ['pain'] }, '');
+      expect(onSave).toHaveLastReturnedWith(null);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    test('the athlete can untap the saved pain', () => {
+      const saved = { feel: 'easier', reasons: ['pain'] };
+      const onSave = ruleWithSaved(saved);
+      render(<SessionFeelPanel saved={saved} note={null} onSave={onSave} onClose={jest.fn()} />);
+      fireEvent.press(screen.getByTestId('session-feel-reason-pain'));
+      expect(screen.getByTestId('session-feel-reason-pain').props.accessibilityState.selected).toBe(false);
+      fireEvent.press(screen.getByTestId('session-feel-save'));
+      expect(onSave).toHaveBeenLastCalledWith({ feel: 'easier', reasons: [] }, '');
+    });
+
+    test('a saved "harder" + felt good re-saves unchanged', () => {
+      const saved = { feel: 'harder', reasons: ['felt_good'] };
+      const onSave = ruleWithSaved(saved);
+      const onClose = jest.fn();
+      render(<SessionFeelPanel saved={saved} note={null} onSave={onSave} onClose={onClose} />);
+      expect(screen.getByTestId('session-feel-reason-felt_good').props.accessibilityState.selected).toBe(true);
+      fireEvent.press(screen.getByTestId('session-feel-save'));
+      expect(onSave).toHaveLastReturnedWith(null);
+      expect(onClose).toHaveBeenCalledTimes(1);
+    });
+
+    test('a different answer neither offers nor carries it', () => {
+      const saved = { feel: 'harder', reasons: ['felt_good'] };
+      const onSave = ruleWithSaved(saved);
+      render(<SessionFeelPanel saved={saved} note={null} onSave={onSave} onClose={jest.fn()} />);
+      fireEvent.press(screen.getByTestId('session-feel-stopped_early'));
+      expect(screen.queryByTestId('session-feel-reason-felt_good')).toBeNull();
+      fireEvent.press(screen.getByTestId('session-feel-save'));
+      expect(onSave).toHaveBeenLastCalledWith({ feel: 'stopped_early', reasons: [] }, '');
+      // Back on the saved answer it is offered again, but not chosen for the athlete.
+      fireEvent.press(screen.getByTestId('session-feel-harder'));
+      expect(screen.getByTestId('session-feel-reason-felt_good').props.accessibilityState.selected).toBe(false);
+    });
+  });
+
   test('a failed save keeps the panel open and says the session itself is safe', () => {
     const onClose = jest.fn();
     render(<SessionFeelPanel saved={null} note={null} onSave={jest.fn(() => 'not_saved')} onClose={onClose} />);
@@ -341,7 +468,7 @@ describe('SessionFeelPanel: an answer by tapping', () => {
   test('the one-line description is plain and lists reasons in order', () => {
     expect(describeSessionFeel({ feel: 'as_planned', reasons: [] })).toBe('As planned.');
     expect(describeSessionFeel({ feel: 'harder', reasons: ['tired', 'unwell'] }))
-      .toBe('Harder than planned: tired or slept badly, unwell.');
+      .toBe('Harder than planned. Tired or slept badly, unwell.');
   });
 });
 
@@ -444,6 +571,29 @@ describe('completion screen: asked only when the session did not go to plan', ()
     expectNoTrainingAction();
   });
 
+  // Android walk (#212): a followed plan that is asked (only effort drift can
+  // ask it) must not also say the session went differently from the plan.
+  test('a followed plan asked because of effort drift says so, not "went differently from the plan"', () => {
+    mockState = baseState({
+      profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+      loadSessionOutcome: jest.fn(() => ({ outcomeKind: 'followed_plan', finalizedAtMs: 1_757_000_000_000 })),
+    });
+    render(<SessionScreen />);
+    expect(screen.getByText('Plan followed.')).toBeOnTheScreen();
+    expect(screen.getByTestId('session-feel-ask')).toHaveTextContent('You did every set, but your effort was different from the targets.');
+    expect(screen.queryByText(/went differently from the plan/)).toBeNull();
+    expect(screen.getByTestId('session-feel-open')).toBeOnTheScreen();
+  });
+
+  test('an adapted session that is asked still says it went differently from the plan', () => {
+    mockState = baseState({
+      profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    });
+    render(<SessionScreen />);
+    expect(screen.getByText('Session adapted.')).toBeOnTheScreen();
+    expect(screen.getByTestId('session-feel-ask')).toHaveTextContent('This session went differently from the plan.');
+  });
+
   test('opening the panel writes nothing; saving asks the store once and returns to the screen', () => {
     const loadSessionFeel = jest.fn()
       .mockReturnValueOnce({ ask: true, saved: null, note: null })
@@ -462,7 +612,7 @@ describe('completion screen: asked only when the session did not go to plan', ()
     expect(mockState.saveSessionFeel).toHaveBeenCalledTimes(1);
     expect(mockState.saveSessionFeel).toHaveBeenCalledWith({ feel: 'harder', reasons: ['unwell'] }, 'felt rough');
     expect(screen.queryByTestId('session-feel-panel')).toBeNull();
-    expect(screen.getByTestId('session-feel-saved')).toHaveTextContent('How it went: Harder than planned: unwell.');
+    expect(screen.getByTestId('session-feel-saved')).toHaveTextContent('How it went: Harder than planned. Unwell.');
     expect(screen.getByText('Your note is saved with this session.')).toBeOnTheScreen();
     expect(screen.getByTestId('session-feel-change')).toBeOnTheScreen();
     expectNoTrainingAction();
@@ -575,4 +725,56 @@ test('a note starter also focuses the note field, so the athlete can type straig
   const focus = jest.spyOn(input.instance, 'focus');
   fireEvent.press(screen.getByTestId('session-note-starter-body'));
   expect(focus).toHaveBeenCalled();
+});
+
+// Issue 158: the completion lines sit apart from the summary above them. The gap is on the outcome footer.
+test('the outcome footer is set apart from the summary above it, so the feel lines get a gap', () => {
+  mockState = baseState();
+  render(<SessionScreen />);
+  expect(StyleSheet.flatten(screen.getByTestId('session-outcome-footer').props.style)).toMatchObject({ marginTop: theme.space[3] });
+});
+
+// ---------------------------------------------------------------------------
+// #180: the sentence never points at a Plan form that is not on the page.
+// The Plan screen shows "Something feels off" only once readiness exists.
+// ---------------------------------------------------------------------------
+
+describe('the record-only sentence names only a report place that exists', () => {
+  test('with the Plan form available, the sentence is unchanged', () => {
+    render(<SessionFeelPanel saved={null} note={null} planReportAvailable onSave={ruleOnly()} onClose={jest.fn()} />);
+    expect(screen.getByTestId('session-feel-record-only')).toHaveTextContent(SESSION_FEEL_RECORD_ONLY_TEXT);
+  });
+
+  test('without the Plan form, the sentence points only at "Report discomfort" in a workout', () => {
+    render(<SessionFeelPanel saved={null} note={null} planReportAvailable={false} onSave={ruleOnly()} onClose={jest.fn()} />);
+    const sentence = screen.getByTestId('session-feel-record-only');
+    expect(sentence).toHaveTextContent(SESSION_FEEL_RECORD_ONLY_TEXT_NO_PLAN_FORM);
+    expect(sentence).not.toHaveTextContent(/Something feels off/);
+    expect(SESSION_FEEL_RECORD_ONLY_TEXT_NO_PLAN_FORM).toMatch(/^This is a record only\. It does not adjust your training\./);
+    expect(SESSION_FEEL_RECORD_ONLY_TEXT_NO_PLAN_FORM).toContain('"Report discomfort"');
+    expect(SESSION_FEEL_RECORD_ONLY_TEXT_NO_PLAN_FORM).not.toMatch(/\b(should|must|rest|doctor|physio|treat)\b/i);
+  });
+
+  test('without the Plan form, a screen reader hears the same sentence the panel shows', () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => {});
+    render(<SessionFeelPanel saved={null} note={null} planReportAvailable={false} onSave={ruleOnly()} onClose={jest.fn()} />);
+    fireEvent.press(screen.getByTestId('session-feel-stopped_early'));
+    fireEvent.press(screen.getByTestId('session-feel-reason-pain'));
+    expect(announce).toHaveBeenLastCalledWith(SESSION_FEEL_RECORD_ONLY_TEXT_NO_PLAN_FORM);
+    announce.mockRestore();
+  });
+
+  test('the completion screen with no readiness opens the panel without the Plan pointer', () => {
+    mockState = baseState({ vector: null });
+    render(<SessionScreen />);
+    fireEvent.press(screen.getByTestId('session-feel-open'));
+    expect(screen.getByTestId('session-feel-record-only')).toHaveTextContent(SESSION_FEEL_RECORD_ONLY_TEXT_NO_PLAN_FORM);
+  });
+
+  test('the completion screen with readiness keeps the Plan pointer', () => {
+    mockState = baseState({ vector: { date: '2026-10-09', readiness_score: 70 } });
+    render(<SessionScreen />);
+    fireEvent.press(screen.getByTestId('session-feel-open'));
+    expect(screen.getByTestId('session-feel-record-only')).toHaveTextContent(SESSION_FEEL_RECORD_ONLY_TEXT);
+  });
 });

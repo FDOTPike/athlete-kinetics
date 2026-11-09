@@ -11,7 +11,7 @@
  * Law 2: chalk is ONLY on the drain bar top edge. Nowhere else in this component.
  * Law: zero hex literals.
  */
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Animated,
   StyleSheet,
@@ -27,7 +27,11 @@ export interface RestTimerCardProps {
   /** Total rest duration in seconds */
   totalSeconds: number;
   /** Time elapsed in seconds since rest started */
-  elapsedSeconds: number;
+  elapsedSeconds?: number;
+  /** Optional wall-clock start time so the countdown ticks inside RestTimerCard without re-rendering the parent screen */
+  startedAtMs?: number;
+  /** Optional callback fired once when the countdown reaches 0 */
+  onComplete?: () => void;
   /** Name of the upcoming movement (shown as context) */
   upcomingLabel?: string;
   style?: StyleProp<ViewStyle>;
@@ -41,15 +45,51 @@ const secondsText = (n: number): string => {
   return min > 0 ? `${min}:${String(sec).padStart(2, '0')}` : `${value}s`;
 };
 
+const accessibleRemainingSeconds = (remaining: number, totalSeconds: number): number => {
+  if (remaining <= 0) return 0;
+  if (remaining <= 5) return 5;
+  if (remaining <= 10) return 10;
+  return Math.min(totalSeconds, Math.ceil(remaining / 15) * 15);
+};
+
 export function RestTimerCard({
   totalSeconds,
   elapsedSeconds,
+  startedAtMs,
+  onComplete,
   upcomingLabel,
   style,
   testID,
 }: RestTimerCardProps): React.JSX.Element {
-  // Numerals update at 1Hz from prop (caller drives elapsed via setInterval)
-  const remaining = Math.max(0, totalSeconds - elapsedSeconds);
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const completedKeyRef = useRef<string | null>(null);
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
+
+  useEffect(() => {
+    if (startedAtMs === undefined) return;
+    setNowMs(Date.now());
+  }, [startedAtMs, totalSeconds]);
+
+  const elapsed = startedAtMs !== undefined
+    ? Math.max(0, Math.floor((nowMs - startedAtMs) / 1000))
+    : (elapsedSeconds ?? 0);
+  const remaining = Math.max(0, totalSeconds - elapsed);
+  const a11yRemaining = accessibleRemainingSeconds(remaining, totalSeconds);
+
+  useEffect(() => {
+    if (startedAtMs === undefined || remaining <= 0) return undefined;
+    const id = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [startedAtMs, remaining > 0]);
+
+  useEffect(() => {
+    if (startedAtMs === undefined || remaining > 0) return;
+    const key = `${startedAtMs}:${totalSeconds}`;
+    if (completedKeyRef.current === key) return;
+    completedKeyRef.current = key;
+    onCompleteRef.current?.();
+  }, [startedAtMs, totalSeconds, remaining]);
 
   // ONE Animated.timing for scaleX over the full duration.
   // We start a new animation only when a new rest period begins (totalSeconds changes).
@@ -58,8 +98,8 @@ export function RestTimerCard({
 
   useEffect(() => {
     animRef.current?.stop();
-    const remainingMs = Math.max(0, (totalSeconds - elapsedSeconds) * 1000);
-    const startValue = totalSeconds > 0 ? (totalSeconds - elapsedSeconds) / totalSeconds : 0;
+    const remainingMs = Math.max(0, (totalSeconds - elapsed) * 1000);
+    const startValue = totalSeconds > 0 ? (totalSeconds - elapsed) / totalSeconds : 0;
     const dur = motionDuration(remainingMs);
 
     scaleX.setValue(startValue);
@@ -80,7 +120,7 @@ export function RestTimerCard({
     };
   // Only restart animation when a new rest period starts (totalSeconds + initial elapsed)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [totalSeconds]);
+  }, [totalSeconds, startedAtMs]);
 
   return (
     <View style={[styles.card, style]} testID={testID}>
@@ -96,7 +136,7 @@ export function RestTimerCard({
         <Text style={styles.eyebrow}>REST</Text>
         <Text
           style={styles.numerals}
-          accessibilityLabel={`Rest timer: ${secondsText(remaining)} remaining`}
+          accessibilityLabel={`Rest timer: ${secondsText(a11yRemaining)} remaining`}
         >
           {secondsText(remaining)}
         </Text>

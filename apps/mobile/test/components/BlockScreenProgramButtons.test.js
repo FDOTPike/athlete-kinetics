@@ -163,7 +163,7 @@ test('plan-first card: with a program active, Go to Plan opens the program edito
 
   fireEvent.press(screen.getByText('Start without a planned session'));
   fireEvent.press(screen.getByLabelText('Start an unplanned session'));
-  expect(screen.getByText('Nothing to start yet')).toBeOnTheScreen();
+  expect(screen.getByText('No session is ready to start')).toBeOnTheScreen();
   fireEvent.press(screen.getByLabelText('Go to Plan'));
 
   expect(mockState.startSession).not.toHaveBeenCalled();

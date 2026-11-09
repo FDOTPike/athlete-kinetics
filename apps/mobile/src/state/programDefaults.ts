@@ -62,6 +62,37 @@ export const RECOMMENDED_BLOCK_COUNT = 3;
  */
 export const recommendedSchemaType = (_profile: UserProfile): SchemaType => 'LINEAR';
 
+/** The method in the same words as the Fine-tune chips, lower-cased for a sentence. */
+const METHOD_WORD: Record<SchemaType, string> = {
+  LINEAR: 'linear', WAVE: 'undulating', STEP: 'step loading', APRE: 'autoregulated',
+};
+
+export interface ProgramChoices {
+  buildMode: 'coach' | 'custom';
+  schemaType: SchemaType;
+  horizonKind: 'weeks' | 'date';
+  blockCount: number;
+  /** The review date as typed; only read when horizonKind is 'date'. */
+  reviewDate?: string;
+}
+
+/**
+ * Android issue #222: the top box on the build screen used to be a fixed
+ * sentence about the defaults, so it kept saying "linear" and "12 weeks" after
+ * the athlete chose otherwise. It is built from the screen's current choices;
+ * with nothing changed it is exactly the recommended-defaults sentence.
+ */
+export const programChoiceDisclosure = (choices: ProgramChoices): string => {
+  const who = choices.buildMode === 'custom' ? 'You pick the movements' : 'Coach picks the movements';
+  const method = METHOD_WORD[choices.schemaType];
+  const article = /^[aeiou]/.test(method) ? 'an' : 'a';
+  const date = choices.reviewDate?.trim() ?? '';
+  const review = choices.horizonKind === 'date'
+    ? (date === '' ? 'with a review on the date you enter' : `with a review around ${date} (rounded up to whole four-week blocks)`)
+    : `with a review after ${choices.blockCount * 4} weeks (${choices.blockCount} four-week block${choices.blockCount === 1 ? '' : 's'})`;
+  return `${who}, on ${article} ${method} progression, ${review}. Change any of it below.`;
+};
+
 export const recommendedProgramDefaults = (
   profile: UserProfile,
 ): RecommendedProgramDefaults => {
@@ -72,7 +103,7 @@ export const recommendedProgramDefaults = (
     blockCount,
     schemaType,
     buildMode: 'coach',
-    disclosure: `Coach picks the movements, on a linear progression, with a review after ${blockCount * 4} weeks (${blockCount} four-week blocks). Change any of it below.`,
+    disclosure: programChoiceDisclosure({ buildMode: 'coach', schemaType, horizonKind: 'weeks', blockCount }),
   };
 };
 
