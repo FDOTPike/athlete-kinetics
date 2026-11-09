@@ -208,6 +208,7 @@ import {
   type TriageResult,
   type UserProfile,
   ADVISORY_KINDS,
+  ANCHOR_MOVEMENT_NAMES,
   LOAD_SOURCES,
   defaultLoadPreference,
   resolveLoadSelection,
@@ -339,6 +340,14 @@ export interface OnboardingExtras {
   readonly goalMovementId?: number | null;
   /** The sport answer, or null/absent when the athlete plays no sport. */
   readonly sport?: SportProfileDraft | null;
+  /**
+   * #217: movements the athlete said they have trained before ("Have you
+   * trained these before?"). Each is written exactly as the Library's chip
+   * writes it, and only where that chip could write it for the saved profile
+   * (priorExperienceWouldClear); the rest are ignored. Training age alone
+   * never adds one.
+   */
+  readonly priorExperienceMovementIds?: readonly number[];
 }
 
 export const ONBOARDING_STALE_MESSAGE = 'This setup was started for a different athlete, so nothing was saved. Start the setup again for the athlete shown now.';
@@ -356,7 +365,7 @@ export const formatTeachingOnlyReason = (verdict: MovementAvailability | undefin
   const humanReasons = verdict.reasons.map((reason) => {
     if (reason !== 'capability') return REASON_TEXT_MAP[reason];
     if (verdict.separateAttestationRequired) return 'requires separate movement approval';
-    if (verdict.confirmationWouldClear) return 'prior-experience confirmation is available';
+    if (verdict.confirmationWouldClear) return 'you can add it if you have trained it before';
     return REASON_TEXT_MAP.capability;
   }).join('; ');
   return `Teaching only — ${humanReasons}`;
@@ -366,6 +375,12 @@ export const formatTeachingOnlyReason = (verdict: MovementAvailability | undefin
 import type { BiometricsBridge } from '@ak/biometrics';
 import { groupSummaryExercises, type SessionReportFact, type SkippedExercise } from './sessionSummary';
 import { SESSION_REPORT_STOP_ENTRY, sessionReportStopText } from './sessionReportStop';
+import {
+  priorExperienceWouldClear,
+  type PriorExperienceDeclarationOptions,
+} from './priorExperience';
+
+export { priorExperienceWouldClear, anchorDisplayName, type PriorExperienceDeclarationOptions } from './priorExperience';
 import phraseCodebaseJson from '../../../../packages/inference/assets/phrase-codebase.json';
 import phraseVectorsJson from '../../../../packages/inference/assets/phrase-codebase.vectors.json';
 import { routeQuestion, type QuestionIndex, type QuestionResult } from '../../../../packages/inference/src/semantic/questionRouter';
@@ -1086,6 +1101,9 @@ interface KineticsStore {
     context: MovementAccessContext,
   ) => boolean;
   revokeMovementPriorExperience: (movementId: number) => boolean;
+  /** #217: what the athlete could declare if their profile were `draft`
+   *  (onboarding asks before the profile is saved). Reads only. */
+  previewPriorExperienceDeclarations: (draft: UserProfile) => PriorExperienceDeclarationOptions;
   /** Coach Mode: close the current athlete's DB and re-boot against the
    *  target athlete's file. Refused while a session is active. */
   switchAthlete: (id: string) => Promise<boolean>;
@@ -1841,6 +1859,25 @@ const capabilityMovementAvailability = (
     equipment: new Set(profile.equipment_inventory),
     safetyExcludedMovementIds,
   });
+};
+
+/** #217: the competition lifts and beginner basics a declaration would clear. */
+const priorExperienceDeclarationOptions = (
+  movements: readonly Movement[],
+  verdicts: readonly MovementAvailability[],
+): PriorExperienceDeclarationOptions => {
+  const clears = new Set(verdicts.filter(priorExperienceWouldClear).map((verdict) => verdict.movementId));
+  return {
+    anchors: ANCHOR_MOVEMENT_NAMES.flatMap((name) => {
+      const movement = movements.find((candidate) => candidate.name === name);
+      return movement !== undefined && clears.has(movement.movement_id)
+        ? [{ movementId: movement.movement_id, name }] : [];
+    }),
+    basicMovementIds: movements
+      .filter((movement) => movement.difficulty === 'Beginner' && clears.has(movement.movement_id))
+      .map((movement) => movement.movement_id)
+      .sort((a, b) => a - b),
+  };
 };
 
 /** The finished count the runner keeps for a slot swapped after logged sets;
@@ -4129,14 +4166,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
   confirmMovementPriorExperience: (movementId, context) => {
     const verdict = get().getMovementAvailabilityVerdicts(context)
       .find((candidate) => candidate.movementId === movementId);
-    if (
-      verdict === undefined
-      || verdict.state !== 'teaching_only'
-      || !verdict.confirmationWouldClear
-      || verdict.separateAttestationRequired
-      || verdict.reasons.length !== 1
-      || verdict.reasons[0] !== 'capability'
-    ) {
+    if (!priorExperienceWouldClear(verdict)) {
       set({ error: 'Prior experience cannot clear every current access requirement for this movement.' });
       return false;
     }
@@ -4194,6 +4224,15 @@ export const useStore = create<KineticsStore>()((set, get) => {
       error: null,
     }));
     return true;
+  },
+
+  previewPriorExperienceDeclarations: (draft) => {
+    if (get().status !== 'ready') return { anchors: [], basicMovementIds: [] };
+    const { movements, niggles, activePriorExperienceMovementIds } = get();
+    return priorExperienceDeclarationOptions(movements, capabilityMovementAvailability(
+      getDb(), movements, draft, 'weight_room',
+      new Set(activePriorExperienceMovementIds), safetyExcludedMovementIdsFor(movements, draft, niggles),
+    ));
   },
 
   // --- Coach Mode (Phase 15): one DB file per athlete ------------------------
@@ -4639,6 +4678,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       return;
     }
     const d = getDb();
+    const declaredInOnboarding: number[] = [];
     d.executeSync('BEGIN');
     try {
       persistProfileFields(d, merged);
@@ -4651,6 +4691,31 @@ export const useStore = create<KineticsStore>()((set, get) => {
         const goalId = `goal-${savedAtMs}-${Math.floor(Math.random() * 1e9).toString(36)}`;
         insertAthleteGoal(d, goalId, validatedGoal.goal, savedAtMs);
         if (goalMovementId !== null) setGoalMovementLink(d, goalId, goalMovementId, savedAtMs);
+      }
+      // #217: the athlete's own "trained before" answers, written as the
+      // Library's chip writes them, and only where that chip could for the
+      // profile just saved. Training age alone adds none.
+      const requestedDeclarations = new Set(extras?.priorExperienceMovementIds ?? []);
+      if (requestedDeclarations.size > 0) {
+        const { movements, niggles, activePriorExperienceMovementIds } = get();
+        const verdicts = capabilityMovementAvailability(
+          d, movements, merged, 'weight_room',
+          new Set(activePriorExperienceMovementIds), safetyExcludedMovementIdsFor(movements, merged, niggles),
+        );
+        for (const verdict of verdicts) {
+          if (!requestedDeclarations.has(verdict.movementId) || !priorExperienceWouldClear(verdict)) continue;
+          d.executeSync(
+            `INSERT INTO movement_prior_experience
+               (movement_id, confirmed_at_ms, revoked_at_ms, basis)
+             VALUES (?, ?, NULL, 'local_user_confirmation')
+             ON CONFLICT(movement_id) DO UPDATE SET
+               confirmed_at_ms = excluded.confirmed_at_ms,
+               revoked_at_ms = NULL,
+               basis = 'local_user_confirmation'`,
+            [verdict.movementId, savedAtMs],
+          );
+          declaredInOnboarding.push(verdict.movementId);
+        }
       }
       d.executeSync('COMMIT');
     } catch (e) {
@@ -4666,6 +4731,13 @@ export const useStore = create<KineticsStore>()((set, get) => {
       focus: readAthleteFocus(d),
       goals: readAthleteGoals(d),
     });
+    if (declaredInOnboarding.length > 0) {
+      set((state) => ({
+        activePriorExperienceMovementIds: [...new Set([...state.activePriorExperienceMovementIds, ...declaredInOnboarding])]
+          .sort((a, b) => a - b),
+        movementAvailabilityRevision: state.movementAvailabilityRevision + 1,
+      }));
+    }
     get().refreshSport();
     if (get().prescription !== null) get().computePrescription([]);
     // Exclusive: no switch, create, delete or other rename can interleave with

@@ -56,6 +56,7 @@ import { theme } from '../theme/theme';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import InfoTip from '../components/InfoTip';
 import { useStore } from '../state/useStore';
+import { anchorDisplayName } from '../state/priorExperience';
 import { useSubViewBack } from '../navigation/navigation';
 import { Chip, Stepper, QuietAction, PrimaryButton } from '../components/ui';
 import {
@@ -320,6 +321,26 @@ export default function OnboardingScreen(): React.JSX.Element {
   const [wantsSport, setWantsSport] = useState(false);
   const [sportFields, setSportFields] = useState<SportFieldsState>(EMPTY_SPORT_FIELDS);
   const movements = useStore((s) => s.movements) ?? [];
+  // #217: "Have you trained these before?" Only what the athlete could declare
+  // for the answers so far (the Library chip's own test); training age alone
+  // declares nothing.
+  const previewDeclarations = useStore((s) => s.previewPriorExperienceDeclarations);
+  const movementAvailabilityRevision = useStore((s) => s.movementAvailabilityRevision);
+  const [declaredAnchorIds, setDeclaredAnchorIds] = useState<readonly number[]>([]);
+  const [declaredBasics, setDeclaredBasics] = useState(false);
+  const declarationOptions = useMemo(
+    () => (typeof previewDeclarations === 'function'
+      ? previewDeclarations(draft)
+      : { anchors: [], basicMovementIds: [] }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [previewDeclarations, draft.training_age, draft.equipment_inventory, movementAvailabilityRevision],
+  );
+  const declaredMovementIds = [
+    ...declarationOptions.anchors.filter((anchor) => declaredAnchorIds.includes(anchor.movementId)).map((anchor) => anchor.movementId),
+    ...(declaredBasics ? declarationOptions.basicMovementIds : []),
+  ];
+  const toggleDeclaredAnchor = (movementId: number): void => setDeclaredAnchorIds((ids) =>
+    (ids.includes(movementId) ? ids.filter((id) => id !== movementId) : [...ids, movementId]));
   const [saveAttempted, setSaveAttempted] = useState(false);
   const today = localIsoToday();
 
@@ -465,6 +486,7 @@ export default function OnboardingScreen(): React.JSX.Element {
         goal: wantsTarget ? goalDraftFromFields(goalFields) : null,
         goalMovementId: wantsTarget && GOAL_EXERCISE_METRICS.has(goalFields.metricId) ? goalExerciseId : null,
         sport: wantsSport ? sportDraftFromFields(sportFields) : null,
+        priorExperienceMovementIds: declaredMovementIds,
       },
     );
   };
@@ -757,6 +779,39 @@ export default function OnboardingScreen(): React.JSX.Element {
                   The coach only ever prescribes movements your equipment allows.
                   Specialist items stay off unless you turn them on.
                 </Text>
+              </View>
+            )}
+            {(declarationOptions.anchors.length > 0 || declarationOptions.basicMovementIds.length > 0) && (
+              <View testID="onboarding-prior-experience">
+                <Text style={styles.fieldLabel} accessibilityRole="header">HAVE YOU TRAINED THESE BEFORE? (OPTIONAL)</Text>
+                <Text style={styles.pDim}>
+                  Tap each one you have trained before and it can be in your plan. This is your own statement
+                  about your training history, not a coaching assessment. If you leave them, your plan starts
+                  with the movements that lead up to them.
+                </Text>
+                <View style={styles.choiceGroup}>
+                  {declarationOptions.anchors.map((anchor) => (
+                    <Chip
+                      key={anchor.movementId}
+                      wrap
+                      label={`I have trained ${anchorDisplayName(anchor.name)} before`}
+                      selected={declaredAnchorIds.includes(anchor.movementId)}
+                      onPress={() => toggleDeclaredAnchor(anchor.movementId)}
+                      accessibilityLabel={`I have trained ${anchorDisplayName(anchor.name)} before`}
+                      testID={`onboarding-declare-${anchor.movementId}`}
+                    />
+                  ))}
+                  {declarationOptions.basicMovementIds.length > 0 && (
+                    <Chip
+                      wrap
+                      label="I have done planks, carries and bodyweight basics before"
+                      selected={declaredBasics}
+                      onPress={() => setDeclaredBasics((value) => !value)}
+                      accessibilityLabel="I have done planks, carries and bodyweight basics before"
+                      testID="onboarding-declare-basics"
+                    />
+                  )}
+                </View>
               </View>
             )}
           </View>
