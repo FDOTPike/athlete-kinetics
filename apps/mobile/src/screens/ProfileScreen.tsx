@@ -695,13 +695,17 @@ export default function ProfileScreen(): React.JSX.Element {
             ? `Effort ceiling ${effectiveRpeCeiling(profile).toFixed(1)} — Your upper setting is ${profile.base_rpe_cap.toFixed(1)}. Beginner experience caps effort at ${effectiveRpeCeiling(profile).toFixed(1)}.`
             : `Effort ceiling ${effectiveRpeCeiling(profile).toFixed(1)} — Your upper setting (${profile.base_rpe_cap.toFixed(1)}) is the ceiling in use.`}
       </Text>
-      <ChipRow
-        label="7 · TARGET ENERGY SYSTEM"
-        tip={ENERGY_SYSTEM_TIP[profile.target_energy_system]}
-        options={ENERGY_SYSTEMS}
-        value={profile.target_energy_system}
-        onSelect={(target_energy_system) => saveProfile({ target_energy_system })}
-      />
+      {/* #210: expert sections (energy system, health data, one-rep maxes)
+          start collapsed behind a plain heading for every athlete. */}
+      <Disclosure label="Energy system focus (optional)" style={styles.expertSection} testID="profile-energy-system">
+        <ChipRow
+          label="7 · TARGET ENERGY SYSTEM"
+          tip={ENERGY_SYSTEM_TIP[profile.target_energy_system]}
+          options={ENERGY_SYSTEMS}
+          value={profile.target_energy_system}
+          onSelect={(target_energy_system) => saveProfile({ target_energy_system })}
+        />
+      </Disclosure>
 
 
       <View style={styles.field}>
@@ -742,55 +746,58 @@ export default function ProfileScreen(): React.JSX.Element {
           Example — ankle: limited dorsiflexion. Saved as you type.
         </Text>
       </View>
-      <View style={styles.field}>
-        <View style={styles.fieldLabelRow}>
-          <Text style={styles.fieldLabel}>{healthCopy.title}</Text>
-          {healthCopy.showHrvTip && <InfoTip term="HRV" />}
-        </View>
-        <Text style={styles.fieldHint}>{healthCopy.hint}</Text>
-        {healthCopy.connectLabel !== null && (
-          <Chip
-            label={healthCopy.connectLabel}
-            selected={false}
-            onPress={() => { void requestBiometricsAccess(); }}
-            accessibilityLabel={healthCopy.connectAccessibilityLabel}
-          />
-        )}
-        {biometricsStatus === 'ready' && (
-          <Chip
-            label="SYNC NOW"
-            selected={false}
-            onPress={() => { void syncBiometrics(); }}
-            accessibilityLabel={healthCopy.syncAccessibilityLabel}
-          />
-        )}
-      </View>
-
-      <View style={styles.field}>
-        <View style={styles.fieldLabelRow}>
-          <Text style={styles.fieldLabel}>ONE-REP MAXES (KG)</Text>
-          <InfoTip term="1RM" />
-        </View>
-        <Text style={styles.fieldHint}>
-          With a max set, SESSION shows real target kilograms for every planned
-          lift. Type the number directly (snapped to 2.5 kg); ± fine-tunes.
-          Clear it by typing 0.
-        </Text>
-        {BIG4_LIFTS.map(({ name, label }) => {
-          const m = movements.find((x) => x.name === name);
-          if (m === undefined) return null;
-          return (
-            <OneRmRow
-              key={name}
-              label={label}
-              valueKg={oneRepMaxes[m.movement_id] as number | undefined}
-              onChange={(kg) => saveOneRepMax(m.movement_id, kg)}
-              athleteId={activeAthleteId}
-              registerCommit={registerOneRmCommit}
+      <Disclosure label="Heart rate and sleep data (optional)" style={styles.expertSection} testID="profile-health-data">
+        <View style={styles.field}>
+          <View style={styles.fieldLabelRow}>
+            <Text style={styles.fieldLabel}>{healthCopy.title}</Text>
+            {healthCopy.showHrvTip && <InfoTip term="HRV" />}
+          </View>
+          <Text style={styles.fieldHint}>{healthCopy.hint}</Text>
+          {healthCopy.connectLabel !== null && (
+            <Chip
+              label={healthCopy.connectLabel}
+              selected={false}
+              onPress={() => { void requestBiometricsAccess(); }}
+              accessibilityLabel={healthCopy.connectAccessibilityLabel}
             />
-          );
-        })}
-      </View>
+          )}
+          {biometricsStatus === 'ready' && (
+            <Chip
+              label="SYNC NOW"
+              selected={false}
+              onPress={() => { void syncBiometrics(); }}
+              accessibilityLabel={healthCopy.syncAccessibilityLabel}
+            />
+          )}
+        </View>
+      </Disclosure>
+      <Disclosure label="One-rep maxes (optional)" style={styles.expertSection} testID="profile-one-rep-maxes">
+        <View style={styles.field}>
+          <View style={styles.fieldLabelRow}>
+            <Text style={styles.fieldLabel}>ONE-REP MAXES (KG)</Text>
+            <InfoTip term="1RM" />
+          </View>
+          <Text style={styles.fieldHint}>
+            With a max set, SESSION shows real target kilograms for every planned
+            lift. Type the number directly (snapped to 2.5 kg); ± fine-tunes.
+            Clear it by typing 0.
+          </Text>
+          {BIG4_LIFTS.map(({ name, label }) => {
+            const m = movements.find((x) => x.name === name);
+            if (m === undefined) return null;
+            return (
+              <OneRmRow
+                key={name}
+                label={label}
+                valueKg={oneRepMaxes[m.movement_id] as number | undefined}
+                onChange={(kg) => saveOneRepMax(m.movement_id, kg)}
+                athleteId={activeAthleteId}
+                registerCommit={registerOneRmCommit}
+              />
+            );
+          })}
+        </View>
+      </Disclosure>
 
       <View style={styles.mgmtSection}>
         <Text style={styles.mgmtHeading}>SESSION &amp; DISPLAY</Text>
@@ -1661,6 +1668,7 @@ const styles = StyleSheet.create({
     marginBottom: theme.space[1],
   },
   heading: { ...theme.font.title, color: theme.color.textHi },
+  expertSection: { marginBottom: theme.space[4] },
   activeAthleteName: { ...theme.font.body, color: theme.color.textHi, marginTop: theme.space[1] },
   safetyNotice: {
     backgroundColor: theme.color.ink1,

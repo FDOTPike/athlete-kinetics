@@ -893,6 +893,79 @@ test('OW-007 the resume error is action-scoped: an unrelated store error does no
   expect(screen.queryByTestId('suspension-error')).toBeNull();
 });
 
+describe('#210: the Pause card comes after the plan, for everyone', () => {
+  const order = () => JSON.stringify(screen.toJSON());
+
+  test.each(['beginner', 'intermediate', 'advanced', 'elite'])(
+    'for a %s athlete, PAUSE renders after the block and today\'s session',
+    (trainingAge) => {
+      mockState = baseState({ profile: { ...baseState().profile, training_age: trainingAge } });
+      render(<BlockScreen />);
+      const json = order();
+      const pause = json.indexOf('Injured, ill, or life got in the way?');
+      expect(pause).toBeGreaterThan(-1);
+      expect(json.indexOf('"TODAY"')).toBeGreaterThan(-1);
+      expect(json.indexOf('"TODAY"')).toBeLessThan(pause);
+      expect(json.indexOf('Four-week trajectory')).toBeGreaterThan(-1);
+      expect(json.indexOf('Four-week trajectory')).toBeLessThan(pause);
+    },
+  );
+
+  const goalProgram = {
+    programId: 7,
+    objective: 'strength',
+    startDate: '2026-07-01',
+    horizonKind: 'weeks',
+    requestedReviewDate: null,
+    plannedEndDate: '2026-10-21',
+    plannedBlockCount: 4,
+    startingMacroBlockIndex: 1,
+    schemaType: 'LINEAR',
+    status: 'active',
+    currentSequenceIndex: 1,
+    days: [{ dayIndex: 1, focus: 'full' }],
+    movementPreferences: [],
+  };
+  const withProgram = (trainingAge, overrides = {}) => baseState({
+    profile: { ...baseState().profile, training_age: trainingAge },
+    program: goalProgram,
+    previewNextProgramBlock: jest.fn(() => null),
+    continueTrainingProgram: jest.fn(),
+    archiveTrainingProgram: jest.fn(),
+    ...overrides,
+  });
+  /** Each label is on screen, and each one renders before the next. */
+  const expectInOrder = (json, labels) => {
+    const at = labels.map((label) => json.indexOf(label));
+    labels.forEach((label, i) => expect([label, at[i]]).not.toEqual([label, -1]));
+    for (let i = 1; i < at.length; i += 1) {
+      expect([labels[i - 1], at[i - 1] < at[i]]).toEqual([labels[i - 1], true]);
+    }
+  };
+
+  test.each(['beginner', 'intermediate', 'advanced', 'elite'])(
+    'with a goal program, a %s athlete sees GOAL PROGRAM, TODAY and the trajectory before PAUSE',
+    (trainingAge) => {
+      mockState = withProgram(trainingAge, { suspension: null });
+      render(<BlockScreen />);
+      expectInOrder(order(), [
+        '"GOAL PROGRAM"', '"TODAY"', 'Four-week trajectory', 'Injured, ill, or life got in the way?',
+      ]);
+    },
+  );
+
+  test.each(['beginner', 'intermediate', 'advanced', 'elite'])(
+    'while paused, a %s athlete sees GOAL PROGRAM, TODAY and the trajectory before PROGRAMME PAUSED',
+    (trainingAge) => {
+      mockState = withProgram(trainingAge, { suspension: OPEN_EPISODE, endSuspension: jest.fn() });
+      render(<BlockScreen />);
+      const json = order();
+      expectInOrder(json, ['"GOAL PROGRAM"', '"TODAY"', 'Four-week trajectory', '"PROGRAMME PAUSED"']);
+      expect(json.indexOf('Injured, ill, or life got in the way?')).toBe(-1);
+    },
+  );
+});
+
 // #169: the phase "i" cards describe what this block's plan actually does
 // from week to week, read from its own planned sets and effort, not fixed
 // glossary prose that is wrong for one objective or another.

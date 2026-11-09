@@ -63,6 +63,8 @@ describe('ProfileScreen OneRmRow and Bodyweight inputs preserve saved values and
       </NavigationProvider>,
     );
 
+    // #210: the one-rep maxes sit behind a collapsed heading.
+    fireEvent.press(screen.getByLabelText('One-rep maxes (optional)'));
     const squatInput = screen.getAllByLabelText(/one rep max in kilograms, type to set/i)[0];
     expect(squatInput.props.value).toBe('100.0');
 
@@ -115,11 +117,15 @@ describe('ProfileScreen OneRmRow and Bodyweight inputs preserve saved values and
 // Review (PR 194): "Saved as 500.0 kg" describes one saved value. Once the
 // athlete types again, presses + or −, or clears the max, it no longer does.
 describe('ProfileScreen one-rep-max clamp notice', () => {
-  const renderProfile = () => render(
-    <NavigationProvider initialTab="athlete">
-      <ProfileScreen />
-    </NavigationProvider>,
-  );
+  const renderProfile = () => {
+    render(
+      <NavigationProvider initialTab="athlete">
+        <ProfileScreen />
+      </NavigationProvider>,
+    );
+    // #210: the one-rep maxes sit behind a collapsed heading.
+    fireEvent.press(screen.getByLabelText('One-rep maxes (optional)'));
+  };
   const squat = () => screen.getAllByLabelText(/one rep max in kilograms, type to set/i)[0];
   const clampTo500 = () => {
     fireEvent.changeText(squat(), '999');
