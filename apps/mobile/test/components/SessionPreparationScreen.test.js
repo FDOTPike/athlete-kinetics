@@ -8,6 +8,7 @@
  * extra work instead of hiding it.
  */
 import React from 'react';
+import { Alert } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { freeFormStartIsEmpty, useStore } from '../../src/state/useStore';
 import { authorizeAthleteDataBoot } from '../../src/state/dataMaintenanceLock';
@@ -75,6 +76,41 @@ test('after Start the screen shows preparation and offers no way to log a set', 
   expect(state().preparation.status).toBe('pending');
 });
 
+// Android walk (#213): the ramp sets use the same working load as the set
+// card (here from a 1RM), in kilograms; with no known load they keep the
+// percentage text.
+test('ramp sets show kilograms from the same working load as the set card, once one is known', () => {
+  startFromScreen();
+  const protocol = state().preparation.protocol;
+  const rampIndexes = protocol.items.map((item, index) => ({ item, index })).filter(({ item }) => item.stage === 'ramp');
+  expect(rampIndexes.map(({ item }) => item.dose.percentOfWorkingLoad)).toEqual([40, 80]);
+  const anchorId = rampIndexes[0].item.movementId;
+  // No 1RM and no history yet: the percentage text, no kilograms.
+  for (const { item, index } of rampIndexes) {
+    expect(screen.getByTestId(`preparation-item-${index}-dose`).props.children).toMatch(/at about \d+% of today's working load$/);
+    expect(screen.getByText(item.title)).toBeTruthy();
+  }
+
+  act(() => { state().saveOneRepMax(anchorId, 120); });
+  const slot = state().sessionPlan.find((candidate) => candidate.movementId === anchorId);
+  const working = state().resolveSlotLoad({
+    movementId: anchorId, bodyweightMode: false,
+    targetReps: slot.target.kind === 'reps' ? slot.target.reps : null,
+    targetRpe: slot.targetRpe ?? 8, overrideLoadKg: slot.overrideLoadKg, sessionPlanSlotId: slot.sessionPlanSlotId,
+  });
+  expect(working.source).toBe('derived');
+  expect(working.initialLoadKg).toBeGreaterThan(0);
+  const name = state().movements.find((movement) => movement.movement_id === anchorId).name;
+  for (const { item, index } of rampIndexes) {
+    const kg = Math.round((working.initialLoadKg * item.dose.percentOfWorkingLoad) / 100 / 2.5) * 2.5;
+    expect(screen.getByText(`Preparation set: ${name}, about ${kg} kg (${item.dose.percentOfWorkingLoad}%)`)).toBeTruthy();
+    expect(screen.getByTestId(`preparation-item-${index}-dose`).props.children)
+      .toBe(`${item.dose.reps} reps at about ${kg} kg (${item.dose.percentOfWorkingLoad}% of today's working load)`);
+  }
+  // Display only: the frozen protocol is unchanged.
+  expect(state().preparation.protocol).toEqual(protocol);
+});
+
 test('working through preparation and finishing hands over to the first working set', () => {
   startFromScreen();
   press('preparation-begin');
@@ -114,7 +150,17 @@ test('stopping from the preparation screen ends the session without logging anyt
   startFromScreen();
   const sessionId = state().session.sessionId;
   press('preparation-begin');
-  press('preparation-stop-session');
+  // #165: Stop session asks first; nothing stops until Stop is chosen.
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  try {
+    press('preparation-stop-session');
+    expect(state().session).not.toBeNull();
+    const [title, , buttons] = alert.mock.calls[0];
+    expect(title).toBe('Stop this session?');
+    act(() => { buttons.find((button) => button.text === 'Stop').onPress(); });
+  } finally {
+    alert.mockRestore();
+  }
   expect(state().session).toBeNull();
   expect(count('SELECT COUNT(*) AS c FROM set_record')).toBe(0);
   // A manual stop with no sets is an empty session: it and its preparation are discarded together.
@@ -181,23 +227,23 @@ describe('session-5: plan-first empty free-form starts', () => {
     const openPlanFromToday = jest.fn();
     const todayView = render(<TodayScreen onOpenPlan={openPlanFromToday} />);
     fireEvent.press(screen.getByTestId('today-adhoc-session'));
-    expect(screen.getByText('Nothing to start yet')).toBeOnTheScreen();
+    expect(screen.getByText('No session is ready to start')).toBeOnTheScreen();
     expect(
-      screen.getByText('There is no plan for today and no earlier session to repeat. Build your plan first.'),
+      screen.getByText('Open your plan to see your next session.'),
     ).toBeOnTheScreen();
     expect(count('SELECT COUNT(*) AS c FROM session')).toBe(0);
     expect(state().session).toBeNull();
 
     // Cancel closes the card and restores the start control
     fireEvent.press(screen.getByLabelText('Cancel'));
-    expect(screen.queryByText('Nothing to start yet')).toBeNull();
+    expect(screen.queryByText('No session is ready to start')).toBeNull();
     expect(screen.getByTestId('today-adhoc-session')).toBeOnTheScreen();
 
     // Re-open and press Go to Plan
     fireEvent.press(screen.getByTestId('today-adhoc-session'));
     fireEvent.press(screen.getByLabelText('Go to Plan'));
     expect(openPlanFromToday).toHaveBeenCalledTimes(1);
-    expect(screen.queryByText('Nothing to start yet')).toBeNull();
+    expect(screen.queryByText('No session is ready to start')).toBeNull();
     expect(count('SELECT COUNT(*) AS c FROM session')).toBe(0);
     todayView.unmount();
 
@@ -205,15 +251,15 @@ describe('session-5: plan-first empty free-form starts', () => {
     const openPlanFromSession = jest.fn();
     const sessionView = render(<SessionScreen onOpenPlan={openPlanFromSession} />);
     fireEvent.press(screen.getByLabelText('Start a new workout session'));
-    expect(screen.getByText('Nothing to start yet')).toBeOnTheScreen();
+    expect(screen.getByText('No session is ready to start')).toBeOnTheScreen();
     expect(
-      screen.getByText('There is no plan for today and no earlier session to repeat. Build your plan first.'),
+      screen.getByText('Open your plan to see your next session.'),
     ).toBeOnTheScreen();
     expect(count('SELECT COUNT(*) AS c FROM session')).toBe(0);
     expect(state().session).toBeNull();
 
     fireEvent.press(screen.getByLabelText('Cancel'));
-    expect(screen.queryByText('Nothing to start yet')).toBeNull();
+    expect(screen.queryByText('No session is ready to start')).toBeNull();
     expect(screen.getByLabelText('Start a new workout session')).toBeOnTheScreen();
 
     fireEvent.press(screen.getByLabelText('Start a new workout session'));
@@ -234,14 +280,14 @@ describe('session-5: plan-first empty free-form starts', () => {
     const blockView = render(<BlockScreen />);
     fireEvent.press(screen.getByText('Start without a planned session'));
     fireEvent.press(screen.getByLabelText('Start an unplanned session'));
-    expect(screen.getByText('Nothing to start yet')).toBeOnTheScreen();
+    expect(screen.getByText('No session is ready to start')).toBeOnTheScreen();
     expect(
-      screen.getByText('There is no plan for today and no earlier session to repeat. Build your plan first.'),
+      screen.getByText('Open your plan to see your next session.'),
     ).toBeOnTheScreen();
     expect(count('SELECT COUNT(*) AS c FROM session')).toBe(0);
 
     fireEvent.press(screen.getByLabelText('Cancel'));
-    expect(screen.queryByText('Nothing to start yet')).toBeNull();
+    expect(screen.queryByText('No session is ready to start')).toBeNull();
     expect(screen.getByLabelText('Start an unplanned session')).toBeOnTheScreen();
     blockView.unmount();
   });
