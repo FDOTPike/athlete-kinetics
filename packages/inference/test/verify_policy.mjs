@@ -180,6 +180,11 @@ const overCap = limits.applyProfileLimits(boostV, DEFAULT_PROFILE,
 check('daily session cap damps extra-session work',
   overCap.vector.load_modifier === Math.round(boostV.load_modifier * 0.85 * 100) / 100 &&
   overCap.vector.set_modifier === boostV.set_modifier - 1 && overCap.vector.rpe_cap === 7.0);
+// #202: the note the athlete reads in "Why today changed" says it in words.
+check('daily session cap note reads in plain words',
+  overCap.notes.includes('You have done 1 session today and your plan allows 1, so extra sessions are kept lighter.')
+  && !overCap.notes.some((note) => /\(\d+\/\d+\)|damped/.test(note)),
+  overCap.notes.join(' | '));
 const overWeek = limits.applyProfileLimits(boostV, DEFAULT_PROFILE,
   { sessionsToday: 0, trainedDaysLast7: 4 });
 check('weekly frequency forces maintenance load',
