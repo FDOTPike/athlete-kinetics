@@ -2550,6 +2550,10 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
   // 065 (session preparation side-car), 066 (focus and goals) and 067 (sport
   // profile and block emphasis record) add no
   // library rows and advance it to 65.
+  // 075 (session plan slot planned count side-car) adds no library rows and
+  // advances the chain to 74.
+  // 076 (sport taxonomy expansion to 22 sports) adds no library rows and
+  // advances the chain to 75.
   const chain = readdirSync(SCHEMA_DIR)
     .filter((f) => f.endsWith('.sql') && !f.startsWith('004_'))
     .sort((a, b) => Number(a.slice(0, 3)) - Number(b.slice(0, 3)));
@@ -2562,7 +2566,7 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
   // Pin the corpus itself, so a library change cannot move the figures below
   // without announcing itself.
   check('[F2-corpus] the shipped catalogue is the one being measured',
-    rows.length === 300 && chain.length === 72,
+    rows.length === 300 && chain.length === 76,
     `${rows.length} movements from ${chain.length} migrations`);
 
   // Round-2 finding 1. Gate [11] validates supported_prefixes tokens against
