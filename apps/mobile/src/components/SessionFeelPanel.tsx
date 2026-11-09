@@ -26,7 +26,7 @@
  * Law: touch targets >= 56pt (Chip and the buttons carry it).
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, AccessibilityInfo, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   SESSION_FEEL_KINDS,
   sessionFeelOfferedReasons,
@@ -38,6 +38,7 @@ import {
   type SessionFeelRecord,
 } from '@ak/inference';
 import { theme } from '../theme/theme';
+import { useSubViewBack } from '../navigation/navigation';
 import { Chip, PrimaryButton, SecondaryButton } from './ui';
 import KeyboardAwareScrollView from './KeyboardAwareScrollView';
 
@@ -201,6 +202,34 @@ export function SessionFeelPanel({ saved, note, answerOptional = false, planRepo
     if (result === null) onClose();
     else setProblem(result);
   };
+
+  // Something the athlete entered and has not saved: a changed answer, a
+  // changed reason list or a changed note. Opening a saved answer is not one.
+  const savedReasons = saved?.reasons ?? [];
+  const unsaved = feel !== (saved?.feel ?? null)
+    || reasons.length !== savedReasons.length
+    || reasons.some((reason) => !savedReasons.includes(reason))
+    || noteText !== (note ?? '');
+
+  /** Android Back: with nothing unsaved, leave; otherwise ask first (#192). */
+  const requestLeave = (): void => {
+    if (!unsaved) {
+      onClose();
+      return;
+    }
+    Alert.alert(
+      'Discard this answer?',
+      'Your choice and note have not been saved.',
+      [
+        { text: 'Keep editing', style: 'cancel' },
+        { text: 'Discard', style: 'destructive', onPress: onClose },
+      ],
+      { cancelable: true },
+    );
+  };
+  // Registered only while there is something to lose; it then runs before the
+  // host's own Back handler for this sub-view, which closes the panel as before.
+  useSubViewBack(unsaved, requestLeave);
 
   const reasonsShown = feel !== null && feel !== 'as_planned';
   // The answer's own list, plus a reason already saved for this same answer
