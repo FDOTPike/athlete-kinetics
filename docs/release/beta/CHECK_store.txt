@@ -1,0 +1,15 @@
+Store draft checks
+==================
+SVG XML: 4 valid files
+Short description: 60 / 80 characters
+Branch comparison: Health Connect adapter, Apple Health adapter and Android manifest have no differences between HEAD and origin/master.
+Evidence reference check:
+Checked 57 file:line citations across 6 documents.
+PASS: 57 citations exist and line numbers are in range.
+FAIL: 0
+
+Beta-branch citation re-check, 2026-11-06 (docs/beta-launch-drafts-landing)
+Code revision checked: ee6dd8c49a642ec69396300c17d72480e3cadb41. The check lists counts only; the old and new line numbers are in RECORDS_2026-11-06.md section 3.
+origin/master citations (pinned 26f6557a): all present, text unchanged on the beta code.
+Unprefixed citations (drafts pinned 614f7326): 35 cited locations corrected, 26 by exact text match and 9 by hand.
+Self-references in tools/device-validation: identical files on the beta branch; left as drafted.

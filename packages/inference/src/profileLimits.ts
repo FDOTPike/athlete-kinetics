@@ -70,8 +70,10 @@ export function applyProfileLimits(
     load = round2(load * 0.85);
     sets = Math.max(-3, sets - 1);
     if (rpe > 7.0) rpe = 7.0;
+    // #202: the athlete reads this note in "Why today changed"; say it in words.
+    const sessionWord = ctx.sessionsToday === 1 ? 'session' : 'sessions';
     notes.push(
-      `Daily session cap reached (${ctx.sessionsToday}/${profile.max_sessions_per_day}): extra-session work is damped.`,
+      `You have done ${ctx.sessionsToday} ${sessionWord} today and your plan allows ${profile.max_sessions_per_day}, so extra sessions are kept lighter.`,
     );
   }
   // Weekly frequency: once the planned training days are spent, today is
