@@ -35,6 +35,7 @@ import {
   type GoalField,
   type GoalMetricId,
   type MuscleGroupId,
+  targetIsLowerThanStart,
   type SmartGoalDraft,
   type TrainingAge,
 } from '@ak/inference';
@@ -162,6 +163,8 @@ export interface GoalFields {
   readonly baselineKnown: boolean;
   readonly baselineText: string;
   readonly targetText: string;
+  /** The athlete chose to keep a target below where they are now. */
+  readonly confirmLowerTarget: boolean;
   readonly reason: string;
   readonly deadlineSet: boolean;
   readonly deadlineText: string;
@@ -169,7 +172,7 @@ export interface GoalFields {
 
 export const EMPTY_GOAL_FIELDS: GoalFields = {
   specificOutcome: '', metricId: 'load_kg', unit: '', measurementMethod: '',
-  baselineKnown: true, baselineText: '', targetText: '', reason: '',
+  baselineKnown: true, baselineText: '', targetText: '', confirmLowerTarget: false, reason: '',
   deadlineSet: false, deadlineText: '',
 };
 
@@ -187,6 +190,7 @@ export const goalDraftFromFields = (fields: GoalFields): SmartGoalDraft => ({
   baselineKnown: fields.baselineKnown,
   baselineValue: fields.baselineKnown ? parseNumber(fields.baselineText) : null,
   targetValue: parseNumber(fields.targetText),
+  confirmLowerTarget: fields.confirmLowerTarget,
   reason: fields.reason,
   requestedDeadline: fields.deadlineSet ? fields.deadlineText.trim() : null,
 });
@@ -203,6 +207,7 @@ export const goalFieldsFromGoal = (goal: {
   baselineKnown: goal.baselineKnown,
   baselineText: goal.baselineValue === null ? '' : String(goal.baselineValue),
   targetText: String(goal.targetValue),
+  confirmLowerTarget: false,
   reason: goal.reason,
   deadlineSet: goal.requestedDeadline !== null,
   deadlineText: goal.requestedDeadline ?? '',
@@ -221,6 +226,50 @@ export interface ExerciseOption {
 
 const GOAL_EXERCISE_MATCH_LIMIT = 6;
 
+/** Short forms lifters type for a library name. */
+const GOAL_EXERCISE_SHORT_FORMS: Readonly<Record<string, string>> = {
+  rdl: 'romaniandeadlift',
+  ohp: 'overheadpress',
+};
+
+const compact = (text: string): string => text.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+/**
+ * Library exercises whose name or base name contains the query. Spacing,
+ * hyphens and case are ignored ("pull up", "pullup" and "Pull-Up" are the
+ * same), a trailing plural "s" is dropped ("pullups"), and a few short forms
+ * are known (RDL, OHP). Exact names come first, then names that start with
+ * the query, then the rest, shorter names first (Android walk 2026-11-03, W1-7).
+ */
+export function goalExerciseMatches(
+  movements: readonly ExerciseOption[], query: string,
+): ExerciseOption[] {
+  const typed = compact(query);
+  if (query.trim().length < 2 || typed.length === 0) return [];
+  const needles = new Set([typed]);
+  if (typed.length > 3 && typed.endsWith('s')) needles.add(typed.slice(0, -1));
+  const shortForm = GOAL_EXERCISE_SHORT_FORMS[typed] ?? GOAL_EXERCISE_SHORT_FORMS[typed.replace(/s$/, '')];
+  if (shortForm !== undefined) needles.add(shortForm);
+  const rank = (movement: ExerciseOption): number => {
+    let best = Number.POSITIVE_INFINITY;
+    for (const name of [movement.name, movement.baseName ?? '']) {
+      const hay = compact(name);
+      if (hay.length === 0) continue;
+      for (const needle of needles) {
+        if (hay === needle) best = Math.min(best, 0);
+        else if (hay.startsWith(needle)) best = Math.min(best, 1);
+        else if (hay.includes(needle)) best = Math.min(best, 2);
+      }
+    }
+    return best;
+  };
+  return movements
+    .map((movement, index) => ({ movement, index, rank: rank(movement) }))
+    .filter((entry) => Number.isFinite(entry.rank))
+    .sort((a, b) => a.rank - b.rank || a.movement.name.length - b.movement.name.length || a.index - b.index)
+    .map((entry) => entry.movement);
+}
+
 export interface GoalExerciseLink {
   readonly movements: readonly ExerciseOption[];
   readonly movementId: number | null;
@@ -232,10 +281,7 @@ export function GoalExerciseField({ movements, movementId, onChange }: GoalExerc
   const [query, setQuery] = useState('');
   const linked = movementId === null ? undefined : movements.find((movement) => movement.movement_id === movementId);
   const needle = query.trim().toLowerCase();
-  const allMatches = needle.length < 2
-    ? []
-    : movements.filter((movement) => movement.name.toLowerCase().includes(needle)
-      || (movement.baseName ?? '').toLowerCase().includes(needle));
+  const allMatches = goalExerciseMatches(movements, query);
   const matches = allMatches.slice(0, GOAL_EXERCISE_MATCH_LIMIT);
   return (
     <View testID="goal-exercise">
@@ -438,7 +484,7 @@ export function GoalEditor({ fields, onChange, today, trainingAge, showAllErrors
         disableFullscreenUI
         style={styles.input}
         value={fields.targetText}
-        onChangeText={(targetText) => patch({ targetText })}
+        onChangeText={(targetText) => patch({ targetText, confirmLowerTarget: false })}
         keyboardType="decimal-pad"
         maxLength={10}
         placeholder={`The number you are aiming for, in ${unit}`}
@@ -447,6 +493,17 @@ export function GoalEditor({ fields, onChange, today, trainingAge, showAllErrors
         testID="goal-target"
       />
       {fieldError('targetValue', fields.targetText.length > 0)}
+      {targetIsLowerThanStart(goalDraftFromFields(fields)) && (
+        <Chip
+          testID="goal-confirm-lower-target"
+          wrap
+          label="KEEP A TARGET BELOW WHERE I AM NOW"
+          selected={fields.confirmLowerTarget}
+          onPress={() => patch({ confirmLowerTarget: !fields.confirmLowerTarget })}
+          accessibilityLabel="Keep a target below where you are now. Tap to confirm."
+          style={styles.wrapChip}
+        />
+      )}
 
       <Text style={styles.label}>WHY DOES THIS MATTER TO YOU? (REQUIRED)</Text>
       <TextInput

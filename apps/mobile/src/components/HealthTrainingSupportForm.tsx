@@ -15,12 +15,61 @@ const preferenceOptions: Readonly<Record<HealthSupportPreferenceKind, readonly s
   rest: ['unanswered', 'need_reported', 'no_need_reported'],
 };
 const label = (value: string): string => value.replace(/_/g, ' ');
+/** #174: plain words for each stored key. The keys themselves are what is
+ *  stored and are unchanged (D07: capture only); only the words shown change.
+ *  These strings are on the clinical reviewer's list. */
+const PLAIN_WORDS: Readonly<Record<string, string>> = {
+  unanswered: 'Not answered',
+  no_preference: 'No preference',
+  seated: 'Seated',
+  recumbent: 'Lying down',
+  standing: 'Standing',
+  other: 'Other',
+  concern_reported: 'I have a concern',
+  no_concern_reported: 'No concern',
+  need_reported: 'I need support here',
+  no_need_reported: 'I do not need support here',
+  general: 'General',
+  functional_context: 'What I can do day to day',
+  symptom_trigger: 'What brings on symptoms',
+  rest_context: 'Rest and recovery',
+  draft: 'Draft, not yet confirmed',
+  user_confirmed: 'Confirmed by you',
+};
+const plain = (value: string): string => PLAIN_WORDS[value] ?? label(value);
+const REVIEW_STATE_WORDS: Readonly<Record<string, string>> = {
+  not_assessed: 'not yet reviewed',
+  pending_review: 'review pending',
+  review_required: 'review requested',
+};
+const DATE_FIELD_TITLES: Readonly<Record<string, string>> = {
+  instructionDate: 'Date of the instruction (optional)',
+  effectiveDate: 'Date it starts to apply (optional)',
+  reviewDate: 'Date it is due for review (optional)',
+  expiryDate: 'Date it stops applying (optional)',
+  dateZoneId: 'Time zone of these dates (optional)',
+};
 /** Plain names for each set of radio options, announced for the radiogroup. */
 const preferenceGroupLabels: Readonly<Record<HealthSupportPreferenceKind, string>> = {
   position: 'Position preference',
   position_transitions: 'Position changes',
   rest: 'Rest needs',
 };
+/** Walk W4-3: the chosen option was drawn exactly like the others, so only a
+ *  screen reader could tell which answer was saved. The chosen one now shows a
+ *  filled dot and the accent border (not colour alone). */
+function RadioOption({ text, a11yLabel, checked, onPress }: {
+  text: string; a11yLabel: string; checked: boolean; onPress: () => void;
+}): React.JSX.Element {
+  return <Pressable style={[styles.button, checked && styles.chosen]} accessibilityRole="radio"
+    accessibilityLabel={a11yLabel} accessibilityState={{ checked }} onPress={onPress}>
+    <View style={styles.optionRow}>
+      <Text style={[styles.text, checked && styles.chosenText]}>{checked ? '●' : '○'}</Text>
+      <Text style={[styles.text, checked && styles.chosenText]}>{sentence(text)}</Text>
+    </View>
+  </Pressable>;
+}
+const sentence = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
 function Button({ title, onPress }: { title: string; onPress: () => void }): React.JSX.Element {
   return <Pressable accessibilityRole="button" accessibilityLabel={title} onPress={onPress} style={styles.button}>
     <Text style={styles.text}>{title}</Text>
@@ -89,41 +138,39 @@ function BoundSupportForm({ athleteId }: { athleteId: string }): React.JSX.Eleme
   return <View style={styles.section}>
     <Text style={styles.title}>Health and training support</Text>
     <Text style={styles.text}>Optional preferences, private notes and instructions you enter.</Text>
-    <Text style={styles.text}>Review state: {label(reviewState)}. This is not medical clearance.</Text>
+    <Text style={styles.text}>Review state: {REVIEW_STATE_WORDS[reviewState] ?? label(reviewState)}. This is not medical clearance.</Text>
     {status !== 'available' && <Text accessibilityRole="alert" style={styles.text}>{status === 'held' ? SUPPORT_HELD_MESSAGE : SUPPORT_UNAVAILABLE_MESSAGE}</Text>}
     <Button title={expanded ? 'Hide health and training support' : 'Show health and training support'} onPress={() => expanded ? hide() : setExpanded(true)} />
     {error !== null && <Text accessibilityRole="alert" style={styles.text}>{error}</Text>}
     {expanded && details !== null && <View style={styles.section}>
-      <Text style={styles.text}>Saved as your note. The app does not interpret this text or verify medical clearance.</Text>
+      {details.notes.length > 0 && <Text style={styles.text}>Saved as your note. The app does not interpret this text or verify medical clearance.</Text>}
       <Text style={styles.text}>Preference recorded; exercise suitability has not been assessed.</Text>
       <Button title="Request review and pause coach suggestions" onPress={() => save((r) => state.setSupportReviewState(athleteId, 'review_required', r))} />
       <Button title="Record review pending and pause coach suggestions" onPress={() => save((r) => state.setSupportReviewState(athleteId, 'pending_review', r))} />
       <Button title="Withdraw my requested pause" onPress={() => save((r) => state.setSupportReviewState(athleteId, 'not_assessed', r))} />
       <Text style={styles.text}>Withdrawing your pause does not release an instruction review hold.</Text>
       {(Object.keys(preferenceOptions) as HealthSupportPreferenceKind[]).map((kind) => <View key={kind} style={styles.section}>
-        <Text style={styles.title}>{label(kind)}</Text>
+        <Text style={styles.title}>{preferenceGroupLabels[kind]}</Text>
         <View testID={`support-preference-${kind}-options`} style={styles.radioGroup}
           accessibilityRole="radiogroup" accessibilityLabel={preferenceGroupLabels[kind]}>
-          {preferenceOptions[kind].map((value) => <Pressable key={value} style={styles.button} accessibilityRole="radio"
-            accessibilityLabel={`${label(kind)}: ${label(value)}`}
-            accessibilityState={{ checked: (details.preferences.find((p) => p.preferenceKind === kind)?.reportedValue ?? 'unanswered') === value }}
-            onPress={() => save((r) => state.saveSupportPreference(athleteId, kind, value, preferenceDetail[kind], r))}>
-            <Text style={styles.text}>{label(value)}</Text></Pressable>)}
+          {preferenceOptions[kind].map((value) => <RadioOption key={value} text={plain(value)}
+            a11yLabel={`${preferenceGroupLabels[kind]}: ${plain(value)}`}
+            checked={(details.preferences.find((p) => p.preferenceKind === kind)?.reportedValue ?? 'unanswered') === value}
+            onPress={() => save((r) => state.saveSupportPreference(athleteId, kind, value, preferenceDetail[kind], r))} />)}
         </View>
-        <Field title={`${label(kind)} details`} value={preferenceDetail[kind]} change={(value) => setPreferenceDetail((p) => ({ ...p, [kind]: value }))} multiline />
-        <Button title={`Save ${label(kind)} details`} onPress={() => save((r) => state.saveSupportPreference(athleteId, kind,
+        <Field title={`${preferenceGroupLabels[kind]}: details`} value={preferenceDetail[kind]} change={(value) => setPreferenceDetail((p) => ({ ...p, [kind]: value }))} multiline />
+        <Button title={`Save ${preferenceGroupLabels[kind].toLowerCase()} details`} onPress={() => save((r) => state.saveSupportPreference(athleteId, kind,
           details.preferences.find((p) => p.preferenceKind === kind)?.reportedValue ?? 'unanswered', preferenceDetail[kind], r))} />
       </View>)}
       <Text style={styles.title}>Notes for your records</Text>
       <View testID="support-note-kind-options" style={styles.radioGroup} accessibilityRole="radiogroup" accessibilityLabel="Note type">
-        {noteKinds.map((kind) => <Pressable key={kind} style={styles.button} accessibilityRole="radio"
-          accessibilityLabel={`Note type: ${label(kind)}`} accessibilityState={{ checked: noteKind === kind }} onPress={() => setNoteKind(kind)}>
-          <Text style={styles.text}>{label(kind)}</Text></Pressable>)}
+        {noteKinds.map((kind) => <RadioOption key={kind} text={plain(kind)} a11yLabel={`Note type: ${plain(kind)}`}
+          checked={noteKind === kind} onPress={() => setNoteKind(kind)} />)}
       </View>
       <Field title="Support note text" value={note} change={setNote} multiline />
       <Button title="Save support note" onPress={() => save((r) => { state.saveSupportNote(athleteId, noteKind, note, noteId, r); setNote(''); setNoteId(undefined); })} />
       {details.notes.map((n, index) => <View key={n.noteId} style={styles.section}>
-        <Text style={styles.text}>{label(n.noteKind)}: {n.bodyText}</Text>
+        <Text style={styles.text}>{plain(n.noteKind)}: {n.bodyText}</Text>
         <Button title={`Edit support note ${index + 1}`} onPress={() => { setNoteId(n.noteId); setNote(n.bodyText); setNoteKind(n.noteKind); }} />
         <Button title={`Delete support note ${index + 1}`} onPress={() => save((r) => {
           state.deleteSupportNote(athleteId, n.noteId, r);
@@ -139,8 +186,9 @@ function BoundSupportForm({ athleteId }: { athleteId: string }): React.JSX.Eleme
       }} multiline />
       <Field title="Reported issuer (optional)" value={issuer} change={setIssuer} />
       {(Object.keys(dates) as (keyof typeof dates)[]).map((key) => <Field key={key}
-        title={key === 'dateZoneId' ? 'Reported time zone (optional)' : `${label(key.replace(/Date$/, ' date'))} (YYYY-MM-DD, optional)`}
+        title={DATE_FIELD_TITLES[key] ?? key}
         value={dates[key]} change={(value) => setDates((d) => ({ ...d, [key]: value }))} />)}
+      <Text style={styles.text}>Write dates as year, month, day, for example 2026-11-05.</Text>
       <Text style={styles.text}>Dates are recorded as reported. They do not automatically begin or end a hold.</Text>
       <Text style={styles.title}>Affected guidance</Text>
       {([['unresolved', 'Scope not yet known'], ['all_prescription', 'All coach suggestions'], ['movement', 'Choose an exercise'],
@@ -163,7 +211,7 @@ function BoundSupportForm({ athleteId }: { athleteId: string }): React.JSX.Eleme
         const suffix = details.instructions.length > 1 ? `, instruction ${index + 1}` : '';
         return <View key={i.instructionId} style={styles.section}>
           <Text style={styles.text}>{SUPPORT_DISCLOSURE}</Text>
-          <Text style={styles.text}>Revision {i.revision}: {label(i.transcriptionState)}</Text>
+          <Text style={styles.text}>Revision {i.revision}: {plain(i.transcriptionState)}</Text>
           <Text style={styles.text}>{i.instructionText}</Text>
           {i.issuerText !== null && <Text style={styles.text}>Reported issuer: {i.issuerText}</Text>}
           {i.transcriptionState === 'draft' && <Button title={`Confirm transcription revision ${i.revision}${suffix}`}
@@ -200,6 +248,9 @@ const styles = StyleSheet.create({
   title: { color: theme.color.textHi, fontSize: 18, fontWeight: '600' },
   text: { color: theme.color.textHi, fontSize: 16, flexShrink: 1 },
   button: { minHeight: 56, padding: 12, justifyContent: 'center', borderWidth: 1, borderColor: theme.color.line },
+  chosen: { borderWidth: 2, borderColor: theme.color.chalk },
+  chosenText: { color: theme.color.chalk, fontWeight: '600' },
+  optionRow: { flexDirection: 'row', gap: 12, alignItems: 'center' },
   input: { minHeight: 56, padding: 12, color: theme.color.textHi, borderWidth: 1, borderColor: theme.color.line },
   multiline: { minHeight: 112, textAlignVertical: 'top' },
 });

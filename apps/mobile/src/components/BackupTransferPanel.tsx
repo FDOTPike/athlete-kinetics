@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
 import { theme } from '../theme/theme';
 import { useBackupStore } from '../state/backupStore';
 import { backupLimitText, measureBackupSize, type BackupSizeEstimate } from '../state/backupCapacity';
@@ -13,6 +13,12 @@ export interface BackupTransferPanelProps {
   /** The number of athletes on the phone; a change re-reads the backup total (#173). */
   athleteCount?: number;
 }
+
+/** m:ss for a run that can take minutes on a slow phone (#135). */
+const elapsedLabel = (ms: number): string => {
+  const seconds = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+};
 
 export default function BackupTransferPanel({ athleteCount }: BackupTransferPanelProps = {}): React.JSX.Element {
   const status = useBackupStore((state) => state.status);
@@ -38,8 +44,29 @@ export default function BackupTransferPanel({ athleteCount }: BackupTransferPane
     void measureBackupSize().then((estimate) => { if (live) setSizeEstimate(estimate); });
     return () => { live = false; };
   }, [status, athleteCount]);
+  // #135: while a run is working, the athlete sees that it is still going and
+  // how long it has taken. Key derivation can take minutes on a slow phone.
+  const [runStart, setRunStart] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
 
   const working = status === 'working';
+
+  useEffect(() => {
+    if (!working) {
+      setRunStart(null);
+      return undefined;
+    }
+    const started = Date.now();
+    setRunStart(started);
+    setNow(started);
+    const tick = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(tick);
+  }, [working]);
+
+  // Announced once when the run starts; the ticking time is not announced.
+  useEffect(() => {
+    if (working) AccessibilityInfo.announceForAccessibility(message ?? 'Working.');
+  }, [working]);
   const recoveryBlocked = startupSafe !== true;
   const strongEnough = password.length >= 12;
   const confirmed = strongEnough && password === confirmation;
@@ -95,6 +122,19 @@ export default function BackupTransferPanel({ athleteCount }: BackupTransferPane
         accessibilityLabel="Create encrypted backup of all athletes and choose where to save it"
         testID="create-backup-button"
       />
+      {/* Walk W4-1: the status (e.g. "Backup is too large…") was drawn below the
+          restore controls, off-screen; it now sits under the backup button. */}
+      {working && (
+        <View style={styles.progress} testID="backup-working-indicator">
+          <ActivityIndicator color={theme.color.textMid} />
+          <Text style={styles.body} testID="backup-working-elapsed">
+            {`${message ?? 'Working…'} ${elapsedLabel(now - (runStart ?? now))}`}
+          </Text>
+        </View>
+      )}
+      {!working && message !== null && (
+        <Text accessibilityLiveRegion="polite" style={styles.body} testID="backup-status-message">{message}</Text>
+      )}
       <QuietAction
         label="RESTORE ENCRYPTED BACKUP"
         onPress={() => { void chooseRestore(password); }}
@@ -115,9 +155,6 @@ export default function BackupTransferPanel({ athleteCount }: BackupTransferPane
             testID="review-recovery-button"
           />
         </>
-      )}
-      {message !== null && (
-        <Text accessibilityLiveRegion="polite" style={styles.body} testID="backup-status-message">{message}</Text>
       )}
       {preview !== null && (
         <View style={styles.preview} testID="restore-preview">
@@ -165,6 +202,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.control,
     paddingHorizontal: theme.space[4],
   },
+  progress: { flexDirection: 'row', alignItems: 'center', gap: theme.space[3] },
   preview: { borderWidth: 1, borderColor: theme.color.line, padding: theme.space[4], gap: theme.space[3] },
   warning: { ...theme.font.body, color: theme.color.textHi },
 });

@@ -52,6 +52,7 @@ import {
 // additive side-car. It is consulted only AFTER every gate and every explicit
 // athlete choice, and only among movements that already passed them.
 import {
+  type EmphasisOrigin,
   PROGRAM_EMPHASIS_VERSION,
   describeCompetitionLifts,
   describeEmphasisGap,
@@ -370,6 +371,16 @@ const FOCUS_SCOPE_SLOT: Record<BlockFocus, number | null> = {
 
 /** Strength-side foci (the volume hybrid damping applies to). */
 const STRENGTH_FOCI: ReadonlySet<BlockFocus> = new Set(['lower', 'upper', 'full']);
+
+/** Partner grappling rounds. They belong on a BJJ day only: a conditioning
+ *  day is general work, and an athlete who owns mats has not said they
+ *  grapple (Android walk 2026-11-03, W1-3). */
+const GRAPPLING_ROUND_NAMES: ReadonlySet<string> = new Set(['BJJ Sparring Round']);
+const fitsFocusDay = (movement: { name: string }, focus: BlockFocus): boolean =>
+  focus === 'bjj' || !GRAPPLING_ROUND_NAMES.has(movement.name);
+/** The same day rule, for the program builder: a choice it offers or accepts
+ *  must be one the generator will place on that day (review, PR 194). */
+export const movementFitsFocusDay = fitsFocusDay;
 
 // Weekly splits, indexed by weekly_frequency - 1. Hybrid alternates lifting
 // and sport days; at frequency 1 the sport IS the week (concurrent training
@@ -1143,7 +1154,7 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
         movement.sportTracking,
       ));
       const pool = tierPool.filter((movement) =>
-        capabilityAvailableForContext(movement, accessContext));
+        fitsFocusDay(movement, focus) && capabilityAvailableForContext(movement, accessContext));
       const patterns = FOCUS_PATTERNS[focus].slice(0, slotBudget);
       // W3: gate-reason visibility for the ranking default. equipAvailableIds
       // and tierAvailableIds are computed once per session; a movement outside
@@ -1277,7 +1288,7 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
         return null;
       };
       const slotReason = (need: { muscle: MuscleGroupId | null; goalLabel: string | null }):
-        { muscle: MuscleGroupId; origin: 'focus' | 'sport' } | { goalLabel: string } =>
+        { muscle: MuscleGroupId; origin: EmphasisOrigin } | { goalLabel: string } =>
         need.muscle !== null
           ? { muscle: need.muscle, origin: emphasisIndex?.originOf(need.muscle) ?? 'focus' }
           : { goalLabel: need.goalLabel ?? '' };
@@ -1459,7 +1470,8 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
         // re-checks every gate from raw inputs, so a rejected candidate is
         // still never re-admitted.
         const rankingCandidates: readonly RankingCandidate[] = input.movements
-          .filter((candidate) => candidate.pattern === pattern && !usedIds.has(candidate.movement_id))
+          .filter((candidate) => candidate.pattern === pattern && !usedIds.has(candidate.movement_id)
+            && fitsFocusDay(candidate, focus))
           .map((candidate) => {
             const capOk = capabilityAvailableForContext(candidate, accessContext);
             const equipOk = equipAvailableIds.has(candidate.movement_id);
@@ -1609,8 +1621,8 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
           // tier limb is unreachable by construction — the ceiling is removed
           // there — so the message correctly attributes the drop to equipment
           // or capability.
-          const equipmentCandidate = pickForPattern(equipPool, pattern, usedIds);
-          const tierCandidate = pickForPattern(tierPool, pattern, usedIds);
+          const equipmentCandidate = pickForPattern(equipPool.filter((c) => fitsFocusDay(c, focus)), pattern, usedIds);
+          const tierCandidate = pickForPattern(tierPool.filter((c) => fitsFocusDay(c, focus)), pattern, usedIds);
           warnings.add(equipmentCandidate === null
             ? `${focus}: no equipment-available movement for ${pattern}`
             : tierCandidate === null
@@ -1752,6 +1764,7 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
         muscle,
         !emphasisDayExists.has(muscle) ? 'no_day' : !emphasisCandidateSeen.has(muscle) ? 'no_exercise' : 'no_room',
         capMin,
+        frequency,
       ));
     }
     if (emphasis.sport?.competitionLifts === true) {
