@@ -4,7 +4,7 @@
  * Coaching information is arranged around one immediate decision, a compact
  * four-week trajectory (liquid calendar), and inline disclosures for management and context.
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import TrainingSupportNotice from '../components/TrainingSupportNotice';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
@@ -32,6 +32,7 @@ import { useNavigation, useSubViewBack } from '../navigation/navigation';
 import ProgramSetupScreen from './ProgramSetupScreen';
 import NewBlockChooserScreen from './NewBlockChooserScreen';
 import InfoTip from '../components/InfoTip';
+import { blockWeekTotals, phaseCardText } from '../state/blockWeekChanges';
 import { REPORT_NOT_SENT_TEXT } from '../components/SubjectiveReportPanel';
 import { EmphasisReportCard } from '../components/EmphasisReportCard';
 import { deriveTodayState } from '../state/todayState';
@@ -478,6 +479,19 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
     }
   };
 
+  // #169: what this block's plan does from week to week, from its own slots.
+  // A session whose slots cannot be read adds nothing: the phase card then
+  // falls back to the glossary text instead of breaking the Plan tab.
+  const weekTotals = useMemo(() => (block === null || typeof loadSessionSlots !== 'function' ? [] : blockWeekTotals(
+    blockSessions.flatMap((summary) => {
+      const slots: unknown = loadSessionSlots(summary.plannedSessionId);
+      return Array.isArray(slots) ? (slots as TodaySlot[]).map((slot) => ({
+        week: summary.weekIndex, phase: summary.phase, sets: slot.sets, targetRpe: slot.targetRpe,
+      })) : [];
+    }),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  )), [block, blockSessions]);
+
   if (showChooser) {
     return (
       <NewBlockChooserScreen
@@ -632,7 +646,9 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                       <Text style={styles.weekTitle}>Week {row.week}</Text>
                       <View style={styles.weekPhaseRow}>
                         <Text style={styles.weekPhase}>{phaseLabel(row.phase)}</Text>
-                        {showPhaseTip && <InfoTip term={phaseTerm} />}
+                        {showPhaseTip && (
+                          <InfoTip term={phaseTerm} body={phaseCardText(weekTotals, row.phase, phaseLabel(row.phase))} />
+                        )}
                       </View>
                     </View>
                     {/* Cells stay at the 56 dp minimum, so a week can be wider than the card. The bar

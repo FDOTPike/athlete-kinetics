@@ -26,6 +26,7 @@ import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { EmphasisReportCard } from '../components/EmphasisReportCard';
 import { programChoiceDisclosure, recommendedProgramDefaults } from '../state/programDefaults';
 import { anchorDisplayName, priorExperienceWouldClear } from '../state/priorExperience';
+import { blockWeekTotals, describeBlockWeek } from '../state/blockWeekChanges';
 import {
   REASON_TEXT_MAP,
   useStore,
@@ -412,6 +413,17 @@ export default function ProgramSetupScreen({
       },
     ))];
   }, [previewResult.preview, movements]);
+  // #169: the block's own week-to-week change, read from the generated plan
+  // (working sets and target effort per week), named by phase.
+  const weekChanges = useMemo(() => {
+    const plan = previewResult.preview?.plan;
+    if (plan == null) return [];
+    const totals = blockWeekTotals(plan.sessions.flatMap((session) => session.slots.map((slot) => ({
+      week: session.week_index, phase: session.phase ?? '', sets: slot.sets, targetRpe: slot.target_rpe,
+    }))));
+    return totals.map((row) => describeBlockWeek(totals, row.week, true))
+      .filter((line): line is string => line !== null);
+  }, [previewResult.preview]);
 
   // R8 §2.3 said a rule must never be enforced invisibly. That contract is kept
   // in full — what changed is how many rules there are left to enforce. Four of
@@ -718,6 +730,11 @@ export default function ProgramSetupScreen({
       {progressionSummary.length > 0 && (
         <View style={styles.card} testID="weekly-progression-summary">
           <Text style={styles.sectionTitle}>How the weeks progress</Text>
+          <View testID="program-week-changes">
+            {weekChanges.map((line) => (
+              <Text key={line} style={styles.caption}>{line}</Text>
+            ))}
+          </View>
           {progressionSummary.map((line, index) => (
             <Text key={`${index}:${line}`} style={styles.caption}>{line}</Text>
           ))}

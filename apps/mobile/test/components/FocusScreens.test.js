@@ -888,6 +888,47 @@ test('OW-007 the resume error is action-scoped: an unrelated store error does no
   expect(screen.queryByTestId('suspension-error')).toBeNull();
 });
 
+// #169: the phase "i" cards describe what this block's plan actually does
+// from week to week, read from its own planned sets and effort, not fixed
+// glossary prose that is wrong for one objective or another.
+describe('#169 phase cards describe the generated weeks', () => {
+  const PHASES = ['accumulation', 'intensification', 'realization', 'deload'];
+  // A hypertrophy block whose sets RISE into week 3 (the walk's case).
+  const WEEK = { 1: { sets: 3, targetRpe: 7 }, 2: { sets: 4, targetRpe: 7.5 }, 3: { sets: 5, targetRpe: 8 }, 4: { sets: 2, targetRpe: 6 } };
+  const hypertrophyBlock = () => baseState({
+    block: { blockId: 1, startDate: '2026-07-13', objective: 'hypertrophy', createdAtMs: 1 },
+    blockSessions: [1, 2, 3, 4].map((week) => ({
+      plannedSessionId: week, weekIndex: week, dayIndex: 1, focus: 'upper', phase: PHASES[week - 1],
+      sessionDate: `2026-07-${String(13 + (week - 1) * 7).padStart(2, '0')}`, slotCount: 2,
+      completionStatus: null,
+    })),
+    loadSessionSlots: jest.fn((id) => [
+      { ...todaySlot, plannedSlotId: id * 10, ...WEEK[id] },
+      { ...todaySlot, plannedSlotId: id * 10 + 1, slotIndex: 1, ...WEEK[id] },
+    ]),
+  });
+
+  test('the REALISE card on a hypertrophy block says sets rise, never "lowest volume"', () => {
+    mockState = hypertrophyBlock();
+    render(<BlockScreen />);
+    fireEvent.press(screen.getByLabelText('What does REALISE mean?'));
+    expect(screen.queryByText(/lowest volume/i)).toBeNull();
+    expect(screen.getByText(/Week 3: more working sets than week 2 \(8 → 10\), at a higher target effort \(RPE 7\.5 → 8\)\./)).toBeOnTheScreen();
+    expect(screen.getByTestId('info-tip-body').props.children).toMatch(/^Realise in this block, from your plan:/);
+  });
+
+  test('the build-strength and deload cards say what those weeks do in this block', () => {
+    mockState = hypertrophyBlock();
+    render(<BlockScreen />);
+    fireEvent.press(screen.getByLabelText('What does BUILD STRENGTH mean?'));
+    expect(screen.queryByText(/Volume comes down/i)).toBeNull();
+    expect(screen.getByText(/Week 2: more working sets than week 1 \(6 → 8\), at a higher target effort \(RPE 7 → 7\.5\)\./)).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText('Close, dismiss explanation'));
+    fireEvent.press(screen.getByLabelText('What does DELOAD mean?'));
+    expect(screen.getByText(/Week 4: fewer working sets than week 3 \(10 → 4\), at a lower target effort \(RPE 8 → 6\)\./)).toBeOnTheScreen();
+  });
+});
+
 describe('#170: the neutral default of 50 is named as a default', () => {
   const noInputs = {
     ...vector,
