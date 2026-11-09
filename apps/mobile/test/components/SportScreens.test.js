@@ -180,15 +180,15 @@ describe('the sport screen in the interview', () => {
   test('"not sure" is the starting workload answer; the competition date is context only', () => {
     openSportSlide();
     press('sport-family-strength');
-    expect(screen.getByLabelText('PRACTICE SESSIONS A WEEK Not sure')).toBeTruthy();
-    expect(screen.getByLabelText('MATCHES OR COMPETITIONS A WEEK Not sure')).toBeTruthy();
+    expect(screen.getByLabelText('practice sessions a week Not sure')).toBeTruthy();
+    expect(screen.getByLabelText('matches or competitions a week Not sure')).toBeTruthy();
     expect(selected('sport-practice-unsure')).toBe(true);
-    pressLabel('Increase PRACTICE SESSIONS A WEEK');
-    pressLabel('Increase PRACTICE SESSIONS A WEEK');
-    expect(screen.getByLabelText('PRACTICE SESSIONS A WEEK 2')).toBeTruthy();
+    pressLabel('Increase practice sessions a week');
+    pressLabel('Increase practice sessions a week');
+    expect(screen.getByLabelText('practice sessions a week 2')).toBeTruthy();
     expect(selected('sport-practice-unsure')).toBe(false);
     press('sport-practice-unsure');
-    expect(screen.getByLabelText('PRACTICE SESSIONS A WEEK Not sure')).toBeTruthy();
+    expect(screen.getByLabelText('practice sessions a week Not sure')).toBeTruthy();
     expect(screen.getByTestId('sport-competition-note').props.children)
       .toBe('If you add a competition date, it is recorded. For now the plan does not peak, taper or test for it. The date is used for reminders and for reviewing your goals.');
     press('sport-outcome-bigger_competition_lifts');
@@ -232,9 +232,9 @@ describe('the sport screen in the interview', () => {
     press('sport-football_association');
     press('sport-outcome-stay_available');
     press('sport-experience-2_to_5_years');
-    pressLabel('Increase PRACTICE SESSIONS A WEEK');
-    pressLabel('Increase PRACTICE SESSIONS A WEEK');
-    pressLabel('Increase MATCHES OR COMPETITIONS A WEEK');
+    pressLabel('Increase practice sessions a week');
+    pressLabel('Increase practice sessions a week');
+    pressLabel('Increase matches or competitions a week');
     type('sport-minutes', '90');
     expect(nextDisabled()).toBe(false);
     next();
@@ -399,8 +399,8 @@ describe('the profile sport panel', () => {
     press('sport-hockey_ice');
     press('sport-outcome-stay_available');
     press('sport-experience-over_5_years');
-    for (let n = 0; n < 4; n += 1) pressLabel('Increase PRACTICE SESSIONS A WEEK');
-    pressLabel('Increase MATCHES OR COMPETITIONS A WEEK');
+    for (let n = 0; n < 4; n += 1) pressLabel('Increase practice sessions a week');
+    pressLabel('Increase matches or competitions a week');
     press('profile-sport-save');
     expect(screen.getByTestId('sport-panel-message').props.children)
       .toBe('Sport saved. Your current plan is unchanged; this is used when your next block is created.');
@@ -442,4 +442,22 @@ describe('the profile sport panel', () => {
     expect(screen.queryByTestId(`profile-goal-exercise-${goalId}`)).toBeNull();
     expect(state().goals).toHaveLength(1);
   });
+});
+
+// Android walk 2026-11-03 (W6-6, issue 160): a control's accessible name starts
+// with its visible words, and a selected chip does not also say "selected".
+test('onboarding sport and target chips: names start with the visible words, selected or not', () => {
+  render(<OnboardingScreen />);
+  next();
+  next();
+  const sportName = () => screen.getByTestId('onboarding-wants-sport').props.accessibilityLabel;
+  const targetName = () => screen.getByTestId('onboarding-wants-target').props.accessibilityLabel;
+  expect(sportName()).toMatch(/^I play or compete in a sport\. /);
+  expect(targetName()).toMatch(/^I also have a specific target\. /);
+  press('onboarding-wants-sport');
+  press('onboarding-wants-target');
+  expect(sportName()).toBe('I play or compete in a sport. One more screen will ask about it.');
+  expect(targetName()).toBe('I also have a specific target. One more screen will ask for it.');
+  expect(sportName()).not.toMatch(/selected/);
+  expect(targetName()).not.toMatch(/selected/);
 });

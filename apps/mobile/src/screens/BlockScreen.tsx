@@ -594,7 +594,19 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                         {showPhaseTip && <InfoTip term={phaseTerm} />}
                       </View>
                     </View>
-                    <View testID={`trajectory-days-week-${row.week}`} style={styles.dayRail}>
+                    {/* Cells stay at the 56 dp minimum, so a week can be wider than the card. The bar
+                        shows that, and the row opens with today's cell in view (issue 163). */}
+                    <ScrollView
+                      horizontal
+                      showsHorizontalScrollIndicator
+                      style={styles.dayScroll}
+                      contentOffset={{
+                        x: Math.max(0, row.cells.findIndex((_, dayIndex) => addDaysIso(block.startDate, (row.week - 1) * 7 + dayIndex) === today)) * (theme.touch.min + theme.space[1]),
+                        y: 0,
+                      }}
+                      testID={`trajectory-days-week-${row.week}`}
+                      contentContainerStyle={styles.dayRail}
+                    >
                       {row.cells.map((cell, dayIndex) => {
                         const cellDate = addDaysIso(block.startDate, (row.week - 1) * 7 + dayIndex);
                         const isToday = cellDate === today;
@@ -676,7 +688,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                           </Pressable>
                         );
                       })}
-                    </View>
+                    </ScrollView>
                   </View>
 
                   {detail !== null && detail.summary.weekIndex === row.week && (
@@ -1769,14 +1781,17 @@ const styles = StyleSheet.create({
     ...theme.font.eyebrow,
     color: theme.color.textLow,
   },
-  dayRail: {
+  dayScroll: {
     width: '100%',
+  },
+  dayRail: {
+    flexGrow: 1,
     flexDirection: 'row',
     gap: theme.space[1],
   },
   dayMark: {
     flex: 1,
-    minWidth: 0,
+    minWidth: theme.touch.min,
     minHeight: theme.touch.min,
     borderWidth: 1,
     borderColor: theme.color.line,

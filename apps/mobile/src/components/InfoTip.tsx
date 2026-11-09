@@ -139,7 +139,7 @@ export default function InfoTip({ term }: InfoTipProps): React.JSX.Element | nul
               style={styles.closeButton}
               onPress={close}
               accessibilityRole="button"
-              accessibilityLabel="Dismiss explanation"
+              accessibilityLabel="Close, dismiss explanation"
             >
               <Text style={styles.closeButtonText}>CLOSE</Text>
             </Pressable>

@@ -491,8 +491,8 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     expect(screen.getByLabelText(/Training guidance safety notice/)).toBeOnTheScreen();
     expect(screen.getByText(/pikeMethods provides training guidance, not medical advice/)).toBeOnTheScreen();
     // Steppers render with Decrease/Increase accessibility labels
-    expect(screen.getByLabelText('Decrease 3 · TRAINING DAYS PER WEEK')).toBeOnTheScreen();
-    expect(screen.getByLabelText('Increase 3 · TRAINING DAYS PER WEEK')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Decrease training days per week')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Increase training days per week')).toBeOnTheScreen();
   });
 
   test('b) Coach Mode athlete delete requires two presses before store action fires', () => {
@@ -643,7 +643,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     expect(screen.getByRole('header', { name: 'NEW TO THIS' })).toBeOnTheScreen();
     expect(screen.getByText(/Choose this if structured training is still new/).props.accessible).toBe(true);
     expect(selection.props.accessibilityState.selected).toBe(false);
-    fireEvent.press(screen.getByLabelText('Dismiss explanation'));
+    fireEvent.press(screen.getByLabelText('Close, dismiss explanation'));
     fireEvent.press(selection);
     expect(screen.getByRole('button', { name: /NEW TO THIS\. Under a year/ }).props.accessibilityState.selected).toBe(true);
   });
@@ -673,7 +673,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     pressNext();
     fireEvent.press(screen.getByLabelText(/EXPERIENCED\./));
     pressNext();
-    fireEvent.press(screen.getByLabelText('Increase TRAINING DAYS PER WEEK'));
+    fireEvent.press(screen.getByLabelText('Increase training days per week'));
     pressNext();
     fireEvent.press(screen.getByRole('button', { name: /MINIMAL\. No equipment/ }));
     pressNext();
@@ -1253,7 +1253,7 @@ describe('OW-001 load-intent declaration surface', () => {
     setup();
     expect(screen.getByLabelText('Plan Push-up with Bodyweight only')).toBeOnTheScreen();
     expect(screen.getByLabelText('Plan Walking Lunge with Dumbbell')).toBeOnTheScreen();
-    expect(screen.getByLabelText('Leave Push-up unset, so it is planned with added weight')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Not set: leave Push-up unset, so it is planned with added weight')).toBeOnTheScreen();
   });
 
   test('copy says the choice applies to FUTURE programming and what unset means', () => {
