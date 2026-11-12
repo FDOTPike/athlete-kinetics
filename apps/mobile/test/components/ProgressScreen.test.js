@@ -95,18 +95,30 @@ describe('Recent sessions open to what was logged', () => {
     const labels = screen.getAllByLabelText(/Show what was logged.$/).map((node) => node.props.accessibilityLabel);
     expect(labels).toHaveLength(2);
     expect(labels[0]).not.toBe(labels[1]);
-    // Check an independent mid-month anchor so the short month adapts to any runtime locale.
+    // Check independent mid-month anchors so month, time prefix/separator, and day period adapt to any runtime locale.
     const novMonth = new Intl.DateTimeFormat(undefined, { month: 'short' }).format(new SpyDate(2026, 10, 15));
+    const timeFmt = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
+    const pmPeriod = timeFmt.formatToParts(new SpyDate(2026, 10, 15, 18, 30)).find((p) => p.type === 'dayPeriod')?.value;
+    const amPeriod = timeFmt.formatToParts(new SpyDate(2026, 10, 15, 9, 15)).find((p) => p.type === 'dayPeriod')?.value;
+    const timeField = (label) => label.split(' · ').pop().replace(/\. Show what was logged\.$/, '');
     expect(labels[0]).toContain('Session adapted');
     expect(labels[0]).toContain(novMonth);
     expect(labels[0]).toMatch(/\b0?3\b/);
     expect(labels[0]).toContain('2026');
-    expect(labels[0]).toMatch(/ · (?:18|0?6)[:.]05/);
+    if (pmPeriod) {
+      expect(labels[0]).toMatch(/ · [^·]*?(?:18|0?6)[:.]05/);
+      expect(timeField(labels[0])).toContain(pmPeriod);
+    } else {
+      expect(labels[0]).toMatch(/ · [^·]*?18[:.]05/);
+    }
     expect(labels[1]).toContain('Session recorded');
     expect(labels[1]).toContain(novMonth);
     expect(labels[1]).toMatch(/\b0?3\b/);
     expect(labels[1]).toContain('2026');
-    expect(labels[1]).toMatch(/ · 0?9[:.]40/);
+    expect(labels[1]).toMatch(/ · [^·]*?0?9[:.]40/);
+    if (amPeriod) {
+      expect(timeField(labels[1])).toContain(amPeriod);
+    }
   });
 
   test('tapping a session shows its logged exercises and skips, and tapping again hides them', () => {
