@@ -101,12 +101,12 @@ describe('Recent sessions open to what was logged', () => {
     expect(labels[0]).toContain(novMonth);
     expect(labels[0]).toMatch(/\b0?3\b/);
     expect(labels[0]).toContain('2026');
-    expect(labels[0]).toMatch(/ · (?:18|0?6):05/);
+    expect(labels[0]).toMatch(/ · (?:18|0?6)[:.]05/);
     expect(labels[1]).toContain('Session recorded');
     expect(labels[1]).toContain(novMonth);
     expect(labels[1]).toMatch(/\b0?3\b/);
     expect(labels[1]).toContain('2026');
-    expect(labels[1]).toMatch(/ · 0?9:40/);
+    expect(labels[1]).toMatch(/ · 0?9[:.]40/);
   });
 
   test('tapping a session shows its logged exercises and skips, and tapping again hides them', () => {
