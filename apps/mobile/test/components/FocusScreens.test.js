@@ -898,12 +898,30 @@ test('OW-007 a successful resume shows no error and leaves the global channel al
   expect(screen.queryByTestId('suspension-error')).toBeNull();
 });
 
-test('OW-007 the resume error is action-scoped: an unrelated store error does not populate it', () => {
+  test('OW-007 the resume error is action-scoped: an unrelated store error does not populate it', () => {
   mockState = baseState({ suspension: OPEN_EPISODE, error: 'some unrelated store failure', endSuspension: jest.fn() });
   render(<BlockScreen />);
 
   // The global error channel must never read as a refusal of this control.
   expect(screen.queryByTestId('suspension-error')).toBeNull();
+});
+
+test('#302: when readiness vector is absent, Plan still renders the pause/resume card', () => {
+  mockState = baseState({
+    current: null,
+    suspension: OPEN_EPISODE,
+    endSuspension: jest.fn(),
+  });
+  render(<BlockScreen />);
+  expect(screen.getByTestId('suspension-resume')).toBeOnTheScreen();
+
+  mockState = baseState({
+    current: null,
+    suspension: null,
+    program: { status: 'active', currentSequenceIndex: 1, plannedBlockCount: 3, plannedEndDate: '2026-09-30' },
+  });
+  render(<BlockScreen />);
+  expect(screen.getByTestId('suspension-begin-life')).toBeOnTheScreen();
 });
 
 describe('#210: the Pause card comes after the plan, for everyone', () => {

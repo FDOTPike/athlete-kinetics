@@ -245,7 +245,7 @@ export function goalExerciseMatches(
   movements: readonly ExerciseOption[], query: string,
 ): ExerciseOption[] {
   const typed = compact(query);
-  if (query.trim().length < 2 || typed.length === 0) return [];
+  if (typed.length < 2) return [];
   const needles = new Set([typed]);
   if (typed.length > 3 && typed.endsWith('s')) needles.add(typed.slice(0, -1));
   const shortForm = GOAL_EXERCISE_SHORT_FORMS[typed] ?? GOAL_EXERCISE_SHORT_FORMS[typed.replace(/s$/, '')];

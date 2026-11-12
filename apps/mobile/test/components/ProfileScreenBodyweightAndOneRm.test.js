@@ -158,4 +158,25 @@ describe('ProfileScreen one-rep-max clamp notice', () => {
     fireEvent(squat(), 'endEditing');
     expect(screen.queryByText(/^Saved as 500\.0 kg/)).toBeNull();
   });
+
+  test('#302: never claims "Saved as 500.0 kg" while the database is closed', () => {
+    renderProfile();
+    useStore.setState({ status: 'booting' });
+    fireEvent.changeText(squat(), '999');
+    fireEvent(squat(), 'endEditing');
+    expect(screen.queryByText(/^Saved as 500\.0 kg/)).toBeNull();
+  });
+
+  test('#302: clears the clamp notice on training data reset or athlete switch', async () => {
+    renderProfile();
+    clampTo500();
+    expect(useStore.getState().resetTrainingData()).toBe(true);
+    await settle();
+    expect(screen.queryByText(/^Saved as 500\.0 kg/)).toBeNull();
+
+    clampTo500();
+    useStore.setState({ activeAthleteId: 'athlete-2' });
+    await settle();
+    expect(screen.queryByText(/^Saved as 500\.0 kg/)).toBeNull();
+  });
 });

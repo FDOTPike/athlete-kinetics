@@ -147,23 +147,26 @@ const loadSourceCopy = (
   // last-logged load) says so and names that load; "last session" is only said
   // of an earlier session, never of a set logged in this one.
   const addedLoad = bodyweightMode ? ' added load' : '';
+const formatOptionalLoadKg = (kg: number | null | undefined): string | undefined =>
+  (kg == null ? undefined : formatLoadKg(kg));
+
   if (sel.source === 'manual') {
     switch (sel.advisoryKind) {
-      case 'apre': return `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg — your entry stands.`;
-      case 'onerm': return `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg from your ${oneRmKg === undefined ? '' : formatLoadKg(oneRmKg)} kg 1RM — your entry stands.`;
+      case 'apre': return `Coach suggests ${formatOptionalLoadKg(sel.advisoryKg)} kg — your entry stands.`;
+      case 'onerm': return `Coach suggests ${formatOptionalLoadKg(sel.advisoryKg)} kg from your ${oneRmKg === undefined ? '' : formatLoadKg(oneRmKg)} kg 1RM — your entry stands.`;
       case 'history':
         if (!sel.advisoryFromThisSession && isEasedBelow(sel.advisoryKg, sel.unadjustedHistoryKg)) {
-          return `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg today · logged ${sel.unadjustedHistoryKg?.toFixed(1)} kg last session — your entry stands.`;
+          return `Coach suggests ${formatOptionalLoadKg(sel.advisoryKg)} kg today · logged ${formatOptionalLoadKg(sel.unadjustedHistoryKg)} kg last session — your entry stands.`;
         }
         return sel.advisoryFromThisSession === true
-          ? `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg from this session — your entry stands.`
-          : `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg from your last session — your entry stands.`;
+          ? `Coach suggests ${formatOptionalLoadKg(sel.advisoryKg)} kg from this session — your entry stands.`
+          : `Coach suggests ${formatOptionalLoadKg(sel.advisoryKg)} kg from your last session — your entry stands.`;
       default: return 'Your call. The number you enter is what gets logged.';
     }
   }
   if (sel.source === 'history') {
     if (!sel.historyFromThisSession && isEasedBelow(sel.initialLoadKg, sel.unadjustedHistoryKg)) {
-      return `Coach suggests ${sel.initialLoadKg?.toFixed(1)} kg${addedLoad} today · last logged ${sel.unadjustedHistoryKg?.toFixed(1)} kg${addedLoad}`;
+      return `Coach suggests ${formatOptionalLoadKg(sel.initialLoadKg)} kg${addedLoad} today · last logged ${formatOptionalLoadKg(sel.unadjustedHistoryKg)} kg${addedLoad}`;
     }
     return bodyweightMode
       ? `Last logged ${sel.initialLoadKg == null ? '' : formatLoadKg(sel.initialLoadKg)} kg added load`
@@ -199,11 +202,11 @@ const loadCopyFor = (
       && apreOverrideKg >= 0;
     if (hasValidApre) {
       return bodyweightMode
-        ? `Prescribed ${apreOverrideKg.toFixed(1)} kg added load`
-        : `Prescribed ${apreOverrideKg.toFixed(1)} kg`;
+        ? `Prescribed ${formatLoadKg(apreOverrideKg)} kg added load`
+        : `Prescribed ${formatLoadKg(apreOverrideKg)} kg`;
     }
     if (carriedSlotLoadKg !== null && sel.initialLoadKg !== null && Number.isFinite(sel.initialLoadKg)) {
-      return `Coach suggests ${sel.initialLoadKg.toFixed(1)} kg · Based on your ${oneRmKg === undefined ? '' : formatLoadKg(oneRmKg)} kg 1RM`;
+      return `Coach suggests ${formatLoadKg(sel.initialLoadKg)} kg · Based on your ${oneRmKg === undefined ? '' : formatLoadKg(oneRmKg)} kg 1RM`;
     }
     return `Based on your ${oneRmKg === undefined ? '' : formatLoadKg(oneRmKg)} kg 1RM`;
   }
@@ -505,12 +508,12 @@ export interface SessionScreenProps {
 // kept only for the athlete and session in hand, and only for sets not yet
 // logged, so the map cannot grow with drafts nothing will read again.
 const unloggedLoadDrafts = new Map<string, string>();
-const loadDraftScope = (athleteId: string | null, sessionId: number | undefined): string =>
-  `${athleteId ?? 'none'}:${sessionId ?? 'none'}:`;
-const loadDraftKey = (athleteId: string | null, sessionId: number | undefined, slotId: number, logged: number, movementId: number | undefined): string =>
-  `${loadDraftScope(athleteId, sessionId)}${slotId}:${logged}:${movementId ?? 'none'}`;
-const pruneLoadDrafts = (athleteId: string | null, sessionId: number | undefined, slotId: number, logged: number): void => {
-  const scope = loadDraftScope(athleteId, sessionId);
+const loadDraftScope = (athleteId: string | null, sessionId: number | undefined, startedAtMs: number | undefined): string =>
+  `${athleteId ?? 'none'}:${sessionId ?? 'none'}:${startedAtMs ?? 'none'}:`;
+const loadDraftKey = (athleteId: string | null, sessionId: number | undefined, startedAtMs: number | undefined, slotId: number, logged: number, movementId: number | undefined): string =>
+  `${loadDraftScope(athleteId, sessionId, startedAtMs)}${slotId}:${logged}:${movementId ?? 'none'}`;
+const pruneLoadDrafts = (athleteId: string | null, sessionId: number | undefined, startedAtMs: number | undefined, slotId: number, logged: number): void => {
+  const scope = loadDraftScope(athleteId, sessionId, startedAtMs);
   for (const key of [...unloggedLoadDrafts.keys()]) {
     if (!key.startsWith(scope)) { unloggedLoadDrafts.delete(key); continue; }
     const [slot, setsLogged] = key.slice(scope.length).split(':');
@@ -934,13 +937,14 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
         advisoryKind: seed.advisoryKind,
       },
     };
-    pruneLoadDrafts(state.activeAthleteId, session?.sessionId, currentSlot.sessionPlanSlotId, currentLogged);
-    const draft = unloggedLoadDrafts.get(loadDraftKey(state.activeAthleteId, session?.sessionId, currentSlot.sessionPlanSlotId, currentLogged, currentMovement?.movement_id));
+    pruneLoadDrafts(state.activeAthleteId, session?.sessionId, session?.startedAtMs, currentSlot.sessionPlanSlotId, currentLogged);
+    const draft = unloggedLoadDrafts.get(loadDraftKey(state.activeAthleteId, session?.sessionId, session?.startedAtMs, currentSlot.sessionPlanSlotId, currentLogged, currentMovement?.movement_id));
     setLoadText(draft ?? (initial === null ? '' : formatLoadKg(initial)));
     setLoadInvalid(false);
   }, [
     state.activeAthleteId,
     session?.sessionId,
+    session?.startedAtMs,
     currentSlot?.sessionPlanSlotId,
     currentLogged,
     currentMovement?.movement_id,
@@ -965,7 +969,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
     lastCorrection.current = correctableSet === null ? null : { setId: correctableSet.set_id, loadKg: correctableSet.load_kg };
     if (seen === null || correctableSet === null || seen.setId !== correctableSet.set_id || seen.loadKg === correctableSet.load_kg) return;
     if (currentSlot === null || target === null || bandOnly) return;
-    const typed = unloggedLoadDrafts.get(loadDraftKey(state.activeAthleteId, session?.sessionId, currentSlot.sessionPlanSlotId, currentLogged, currentMovement?.movement_id));
+    const typed = unloggedLoadDrafts.get(loadDraftKey(state.activeAthleteId, session?.sessionId, session?.startedAtMs, currentSlot.sessionPlanSlotId, currentLogged, currentMovement?.movement_id));
     if (typed !== undefined) return;
     const seed = state.resolveSlotLoad({
       movementId: currentSlot.movementId,
@@ -994,7 +998,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   const editLoadText = (text: string): void => {
     setLoadText(text);
     if (currentSlot !== null) {
-      unloggedLoadDrafts.set(loadDraftKey(state.activeAthleteId, session?.sessionId, currentSlot.sessionPlanSlotId, currentLogged, currentMovement?.movement_id), text);
+      unloggedLoadDrafts.set(loadDraftKey(state.activeAthleteId, session?.sessionId, session?.startedAtMs, currentSlot.sessionPlanSlotId, currentLogged, currentMovement?.movement_id), text);
     }
   };
 

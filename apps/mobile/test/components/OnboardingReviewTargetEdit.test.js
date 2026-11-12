@@ -230,12 +230,13 @@ describe('Onboarding wording found on the Android walk', () => {
   });
 
   test('STRENGTH + GRAPPLING says its BJJ days are planned and the sport step is for another sport', () => {
-    const { HYBRID_SPORT_NOTE } = require('../../src/screens/OnboardingScreen');
     render(<OnboardingScreen />);
     next();
     pressLabel(/^STRENGTH \+ GRAPPLING/);
     next();
-    expect(screen.getByTestId('onboarding-hybrid-sport-note').props.children).toBe(HYBRID_SPORT_NOTE);
+    expect(screen.getByTestId('onboarding-hybrid-sport-note').props.children).toBe(
+      'Your Strength + Grappling goal already includes BJJ days. Do you also train another sport? This step is optional.',
+    );
     press('onboarding-wants-sport');
     next();
     expect(screen.getByTestId('onboarding-hybrid-sport-step-note')).toBeOnTheScreen();

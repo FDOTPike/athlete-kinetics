@@ -6777,7 +6777,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       [sessionId],
     ))[0];
     const setRows = rowsOf<{
-      movement_id: number; movement_name: string; reps: number; load_kg: number;
+      set_id: number; movement_id: number; movement_name: string; reps: number; load_kg: number;
       time_s: number | null; session_plan_slot_id: number | null; planned_sets: number | null;
       rpe: number | null;
       swapped_to_name: string | null;
@@ -6790,7 +6790,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
               tm.value AS time_s, st.session_plan_slot_id,
               COALESCE(spc.original_planned_sets, sps.planned_sets) AS planned_sets,
               CASE WHEN spc.original_planned_sets IS NOT NULL THEN rm.name END AS swapped_to_name,
-              sr.rpe
+              sr.rpe, sr.set_id
          FROM set_record sr
          JOIN movement m ON m.movement_id = sr.movement_id
          LEFT JOIN set_metric tm ON tm.set_id = sr.set_id AND tm.metric = 'time_s'
@@ -6850,21 +6850,28 @@ export const useStore = create<KineticsStore>()((set, get) => {
         ORDER BY n.reported_at_ms, n.id`,
       [sessionId],
     ));
+    // #302 Bug 7: an unslotted set is counted at most once across skipped slots
+    // sharing the same movement, rather than repeating the same set per slot.
+    const claimedSetIds = new Set<number>();
+    const skippedExercises = skippedRows.map((row) => {
+      const sets = setRows.filter((set) => {
+        if (claimedSetIds.has(set.set_id)) return false;
+        const matches = set.session_plan_slot_id != null
+          ? set.session_plan_slot_id === row.session_plan_slot_id
+          : set.movement_id === row.movement_id || set.movement_id === row.current_movement_id;
+        if (matches) claimedSetIds.add(set.set_id);
+        return matches;
+      });
+      const loggedAs: string[] = [];
+      for (const set of sets) {
+        if (set.movement_id !== row.movement_id && !loggedAs.includes(set.movement_name)) loggedAs.push(set.movement_name);
+      }
+      return { name: row.movement_name, plannedSets: row.planned_sets, loggedSets: sets.length, loggedAs };
+    });
     return {
       durationMin: sessionRow?.duration_min ?? null,
       reports: reportRows.map((row) => ({ region: row.region, severity: row.severity })),
-      // A set belongs to a skipped slot as the session timeline counts it: by
-      // its slot when it has one, else by movement.
-      skippedExercises: skippedRows.map((row) => {
-        const sets = setRows.filter((set) => (set.session_plan_slot_id != null
-          ? set.session_plan_slot_id === row.session_plan_slot_id
-          : set.movement_id === row.movement_id || set.movement_id === row.current_movement_id));
-        const loggedAs: string[] = [];
-        for (const set of sets) {
-          if (set.movement_id !== row.movement_id && !loggedAs.includes(set.movement_name)) loggedAs.push(set.movement_name);
-        }
-        return { name: row.movement_name, plannedSets: row.planned_sets, loggedSets: sets.length, loggedAs };
-      }),
+      skippedExercises,
       exercises: groupSummaryExercises(setRows.map((row) => ({
         movementId: row.movement_id,
         movementName: row.movement_name,

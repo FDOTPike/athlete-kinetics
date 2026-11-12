@@ -11,8 +11,17 @@ test('the pause card names the goal program block the athlete can see', () => {
 
 test('with no goal program the pause card names no block number', () => {
   const text = pausedHeldText('illness', null);
-  expect(text).toContain('Paused for illness. Your place is held and will come back to it');
+  expect(text).toContain('Paused for illness. Your place is held');
   expect(text).not.toMatch(/block \d/);
+  expect(text).not.toContain('will come back to it');
+  expect(text).not.toContain('everything else works as normal');
+  expect(text).toContain('automatic load increases from easy sessions');
+});
+
+test('#302 194c: currentSequenceIndex 0 shows no "block 0 of N"', () => {
+  const text = pausedHeldText('illness', { currentSequenceIndex: 0, plannedBlockCount: 3 });
+  expect(text).toContain('Your place is held');
+  expect(text).not.toMatch(/block 0/);
 });
 
 // W3-8: the build page printed raw resolver codes ("capability").
@@ -40,7 +49,8 @@ test('adjustment values read as words', () => {
   const { loadChangeText, setChangeText } = require('../../src/screens/BlockScreen');
   expect(loadChangeText(0.77)).toBe('Planned load reduced by 23%');
   expect(loadChangeText(1)).toBe('No change');
-  expect(loadChangeText(1.05)).toBe('Planned load raised by 5%');
+  // #302 194b: modifiers >= 1 never apply a load increase.
+  expect(loadChangeText(1.05)).toBe('No change');
   expect(setChangeText(-1)).toBe('1 fewer set');
   expect(setChangeText(-2)).toBe('2 fewer sets');
   expect(setChangeText(0)).toBe('No change');

@@ -138,8 +138,8 @@ const ADJUSTMENT_SOURCE_TEXT: Record<string, string> = {
 };
 export const loadChangeText = (modifier: number): string => {
   const pct = Math.round((1 - modifier) * 100);
-  if (pct === 0) return 'No change';
-  return pct > 0 ? `Planned load reduced by ${pct}%` : `Planned load raised by ${-pct}%`;
+  if (pct <= 0) return 'No change';
+  return `Planned load reduced by ${pct}%`;
 };
 export const setChangeText = (delta: number): string => {
   if (delta === 0) return 'No change';
@@ -158,18 +158,18 @@ export function pausedHeldText(
 ): string {
   const reason = typeof reasonOrHalted === 'string' ? reasonOrHalted : undefined;
   const halted = typeof reasonOrHalted === 'boolean' ? reasonOrHalted : haltedArg;
-  const place = program != null
+  const place = program != null && program.currentSequenceIndex > 0
     ? `You are held at block ${program.currentSequenceIndex} of ${program.plannedBlockCount}`
     : 'Your place is held';
   // While today's safety report halts training, the card must not invite
   // training (#178); the halt card above says what to do instead.
-  if (halted) return `Paused for ${reasonLabel}. ${place} and will come back to it. Today's safety report has stopped training for today.`;
+  if (halted) return `Paused for ${reasonLabel}. ${place}. Today's safety report has stopped training for today.`;
   // #188: an injury pause never tells the athlete to keep training; it points
   // to the report form instead. What a pause does is unchanged.
   if (reason === 'injury') {
-    return `Paused for ${reasonLabel}. ${place} and will come back to it. If something hurts, report it under "Something feels off".`;
+    return `Paused for ${reasonLabel}. ${place}. If something hurts, report it under "Something feels off".`;
   }
-  return `Paused for ${reasonLabel}. ${place} and will come back to it — training you do now will not use it up. Keep training if you can; everything else works as normal.`;
+  return `Paused for ${reasonLabel}. ${place} — training you do now will not use it up. Keep training if you can; automatic load increases from easy sessions are paused while the program is paused.`;
 }
 
 function targetLabel(slot: TodaySlot): string {
@@ -815,6 +815,104 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
     </View>
   );
 
+  // #302 Bug 3 / 194c: pause & resume card rendered both in the pre-readiness gate
+  // and in the full screen so suspension remains accessible before readiness arrives.
+  const renderPauseCard = (onOpenReport?: () => void): React.JSX.Element | null => (
+    suspension != null ? (
+      <View style={[styles.card, styles.haltCard]}>
+        <Text style={styles.eyebrow}>PROGRAM PAUSED</Text>
+        <Text style={styles.cardTitle}>Your place is being held</Text>
+        <Text style={styles.bodyText}>
+          {pausedHeldText(SUSPENSION_REASON_LABEL[suspension.reason], program, suspension.reason, halted)}
+        </Text>
+        {suspension.reason === 'injury' && onOpenReport !== undefined && (
+          <SecondaryButton
+            label="Something feels off"
+            onPress={onOpenReport}
+            accessibilityLabel="Open Something feels off to report the injury"
+            testID="suspension-injury-report"
+          />
+        )}
+        <PrimaryButton
+          label="Resume my program"
+          onPress={() => {
+            // Same action-scoped try/catch the pause controls use below.
+            try {
+              setSuspendError(null);
+              endSuspension(Date.now());
+            } catch (e) {
+              setSuspendError(e instanceof Error ? e.message : String(e));
+            }
+          }}
+          accessibilityLabel={program != null && program.currentSequenceIndex > 0
+            ? `Resume the program from block ${program.currentSequenceIndex} of ${program.plannedBlockCount}`
+            : 'Resume the program'}
+          testID="suspension-resume"
+        />
+        {suspendError !== null && (
+          <Text style={styles.adjustedText} testID="suspension-error">{suspendError}</Text>
+        )}
+      </View>
+    ) : block !== null || program != null ? (
+      /* Walk W3-7: with no block and no program there is nothing to hold,
+         so the pause buttons are not offered. An open pause still shows. */
+      <View style={styles.card}>
+        <Text style={styles.eyebrow}>PAUSE</Text>
+        <Text style={styles.cardTitle}>Injured, ill, or life got in the way?</Text>
+        <Text style={styles.bodyText}>
+          {halted
+            ? HALT_PAUSE_CARD_TEXT
+            : 'Pausing holds your place in the program so a gap does not cost you a block. You can still train while paused.'}
+        </Text>
+        {/* #188: every pause asks first; the pause itself is unchanged. */}
+        {confirmPauseReason === null ? SUSPENSION_REASONS.map((reason) => (
+          <PrimaryButton
+            key={reason}
+            label={`Pause — ${SUSPENSION_REASON_LABEL[reason]}`}
+            onPress={() => {
+              setSuspendError(null);
+              setConfirmPauseReason(reason);
+            }}
+            accessibilityLabel={`Pause my program for ${SUSPENSION_REASON_LABEL[reason]}`}
+            testID={`suspension-begin-${reason}`}
+          />
+        )) : (
+          <>
+            <Text style={styles.bodyText}>
+              {`Pause your program (${SUSPENSION_REASON_LABEL[confirmPauseReason]})?`}
+            </Text>
+            <PrimaryButton
+              label="Pause my program"
+              onPress={() => {
+                const reason = confirmPauseReason;
+                setConfirmPauseReason(null);
+                try {
+                  setSuspendError(null);
+                  beginSuspension(reason, Date.now());
+                } catch (e) {
+                  setSuspendError(e instanceof Error ? e.message : String(e));
+                }
+              }}
+              accessibilityLabel={`Confirm: pause my program for ${SUSPENSION_REASON_LABEL[confirmPauseReason]}`}
+              testID="suspension-confirm"
+            />
+            <SecondaryButton
+              label="Cancel"
+              onPress={() => setConfirmPauseReason(null)}
+              accessibilityLabel="Cancel and keep the program running"
+              testID="suspension-cancel"
+            />
+          </>
+        )}
+        {/* Action-scoped, not the global error channel: an unrelated store
+            error must never read as a refusal of this control. */}
+        {suspendError !== null && (
+          <Text style={styles.adjustedText} testID="suspension-error">{suspendError}</Text>
+        )}
+      </View>
+    ) : null
+  );
+
   if (vector === null) {
     return (
       // The no-vector gate is an early return INSIDE the real screen, so the
@@ -909,6 +1007,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
             <Text style={styles.captionText}>{routineActionMessage}</Text>
           )}
         </View>
+        {renderPauseCard()}
       </ScrollView>
     );
   }
@@ -1196,109 +1295,11 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           every athlete; a healthy athlete sees the plan first.
           RR-02 suspension. Athlete-owned in BOTH directions: the app never
           infers an episode and never ends one. Suspension freezes the macro
-          position and NOTHING else — training, substitution, the RPE ceiling
-          and halt supremacy all keep working, which is why this card offers no
-          "stop training" affordance. */}
-      {suspension != null ? (
-        <View style={[styles.card, styles.haltCard]}>
-          <Text style={styles.eyebrow}>PROGRAM PAUSED</Text>
-          <Text style={styles.cardTitle}>Your place is being held</Text>
-          <Text style={styles.bodyText}>
-            {pausedHeldText(SUSPENSION_REASON_LABEL[suspension.reason], program, suspension.reason, halted)}
-          </Text>
-          {suspension.reason === 'injury' && (
-            <SecondaryButton
-              label="Something feels off"
-              onPress={openReportForm}
-              accessibilityLabel="Open Something feels off to report the injury"
-              testID="suspension-injury-report"
-            />
-          )}
-          <PrimaryButton
-            label="Resume my program"
-            onPress={() => {
-              // Same action-scoped try/catch the pause controls use below. The
-              // resume path had none, so a database failure escaped the handler
-              // and the athlete saw this card unchanged with no explanation —
-              // in the one flow that is athlete-owned in BOTH directions.
-              try {
-                setSuspendError(null);
-                endSuspension(Date.now());
-              } catch (e) {
-                setSuspendError(e instanceof Error ? e.message : String(e));
-              }
-            }}
-            accessibilityLabel={program != null
-              ? `Resume the program and return to block ${program.currentSequenceIndex} of ${program.plannedBlockCount}`
-              : 'Resume the program and return to your place'}
-            testID="suspension-resume"
-          />
-          {/* Mounted INSIDE the suspended branch. The resume button exists only
-              here, so an error node living only in the other branch could never
-              be seen by the athlete whose resume just failed — the second,
-              independent reason the message was invisible. */}
-          {suspendError !== null && (
-            <Text style={styles.adjustedText} testID="suspension-error">{suspendError}</Text>
-          )}
-        </View>
-      ) : block !== null || program != null ? (
-        /* Walk W3-7: with no block and no program there is nothing to hold,
-           so the pause buttons are not offered. An open pause still shows. */
-        <View style={styles.card}>
-          <Text style={styles.eyebrow}>PAUSE</Text>
-          <Text style={styles.cardTitle}>Injured, ill, or life got in the way?</Text>
-          <Text style={styles.bodyText}>
-            {halted
-              ? HALT_PAUSE_CARD_TEXT
-              : 'Pausing holds your place in the program so a gap does not cost you a block. You can still train while paused.'}
-          </Text>
-          {/* #188: every pause asks first; the pause itself is unchanged. */}
-          {confirmPauseReason === null ? SUSPENSION_REASONS.map((reason) => (
-            <PrimaryButton
-              key={reason}
-              label={`Pause — ${SUSPENSION_REASON_LABEL[reason]}`}
-              onPress={() => {
-                setSuspendError(null);
-                setConfirmPauseReason(reason);
-              }}
-              accessibilityLabel={`Pause my program for ${SUSPENSION_REASON_LABEL[reason]}`}
-              testID={`suspension-begin-${reason}`}
-            />
-          )) : (
-            <>
-              <Text style={styles.bodyText}>
-                {`Pause your program (${SUSPENSION_REASON_LABEL[confirmPauseReason]})?`}
-              </Text>
-              <PrimaryButton
-                label="Pause my program"
-                onPress={() => {
-                  const reason = confirmPauseReason;
-                  setConfirmPauseReason(null);
-                  try {
-                    setSuspendError(null);
-                    beginSuspension(reason, Date.now());
-                  } catch (e) {
-                    setSuspendError(e instanceof Error ? e.message : String(e));
-                  }
-                }}
-                accessibilityLabel={`Confirm: pause my program for ${SUSPENSION_REASON_LABEL[confirmPauseReason]}`}
-                testID="suspension-confirm"
-              />
-              <SecondaryButton
-                label="Cancel"
-                onPress={() => setConfirmPauseReason(null)}
-                accessibilityLabel="Cancel and keep the program running"
-                testID="suspension-cancel"
-              />
-            </>
-          )}
-          {/* Action-scoped, not the global error channel: an unrelated store
-              error must never read as a refusal of this control. */}
-          {suspendError !== null && (
-            <Text style={styles.adjustedText} testID="suspension-error">{suspendError}</Text>
-          )}
-        </View>
-      ) : null}
+          position and pauses automatic load increases from easy sessions
+          (positive RPE grants); training, substitution, the RPE ceiling and halt
+          supremacy still apply, which is why this card offers no "stop training"
+          affordance. */}
+      {renderPauseCard(openReportForm)}
 
       {/* Changed in this block: the autopilot changes stored when the active
           block was built. Hidden when there is nothing to show, because an

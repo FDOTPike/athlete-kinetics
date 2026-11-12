@@ -80,10 +80,11 @@ export const presetMatches = (inventory: readonly string[], preset: readonly str
   return standard.size === new Set(preset).size && preset.every((item) => standard.has(item));
 };
 
-/** Walk W4-6: the reset did not say whose data it removes (only the active
- *  athlete's). */
+/** Walk W4-6 / #302 194f: the reset did not say whose data it removes (only the
+ *  active athlete's), omitted one-rep maxes and prior-date reports, and overstated
+ *  that the whole profile stays unchanged. */
 export const resetScopeText = (name: string | undefined): string =>
-  `This removes ${name ? `${name}'s` : "this athlete's"} training history, telemetry, blocks, and today's reports. Their profile, saved profile slots and other athletes are not changed.`;
+  `This removes ${name ? `${name}'s` : "this athlete's"} training history, telemetry, blocks, one-rep maxes, and reports from every date. Their other profile settings, saved profile slots and other athletes are not changed.`;
 export const resetConfirmText = (name: string | undefined): string =>
   `This cannot be undone. Reset ${name ? `${name}'s` : "this athlete's"} training data?`;
 
@@ -280,7 +281,7 @@ export default function ProfileScreen(): React.JSX.Element {
     [databaseReady, movements, getMovementAvailabilityVerdicts, movementAvailabilityRevision, niggles, profile],
   );
   const oneRepMaxes = useStore((s) => s.oneRepMaxes);
-  const saveOneRepMax = useStore((s) => (s.status === 'ready' ? s.saveOneRepMax : inertWhileClosed));
+  const saveOneRepMax = useStore((s) => (s.status === 'ready' ? s.saveOneRepMax : refusedWhileClosed));
   const biometricsStatus = useStore((s) => s.biometricsStatus);
   const healthCopy = biometricsCopy(providerForPlatform(Platform.OS), biometricsStatus);
   const syncBiometrics = useStore((s) => s.syncBiometrics);

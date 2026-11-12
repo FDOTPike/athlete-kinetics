@@ -84,7 +84,7 @@ describe('Recent sessions open to what was logged', () => {
   beforeEach(() => {
     mockState = state({
       loadRecentOutcomes: jest.fn(() => [
-        { sessionId: 12, outcomeKind: 'adapted_session', finalizedAtMs: at('2026-11-03T18:05:00Z') },
+        { sessionId: 12, outcomeKind: 'session_recorded', finalizedAtMs: at('2026-11-03T18:05:00Z') },
         { sessionId: 11, outcomeKind: 'session_recorded', finalizedAtMs: at('2026-11-03T09:40:00Z') },
       ]),
       loadSessionSummaryFacts: jest.fn(facts),
@@ -96,7 +96,8 @@ describe('Recent sessions open to what was logged', () => {
     const labels = screen.getAllByLabelText(/Show what was logged.$/).map((node) => node.props.accessibilityLabel);
     expect(labels).toHaveLength(2);
     expect(labels[0]).not.toBe(labels[1]);
-    expect(labels[0]).toMatch(/2026 · /);
+    expect(labels[0]).toMatch(/2026 · \d{1,2}:\d{2}/);
+    expect(labels[1]).toMatch(/2026 · \d{1,2}:\d{2}/);
   });
 
   test('tapping a session shows its logged exercises and skips, and tapping again hides them', () => {

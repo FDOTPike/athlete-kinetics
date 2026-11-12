@@ -78,6 +78,8 @@ describe('the goal search forgives spacing, plurals and short forms', () => {
 
   test('one letter, spaces and punctuation alone find nothing', () => {
     expect(ids('p')).toEqual([]);
+    expect(ids('p-')).toEqual([]);
+    expect(ids(' p- ')).toEqual([]);
     expect(ids('  ')).toEqual([]);
     expect(ids('--')).toEqual([]);
   });

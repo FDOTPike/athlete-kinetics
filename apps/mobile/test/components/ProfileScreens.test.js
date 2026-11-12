@@ -185,8 +185,8 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
   });
 
   describe('Reset training data', () => {
-    // Walk W4-6: the reset names the active athlete, the only one it changes.
-    const caption = "This removes Default Athlete's training history, telemetry, blocks, and today's reports. Their profile, saved profile slots and other athletes are not changed.";
+    // Walk W4-6 / #302 194f: the reset names the active athlete, the only one it changes.
+    const caption = "This removes Default Athlete's training history, telemetry, blocks, one-rep maxes, and reports from every date. Their other profile settings, saved profile slots and other athletes are not changed.";
     const resetSection = () => within(screen.getByTestId('reset-training-data-section'));
 
     const openReset = async () => {

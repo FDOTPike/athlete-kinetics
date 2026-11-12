@@ -247,6 +247,13 @@ test('a change to an each-side item is recorded per side', () => {
   const index = preparation.items.findIndex((entry) => entry.item?.dose?.perSide === true
     || protocol.items[preparation.items.indexOf(entry)]?.dose?.perSide === true);
   expect(index).toBeGreaterThanOrEqual(0);
+  for (let i = 0; i < index; i += 1) {
+    preparation.items[i] = { ...preparation.items[i], status: 'completed' };
+  }
+  show(preparation);
+  fireEvent.press(screen.getByTestId(`preparation-item-${index}-change`));
+  expect(within(screen.getByTestId(`preparation-item-${index}-editor`)).getByText(/^(Seconds|Reps) you did each side$/i)).toBeTruthy();
+
   preparation.items[index] = { ...preparation.items[index], status: 'modified', performedAmount: 20 };
   show(preparation);
   expect(screen.getByTestId(`preparation-item-${index}-recorded`).props.children).toMatch(/^Changed: 20 (seconds|reps) each side$/);
