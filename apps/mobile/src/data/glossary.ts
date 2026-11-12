@@ -187,7 +187,7 @@ export const GLOSSARY_ENTRIES: readonly GlossaryEntry[] = [
     term: 'READINESS',
     category: 'metric',
     definition:
-      'A subjective and contextual signal of how prepared you feel to train today. A guide for daily adjustments, not an absolute guarantee of performance.',
+      "An estimate from 0 to 100 that the app computes each day from your synced overnight signals: heart rate variability compared with your own baseline, and sleep efficiency. Training load is shown beside it but is not part of the score. With no signals the estimate sits at a neutral default of 50. It guides how hard today's plan should be; it is not a measure of how you feel and does not guarantee performance.",
     aliases: ['readiness score', 'daily readiness', 'recovery signal'],
   },
   {
@@ -197,6 +197,14 @@ export const GLOSSARY_ENTRIES: readonly GlossaryEntry[] = [
     definition:
       'Heart Rate Variability — beat-to-beat variation in heart rhythm. A contextual trend signal reflecting training and life stress, not a diagnosis or proof of recovery.',
     aliases: ['heart rate variability', 'hrv score', 'recovery trend'],
+  },
+  {
+    id: 'bar-speed',
+    term: 'Bar speed',
+    category: 'metric',
+    definition:
+      "How fast the weight moves on the lifting part of a rep. When a weight that is normally comfortable moves noticeably slower than usual, you are more tired than usual. A report that everything feels heavy and slow can lower today's load.",
+    aliases: ['bar velocity', 'rep speed', 'slow bar'],
   },
 
   // --- Loading Methods ---
@@ -279,7 +287,7 @@ export const GLOSSARY_ENTRIES: readonly GlossaryEntry[] = [
     term: 'BUILD',
     category: 'structure',
     definition:
-      'Volume weeks. More total work at moderate effort to accumulate fitness.',
+      'The first weeks of a block, where the work is set up. How sets and effort change after that depends on your goal; the phase card in Plan shows what your own block does each week.',
     aliases: ['accumulation phase', 'volume block'],
   },
   {
@@ -290,7 +298,7 @@ export const GLOSSARY_ENTRIES: readonly GlossaryEntry[] = [
     displayTerm: 'BUILD STRENGTH',
     category: 'structure',
     definition:
-      "Volume comes down, effort goes up. You do less work but it's harder.",
+      "The middle weeks of a block, where the work gets harder. Depending on your goal that can mean more sets, a higher target effort, or both; the phase card in Plan shows your block's numbers.",
     aliases: ['intensification phase', 'transmutation'],
   },
   {
@@ -298,7 +306,7 @@ export const GLOSSARY_ENTRIES: readonly GlossaryEntry[] = [
     term: 'REALISE',
     category: 'structure',
     definition:
-      "The peak week. Lowest volume, highest effort — this is where the block's work shows up.",
+      "The last working week before the deload, where the block's work comes together. Whether sets go up or down depends on your goal; the phase card in Plan shows your block's own numbers.",
     aliases: ['realization phase', 'peak week', 'realize'],
   },
   {
@@ -316,6 +324,15 @@ export const GLOSSARY_ENTRIES: readonly GlossaryEntry[] = [
     definition:
       'The pause between sets. After each set the session counts down a rest whose length follows how hard that set was — longer after a harder set. It can be switched off in Profile.',
     aliases: ['rest between sets', 'rest interval', 'rest countdown'],
+  },
+  {
+    id: 'DOMS',
+    term: 'DOMS',
+    displayTerm: 'Muscle soreness (DOMS)',
+    category: 'general',
+    definition:
+      'Delayed onset muscle soreness: the stiff, achy feeling in a muscle a day or two after training, most often after new or harder work. It is normal and is not damage. It usually eases as you warm up and fades within a few days. Pain that is sharp, sits in a joint, or gets worse as you move is not DOMS: report it under "Something feels off".',
+    aliases: ['delayed onset muscle soreness', 'muscle soreness', 'sore muscles after training'],
   },
 
   // --- Goals ---
