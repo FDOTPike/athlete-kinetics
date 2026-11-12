@@ -24,6 +24,8 @@ const examples = [
   ['dizzy not gone', false, true],
   ['was dizzy yesterday but not fine now', false, true],
   ['was dizzy yesterday but my knee is fine now', false, true],
+  ['not suffering from dizziness', false, false],
+  ['not dizzy or nauseous', false, false],
 ];
 let failures = 0;
 for (const [text, pain, systemic] of examples) {

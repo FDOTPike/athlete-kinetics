@@ -80,12 +80,12 @@ export function scanRedFlags(text: string): RedFlagScan {
     const tokens = clauses[c];
     const negated = (i: number): boolean => {
       for (let j = i - 1; j >= Math.max(0, i - 3); j--) {
-        if (tokens[j] === 'and' || TIER1_PAIN.has(tokens[j]) || SYSTEMIC.has(tokens[j]) ||
-            RELIEF_OR_CONTRAST.has(tokens[j])) break;
-        if (NEGATORS.has(tokens[j])) {
-          if (tokens[j] !== 'free' && tokens.slice(j + 1, i).includes('from')) break;
-          return true;
+        if (tokens[j] === 'and' || RELIEF_OR_CONTRAST.has(tokens[j])) break;
+        if (TIER1_PAIN.has(tokens[j]) || SYSTEMIC.has(tokens[j])) {
+          if ((tokens[j + 1] === 'or' || tokens[j + 1] === 'nor') && negated(j)) return true;
+          break;
         }
+        if (NEGATORS.has(tokens[j])) return true;
       }
       for (let j = i + 1; j <= Math.min(tokens.length - 1, i + 3); j++) {
         if (tokens[j] === 'and' || TIER1_PAIN.has(tokens[j]) || SYSTEMIC.has(tokens[j]) ||

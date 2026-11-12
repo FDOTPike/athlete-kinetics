@@ -80,6 +80,8 @@ for (const [text, pain, systemic] of [
   ['dizzy not gone', false, true],
   ['was dizzy yesterday but not fine now', false, true],
   ['was dizzy yesterday but my knee is fine now', false, true],
+  ['not suffering from dizziness', false, false],
+  ['not dizzy or nauseous', false, false],
 ]) {
   const result = redFlag.scanRedFlags(text);
   check(`red flag clause: ${text}`, result.pain === pain && result.systemic === systemic);
