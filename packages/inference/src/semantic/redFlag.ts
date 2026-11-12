@@ -50,6 +50,11 @@ const SYSTEMIC = new Set([
 /** 'chest' alone is gym vocabulary (chest press/day/fly): bigrams only. */
 const CHEST_SECOND = new Set(['pain', 'pains', 'pressure', 'tightness', 'tight', 'burn', 'burning', 'ache']);
 const NEGATORS = new Set(['no', 'not', 'without', 'zero', 'isnt', 'never', 'non', 'none', 'free', 'resolved']);
+const RESOLUTION_NEGATORS = new Set(['not', 'no', 'never', 'isnt', 'wasnt', 'hardly', 'barely', 'without']);
+const RELIEF_OR_CONTRAST = new Set([
+  'relief', 'improvement', 'recovery', 'recovered', 'better',
+  'ease', 'easing', 'change', 'break', 'letup', 'until', 'unless', 'despite',
+]);
 
 const BOUNDARY = new Set([',', ';', '.', '!', '?', 'but', 'however', 'except', 'though', 'although']);
 const DENIAL = new Set(['zero', 'gone', 'resolved', 'subsided', 'none']);
@@ -75,21 +80,37 @@ export function scanRedFlags(text: string): RedFlagScan {
     const tokens = clauses[c];
     const negated = (i: number): boolean => {
       for (let j = i - 1; j >= Math.max(0, i - 3); j--) {
-        if (tokens[j] === 'and' || TIER1_PAIN.has(tokens[j]) || SYSTEMIC.has(tokens[j])) break;
-        if (NEGATORS.has(tokens[j])) return true;
+        if (tokens[j] === 'and' || TIER1_PAIN.has(tokens[j]) || SYSTEMIC.has(tokens[j]) ||
+            RELIEF_OR_CONTRAST.has(tokens[j])) break;
+        if (NEGATORS.has(tokens[j])) {
+          if (tokens[j] !== 'free' && tokens.slice(j + 1, i).includes('from')) break;
+          return true;
+        }
       }
       for (let j = i + 1; j <= Math.min(tokens.length - 1, i + 3); j++) {
-        if (tokens[j] === 'and' || TIER1_PAIN.has(tokens[j]) || SYSTEMIC.has(tokens[j])) break;
+        if (tokens[j] === 'and' || TIER1_PAIN.has(tokens[j]) || SYSTEMIC.has(tokens[j]) ||
+            RESOLUTION_NEGATORS.has(tokens[j])) break;
         if (DENIAL.has(tokens[j])) return true;
       }
       const past = tokens.includes('yesterday') || tokens.includes('earlier') || tokens.includes('tuesday') ||
         tokens.some((t, j) => t === 'last' && tokens[j + 1] === 'week');
       if (!past) return false;
       const tail = [...tokens.slice(i + 1), ...(clauses[c + 1] ?? [])];
-      const resolution = tail.findIndex((t, j) => (t === 'resolved') ||
-        ((t === 'fine' || t === 'good' || t === 'gone' || t === '100') && tail[j + 1] === 'now'));
+      const resolution = tail.findIndex((t, j) => {
+        const matchesResolution = (t === 'resolved') ||
+          ((t === 'fine' || t === 'good' || t === 'gone' || t === '100') && tail[j + 1] === 'now');
+        if (!matchesResolution) return false;
+        return !RESOLUTION_NEGATORS.has(tail[j - 1] ?? '') && !RESOLUTION_NEGATORS.has(tail[j - 2] ?? '');
+      });
       if (resolution < 0) return false;
-      return !tail.slice(0, resolution).some(t => TIER1_PAIN.has(t) || SYSTEMIC.has(t));
+      const isSystemicToken = SYSTEMIC.has(tokens[i]) || tokens[i] === 'chest' ||
+        (i > 0 && tokens[i - 1] === 'chest' && CHEST_SECOND.has(tokens[i]));
+      const beforeResolution = tail.slice(0, resolution);
+      if (beforeResolution.some(t => TIER1_PAIN.has(t) || SYSTEMIC.has(t))) return false;
+      if (beforeResolution.some(t => BODY_REGIONS.has(t) && (isSystemicToken || !tokens.includes(t)))) {
+        return false;
+      }
+      return true;
     };
     let tier1 = false;
     let tier2 = false;
