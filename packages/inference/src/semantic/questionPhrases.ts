@@ -1,4 +1,4 @@
-// Source: lab 65836a8bb03df9dc351d4d9fda6f6a7f07e3aeb2, ask/candidates/a4-two-batches/{candidate,phrases}.json; defaults: ask/config.json and ask/lib.mjs.
+// Source: lab 127bbdfaf992cfaa6dad74afdffb142103789971, ask/candidates/a4-two-batches/{candidate,phrases}.json; defaults: ask/config.json and ask/lib.mjs.
 export const QUESTION_SETTINGS = {
   "cards": 1,
   "margin": 0,
