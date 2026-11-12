@@ -14,7 +14,7 @@ permissions:
 # cancelled instead of holding a macOS runner for an hour and a half on a
 # commit nobody will merge. Pushes to master are never cancelled.
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.ref }}
+  group: ci-${{ github.event.pull_request.number || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
