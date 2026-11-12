@@ -83,7 +83,7 @@ describe('Recent sessions open to what was logged', () => {
   beforeEach(() => {
     mockState = state({
       loadRecentOutcomes: jest.fn(() => [
-        { sessionId: 12, outcomeKind: 'session_recorded', finalizedAtMs: new SpyDate(2026, 10, 3, 18, 5).getTime() },
+        { sessionId: 12, outcomeKind: 'adapted_session', finalizedAtMs: new SpyDate(2026, 10, 3, 18, 5).getTime() },
         { sessionId: 11, outcomeKind: 'session_recorded', finalizedAtMs: new SpyDate(2026, 10, 3, 9, 40).getTime() },
       ]),
       loadSessionSummaryFacts: jest.fn(facts),
@@ -95,9 +95,18 @@ describe('Recent sessions open to what was logged', () => {
     const labels = screen.getAllByLabelText(/Show what was logged.$/).map((node) => node.props.accessibilityLabel);
     expect(labels).toHaveLength(2);
     expect(labels[0]).not.toBe(labels[1]);
-    const nov3WithTime = /(?:Nov\b.*?\b3\b|\b3\b.*?Nov\b).*?2026 · \d{1,2}:\d{2}/;
-    expect(labels[0]).toMatch(nov3WithTime);
-    expect(labels[1]).toMatch(nov3WithTime);
+    // Check an independent mid-month anchor so the short month adapts to any runtime locale.
+    const novMonth = new Intl.DateTimeFormat(undefined, { month: 'short' }).format(new SpyDate(2026, 10, 15));
+    expect(labels[0]).toContain('Session adapted');
+    expect(labels[0]).toContain(novMonth);
+    expect(labels[0]).toMatch(/\b0?3\b/);
+    expect(labels[0]).toContain('2026');
+    expect(labels[0]).toMatch(/ · (?:18|0?6):05/);
+    expect(labels[1]).toContain('Session recorded');
+    expect(labels[1]).toContain(novMonth);
+    expect(labels[1]).toMatch(/\b0?3\b/);
+    expect(labels[1]).toContain('2026');
+    expect(labels[1]).toMatch(/ · 0?9:40/);
   });
 
   test('tapping a session shows its logged exercises and skips, and tapping again hides them', () => {
