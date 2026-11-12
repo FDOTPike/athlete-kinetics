@@ -280,7 +280,7 @@ export interface GoalExerciseLink {
 export function GoalExerciseField({ movements, movementId, onChange }: GoalExerciseLink): React.JSX.Element {
   const [query, setQuery] = useState('');
   const linked = movementId === null ? undefined : movements.find((movement) => movement.movement_id === movementId);
-  const needle = query.trim().toLowerCase();
+  const needle = compact(query);
   const allMatches = goalExerciseMatches(movements, query);
   const matches = allMatches.slice(0, GOAL_EXERCISE_MATCH_LIMIT);
   return (

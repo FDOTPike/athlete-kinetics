@@ -908,7 +908,7 @@ test('OW-007 a successful resume shows no error and leaves the global channel al
 
 test('#302: when readiness vector is absent, Plan still renders the pause/resume card', () => {
   mockState = baseState({
-    current: null,
+    vector: null,
     suspension: OPEN_EPISODE,
     endSuspension: jest.fn(),
   });
@@ -916,7 +916,7 @@ test('#302: when readiness vector is absent, Plan still renders the pause/resume
   expect(screen.getByTestId('suspension-resume')).toBeOnTheScreen();
 
   mockState = baseState({
-    current: null,
+    vector: null,
     suspension: null,
     program: { status: 'active', currentSequenceIndex: 1, plannedBlockCount: 3, plannedEndDate: '2026-09-30' },
   });

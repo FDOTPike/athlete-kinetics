@@ -90,4 +90,12 @@ describe('the goal search forgives spacing, plurals and short forms', () => {
     expect(screen.getByTestId('goal-exercise-option-27')).toBeOnTheScreen();
     expect(screen.queryByTestId('goal-exercise-none')).toBeNull();
   });
+
+  test('on screen, queries below two compacted characters ("p-", "--") do not show "nothing found"', () => {
+    render(<GoalExerciseField movements={pulls} movementId={null} onChange={() => {}} />);
+    search('p-');
+    expect(screen.queryByTestId('goal-exercise-none')).toBeNull();
+    search('--');
+    expect(screen.queryByTestId('goal-exercise-none')).toBeNull();
+  });
 });
