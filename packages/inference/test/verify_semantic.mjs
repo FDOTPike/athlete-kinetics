@@ -64,6 +64,22 @@ check('loadCodebase rejects misaligned vectors', (() => {
   try { cbMod.loadCodebase(codebase, vecFile.vectors.slice(1)); return false; } catch { return true; }
 })());
 
+// Clause-scoped denial and positive safety controls, independent of the embedder.
+for (const [text, pain, systemic] of [
+  ['no knee pain', false, false], ['zero lower back pain', false, false],
+  ['free of shoulder tightness', false, false], ['no knee pain, chest is fine, shoulder tight', false, false],
+  ['no knee pain, but sharp pain in left hip', true, false], ['knee pain is zero', false, false],
+  ['shoulder pain resolved', false, false], ['was dizzy yesterday but fine now', false, false],
+  ['sharp pain in left knee', true, false], ['sharp pain in chest during bench press, feeling dizzy', true, true],
+  ['not dizzy but dizzy now', false, true], ['was dizzy yesterday but fine now, dizzy again', false, true],
+  ['no pain and dizzy', false, true], ['knee pain and dizzy resolved', true, false],
+  ['sharp knee pain is zero', false, false],
+  ['sharp, knee', true, false],
+]) {
+  const result = redFlag.scanRedFlags(text);
+  check(`red flag clause: ${text}`, result.pain === pain && result.systemic === systemic);
+}
+
 // --- 3. live routing with the production embedding model ------------------------
 console.log('[3] live routing (embedding real queries with MiniLM)');
 const { pipeline } = await import('@xenova/transformers');
@@ -273,23 +289,17 @@ r5 = await resolveLive('quads are sore from squats, not dizzy');
 check('a denial the one-word negation check catches is read as it was',
   redFlag.scanRedFlags('quads are sore from squats, not dizzy').systemic === false && !r5.overrideApplied,
   `${r5.entry?.id} override=${r5.overrideApplied}`);
-// KNOWN TRADE-OFF, pinned so that it is seen and not forgotten. The negation
-// check looks one word back, so "not feeling dizzy" still reads as dizzy. This
-// report used to leave with a soreness adjustment; it now halts, and the
-// athlete's severity rating cannot undo a halt. It is the price of the rule
-// above until the negation check is repaired, which is a separate change that
-// LOOSENS symptom handling and so needs its own review. If that repair lands,
-// this check is the one to change.
+// The three-token window now recognizes the previously pinned denial.
 {
   const alone = triageMod.triage(await embedOne('back muscles are sore but i am not feeling dizzy'), loaded);
-  check('  precondition for the trade-off: the match alone is confident, curated and does not halt',
+  check('precondition: the match alone is confident, curated and does not halt',
     alone.confident === true && alone.entry !== null && ['pain', 'illness', 'fatigue'].includes(alone.entry.category)
       && alone.entry.guardrail.halt === false, `${alone.entry?.id} ${alone.similarity.toFixed(3)}`);
 }
 r5 = await resolveLive('back muscles are sore but i am not feeling dizzy');
-check('KNOWN TRADE-OFF: a denial two words back ("not feeling dizzy") beside a routine match now halts',
-  redFlag.scanRedFlags('back muscles are sore but i am not feeling dizzy').systemic === true
-    && r5.overrideApplied && r5.entry?.id === 'red-flag-systemic',
+check('a denial two words back is recognized',
+  redFlag.scanRedFlags('back muscles are sore but i am not feeling dizzy').systemic === false
+    && !r5.overrideApplied,
   `${r5.entry?.id} override=${r5.overrideApplied}`);
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}  (routing ${routedOk}/${CASES.length})`);
