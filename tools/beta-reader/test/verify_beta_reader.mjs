@@ -100,11 +100,11 @@ try {
   const aggregate = JSON.parse(textOf(happy.aggregatePath));
   const priv = JSON.parse(textOf(happy.privatePath));
   assert.equal(aggregate.input.backupSha256, pmbakSha);
-  assert.equal(aggregate.input.sourceSchemaVersion, 72);
-  assert.equal(aggregate.input.sourceMigrationSlot, 73);
+  assert.equal(aggregate.input.sourceSchemaVersion, 76);
+  assert.equal(aggregate.input.sourceMigrationSlot, 77);
   assert.deepEqual(aggregate.athletes, { consented: 2, quarantined: 1, totalInBackup: 3 });
   assert.deepEqual(aggregate.integrity, { athletesChecked: 2, integrityOk: 2, foreignKeyViolationRows: 0, schemaMatchesDeclaredContract: 2 });
-  pass('input hash, slot 73 / version 72, consent counts and integrity checks as expected');
+  pass('input hash, slot 77 / version 76, consent counts and integrity checks as expected');
 
   const q = aggregate.queries;
   assert.equal(q.session_inventory.status, 'ok');

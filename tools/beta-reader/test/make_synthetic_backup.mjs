@@ -1,6 +1,6 @@
 // Builds SYNTHETIC encrypted backups for the reader's verifier. Every name,
 // note, report and question below is invented. Each athlete database is built
-// from the real migration files (user_version 72, migration slot 73), seeded
+// from the real migration files (user_version 76, migration slot 77), seeded
 // with a few rows in the tables the reading plan queries, and sealed with the
 // package's own sealBackup (packages/core-db/src/backup/contract.ts).
 import { DatabaseSync } from 'node:sqlite';

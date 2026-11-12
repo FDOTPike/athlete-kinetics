@@ -5,7 +5,7 @@ import subprocess
 from unittest.mock import patch
 
 pinned = '26f6557a793f1cafe9f609fb10e015cfc42d22b0'
-beta = 'ee6dd8c49a642ec69396300c17d72480e3cadb41'
+beta = '47857623588c7d8a4c91c048e4321c07c2d14b38'
 verifier = str(Path(__file__).with_name('verify_plan.py'))
 check_output = subprocess.check_output
 read_text = Path.read_text

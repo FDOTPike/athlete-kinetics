@@ -10,7 +10,7 @@ os.chdir(ROOT)
 os.environ['GIT_OPTIONAL_LOCKS'] = '0'
 REFERENCE_COMMIT = '26f6557a793f1cafe9f609fb10e015cfc42d22b0'
 # Migration 072 postdates the reference; it is read at the beta branch's code revision.
-BETA_COMMIT = 'ee6dd8c49a642ec69396300c17d72480e3cadb41'
+BETA_COMMIT = '47857623588c7d8a4c91c048e4321c07c2d14b38'
 QUESTION_LOG_SCHEMA = 'packages/core-db/src/schema/072_question_log.sql'
 cache = {}
 def at_commit(commit, path):
