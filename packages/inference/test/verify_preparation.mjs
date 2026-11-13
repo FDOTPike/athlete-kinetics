@@ -261,5 +261,18 @@ console.log('[6] frozen protocol round trip');
   check('text that is not JSON is refused', invalidJson);
 }
 
+// --- [7] #302 194e: essential work exceeding the time limit ---------------------
+console.log('[7] #302 194e essential work over budget');
+{
+  const tight = build({ budgetMin: 4 });
+  const totalSec = tight.items.reduce((sum, item) => sum + item.estimateSeconds, 0);
+  check('tight 4-minute budget fixture (clamped to 5-min floor) exceeds 300s in essential items', totalSec > 300, String(totalSec));
+  const lines = tight.basis.join(' ');
+  check('basis does not claim the protocol was fitted when essential items exceed the budget',
+    !/fitted to a \d+-minute limit/.test(lines), lines);
+  check('basis states optional items were left out and essential work exceeds the limit',
+    /optional items were left out/i.test(lines) && /essential work/i.test(lines) && /exceeds/i.test(lines), lines);
+}
+
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

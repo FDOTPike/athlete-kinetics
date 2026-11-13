@@ -185,3 +185,25 @@ test('set counts and focus names read correctly', () => {
   expect(sessionFocusName('full_body')).toBe('Full Body');
   expect(sessionFocusName('')).toBe('Session');
 });
+
+// #302 Bug 7: one unslotted set must not be counted against several skipped slots.
+test('#302: a single unslotted set counts toward at most one skipped slot of the same movement', () => {
+  nextSetIndex = 1;
+  raw().exec("INSERT INTO session (session_id, micro_cycle_id, session_date, started_at_ms, duration_min) VALUES (7002, NULL, '2026-11-03', 1000, 30)");
+  const pushUpId = idOf('Push-up');
+  const slot = raw().prepare(
+    "INSERT INTO session_plan_slot (session_id, slot_index, movement_id, planned_sets, planned_reps, provenance_kind) VALUES (7002, ?, ?, 2, 10, 'added')",
+  );
+  const firstSlotId = Number(slot.run(0, pushUpId).lastInsertRowid);
+  const secondSlotId = Number(slot.run(1, pushUpId).lastInsertRowid);
+  raw().prepare(
+    'INSERT INTO set_record (session_id, movement_id, set_index, reps, load_kg, rpe, logged_at_ms) VALUES (7002, ?, 1, 10, 0, 7, 2000)',
+  ).run(pushUpId);
+  raw().prepare('INSERT INTO session_skipped_slot (session_plan_slot_id) VALUES (?)').run(firstSlotId);
+  raw().prepare('INSERT INTO session_skipped_slot (session_plan_slot_id) VALUES (?)').run(secondSlotId);
+  const facts = state().loadSessionSummaryFacts(7002);
+  expect(facts.skippedExercises).toEqual([
+    { name: 'Push-up', plannedSets: 2, loggedSets: 1, loggedAs: [] },
+    { name: 'Push-up', plannedSets: 2, loggedSets: 0, loggedAs: [] },
+  ]);
+});

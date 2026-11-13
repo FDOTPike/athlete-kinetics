@@ -187,7 +187,12 @@ export function PreparationPanel({
                   {editing && (
                     <View style={styles.editor} testID={`preparation-item-${index}-editor`}>
                       <Stepper
-                        label={unit === 'seconds' ? 'Seconds you did' : 'Reps you did'}
+                        label={(() => {
+                          const perSide = 'perSide' in item.dose && item.dose.perSide;
+                          return unit === 'seconds'
+                            ? (perSide ? 'Seconds you did each side' : 'Seconds you did')
+                            : (perSide ? 'Reps you did each side' : 'Reps you did');
+                        })()}
                         value={String(amount)}
                         onDecrement={() => setAmount((value) => Math.max(0, value - step))}
                         onIncrement={() => setAmount((value) => Math.min(3600, value + step))}

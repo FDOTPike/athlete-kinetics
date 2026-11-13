@@ -193,4 +193,22 @@ describe('#135 a working backup or restore shows an indicator with elapsed time'
     expect(screen.getByTestId('create-backup-button').props.accessibilityState.disabled).toBe(true);
     expect(screen.getByTestId('choose-restore-button').props.accessibilityState.disabled).toBe(true);
   });
+
+  test('#302: restore and recovery status render in the restore controls area instead of above them', () => {
+    mockState.recoveryAvailable = true;
+    render(<BackupTransferPanel />);
+    fireEvent.changeText(screen.getByLabelText('Backup password, at least 12 characters'), 'previous-password');
+    fireEvent.press(screen.getByTestId('choose-restore-button'));
+    mockState.status = 'error';
+    mockState.message = 'Could not read that backup.';
+    screen.rerender(<BackupTransferPanel />);
+    const tree = JSON.stringify(screen.toJSON());
+    expect(tree.indexOf('backup-status-message')).toBeGreaterThan(tree.indexOf('choose-restore-button'));
+
+    fireEvent.press(screen.getByTestId('review-recovery-button'));
+    mockState.message = 'Could not open recovery copy.';
+    screen.rerender(<BackupTransferPanel />);
+    const recoveryTree = JSON.stringify(screen.toJSON());
+    expect(recoveryTree.indexOf('backup-status-message')).toBeGreaterThan(recoveryTree.indexOf('review-recovery-button'));
+  });
 });

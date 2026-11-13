@@ -146,10 +146,11 @@ test('pausedHeldText: injury has no "keep training"; other reasons are unchanged
 
 test('pausedHeldText: the injury sentence ends at "Something feels off" and promises no plan change (#188 owner ruling)', () => {
   const injury = pausedHeldText('an injury', { currentSequenceIndex: 1, plannedBlockCount: 3 }, 'injury');
-  expect(injury).toBe('Paused for an injury. You are held at block 1 of 3 and will come back to it. If something hurts, report it under "Something feels off".');
+  expect(injury).toBe('Paused for an injury. You are held at block 1 of 3. If something hurts, report it under "Something feels off".');
   expect(injury.endsWith('If something hurts, report it under "Something feels off".')).toBe(true);
   expect(injury).not.toContain("so Coach can adjust today's plan");
-  expect(pausedHeldText('an injury', null, 'injury')).toBe('Paused for an injury. Your place is held and will come back to it. If something hurts, report it under "Something feels off".');
+  expect(injury).not.toContain('will come back to it');
+  expect(pausedHeldText('an injury', null, 'injury')).toBe('Paused for an injury. Your place is held. If something hurts, report it under "Something feels off".');
 });
 
 test('TODAY: an injury pause does not say "you can still train"', () => {
@@ -161,4 +162,29 @@ test('TODAY: an injury pause does not say "you can still train"', () => {
   mockState = baseState({ program, suspension: { reason: 'life', frozen_macro_index: 1, started_at_ms: 1 } });
   render(<TodayScreen />);
   expect(screen.getByText(/You can still train/)).toBeOnTheScreen();
+});
+
+test('#302 194d: TODAY paused card states training is halted for safety while place is held', () => {
+  mockState = baseState({
+    program,
+    lastTriage: { kind: 'matched', directive: { halt: true, followUp: null } },
+    suspension: { reason: 'life', frozen_macro_index: 1, started_at_ms: 1 },
+  });
+  render(<TodayScreen />);
+  const paused = screen.getByTestId('today-paused');
+  expect(paused).toBeOnTheScreen();
+  expect(screen.queryByText(/still train/i)).toBeNull();
+  expect(screen.getByText(/halted for safety/i)).toBeOnTheScreen();
+  expect(screen.getByText(/place is being held/i)).toBeOnTheScreen();
+});
+
+test('#302 194c: resume button accessibilityLabel does not promise returning to a block or read block 0 of N', () => {
+  mockState = baseState({
+    program: { currentSequenceIndex: 0, plannedBlockCount: 3 },
+    suspension: { reason: 'life', frozen_macro_index: 1, started_at_ms: 1 },
+  });
+  render(<BlockScreen />);
+  const label = screen.getByTestId('suspension-resume').props.accessibilityLabel;
+  expect(label).not.toContain('return to');
+  expect(label).not.toContain('block 0');
 });

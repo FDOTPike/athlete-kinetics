@@ -35,7 +35,7 @@ export const parseOneRmText = (text: string): number | null => {
 export interface OneRmRowProps {
   label: string;
   valueKg: number | undefined;
-  onChange: (kg: number | null) => void;
+  onChange: (kg: number | null) => boolean | void;
   /** Every keystroke, before it is committed. A screen that can remove the
    *  field while it still has focus (the onboarding step's NEXT) uses it to
    *  commit the typed text itself, since no end-of-editing event comes then. */
@@ -49,21 +49,38 @@ export interface OneRmRowProps {
 export function OneRmRow({ label, valueKg, onChange, onTextChange, athleteId, registerCommit }: OneRmRowProps): React.JSX.Element {
   const [text, setText] = useState(valueKg !== undefined ? formatMaxKg(valueKg) : '');
   const [clampNote, setClampNote] = useState<string | null>(null);
+  const clampedSaveRef = useRef<{ valueKg: number; athleteId: string | undefined } | null>(null);
   useEffect(() => {
     setText(valueKg !== undefined ? formatMaxKg(valueKg) : '');
-  }, [valueKg]);
+    const saved = clampedSaveRef.current;
+    clampedSaveRef.current = null;
+    if (saved === null || saved.valueKg !== valueKg || saved.athleteId !== athleteId) {
+      setClampNote(null);
+    }
+  }, [valueKg, athleteId]);
   const saveText = (): void => {
     const parsed = parseOneRmText(text);
     if (parsed === null) {
-      onChange(null); // empty/garbage/sub-20 clears the max
+      if (onChange(null) === false) {
+        setText(valueKg !== undefined ? formatMaxKg(valueKg) : '');
+        setClampNote(null);
+        return;
+      }
       setText('');
       setClampNote(null);
       return;
     }
-    onChange(parsed); // store snaps to 0.25 and clamps 20..500
-    setText(formatMaxKg(oneRmKeptKg(parsed)));
+    if (onChange(parsed) === false) {
+      setText(valueKg !== undefined ? formatMaxKg(valueKg) : '');
+      setClampNote(null);
+      return;
+    }
+    const kept = oneRmKeptKg(parsed);
+    const note = oneRmClampNote(parsed);
+    clampedSaveRef.current = note !== null ? { valueKg: kept, athleteId } : null;
+    setText(formatMaxKg(kept));
     // Walk W4-7: 999 became 500.0 with no word. Say what was saved.
-    setClampNote(oneRmClampNote(parsed));
+    setClampNote(note);
   };
   // Walk A-12 (#224): Android Back hides the keyboard without ending editing,
   // and the typed text was lost when Profile closed. Typed text is now saved

@@ -88,6 +88,7 @@ function PastSessionSummary({ sessionId, load }: {
     lines = [];
     readFailed = true;
   }
+  // #302 (194g, ratified 2026-11-07): progress summary fallback copy stays plain and accurate.
   return (
     <View style={styles.pastSummary} testID={`progress-session-${sessionId}-summary`}>
       {readFailed

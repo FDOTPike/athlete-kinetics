@@ -586,15 +586,23 @@ export function buildPreparationProtocol(input: PreparationInput): PreparationPr
     .sort((a, b) => stageOrder(a.item) - stageOrder(b.item) || a.index - b.index)
     .map(({ item }) => item);
 
+  const sum = items.reduce((seconds, item) => seconds + item.estimateSeconds, 0);
+  const roundedBudgetMin = Math.round(budgetMin);
   basis.push(input.slots.length === 0
     ? 'No movements are planned yet, so this is general preparation.'
     : `Session movements: ${patternsInOrder.map((pattern) => PATTERN_LABEL[pattern]).join(', ')}.`);
   if (anchor !== null) basis.push(`First movement prepared: ${anchor.movementName}.`);
-  basis.push(variant === 'standard'
-    // Walk 2 (W2-11): "within 10 minutes" beside "About 8 minutes" read as two
-    // durations. This is the time limit the protocol was fitted to.
-    ? `Full protocol, fitted to a ${Math.round(budgetMin)}-minute limit.`
-    : `Short protocol, fitted to a ${Math.round(budgetMin)}-minute limit.`);
+  if (sum > roundedBudgetMin * 60) {
+    basis.push(variant === 'standard'
+      ? `Full protocol: optional items were left out, and essential work exceeds the ${roundedBudgetMin}-minute limit.`
+      : `Short protocol: optional items were left out, and essential work exceeds the ${roundedBudgetMin}-minute limit.`);
+  } else {
+    basis.push(variant === 'standard'
+      // Walk 2 (W2-11): "within 10 minutes" beside "About 8 minutes" read as two
+      // durations. This is the time limit the protocol was fitted to.
+      ? `Full protocol, fitted to a ${roundedBudgetMin}-minute limit.`
+      : `Short protocol, fitted to a ${roundedBudgetMin}-minute limit.`);
+  }
   if (input.tier === 'beginner') basis.push('Experience: beginner — move slowly and use the easier option whenever unsure.');
   if (sportContext) basis.push('Sport or conditioning session: balance is included.');
   if (restricted.size > 0) basis.push('Active niggles: drills that load those areas are withheld.');
@@ -605,7 +613,6 @@ export function buildPreparationProtocol(input: PreparationInput): PreparationPr
     notes.push(input.timeConflictNote.trim());
   }
 
-  const sum = items.reduce((seconds, item) => seconds + item.estimateSeconds, 0);
   return {
     version: PREPARATION_PROTOCOL_VERSION,
     policyId: PREPARATION_POLICY_ID,

@@ -22,6 +22,7 @@ test('a day with no sets says no training was logged, and keeps its measures', (
 
 // W4-9: the energy system "i" always explained ATP-PC.
 test('the energy system "i" explains only the chosen system, and only with a glossary entry', () => {
+  expect(ENERGY_SYSTEM_TIP).toEqual({ atp_pc: 'ATP-PC' });
   for (const system of ENERGY_SYSTEMS) {
     const tip = ENERGY_SYSTEM_TIP[system];
     if (tip !== undefined) expect([system, getGlossaryEntry(tip)?.term]).toEqual([system, tip]);
@@ -30,9 +31,13 @@ test('the energy system "i" explains only the chosen system, and only with a glo
   expect(ENERGY_SYSTEM_TIP.aerobic).toBeUndefined();
 });
 
-// W4-6: reset did not say whose data it removes.
+// W4-6 & #302 194f: reset did not say whose data it removes, and must list
+// one-rep maxes, reports from every date, and "Their other profile settings".
 test('reset names the athlete whose data it removes', () => {
   expect(resetScopeText('Kim')).toContain("This removes Kim's training history");
+  expect(resetScopeText('Kim')).toContain('one-rep maxes');
+  expect(resetScopeText('Kim')).toContain('reports from every date');
+  expect(resetScopeText('Kim')).toContain('Their other profile settings');
   expect(resetScopeText('Kim')).toContain('other athletes are not changed');
   expect(resetScopeText(undefined)).toContain("this athlete's");
   expect(resetConfirmText('Kim')).toBe("This cannot be undone. Reset Kim's training data?");

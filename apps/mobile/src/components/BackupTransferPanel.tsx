@@ -50,7 +50,24 @@ export default function BackupTransferPanel({ athleteCount }: BackupTransferPane
   const [runStart, setRunStart] = useState<number | null>(null);
   const [now, setNow] = useState(() => Date.now());
 
+  const [statusArea, setStatusArea] = useState<'create' | 'restore'>('create');
   const working = status === 'working';
+  const showStatusInRestore = preview !== null || statusArea === 'restore';
+  const renderStatus = (): React.JSX.Element | null => (
+    <>
+      {working && (
+        <View style={styles.progress} testID="backup-working-indicator">
+          <ActivityIndicator color={theme.color.textMid} />
+          <Text style={styles.body} testID="backup-working-elapsed">
+            {`${message ?? 'Working…'} ${elapsedLabel(now - (runStart ?? now))}`}
+          </Text>
+        </View>
+      )}
+      {!working && message !== null && (
+        <Text accessibilityLiveRegion="polite" style={styles.body} testID="backup-status-message">{message}</Text>
+      )}
+    </>
+  );
 
   useEffect(() => {
     if (!working) {
@@ -118,27 +135,15 @@ export default function BackupTransferPanel({ athleteCount }: BackupTransferPane
       {strongEnough && confirmation.length > 0 && password !== confirmation && <Text style={styles.detail}>Passwords do not match.</Text>}
       <QuietAction
         label="CREATE ENCRYPTED BACKUP"
-        onPress={() => { void createBackup(password); }}
+        onPress={() => { setStatusArea('create'); void createBackup(password); }}
         disabled={working || recoveryBlocked || !confirmed}
         accessibilityLabel="Create encrypted backup of all athletes and choose where to save it"
         testID="create-backup-button"
       />
-      {/* Walk W4-1: the status (e.g. "Backup is too large…") was drawn below the
-          restore controls, off-screen; it now sits under the backup button. */}
-      {working && (
-        <View style={styles.progress} testID="backup-working-indicator">
-          <ActivityIndicator color={theme.color.textMid} />
-          <Text style={styles.body} testID="backup-working-elapsed">
-            {`${message ?? 'Working…'} ${elapsedLabel(now - (runStart ?? now))}`}
-          </Text>
-        </View>
-      )}
-      {!working && message !== null && (
-        <Text accessibilityLiveRegion="polite" style={styles.body} testID="backup-status-message">{message}</Text>
-      )}
+      {!showStatusInRestore && renderStatus()}
       <QuietAction
         label="RESTORE ENCRYPTED BACKUP"
-        onPress={() => { void chooseRestore(password); }}
+        onPress={() => { setStatusArea('restore'); void chooseRestore(password); }}
         disabled={working || recoveryBlocked || !strongEnough || preview !== null}
         accessibilityLabel="Choose and preview an encrypted backup to replace all data"
         testID="choose-restore-button"
@@ -150,7 +155,7 @@ export default function BackupTransferPanel({ athleteCount }: BackupTransferPane
           </Text>
           <QuietAction
             label="REVIEW PREVIOUS DATA RECOVERY"
-            onPress={() => { void reviewRecovery(password); }}
+            onPress={() => { setStatusArea('restore'); void reviewRecovery(password); }}
             disabled={working || recoveryBlocked || !strongEnough || preview !== null}
             accessibilityLabel="Review the protected data recovery from the previous restore"
             testID="review-recovery-button"
@@ -175,14 +180,15 @@ export default function BackupTransferPanel({ athleteCount }: BackupTransferPane
           )}
           <QuietAction
             label="CONFIRM REPLACE ALL DATA"
-            onPress={() => { void confirmRestore(); }}
+            onPress={() => { setStatusArea('restore'); void confirmRestore(); }}
             disabled={working || recoveryBlocked}
             accessibilityLabel="Confirm replace all current athlete data from this backup"
             testID="confirm-restore-button"
           />
-          <QuietAction label="KEEP CURRENT DATA" onPress={cancelRestore} disabled={working || recoveryBlocked} testID="cancel-restore-button" />
+          <QuietAction label="KEEP CURRENT DATA" onPress={() => { setStatusArea('restore'); cancelRestore(); }} disabled={working || recoveryBlocked} testID="cancel-restore-button" />
         </View>
       )}
+      {showStatusInRestore && renderStatus()}
     </View>
   );
 }

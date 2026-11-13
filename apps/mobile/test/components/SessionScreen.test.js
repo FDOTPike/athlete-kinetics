@@ -1202,11 +1202,17 @@ test('rest is silent, previews the next deterministic set, and can end early', (
 // Android walk 2026-11-03 (W2-12): the exercise just worked vanished from the
 // timeline during its rest and came back only after Ready now.
 test('during rest the exercise just worked stays named, with its set count', () => {
-  mockState = state({ runner: runner({ phase: 'resting', setIndex: 1, restSecondsTarget: 90, restStartedAtMs: Date.now(), restRpe: 8, slotSetCounts: [1, 0], loggedSets: 1 }) });
+  mockState = state({
+    session: {
+      sessionId: 10, date: '2026-07-15', startedAtMs: Date.now(),
+      sets: [{ set_id: 1, movement_id: 1, movement_name: 'First movement', set_index: 1, reps: 5, load_kg: 0, rpe: 8, tonnage_kg: 0, session_plan_slot_id: 1, timeS: null, bandLevel: null }],
+    },
+    runner: runner({ phase: 'resting', setIndex: 1, restSecondsTarget: 90, restStartedAtMs: Date.now(), restRpe: 8, slotSetCounts: [1, 0], loggedSets: 1 }),
+  });
   render(<SessionScreen />);
   const card = within(screen.getByTestId('session-rest-exercise'));
   expect(card.getByText('First movement')).toBeOnTheScreen();
-  expect(card.getByText(/^\d+ of 3 sets done$|^\d+ sets? complete$/)).toBeOnTheScreen();
+  expect(card.getByText('1 of 3 sets done')).toBeOnTheScreen();
 });
 test('session rest override changes by 15 seconds and persists through the runner action', () => {
   mockState = state({
@@ -3439,4 +3445,52 @@ test('eased day, manual mode, Set 2: the advisory names the earlier session, not
 
   expect(screen.getByLabelText('Load source. Coach suggests 12.5 kg today · logged 17.5 kg last session — your entry stands.')).toBeOnTheScreen();
   expect(screen.queryByLabelText(/from this session/)).toBeNull();
+});
+
+// #302 Bug 1: manual/eased advisory copy keeps quarter-kg precision via formatLoadKg.
+test('manual advisory load uses formatLoadKg so 22.75 kg stays 22.75 kg (not 22.8)', () => {
+  mockState = state({
+    movements: [movement(1, 'First movement', { supportedPrefixes: ['Dumbbell'] }), movement(2, 'Later movement')],
+    profile: { training_age: 'intermediate', equipment_inventory: [], session_duration_cap_min: 60 },
+    loadPreference: 'manual',
+    lastLoggedLoads: { 1: 22.75 },
+  });
+  mockState.resolveSlotLoad = jest.fn(() => ({ source: 'manual', initialLoadKg: null, advisoryKg: 22.75, advisoryKind: 'history' }));
+  mockState.slotLoadCopyFacts = jest.fn(() => ({ historyFromThisSession: false, advisoryFromThisSession: false, unadjustedHistoryKg: 22.75 }));
+
+  render(<SessionScreen />);
+
+  expect(screen.getByLabelText('Load source. Coach suggests 22.75 kg from your last session — your entry stands.')).toBeOnTheScreen();
+  expect(screen.queryByLabelText(/22\.8/)).toBeNull();
+});
+
+// #302 Bug 6: a reused sessionId with a new startedAtMs must not restore a stale unlogged draft.
+test('a reused sessionId with a new startedAtMs drops any stale unlogged load draft', () => {
+  clearUnloggedLoadDraftsForTests();
+  mockState = state({
+    activeAthleteId: 'athlete-1',
+    session: { sessionId: 1, date: '2026-11-05', startedAtMs: 1_000_000, sets: [] },
+    runner: runner({ slots: [
+      { sessionPlanSlotId: 1, movementId: 1, movementName: 'First movement', sets: 3, target: { kind: 'reps', reps: 5 }, targetRpe: 8 },
+    ], slotSetCounts: [0] }),
+    sessionPlan: [slot(1, 1, 5)],
+  });
+  mockState.resolveSlotLoad = jest.fn(() => ({ source: 'history', initialLoadKg: 60, advisoryKg: null, advisoryKind: null }));
+
+  const { rerender } = render(<SessionScreen />);
+  fireEvent.changeText(screen.getByLabelText(/Load in kilograms/i), '72.5');
+  expect(screen.getByLabelText(/Load in kilograms/i).props.value).toBe('72.5');
+
+  mockState = state({
+    activeAthleteId: 'athlete-1',
+    session: { sessionId: 1, date: '2026-11-06', startedAtMs: 2_000_000, sets: [] },
+    runner: runner({ slots: [
+      { sessionPlanSlotId: 1, movementId: 1, movementName: 'First movement', sets: 3, target: { kind: 'reps', reps: 5 }, targetRpe: 8 },
+    ], slotSetCounts: [0] }),
+    sessionPlan: [slot(1, 1, 5)],
+  });
+  mockState.resolveSlotLoad = jest.fn(() => ({ source: 'history', initialLoadKg: 60, advisoryKg: null, advisoryKind: null }));
+
+  rerender(<SessionScreen />);
+  expect(screen.getByLabelText(/Load in kilograms/i).props.value).toBe('60.0');
 });

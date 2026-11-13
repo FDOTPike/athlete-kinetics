@@ -71,7 +71,6 @@ describe('Progress truth (D5)', () => {
 // Android walk 2026-11-03 (W2-9): a recent session was a label and a date that
 // could not be opened, and two sessions on one day looked identical.
 describe('Recent sessions open to what was logged', () => {
-  const at = (iso) => new SpyDate(iso).getTime();
   const facts = (sessionId) => ({
     durationMin: 31,
     exercises: [{ movementId: 1, movementName: sessionId === 11 ? 'Goblet Squat' : 'Push-up', plannedSets: 3, sets: [
@@ -84,8 +83,8 @@ describe('Recent sessions open to what was logged', () => {
   beforeEach(() => {
     mockState = state({
       loadRecentOutcomes: jest.fn(() => [
-        { sessionId: 12, outcomeKind: 'adapted_session', finalizedAtMs: at('2026-11-03T18:05:00Z') },
-        { sessionId: 11, outcomeKind: 'session_recorded', finalizedAtMs: at('2026-11-03T09:40:00Z') },
+        { sessionId: 12, outcomeKind: 'adapted_session', finalizedAtMs: new SpyDate(2026, 10, 3, 18, 5).getTime() },
+        { sessionId: 11, outcomeKind: 'session_recorded', finalizedAtMs: new SpyDate(2026, 10, 3, 9, 40).getTime() },
       ]),
       loadSessionSummaryFacts: jest.fn(facts),
     });
@@ -96,7 +95,30 @@ describe('Recent sessions open to what was logged', () => {
     const labels = screen.getAllByLabelText(/Show what was logged.$/).map((node) => node.props.accessibilityLabel);
     expect(labels).toHaveLength(2);
     expect(labels[0]).not.toBe(labels[1]);
-    expect(labels[0]).toMatch(/2026 · /);
+    // Check independent mid-month anchors so month, time prefix/separator, and day period adapt to any runtime locale.
+    const novMonth = new Intl.DateTimeFormat(undefined, { month: 'short' }).format(new SpyDate(2026, 10, 15));
+    const timeFmt = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
+    const pmPeriod = timeFmt.formatToParts(new SpyDate(2026, 10, 15, 18, 30)).find((p) => p.type === 'dayPeriod')?.value;
+    const amPeriod = timeFmt.formatToParts(new SpyDate(2026, 10, 15, 9, 15)).find((p) => p.type === 'dayPeriod')?.value;
+    const timeField = (label) => label.split(' · ').pop().replace(/\. Show what was logged\.$/, '');
+    expect(labels[0]).toContain('Session adapted');
+    expect(labels[0]).toContain(novMonth);
+    expect(labels[0]).toMatch(/\b0?3\b/);
+    expect(labels[0]).toContain('2026');
+    if (pmPeriod) {
+      expect(labels[0]).toMatch(/ · [^·\d]*?(?:18|0?6)[:.]05/);
+      expect(timeField(labels[0])).toContain(pmPeriod);
+    } else {
+      expect(labels[0]).toMatch(/ · [^·\d]*?18[:.]05/);
+    }
+    expect(labels[1]).toContain('Session recorded');
+    expect(labels[1]).toContain(novMonth);
+    expect(labels[1]).toMatch(/\b0?3\b/);
+    expect(labels[1]).toContain('2026');
+    expect(labels[1]).toMatch(/ · [^·\d]*?0?9[:.]40/);
+    if (amPeriod) {
+      expect(timeField(labels[1])).toContain(amPeriod);
+    }
   });
 
   test('tapping a session shows its logged exercises and skips, and tapping again hides them', () => {

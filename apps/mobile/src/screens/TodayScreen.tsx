@@ -680,7 +680,7 @@ function AvailableTodayScreen({
           {/* #188: an injury pause never invites training. #178: a halt never invites training. */}
           <Text style={styles.body}>
             {halted
-              ? 'Your place is being held.'
+              ? 'Your place is being held. Training is halted for safety today.'
               : suspension.reason !== 'injury'
                 ? 'Your place is being held. You can still train.'
                 : vector !== null
