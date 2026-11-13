@@ -41,6 +41,10 @@ The ninth is `077_multisport_and_flexibility` (ordinal 76): adds the
 `athlete_secondary_sport_profile` and `activity_flexibility_tag` side-car tables
 and their guards, leaving `activity_definition` and the singleton sport profile
 byte-identical for the 067 verifier.
+The tenth is `078_kinestrike_telemetry` (ordinal 77): adds the
+`state_vector_kinestrike` side-car table for daily KineStrike plantar/IMU
+summary telemetry, leaving `state_vector` and `004_state_vector_materialize.sql`
+byte-identical.
 `MIGRATION_LINEAGE.json` records the SHA-256 of every shipped file and its
 ordinal, and of master's 34-entry chain. Master's exact `034`/`058` bytes and its
 registry live under `test/fixtures/lineage/master-1da218d/`.
