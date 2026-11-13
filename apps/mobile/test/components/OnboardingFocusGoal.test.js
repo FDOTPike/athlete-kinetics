@@ -5,8 +5,8 @@
  *
  *   - the focus slide asks the exact question, offers the four bundles, lets
  *     every bundle be edited and individual muscle groups be chosen;
- *   - a detailed target is optional: the interview is eight screens without
- *     it and nine with it, and "skip" really does train with the focus alone;
+ *   - a detailed target is optional: the interview (from SOME MILEAGE up, with the
+ *     optional maxes screen) is nine screens without it and ten with it, and "skip" really does train with the focus alone;
  *   - a started target must be finished or explicitly skipped;
  *   - the feasibility note states arithmetic and uncertainty, never a promise;
  *   - finishing saves profile, focus and goal together; a refused save is
@@ -89,7 +89,8 @@ const openFocusSlide = () => {
 };
 /** From the experience screen to the review screen, answering the required question. */
 const walkToReview = () => {
-  next(); // experience -> logistics
+  next(); // experience -> maxes (optional, from SOME MILEAGE up; issue #218)
+  if (screen.queryByTestId('onboarding-maxes-step') !== null) next(); // maxes -> logistics
   next(); // logistics -> equipment
   next(); // equipment -> limits
   pressLabel('No, nothing to note');
@@ -108,7 +109,7 @@ describe('the focus slide', () => {
   test('asks the exact question and starts from balanced whole body', () => {
     openFocusSlide();
     expect(screen.getByText('Is there an area that you want to work on?')).toBeTruthy();
-    expect(stepLabel()).toBe('Step 3 of 8');
+    expect(stepLabel()).toBe('Step 3 of 9');
     for (const bundle of ['posture', 'beach_muscles', 'lower_body', 'balanced']) {
       expect(screen.getByTestId(`focus-bundle-${bundle}`)).toBeTruthy();
     }
@@ -157,15 +158,15 @@ describe('the focus slide', () => {
 });
 
 describe('the detailed target is optional', () => {
-  test('focus only: eight screens, no target screen, and only the focus is saved', async () => {
+  test('focus only: nine screens (with the optional maxes screen), no target screen, and only the focus is saved', async () => {
     openFocusSlide();
     press('focus-bundle-posture');
     next();
     expect(screen.queryByTestId('goal-editor')).toBeNull();
     expect(screen.getByText('HOW LONG HAVE YOU BEEN TRAINING?')).toBeTruthy();
-    expect(stepLabel()).toBe('Step 4 of 8');
+    expect(stepLabel()).toBe('Step 4 of 9');
     walkToReview();
-    expect(stepLabel()).toBe('Step 8 of 8');
+    expect(stepLabel()).toBe('Step 9 of 9');
     expect(screen.getByText('Posture: rear shoulders, upper back, core and abs')).toBeTruthy();
     expect(screen.getByTestId('onboarding-summary-target-row').props.children)
       .toBe('No specific target — training with the focus only.');
@@ -177,14 +178,14 @@ describe('the detailed target is optional', () => {
     expect(count('athlete_goal')).toBe(0);
   });
 
-  test('with a target: nine screens, a gate until the goal is complete, and one atomic save', async () => {
+  test('with a target: ten screens (with the optional maxes screen), a gate until the goal is complete, and one atomic save', async () => {
     openFocusSlide();
     press('focus-bundle-lower_body');
     press('onboarding-wants-target');
-    expect(stepLabel()).toBe('Step 3 of 9');
+    expect(stepLabel()).toBe('Step 3 of 10');
     next();
     expect(screen.getByTestId('goal-editor')).toBeTruthy();
-    expect(stepLabel()).toBe('Step 4 of 9');
+    expect(stepLabel()).toBe('Step 4 of 10');
     // A started target must be finished or explicitly skipped.
     expect(nextDisabled()).toBe(true);
     expect(screen.getByText(/Finish the target to continue, or choose "Skip this"/)).toBeTruthy();
@@ -212,9 +213,9 @@ describe('the detailed target is optional', () => {
     next();
     expect(screen.getByText('HOW LONG HAVE YOU BEEN TRAINING?')).toBeTruthy();
     walkToReview();
-    expect(stepLabel()).toBe('Step 9 of 9');
+    expect(stepLabel()).toBe('Step 10 of 10');
     expect(screen.getByTestId('onboarding-summary-target-row').props.children)
-      .toBe('TARGET — Squat 100 kg for 5 reps: 100 kg by 2099-01-08');
+      .toBe('TARGET — Squat 100 kg for 5 reps: from 80 kg to 100 kg by 2099-01-08');
     await startTraining();
     expect(state().error).toBeNull();
     expect(state().onboarded).toBe(true);
@@ -252,7 +253,7 @@ describe('the detailed target is optional', () => {
     // The target screen is gone and the interview carries on at the next screen.
     expect(screen.queryByTestId('goal-editor')).toBeNull();
     expect(screen.getByText('HOW LONG HAVE YOU BEEN TRAINING?')).toBeTruthy();
-    expect(stepLabel()).toBe('Step 4 of 8');
+    expect(stepLabel()).toBe('Step 4 of 9');
     walkToReview();
     expect(screen.getByTestId('onboarding-summary-target-row').props.children)
       .toBe('No specific target — training with the focus only.');
@@ -260,6 +261,105 @@ describe('the detailed target is optional', () => {
     expect(state().onboarded).toBe(true);
     expect(state().focus).toMatchObject({ bundleId: 'beach_muscles' });
     expect(count('athlete_goal')).toBe(0);
+  });
+
+  test('skip from EDIT on the review returns to the review, not the next screen', async () => {
+    openFocusSlide();
+    press('focus-bundle-beach_muscles');
+    press('onboarding-wants-target');
+    next();
+    fillTarget();
+    next();
+    walkToReview();
+    pressLabel('Edit target');
+    expect(screen.getByTestId('goal-editor')).toBeTruthy();
+    press('onboarding-skip-target');
+    // QA-001: an edit started from the review returns to the review, and the
+    // index is the review's index in the array WITHOUT the removed screen.
+    expect(screen.getByLabelText('START TRAINING')).toBeTruthy();
+    expect(screen.queryByText('HOW LONG HAVE YOU BEEN TRAINING?')).toBeNull();
+    // Ten screens include the target and maxes; skipping target leaves nine,
+    // and the review must be step 9 of 9 — never an out-of-range index.
+    expect(stepLabel()).toBe('Step 9 of 9');
+  });
+
+  test('after a review-edit skip, Back moves one step and NEXT returns to the review', () => {
+    openFocusSlide();
+    press('focus-bundle-beach_muscles');
+    press('onboarding-wants-target');
+    next();
+    fillTarget();
+    next();
+    walkToReview();
+    pressLabel('Edit target');
+    press('onboarding-skip-target');
+    expect(screen.getByLabelText('START TRAINING')).toBeTruthy();
+    pressLabel('Back');
+    expect(screen.getByText('ANY TRAINING NOTES TO RECORD?')).toBeTruthy();
+    expect(stepLabel()).toBe('Step 8 of 9');
+    next();
+    expect(screen.getByLabelText('START TRAINING')).toBeTruthy();
+    expect(stepLabel()).toBe('Step 9 of 9');
+  });
+
+  test('after a skip, a later EDIT still returns to the review on NEXT', () => {
+    openFocusSlide();
+    press('focus-bundle-beach_muscles');
+    press('onboarding-wants-target');
+    next();
+    fillTarget();
+    next();
+    walkToReview();
+    pressLabel('Edit target');
+    press('onboarding-skip-target');
+    expect(screen.getByLabelText('START TRAINING')).toBeTruthy();
+    // A second edit proves the cleared flag re-enters and NEXT returns.
+    pressLabel('Edit focus');
+    expect(screen.getByTestId('focus-picker')).toBeTruthy();
+    next();
+    expect(screen.getByLabelText('START TRAINING')).toBeTruthy();
+  });
+
+  test('skipping sport from a review edit presents the still-unanswered target', () => {
+    openFocusSlide();
+    press('focus-bundle-beach_muscles');
+    next();
+    walkToReview();
+    pressLabel('Edit focus');
+    press('onboarding-wants-sport');
+    press('onboarding-wants-target');
+    next();
+    expect(screen.getByTestId('sport-editor')).toBeTruthy();
+    press('onboarding-skip-sport');
+    // The target was added in the same edit and is still unanswered: present it
+    // instead of jumping to a review that would refuse START TRAINING.
+    expect(screen.getByTestId('goal-editor')).toBeTruthy();
+    fillTarget();
+    next();
+    expect(screen.getByLabelText('START TRAINING')).toBeTruthy();
+    expect(stepLabel()).toBe('Step 10 of 10');
+  });
+
+  test('skip from EDIT returns to the review when both optional screens exist', () => {
+    openFocusSlide();
+    press('focus-bundle-beach_muscles');
+    press('onboarding-wants-sport');
+    press('onboarding-wants-target');
+    next();
+    press('sport-family-strength');
+    press('sport-outcome-bigger_competition_lifts');
+    press('sport-experience-new');
+    press('sport-practice-unsure');
+    press('sport-matches-unsure');
+    next();
+    fillTarget();
+    next();
+    walkToReview();
+    expect(stepLabel()).toBe('Step 11 of 11');
+    pressLabel('Edit target');
+    press('onboarding-skip-target');
+    expect(screen.getByLabelText('START TRAINING')).toBeTruthy();
+    expect(stepLabel()).toBe('Step 10 of 10');
   });
 
   test('a custom measurement asks for its unit', () => {

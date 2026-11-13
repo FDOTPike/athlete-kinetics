@@ -109,6 +109,9 @@ const availableVerdicts = sampleMovements.map((movement) => ({
   separateAttestationRequired: false,
 }));
 
+// #210: the filter rows sit behind a collapsed "Filters" heading for everyone.
+const openFilters = () => fireEvent.press(screen.getByLabelText('Filters'));
+
 describe('LibraryScreen Phase 2a', () => {
   beforeEach(() => {
     mockState = {
@@ -122,6 +125,24 @@ describe('LibraryScreen Phase 2a', () => {
         next: { movementName: 'Barbell Back Squat', progressionGroup: 'squat-skill', progressionRank: 1 },
       }),
     };
+  });
+
+  test('#210 the filter rows start collapsed for every athlete; search and the count stay visible', () => {
+    for (const trainingAge of ['beginner', 'intermediate', 'advanced', 'elite']) {
+      mockState.profile.training_age = trainingAge;
+      const view = render(<LibraryScreen />);
+      expect(screen.getByLabelText('Filters').props.accessibilityState).toMatchObject({ expanded: false });
+      for (const row of ['Availability', 'Pattern', 'Equipment', 'Difficulty', 'Movement type', 'Training scope']) {
+        expect(screen.queryByText(row)).toBeNull();
+      }
+      expect(screen.getByLabelText('Search movements')).toBeOnTheScreen();
+      expect(screen.getByText(/of 3 movements/)).toBeOnTheScreen();
+      view.unmount();
+    }
+    render(<LibraryScreen />);
+    openFilters();
+    expect(screen.getByText('Pattern')).toBeOnTheScreen();
+    expect(screen.getByText('Training scope')).toBeOnTheScreen();
   });
 
   test('uses a virtualized SectionList and derives live totals', () => {
@@ -144,6 +165,7 @@ describe('LibraryScreen Phase 2a', () => {
 
   test('uses canonical plural dumbbells equipment token', () => {
     render(<LibraryScreen />);
+    openFilters();
     fireEvent.press(screen.getByLabelText('Filter equipment by Dumbbells'));
     expect(screen.getByText('Goblet Squat')).toBeOnTheScreen();
     expect(screen.getByText('Dumbbell Bench Press')).toBeOnTheScreen();
@@ -152,6 +174,7 @@ describe('LibraryScreen Phase 2a', () => {
 
   test('combines difficulty and equipment facets conjunctively', () => {
     render(<LibraryScreen />);
+    openFilters();
     fireEvent.press(screen.getByLabelText('Filter tier by Intermediate'));
     fireEvent.press(screen.getByLabelText('Filter equipment by Dumbbells'));
     expect(screen.getByText('Dumbbell Bench Press')).toBeOnTheScreen();
@@ -167,6 +190,7 @@ describe('LibraryScreen Phase 2a', () => {
       availableVerdicts[2],
     ];
     render(<LibraryScreen />);
+    openFilters();
     expect(screen.getByLabelText('Show available movements').props.accessibilityState.selected).toBe(true);
     expect(screen.queryByText('Barbell Back Squat')).not.toBeOnTheScreen();
     fireEvent.press(screen.getByLabelText('Show all movements for learning'));
@@ -186,6 +210,7 @@ describe('LibraryScreen Phase 2a', () => {
     expect(screen.getByText('Access cannot be verified right now.')).toBeOnTheScreen();
     fireEvent.press(screen.getByLabelText('Back to movement list'));
     expect(screen.getByText('Access cannot be verified right now.')).toBeOnTheScreen();
+    openFilters();
     fireEvent.press(screen.getByLabelText('Show available movements'));
     expect(screen.queryByText('Dumbbell Bench Press')).not.toBeOnTheScreen();
   });

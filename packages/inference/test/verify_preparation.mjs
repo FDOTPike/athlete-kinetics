@@ -212,6 +212,28 @@ console.log('[5] truthful outcomes');
       && prep.describePreparationDose(time) === '30 seconds each side'
       && prep.describePreparationDose(reps) === '6 reps'
       && prep.describePreparationDose({ kind: 'ramp', reps: 5, percentOfWorkingLoad: 40 }) === '5 reps at about 40% of today\'s working load');
+  // Android walk (#213): with today's working load known, a ramp set reads in
+  // kilograms on the 2.5 kg step, with the percentage as support. Unknown
+  // stays the percentage text. The percentages themselves are unchanged.
+  const ramp40 = { kind: 'ramp', reps: 6, percentOfWorkingLoad: 40 };
+  const ramp80 = { kind: 'ramp', reps: 6, percentOfWorkingLoad: 80 };
+  check('a ramp load in kg is the percentage of the working load on the 2.5 kg step',
+    prep.rampLoadKg(40, 87.5) === 35 && prep.rampLoadKg(80, 87.5) === 70
+      && prep.rampLoadKg(80, 92.5) === 75 && prep.rampLoadKg(40, 100) === 40
+      && prep.rampLoadKg(40, null) === null && prep.rampLoadKg(40, 0) === null
+      && prep.rampLoadKg(40, Number.NaN) === null && prep.rampLoadKg(40, -10) === null);
+  check('a ramp dose with a known working load names the kilograms, with the percentage as support',
+    prep.describePreparationDose(ramp40, 87.5) === '6 reps at about 35 kg (40% of today\'s working load)'
+      && prep.describePreparationDose(ramp80, 87.5) === '6 reps at about 70 kg (80% of today\'s working load)'
+      && prep.describePreparationDose(ramp40, null) === '6 reps at about 40% of today\'s working load'
+      && prep.describePreparationDose(ramp40) === '6 reps at about 40% of today\'s working load'
+      && prep.describePreparationDose(reps, 87.5) === '6 reps');
+  check('a ramp title with a known working load names the kilograms; without one it is the planned title',
+    prep.rampItemTitle('Competition Squat', 40, 87.5) === 'Preparation set: Competition Squat, about 35 kg (40%)'
+      && prep.rampItemTitle('Competition Squat', 80, 87.5) === 'Preparation set: Competition Squat, about 70 kg (80%)'
+      && prep.rampItemTitle('Competition Squat', 40, null) === 'Preparation set: Competition Squat at about 40% of today\'s working load'
+      && build().items.filter((item) => item.stage === 'ramp')
+        .every((item) => item.title === prep.rampItemTitle('Movement 1', item.dose.percentOfWorkingLoad, null)));
 }
 
 // --- [6] frozen protocol round trip -----------------------------------------------------
@@ -237,6 +259,19 @@ console.log('[6] frozen protocol round trip');
   let invalidJson = false;
   try { prep.parsePreparationProtocol('{not json'); } catch (error) { invalidJson = error.name === 'PreparationProtocolError'; }
   check('text that is not JSON is refused', invalidJson);
+}
+
+// --- [7] #302 194e: essential work exceeding the time limit ---------------------
+console.log('[7] #302 194e essential work over budget');
+{
+  const tight = build({ budgetMin: 4 });
+  const totalSec = tight.items.reduce((sum, item) => sum + item.estimateSeconds, 0);
+  check('tight 4-minute budget fixture (clamped to 5-min floor) exceeds 300s in essential items', totalSec > 300, String(totalSec));
+  const lines = tight.basis.join(' ');
+  check('basis does not claim the protocol was fitted when essential items exceed the budget',
+    !/fitted to a \d+-minute limit/.test(lines), lines);
+  check('basis states optional items were left out and essential work exceeds the limit',
+    /optional items were left out/i.test(lines) && /essential work/i.test(lines) && /exceeds/i.test(lines), lines);
 }
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);

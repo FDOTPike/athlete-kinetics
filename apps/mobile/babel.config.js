@@ -13,22 +13,29 @@ const path = require('path');
 // __dirname makes the alias location-independent, exactly like the forward-slash
 // normalization jest.config.js needs for the same class of reason.
 const pkg = (name) => path.join(__dirname, '..', '..', 'packages', name, 'src');
+const inlineBuildFlags = require('./buildFlags');
 
-module.exports = {
-  presets: ['module:@react-native/babel-preset'],
-  plugins: [
-    // .sql files import as raw strings (matches packages/core-db/src/types/sql.d.ts)
-    ['inline-import', { extensions: ['.sql'] }],
-    [
-      'module-resolver',
-      {
-        root: ['.'],
-        alias: {
-          '@ak/core-db': pkg('core-db'),
-          '@ak/inference': pkg('inference'),
-          '@ak/biometrics': pkg('biometrics'),
+module.exports = (api) => {
+  // Build-time beta switch (issue #132): AK_BETA_BUILD is read once per build
+  // and inlined into the bundle. Babel re-reads this config when it changes.
+  const beta = api.cache.using(() => inlineBuildFlags.betaBuildSetting(process.env));
+  return {
+    presets: ['module:@react-native/babel-preset'],
+    plugins: [
+      [inlineBuildFlags, { beta }],
+      // .sql files import as raw strings (matches packages/core-db/src/types/sql.d.ts)
+      ['inline-import', { extensions: ['.sql'] }],
+      [
+        'module-resolver',
+        {
+          root: ['.'],
+          alias: {
+            '@ak/core-db': pkg('core-db'),
+            '@ak/inference': pkg('inference'),
+            '@ak/biometrics': pkg('biometrics'),
+          },
         },
-      },
+      ],
     ],
-  ],
+  };
 };

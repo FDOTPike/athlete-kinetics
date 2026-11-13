@@ -5,7 +5,8 @@
  * Unselected: line border, textMid label, transparent fill.
  * Disabled: 45% opacity, ink1 fill, textLow label.
  * borderRadius: theme.radius.chip (2pt).
- * minHeight: theme.touch.min (56pt).
+ * minHeight and minWidth: theme.touch.min (56pt), so a one-character chip
+ * is still a full-size target.
  *
  * Law 2: Selected chips = inverted white fill, not chalk.
  * Law: zero hex literals.
@@ -28,6 +29,10 @@ export interface ChipProps {
   accessibilityLabel?: string;
   style?: StyleProp<ViewStyle>;
   testID?: string;
+  /** Let a long label wrap, centred, instead of cutting it at one line.
+   *  For option chips whose label is a sentence (onboarding focus, sport and
+   *  target choices); short chips keep the single line. */
+  wrap?: boolean;
 }
 
 export function Chip({
@@ -38,6 +43,7 @@ export function Chip({
   accessibilityLabel,
   style,
   testID,
+  wrap = false,
 }: ChipProps): React.JSX.Element {
   return (
     <Pressable
@@ -61,8 +67,9 @@ export function Chip({
           styles.label,
           selected && styles.labelSelected,
           disabled && styles.labelDisabled,
+          wrap && styles.labelWrap,
         ]}
-        numberOfLines={1}
+        numberOfLines={wrap ? undefined : 1}
       >
         {label}
       </Text>
@@ -73,9 +80,12 @@ export function Chip({
 const styles = StyleSheet.create({
   base: {
     minHeight: theme.touch.min,
+    minWidth: theme.touch.min,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: theme.space[4], // 16
+    // Vertical padding keeps a wrapped label off the border at large text (issue 158).
+    paddingVertical: theme.space[2],
     borderRadius: theme.radius.chip,
     borderWidth: 1,
     borderColor: theme.color.line,
@@ -101,6 +111,9 @@ const styles = StyleSheet.create({
     ...theme.font.label,
     fontFamily: theme.font.family,
     color: theme.color.textMid,
+  },
+  labelWrap: {
+    textAlign: 'center',
   },
   labelSelected: {
     // ink0 on the inverted textHi fill

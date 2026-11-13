@@ -107,7 +107,10 @@ export {
   type RirOption,
 } from './effortCues';
 export {
+  applyLoadModifier,
+  applyPrescriptionToSlot,
   derivePrescription,
+  isPrescriptionReduced,
   type DeriveInput,
   type DerivedPrescription,
   type ReportInput,
@@ -120,6 +123,7 @@ export {
   type NormalizedProgramHorizon,
   type ProgramReviewHorizon,
   accessContextForBlockFocus,
+  movementFitsFocusDay,
   availableMovements,
   BLOCK_WEEKS,
   generateBlock,
@@ -191,6 +195,7 @@ export {
 } from './completionAction';
 export {
   applyProfileLimits,
+  effectiveRpeCeiling,
   applySeverityToGuardrail,
   EXPERIENCE_TRIAGE,
   scaleGuardrailForExperience,
@@ -345,12 +350,15 @@ export {
   currentSlot,
   deserializeRunner,
   nextUp,
+  replaceSlotAfterLoggedSets,
   replayRunner,
   restoreRunnerCheckpoint,
   restSecondsFor,
+  runnerTierForTrainingAge,
   serializeRunner,
   startRunner,
   type LegacyRunnerSlot,
+  type ReplaceSlotAfterLoggedSetsInput,
   type RunnerCheckpoint,
   type RunnerEvent,
   type RunnerHaltReason,
@@ -367,6 +375,8 @@ export {
   SESSION_OUTCOME_ENGINE_VERSION,
   SessionOutcomeValidationError,
   evaluateSessionOutcome,
+  evaluateAfterTheFactOutcome,
+  isDirectiveHalt,
   type SessionOutcomeDecision,
   type SessionOutcomeEvidence,
   type SessionOutcomeInput,
@@ -381,8 +391,13 @@ export {
   SESSION_FEEL_ENGINE_VERSION,
   SESSION_FEEL_KINDS,
   SESSION_FEEL_REASONS,
+  SESSION_FEEL_HARDER_REASONS,
+  SESSION_FEEL_EASIER_REASONS,
   SESSION_FEEL_RPE_DRIFT_THRESHOLD,
   meanRpeDrift,
+  sessionFeelOfferedReasons,
+  sessionFeelReasonRequired,
+  sessionFeelReasonsFor,
   shouldAskSessionFeel,
   validateSessionFeel,
   type SessionFeelDraft,
@@ -517,6 +532,9 @@ export {
   FOCUS_BUNDLE_INFO,
   FOCUS_MAX_MUSCLES,
   FOCUS_QUESTION,
+  GOAL_BODYWEIGHT_MAX_KG,
+  GOAL_BODYWEIGHT_MIN_KG,
+  GOAL_LOAD_MAX_KG,
   GOAL_METHOD_MAX,
   GOAL_METRICS,
   GOAL_METRIC_INFO,
@@ -535,6 +553,8 @@ export {
   focusFromBundle,
   focusMatchFor,
   goalProgress,
+  LOWER_TARGET_CONFIRM_MESSAGE,
+  targetIsLowerThanStart,
   isFocusBundleId,
   isGoalMetricId,
   isMuscleGroupId,
@@ -632,6 +652,8 @@ export {
   PreparationProtocolError,
   buildPreparationProtocol,
   describePreparationDose,
+  rampItemTitle,
+  rampLoadKg,
   isExtraPreparationWork,
   isTerminalPreparationStatus,
   parsePreparationProtocol,
@@ -654,3 +676,8 @@ export {
   type PreparationStatus,
   type PreparationVariant,
 } from './preparationPolicy';
+
+export * from './prehabCatalog';
+export * from './flexibilityPolicy';
+export { makeMultiSportEmphasisIndex, MAX_EMPHASIS_MUSCLES, SECONDARY_SPORT_WEIGHT } from './programEmphasis';
+export { assertDistinctSecondarySport, assertSecondarySportAllowed, resolveMultiSportWorkload, type MultiSportWorkload, type MultiSportInterference } from './sportProfile';

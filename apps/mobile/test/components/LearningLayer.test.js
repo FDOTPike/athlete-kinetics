@@ -129,7 +129,7 @@ describe('LearningLayer (Work Order B)', () => {
     expect(screen.getByTestId('info-tip-backdrop').props.accessible).toBe(false);
 
     // The close control is independently focusable; the backdrop cannot mask the content.
-    fireEvent.press(screen.getByRole('button', { name: 'Dismiss explanation' }));
+    fireEvent.press(screen.getByRole('button', { name: 'Close, dismiss explanation' }));
     expect(screen.queryByText(GLOSSARY.DELOAD)).toBeNull();
   });
 

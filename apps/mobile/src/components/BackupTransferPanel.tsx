@@ -1,14 +1,27 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { AccessibilityInfo, ActivityIndicator, StyleSheet, Text, TextInput, View } from 'react-native';
 import { theme } from '../theme/theme';
 import { useBackupStore } from '../state/backupStore';
+import { formatAthleteDateTime } from '../state/athleteDate';
+import { backupLimitText, measureBackupSize, type BackupSizeEstimate } from '../state/backupCapacity';
 import { QuietAction } from './ui';
 
 const dateLabel = (value: string | null): string => value === null
   ? 'No confirmed backup saved yet.'
-  : `Last confirmed save: ${new Date(value).toLocaleString()}`;
+  : `Last confirmed save: ${formatAthleteDateTime(value)}`;
 
-export default function BackupTransferPanel(): React.JSX.Element {
+export interface BackupTransferPanelProps {
+  /** The number of athletes on the phone; a change re-reads the backup total (#173). */
+  athleteCount?: number;
+}
+
+/** m:ss for a run that can take minutes on a slow phone (#135). */
+const elapsedLabel = (ms: number): string => {
+  const seconds = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+};
+
+export default function BackupTransferPanel({ athleteCount }: BackupTransferPanelProps = {}): React.JSX.Element {
   const status = useBackupStore((state) => state.status);
   const message = useBackupStore((state) => state.message);
   const preview = useBackupStore((state) => state.preview);
@@ -22,8 +35,56 @@ export default function BackupTransferPanel(): React.JSX.Element {
   const cancelRestore = useBackupStore((state) => state.cancelRestore);
   const [password, setPassword] = useState('');
   const [confirmation, setConfirmation] = useState('');
+  // #173: the limit and the current total, re-read after each backup action
+  // and whenever the athlete count changes (the panel stays mounted while
+  // athletes are added or deleted on the Profile screen).
+  const [sizeEstimate, setSizeEstimate] = useState<BackupSizeEstimate | null>(null);
+  useEffect(() => {
+    if (status === 'working') return undefined;
+    let live = true;
+    void measureBackupSize().then((estimate) => { if (live) setSizeEstimate(estimate); });
+    return () => { live = false; };
+  }, [status, athleteCount]);
+  // #135: while a run is working, the athlete sees that it is still going and
+  // how long it has taken. Key derivation can take minutes on a slow phone.
+  const [runStart, setRunStart] = useState<number | null>(null);
+  const [now, setNow] = useState(() => Date.now());
 
+  const [statusArea, setStatusArea] = useState<'create' | 'restore'>('create');
   const working = status === 'working';
+  const showStatusInRestore = preview !== null || statusArea === 'restore';
+  const renderStatus = (): React.JSX.Element | null => (
+    <>
+      {working && (
+        <View style={styles.progress} testID="backup-working-indicator">
+          <ActivityIndicator color={theme.color.textMid} />
+          <Text style={styles.body} testID="backup-working-elapsed">
+            {`${message ?? 'Working…'} ${elapsedLabel(now - (runStart ?? now))}`}
+          </Text>
+        </View>
+      )}
+      {!working && message !== null && (
+        <Text accessibilityLiveRegion="polite" style={styles.body} testID="backup-status-message">{message}</Text>
+      )}
+    </>
+  );
+
+  useEffect(() => {
+    if (!working) {
+      setRunStart(null);
+      return undefined;
+    }
+    const started = Date.now();
+    setRunStart(started);
+    setNow(started);
+    const tick = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(tick);
+  }, [working]);
+
+  // Announced once when the run starts; the ticking time is not announced.
+  useEffect(() => {
+    if (working) AccessibilityInfo.announceForAccessibility(message ?? 'Working.');
+  }, [working]);
   const recoveryBlocked = startupSafe !== true;
   const strongEnough = password.length >= 12;
   const confirmed = strongEnough && password === confirmation;
@@ -32,9 +93,9 @@ export default function BackupTransferPanel(): React.JSX.Element {
     <View style={styles.section} testID="backup-transfer-section">
       <Text style={styles.heading}>BACK UP &amp; TRANSFER DATA</Text>
       <Text style={styles.body}>
-        An encrypted backup includes every athlete, profile, plan, routine, workout, activity, health-support record, preference, and identifier on this phone.
-        It is separate from readable CSV history export.
+        An encrypted backup includes each athlete&apos;s profile, plans, routines, workouts, activities, health-support records, preferences, and identifiers on this phone.
       </Text>
+      <Text style={styles.body} testID="backup-limit">{backupLimitText(sizeEstimate)}</Text>
       <Text style={styles.body}>
         New phone: create a backup, save it somewhere you can reach from the new phone, install pikeMethods there, then choose Restore backup.
         A copy kept only on this phone will not protect you if the phone is lost.
@@ -74,14 +135,15 @@ export default function BackupTransferPanel(): React.JSX.Element {
       {strongEnough && confirmation.length > 0 && password !== confirmation && <Text style={styles.detail}>Passwords do not match.</Text>}
       <QuietAction
         label="CREATE ENCRYPTED BACKUP"
-        onPress={() => { void createBackup(password); }}
+        onPress={() => { setStatusArea('create'); void createBackup(password); }}
         disabled={working || recoveryBlocked || !confirmed}
         accessibilityLabel="Create encrypted backup of all athletes and choose where to save it"
         testID="create-backup-button"
       />
+      {!showStatusInRestore && renderStatus()}
       <QuietAction
         label="RESTORE ENCRYPTED BACKUP"
-        onPress={() => { void chooseRestore(password); }}
+        onPress={() => { setStatusArea('restore'); void chooseRestore(password); }}
         disabled={working || recoveryBlocked || !strongEnough || preview !== null}
         accessibilityLabel="Choose and preview an encrypted backup to replace all data"
         testID="choose-restore-button"
@@ -93,20 +155,17 @@ export default function BackupTransferPanel(): React.JSX.Element {
           </Text>
           <QuietAction
             label="REVIEW PREVIOUS DATA RECOVERY"
-            onPress={() => { void reviewRecovery(password); }}
+            onPress={() => { setStatusArea('restore'); void reviewRecovery(password); }}
             disabled={working || recoveryBlocked || !strongEnough || preview !== null}
             accessibilityLabel="Review the protected data recovery from the previous restore"
             testID="review-recovery-button"
           />
         </>
       )}
-      {message !== null && (
-        <Text accessibilityLiveRegion="polite" style={styles.body} testID="backup-status-message">{message}</Text>
-      )}
       {preview !== null && (
         <View style={styles.preview} testID="restore-preview">
           <Text style={styles.label}>RESTORE PREVIEW</Text>
-          <Text style={styles.body}>Created {new Date(preview.createdAt).toLocaleString()}</Text>
+          <Text style={styles.body}>Created {formatAthleteDateTime(preview.createdAt)}</Text>
           <Text style={styles.body}>{preview.databaseCount} athlete database{preview.databaseCount === 1 ? '' : 's'} · {Math.ceil(preview.totalBytes / 1_048_576)} MB</Text>
           <Text style={styles.body}>Athletes: {preview.athleteNames.join(', ')}</Text>
           {preview.source === 'retained_recovery' ? (
@@ -121,14 +180,15 @@ export default function BackupTransferPanel(): React.JSX.Element {
           )}
           <QuietAction
             label="CONFIRM REPLACE ALL DATA"
-            onPress={() => { void confirmRestore(password); }}
-            disabled={working || recoveryBlocked || !strongEnough}
+            onPress={() => { setStatusArea('restore'); void confirmRestore(); }}
+            disabled={working || recoveryBlocked}
             accessibilityLabel="Confirm replace all current athlete data from this backup"
             testID="confirm-restore-button"
           />
-          <QuietAction label="KEEP CURRENT DATA" onPress={cancelRestore} disabled={working || recoveryBlocked} testID="cancel-restore-button" />
+          <QuietAction label="KEEP CURRENT DATA" onPress={() => { setStatusArea('restore'); cancelRestore(); }} disabled={working || recoveryBlocked} testID="cancel-restore-button" />
         </View>
       )}
+      {showStatusInRestore && renderStatus()}
     </View>
   );
 }
@@ -149,6 +209,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.control,
     paddingHorizontal: theme.space[4],
   },
+  progress: { flexDirection: 'row', alignItems: 'center', gap: theme.space[3] },
   preview: { borderWidth: 1, borderColor: theme.color.line, padding: theme.space[4], gap: theme.space[3] },
   warning: { ...theme.font.body, color: theme.color.textHi },
 });

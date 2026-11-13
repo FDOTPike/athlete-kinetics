@@ -1,13 +1,16 @@
 /** Phase 17 utility-first active-session surface. */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING_NOTE, EFFORT_STOP_GUIDANCE, effortCue, mapRirToRpe, RIR_OPTIONS, PREPARATION_STATUS_LABEL, isTerminalPreparationStatus, preparationDoseUnit, type EffortAnswer, type RunnerHaltReason } from '@ak/inference';
-import { formatTeachingOnlyReason, useStore, type LoadSelection, type LoggedSet, type SetLoadShown, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
-import { useSubViewBack } from '../navigation/navigation';
-import { buildSessionSummary, NO_NEXT_SESSION_TEXT } from '../state/sessionSummary';
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions, type HostInstance } from 'react-native';
+import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING_NOTE, EFFORT_STOP_GUIDANCE, effortCue, effectiveRpeCeiling, mapRirToRpe, RIR_OPTIONS, PREPARATION_STATUS_LABEL, isTerminalPreparationStatus, preparationDoseUnit, type EffortAnswer, type RunnerHaltReason } from '@ak/inference';
+import { EXPERIENCE_SEVERITY, runnerTierForTrainingAge } from '../../../../packages/inference/src/sessionRunner';
+import { formatTeachingOnlyReason, freeFormStartIsEmpty, useStore, type LoadCopyFacts, type LoadSelection,type LoggedSet, type SetLoadShown, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
+import { useNavigation, useSubViewBack } from '../navigation/navigation';
+import { buildSessionSummary, isDumbbellLoad, markPerDumbbell, NO_NEXT_SESSION_TEXT, setsOfPlanned, skippedExerciseText } from '../state/sessionSummary';
+import { isSessionReportStop, SESSION_REPORT_STOP_SENTENCE } from '../state/sessionReportStop';
 import { SUPPORT_HELD_MESSAGE, SUPPORT_UNAVAILABLE_MESSAGE } from '../state/healthSupportStore';
 import { theme } from '../theme/theme';
 import InfoTip from '../components/InfoTip';
+import { isEasedBelow } from '../state/loadCopyFacts';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import {
   PrimaryButton,
@@ -21,7 +24,11 @@ import {
 } from '../components/ui';
 import { PreparationPanel } from '../components/PreparationPanel';
 import { MovementPreview } from '../components/movementPreview/MovementPreview';
+import { formatAthleteDate } from '../state/athleteDate';
 import { SessionFeelPanel, describeSessionFeel } from '../components/SessionFeelPanel';
+import { HALT_NEXT_TEXT } from '../state/haltCopy';
+import { operativeReportLine } from '../state/operativeReportLine';
+import { SubjectiveReportPanel } from '../components/SubjectiveReportPanel';
 
 
 type SessionMode = 'guided' | 'self_directed';
@@ -35,25 +42,31 @@ const secondsText = (n: number): string => {
   return min > 0 ? `${min}:${String(sec).padStart(2, '0')}` : `${value}s`;
 };
 
-const GENERIC_HALT_COPY = 'A safety concern paused this session.';
+/** #183: a region as the athlete reads it ("Lower back"); the stored key
+ *  ("lower_back") is what is saved. */
+const regionDisplayName = (joint: string): string => {
+  const words = joint.replace(/_/g, ' ');
+  return words.charAt(0).toUpperCase() + words.slice(1);
+};
+
+const GENERIC_HALT_COPY = 'A safety concern stopped this session.';
+// #181: a report-driven stop is "stopped", never "paused"; a manual stop
+// keeps "paused" while the session can still be finished.
 const NON_SAFETY_HALT_COPY = {
   manual: 'You chose to stop this session.',
-  niggle: 'You reported that something felt off, so this session is paused.',
-  pain: 'You reported pain, so this session is paused.',
+  niggle: 'You reported discomfort, so this session has stopped for today.',
+  pain: 'You reported pain, so this session has stopped for today.',
 } satisfies Record<Exclude<RunnerHaltReason, 'safety'>, string>;
 
 /** Exhaustive athlete-facing copy for persisted runner halt reasons. The
  * Record above makes a newly added non-safety RunnerHaltReason a type error
- * until copy is supplied. Runtime-unknown, absent, and blank safety evidence
- * all fail closed to one generic safety message; raw tokens are never output. */
+ * until copy is supplied. Runtime-unknown and absent reasons fail closed to
+ * one generic safety message; raw tokens are never output. A safety halt
+ * never prints the matched entry's adjustment cue (#178): the cue describes a
+ * reduced session, and a halt allows none. */
 const formatRunnerHaltReason = (
   reason: RunnerHaltReason | null | undefined,
-  matchedTriageCue: string | null | undefined,
 ): string => {
-  if (reason === 'safety') {
-    const cue = matchedTriageCue?.trim();
-    return cue === undefined || cue.length === 0 ? GENERIC_HALT_COPY : cue;
-  }
   if (reason === 'manual' || reason === 'niggle' || reason === 'pain') {
     return NON_SAFETY_HALT_COPY[reason];
   }
@@ -65,6 +78,11 @@ const formatRunnerHaltReason = (
  *  and negatives. An empty/whitespace draft is ABSENT evidence (null), which
  *  is never coerced to zero. The literal "0" is a valid explicit zero. */
 const LOAD_DRAFT_RE = /^(?:\d+(?:[.,]\d*)?|[.,]\d+)$/;
+/** Android walk (#232): the line under the target for a band-only movement,
+ *  which asks for no kilograms. */
+const BAND_ONLY_NO_LADDER_TEXT = 'No bands named yet. You can name them in Profile > Band ladder.';
+const BAND_ONLY_CHOOSE_TEXT = 'Choose the band you used. No kilograms are needed.';
+
 const parseLoadDraft = (text: string): number | null => {
   const trimmed = text.trim();
   if (trimmed === '') return null;
@@ -73,14 +91,26 @@ const parseLoadDraft = (text: string): number | null => {
   return Number.isFinite(value) && value >= 0 ? value : null;
 };
 
-/** P1-2 (Opus audit): a loggable load must sit on the 2.5 kg rack grid and be
- *  within 0–500 inclusive. Reject — never silently snap — any draft that
- *  would change numerically at commit time. */
-const LOAD_GRID = 2.5;
+/** P1-2: a loggable load must sit on the logging grid and be within 0–500
+ *  inclusive. Reject — never silently snap — any draft that would change
+ *  numerically at commit time.
+ *  The grid is 0.25 kg (issue #233), so 12, 14, 16 and 24 kg dumbbells and
+ *  kettlebells and 1.25 kg change plates can be logged. Load suggestions and
+ *  the ± steppers stay on the 2.5 kg plate grid. */
+const LOAD_GRID = 0.25;
 const LOAD_MAX = 500;
 const isOnLoadGrid = (kg: number): boolean =>
   Number.isFinite(kg) && kg >= 0 && kg <= LOAD_MAX
   && Math.abs(kg / LOAD_GRID - Math.round(kg / LOAD_GRID)) < 1e-9;
+
+/** A load as the field shows it: a load on the grid keeps its quarter
+ *  kilogram (22.75), so a logged load comes back exactly and stays loggable;
+ *  anything else keeps the one decimal it always had. */
+const formatLoadKg = (kg: number): string => {
+  if (!isOnLoadGrid(kg)) return kg.toFixed(1);
+  const hundredths = Math.round(kg * 100);
+  return (hundredths / 100).toFixed(hundredths % 10 === 0 ? 1 : 2);
+};
 
 /** True when the draft holds a loggable value (explicit zero included).
  *  Syntax + grid + range must all pass. */
@@ -93,60 +123,137 @@ const isLoadDraftLoggable = (text: string): boolean => {
  *  audit corrections 3–6). The effective source comes from the pure resolver;
  *  this maps it to reviewed copy. An edited value keeps its source — there is
  *  no fifth "athlete-entered" source. */
+/** Issue #218: the first-time hint names what to aim for at the slot's reps
+ *  and effort: a weight lifted about reps + reps-left times, where reps left
+ *  is what the target effort leaves (effort 8 leaves about 2). Null when the
+ *  slot has no rep target or effort, so the fixed hint stays. */
+const firstTimeAim = (reps: number | null, targetRpe: number | null): string | null => {
+  if (reps === null || !Number.isFinite(reps) || reps < 1 || targetRpe === null || !Number.isFinite(targetRpe)) return null;
+  const left = Math.max(0, Math.round(10 - targetRpe));
+  return left === 0
+    ? `First time on this one — choose a weight you could lift about ${reps} ${reps === 1 ? 'time' : 'times'}.`
+    : `First time on this one — choose a weight you could lift about ${reps + left} times, so you finish ${reps} ${reps === 1 ? 'rep' : 'reps'} with about ${left} left.`;
+};
+
 const loadSourceCopy = (
-  sel: LoadSelection,
+  sel: LoadSelection & Partial<LoadCopyFacts>,
   bodyweightMode: boolean,
   oneRmKg: number | undefined,
   timedTarget: boolean,
+  aim: string | null = null,
+  targetReps: number | null = null,
 ): string => {
+  // Walk W2-4, W5-10 (#131): an eased load (shown lower than the unadjusted
+  // last-logged load) says so and names that load; "last session" is only said
+  // of an earlier session, never of a set logged in this one.
+  const addedLoad = bodyweightMode ? ' added load' : '';
+const formatOptionalLoadKg = (kg: number | null | undefined): string | undefined =>
+  (kg == null ? undefined : formatLoadKg(kg));
+
   if (sel.source === 'manual') {
     switch (sel.advisoryKind) {
-      case 'apre': return `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg — your entry stands.`;
-      case 'onerm': return `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg from your ${oneRmKg?.toFixed(1)} kg 1RM — your entry stands.`;
-      case 'history': return `Coach suggests ${sel.advisoryKg?.toFixed(1)} kg from your last session — your entry stands.`;
+      case 'apre': return `Coach suggests ${formatOptionalLoadKg(sel.advisoryKg)} kg — your entry stands.`;
+      case 'onerm': return `Coach suggests ${formatOptionalLoadKg(sel.advisoryKg)} kg from your ${oneRmKg === undefined ? '' : formatLoadKg(oneRmKg)} kg 1RM — your entry stands.`;
+      case 'history':
+        if (!sel.advisoryFromThisSession && isEasedBelow(sel.advisoryKg, sel.unadjustedHistoryKg)) {
+          return `Coach suggests ${formatOptionalLoadKg(sel.advisoryKg)} kg today · logged ${formatOptionalLoadKg(sel.unadjustedHistoryKg)} kg last session — your entry stands.`;
+        }
+        return sel.advisoryFromThisSession === true
+          ? `Coach suggests ${formatOptionalLoadKg(sel.advisoryKg)} kg from this session — your entry stands.`
+          : `Coach suggests ${formatOptionalLoadKg(sel.advisoryKg)} kg from your last session — your entry stands.`;
       default: return 'Your call. The number you enter is what gets logged.';
     }
   }
   if (sel.source === 'history') {
+    if (!sel.historyFromThisSession && isEasedBelow(sel.initialLoadKg, sel.unadjustedHistoryKg)) {
+      return `Coach suggests ${formatOptionalLoadKg(sel.initialLoadKg)} kg${addedLoad} today · last logged ${formatOptionalLoadKg(sel.unadjustedHistoryKg)} kg${addedLoad}`;
+    }
     return bodyweightMode
-      ? `Last logged ${sel.initialLoadKg?.toFixed(1)} kg added load`
-      : `Last logged ${sel.initialLoadKg?.toFixed(1)} kg`;
+      ? `Last logged ${sel.initialLoadKg == null ? '' : formatLoadKg(sel.initialLoadKg)} kg added load`
+      : `Last logged ${sel.initialLoadKg == null ? '' : formatLoadKg(sel.initialLoadKg)} kg`;
   }
   // seeded
   return bodyweightMode
     ? '0 kg means bodyweight only. Add weight when you need it.'
     : timedTarget
       ? 'First time on this one — choose a load you can control for the full interval.'
-      : 'First time on this one — pick a weight you could lift about ten times.';
+      // Issue #137: with no RPE-based aim, the fallback still names the
+      // prescribed reps instead of a fixed count of ten.
+      : aim ?? (targetReps !== null
+        ? `First time on this one — pick a weight you could lift for all ${targetReps} ${targetReps === 1 ? 'rep' : 'reps'} with plenty left.`
+        : 'First time on this one — pick a weight you could lift for the full set with plenty left.');
 };
 
 /** Derived-source copy must distinguish APRE prescription from 1RM
  *  derivation; the resolver's source alone does not carry that. */
 const loadCopyFor = (
-  sel: LoadSelection,
+  sel: LoadSelection & Partial<LoadCopyFacts>,
   bodyweightMode: boolean,
   oneRmKg: number | undefined,
   apreOverrideKg: number | null,
   timedTarget: boolean,
+  aim: string | null = null,
+  targetReps: number | null = null,
+  carriedSlotLoadKg: number | null = null,
 ): string => {
   if (sel.source === 'derived') {
     const hasValidApre = apreOverrideKg !== null
       && Number.isFinite(apreOverrideKg)
       && apreOverrideKg >= 0;
-    return hasValidApre
-      ? bodyweightMode
-        ? `Prescribed ${apreOverrideKg.toFixed(1)} kg added load`
-        : `Prescribed ${apreOverrideKg.toFixed(1)} kg`
-      : `Based on your ${oneRmKg?.toFixed(1)} kg 1RM`;
+    if (hasValidApre) {
+      return bodyweightMode
+        ? `Prescribed ${formatLoadKg(apreOverrideKg)} kg added load`
+        : `Prescribed ${formatLoadKg(apreOverrideKg)} kg`;
+    }
+    if (carriedSlotLoadKg !== null && sel.initialLoadKg !== null && Number.isFinite(sel.initialLoadKg)) {
+      return `Coach suggests ${formatLoadKg(sel.initialLoadKg)} kg · Based on your ${oneRmKg === undefined ? '' : formatLoadKg(oneRmKg)} kg 1RM`;
+    }
+    return `Based on your ${oneRmKg === undefined ? '' : formatLoadKg(oneRmKg)} kg 1RM`;
   }
-  return loadSourceCopy(sel, bodyweightMode, oneRmKg, timedTarget);
+  return loadSourceCopy(sel, bodyweightMode, oneRmKg, timedTarget, aim, targetReps);
 };
 
-// Local rest when no runner owns the timer: the runner's RPE bands. Training
-// tier does not change rest (2026-09-15 tier-neutral rest ruling).
-const restSecondsFor = (rpe: number): number => {
-  const base = rpe >= 9 ? 240 : rpe >= 8 ? 180 : rpe >= 7 ? 120 : 90;
+/** One plain line when a rated set went above the athlete's effort ceiling
+ *  (issue #206): a statement of fact and the reps to leave next time. It
+ *  changes nothing: logging, the next-set target and next-session easing are
+ *  untouched. Reps left is the whole number that keeps the set at or under
+ *  the ceiling (8.5 → 2, 7.0 → 3). A timed set has no reps and is rated by
+ *  direct effort, so it gets only the first sentence (owner ruling, #206).
+ *  When today's discomfort report set a lower effort cap than the profile
+ *  ceiling, that lower cap decides both when the note shows and the reps left,
+ *  and the note calls it "today's ceiling" (owner ruling, #206). */
+export const aboveCeilingNote = (
+  rpe: number | null,
+  profileCeiling: number,
+  reportCap: number | null = null,
+  isTimed = false,
+): string | null => {
+  const todayCapLower = reportCap !== null && Number.isFinite(reportCap) && reportCap < profileCeiling;
+  const ceiling = todayCapLower ? reportCap : profileCeiling;
+  if (rpe === null || !Number.isFinite(rpe) || !Number.isFinite(ceiling) || rpe <= ceiling) return null;
+  const which = todayCapLower ? "today's ceiling" : 'your ceiling';
+  if (isTimed) {
+    return `That was above ${which} of ${ceiling.toFixed(1)}.`;
+  }
+  const repsLeft = Math.max(1, Math.ceil(10 - ceiling));
+  return `That was above ${which} of ${ceiling.toFixed(1)}. Next set, stop with ${repsLeft} ${repsLeft === 1 ? 'rep' : 'reps'} left.`;
+};
+
+// Local rest when no runner owns the timer: the runner's rule. Training tier
+// does not change rest (2026-09-15 tier-neutral rest ruling); a bodyweight set
+// (0 kg on a bodyweight movement) rests 60 s below RPE 8 and 90 s at 8 or
+// above (issue #209, by load, never by tier).
+const restSecondsFor = (rpe: number, bodyweightSet = false): number => {
+  const base = bodyweightSet
+    ? (rpe >= 8 ? 90 : 60)
+    : rpe >= 9 ? 240 : rpe >= 8 ? 180 : rpe >= 7 ? 120 : 90;
   return clamp(Math.round(base / 15) * 15, 45, 300);
+};
+
+/** Rest as the athlete reads it: minutes and seconds ("3:00", "0:45"). */
+const minutesSeconds = (totalSeconds: number): string => {
+  const value = Math.max(0, Math.round(totalSeconds));
+  return `${Math.floor(value / 60)}:${String(value % 60).padStart(2, '0')}`;
 };
 
 const targetFor = (slot: PlanSlot): SlotTarget => {
@@ -161,6 +268,26 @@ const targetText = (slot: PlanSlot): string => {
   return target.kind === 'time' ? `${slot.plannedSets} × ${secondsText(target.seconds)}` : `${slot.plannedSets} × ${target.reps}`;
 };
 
+/** Android walk (#203): rep-based sets ask "how many more clean reps", so the
+ *  target says reps left first, with RPE kept as support. Reps left is the
+ *  inverse of the RIR answer mapping (mapRirToRpe: 3 → 7, 2 → 8, 4+ → 6); a
+ *  half-point target falls between two answers and is shown as a range.
+ *  Timed work asks for RPE directly and keeps the RPE target only. Display
+ *  only: the target itself is unchanged. */
+const targetEffortText = (slot: PlanSlot): string => {
+  const rpe = slot.targetRpe;
+  if (rpe === null || !Number.isFinite(rpe)) return '';
+  if (targetFor(slot).kind === 'time') return ` · RPE ${rpe.toFixed(1)}`;
+  const left = 10 - rpe;
+  const lo = Math.floor(left);
+  const hi = Math.ceil(left);
+  const repsLeft = left >= 4 ? 'at least 4 reps left'
+    : left <= 0 ? 'no reps left'
+      : lo !== hi ? `about ${lo}–${hi} reps left`
+        : lo === 1 ? 'about 1 rep left' : `about ${lo} reps left`;
+  return ` · ${repsLeft} (RPE ${rpe.toFixed(1)})`;
+};
+
 const lines = (text: string | null | undefined, max: number): string[] => {
   if (text === null || text === undefined || text.trim().length === 0) return [];
   const split = text.split(/\r?\n|•/g).map((x) => x.replace(/^[-–—\s]+/, '').trim()).filter(Boolean);
@@ -170,17 +297,97 @@ const lines = (text: string | null | undefined, max: number): string[] => {
 const sameSlot = (logged: { session_plan_slot_id: number | null; movement_id: number }, slot: PlanSlot): boolean =>
   logged.session_plan_slot_id != null ? logged.session_plan_slot_id === slot.sessionPlanSlotId : logged.movement_id === slot.movementId;
 
-const formatFinalizedDate = (ms: number): string => {
-  const date = new Date(ms);
-  const weekdays = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-  const day = date.getDate();
-  const dayName = weekdays[date.getDay()];
-  const monthName = months[date.getMonth()];
-  // R3: the year is included so a prior-year completion cannot read as recent.
-  const year = date.getFullYear();
-  return `${dayName} ${day} ${monthName} ${year}`;
-};
+// R3: the year is included so a prior-year completion cannot read as recent.
+const formatFinalizedDate = (ms: number): string => formatAthleteDate(ms);
+
+/** Limits a corrected set must meet: the same reps range and load grid the
+ *  Log set path applies (logCurrent, isOnLoadGrid). A correction never snaps a value. */
+const canSaveCorrection = (reps: number, loadKg: number): boolean =>
+  Number.isInteger(reps) && reps >= 1 && reps <= 50 && isOnLoadGrid(loadKg);
+
+/** Correct the reps and load of the last logged set of the current exercise.
+ *  The load is typed on the same grid, with the same sentence, as the Log set
+ *  field. A band-only movement has no load (Log set logs 0 kg), so it gets reps only.
+ *  Effort is kept as logged: it feeds the rest timer the runner already started (#142). */
+function CorrectLastSet({
+  set,
+  bandOnly,
+  onSave,
+}: {
+  set: LoggedSet;
+  bandOnly: boolean;
+  onSave: (setId: number, reps: number, loadKg: number, rpe: number | null) => void;
+}): React.JSX.Element {
+  const [open, setOpen] = useState(false);
+  const [reps, setReps] = useState(set.reps);
+  const [loadText, setLoadText] = useState(formatLoadKg(set.load_kg));
+  const parsedLoad = bandOnly ? 0 : parseLoadDraft(loadText);
+  const loadOk = parsedLoad !== null && isOnLoadGrid(parsedLoad);
+  const valid = canSaveCorrection(reps, parsedLoad ?? -1) && (bandOnly || loadOk);
+  return (
+    <View style={styles.correctionBlock}>
+      <Text style={styles.correctionText}>{`Set ${set.set_index} logged: ${set.reps} reps${bandOnly ? '' : ` at ${formatLoadKg(set.load_kg)} kg`}`}</Text>
+      {!open ? (
+        <QuietAction
+          label={`Correct set ${set.set_index}`}
+          accessibilityLabel={`Correct set ${set.set_index}`}
+          onPress={() => {
+            setReps(set.reps);
+            setLoadText(formatLoadKg(set.load_kg));
+            setOpen(true);
+          }}
+        />
+      ) : (
+        <View style={{ gap: theme.space[3] }}>
+          <Stepper
+            testID="correction-reps-stepper"
+            label="Corrected reps"
+            value={String(reps)}
+            onDecrement={() => setReps((n) => clamp(n - 1, 1, 50))}
+            onIncrement={() => setReps((n) => clamp(n + 1, 1, 50))}
+          />
+          {!bandOnly && (
+            <View style={{ gap: theme.space[2] }}>
+              <Text style={styles.loadFieldLabel}>CORRECTED LOAD (KG)</Text>
+              <TextInput
+                disableFullscreenUI
+                testID="correction-load-input"
+                style={styles.loadInput}
+                value={loadText}
+                onChangeText={setLoadText}
+                keyboardType="numeric"
+                placeholder="—"
+                placeholderTextColor={theme.color.textLow}
+                maxLength={6}
+                accessibilityLabel="Corrected load in kilograms"
+              />
+              {!loadOk && loadText.trim() !== '' && (
+                <Text style={styles.loadEvidence} testID="correction-load-validation" accessibilityRole="alert">
+                  Enter a load from 0 to 500 in 0.25 kg steps.
+                </Text>
+              )}
+            </View>
+          )}
+          <PrimaryButton
+            label="Save correction"
+            accessibilityLabel="Save correction"
+            disabled={!valid}
+            onPress={() => {
+              if (!valid) return;
+              onSave(set.set_id, reps, bandOnly ? 0 : parsedLoad as number, set.rpe);
+              setOpen(false);
+            }}
+          />
+          <QuietAction
+            label="Cancel"
+            accessibilityLabel="Cancel correction"
+            onPress={() => setOpen(false)}
+          />
+        </View>
+      )}
+    </View>
+  );
+}
 
 function CompletedMetrics({
   sets,
@@ -194,9 +401,12 @@ function CompletedMetrics({
   onEdit: (setId: number, reps: number, loadKg: number, rpe: number | null, metrics?: SetMetricPatch) => void;
 }): React.JSX.Element | null {
   const [open, setOpen] = useState(false);
-  const metricSets = sets.filter((set) => set.timeS !== null || set.bandLevel !== null || (
-    bandLadder.length > 0 && movementsById.get(set.movement_id)?.supportedPrefixes?.includes('Banded') === true
-  ));
+  const metricSets = sets
+    .filter((set) => set.timeS !== null || set.bandLevel !== null || (
+      bandLadder.length > 0 && movementsById.get(set.movement_id)?.supportedPrefixes?.includes('Banded') === true
+    ))
+    .slice()
+    .sort((a, b) => a.set_index - b.set_index || a.set_id - b.set_id);
   if (metricSets.length === 0) return null;
 
   return (
@@ -280,6 +490,8 @@ export interface SessionScreenProps {
    * renders standalone in component tests.
    */
   onReturnToToday?: () => void;
+  /** Shell-supplied: open the PLAN tab when starting an empty unplanned session is blocked. */
+  onOpenPlan?: () => void;
 }
 
 /**
@@ -287,8 +499,42 @@ export interface SessionScreenProps {
  * completion screen shown after a session ends (its saved outcome, the
  * summary of what was done, and the optional record of how it went).
  */
-export default function SessionScreen({ onReturnToToday }: SessionScreenProps = {}): React.JSX.Element {
+// Walk 2 (W2-13): a load typed but not yet logged was lost when the athlete
+// left the workout (the screen unmounts) and came back. Unlogged drafts are
+// kept here, in memory only, by session, slot, set and movement. They are
+// never logged evidence and never feed a suggestion.
+// Review (PR 194): each athlete has its own database, so session and slot
+// ids repeat between athletes; the athlete is part of the key. A draft is
+// kept only for the athlete and session in hand, and only for sets not yet
+// logged, so the map cannot grow with drafts nothing will read again.
+const unloggedLoadDrafts = new Map<string, string>();
+const loadDraftScope = (athleteId: string | null, sessionId: number | undefined, startedAtMs: number | undefined): string =>
+  `${athleteId ?? 'none'}:${sessionId ?? 'none'}:${startedAtMs ?? 'none'}:`;
+const loadDraftKey = (athleteId: string | null, sessionId: number | undefined, startedAtMs: number | undefined, slotId: number, logged: number, movementId: number | undefined): string =>
+  `${loadDraftScope(athleteId, sessionId, startedAtMs)}${slotId}:${logged}:${movementId ?? 'none'}`;
+const pruneLoadDrafts = (athleteId: string | null, sessionId: number | undefined, startedAtMs: number | undefined, slotId: number, logged: number): void => {
+  const scope = loadDraftScope(athleteId, sessionId, startedAtMs);
+  for (const key of [...unloggedLoadDrafts.keys()]) {
+    if (!key.startsWith(scope)) { unloggedLoadDrafts.delete(key); continue; }
+    const [slot, setsLogged] = key.slice(scope.length).split(':');
+    if (Number(slot) === slotId && Number(setsLogged) < logged) unloggedLoadDrafts.delete(key);
+  }
+};
+export const clearUnloggedLoadDraftsForTests = (): void => { unloggedLoadDrafts.clear(); };
+export const unloggedLoadDraftCountForTests = (): number => unloggedLoadDrafts.size;
+
+export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionScreenProps = {}): React.JSX.Element {
+  // Large text (issue 158): the two workout buttons stack so their words do not break.
+  const { fontScale } = useWindowDimensions();
+  const stackQuickRow = fontScale >= 1.3;
   const state = useStore((s) => s);
+  const nav = typeof useNavigation === 'function' ? useNavigation() : undefined;
+  const [emptyStartPromptOpen, setEmptyStartPromptOpen] = useState(false);
+  const checkFreeFormStartIsEmpty = (): boolean => {
+    if (typeof state.freeFormStartIsEmpty === 'function') return state.freeFormStartIsEmpty();
+    if (typeof freeFormStartIsEmpty === 'function') return freeFormStartIsEmpty();
+    return false;
+  };
   const {
     movements, session, sessionPlan, activeSessionPlanSlotId, profile, oneRepMaxes,
     lastTriage, substitution, startSession, selectMovementSlot, setMovementPreference,
@@ -297,6 +543,9 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
     advanceRunnerRest, skipRunnerRest, setRunnerRestOverride, runnerThumbsDown, runnerHalt, lastEndedSessionId,
     loadSessionOutcome, dismissOutcome,
   } = state;
+  // OW-001: the athlete's declared implement per movement. Component tests
+  // drive this screen with partial store states, so absent reads as none.
+  const loadIntents = state.loadIntents;
   // Preparation (065). Component tests drive this screen with partial store
   // states, so an absent field reads as "no preparation recorded".
   const preparation = state.preparation ?? null;
@@ -342,21 +591,47 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [safetyOpen, setSafetyOpen] = useState(false);
   const [niggleRegion, setNiggleRegion] = useState<string | null>(null);
-  const [niggleSeverity, setNiggleSeverity] = useState(4);
+  // #183: no severity is preselected; a report is saved only once the
+  // athlete has chosen one.
+  const [niggleSeverity, setNiggleSeverity] = useState<number | null>(null);
+  const [niggleSavedNotice, setNiggleSavedNotice] = useState(false);
   const [bandLevel, setBandLevel] = useState<number | null>(null);
+  // The runner stops on the tier it started with; fall back to the profile before it starts.
+  const haltMin = EXPERIENCE_SEVERITY[runnerTierForTrainingAge(state.runner?.tier ?? profile.training_age)].haltMin;
   const advancedRest = useRef<string | null>(null);
+  // "Choose an alternative" renders below the next exercise, often off-screen
+  // (Android walk 2026-11-03, ux-4). Scroll to it once per opening.
+  const timelineRef = useRef<ScrollView | null>(null);
+  const scrolledToSubstitutionFor = useRef<number | null>(null);
+  useEffect(() => {
+    if (substitution === null) scrolledToSubstitutionFor.current = null;
+  }, [substitution]);
 
   // Session feel (070): the sub-view that records how the ended session went.
   const [feelOpen, setFeelOpen] = useState(false);
   const [feelRevision, setFeelRevision] = useState(0);
   useEffect(() => { setFeelOpen(false); }, [lastEndedSessionId]);
+  // Issue #180, S5: "Something feels off" on the completion screen. The same form
+  // as the Plan screen; with no readiness vector it shows the Plan screen's gate.
+  const [reportOpen, setReportOpen] = useState(false);
+  useEffect(() => { setReportOpen(false); }, [lastEndedSessionId]);
+  const vector = state.vector ?? null;
 
-  const hasSubView = feelOpen || detailsOpen || safetyOpen || niggleRegion !== null || substitution !== null;
+  type PendingSubstitution =
+    | { kind: 'regression'; option: NonNullable<typeof substitution>['result']['layer1Regression']['options'][number] }
+    | { kind: 'daySwap'; option: NonNullable<typeof substitution>['result']['layer2DaySwap']['options'][number] };
+  const [pendingSub, setPendingSub] = useState<PendingSubstitution | null>(null);
+  const [pendingSubSets, setPendingSubSets] = useState<number>(1);
+  useEffect(() => { setPendingSub(null); }, [substitution]);
+
+  const hasSubView = feelOpen || reportOpen || detailsOpen || safetyOpen || niggleRegion !== null || substitution !== null;
   useSubViewBack(hasSubView, () => {
-    if (feelOpen) setFeelOpen(false);
+    if (reportOpen) setReportOpen(false);
+    else if (feelOpen) setFeelOpen(false);
     else if (detailsOpen) setDetailsOpen(false);
     else if (safetyOpen) setSafetyOpen(false);
     else if (niggleRegion !== null) setNiggleRegion(null);
+    else if (pendingSub !== null) setPendingSub(null);
     else if (substitution !== null) closeSubstitution();
   });
 
@@ -384,7 +659,10 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
     try {
       const facts = loadSessionSummaryFacts(lastEndedSessionId);
       return buildSessionSummary({
-        exercises: facts.exercises,
+        // Issue #218: a dumbbell exercise's loads are stated per dumbbell.
+        exercises: markPerDumbbell(facts.exercises, movements, loadIntents),
+        skippedExercises: facts.skippedExercises ?? [],
+        reports: facts.reports ?? [],
         previousSets: facts.previousSets,
         durationMin: facts.durationMin,
         blockSessions: summaryBlockSessions,
@@ -395,7 +673,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
       // read stay unknown — the status line above is already persisted truth.
       return null;
     }
-  }, [lastEndedSessionId, loadSessionSummaryFacts, summaryBlockSessions, summaryToday]);
+  }, [lastEndedSessionId, loadSessionSummaryFacts, summaryBlockSessions, summaryToday, movements, loadIntents]);
 
   // Session feel (070): whether to ask how the ended session went, and what is
   // already saved. Component tests drive this screen with partial store states,
@@ -421,19 +699,93 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
 
   const byId = useMemo(() => new Map(movements.map((m) => [m.movement_id, m])), [movements]);
   const loggedCount = (slot: PlanSlot): number => session?.sets.filter((set) => sameSlot(set, slot)).length ?? 0;
+  // Walk 2 (W2-1): a swap rewrites the slot's movement. The skipped line
+  // names the PLANNED movement, and sets of anything else are "logged as".
+  const plannedMovementId = (slot: PlanSlot): number => slot.originalMovementId ?? slot.movementId;
+  // Review (PR 194): the "logged as"/"includes" names are the movements other
+  // than the one the row is titled with. A finished row is titled with the
+  // current movement; a skipped row and the completion card with the planned
+  // one, so after a swap no row repeats its own name.
+  const loggedAsNames = (slot: PlanSlot, baseMovementId: number = plannedMovementId(slot)): string[] => {
+    const names: string[] = [];
+    for (const set of session?.sets.filter((set) => sameSlot(set, slot)) ?? []) {
+      if (set.movement_id === baseMovementId) continue;
+      const name = byId.get(set.movement_id)?.name ?? 'Movement';
+      if (!names.includes(name)) names.push(name);
+    }
+    return names;
+  };
   const runnerCurrent = runner?.slots?.[runner.slotIndex ?? -1];
   const runnerCurrentId = runnerCurrent?.sessionPlanSlotId ?? null;
-  const selected = activeSessionPlanSlotId === null ? null : sessionPlan.find((slot) => slot.sessionPlanSlotId === activeSessionPlanSlotId) ?? null;
-  const firstIncomplete = sessionPlan.find((slot) => loggedCount(slot) < slot.plannedSets) ?? null;
+  const selectedCandidate = activeSessionPlanSlotId === null ? null : sessionPlan.find((slot) => slot.sessionPlanSlotId === activeSessionPlanSlotId) ?? null;
+  const selected = selectedCandidate !== null && selectedCandidate.replacedBySessionPlanSlotId == null ? selectedCandidate : null;
+  const firstIncomplete = sessionPlan.find((slot) => slot.replacedBySessionPlanSlotId == null && loggedCount(slot) < slot.plannedSets) ?? null;
   const fallback = selected !== null && loggedCount(selected) < selected.plannedSets ? selected : firstIncomplete;
   const currentSlot = runnerCurrentId !== null ? sessionPlan.find((slot) => slot.sessionPlanSlotId === runnerCurrentId) ?? fallback : fallback;
   const currentMovement: Movement | null = currentSlot === null ? null : byId.get(runnerCurrent?.movementId ?? currentSlot.movementId) ?? byId.get(currentSlot.movementId) ?? null;
   const currentLogged = currentSlot === null ? 0 : (runner !== null && (runner.slotIndex ?? -1) >= 0 && runner.slotSetCounts?.[runner.slotIndex] != null ? Math.max(loggedCount(currentSlot), runner.slotSetCounts[runner.slotIndex]) : loggedCount(currentSlot));
+
+
+  const subTargetSlot = substitution === null
+    ? null
+    : (currentSlot !== null && currentSlot.movementId === substitution.targetId
+        ? currentSlot
+        : sessionPlan.find((slot) => slot.movementId === substitution.targetId && slot.replacedBySessionPlanSlotId == null) ?? currentSlot);
+  const subTargetLogged = subTargetSlot === null
+    ? 0
+    : subTargetSlot.sessionPlanSlotId === currentSlot?.sessionPlanSlotId
+      ? currentLogged
+      : loggedCount(subTargetSlot);
+  const subTargetMovementName = (subTargetSlot !== null ? byId.get(subTargetSlot.movementId)?.name : undefined)
+    ?? (substitution !== null ? byId.get(substitution.targetId)?.name : undefined)
+    ?? 'Movement';
   const allDone = sessionPlan.length > 0 && sessionPlan.every((slot) => loggedCount(slot) >= slot.plannedSets);
   const triageHalted = lastTriage?.kind === 'matched' && lastTriage.directive.halt;
   const runnerComplete = runnerPhase === 'complete';
   const halted = runnerPhase === 'halted' || (!runnerComplete && triageHalted);
   const complete = !halted && sessionPlan.length > 0 && (runnerComplete || allDone);
+
+  // Android walk 2026-11-03 (W6-4): after Log set, or when preparation ends, the
+  // workout scroll position stayed where it was, so the current card and its rest
+  // timer could sit off-screen. When the scroll key changes, one scroll is
+  // scheduled for after the next frame. It measures the current row fresh, so no
+  // stored position can be stale. Nothing scrolls when the session is halted or
+  // complete, while preparation is open, or when the current row is not on screen.
+  const scrollPreparationOpen = preparation !== null && preparation.sessionId === session?.sessionId
+    && !isTerminalPreparationStatus(preparation.status);
+  const currentRowRef = useRef<View | null>(null);
+  const scrollState = useRef({ halted, complete, preparationOpen: scrollPreparationOpen });
+  useEffect(() => {
+    scrollState.current = { halted, complete, preparationOpen: scrollPreparationOpen };
+  });
+  const currentSlotId = currentSlot?.sessionPlanSlotId ?? null;
+  const scrollKey = `${scrollPreparationOpen}|${runnerPhase}|${currentLogged}|${currentSlotId}`;
+  const lastScrollKey = useRef<string | null>(null);
+  useEffect(() => {
+    if (lastScrollKey.current === null) {
+      lastScrollKey.current = scrollKey;
+      return undefined;
+    }
+    if (lastScrollKey.current === scrollKey) return undefined;
+    lastScrollKey.current = scrollKey;
+    const frame = requestAnimationFrame(() => {
+      const now = scrollState.current;
+      const row = currentRowRef.current;
+      const scroller = timelineRef.current;
+      if (now.halted || now.complete || now.preparationOpen || row === null || scroller === null) return;
+      // The content view is a host ref, which Fabric's measureLayout requires (a node
+      // handle number is refused on the new architecture). Its y is content-relative.
+      // getInnerViewRef is on the runtime ScrollView (ScrollView.js) but not in the public typings.
+      const content = (scroller as ScrollView & { getInnerViewRef?: () => HostInstance | null }).getInnerViewRef?.() ?? null;
+      if (content === null) return;
+      row.measureLayout(
+        content,
+        (_x, y) => { scroller.scrollTo({ y: Math.max(0, y - theme.space[4]), animated: true }); },
+        () => undefined,
+      );
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [scrollKey]);
   const target = currentSlot === null ? null : targetFor(currentSlot);
   const oneRm = currentSlot === null ? undefined : oneRepMaxes[currentSlot.movementId];
   // P2-2 (Opus audit): bodyweightMode is true ONLY when the canonical first
@@ -442,33 +794,72 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
   // external-load safety behavior (blank first exposure, disabled LOG SET).
   const primaryImplement = currentMovement?.supportedPrefixes[0];
   const bodyweightMode = primaryImplement === 'Bodyweight';
-  const loadLabel = bodyweightMode ? 'Added kg (0 = bodyweight)' : 'Load kg';
+  // Issue #218: a dumbbell load is per dumbbell and is logged as typed;
+  // nothing multiplies it. The declared implement, or a sole DB, decides;
+  // the first of several listed implements is only dropdown order.
+  const dumbbellMode = isDumbbellLoad(currentMovement ?? undefined, loadIntents);
+  const loadLabel = bodyweightMode ? 'Added kg (0 = bodyweight)' : dumbbellMode ? 'Load kg per dumbbell' : 'Load kg';
   // P2-4 (Opus audit): one stable target-RPE value for load resolution —
   // the slot target when present, a fixed fallback when absent. Used by both
   // the display resolver call and the one-time draft initializer so they
   // never diverge. Mutable Actual RPE is completion evidence and must not
   // recalculate source/advisory copy or rewrite load draft state.
   const stableTargetRpe = currentSlot?.targetRpe ?? 8;
-  const loadSelection: LoadSelection | null = currentSlot === null || target === null
+  // #131: copy facts (eased today, this-session history) ride along with the
+  // resolver's selection; they never change the load itself.
+  const loadSelection: (LoadSelection & Partial<LoadCopyFacts>) | null = currentSlot === null || target === null
     ? null
-    : state.resolveSlotLoad({
-        movementId: currentSlot.movementId,
-        bodyweightMode,
-        targetReps: target.kind === 'reps' ? target.reps : null,
-        targetRpe: stableTargetRpe,
-        overrideLoadKg: currentSlot.overrideLoadKg,
-        sessionPlanSlotId: currentSlot.sessionPlanSlotId,
-      });
-  const loadEvidence = loadSelection === null
-    ? ''
+    : {
+        ...state.resolveSlotLoad({
+          movementId: currentSlot.movementId,
+          bodyweightMode,
+          targetReps: target.kind === 'reps' ? target.reps : null,
+          targetRpe: stableTargetRpe,
+          overrideLoadKg: currentSlot.overrideLoadKg,
+          sessionPlanSlotId: currentSlot.sessionPlanSlotId,
+        }),
+        ...(typeof state.slotLoadCopyFacts === 'function'
+          ? state.slotLoadCopyFacts({ movementId: currentSlot.movementId })
+          : {}),
+      };
+  // Android walk (#231): within the same slot, after a set has been logged in
+  // this session, start the next set's field at the load of the previous set
+  // while keeping today's coach suggestion visible next to it.
+  const latestSlotSet = currentSlot === null
+    ? null
+    : (session?.sets.filter((set) => sameSlot(set, currentSlot)) ?? [])
+        .reduce<LoggedSet | null>(
+          (latest, candidate) => latest === null
+            || candidate.set_index > latest.set_index
+            || (candidate.set_index === latest.set_index && candidate.set_id > latest.set_id)
+            ? candidate
+            : latest,
+          null,
+        );
+  const previousSlotLoadKg = latestSlotSet !== null
+    && Number.isFinite(latestSlotSet.load_kg)
+    && latestSlotSet.load_kg >= 0
+    ? latestSlotSet.load_kg
+    : null;
+  // Android walk (#232): a movement whose only implement is a band (Band Row,
+  // Band Pull-Apart) has no kilograms to enter. The set records reps, effort
+  // and, when bands are named, the band; its load is 0. Movements that take
+  // a load as well as a band keep the load field.
+  const bandOnly = currentMovement?.supportedPrefixes?.length === 1 && primaryImplement === 'Banded';
+  const loadEvidence = bandOnly
+    ? (bandLadder.length > 0 ? BAND_ONLY_CHOOSE_TEXT : BAND_ONLY_NO_LADDER_TEXT)
+    : loadSelection === null ? ''
     : loadCopyFor(
         loadSelection,
         bodyweightMode,
         oneRm,
         currentSlot?.overrideLoadKg ?? null,
         target?.kind === 'time',
+        firstTimeAim(target?.kind === 'reps' ? target.reps : null, currentSlot?.targetRpe ?? null),
+        target?.kind === 'reps' ? target.reps : null,
+        previousSlotLoadKg,
       );
-  const loadLoggable = isLoadDraftLoggable(loadText) && !loadInvalid;
+  const loadLoggable = bandOnly || (isLoadDraftLoggable(loadText) && !loadInvalid);
 
   const safeRpe: number | null = selectedChoice !== null
     ? mapRirToRpe(selectedChoice)
@@ -476,20 +867,27 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
       ? clamp(Math.round(directRpe * 2) / 2, 5, 10)
       : null;
 
+  // "4+" is only a lower bound on reps left (6.0 or easier) and the easiest
+  // chip on the bar, so a "stop with N reps left" note could be false and no
+  // other chip could satisfy it: no note for it (owner ruling, #206). It still
+  // logs 6.0, and next-session easing is unchanged.
+  // Today's discomfort report cap: the operative (non-halt) report's effort
+  // cap. A halt zeroes the vector and ends the session, so it is not a cap.
+  const reportCap = lastTriage?.kind === 'matched' && !lastTriage.directive.halt
+    ? lastTriage.directive.vector.rpe_cap
+    : null;
+  const ceilingNote = selectedChoice === '4+'
+    ? null
+    : aboveCeilingNote(safeRpe, effectiveRpeCeiling(profile), reportCap, target?.kind === 'time');
+
   const runnerResting = runnerPhase === 'resting';
   const rest = runnerResting ? {
     seconds: runner?.restSecondsTarget ?? restSecondsFor(safeRpe ?? currentSlot?.targetRpe ?? 8),
     startedAtMs: runner?.restStartedAtMs ?? nowMs,
     slotId: currentSlot?.sessionPlanSlotId ?? -1,
   } : localRest;
-  const restRemaining = rest === null ? 0 : Math.max(0, rest.seconds - Math.floor((nowMs - rest.startedAtMs) / 1000));
+  const restRemaining = rest === null ? 0 : Math.max(0, rest.seconds - Math.floor((Date.now() - rest.startedAtMs) / 1000));
   const resting = rest !== null && !halted && !complete;
-
-  useEffect(() => {
-    if (!resting) return undefined;
-    const id = setInterval(() => setNowMs(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, [resting]);
 
   const runnerSetIndex = runner?.setIndex ?? 1;
   const runnerSlotCompleted = runner?.slotSetCounts?.[runner?.slotIndex ?? 0] ?? 0;
@@ -509,7 +907,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
 
   useEffect(() => {
     if (currentSlot === null || target === null) return;
-    setDetailsOpen(false); setSafetyOpen(false); setNiggleRegion(null); setNiggleSeverity(4); setBandLevel(null);
+    setDetailsOpen(false); setSafetyOpen(false); setNiggleRegion(null); setNiggleSeverity(null); setNiggleSavedNotice(false); setBandLevel(null);
     setReps(target.kind === 'reps' ? target.reps : 1);
     setSeconds(target.kind === 'time' ? target.seconds : 30);
     // Initialize the load draft ONCE per set key from the resolver output.
@@ -525,22 +923,28 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
       overrideLoadKg: currentSlot.overrideLoadKg,
       sessionPlanSlotId: currentSlot.sessionPlanSlotId,
     });
-    const initial = seed.initialLoadKg;
-    // The record holds the number the field showed (one decimal), not the
+    const initial = previousSlotLoadKg ?? seed.initialLoadKg;
+    // The record holds the number the field showed (one decimal, two for a
+    // quarter kilogram), not the
     // resolver's unrounded value; null stays null (a blank field).
     loadShownRef.current = {
       slotId: currentSlot.sessionPlanSlotId,
       logged: currentLogged,
       seed: {
         source: seed.source,
-        shownLoadKg: initial === null ? null : Number(initial.toFixed(1)),
+        shownLoadKg: initial === null ? null : Number(formatLoadKg(initial)),
         advisoryKg: seed.advisoryKg,
         advisoryKind: seed.advisoryKind,
       },
     };
-    setLoadText(initial === null ? '' : initial.toFixed(1));
+    pruneLoadDrafts(state.activeAthleteId, session?.sessionId, session?.startedAtMs, currentSlot.sessionPlanSlotId, currentLogged);
+    const draft = unloggedLoadDrafts.get(loadDraftKey(state.activeAthleteId, session?.sessionId, session?.startedAtMs, currentSlot.sessionPlanSlotId, currentLogged, currentMovement?.movement_id));
+    setLoadText(draft ?? (initial === null ? '' : formatLoadKg(initial)));
     setLoadInvalid(false);
   }, [
+    state.activeAthleteId,
+    session?.sessionId,
+    session?.startedAtMs,
     currentSlot?.sessionPlanSlotId,
     currentLogged,
     currentMovement?.movement_id,
@@ -548,6 +952,55 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
     target?.kind === 'reps' ? target.reps : target?.seconds,
     currentSlot?.overrideLoadKg,
   ]);
+
+  // The last logged set of the current exercise, the only one a correction can
+  // change. Not offered for a time target, in a halted session, or for another exercise.
+  const correctableSet = currentSlot === null || session === null || halted || target?.kind === 'time'
+    ? null
+    : session.sets
+      .filter((set) => sameSlot(set, currentSlot))
+      .reduce<LoggedSet | null>((best, set) => (best === null || set.set_id > best.set_id ? set : best), null);
+  // A corrected load is what the next set starts from, unless the athlete has
+  // already typed a load for that set. Re-seed only on a correction of the same
+  // set (a new logged set is seeded by the effect above).
+  const lastCorrection = useRef<{ setId: number; loadKg: number } | null>(null);
+  useEffect(() => {
+    const seen = lastCorrection.current;
+    lastCorrection.current = correctableSet === null ? null : { setId: correctableSet.set_id, loadKg: correctableSet.load_kg };
+    if (seen === null || correctableSet === null || seen.setId !== correctableSet.set_id || seen.loadKg === correctableSet.load_kg) return;
+    if (currentSlot === null || target === null || bandOnly) return;
+    const typed = unloggedLoadDrafts.get(loadDraftKey(state.activeAthleteId, session?.sessionId, session?.startedAtMs, currentSlot.sessionPlanSlotId, currentLogged, currentMovement?.movement_id));
+    if (typed !== undefined) return;
+    const seed = state.resolveSlotLoad({
+      movementId: currentSlot.movementId,
+      bodyweightMode,
+      targetReps: target.kind === 'reps' ? target.reps : null,
+      targetRpe: stableTargetRpe,
+      overrideLoadKg: currentSlot.overrideLoadKg,
+      sessionPlanSlotId: currentSlot.sessionPlanSlotId,
+    });
+    const initial = seed.initialLoadKg;
+    loadShownRef.current = {
+      slotId: currentSlot.sessionPlanSlotId,
+      logged: currentLogged,
+      seed: {
+        source: seed.source,
+        shownLoadKg: initial === null ? null : Number(formatLoadKg(initial)),
+        advisoryKg: seed.advisoryKg,
+        advisoryKind: seed.advisoryKind,
+      },
+    };
+    setLoadText(initial === null ? '' : formatLoadKg(initial));
+    setLoadInvalid(false);
+  }, [correctableSet?.set_id, correctableSet?.load_kg]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The athlete's own edits of the load field, remembered until the set is logged.
+  const editLoadText = (text: string): void => {
+    setLoadText(text);
+    if (currentSlot !== null) {
+      unloggedLoadDrafts.set(loadDraftKey(state.activeAthleteId, session?.sessionId, session?.startedAtMs, currentSlot.sessionPlanSlotId, currentLogged, currentMovement?.movement_id), text);
+    }
+  };
 
   const moveLegacyForward = (): void => {
     if (currentSlot === null) return;
@@ -558,13 +1011,18 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
     if (next !== null) selectMovementSlot(next.sessionPlanSlotId);
   };
 
-  useEffect(() => {
-    if (!resting || restRemaining !== 0 || rest === null) return;
+  const completeRest = (): void => {
+    if (!resting || rest === null) return;
     const key = `${rest.slotId}:${rest.startedAtMs}`;
     if (advancedRest.current === key) return;
     advancedRest.current = key;
     if (runnerResting) advanceRunnerRest();
     else { setLocalRest(null); moveLegacyForward(); }
+  };
+
+  useEffect(() => {
+    if (!resting || restRemaining !== 0 || rest === null) return;
+    completeRest();
   }, [resting, restRemaining, rest?.slotId, rest?.startedAtMs, runnerResting]);
 
   if (session === null && lastEndedSessionId != null && outcome !== null) {
@@ -573,9 +1031,12 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
     const outcomeCopy: Record<string, string> = isBeginner
       ? {
           followed_plan: "You followed today's plan. Recover well.",
-          adapted_session: "Session adjusted.",
+          // Walk 2 (W2-8): the same word Progress uses for this outcome.
+          adapted_session: "Session adapted.",
           stopped_safely: "Stopping was the right call. Recovery is part of the plan.",
-          session_recorded: "Your session is saved. Continue from here next time.",
+          // Walk 2 (W2-8): this shows after Finish session too; "continue from
+          // here next time" read as if the session were unfinished.
+          session_recorded: "Your session is saved.",
         }
       : {
           followed_plan: "Plan followed.",
@@ -589,6 +1050,25 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
     // their existing honest copy.
     const displayMsg = outcomeCopy[outcome.kind] ?? 'Outcome unavailable';
 
+    if (reportOpen) {
+      // Issue #180, S5: the Plan screen's "Something feels off" form, opened here.
+      // Apply hands the text and severity to the same store action (reportSubjective).
+      return (
+        <SubjectiveReportPanel
+          hasVector={vector !== null}
+          lastTriage={lastTriage ?? null}
+          triaging={state.triaging ?? false}
+          triageReady={state.triageReady ?? false}
+          onApply={(text, severity) => {
+            // Resolves true only when the store stored the report; the form keeps the text otherwise.
+            if (typeof state.reportSubjective !== 'function') return Promise.resolve(false);
+            return state.reportSubjective(text, severity);
+          }}
+          onClose={() => setReportOpen(false)}
+        />
+      );
+    }
+
     if (feelOpen && sessionFeel !== null) {
       // A session that went to plan is not asked anything, so its note may be
       // saved on its own. Once an answer exists, or the question was asked,
@@ -599,6 +1079,8 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
           saved={sessionFeel.saved}
           note={sessionFeel.note}
           answerOptional={answerOptional}
+          // Plan's "Something feels off" form exists only once readiness does.
+          planReportAvailable={state.vector != null}
           onSave={(draft, noteText) => {
             if (answerOptional && draft.feel === null) {
               if (noteText.trim().length === 0) return 'nothing_to_save';
@@ -623,7 +1105,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
     }
 
     return (
-      <View style={styles.outcomeContainer}>
+      <ScrollView style={styles.outcomeContainer} contentContainerStyle={{ flexGrow: 1, padding: theme.space[4] }}>
         {/* Wordmark top-left */}
         <View style={styles.header}>
           <Text style={styles.wordmark}>pikeMethods</Text>
@@ -657,7 +1139,19 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
           {summary !== null && (
             <View style={styles.summaryBlock} testID="session-summary">
               {summary.exerciseLines.map((line) => (
-                <Text key={line.key} style={styles.summaryLine}>{line.text}</Text>
+                <React.Fragment key={line.key}>
+                  <Text style={styles.summaryLine}>{line.text}</Text>
+                  {summary.topSetByExercise[line.key] !== undefined && (
+                    <Text style={styles.summaryComparison} testID="session-summary-top-set">{summary.topSetByExercise[line.key]!.text}</Text>
+                  )}
+                </React.Fragment>
+              ))}
+              {summary.skippedLines.map((line) => (
+                <Text key={line.key} style={styles.summaryLine} testID="session-summary-skipped">{line.text}</Text>
+              ))}
+              {/* #181: the reports made during the session, region and severity. */}
+              {(summary.reportLines ?? []).map((line) => (
+                <Text key={line.key} style={styles.summaryLine} testID="session-summary-report">{line.text}</Text>
               ))}
               {summary.comparisonLines.map((line) => (
                 <Text key={line.key} style={styles.summaryComparison}>{line.text}</Text>
@@ -677,7 +1171,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
           )}
         </View>
 
-        <View style={styles.outcomeFooter}>
+        <View style={styles.outcomeFooter} testID="session-outcome-footer">
           {sessionFeel !== null && (
             <View style={styles.feelBlock} testID="session-feel-summary">
               {sessionFeel.saved !== null ? (
@@ -690,7 +1184,14 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                 </>
               ) : sessionFeel.ask ? (
                 <>
-                  <Text style={styles.summaryLine} testID="session-feel-ask">This session went differently from the plan.</Text>
+                  {/* Android walk (#212): a followed plan is asked only because the
+                      logged effort drifted from the targets; "went differently
+                      from the plan" contradicted "Plan followed." above it. */}
+                  <Text style={styles.summaryLine} testID="session-feel-ask">
+                    {outcome.kind === 'followed_plan'
+                      ? 'You did every set, but your effort was different from the targets.'
+                      : 'This session went differently from the plan.'}
+                  </Text>
                   <SecondaryButton
                     label="Record how it went"
                     onPress={() => setFeelOpen(true)}
@@ -709,6 +1210,16 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
               )}
             </View>
           )}
+          <View style={styles.feelBlock} testID="completion-report-block">
+            <Text style={styles.summaryComparison}>Add a subjective report only when you need Coach to adapt</Text>
+            <SecondaryButton
+              label="Something feels off"
+              onPress={() => { setFeelOpen(false); setReportOpen(true); }}
+              accessibilityLabel="Something feels off"
+              testID="completion-report-open"
+              style={{ alignSelf: 'stretch' }}
+            />
+          </View>
           <SecondaryButton
             label="Back to Today"
             onPress={() => {
@@ -721,7 +1232,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
             style={{ alignSelf: 'stretch' }}
           />
         </View>
-      </View>
+      </ScrollView>
     );
   }
 
@@ -747,22 +1258,55 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
         </View>
         <Text style={styles.kicker}>SESSION</Text>
         <Text style={styles.idleTitle}>
-          {blocked ? 'Training is paused.' : 'Ready when you are.'}
+          {blocked ? (isSessionReportStop(lastTriage) ? 'Training is stopped for today.' : 'Training is paused.') : 'Ready when you are.'}
         </Text>
         <Text style={styles.idleBody}>
           {blocked
-            ? 'Resolve today’s safety halt before starting another session.'
+            ? (isSessionReportStop(lastTriage)
+              // #187: the day was closed by the athlete's own Stop report.
+              ? SESSION_REPORT_STOP_SENTENCE
+              : 'Resolve today’s safety halt before starting another session.')
             : mode === 'guided'
             ? 'You will move one clear step at a time.'
             : 'Your session will stay in one clear vertical timeline.'}
         </Text>
         {!blocked && (
-          <PrimaryButton
-            label="Start session"
-            onPress={() => startSession()}
-            accessibilityLabel="Start a new workout session"
-            style={{ marginTop: theme.space[5] }}
-          />
+          emptyStartPromptOpen ? (
+            <View style={[styles.emptyCard, { marginTop: theme.space[5] }]} testID="empty-free-form-start-card">
+              <Text style={styles.emptyTitle}>No session is ready to start</Text>
+              <Text style={styles.emptyBody}>
+                Open your plan to see your next session.
+              </Text>
+              <PrimaryButton
+                label="Go to Plan"
+                onPress={() => {
+                  setEmptyStartPromptOpen(false);
+                  onOpenPlan?.();
+                  nav?.setTab('coach');
+                }}
+                accessibilityLabel="Go to Plan"
+                style={{ marginTop: theme.space[4] }}
+              />
+              <QuietAction
+                label="Cancel"
+                onPress={() => setEmptyStartPromptOpen(false)}
+                accessibilityLabel="Cancel"
+              />
+            </View>
+          ) : (
+            <PrimaryButton
+              label="Start session"
+              onPress={() => {
+                if (checkFreeFormStartIsEmpty()) {
+                  setEmptyStartPromptOpen(true);
+                  return;
+                }
+                startSession();
+              }}
+              accessibilityLabel="Start a new workout session"
+              style={{ marginTop: theme.space[5] }}
+            />
+          )
         )}
       </View>
     );
@@ -825,7 +1369,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
     : formatTeachingOnlyReason(currentAvailability);
 
   const chooseSlot = (slot: PlanSlot): void => {
-    if (mode === 'guided' || loggedCount(slot) >= slot.plannedSets) return;
+    if (mode === 'guided' || slot.replacedBySessionPlanSlotId != null || loggedCount(slot) >= slot.plannedSets) return;
     selectMovementSlot(slot.sessionPlanSlotId);
   };
 
@@ -841,7 +1385,8 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
     // Equipment/safety/capability/attestation restrictions block execution of
     // this slot even though they no longer block the whole session.
     if (!currentSlotExecutable) return;
-    const parsed = parseLoadDraft(loadText);
+    // A band-only movement logs load 0 (#232): no kilograms were asked for.
+    const parsed = bandOnly ? 0 : parseLoadDraft(loadText);
     // Logging an external-load set requires an explicit finite, non-negative
     // entry; blank is absent evidence and never coerced to zero.
     if (parsed === null) {
@@ -860,12 +1405,13 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
     // No seed is better than another set's seed: if the draft was not initialized for exactly this
     // slot and set (a press landing before the initializer has run), nothing is recorded as shown.
     const held = loadShownRef.current;
-    const seededForThisSet = held !== null && held.slotId === currentSlot.sessionPlanSlotId && held.logged === currentLogged ? held.seed : null;
+    // A band-only movement showed no load, so none is recorded as shown.
+    const seededForThisSet = !bandOnly && held !== null && held.slotId === currentSlot.sessionPlanSlotId && held.logged === currentLogged ? held.seed : null;
     logSet(currentMovement.movement_id, target.kind === 'time' ? 1 : Math.round(clamp(reps, 1, 50)), safeLoad, safeRpe, undefined, undefined, undefined, metrics, currentSlot.sessionPlanSlotId, seededForThisSet);
     if (runner === null) {
       if (uiPreferences.restTimerEnabled) setLocalRest({
         startedAtMs: Date.now(),
-        seconds: restSecondsFor(safeRpe ?? currentSlot.targetRpe ?? 8),
+        seconds: restSecondsFor(safeRpe ?? currentSlot.targetRpe ?? 8, bodyweightMode && safeLoad === 0),
         slotId: currentSlot.sessionPlanSlotId,
       });
       else moveLegacyForward();
@@ -882,20 +1428,177 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
     openSubstitution(currentMovement.movement_id);
   };
 
-  const submitNiggle = (): void => {
-    if (niggleRegion === null) return;
-    reportNiggle(niggleRegion, niggleSeverity);
-    setSafetyOpen(false);
+  // #165: a manual "Stop session" asks first; Keep going changes nothing.
+  // An empty stopped session is still discarded by endSession, as before.
+  const confirmStopSession = (stop: () => void): void => {
+    Alert.alert('Stop this session?', 'Sets you have logged are kept.', [
+      { text: 'Keep going', style: 'cancel' },
+      { text: 'Stop', style: 'destructive', onPress: stop },
+    ]);
   };
+
+  const confirmSkipExercise = (): void => {
+    if (runner?.phase !== 'working' || currentSlot === null) return;
+    Alert.alert('Skip this exercise', 'Skip the remaining sets for this exercise? Sets already logged will be kept.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Skip this exercise', onPress: () => {
+        const latest = useStore.getState();
+        if (latest.session?.sessionId === session?.sessionId
+          && latest.activeSessionPlanSlotId === currentSlot.sessionPlanSlotId
+          && latest.runner?.phase === 'working') latest.runnerSkipSlot();
+      } },
+    ], { cancelable: true });
+  };
+
+  const submitNiggle = (): void => {
+    if (niggleRegion === null || niggleSeverity === null) return;
+    // #184: during rest the report belongs to the next set, so the rest ends
+    // first and the report is handled exactly as on the next set card.
+    if (resting) readyNow();
+    // A report that did not save keeps the form open and claims nothing.
+    if (reportNiggle(niggleRegion, niggleSeverity) !== true) {
+      setNiggleSavedNotice(false);
+      return;
+    }
+    setSafetyOpen(false);
+    const after = typeof useStore.getState === 'function' ? useStore.getState() : state;
+    // A Stop-level report closes the session (#181): nothing is left to annotate.
+    const afterHalted = after?.session === null
+      || after?.runner?.phase === 'halted'
+      || (after?.runner?.phase !== 'complete' && after?.lastTriage?.kind === 'matched' && after.lastTriage.directive.halt);
+    setNiggleSavedNotice(!afterHalted);
+    // #182: a report confirms it was saved before any sheet opens. The store
+    // records the offer of alternatives; the sheet opens only once the
+    // athlete has seen the confirmation.
+    const offeredSlotId = afterHalted ? null : after?.runner?.substitutionOfferedForSessionPlanSlotId ?? null;
+    const offeredMovementId = offeredSlotId === null
+      ? undefined
+      : (after?.sessionPlan ?? sessionPlan).find((planSlot) => planSlot.sessionPlanSlotId === offeredSlotId)?.movementId;
+    if (offeredMovementId !== undefined) {
+      Alert.alert('Report saved', 'Report saved with this session. Next, see the options for this exercise.', [
+        { text: 'OK', onPress: () => {
+          // The report is already saved: a failure to open the sheet is
+          // recorded and shown, not thrown out of the alert callback. The
+          // sheet can also stay closed without a throw (a support hold or an
+          // unverifiable session context); that is shown the same way.
+          const showCouldNotOpen = (): void => {
+            Alert.alert(
+              'Could not open options',
+              'Your report is saved, but the options for this exercise could not be opened. You can skip this exercise on the session card.',
+            );
+          };
+          try {
+            if (openSubstitution(offeredMovementId) === false) showCouldNotOpen();
+          } catch (error) {
+            useStore.setState({ error: error instanceof Error ? error.message : String(error) });
+            showCouldNotOpen();
+          }
+        } },
+      ]);
+    }
+  };
+
+  // #184: the discomfort form, its saved line and "Stop session" are on the
+  // set card and on the rest card, with the same handlers. A report made
+  // during rest is handled as one made on the next set card (submitNiggle
+  // ends the rest first).
+  const renderDiscomfortFormAndStop = (): React.JSX.Element => (
+    <>
+      {safetyOpen && (
+        <View style={styles.safety}>
+          <Text style={styles.safetyPrompt}>Where, and how strong is it?</Text>
+          <View style={styles.joints}>
+            {(JOINTS as readonly string[]).map((joint) => {
+              const selectedJoint = niggleRegion === joint;
+              return (
+                <Chip
+                  key={joint}
+                  label={regionDisplayName(joint)}
+                  selected={selectedJoint}
+                  onPress={() => setNiggleRegion(joint)}
+                  accessibilityLabel={joint.replace(/_/g, ' ')}
+                  style={{ margin: theme.space[1] }}
+                />
+              );
+            })}
+          </View>
+          <View style={styles.severity} testID="niggle-severity-row">
+            {[4, 6, 8].map((severity) => {
+              const selectedSeverity = niggleSeverity === severity;
+              const label = severity === 4 ? 'Mild' : severity === 6 ? 'Moderate' : 'Stop';
+              return (
+                <Chip
+                  key={severity}
+                  label={label}
+                  selected={selectedSeverity}
+                  onPress={() => setNiggleSeverity(severity)}
+                  accessibilityLabel={`${label} discomfort, ${severity} of 10`}
+                  testID={`niggle-severity-${severity}`}
+                  style={styles.severityChip}
+                />
+              );
+            })}
+          </View>
+          {niggleSeverity !== null && niggleSeverity >= haltMin && (
+            <Text style={styles.loadEvidence}>
+              At this level the session stops for today.
+            </Text>
+          )}
+          <View style={{ marginTop: theme.space[3] }}>
+            <PrimaryButton
+              label={niggleSeverity !== null && niggleSeverity >= haltMin ? 'Save report and stop session' : 'Save report'}
+              onPress={submitNiggle}
+              disabled={niggleRegion === null || niggleSeverity === null}
+              accessibilityLabel={niggleSeverity !== null && niggleSeverity >= haltMin ? 'Save discomfort report and stop session' : 'Save discomfort report'}
+            />
+          </View>
+        </View>
+      )}
+      {!safetyOpen && niggleSavedNotice && !halted && (
+        <Text style={styles.loadEvidence}>Report saved with this session.</Text>
+      )}
+
+      {/* Stop Session outlined full-width SecondaryButton */}
+      <View style={{ marginTop: theme.space[3] }}>
+        <SecondaryButton
+          label="Stop session"
+          onPress={() => confirmStopSession(() => runnerHalt('manual'))}
+          accessibilityLabel="Stop this session"
+          fullWidth={true}
+        />
+      </View>
+    </>
+  );
 
   const setup = lines(currentMovement?.instructions, 4);
   const cues = lines(currentMovement?.cues, 3);
   const supportsBands = currentMovement?.supportedPrefixes?.includes('Banded') === true && bandLadder.length > 0;
-  const runnerNext = runner === null ? null : nextRunnerWork(runner);
+  // #182 (walk A-11): "Next up" never points at a slot a report holds back;
+  // it names the next slot that can be performed, in the runner's order.
+  const heldByReport = (sessionPlanSlotId: number): boolean => {
+    const planSlot = sessionPlan.find((candidate) => candidate.sessionPlanSlotId === sessionPlanSlotId);
+    return planSlot !== undefined && availabilityMap.get(planSlot.movementId)?.reasons.includes('safety') === true;
+  };
+  const runnerNextRaw = runner === null ? null : nextRunnerWork(runner);
+  const runnerNext = runner === null || runnerNextRaw === null || !heldByReport(runnerNextRaw.slot.sessionPlanSlotId)
+    ? runnerNextRaw
+    : (() => {
+      const skippedIds = new Set(runner.skippedSessionPlanSlotIds);
+      for (let offset = 1; offset <= runner.slots.length; offset += 1) {
+        const index = (runner.slotIndex + offset) % runner.slots.length;
+        const candidate = runner.slots[index];
+        const done = runner.slotSetCounts[index] ?? 0;
+        if (candidate === undefined || skippedIds.has(candidate.sessionPlanSlotId) || done >= candidate.sets) continue;
+        if (heldByReport(candidate.sessionPlanSlotId)) continue;
+        return { slot: candidate, setIndex: done + 1 };
+      }
+      return null;
+    })();
   const upcomingSlot = runnerNext !== null
     ? sessionPlan.find((slot) => slot.sessionPlanSlotId === runnerNext.slot.sessionPlanSlotId) ?? null
+    : runner !== null && runnerNextRaw !== null ? null
     : currentSlot === null ? firstIncomplete
-      : sessionPlan.slice(Math.max(0, sessionPlan.findIndex((slot) => slot.sessionPlanSlotId === currentSlot.sessionPlanSlotId) + 1)).find((slot) => loggedCount(slot) < slot.plannedSets) ?? null;
+      : sessionPlan.slice(Math.max(0, sessionPlan.findIndex((slot) => slot.sessionPlanSlotId === currentSlot.sessionPlanSlotId) + 1)).find((slot) => loggedCount(slot) < slot.plannedSets && !heldByReport(slot.sessionPlanSlotId)) ?? null;
   const upcomingText = runnerNext !== null && upcomingSlot !== null
     ? `${byId.get(upcomingSlot.movementId)?.name ?? 'Movement'} · set ${runnerNext.setIndex} of ${runnerNext.slot.sets}`
     : upcomingSlot !== null
@@ -908,6 +1611,37 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
   // to the halt card below (halting has already recorded preparation as stopped).
   const preparationOpen = preparation !== null && preparation.sessionId === session.sessionId
     && !isTerminalPreparationStatus(preparation.status);
+
+  // Android walk (#213): the ramp sets read in kg when today's working load
+  // for the ramped movement is known. It comes from the same resolver as the
+  // set card, and only a load the app derived (from a 1RM or an override)
+  // counts as known. Display only: the frozen protocol is not changed.
+  const rampWorkingLoad = ((): { movementId: number; movementName: string; workingLoadKg: number } | null => {
+    if (!preparationOpen || preparation === null || preparation.protocol === null) return null;
+    if (typeof state.resolveSlotLoad !== 'function') return null;
+    const rampMovementId = preparation.protocol.items.find((item) => item.stage === 'ramp')?.movementId ?? null;
+    if (rampMovementId === null) return null;
+    const rampSlot = sessionPlan.find((slot) => slot.movementId === rampMovementId);
+    const rampMovement = byId.get(rampMovementId);
+    if (rampSlot === undefined || rampMovement === undefined) return null;
+    const rampTarget = targetFor(rampSlot);
+    try {
+      const selection = state.resolveSlotLoad({
+        movementId: rampSlot.movementId,
+        bodyweightMode: rampMovement.supportedPrefixes[0] === 'Bodyweight',
+        targetReps: rampTarget.kind === 'reps' ? rampTarget.reps : null,
+        targetRpe: rampSlot.targetRpe ?? 8,
+        overrideLoadKg: rampSlot.overrideLoadKg,
+        sessionPlanSlotId: rampSlot.sessionPlanSlotId,
+      });
+      const kg = selection.initialLoadKg;
+      if (selection.source !== 'derived' || kg === null || !Number.isFinite(kg) || kg <= 0) return null;
+      return { movementId: rampMovementId, movementName: rampMovement.name, workingLoadKg: kg };
+    } catch {
+      // The kilograms are a convenience; the percentages stay if they cannot be read.
+      return null;
+    }
+  })();
   if (preparationOpen && preparation !== null && !halted) {
     return (
       <View style={styles.screen}>
@@ -918,7 +1652,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
             <Text style={styles.headerTitle}>Before your first set</Text>
             <Text style={styles.headerMeta}>
               {sessionPlan.length === 0
-                ? 'No movements are planned yet. Prepare first, then add your work.'
+                ? 'No movements are planned yet.'
                 : `${sessionPlan.length} exercise${sessionPlan.length === 1 ? '' : 's'} planned after preparation.`}
             </Text>
           </View>
@@ -927,24 +1661,36 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
             onBegin={beginPreparation}
             onRecordItem={recordPreparationItem}
             onFinish={finishPreparation}
-            onStopSession={() => { runnerHalt('manual'); endSession(); }}
+            onStopSession={() => confirmStopSession(() => { runnerHalt('manual'); endSession(); })}
+            rampWorkingLoad={rampWorkingLoad}
           />
         </KeyboardAwareScrollView>
       </View>
     );
   }
 
+  // A swap after logged sets is one planned exercise (issue #144). Its chain counts once,
+  // through the row that was not swapped on: only that row has no replacedBySessionPlanSlotId.
+  const plannedExercises = sessionPlan.filter((slot) => slot.replacedBySessionPlanSlotId == null);
+  const exercisesCompleteText = `${plannedExercises.filter((slot) => loggedCount(slot) >= slot.plannedSets).length} of ${plannedExercises.length} exercises complete${runner?.skippedSessionPlanSlotIds.length ? ` · ${runner.skippedSessionPlanSlotIds.length} skipped` : ''}`;
+
   return (
     <View style={styles.screen}>
-      <KeyboardAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} accessibilityLabel="Current workout timeline">
+      <KeyboardAwareScrollView ref={timelineRef} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} accessibilityLabel="Current workout timeline">
         {/* Wordmark top-left */}
         <View style={styles.header}>
           <Text style={styles.wordmark}>pikeMethods</Text>
           <Text style={styles.kicker}>{mode === 'guided' ? 'GUIDED SESSION' : 'SELF-DIRECTED SESSION'}</Text>
-          <Text style={styles.headerTitle}>{halted ? 'Session paused' : complete ? 'Session complete' : 'Your next step'}</Text>
-          {!halted && !complete && (
+          <Text style={styles.headerTitle}>{halted ? (runner?.haltReason === 'manual' ? 'Session paused' : 'Session stopped') : complete ? 'Session complete' : 'Your next step'}</Text>
+          {!halted && (!complete || Boolean(runner?.skippedSessionPlanSlotIds.length)) && (
             <Text style={styles.headerMeta}>
-              {sessionPlan.length === 0 ? 'No movements are planned yet.' : `${sessionPlan.filter((slot) => loggedCount(slot) >= slot.plannedSets).length} of ${sessionPlan.length} exercises complete`}
+              {sessionPlan.length === 0 ? 'No movements are planned yet.' : exercisesCompleteText}
+            </Text>
+          )}
+          {/* #186: name the report shaping today and the change it applied. */}
+          {!halted && state.prescription?.report != null && state.prescription.forDate === session.date && (
+            <Text style={styles.headerMeta} testID="session-report-line">
+              {operativeReportLine(state.prescription.report)}
             </Text>
           )}
           {preparation !== null && preparation.sessionId === session.sessionId && (
@@ -958,11 +1704,11 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
           <View style={styles.haltCard} accessibilityRole="alert">
             <Text style={styles.haltTitle}>Stop training for today.</Text>
             <Text style={styles.haltBody}>
-              {formatRunnerHaltReason(
-                runner?.haltReason,
-                lastTriage?.kind === 'matched' ? lastTriage.directive.vector.coaching_cue : null,
-              )}
+              {formatRunnerHaltReason(runner?.haltReason)}
             </Text>
+            {(triageHalted || runner?.haltReason === 'safety') && (
+              <Text style={styles.haltBody}>{HALT_NEXT_TEXT}</Text>
+            )}
             <View style={{ marginTop: theme.space[4], alignSelf: 'stretch' }}>
               <SecondaryButton
                 label="Finish session"
@@ -976,8 +1722,27 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
 
         {complete && (
           <View style={styles.completeCard} accessibilityRole="summary">
-            <Text style={styles.completeTitle}>All planned work is logged.</Text>
-            <Text style={styles.completeBody}>Take the win. There is nothing else you need to decide here.</Text>
+            <Text style={styles.completeTitle}>{runner?.skippedSessionPlanSlotIds.length ? 'No exercises remain.' : 'All planned work is logged.'}</Text>
+            <Text style={styles.completeBody}>{runner?.skippedSessionPlanSlotIds.length ? 'Finish this session when you are ready.' : 'Take the win. There is nothing else you need to decide here.'}</Text>
+            {Boolean(runner?.skippedSessionPlanSlotIds.length) && (
+              <View testID="session-complete-skipped">
+                {sessionPlan
+                  .filter((slot) => runner?.skippedSessionPlanSlotIds.includes(slot.sessionPlanSlotId))
+                  .map((slot) => {
+                    const text = skippedExerciseText({
+                      name: byId.get(plannedMovementId(slot))?.name ?? 'Movement',
+                      plannedSets: slot.plannedSets,
+                      loggedSets: loggedCount(slot),
+                      loggedAs: loggedAsNames(slot),
+                    });
+                    return (
+                      <Text key={slot.sessionPlanSlotId} style={styles.completeRowMeta}>
+                        {text}
+                      </Text>
+                    );
+                  })}
+              </View>
+            )}
             <CompletedMetrics sets={session.sets} bandLadder={bandLadder} movementsById={byId} onEdit={editSet} />
             <PrimaryButton
               label="Finish session"
@@ -991,7 +1756,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
         {!halted && !complete && sessionPlan.length === 0 && (
           <View style={styles.emptyCard}>
             <Text style={styles.emptyTitle}>No exercise is queued.</Text>
-            <Text style={styles.emptyBody}>Return to Coach to create a session plan, then come back here.</Text>
+            <Text style={styles.emptyBody}>Finish this session, then build your plan on the PLAN tab.</Text>
             <SecondaryButton
               label="Finish session"
               onPress={endSession}
@@ -1002,18 +1767,63 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
         )}
 
         {!halted && !complete && sessionPlan.length > 0 && (
-          <View style={styles.timeline}>
+          <View
+            style={styles.timeline}
+            testID="session-timeline"
+          >
             {sessionPlan.map((slot) => {
               const movement = byId.get(slot.movementId);
               const fallbackVideoUrl = movement?.media?.status === 'external_fallback'
                 ? movement.media.fallbackUrl
                 : null;
               const logged = loggedCount(slot);
-              const finished = logged >= slot.plannedSets;
+              const isReplaced = slot.replacedBySessionPlanSlotId != null;
+              const replacedBySlot = isReplaced
+                ? sessionPlan.find((candidate) => candidate.sessionPlanSlotId === slot.replacedBySessionPlanSlotId) ?? null
+                : null;
+              const finished = isReplaced || logged >= slot.plannedSets;
               // Cross-movement rest still belongs to the just-finished slot.
               // Keep it active so the rest controls remain reachable.
-              const active = currentSlot?.sessionPlanSlotId === slot.sessionPlanSlotId && (!finished || resting);
-              const selectable = mode === 'self_directed' && !finished && !active && !resting;
+              const active = !isReplaced && currentSlot?.sessionPlanSlotId === slot.sessionPlanSlotId && (!finished || resting);
+              const skipped = !isReplaced && (runner?.skippedSessionPlanSlotIds.includes(slot.sessionPlanSlotId) ?? false);
+              const selectable = mode === 'self_directed' && !isReplaced && !finished && !active && !resting && !skipped;
+
+              if (isReplaced) {
+                const completedSets = session?.sets.filter((set) => sameSlot(set, slot)) ?? [];
+                const name = movement?.name ?? 'Movement';
+                const replacementName = (replacedBySlot !== null ? byId.get(replacedBySlot.movementId)?.name : undefined) ?? 'Movement';
+                // 075 (issue #144): with the original count recorded the row reads "1 of 2 sets,
+                // then swapped to <movement>". Without it (older records) it keeps the earlier wording.
+                const originalSets = slot.originalPlannedSets ?? null;
+                const swappedMeta = originalSets !== null
+                  ? `${logged} of ${originalSets} sets, then swapped to ${replacementName}`
+                  : `Swapped for ${replacementName} · ${logged} ${logged === 1 ? 'set' : 'sets'} logged`;
+                const swappedLabel = originalSets !== null
+                  ? `${name}, ${logged} of ${originalSets} sets, then swapped to ${replacementName}`
+                  : `Swapped for ${replacementName} · ${name} · ${logged} ${logged === 1 ? 'set' : 'sets'} logged`;
+
+                return (
+                  <View
+                    key={slot.sessionPlanSlotId}
+                    style={[styles.timelineRow, styles.replacedRow]}
+                   
+                    accessibilityRole="text"
+                    accessibilityLabel={swappedLabel}
+                    accessibilityState={{ disabled: true }}
+                  >
+                    <View style={styles.rail}>
+                      <View style={[styles.dot, styles.dotComplete]}>
+                        <Text style={styles.check}>✓</Text>
+                      </View>
+                    </View>
+                    <View style={styles.completeRow}>
+                      <Text style={styles.completeRowName} numberOfLines={1}>{name}</Text>
+                      <Text style={styles.completeRowMeta}>{swappedMeta}</Text>
+                      <CompletedMetrics sets={completedSets} bandLadder={bandLadder} movementsById={byId} onEdit={editSet} />
+                    </View>
+                  </View>
+                );
+              }
 
               if (finished && !active) {
                 const completedSets = session?.sets.filter((set) => sameSlot(set, slot)) ?? [];
@@ -1024,6 +1834,8 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                 const metricSummary = latestCompleted?.timeS !== null && latestCompleted?.timeS !== undefined
                   ? ` · ${secondsText(latestCompleted.timeS)} logged`
                   : bandLabel === null ? '' : ` · ${bandLabel}`;
+                const asNames = loggedAsNames(slot, slot.movementId);
+                const includesSuffix = asNames.length > 0 ? ` · includes ${asNames.join(', ')}` : '';
 
                 return (
                   <View key={slot.sessionPlanSlotId} style={styles.timelineRow}>
@@ -1034,8 +1846,45 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                     </View>
                     <View style={styles.completeRow}>
                       <Text style={styles.completeRowName} numberOfLines={1}>{movement?.name ?? 'Movement'}</Text>
-                      <Text style={styles.completeRowMeta}>{logged} sets complete{metricSummary}</Text>
+                      <Text style={styles.completeRowMeta}>{logged} {logged === 1 ? 'set' : 'sets'} complete{metricSummary}{includesSuffix}</Text>
                       <CompletedMetrics sets={completedSets} bandLadder={bandLadder} movementsById={byId} onEdit={editSet} />
+                    </View>
+                  </View>
+                );
+              }
+
+              if (skipped && !active) {
+                const skippedSets = session?.sets.filter((set) => sameSlot(set, slot)) ?? [];
+                const name = byId.get(plannedMovementId(slot))?.name ?? 'Movement';
+                const asNames = loggedAsNames(slot);
+                const loggedSuffix = asNames.length > 0 ? ` as ${asNames.join(', ')}` : '';
+                const skippedMeta = logged > 0
+                  ? `Skipped · ${setsOfPlanned(logged, slot.plannedSets)} logged${loggedSuffix}`
+                  : 'Skipped · no sets logged';
+                const skippedLabel = logged > 0
+                  ? `${name}, skipped, ${setsOfPlanned(logged, slot.plannedSets)} logged${loggedSuffix}`
+                  : `${name}, skipped, no sets logged`;
+
+                return (
+                  <View key={slot.sessionPlanSlotId} style={styles.timelineRow}>
+                    <View style={styles.rail}>
+                      <View style={[styles.dot, styles.dotSkipped]}>
+                        <Text style={styles.skipMark}>–</Text>
+                      </View>
+                    </View>
+                    <View style={styles.completeRow}>
+                      <Text
+                        style={styles.completeRowName}
+                        numberOfLines={1}
+                        accessibilityRole="text"
+                        accessibilityLabel={skippedLabel}
+                      >
+                        {name}
+                      </Text>
+                      <Text style={styles.completeRowMeta}>{skippedMeta}</Text>
+                      {logged > 0 && (
+                        <CompletedMetrics sets={skippedSets} bandLadder={bandLadder} movementsById={byId} onEdit={editSet} />
+                      )}
                     </View>
                   </View>
                 );
@@ -1056,7 +1905,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                       style={({ pressed }) => [styles.upcomingRow, selectable && styles.upcomingSelectable, pressed && selectable && styles.pressed]}
                     >
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.upcomingName} numberOfLines={1}>{movement?.name ?? 'Movement'}</Text>
+                        <Text style={styles.upcomingName}>{movement?.name ?? 'Movement'}</Text>
                         <Text style={styles.upcomingMeta}>{targetText(slot)}</Text>
                       </View>
                       {selectable && <Text style={styles.choose}>Choose</Text>}
@@ -1067,33 +1916,61 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
 
               // Active slot
               return (
-                <View key={slot.sessionPlanSlotId} style={styles.timelineRow}>
+                <View
+                  key={slot.sessionPlanSlotId}
+                  style={styles.timelineRow}
+                  testID="session-current-row"
+                  ref={currentRowRef}
+                >
                   {/* Left Active Spine (Chalk marks CURRENT/ACTIVE only) */}
                   <View style={[styles.rail, styles.railActive]}>
                     <View style={[styles.dot, styles.dotCurrent]} />
                   </View>
 
                   <View style={styles.currentCard}>
+                    {correctableSet !== null && (
+                      <CorrectLastSet key={correctableSet.set_id} set={correctableSet} bandOnly={bandOnly} onSave={editSet} />
+                    )}
                     {resting ? (
                       <View style={{ alignItems: 'center', gap: theme.space[3] }}>
+                        {/* Walk 2 (W2-12): the exercise just worked stays named during
+                            its rest; it vanished from the timeline until Ready now. */}
+                        <View style={{ alignSelf: 'stretch' }} testID="session-rest-exercise">
+                          <Text style={styles.completeRowName} numberOfLines={1}>{movement?.name ?? 'Movement'}</Text>
+                          <Text style={styles.completeRowMeta}>
+                            {finished
+                              ? `${logged} ${logged === 1 ? 'set' : 'sets'} complete`
+                              : `${setsOfPlanned(logged, slot.plannedSets)} done`}
+                          </Text>
+                        </View>
                         {/* Draining chalk barRestTimerCard */}
                         <RestTimerCard
                           totalSeconds={rest.seconds}
-                          elapsedSeconds={restRemaining}
+                          elapsedSeconds={rest.seconds - restRemaining}
+                          startedAtMs={rest.startedAtMs}
+                          onComplete={completeRest}
                           style={{ alignSelf: 'stretch' }}
                         />
+                        <Text style={styles.nextUp} testID="session-rest-between">
+                          {`Rest between sets: ${minutesSeconds(rest.seconds)}`}
+                        </Text>
                         {runnerResting && (
                           <>
                             <Stepper
                               testID="session-rest-stepper"
-                              label="Session rest seconds"
-                              value={String(rest.seconds)}
+                              label="Change rest (min:sec)"
+                              value={minutesSeconds(rest.seconds)}
                               onDecrement={() => setRunnerRestOverride(clamp(rest.seconds - 15, 45, 300))}
                               onIncrement={() => setRunnerRestOverride(clamp(rest.seconds + 15, 45, 300))}
                               repeatOnHold={true}
                               style={styles.sessionStepper}
                             />
-                            <Text style={styles.nextUp}>Applies to this session.</Text>
+                            {/* The target follows the last set's effort (restSecondsFor);
+                                say so, or the number reads as a setting that changed by
+                                itself (Android walk 2026-11-03, ux-8). */}
+                            <Text style={styles.nextUp}>
+                              Rest uses your effort rating, or the planned effort if you leave it blank. Harder sets get longer rests; a bodyweight set gets 60 to 90 seconds. Your changes apply for this session.
+                            </Text>
                           </>
                         )}
                         <PrimaryButton
@@ -1103,31 +1980,44 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                           style={{ alignSelf: 'stretch' }}
                         />
                         {upcomingText !== null && <Text style={styles.nextUp}>Next up: {upcomingText}</Text>}
+                        {/* #184: the safety controls are reachable during rest too. */}
+                        <View style={{ alignSelf: 'stretch' }} testID="session-rest-safety">
+                          <SecondaryButton
+                            label="Report discomfort"
+                            onPress={() => {
+                              setSafetyOpen((value) => !value);
+                              setNiggleSavedNotice(false);
+                            }}
+                            accessibilityLabel="Report discomfort"
+                            fullWidth={true}
+                          />
+                          {renderDiscomfortFormAndStop()}
+                        </View>
                       </View>
                     ) : (
                       <View style={{ gap: theme.space[3] }}>
                         <Text style={styles.currentLabel}>CURRENT · SET {Math.min(slot.plannedSets, currentLogged + 1)} OF {slot.plannedSets}</Text>
                         <Text style={styles.movementName}>{movement?.name ?? 'Movement'}</Text>
-                        <Text style={styles.targetLine}>Target {targetText(slot)}{slot.targetRpe === null ? '' : ` · RPE ${slot.targetRpe.toFixed(1)}`}</Text>
-                        <Text
-                          style={styles.loadEvidence}
-                          testID="session-load-source-line"
-                          accessibilityLabel={`Load source. ${loadEvidence}`}
-                        >
-                          {loadEvidence}
-                        </Text>
+                        <Text style={styles.targetLine} testID="session-target-line">Target {targetText(slot)}{targetEffortText(slot)}</Text>
+                        {/* #182: no "pick a weight" on a slot a report holds back. */}
+                        {!heldByReport(slot.sessionPlanSlotId) && (
+                          <Text
+                            style={styles.loadEvidence}
+                            testID="session-load-source-line"
+                            accessibilityLabel={bandOnly ? loadEvidence : `Load source. ${loadEvidence}`}
+                          >
+                            {loadEvidence}
+                          </Text>
+                        )}
                         {loadInvalid && (
                           <Text
                             style={styles.loadEvidence}
                             testID="session-load-validation"
                             accessibilityRole="alert"
-                            accessibilityLabel="Load validation. Enter a load from 0 to 500 in 2.5 kg increments."
+                            accessibilityLabel="Load validation. Enter a load from 0 to 500 in 0.25 kg steps."
                           >
-                            Enter a load from 0 to 500 in 2.5 kg increments.
+                            Enter a load from 0 to 500 in 0.25 kg steps.
                           </Text>
-                        )}
-                        {!loadInvalid && !loadLoggable && (
-                          <Text style={styles.loadEvidence} testID="session-load-hint">Enter a load to log this set.</Text>
                         )}
                         {currentSlotBlockedReason !== null && (
                           <Text
@@ -1156,6 +2046,8 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                               Target: {target?.kind === 'reps' ? target.reps : '—'} reps. Log the reps you actually completed.
                             </Text>
                           )}
+                          {/* #182: a slot a report holds back asks for no load. */}
+                          {!bandOnly && !heldByReport(slot.sessionPlanSlotId) && (
                           <View style={styles.loadField}>
                             <Text style={styles.loadFieldLabel} testID="session-load-label">{loadLabel.toUpperCase()}</Text>
                             <View style={styles.loadFieldRow}>
@@ -1164,7 +2056,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                                 onPress={() => {
                                   const current = parseLoadDraft(loadText);
                                   if (current === null) return;
-                                  setLoadText(clamp(current - 2.5, 0, 500).toFixed(1));
+                                  editLoadText(formatLoadKg(clamp(current - 2.5, 0, 500)));
                                   setLoadInvalid(false);
                                 }}
                                 disabled={!isLoadDraftLoggable(loadText)}
@@ -1185,7 +2077,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                                 style={styles.loadInput}
                                 value={loadText}
                                 onChangeText={(t) => {
-                                  setLoadText(t);
+                                  editLoadText(t);
                                   const parsed = parseLoadDraft(t);
                                   setLoadInvalid(t.trim() !== '' && (parsed === null || !isOnLoadGrid(parsed)));
                                 }}
@@ -1196,7 +2088,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                                 accessibilityLabel={
                                   loadSelection === null
                                     ? `${loadLabel} entry`
-                                    : `${bodyweightMode ? 'Added load in kilograms, zero means bodyweight only' : 'Load in kilograms'}. ${loadEvidence}`
+                                    : `${bodyweightMode ? 'Added load in kilograms, zero means bodyweight only' : dumbbellMode ? 'Load in kilograms per dumbbell' : 'Load in kilograms'}. ${loadEvidence}`
                                 }
                               />
                               <Pressable
@@ -1204,7 +2096,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                                 onPress={() => {
                                   const current = parseLoadDraft(loadText);
                                   if (current === null) return;
-                                  setLoadText(clamp(current + 2.5, 0, 500).toFixed(1));
+                                  editLoadText(formatLoadKg(clamp(current + 2.5, 0, 500)));
                                   setLoadInvalid(false);
                                 }}
                                 disabled={!isLoadDraftLoggable(loadText)}
@@ -1221,6 +2113,7 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                               </Pressable>
                             </View>
                           </View>
+                          )}
 
                           <Text style={styles.effortCue} testID="effort-scale-explanation">
                             How hard did that feel? The full effort scale runs from 1 (very easy) to 10 (your hardest effort). Direct working-set entry runs from 5 to 10.
@@ -1336,13 +2229,18 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                               ? (effortCue(safeRpe) ?? 'Effort is optional evidence — leave it untouched to skip.')
                               : 'Effort is optional evidence — leave it untouched to skip.'}
                           </Text>
+                          {ceilingNote !== null && (
+                            <Text style={styles.effortCue} testID="effort-above-ceiling-note" accessibilityLiveRegion="polite">
+                              {ceilingNote}
+                            </Text>
+                          )}
                           <Text style={styles.effortCue}>{EFFORT_BREATHING_NOTE}</Text>
                           <Text style={styles.effortStop} testID="effort-stop-guidance">{EFFORT_STOP_GUIDANCE}</Text>
-                          <Text style={styles.rpeEvidence}>
-                            {safeRpe !== null
-                              ? 'This effort rating will be saved with the set.'
-                              : 'Effort rating is optional; leave it blank if you are unsure.'}
-                          </Text>
+                          {/* With no rating, the cue above already says effort is
+                              optional; a second line said it again (ux-8). */}
+                          {safeRpe !== null && (
+                            <Text style={styles.rpeEvidence}>This effort rating will be saved with the set.</Text>
+                          )}
                         </View>
 
                         {supportsBands && (
@@ -1378,6 +2276,11 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                               ? `Log set ${Math.min(slot.plannedSets, currentLogged + 1)} for ${movement?.name ?? 'movement'}`
                               : `Log set ${Math.min(slot.plannedSets, currentLogged + 1)} for ${movement?.name ?? 'movement'}, unavailable — enter a load first`}
                         />
+                        {!loadInvalid && !loadLoggable && !heldByReport(slot.sessionPlanSlotId) && (
+                          <Text style={styles.loadEvidence} testID="session-load-hint">Enter a load to log this set.</Text>
+                        )}
+
+                        {runner?.phase === 'working' && <QuietAction label="Skip this exercise" onPress={confirmSkipExercise} />}
 
                         {/* Shared Disclosure Primitive */}
                         <Disclosure
@@ -1418,75 +2321,27 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
                         </Disclosure>
 
                         {/* 56pt quick avoidance / discomfort trigger rows */}
-                        <View style={styles.quickRow}>
+                        <View testID="workout-quick-row" style={[styles.quickRow, stackQuickRow && styles.quickRowStacked]}>
                           <SecondaryButton
-                            label="Doesn’t feel right"
+                            label="Swap or avoid this"
                             onPress={thumbsDown}
-                            accessibilityLabel={`Avoid ${movement?.name ?? 'this movement'} and find a substitution`}
+                            accessibilityLabel={`Swap or avoid this: ${movement?.name ?? 'this movement'}`}
+                            fullWidth={stackQuickRow}
                             style={{ flex: 1, minHeight: theme.touch.min }}
                           />
                           <SecondaryButton
                             label="Report discomfort"
-                            onPress={() => setSafetyOpen((value) => !value)}
+                            onPress={() => {
+                              setSafetyOpen((value) => !value);
+                              setNiggleSavedNotice(false);
+                            }}
                             accessibilityLabel="Report discomfort"
+                            fullWidth={stackQuickRow}
                             style={{ flex: 1, minHeight: theme.touch.min }}
                           />
                         </View>
 
-                        {safetyOpen && (
-                          <View style={styles.safety}>
-                            <Text style={styles.safetyPrompt}>Where, and how strong is it?</Text>
-                            <View style={styles.joints}>
-                              {(JOINTS as readonly string[]).map((joint) => {
-                                const selectedJoint = niggleRegion === joint;
-                                return (
-                                  <Chip
-                                    key={joint}
-                                    label={joint.replace(/_/g, ' ')}
-                                    selected={selectedJoint}
-                                    onPress={() => setNiggleRegion(joint)}
-                                    accessibilityLabel={joint.replace(/_/g, ' ')}
-                                    style={{ margin: theme.space[1] }}
-                                  />
-                                );
-                              })}
-                            </View>
-                            <View style={styles.severity}>
-                              {[4, 6, 8].map((severity) => {
-                                const selectedSeverity = niggleSeverity === severity;
-                                const label = severity === 4 ? 'Mild' : severity === 6 ? 'Moderate' : 'Stop';
-                                return (
-                                  <Chip
-                                    key={severity}
-                                    label={label}
-                                    selected={selectedSeverity}
-                                    onPress={() => setNiggleSeverity(severity)}
-                                    accessibilityLabel={`${label} discomfort, ${severity} of 10`}
-                                    style={{ flex: 1, marginHorizontal: theme.space[1] }}
-                                  />
-                                );
-                              })}
-                            </View>
-                            <View style={{ marginTop: theme.space[3] }}>
-                              <PrimaryButton
-                                label={niggleSeverity >= 8 ? 'Stop session' : 'Find an alternative'}
-                                onPress={submitNiggle}
-                                disabled={niggleRegion === null}
-                                accessibilityLabel="Save discomfort report"
-                              />
-                            </View>
-                          </View>
-                        )}
-
-                        {/* Stop Session outlined full-width SecondaryButton */}
-                        <View style={{ marginTop: theme.space[3] }}>
-                          <SecondaryButton
-                            label="Stop session"
-                            onPress={() => runnerHalt('manual')}
-                            accessibilityLabel="Stop this session"
-                            fullWidth={true}
-                          />
-                        </View>
+                        {renderDiscomfortFormAndStop()}
                       </View>
                     )}
                   </View>
@@ -1497,73 +2352,172 @@ export default function SessionScreen({ onReturnToToday }: SessionScreenProps = 
         )}
 
         {!halted && !complete && substitution !== null && (
-          <View style={styles.substitution}>
-            <View style={styles.subHeader}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.subTitle}>Choose an alternative</Text>
-                <Text style={styles.subBody}>Your completed sets stay recorded. The replacement carries the remaining work.</Text>
-              </View>
-              <Pressable onPress={closeSubstitution} accessibilityRole="button" accessibilityLabel="Close substitution options" style={styles.close}>
-                <Text style={styles.closeText}>×</Text>
-              </Pressable>
-            </View>
-            {substitution.result.haltAdvised && (
-              <View style={styles.subHalt}>
-                <Text style={styles.subHaltText}>This report needs a pause rather than another exercise today.</Text>
-                <SecondaryButton
-                  label="Stop session"
-                  onPress={() => runnerHalt('safety')}
-                  accessibilityLabel="Halt session from substitution safety advice"
-                  fullWidth={true}
-                  style={{ marginTop: theme.space[3] }}
-                />
-              </View>
+          <View
+            style={styles.substitution}
+            testID="substitution-sheet"
+            onLayout={(event) => {
+              if (scrolledToSubstitutionFor.current === substitution.targetId) return;
+              scrolledToSubstitutionFor.current = substitution.targetId;
+              timelineRef.current?.scrollTo({ y: Math.max(0, event.nativeEvent.layout.y - theme.space[4]), animated: true });
+            }}
+          >
+            {pendingSub !== null && subTargetLogged > 0 ? (
+              <>
+                <View style={styles.subHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.subTitle}>{`Sets of ${pendingSub.option.name}`}</Text>
+                    <Text style={styles.subBody}>
+                      {`${subTargetLogged} logged ${subTargetLogged === 1 ? 'set' : 'sets'} of ${subTargetMovementName} ${subTargetLogged === 1 ? 'is' : 'are'} kept.`}
+                    </Text>
+                  </View>
+                  <Pressable
+                    onPress={() => {
+                      setPendingSub(null);
+                      closeSubstitution();
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Close substitution options"
+                    style={styles.close}
+                  >
+                    <Text style={styles.closeText}>×</Text>
+                  </Pressable>
+                </View>
+                <View style={styles.rirChoicesRow}>
+                  {[1, 2, 3, 4, 5, 6].map((k) => (
+                    <Chip
+                      key={k}
+                      label={String(k)}
+                      selected={pendingSubSets === k}
+                      onPress={() => setPendingSubSets(k)}
+                      accessibilityLabel={k === 1 ? `1 set of ${pendingSub.option.name}` : `${k} sets of ${pendingSub.option.name}`}
+                      style={styles.rirChip}
+                    />
+                  ))}
+                </View>
+                <View style={{ marginTop: theme.space[3], gap: theme.space[2] }}>
+                  <PrimaryButton
+                    label={pendingSub.kind === 'regression' ? `Use ${pendingSub.option.name} instead` : `Move ${pendingSub.option.name} forward into this session`}
+                    accessibilityLabel={pendingSub.kind === 'regression' ? `Use ${pendingSub.option.name} instead` : `Move ${pendingSub.option.name} forward into this session`}
+                    onPress={() => {
+                      const targetId = substitution.targetId;
+                      const chosen = pendingSub;
+                      const chosenSets = pendingSubSets;
+                      setPendingSub(null);
+                      if (chosen.kind === 'regression') {
+                        applyRegression(targetId, chosen.option.movement_id, chosenSets);
+                      } else {
+                        applyDaySwap(targetId, chosen.option, chosenSets);
+                      }
+                    }}
+                  />
+                  <QuietAction label="Cancel" accessibilityLabel="Cancel" onPress={() => setPendingSub(null)} />
+                </View>
+              </>
+            ) : (
+              <>
+                <View style={styles.subHeader}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.subTitle}>Choose an alternative</Text>
+                    <Text style={styles.subBody} testID="substitution-today-only">For today only. The plan keeps the original exercise; a pulled-forward exercise leaves its later session.</Text>
+                    <Text style={styles.subBody}>Your completed sets stay recorded. The replacement carries the remaining work.</Text>
+                  </View>
+                  <Pressable onPress={closeSubstitution} accessibilityRole="button" accessibilityLabel="Close substitution options" style={styles.close}>
+                    <Text style={styles.closeText}>×</Text>
+                  </Pressable>
+                </View>
+                {substitution.result.haltAdvised && (
+                  <View style={styles.subHalt}>
+                    <Text style={styles.subHaltText}>This report needs a pause rather than another exercise today.</Text>
+                    <SecondaryButton
+                      label="Stop session"
+                      onPress={() => runnerHalt('safety')}
+                      accessibilityLabel="Halt session from substitution safety advice"
+                      fullWidth={true}
+                      style={{ marginTop: theme.space[3] }}
+                    />
+                  </View>
+                )}
+                <View style={{ marginTop: theme.space[3] }}>
+                  {substitution.result.layer1Regression.options.map((option) => {
+                    const avail = availabilityMap.get(option.movement_id);
+                    // Fail closed: only an explicit 'available' verdict is selectable.
+                    // The store refuses the swap anyway; the sheet must not offer it.
+                    const selectable = avail?.state === 'available';
+                    const isTeachingOnly = !selectable;
+                    return (
+                      <Pressable
+                        key={option.movement_id}
+                        disabled={!selectable}
+                        onPress={() => {
+                          if (subTargetLogged > 0) {
+                            setPendingSubSets(clamp((subTargetSlot?.plannedSets ?? 1) - subTargetLogged, 1, 6));
+                            setPendingSub({ kind: 'regression', option });
+                          } else {
+                            applyRegression(substitution.targetId, option.movement_id);
+                          }
+                        }}
+                        accessibilityRole="button"
+                        accessibilityState={{ disabled: !selectable }}
+                        accessibilityLabel={`Use ${option.name} instead`}
+                        style={({ pressed }) => [styles.option, pressed && selectable && styles.pressed, !selectable && styles.optionDisabled]}
+                      >
+                        <View style={styles.optionCopy}>
+                          <Text style={styles.optionName}>{option.name}</Text>
+                          <Text style={styles.optionReason}>{option.rationale}</Text>
+                          {isTeachingOnly && (
+                            <Text style={styles.teachingOnlyOption}>
+                              {formatTeachingOnlyReason(avail)}
+                            </Text>
+                          )}
+                        </View>
+                        <Text style={styles.optionArrow}>›</Text>
+                      </Pressable>
+                    );
+                  })}
+                  {substitution.result.layer2DaySwap.options.map((option) => {
+                    const avail = availabilityMap.get(option.movement_id);
+                    const selectable = avail?.state === 'available';
+                    const isTeachingOnly = !selectable;
+                    return (
+                      <Pressable
+                        key={`swap-${option.plannedSlotId}`}
+                        disabled={!selectable}
+                        onPress={() => {
+                          if (subTargetLogged > 0) {
+                            setPendingSubSets(clamp((subTargetSlot?.plannedSets ?? 1) - subTargetLogged, 1, 6));
+                            setPendingSub({ kind: 'daySwap', option });
+                          } else {
+                            applyDaySwap(substitution.targetId, option);
+                          }
+                        }}
+                        accessibilityRole="button"
+                        accessibilityState={{ disabled: !selectable }}
+                        accessibilityLabel={`Move ${option.name} forward into this session`}
+                        style={({ pressed }) => [styles.option, pressed && selectable && styles.pressed, !selectable && styles.optionDisabled]}
+                      >
+                        <View style={styles.optionCopy}>
+                          <Text style={styles.optionName}>{option.name}</Text>
+                          <Text style={styles.optionReason}>{option.rationale}</Text>
+                          {isTeachingOnly && (
+                            <Text style={styles.teachingOnlyOption}>
+                              {formatTeachingOnlyReason(avail)}
+                            </Text>
+                          )}
+                        </View>
+                        <Text style={styles.optionArrow}>›</Text>
+                      </Pressable>
+                    );
+                  })}
+                  {substitution.result.layer1Regression.options.length === 0 && substitution.result.layer2DaySwap.options.length === 0 && (
+                    <Text style={styles.noOptions}>
+                      {substitution.heldByReportedArea === true
+                        ? 'Other exercises were held back because of an area you reported. None is left to switch to. It is okay to finish here.'
+                        : "No other exercise passes the app's checks for you right now. It is okay to finish here."}
+                    </Text>
+                  )}
+                </View>
+              </>
             )}
-            <View style={{ marginTop: theme.space[3] }}>
-              {substitution.result.layer1Regression.options.map((option) => {
-                const avail = availabilityMap.get(option.movement_id);
-                // Fail closed: only an explicit 'available' verdict is selectable.
-                // The store refuses the swap anyway; the sheet must not offer it.
-                const selectable = avail?.state === 'available';
-                const isTeachingOnly = !selectable;
-                return (
-                  <Pressable key={option.movement_id} disabled={!selectable} onPress={() => applyRegression(substitution.targetId, option.movement_id)} accessibilityRole="button" accessibilityState={{ disabled: !selectable }} accessibilityLabel={`Use ${option.name} instead`} style={({ pressed }) => [styles.option, pressed && selectable && styles.pressed, !selectable && styles.optionDisabled]}>
-                    <View style={styles.optionCopy}>
-                      <Text style={styles.optionName}>{option.name}</Text>
-                      <Text style={styles.optionReason}>{option.rationale}</Text>
-                      {isTeachingOnly && (
-                        <Text style={styles.teachingOnlyOption}>
-                          {formatTeachingOnlyReason(avail)}
-                        </Text>
-                      )}
-                    </View>
-                    <Text style={styles.optionArrow}>›</Text>
-                  </Pressable>
-                );
-              })}
-              {substitution.result.layer2DaySwap.options.map((option) => {
-                const avail = availabilityMap.get(option.movement_id);
-                const selectable = avail?.state === 'available';
-                const isTeachingOnly = !selectable;
-                return (
-                  <Pressable key={`swap-${option.plannedSlotId}`} disabled={!selectable} onPress={() => applyDaySwap(substitution.targetId, option)} accessibilityRole="button" accessibilityState={{ disabled: !selectable }} accessibilityLabel={`Move ${option.name} forward into this session`} style={({ pressed }) => [styles.option, pressed && selectable && styles.pressed, !selectable && styles.optionDisabled]}>
-                    <View style={styles.optionCopy}>
-                      <Text style={styles.optionName}>{option.name}</Text>
-                      <Text style={styles.optionReason}>{option.rationale}</Text>
-                      {isTeachingOnly && (
-                        <Text style={styles.teachingOnlyOption}>
-                          {formatTeachingOnlyReason(avail)}
-                        </Text>
-                      )}
-                    </View>
-                    <Text style={styles.optionArrow}>›</Text>
-                  </Pressable>
-                );
-              })}
-              {substitution.result.layer1Regression.options.length === 0 && substitution.result.layer2DaySwap.options.length === 0 && (
-                <Text style={styles.noOptions}>No replacement is available under the current app checks. It is okay to finish here.</Text>
-              )}
-            </View>
           </View>
         )}
       </KeyboardAwareScrollView>
@@ -1627,6 +2581,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'stretch',
   },
+  replacedRow: {
+    opacity: 0.4,
+  },
   rail: {
     width: 30,
     alignItems: 'center',
@@ -1656,8 +2613,17 @@ const styles = StyleSheet.create({
     borderColor: theme.color.chalk,
     backgroundColor: theme.color.chalk,
   },
+  dotSkipped: {
+    borderColor: theme.color.textMid,
+    backgroundColor: theme.color.ink1,
+  },
   check: {
     color: theme.color.ink0,
+    fontSize: 9,
+    fontWeight: '900',
+  },
+  skipMark: {
+    color: theme.color.textMid,
     fontSize: 9,
     fontWeight: '900',
   },
@@ -1701,8 +2667,8 @@ const styles = StyleSheet.create({
     marginTop: theme.space[2],
   },
   metricAdjust: {
-    minWidth: 54,
-    minHeight: 40,
+    minWidth: theme.touch.min,
+    minHeight: theme.touch.min,
     paddingHorizontal: theme.space[2],
     alignItems: 'center',
     justifyContent: 'center',
@@ -1733,6 +2699,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginTop: theme.space[2],
+  },
+  correctionBlock: {
+    gap: theme.space[2],
+    marginBottom: theme.space[3],
+  },
+  correctionText: {
+    ...theme.font.label,
+    color: theme.color.textMid,
   },
   currentCard: {
     flex: 1,
@@ -1870,6 +2844,7 @@ const styles = StyleSheet.create({
   },
   choose: {
     alignSelf: 'center',
+    marginLeft: theme.space[2],
     ...theme.font.label,
     color: theme.color.textHi,
   },
@@ -1920,6 +2895,9 @@ const styles = StyleSheet.create({
     marginTop: theme.space[3],
     gap: theme.space[2],
   },
+  quickRowStacked: {
+    flexDirection: 'column',
+  },
   safety: {
     marginTop: theme.space[3],
     padding: theme.space[3],
@@ -1940,8 +2918,13 @@ const styles = StyleSheet.create({
   },
   severity: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     marginTop: theme.space[3],
   },
+  // Walk W5-7: equal thirds (flex: 1) cut "MODERATE" to "MODER…". Each chip
+  // now starts at its label's width and shares what is left; at large text
+  // the row wraps instead of cutting a label.
+  severityChip: { flexGrow: 1, margin: theme.space[1] },
   haltCard: {
     padding: theme.space[4],
     borderWidth: 1,
@@ -2016,8 +2999,8 @@ const styles = StyleSheet.create({
     marginTop: theme.space[1],
   },
   close: {
-    width: 42,
-    height: 42,
+    minWidth: theme.touch.min,
+    minHeight: theme.touch.min,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2085,7 +3068,6 @@ const styles = StyleSheet.create({
   outcomeContainer: {
     flex: 1,
     backgroundColor: theme.color.ink0,
-    padding: theme.space[4],
   },
   outcomeMain: {
     flex: 1,
@@ -2134,6 +3116,7 @@ const styles = StyleSheet.create({
     textAlign: 'left',
   },
   outcomeFooter: {
+    marginTop: theme.space[3],
     paddingBottom: theme.space[4],
   },
   feelBlock: {
@@ -2183,7 +3166,7 @@ const styles = StyleSheet.create({
     marginTop: theme.space[3],
   },
   rirChip: {
-    minWidth: 48,
+    minWidth: theme.touch.min,
   },
   derivedRpeContainer: {
     alignItems: 'center',
@@ -2200,7 +3183,7 @@ const styles = StyleSheet.create({
     alignItems: 'stretch',
   },
   directToggle: {
-    minHeight: 44,
+    minHeight: theme.touch.min,
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: theme.space[2],
@@ -2226,6 +3209,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   halfStepChip: {
-    minWidth: 48,
+    minWidth: theme.touch.min,
   },
 });

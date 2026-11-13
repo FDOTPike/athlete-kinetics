@@ -27,6 +27,22 @@ export interface ProfileLimitedPrescription {
 
 const round2 = (x: number): number => Math.round(x * 100) / 100;
 
+/** The ceilings `applyProfileLimits` applies by experience and objective. */
+export const BEGINNER_RPE_CEILING = 8.5;
+export const REHAB_RPE_CEILING = 7.0;
+
+/** The effort ceiling `applyProfileLimits` will reach from the profile alone:
+ *  the athlete's own setting, then the beginner and rehab ceilings, lowest wins.
+ *  Shown to athletes so they see the ceiling the engine uses. */
+export function effectiveRpeCeiling(
+  profile: Pick<UserProfile, 'base_rpe_cap' | 'training_age' | 'objective'>,
+): number {
+  let ceiling = profile.base_rpe_cap;
+  if (profile.training_age === 'beginner' && ceiling > BEGINNER_RPE_CEILING) ceiling = BEGINNER_RPE_CEILING;
+  if (profile.objective === 'rehab' && ceiling > REHAB_RPE_CEILING) ceiling = REHAB_RPE_CEILING;
+  return ceiling;
+}
+
 export function applyProfileLimits(
   base: AdjustmentVector,
   profile: UserProfile,
@@ -41,12 +57,12 @@ export function applyProfileLimits(
     rpe = profile.base_rpe_cap;
     notes.push(`Profile effort ceiling: RPE capped at ${profile.base_rpe_cap.toFixed(1)}.`);
   }
-  if (profile.training_age === 'beginner' && rpe > 8.5) {
-    rpe = 8.5;
+  if (profile.training_age === 'beginner' && rpe > BEGINNER_RPE_CEILING) {
+    rpe = BEGINNER_RPE_CEILING;
     notes.push('Beginner training age: RPE capped at 8.5.');
   }
-  if (profile.objective === 'rehab' && rpe > 7.0) {
-    rpe = 7.0;
+  if (profile.objective === 'rehab' && rpe > REHAB_RPE_CEILING) {
+    rpe = REHAB_RPE_CEILING;
     notes.push('Rehab objective: RPE capped at 7.0.');
   }
   // Daily session cap: work beyond the cap is damped once (no compounding).
@@ -54,8 +70,10 @@ export function applyProfileLimits(
     load = round2(load * 0.85);
     sets = Math.max(-3, sets - 1);
     if (rpe > 7.0) rpe = 7.0;
+    // #202: the athlete reads this note in "Why today changed"; say it in words.
+    const sessionWord = ctx.sessionsToday === 1 ? 'session' : 'sessions';
     notes.push(
-      `Daily session cap reached (${ctx.sessionsToday}/${profile.max_sessions_per_day}): extra-session work is damped.`,
+      `You have done ${ctx.sessionsToday} ${sessionWord} today and your plan allows ${profile.max_sessions_per_day}, so extra sessions are kept lighter.`,
     );
   }
   // Weekly frequency: once the planned training days are spent, today is

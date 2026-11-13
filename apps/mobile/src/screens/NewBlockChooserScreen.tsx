@@ -7,12 +7,17 @@ interface NewBlockChooserScreenProps {
   onSelectAuto: () => void;
   onSelectCustom: () => void;
   onCancel?: () => void;
+  /** True for a beginner: standalone routines unlock after the Beginner stage
+   *  (the same rule BlockScreen and the routine builder apply). Custom then
+   *  shows its reason and does not open the builder (issue #154). */
+  customLocked?: boolean;
 }
 
 export default function NewBlockChooserScreen({
   onSelectAuto,
   onSelectCustom,
   onCancel,
+  customLocked = false,
 }: NewBlockChooserScreenProps): React.JSX.Element {
   return (
     <ScrollView
@@ -44,38 +49,29 @@ export default function NewBlockChooserScreen({
           </Text>
         </Pressable>
 
-        {/* Mode 2: Custom */}
+        {/* Mode 2: Custom. Closed to a beginner: shown with the reason, not opened. */}
         <Pressable
-          style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-          onPress={onSelectCustom}
+          style={({ pressed }) => [styles.card, pressed && !customLocked && styles.cardPressed, customLocked && styles.cardLocked]}
+          onPress={customLocked ? undefined : onSelectCustom}
           accessibilityRole="button"
-          accessibilityLabel="Custom: You choose every movement, day by day. Full control — you'll need to know what you're doing."
+          accessibilityState={{ disabled: customLocked }}
+          accessibilityLabel={customLocked
+            ? 'Custom: not available yet. Standalone routines unlock after the Beginner stage.'
+            : "Custom: You choose every movement, day by day. Full control — you'll need to know what you're doing."}
         >
           <View style={styles.cardHeaderRow}>
             <Text style={styles.modeName}>Custom</Text>
           </View>
-          <Text style={styles.modeBlurb}>
-            You choose every movement, day by day. Full control — you'll need to know what you're doing.
-          </Text>
+          {customLocked ? (
+            <Text style={styles.modeBlurb}>
+              Not available yet. Standalone routines unlock after the Beginner stage.
+            </Text>
+          ) : (
+            <Text style={styles.modeBlurb}>
+              You choose every movement, day by day. Full control — you'll need to know what you're doing.
+            </Text>
+          )}
         </Pressable>
-
-        {/* Mode 3: Guided (Disabled) */}
-        <View
-          style={[styles.card, styles.cardDisabled]}
-          accessibilityRole="button"
-          accessibilityState={{ disabled: true }}
-          accessibilityLabel="Guided: The coach drafts a week, you swap anything you don't like, then confirm. Coming soon"
-        >
-          <View style={styles.cardHeaderRow}>
-            <Text style={[styles.modeName, styles.modeNameDisabled]}>Guided</Text>
-            <View style={styles.badgeDisabled}>
-              <Text style={styles.badgeDisabledText}>Coming soon</Text>
-            </View>
-          </View>
-          <Text style={[styles.modeBlurb, styles.modeBlurbDisabled]}>
-            The coach drafts a week, you swap anything you don't like, then confirm.
-          </Text>
-        </View>
       </View>
 
       {onCancel !== undefined && (
@@ -109,9 +105,8 @@ const styles = StyleSheet.create({
     borderColor: theme.color.textMid,
     backgroundColor: theme.color.ink1,
   },
-  cardDisabled: {
+  cardLocked: {
     opacity: 0.6,
-    borderColor: theme.color.line,
   },
   cardHeaderRow: {
     flexDirection: 'row',
@@ -123,28 +118,9 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '800',
   },
-  modeNameDisabled: {
-    color: theme.color.textMid,
-  },
   modeBlurb: {
     color: theme.color.textMid,
     fontSize: 14,
     lineHeight: 20,
-  },
-  modeBlurbDisabled: {
-    color: theme.color.textLow,
-  },
-  badgeDisabled: {
-    backgroundColor: theme.color.ink0,
-    borderWidth: 1,
-    borderColor: theme.color.line,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  badgeDisabledText: {
-    color: theme.color.textLow,
-    fontSize: 11,
-    fontWeight: '700',
   },
 });

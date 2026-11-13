@@ -9,7 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Chip, PrimaryButton, SecondaryButton } from '../components/ui';
+import { Chip, Disclosure, PrimaryButton, SecondaryButton } from '../components/ui';
 import { MovementPreview } from '../components/movementPreview/MovementPreview';
 import { useSubViewBack } from '../navigation/navigation';
 import {
@@ -143,6 +143,9 @@ export default function LibraryScreenV2({ initialMovementId }: LibraryScreenProp
   const [kindFilter, setKindFilter] = useState<KindFilter>('all');
   const [scopeFilter, setScopeFilter] = useState<ScopeFilter>('all');
   const [selectedMovementId, setSelectedMovementId] = useState<number | null>(initialMovementId ?? null);
+  // #210: the six filter rows start collapsed behind one plain heading, for
+  // every athlete. Held here so they stay as left when a movement is opened.
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   useEffect(() => {
     setAvailabilityView(trainingAge === 'beginner' ? 'available' : 'all');
@@ -271,32 +274,43 @@ export default function LibraryScreenV2({ initialMovementId }: LibraryScreenProp
               </View>
             )}
             <View style={styles.chipRow}>
-              <Chip
-                label={selectedMovement.is_compound ? 'COMPOUND' : 'ISOLATION'}
-                selected={false}
-                onPress={() => {}}
-              />
-              <Chip
-                label={`${selectedMovement.difficulty.toUpperCase()}${selectedMovement.beginnerOk && selectedMovement.difficulty !== 'Beginner' ? ' · BEGINNER OK' : ''}`}
-                selected={false}
-                onPress={() => {}}
-              />
-              <Chip label={selectedMovement.loggingMode.toUpperCase()} selected={false} onPress={() => {}} />
+              <View style={styles.detailTag} accessibilityRole="text">
+                <Text style={styles.detailTagLabel} numberOfLines={1}>
+                  {selectedMovement.is_compound ? 'COMPOUND' : 'ISOLATION'}
+                </Text>
+              </View>
+              <View style={styles.detailTag} accessibilityRole="text">
+                <Text style={styles.detailTagLabel} numberOfLines={1}>
+                  {`${selectedMovement.difficulty.toUpperCase()}${selectedMovement.beginnerOk && selectedMovement.difficulty !== 'Beginner' ? ' · BEGINNER OK' : ''}`}
+                </Text>
+              </View>
+              <View style={styles.detailTag} accessibilityRole="text">
+                <Text style={styles.detailTagLabel} numberOfLines={1}>
+                  {selectedMovement.loggingMode.toUpperCase()}
+                </Text>
+              </View>
               {selectedMovement.scope === 'full_body' && (
-                <Chip
-                  label={FULL_BODY_LABEL.toUpperCase()}
-                  selected={false}
-                  onPress={() => {}}
+                <View
+                  style={styles.detailTag}
+                  accessible={true}
+                  accessibilityRole="text"
                   accessibilityLabel={`${selectedMovement.name} is a full body movement`}
-                />
+                >
+                  <Text style={styles.detailTagLabel} numberOfLines={1}>
+                    {FULL_BODY_LABEL.toUpperCase()}
+                  </Text>
+                </View>
               )}
               {selectedMovement.required.map((requirement) => (
-                <Chip
+                <View
                   key={requirement}
-                  label={equipmentLabel(requirement).toUpperCase()}
-                  selected={false}
-                  onPress={() => {}}
-                />
+                  style={styles.detailTag}
+                  accessibilityRole="text"
+                >
+                  <Text style={styles.detailTagLabel} numberOfLines={1}>
+                    {equipmentLabel(requirement).toUpperCase()}
+                  </Text>
+                </View>
               ))}
             </View>
             {selectedMovement.targetMuscles.length > 0 && (
@@ -385,6 +399,16 @@ export default function LibraryScreenV2({ initialMovementId }: LibraryScreenProp
           accessibilityLabel="Search movements"
         />
       </View>
+      <Disclosure
+        label="Filters"
+        hint={availabilityView === 'available'
+          ? 'Showing the movements available to you. Availability, pattern, equipment and more.'
+          : 'Availability, pattern, equipment and more.'}
+        open={filtersOpen}
+        onOpenChange={setFiltersOpen}
+        testID="library-filters"
+      >
+      <View style={styles.filterBody}>
       <Text style={styles.filterLabel}>Availability</Text>
       <View style={styles.toggleRow}>
         <Chip
@@ -406,7 +430,7 @@ export default function LibraryScreenV2({ initialMovementId }: LibraryScreenProp
           label="All patterns"
           selected={patternFilter === null}
           onPress={() => setPatternFilter(null)}
-          accessibilityLabel="Clear pattern filter"
+          accessibilityLabel="All patterns, clear pattern filter"
         />
         {patternOptions.map((pattern) => (
           <Chip
@@ -424,7 +448,7 @@ export default function LibraryScreenV2({ initialMovementId }: LibraryScreenProp
           label="All equipment"
           selected={equipmentFilter === null}
           onPress={() => setEquipmentFilter(null)}
-          accessibilityLabel="Clear equipment filter"
+          accessibilityLabel="All equipment, clear equipment filter"
         />
         {equipmentOptions.map((equipment) => (
           <Chip
@@ -444,7 +468,7 @@ export default function LibraryScreenV2({ initialMovementId }: LibraryScreenProp
             label={difficulty === 'all' ? 'All tiers' : difficulty}
             selected={difficultyFilter === difficulty}
             onPress={() => setDifficultyFilter(difficulty)}
-            accessibilityLabel={difficulty === 'all' ? 'Clear tier filter' : `Filter tier by ${difficulty}`}
+            accessibilityLabel={difficulty === 'all' ? 'All tiers, clear tier filter' : `Filter tier by ${difficulty}`}
           />
         ))}
       </View>
@@ -456,7 +480,7 @@ export default function LibraryScreenV2({ initialMovementId }: LibraryScreenProp
             label={kind === 'all' ? 'All types' : kind === 'compound' ? 'Compound' : 'Isolation'}
             selected={kindFilter === kind}
             onPress={() => setKindFilter(kind)}
-            accessibilityLabel={kind === 'all' ? 'Clear movement type filter' : `Filter type by ${kind}`}
+            accessibilityLabel={kind === 'all' ? 'All types, clear movement type filter' : `Filter type by ${kind}`}
           />
         ))}
       </View>
@@ -473,6 +497,8 @@ export default function LibraryScreenV2({ initialMovementId }: LibraryScreenProp
         ))}
       </View>
       <SecondaryButton label="Clear filters" onPress={clearFilters} accessibilityLabel="Clear search and filters" />
+      </View>
+      </Disclosure>
     </View>
   );
 
@@ -533,8 +559,9 @@ const styles = StyleSheet.create({
     height: theme.touch.min,
     justifyContent: 'center',
   },
-  searchInput: { ...theme.font.body, fontFamily: theme.font.family, color: theme.color.textHi, padding: 0 },
+  searchInput: { ...theme.font.body, fontFamily: theme.font.family, color: theme.color.textHi, padding: 0, minHeight: theme.touch.min, textAlignVertical: 'center' },
   filterLabel: { ...theme.font.eyebrow, color: theme.color.textMid },
+  filterBody: { gap: theme.space[3] },
   filterScroll: { gap: theme.space[2], paddingVertical: theme.space[1] },
   toggleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.space[2] },
   wrapRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.space[2] },
@@ -586,6 +613,21 @@ const styles = StyleSheet.create({
   teachingOnlyBanner: { borderLeftWidth: 4, borderLeftColor: theme.color.textMid, paddingLeft: theme.space[3] },
   teachingOnlyBannerText: { ...theme.font.body, color: theme.color.textMid },
   chipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.space[2] },
+  detailTag: {
+    minHeight: theme.touch.min,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: theme.space[4],
+    borderRadius: theme.radius.chip,
+    borderWidth: 1,
+    borderColor: theme.color.line,
+    backgroundColor: 'transparent',
+  },
+  detailTagLabel: {
+    ...theme.font.label,
+    fontFamily: theme.font.family,
+    color: theme.color.textMid,
+  },
   targetMuscles: { ...theme.font.label, color: theme.color.textMid },
   sectionBlock: { gap: theme.space[2] },
   sectionTitle: { ...theme.font.cue, color: theme.color.textHi },

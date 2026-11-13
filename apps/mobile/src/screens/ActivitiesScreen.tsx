@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Alert, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   ACTIVITY_DEMANDS,
   ACTIVITY_EQUIPMENT_KINDS,
@@ -122,14 +122,38 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
   // Cancel still clears it.
   const [entryDraftKept, setEntryDraftKept] = useState(false);
   const [keptCompletionOccurrenceId, setKeptCompletionOccurrenceId] = useState<string | null>(null);
+  // #148: what the entry looked like when it was started fresh. Leaving with
+  // an UNCHANGED entry closes quietly; only a real unsaved change is confirmed.
+  const [entryStart, setEntryStart] = useState(0);
+  const [entryBaseline, setEntryBaseline] = useState<string | null>(null);
+
+  // A shown validation message describes the values at the last Save. Once the
+  // athlete edits a typed field it may no longer be true, so it is cleared;
+  // Save validates again and shows a message if one still applies.
+  const editField = (setValue: (value: string) => void) => (value: string): void => {
+    setValue(value);
+    setError(null);
+  };
 
   const activeSeries = useMemo(
     () => ledger.series.filter((row) => row.effectiveEndDate === null),
     [ledger.series, today],
   );
 
+  const entrySnapshot = (): string => JSON.stringify([
+    entryMode, activityId, seriesId, kindId, displayName, demand, facilityCode, equipmentCode,
+    weekday, timing, timeText, dateText, durationText, effortText, oneOffState, modalityId, purposeId,
+  ]);
+  useEffect(() => {
+    setEntryBaseline(entrySnapshot());
+    // entrySnapshot reads the values of the render that started the entry.
+  }, [entryStart]);
+  const entryChanged = entryBaseline !== null && entrySnapshot() !== entryBaseline;
+
   const resetForm = (): void => {
+    setEntryStart((n) => n + 1);
     setEntryDraftKept(false);
+    setEntryMode('weekly');
     setActivityId(undefined);
     setSeriesId(undefined);
     setKindId('walking');
@@ -177,6 +201,7 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
       : `${String(Math.floor(row.localStartMinute / 60)).padStart(2, '0')}:${String(row.localStartMinute % 60).padStart(2, '0')}`);
     setDurationText(row.expectedDurationMin?.toString() ?? '');
     setEffortText(row.expectedEffort?.toString() ?? '');
+    setEntryStart((n) => n + 1);
     setError(null);
     setNotice(null);
     setFormOpen(true);
@@ -273,13 +298,34 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
     }
   });
 
+  // #148: the kept or open entry lives only in this screen, so leaving
+  // Activities (BACK TO ATHLETE, or a later hardware Back) asks first.
+  const requestLeave = (): void => {
+    if (!entryChanged) {
+      onClose();
+      return;
+    }
+    Alert.alert(
+      'Discard this activity?',
+      'Your activity entry has not been saved.',
+      [
+        { text: 'Keep editing', style: 'cancel' },
+        { text: 'Discard', style: 'destructive', onPress: onClose },
+      ],
+      { cancelable: true },
+    );
+  };
+  // Only a kept entry that really changed takes the Back; otherwise the host
+  // closes Activities exactly as it did before this change.
+  useSubViewBack(!formOpen && entryDraftKept && entryChanged, requestLeave);
+
   return (
     <KeyboardAwareScrollView
       style={styles.screen}
       contentContainerStyle={styles.content}
       testID="activities-screen"
     >
-      <QuietAction label="BACK TO ATHLETE" onPress={onClose} accessibilityLabel="Back to athlete profile" />
+      <QuietAction label="BACK TO ATHLETE" onPress={requestLeave} accessibilityLabel="Back to athlete profile" />
       <Text accessibilityRole="header" style={styles.heading}>YOUR ACTIVITIES</Text>
       <Text style={styles.intro}>
         Record sport, walking, swimming, cycling, gym work, or another activity you already do.
@@ -378,7 +424,7 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
             disableFullscreenUI
             style={styles.input}
             value={displayName}
-            onChangeText={setDisplayName}
+            onChangeText={editField(setDisplayName)}
             maxLength={160}
             accessibilityLabel="Activity name shown in the app"
             placeholder="For example, hobby horsing"
@@ -410,7 +456,7 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
           ) : (
             <>
               <Text style={styles.label}>DATE</Text>
-              <TextInput disableFullscreenUI style={styles.input} value={dateText} onChangeText={setDateText}
+              <TextInput disableFullscreenUI style={styles.input} value={dateText} onChangeText={editField(setDateText)}
                 accessibilityLabel="Activity date, YYYY-MM-DD" placeholder="YYYY-MM-DD"
                 placeholderTextColor={theme.color.textLow} autoCapitalize="none" />
               <Text style={styles.label}>WHAT HAPPENED?</Text>
@@ -435,20 +481,20 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
             Daylight-saving edge times are refused rather than guessed.
           </Text>
           <Text style={styles.label}>START TIME (OPTIONAL FOR FLEXIBLE)</Text>
-          <TextInput disableFullscreenUI style={styles.input} value={timeText} onChangeText={setTimeText}
+          <TextInput disableFullscreenUI style={styles.input} value={timeText} onChangeText={editField(setTimeText)}
             keyboardType="numbers-and-punctuation" accessibilityLabel="Start time in 24-hour HH:MM"
             placeholder="17:00" placeholderTextColor={theme.color.textLow} />
 
           <Text style={styles.label}>
             {entryMode === 'one_off' && oneOffState === 'completed' ? 'ACTUAL MINUTES (OPTIONAL)' : 'EXPECTED MINUTES (OPTIONAL)'}
           </Text>
-          <TextInput disableFullscreenUI style={styles.input} value={durationText} onChangeText={setDurationText}
+          <TextInput disableFullscreenUI style={styles.input} value={durationText} onChangeText={editField(setDurationText)}
             keyboardType="number-pad" accessibilityLabel="Whole activity duration in minutes"
             placeholder="Leave blank if unknown" placeholderTextColor={theme.color.textLow} />
           <Text style={styles.label}>
             {entryMode === 'one_off' && oneOffState === 'completed' ? 'ACTUAL EFFORT (OPTIONAL)' : 'EXPECTED EFFORT (OPTIONAL)'}
           </Text>
-          <TextInput disableFullscreenUI style={styles.input} value={effortText} onChangeText={setEffortText}
+          <TextInput disableFullscreenUI style={styles.input} value={effortText} onChangeText={editField(setEffortText)}
             keyboardType="decimal-pad" accessibilityLabel="Whole activity effort from 1 to 10"
             placeholder="1 very easy · 10 hardest effort" placeholderTextColor={theme.color.textLow} />
           <Text style={styles.hint}>Effort is for the whole activity. Blank stays unknown; it is never converted to RIR.</Text>
@@ -580,7 +626,7 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
           <Text accessibilityRole="header" style={styles.sectionTitle}>LOG {completionTarget.displayName.toUpperCase()}</Text>
           <Text style={styles.label}>ACTUAL MINUTES (OPTIONAL)</Text>
           <TextInput disableFullscreenUI style={styles.input} value={completionDuration}
-            onChangeText={setCompletionDuration} keyboardType="number-pad"
+            onChangeText={editField(setCompletionDuration)} keyboardType="number-pad"
             accessibilityLabel="Actual activity duration in minutes"
             placeholder={completionTarget.expectedDurationMin === null
               ? 'Leave blank if unknown'
@@ -588,7 +634,7 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
             placeholderTextColor={theme.color.textLow} />
           <Text style={styles.label}>ACTUAL EFFORT (OPTIONAL)</Text>
           <TextInput disableFullscreenUI style={styles.input} value={completionEffort}
-            onChangeText={setCompletionEffort} keyboardType="decimal-pad"
+            onChangeText={editField(setCompletionEffort)} keyboardType="decimal-pad"
             accessibilityLabel="Actual whole activity effort from 1 to 10"
             placeholder="1 very easy · 10 hardest effort" placeholderTextColor={theme.color.textLow} />
           {error !== null && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}

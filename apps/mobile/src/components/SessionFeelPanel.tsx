@@ -3,7 +3,10 @@
  *
  * A record, not a decision. Saving changes no prescription, block or
  * progression. The athlete answers by tapping: one answer for how the session
- * went and, unless it went as planned, at least one reason from a closed list.
+ * went and, unless it went as planned, reasons from that answer's closed list
+ * (issue #220: harder and easier have their own lists, and only "harder"
+ * needs a reason). A reason already saved for the same answer that its list
+ * does not offer is shown as an extra chip while the answer is unchanged.
  * The typed note is optional, is stored word for word, and is never
  * interpreted by this component or by anything it calls. The note starters
  * only put a few words into the note for the athlete to finish: they are a
@@ -23,10 +26,11 @@
  * Law: touch targets >= 56pt (Chip and the buttons carry it).
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, AccessibilityInfo, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   SESSION_FEEL_KINDS,
-  SESSION_FEEL_REASONS,
+  sessionFeelOfferedReasons,
+  sessionFeelReasonRequired,
   type SessionFeelDraft,
   type SessionFeelKind,
   type SessionFeelProblem,
@@ -34,6 +38,7 @@ import {
   type SessionFeelRecord,
 } from '@ak/inference';
 import { theme } from '../theme/theme';
+import { useSubViewBack } from '../navigation/navigation';
 import { Chip, PrimaryButton, SecondaryButton } from './ui';
 import KeyboardAwareScrollView from './KeyboardAwareScrollView';
 
@@ -53,6 +58,9 @@ export const SESSION_FEEL_REASON_LABEL: Record<SessionFeelReason, string> = {
   time: 'Short on time',
   felt_good: 'Felt good',
   other: 'Something else',
+  too_heavy: 'Load too heavy',
+  too_light: 'Load too light',
+  rested_well: 'Rested well',
 };
 
 export const SESSION_FEEL_NOTE_MAX_LENGTH = 1000;
@@ -62,15 +70,27 @@ const BODY_REASONS: readonly SessionFeelReason[] = ['pain', 'unwell'];
 
 /**
  * Always shown. This panel only records, so the athlete is told where a report
- * does change training: first the place they can use now, after a session, and
- * then the one for next time. The two names are the labels of those controls
- * (BlockScreen, SessionScreen) and "Plan" is that tab's name; a test keeps
- * them in step.
+ * does change training: first the place they can use now, after a session (the
+ * completion screen, SessionScreen), then the Plan screen (BlockScreen), and
+ * then the one for next time. "Something feels off" is the label of both
+ * controls; "Plan" is that tab's name; a test keeps them in step. This is the
+ * sentence used when readiness exists, so both forms are there; without it the
+ * no-plan-form sentence below is used.
  */
 export const SESSION_FEEL_RECORD_ONLY_TEXT =
   'This is a record only. It does not adjust your training. If something hurts or you feel unwell, '
-  + 'report it under "Something feels off" on the Plan screen. '
+  + 'report it under "Something feels off" here or on the Plan screen. '
   + 'During a session, use "Report discomfort" on the lift.';
+
+/**
+ * The same sentence when the Plan screen has no "Something feels off" form:
+ * Plan shows that form only once readiness exists (BlockScreen's no-readiness
+ * screen has no report form), so the sentence names only the place that is
+ * there (#180). What a report does with no readiness is not changed here.
+ */
+export const SESSION_FEEL_RECORD_ONLY_TEXT_NO_PLAN_FORM =
+  'This is a record only. It does not adjust your training. If something hurts or you feel unwell, '
+  + 'use "Report discomfort" on the lift during a session.';
 
 /**
  * Note starters: six kinds of line worth writing, each with the words a tap
@@ -97,11 +117,13 @@ export function withNoteStarter(note: string, label: string): string {
   return next.length > SESSION_FEEL_NOTE_MAX_LENGTH ? note : next;
 }
 
-/** One line for the completion screen: "Harder than planned: unwell, short on time." */
+/** One line for the completion screen, two plain sentences (issue #220):
+ *  "Easier than planned. Felt good." or "Harder than planned. Unwell, short on time." */
 export function describeSessionFeel(record: SessionFeelRecord): string {
   const answer = SESSION_FEEL_LABEL[record.feel];
   if (record.reasons.length === 0) return `${answer}.`;
-  return `${answer}: ${record.reasons.map((reason) => SESSION_FEEL_REASON_LABEL[reason].toLowerCase()).join(', ')}.`;
+  const reasons = record.reasons.map((reason) => SESSION_FEEL_REASON_LABEL[reason].toLowerCase()).join(', ');
+  return `${answer}. ${reasons.charAt(0).toUpperCase()}${reasons.slice(1)}.`;
 }
 
 /** 'nothing_to_save': the answer was optional and neither an answer nor a note was given. */
@@ -109,7 +131,7 @@ export type SessionFeelSaveResult = SessionFeelProblem | 'not_saved' | 'nothing_
 
 const PROBLEM_TEXT: Record<Exclude<SessionFeelSaveResult, null>, string> = {
   feel_required: 'Choose how the session went.',
-  reason_required: 'Choose at least one reason.',
+  reason_required: 'Choose at least one reason it was harder.',
   unknown_value: 'This could not be saved. Your session is still recorded.',
   not_saved: 'This could not be saved. Your session is still recorded.',
   nothing_to_save: 'Type a note, or choose how the session went.',
@@ -124,6 +146,9 @@ export interface SessionFeelPanelProps {
    *  may be saved on its own. Only changes the wording; the caller decides
    *  what a save with no answer does. */
   answerOptional?: boolean;
+  /** False when the Plan screen's "Something feels off" form is not shown
+   *  (no readiness yet), so the record-only sentence does not point at it. */
+  planReportAvailable?: boolean;
   /** Asks the store to save. Returns null when saved, otherwise why not. */
   onSave: (draft: SessionFeelDraft, note: string) => SessionFeelSaveResult;
   /** Leave without saving, or after a save. */
@@ -134,7 +159,8 @@ export interface SessionFeelPanelProps {
  * The sub-view that asks how a finished session went. Starts from the saved
  * answer when there is one, so it doubles as the way to correct it.
  */
-export function SessionFeelPanel({ saved, note, answerOptional = false, onSave, onClose }: SessionFeelPanelProps): React.JSX.Element {
+export function SessionFeelPanel({ saved, note, answerOptional = false, planReportAvailable = true, onSave, onClose }: SessionFeelPanelProps): React.JSX.Element {
+  const recordOnlyText = planReportAvailable ? SESSION_FEEL_RECORD_ONLY_TEXT : SESSION_FEEL_RECORD_ONLY_TEXT_NO_PLAN_FORM;
   const [feel, setFeel] = useState<SessionFeelKind | null>(saved?.feel ?? null);
   const [reasons, setReasons] = useState<readonly SessionFeelReason[]>(saved?.reasons ?? []);
   const [noteText, setNoteText] = useState(note ?? '');
@@ -142,6 +168,14 @@ export function SessionFeelPanel({ saved, note, answerOptional = false, onSave, 
   const [starter, setStarter] = useState<SessionNoteStarterId | null>(null);
   // Stays true once a "Body" line was started in this visit, whatever is tapped next.
   const [bodyLineStarted, setBodyLineStarted] = useState(false);
+
+  /** Choose an answer. A different answer starts with no reasons: a reason
+   *  tapped under the earlier answer, even one both lists offer, was given
+   *  for that answer, not this one. */
+  const chooseFeel = (kind: SessionFeelKind): void => {
+    if (kind !== feel) setReasons([]);
+    setFeel(kind);
+  };
 
   /** Tap a reason on or off. Any earlier "could not save" message is cleared. */
   const toggleReason = (reason: SessionFeelReason): void => {
@@ -151,11 +185,15 @@ export function SessionFeelPanel({ saved, note, answerOptional = false, onSave, 
       : [...current, reason]));
   };
 
-  /** Tap a note starter: its words go into the note, and its example is shown. */
+  /** Tap a note starter: its words go into the note, its example is shown,
+   *  and the note field takes focus so the athlete can type straight away
+   *  (Android walk 2026-11-03, ux-8: the keyboard stayed closed). */
+  const noteRef = useRef<TextInput | null>(null);
   const startLine = (id: SessionNoteStarterId, label: string): void => {
     setStarter(id);
     if (id === 'body') setBodyLineStarted(true);
     setNoteText((current) => withNoteStarter(current, label));
+    noteRef.current?.focus();
   };
 
   /** Ask the store to save. Close on success; otherwise stay open and say why. */
@@ -165,8 +203,40 @@ export function SessionFeelPanel({ saved, note, answerOptional = false, onSave, 
     else setProblem(result);
   };
 
+  // Something the athlete entered and has not saved: a changed answer, a
+  // changed reason list or a changed note. Opening a saved answer is not one.
+  const savedReasons = saved?.reasons ?? [];
+  const unsaved = feel !== (saved?.feel ?? null)
+    || reasons.length !== savedReasons.length
+    || reasons.some((reason) => !savedReasons.includes(reason))
+    || noteText !== (note ?? '');
+
+  /** Android Back: with nothing unsaved, leave; otherwise ask first (#192). */
+  const requestLeave = (): void => {
+    if (!unsaved) {
+      onClose();
+      return;
+    }
+    Alert.alert(
+      'Discard this answer?',
+      'Your choice and note have not been saved.',
+      [
+        { text: 'Keep editing', style: 'cancel' },
+        { text: 'Discard', style: 'destructive', onPress: onClose },
+      ],
+      { cancelable: true },
+    );
+  };
+  // Registered only while there is something to lose; it then runs before the
+  // host's own Back handler for this sub-view, which closes the panel as before.
+  useSubViewBack(unsaved, requestLeave);
+
   const reasonsShown = feel !== null && feel !== 'as_planned';
-  const bodyReasonChosen = reasonsShown && reasons.some((reason) => BODY_REASONS.includes(reason));
+  // The answer's own list, plus a reason already saved for this same answer
+  // that the list does not offer (a row from before the per-answer lists):
+  // shown, still selected, so a saved "pain" is never hidden or dropped.
+  const offeredReasons = sessionFeelOfferedReasons(feel, saved);
+  const bodyReasonChosen = reasonsShown && reasons.some((reason) => BODY_REASONS.includes(reason) && offeredReasons.includes(reason));
   // The sentence is always there; this only decides whether it stands out.
   const aboutTheBody = bodyReasonChosen || bodyLineStarted;
   // A screen reader hears it at the moment a sighted athlete sees it change.
@@ -174,10 +244,10 @@ export function SessionFeelPanel({ saved, note, answerOptional = false, onSave, 
   const stoodOut = useRef(aboutTheBody);
   useEffect(() => {
     if (aboutTheBody && !stoodOut.current) {
-      AccessibilityInfo.announceForAccessibility(SESSION_FEEL_RECORD_ONLY_TEXT);
+      AccessibilityInfo.announceForAccessibility(recordOnlyText);
     }
     stoodOut.current = aboutTheBody;
-  }, [aboutTheBody]);
+  }, [aboutTheBody, recordOnlyText]);
 
   return (
     <KeyboardAwareScrollView
@@ -197,7 +267,7 @@ export function SessionFeelPanel({ saved, note, answerOptional = false, onSave, 
             key={kind}
             label={SESSION_FEEL_LABEL[kind]}
             selected={feel === kind}
-            onPress={() => { setProblem(null); setFeel(kind); }}
+            onPress={() => { setProblem(null); chooseFeel(kind); }}
             testID={`session-feel-${kind}`}
           />
         ))}
@@ -205,9 +275,13 @@ export function SessionFeelPanel({ saved, note, answerOptional = false, onSave, 
 
       {reasonsShown && (
         <View style={styles.group} testID="session-feel-reasons">
-          <Text style={styles.label}>Why? Choose any that apply.</Text>
+          <Text style={styles.label} testID="session-feel-reasons-label">
+            {feel !== null && sessionFeelReasonRequired(feel)
+              ? 'Why? Choose at least one.'
+              : 'Why? Optional. Choose any that apply.'}
+          </Text>
           <View style={styles.chipRow}>
-            {SESSION_FEEL_REASONS.map((reason) => (
+            {offeredReasons.map((reason) => (
               <Chip
                 key={reason}
                 label={SESSION_FEEL_REASON_LABEL[reason]}
@@ -224,7 +298,7 @@ export function SessionFeelPanel({ saved, note, answerOptional = false, onSave, 
         style={aboutTheBody ? styles.notice : styles.standing}
         testID="session-feel-record-only"
       >
-        {SESSION_FEEL_RECORD_ONLY_TEXT}
+        {recordOnlyText}
       </Text>
 
       <View style={styles.group}>
@@ -250,6 +324,7 @@ export function SessionFeelPanel({ saved, note, answerOptional = false, onSave, 
           </Text>
         )}
         <TextInput
+          ref={noteRef}
           disableFullscreenUI
           style={styles.input}
           value={noteText}

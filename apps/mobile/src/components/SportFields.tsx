@@ -21,7 +21,6 @@
 import React from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import {
-  COMPETITION_DATE_NOTE,
   SPORT_EXPERIENCE,
   SPORT_EXPERIENCE_LABEL,
   SPORT_FAMILIES,
@@ -47,6 +46,14 @@ import { theme } from '../theme/theme';
 import { Chip, Stepper } from './ui';
 
 export const SPORT_QUESTION = 'Do you play or compete in a sport?';
+
+/**
+ * Shown above the competition date field, so the athlete reads it before
+ * typing a date (#229): the fixed cycle stays, and the date does not shape the
+ * plan. The generator's own "does not change this plan" lines are unchanged.
+ */
+export const COMPETITION_DATE_FIRST_NOTE =
+  'If you add a competition date, it is recorded. For now the plan does not peak, taper or test for it. The date is used for reminders and for reviewing your goals.';
 
 export interface SportFieldsState {
   readonly family: SportFamilyId | null;
@@ -165,6 +172,7 @@ export function SportEditor({ fields, onChange, today, showAllErrors = false }: 
           <View style={styles.group}>
             {members.map((sportId) => (
               <Chip
+                wrap
                 key={sportId}
                 testID={`sport-${sportId}`}
                 label={`${SPORT_INFO[sportId].label.toUpperCase()} — ${SPORT_INFO[sportId].distinction ?? ''}`}
@@ -205,6 +213,7 @@ export function SportEditor({ fields, onChange, today, showAllErrors = false }: 
           <View style={styles.group}>
             {SPORT_OUTCOMES_BY_SPORT[fields.sportId].map((outcomeId) => (
               <Chip
+                wrap
                 key={outcomeId}
                 testID={`sport-outcome-${outcomeId}`}
                 label={SPORT_OUTCOME_LABEL[outcomeId].toUpperCase()}
@@ -240,6 +249,7 @@ export function SportEditor({ fields, onChange, today, showAllErrors = false }: 
           <View style={styles.wrap}>
             {SPORT_EXPERIENCE.map((experienceId) => (
               <Chip
+                wrap
                 key={experienceId}
                 testID={`sport-experience-${experienceId}`}
                 label={SPORT_EXPERIENCE_LABEL[experienceId].toUpperCase()}
@@ -305,6 +315,7 @@ export function SportEditor({ fields, onChange, today, showAllErrors = false }: 
           </Text>
 
           <Text style={styles.label}>NEXT COMPETITION (OPTIONAL)</Text>
+          <Text style={styles.dim} testID="sport-competition-note">{COMPETITION_DATE_FIRST_NOTE}</Text>
           <TextInput
             disableFullscreenUI
             style={styles.input}
@@ -318,7 +329,6 @@ export function SportEditor({ fields, onChange, today, showAllErrors = false }: 
             testID="sport-competition"
           />
           {fieldError('competitionDate', fields.competitionText.length > 0)}
-          <Text style={styles.dim} testID="sport-competition-note">{COMPETITION_DATE_NOTE}</Text>
         </>
       )}
     </View>

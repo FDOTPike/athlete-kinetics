@@ -13,18 +13,34 @@ beforeEach(() => {
   };
 });
 
-test('explains encrypted all-athlete backup, off-phone storage, CSV separation, and replace-only restore', () => {
+test('explains encrypted all-athlete backup, off-phone storage, and replace-only restore', () => {
   mockState.preview = {
     backupId: 'one', createdAt: '2026-09-13T05:00:00.000Z', athleteNames: ['Athlete 1', 'Alex'],
     databaseCount: 2, totalBytes: 2_097_152, replaceOnly: true,
   };
   render(<BackupTransferPanel />);
-  expect(screen.getByText(/includes every athlete, profile, plan, routine, workout, activity, health-support record/)).toBeOnTheScreen();
-  expect(screen.getByText(/separate from readable CSV history export/)).toBeOnTheScreen();
+  // #173: "every athlete" became the stated limit (see BackupCapacity.test.js).
+  expect(screen.getByText(/includes each athlete's profile, plans, routines, workouts, activities, health-support records/)).toBeOnTheScreen();
+  expect(screen.getByText(/Backups cover up to about five athletes in this version/)).toBeOnTheScreen();
   expect(screen.getByText(/copy kept only on this phone will not protect you/)).toBeOnTheScreen();
   expect(screen.getByText(/Replace only: this removes all current athlete data/)).toBeOnTheScreen();
   expect(screen.getByText(/creates and verifies an encrypted recovery backup/)).toBeOnTheScreen();
   expect(screen.getByText('Athletes: Athlete 1, Alex')).toBeOnTheScreen();
+});
+
+// #235: there is no CSV export, so the panel must not point to one.
+test('does not mention a CSV export with status, recovery and preview shown', () => {
+  mockState.recoveryAvailable = true;
+  mockState.message = 'Backup saved.';
+  mockState.lastSuccessfulBackupAt = '2026-09-13T05:00:00.000Z';
+  mockState.preview = {
+    backupId: 'one', createdAt: '2026-09-13T05:00:00.000Z', athleteNames: ['Athlete 1'],
+    databaseCount: 1, totalBytes: 1_048_576, replaceOnly: true,
+  };
+  render(<BackupTransferPanel />);
+  expect(screen.getByTestId('restore-preview')).toBeOnTheScreen();
+  expect(screen.queryAllByText(/CSV/i)).toHaveLength(0);
+  expect(JSON.stringify(screen.toJSON())).not.toMatch(/CSV/i);
 });
 
 test('requires a confirmed 12-character password to create but not to open a restore picker', () => {
@@ -44,18 +60,30 @@ test('requires a confirmed 12-character password to create but not to open a res
   expect(mockState.chooseRestore).not.toHaveBeenCalled();
 });
 
-test('preview confirmation is explicit and cancellation never invokes restore', () => {
-  mockState.preview = {
-    backupId: 'one', createdAt: '2026-09-13T05:00:00.000Z', athleteNames: ['Athlete 1'],
-    databaseCount: 1, totalBytes: 1_048_576, replaceOnly: true,
-  };
-  render(<BackupTransferPanel />);
-  fireEvent.changeText(screen.getByLabelText('Backup password, at least 12 characters'), 'restore-passphrase');
+const PREVIEW = {
+  backupId: 'one', createdAt: '2026-09-13T05:00:00.000Z', athleteNames: ['Athlete 1'],
+  databaseCount: 1, totalBytes: 1_048_576, replaceOnly: true,
+};
+
+test('cancelling the preview never invokes restore and removes the confirmation', () => {
+  mockState.preview = PREVIEW;
+  // Model the store: cancelling clears the preview.
+  mockState.cancelRestore = jest.fn(() => { mockState.preview = null; });
+  const view = render(<BackupTransferPanel />);
   fireEvent.press(screen.getByTestId('cancel-restore-button'));
+  view.rerender(<BackupTransferPanel />);
   expect(mockState.cancelRestore).toHaveBeenCalledTimes(1);
   expect(mockState.confirmRestore).not.toHaveBeenCalled();
+  expect(screen.queryByTestId('confirm-restore-button')).toBeNull();
+});
+
+test('preview confirmation is explicit and uses the pending candidate', () => {
+  mockState.preview = PREVIEW;
+  render(<BackupTransferPanel />);
+  expect(mockState.confirmRestore).not.toHaveBeenCalled();
+  expect(screen.getByTestId('confirm-restore-button').props.accessibilityState.disabled).toBe(false);
   fireEvent.press(screen.getByTestId('confirm-restore-button'));
-  expect(mockState.confirmRestore).toHaveBeenCalledWith('restore-passphrase');
+  expect(mockState.confirmRestore).toHaveBeenCalledWith();
 });
 
 test('offers a bounded password-gated path to review the previous encrypted recovery', () => {
@@ -119,4 +147,68 @@ test('an in-flight backup or restore keeps every action disabled', () => {
   for (const id of ['create-backup-button', 'choose-restore-button', 'review-recovery-button', 'confirm-restore-button', 'cancel-restore-button']) {
     expect(screen.getByTestId(id).props.accessibilityState.disabled).toBe(true);
   }
+});
+
+describe('#135 a working backup or restore shows an indicator with elapsed time', () => {
+  const { act } = require('@testing-library/react-native');
+  const { AccessibilityInfo } = require('react-native');
+  beforeEach(() => { jest.useFakeTimers(); });
+  afterEach(() => { jest.useRealTimers(); jest.restoreAllMocks(); });
+
+  test('shows an indicator with elapsed time that advances each second, and clears when the run ends', () => {
+    mockState.status = 'working';
+    mockState.message = 'Creating an encrypted snapshot…';
+    const { rerender } = render(<BackupTransferPanel />);
+    expect(screen.getByTestId('backup-working-indicator')).toBeOnTheScreen();
+    expect(screen.getByTestId('backup-working-elapsed').props.children).toBe('Creating an encrypted snapshot… 0:00');
+    act(() => { jest.advanceTimersByTime(65_000); });
+    expect(screen.getByTestId('backup-working-elapsed').props.children).toBe('Creating an encrypted snapshot… 1:05');
+
+    mockState.status = 'success';
+    mockState.message = 'Encrypted backup saved to the location you chose. Keep a copy off this phone.';
+    rerender(<BackupTransferPanel />);
+    expect(screen.queryByTestId('backup-working-indicator')).toBeNull();
+    expect(screen.getByTestId('backup-status-message').props.children).toBe(mockState.message);
+  });
+
+  test('a failed run clears the indicator too', () => {
+    mockState.status = 'working';
+    mockState.message = 'Opening encrypted backup…';
+    const { rerender } = render(<BackupTransferPanel />);
+    expect(screen.getByTestId('backup-working-indicator')).toBeOnTheScreen();
+    mockState.status = 'error';
+    mockState.message = 'The backup could not be opened.';
+    rerender(<BackupTransferPanel />);
+    expect(screen.queryByTestId('backup-working-indicator')).toBeNull();
+  });
+
+  test('the start is announced once, not on every elapsed-time tick, and the start buttons stay disabled', () => {
+    const announce = jest.spyOn(AccessibilityInfo, 'announceForAccessibility').mockImplementation(() => {});
+    mockState.status = 'working';
+    mockState.message = 'Opening encrypted backup…';
+    render(<BackupTransferPanel />);
+    act(() => { jest.advanceTimersByTime(5_000); });
+    expect(announce).toHaveBeenCalledTimes(1);
+    expect(announce).toHaveBeenCalledWith('Opening encrypted backup…');
+    expect(screen.getByTestId('create-backup-button').props.accessibilityState.disabled).toBe(true);
+    expect(screen.getByTestId('choose-restore-button').props.accessibilityState.disabled).toBe(true);
+  });
+
+  test('#302: restore and recovery status render in the restore controls area instead of above them', () => {
+    mockState.recoveryAvailable = true;
+    render(<BackupTransferPanel />);
+    fireEvent.changeText(screen.getByLabelText('Backup password, at least 12 characters'), 'previous-password');
+    fireEvent.press(screen.getByTestId('choose-restore-button'));
+    mockState.status = 'error';
+    mockState.message = 'Could not read that backup.';
+    screen.rerender(<BackupTransferPanel />);
+    const tree = JSON.stringify(screen.toJSON());
+    expect(tree.indexOf('backup-status-message')).toBeGreaterThan(tree.indexOf('choose-restore-button'));
+
+    fireEvent.press(screen.getByTestId('review-recovery-button'));
+    mockState.message = 'Could not open recovery copy.';
+    screen.rerender(<BackupTransferPanel />);
+    const recoveryTree = JSON.stringify(screen.toJSON());
+    expect(recoveryTree.indexOf('backup-status-message')).toBeGreaterThan(recoveryTree.indexOf('review-recovery-button'));
+  });
 });

@@ -254,6 +254,13 @@ console.log('\n[6] the REAL workflow in this repository');
     qaBuildAt >= 0 && cleanGateAt > qaBuildAt && candidateGateAt > cleanGateAt
       && effectiveWorkflow.includes('git diff --exit-code -- .')
       && effectiveWorkflow.includes('git diff --cached --exit-code -- .'));
+
+  const concurrencyMatch = effectiveWorkflow.match(
+    /^concurrency:\s*\r?\n\s+group:\s*ci-\$\{\{\s*github\.event\.pull_request\.number\s*\|\|\s*github\.run_id\s*\}\}\s*\r?\n\s+cancel-in-progress:\s*\$\{\{\s*github\.event_name\s*==\s*'pull_request'\s*\}\}/m,
+  );
+  check('  ...and CI cancels superseded pull-request runs without grouping non-PR runs together',
+    Boolean(concurrencyMatch) && !/group:[^\r\n]*github\.ref/.test(effectiveWorkflow),
+    concurrencyMatch ? 'present' : 'missing or shared non-PR concurrency group');
 }
 
 console.log(`\n${fail === 0 ? 'ALL CI STRUCTURE FIXTURES PASSED' : `${fail} CI STRUCTURE FIXTURE(S) FAILED`}`);

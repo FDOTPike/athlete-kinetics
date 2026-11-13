@@ -42,6 +42,7 @@ import { basename, dirname, join, relative, sep } from 'node:path';
 
 import { parseMeminfoDump, privateDirtyBytes } from './meminfo_parser.mjs';
 import {
+  bindTargetSamples,
   computeCadence,
   computeSamplingSegments,
   correlateRequests,
@@ -225,13 +226,16 @@ export function verifyEvidencePacket({
   // --- 3. re-parse every raw sample and re-derive its Private Dirty -------
   const samples = session.samples ?? [];
   let reparsed = 0;
+  const processSamples = [];
   const valueMismatches = [];
   for (const s of samples) {
     const p = join(evidenceDir, basename(String(s?.rawFile ?? '')));
     if (!existsSync(p)) continue;
     let derived = null;
     try {
-      derived = privateDirtyBytes(parseMeminfoDump(readFileSync(p, 'utf-8')));
+      const parsed = parseMeminfoDump(readFileSync(p, 'utf-8'));
+      derived = privateDirtyBytes(parsed);
+      processSamples.push({ ...s, appName: parsed.appName, processId: parsed.processId });
     } catch { derived = null; }
     reparsed += 1;
     if (derived !== s.privateDirtyBytes) {
@@ -262,13 +266,20 @@ export function verifyEvidencePacket({
         + `cadence (${defaultGap}) — a widened continuity threshold makes unsampled holes look `
         + 'like coverage, so it may not be asserted by the packet');
     }
-    const segments = computeSamplingSegments(sampleStarts, {
+    let segments = computeSamplingSegments(sampleStarts, {
       continuityGapMs: Number.isFinite(recordedGap) ? recordedGap : defaultGap,
     });
-    const { markers } = parseLifecycleMarkers(readFileSync(logcatPath, 'utf-8'), {
+    let { markers } = parseLifecycleMarkers(readFileSync(logcatPath, 'utf-8'), {
       tzOffsetMinutes: Number.isFinite(session.deviceUtcOffsetMinutes) ? session.deviceUtcOffsetMinutes : null,
       year: new Date(session.startedAtUtc).getUTCFullYear(),
     });
+    try {
+      if (processSamples.length !== samples.length) throw new Error('Missing raw process identity');
+      ({ markers, segments } = bindTargetSamples({ samples: processSamples, markers, segments, packageName: session.package }));
+    } catch (e) {
+      problems.push(e.message);
+      markers = [];
+    }
     const { qualified, disposalIntegrity } = correlateRequests({ markers, segments });
     const mem = summarizeMemory({
       samples: samples.map((s) => ({

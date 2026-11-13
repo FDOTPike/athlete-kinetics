@@ -249,3 +249,97 @@ describe('Learning Glossary & InfoTip Contracts (WO §7.2 Items 12–16)', () =>
     });
   });
 });
+
+// Android walk 2026-11-03 (W2-14): Plan names the intensification phase
+// "Build strength", but its info button asked about INTENSIFICATION.
+test('the phase shown as "Build strength" explains itself under that name', () => {
+  render(<InfoTip term="INTENSIFICATION" />);
+  expect(screen.getByLabelText('What does BUILD STRENGTH mean?')).toBeOnTheScreen();
+  expect(screen.queryByLabelText('What does INTENSIFICATION mean?')).toBeNull();
+});
+
+// The display name must not change the bundled question index: `term` and
+// `aliases` feed it, so "Build strength" is a display name only.
+test('"Build strength" is found by search and lookup, as a display name', () => {
+  const { getGlossaryEntry, searchGlossary, glossaryTitle } = require('../../src/data/glossary');
+  const entry = getGlossaryEntry('build strength');
+  expect(entry.id).toBe('INTENSIFICATION');
+  expect(entry.term).toBe('INTENSIFICATION');
+  expect(glossaryTitle(entry)).toBe('BUILD STRENGTH');
+  expect(searchGlossary('build str')[0].id).toBe('INTENSIFICATION');
+});
+
+describe('2026-11-05 Glossary Rulings (#285)', () => {
+  const { getGlossaryEntry, glossaryTitle } = require('../../src/data/glossary');
+
+  test('DOMS entry matches the 2026-11-05 ruling', () => {
+    const entry = getGlossaryEntry('DOMS');
+    expect(entry).toBeDefined();
+    expect(entry.id).toBe('DOMS');
+    expect(entry.term).toBe('DOMS');
+    expect(entry.displayTerm).toBe('Muscle soreness (DOMS)');
+    expect(entry.category).toBe('general');
+    expect(entry.aliases).toEqual([
+      'delayed onset muscle soreness',
+      'muscle soreness',
+      'sore muscles after training',
+    ]);
+    expect(entry.definition).toBe(
+      'Delayed onset muscle soreness: the stiff, achy feeling in a muscle a day or two after training, most often after new or harder work. It is normal and is not damage. It usually eases as you warm up and fades within a few days. Pain that is sharp, sits in a joint, or gets worse as you move is not DOMS: report it under "Something feels off".'
+    );
+    expect(glossaryTitle(entry)).toBe('Muscle soreness (DOMS)');
+  });
+
+  test('bar-speed entry matches the 2026-11-05 ruling', () => {
+    const entry = getGlossaryEntry('bar-speed');
+    expect(entry).toBeDefined();
+    expect(entry.id).toBe('bar-speed');
+    expect(entry.term).toBe('Bar speed');
+    expect(entry.category).toBe('metric');
+    expect(entry.aliases).toEqual(['bar velocity', 'rep speed', 'slow bar']);
+    expect(entry.definition).toBe(
+      "How fast the weight moves on the lifting part of a rep. When a weight that is normally comfortable moves noticeably slower than usual, you are more tired than usual. A report that everything feels heavy and slow can lower today's load."
+    );
+  });
+
+  test('READINESS definition matches the 2026-11-05 ruling', () => {
+    const entry = getGlossaryEntry('READINESS');
+    expect(entry).toBeDefined();
+    expect(entry.definition).toBe(
+      "An estimate from 0 to 100 that the app computes each day from your synced overnight signals: heart rate variability compared with your own baseline, and sleep efficiency. Training load is shown beside it but is not part of the score. With no signals the estimate sits at a neutral default of 50. It guides how hard today's plan should be; it is not a measure of how you feel and does not guarantee performance."
+    );
+  });
+
+  test('BUILD definition matches the 2026-11-05 ruling', () => {
+    const entry = getGlossaryEntry('BUILD');
+    expect(entry).toBeDefined();
+    expect(entry.definition).toBe(
+      'The first weeks of a block, where the work is set up. How sets and effort change after that depends on your goal; the phase card in Plan shows what your own block does each week.'
+    );
+  });
+
+  test('INTENSIFICATION definition matches the 2026-11-05 ruling and keeps BUILD STRENGTH displayTerm', () => {
+    const entry = getGlossaryEntry('INTENSIFICATION');
+    expect(entry).toBeDefined();
+    expect(entry.displayTerm).toBe('BUILD STRENGTH');
+    expect(entry.definition).toBe(
+      "The middle weeks of a block, where the work gets harder. Depending on your goal that can mean more sets, a higher target effort, or both; the phase card in Plan shows your block's numbers."
+    );
+  });
+
+  test('REALISE definition matches the 2026-11-05 ruling', () => {
+    const entry = getGlossaryEntry('REALISE');
+    expect(entry).toBeDefined();
+    expect(entry.definition).toBe(
+      "The last working week before the deload, where the block's work comes together. Whether sets go up or down depends on your goal; the phase card in Plan shows your block's own numbers."
+    );
+  });
+
+  test('DELOAD definition remains unchanged', () => {
+    const entry = getGlossaryEntry('DELOAD');
+    expect(entry).toBeDefined();
+    expect(entry.definition).toBe(
+      'A planned easy week. Sets drop and the RPE cap comes down so you absorb the block instead of digging a hole.'
+    );
+  });
+});

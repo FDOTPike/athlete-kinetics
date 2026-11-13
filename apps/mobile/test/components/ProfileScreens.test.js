@@ -1,10 +1,11 @@
 import React from 'react';
-import { BackHandler, StyleSheet } from 'react-native';
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { TRAINING_AGES } from '@ak/inference';
-import ProfileScreen from '../../src/screens/ProfileScreen';
+import { Alert, BackHandler, StyleSheet } from 'react-native';
+import { act, fireEvent, render, renderAsync, screen, within } from '@testing-library/react-native';
+import { HISTORY_IMPORT_EXAMPLE, TRAINING_AGES } from '@ak/inference';
+import ProfileScreen, { objectiveChangeText } from '../../src/screens/ProfileScreen';
 import OnboardingScreen from '../../src/screens/OnboardingScreen';
 import { NavigationProvider } from '../../src/navigation/navigation';
+import { PrimaryButton } from '../../src/components/ui';
 
 let mockState;
 const mockBackupState = {
@@ -26,11 +27,18 @@ jest.mock('@ak/inference', () => ({
 
 jest.mock('../../src/state/useStore', () => ({
   palette: { bg: '#000', surface: '#15151A', line: '#26262E', text: '#F4F4F6', dim: '#86868F', green: '#2EE6A8', amber: '#FFB454', red: '#FF5D5D' },
-  useStore: (selector) => selector(mockState),
+  useStore: Object.assign((selector) => selector(mockState), { getState: () => mockState }),
 }));
 
 jest.mock('../../src/state/backupStore', () => ({
   useBackupStore: (selector) => selector(mockBackupState),
+}));
+
+// #173: the add-athlete warning reads the athlete database sizes.
+let mockBackupEstimate = null;
+jest.mock('../../src/state/backupCapacity', () => ({
+  ...jest.requireActual('../../src/state/backupCapacity'),
+  measureBackupSize: jest.fn(async () => mockBackupEstimate),
 }));
 
 const baseProfile = {
@@ -72,14 +80,18 @@ function captureHardwareBack() {
 // The tests in this file predate it and are about OTHER screens, so these two
 // helpers walk straight through it, leaving its default answer (balanced whole
 // body) in place. The focus and target screens themselves are covered in
-// OnboardingFocusGoal.test.js.
+// OnboardingFocusGoal.test.js. The optional one-rep-max screen (issue #218)
+// joins from SOME MILEAGE up and is walked through the same way; it is
+// covered in OnboardingMaxesStep.test.js.
+const passThrough = () => screen.queryByTestId('focus-picker') !== null
+  || screen.queryByTestId('onboarding-maxes-step') !== null;
 const pressNext = () => {
   fireEvent.press(screen.getByLabelText('Next'));
-  if (screen.queryByTestId('focus-picker') !== null) fireEvent.press(screen.getByLabelText('Next'));
+  if (passThrough()) fireEvent.press(screen.getByLabelText('Next'));
 };
 const pressBack = () => {
   fireEvent.press(screen.getByLabelText('Back'));
-  if (screen.queryByTestId('focus-picker') !== null) fireEvent.press(screen.getByLabelText('Back'));
+  if (passThrough()) fireEvent.press(screen.getByLabelText('Back'));
 };
 
 describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
@@ -89,6 +101,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
   let saveLoadPreferenceMock;
 
   beforeEach(() => {
+    mockBackupState.status = 'idle';
     deleteAthleteMock = jest.fn();
     wipeBlockStateMock = jest.fn();
     switchProfileMock = jest.fn();
@@ -98,6 +111,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       // A booted store: ProfileScreen reads the database (availability verdicts,
       // recent outcomes, measured history) only once status is 'ready'.
       status: 'ready',
+      error: null,
       profile: baseProfile,
       saveProfile: jest.fn(),
       uiPreferences: { sessionModeOverride: null, readinessDetail: 'summary', restTimerEnabled: true, textScale: 'system' },
@@ -160,6 +174,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       completeOnboarding: jest.fn(),
       beginOnboardingDraft: () => ({ athleteId: 'default', contextRevision: 0 }),
       loadDemoAthlete: jest.fn(),
+      resetTrainingData: jest.fn(() => { mockState.error = null; return true; }),
       loadRecentOutcomes: () => [
         { outcomeKind: 'followed_plan', finalizedAtMs: 1700000000000 },
         { outcomeKind: 'adapted_session', finalizedAtMs: 1700000100000 },
@@ -167,6 +182,317 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
         { outcomeKind: 'session_recorded', finalizedAtMs: 1700000300000 },
       ],
     };
+  });
+
+  describe('Reset training data', () => {
+    // Walk W4-6 / #302 194f: the reset names the active athlete, the only one it changes.
+    const caption = "This removes Default Athlete's training history, telemetry, blocks, one-rep maxes, and reports from every date. Their other profile settings, saved profile slots and other athletes are not changed.";
+    const resetSection = () => within(screen.getByTestId('reset-training-data-section'));
+
+    const openReset = async () => {
+      await renderAsync(<ProfileScreen />);
+      fireEvent.press(screen.getByRole('button', { name: 'Reset training data' }));
+    };
+
+    const showImportNotice = () => {
+      mockState.importHistory.mockReturnValue({
+        committed: true, duplicate: false,
+        preview: { sessions: [], errors: [], warnings: [], unknownMovementNames: [], formatVersion: null },
+      });
+      fireEvent.press(screen.getByText('IMPORT TRAINING HISTORY'));
+      fireEvent.changeText(screen.getByLabelText('Paste AK history import text'), HISTORY_IMPORT_EXAMPLE);
+      fireEvent.press(screen.getByLabelText('Preview history import without saving'));
+      fireEvent.press(screen.getByLabelText('Commit reviewed history import'));
+      expect(screen.getByText('History imported. It is visible in the local timeline.')).toBeOnTheScreen();
+    };
+
+    beforeEach(() => {
+      mockState.vector = { readiness_score: 75 };
+      mockState.blockSessions = [{ sessionId: 1 }];
+    });
+
+    test('renders immediately after backup with the exact reset confirmation strings even with history', async () => {
+      await openReset();
+
+      expect(screen.getAllByTestId(/^(backup-transfer|reset-training-data|learning-terminology)-section$/)
+        .map((section) => section.props.testID)).toEqual([
+        'backup-transfer-section', 'reset-training-data-section', 'learning-terminology-section',
+      ]);
+      const section = within(screen.getByTestId('reset-training-data-section'));
+      expect(section.getByText('Reset training data')).toBeOnTheScreen();
+      expect(section.getByText(caption)).toBeOnTheScreen();
+      expect(section.getByText('Continue to reset')).toBeOnTheScreen();
+      expect(section.getByLabelText('Continue to reset training data')).toBeEnabled();
+
+      fireEvent.press(section.getByTestId('reset-continue-button'));
+      expect(section.getByText("This cannot be undone. Reset Default Athlete's training data?")).toBeOnTheScreen();
+      expect(section.getByTestId('reset-confirm-button')).toHaveTextContent('Reset training data');
+      expect(section.getByLabelText('Confirm reset training data')).toBeOnTheScreen();
+      expect(section.getByTestId('reset-keep-button')).toHaveTextContent('Keep my data');
+    });
+
+    test('Continue then Keep my data returns to step 1 without resetting', async () => {
+      await openReset();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      expect(mockState.resetTrainingData).not.toHaveBeenCalled();
+      fireEvent.press(screen.getByTestId('reset-keep-button'));
+
+      expect(mockState.resetTrainingData).not.toHaveBeenCalled();
+      expect(screen.getByText(caption)).toBeOnTheScreen();
+      expect(screen.getByTestId('reset-continue-button')).toBeOnTheScreen();
+      expect(screen.queryByTestId('reset-confirm-button')).toBeNull();
+    });
+
+    test('Continue then Reset training data resets exactly once and returns to step 1', async () => {
+      await openReset();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      expect(mockState.resetTrainingData).not.toHaveBeenCalled();
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+
+      expect(mockState.resetTrainingData).toHaveBeenCalledTimes(1);
+      expect(mockState.resetTrainingData).toHaveBeenCalledWith();
+      expect(screen.getByText(caption)).toBeOnTheScreen();
+      expect(screen.getByTestId('reset-continue-button')).toBeOnTheScreen();
+      expect(screen.queryByTestId('reset-confirm-button')).toBeNull();
+    });
+
+    test('a successful reset clears typed bodyweight and ending an edit does not save the old value', async () => {
+      await openReset();
+      fireEvent.changeText(screen.getByLabelText('Bodyweight today in kilograms'), '75');
+      fireEvent(screen.getByLabelText('Bodyweight today in kilograms'), 'endEditing');
+      expect(mockState.saveBodyweight).toHaveBeenCalledWith(mockState.today, 75);
+      mockState.saveBodyweight.mockClear();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+
+      expect(screen.getByLabelText('Bodyweight today in kilograms')).toHaveDisplayValue('');
+      fireEvent(screen.getByLabelText('Bodyweight today in kilograms'), 'endEditing');
+      expect(mockState.saveBodyweight).not.toHaveBeenCalledWith(mockState.today, 75);
+    });
+
+    test('after a successful reset, typing the old bodyweight again saves it', async () => {
+      await openReset();
+      fireEvent.changeText(screen.getByLabelText('Bodyweight today in kilograms'), '75');
+      fireEvent(screen.getByLabelText('Bodyweight today in kilograms'), 'endEditing');
+      expect(screen.getByLabelText('Bodyweight today in kilograms')).toHaveDisplayValue('75.0');
+      mockState.saveBodyweight.mockClear();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+
+      // The reset deleted today's value; entering the same value must store it again.
+      fireEvent.changeText(screen.getByLabelText('Bodyweight today in kilograms'), '75.0');
+      fireEvent(screen.getByLabelText('Bodyweight today in kilograms'), 'endEditing');
+      expect(mockState.saveBodyweight).toHaveBeenCalledWith(mockState.today, 75);
+    });
+
+    test('a successful reset clears the import notice and preserves history input and preview', async () => {
+      await openReset();
+      showImportNotice();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+
+      expect(screen.queryByText('History imported. It is visible in the local timeline.')).toBeNull();
+      expect(screen.getByLabelText('Paste AK history import text')).toHaveDisplayValue(HISTORY_IMPORT_EXAMPLE);
+      expect(screen.getByLabelText('Commit reviewed history import')).toBeOnTheScreen();
+    });
+
+    test('a failed reset preserves typed bodyweight and the import notice', async () => {
+      mockState.resetTrainingData.mockImplementation(() => { mockState.error = 'COMMIT failed'; return false; });
+      await openReset();
+      showImportNotice();
+      fireEvent.changeText(screen.getByLabelText('Bodyweight today in kilograms'), '75');
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+
+      expect(screen.getByLabelText('Bodyweight today in kilograms')).toHaveDisplayValue('75');
+      expect(screen.getByText('History imported. It is visible in the local timeline.')).toBeOnTheScreen();
+      expect(screen.getByLabelText('Paste AK history import text')).toHaveDisplayValue(HISTORY_IMPORT_EXAMPLE);
+      expect(screen.getByLabelText('Commit reviewed history import')).toBeOnTheScreen();
+    });
+
+    test('a failing reset keeps step 2 open and shows the exact store error as an alert', async () => {
+      const error = 'DELETE FROM session failed';
+      mockState.resetTrainingData.mockImplementation(() => { mockState.error = error; return false; });
+      mockState.loadRecentOutcomes = jest.fn(() => []);
+      await openReset();
+      mockState.loadRecentOutcomes.mockClear();
+      mockState.loadMeasuredHistory.mockClear();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+
+      const section = within(screen.getByTestId('reset-training-data-section'));
+      expect(section.getByTestId('reset-confirm-button')).toBeOnTheScreen();
+      expect(section.queryByTestId('reset-continue-button')).toBeNull();
+      expect(section.getByRole('alert').props.children).toBe(error);
+      expect(mockState.loadRecentOutcomes).not.toHaveBeenCalled();
+      expect(mockState.loadMeasuredHistory).not.toHaveBeenCalled();
+    });
+
+    test('a successful reset of an empty database returns false and returns to step 1 without an alert', async () => {
+      mockState.resetTrainingData.mockImplementation(() => { mockState.error = null; return false; });
+      await openReset();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+
+      expect(screen.getByTestId('reset-continue-button')).toBeOnTheScreen();
+      expect(screen.queryByTestId('reset-confirm-button')).toBeNull();
+      expect(resetSection().queryByRole('alert')).toBeNull();
+    });
+
+    test('a stale error before Confirm is not shown after a successful reset', async () => {
+      mockState.error = 'Earlier unrelated error';
+      await openReset();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      expect(resetSection().queryByRole('alert')).toBeNull();
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+
+      expect(screen.getByTestId('reset-continue-button')).toBeOnTheScreen();
+      expect(resetSection().queryByRole('alert')).toBeNull();
+      expect(screen.queryByText('Earlier unrelated error')).toBeNull();
+    });
+
+    test('Keep my data clears a shown reset error', async () => {
+      mockState.resetTrainingData.mockImplementation(() => { mockState.error = 'COMMIT failed'; return false; });
+      await openReset();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+      expect(resetSection().getByRole('alert')).toHaveTextContent('COMMIT failed');
+      fireEvent.press(screen.getByTestId('reset-keep-button'));
+
+      expect(screen.getByTestId('reset-continue-button')).toBeOnTheScreen();
+      expect(resetSection().queryByRole('alert')).toBeNull();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      expect(resetSection().queryByRole('alert')).toBeNull();
+    });
+
+    test('pressing Reset again clears the shown error after a successful retry', async () => {
+      mockState.resetTrainingData.mockImplementationOnce(() => { mockState.error = 'COMMIT failed'; return false; });
+      await openReset();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+      expect(resetSection().getByRole('alert')).toHaveTextContent('COMMIT failed');
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+
+      expect(mockState.resetTrainingData).toHaveBeenCalledTimes(2);
+      expect(screen.getByTestId('reset-continue-button')).toBeOnTheScreen();
+      expect(resetSection().queryByRole('alert')).toBeNull();
+    });
+
+    test('changing the active athlete clears a shown reset error', async () => {
+      mockState.resetTrainingData.mockImplementation(() => { mockState.error = 'COMMIT failed'; return false; });
+      await openReset();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+      expect(resetSection().getByRole('alert')).toHaveTextContent('COMMIT failed');
+      mockState.activeAthleteId = 'ath-2';
+      await screen.rerenderAsync(<ProfileScreen />);
+
+      expect(screen.getByTestId('reset-continue-button')).toBeOnTheScreen();
+      expect(resetSection().queryByRole('alert')).toBeNull();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      expect(resetSection().queryByRole('alert')).toBeNull();
+    });
+
+    test('changing athletes clears reset confirmation and requires the new athlete to continue', async () => {
+      await openReset();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+
+      mockState.activeAthleteId = 'ath-2';
+      await screen.rerenderAsync(<ProfileScreen />);
+
+      expect(screen.queryByTestId('reset-confirm-button')).toBeNull();
+      expect(screen.getByTestId('reset-continue-button')).toBeOnTheScreen();
+      expect(mockState.resetTrainingData).not.toHaveBeenCalled();
+
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+      expect(mockState.resetTrainingData).toHaveBeenCalledTimes(1);
+    });
+
+    test.each([
+      ['a live session', { session: { sessionId: 10, sets: [] } }, 'idle'],
+      ['backup working', {}, 'working'],
+      ['the database booting', { status: 'booting' }, 'idle'],
+      ['the database in error', { status: 'error' }, 'idle'],
+    ])('Confirm keeps the confirmation open and does not reset with %s', async (_reason, state, backupStatus) => {
+      await openReset();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+
+      Object.assign(mockState, state);
+      mockBackupState.status = backupStatus;
+      await screen.rerenderAsync(<ProfileScreen />);
+
+      // Invoke the handler directly to verify its guard independently of the disabled button.
+      const confirm = screen.UNSAFE_getAllByType(PrimaryButton)
+        .find((button) => button.props.testID === 'reset-confirm-button');
+      act(() => confirm.props.onPress());
+      expect(mockState.resetTrainingData).not.toHaveBeenCalled();
+      expect(screen.getByTestId('reset-confirm-button')).toBeDisabled();
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+      expect(mockState.resetTrainingData).not.toHaveBeenCalled();
+
+      Object.assign(mockState, { session: null, status: 'ready' });
+      mockBackupState.status = 'idle';
+      await screen.rerenderAsync(<ProfileScreen />);
+      expect(screen.getByTestId('reset-confirm-button')).toBeEnabled();
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+      expect(mockState.resetTrainingData).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId('reset-continue-button')).toBeOnTheScreen();
+    });
+
+    test.each([
+      ['a live session', { session: { sessionId: 10, sets: [] } }, 'idle'],
+      ['backup working', {}, 'working'],
+      ['the database booting', { status: 'booting' }, 'idle'],
+      ['the database in error', { status: 'error' }, 'idle'],
+    ])('Continue is disabled with %s', async (_reason, state, backupStatus) => {
+      Object.assign(mockState, state);
+      mockBackupState.status = backupStatus;
+      await openReset();
+
+      expect(screen.getByTestId('reset-continue-button')).toBeDisabled();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      expect(screen.queryByTestId('reset-confirm-button')).toBeNull();
+      expect(mockState.resetTrainingData).not.toHaveBeenCalled();
+    });
+
+    test('confirm resets training data without loading the demo athlete', async () => {
+      await openReset();
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+
+      expect(mockState.resetTrainingData).toHaveBeenCalledTimes(1);
+      expect(mockState.loadDemoAthlete).not.toHaveBeenCalled();
+    });
+
+    test.each([true, false])('confirm refreshes outcomes and measurements with no live session when reset returns %s', async (resetResult) => {
+      let outcomes = [{ outcomeKind: 'followed_plan', finalizedAtMs: 1700000000000 }];
+      let measures = [{ date: '2026-10-29', tonnageKg: 500, setCount: 5, bodyweightKg: 75 }];
+      mockState.loadRecentOutcomes = jest.fn(() => outcomes);
+      mockState.loadMeasuredHistory.mockImplementation(() => measures);
+      mockState.resetTrainingData.mockImplementation(() => {
+        outcomes = [];
+        measures = [];
+        return resetResult;
+      });
+      await openReset();
+      fireEvent.press(screen.getByRole('button', { name: 'TRAINING-DECISIONS DISCLOSURE' }));
+      expect(screen.getByText('Plan followed')).toBeOnTheScreen();
+      expect(screen.getByText('2026-10-29')).toBeOnTheScreen();
+      expect(mockState.session).toBeNull();
+      mockState.loadRecentOutcomes.mockClear();
+      mockState.loadMeasuredHistory.mockClear();
+
+      fireEvent.press(screen.getByTestId('reset-continue-button'));
+      fireEvent.press(screen.getByTestId('reset-confirm-button'));
+
+      expect(mockState.loadRecentOutcomes).toHaveBeenCalledWith(20);
+      expect(mockState.loadMeasuredHistory).toHaveBeenCalledWith(14);
+      expect(screen.queryByText('Plan followed')).toBeNull();
+      expect(screen.queryByText('2026-10-29')).toBeNull();
+      expect(screen.getByText('No finalized session outcomes recorded yet.')).toBeOnTheScreen();
+      expect(screen.getByTestId('reset-continue-button')).toBeOnTheScreen();
+    });
   });
 
   test('a) chips & steppers render with shared primitive accessibility semantics', () => {
@@ -177,8 +503,8 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     expect(screen.getByLabelText(/Training guidance safety notice/)).toBeOnTheScreen();
     expect(screen.getByText(/pikeMethods provides training guidance, not medical advice/)).toBeOnTheScreen();
     // Steppers render with Decrease/Increase accessibility labels
-    expect(screen.getByLabelText('Decrease 3 · TRAINING DAYS PER WEEK')).toBeOnTheScreen();
-    expect(screen.getByLabelText('Increase 3 · TRAINING DAYS PER WEEK')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Decrease training days per week')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Increase training days per week')).toBeOnTheScreen();
   });
 
   test('b) Coach Mode athlete delete requires two presses before store action fires', () => {
@@ -295,6 +621,8 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     // Navigate to goal step
     pressNext();
     expect(screen.getByText('WHAT ARE WE TRAINING FOR?')).toBeOnTheScreen();
+    // Owner 2026-10-31: say from the start that goals can change later.
+    expect(screen.getByText('You can change your goals at any time in Athlete Profile.')).toBeOnTheScreen();
   });
 
   test('WO-02 uses supportive weight-loss and week-ceiling copy exactly', () => {
@@ -327,7 +655,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     expect(screen.getByRole('header', { name: 'NEW TO THIS' })).toBeOnTheScreen();
     expect(screen.getByText(/Choose this if structured training is still new/).props.accessible).toBe(true);
     expect(selection.props.accessibilityState.selected).toBe(false);
-    fireEvent.press(screen.getByLabelText('Dismiss explanation'));
+    fireEvent.press(screen.getByLabelText('Close, dismiss explanation'));
     fireEvent.press(selection);
     expect(screen.getByRole('button', { name: /NEW TO THIS\. Under a year/ }).props.accessibilityState.selected).toBe(true);
   });
@@ -349,6 +677,48 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     expect(screen.getByText('A straight bar loaded with weight plates.').props.numberOfLines).toBeUndefined();
   });
 
+  // #205: the week is a prefill by experience, never applied after the athlete edits it.
+  test('YOUR WEEK is prefilled by experience: NEW TO THIS is 3 days of 45 minutes', () => {
+    render(<OnboardingScreen />);
+    pressNext(); // welcome -> goal
+    pressNext(); // goal -> (focus) -> experience
+    fireEvent.press(screen.getByLabelText(/NEW TO THIS\./));
+    pressNext();
+    expect(screen.getByText('YOUR WEEK')).toBeOnTheScreen();
+    expect(screen.getByLabelText('training days per week 3')).toBeOnTheScreen();
+    expect(screen.getByLabelText('minutes in a session, tops 45 min')).toBeOnTheScreen();
+    expect(screen.getByText(/Choose a week that feels manageable\. A realistic ceiling beats an optimistic one\./)).toBeOnTheScreen();
+    expect(screen.getByTestId('onboarding-week-suggestion').props.children)
+      .toBe('Suggested for NEW TO THIS: 3 days a week, up to 45 minutes each. Change it to fit your week.');
+    pressBack();
+    fireEvent.press(screen.getByLabelText(/SOME MILEAGE\./));
+    pressNext();
+    expect(screen.getByLabelText('training days per week 4')).toBeOnTheScreen();
+    expect(screen.getByLabelText('minutes in a session, tops 60 min')).toBeOnTheScreen();
+    pressBack();
+    fireEvent.press(screen.getByLabelText(/COMPETITIVE\./));
+    pressNext();
+    expect(screen.getByLabelText('training days per week 4')).toBeOnTheScreen();
+    expect(screen.getByLabelText('minutes in a session, tops 75 min')).toBeOnTheScreen();
+  });
+
+  test('YOUR WEEK keeps the athlete edit when experience changes afterwards', () => {
+    render(<OnboardingScreen />);
+    pressNext(); // welcome -> goal
+    pressNext(); // goal -> (focus) -> experience
+    fireEvent.press(screen.getByLabelText(/EXPERIENCED\./));
+    pressNext();
+    expect(screen.getByLabelText('minutes in a session, tops 75 min')).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText('Increase training days per week'));
+    expect(screen.getByLabelText('training days per week 5')).toBeOnTheScreen();
+    expect(screen.queryByTestId('onboarding-week-suggestion')).toBeNull();
+    pressBack();
+    fireEvent.press(screen.getByLabelText(/NEW TO THIS\./));
+    pressNext();
+    expect(screen.getByLabelText('training days per week 5')).toBeOnTheScreen();
+    expect(screen.getByLabelText('minutes in a session, tops 75 min')).toBeOnTheScreen();
+  });
+
   test('WO-02 review uses scrollable sections and edit routing preserves the complete draft', () => {
     render(<OnboardingScreen />);
     fireEvent.changeText(screen.getByLabelText('Your name'), 'Ari');
@@ -357,9 +727,9 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     pressNext();
     fireEvent.press(screen.getByLabelText(/EXPERIENCED\./));
     pressNext();
-    fireEvent.press(screen.getByLabelText('Increase TRAINING DAYS PER WEEK'));
+    fireEvent.press(screen.getByLabelText('Increase training days per week'));
     pressNext();
-    fireEvent.press(screen.getByRole('button', { name: /MINIMAL\. No equipment/ }));
+    fireEvent.press(screen.getByRole('button', { name: /MINIMAL\. Bands and mats only/ }));
     pressNext();
     fireEvent.press(screen.getByLabelText('No, nothing to note'));
     pressNext();
@@ -427,12 +797,18 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       ],
     });
 
+    fireEvent.press(screen.getByLabelText('One-rep maxes (optional)'));
     const squat = screen.getByLabelText('SQUAT one rep max in kilograms, type to set');
     expect(squat.props.keyboardType).toBe('numeric');
     fireEvent.changeText(squat, '142.5');
     expect(screen.getByLabelText('SQUAT one rep max in kilograms, type to set').props.value).toBe('142.5');
     fireEvent(squat, 'endEditing', { nativeEvent: { text: '142.5' } });
     expect(mockState.saveOneRepMax).toHaveBeenCalledWith(11, 142.5);
+    // Issue #233: a quarter-kilogram max stays as typed (no snap to 2.5).
+    fireEvent.changeText(squat, '251.25');
+    fireEvent(squat, 'endEditing', { nativeEvent: { text: '251.25' } });
+    expect(mockState.saveOneRepMax).toHaveBeenLastCalledWith(11, 251.25);
+    expect(screen.getByLabelText('SQUAT one rep max in kilograms, type to set').props.value).toBe('251.25');
   });
 
   test('Profile load selection is disabled during an active session', () => {
@@ -556,21 +932,144 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     const { getByRole } = render(<ProfileScreen />);
 
     // OBJECTIVES renders one chip per objective; 'hybrid' is baseProfile's value.
-    const objectives = ['strength', 'hypertrophy', 'power', 'endurance', 'gpp', 'hybrid', 'rehab', 'weight_loss'];
-    const selected = getByRole('button', { name: '1 · OBJECTIVE: hybrid' });
+    const objectiveLabels = [
+      'GET STRONGER',
+      'BUILD MUSCLE',
+      'GET EXPLOSIVE',
+      'LAST LONGER',
+      'ALL-ROUND FITNESS',
+      'STRENGTH + GRAPPLING',
+      'RETURN TO TRAINING',
+      'WEIGHT-LOSS SUPPORT',
+    ];
+    const selected = getByRole('button', { name: '1 · OBJECTIVE: STRENGTH + GRAPPLING' });
     expect(selected.props.accessibilityState.selected).toBe(true);
 
-    const unselected = getByRole('button', { name: '1 · OBJECTIVE: strength' });
+    const unselected = getByRole('button', { name: '1 · OBJECTIVE: GET STRONGER' });
     expect(unselected.props.accessibilityState.selected).toBe(false);
     expect(unselected.props.accessibilityState.disabled).toBe(false);
 
     // Exactly ONE of the row's chips claims the selected state.
-    const selectedCount = objectives.filter(
-      (o) => getByRole('button', {
-        name: `1 · OBJECTIVE: ${o.replace(/_/g, ' ')}`,
+    const selectedCount = objectiveLabels.filter(
+      (label) => getByRole('button', {
+        name: `1 · OBJECTIVE: ${label}`,
       }).props.accessibilityState.selected,
     ).length;
     expect(selectedCount).toBe(1);
+  });
+
+  // #176: changing the objective asks first and says what will change.
+  test('OBJECTIVE asks first, says what will change, and saves only on confirm', () => {
+    mockState = { ...mockState, block: { blockId: 1, startDate: '2026-07-01', objective: 'hybrid', createdAtMs: 1 }, program: null };
+    render(<ProfileScreen />);
+    fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: GET STRONGER'));
+    expect(mockState.saveProfile).not.toHaveBeenCalled();
+    expect(screen.getByTestId('profile-objective-change-text').props.children)
+      .toBe('Change your objective from hybrid to strength? Your current block stays as it is. Your next block will be built for strength.');
+    fireEvent.press(screen.getByTestId('profile-objective-keep'));
+    expect(screen.queryByTestId('profile-objective-change-text')).toBeNull();
+    expect(mockState.saveProfile).not.toHaveBeenCalled();
+    fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: WEIGHT-LOSS SUPPORT'));
+    fireEvent.press(screen.getByTestId('profile-objective-confirm'));
+    expect(mockState.saveProfile).toHaveBeenCalledWith({ objective: 'weight_loss' });
+    expect(screen.queryByTestId('profile-objective-change-text')).toBeNull();
+  });
+
+  test('OBJECTIVE change with a program running says the program keeps its objective', () => {
+    mockState = {
+      ...mockState,
+      block: { blockId: 1, startDate: '2026-07-01', objective: 'hybrid', createdAtMs: 1 },
+      program: { programId: 1, objective: 'hybrid', status: 'active', currentSequenceIndex: 1, plannedBlockCount: 2, days: [], movementPreferences: [] },
+    };
+    render(<ProfileScreen />);
+    fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: BUILD MUSCLE'));
+    expect(screen.getByTestId('profile-objective-change-text').props.children)
+      .toBe('Change your objective from hybrid to hypertrophy? Your current block and the rest of your program stay hybrid. Hypertrophy is used when you build your next program.');
+    // Tapping the chip that is already selected asks nothing.
+    fireEvent.press(screen.getByTestId('profile-objective-keep'));
+    fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: STRENGTH + GRAPPLING'));
+    expect(screen.queryByTestId('profile-objective-change-text')).toBeNull();
+    expect(mockState.saveProfile).not.toHaveBeenCalled();
+  });
+
+  test('OBJECTIVE change with a program running names the objective the program was built with', () => {
+    // The profile objective was already changed once; the program keeps its own.
+    mockState = {
+      ...mockState,
+      profile: { ...mockState.profile, objective: 'strength' },
+      block: { blockId: 1, startDate: '2026-07-01', objective: 'hybrid', createdAtMs: 1 },
+      program: { programId: 1, objective: 'hybrid', status: 'active', currentSequenceIndex: 1, plannedBlockCount: 2, days: [], movementPreferences: [] },
+    };
+    render(<ProfileScreen />);
+    fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: GET EXPLOSIVE'));
+    expect(screen.getByTestId('profile-objective-change-text').props.children)
+      .toBe('Change your objective from strength to power? Your current block and the rest of your program stay hybrid. Power is used when you build your next program.');
+  });
+
+  // Owner ruling on #176: a program in review_due has finished; there is no
+  // current block or rest of the program to keep the old objective.
+  test('objectiveChangeText says a finished program has finished', () => {
+    expect(objectiveChangeText('strength', 'hypertrophy', 'strength', false, false, true))
+      .toBe('Change your objective from strength to hypertrophy? Your program has finished. Your next program will be built for hypertrophy.');
+    // A finished program wins over a block or archived blocks.
+    expect(objectiveChangeText('strength', 'hypertrophy', 'strength', true, true, true))
+      .toBe('Change your objective from strength to hypertrophy? Your program has finished. Your next program will be built for hypertrophy.');
+  });
+
+  test('OBJECTIVE change when the program is due for review says the program has finished', () => {
+    mockState = {
+      ...mockState,
+      profile: { ...mockState.profile, objective: 'strength' },
+      block: null,
+      hasArchivedBlock: true,
+      program: { programId: 1, objective: 'strength', status: 'review_due', currentSequenceIndex: 2, plannedBlockCount: 2, days: [], movementPreferences: [] },
+    };
+    render(<ProfileScreen />);
+    fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: BUILD MUSCLE'));
+    expect(screen.getByTestId('profile-objective-change-text').props.children)
+      .toBe('Change your objective from strength to hypertrophy? Your program has finished. Your next program will be built for hypertrophy.');
+  });
+
+  test('OBJECTIVE change after earlier blocks ended does not call the next block the first', () => {
+    mockState = { ...mockState, block: null, program: null, hasArchivedBlock: true };
+    render(<ProfileScreen />);
+    fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: GET STRONGER'));
+    expect(screen.getByTestId('profile-objective-change-text').props.children)
+      .toBe('Change your objective from hybrid to strength? Your next block will be built for strength.');
+  });
+
+  test('OBJECTIVE change with no block history still says first block', () => {
+    mockState = { ...mockState, block: null, program: null, hasArchivedBlock: false };
+    render(<ProfileScreen />);
+    fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: GET STRONGER'));
+    expect(screen.getByTestId('profile-objective-change-text').props.children)
+      .toBe('Change your objective from hybrid to strength? Your first block will be built for strength.');
+  });
+
+  test('a pending OBJECTIVE change is dropped when the athlete or profile slot changes', () => {
+    mockState = { ...mockState, block: null, program: null };
+    render(<ProfileScreen />);
+    fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: GET STRONGER'));
+    expect(screen.getByTestId('profile-objective-confirmation')).toBeOnTheScreen();
+    // Another athlete becomes active while the confirmation is open.
+    mockState = { ...mockState, activeAthleteId: 'ath-2' };
+    screen.rerender(<ProfileScreen />);
+    expect(screen.queryByTestId('profile-objective-confirmation')).toBeNull();
+    expect(mockState.saveProfile).not.toHaveBeenCalled();
+
+    fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: GET EXPLOSIVE'));
+    expect(screen.getByTestId('profile-objective-confirmation')).toBeOnTheScreen();
+    // Another profile slot becomes active while the confirmation is open.
+    mockState = {
+      ...mockState,
+      profileSlots: [
+        { slotId: 1, name: 'Main', isActive: false },
+        { slotId: 2, name: 'Secondary', isActive: true },
+      ],
+    };
+    screen.rerender(<ProfileScreen />);
+    expect(screen.queryByTestId('profile-objective-confirmation')).toBeNull();
+    expect(mockState.saveProfile).not.toHaveBeenCalled();
   });
 
   test('TRAINING AGE ChipRow keeps shared semantics and disables every chip during a session', () => {
@@ -590,17 +1089,19 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
   // question — so the flow is eight; a ninth appears only when the athlete says
   // they have a specific target (covered in OnboardingFocusGoal.test.js).
 
-  test('first-run flow is eight screens, asks the focus question third, and combines days with minutes', () => {
+  test('first-run flow is nine screens from SOME MILEAGE up (the optional maxes screen, issue #218), asks the focus question third, and combines days with minutes', () => {
     render(<OnboardingScreen />);
-    expect(screen.getByLabelText('Step 1 of 8')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Step 1 of 9')).toBeOnTheScreen();
     fireEvent.press(screen.getByLabelText('Next')); // goal
-    expect(screen.getByLabelText('Step 2 of 8')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Step 2 of 9')).toBeOnTheScreen();
     fireEvent.press(screen.getByLabelText('Next')); // focus
-    expect(screen.getByLabelText('Step 3 of 8')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Step 3 of 9')).toBeOnTheScreen();
     expect(screen.getByText('Is there an area that you want to work on?')).toBeOnTheScreen();
     fireEvent.press(screen.getByLabelText('Next')); // experience
     expect(screen.getByText('HOW LONG HAVE YOU BEEN TRAINING?')).toBeOnTheScreen();
-    pressNext(); // logistics
+    fireEvent.press(screen.getByLabelText('Next')); // maxes (optional)
+    expect(screen.getByTestId('onboarding-maxes-step')).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText('Next')); // logistics
     expect(screen.getByText('TRAINING DAYS PER WEEK')).toBeOnTheScreen();
     expect(screen.getByText('MINUTES IN A SESSION, TOPS')).toBeOnTheScreen();
     // The retired per-decision screens never appear anywhere in the flow.
@@ -614,7 +1115,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     fireEvent.press(screen.getByLabelText('No, nothing to note'));
     expect(screen.getByLabelText('Next')).not.toBeDisabled();
     pressNext();
-    expect(screen.getByLabelText('Step 8 of 8')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Step 9 of 9')).toBeOnTheScreen();
   });
 
   test('limitations asks one explicit no/yes; yes reveals notes, no clears drafts, review discloses', () => {
@@ -764,7 +1265,14 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       expect(hardwareBack.press()).toBe(true);
       expect(hardwareBack.press()).toBe(true);
       expect(screen.getByTestId('activities-screen')).toBeOnTheScreen();
+      // #148: leaving Activities with a kept entry asks first; Discard leaves.
+      const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
       expect(hardwareBack.press()).toBe(true);
+      expect(alert).toHaveBeenCalledTimes(1);
+      expect(alert.mock.calls[0][0]).toBe('Discard this activity?');
+      expect(screen.getByTestId('activities-screen')).toBeOnTheScreen();
+      act(() => { alert.mock.calls[0][2].find((button) => button.text === 'Discard').onPress(); });
+      alert.mockRestore();
       expect(screen.queryByTestId('activities-screen')).toBeNull();
       expect(screen.getByText('ATHLETE PROFILE')).toBeOnTheScreen();
       expect(mockState.saveOneOffActivity).not.toHaveBeenCalled();
@@ -774,6 +1282,106 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       hardwareBack.restore();
     }
   }, 30000);
+
+  describe('#210: expert sections start collapsed for every athlete', () => {
+    test.each(['beginner', 'intermediate', 'advanced', 'elite'])('for a %s athlete', (trainingAge) => {
+      mockState.profile = { ...mockState.profile, training_age: trainingAge };
+      render(<ProfileScreen />);
+      for (const heading of ['Energy system focus (optional)', 'Heart rate and sleep data (optional)', 'One-rep maxes (optional)']) {
+        expect(screen.getByLabelText(heading).props.accessibilityState).toMatchObject({ expanded: false });
+      }
+      expect(screen.queryByText('7 · TARGET ENERGY SYSTEM')).toBeNull();
+      expect(screen.queryByText(/HEALTH CONNECT|APPLE HEALTH/)).toBeNull();
+      expect(screen.queryByText('ONE-REP MAXES (KG)')).toBeNull();
+      // Every other numbered field is still in view.
+      expect(screen.getByText('6 · EFFORT CEILING')).toBeOnTheScreen();
+    }, 30000);
+
+    test('each heading opens its section', () => {
+      render(<ProfileScreen />);
+      fireEvent.press(screen.getByLabelText('Energy system focus (optional)'));
+      expect(screen.getByText('7 · TARGET ENERGY SYSTEM')).toBeOnTheScreen();
+      fireEvent.press(screen.getByLabelText('Heart rate and sleep data (optional)'));
+      expect(screen.getByText(/HEALTH CONNECT|APPLE HEALTH/)).toBeOnTheScreen();
+      fireEvent.press(screen.getByLabelText('One-rep maxes (optional)'));
+      expect(screen.getByText('ONE-REP MAXES (KG)')).toBeOnTheScreen();
+    }, 30000);
+  });
+
+  describe('#173: a warning before a sixth athlete is added', () => {
+    const WARNING = 'Backups cover up to about five athletes in this version. You can still add this athlete, '
+      + 'but a backup may not be possible until a later version.';
+    const fiveAthletes = [1, 2, 3, 4, 5].map((n) => ({ id: n === 1 ? 'default' : `ath-${n}`, name: `Athlete ${n}` }));
+
+    afterEach(() => { mockBackupEstimate = null; });
+
+    test('five athletes whose databases fill the backup: the warning shows before ADD ATHLETE', async () => {
+      const { estimateFromSizes } = jest.requireActual('../../src/state/backupCapacity');
+      mockBackupEstimate = estimateFromSizes(fiveAthletes.map(() => 1_400_832));
+      mockState.advancedToolsUnlocked = true;
+      mockState.athletes = fiveAthletes;
+      render(<ProfileScreen />);
+      fireEvent.press(screen.getByLabelText('Coach mode, 5 athletes, collapsed'));
+      expect(await screen.findByText(WARNING)).toBeOnTheScreen();
+      expect(screen.getByLabelText('Add a new athlete')).toBeOnTheScreen();
+      expect(mockState.createAthlete).not.toHaveBeenCalled();
+    }, 30000);
+
+    test('two small athletes: no warning', async () => {
+      const { estimateFromSizes } = jest.requireActual('../../src/state/backupCapacity');
+      mockBackupEstimate = estimateFromSizes([1_400_832, 1_400_832]);
+      mockState.advancedToolsUnlocked = true;
+      render(<ProfileScreen />);
+      fireEvent.press(screen.getByLabelText('Coach mode, 2 athletes, collapsed'));
+      await act(async () => {});
+      expect(screen.queryByText(WARNING)).toBeNull();
+    }, 30000);
+
+    test('four athletes whose measured sizes would go over the cap: the warning shows (the count alone would not)', async () => {
+      const { estimateFromSizes, addingAthleteExceedsBackupCap } = jest.requireActual('../../src/state/backupCapacity');
+      const fourAthletes = fiveAthletes.slice(0, 4);
+      mockBackupEstimate = estimateFromSizes(fourAthletes.map(() => 2_000_000));
+      expect(addingAthleteExceedsBackupCap(null, 4)).toBe(false);
+      mockState.advancedToolsUnlocked = true;
+      mockState.athletes = fourAthletes;
+      render(<ProfileScreen />);
+      fireEvent.press(screen.getByLabelText('Coach mode, 4 athletes, collapsed'));
+      expect(await screen.findByText(WARNING)).toBeOnTheScreen();
+    }, 30000);
+
+    test('an estimate measured for fewer athletes is not used after an athlete is added', async () => {
+      const { estimateFromSizes } = jest.requireActual('../../src/state/backupCapacity');
+      const fourAthletes = fiveAthletes.slice(0, 4);
+      mockBackupEstimate = estimateFromSizes(fourAthletes.map(() => 1_400_832));
+      mockState.advancedToolsUnlocked = true;
+      mockState.athletes = fourAthletes;
+      render(<ProfileScreen />);
+      fireEvent.press(screen.getByLabelText('Coach mode, 4 athletes, collapsed'));
+      await act(async () => {});
+      expect(screen.queryByText(WARNING)).toBeNull();
+
+      // The fifth athlete is added; its new measurement has not finished yet.
+      mockBackupEstimate = new Promise(() => {});
+      mockState.athletes = fiveAthletes;
+      await screen.rerenderAsync(<ProfileScreen />);
+      expect(screen.getByText(WARNING)).toBeOnTheScreen();
+    }, 30000);
+  });
+
+  describe('#177: the active athlete is named only in Coach mode', () => {
+    test('with two athletes, Profile names the active athlete under the heading', () => {
+      render(<ProfileScreen />);
+      expect(screen.getByText('ATHLETE PROFILE')).toBeOnTheScreen();
+      expect(screen.getByTestId('profile-active-athlete')).toHaveTextContent('Default Athlete');
+    });
+
+    test('with one athlete, Profile names no one', () => {
+      mockState.athletes = [{ id: 'default', name: 'Default Athlete' }];
+      render(<ProfileScreen />);
+      expect(screen.getByText('ATHLETE PROFILE')).toBeOnTheScreen();
+      expect(screen.queryByTestId('profile-active-athlete')).toBeNull();
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -906,7 +1514,7 @@ describe('OW-001 load-intent declaration surface', () => {
     setup();
     expect(screen.getByLabelText('Plan Push-up with Bodyweight only')).toBeOnTheScreen();
     expect(screen.getByLabelText('Plan Walking Lunge with Dumbbell')).toBeOnTheScreen();
-    expect(screen.getByLabelText('Leave Push-up unset, so it is planned with added weight')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Not set: leave Push-up unset, so it is planned with added weight')).toBeOnTheScreen();
   });
 
   test('copy says the choice applies to FUTURE programming and what unset means', () => {

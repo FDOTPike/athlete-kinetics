@@ -96,7 +96,8 @@ const openSportSlide = () => {
   expect(screen.getByTestId('sport-editor')).toBeTruthy();
 };
 const walkToReview = () => {
-  next(); // experience -> logistics
+  next(); // experience -> maxes (optional, from SOME MILEAGE up; issue #218)
+  if (screen.queryByTestId('onboarding-maxes-step') !== null) next(); // maxes -> logistics
   next(); // logistics -> equipment
   next(); // equipment -> limits
   pressLabel('No, nothing to note');
@@ -109,14 +110,14 @@ describe('the sport screen in the interview', () => {
     render(<OnboardingScreen />);
     next();
     next();
-    expect(stepLabel()).toBe('Step 3 of 8');
+    expect(stepLabel()).toBe('Step 3 of 9');
     expect(selected('onboarding-wants-sport')).toBe(false);
     press('onboarding-wants-sport');
-    expect(stepLabel()).toBe('Step 3 of 9');
+    expect(stepLabel()).toBe('Step 3 of 10');
     next();
     expect(screen.getByText('DO YOU PLAY OR COMPETE IN A SPORT?')).toBeTruthy();
-    expect(stepLabel()).toBe('Step 4 of 9');
-    for (const family of ['basketball', 'football', 'hockey', 'powerlifting', 'muay_thai', 'other']) {
+    expect(stepLabel()).toBe('Step 4 of 10');
+    for (const family of ['court', 'football', 'hockey', 'strength', 'striking', 'other']) {
       expect(screen.getByTestId(`sport-family-${family}`)).toBeTruthy();
     }
     // A started sport answer is finished or skipped: nothing half-answered is carried forward.
@@ -152,14 +153,16 @@ describe('the sport screen in the interview', () => {
     press('sport-family-hockey');
     expect(screen.getByLabelText('Field hockey. Played on grass or turf.')).toBeTruthy();
     expect(screen.getByLabelText('Ice hockey. Played on ice, on skates.')).toBeTruthy();
-    press('sport-family-basketball');
+    // strength is the single-code family in the 22-sport catalog: powerlifting only.
+    press('sport-family-strength');
     expect(screen.queryByText(/WHICH KIND OF/)).toBeNull();
-    expect(screen.getByTestId('sport-outcome-jump_higher')).toBeTruthy();
+    expect(screen.getByTestId('sport-outcome-bigger_competition_lifts')).toBeTruthy();
   });
 
   test('choosing an outcome says what the plan will do, what it cannot do, and on what basis', () => {
     openSportSlide();
-    press('sport-family-basketball');
+    press('sport-family-court');
+    press('sport-basketball');
     expect(screen.queryByTestId('sport-emphasis')).toBeNull();
     press('sport-outcome-jump_higher');
     expect(screen.getByTestId('sport-emphasis-summary').props.children)
@@ -167,7 +170,8 @@ describe('the sport screen in the interview', () => {
     expect(textsOf('sport-emphasis-limit').join(' ')).toMatch(/no jump or plyometric drills yet.*does not include jump training itself/);
     expect(screen.getByTestId('sport-emphasis-basis').props.children).toMatch(/Suchomel.*Markovic/);
     // An outcome with no reviewed basis says so and adds nothing.
-    press('sport-family-muay_thai');
+    press('sport-family-striking');
+    press('sport-muay_thai');
     press('sport-outcome-striking_and_clinch');
     expect(screen.getByTestId('sport-emphasis-summary').props.children).toMatch(/^No extra emphasis\. The app has no reviewed evidence/);
     expect(textsOf('sport-emphasis-limit').join(' ')).toMatch(/hip-flexor raises are not added by default/);
@@ -176,18 +180,18 @@ describe('the sport screen in the interview', () => {
 
   test('"not sure" is the starting workload answer; the competition date is context only', () => {
     openSportSlide();
-    press('sport-family-powerlifting');
-    expect(screen.getByLabelText('PRACTICE SESSIONS A WEEK Not sure')).toBeTruthy();
-    expect(screen.getByLabelText('MATCHES OR COMPETITIONS A WEEK Not sure')).toBeTruthy();
+    press('sport-family-strength');
+    expect(screen.getByLabelText('practice sessions a week Not sure')).toBeTruthy();
+    expect(screen.getByLabelText('matches or competitions a week Not sure')).toBeTruthy();
     expect(selected('sport-practice-unsure')).toBe(true);
-    pressLabel('Increase PRACTICE SESSIONS A WEEK');
-    pressLabel('Increase PRACTICE SESSIONS A WEEK');
-    expect(screen.getByLabelText('PRACTICE SESSIONS A WEEK 2')).toBeTruthy();
+    pressLabel('Increase practice sessions a week');
+    pressLabel('Increase practice sessions a week');
+    expect(screen.getByLabelText('practice sessions a week 2')).toBeTruthy();
     expect(selected('sport-practice-unsure')).toBe(false);
     press('sport-practice-unsure');
-    expect(screen.getByLabelText('PRACTICE SESSIONS A WEEK Not sure')).toBeTruthy();
+    expect(screen.getByLabelText('practice sessions a week Not sure')).toBeTruthy();
     expect(screen.getByTestId('sport-competition-note').props.children)
-      .toBe('The date is used for reminders and for reviewing your goals. It does not make the plan peak, taper or test a maximum.');
+      .toBe('If you add a competition date, it is recorded. For now the plan does not peak, taper or test for it. The date is used for reminders and for reviewing your goals.');
     press('sport-outcome-bigger_competition_lifts');
     press('sport-experience-over_5_years');
     expect(nextDisabled()).toBe(false);
@@ -201,20 +205,42 @@ describe('the sport screen in the interview', () => {
     expect(nextDisabled()).toBe(false);
   });
 
+  test('the date note is shown above the date field, before any date is typed (#229)', () => {
+    openSportSlide();
+    press('sport-family-strength');
+    expect(screen.getByTestId('sport-competition').props.value).toBe('');
+    expect(screen.getByTestId('sport-competition-note').props.children).toMatch(/does not peak, taper or test for it/);
+    // The field is still blank, so the note must not claim a date is already recorded.
+    expect(screen.getByTestId('sport-competition-note').props.children)
+      .toBe('If you add a competition date, it is recorded. For now the plan does not peak, taper or test for it. The date is used for reminders and for reviewing your goals.');
+    expect(screen.getByTestId('sport-competition-note').props.children).not.toContain('Your competition date is recorded.');
+    // Render order: the note comes before the date field, so it is read first.
+    const order = [];
+    const walk = (node) => {
+      if (node === null || typeof node !== 'object') return;
+      if (Array.isArray(node)) { node.forEach(walk); return; }
+      if (node.props?.testID !== undefined) order.push(node.props.testID);
+      walk(node.children ?? null);
+    };
+    walk(screen.toJSON());
+    expect(order.indexOf('sport-competition-note')).toBeGreaterThan(-1);
+    expect(order.indexOf('sport-competition-note')).toBeLessThan(order.indexOf('sport-competition'));
+  });
+
   test('a complete sport answer is saved with the rest of the interview, in one go', async () => {
     openSportSlide();
     press('sport-family-football');
     press('sport-football_association');
     press('sport-outcome-stay_available');
     press('sport-experience-2_to_5_years');
-    pressLabel('Increase PRACTICE SESSIONS A WEEK');
-    pressLabel('Increase PRACTICE SESSIONS A WEEK');
-    pressLabel('Increase MATCHES OR COMPETITIONS A WEEK');
+    pressLabel('Increase practice sessions a week');
+    pressLabel('Increase practice sessions a week');
+    pressLabel('Increase matches or competitions a week');
     type('sport-minutes', '90');
     expect(nextDisabled()).toBe(false);
     next();
     walkToReview();
-    expect(stepLabel()).toBe('Step 9 of 9');
+    expect(stepLabel()).toBe('Step 10 of 10');
     expect(screen.getByText('Football (soccer) — keep training and playing without long breaks')).toBeTruthy();
     await startTraining();
     expect(state().error).toBeNull();
@@ -250,7 +276,7 @@ describe('the sport screen in the interview', () => {
     press('onboarding-skip-sport');
     expect(screen.queryByTestId('sport-editor')).toBeNull();
     expect(screen.getByText('HOW LONG HAVE YOU BEEN TRAINING?')).toBeTruthy();
-    expect(stepLabel()).toBe('Step 4 of 8');
+    expect(stepLabel()).toBe('Step 4 of 9');
     walkToReview();
     expect(screen.queryByText('SPORT')).toBeNull();
     await startTraining();
@@ -259,20 +285,21 @@ describe('the sport screen in the interview', () => {
     expect(count('athlete_sport_profile')).toBe(0);
   });
 
-  test('sport and target together: ten screens, sport first, and a goal can name its exercise', async () => {
+  test('sport and target together: eleven screens with the optional maxes screen, sport first, and a goal can name its exercise', async () => {
     render(<OnboardingScreen />);
     next();
     next();
     press('onboarding-wants-sport');
     press('onboarding-wants-target');
-    expect(stepLabel()).toBe('Step 3 of 10');
+    expect(stepLabel()).toBe('Step 3 of 11');
     next();
-    press('sport-family-basketball');
+    press('sport-family-court');
+    press('sport-basketball');
     press('sport-outcome-general_support');
     press('sport-experience-new');
     next();
     expect(screen.getByTestId('goal-editor')).toBeTruthy();
-    expect(stepLabel()).toBe('Step 5 of 10');
+    expect(stepLabel()).toBe('Step 5 of 11');
     type('goal-outcome', 'Goblet squat 40 kg for 10');
     type('goal-method', 'Goblet squat, 10 reps to parallel');
     type('goal-baseline', '24');
@@ -329,7 +356,7 @@ describe('the plan explains itself', () => {
     expect(applied[0]).toBe('Focus — Beach muscles: upper chest, biceps, triceps.');
     expect(applied.join(' ')).toMatch(/is planned instead of .+: it trains upper chest directly \(your focus\)\./);
     expect(applied.join(' ')).toMatch(/Basketball — jump higher: Extra leg-strength work/);
-    expect(applied.join(' ')).toMatch(/Sport workload: 3 practice sessions and 0 matches a week, as you told the app\. To leave room for it, each accessory exercise has one fewer set\./);
+    expect(applied.join(' ')).toMatch(/Sport workload: 3 practice sessions and 0 matches a week, as you told the app\. To leave room for it, most accessory exercises have one fewer set \(down to at least one set; goal-linked, locomotion, non-strength-day, and deload sets are kept\)\./);
     expect(omitted.join(' ')).toMatch(/no jump or plyometric drills yet/);
     expect(screen.getByText('Safety, your equipment, your experience level and your session length always come first.')).toBeTruthy();
     // Nothing has been created by looking.
@@ -359,6 +386,10 @@ describe('the profile sport panel', () => {
     render(<SportPanel />);
     expect(screen.getByTestId('profile-sport-summary').props.children).toBe('No sport set. The plan is general gym training.');
     expect(screen.getByTestId('profile-sport-workload').props.children).toMatch(/^Sport workload: no sport sessions recorded\./);
+    // #146: with no sessions yet, the copy must not promise that Activities
+    // change the next block; one weekly session does not change the gym plan.
+    expect(screen.getByTestId('profile-sport-workload').props.children).not.toMatch(/will take them into account/);
+    expect(screen.getByTestId('profile-sport-workload').props.children).toMatch(/A light week will not change your next block\./);
     press('profile-sport-edit');
     expect(screen.getByText('Do you play or compete in a sport?')).toBeTruthy();
     // Saving an unfinished answer explains what is missing instead of saving.
@@ -369,18 +400,29 @@ describe('the profile sport panel', () => {
     press('sport-hockey_ice');
     press('sport-outcome-stay_available');
     press('sport-experience-over_5_years');
-    for (let n = 0; n < 4; n += 1) pressLabel('Increase PRACTICE SESSIONS A WEEK');
-    pressLabel('Increase MATCHES OR COMPETITIONS A WEEK');
+    for (let n = 0; n < 4; n += 1) pressLabel('Increase practice sessions a week');
+    pressLabel('Increase matches or competitions a week');
     press('profile-sport-save');
     expect(screen.getByTestId('sport-panel-message').props.children)
       .toBe('Sport saved. Your current plan is unchanged; this is used when your next block is created.');
     expect(screen.getByTestId('profile-sport-summary').props.children)
       .toBe('Ice hockey — keep training and playing without long breaks. Played: more than 5 years.');
+    // #176: said of the next block, in the future tense; nothing has changed yet.
     expect(screen.getByTestId('profile-sport-workload').props.children)
-      .toMatch(/^Sport workload: 4 practice sessions and 1 match a week, as you told the app\. That is a very full week/);
+      .toMatch(/^Sport workload: 4 practice sessions and 1 match a week, as you told the app\. That is a very full week, so your next block will have up to two fewer sets on most accessory exercises \(down to at least one set; goal-linked, locomotion, non-strength-day, and deload sets are kept\), and its week 3 will repeat week 2/);
+    expect(screen.getByTestId('profile-sport-workload').props.children).not.toMatch(/ has two fewer sets| exercises have up to two fewer sets/);
     expect(plan()).toBe(before);
 
+    // #176: removing asks first and says what will change.
     press('profile-sport-remove');
+    expect(state().sport).not.toBeNull();
+    expect(screen.getByTestId('profile-sport-remove-text').props.children)
+      .toBe('Remove Ice hockey? Your next block will be planned without your sport, and the weekly sport numbers you gave will no longer be counted. Your current plan is unchanged.');
+    press('profile-sport-remove-keep');
+    expect(screen.queryByTestId('profile-sport-remove-text')).toBeNull();
+    expect(state().sport).not.toBeNull();
+    press('profile-sport-remove');
+    press('profile-sport-remove-confirm');
     expect(screen.getByTestId('sport-panel-message').props.children)
       .toBe('Sport removed. Your current plan is unchanged; this is used when your next block is created.');
     expect(state().sport).toBeNull();
@@ -412,4 +454,22 @@ describe('the profile sport panel', () => {
     expect(screen.queryByTestId(`profile-goal-exercise-${goalId}`)).toBeNull();
     expect(state().goals).toHaveLength(1);
   });
+});
+
+// Android walk 2026-11-03 (W6-6, issue 160): a control's accessible name starts
+// with its visible words, and a selected chip does not also say "selected".
+test('onboarding sport and target chips: names start with the visible words, selected or not', () => {
+  render(<OnboardingScreen />);
+  next();
+  next();
+  const sportName = () => screen.getByTestId('onboarding-wants-sport').props.accessibilityLabel;
+  const targetName = () => screen.getByTestId('onboarding-wants-target').props.accessibilityLabel;
+  expect(sportName()).toMatch(/^I play or compete in a sport\. /);
+  expect(targetName()).toMatch(/^I also have a specific target\. /);
+  press('onboarding-wants-sport');
+  press('onboarding-wants-target');
+  expect(sportName()).toBe('I play or compete in a sport. One more screen will ask about it.');
+  expect(targetName()).toBe('I also have a specific target. One more screen will ask for it.');
+  expect(sportName()).not.toMatch(/selected/);
+  expect(targetName()).not.toMatch(/selected/);
 });

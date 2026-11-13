@@ -94,6 +94,9 @@ const movements = db.prepare(
     const p = JSON.parse(r.prefixes_json ?? '[]');
     return p.length === 1 ? p[0] : undefined;
   })(),
+  // #228 (Option B): the store's domain flag — 'Bodyweight' is one of the
+  // movement's supported implements. Membership, never a declaration.
+  bodyweightSupported: JSON.parse(r.prefixes_json ?? '[]').includes('Bodyweight'),
   // L2(b): this 001-015 fixture predates movement_progression, so it cannot
   // resolve real chain membership. It declares every movement a chain member so
   // the sections below keep exercising FLOOR MECHANICS. Chain SCOPING — that an
@@ -153,7 +156,7 @@ for (const objective of OBJECTIVES) {
       .reduce((a, s) => a + s.slots.reduce((b, sl) => b + sl.sets, 0), 0);
     if (!(weekSets(4) < weekSets(1))) deloadAll = false;
     if (plan.weeks !== 4) weeks4 = false;
-    if (plan.warnings.length !== 0) warnFree = false; // full inventory: nothing missing
+    if (plan.warnings.filter((w) => !/the main lift the day before or after/.test(w)).length !== 0) warnFree = false; // full inventory: nothing missing (a #228 spacing disclosure is not a gap)
     if (plan.sessions.length !== f * 4) counts = false;
     for (const s of plan.sessions) {
       if (s.week_index === 4 && s.phase !== 'deload') endsDeload = false;
@@ -262,6 +265,23 @@ const bjjRoundId = movements.find((m) => m.name === 'BJJ Sparring Round').moveme
 check('mats removed: bjj days fall back without ever emitting BJJ Sparring Round',
   noMats.sessions.some((s) => s.focus === 'bjj') &&
   noMats.sessions.every((s) => s.slots.every((sl) => sl.movement_id !== bjjRoundId)));
+// Android walk 2026-11-03 (W1-3): owning mats is not grappling. A partner
+// sparring round is placed on a BJJ day only, never on a conditioning day.
+let conditioningDays = 0, sparringOffBjjDay = 0, sparringOnBjjDay = 0;
+for (const objective of ['gpp', 'endurance', 'weight_loss', 'strength', 'power', 'hybrid']) {
+  for (let f = 1; f <= 7; f++) {
+    const plan = gen({ objective, weekly_frequency: f, equipment_inventory: [...STANDARD_EQUIPMENT_ITEMS] });
+    for (const s of plan.sessions) {
+      const hasRound = s.slots.some((sl) => sl.movement_id === bjjRoundId);
+      if (s.focus === 'conditioning') conditioningDays += 1;
+      if (hasRound && s.focus !== 'bjj') sparringOffBjjDay += 1;
+      if (hasRound && s.focus === 'bjj') sparringOnBjjDay += 1;
+    }
+  }
+}
+check('with mats, BJJ Sparring Round appears on bjj days only (never on a conditioning day)',
+  conditioningDays > 0 && sparringOnBjjDay > 0 && sparringOffBjjDay === 0,
+  `${conditioningDays} conditioning days, ${sparringOnBjjDay} bjj-day rounds, ${sparringOffBjjDay} off-day rounds`);
 
 // --- [5] SQL contract: 007 literals == TS constants -----------------------------
 console.log('[5] SQL contract (007 <-> types.ts single source of truth)');
@@ -1059,6 +1079,28 @@ check('Layer 2 pulls only same-category, strictly-later slots',
   ds.options.map((o) => `${o.name}@${o.fromDayIndex}`).join(', '));
 check('conservation of volume: setsConserved == origin slot sets, origin slot identified',
   ds.options[0].setsConserved === 4 && ds.options[0].plannedSlotId === 77);
+// Android walk 2026-11-03 (ux-4): the option said "from day 2" for a session
+// the plan shows as the third day. Name the session by its date when known,
+// otherwise count block days from 1, as the plan does.
+const dsDated = computeSubstitutions({ target: byName('Barbell Row'), library: subLib,
+  inventory: [...EQUIPMENT_ITEMS], niggles: [],
+  futureSlots: [{ ...futureSlots[0], sessionDate: '2026-11-10' }], currentDayIndex: 2,
+  trainingAge: 'intermediate', accessContext: 'weight_room' }).layer2DaySwap;
+check('day-swap names the origin session by its date when the date is known',
+  dsDated.options[0].rationale.includes('the 2026-11-10 session')
+    && dsDated.options[0].sessionDate === '2026-11-10'
+    && !/\bday 5\b/.test(dsDated.options[0].rationale),
+  dsDated.options[0].rationale);
+check('day-swap without a date counts block days from 1, not 0',
+  ds.options[0].rationale.includes('block day 6') && !/\bday 5\b/.test(ds.options[0].rationale),
+  ds.options[0].rationale);
+{
+  const sameLevel = subLib.flatMap((m) => computeSubstitutions({ ...baseInput, target: m })
+    .layer1Regression.options.filter((o) => o.difficulty === m.difficulty).map((o) => o.rationale));
+  check('same-difficulty regression options exist and carry no "altered torque" jargon',
+    sameLevel.length > 0 && sameLevel.every((r) => !/torque/i.test(r)),
+    `${sameLevel.length} options; first: ${sameLevel[0]}`);
+}
 
 // sentiment routing
 const avoidLib = subLib.map((m) => m.name === 'Goblet Squat' ? { ...m, preference: -1 } : m);
@@ -2511,6 +2553,10 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
   // 065 (session preparation side-car), 066 (focus and goals) and 067 (sport
   // profile and block emphasis record) add no
   // library rows and advance it to 65.
+  // 075 (session plan slot planned count side-car) adds no library rows and
+  // advances the chain to 74.
+  // 076 (sport taxonomy expansion to 22 sports) adds no library rows and
+  // advances the chain to 75.
   const chain = readdirSync(SCHEMA_DIR)
     .filter((f) => f.endsWith('.sql') && !f.startsWith('004_'))
     .sort((a, b) => Number(a.slice(0, 3)) - Number(b.slice(0, 3)));
@@ -2523,7 +2569,7 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
   // Pin the corpus itself, so a library change cannot move the figures below
   // without announcing itself.
   check('[F2-corpus] the shipped catalogue is the one being measured',
-    rows.length === 300 && chain.length === 70,
+    rows.length === 300 && chain.length === 76,
     `${rows.length} movements from ${chain.length} migrations`);
 
   // Round-2 finding 1. Gate [11] validates supported_prefixes tokens against
@@ -2606,6 +2652,215 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
   check('[OW-006] no bodyweight fatigue coefficient is ratified yet - if this FAILS, OW-026 landed and bodyweightDominant must be made reachable in the same change',
     divergent.length === 0 && schemas.length > 0 && phases.length > 0,
     divergent.join('; ') || `${schemas.length} schemas x ${phases.length} phases identical`);
+}
+
+// --- [MAIN_LIFT_SPACING] #228: no same main lift on back-to-back days ---------
+// docs/decisions/MAIN_LIFT_SPACING_2026-11-05.md (PROPOSED). A main lift is a
+// session's first two slots on a strength day. When the same movement would be
+// a main lift on two calendar days in a row, the later-decided day takes the
+// ranker's next eligible movement of the same pattern and class, if one exists.
+console.log('[MAIN_LIFT_SPACING] no same main lift on back-to-back days');
+{
+  const dayMs = 86_400_000;
+  const strengthDays = (plan) => plan.sessions.filter((s) => ['lower', 'upper', 'full'].includes(s.focus));
+  const mainIds = (session) => session.slots.slice(0, 2).map((slot) => slot.movement_id);
+  const backToBackRepeats = (plan) => {
+    const days = strengthDays(plan);
+    const repeats = [];
+    for (const a of days) {
+      for (const b of days) {
+        if (Date.parse(b.session_date) - Date.parse(a.session_date) !== dayMs) continue;
+        for (const id of mainIds(a)) if (mainIds(b).includes(id)) repeats.push(`${a.session_date}/${b.session_date}:${id}`);
+      }
+    }
+    return repeats;
+  };
+  let plans = 0;
+  let backToBackPairs = 0;
+  const offenders = [];
+  for (const objective of ['strength', 'hypertrophy', 'power', 'gpp', 'hybrid', 'weight_loss', 'endurance']) {
+    for (const training_age of ['intermediate', 'advanced']) {
+      for (let f = 2; f <= 7; f += 1) {
+        const plan = gen({ objective, training_age, weekly_frequency: f, session_duration_cap_min: 75 });
+        plans += 1;
+        const days = strengthDays(plan);
+        for (const a of days) for (const b of days) {
+          if (Date.parse(b.session_date) - Date.parse(a.session_date) === dayMs) backToBackPairs += 1;
+        }
+        const repeats = backToBackRepeats(plan);
+        if (repeats.length > 0) offenders.push(`${objective}/${training_age}/${f}d: ${repeats.slice(0, 2).join(', ')}`);
+      }
+    }
+  }
+  check('no movement is a main lift on two strength days in a row (full gym, 7 objectives x 2 tiers x 2-7 days)',
+    plans > 0 && backToBackPairs > 0 && offenders.length === 0,
+    offenders.length === 0 ? `${plans} plans, ${backToBackPairs} back-to-back strength-day pairs` : offenders.slice(0, 4).join(' | '));
+
+  // The walk's case (A-15/A-16): advanced, BUILD MUSCLE, 5 days. The upper day
+  // and the full day after it no longer open with the same press.
+  const walk = gen({ objective: 'hypertrophy', training_age: 'advanced', weekly_frequency: 5, session_duration_cap_min: 75 });
+  check('walk A-1 (advanced hypertrophy, 5 days): no back-to-back main-lift repeat, and the swap is disclosed',
+    backToBackRepeats(walk).length === 0
+      && walk.warnings.some((w) => /planned instead of .*, the main lift the day before or after/.test(w)),
+    walk.warnings.filter((w) => /main lift the day before/.test(w)).join('; ') || 'no disclosure');
+
+  // An explicit athlete choice always wins: the same movement chosen for both
+  // days is kept on both.
+  const squat = walk.sessions.find((s) => s.focus === 'lower').slots[0].movement_id;
+  const pattern = movements.find((m) => m.movement_id === squat).pattern;
+  const program = [
+    { day_index: 1, focus: 'lower', movement_preferences: [{ slot_index: 1, pattern, movement_id: squat }] },
+    { day_index: 2, focus: 'full', movement_preferences: [{ slot_index: 1, pattern, movement_id: squat }] },
+  ];
+  const chosen = generateBlock({ profile: prof({ objective: 'hypertrophy', training_age: 'advanced', weekly_frequency: 2 }), movements, startDate: START, programDays: program });
+  const week1 = chosen.sessions.filter((s) => s.week_index === 1);
+  check('an explicit choice of the same main lift on back-to-back days is kept (the athlete owns it)',
+    week1.length === 2 && week1.every((s) => mainIds(s).includes(squat)),
+    `${squat} ${pattern}: ${week1.map((s) => `${s.focus}=${s.slots.map((slot) => slot.movement_id).join(',')}`).join(' ')} ${chosen.warnings.join('; ')}`);
+
+  // Spacing never reaches a non-adjacent pair: a 3-day week spread over
+  // non-consecutive days is byte-identical to a plan with no neighbours.
+  const spread = gen({ objective: 'strength', training_age: 'intermediate', weekly_frequency: 3 });
+  const spreadDays = strengthDays(spread).filter((s) => s.week_index === 1).map((s) => Date.parse(s.session_date));
+  const hasNeighbour = spreadDays.some((a) => spreadDays.includes(a + dayMs));
+  check('a week with no back-to-back strength days carries no spacing note',
+    hasNeighbour || !spread.warnings.some((w) => /main lift the day before/.test(w)));
+
+  // #228 owner ruling (Option A): in a hypertrophy plan, spacing follows the
+  // Round 5 competition-lift exclusion. It takes a non-competition movement of
+  // the same pattern, loading class and compound class when one qualifies, and
+  // falls back to a competition lift only when none does.
+  const { ANCHOR_MOVEMENT_NAMES } = require('./.build/movementRanking.js');
+  const byName = (name) => movements.find((m) => m.name === name);
+  const spacingSwaps = (plan) => plan.warnings
+    .map((w) => /^[a-z]+: (.+) planned instead of (.+), the main lift the day before or after$/.exec(w))
+    .filter((match) => match !== null)
+    .map(([, chosen, instead]) => ({ chosen, instead }));
+  // #228 owner ruling (Option B): for spacing, a planned implement other than
+  // Bodyweight is loaded. A movement with an undeclared implement that could
+  // be done with bodyweight (Push-up with no declared load) is not loaded;
+  // one whose every supported implement is external (Dumbbell Bench Press:
+  // BB or DB) still is. Written out here from the ruling and the library's
+  // own supported implements rather than imported, so the check does not
+  // restate the code under test.
+  const loadedForSpacing = (m) => (m.plannedImplement !== undefined
+    ? m.plannedImplement !== 'Bodyweight'
+    : !(prefixesById.get(m.movement_id) ?? []).includes('Bodyweight'));
+  const sameClassNonCompetition = (name, pool = movements) => {
+    const original = pool.find((m) => m.name === name);
+    return pool.filter((m) => m.movement_id !== original.movement_id
+      && m.pattern === original.pattern && m.is_compound === original.is_compound
+      && loadedForSpacing(m) === loadedForSpacing(original)
+      && !ANCHOR_MOVEMENT_NAMES.includes(m.name)).map((m) => m.name);
+  };
+
+  // Non-competition movement available: advanced hypertrophy, 7 days. The
+  // Sunday full day repeats Monday's Front Squat; Competition Squat ranks ahead
+  // of Goblet Squat, but Goblet Squat (loaded, compound, squat) qualifies.
+  const seven = gen({ objective: 'hypertrophy', training_age: 'advanced', weekly_frequency: 7, session_duration_cap_min: 75 });
+  const squatSwap = spacingSwaps(seven).find((swap) => swap.instead === 'Front Squat');
+  check('hypertrophy spacing: a qualifying non-competition movement exists for Front Squat (premise)',
+    sameClassNonCompetition('Front Squat').includes('Goblet Squat'), sameClassNonCompetition('Front Squat').join(', '));
+  check('hypertrophy spacing never picks a competition lift when a non-competition movement qualifies (Goblet Squat, not Competition Squat)',
+    squatSwap !== undefined && !ANCHOR_MOVEMENT_NAMES.includes(squatSwap.chosen) && squatSwap.chosen === 'Goblet Squat'
+      && backToBackRepeats(seven).length === 0,
+    spacingSwaps(seven).map((swap) => `${swap.chosen} for ${swap.instead}`).join('; ') || 'no swap');
+  const sweepOffenders = [];
+  for (const training_age of ['intermediate', 'advanced']) {
+    for (let f = 2; f <= 7; f += 1) {
+      const plan = gen({ objective: 'hypertrophy', training_age, weekly_frequency: f, session_duration_cap_min: 75 });
+      for (const swap of spacingSwaps(plan)) {
+        if (ANCHOR_MOVEMENT_NAMES.includes(swap.chosen) && sameClassNonCompetition(swap.instead).length > 0) {
+          sweepOffenders.push(`${training_age}/${f}d: ${swap.chosen} for ${swap.instead}`);
+        }
+      }
+    }
+  }
+  check('hypertrophy spacing sweep (2-7 days x 2 tiers): a competition lift is chosen only when no non-competition movement qualifies',
+    sweepOffenders.length === 0, sweepOffenders.slice(0, 3).join(' | '));
+
+  // No non-competition movement available. With Push-up planned as strictly
+  // bodyweight (a different loading class), the only other loaded compound
+  // horizontal push is Competition Bench, so the fallback takes it rather than
+  // repeating yesterday's Dumbbell Bench Press.
+  const pushUpBodyweight = movements.map((m) => (m.name === 'Push-up' ? { ...m, plannedImplement: 'Bodyweight' } : m));
+  check('hypertrophy spacing: no other non-competition movement of the same class exists for Dumbbell Bench Press (premise)',
+    sameClassNonCompetition('Dumbbell Bench Press', pushUpBodyweight).length === 0,
+    sameClassNonCompetition('Dumbbell Bench Press', pushUpBodyweight).join(', '));
+  const constrained = generateBlock({
+    profile: prof({ objective: 'hypertrophy', training_age: 'advanced', weekly_frequency: 5, session_duration_cap_min: 75 }),
+    movements: pushUpBodyweight, startDate: START,
+  });
+  check('hypertrophy spacing falls back to a competition lift when no non-competition movement qualifies (Competition Bench for Dumbbell Bench Press)',
+    spacingSwaps(constrained).some((swap) => swap.chosen === 'Competition Bench' && swap.instead === 'Dumbbell Bench Press')
+      && backToBackRepeats(constrained).length === 0,
+    spacingSwaps(constrained).map((swap) => `${swap.chosen} for ${swap.instead}`).join('; ') || 'no swap');
+
+  // #228 owner ruling (Option B): the walk's own pool. Push-up supports
+  // Bodyweight and Banded, so with nothing declared its implement is
+  // undeclared, and for spacing it does not count as loaded. No loaded
+  // non-competition movement qualifies for Dumbbell Bench Press, so the
+  // fallback is Competition Bench, not Push-up. The swap lands on the full
+  // day that follows the upper day, so the note carries that session's focus.
+  const walkNote = 'full: Competition Bench planned instead of Dumbbell Bench Press, the main lift the day before or after';
+  const benchId = byName('Competition Bench').movement_id;
+  check('walk spacing premise: Push-up has no declared load, and no loaded non-competition movement qualifies for Dumbbell Bench Press',
+    byName('Push-up').plannedImplement === undefined && byName('Push-up').bodyweightSupported === true
+      && sameClassNonCompetition('Dumbbell Bench Press').length === 0,
+    `Push-up=${String(byName('Push-up').plannedImplement)}; ${sameClassNonCompetition('Dumbbell Bench Press').join(', ')}`);
+  check('walk (advanced hypertrophy, 5 days): Competition Bench, not Push-up, replaces Dumbbell Bench Press, and the note names it',
+    spacingSwaps(walk).some((swap) => swap.chosen === 'Competition Bench' && swap.instead === 'Dumbbell Bench Press')
+      && !spacingSwaps(walk).some((swap) => swap.chosen === 'Push-up')
+      && walk.warnings.includes(walkNote)
+      && walk.sessions.some((s) => s.focus === 'full' && mainIds(s).includes(benchId))
+      && backToBackRepeats(walk).length === 0,
+    walk.warnings.filter((w) => /main lift the day before/.test(w)).join('; ') || 'no swap');
+
+  // The same input with a load declared for Push-up (Banded, one of its
+  // supported implements): Push-up now counts as loaded and is the
+  // non-competition replacement, ahead of Competition Bench.
+  const pushUpDeclared = movements.map((m) => (m.name === 'Push-up' ? { ...m, plannedImplement: 'Banded' } : m));
+  const declaredWalk = generateBlock({
+    profile: prof({ objective: 'hypertrophy', training_age: 'advanced', weekly_frequency: 5, session_duration_cap_min: 75 }),
+    movements: pushUpDeclared, startDate: START,
+  });
+  check('walk with a declared load on Push-up: Push-up, not Competition Bench, replaces Dumbbell Bench Press',
+    spacingSwaps(declaredWalk).some((swap) => swap.chosen === 'Push-up' && swap.instead === 'Dumbbell Bench Press')
+      && !spacingSwaps(declaredWalk).some((swap) => swap.chosen === 'Competition Bench')
+      && backToBackRepeats(declaredWalk).length === 0,
+    spacingSwaps(declaredWalk).map((swap) => `${swap.chosen} for ${swap.instead}`).join('; ') || 'no swap');
+
+  // #228 owner ruling (Option A on the dose): the spacing replacement is
+  // prescribed as that movement normally is. A replacement on a capability
+  // chain keeps its chain rep floor (chainScopedRepsFor), so the reps can rise
+  // when the original main lift was not on a chain.
+  const CHAIN_FLOOR = 20;
+  const offChain = movements.map((m) => ({ ...m, progressionGroup: undefined }));
+  const offChainPlan = generateBlock({
+    profile: prof({ objective: 'hypertrophy', training_age: 'advanced', weekly_frequency: 7, session_duration_cap_min: 75 }),
+    movements: offChain, startDate: START,
+  });
+  const chainSwap = spacingSwaps(offChainPlan)[0];
+  const chainPool = offChain.map((m) => (chainSwap !== undefined && m.name === chainSwap.chosen
+    ? { ...m, progressionGroup: 'spacing-chain', chainAdvancementReps: CHAIN_FLOOR } : m));
+  const chainPlan = generateBlock({
+    profile: prof({ objective: 'hypertrophy', training_age: 'advanced', weekly_frequency: 7, session_duration_cap_min: 75 }),
+    movements: chainPool, startDate: START,
+  });
+  const repsOf = (plan, name) => {
+    const id = byName(name).movement_id;
+    return plan.sessions.filter((s) => s.phase !== 'deload')
+      .flatMap((s) => s.slots.slice(0, 2).filter((slot) => slot.movement_id === id).map((slot) => slot.reps));
+  };
+  const replacementReps = chainSwap === undefined ? [] : repsOf(chainPlan, chainSwap.chosen);
+  const originalReps = chainSwap === undefined ? [] : repsOf(chainPlan, chainSwap.instead);
+  check('a spacing replacement on a capability chain keeps its chain rep floor (the original main lift is off-chain)',
+    chainSwap !== undefined
+      && spacingSwaps(chainPlan).some((swap) => swap.chosen === chainSwap.chosen && swap.instead === chainSwap.instead)
+      && originalReps.length > 0 && originalReps.every((reps) => reps < CHAIN_FLOOR)
+      && replacementReps.length > 0 && replacementReps.every((reps) => reps === CHAIN_FLOOR),
+    chainSwap === undefined ? 'no swap'
+      : `${chainSwap.chosen} reps ${replacementReps.join(',')} for ${chainSwap.instead} reps ${originalReps.join(',')}`);
 }
 
 try { verifyR05Blocks(); } catch (error) { check('R05 experience-only block workload', false, error.message); }
