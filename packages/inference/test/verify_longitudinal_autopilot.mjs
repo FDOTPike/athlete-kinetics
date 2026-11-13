@@ -1123,11 +1123,14 @@ check('applyLongitudinalOverlayToBlockPlan trims Week 3 by -1, enforces MRV_p, s
     library: TEST_LIBRARY,
     inventory: STANDARD_EQUIPMENT_ITEMS,
     blocks: [b1, b2],
-    initialPatternMrvSets: { hinge: 3 },
+    initialPatternMrvSets: { squat: 3, hinge: 3 },
     upcomingMacroBlockIndex: 3,
     upcomingMacroPhase: 'hypertrophy',
     policy: EXPLICIT_POLICY,
   });
+
+  // After 2 deficit blocks from initial squat MRV=3, squat MRV is 1 (< deload sets >= 2).
+  assert.equal(overlay.patternMrvSets.squat, 1);
 
   const rawPlan = generateBlock({
     profile: { ...DEFAULT_PROFILE, objective: 'strength', training_age: 'intermediate' },
@@ -1146,44 +1149,263 @@ check('applyLongitudinalOverlayToBlockPlan trims Week 3 by -1, enforces MRV_p, s
   let sawWeek3SquatTrim = false;
   let sawWeek4DeloadUnchanged = false;
   let sawBenchSubstituted = false;
+  let sawTimeBudgetRecomputed = false;
 
   for (let sIdx = 0; sIdx < rawPlan.sessions.length; sIdx += 1) {
     const beforeSession = rawPlan.sessions[sIdx];
     const afterSession = projected.sessions[sIdx];
+    const beforeTime = rawPlan.timeBudget.sessions[sIdx];
+    const afterTime = projected.timeBudget.sessions[sIdx];
+    let sessionSetsReduced = false;
+
     for (let k = 0; k < beforeSession.slots.length; k += 1) {
       const beforeSlot = beforeSession.slots[k];
       const afterSlot = afterSession.slots[k];
       const pattern = patternById.get(afterSlot.movement_id);
 
       assert.equal(afterSlot.sets >= 1 && afterSlot.sets <= 10, true);
+      if (afterSlot.sets < beforeSlot.sets) {
+        sessionSetsReduced = true;
+      }
 
-      if (beforeSlot.movement_id === 201 && beforeSession.phase !== 'deload') {
+      if (beforeSession.phase === 'deload') {
+        // Deload weeks are preserved untouched regardless of MRV_p or substitutions.
+        assert.deepEqual(afterSlot, beforeSlot);
+        if (pattern === 'squat') {
+          assert.equal(beforeSlot.sets > overlay.patternMrvSets.squat, true);
+          sawWeek4DeloadUnchanged = true;
+        }
+        continue;
+      }
+
+      if (beforeSlot.movement_id === 201) {
         assert.equal(afterSlot.movement_id, 203);
         sawBenchSubstituted = true;
       }
-      if (pattern === 'hinge' && beforeSession.phase !== 'deload') {
+      if (pattern === 'hinge') {
         assert.equal(afterSlot.sets <= 3, true);
       }
       if (
         pattern === 'squat' &&
         beforeSession.week_index === 3 &&
-        beforeSession.phase !== 'deload' &&
         beforeSlot.sets > 1
       ) {
         const cappedBefore = Math.min(beforeSlot.sets, overlay.patternMrvSets.squat);
         assert.equal(afterSlot.sets, Math.max(1, cappedBefore - 1));
         sawWeek3SquatTrim = true;
       }
-      if (beforeSession.phase === 'deload' && pattern === 'squat') {
-        assert.equal(afterSlot.sets, Math.min(beforeSlot.sets, overlay.patternMrvSets.squat));
-        sawWeek4DeloadUnchanged = true;
-      }
+    }
+
+    if (sessionSetsReduced) {
+      assert.equal(
+        afterTime.estimatedMin < beforeTime.estimatedMin,
+        true,
+        `expected recomputed estimatedMin (${afterTime.estimatedMin}) < stale (${beforeTime.estimatedMin})`,
+      );
+      sawTimeBudgetRecomputed = true;
     }
   }
 
   assert.equal(sawWeek3SquatTrim, true, 'expected at least one Week-3 squat slot trimmed');
-  assert.equal(sawWeek4DeloadUnchanged, true, 'expected Week-4 deload squat slot preserved');
+  assert.equal(sawWeek4DeloadUnchanged, true, 'expected Week-4 deload squat slot preserved untouched');
   assert.equal(sawBenchSubstituted, true, 'expected Avoided Bench (201) replaced by Push-up (203)');
+  assert.equal(sawTimeBudgetRecomputed, true, 'expected session timeBudget recomputed after set reductions');
+});
+
+check('observer skeleton anchors to windowDates even when stateVectors is empty or truncated', () => {
+  const d = makeWindowDates('2026-01-05', 21);
+  const fullBlock = makeBlockRecord({
+    blockSequence: 1,
+    macroBlockIndex: 1,
+    startDate: '2026-01-05',
+    setRows: makePatternSetRows(d, 'squat', -1.5, 4),
+    niggleRows: [{ date: d[19], region: 'knee', severity: 5 }],
+  });
+  const emptySvBlock = {
+    ...clone(fullBlock),
+    stateVectors: [],
+  };
+  const truncatedSvBlock = {
+    ...clone(fullBlock),
+    stateVectors: fullBlock.stateVectors.slice(0, 2),
+  };
+
+  const fullOut = evaluateLongitudinalAutopilot({
+    profile: { ...DEFAULT_PROFILE, training_age: 'intermediate' },
+    library: TEST_LIBRARY,
+    inventory: STANDARD_EQUIPMENT_ITEMS,
+    blocks: [fullBlock],
+    upcomingMacroBlockIndex: 2,
+    upcomingMacroPhase: 'gpp',
+    policy: EXPLICIT_POLICY,
+  });
+  const emptyOut = evaluateLongitudinalAutopilot({
+    profile: { ...DEFAULT_PROFILE, training_age: 'intermediate' },
+    library: TEST_LIBRARY,
+    inventory: STANDARD_EQUIPMENT_ITEMS,
+    blocks: [emptySvBlock],
+    upcomingMacroBlockIndex: 2,
+    upcomingMacroPhase: 'gpp',
+    policy: EXPLICIT_POLICY,
+  });
+  const truncatedOut = evaluateLongitudinalAutopilot({
+    profile: { ...DEFAULT_PROFILE, training_age: 'intermediate' },
+    library: TEST_LIBRARY,
+    inventory: STANDARD_EQUIPMENT_ITEMS,
+    blocks: [truncatedSvBlock],
+    upcomingMacroBlockIndex: 2,
+    upcomingMacroPhase: 'gpp',
+    policy: EXPLICIT_POLICY,
+  });
+
+  // Day-20 knee niggle >= triageMin (4) forces caution even when stateVectors is empty/short.
+  assert.equal(fullOut.latestFlawReport.patterns.squat.flawClass, 'caution');
+  assert.deepEqual(emptyOut, fullOut);
+  assert.deepEqual(truncatedOut, fullOut);
+});
+
+check('Week-3 completion overreach honours policy observation-day floor instead of a 1-day literal', () => {
+  const mkSingleDayW3Comp = (seq, startIso, obsDays) => {
+    const d = makeWindowDates(startIso, 21);
+    return makeBlockRecord({
+      blockSequence: seq,
+      macroBlockIndex: seq,
+      startDate: startIso,
+      setRows: makePatternSetRows(d, 'squat', 0.0, 4),
+      completionRows: d.slice(7, 7 + obsDays).map((date) => ({
+        date,
+        pattern: 'squat',
+        evidenceCount: 4,
+        sumShortfall: 1.6, // 0.4 >= deficitThreshold 0.2
+      })),
+    });
+  };
+
+  // Under EXPLICIT_POLICY (minObservationDays: 5), 1 Week-3 observation day must NOT trigger overreach.
+  const oneDayOut = evaluateLongitudinalAutopilot({
+    profile: { ...DEFAULT_PROFILE, training_age: 'intermediate' },
+    library: TEST_LIBRARY,
+    inventory: STANDARD_EQUIPMENT_ITEMS,
+    blocks: [mkSingleDayW3Comp(1, '2026-01-05', 1), mkSingleDayW3Comp(2, '2026-02-02', 1)],
+    upcomingMacroBlockIndex: 3,
+    upcomingMacroPhase: 'hypertrophy',
+    policy: EXPLICIT_POLICY,
+  });
+  assert.equal(oneDayOut.week3SetTrimByPattern.squat, 0);
+
+  // Explicit caller-supplied week3CompletionMinObservationDays: 2 engages at 2 days.
+  const twoDayPolicy = {
+    ...EXPLICIT_POLICY,
+    week3CompletionMinObservationDays: 2,
+  };
+  assert.equal(isValidLongitudinalAutopilotPolicy(twoDayPolicy), true);
+  assert.equal(
+    isValidLongitudinalAutopilotPolicy({ ...EXPLICIT_POLICY, week3CompletionMinObservationDays: 0 }),
+    false,
+  );
+  const twoDayOut = evaluateLongitudinalAutopilot({
+    profile: { ...DEFAULT_PROFILE, training_age: 'intermediate' },
+    library: TEST_LIBRARY,
+    inventory: STANDARD_EQUIPMENT_ITEMS,
+    blocks: [mkSingleDayW3Comp(1, '2026-01-05', 2), mkSingleDayW3Comp(2, '2026-02-02', 2)],
+    upcomingMacroBlockIndex: 3,
+    upcomingMacroPhase: 'hypertrophy',
+    policy: twoDayPolicy,
+  });
+  assert.equal(twoDayOut.week3SetTrimByPattern.squat, -1);
+});
+
+check('acute upcoming halt exposes haltAdvised === true and refuses non-recovery BlockPlan projection, while recomputed timeBudget flags over-cap substitutions', () => {
+  const d = makeWindowDates('2026-01-05', 21);
+  const b1 = makeBlockRecord({
+    blockSequence: 1,
+    macroBlockIndex: 1,
+    startDate: '2026-01-05',
+    setRows: makePatternSetRows(d, 'squat', -1.5, 4),
+    niggleRows: [{ date: d[8], region: 'shoulder', severity: 5 }],
+    swapRecords: [
+      {
+        sessionDate: d[8],
+        sessionPlanSlotId: 10,
+        replacedBySessionPlanSlotId: 11,
+        originalMovementId: 201,
+        replacementMovementId: 203,
+        pattern: 'push_h',
+        cause: 'joint_discomfort',
+      },
+    ],
+  });
+  const b2 = makeBlockRecord({
+    blockSequence: 2,
+    macroBlockIndex: 2,
+    startDate: '2026-02-02',
+    niggleRows: [{ date: d[8], region: 'shoulder', severity: 5 }],
+    swapRecords: [
+      {
+        sessionDate: addDaysIso('2026-02-02', 8),
+        sessionPlanSlotId: 20,
+        replacedBySessionPlanSlotId: 21,
+        originalMovementId: 201,
+        replacementMovementId: 203,
+        pattern: 'push_h',
+        cause: 'joint_discomfort',
+      },
+    ],
+  });
+
+  const haltedOverlay = evaluateLongitudinalAutopilot({
+    profile: { ...DEFAULT_PROFILE, objective: 'strength', training_age: 'intermediate' },
+    library: TEST_LIBRARY,
+    inventory: STANDARD_EQUIPMENT_ITEMS,
+    blocks: [b1],
+    upcomingMacroBlockIndex: 2,
+    upcomingMacroPhase: 'gpp',
+    upcomingBlockNiggles: [{ region: 'shoulder', severity: 8 }],
+    policy: EXPLICIT_POLICY,
+  });
+  assert.equal(haltedOverlay.haltAdvised, true);
+
+  const rawPlan = generateBlock({
+    profile: { ...DEFAULT_PROFILE, objective: 'strength', training_age: 'intermediate' },
+    movements: GENERATOR_LIBRARY,
+    startDate: '2026-03-02',
+    macroBlockIndex: 2,
+  });
+  const patternById = new Map(GENERATOR_LIBRARY.map((m) => [m.movement_id, m.pattern]));
+
+  assert.equal(rawPlan.recovery, false);
+  assert.throws(
+    () => applyLongitudinalOverlayToBlockPlan(rawPlan, patternById, haltedOverlay),
+    /haltAdvised/,
+  );
+
+  // Over-cap substitution timePolicy surfaces non-empty conflicts on projected timeBudget.
+  const subOverlay = evaluateLongitudinalAutopilot({
+    profile: { ...DEFAULT_PROFILE, objective: 'strength', training_age: 'intermediate' },
+    library: TEST_LIBRARY,
+    inventory: STANDARD_EQUIPMENT_ITEMS,
+    blocks: [b1, b2],
+    upcomingMacroBlockIndex: 3,
+    upcomingMacroPhase: 'hypertrophy',
+    policy: EXPLICIT_POLICY,
+  });
+  assert.equal(subOverlay.haltAdvised, false);
+  assert.equal(rawPlan.timeBudget.conflicts.length, 0);
+
+  const overCapProjected = applyLongitudinalOverlayToBlockPlan(
+    rawPlan,
+    patternById,
+    subOverlay,
+    {
+      // Substituted movement 203 given an unachievable timed duration to prove conflict recomputation.
+      timePolicyByMovementId: { 203: { defaultSets: 4, targetSeconds: 1200 } },
+    },
+  );
+  assert.equal(overCapProjected.timeBudget.conflicts.length > 0, true);
+  assert.equal(
+    overCapProjected.timeBudget.sessions.some((s) => !s.feasible && s.overByMin > 0),
+    true,
+  );
 });
 
 // ===========================================================================
@@ -1227,6 +1449,8 @@ check('NON-VACUOUS beginner clamp: identical strong headroom grants dLoad_p = 1.
   });
 
   assert.equal(intermediateOut.controlAction.corrections.squat.dLoad_p, 1.05);
+  assert.equal(intermediateOut.controlAction.blockAddedRpe, 0.5);
+  assert.equal(intermediateOut.cumulativeMacrocycleRpeGranted, 0.5);
   for (const p of MOVEMENT_PATTERNS) {
     assert.equal(
       beginnerOut.controlAction.corrections[p].dLoad_p <= 1.0,
@@ -1270,29 +1494,20 @@ check('completion shortfall reduction overrides positive RPE headroom fieldwise'
   });
 });
 
-check('9-month (9-block) trajectory enforces cumulative RPE raise <= 2.5 in blocks 1..8, 0.0 in 6..8, 0.0 under suspension, and clean Macrocycle 2 rollover at block 9', () => {
+check('multi-macrocycle trajectory counts each boundary grant once, enforces <= 2.5 in positions 1..8, 0.0 in 6..8, 0.0 under suspension, and clean Macrocycle 2 rollover', () => {
   const blocks = [];
   const blockGrants = [];
 
-  for (let seq = 1; seq <= 9; seq += 1) {
+  for (let seq = 1; seq <= 16; seq += 1) {
     const macroIdx = ((seq - 1) % 8) + 1;
     const startIso = addDaysIso('2026-01-05', (seq - 1) * 28);
-    const d = makeWindowDates(startIso, 21);
-    blocks.push(
-      makeBlockRecord({
-        blockSequence: seq,
-        macroBlockIndex: macroIdx,
-        startDate: startIso,
-        setRows: makePatternSetRows(d, 'squat', -1.5, 4),
-      }),
-    );
 
+    // Evaluate upcoming block `seq` using strictly prior completed history `blocks.slice(0, seq - 1)`.
     const out = evaluateLongitudinalAutopilot({
       profile: { ...DEFAULT_PROFILE, training_age: 'intermediate' },
       library: TEST_LIBRARY,
       inventory: STANDARD_EQUIPMENT_ITEMS,
-      blocks: blocks.slice(0, seq),
-      // Note: evaluate upcoming block = macroIdx (1..8 of macrocycle 1, then 1 of macrocycle 2)
+      blocks: blocks.slice(0, seq - 1),
       upcomingMacroBlockIndex: macroIdx,
       upcomingMacroPhase: macroPhaseOf(macroIdx),
       policy: EXPLICIT_POLICY,
@@ -1303,26 +1518,51 @@ check('9-month (9-block) trajectory enforces cumulative RPE raise <= 2.5 in bloc
       blockAddedRpe: out.controlAction.blockAddedRpe,
       cumulativeMacrocycleRpe: out.cumulativeMacrocycleRpeGranted,
     });
+
+    const d = makeWindowDates(startIso, 21);
+    blocks.push(
+      makeBlockRecord({
+        blockSequence: seq,
+        macroBlockIndex: macroIdx,
+        startDate: startIso,
+        setRows: makePatternSetRows(d, 'squat', -1.5, 4),
+      }),
+    );
   }
 
-  // Blocks 1..5 grant +0.5 each => sum = 2.5.
-  const sum1To8 = blockGrants
+  // Macrocycle 1: seq 1 has empty history (0.0); seq 2..5 grant +0.5 each => sum = 2.0 <= 2.5; seq 6..8 grant 0.0.
+  const sumMacro1 = blockGrants
     .slice(0, 8)
     .reduce((acc, row) => acc + row.blockAddedRpe, 0);
-  const sum6To8 = blockGrants
+  const sumMacro1Late = blockGrants
     .slice(5, 8)
     .reduce((acc, row) => acc + row.blockAddedRpe, 0);
 
-  assert.equal(sum1To8 <= 2.5, true);
-  assert.equal(sum1To8, 2.5);
-  assert.equal(sum6To8, 0.0);
+  assert.equal(blockGrants[0].blockAddedRpe, 0.0);
+  assert.equal(blockGrants[0].cumulativeMacrocycleRpe, 0.0);
+  assert.equal(blockGrants[1].blockAddedRpe, 0.5);
+  assert.equal(blockGrants[1].cumulativeMacrocycleRpe, 0.5);
+  assert.equal(sumMacro1 <= 2.5, true);
+  assert.equal(sumMacro1, 2.0);
+  assert.equal(sumMacro1Late, 0.0);
   assert.equal(blockGrants[5].blockAddedRpe, 0);
   assert.equal(blockGrants[6].blockAddedRpe, 0);
   assert.equal(blockGrants[7].blockAddedRpe, 0);
-  // Block 9 rolls into Macrocycle 2 Block 1 => resets cumulative cap and grants +0.5.
+
+  // Macrocycle 2 (seq 9..16): seq 9..13 grant +0.5 each => full 2.5 cap; seq 14..16 grant 0.0.
   assert.equal(blockGrants[8].macroIdx, 1);
   assert.equal(blockGrants[8].blockAddedRpe, 0.5);
   assert.equal(blockGrants[8].cumulativeMacrocycleRpe, 0.5);
+  const sumMacro2 = blockGrants
+    .slice(8, 16)
+    .reduce((acc, row) => acc + row.blockAddedRpe, 0);
+  const sumMacro2Late = blockGrants
+    .slice(13, 16)
+    .reduce((acc, row) => acc + row.blockAddedRpe, 0);
+  assert.equal(sumMacro2 <= 2.5, true);
+  assert.equal(sumMacro2, 2.5);
+  assert.equal(blockGrants[12].cumulativeMacrocycleRpe, 2.5);
+  assert.equal(sumMacro2Late, 0.0);
 
   // Suspension withholding check at macroBlockIndex = 3:
   const suspendedOut = evaluateLongitudinalAutopilot({

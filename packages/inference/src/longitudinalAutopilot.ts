@@ -39,8 +39,23 @@ import {
 } from './types';
 import { LOAD_MODIFIER_LITERALS } from './outputSchema';
 import type { Guardrail } from './semantic/codebase';
-import type { BlockPlan, PlannedSessionPlan, PlannedSlotPlan } from './blockGenerator';
+import type {
+  BlockPlan,
+  BlockTimeBudget,
+  PlannedSessionPlan,
+  PlannedSessionTime,
+  PlannedSlotPlan,
+} from './blockGenerator';
 import type { ExecutableMovementAccessContext } from './tierPolicy';
+import {
+  SESSION_TIME_CONTRACT_VERSION,
+  describeSessionTimeConflict,
+  feasibleSessionAlternatives,
+  fitSessionToCap,
+  normalizedCapMin,
+  preparationPlanningMinutes,
+  type SessionTimeEstimate,
+} from './sessionTimeBudget';
 import {
   CONTROL_AUTHORITY,
   FLAW_DETECTION_CONSTANTS,
@@ -105,6 +120,8 @@ export interface LongitudinalAutopilotPolicy {
   readonly mClean: number;
   /** Explicit completion shortfall policy; null disables completion reduction. */
   readonly completionPolicy: CompletionActionPolicy | null;
+  /** Optional explicit Week-3 7-day completion observation floor (>= 1); falls back to `completionPolicy.minObservationDays`. */
+  readonly week3CompletionMinObservationDays?: number;
 }
 
 export type LongitudinalSwapCause =
@@ -215,6 +232,8 @@ export interface LongitudinalAutopilotInput {
 
 export interface LongitudinalAutopilotResult {
   readonly policyApplied: boolean;
+  /** True when an acute upcoming niggle (>= haltMin) or active global guardrail advises a full halt. */
+  readonly haltAdvised: boolean;
   /** Movements promoted to Avoid (-1) for the upcoming block. */
   readonly derivedPreferences: Record<number, -1>;
   /** Trailing-window joint-coupled swap counts per movement_id. */
@@ -235,6 +254,22 @@ export interface LongitudinalAutopilotResult {
   readonly controlAction: ControlAction;
   /** Cumulative positive RPE grants issued in the active macrocycle through upcoming block. */
   readonly cumulativeMacrocycleRpeGranted: number;
+}
+
+export interface MovementTimePolicyInput {
+  readonly defaultSets: number;
+  readonly targetSeconds: number;
+}
+
+export interface ApplyLongitudinalOverlayOptions {
+  /** Optional time-based movement policies (`movement_time_policy`) for accurate session-time recomputation. */
+  readonly timePolicyByMovementId?:
+    | ReadonlyMap<number, MovementTimePolicyInput>
+    | Readonly<Record<number, MovementTimePolicyInput>>;
+  /** Optional `${week_index}:${day_index}:${slot_index}` keys protected from accessory-first trimming. */
+  readonly protectedSlotKeys?: ReadonlySet<string>;
+  /** Optional weekly training frequency override; defaults to Week-1 session count. */
+  readonly weeklyFrequency?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -300,7 +335,19 @@ export function isValidLongitudinalAutopilotPolicy(
 ): policy is LongitudinalAutopilotPolicy {
   if (policy === null || typeof policy !== 'object') return false;
   const record = policy as Record<string, unknown>;
-  const { kTrigger, swapWindowBlocks, mCadence, mClean, completionPolicy } = record;
+  const {
+    kTrigger,
+    swapWindowBlocks,
+    mCadence,
+    mClean,
+    completionPolicy,
+    week3CompletionMinObservationDays,
+  } = record;
+  const validWeek3MinObs =
+    week3CompletionMinObservationDays === undefined ||
+    (typeof week3CompletionMinObservationDays === 'number' &&
+      Number.isInteger(week3CompletionMinObservationDays) &&
+      week3CompletionMinObservationDays >= 1);
   return (
     typeof kTrigger === 'number' &&
     Number.isInteger(kTrigger) &&
@@ -314,6 +361,7 @@ export function isValidLongitudinalAutopilotPolicy(
     typeof mClean === 'number' &&
     Number.isInteger(mClean) &&
     mClean >= 1 &&
+    validWeek3MinObs &&
     (completionPolicy === null || isValidCompletionPolicy(completionPolicy))
   );
 }
@@ -525,9 +573,19 @@ export function evaluateLongitudinalAutopilot(
         : LONGITUDINAL_MRV_MAX_SETS;
   }
 
+  const haltMin = EXPERIENCE_SEVERITY[input.profile.training_age].haltMin;
+  const acuteUpcomingHalt = (input.upcomingBlockNiggles ?? []).some(
+    (niggle) => niggle.severity >= haltMin,
+  );
+  const latestGuardrail =
+    input.blocks.length > 0
+      ? (input.blocks[input.blocks.length - 1].globalGuardrail ?? null)
+      : null;
+
   if (!isValidLongitudinalAutopilotPolicy(input.policy)) {
     return {
       policyApplied: false,
+      haltAdvised: acuteUpcomingHalt || latestGuardrail?.halt === true,
       derivedPreferences: {},
       swapTriggerCounts: {},
       substitutions: {},
@@ -648,10 +706,11 @@ export function evaluateLongitudinalAutopilot(
       block.niggleRows,
     );
     const guardrail = block.globalGuardrail ?? null;
-    // Construct minimal length-preserving StateVector skeleton so descriptive fields
-    // on StateVectorRow (acwr, readiness_score, ks_*) cannot influence detectFlaws.
-    const sanitizedStateVectors: StateVectorRow[] = block.stateVectors.map((sv) => ({
-      date: sv.date,
+    // Construct minimal date-axis-aligned StateVector skeleton from `windowDates` so
+    // descriptive fields (acwr, readiness_score, ks_*) cannot influence detectFlaws
+    // and empty/short `stateVectors` never truncate or misalign the observer window.
+    const sanitizedStateVectors: StateVectorRow[] = block.windowDates.map((date) => ({
+      date,
       readiness_score: 0,
       hrv_component: 0,
       load_component: 0,
@@ -692,6 +751,9 @@ export function evaluateLongitudinalAutopilot(
             buildCompletionWindow(resolveWeek3Dates(block), block.completionRows ?? []),
           )
         : null;
+    const week3MinObsDays =
+      policy.week3CompletionMinObservationDays ??
+      policy.completionPolicy?.minObservationDays;
 
     const restrictiveGlobal =
       guardrail !== null &&
@@ -721,8 +783,9 @@ export function evaluateLongitudinalAutopilot(
       const w3CompSummary = week3CompletionSummaries?.[pattern] ?? null;
       const w3CompOverreach =
         policy.completionPolicy !== null &&
+        week3MinObsDays !== undefined &&
         w3CompSummary !== null &&
-        w3CompSummary.observationDays >= 1 &&
+        w3CompSummary.observationDays >= week3MinObsDays &&
         w3CompSummary.meanShortfall !== null &&
         w3CompSummary.meanShortfall >= policy.completionPolicy.deficitThreshold;
 
@@ -801,12 +864,17 @@ export function evaluateLongitudinalAutopilot(
     ? Math.max(1, Math.min(8, Math.round(input.upcomingMacroBlockIndex)))
     : macroGrantSlots + 1;
 
-  // Walk backwards across historical blocks belonging to earlier positions
-  // (< normalizedUpcomingMacroIdx) of the active macrocycle to accumulate already-issued RPE grants.
+  // Walk backwards across non-suspended completed blocks belonging to earlier positions
+  // (< normalizedUpcomingMacroIdx) of the active macrocycle. Each completed block
+  // `blocks[targetIdx]` (`targetIdx >= 1`) applied the boundary derived from the
+  // preceding block `blocks[targetIdx - 1]`; `blocks[blocks.length - 1]` drives
+  // only the upcoming block boundary so no grant is ever double-counted.
   const activeMacrocycleBlockIndices: number[] = [];
   let cursorUpperBound = normalizedUpcomingMacroIdx;
   for (let bIdx = input.blocks.length - 1; bIdx >= 0; bIdx -= 1) {
-    const rawPos = input.blocks[bIdx].macroBlockIndex;
+    const block = input.blocks[bIdx];
+    if (block.isSuspended === true) continue;
+    const rawPos = block.macroBlockIndex;
     const pos = Number.isFinite(rawPos) ? Math.max(1, Math.min(8, Math.round(rawPos))) : 1;
     if (pos < cursorUpperBound) {
       activeMacrocycleBlockIndices.unshift(bIdx);
@@ -818,16 +886,18 @@ export function evaluateLongitudinalAutopilot(
   }
 
   let priorMacrocycleRpeGranted = 0;
-  for (const bIdx of activeMacrocycleBlockIndices) {
-    const block = input.blocks[bIdx];
-    if (block.isSuspended === true) continue;
-    const pos = Math.max(1, Math.min(8, Math.round(block.macroBlockIndex)));
+  for (const targetIdx of activeMacrocycleBlockIndices) {
+    if (targetIdx < 1) continue;
+    const targetBlock = input.blocks[targetIdx];
+    if (targetBlock.isSuspended === true) continue;
+    const sourceIdx = targetIdx - 1;
+    const pos = Math.max(1, Math.min(8, Math.round(targetBlock.macroBlockIndex)));
     const permittedThen =
       pos <= macroGrantSlots &&
       priorMacrocycleRpeGranted + CONTROL_AUTHORITY.RPE_STEP <=
         CONTROL_AUTHORITY.MAX_MACROCYCLE_RPE_RAISE;
     const historicalRpeAction = deriveControlAction(
-      blockReports[bIdx],
+      blockReports[sourceIdx],
       input.profile,
       input.upcomingMacroPhase,
       pos,
@@ -835,9 +905,9 @@ export function evaluateLongitudinalAutopilot(
     );
     const historicalComposed = composeBlockBoundaryAction(
       historicalRpeAction,
-      blockCompletionActions[bIdx],
+      blockCompletionActions[sourceIdx],
       input.profile,
-      block.globalGuardrail ?? null,
+      input.blocks[sourceIdx].globalGuardrail ?? null,
     );
     priorMacrocycleRpeGranted = round4(
       Math.min(
@@ -853,16 +923,8 @@ export function evaluateLongitudinalAutopilot(
     blockCompletionActions.length > 0
       ? blockCompletionActions[blockCompletionActions.length - 1]
       : neutralControlAction();
-  const latestGuardrail =
-    input.blocks.length > 0
-      ? (input.blocks[input.blocks.length - 1].globalGuardrail ?? null)
-      : null;
 
   // Check if acute upcoming niggles cross halt threshold -> Halt supremacy.
-  const haltMin = EXPERIENCE_SEVERITY[input.profile.training_age].haltMin;
-  const acuteUpcomingHalt = (input.upcomingBlockNiggles ?? []).some(
-    (niggle) => niggle.severity >= haltMin,
-  );
   const effectiveGuardrail: Guardrail | null = acuteUpcomingHalt
     ? {
         load_multiplier: 1,
@@ -872,9 +934,10 @@ export function evaluateLongitudinalAutopilot(
         follow_up: null,
       }
     : latestGuardrail;
+  const haltAdvised = effectiveGuardrail?.halt === true;
 
   let controlAction = neutralControlAction();
-  if (latestFlawReport !== null && !acuteUpcomingHalt) {
+  if (latestFlawReport !== null && !haltAdvised) {
     const rpeRaisePermitted =
       input.upcomingBlockSuspended !== true &&
       normalizedUpcomingMacroIdx <= macroGrantSlots &&
@@ -905,6 +968,7 @@ export function evaluateLongitudinalAutopilot(
 
   return {
     policyApplied: true,
+    haltAdvised,
     derivedPreferences,
     swapTriggerCounts,
     substitutions,
@@ -918,6 +982,8 @@ export function evaluateLongitudinalAutopilot(
   };
 }
 
+const ACCESSORY_SLOT_FROM = 3;
+
 const lookupPattern = (
   movementId: number,
   movementPatternById:
@@ -930,14 +996,35 @@ const lookupPattern = (
   return (movementPatternById as Readonly<Record<number, MovementPattern>>)[movementId];
 };
 
+const lookupTimePolicy = (
+  movementId: number,
+  timePolicyByMovementId?:
+    | ReadonlyMap<number, MovementTimePolicyInput>
+    | Readonly<Record<number, MovementTimePolicyInput>>,
+): MovementTimePolicyInput | undefined => {
+  if (timePolicyByMovementId === undefined) return undefined;
+  if (timePolicyByMovementId instanceof Map) {
+    return (timePolicyByMovementId as ReadonlyMap<number, MovementTimePolicyInput>).get(
+      movementId,
+    );
+  }
+  return (timePolicyByMovementId as Readonly<Record<number, MovementTimePolicyInput>>)[
+    movementId
+  ];
+};
+
 /**
  * Project a `LongitudinalAutopilotResult` onto a generated `BlockPlan` without
  * mutating the input plan:
- *   - Substitutes Avoid-promoted movements on non-deload sessions using their
+ *   - Fails closed if `overlay.haltAdvised === true` and `!blockPlan.recovery`.
+ *   - Preserves deload (`session.phase === 'deload'`) and recovery blocks untouched.
+ *   - Substitutes Avoid-promoted movements on working sessions using their
  *     Layer 1 green regression when available and non-duplicating.
- *   - Enforces per-pattern `MRV_p` ceiling in `[1, 10]`.
+ *   - Enforces per-pattern `MRV_p` ceiling in `[1, 10]` on working sessions.
  *   - Applies `-1` working-set trim on Week 3 (`week_index === 3`, non-deload,
  *     non-recovery) for patterns with active `week3SetTrimByPattern[p] === -1`.
+ *   - Recomputes `BlockPlan.timeBudget` (`sessions`, `conflicts`, `alternatives`)
+ *     under the shared `sessionTimeBudget` contract after slot projection.
  */
 export function applyLongitudinalOverlayToBlockPlan(
   blockPlan: BlockPlan,
@@ -945,7 +1032,14 @@ export function applyLongitudinalOverlayToBlockPlan(
     | ReadonlyMap<number, MovementPattern>
     | Readonly<Record<number, MovementPattern>>,
   overlay: LongitudinalAutopilotResult,
+  options?: ApplyLongitudinalOverlayOptions,
 ): BlockPlan {
+  if (overlay.haltAdvised && !blockPlan.recovery) {
+    throw new Error(
+      'applyLongitudinalOverlayToBlockPlan: cannot project a non-recovery BlockPlan while overlay.haltAdvised is true',
+    );
+  }
+
   const cloneSlot = (slot: PlannedSlotPlan): PlannedSlotPlan => ({
     ...slot,
     ...(slot.applied_prefixes !== undefined
@@ -978,6 +1072,8 @@ export function applyLongitudinalOverlayToBlockPlan(
   }
 
   const adjustedPatterns = new Set<string>(blockPlan.autopilotAdjusted);
+  const warnings = new Set<string>(blockPlan.warnings);
+  const protectedSlots = options?.protectedSlotKeys ?? new Set<string>();
 
   const sessions: PlannedSessionPlan[] = blockPlan.sessions.map((session) => {
     const isDeload = session.phase === 'deload';
@@ -985,20 +1081,21 @@ export function applyLongitudinalOverlayToBlockPlan(
 
     const slots: PlannedSlotPlan[] = session.slots.map((rawSlot) => {
       const slot = cloneSlot(rawSlot);
-      let movementId = slot.movement_id;
+      if (isDeload || blockPlan.recovery) {
+        return slot;
+      }
 
-      if (!isDeload) {
-        const sub = overlay.substitutions[movementId];
-        if (
-          sub !== undefined &&
-          sub.kind === 'layer1_regression' &&
-          !usedIdsInSession.has(sub.replacement.movement_id)
-        ) {
-          usedIdsInSession.delete(movementId);
-          movementId = sub.replacement.movement_id;
-          usedIdsInSession.add(movementId);
-          slot.movement_id = movementId;
-        }
+      let movementId = slot.movement_id;
+      const sub = overlay.substitutions[movementId];
+      if (
+        sub !== undefined &&
+        sub.kind === 'layer1_regression' &&
+        !usedIdsInSession.has(sub.replacement.movement_id)
+      ) {
+        usedIdsInSession.delete(movementId);
+        movementId = sub.replacement.movement_id;
+        usedIdsInSession.add(movementId);
+        slot.movement_id = movementId;
       }
 
       const pattern = lookupPattern(movementId, movementPatternById);
@@ -1013,12 +1110,7 @@ export function applyLongitudinalOverlayToBlockPlan(
       );
 
       let nextSets = clampInt(slot.sets, LONGITUDINAL_MRV_MIN_SETS, ceiling);
-      if (
-        !isDeload &&
-        !blockPlan.recovery &&
-        session.week_index === 3 &&
-        overlay.week3SetTrimByPattern[pattern] === -1
-      ) {
+      if (session.week_index === 3 && overlay.week3SetTrimByPattern[pattern] === -1) {
         nextSets = Math.max(LONGITUDINAL_MRV_MIN_SETS, nextSets - 1);
       }
 
@@ -1036,19 +1128,113 @@ export function applyLongitudinalOverlayToBlockPlan(
     };
   });
 
+  // Recompute session timeBudget under the shared sessionTimeBudget contract.
+  const capMin = normalizedCapMin(blockPlan.timeBudget.capMin);
+  const preparationAllowance = preparationPlanningMinutes(capMin);
+  const sessionTimes: PlannedSessionTime[] = [];
+  const conflictSet = new Set<string>();
+  const pendingConflicts: { label: string; estimate: SessionTimeEstimate }[] = [];
+  let worstRequiredMin = 0;
+
+  for (const session of sessions) {
+    const deloadSession = session.phase === 'deload';
+    const fit = fitSessionToCap({
+      capMin,
+      preparationMin: preparationAllowance,
+      slots: session.slots.map((slot) => {
+        const pattern = lookupPattern(slot.movement_id, movementPatternById);
+        const locomotion = pattern === 'locomotion';
+        const timePolicy = lookupTimePolicy(slot.movement_id, options?.timePolicyByMovementId);
+        if (timePolicy !== undefined) {
+          return {
+            sets: timePolicy.defaultSets,
+            target: { kind: 'time' as const, seconds: timePolicy.targetSeconds },
+            targetRpe: slot.target_rpe,
+            minSets: timePolicy.defaultSets,
+            trimPriority: 1,
+            trimmable: false,
+          };
+        }
+        return {
+          sets: slot.sets,
+          target: { kind: 'reps' as const, reps: slot.reps },
+          targetRpe: slot.target_rpe,
+          minSets: Math.min(slot.sets, deloadSession ? 1 : 2),
+          trimPriority:
+            slot.slot_index >= ACCESSORY_SLOT_FROM &&
+            !protectedSlots.has(`${session.week_index}:${session.day_index}:${slot.slot_index}`)
+              ? 0
+              : 1,
+          trimmable: !locomotion,
+        };
+      }),
+    });
+
+    for (const index of fit.trimmedSlotIndices) {
+      session.slots[index]!.sets = fit.sets[index]!;
+    }
+    if (fit.trimmedSlotIndices.length > 0) {
+      warnings.add(
+        `${session.focus} week ${session.week_index}: sets reduced on ${fit.trimmedSlotIndices.length} movement${fit.trimmedSlotIndices.length === 1 ? '' : 's'} so the session fits ${capMin} minutes including ${fit.preparationMin} minutes of preparation`,
+      );
+    }
+    if (!fit.feasible) {
+      worstRequiredMin = Math.max(worstRequiredMin, fit.estimate.totalMin);
+      pendingConflicts.push({
+        label: `The ${session.focus} session`,
+        estimate: fit.estimate,
+      });
+    }
+    sessionTimes.push({
+      week_index: session.week_index,
+      day_index: session.day_index,
+      focus: session.focus,
+      preparationMin: fit.preparationMin,
+      preparationCondensed: fit.preparationCondensed,
+      estimatedMin: fit.estimate.totalMin,
+      trimmedSlotIndexes: fit.trimmedSlotIndices.map((index) => session.slots[index]!.slot_index),
+      feasible: fit.feasible,
+      overByMin: fit.overByMin,
+    });
+  }
+
+  const derivedFrequency =
+    options?.weeklyFrequency ??
+    Math.max(1, sessions.filter((session) => session.week_index === 1).length);
+  const alternatives =
+    worstRequiredMin === 0
+      ? []
+      : [
+          ...feasibleSessionAlternatives({
+            capMin,
+            requiredMin: worstRequiredMin,
+            weeklyFrequency: derivedFrequency,
+          }),
+        ];
+  for (const pending of pendingConflicts) {
+    conflictSet.add(
+      describeSessionTimeConflict({
+        label: pending.label,
+        capMin,
+        estimate: pending.estimate,
+        alternatives,
+      }),
+    );
+  }
+
+  const recomputedTimeBudget: BlockTimeBudget = {
+    contractVersion: SESSION_TIME_CONTRACT_VERSION,
+    capMin,
+    sessions: sessionTimes,
+    conflicts: [...conflictSet],
+    alternatives,
+  };
+
   return {
     ...blockPlan,
     sessions,
-    warnings: [...blockPlan.warnings],
+    warnings: [...warnings].sort(),
     autopilotAdjusted: [...adjustedPatterns].sort(),
-    timeBudget: {
-      ...blockPlan.timeBudget,
-      sessions: blockPlan.timeBudget.sessions.map((s) => ({
-        ...s,
-        trimmedSlotIndexes: [...s.trimmedSlotIndexes],
-      })),
-      conflicts: [...blockPlan.timeBudget.conflicts],
-      alternatives: blockPlan.timeBudget.alternatives.map((a) => ({ ...a })),
-    },
+    timeBudget: recomputedTimeBudget,
   };
 }
