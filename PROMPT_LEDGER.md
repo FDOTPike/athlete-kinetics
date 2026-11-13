@@ -13207,3 +13207,20 @@ The appendix held the code around the read, every match for `0286` and "record o
   - `npm run verify:store`: ALL CHECKS PASSED.
   - Jest on `SessionSummarySkipped.test.js` and `SessionSummary.test.js`: 2 suites, 48 of 48 tests pass.
 - **Branch:** `claude/summary-skipped-2026-11-03`, PR #116 into `claude/beta-question-box-2026-10-28`.
+
+
+## Entry 0302 — 2026-11-14 · KineStrike Telemetry Bridge (`WO-KS-BRIDGE-01` #342 & `WO-KS-BRIDGE-02` #343)
+
+**Status:** EVIDENCE CAPTURED (pure telemetry bridge `#342` + additive `078` side-car migration & non-binding `SessionFeelPanel` advisory integration `#343`).
+
+### Summary
+
+- **`WO-KS-BRIDGE-01` (#342):** Implemented `packages/inference/src/kinestrikeBridge.ts` and exported its public surface from `packages/inference/src/index.ts` (zero `fs` / `sqlite` / React Native / BLE imports):
+  - Strict ASCII XOR NMEA checksum validator (`verifyNmeaChecksum`) and fixed-width 15-token `$PKSF,1` parser (`parsePksfSentence`), rejecting unknown talkers/versions, trailing/missing fields, out-of-range zone shares (`[0, 100]` and sum `<= 100.5`), negative/NaN fields, and unknown `fall_state` values.
+  - Pure summary accumulator (`summarizePksfSession`) returning an all-`null` row when zero valid strikes exist and populating `ks_*` summary fields otherwise.
+  - Pure sport-aware suggestion mapper (`suggestSessionFeelFromKineStrike`) honoring `KINESTRIKE_BRIDGE_DEFAULTS`, canonical `isSportId(sport)` validation, non-binding advisory `suggestedReasons` / `suggestedSubChips`, and deterministic fallback to empty suggestions.
+  - Added fail-first test suite `packages/inference/src/__tests__/kinestrikeBridge.test.ts` and root `jest.config.cjs`.
+- **`WO-KS-BRIDGE-02` (#343):**
+  - Added idempotent additive side-car migration `packages/core-db/src/schema/078_kinestrike_telemetry.sql` (`state_vector_kinestrike`, `STRICT, WITHOUT ROWID`, keyed by `date`), leaving `state_vector` and `004_state_vector_materialize.sql` untouched while registering ordinal `77` across `migrations.ts`, `migrationRunner.ts`, `MIGRATION_LINEAGE.json`, `MIGRATION_LINEAGE.md`, `schemaContract.ts` (`userVersion: 77`, `migrationSlot: 78`, `tableCount: 128`, `objectCount: 217`), `WO03_DURABLE_DATA_INVENTORY.md`, `useStore.ts` (`resetTrainingData`), `verify_store_sql.mjs` (display/reset-only; zero engine reads), `verify_migrations.mjs`, `verify_backup_contract.mjs`, `verify_blocks.mjs`, `verify_pipeline.mjs`, and `BackupForwardRestore.test.js`.
+  - Extended `apps/mobile/src/components/SessionFeelPanel.tsx` with optional backwards-compatible `suggestedReasonCodes` and `suggestedKineStrikeSubChips` props (`saved === null` pre-selection only, non-binding athlete toggle override, zero change to `onSave(feel, reasons)` signature) plus `apps/mobile/test/components/KineStrikeBridge02.test.js`.
+- **Branch:** `feat/kinestrike-bridge-v1`.

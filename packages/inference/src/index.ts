@@ -681,3 +681,21 @@ export * from './prehabCatalog';
 export * from './flexibilityPolicy';
 export { makeMultiSportEmphasisIndex, MAX_EMPHASIS_MUSCLES, SECONDARY_SPORT_WEIGHT } from './programEmphasis';
 export { assertDistinctSecondarySport, assertSecondarySportAllowed, resolveMultiSportWorkload, type MultiSportWorkload, type MultiSportInterference } from './sportProfile';
+export {
+  KINESTRIKE_BRIDGE_DEFAULTS,
+  KINESTRIKE_SUBCHIP_LABEL,
+  deriveKineStrikeSubChips,
+  evaluateKineStrikeFeelSuggestions,
+  isKineStrikeBiometricBridgeV1,
+  mapKineStrikeSessionFeelReasons,
+  parseKineStrikeSessionLog,
+  verifyNmeaChecksum,
+  type KineStrikeBiometricBridgeV1,
+  type KineStrikeFallState,
+  type KineStrikeFoot,
+  type KineStrikeLegacyBridgeV1,
+  type KineStrikeReasonRule,
+  type KineStrikeSubChipCode,
+  type KineStrikeTelemetrySummary,
+  type SessionFeelReasonCode,
+} from './kinestrikeBridge';

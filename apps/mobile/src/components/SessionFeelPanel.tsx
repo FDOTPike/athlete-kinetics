@@ -28,19 +28,60 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, AccessibilityInfo, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
+  KINESTRIKE_BRIDGE_DEFAULTS,
+  KINESTRIKE_SUBCHIP_LABEL,
   SESSION_FEEL_KINDS,
+  SESSION_FEEL_REASONS,
   sessionFeelOfferedReasons,
   sessionFeelReasonRequired,
+  type KineStrikeSubChipCode,
   type SessionFeelDraft,
   type SessionFeelKind,
   type SessionFeelProblem,
   type SessionFeelReason,
+  type SessionFeelReasonCode,
   type SessionFeelRecord,
 } from '@ak/inference';
 import { theme } from '../theme/theme';
 import { useSubViewBack } from '../navigation/navigation';
 import { Chip, PrimaryButton, SecondaryButton } from './ui';
 import KeyboardAwareScrollView from './KeyboardAwareScrollView';
+
+export {
+  KINESTRIKE_BRIDGE_DEFAULTS,
+  KINESTRIKE_SUBCHIP_LABEL,
+  type KineStrikeSubChipCode,
+  type SessionFeelReasonCode,
+};
+
+function normalizeSuggestedReasons(
+  codes: readonly SessionFeelReasonCode[] | undefined,
+): readonly SessionFeelReason[] {
+  if (!Array.isArray(codes) || codes.length === 0) return [];
+  const out: SessionFeelReason[] = [];
+  for (const raw of codes) {
+    const mapped = raw === 'soreness' ? 'tired' : raw;
+    if (
+      (SESSION_FEEL_REASONS as readonly string[]).includes(mapped) &&
+      !out.includes(mapped as SessionFeelReason)
+    ) {
+      out.push(mapped as SessionFeelReason);
+    }
+  }
+  return out;
+}
+
+function normalizeSuggestedSubChips(
+  codes: readonly KineStrikeSubChipCode[] | undefined,
+): readonly KineStrikeSubChipCode[] {
+  if (!Array.isArray(codes) || codes.length === 0) return [];
+  const valid = Object.keys(KINESTRIKE_SUBCHIP_LABEL) as KineStrikeSubChipCode[];
+  const out: KineStrikeSubChipCode[] = [];
+  for (const code of codes) {
+    if (valid.includes(code) && !out.includes(code)) out.push(code);
+  }
+  return out;
+}
 
 export const SESSION_FEEL_LABEL: Record<SessionFeelKind, string> = {
   as_planned: 'As planned',
@@ -149,6 +190,10 @@ export interface SessionFeelPanelProps {
   /** False when the Plan screen's "Something feels off" form is not shown
    *  (no readiness yet), so the record-only sentence does not point at it. */
   planReportAvailable?: boolean;
+  /** Optional 1-tap reason suggestions from KineStrike telemetry when no saved answer exists. */
+  suggestedReasonCodes?: readonly SessionFeelReasonCode[];
+  /** Optional ratified KineStrike plantar telemetry sub-chip badges. */
+  suggestedKineStrikeSubChips?: readonly KineStrikeSubChipCode[];
   /** Asks the store to save. Returns null when saved, otherwise why not. */
   onSave: (draft: SessionFeelDraft, note: string) => SessionFeelSaveResult;
   /** Leave without saving, or after a save. */
@@ -159,8 +204,20 @@ export interface SessionFeelPanelProps {
  * The sub-view that asks how a finished session went. Starts from the saved
  * answer when there is one, so it doubles as the way to correct it.
  */
-export function SessionFeelPanel({ saved, note, answerOptional = false, planReportAvailable = true, onSave, onClose }: SessionFeelPanelProps): React.JSX.Element {
+export function SessionFeelPanel({
+  saved,
+  note,
+  answerOptional = false,
+  planReportAvailable = true,
+  suggestedReasonCodes,
+  suggestedKineStrikeSubChips,
+  onSave,
+  onClose,
+}: SessionFeelPanelProps): React.JSX.Element {
   const recordOnlyText = planReportAvailable ? SESSION_FEEL_RECORD_ONLY_TEXT : SESSION_FEEL_RECORD_ONLY_TEXT_NO_PLAN_FORM;
+  const suggestedReasons = saved === null ? normalizeSuggestedReasons(suggestedReasonCodes) : [];
+  const subChips = normalizeSuggestedSubChips(suggestedKineStrikeSubChips);
+  const reasonToggledByUser = useRef(false);
   const [feel, setFeel] = useState<SessionFeelKind | null>(saved?.feel ?? null);
   const [reasons, setReasons] = useState<readonly SessionFeelReason[]>(saved?.reasons ?? []);
   const [noteText, setNoteText] = useState(note ?? '');
@@ -171,14 +228,23 @@ export function SessionFeelPanel({ saved, note, answerOptional = false, planRepo
 
   /** Choose an answer. A different answer starts with no reasons: a reason
    *  tapped under the earlier answer, even one both lists offer, was given
-   *  for that answer, not this one. */
+   *  for that answer, not this one. When no answer was saved or chosen yet,
+   *  optional KineStrike 1-tap suggestions offered by this answer are pre-selected. */
   const chooseFeel = (kind: SessionFeelKind): void => {
-    if (kind !== feel) setReasons([]);
+    if (kind !== feel) {
+      if (feel === null && saved === null && !reasonToggledByUser.current && suggestedReasons.length > 0) {
+        const offered = sessionFeelOfferedReasons(kind, saved);
+        setReasons(suggestedReasons.filter((reason) => offered.includes(reason)));
+      } else {
+        setReasons([]);
+      }
+    }
     setFeel(kind);
   };
 
   /** Tap a reason on or off. Any earlier "could not save" message is cleared. */
   const toggleReason = (reason: SessionFeelReason): void => {
+    reasonToggledByUser.current = true;
     setProblem(null);
     setReasons((current) => (current.includes(reason)
       ? current.filter((entry) => entry !== reason)
@@ -272,6 +338,20 @@ export function SessionFeelPanel({ saved, note, answerOptional = false, planRepo
           />
         ))}
       </View>
+
+      {subChips.length > 0 && (
+        <View style={styles.chipRow} testID="session-feel-kinestrike-subchips">
+          {subChips.map((code) => (
+            <Text
+              key={code}
+              style={styles.caption}
+              testID={`session-feel-kinestrike-subchip-${code}`}
+            >
+              {KINESTRIKE_SUBCHIP_LABEL[code]}
+            </Text>
+          ))}
+        </View>
+      )}
 
       {reasonsShown && (
         <View style={styles.group} testID="session-feel-reasons">
