@@ -106,16 +106,16 @@ describe('Recent sessions open to what was logged', () => {
     expect(labels[0]).toMatch(/\b0?3\b/);
     expect(labels[0]).toContain('2026');
     if (pmPeriod) {
-      expect(labels[0]).toMatch(/ · [^·]*?(?:18|0?6)[:.]05/);
+      expect(labels[0]).toMatch(/ · [^·\d]*?(?:18|0?6)[:.]05/);
       expect(timeField(labels[0])).toContain(pmPeriod);
     } else {
-      expect(labels[0]).toMatch(/ · [^·]*?18[:.]05/);
+      expect(labels[0]).toMatch(/ · [^·\d]*?18[:.]05/);
     }
     expect(labels[1]).toContain('Session recorded');
     expect(labels[1]).toContain(novMonth);
     expect(labels[1]).toMatch(/\b0?3\b/);
     expect(labels[1]).toContain('2026');
-    expect(labels[1]).toMatch(/ · [^·]*?0?9[:.]40/);
+    expect(labels[1]).toMatch(/ · [^·\d]*?0?9[:.]40/);
     if (amPeriod) {
       expect(timeField(labels[1])).toContain(amPeriod);
     }
