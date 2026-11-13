@@ -194,6 +194,26 @@ export {
   type WindowCompletionRow,
 } from './completionAction';
 export {
+  EQUIPMENT_NON_PATHOLOGICAL_CAUSES,
+  EQUIPMENT_NON_PATHOLOGICAL_PHRASE_IDS,
+  LONGITUDINAL_MRV_MAX_SETS,
+  LONGITUDINAL_MRV_MIN_SETS,
+  applyLongitudinalOverlayToBlockPlan,
+  evaluateLongitudinalAutopilot,
+  isValidLongitudinalAutopilotPolicy,
+  selectSubstitution,
+  type ApplyLongitudinalOverlayOptions,
+  type LongitudinalAutopilotInput,
+  type LongitudinalAutopilotPolicy,
+  type LongitudinalAutopilotResult,
+  type LongitudinalBlockEvidence,
+  type LongitudinalSwapCause,
+  type LongitudinalSwapRecord,
+  type MovementTimePolicyInput,
+  type SelectSubstitutionInput,
+  type SelectedSubstitution,
+} from './longitudinalAutopilot';
+export {
   applyProfileLimits,
   effectiveRpeCeiling,
   applySeverityToGuardrail,

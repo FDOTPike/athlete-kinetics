@@ -13207,3 +13207,17 @@ The appendix held the code around the read, every match for `0286` and "record o
   - `npm run verify:store`: ALL CHECKS PASSED.
   - Jest on `SessionSummarySkipped.test.js` and `SessionSummary.test.js`: 2 suites, 48 of 48 tests pass.
 - **Branch:** `claude/summary-skipped-2026-11-03`, PR #116 into `claude/beta-question-box-2026-10-28`.
+
+## Entry 0301 — 2026-11-14 · Stage B Phase 1 (`WO-LONG-ENGINE-01`): V1 9-Month Longitudinal Autopilot Overlay
+
+**Status:** EVIDENCE CAPTURED (pure inference overlay + verification suite); NOT VERIFIED — production parameter tuple ratification pending empirical simulation artifact (`bench-longitudinal/results.json` absent on disk).
+
+### Summary
+
+- Implemented `packages/inference/src/longitudinalAutopilot.ts` and exported its public contract from `packages/inference/src/index.ts`:
+  - **Explicit Policy Gate (`LongitudinalAutopilotPolicy`):** Follows `completionAction.ts` by embedding zero module-level candidate threshold defaults (`kTrigger`, `swapWindowBlocks`, `mCadence`, `mClean`, `completionPolicy`); `null` or invalid policy fails closed to a neutral overlay (`policyApplied: false`).
+  - **Mechanism 1 (Cross-Block `073` Swap + Joint-Discomfort Memory):** Evaluates trailing `swapWindowBlocks` completed blocks, promoting a movement to `MOVEMENT_PREFERENCE.AVOID` (`-1`) and selecting its deterministic Layer 1 green regression (`selectSubstitution` wrapping `computeSubstitutions`) when joint-coupled swap/discomfort triggers reach `kTrigger`, while excluding `cause === 'equipment_busy'`, `matched_phrase_entry_id === 'equipment-improvised'`, `preference`, and `time`.
+  - **Mechanism 2 (Bounded Per-Pattern `MRV_p` in `[1, 10]` & Week-3 Cadence Modulator):** Bounds working-set ceilings strictly inside `[1, 10]` on working weeks, engages `-1` Week-3 working-set trim after `mCadence` consecutive Week-3 overreach blocks (reading policy observation-day floors rather than any literal), holds across neutral/interrupted blocks, preserves Week 4 deload and recovery sessions untouched across `MRV_p`, Week-3 trim, and substitutions, recomputes `BlockPlan.timeBudget` under `sessionTimeBudget` after projection, and steps back up by `+1` only after `mClean` consecutive clean `latent_headroom` blocks.
+  - **Boundary Clamps, Halt Propagation & Side-Channel Isolation:** Propagates `haltAdvised` fail-closed onto `LongitudinalAutopilotResult` (refusing non-recovery `BlockPlan` projection while `haltAdvised` is set), counts each historical macrocycle RPE boundary grant once at the block that applied it, enforces beginner `dLoad_p <= 1.0`, macrocycle positive RPE raise ceiling (`<= 2.5` across positions `1..8`, `0.0` in `6..8`, `0.0` under open suspension, clean rollover at Macrocycle 2 position `1`), and byte-identical date-axis-aligned isolation from `acwr`, `072_question_log`, and KineStrike `ks_*` descriptive fields.
+- Added fail-first verification suite `packages/inference/test/verify_longitudinal_autopilot.mjs` (`21` checks) and wired it into `build:inference-test` and `verify:autopilot` in `package.json`.
+- **Branch:** `feat/v1-longitudinal-engine`.
