@@ -27,7 +27,8 @@ jest.mock('../../src/state/athleteRegistry', () => {
   };
 });
 
-// Owner ruling 2026-11-03 (Entry 0288, walk finding W2-3): logged loads sit on
+// Owner ruling 2026-11-03 (PR #194, commit b4fe6b42; Entry 0300; issue #297;
+// walk finding W2-3): logged loads sit on
 // a 0.5 kg grid, so a 12, 14, 16 or 24 kg dumbbell or kettlebell is stored as
 // lifted. Before, the store rounded every load to 2.5 kg (12 became 12.5).
 

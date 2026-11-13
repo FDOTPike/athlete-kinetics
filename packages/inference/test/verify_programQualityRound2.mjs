@@ -500,6 +500,34 @@ console.log('[P4c] progression summary identity (see component + generated matri
   // Determinism: repeated runs give identical output.
   check('[P4c] the summary is deterministic across repeated runs',
     JSON.stringify(weeklyProgressionSummary(dayPlan, (id) => (id === 14 ? { name: 'Goblet Squat', bodyweight: false } : { name: 'Bodyweight Squat', bodyweight: true }))) === JSON.stringify(lines));
+
+  // Issue #226: when the same movement appears on multiple days of a week with
+  // the identical progression change, weeklyProgressionSummary emits that line
+  // once per week transition (preserving first-seen plan order), while keeping
+  // distinct lines when the same movement progresses differently on two days.
+  const multiDaySameMovementPlan = {
+    objective: 'strength', start_date: '2026-09-01', weeks: 4, schemaType: 'LINEAR',
+    macroBlockIndex: 1, macroPhase: 'gpp', peakShifted: false, recovery: false,
+    autopilotAdjusted: [], warnings: [],
+    sessions: [
+      { week_index: 1, day_index: 1, focus: 'lower', slots: [{ slot_index: 1, movement_id: 8, sets: 4, reps: 5, target_rpe: 7.5 }] },
+      { week_index: 1, day_index: 3, focus: 'full', slots: [{ slot_index: 1, movement_id: 8, sets: 4, reps: 5, target_rpe: 7.5 }] },
+      { week_index: 1, day_index: 5, focus: 'lower', slots: [{ slot_index: 1, movement_id: 8, sets: 4, reps: 5, target_rpe: 7.5 }] },
+      { week_index: 2, day_index: 1, focus: 'lower', slots: [{ slot_index: 1, movement_id: 8, sets: 4, reps: 5, target_rpe: 8 }] },
+      { week_index: 2, day_index: 3, focus: 'full', slots: [{ slot_index: 1, movement_id: 8, sets: 4, reps: 5, target_rpe: 8 }] },
+      { week_index: 2, day_index: 5, focus: 'lower', slots: [{ slot_index: 1, movement_id: 8, sets: 5, reps: 5, target_rpe: 7.5 }] },
+    ],
+  };
+  const dedupedLines = weeklyProgressionSummary(
+    multiDaySameMovementPlan,
+    (id) => (id === 8 ? { name: 'Front Squat', bodyweight: false } : undefined),
+  );
+  const w1to2Lines = dedupedLines.filter((l) => !l.includes('deload'));
+  check('[P4c/#226] duplicate progression lines within a week transition are collapsed while distinct changes survive',
+    w1to2Lines.length === 2
+      && w1to2Lines[0].includes('higher target effort')
+      && w1to2Lines[1].includes('same reps plus a set'),
+    JSON.stringify(w1to2Lines));
 }
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);

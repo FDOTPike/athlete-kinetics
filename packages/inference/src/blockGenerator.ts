@@ -1970,18 +1970,23 @@ export function weeklyProgressionSummary(
         });
       }
     }
+    const seenInTransition = new Set<string>();
     for (const session of beforeSessions) {
       for (const slot of session.slots) {
         const after = afterBySlot.get(`${session.day_index}:${slot.slot_index}:${slot.movement_id}`);
         if (after === undefined) continue;
         const movement = resolveMovement(slot.movement_id);
         const name = movement?.name ?? `Movement ${slot.movement_id}`;
-        lines.push(explainSlotChange(
+        const line = explainSlotChange(
           { sets: slot.sets, reps: slot.reps, target_rpe: slot.target_rpe },
           { sets: after.sets, reps: after.reps, target_rpe: after.target_rpe },
           name,
           movement?.bodyweight === true,
-        ));
+        );
+        if (!seenInTransition.has(line)) {
+          seenInTransition.add(line);
+          lines.push(line);
+        }
       }
     }
   }
