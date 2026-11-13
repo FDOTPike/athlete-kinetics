@@ -485,7 +485,14 @@ export default function ProgramSetupScreen({
           applied quietly. */}
       {!editing && (
         <View style={styles.card} testID="program-recommendation-card">
-          <Text style={styles.sectionTitle}>What the coach has picked for you</Text>
+          <Text style={styles.sectionTitle} testID="program-recommendation-heading">
+            {buildMode === recommended.buildMode
+              && schemaType === recommended.schemaType
+              && horizonKind === recommended.horizonKind
+              && blockCount === recommended.blockCount
+              ? 'What the coach has picked for you'
+              : 'Your program choices'}
+          </Text>
           <Text style={styles.notice} testID="program-choice-disclosure">
             {programChoiceDisclosure({ buildMode, schemaType, horizonKind, blockCount, reviewDate })}
           </Text>

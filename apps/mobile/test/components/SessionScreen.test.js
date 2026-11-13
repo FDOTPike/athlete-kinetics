@@ -1938,7 +1938,8 @@ test('post-session Outcome view displays correct copy for all mappings (beginner
 });
 
 // --- P1-2: grid/range validation tests ---------------------------------------
-// Owner ruling 2026-11-03 (Entry 0288): the logging grid is 0.5 kg, so the
+// Owner ruling 2026-11-03 (PR #194, commit b4fe6b42; Entry 0300; issue #297):
+// the logging grid is 0.5 kg, so the
 // off-grid examples are now 1.3 and 61.2 (1 and 61 are loggable).
 test('off-grid load 1.3 shows validation, disables Log set, and never calls logSet', () => {
   render(<SessionScreen />);
@@ -1992,7 +1993,7 @@ test.each([
   ['2,5', 2.5],
   ['60', 60],
   ['500', 500],
-  // Owner ruling 2026-11-03 (Entry 0288): dumbbell and kettlebell sizes.
+  // Owner ruling 2026-11-03 (PR #194, commit b4fe6b42; Entry 0300; issue #297): dumbbell and kettlebell sizes.
   ['12', 12],
   ['16', 16],
   ['24', 24],
