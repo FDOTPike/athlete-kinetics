@@ -361,6 +361,54 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
   check('CI builds the tests ad-hoc for the simulator only (no team, no profile) and runs them fail-closed',
     /CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER=/.test(ci) && /-sdk iphonesimulator[\s\S]*build-for-testing/.test(ci)
       && ci.includes('tools/ios_ui_tests.sh') && runner.includes('exit "$FAILED"') && runner.includes('lsof -nP -a -i -p'));
+  const typesSrc = read('packages/inference/src/types.ts');
+  const defaultProfileBody = typesSrc.match(/export const DEFAULT_PROFILE:\s*UserProfile\s*=\s*Object\.freeze\(\{([\s\S]*?)\n\}\);/)?.[1] ?? '';
+  const defaultTrainingAge = defaultProfileBody.match(/training_age:\s*'([^']+)'/)?.[1];
+  const onboardingSrc = read('apps/mobile/src/screens/OnboardingScreen.tsx');
+  const usesDefaultProfile = /useState<UserProfile>\(\{\s*\.\.\.DEFAULT_PROFILE\b/.test(onboardingSrc);
+  const asksMaxesMatch = onboardingSrc.match(/const asksMaxes\s*=\s*draft\.training_age\s*(!==|===)\s*'([^']+)';/);
+  const asksMaxes = asksMaxesMatch !== null && defaultTrainingAge !== undefined
+    ? (asksMaxesMatch[1] === '!==' ? defaultTrainingAge !== asksMaxesMatch[2] : defaultTrainingAge === asksMaxesMatch[2])
+    : null;
+  const wantsSport = onboardingSrc.match(/const \[wantsSport\b[^\]]*\]\s*=\s*useState\((true|false)\)/)?.[1] === 'true';
+  const wantsTarget = onboardingSrc.match(/const \[wantsTarget\b[^\]]*\]\s*=\s*useState\((true|false)\)/)?.[1] === 'true';
+  const stepsBody = onboardingSrc.match(/const steps:\s*StepKey\[\]\s*=\s*useMemo\(\s*\(\)\s*=>\s*\[([\s\S]*?)\],\s*\[[^\]]*\]\s*,?\s*\);/)?.[1] ?? '';
+  const parseDefaultSteps = (body, flags) => {
+    if (!body || Object.values(flags).some((v) => v === null || v === undefined)) return null;
+    const resolved = body.replace(
+      /\.\.\.\(\s*(\w+)\s*\?\s*\[([^\]]*)\]\s*:\s*\[\s*\]\s*\)/g,
+      (_, flag, inner) => (Object.hasOwn(flags, flag) ? (flags[flag] ? inner : '') : `...(${flag}?...)`),
+    );
+    if (resolved.includes('...(') || resolved.includes('?')) return null;
+    return [...resolved.matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
+  };
+  const defaultSteps = parseDefaultSteps(stepsBody, { wantsSport, wantsTarget, asksMaxes });
+  const limitsIdx = defaultSteps === null ? -1 : defaultSteps.indexOf('limits');
+  const expectedOnboardingSteps = limitsIdx > 0 ? limitsIdx : null;
+  const onboardingBody = suite.match(/private func completeOnboarding\([\s\S]*?\n  \}/)?.[0] ?? '';
+  const completeOnboardingStepCount = (swiftSrc) => {
+    const codeOnly = swiftSrc.replace(/\/\*[\s\S]*?\*\/|^\s*\/\/.*$/gm, '');
+    const matches = [...codeOnly.matchAll(/\bfor\s+step\s+in\s+1\.\.\.(\d+)\s*\{/g)];
+    if (matches.length !== 1) return null;
+    const afterLoop = codeOnly.slice(matches[0].index + matches[0][0].length);
+    if (!afterLoop.includes('tap("No, nothing to note")')) return null;
+    return Number(matches[0][1]);
+  };
+  const actualOnboardingSteps = completeOnboardingStepCount(onboardingBody);
+  check(
+    `completeOnboarding loops for step in 1...${expectedOnboardingSteps ?? '?'} before "No, nothing to note" (default training_age=${defaultTrainingAge ?? 'unknown'})`,
+    usesDefaultProfile
+      && expectedOnboardingSteps !== null
+      && actualOnboardingSteps === expectedOnboardingSteps,
+    `asksMaxes=${asksMaxes} steps=${defaultSteps?.length ?? 'unknown'} expected=${expectedOnboardingSteps ?? 'unknown'} actual=${actualOnboardingSteps ?? 'missing'}`,
+  );
+  const staleEightScreenOnboarding = onboardingBody.replace(/\bfor\s+step\s+in\s+1\.\.\.\d+/, 'for step in 1...6');
+  check(
+    'falsifier: completeOnboarding with 1...6 Next taps fails against the 9-screen default onboarding',
+    expectedOnboardingSteps === 7
+      && completeOnboardingStepCount(staleEightScreenOnboarding) === 6
+      && completeOnboardingStepCount(staleEightScreenOnboarding) !== expectedOnboardingSteps,
+  );
 }
 
 console.log('[N11] beta orientation lock (#168)');
