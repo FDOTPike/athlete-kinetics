@@ -71,7 +71,8 @@ final class AthleteKineticsUITests: XCTestCase {
   /// existence check and the read (CI evidence 5032e65: the restore status
   /// disappeared mid-read during the hand-over to the restored athlete).
   private func currentLabel(_ el: XCUIElement) -> String? {
-    (try? el.snapshot())?.label
+    guard let snap = try? el.snapshot() else { return nil }
+    return snap.label
   }
 
   private func element(labelContains text: String) -> XCUIElement {
@@ -176,16 +177,29 @@ final class AthleteKineticsUITests: XCTestCase {
     el.typeText(submit ? text + "\n" : text)
   }
 
-  /// The label once it settles to one beginning with `prefix`.
+  /// The label once it settles to one beginning with `prefix`. Polls
+  /// `currentLabel` (`try? el.snapshot()`) every 0.5 s instead of
+  /// `XCTWaiter.wait` + `.exists`, avoiding snapshot-evaluation waiter stalls.
   @discardableResult
   private func settledLabel(_ el: XCUIElement, beginsWith prefix: String, _ what: String,
-                            timeout: TimeInterval = 120) -> String {
-    let done = NSPredicate(format: "label BEGINSWITH %@", prefix)
-    let result = XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: done, object: el)], timeout: timeout)
-    let label = el.exists ? el.label : "<absent>"
-    log("\(what): \(label.prefix(220))")
-    if result != .completed { XCTFail("\(what) did not become '\(prefix)…' within \(Int(timeout)) s; it read: \(label)") }
-    return label
+                            timeout: TimeInterval = 120,
+                            file: StaticString = #filePath, line: UInt = #line) -> String {
+    let deadline = Date().addingTimeInterval(timeout)
+    var lastLabel: String?
+    while true {
+      let label = currentLabel(el)
+      lastLabel = label
+      if let label = label, label.hasPrefix(prefix) {
+        log("\(what): \(label.prefix(220))")
+        return label
+      }
+      if Date() >= deadline { break }
+      usleep(500_000)
+    }
+    let finalLabel = lastLabel ?? "<absent>"
+    log("\(what): \(finalLabel.prefix(220))")
+    XCTFail("\(what) did not become '\(prefix)…' within \(Int(timeout)) s; it read: \(finalLabel)", file: file, line: line)
+    return finalLabel
   }
 
   private func launch(_ arguments: [String] = []) {
@@ -233,25 +247,73 @@ final class AthleteKineticsUITests: XCTestCase {
     }
     tap("No, nothing to note")
     tap("Next", "Next to review (\(who))")
-    tap("START TRAINING")
+    let startBtn = element("START TRAINING")
+    reveal(startBtn, "START TRAINING")
+    bringClear(startBtn, "START TRAINING")
+    startBtn.tap()
     // The program set-up offer: accepted when the flow needs a plan,
-    // otherwise kept for later.
-    let cancel = element("Cancel")
-    if cancel.waitForExistence(timeout: 8) {
-      if createProgram {
-        let create = element("Create program")
-        reveal(create, "Create program (\(who))")
-        XCTAssertTrue(create.isEnabled, "Create program is disabled for a default onboarding (\(who))")
-        create.tap()
-        log("program set-up offer: created (\(who))")
-      } else {
-        cancel.tap()
-        log("program set-up offer: cancelled (\(who))")
+    // otherwise kept for later. Poll across the full 60 s transition window
+    // because onboarding save on a loaded runner can push offer mount past 8 s,
+    // and retry START TRAINING once if the review screen stays put >= 5 s.
+    let tapTime = Date()
+    let transitionDeadline = tapTime.addingTimeInterval(60)
+    var offerHandled = false
+    var retriedStart = false
+    var tabsShown = false
+    while Date() < transitionDeadline {
+      if (try? element("Create program").snapshot()) != nil && (try? element("Cancel").snapshot()) != nil {
+        if createProgram {
+          if !offerHandled {
+            let create = element("Create program")
+            reveal(create, "Create program (\(who))")
+            bringClear(create, "Create program (\(who))")
+            XCTAssertTrue(create.isEnabled, "Create program is disabled for a default onboarding (\(who))")
+            create.tap()
+            log("program set-up offer: created (\(who))")
+            offerHandled = true
+          }
+        } else {
+          let cancel = element("Cancel")
+          reveal(cancel, "Cancel program set-up (\(who))")
+          bringClear(cancel, "Cancel program set-up (\(who))")
+          cancel.tap()
+          if !offerHandled {
+            log("program set-up offer: cancelled (\(who))")
+            offerHandled = true
+          }
+        }
+        let dismissDeadline = Date().addingTimeInterval(5)
+        while Date() < dismissDeadline
+          && (try? element("Create program").snapshot()) != nil
+          && (try? element("Cancel").snapshot()) != nil {
+          usleep(250_000)
+        }
+        continue
       }
-    } else if createProgram {
-      log("program set-up offer: not shown (\(who))")
+      if (try? element("shell-primary-tabs").snapshot()) != nil {
+        if !createProgram || offerHandled || Date().timeIntervalSince(tapTime) >= 8 {
+          if createProgram && !offerHandled {
+            log("program set-up offer: not shown (\(who))")
+          }
+          tabsShown = true
+          break
+        }
+      } else if !retriedStart && !offerHandled && Date().timeIntervalSince(tapTime) >= 5 {
+        if (try? startBtn.snapshot()) != nil && startBtn.isHittable {
+          retriedStart = true
+          log("START-TRAINING-RETRY (\(who)): review screen still visible \(Int(Date().timeIntervalSince(tapTime))) s after tap")
+          reveal(startBtn, "START TRAINING")
+          bringClear(startBtn, "START TRAINING")
+          startBtn.tap()
+          usleep(500_000)
+          continue
+        }
+      }
+      usleep(500_000)
     }
-    wait(element("shell-primary-tabs"), "the primary tabs after onboarding (\(who))", timeout: 60)
+    if !tabsShown {
+      XCTFail("the primary tabs after onboarding (\(who)) did not appear within 60 s")
+    }
     log("onboarding complete: \(who)")
   }
 
@@ -847,7 +909,16 @@ final class AthleteKineticsUITests: XCTestCase {
       if (now.hasPrefix("Restore ") && !now.hasPrefix("Restore cancelled")) || now.hasPrefix("A restored database") { break }
       sleep(2)
     }
-    dismissSetUpOfferIfShown("after the restore")
+    let postRestoreDeadline = Date().addingTimeInterval(60)
+    while Date() < postRestoreDeadline {
+      if (try? element("Create program").snapshot()) != nil && (try? element("Cancel").snapshot()) != nil {
+        dismissSetUpOfferIfShown("after the restore")
+        openProfile()
+        continue
+      }
+      if let now = currentLabel(restoreStatus), now.hasPrefix("Restore complete.") { break }
+      usleep(500_000)
+    }
     settledLabel(restoreStatus, beginsWith: "Restore complete.", "status after restore", timeout: 60)
     wait(element("shell-root"), "the app after restore")
     openProfile()
