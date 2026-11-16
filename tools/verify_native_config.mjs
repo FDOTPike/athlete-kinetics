@@ -32,6 +32,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { KNOWN_SHA256 } from '../scripts/embedder-integrity.mjs';
+import { splitJobs, splitSteps, stripYamlComments } from './verify_ci_structure.mjs';
 
 const ROOT = join(import.meta.dirname, '..');
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
@@ -125,6 +126,42 @@ console.log('[N2] pinned embedder model staged into the iOS bundle');
     smoke.includes("'Files import types resolve natively'") && smoke.includes('backupImportTypes(Platform.OS, picker.types.allFiles)')
       && read('tools/ios_simulator_smoke.sh').includes('"Files import types resolve natively"')
       && read('tools/ios_simulator_smoke.sh').includes('missing check:'));
+  const stripJsComments = (src) => src.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
+  const smokeRequiredChecks = (scriptSrc) => {
+    const m = scriptSrc.match(/\bconst\s+required\s*=\s*\[([\s\S]*?)\];/);
+    if (m === null) return [];
+    return [...stripJsComments(m[1]).matchAll(/["']([^"']+)["']/g)].map((x) => x[1]);
+  };
+  const hasQuestionBoxSmoke = (smokeSrc, smokeScriptSrc) => {
+    const code = stripJsComments(smokeSrc);
+    const stepStart = code.indexOf("step(checks, 'question box inference + routing'");
+    if (stepStart === -1) return false;
+    const stepTail = code.slice(stepStart);
+    const nextStep = stepTail.indexOf('\n  await step(');
+    const stepBody = nextStep === -1 ? stepTail : stepTail.slice(0, nextStep);
+    return stepBody.includes('tryCreateDeviceEmbedder()')
+      && code.includes('question-vectors.json')
+      && /packVectors\([^,]+,\s*asset\.dim\)/.test(stepBody)
+      && stepBody.includes('1111')
+      && stepBody.includes('384')
+      && /(?:routeQuestion\(\s*['"]what is a deload week['"]|const\s+question\s*=\s*['"]what is a deload week['"][\s\S]*routeQuestion\(\s*question\b)/.test(stepBody)
+      && stepBody.includes("routed.outcome !== 'DELOAD'")
+      && stepBody.includes("routed.shown[0] !== 'DELOAD'")
+      && smokeRequiredChecks(smokeScriptSrc).includes('question box inference + routing');
+  };
+  const smokeScriptSrc = read('tools/ios_simulator_smoke.sh');
+  check(
+    'the native smoke verifies question-vectors.json (1111 x 384) routing via ONNX and CI requires it',
+    hasQuestionBoxSmoke(smoke, smokeScriptSrc),
+  );
+  check(
+    'falsifier: dropping "question box inference + routing" from ios_simulator_smoke.sh required list fails closed',
+    !hasQuestionBoxSmoke(smoke, smokeScriptSrc.replace('"question box inference + routing"', '')),
+  );
+  check(
+    'falsifier: dropping the question box smoke step from nativeSmoke.ts fails closed',
+    !hasQuestionBoxSmoke(smoke.replace("'question box inference + routing'", "'dropped'"), smokeScriptSrc),
+  );
   check('iOS opens the bundled model in place (no Documents copy)', /Platform\.OS === 'ios'[\s\S]{0,200}MainBundleDir/.test(embedder));
   const stage = read('scripts/stage-native-embedder.mjs');
   check('the staging script verifies against KNOWN_SHA256 and never downloads',
@@ -406,6 +443,48 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
   check('CI builds the tests ad-hoc for the simulator only (no team, no profile) and runs them fail-closed',
     /CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER=/.test(ci) && /-sdk iphonesimulator[\s\S]*build-for-testing/.test(ci)
       && ci.includes('tools/ios_ui_tests.sh') && runner.includes('exit "$FAILED"') && runner.includes('lsof -nP -a -i -p'));
+  const checkIosBetaBuildSplit = (ciYaml) => {
+    const clean = stripYamlComments(ciYaml);
+    const jobs = splitJobs(clean);
+    const verifyJob = jobs.get('verify') ?? '';
+    const androidJob = jobs.get('android-apk') ?? '';
+    const iosJob = jobs.get('ios-simulator') ?? '';
+    if (!iosJob) return { ok: false, nonBetaClean: false, uiTestBetaEnabled: false };
+    const stepsIdx = iosJob.indexOf('\n    steps:');
+    if (stepsIdx === -1) return { ok: false, nonBetaClean: false, uiTestBetaEnabled: false };
+    const iosJobHeader = iosJob.slice(0, stepsIdx);
+    const steps = splitSteps(iosJob);
+    const unsignedStep = steps.find((s) => s.includes('Build unsigned Release for the simulator')) ?? '';
+    const uiTestStep = steps.find((s) => s.includes('Build the UI tests')) ?? '';
+    const nonBetaClean = !verifyJob.includes('AK_BETA_BUILD')
+      && !androidJob.includes('AK_BETA_BUILD')
+      && !iosJobHeader.includes('AK_BETA_BUILD')
+      && unsignedStep !== '' && !unsignedStep.includes('AK_BETA_BUILD');
+    const uiTestBetaEnabled = uiTestStep !== ''
+      && /\n {8}env:\s*\n(?: {10}[^\n]+\n)*? {10}AK_BETA_BUILD:\s*['"]?on['"]?\b/.test(uiTestStep)
+      && /xcodebuild[\s\S]*\bAK_BETA_BUILD=on\s+build-for-testing\b/.test(uiTestStep)
+      && !/\n(?: {8}| {6}- )(?:continue-on-error|if):/.test(uiTestStep);
+    return {
+      ok: nonBetaClean && uiTestBetaEnabled,
+      nonBetaClean,
+      uiTestBetaEnabled,
+    };
+  };
+  const betaSplit = checkIosBetaBuildSplit(ci);
+  check(
+    'CI enables AK_BETA_BUILD=on only on the iOS UI-test build step and leaves unsigned Release/Android/verify non-beta',
+    betaSplit.ok,
+    `nonBetaClean=${betaSplit.nonBetaClean} uiTestBetaEnabled=${betaSplit.uiTestBetaEnabled}`,
+  );
+  check(
+    'falsifier: removing AK_BETA_BUILD from Build the UI tests fails the CI beta-switch contract',
+    !checkIosBetaBuildSplit(ci.replace(/AK_BETA_BUILD[^\n]*\n?/g, '')).ok,
+  );
+  check(
+    'falsifier: setting AK_BETA_BUILD on Build unsigned Release or ios-simulator job env fails non-beta isolation',
+    !checkIosBetaBuildSplit(ci.replace('- name: Build unsigned Release for the simulator\n', "- name: Build unsigned Release for the simulator\n        env:\n          AK_BETA_BUILD: 'on'\n")).nonBetaClean
+      && !checkIosBetaBuildSplit(ci.replace('    env:\n      XCODE_MAJOR:', "    env:\n      AK_BETA_BUILD: 'on'\n      XCODE_MAJOR:")).nonBetaClean,
+  );
   const typesSrc = read('packages/inference/src/types.ts');
   const onboardingSrc = read('apps/mobile/src/screens/OnboardingScreen.tsx');
   const parseBooleanStateInit = (src, varName) => {
@@ -1041,6 +1120,89 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
   check(
     'falsifier: unhardened saveInFiles using .exists and .label fails closed',
     !isHardenedSaveInFiles(unhardenedSaveInFiles),
+  );
+  const test1Body = suite.match(/func test1_onboardingNavigationAndAccessibility\([\s\S]*?\n  \}/)?.[0] ?? '';
+  const hasGlossaryAndQuestionBoxInTest1 = (src) => {
+    const code = stripSwiftComments(src);
+    const loopEnd = code.indexOf('issues += audit(screen)');
+    const finalAssert = code.indexOf('XCTAssertTrue(issues.isEmpty');
+    if (loopEnd === -1 || finalAssert === -1 || finalAssert <= loopEnd) return false;
+    const postLoop = code.slice(loopEnd + 'issues += audit(screen)'.length, finalAssert);
+    if (/\bif\b[^\{]*(?:Open terminology glossary|glossary-screen|Question box|question-box|question-answer-card|DELOAD)/.test(postLoop)) {
+      return false;
+    }
+    const tokens = [
+      /"Open terminology glossary"/,
+      /wait\(\s*element\(\s*"glossary-screen"\s*\)/,
+      /issues \+=\s*audit\(\s*"Glossary"\s*\)/,
+      /"Question box"/,
+      /wait\(\s*element\(\s*"question-box"\s*\)/,
+      /issues \+=\s*audit\(\s*"QuestionBox"\s*\)/,
+      /"Question"[\s\S]*?"what is a deload week"/,
+      /"Ask"[\s\S]*?\.tap\(\)/,
+      /wait\(\s*element\(\s*"question-answer-card"\s*\)[^\n]*timeout:\s*60\s*\)/,
+      /"DELOAD"/,
+      /"Back to Athlete Profile"/,
+      /wait\(\s*element\(\s*"athlete-screen-shown"\s*\)/,
+    ];
+    let cursor = 0;
+    for (const re of tokens) {
+      const match = re.exec(postLoop.slice(cursor));
+      if (match === null) return false;
+      cursor += match.index + match[0].length;
+    }
+    return true;
+  };
+  check(
+    'test1_onboardingNavigationAndAccessibility unconditionally audits Glossary and QuestionBoxPanel and verifies DELOAD routing before asserting issues.isEmpty',
+    hasGlossaryAndQuestionBoxInTest1(test1Body),
+  );
+  const plainSevenScreenTest1 = [
+    '  func test1_onboardingNavigationAndAccessibility() throws {',
+    '    for (key, screen, marker) in destinations {',
+    '      issues += audit(screen)',
+    '    }',
+    '    XCTAssertTrue(issues.isEmpty)',
+    '  }',
+  ].join('\n');
+  const conditionalQuestionBoxTest1 = [
+    '  func test1_onboardingNavigationAndAccessibility() throws {',
+    '    for (key, screen, marker) in destinations {',
+    '      issues += audit(screen)',
+    '    }',
+    '    tap("Open terminology glossary")',
+    '    wait(element("glossary-screen"), "glossary")',
+    '    issues += audit("Glossary")',
+    '    if element("Question box").waitForExistence(timeout: 3) {',
+    '      tap("Question box")',
+    '      wait(element("question-box"), "question box")',
+    '      issues += audit("QuestionBox")',
+    '      enterText(into: "Question", "what is a deload week", submit: false)',
+    '      element("Ask").tap()',
+    '      wait(element("question-answer-card"), "answer", timeout: 60)',
+    '      wait(element("DELOAD"), "deload", timeout: 60)',
+    '    }',
+    '    tap("Back to Athlete Profile")',
+    '    wait(element("athlete-screen-shown"), "profile")',
+    '    XCTAssertTrue(issues.isEmpty)',
+    '  }',
+  ].join('\n');
+  const earlyAssertTest1 = [
+    '  func test1_onboardingNavigationAndAccessibility() throws {',
+    '    for (key, screen, marker) in destinations {',
+    '      issues += audit(screen)',
+    '    }',
+    '    XCTAssertTrue(issues.isEmpty)',
+    '    tap("Open terminology glossary")',
+    '    wait(element("glossary-screen"), "glossary")',
+    '    issues += audit("Glossary")',
+    '  }',
+  ].join('\n');
+  check(
+    'falsifier: plain 7-destination test1, conditional QuestionBox skip, or early issues.isEmpty assertion all fail closed',
+    !hasGlossaryAndQuestionBoxInTest1(plainSevenScreenTest1)
+      && !hasGlossaryAndQuestionBoxInTest1(conditionalQuestionBoxTest1)
+      && !hasGlossaryAndQuestionBoxInTest1(earlyAssertTest1),
   );
 }
 

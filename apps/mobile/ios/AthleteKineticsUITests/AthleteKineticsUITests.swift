@@ -640,6 +640,10 @@ final class AthleteKineticsUITests: XCTestCase {
   func test1_onboardingNavigationAndAccessibility() throws {
     launch()
     completeOnboarding("first athlete")
+    guard #available(iOS 17.0, *) else {
+      XCTFail("the accessibility audit needs iOS 17+; this runtime is older")
+      return
+    }
     var issues: [String] = []
     let destinations: [(String, String, String)] = [
       ("tab-today", "Today", "shell-primary-tabs"), ("tab-coach", "Plan", "shell-primary-tabs"),
@@ -658,12 +662,53 @@ final class AthleteKineticsUITests: XCTestCase {
         predicate: NSPredicate(format: "isSelected == true"), object: element(key))], timeout: 30)
       XCTAssertEqual(selected, .completed, "\(screen) control is not marked selected within 30 s of tapping it")
       log("visited \(screen)")
-      guard #available(iOS 17.0, *) else {
-        XCTFail("the accessibility audit needs iOS 17+; this runtime is older")
-        return
-      }
       issues += audit(screen)
     }
+    let openGlossary = element("Open terminology glossary")
+    reveal(openGlossary, "Open terminology glossary")
+    bringClear(openGlossary, "Open terminology glossary")
+    openGlossary.tap()
+    wait(element("glossary-screen"), "the Terminology Glossary screen")
+    issues += audit("Glossary")
+
+    let questionBoxButton = element("Question box")
+    reveal(questionBoxButton, "Question box")
+    bringClear(questionBoxButton, "Question box")
+    questionBoxButton.tap()
+    wait(element("question-box"), "the Question box panel")
+    issues += audit("QuestionBox")
+
+    enterText(into: "Question", "what is a deload week", submit: false)
+    for targetName in ["Answers from the glossary only. This is not medical advice.", "GLOSSARY"] {
+      if !app.keyboards.firstMatch.exists { break }
+      let blurTarget = element(targetName)
+      reveal(blurTarget, "the Question box blur target (\(targetName))")
+      bringClear(blurTarget, "the Question box blur target (\(targetName))")
+      blurTarget.tap()
+      log("question box keyboard: tapped \(targetName) to dismiss")
+      let hidden = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.keyboards.firstMatch)
+      if XCTWaiter.wait(for: [hidden], timeout: 5) == .completed { break }
+    }
+    let askButton = element("Ask")
+    reveal(askButton, "Ask")
+    bringClear(askButton, "Ask")
+    XCTAssertTrue(askButton.isEnabled && askButton.isHittable, "Ask button is not enabled and hittable")
+    askButton.tap()
+
+    let answerCard = wait(element("question-answer-card"), "the QuestionBox answer card", timeout: 60)
+    wait(element("DELOAD"), "the DELOAD answer title", timeout: 60)
+    XCTAssertTrue(
+      answerCard.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "DELOAD")).firstMatch.exists
+        || answerCard.label.contains("DELOAD"),
+      "question-answer-card did not display DELOAD: \(answerCard.label)",
+    )
+    log("question box: routed to DELOAD")
+
+    let backToAthlete = element("Back to Athlete Profile")
+    reveal(backToAthlete, "Back to Athlete Profile")
+    bringClear(backToAthlete, "Back to Athlete Profile")
+    backToAthlete.tap()
+    wait(element("athlete-screen-shown"), "Profile after returning from Glossary")
     XCTAssertTrue(issues.isEmpty, "accessibility audit found \(issues.count) issue(s); first: \(issues.first ?? "")")
   }
 
