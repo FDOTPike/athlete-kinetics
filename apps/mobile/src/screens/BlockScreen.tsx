@@ -1922,8 +1922,10 @@ const styles = StyleSheet.create({
   weekMeta: {
     width: '100%',
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: theme.space[1],
   },
   weekTitle: {
     ...theme.font.label,
@@ -1931,11 +1933,15 @@ const styles = StyleSheet.create({
   },
   weekPhaseRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
+    flexShrink: 1,
+    maxWidth: '100%',
   },
   weekPhase: {
     ...theme.font.eyebrow,
     color: theme.color.textLow,
+    flexShrink: 1,
   },
   dayScroll: {
     width: '100%',
@@ -1955,7 +1961,7 @@ const styles = StyleSheet.create({
     backgroundColor: theme.color.ink1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 0,
+    paddingHorizontal: theme.space[1],
   },
   dayMarkPressed: {
     backgroundColor: theme.color.pressed,

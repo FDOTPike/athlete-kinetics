@@ -567,13 +567,15 @@ const styles = StyleSheet.create({
   wrapRow: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.space[2] },
   sectionHeader: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'space-between',
     alignItems: 'baseline',
+    gap: theme.space[2],
     paddingTop: theme.space[3],
     paddingBottom: theme.space[1],
     backgroundColor: theme.color.ink0,
   },
-  sectionHeaderTitle: { ...theme.font.cue, color: theme.color.textHi },
+  sectionHeaderTitle: { ...theme.font.cue, color: theme.color.textHi, flexShrink: 1 },
   sectionHeaderCount: { ...theme.font.label, color: theme.color.textLow },
   movementRow: {
     minHeight: theme.touch.min,
