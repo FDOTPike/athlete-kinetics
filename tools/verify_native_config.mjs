@@ -728,24 +728,37 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
     const code = stripSwiftComments(src);
     const upMatch = code.match(/while\s+!el\.isHittable\s*&&\s*tries\s*<\s*(\d+)\s*\{\s*app\.swipeUp\(velocity:\s*\.slow\);\s*tries\s*\+=\s*1\s*\}/);
     const downMatch = code.match(/while\s+!el\.isHittable\s*&&\s*tries\s*<\s*(\d+)\s*\{\s*app\.swipeDown\(velocity:\s*\.slow\);\s*tries\s*\+=\s*1\s*\}/);
+    const between = upMatch && downMatch && upMatch.index < downMatch.index
+      ? code.slice(upMatch.index + upMatch[0].length, downMatch.index)
+      : '';
+    const hasResetBetweenLoops = /\btries\s*=\s*0\b/.test(between);
     return upMatch !== null
       && downMatch !== null
-      && upMatch.index < downMatch.index
+      && hasResetBetweenLoops
       && Number(upMatch[1]) >= 30
       && Number(downMatch[1]) >= 45
       && !code.includes('scrollViews');
   };
   check(
-    'reveal() swipes at least 30 slow ups before 45 slow downs to reach controls in a 375x667 viewport (#362)',
+    'reveal() swipes at least 30 slow ups, resets tries = 0, then swipes at least 45 slow downs to reach controls in a 375x667 viewport (#362)',
     hasCompatibilityViewportRevealReach(reveal),
   );
   const shortReveal = [
     'while !el.isHittable && tries < 15 { app.swipeUp(velocity: .slow); tries += 1 }',
+    'tries = 0',
     'while !el.isHittable && tries < 30 { app.swipeDown(velocity: .slow); tries += 1 }',
   ].join('\n');
   check(
     'falsifier: 15-swipe reveal() fails the 375x667 viewport reach contract',
     !hasCompatibilityViewportRevealReach(shortReveal),
+  );
+  const noResetReveal = [
+    'while !el.isHittable && tries < 30 { app.swipeUp(velocity: .slow); tries += 1 }',
+    'while !el.isHittable && tries < 45 { app.swipeDown(velocity: .slow); tries += 1 }',
+  ].join('\n');
+  check(
+    'falsifier: omitting tries = 0 reset between reveal() swipe loops fails the 375x667 viewport reach contract',
+    !hasCompatibilityViewportRevealReach(noResetReveal),
   );
   const dismissBody = suite.slice(suite.indexOf('private func dismissHealthAccessAlertIfShown('), suite.indexOf('// MARK: - tests'));
   const hasCompatibilityHealthAlertHandling = (src) => {
@@ -755,20 +768,25 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
       && code.includes('findSheetContainer')
       && code.includes('targetFrame.width < sbFrame.width - 2 && targetFrame.height < sbFrame.height - 2')
       && code.includes('springboard.coordinate(withNormalizedOffset:')
-      && !/if\s+stillShown\s*&&\s*measuredOffset\s*>\s*0/.test(code)
-      && /if\s+stillShown\s*\{[\s\S]*if\s+measuredOffset\s*>\s*0[\s\S]*\}\s*else\s+if\s+found\.place\s*==\s*"the app",\s*!alertFrame\.isNull,\s*alertFrame\.midY\s*<\s*targetFrame\.midY/.test(code)
-      && code.includes('after-compat-offset-retry')
+      && /\blet\s+stillShownAfter1s\s*=\s*probeAlertOKStillShown\(\s*"after-1s"\s*\)/.test(code)
+      && code.includes('still shown after 1 s: \\(stillShownAfter1s')
+      && /\bif\s+stillShownAfter1s\s*\{[\s\S]*\bif\s+measuredOffset\s*>\s*0\b[\s\S]*\bfound\.ok\.tap\(\)/.test(code)
+      && !code.includes('after-compat-offset-retry')
+      && !/found\.frame\.height\s*\*/.test(code)
+      && !/max\([^)]*,\s*30\b/.test(code)
       && code.includes('XCTAssertFalse(stillShownAfter3s, "the Health Access alert stayed open after the OK tap")');
   };
   check(
-    'dismissHealthAccessAlertIfShown scales compatibility-window taps into SpringBoard screen coordinates and preserves fallback retry (#362)',
+    'dismissHealthAccessAlertIfShown scales compatibility-window taps into SpringBoard screen coordinates, retries via found.ok.tap() without hard-coded offsets, and preserves immutable 1 s probe logging (#362)',
     hasCompatibilityHealthAlertHandling(dismissBody),
   );
   const legacyDismiss = [
     'if found.place == "the app", !alertFrame.isNull, alertFrame.midY < targetFrame.midY {',
     '  if nf.minY == 0 && abs(nf.width - targetFrame.width) <= 2 { measuredOffset = targetFrame.height - nf.height }',
     '}',
-    'if stillShown && measuredOffset > 0 { stillShown = probeAlertOKStillShown("after-unshifted-retry") }',
+    'let stillShownAfter1s = probeAlertOKStillShown("after-1s")',
+    'if stillShownAfter1s && measuredOffset > 0 { _ = probeAlertOKStillShown("after-unshifted-retry") }',
+    'log("still shown after 1 s: \\(stillShownAfter1s ? \\"yes\\" : \\"no\\")")',
     'XCTAssertFalse(stillShownAfter3s, "the Health Access alert stayed open after the OK tap")',
   ].join('\n');
   check(
@@ -782,18 +800,54 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
     '  if nf.minY == 0 && abs(nf.width - targetFrame.width) <= 2 { measuredOffset = targetFrame.height - nf.height }',
     '}',
     'found.target.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0)).withOffset(CGVector(dx: found.frame.midX, dy: initialOffsetY)).tap()',
-    'if stillShown {',
-    '  if measuredOffset > 0 {',
-    '    stillShown = probeAlertOKStillShown("after-unshifted-retry")',
-    '  } else if found.place == "the app", !alertFrame.isNull, alertFrame.midY < targetFrame.midY {',
-    '    stillShown = probeAlertOKStillShown("after-compat-offset-retry")',
-    '  }',
-    '}',
+    'let stillShownAfter1s = probeAlertOKStillShown("after-1s")',
+    'if stillShownAfter1s { if measuredOffset > 0 { _ = probeAlertOKStillShown("after-unshifted-retry") } else { found.ok.tap() } }',
+    'log("still shown after 1 s: \\(stillShownAfter1s ? \\"yes\\" : \\"no\\")")',
     'XCTAssertFalse(stillShownAfter3s, "the Health Access alert stayed open after the OK tap")',
   ].join('\n');
   check(
     'falsifier: unscaled found.target.coordinate without sbFrame compatibility scaling fails the contract',
     !hasCompatibilityHealthAlertHandling(unscaledCompatDismiss),
+  );
+  const hardcodedOffsetDismiss = [
+    'let isCompatBox = targetFrame.width < sbFrame.width - 2 && targetFrame.height < sbFrame.height - 2',
+    'func findSheetContainer(_ root: XCUIElementSnapshot) -> XCUIElementSnapshot? { nil }',
+    'if found.place == "the app", !alertFrame.isNull, alertFrame.midY < targetFrame.midY {',
+    '  if nf.minY == 0 && abs(nf.width - targetFrame.width) <= 2 { measuredOffset = targetFrame.height - nf.height }',
+    '}',
+    'springboard.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0)).withOffset(CGVector(dx: 0, dy: 0)).tap()',
+    'let stillShownAfter1s = probeAlertOKStillShown("after-1s")',
+    'if stillShownAfter1s {',
+    '  if measuredOffset > 0 {',
+    '    _ = probeAlertOKStillShown("after-unshifted-retry")',
+    '  } else {',
+    '    let compatY = min(targetFrame.maxY - 8, found.frame.midY + max(found.frame.height * 0.625, 30))',
+    '    found.ok.tap()',
+    '    _ = probeAlertOKStillShown("after-compat-offset-retry")',
+    '  }',
+    '}',
+    'log("still shown after 1 s: \\(stillShownAfter1s ? \\"yes\\" : \\"no\\")")',
+    'XCTAssertFalse(stillShownAfter3s, "the Health Access alert stayed open after the OK tap")',
+  ].join('\n');
+  check(
+    'falsifier: hard-coded hosting-sheet fallback offset fails the compatibility-window contract',
+    !hasCompatibilityHealthAlertHandling(hardcodedOffsetDismiss),
+  );
+  const overwritten1sDismiss = [
+    'let isCompatBox = targetFrame.width < sbFrame.width - 2 && targetFrame.height < sbFrame.height - 2',
+    'func findSheetContainer(_ root: XCUIElementSnapshot) -> XCUIElementSnapshot? { nil }',
+    'if found.place == "the app", !alertFrame.isNull, alertFrame.midY < targetFrame.midY {',
+    '  if nf.minY == 0 && abs(nf.width - targetFrame.width) <= 2 { measuredOffset = targetFrame.height - nf.height }',
+    '}',
+    'springboard.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0)).withOffset(CGVector(dx: 0, dy: 0)).tap()',
+    'var stillShown = probeAlertOKStillShown("after-1s")',
+    'if stillShown { if measuredOffset > 0 { stillShown = probeAlertOKStillShown("after-unshifted-retry") } else { found.ok.tap() } }',
+    'log("still shown after 1 s: \\(stillShown ? \\"yes\\" : \\"no\\")")',
+    'XCTAssertFalse(stillShownAfter3s, "the Health Access alert stayed open after the OK tap")',
+  ].join('\n');
+  check(
+    'falsifier: overwriting the 1 s probe boolean before logging fails the immutable probe contract',
+    !hasCompatibilityHealthAlertHandling(overwritten1sDismiss),
   );
 }
 

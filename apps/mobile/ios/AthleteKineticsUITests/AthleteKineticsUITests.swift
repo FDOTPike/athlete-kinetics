@@ -578,32 +578,31 @@ final class AthleteKineticsUITests: XCTestCase {
         }
         tapScreen = tapTargetPoint(found.frame.midX, initialOffsetY)
         sleep(1)
-        var stillShown = probeAlertOKStillShown("after-1s")
-        if stillShown {
+        let stillShownAfter1s = probeAlertOKStillShown("after-1s")
+        var stillShownAfterRetry: Bool?
+        if stillShownAfter1s {
           if measuredOffset > 0 {
             tapScreen = tapTargetPoint(found.frame.midX, found.frame.midY)
             tapY = found.frame.midY
             sleep(1)
-            stillShown = probeAlertOKStillShown("after-unshifted-retry")
-            tapPath = stillShown ? "\(tapPath),unshifted-retry" : "unshifted-after-\(offsetSource)"
-          } else if found.place == "the app", !alertFrame.isNull, alertFrame.midY < targetFrame.midY {
-            // #362: in iPadOS's 375 x 667 pt compatibility window, the remote
-            // HealthPrivacyService sheet sits ~30 pt below the window top without
-            // exposing a shorter ancestor in targetSnap, so the unshifted tap lands
-            // just above the OK button; retry with the measured compatibility offset.
-            let compatY = min(targetFrame.maxY - 8, found.frame.midY + max(found.frame.height * 0.625, 30))
-            tapScreen = tapTargetPoint(found.frame.midX, compatY)
-            tapY = compatY
+            let retryRemaining = probeAlertOKStillShown("after-unshifted-retry")
+            stillShownAfterRetry = retryRemaining
+            tapPath = retryRemaining ? "\(tapPath),unshifted-retry" : "unshifted-after-\(offsetSource)"
+          } else {
+            // When no shifted hosting sheet container was detected, fall back to
+            // XCUIElement's own tap rather than guessing a displacement.
+            found.ok.tap()
             sleep(1)
-            stillShown = probeAlertOKStillShown("after-compat-offset-retry")
-            let delta = Int((compatY - found.frame.midY).rounded())
-            tapPath = stillShown ? "\(tapPath),compat-offset-retry(+\(delta)pt)" : "compat-offset-retry(+\(delta)pt)"
+            let retryRemaining = probeAlertOKStillShown("after-element-tap-retry")
+            stillShownAfterRetry = retryRemaining
+            tapPath = retryRemaining ? "\(tapPath),element-tap-retry" : "\(tapPath)->element-tap"
           }
         }
         sleep(2)
         let stillShownAfter3s = probeAlertOKStillShown("after-3s")
         let compatTag = isCompatBox ? " compatScreen=(\(Int(tapScreen.x.rounded())),\(Int(tapScreen.y.rounded()))) sb=(\(Int(sbFrame.width)),\(Int(sbFrame.height)))" : ""
-        log("HEALTH-ALERT-OK tapped OK on a system \(kind) in \(found.place) (\(context)); title: \(title.prefix(120)); tapPath=\(tapPath) okFrame=(\(Int(found.frame.midX)),\(Int(found.frame.midY))) tapY=\(Int(tapY.rounded()))\(compatTag) remoteContainer=(minY:\(remoteContainerMinY),h:\(remoteContainerHeight)) alertMidY=\(alertFrame.isNull ? -1 : Int(alertFrame.midY)); still shown after 1 s: \(stillShown ? "yes" : "no"); still shown 2 s later: \(stillShownAfter3s ? "yes" : "no")")
+        let retryTag = stillShownAfterRetry.map { "; still shown after retry: \($0 ? "yes" : "no")" } ?? ""
+        log("HEALTH-ALERT-OK tapped OK on a system \(kind) in \(found.place) (\(context)); title: \(title.prefix(120)); tapPath=\(tapPath) okFrame=(\(Int(found.frame.midX)),\(Int(found.frame.midY))) tapY=\(Int(tapY.rounded()))\(compatTag) remoteContainer=(minY:\(remoteContainerMinY),h:\(remoteContainerHeight)) alertMidY=\(alertFrame.isNull ? -1 : Int(alertFrame.midY)); still shown after 1 s: \(stillShownAfter1s ? "yes" : "no")\(retryTag); still shown 2 s later: \(stillShownAfter3s ? "yes" : "no")")
         XCTAssertFalse(stillShownAfter3s, "the Health Access alert stayed open after the OK tap")
         return true
       }
