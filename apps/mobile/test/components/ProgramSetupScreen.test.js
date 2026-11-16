@@ -348,8 +348,8 @@ test('editing a day row changes the focus passed to block generation / program c
   render(<ProgramSetupScreen />);
   openAdvanced();
 
-  // Day 1 default for strength 2-day is 'lower'. Change it to 'conditioning'.
-  const conditioningChips = screen.getAllByText('conditioning');
+  // Day 1 default for strength 2-day is 'lower'. Change it to 'Conditioning'.
+  const conditioningChips = screen.getAllByText('Conditioning');
   fireEvent.press(conditioningChips[0]);
 
   fireEvent.press(screen.getByText('Create program'));
@@ -399,8 +399,8 @@ test('custom week-one rows use the middle dot between day number and focus', () 
   fireEvent.press(screen.getByText('Customize'));
 
   // The literal separator is U+00B7 MIDDLE DOT, never '?'.
-  expect(screen.getAllByText(/Day \d+ · /).length).toBeGreaterThan(0);
-  expect(screen.queryByText(/Day \d+ \? /)).toBeNull();
+  expect(screen.getAllByText(/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) · /).length).toBeGreaterThan(0);
+  expect(screen.queryByText(/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) \? /)).toBeNull();
 });
 
 // ---------------------------------------------------------------------------
@@ -425,8 +425,8 @@ test('#210 no "bjj" day chip for a strength athlete with no sport', () => {
   mockState.sport = null;
   render(<ProgramSetupScreen />);
   openAdvanced();
-  expect(screen.getAllByText('lower').length).toBeGreaterThan(0);
-  expect(screen.queryAllByText('bjj')).toHaveLength(0);
+  expect(screen.getAllByText('Lower').length).toBeGreaterThan(0);
+  expect(screen.queryAllByText('BJJ')).toHaveLength(0);
 });
 
 test('#210 the "bjj" day chip shows for the strength + grappling goal', () => {
@@ -435,7 +435,7 @@ test('#210 the "bjj" day chip shows for the strength + grappling goal', () => {
   mockState.sport = null;
   render(<ProgramSetupScreen />);
   openAdvanced();
-  expect(screen.queryAllByText('bjj').length).toBeGreaterThan(0);
+  expect(screen.queryAllByText('BJJ').length).toBeGreaterThan(0);
 });
 
 test('#210 the "bjj" day chip shows for a grappling sport named under Other', () => {
@@ -443,7 +443,7 @@ test('#210 the "bjj" day chip shows for a grappling sport named under Other', ()
   mockState.sport = { sportId: 'other', otherSportName: 'Brazilian Jiu-Jitsu' };
   render(<ProgramSetupScreen />);
   openAdvanced();
-  expect(screen.queryAllByText('bjj').length).toBeGreaterThan(0);
+  expect(screen.queryAllByText('BJJ').length).toBeGreaterThan(0);
 });
 
 test('#210 a day already set to bjj keeps its chip so the choice stays visible', () => {
@@ -457,5 +457,5 @@ test('#210 a day already set to bjj keeps its chip so the choice stays visible',
     days: [{ dayIndex: 1, focus: 'bjj' }], movementPreferences: [],
   };
   render(<ProgramSetupScreen editing />);
-  expect(screen.queryAllByText('bjj')).toHaveLength(1);
+  expect(screen.queryAllByText('BJJ')).toHaveLength(1);
 });

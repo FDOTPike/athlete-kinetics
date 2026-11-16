@@ -124,8 +124,8 @@ const AGE_COPY: Record<TrainingAge, { label: string; blurb: string }> = {
 export const WEEK_DEFAULT_BY_AGE: Record<TrainingAge, { readonly days: number; readonly minutes: number }> = {
   beginner: { days: 3, minutes: 45 },
   intermediate: { days: 4, minutes: 60 },
-  advanced: { days: 4, minutes: 75 },
-  elite: { days: 4, minutes: 75 },
+  advanced: { days: 5, minutes: 75 },
+  elite: { days: 6, minutes: 75 },
 };
 
 const ENERGY_COPY: Record<EnergySystem, { label: string; blurb: string }> = {

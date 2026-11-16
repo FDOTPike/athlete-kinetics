@@ -25,9 +25,11 @@ import {
   generateDemoHistory,
   insertTrainingProgram,
   linkTrainingBlockProgram,
+  mapBaseProgramFocus,
   migrate,
   openKineticsDb,
   updateTrainingProgramEndDate,
+  writeProgramAdvancedControl,
   type DemoSql,
 } from '@ak/core-db';
 import {
@@ -85,8 +87,11 @@ import {
   composeRoutineMicrocycle,
   contextualRoutineRoles,
   computeSubstitutions,
+  DEFAULT_LONGITUDINAL_AUTOPILOT_POLICY,
   DEFAULT_PROFILE,
   detectFlaws,
+  evaluateLongitudinalAutopilot,
+  type LongitudinalBlockEvidence,
   applyLoadModifier,
   applyPrescriptionToSlot,
   derivePrescription,
@@ -146,7 +151,11 @@ import {
   type ReturnAction,
   type BlockPlan,
   type BlockFocus,
+  type BlockLongitudinalControl,
   type ProgramDayPreference,
+  type ProgramRoutineDayAssignment,
+  type ProgramScheduleMode,
+  type ProgramSlotOverride,
   type FutureSlot,
   type GeneratorMovement,
   type Guardrail,
@@ -662,6 +671,12 @@ export interface TodaySlot {
   overrideReason: string | null;
   /** Optional planned_slot_autopilot provenance; absent means untouched. */
   autopilot?: AutopilotAttribution;
+  /** Optional Phase 2 (#228) athlete Customize / routine override provenance. */
+  athleteOverride?: {
+    source: 'slot_override' | 'routine_assignment';
+    mrvCeilingSets: number | null;
+    aboveMrv: boolean;
+  };
   /** Frozen bounded-dose decision for routine-derived slots. */
   routineDecision?: {
     role: RoutineRole;
@@ -726,6 +741,25 @@ export interface TrainingProgramMovementPreference {
 export interface TrainingProgramDay {
   dayIndex: number;
   focus: string;
+  routineAssignment?: {
+    routineTemplateId: number;
+    routineDayIndex: number;
+    routineName: string;
+  };
+}
+
+export interface TrainingProgramSlotOverride {
+  dayIndex: number;
+  slotIndex: number;
+  sets?: number | null;
+  reps?: number | null;
+  targetRpe?: number | null;
+}
+
+export interface TrainingProgramDayRoutineAssignment {
+  dayIndex: number;
+  routineTemplateId: number;
+  routineDayIndex: number;
 }
 
 export interface TrainingProgram {
@@ -740,8 +774,11 @@ export interface TrainingProgram {
   schemaType: SchemaType;
   status: 'active' | 'review_due' | 'archived';
   currentSequenceIndex: number;
+  scheduleMode: ProgramScheduleMode;
   days: TrainingProgramDay[];
   movementPreferences: TrainingProgramMovementPreference[];
+  slotOverrides: TrainingProgramSlotOverride[];
+  routineAssignments: TrainingProgramDayRoutineAssignment[];
 }
 
 export type TrainingProgramHorizon =
@@ -752,8 +789,11 @@ export interface TrainingProgramInput {
   horizon: TrainingProgramHorizon;
   schemaType: SchemaType;
   dayIndices: number[];
+  scheduleMode?: ProgramScheduleMode;
   movementPreferences?: TrainingProgramMovementPreference[];
   days?: TrainingProgramDay[];
+  slotOverrides?: TrainingProgramSlotOverride[];
+  routineAssignments?: TrainingProgramDayRoutineAssignment[];
   /** A session length the athlete chose on the Build screen from the plan's
    *  own offers (Android walk 2026-11-03, W1-4). The preview plans with it;
    *  creating the program saves it to the profile. Absent = the profile's. */
@@ -772,7 +812,11 @@ export interface TrainingProgramPreview {
   plannedEndDate: string;
   plannedBlockCount: number;
   schemaType: SchemaType;
+  scheduleMode: ProgramScheduleMode;
   days: TrainingProgramDay[];
+  slotOverrides: TrainingProgramSlotOverride[];
+  routineAssignments: TrainingProgramDayRoutineAssignment[];
+  patternMrvSets?: Partial<Record<MovementPattern, number>>;
   plan: BlockPlan;
 }
 
@@ -3127,6 +3171,9 @@ interface PendingProgramCreation {
   input: TrainingProgramInput;
   preview: TrainingProgramPreview;
   programDays: ProgramDayPreference[];
+  scheduleMode: ProgramScheduleMode;
+  slotOverrides: TrainingProgramSlotOverride[];
+  routineAssignments: TrainingProgramDayRoutineAssignment[];
   /** A session length chosen on the Build screen, saved to the profile in the
    *  same transaction as the program (null: the profile's length is kept). */
   sessionDurationCapMin: number | null;
@@ -3143,6 +3190,7 @@ interface PendingProgramContinuation {
   startingMacroBlockIndex: number;
   plannedEndDate: string;
   programDays: ProgramDayPreference[];
+  scheduleMode: ProgramScheduleMode;
   weeklyFrequency: number;
   objective: UserProfile['objective'];
 }
@@ -3156,11 +3204,235 @@ const isoUtcMs = (value: string): number => {
   return ms;
 };
 
-const trainingProgramShape = (profile: UserProfile, input: TrainingProgramInput, horizonAnchorDate: string) => {
+const readRoutineAssignmentMap = (
+  d: DB,
+  assignments: readonly TrainingProgramDayRoutineAssignment[],
+): Map<string, ProgramRoutineDayAssignment> => {
+  const result = new Map<string, ProgramRoutineDayAssignment>();
+  const templateIds = [...new Set(assignments.map((a) => a.routineTemplateId))];
+  for (const templateId of templateIds) {
+    const templateRow = rowsOf<{ name: string }>(d.executeSync(
+      'SELECT name FROM routine_template WHERE routine_template_id = ?',
+      [templateId],
+    ))[0];
+    if (templateRow === undefined) continue;
+    const slotRows = rowsOf<{
+      day_index: number;
+      slot_index: number;
+      movement_id: number;
+      sets: number;
+      reps: number;
+      target_rpe: number;
+    }>(d.executeSync(
+      `SELECT day_index, slot_index, movement_id, sets, reps, target_rpe
+         FROM routine_template_slot
+        WHERE routine_template_id = ?
+        ORDER BY day_index, slot_index`,
+      [templateId],
+    ));
+    for (const row of slotRows) {
+      const key = `${templateId}:${row.day_index}`;
+      const existing = result.get(key);
+      const slot = {
+        slot_index: row.slot_index,
+        movement_id: row.movement_id,
+        sets: row.sets,
+        reps: row.reps,
+        target_rpe: row.target_rpe,
+      };
+      if (existing === undefined) {
+        result.set(key, {
+          routine_template_id: templateId,
+          routine_day_index: row.day_index,
+          routine_name: templateRow.name,
+          slots: [slot],
+        });
+      } else {
+        result.set(key, { ...existing, slots: [...existing.slots, slot] });
+      }
+    }
+  }
+  return result;
+};
+
+const readLongitudinalControlContext = (
+  d: DB,
+  args: {
+    profile: UserProfile;
+    movements: readonly Movement[];
+    macroBlockIndex: number;
+    introductoryWeek1?: boolean;
+  },
+): BlockLongitudinalControl => {
+  const introFlag = args.introductoryWeek1 === true ? { introductoryWeek1: true as const } : {};
+  const patternRows = rowsOf<{ pattern: MovementPattern }>(d.executeSync(
+    `SELECT DISTINCT m.pattern
+       FROM set_record sr
+       JOIN movement m ON m.movement_id = sr.movement_id
+     UNION
+     SELECT DISTINCT m.pattern
+       FROM history_import_set his
+       JOIN movement m ON m.movement_id = his.movement_id`,
+  ));
+  const loggedPatterns = new Set(patternRows.map((row) => row.pattern));
+  if (loggedPatterns.size === 0) {
+    return introFlag;
+  }
+  const blockRows = rowsOf<{
+    block_id: number;
+    start_date: string;
+    macro_block_index: number;
+    suspension_attributed: number;
+  }>(d.executeSync(
+    `SELECT tb.block_id, tb.start_date,
+            COALESCE(bm.macro_block_index, 1) AS macro_block_index,
+            EXISTS(SELECT 1 FROM block_suspension_origin bso WHERE bso.block_id = tb.block_id) AS suspension_attributed
+       FROM training_block tb
+       LEFT JOIN block_meta bm ON bm.block_id = tb.block_id
+      WHERE tb.status = 'archived'
+      ORDER BY tb.block_id ASC`,
+  ));
+  if (blockRows.length === 0) {
+    return introFlag;
+  }
+  const minStartDate = blockRows[0].start_date;
+  const maxEndDate = addDaysIso(blockRows[blockRows.length - 1].start_date, 27);
+  const allSetAgg = rowsOf<{
+    date: string; pattern: MovementPattern; set_count: number;
+    sum_delta_rpe: number; delta_count: number; sum_attenuation: number;
+  }>(d.executeSync(
+    `SELECT s.session_date AS date, m.pattern AS pattern, COUNT(*) AS set_count,
+            COALESCE(SUM(CASE WHEN sr.rpe IS NOT NULL AND st.target_rpe IS NOT NULL THEN sr.rpe - st.target_rpe END), 0) AS sum_delta_rpe,
+            SUM(CASE WHEN sr.rpe IS NOT NULL AND st.target_rpe IS NOT NULL THEN 1 ELSE 0 END) AS delta_count,
+            SUM(1.0 / MAX(1.0, COALESCE(sp.effective_load_kg, sr.load_kg) / MAX(sr.load_kg, 0.01))) AS sum_attenuation
+       FROM set_record sr
+       JOIN session s ON s.session_id = sr.session_id
+       JOIN movement m ON m.movement_id = sr.movement_id
+       LEFT JOIN set_prefix sp ON sp.set_id = sr.set_id
+       LEFT JOIN set_target st ON st.set_id = sr.set_id
+      WHERE s.session_date >= ? AND s.session_date <= ?
+      GROUP BY s.session_date, m.pattern`,
+    [minStartDate, maxEndDate],
+  ));
+  const [minY, minM, minD] = minStartDate.split('-').map(Number);
+  const minStartMs = new Date(minY, minM - 1, minD, 0, 0, 0, 0).getTime();
+  const allNiggles = rowsOf<{ region: string; severity: number; reported_at_ms: number }>(d.executeSync(
+    'SELECT region, severity, reported_at_ms FROM niggle WHERE reported_at_ms >= ?',
+    [minStartMs],
+  )).map((r) => ({ date: localDateOf(r.reported_at_ms), region: r.region as Joint, severity: r.severity }));
+  const peakRows = rowsOf<{ block_id: number; pattern: MovementPattern; max_sets: number }>(d.executeSync(
+    `SELECT ps.block_id, m.pattern, MAX(sl.sets) AS max_sets
+       FROM planned_slot sl
+       JOIN planned_session ps ON ps.planned_session_id = sl.planned_session_id
+       JOIN movement m ON m.movement_id = sl.movement_id
+      WHERE ps.week_index <= 3
+      GROUP BY ps.block_id, m.pattern`,
+  ));
+  const peakByBlock = new Map<number, Partial<Record<MovementPattern, number>>>();
+  for (const row of peakRows) {
+    const existing = peakByBlock.get(row.block_id) ?? {};
+    existing[row.pattern] = row.max_sets;
+    peakByBlock.set(row.block_id, existing);
+  }
+  const blocks: LongitudinalBlockEvidence[] = blockRows.map((b, idx) => {
+    const windowDates = demoDates(addDaysIso(b.start_date, 20), 21);
+    const windowSet = new Set(windowDates);
+    return {
+      blockSequence: idx + 1,
+      macroBlockIndex: b.macro_block_index,
+      windowDates,
+      stateVectors: [],
+      setRows: allSetAgg
+        .filter((r) => windowSet.has(r.date))
+        .map((r) => ({
+          date: r.date,
+          pattern: r.pattern,
+          setCount: r.set_count,
+          sumDeltaRpe: r.sum_delta_rpe,
+          deltaCount: r.delta_count,
+          sumAttenuation: r.sum_attenuation,
+        })),
+      niggleRows: allNiggles.filter((r) => windowSet.has(r.date)),
+      isSuspended: b.suspension_attributed === 1,
+      peakPrescribedSetsByPattern: peakByBlock.get(b.block_id),
+    };
+  });
+  const subLibrary: SubstitutionMovement[] = args.movements.map((m) => ({
+    movement_id: m.movement_id,
+    beginnerOk: m.beginnerOk,
+    capabilityAvailable: true,
+    sportTracking: m.sportTracking,
+    name: m.name,
+    pattern: m.pattern as MovementPattern,
+    is_compound: m.is_compound,
+    difficulty: m.difficulty,
+    family: m.baseName,
+    required: m.required,
+    preference: m.preference,
+  }));
+  const overlay = evaluateLongitudinalAutopilot({
+    profile: args.profile,
+    library: subLibrary,
+    inventory: args.profile.equipment_inventory,
+    blocks,
+    upcomingMacroBlockIndex: args.macroBlockIndex,
+    upcomingMacroPhase: macroPhaseOf(args.macroBlockIndex) as MacroPhase,
+    policy: DEFAULT_LONGITUDINAL_AUTOPILOT_POLICY,
+  });
+  const patternMrvSets: Partial<Record<MovementPattern, number>> = {};
+  for (const pattern of loggedPatterns) {
+    patternMrvSets[pattern] = overlay.patternMrvSets[pattern];
+  }
+  return {
+    patternMrvSets,
+    ...introFlag,
+  };
+};
+
+const buildProgramDayPreferences = (
+  days: readonly TrainingProgramDay[],
+  movementPreferences: readonly TrainingProgramMovementPreference[],
+  slotOverrides: readonly TrainingProgramSlotOverride[],
+  routineAssignments: readonly TrainingProgramDayRoutineAssignment[],
+  routineByDayKey: ReadonlyMap<string, ProgramRoutineDayAssignment>,
+): ProgramDayPreference[] =>
+  days.map((day) => {
+    const ra = routineAssignments.find((item) => item.dayIndex === day.dayIndex);
+    const routineAssignment = ra === undefined
+      ? null
+      : (routineByDayKey.get(`${ra.routineTemplateId}:${ra.routineDayIndex}`) ?? null);
+    return {
+      day_index: day.dayIndex,
+      focus: day.focus as ProgramDayPreference['focus'],
+      movement_preferences: movementPreferences
+        .filter((p) => p.dayIndex === day.dayIndex)
+        .map((p) => ({ slot_index: p.slotIndex, pattern: p.pattern, movement_id: p.movementId })),
+      slot_overrides: slotOverrides
+        .filter((o) => o.dayIndex === day.dayIndex)
+        .map((o) => ({
+          slot_index: o.slotIndex,
+          ...(o.sets !== undefined ? { sets: o.sets } : {}),
+          ...(o.reps !== undefined ? { reps: o.reps } : {}),
+          ...(o.targetRpe !== undefined ? { target_rpe: o.targetRpe } : {}),
+        })),
+      routine_assignment: routineAssignment,
+    };
+  });
+
+const trainingProgramShape = (
+  profile: UserProfile,
+  input: TrainingProgramInput,
+  horizonAnchorDate: string,
+  routineByDayKey: ReadonlyMap<string, ProgramRoutineDayAssignment> = new Map(),
+) => {
   const selected = [...new Set(input.dayIndices)].sort((a, b) => a - b);
   if (selected.length < 1 || selected.length > 7
       || selected.some((day) => !Number.isInteger(day) || day < 1 || day > 7)) {
     throw new Error('Choose between one and seven training days.');
+  }
+  const scheduleMode: ProgramScheduleMode = input.scheduleMode ?? 'iso_weekday';
+  if (scheduleMode !== 'iso_weekday' && scheduleMode !== 'relative_day_index') {
+    throw new Error('Program schedule mode is invalid.');
   }
   // The horizon is measured from the program's stable anchor, never from the
   // edit date: editing an active program must not restart its review horizon
@@ -3189,17 +3461,61 @@ const trainingProgramShape = (profile: UserProfile, input: TrainingProgramInput,
     }
     seenSlots.add(key);
   }
-  const programDays: ProgramDayPreference[] = days.map((day) => ({
-    day_index: day.dayIndex,
-    focus: day.focus as ProgramDayPreference['focus'],
-    movement_preferences: movementPreferences.filter((p) => p.dayIndex === day.dayIndex).map((p) => ({
-      slot_index: p.slotIndex, pattern: p.pattern, movement_id: p.movementId,
-    })),
-  }));
+  const seenOverrideKeys = new Set<string>();
+  const slotOverrides = [...(input.slotOverrides ?? [])]
+    .filter((o) => o.sets != null || o.reps != null || o.targetRpe != null)
+    .sort((a, b) => a.dayIndex - b.dayIndex || a.slotIndex - b.slotIndex);
+  for (const ov of slotOverrides) {
+    const key = `${ov.dayIndex}:${ov.slotIndex}`;
+    if (!allowedDays.has(ov.dayIndex) || !Number.isInteger(ov.slotIndex)
+        || ov.slotIndex < 1 || ov.slotIndex > 6 || seenOverrideKeys.has(key)) {
+      throw new Error('A slot dose override points to an invalid program slot.');
+    }
+    if (ov.sets != null && (!Number.isInteger(ov.sets) || ov.sets < 1 || ov.sets > 10)) {
+      throw new Error('Slot override sets must be an integer between 1 and 10.');
+    }
+    if (ov.reps != null && (!Number.isInteger(ov.reps) || ov.reps < 1 || ov.reps > 30)) {
+      throw new Error('Slot override reps must be an integer between 1 and 30.');
+    }
+    if (ov.targetRpe != null && (!Number.isFinite(ov.targetRpe) || ov.targetRpe < 5.0 || ov.targetRpe > 10.0)) {
+      throw new Error('Slot override target RPE must be between 5.0 and 10.0.');
+    }
+    seenOverrideKeys.add(key);
+  }
+  const seenRoutineDays = new Set<number>();
+  const routineAssignmentsRaw = [...(input.routineAssignments ?? [])].sort(
+    (a, b) => a.dayIndex - b.dayIndex,
+  );
+  const routineAssignments: TrainingProgramDayRoutineAssignment[] = [];
+  for (const ra of routineAssignmentsRaw) {
+    if (!allowedDays.has(ra.dayIndex) || seenRoutineDays.has(ra.dayIndex)
+        || !Number.isInteger(ra.routineDayIndex) || ra.routineDayIndex < 1 || ra.routineDayIndex > 7) {
+      throw new Error('A routine assignment points to an invalid program day.');
+    }
+    seenRoutineDays.add(ra.dayIndex);
+    const resolved = routineByDayKey.get(`${ra.routineTemplateId}:${ra.routineDayIndex}`);
+    if (resolved === undefined || resolved.slots.length === 0) {
+      if (input.keepPlaceablePreferencesOnly === true) continue;
+      throw new Error('Assigned routine day was not found or has no exercises.');
+    }
+    routineAssignments.push(ra);
+  }
+  if (profile.training_age === 'beginner'
+      && (slotOverrides.length > 0 || routineAssignments.length > 0)) {
+    throw new Error('Beginner athletes cannot customize sets, reps, target RPE, or assign routines to program days.');
+  }
+  const programDays = buildProgramDayPreferences(
+    days,
+    movementPreferences,
+    slotOverrides,
+    routineAssignments,
+    routineByDayKey,
+  );
   return {
     requestedReviewDate, plannedBlockCount,
     plannedEndDate,
-    days, movementPreferences, programDays,
+    scheduleMode,
+    days, movementPreferences, slotOverrides, routineAssignments, programDays,
   };
 };
 
@@ -4879,9 +5195,10 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const horizonAnchorDate = activeProgram === null
       ? startDate
       : programHorizonAnchor(activeProgram.plannedEndDate, activeProgram.plannedBlockCount);
-    let shape = trainingProgramShape(planningProfile, input, horizonAnchorDate);
-    const byId = new Map(movements.map((movement) => [movement.movement_id, movement]));
     const d = getDb();
+    const routineByDayKey = readRoutineAssignmentMap(d, input.routineAssignments ?? []);
+    let shape = trainingProgramShape(planningProfile, input, horizonAnchorDate, routineByDayKey);
+    const byId = new Map(movements.map((movement) => [movement.movement_id, movement]));
     const safetyExcluded = safetyExcludedMovementIdsFor(movements, profile, niggles);
     const priorExperience = new Set(get().activePriorExperienceMovementIds);
     const capabilityAvailableWeightRoom = capabilityAvailableMovementIds(
@@ -4919,7 +5236,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       // it shows that week instead of throwing.
       const placeable = shape.movementPreferences.filter((preference) => preferenceProblem(preference) === null);
       if (placeable.length !== shape.movementPreferences.length) {
-        shape = trainingProgramShape(planningProfile, { ...input, movementPreferences: placeable }, horizonAnchorDate);
+        shape = trainingProgramShape(planningProfile, { ...input, movementPreferences: placeable }, horizonAnchorDate, routineByDayKey);
       }
     }
     for (const preference of shape.movementPreferences) {
@@ -4970,10 +5287,18 @@ export const useStore = create<KineticsStore>()((set, get) => {
       }),
     };
     const previewEmphasis = programEmphasisFor(d, startDate);
+    const longitudinalControl = readLongitudinalControlContext(d, {
+      profile: effectiveProfile,
+      movements,
+      macroBlockIndex,
+      introductoryWeek1: activeProgram === null || activeProgram.currentSequenceIndex === 0,
+    });
     const plan = generateBlock({
       profile: effectiveProfile, movements: genMovements, startDate,
       schemaType: input.schemaType, macroBlockIndex,
+      scheduleMode: shape.scheduleMode,
       programDays: shape.programDays,
+      longitudinalControl,
       powerPreferredMovementNames: powerNames,
       ...(previewEmphasis === null ? {} : { emphasis: previewEmphasis }),
     });
@@ -4982,7 +5307,15 @@ export const useStore = create<KineticsStore>()((set, get) => {
     return {
       objective: planningProfile.objective, startDate, requestedReviewDate: shape.requestedReviewDate,
       plannedEndDate: shape.plannedEndDate, plannedBlockCount: shape.plannedBlockCount,
-      schemaType: input.schemaType, days: shape.days, plan,
+      schemaType: input.schemaType,
+      scheduleMode: shape.scheduleMode,
+      days: shape.days,
+      slotOverrides: shape.slotOverrides,
+      routineAssignments: shape.routineAssignments,
+      ...(longitudinalControl.patternMrvSets !== undefined
+        ? { patternMrvSets: longitudinalControl.patternMrvSets }
+        : {}),
+      plan,
     };
   },
 
@@ -5005,9 +5338,13 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const capChanges = chosenCapMin !== null && chosenCapMin !== priorCapMin;
     try {
       const preview = get().previewTrainingProgram(input);
-      const shape = trainingProgramShape(get().profile, input, preview.startDate);
+      const routineByDayKey = readRoutineAssignmentMap(getDb(), input.routineAssignments ?? []);
+      const shape = trainingProgramShape(get().profile, input, preview.startDate, routineByDayKey);
       pendingProgramCreation = {
         input, preview, programDays: shape.programDays,
+        scheduleMode: shape.scheduleMode,
+        slotOverrides: shape.slotOverrides,
+        routineAssignments: shape.routineAssignments,
         sessionDurationCapMin: capChanges ? chosenCapMin : null,
       };
       set({ error: null });
@@ -5083,7 +5420,10 @@ export const useStore = create<KineticsStore>()((set, get) => {
       d, profile, movements, niggles: get().niggles,
       priorExperience: new Set(get().activePriorExperienceMovementIds),
       today: localToday(), startDate: localToday(), schemaType, macroBlockIndex,
+      scheduleMode: pendingProgramCreation?.scheduleMode ?? pendingProgramContinuation?.scheduleMode,
       programDays: pendingProgramCreation?.programDays ?? pendingProgramContinuation?.programDays,
+      introductoryWeek1: pendingProgramCreation !== null
+        || (pendingProgramContinuation !== null && pendingProgramContinuation.sequenceIndex === 1),
     });
     // Session-time contract: a block whose sessions cannot fit preparation,
     // rest and changeovers inside the session limit is not committed. The
@@ -5137,10 +5477,19 @@ export const useStore = create<KineticsStore>()((set, get) => {
           plannedBlockCount: programDraft.preview.plannedBlockCount,
           startingMacroBlockIndex: plan.macroBlockIndex, // R3: rotation, not the date
           schemaType,
-          days: programDraft.preview.days,
+          days: programDraft.preview.days.map((day) => ({
+            dayIndex: day.dayIndex,
+            focus: mapBaseProgramFocus(day.focus),
+          })),
           movementPreferences: programDraft.input.movementPreferences ?? [],
           weeklyFrequency: programDraft.preview.days.length,
           now: Date.now(),
+        });
+        writeProgramAdvancedControl(d, programId, {
+          scheduleMode: programDraft.scheduleMode,
+          days: programDraft.preview.days,
+          slotOverrides: programDraft.slotOverrides,
+          routineAssignments: programDraft.routineAssignments,
         });
         // Review (PR 194): the chosen session length is written in the same
         // transaction as the program, so a stop between two commits can no
@@ -5204,13 +5553,20 @@ export const useStore = create<KineticsStore>()((set, get) => {
         );
       }
       for (const s of plan.sessions) {
+        const baseSessionFocus = mapBaseProgramFocus(s.focus);
         d.executeSync(
           'INSERT INTO planned_session (block_id, week_index, day_index, focus, phase, session_date) VALUES (?, ?, ?, ?, ?, ?)',
-          [blockId, s.week_index, s.day_index, s.focus, s.phase, s.session_date],
+          [blockId, s.week_index, s.day_index, baseSessionFocus, s.phase, s.session_date],
         );
         const sessionId = rowsOf<{ id: number }>(
           d.executeSync('SELECT last_insert_rowid() AS id'),
         )[0]!.id;
+        if (s.focus !== baseSessionFocus) {
+          d.executeSync(
+            'INSERT INTO planned_session_focus_ext (planned_session_id, focus) VALUES (?, ?)',
+            [sessionId, s.focus],
+          );
+        }
         insertPlannedSlots(d, sessionId, s.slots, { movements, declaredIntents, profile });
       }
       d.executeSync('COMMIT');
@@ -5273,11 +5629,18 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const row = rowsOf<{
       week_index: number; day_index: number; focus: string; phase: string; session_date: string;
     }>(d.executeSync(
-      'SELECT week_index, day_index, focus, phase, session_date FROM planned_session WHERE planned_session_id = ?',
+      `SELECT ps.week_index, ps.day_index, COALESCE(psfe.focus, ps.focus) AS focus, ps.phase, ps.session_date
+         FROM planned_session ps
+         LEFT JOIN planned_session_focus_ext psfe ON psfe.planned_session_id = ps.planned_session_id
+        WHERE ps.planned_session_id = ?`,
       [plan.plannedSessionId],
     ))[0];
     const meta = rowsOf<{ macro_block_index: number; schema_type: string }>(d.executeSync(
       'SELECT macro_block_index, schema_type FROM block_meta WHERE block_id = ?',
+      [state.block.blockId],
+    ))[0];
+    const blockProgramRow = rowsOf<{ sequence_index: number }>(d.executeSync(
+      'SELECT sequence_index FROM training_block_program WHERE block_id = ?',
       [state.block.blockId],
     ))[0];
     if (row === undefined || meta === undefined) {
@@ -5286,13 +5649,13 @@ export const useStore = create<KineticsStore>()((set, get) => {
     }
     const program = state.program;
     const programDays: ProgramDayPreference[] | undefined = program?.status === 'active'
-      ? program.days.map((day) => ({
-          day_index: day.dayIndex,
-          focus: day.focus as ProgramDayPreference['focus'],
-          movement_preferences: program.movementPreferences
-            .filter((p) => p.dayIndex === day.dayIndex)
-            .map((p) => ({ slot_index: p.slotIndex, pattern: p.pattern, movement_id: p.movementId })),
-        }))
+      ? buildProgramDayPreferences(
+          program.days,
+          program.movementPreferences,
+          program.slotOverrides,
+          program.routineAssignments,
+          readRoutineAssignmentMap(d, program.routineAssignments),
+        )
       : undefined;
     // The same generator and the same inputs a block generation uses, run on
     // the block's own start date. Only today's day is taken from the result.
@@ -5301,7 +5664,10 @@ export const useStore = create<KineticsStore>()((set, get) => {
       const { plan: generated } = generateBlockFromStoredState({
         d, profile: state.profile, movements: state.movements, niggles: state.niggles,
         priorExperience, today: localToday(), startDate: state.block.startDate,
-        schemaType: meta.schema_type as SchemaType, macroBlockIndex: meta.macro_block_index, programDays,
+        schemaType: meta.schema_type as SchemaType, macroBlockIndex: meta.macro_block_index,
+        ...(program?.status === 'active' ? { scheduleMode: program.scheduleMode } : {}),
+        programDays,
+        introductoryWeek1: blockProgramRow?.sequence_index === 1,
       });
       if (generated.timeBudget.conflicts.length > 0) {
         set({ error: generated.timeBudget.conflicts.join(' ') });
@@ -5386,7 +5752,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
       focus: string; phase: string; session_date: string; slot_count: number;
       completion_status: string | null;
     }>(d.executeSync(
-      `SELECT ps.planned_session_id, ps.week_index, ps.day_index, ps.focus, ps.phase,
+      `SELECT ps.planned_session_id, ps.week_index, ps.day_index,
+              COALESCE(psfe.focus, ps.focus) AS focus, ps.phase,
               ps.session_date, count(sl.planned_slot_id) AS slot_count,
               CASE
                 WHEN EXISTS (
@@ -5404,6 +5771,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
                 ELSE NULL
               END AS completion_status
        FROM planned_session ps
+       LEFT JOIN planned_session_focus_ext psfe ON psfe.planned_session_id = ps.planned_session_id
        LEFT JOIN planned_slot sl ON sl.planned_session_id = ps.planned_session_id
        WHERE ps.block_id = ?
        GROUP BY ps.planned_session_id
@@ -5480,7 +5848,11 @@ export const useStore = create<KineticsStore>()((set, get) => {
       return;
     }
     const days = rowsOf<{ day_index: number; focus: string }>(d.executeSync(
-      'SELECT day_index, focus FROM training_program_day WHERE program_id = ? ORDER BY day_index',
+      `SELECT tpd.day_index, COALESCE(tpdfe.focus, tpd.focus) AS focus
+         FROM training_program_day tpd
+         LEFT JOIN training_program_day_focus_ext tpdfe
+           ON tpdfe.program_id = tpd.program_id AND tpdfe.day_index = tpd.day_index
+        WHERE tpd.program_id = ? ORDER BY tpd.day_index`,
       [row.program_id],
     )).map((day) => ({ dayIndex: day.day_index, focus: day.focus }));
     const movementPreferences = rowsOf<{
@@ -5494,12 +5866,59 @@ export const useStore = create<KineticsStore>()((set, get) => {
       dayIndex: preference.day_index, slotIndex: preference.slot_index,
       pattern: preference.pattern, movementId: preference.movement_id,
     }));
+    const scheduleModeRow = rowsOf<{ mode: ProgramScheduleMode }>(d.executeSync(
+      'SELECT mode FROM training_program_schedule_mode WHERE program_id = ?',
+      [row.program_id],
+    ))[0];
+    // Pre-078 legacy programs keep relative offset semantics unless explicitly updated.
+    const scheduleMode: ProgramScheduleMode = scheduleModeRow?.mode ?? 'relative_day_index';
+    const slotOverrides = rowsOf<{
+      day_index: number; slot_index: number; sets: number | null; reps: number | null; target_rpe: number | null;
+    }>(d.executeSync(
+      `SELECT day_index, slot_index, sets, reps, target_rpe
+         FROM training_program_slot_override
+        WHERE program_id = ? ORDER BY day_index, slot_index`,
+      [row.program_id],
+    )).map((ov) => ({
+      dayIndex: ov.day_index,
+      slotIndex: ov.slot_index,
+      ...(ov.sets !== null ? { sets: ov.sets } : {}),
+      ...(ov.reps !== null ? { reps: ov.reps } : {}),
+      ...(ov.target_rpe !== null ? { targetRpe: ov.target_rpe } : {}),
+    }));
+    const routineAssignmentRows = rowsOf<{
+      day_index: number; routine_template_id: number; routine_day_index: number; routine_name: string;
+    }>(d.executeSync(
+      `SELECT tpdr.day_index, tpdr.routine_template_id, tpdr.routine_day_index, rt.name AS routine_name
+         FROM training_program_day_routine tpdr
+         JOIN routine_template rt ON rt.routine_template_id = tpdr.routine_template_id
+        WHERE tpdr.program_id = ? ORDER BY tpdr.day_index`,
+      [row.program_id],
+    ));
+    const routineByProgramDay = new Map(routineAssignmentRows.map((ra) => [
+      ra.day_index,
+      {
+        routineTemplateId: ra.routine_template_id,
+        routineDayIndex: ra.routine_day_index,
+        routineName: ra.routine_name,
+      },
+    ]));
+    const routineAssignments = routineAssignmentRows.map((ra) => ({
+      dayIndex: ra.day_index,
+      routineTemplateId: ra.routine_template_id,
+      routineDayIndex: ra.routine_day_index,
+    }));
+    const daysWithRoutines: TrainingProgramDay[] = days.map((day) => {
+      const assignment = routineByProgramDay.get(day.dayIndex);
+      return assignment === undefined ? day : { ...day, routineAssignment: assignment };
+    });
     set({ program: {
       programId: row.program_id, objective: row.objective as UserProfile['objective'], startDate: row.start_date,
       horizonKind: row.horizon_kind, requestedReviewDate: row.requested_review_date,
       plannedEndDate: row.planned_end_date, plannedBlockCount: row.planned_block_count,
       startingMacroBlockIndex: row.starting_macro_block_index, schemaType: row.schema_type,
-      status: row.status, currentSequenceIndex: row.current_sequence_index, days, movementPreferences,
+      status: row.status, currentSequenceIndex: row.current_sequence_index,
+      scheduleMode, days: daysWithRoutines, movementPreferences, slotOverrides, routineAssignments,
     } });
   },
 
@@ -5533,7 +5952,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
         d.executeSync('DELETE FROM training_program_day WHERE program_id = ?', [current.programId]);
         for (const day of preview.days) {
           d.executeSync('INSERT INTO training_program_day (program_id, day_index, focus) VALUES (?, ?, ?)',
-            [current.programId, day.dayIndex, day.focus]);
+            [current.programId, day.dayIndex, mapBaseProgramFocus(day.focus)]);
         }
         for (const preference of input.movementPreferences ?? []) {
           d.executeSync(
@@ -5542,6 +5961,12 @@ export const useStore = create<KineticsStore>()((set, get) => {
             [current.programId, preference.dayIndex, preference.slotIndex, preference.pattern, preference.movementId],
           );
         }
+        writeProgramAdvancedControl(d, current.programId, {
+          scheduleMode: preview.scheduleMode,
+          days: preview.days,
+          slotOverrides: preview.slotOverrides,
+          routineAssignments: preview.routineAssignments,
+        });
         d.executeSync('UPDATE athlete_profile SET weekly_frequency = ?, updated_at_ms = ? WHERE profile_id = 1',
           [preview.days.length, now]);
         d.executeSync('COMMIT');
@@ -5566,7 +5991,9 @@ export const useStore = create<KineticsStore>()((set, get) => {
         || current.currentSequenceIndex >= current.plannedBlockCount) return null;
     const input: TrainingProgramInput = {
       horizon: { kind: 'weeks', blockCount: current.plannedBlockCount },
-      schemaType: current.schemaType, dayIndices: current.days.map((day) => day.dayIndex),
+      schemaType: current.schemaType,
+      scheduleMode: current.scheduleMode,
+      dayIndices: current.days.map((day) => day.dayIndex),
       // The saved focuses, as continuation uses them: without them the preview
       // would plan each day on the default focus and show a different week.
       days: current.days,
@@ -5574,6 +6001,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
       // profile change) are left out as continuation leaves them out, so the
       // review button cannot throw on old data.
       movementPreferences: current.movementPreferences,
+      slotOverrides: current.slotOverrides,
+      routineAssignments: current.routineAssignments,
       keepPlaceablePreferencesOnly: true,
     };
     return get().previewTrainingProgram(input).plan;
@@ -5616,12 +6045,14 @@ export const useStore = create<KineticsStore>()((set, get) => {
       get().refreshProgram();
       return;
     }
-    const programDays: ProgramDayPreference[] = current.days.map((day) => ({
-      day_index: day.dayIndex, focus: day.focus as ProgramDayPreference['focus'],
-      movement_preferences: current.movementPreferences.filter((p) => p.dayIndex === day.dayIndex).map((p) => ({
-        slot_index: p.slotIndex, pattern: p.pattern, movement_id: p.movementId,
-      })),
-    }));
+    const routineByDayKey = readRoutineAssignmentMap(d, current.routineAssignments);
+    const programDays = buildProgramDayPreferences(
+      current.days,
+      current.movementPreferences,
+      current.slotOverrides,
+      current.routineAssignments,
+      routineByDayKey,
+    );
     const nextSequence = current.currentSequenceIndex + 1;
     const remainingBlocks = current.plannedBlockCount - current.currentSequenceIndex;
     pendingProgramContinuation = {
@@ -5629,7 +6060,9 @@ export const useStore = create<KineticsStore>()((set, get) => {
       startingMacroBlockIndex: current.startingMacroBlockIndex,
       plannedEndDate: addDaysIso(localToday(), remainingBlocks * 28),
       objective: current.objective,
-      programDays, weeklyFrequency: current.days.length,
+      programDays,
+      scheduleMode: current.scheduleMode,
+      weeklyFrequency: current.days.length,
     };
     try {
       set({ error: null });
@@ -5917,6 +6350,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       throw error;
     }
     get().loadRoutineTemplates();
+    get().refreshProgram();
   },
 
   freezeRoutineTemplateToPlannedSession: (routineTemplateId, sessionDate, routineDayIndex = 1) => {
@@ -6645,6 +7079,9 @@ export const useStore = create<KineticsStore>()((set, get) => {
       target_kind: string | null; target_reps: number | null; target_seconds: number | null;
       override_load_kg: number | null; override_reason: string | null;
       autopilot_rpe_delta: number | null; autopilot_set_delta: number | null; autopilot_reason: AutopilotAttributionReason | null;
+      athlete_override_source: 'slot_override' | 'routine_assignment' | null;
+      athlete_override_mrv: number | null;
+      athlete_override_above_mrv: number | null;
       routine_role: RoutineRole | null; lift_family: string | null;
       stress_purpose: RoutineStressPurpose | null; stress_coefficient: number | null;
       equivalent_volume: number | null; stress_dose: number | null;
@@ -6654,6 +7091,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
               sl.sets, sl.reps, sl.target_rpe,
               st.target_kind, st.target_reps, st.target_seconds,
               pa.rpe_delta AS autopilot_rpe_delta, pa.set_delta AS autopilot_set_delta, pa.reason AS autopilot_reason,
+              ao.source AS athlete_override_source, ao.mrv_ceiling_sets AS athlete_override_mrv, ao.above_mrv AS athlete_override_above_mrv,
               so.target_load_kg AS override_load_kg, so.reason AS override_reason,
               rd.role AS routine_role, rd.lift_family, rd.stress_purpose,
               rd.stress_coefficient, rd.equivalent_volume, rd.stress_dose,
@@ -6662,6 +7100,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
        JOIN movement m ON m.movement_id = sl.movement_id
        LEFT JOIN planned_slot_target st ON st.planned_slot_id = sl.planned_slot_id
        LEFT JOIN planned_slot_autopilot pa ON pa.planned_slot_id = sl.planned_slot_id
+       LEFT JOIN planned_slot_athlete_override ao ON ao.planned_slot_id = sl.planned_slot_id
        LEFT JOIN slot_override so ON so.planned_slot_id = sl.planned_slot_id
        LEFT JOIN planned_slot_routine_decision rd ON rd.planned_slot_id = sl.planned_slot_id
        WHERE sl.planned_session_id = ?
@@ -6684,6 +7123,11 @@ export const useStore = create<KineticsStore>()((set, get) => {
         rpeDelta: sl.autopilot_rpe_delta ?? 0,
         setDelta: sl.autopilot_set_delta ?? 0,
         reason: sl.autopilot_reason,
+      },
+      athleteOverride: sl.athlete_override_source === null ? undefined : {
+        source: sl.athlete_override_source,
+        mrvCeilingSets: sl.athlete_override_mrv,
+        aboveMrv: sl.athlete_override_above_mrv === 1,
       },
       routineDecision: sl.routine_role === null ? undefined : {
         role: sl.routine_role,
@@ -6761,7 +7205,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
          FROM session s
          JOIN session_origin so ON so.session_id = s.session_id
          JOIN planned_session ps ON ps.planned_session_id = so.source_planned_session_id
-        WHERE ps.focus = ?
+         LEFT JOIN planned_session_focus_ext psfe ON psfe.planned_session_id = ps.planned_session_id
+        WHERE COALESCE(psfe.focus, ps.focus) = ?
           AND s.duration_min IS NOT NULL
         ORDER BY s.session_id DESC
         LIMIT ?`,
@@ -9186,7 +9631,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
           + ' + (SELECT count(*) FROM session_preparation)'
           + ' + (SELECT count(*) FROM block_emphasis) AS c';
         had = rowsOf<{ c: number }>(d.executeSync(
-          'SELECT (SELECT count(*) FROM history_import_capability_evidence) + (SELECT count(*) FROM history_import_set) + (SELECT count(*) FROM history_import_session) + (SELECT count(*) FROM history_import) + (SELECT count(*) FROM import_readiness_daily) + (SELECT count(*) FROM bodyweight_daily) + (SELECT count(*) FROM movement_capability_attestation) + (SELECT count(*) FROM movement_prior_experience) + (SELECT count(*) FROM capability_session_evidence) + (SELECT count(*) FROM set_target) + (SELECT count(*) FROM session_runner_checkpoint) + (SELECT count(*) FROM session_slot_target) + (SELECT count(*) FROM planned_slot_disposition) + (SELECT count(*) FROM planned_slot_autopilot) + (SELECT count(*) FROM planned_slot_legacy_role_allowance) + (SELECT count(*) FROM planned_slot_routine_decision) + (SELECT count(*) FROM planned_slot_target) + (SELECT count(*) FROM planned_slot_load_intent) + (SELECT count(*) FROM planned_session_routine_context) + (SELECT count(*) FROM planned_session_method) + (SELECT count(*) FROM session_plan_slot) + (SELECT count(*) FROM session_origin) + (SELECT count(*) FROM set_prefix) + (SELECT count(*) FROM set_metric) + (SELECT count(*) FROM set_record) + (SELECT count(*) FROM set_dose_target) + (SELECT count(*) FROM session_note) + (SELECT count(*) FROM session_feel) + (SELECT count(*) FROM session_feel_extra_reason) + (SELECT count(*) FROM question_log) + (SELECT count(*) FROM report_severity) + (SELECT count(*) FROM slot_override) + (SELECT count(*) FROM planned_slot) + (SELECT count(*) FROM planned_session) + (SELECT count(*) FROM block_meta) + (SELECT count(*) FROM suspension_episode WHERE ended_at_ms IS NULL) + (SELECT count(*) FROM training_program_movement_preference) + (SELECT count(*) FROM training_program_day) + (SELECT count(*) FROM training_block_program) + (SELECT count(*) FROM training_program) + (SELECT count(*) FROM session) + (SELECT count(*) FROM session_outcome) + (SELECT count(*) FROM micro_cycle) + (SELECT count(*) FROM macro_cycle) + (SELECT count(*) FROM training_block) + (SELECT count(*) FROM suspension_episode_program) + (SELECT count(*) FROM block_suspension_origin) + (SELECT count(*) FROM subjective_report) + (SELECT count(*) FROM niggle) + (SELECT count(*) FROM one_rep_max) + (SELECT count(*) FROM return_checkin_ack) + (SELECT count(*) FROM hrv_daily) + (SELECT count(*) FROM resting_hr_daily) + (SELECT count(*) FROM sleep_daily) + (SELECT count(*) FROM spo2_daily) + (SELECT count(*) FROM spo2_sample) + (SELECT count(*) FROM mech_daily) + (SELECT count(*) FROM state_vector) AS c',
+          'SELECT (SELECT count(*) FROM history_import_capability_evidence) + (SELECT count(*) FROM history_import_set) + (SELECT count(*) FROM history_import_session) + (SELECT count(*) FROM history_import) + (SELECT count(*) FROM import_readiness_daily) + (SELECT count(*) FROM bodyweight_daily) + (SELECT count(*) FROM movement_capability_attestation) + (SELECT count(*) FROM movement_prior_experience) + (SELECT count(*) FROM capability_session_evidence) + (SELECT count(*) FROM set_target) + (SELECT count(*) FROM session_runner_checkpoint) + (SELECT count(*) FROM session_slot_target) + (SELECT count(*) FROM planned_slot_disposition) + (SELECT count(*) FROM planned_slot_autopilot) + (SELECT count(*) FROM planned_slot_athlete_override) + (SELECT count(*) FROM planned_slot_legacy_role_allowance) + (SELECT count(*) FROM planned_slot_routine_decision) + (SELECT count(*) FROM planned_slot_target) + (SELECT count(*) FROM planned_slot_load_intent) + (SELECT count(*) FROM planned_session_routine_context) + (SELECT count(*) FROM planned_session_method) + (SELECT count(*) FROM planned_session_focus_ext) + (SELECT count(*) FROM session_plan_slot) + (SELECT count(*) FROM session_origin) + (SELECT count(*) FROM set_prefix) + (SELECT count(*) FROM set_metric) + (SELECT count(*) FROM set_record) + (SELECT count(*) FROM set_dose_target) + (SELECT count(*) FROM session_note) + (SELECT count(*) FROM session_feel) + (SELECT count(*) FROM session_feel_extra_reason) + (SELECT count(*) FROM question_log) + (SELECT count(*) FROM report_severity) + (SELECT count(*) FROM slot_override) + (SELECT count(*) FROM planned_slot) + (SELECT count(*) FROM planned_session) + (SELECT count(*) FROM block_meta) + (SELECT count(*) FROM suspension_episode WHERE ended_at_ms IS NULL) + (SELECT count(*) FROM training_program_day_routine) + (SELECT count(*) FROM training_program_slot_override) + (SELECT count(*) FROM training_program_day_focus_ext) + (SELECT count(*) FROM training_program_schedule_mode) + (SELECT count(*) FROM training_program_movement_preference) + (SELECT count(*) FROM training_program_day) + (SELECT count(*) FROM training_block_program) + (SELECT count(*) FROM training_program) + (SELECT count(*) FROM session) + (SELECT count(*) FROM session_outcome) + (SELECT count(*) FROM micro_cycle) + (SELECT count(*) FROM macro_cycle) + (SELECT count(*) FROM training_block) + (SELECT count(*) FROM suspension_episode_program) + (SELECT count(*) FROM block_suspension_origin) + (SELECT count(*) FROM subjective_report) + (SELECT count(*) FROM niggle) + (SELECT count(*) FROM one_rep_max) + (SELECT count(*) FROM return_checkin_ack) + (SELECT count(*) FROM hrv_daily) + (SELECT count(*) FROM resting_hr_daily) + (SELECT count(*) FROM sleep_daily) + (SELECT count(*) FROM spo2_daily) + (SELECT count(*) FROM spo2_sample) + (SELECT count(*) FROM mech_daily) + (SELECT count(*) FROM state_vector) AS c',
         ))[0];
         hadModuleTables = rowsOf<{ c: number }>(d.executeSync(moduleTablesCountSql))[0];
         d.executeSync('BEGIN');
@@ -9216,6 +9661,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       d.executeSync('DELETE FROM session_slot_target');
       d.executeSync('DELETE FROM planned_slot_disposition');
       d.executeSync('DELETE FROM planned_slot_autopilot');
+      d.executeSync('DELETE FROM planned_slot_athlete_override');
       d.executeSync('DELETE FROM planned_slot_legacy_role_allowance');
       d.executeSync('DELETE FROM planned_slot_routine_decision');
       d.executeSync('DELETE FROM planned_slot_target');
@@ -9231,6 +9677,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       d.executeSync('DELETE FROM planned_slot_load_intent');
       d.executeSync('DELETE FROM planned_session_routine_context');
       d.executeSync('DELETE FROM planned_session_method');
+      d.executeSync('DELETE FROM planned_session_focus_ext');
       // 071 records, each before its parent. Named explicitly for the reason
       // given for preparation above: ids are reused once the parent is empty,
       // and an orphan surviving an FK-OFF reset would attach an old record to
@@ -9275,6 +9722,10 @@ export const useStore = create<KineticsStore>()((set, get) => {
       // 059 side-cars cascade from their OWN episode rather than being carried
       // off by a program or block parent.
       d.executeSync('DELETE FROM suspension_episode WHERE ended_at_ms IS NULL');
+      d.executeSync('DELETE FROM training_program_day_routine');
+      d.executeSync('DELETE FROM training_program_slot_override');
+      d.executeSync('DELETE FROM training_program_day_focus_ext');
+      d.executeSync('DELETE FROM training_program_schedule_mode');
       d.executeSync('DELETE FROM training_program_movement_preference');
       d.executeSync('DELETE FROM training_program_day');
       d.executeSync('DELETE FROM training_block_program');
@@ -9426,10 +9877,11 @@ export const useStore = create<KineticsStore>()((set, get) => {
         `SELECT so.session_id, so.outcome_kind, so.finalized_at_ms, so.origin_kind,
                 (SELECT COUNT(DISTINCT sr.movement_id) FROM set_record sr WHERE sr.session_id = so.session_id) AS exercise_count,
                 so.logged_set_count,
-                (SELECT MIN(ps.focus) FROM set_record sr
+                (SELECT MIN(COALESCE(psfe.focus, ps.focus)) FROM set_record sr
                    JOIN set_target st ON st.set_id = sr.set_id
                    JOIN planned_slot pl ON pl.planned_slot_id = st.source_planned_slot_id
                    JOIN planned_session ps ON ps.planned_session_id = pl.planned_session_id
+                   LEFT JOIN planned_session_focus_ext psfe ON psfe.planned_session_id = ps.planned_session_id
                   WHERE sr.session_id = so.session_id) AS focus
            FROM session_outcome so
           ORDER BY so.finalized_at_ms DESC LIMIT ?`,
@@ -9556,13 +10008,18 @@ const generateBlockFromStoredState = (args: {
   startDate: string;
   schemaType: SchemaType;
   macroBlockIndex: number;
+  scheduleMode?: ProgramScheduleMode;
   programDays: ProgramDayPreference[] | undefined;
+  introductoryWeek1?: boolean;
 }): {
   plan: BlockPlan;
   suspensionBeforeGeneration: ReturnType<typeof openSuspension>;
   blockEmphasisInput: ProgramEmphasis | null;
 } => {
-  const { d, profile, movements, niggles, priorExperience, today, startDate, schemaType, macroBlockIndex, programDays } = args;
+  const {
+    d, profile, movements, niggles, priorExperience, today, startDate,
+    schemaType, macroBlockIndex, scheduleMode, programDays, introductoryWeek1,
+  } = args;
   const safetyExcluded = safetyExcludedMovementIdsFor(movements, profile, niggles);
   const capabilityAvailableWeightRoom = capabilityAvailableMovementIds(
     d, movements, profile, 'weight_room', priorExperience, safetyExcluded,
@@ -9574,6 +10031,12 @@ const generateBlockFromStoredState = (args: {
   // OW-001: the athlete's own declarations, read once and threaded in.
   const declaredIntents = readMovementLoadIntents(d);
   const powerNamesGenerate = powerPreferredMovementNames(d);
+  const longitudinalControl = readLongitudinalControlContext(d, {
+    profile,
+    movements,
+    macroBlockIndex,
+    introductoryWeek1,
+  });
   const genMovements: GeneratorMovement[] = movements.map((m) => ({
     movement_id: m.movement_id,
     name: m.name,
@@ -9684,8 +10147,10 @@ const generateBlockFromStoredState = (args: {
     schemaType,
     macroBlockIndex,
     autopilotRpeRaisePermitted: suspensionBeforeGeneration === null,
+    ...(scheduleMode === undefined ? {} : { scheduleMode }),
     programDays,
     flawReport,
+    longitudinalControl,
     powerPreferredMovementNames: powerNamesGenerate,
     ...(blockEmphasisInput === null ? {} : { emphasis: blockEmphasisInput }),
   });
@@ -9769,6 +10234,18 @@ const insertPlannedSlots = (
       d.executeSync(
         'INSERT INTO planned_slot_autopilot (planned_slot_id, rpe_delta, set_delta, reason) VALUES (?, ?, ?, ?)',
         [plannedSlotId, sl.autopilotDelta.rpe_delta, sl.autopilotDelta.set_delta, sl.autopilotDelta.reason],
+      );
+    }
+    if (sl.athleteOverride !== undefined) {
+      d.executeSync(
+        `INSERT INTO planned_slot_athlete_override (planned_slot_id, source, mrv_ceiling_sets, above_mrv)
+         VALUES (?, ?, ?, ?)`,
+        [
+          plannedSlotId,
+          sl.athleteOverride.source,
+          sl.athleteOverride.mrv_ceiling_sets,
+          sl.athleteOverride.above_mrv ? 1 : 0,
+        ],
       );
     }
     d.executeSync(

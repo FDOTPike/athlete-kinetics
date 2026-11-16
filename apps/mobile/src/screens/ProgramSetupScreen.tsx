@@ -27,18 +27,28 @@ import { EmphasisReportCard } from '../components/EmphasisReportCard';
 import { programChoiceDisclosure, recommendedProgramDefaults } from '../state/programDefaults';
 import { anchorDisplayName, priorExperienceWouldClear } from '../state/priorExperience';
 import { blockWeekTotals, describeBlockWeek } from '../state/blockWeekChanges';
+import { sessionFocusName } from '../state/sessionSummary';
 import {
   REASON_TEXT_MAP,
   useStore,
+  type RoutineTemplate,
   type TrainingProgramDay,
+  type TrainingProgramDayRoutineAssignment,
   type TrainingProgramInput,
   type TrainingProgramMovementPreference,
+  type TrainingProgramSlotOverride,
 } from '../state/useStore';
+
+const EMPTY_ROUTINES: readonly RoutineTemplate[] = [];
 
 const FOCUS_SPLIT_WORD: Record<BlockFocus, string> = {
   lower: 'lower-body',
   upper: 'upper-body',
   full: 'full-body',
+  push: 'push',
+  pull: 'pull',
+  legs: 'legs',
+  accessories: 'accessories',
   conditioning: 'conditioning',
   bjj: 'BJJ',
 };
@@ -84,19 +94,13 @@ const SCHEMA_LABEL: Record<SchemaType, string> = {
   LINEAR: 'Linear', WAVE: 'Undulating', STEP: 'Step loading', APRE: 'Autoregulated',
 };
 
-const WEEKDAY_NAME = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const ISO_WEEKDAY_SHORT = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 
 /**
- * #228: a training day as the athlete reads it. Day 1 is the day the program
- * starts, so with a known start date each day carries its weekday
- * ("Day 1, Saturday"); without one it is "Day 1".
+ * #228 Q3: explicit fixed Mon–Sun ISO weekday labels (1 = Mon .. 7 = Sun).
  */
-export const programDayLabel = (dayIndex: number, dayOneIso: string | null): string => {
-  const dayOneMs = dayOneIso === null ? Number.NaN : Date.parse(`${dayOneIso}T00:00:00Z`);
-  if (!Number.isFinite(dayOneMs)) return `Day ${dayIndex}`;
-  const weekday = new Date(dayOneMs + (dayIndex - 1) * 86_400_000).getUTCDay();
-  return `Day ${dayIndex}, ${WEEKDAY_NAME[weekday]}`;
-};
+export const programDayLabel = (dayIndex: number, _dayOneIso: string | null = null): string =>
+  ISO_WEEKDAY_SHORT[dayIndex] ?? `Day ${dayIndex}`;
 
 interface ProgramSetupScreenProps {
   editing?: boolean;
@@ -121,7 +125,11 @@ export default function ProgramSetupScreen({
   const movementAvailabilityRevision = useStore((s) => s.movementAvailabilityRevision);
   const confirmMovementPriorExperience = useStore((s) => s.confirmMovementPriorExperience);
   const activePriorExperienceMovementIds = useStore((s) => s.activePriorExperienceMovementIds);
+  const routineTemplates = useStore((s) => s.routineTemplates ?? EMPTY_ROUTINES);
   const storeError = useStore((s) => s.error);
+
+  const canCustomizeAdvanced = profile.training_age !== 'beginner';
+  const effectiveRpeCap = Math.min(profile.base_rpe_cap, profile.objective === 'rehab' ? 7.0 : 10.0);
 
   const initialFrequency = program?.days.length ?? profile.weekly_frequency;
   // W2: every programming control now OPENS on a disclosed coach default
@@ -130,7 +138,13 @@ export default function ProgramSetupScreen({
   // over the recommendation when editing.
   const recommended = useMemo(() => recommendedProgramDefaults(profile), [profile]);
   const [buildMode, setBuildMode] = useState<'coach' | 'custom'>(
-    editing && (program?.movementPreferences.length ?? 0) > 0 ? 'custom' : recommended.buildMode,
+    editing && (
+      (program?.movementPreferences.length ?? 0) > 0
+      || (program?.slotOverrides?.length ?? 0) > 0
+      || (program?.routineAssignments?.length ?? 0) > 0
+    )
+      ? 'custom'
+      : recommended.buildMode,
   );
   const [horizonKind, setHorizonKind] = useState<'weeks' | 'date'>(
     editing ? (program?.horizonKind ?? recommended.horizonKind) : recommended.horizonKind,
@@ -166,6 +180,12 @@ export default function ProgramSetupScreen({
   const [preferences, setPreferences] = useState<TrainingProgramMovementPreference[]>(() =>
     program?.movementPreferences ?? [],
   );
+  const [slotOverrides, setSlotOverrides] = useState<TrainingProgramSlotOverride[]>(() =>
+    program?.slotOverrides ?? [],
+  );
+  const [routineAssignments, setRoutineAssignments] = useState<TrainingProgramDayRoutineAssignment[]>(() =>
+    program?.routineAssignments ?? [],
+  );
   const [localError, setLocalError] = useState<string | null>(null);
   // Android walk 2026-11-03 (W1-4): a session length the athlete picked from
   // the plan's own offers. It is a draft until Create program saves it; Cancel
@@ -175,6 +195,27 @@ export default function ProgramSetupScreen({
     () => (sessionCapOverride === null ? profile : { ...profile, session_duration_cap_min: sessionCapOverride }),
     [profile, sessionCapOverride],
   );
+
+  const routineDayOptions = useMemo(() => {
+    const options: {
+      key: string;
+      routineTemplateId: number;
+      routineDayIndex: number;
+      label: string;
+    }[] = [];
+    for (const template of routineTemplates) {
+      const days = [...new Set(template.slots.map((s) => s.dayIndex))].sort((a, b) => a - b);
+      for (const routineDayIndex of days) {
+        options.push({
+          key: `${template.routineTemplateId}:${routineDayIndex}`,
+          routineTemplateId: template.routineTemplateId,
+          routineDayIndex,
+          label: `${template.name} · Day ${routineDayIndex}`,
+        });
+      }
+    }
+    return options;
+  }, [routineTemplates]);
 
   const input = useMemo<TrainingProgramInput | null>(() => {
     // Only ONE way to be incomplete survives: choosing the Date horizon and not
@@ -191,12 +232,19 @@ export default function ProgramSetupScreen({
         ? { kind: 'weeks', blockCount }
         : { kind: 'date', requestedReviewDate: reviewDate.trim() },
       schemaType,
+      scheduleMode: 'iso_weekday',
       dayIndices,
       days,
       movementPreferences: buildMode === 'custom' ? preferences : [],
+      slotOverrides: buildMode === 'custom' && canCustomizeAdvanced ? slotOverrides : [],
+      routineAssignments: buildMode === 'custom' && canCustomizeAdvanced ? routineAssignments : [],
       ...(sessionCapOverride === null ? {} : { sessionDurationCapMin: sessionCapOverride }),
     };
-  }, [horizonKind, schemaType, buildMode, blockCount, reviewDate, dayIndices, preferences, dayFocuses, profile.objective, sessionCapOverride]);
+  }, [
+    horizonKind, schemaType, buildMode, blockCount, reviewDate, dayIndices,
+    preferences, slotOverrides, routineAssignments, canCustomizeAdvanced,
+    dayFocuses, profile.objective, sessionCapOverride,
+  ]);
 
   const previewResult = useMemo(() => {
     if (input === null) return { preview: null, error: null };
@@ -224,6 +272,8 @@ export default function ProgramSetupScreen({
       : [...dayIndices, day].sort((a, b) => a - b);
     setDayIndices(nextDays);
     setPreferences((current) => current.filter((preference) => preference.dayIndex !== day));
+    setSlotOverrides((current) => current.filter((ov) => ov.dayIndex !== day));
+    setRoutineAssignments((current) => current.filter((ra) => ra.dayIndex !== day));
     setDayFocuses((current) => {
       const updated = { ...current };
       const defaultFocuses = programFocuses(profile.objective, nextDays.length);
@@ -246,6 +296,7 @@ export default function ProgramSetupScreen({
       [dayIndex]: focus,
     }));
     setPreferences((current) => current.filter((preference) => preference.dayIndex !== dayIndex));
+    setSlotOverrides((current) => current.filter((ov) => ov.dayIndex !== dayIndex));
   };
 
   const chooseMovement = (dayIndex: number, slotIndex: number, pattern: TrainingProgramMovementPreference['pattern'], movementId: number): void => {
@@ -253,6 +304,42 @@ export default function ProgramSetupScreen({
       ...current.filter((item) => !(item.dayIndex === dayIndex && item.slotIndex === slotIndex)),
       { dayIndex, slotIndex, pattern, movementId },
     ]);
+  };
+
+  const updateSlotOverride = (
+    dayIndex: number,
+    slotIndex: number,
+    patch: { sets?: number; reps?: number; targetRpe?: number },
+  ): void => {
+    if (!canCustomizeAdvanced) return;
+    setSlotOverrides((current) => {
+      const existing = current.find((item) => item.dayIndex === dayIndex && item.slotIndex === slotIndex);
+      const merged: TrainingProgramSlotOverride = {
+        dayIndex,
+        slotIndex,
+        ...(existing ?? {}),
+        ...patch,
+      };
+      return [
+        ...current.filter((item) => !(item.dayIndex === dayIndex && item.slotIndex === slotIndex)),
+        merged,
+      ];
+    });
+  };
+
+  const assignRoutineDay = (
+    dayIndex: number,
+    assignment: TrainingProgramDayRoutineAssignment | null,
+  ): void => {
+    if (!canCustomizeAdvanced) return;
+    setRoutineAssignments((current) => {
+      const filtered = current.filter((item) => item.dayIndex !== dayIndex);
+      return assignment === null ? filtered : [...filtered, assignment];
+    });
+    if (assignment !== null) {
+      setPreferences((current) => current.filter((item) => item.dayIndex !== dayIndex));
+      setSlotOverrides((current) => current.filter((item) => item.dayIndex !== dayIndex));
+    }
   };
 
   const confirm = (): void => {
@@ -272,6 +359,14 @@ export default function ProgramSetupScreen({
   // each one is defensive about a plan that is missing an optional array.
   // A throw here is a blank screen at exactly the worst moment.
   const weekOne = previewResult.preview?.plan?.sessions?.filter((session) => session.week_index === 1) ?? [];
+  const weekTwo = previewResult.preview?.plan?.sessions?.filter((session) => session.week_index === 2) ?? [];
+  const customizeSessions = useMemo(() => {
+    const merged = [...weekOne];
+    for (const s of weekTwo) {
+      if (!weekOne.some((w1) => w1.day_index === s.day_index)) merged.push(s);
+    }
+    return merged;
+  }, [weekOne, weekTwo]);
 
   // --- W3 disclosures: honest style, capacity, anchor coverage -------------
   // The athlete-facing style is the goal's honest meaning (WO §2.2), shown
@@ -333,7 +428,7 @@ export default function ProgramSetupScreen({
           draft.map((d) => (d.dayIndex === day.dayIndex ? { ...d, focus: candidate } : d)),
         );
         if (simulated === 3) {
-          fixes.push(`set ${dayLabel(day.dayIndex)}'s focus to ${candidate}`);
+          fixes.push(`set ${dayLabel(day.dayIndex)}'s focus to ${sessionFocusName(candidate)}`);
         }
       }
     }
@@ -417,6 +512,8 @@ export default function ProgramSetupScreen({
       setDayIndices(days);
       setDayFocuses(nextFocuses);
       setPreferences([]);
+      setSlotOverrides([]);
+      setRoutineAssignments([]);
     }
   };
   const alternativeLabel = (alternative: SessionTimeAlternative): string =>
@@ -464,6 +561,7 @@ export default function ProgramSetupScreen({
   // method") are gone because the decisions they policed now arrive with
   // disclosed defaults, not because the explanation was dropped. The one rule
   // that can still block is still explained, in the same live region.
+  const coachNotes = previewResult.preview?.plan?.coachNotes ?? [];
   const missingRequirement = useMemo<string | null>(() => {
     if (horizonKind === 'date' && reviewDate.trim() === '') return 'Enter a review date.';
     return null;
@@ -505,7 +603,7 @@ export default function ProgramSetupScreen({
           {weekOne.map((session) => (
             <View key={session.day_index} style={styles.session}>
               <Text style={styles.sessionTitle}>
-                {dayLabel(session.day_index)} · {session.focus}
+                {dayLabel(session.day_index)} · {sessionFocusName(session.focus)}
               </Text>
               {session.slots.map((slot) => {
                 const movement = movements.find((item) => item.movement_id === slot.movement_id);
@@ -516,6 +614,15 @@ export default function ProgramSetupScreen({
                 );
               })}
             </View>
+          ))}
+        </View>
+      )}
+
+      {coachNotes.length > 0 && (
+        <View style={styles.card} testID="program-coach-notes">
+          <Text style={styles.sectionTitle}>Coach notes</Text>
+          {coachNotes.map((note) => (
+            <Text key={note} style={styles.caption}>{note}</Text>
           ))}
         </View>
       )}
@@ -621,7 +728,11 @@ export default function ProgramSetupScreen({
           <Chip label="Coach build" selected={buildMode === 'coach'} onPress={() => setBuildMode('coach')} />
           <Chip label="Customize" selected={buildMode === 'custom'} onPress={() => setBuildMode('custom')} />
         </View>
-        <Text style={styles.caption}>Customize changes movements only. Sets, reps and RPE stay coach-controlled.</Text>
+        <Text style={styles.caption}>
+          {canCustomizeAdvanced
+            ? 'Choose exercises, sets, reps and target RPE for each slot, or assign a saved routine to a day.'
+            : 'Customize changes movements only. Sets, reps and RPE stay coach-controlled.'}
+        </Text>
       </View>
 
       <View style={styles.card}>
@@ -668,9 +779,7 @@ export default function ProgramSetupScreen({
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>3. Training days</Text>
         <Text style={styles.caption} testID="program-days-caption">
-          {editing
-            ? 'Day 1 is the day your next block starts. These days repeat every week.'
-            : `Day 1 is today, ${programDayLabel(1, today).replace('Day 1, ', '')}. These days repeat every week.`}
+          Choose the days of the week you train. Your schedule repeats every week.
         </Text>
         <View style={styles.wrap}>
           {[1, 2, 3, 4, 5, 6, 7].map((day) => (
@@ -702,7 +811,7 @@ export default function ProgramSetupScreen({
                     || offersGrapplingDays(profile.objective, sport)).map((focus) => (
                     <Chip
                       key={focus}
-                      label={focus}
+                      label={sessionFocusName(focus)}
                       selected={currentFocus === focus}
                       onPress={() => setDayFocus(dayIndex, focus)}
                     />
@@ -726,37 +835,124 @@ export default function ProgramSetupScreen({
         </View>
       </View>
 
-      {buildMode === 'custom' && weekOne.length > 0 && (
+      {buildMode === 'custom' && customizeSessions.length > 0 && (
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>5. Customize generated week</Text>
-          {weekOne.map((session) => (
-            <View key={session.day_index} style={styles.session}>
-              <Text style={styles.sessionTitle}>Day {session.day_index} · {session.focus}</Text>
-              {session.slots.map((slot) => {
-                const movement = movements.find((item) => item.movement_id === slot.movement_id);
-                if (movement === undefined) return null;
-                const selectedId = preferences.find((item) =>
-                  item.dayIndex === session.day_index && item.slotIndex === slot.slot_index)?.movementId ?? slot.movement_id;
-                const accessContext = accessContextForBlockFocus(session.focus as BlockFocus);
-                // Only choices the generator will place on this day (a sparring
-                // round belongs on a BJJ day only).
-                const choices = movements.filter((item) => item.pattern === movement.pattern
-                  && availableIdsByContext[accessContext].has(item.movement_id)
-                  && movementFitsFocusDay(item, session.focus as BlockFocus));
-                return (
-                  <View key={slot.slot_index} style={styles.slot}>
-                    <CustomizeSlot
-                      testID={`customize-slot-${session.day_index}-${slot.slot_index}`}
-                      pattern={movement.pattern}
-                      choices={choices}
-                      selectedId={selectedId}
-                      onChoose={(movementId) => chooseMovement(session.day_index, slot.slot_index, movement.pattern as TrainingProgramMovementPreference['pattern'], movementId)}
-                    />
+          {customizeSessions.map((session) => {
+            const assignedRoutine = canCustomizeAdvanced
+              ? routineAssignments.find((item) => item.dayIndex === session.day_index)
+              : undefined;
+            return (
+              <View key={session.day_index} style={styles.session}>
+                <Text style={styles.sessionTitle}>
+                  {dayLabel(session.day_index)} · {sessionFocusName(session.focus)}
+                </Text>
+                {canCustomizeAdvanced && (
+                  <View style={styles.routinePicker} testID={`day-routine-picker-${session.day_index}`}>
+                    <Text style={styles.slotTitle}>Day source</Text>
+                    <View style={styles.wrap}>
+                      <Chip
+                        wrap
+                        label="Generated day"
+                        selected={assignedRoutine === undefined}
+                        onPress={() => assignRoutineDay(session.day_index, null)}
+                      />
+                      {routineDayOptions.map((opt) => (
+                        <Chip
+                          key={opt.key}
+                          wrap
+                          label={opt.label}
+                          selected={assignedRoutine?.routineTemplateId === opt.routineTemplateId
+                            && assignedRoutine?.routineDayIndex === opt.routineDayIndex}
+                          onPress={() => assignRoutineDay(session.day_index, {
+                            dayIndex: session.day_index,
+                            routineTemplateId: opt.routineTemplateId,
+                            routineDayIndex: opt.routineDayIndex,
+                          })}
+                        />
+                      ))}
+                    </View>
                   </View>
-                );
-              })}
-            </View>
-          ))}
+                )}
+                {assignedRoutine !== undefined ? (
+                  <View style={styles.doseGroup}>
+                    <Text style={styles.caption}>
+                      Using saved routine for Weeks 1–3 (deload scaled automatically in Week 4).
+                    </Text>
+                    {session.slots.map((slot) => {
+                      const movement = movements.find((item) => item.movement_id === slot.movement_id);
+                      return (
+                        <Text key={slot.slot_index} style={styles.caption}>
+                          {movement?.name ?? `Movement ${slot.movement_id}`} — {slot.sets}×{slot.reps} @ RPE {slot.target_rpe}
+                        </Text>
+                      );
+                    })}
+                  </View>
+                ) : (
+                  session.slots.map((slot) => {
+                    const movement = movements.find((item) => item.movement_id === slot.movement_id);
+                    if (movement === undefined) return null;
+                    const selectedId = preferences.find((item) =>
+                      item.dayIndex === session.day_index && item.slotIndex === slot.slot_index)?.movementId ?? slot.movement_id;
+                    const accessContext = accessContextForBlockFocus(session.focus as BlockFocus);
+                    // Only choices the generator will place on this day (a sparring
+                    // round belongs on a BJJ day only).
+                    const choices = movements.filter((item) => item.pattern === movement.pattern
+                      && availableIdsByContext[accessContext].has(item.movement_id)
+                      && movementFitsFocusDay(item, session.focus as BlockFocus));
+                    const ov = slotOverrides.find(
+                      (item) => item.dayIndex === session.day_index && item.slotIndex === slot.slot_index,
+                    );
+                    const setsVal = ov?.sets ?? slot.sets;
+                    const repsVal = ov?.reps ?? slot.reps;
+                    const rpeVal = ov?.targetRpe ?? slot.target_rpe;
+                    return (
+                      <View key={slot.slot_index} style={styles.slot}>
+                        <CustomizeSlot
+                          testID={`customize-slot-${session.day_index}-${slot.slot_index}`}
+                          pattern={movement.pattern}
+                          choices={choices}
+                          selectedId={selectedId}
+                          onChoose={(movementId) => chooseMovement(session.day_index, slot.slot_index, movement.pattern as TrainingProgramMovementPreference['pattern'], movementId)}
+                        />
+                        {canCustomizeAdvanced && (
+                          <View style={styles.doseGroup}>
+                            <DoseStepper
+                              testID={`slot-sets-${session.day_index}-${slot.slot_index}`}
+                              label="Sets"
+                              value={setsVal}
+                              min={1}
+                              max={10}
+                              step={1}
+                              onChange={(next) => updateSlotOverride(session.day_index, slot.slot_index, { sets: next })}
+                            />
+                            <DoseStepper
+                              testID={`slot-reps-${session.day_index}-${slot.slot_index}`}
+                              label="Reps"
+                              value={repsVal}
+                              min={1}
+                              max={30}
+                              step={1}
+                              onChange={(next) => updateSlotOverride(session.day_index, slot.slot_index, { reps: next })}
+                            />
+                            <DoseStepper
+                              testID={`slot-rpe-${session.day_index}-${slot.slot_index}`}
+                              label="Target RPE"
+                              value={rpeVal}
+                              min={5.0}
+                              max={effectiveRpeCap}
+                              step={0.5}
+                              onChange={(next) => updateSlotOverride(session.day_index, slot.slot_index, { targetRpe: next })}
+                            />
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })
+                )}
+              </View>
+            );
+          })}
         </View>
       )}
       </Disclosure>
@@ -922,6 +1118,51 @@ function CustomizeSlot({ testID, pattern, choices, selectedId, onChoose }: Custo
   );
 }
 
+interface DoseStepperProps {
+  testID: string;
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (next: number) => void;
+}
+
+function DoseStepper({ testID, label, value, min, max, step, onChange }: DoseStepperProps): React.JSX.Element {
+  const canDecrease = value > min;
+  const canIncrease = value < max;
+  const adjust = (delta: number): void => {
+    const next = Math.max(min, Math.min(max, Math.round((value + delta) * 10) / 10));
+    onChange(next);
+  };
+  return (
+    <View testID={testID} style={styles.doseRow}>
+      <Text style={styles.doseLabel}>{label}</Text>
+      <View style={styles.stepperRow}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Decrease ${label}`}
+          disabled={!canDecrease}
+          onPress={() => adjust(-step)}
+          style={[styles.stepperButton, !canDecrease && styles.stepperButtonDisabled]}
+        >
+          <Text style={styles.stepperBtnText}>-</Text>
+        </Pressable>
+        <Text style={styles.stepperValue}>{String(value)}</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Increase ${label}`}
+          disabled={!canIncrease}
+          onPress={() => adjust(step)}
+          style={[styles.stepperButton, !canIncrease && styles.stepperButtonDisabled]}
+        >
+          <Text style={styles.stepperBtnText}>+</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.color.ink0 },
   scroll: { flex: 1 },
@@ -998,4 +1239,21 @@ const styles = StyleSheet.create({
   },
   showAll: { minHeight: 56, justifyContent: 'center', alignSelf: 'flex-start' },
   showAllText: { color: theme.color.textHi, fontSize: 13, fontWeight: '700', textDecorationLine: 'underline' },
+  routinePicker: { gap: 6 },
+  doseGroup: { gap: 6, paddingTop: 4 },
+  doseRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  doseLabel: { color: theme.color.textMid, fontSize: 13, fontWeight: '600' },
+  stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  stepperButton: {
+    minWidth: theme.touch.min,
+    minHeight: theme.touch.min,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.chip,
+  },
+  stepperButtonDisabled: { opacity: 0.4 },
+  stepperBtnText: { color: theme.color.textHi, fontSize: 18, fontWeight: '700' },
+  stepperValue: { color: theme.color.textHi, fontSize: 15, fontWeight: '700', minWidth: 32, textAlign: 'center' },
 });

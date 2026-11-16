@@ -39,7 +39,15 @@ export function offPlanStartTarget<T extends OffPlanSessionSummary>(
 
 const WEEKDAY = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const FOCUS_WORD: Readonly<Record<string, string>> = {
-  lower: 'lower-body', upper: 'upper-body', full: 'full-body', conditioning: 'conditioning', bjj: 'BJJ',
+  lower: 'lower-body',
+  upper: 'upper-body',
+  full: 'full-body',
+  push: 'push',
+  pull: 'pull',
+  legs: 'legs',
+  accessories: 'accessories',
+  conditioning: 'conditioning',
+  bjj: 'BJJ',
 };
 
 /** "Thursday's upper-body session", for the control and its caption. */

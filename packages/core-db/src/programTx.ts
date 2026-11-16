@@ -109,3 +109,89 @@ export function linkTrainingBlockProgram(
 export function archiveActiveTrainingBlock(d: ExecDb): void {
   d.executeSync("UPDATE training_block SET status = 'archived' WHERE status = 'active'");
 }
+
+export type BaseProgramFocus = 'lower' | 'upper' | 'full' | 'conditioning' | 'bjj';
+
+/** Map an extended Phase 2 focus ('push'|'pull'|'legs'|'accessories') to the
+ *  base CHECK-constrained focus stored in training_program_day / planned_session. */
+export function mapBaseProgramFocus(focus: string): BaseProgramFocus {
+  switch (focus) {
+    case 'push':
+    case 'pull':
+      return 'upper';
+    case 'legs':
+      return 'lower';
+    case 'accessories':
+      return 'full';
+    case 'lower':
+    case 'upper':
+    case 'full':
+    case 'conditioning':
+    case 'bjj':
+      return focus;
+    default:
+      return 'full';
+  }
+}
+
+export interface ProgramSlotOverrideWrite {
+  dayIndex: number;
+  slotIndex: number;
+  sets?: number | null;
+  reps?: number | null;
+  targetRpe?: number | null;
+}
+
+export interface ProgramRoutineDayWrite {
+  dayIndex: number;
+  routineTemplateId: number;
+  routineDayIndex: number;
+}
+
+export interface ProgramAdvancedControlWrite {
+  scheduleMode?: 'iso_weekday' | 'relative_day_index';
+  days: readonly ProgramDayWrite[];
+  slotOverrides?: readonly ProgramSlotOverrideWrite[];
+  routineAssignments?: readonly ProgramRoutineDayWrite[];
+}
+
+/** Replace Phase 2 advanced control side-cars for a program inside an active tx. */
+export function writeProgramAdvancedControl(
+  d: ExecDb,
+  programId: number,
+  input: ProgramAdvancedControlWrite,
+): void {
+  d.executeSync('DELETE FROM training_program_day_focus_ext WHERE program_id = ?', [programId]);
+  for (const day of input.days) {
+    if (
+      day.focus === 'push'
+      || day.focus === 'pull'
+      || day.focus === 'legs'
+      || day.focus === 'accessories'
+    ) {
+      d.executeSync(
+        'INSERT INTO training_program_day_focus_ext (program_id, day_index, focus) VALUES (?, ?, ?)',
+        [programId, day.dayIndex, day.focus],
+      );
+    }
+  }
+  d.executeSync(
+    'INSERT OR REPLACE INTO training_program_schedule_mode (program_id, mode) VALUES (?, ?)',
+    [programId, input.scheduleMode ?? 'iso_weekday'],
+  );
+  d.executeSync('DELETE FROM training_program_slot_override WHERE program_id = ?', [programId]);
+  for (const ov of input.slotOverrides ?? []) {
+    if (ov.sets == null && ov.reps == null && ov.targetRpe == null) continue;
+    d.executeSync(
+      'INSERT INTO training_program_slot_override (program_id, day_index, slot_index, sets, reps, target_rpe) VALUES (?, ?, ?, ?, ?, ?)',
+      [programId, ov.dayIndex, ov.slotIndex, ov.sets ?? null, ov.reps ?? null, ov.targetRpe ?? null],
+    );
+  }
+  d.executeSync('DELETE FROM training_program_day_routine WHERE program_id = ?', [programId]);
+  for (const ra of input.routineAssignments ?? []) {
+    d.executeSync(
+      'INSERT INTO training_program_day_routine (program_id, day_index, routine_template_id, routine_day_index) VALUES (?, ?, ?, ?)',
+      [programId, ra.dayIndex, ra.routineTemplateId, ra.routineDayIndex],
+    );
+  }
+}

@@ -698,7 +698,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     pressBack();
     fireEvent.press(screen.getByLabelText(/COMPETITIVE\./));
     pressNext();
-    expect(screen.getByLabelText('training days per week 4')).toBeOnTheScreen();
+    expect(screen.getByLabelText('training days per week 6')).toBeOnTheScreen();
     expect(screen.getByLabelText('minutes in a session, tops 75 min')).toBeOnTheScreen();
   });
 
@@ -710,12 +710,12 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     pressNext();
     expect(screen.getByLabelText('minutes in a session, tops 75 min')).toBeOnTheScreen();
     fireEvent.press(screen.getByLabelText('Increase training days per week'));
-    expect(screen.getByLabelText('training days per week 5')).toBeOnTheScreen();
+    expect(screen.getByLabelText('training days per week 6')).toBeOnTheScreen();
     expect(screen.queryByTestId('onboarding-week-suggestion')).toBeNull();
     pressBack();
     fireEvent.press(screen.getByLabelText(/NEW TO THIS\./));
     pressNext();
-    expect(screen.getByLabelText('training days per week 5')).toBeOnTheScreen();
+    expect(screen.getByLabelText('training days per week 6')).toBeOnTheScreen();
     expect(screen.getByLabelText('minutes in a session, tops 75 min')).toBeOnTheScreen();
   });
 

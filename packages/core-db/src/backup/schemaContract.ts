@@ -152,6 +152,14 @@ export const SUPPORTED_BACKUP_SCHEMA_CONTRACTS: readonly BackupSchemaContract[] 
     objectCount: 216,
     fingerprint: '88daea365fb6f4d9d6414c1ab2c267af5aa0aa0149c7b5b3a69a3b0b804be294',
   },
+  // Through 078_advanced_program_control: six side-car tables for Phase 2 (#228 + A7).
+  {
+    userVersion: 77,
+    migrationSlot: 78,
+    tableCount: 133,
+    objectCount: 222,
+    fingerprint: 'd07dce1175b8d98781ada22d35d35f17fc161e5f1ccefe5fbcbec33df1d692e2',
+  },
 ];
 
 export const CURRENT_BACKUP_SCHEMA_CONTRACT: BackupSchemaContract =

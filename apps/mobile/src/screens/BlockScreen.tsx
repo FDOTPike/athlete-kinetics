@@ -66,6 +66,10 @@ const FOCUS_ABBREV: Record<string, string> = {
   lower: 'LWR',
   upper: 'UPR',
   full: 'FUL',
+  push: 'PSH',
+  pull: 'PUL',
+  legs: 'LEG',
+  accessories: 'ACC',
   conditioning: 'CND',
   bjj: 'BJJ',
 };
@@ -252,15 +256,25 @@ const isMissedSession = (
   today: string,
 ): boolean => summary.completionStatus === null && summary.sessionDate < today;
 
-function weekRowsFor(sessions: readonly BlockSessionSummary[]): WeekRow[] {
+function weekRowsFor(sessions: readonly BlockSessionSummary[], blockStartDate?: string): WeekRow[] {
   return [1, 2, 3, 4].map((week) => {
     const inWeek = sessions.filter((session) => session.weekIndex === week);
+    const weekStart = blockStartDate === undefined ? undefined : addDaysIso(blockStartDate, (week - 1) * 7);
+    const weekEnd = weekStart === undefined ? undefined : addDaysIso(weekStart, 6);
+    const weekAlignedByDate = weekStart !== undefined
+      && weekEnd !== undefined
+      && inWeek.length > 0
+      && inWeek.every((s) => s.sessionDate >= weekStart && s.sessionDate <= weekEnd);
     return {
       week,
       phase: inWeek[0]?.phase ?? 'accumulation',
-      cells: [1, 2, 3, 4, 5, 6, 7].map(
-        (day) => inWeek.find((session) => session.dayIndex === day) ?? null,
-      ),
+      cells: [0, 1, 2, 3, 4, 5, 6].map((offset) => {
+        if (weekAlignedByDate && weekStart !== undefined) {
+          const cellDate = addDaysIso(weekStart, offset);
+          return inWeek.find((session) => session.sessionDate === cellDate) ?? null;
+        }
+        return inWeek.find((session) => session.dayIndex === offset + 1) ?? null;
+      }),
     };
   });
 }
@@ -602,7 +616,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
 
   const current = prescription != null && prescription.forDate === today ? prescription : null;
   const safeBlockSessions = blockSessions ?? [];
-  const rows = weekRowsFor(safeBlockSessions);
+  const rows = weekRowsFor(safeBlockSessions, block?.startDate);
   const nextPlanned = safeBlockSessions.find((planned) => planned.sessionDate > today);
 
   const openDetail = (summary: BlockSessionSummary): void => {

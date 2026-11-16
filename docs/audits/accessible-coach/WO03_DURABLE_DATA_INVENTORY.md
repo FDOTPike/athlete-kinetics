@@ -45,7 +45,7 @@ The inventory comes from the complete migration chain and the recovery sentinels
 - `movement_capability_attestation` — athlete capability attestations.
 - `one_rep_max` — athlete-entered or updated movement load estimates.
 
-### Programs, routines, plans, provenance, and suspension state (27)
+### Programs, routines, plans, provenance, and suspension state (33)
 
 - `block_emphasis` — frozen, immutable record of what focus, goal, sport and sport workload changed in a block and what they could not change (067).
 - `macro_cycle`
@@ -53,7 +53,9 @@ The inventory comes from the complete migration chain and the recovery sentinels
 - `training_block`
 - `block_meta`
 - `planned_session`
+- `planned_session_focus_ext`
 - `planned_slot`
+- `planned_slot_athlete_override`
 - `slot_override`
 - `planned_session_method`
 - `planned_slot_target`
@@ -64,8 +66,12 @@ The inventory comes from the complete migration chain and the recovery sentinels
 - `planned_slot_routine_decision`
 - `planned_slot_legacy_role_allowance`
 - `training_program`
+- `training_program_schedule_mode`
 - `training_program_day`
+- `training_program_day_focus_ext`
 - `training_program_movement_preference`
+- `training_program_slot_override`
+- `training_program_day_routine`
 - `training_block_program`
 - `routine_template`
 - `routine_template_slot`
@@ -237,3 +243,7 @@ Final live durable tables: 125 (the 124 above, and `session_plan_slot_planned_co
 Final live durable tables: 127 (the 125 above, and `athlete_secondary_sport_profile` and `activity_flexibility_tag`). The migration array has 76 entries through slot `077`, so `PRAGMA user_version = 76`. The current backup contract fingerprints 216 durable table/index/trigger objects; all earlier schema contracts remain registered unchanged.
 
 `076` rebuilds `athlete_sport_profile` with the widened sport CHECK (22 proposed SportIds) and preserves every column and row. `077` adds the two side-cars: `athlete_secondary_sport_profile` holds the Rank-2 sport (rank fixed at 2; presence of a Rank-1 profile is a TypeScript guard, not an FK) and `activity_flexibility_tag` marks a low-demand activity as a mobility/flexibility session. Both are athlete-owned record-only data, included in the encrypted physical backup, survive forward restoration and migration replay, and are cleared by Reset training data. The tag is excluded from sport workload counting.
+
+## Update — migration 078 (#228 + A7 advanced program control)
+
+Final live durable tables: 133 (the 127 above, plus `training_program_day_focus_ext`, `planned_session_focus_ext`, `training_program_schedule_mode`, `training_program_slot_override`, `training_program_day_routine`, and `planned_slot_athlete_override`). The migration array has 77 entries through slot `078`, so `PRAGMA user_version = 77`. The current backup contract fingerprints 222 durable table/index/trigger objects; all earlier schema contracts remain registered unchanged.

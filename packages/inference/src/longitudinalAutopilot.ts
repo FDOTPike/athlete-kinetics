@@ -1181,7 +1181,16 @@ export function applyLongitudinalOverlayToBlockPlan(
     ...(slot.autopilotDelta !== undefined
       ? { autopilotDelta: { ...slot.autopilotDelta } }
       : {}),
+    ...(slot.athleteOverride !== undefined
+      ? { athleteOverride: { ...slot.athleteOverride } }
+      : {}),
   });
+
+  const isAthleteSetsFrozen = (slot: PlannedSlotPlan): boolean =>
+    slot.athleteOverride !== undefined
+    && (slot.athleteOverride.source === 'routine_assignment'
+      || slot.athleteOverride.above_mrv === true
+      || slot.athleteOverride.sets_frozen === true);
 
   if (!overlay.policyApplied) {
     return {
@@ -1233,6 +1242,10 @@ export function applyLongitudinalOverlayToBlockPlan(
 
       const pattern = lookupPattern(movementId, movementPatternById);
       if (pattern === undefined || pattern === 'locomotion') {
+        return slot;
+      }
+
+      if (isAthleteSetsFrozen(slot)) {
         return slot;
       }
 
@@ -1289,17 +1302,18 @@ export function applyLongitudinalOverlayToBlockPlan(
             trimmable: false,
           };
         }
+        const athleteFixed = !deloadSession && isAthleteSetsFrozen(slot);
         return {
           sets: slot.sets,
           target: { kind: 'reps' as const, reps: slot.reps },
           targetRpe: slot.target_rpe,
-          minSets: Math.min(slot.sets, deloadSession ? 1 : 2),
+          minSets: athleteFixed ? slot.sets : Math.min(slot.sets, deloadSession ? 1 : 2),
           trimPriority:
             slot.slot_index >= ACCESSORY_SLOT_FROM &&
             !protectedSlots.has(`${session.week_index}:${session.day_index}:${slot.slot_index}`)
               ? 0
               : 1,
-          trimmable: !locomotion && !preserved,
+          trimmable: !locomotion && !preserved && !athleteFixed,
         };
       }),
     });

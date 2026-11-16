@@ -70,7 +70,7 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '068_movement_content_correction_v2.sql',
   '069_resting_heart_rate.sql',
   '070_session_feel.sql', '071_beta_recording.sql', '072_question_log.sql', '073_session_slot_replaced_by.sql',
-  '074_session_feel_reasons.sql', '075_session_plan_slot_planned_count.sql', '076_sport_taxonomy_expansion.sql', '077_multisport_and_flexibility.sql'];
+  '074_session_feel_reasons.sql', '075_session_plan_slot_planned_count.sql', '076_sport_taxonomy_expansion.sql', '077_multisport_and_flexibility.sql', '078_advanced_program_control.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
@@ -1770,8 +1770,8 @@ console.log('[2u] 057 block_meta phase/index repair + enforcement');
     // 75 files (slots 001-076, no 004) -> user_version 75. This count is
     // pinned deliberately so adding a migration is a conscious act, not a
     // silent one. Re-pinned for 076 (sport_taxonomy_expansion).
-    check('fresh install reaches user_version 76 (76 files, no slot 004)',
-      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 76,
+    check('fresh install reaches user_version 77 (77 files, no slot 004)',
+      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 77,
       String(uv(db)));
     const trig = db.raw.prepare(
       `SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'trigger'
@@ -4705,7 +4705,7 @@ console.log('\n[one statement per database call]');
 console.log('[076] sport taxonomy expansion (athlete_sport_profile CHECK widened)');
 {
   const index = FILES.indexOf('076_sport_taxonomy_expansion.sql');
-  check('076 is appended before 077', index === MIGRATIONS.length - 2 && FILES[index + 1] === '077_multisport_and_flexibility.sql');
+  check('076 is appended before 077', index === MIGRATIONS.length - 3 && FILES[index + 1] === '077_multisport_and_flexibility.sql');
   const upgraded = freshDb();
   applyRaw(upgraded, MIGRATIONS, 0, index); // through 075
   upgraded.raw.exec("INSERT INTO athlete_sport_profile (sport_profile_id, sport_id, outcome_id, experience_id, revision, updated_at_ms) VALUES (1, 'basketball', 'general_support', 'new', 1, 0)");
@@ -4728,7 +4728,7 @@ console.log('[076] sport taxonomy expansion (athlete_sport_profile CHECK widened
 console.log('[077] multisport and flexibility (secondary sport + flexibility tag)');
 {
   const index = FILES.indexOf('077_multisport_and_flexibility.sql');
-  check('077 is the last migration in the chain', index === MIGRATIONS.length - 1);
+  check('077 is appended before 078', index === MIGRATIONS.length - 2 && FILES[index + 1] === '078_advanced_program_control.sql');
   const d = freshDb();
   runMigrations(d, MIGRATIONS);
   const has = (name) => d.raw.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name=?").get(name).c === 1;
@@ -4750,6 +4750,85 @@ console.log('[077] multisport and flexibility (secondary sport + flexibility tag
   tag('flex1');
   check('077 accepts tagging a low-demand activity', d.raw.prepare('SELECT COUNT(*) c FROM activity_flexibility_tag').get().c === 1);
   check('077 blocks reclassifying a tagged activity away from low demand', throws(() => d.raw.exec("UPDATE activity_definition SET demand_class = 'moderate' WHERE activity_id = 'flex1'")));
+}
+
+// =============================================================================
+// [078] advanced program control side-cars
+// =============================================================================
+console.log('[078] advanced program control (focus ext, schedule mode, slot overrides, day routines, planned slot overrides)');
+{
+  const index = FILES.indexOf('078_advanced_program_control.sql');
+  check('078 is the last migration in the chain', index === MIGRATIONS.length - 1);
+  const d = freshDb();
+  runMigrations(d, MIGRATIONS);
+  const has = (name) => d.raw.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name=?").get(name).c === 1;
+  const tables = [
+    'training_program_day_focus_ext',
+    'planned_session_focus_ext',
+    'training_program_schedule_mode',
+    'training_program_slot_override',
+    'training_program_day_routine',
+    'planned_slot_athlete_override',
+  ];
+  check('078 creates all six side-car tables', tables.every((t) => has(t)));
+  const rejects = (sql) => { try { d.raw.exec(sql); return false; } catch { return true; } };
+
+  // Seed parent program + day + block + session + slot + routine_template
+  d.raw.exec(`
+    UPDATE athlete_profile SET training_age = 'advanced', objective = 'hypertrophy', weekly_frequency = 3 WHERE profile_id = 1;
+    INSERT INTO training_program (program_id, objective, start_date, horizon_kind, requested_review_date, planned_end_date, planned_block_count, starting_macro_block_index, schema_type, status, created_at_ms, updated_at_ms)
+      VALUES (1, 'hypertrophy', '2026-11-18', 'weeks', NULL, '2026-12-16', 1, 1, 'LINEAR', 'active', 1000, 1000);
+    INSERT INTO training_program_day (program_id, day_index, focus) VALUES (1, 3, 'upper');
+    INSERT INTO training_block (block_id, start_date, objective, weeks, status, created_at_ms)
+      VALUES (1, '2026-11-18', 'hypertrophy', 4, 'active', 1000);
+    INSERT INTO planned_session (planned_session_id, block_id, week_index, day_index, focus, phase, session_date)
+      VALUES (1, 1, 1, 3, 'upper', 'accumulation', '2026-11-18');
+    INSERT INTO planned_slot (planned_slot_id, planned_session_id, slot_index, movement_id, sets, reps, target_rpe)
+      VALUES (1, 1, 1, 1, 5, 8, 8.0);
+    INSERT INTO routine_template (routine_template_id, name, schema_type, created_at_ms, updated_at_ms)
+      VALUES (1, 'Push Routine', 'LINEAR', 1000, 1000);
+  `);
+
+  // Extended focus checks
+  d.raw.exec("INSERT INTO training_program_day_focus_ext (program_id, day_index, focus) VALUES (1, 3, 'push')");
+  d.raw.exec("INSERT INTO planned_session_focus_ext (planned_session_id, focus) VALUES (1, 'push')");
+  check('078 rejects unknown extended focus values',
+    rejects("INSERT INTO training_program_day_focus_ext (program_id, day_index, focus) VALUES (1, 1, 'cardio')")
+    && rejects("INSERT INTO planned_session_focus_ext (planned_session_id, focus) VALUES (999, 'cardio')"));
+
+  // Schedule mode checks
+  d.raw.exec("INSERT INTO training_program_schedule_mode (program_id, mode) VALUES (1, 'iso_weekday')");
+  check('078 rejects invalid schedule_mode value',
+    rejects("UPDATE training_program_schedule_mode SET mode = 'invalid' WHERE program_id = 1"));
+
+  // Slot override schema bounds [1,10] sets, [1,30] reps, [5.0,10.0] target_rpe & non-empty row check
+  d.raw.exec('INSERT INTO training_program_slot_override (program_id, day_index, slot_index, sets, reps, target_rpe) VALUES (1, 3, 1, 10, 30, 9.5)');
+  check('078 enforces slot_override schema bounds and non-null check',
+    rejects('INSERT INTO training_program_slot_override (program_id, day_index, slot_index, sets, reps, target_rpe) VALUES (1, 3, 2, 11, 8, 8.0)')
+    && rejects('INSERT INTO training_program_slot_override (program_id, day_index, slot_index, sets, reps, target_rpe) VALUES (1, 3, 2, 0, 8, 8.0)')
+    && rejects('INSERT INTO training_program_slot_override (program_id, day_index, slot_index, sets, reps, target_rpe) VALUES (1, 3, 2, 4, 31, 8.0)')
+    && rejects('INSERT INTO training_program_slot_override (program_id, day_index, slot_index, sets, reps, target_rpe) VALUES (1, 3, 2, 4, 8, 4.5)')
+    && rejects('INSERT INTO training_program_slot_override (program_id, day_index, slot_index, sets, reps, target_rpe) VALUES (1, 3, 2, 4, 8, 10.5)')
+    && rejects('INSERT INTO training_program_slot_override (program_id, day_index, slot_index, sets, reps, target_rpe) VALUES (1, 3, 2, NULL, NULL, NULL)'));
+
+  // Routine day assignment + planned slot athlete override provenance
+  d.raw.exec('INSERT INTO training_program_day_routine (program_id, day_index, routine_template_id, routine_day_index) VALUES (1, 3, 1, 1)');
+  d.raw.exec("INSERT INTO planned_slot_athlete_override (planned_slot_id, source, mrv_ceiling_sets, above_mrv) VALUES (1, 'slot_override', 4, 1)");
+  check('078 rejects out-of-range routine_day_index and invalid override source',
+    rejects('UPDATE training_program_day_routine SET routine_day_index = 8 WHERE program_id = 1')
+    && rejects("UPDATE planned_slot_athlete_override SET source = 'invalid' WHERE planned_slot_id = 1"));
+
+  // Cascade when routine_template is deleted
+  d.raw.exec('DELETE FROM routine_template WHERE routine_template_id = 1');
+  check('078 cascades routine_template deletion to training_program_day_routine',
+    d.raw.prepare('SELECT COUNT(*) c FROM training_program_day_routine').get().c === 0);
+
+  // Sentinel & self-heal parity
+  d.raw.exec('DROP TABLE training_program_slot_override');
+  check('078 dropped side-car is detected by sentinelsMissing',
+    sentinelsMissing(d).includes('training_program_slot_override'));
+  runMigrations(d, MIGRATIONS);
+  check('078 self-heal restores dropped side-car table', has('training_program_slot_override'));
 }
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);

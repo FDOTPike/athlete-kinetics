@@ -41,6 +41,11 @@ The ninth is `077_multisport_and_flexibility` (ordinal 76): adds the
 `athlete_secondary_sport_profile` and `activity_flexibility_tag` side-car tables
 and their guards, leaving `activity_definition` and the singleton sport profile
 byte-identical for the 067 verifier.
+The tenth is `078_advanced_program_control` (ordinal 77): adds the six Phase 2
+(`#228` + `A7`) side-car tables (`training_program_day_focus_ext`,
+`planned_session_focus_ext`, `training_program_schedule_mode`,
+`training_program_slot_override`, `training_program_day_routine`, and
+`planned_slot_athlete_override`).
 `MIGRATION_LINEAGE.json` records the SHA-256 of every shipped file and its
 ordinal, and of master's 34-entry chain. Master's exact `034`/`058` bytes and its
 registry live under `test/fixtures/lineage/master-1da218d/`.
