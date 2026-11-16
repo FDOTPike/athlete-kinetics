@@ -707,6 +707,94 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
     'falsifier: unlockAdvancedTools using element("Build 0.1.0") fails the decoupled build-label contract',
     hardcodedBuildUnlock.includes('element("Build 0.1.0")') && !hasDecoupledBuildUnlock(hardcodedBuildUnlock),
   );
+  // #362 (2026-11-16 owner ruling): keep UIDeviceFamily = [1] on the app target
+  // and ensure XCUITest supports the 375 x 667 pt compatibility viewport.
+  const appConfigs = configs.filter((b) => b.includes('PRODUCT_BUNDLE_IDENTIFIER = com.pikemethods.training;') && !b.includes('TEST_TARGET_NAME'));
+  const isPhoneOnlyAppConfig = (block) => {
+    const m = block.match(/TARGETED_DEVICE_FAMILY\s*=\s*"?([^";]+)"?\s*;/);
+    return m === null || !/\b2\b/.test(m[1]);
+  };
+  check(
+    'app target configurations omit iPad (2) from TARGETED_DEVICE_FAMILY (UIDeviceFamily=[1], #362)',
+    appConfigs.length === 2 && appConfigs.every(isPhoneOnlyAppConfig),
+    `configs=${appConfigs.length}`,
+  );
+  const universalAppConfig = appConfigs[0].replace(/buildSettings = \{/, 'buildSettings = {\n\t\t\t\tTARGETED_DEVICE_FAMILY = "1,2";');
+  check(
+    'falsifier: adding TARGETED_DEVICE_FAMILY = "1,2" to an app config fails the phone-only app check',
+    universalAppConfig !== appConfigs[0] && !isPhoneOnlyAppConfig(universalAppConfig),
+  );
+  const hasCompatibilityViewportRevealReach = (src) => {
+    const code = stripSwiftComments(src);
+    const upMatch = code.match(/while\s+!el\.isHittable\s*&&\s*tries\s*<\s*(\d+)\s*\{\s*app\.swipeUp\(velocity:\s*\.slow\);\s*tries\s*\+=\s*1\s*\}/);
+    const downMatch = code.match(/while\s+!el\.isHittable\s*&&\s*tries\s*<\s*(\d+)\s*\{\s*app\.swipeDown\(velocity:\s*\.slow\);\s*tries\s*\+=\s*1\s*\}/);
+    return upMatch !== null
+      && downMatch !== null
+      && upMatch.index < downMatch.index
+      && Number(upMatch[1]) >= 30
+      && Number(downMatch[1]) >= 45
+      && !code.includes('scrollViews');
+  };
+  check(
+    'reveal() swipes at least 30 slow ups before 45 slow downs to reach controls in a 375x667 viewport (#362)',
+    hasCompatibilityViewportRevealReach(reveal),
+  );
+  const shortReveal = [
+    'while !el.isHittable && tries < 15 { app.swipeUp(velocity: .slow); tries += 1 }',
+    'while !el.isHittable && tries < 30 { app.swipeDown(velocity: .slow); tries += 1 }',
+  ].join('\n');
+  check(
+    'falsifier: 15-swipe reveal() fails the 375x667 viewport reach contract',
+    !hasCompatibilityViewportRevealReach(shortReveal),
+  );
+  const dismissBody = suite.slice(suite.indexOf('private func dismissHealthAccessAlertIfShown('), suite.indexOf('// MARK: - tests'));
+  const hasCompatibilityHealthAlertHandling = (src) => {
+    const code = stripSwiftComments(src);
+    return code.includes('found.place == "the app", !alertFrame.isNull, alertFrame.midY < targetFrame.midY')
+      && code.includes('abs(nf.width - targetFrame.width) <= 2')
+      && code.includes('findSheetContainer')
+      && code.includes('targetFrame.width < sbFrame.width - 2 && targetFrame.height < sbFrame.height - 2')
+      && code.includes('springboard.coordinate(withNormalizedOffset:')
+      && !/if\s+stillShown\s*&&\s*measuredOffset\s*>\s*0/.test(code)
+      && /if\s+stillShown\s*\{[\s\S]*if\s+measuredOffset\s*>\s*0[\s\S]*\}\s*else\s+if\s+found\.place\s*==\s*"the app",\s*!alertFrame\.isNull,\s*alertFrame\.midY\s*<\s*targetFrame\.midY/.test(code)
+      && code.includes('after-compat-offset-retry')
+      && code.includes('XCTAssertFalse(stillShownAfter3s, "the Health Access alert stayed open after the OK tap")');
+  };
+  check(
+    'dismissHealthAccessAlertIfShown scales compatibility-window taps into SpringBoard screen coordinates and preserves fallback retry (#362)',
+    hasCompatibilityHealthAlertHandling(dismissBody),
+  );
+  const legacyDismiss = [
+    'if found.place == "the app", !alertFrame.isNull, alertFrame.midY < targetFrame.midY {',
+    '  if nf.minY == 0 && abs(nf.width - targetFrame.width) <= 2 { measuredOffset = targetFrame.height - nf.height }',
+    '}',
+    'if stillShown && measuredOffset > 0 { stillShown = probeAlertOKStillShown("after-unshifted-retry") }',
+    'XCTAssertFalse(stillShownAfter3s, "the Health Access alert stayed open after the OK tap")',
+  ].join('\n');
+  check(
+    'falsifier: measuredOffset-only retry in dismissHealthAccessAlertIfShown fails the compatibility-window contract',
+    !hasCompatibilityHealthAlertHandling(legacyDismiss),
+  );
+  const unscaledCompatDismiss = [
+    'let sbFrame = springboard.frame',
+    'func findSheetContainer(_ root: XCUIElementSnapshot) -> XCUIElementSnapshot? { nil }',
+    'if found.place == "the app", !alertFrame.isNull, alertFrame.midY < targetFrame.midY {',
+    '  if nf.minY == 0 && abs(nf.width - targetFrame.width) <= 2 { measuredOffset = targetFrame.height - nf.height }',
+    '}',
+    'found.target.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0)).withOffset(CGVector(dx: found.frame.midX, dy: initialOffsetY)).tap()',
+    'if stillShown {',
+    '  if measuredOffset > 0 {',
+    '    stillShown = probeAlertOKStillShown("after-unshifted-retry")',
+    '  } else if found.place == "the app", !alertFrame.isNull, alertFrame.midY < targetFrame.midY {',
+    '    stillShown = probeAlertOKStillShown("after-compat-offset-retry")',
+    '  }',
+    '}',
+    'XCTAssertFalse(stillShownAfter3s, "the Health Access alert stayed open after the OK tap")',
+  ].join('\n');
+  check(
+    'falsifier: unscaled found.target.coordinate without sbFrame compatibility scaling fails the contract',
+    !hasCompatibilityHealthAlertHandling(unscaledCompatDismiss),
+  );
 }
 
 console.log('[N11] beta orientation lock (#168)');

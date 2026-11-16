@@ -89,12 +89,15 @@ final class AthleteKineticsUITests: XCTestCase {
   }
 
   /// Scroll until the element is hittable: down the page first, then back up.
+  /// #362: a 375 x 667 pt compatibility viewport needs up to 30 slow upward
+  /// swipes to reach controls near the bottom of ProfileScreen (such as the
+  /// backup password fields in test4).
   private func reveal(_ el: XCUIElement, _ what: String, file: StaticString = #filePath, line: UInt = #line) {
     wait(el, what, file: file, line: line)
     var tries = 0
-    while !el.isHittable && tries < 15 { app.swipeUp(velocity: .slow); tries += 1 }
+    while !el.isHittable && tries < 30 { app.swipeUp(velocity: .slow); tries += 1 }
     tries = 0
-    while !el.isHittable && tries < 30 { app.swipeDown(velocity: .slow); tries += 1 }
+    while !el.isHittable && tries < 45 { app.swipeDown(velocity: .slow); tries += 1 }
     if !el.isHittable { XCTFail("\(what) never became hittable", file: file, line: line) }
   }
 
@@ -473,12 +476,29 @@ final class AthleteKineticsUITests: XCTestCase {
           }
           return nil
         }
+        func findSheetContainer(_ root: XCUIElementSnapshot) -> XCUIElementSnapshot? {
+          var queue: [XCUIElementSnapshot] = [root]
+          var index = 0
+          while index < queue.count {
+            let node = queue[index]
+            index += 1
+            if node.elementType != .alert {
+              let nf = node.frame
+              if nf.minY >= 0 && nf.minY < targetFrame.midY && nf.height > targetFrame.midY
+                && nf.height < targetFrame.height - 1 && abs(nf.width - targetFrame.width) <= 2 {
+                return node
+              }
+            }
+            queue.append(contentsOf: node.children)
+          }
+          return nil
+        }
         var measuredOffset: CGFloat = 0
         var offsetSource = "none"
         var remoteContainerMinY = -1
         var remoteContainerHeight = -1
-        if found.place == "the app", !alertFrame.isNull, alertFrame.midY < targetFrame.midY {
-          if let root = targetSnap, let ancestors = findAlertAncestors(root) {
+        if found.place == "the app", !alertFrame.isNull, alertFrame.midY < targetFrame.midY, let root = targetSnap {
+          if let ancestors = findAlertAncestors(root) {
             for node in ancestors.reversed() where node.elementType != .alert {
               let nf = node.frame
               if nf.minY == 0 && nf.height > targetFrame.midY && nf.height < targetFrame.height - 1 && abs(nf.width - targetFrame.width) <= 2 {
@@ -489,11 +509,53 @@ final class AthleteKineticsUITests: XCTestCase {
                 break
               }
             }
+          } else if let container = findSheetContainer(root) {
+            let nf = container.frame
+            measuredOffset = max(nf.minY, targetFrame.height - nf.height)
+            offsetSource = "sheetContainer"
+            remoteContainerMinY = Int(nf.minY.rounded())
+            remoteContainerHeight = Int(nf.height.rounded())
           }
         }
-        let rootOrigin = found.target.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
+        // #362: when an iPhone-only app runs in iPadOS's scaled compatibility box
+        // (e.g. 375x667 scaled and centered inside 820x1180 SpringBoard),
+        // `found.target.coordinate(...)` dispatches raw screen coordinates without
+        // applying the box transform, missing the OK button vertically and horizontally.
+        // Map app-window points into SpringBoard screen space when `targetFrame` is
+        // strictly smaller than `sbFrame`.
+        let sbSnapFrame = (try? springboard.snapshot())?.frame
+        let sbFrame = (sbSnapFrame != nil && sbSnapFrame!.width > 0 && sbSnapFrame!.height > 0)
+          ? sbSnapFrame!
+          : springboard.frame
+        let isCompatBox = found.place == "the app"
+          && targetFrame.width > 0 && targetFrame.height > 0
+          && targetFrame.width < sbFrame.width - 2 && targetFrame.height < sbFrame.height - 2
+        let compatScale = isCompatBox
+          ? min(sbFrame.width / targetFrame.width, sbFrame.height / targetFrame.height)
+          : 1.0
+        let compatOriginX = isCompatBox
+          ? sbFrame.minX + (sbFrame.width - targetFrame.width * compatScale) / 2
+          : 0.0
+        let compatOriginY = isCompatBox
+          ? sbFrame.minY + (sbFrame.height - targetFrame.height * compatScale) / 2
+          : 0.0
+        func tapTargetPoint(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+          if isCompatBox {
+            let screenX = compatOriginX + (x - targetFrame.minX) * compatScale
+            let screenY = compatOriginY + (y - targetFrame.minY) * compatScale
+            springboard.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
+              .withOffset(CGVector(dx: screenX, dy: screenY))
+              .tap()
+            return CGPoint(x: screenX, y: screenY)
+          }
+          found.target.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
+            .withOffset(CGVector(dx: x, dy: y))
+            .tap()
+          return CGPoint(x: x, y: y)
+        }
         let initialOffsetY = found.frame.midY + measuredOffset
         var tapY = initialOffsetY
+        var tapScreen = CGPoint(x: found.frame.midX, y: initialOffsetY)
         var tapPath = measuredOffset > 0 ? "\(offsetSource)(+\(Int(measuredOffset.rounded()))pt)" : "direct"
         func probeAlertOKStillShown(_ phase: String) -> Bool {
           do {
@@ -514,19 +576,34 @@ final class AthleteKineticsUITests: XCTestCase {
             }
           }
         }
-        rootOrigin.withOffset(CGVector(dx: found.frame.midX, dy: initialOffsetY)).tap()
+        tapScreen = tapTargetPoint(found.frame.midX, initialOffsetY)
         sleep(1)
         var stillShown = probeAlertOKStillShown("after-1s")
-        if stillShown && measuredOffset > 0 {
-          rootOrigin.withOffset(CGVector(dx: found.frame.midX, dy: found.frame.midY)).tap()
-          tapY = found.frame.midY
-          sleep(1)
-          stillShown = probeAlertOKStillShown("after-unshifted-retry")
-          tapPath = stillShown ? "\(tapPath),unshifted-retry" : "unshifted-after-\(offsetSource)"
+        if stillShown {
+          if measuredOffset > 0 {
+            tapScreen = tapTargetPoint(found.frame.midX, found.frame.midY)
+            tapY = found.frame.midY
+            sleep(1)
+            stillShown = probeAlertOKStillShown("after-unshifted-retry")
+            tapPath = stillShown ? "\(tapPath),unshifted-retry" : "unshifted-after-\(offsetSource)"
+          } else if found.place == "the app", !alertFrame.isNull, alertFrame.midY < targetFrame.midY {
+            // #362: in iPadOS's 375 x 667 pt compatibility window, the remote
+            // HealthPrivacyService sheet sits ~30 pt below the window top without
+            // exposing a shorter ancestor in targetSnap, so the unshifted tap lands
+            // just above the OK button; retry with the measured compatibility offset.
+            let compatY = min(targetFrame.maxY - 8, found.frame.midY + max(found.frame.height * 0.625, 30))
+            tapScreen = tapTargetPoint(found.frame.midX, compatY)
+            tapY = compatY
+            sleep(1)
+            stillShown = probeAlertOKStillShown("after-compat-offset-retry")
+            let delta = Int((compatY - found.frame.midY).rounded())
+            tapPath = stillShown ? "\(tapPath),compat-offset-retry(+\(delta)pt)" : "compat-offset-retry(+\(delta)pt)"
+          }
         }
         sleep(2)
         let stillShownAfter3s = probeAlertOKStillShown("after-3s")
-        log("HEALTH-ALERT-OK tapped OK on a system \(kind) in \(found.place) (\(context)); title: \(title.prefix(120)); tapPath=\(tapPath) okFrame=(\(Int(found.frame.midX)),\(Int(found.frame.midY))) tapY=\(Int(tapY.rounded())) remoteContainer=(minY:\(remoteContainerMinY),h:\(remoteContainerHeight)) alertMidY=\(alertFrame.isNull ? -1 : Int(alertFrame.midY)); still shown after 1 s: \(stillShown ? "yes" : "no"); still shown 2 s later: \(stillShownAfter3s ? "yes" : "no")")
+        let compatTag = isCompatBox ? " compatScreen=(\(Int(tapScreen.x.rounded())),\(Int(tapScreen.y.rounded()))) sb=(\(Int(sbFrame.width)),\(Int(sbFrame.height)))" : ""
+        log("HEALTH-ALERT-OK tapped OK on a system \(kind) in \(found.place) (\(context)); title: \(title.prefix(120)); tapPath=\(tapPath) okFrame=(\(Int(found.frame.midX)),\(Int(found.frame.midY))) tapY=\(Int(tapY.rounded()))\(compatTag) remoteContainer=(minY:\(remoteContainerMinY),h:\(remoteContainerHeight)) alertMidY=\(alertFrame.isNull ? -1 : Int(alertFrame.midY)); still shown after 1 s: \(stillShown ? "yes" : "no"); still shown 2 s later: \(stillShownAfter3s ? "yes" : "no")")
         XCTAssertFalse(stillShownAfter3s, "the Health Access alert stayed open after the OK tap")
         return true
       }
