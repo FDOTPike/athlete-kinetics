@@ -362,17 +362,11 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
     /CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER=/.test(ci) && /-sdk iphonesimulator[\s\S]*build-for-testing/.test(ci)
       && ci.includes('tools/ios_ui_tests.sh') && runner.includes('exit "$FAILED"') && runner.includes('lsof -nP -a -i -p'));
   const typesSrc = read('packages/inference/src/types.ts');
-  const defaultProfileBody = typesSrc.match(/export const DEFAULT_PROFILE:\s*UserProfile\s*=\s*Object\.freeze\(\{([\s\S]*?)\n\}\);/)?.[1] ?? '';
-  const defaultTrainingAge = defaultProfileBody.match(/training_age:\s*'([^']+)'/)?.[1];
   const onboardingSrc = read('apps/mobile/src/screens/OnboardingScreen.tsx');
-  const usesDefaultProfile = /useState<UserProfile>\(\{\s*\.\.\.DEFAULT_PROFILE\b/.test(onboardingSrc);
-  const asksMaxesMatch = onboardingSrc.match(/const asksMaxes\s*=\s*draft\.training_age\s*(!==|===)\s*'([^']+)';/);
-  const asksMaxes = asksMaxesMatch !== null && defaultTrainingAge !== undefined
-    ? (asksMaxesMatch[1] === '!==' ? defaultTrainingAge !== asksMaxesMatch[2] : defaultTrainingAge === asksMaxesMatch[2])
-    : null;
-  const wantsSport = onboardingSrc.match(/const \[wantsSport\b[^\]]*\]\s*=\s*useState\((true|false)\)/)?.[1] === 'true';
-  const wantsTarget = onboardingSrc.match(/const \[wantsTarget\b[^\]]*\]\s*=\s*useState\((true|false)\)/)?.[1] === 'true';
-  const stepsBody = onboardingSrc.match(/const steps:\s*StepKey\[\]\s*=\s*useMemo\(\s*\(\)\s*=>\s*\[([\s\S]*?)\],\s*\[[^\]]*\]\s*,?\s*\);/)?.[1] ?? '';
+  const parseBooleanStateInit = (src, varName) => {
+    const raw = src.match(new RegExp(`const \\[${varName}\\b[^\\]]*\\]\\s*=\\s*useState\\((true|false)\\)`))?.[1];
+    return raw === 'true' ? true : raw === 'false' ? false : null;
+  };
   const parseDefaultSteps = (body, flags) => {
     if (!body || Object.values(flags).some((v) => v === null || v === undefined)) return null;
     const resolved = body.replace(
@@ -382,9 +376,31 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
     if (resolved.includes('...(') || resolved.includes('?')) return null;
     return [...resolved.matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
   };
-  const defaultSteps = parseDefaultSteps(stepsBody, { wantsSport, wantsTarget, asksMaxes });
-  const limitsIdx = defaultSteps === null ? -1 : defaultSteps.indexOf('limits');
-  const expectedOnboardingSteps = limitsIdx > 0 ? limitsIdx : null;
+  const computeOnboardingContract = (typesSource, onboardingSource) => {
+    const defaultProfileBody = typesSource.match(/export const DEFAULT_PROFILE:\s*UserProfile\s*=\s*Object\.freeze\(\{([\s\S]*?)\n\}\);/)?.[1] ?? '';
+    const defaultTrainingAge = defaultProfileBody.match(/training_age:\s*'([^']+)'/)?.[1];
+    const usesDefaultProfile = /useState<UserProfile>\(\{\s*\.\.\.DEFAULT_PROFILE\b/.test(onboardingSource);
+    const asksMaxesMatch = onboardingSource.match(/const asksMaxes\s*=\s*draft\.training_age\s*(!==|===)\s*'([^']+)';/);
+    const asksMaxes = asksMaxesMatch !== null && defaultTrainingAge !== undefined
+      ? (asksMaxesMatch[1] === '!==' ? defaultTrainingAge !== asksMaxesMatch[2] : defaultTrainingAge === asksMaxesMatch[2])
+      : null;
+    const wantsSport = parseBooleanStateInit(onboardingSource, 'wantsSport');
+    const wantsTarget = parseBooleanStateInit(onboardingSource, 'wantsTarget');
+    const stepsBody = onboardingSource.match(/const steps:\s*StepKey\[\]\s*=\s*useMemo\(\s*\(\)\s*=>\s*\[([\s\S]*?)\],\s*\[[^\]]*\]\s*,?\s*\);/)?.[1] ?? '';
+    const defaultSteps = parseDefaultSteps(stepsBody, { wantsSport, wantsTarget, asksMaxes });
+    const limitsIdx = defaultSteps === null ? -1 : defaultSteps.indexOf('limits');
+    const expectedOnboardingSteps = limitsIdx > 0 ? limitsIdx : null;
+    return { defaultTrainingAge, usesDefaultProfile, asksMaxes, wantsSport, wantsTarget, defaultSteps, expectedOnboardingSteps };
+  };
+  const {
+    defaultTrainingAge,
+    usesDefaultProfile,
+    asksMaxes,
+    wantsSport,
+    wantsTarget,
+    defaultSteps,
+    expectedOnboardingSteps,
+  } = computeOnboardingContract(typesSrc, onboardingSrc);
   const onboardingBody = suite.match(/private func completeOnboarding\([\s\S]*?\n  \}/)?.[0] ?? '';
   const completeOnboardingStepCount = (swiftSrc) => {
     const codeOnly = swiftSrc.replace(/\/\*[\s\S]*?\*\/|^\s*\/\/.*$/gm, '');
@@ -398,9 +414,11 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
   check(
     `completeOnboarding loops for step in 1...${expectedOnboardingSteps ?? '?'} before "No, nothing to note" (default training_age=${defaultTrainingAge ?? 'unknown'})`,
     usesDefaultProfile
+      && wantsSport !== null
+      && wantsTarget !== null
       && expectedOnboardingSteps !== null
       && actualOnboardingSteps === expectedOnboardingSteps,
-    `asksMaxes=${asksMaxes} steps=${defaultSteps?.length ?? 'unknown'} expected=${expectedOnboardingSteps ?? 'unknown'} actual=${actualOnboardingSteps ?? 'missing'}`,
+    `asksMaxes=${asksMaxes} wantsSport=${wantsSport} wantsTarget=${wantsTarget} steps=${defaultSteps?.length ?? 'unknown'} expected=${expectedOnboardingSteps ?? 'unknown'} actual=${actualOnboardingSteps ?? 'missing'}`,
   );
   const staleEightScreenOnboarding = onboardingBody.replace(/\bfor\s+step\s+in\s+1\.\.\.\d+/, 'for step in 1...6');
   check(
@@ -408,6 +426,25 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
     expectedOnboardingSteps === 7
       && completeOnboardingStepCount(staleEightScreenOnboarding) === 6
       && completeOnboardingStepCount(staleEightScreenOnboarding) !== expectedOnboardingSteps,
+  );
+  const typedSportInit = onboardingSrc.replace(
+    /const \[wantsSport\b[^\]]*\]\s*=\s*useState\((?:true|false)\)/,
+    'const [wantsSport, setWantsSport] = useState<boolean>(true)',
+  );
+  const typedTargetInit = onboardingSrc.replace(
+    /const \[wantsTarget\b[^\]]*\]\s*=\s*useState\((?:true|false)\)/,
+    'const [wantsTarget, setWantsTarget] = useState<boolean>(true)',
+  );
+  const poisonedSportContract = computeOnboardingContract(typesSrc, typedSportInit);
+  const poisonedTargetContract = computeOnboardingContract(typesSrc, typedTargetInit);
+  check(
+    'falsifier: typed optional-screen initializers (useState<boolean>(true)) parse as null and fail closed',
+    typedSportInit !== onboardingSrc
+      && typedTargetInit !== onboardingSrc
+      && poisonedSportContract.wantsSport === null
+      && poisonedSportContract.expectedOnboardingSteps === null
+      && poisonedTargetContract.wantsTarget === null
+      && poisonedTargetContract.expectedOnboardingSteps === null,
   );
 }
 
