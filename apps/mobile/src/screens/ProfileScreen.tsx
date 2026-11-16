@@ -32,6 +32,7 @@ import {
 } from '@ak/inference';
 import { FocusGoalsPanel } from '../components/FocusGoalsPanel';
 import { SportPanel } from '../components/SportPanel';
+import appJson from '../../app.json';
 import { theme } from '../theme/theme';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { useStore } from '../state/useStore';
@@ -151,6 +152,9 @@ function ChipRow<T extends string>({ label, options, optionLabels, value, onSele
  * `programFinished` is a program in review_due: it has finished, so there is no
  * current block or rest of the program to keep the old objective (owner ruling).
  */
+const objectiveDisplayLabel = (objective: string): string =>
+  OBJECTIVE_LABEL[objective as keyof typeof OBJECTIVE_LABEL] ?? objective.replace(/_/g, ' ');
+
 export const objectiveChangeText = (
   from: string,
   to: string,
@@ -159,14 +163,14 @@ export const objectiveChangeText = (
   hasArchivedBlock = false,
   programFinished = false,
 ): string => {
-  const fromLabel = from.replace(/_/g, ' ');
-  const toLabel = to.replace(/_/g, ' ');
+  const fromLabel = objectiveDisplayLabel(from);
+  const toLabel = objectiveDisplayLabel(to);
   const question = `Change your objective from ${fromLabel} to ${toLabel}?`;
   if (programFinished) {
     return `${question} Your program has finished. Your next program will be built for ${toLabel}.`;
   }
   if (programObjective !== null) {
-    const programLabel = programObjective.replace(/_/g, ' ');
+    const programLabel = objectiveDisplayLabel(programObjective);
     return `${question} Your current block and the rest of your program stay ${programLabel}. ${toLabel.charAt(0).toUpperCase()}${toLabel.slice(1)} is used when you build your next program.`;
   }
   if (hasBlock) return `${question} Your current block stays as it is. Your next block will be built for ${toLabel}.`;
@@ -533,13 +537,13 @@ export default function ProfileScreen(): React.JSX.Element {
           <PrimaryButton
             label="Change objective"
             onPress={() => { saveProfile({ objective: pendingObjective }); setPendingObjective(null); }}
-            accessibilityLabel={`Change objective to ${pendingObjective.replace(/_/g, ' ')}`}
+            accessibilityLabel={`Change objective to ${objectiveDisplayLabel(pendingObjective)}`}
             testID="profile-objective-confirm"
           />
           <SecondaryButton
-            label={`Keep ${profile.objective.replace(/_/g, ' ')}`}
+            label={`Keep ${objectiveDisplayLabel(profile.objective)}`}
             onPress={() => setPendingObjective(null)}
-            accessibilityLabel={`Keep ${profile.objective.replace(/_/g, ' ')}`}
+            accessibilityLabel={`Keep ${objectiveDisplayLabel(profile.objective)}`}
             testID="profile-objective-keep"
           />
         </View>
@@ -1530,10 +1534,10 @@ export default function ProfileScreen(): React.JSX.Element {
       <Pressable
         onPress={recordBuildTap}
         accessibilityRole="button"
-        accessibilityLabel="Build 0.1.0"
+        accessibilityLabel={`Build ${appJson.version}`}
         style={styles.buildLabel}
       >
-        <Text style={styles.buildText}>BUILD 0.1.0</Text>
+        <Text style={styles.buildText}>{`BUILD ${appJson.version.toUpperCase()}`}</Text>
       </Pressable>
     </KeyboardAwareScrollView>
   );

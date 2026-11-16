@@ -265,9 +265,9 @@ describe('Round 2: ProgramSetupScreen power explanation, capacity law, progressi
     // DRAFT, not the profile (the defect the auditor demonstrated).
     expect(strengthAnchorCapacity(mockState.profile, programFocuses, defaultProgramDayIndices)).toBe(3);
 
-    // Switching day 4 to 'upper' adds the push_h role: the draft now covers
+    // Switching day 4 to 'Upper' adds the push_h role: the draft now covers
     // all three roles and the warning disappears.
-    fireEvent.press(screen.getAllByText('upper')[1]); // day-4 row's upper chip
+    fireEvent.press(screen.getAllByText('Upper')[1]); // day-4 row's Upper chip
     expect(screen.queryByTestId('strength-capacity-warning')).toBeNull();
   });
 

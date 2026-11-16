@@ -186,4 +186,167 @@ describe('resetTrainingData deletes set_metric and counts non-session training d
       expect({ table, left: driver.raw.prepare(`SELECT count(*) AS c FROM ${table}`).get().c }).toEqual({ table, left: 0 });
     }
   });
+
+  test('#355 resetTrainingData wipes recorded activity occurrences and 064 children, preserves schedule intentions, fails closed on 064 scopes, and refreshes activityLedger', async () => {
+    useStore.getState().boot();
+    await flush();
+    expect(useStore.getState().status).toBe('ready');
+
+    const driver = drivers.get('athlete_kinetics.db');
+
+    // 1. Recurring schedule intention (activity_definition + activity_series) + flexibility tag.
+    act(() => {
+      useStore.getState().saveWeeklyActivity({
+        kindId: 'basketball',
+        displayName: 'Friday Basketball',
+        demand: 'high',
+        facilityCode: null,
+        equipmentCode: null,
+        localWeekday: 5,
+        localStartMinute: 1080,
+        timezoneId: 'Australia/Sydney',
+        timing: 'fixed',
+        expectedDurationMin: 60,
+        expectedEffort: 7,
+        effectiveStartDate: '2026-10-01',
+      });
+      useStore.getState().saveWeeklyActivity({
+        kindId: 'walking',
+        displayName: 'Recovery Stretch Walk',
+        demand: 'low',
+        facilityCode: null,
+        equipmentCode: null,
+        localWeekday: 0,
+        localStartMinute: null,
+        timezoneId: 'Australia/Sydney',
+        timing: 'flexible',
+        expectedDurationMin: 20,
+        expectedEffort: null,
+        effectiveStartDate: '2026-10-01',
+      });
+    });
+
+    const walkActivity = useStore.getState().activityLedger.definitions.find((d) => d.kindId === 'walking');
+    expect(walkActivity).toBeDefined();
+    driver.raw.prepare(
+      'INSERT INTO activity_flexibility_tag (activity_id, template_id, recorded_at_ms) VALUES (?, ?, ?)',
+    ).run(walkActivity.activityId, 'hips_lower_body', 1000);
+
+    // 2. Recorded activity_occurrence + activity_completion + session + activity_source_link + recommendation_activity_basis + 064 hold scope.
+    let occurrenceId;
+    act(() => {
+      occurrenceId = useStore.getState().saveOneOffActivity({
+        kindId: 'swimming',
+        displayName: 'Saturday Swim',
+        demand: 'moderate',
+        facilityCode: 'pool',
+        equipmentCode: null,
+        localDate: '2026-11-08',
+        localStartMinute: null,
+        timezoneId: 'Australia/Sydney',
+        timing: 'flexible',
+        state: 'completed',
+        modalityId: 'unknown',
+        purposeId: 'conditioning',
+        expectedDurationMin: 40,
+        expectedEffort: 6,
+        actualDurationMin: 40,
+        actualEffort: 6,
+      });
+      const athleteId = useStore.getState().activeAthleteId;
+      useStore.getState().saveSupportInstruction(
+        athleteId,
+        { instructionText: 'Monitor swim load', scopes: [{ targetKind: 'activity_occurrence', occurrenceId }] },
+        useStore.getState().getHealthSupportFacts().revision,
+      );
+    });
+
+    // Seed a session linked by activity_source_link and recommendation_activity_basis (both ON DELETE RESTRICT to activity_occurrence).
+    driver.raw.exec("INSERT INTO session (session_id, session_date, started_at_ms) VALUES (901, '2026-11-08', 1000)");
+    driver.raw.prepare(
+      `INSERT INTO activity_source_link (source_link_id, occurrence_id, source_kind, source_identity, linked_session_id, recorded_at_ms)
+       VALUES ('link-901', ?, 'coached_session', 'session:901', 901, 1000)`,
+    ).run(occurrenceId);
+    driver.raw.exec(
+      `INSERT INTO recommendation_support_record (decision_id, advice_target_kind, advice_target_identity, support_status, engine_version, generated_at_ms)
+       VALUES ('dec-901', 'block', 'b-1', 'held', 'test', 1000)`,
+    );
+    driver.raw.prepare(
+      'INSERT INTO recommendation_activity_basis (decision_id, occurrence_id, occurrence_revision) VALUES (?, ?, 1)',
+    ).run('dec-901', occurrenceId);
+
+    const defsBefore = driver.raw.prepare('SELECT count(*) AS c FROM activity_definition').get().c;
+    const seriesBefore = driver.raw.prepare('SELECT count(*) AS c FROM activity_series').get().c;
+    const flexBefore = driver.raw.prepare('SELECT count(*) AS c FROM activity_flexibility_tag').get().c;
+    expect(defsBefore).toBeGreaterThanOrEqual(3);
+    expect(seriesBefore).toBeGreaterThanOrEqual(2);
+    expect(flexBefore).toBe(1);
+    expect(useStore.getState().activityLedger.occurrences.length).toBeGreaterThanOrEqual(1);
+
+    let resetResult = false;
+    act(() => {
+      resetResult = useStore.getState().resetTrainingData();
+    });
+    expect(resetResult).toBe(true);
+    expect(useStore.getState().error).toBeNull();
+
+    // Recorded occurrences & child linkage gone; recurring schedule & flexibility tag preserved.
+    expect(driver.raw.prepare('SELECT count(*) AS c FROM activity_occurrence').get().c).toBe(0);
+    expect(driver.raw.prepare('SELECT count(*) AS c FROM activity_completion').get().c).toBe(0);
+    expect(driver.raw.prepare('SELECT count(*) AS c FROM activity_source_link').get().c).toBe(0);
+    expect(driver.raw.prepare('SELECT count(*) AS c FROM recommendation_activity_basis').get().c).toBe(0);
+    expect(driver.raw.prepare('SELECT count(*) AS c FROM session').get().c).toBe(0);
+    expect(driver.raw.prepare('SELECT count(*) AS c FROM activity_definition').get().c).toBe(defsBefore);
+    expect(driver.raw.prepare('SELECT count(*) AS c FROM activity_series').get().c).toBe(seriesBefore);
+    expect(driver.raw.prepare('SELECT count(*) AS c FROM activity_flexibility_tag').get().c).toBe(flexBefore);
+
+    // 064 health_support_scope pointing to activity_occurrence fails closed as unresolved (instruction + hold rows).
+    const scopesAfterReset = driver.raw.prepare(
+      'SELECT target_kind, occurrence_id FROM health_support_scope',
+    ).all();
+    expect(scopesAfterReset.length).toBeGreaterThanOrEqual(1);
+    expect(scopesAfterReset.every((row) => row.target_kind === 'unresolved' && row.occurrence_id === null)).toBe(true);
+    expect(
+      driver.raw.prepare("SELECT count(*) AS c FROM health_support_scope WHERE target_kind = 'activity_occurrence'").get().c,
+    ).toBe(0);
+    expect(driver.raw.prepare("SELECT count(*) AS c FROM health_support_hold WHERE state = 'held'").get().c).toBe(1);
+
+    // In-memory ledger refreshed: occurrences cleared, series & definitions intact.
+    expect(useStore.getState().activityLedger.occurrences).toEqual([]);
+    expect(useStore.getState().activityLedger.series.length).toBe(seriesBefore);
+    expect(useStore.getState().activityLedger.definitions.length).toBe(defsBefore);
+
+    // Negative invariant: schedule intentions alone mean nothing recorded to wipe -> reset returns false.
+    expect(useStore.getState().resetTrainingData()).toBe(false);
+
+    // Activity_occurrence-only path: moduleTablesCountSql must report true and clear it.
+    act(() => {
+      useStore.getState().saveOneOffActivity({
+        kindId: 'custom',
+        displayName: 'Isolated occurrence',
+        demand: 'low',
+        facilityCode: null,
+        equipmentCode: null,
+        localDate: '2026-11-08',
+        localStartMinute: null,
+        timezoneId: 'Australia/Sydney',
+        timing: 'flexible',
+        state: 'planned',
+        modalityId: 'unknown',
+        purposeId: 'recreation',
+        expectedDurationMin: 15,
+        expectedEffort: null,
+        actualDurationMin: null,
+        actualEffort: null,
+      });
+    });
+    expect(useStore.getState().activityLedger.occurrences).toHaveLength(1);
+    let occurrenceOnlyReset = false;
+    act(() => {
+      occurrenceOnlyReset = useStore.getState().resetTrainingData();
+    });
+    expect(occurrenceOnlyReset).toBe(true);
+    expect(driver.raw.prepare('SELECT count(*) AS c FROM activity_occurrence').get().c).toBe(0);
+    expect(useStore.getState().activityLedger.occurrences).toEqual([]);
+  });
 });

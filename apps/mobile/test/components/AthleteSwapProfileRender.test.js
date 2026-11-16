@@ -240,7 +240,7 @@ test('ADD ATHLETE: Profile never reads the closed database, then reads the new a
   await mountProfile();
 
   // The QA path, through the real controls.
-  for (let i = 0; i < 7; i += 1) fireEvent.press(screen.getByLabelText('Build 0.1.0'));
+  for (let i = 0; i < 7; i += 1) fireEvent.press(screen.getByLabelText('Build 1.0.0-beta.1'));
   await settle();
   expect(store().advancedToolsUnlocked).toBe(true);
   fireEvent.press(screen.getByLabelText('Coach mode, 1 athlete, collapsed'));

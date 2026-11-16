@@ -68,7 +68,7 @@ describe('ProgramSetupScreen setDayFocus clears stale movementPreferences for th
     fireEvent.press(boxSquatChips[1]);
 
     // Now change Day 1 ("Today") focus from lower to upper
-    fireEvent.press(screen.getAllByLabelText('upper')[0]);
+    fireEvent.press(screen.getAllByLabelText('Upper')[0]);
 
     // Expected: changing Day 1 focus clears incompatible Day 1 movement preferences
     // so the customizer stays mounted, no invalid-preference error is thrown, and Create program stays enabled.

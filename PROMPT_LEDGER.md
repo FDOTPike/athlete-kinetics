@@ -13207,3 +13207,25 @@ The appendix held the code around the read, every match for `0286` and "record o
   - `npm run verify:store`: ALL CHECKS PASSED.
   - Jest on `SessionSummarySkipped.test.js` and `SessionSummary.test.js`: 2 suites, 48 of 48 tests pass.
 - **Branch:** `claude/summary-skipped-2026-11-03`, PR #116 into `claude/beta-question-box-2026-10-28`.
+
+## Entry 0301 — 2026-11-16 · Stage A closed-beta fixes (#351–#358, Ruling Group 7)
+
+**Executor:** Stage A swarm worker in `stagea_fixes_351_358`, acting under owner rulings recorded in `RATIFIED_OWNER_RULINGS_GROUPS_1_TO_7.md` and Coordinator directives (`#11`, `#30`, `#38`).
+
+### Decisions & Scope
+
+- **#351 (`Option A`):** Extended `offersGrapplingDays` in `apps/mobile/src/screens/ProgramSetupScreen.tsx` to cover `SPORT_INFO[sport.sportId]?.family === 'grappling'` (`grappling_bjj`, `grappling_wrestling`, `grappling_judo`) and `sport.sportId === 'combat_mma'`.
+- **#352 (`Option A`):** Enabled `sessionTime.alternatives` and `sessionCapOverride` inside `Manage program` (`editing === true`) in `ProgramSetupScreen.tsx` with the ratified edit-mode captions; updated `updateProgramPreferences` in `apps/mobile/src/state/useStore.ts` to refuse `preview.plan.timeBudget.conflicts.length > 0` before writes and persist `session_duration_cap_min` to `athlete_profile` and store `profile`.
+- **#353:** Mapped `objectiveChangeText` and `profile-objective-confirmation` button/accessibility labels in `apps/mobile/src/screens/ProfileScreen.tsx` through `OBJECTIVE_LABEL`.
+- **#354:** Added `apps/mobile/src/state/accessConflictCopy.ts` exporting `NON_EQUIPMENT_ACCESS_CONFLICT_MESSAGE` and gave non-equipment rules (`tier`, `safety`, `capability`, or `!permittedForProfile`) precedence over equipment conflicts on `TodayScreen.tsx` and in `useStore.ts` (`todayPlanConflictReason`, `startSession`); allowed `updateTodayPlannedWorkout` to replace routine-frozen today sessions when outside the access boundary or on `training_age === 'beginner'`, clearing `planned_session_routine_context` and `planned_session_method`.
+- **#355 (`Option A`):** Preserved recurring `activity_definition`, `activity_series`, and `activity_flexibility_tag` rows across `resetTrainingData()` in `useStore.ts` while deleting `recommendation_activity_basis`, `activity_source_link`, `activity_completion`, resetting matching `health_support_scope` rows (`target_kind = 'unresolved', occurrence_id = NULL`), deleting `activity_occurrence`, adding `activity_occurrence` to `moduleTablesCountSql`, and calling `get().refreshActivityLedger()`.
+- **#356:** Synced external `ask/bank.json` to the 71-entry `apps/mobile/src/data/glossary.ts` glossary (`askVersion: "14"` preserved), regenerated `packages/inference/src/semantic/questionPhrases.ts` via `node scripts/verify-question-parity.mjs "<TrainingLMmodels>" --write-assets`, and verified parity (`196/196 identical outcomes`).
+- **#357:** Rendered `sessionFocusName(focus)` on `ProgramSetupScreen` Training days chips.
+- **#358:** Added `"version": "1.0.0-beta.1"` to `apps/mobile/app.json`, wired `ProfileScreen.tsx` footer text/accessibility label to `appJson.version`, and updated the XCUITest footer assertion in `apps/mobile/ios/AthleteKineticsUITests/AthleteKineticsUITests.swift`.
+
+### Gates & Evidence (`fix/android-351-358-stagea-rulings`)
+
+- Fail-first (`stagea_fail_first.txt`): `Test Suites: 9 failed, 9 total` / `Tests: 31 failed, 147 passed, 178 total` (`JEST_EXIT=1`, `PARITY_EXIT=1`).
+- Guard-break/restore (`stagea_guard_break.txt`): verified fail-on-break (`EXIT=1`) and byte-for-byte SHA-256 restore (`sha256 verified identical=true`, `EXIT=0`) across `#352`, `#354`, and `#351`.
+- Parity & full CI after final code/test edits (`stagea_verify_ci.txt`): `Question routing parity: 196/196 identical outcomes (lab c6cbef87435d0cfb9570cff1dc054c00d79d347c); sealed guard active.` (`PARITY_EXIT=0`), `verify:store SQL — 810/810 checks green`, routine templates checks (`16/16` green, `0 failed`), Jest `248/248` suites / `6815/6815` checks green (`VERIFY_CI_EXIT=0`).
+- **Branch:** `fix/android-351-358-stagea-rulings` stacked on `40c4dba9` (`fix/android-271-298-226-140-297-remaining-rulings`).

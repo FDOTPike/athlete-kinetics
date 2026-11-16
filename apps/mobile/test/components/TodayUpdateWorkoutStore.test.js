@@ -189,3 +189,151 @@ test('Start refuses while the conflict stands and nothing has been updated', asy
   );
   expect(todaySlots(raw, todayId)).toEqual(beforeSlots);
 });
+
+const NON_EQUIPMENT_MSG =
+  "This workout includes a movement outside your current safety or experience settings. Update today's workout to swap it for a matching alternative.";
+
+describe('#354 non-equipment access boundaries & routine-frozen workout updates', () => {
+  const freezeSingleMoveRoutine = async (trainingAge, movementName) => {
+    const boot = await bootStore();
+    const { useStore, raw } = boot;
+    useStore.getState().saveProfile({
+      training_age: trainingAge,
+      equipment_inventory: OWNED_EQUIPMENT,
+    });
+    const row = raw.prepare(
+      `SELECT m.movement_id, m.name
+         FROM movement m
+         JOIN movement_role_eligibility r USING (movement_id)
+        WHERE r.role = 'major' AND m.name = ?
+        ORDER BY m.movement_id LIMIT 1`,
+    ).get(movementName);
+    expect(row).toBeDefined();
+    const saved = useStore.getState().saveRoutineTemplate({
+      name: 'Stage A test routine',
+      schemaType: 'LINEAR',
+      slots: [{
+        dayIndex: 1, slotIndex: 1, movementId: Number(row.movement_id),
+        role: 'major', sets: 3, reps: 5, targetRpe: 7.5,
+      }],
+    });
+    const frozen = useStore.getState().freezeRoutineTemplateToPlannedSession(saved.routineTemplateId, undefined, 1);
+    expect(frozen.plannedSessionId).toBeGreaterThan(0);
+    return { ...boot, templateId: saved.routineTemplateId, plannedSessionId: frozen.plannedSessionId };
+  };
+
+  test('active niggle triggers non-equipment conflict (even when equipment also fails), startSession error matches, and update repairs today', async () => {
+    const { useStore, raw } = await generatedBlockWithEquipment(OWNED_EQUIPMENT);
+    const todayId = useStore.getState().todayPlan.plannedSessionId;
+    const beforeOthers = otherPlannedDays(raw, todayId);
+
+    // Default strength Day 1 is lower (knee-loaded squat/hinge/lunge); report knee niggle >= triageMin(4) & < haltMin(8).
+    expect(useStore.getState().reportNiggle('knee', 5)).toBe(true);
+    expect(useStore.getState().todayPlanEquipmentConflict()).toBe(true);
+    useStore.getState().startSession();
+    expect(useStore.getState().session).toBeNull();
+    expect(useStore.getState().error).toBe(NON_EQUIPMENT_MSG);
+    expect(useStore.getState().todayPlanConflictReason()).toBe('non_equipment');
+
+    // Precedence: if equipment is ALSO removed, non-equipment copy still wins over equipment copy.
+    useStore.getState().saveProfile({ equipment_inventory: [] });
+    useStore.getState().startSession();
+    expect(useStore.getState().session).toBeNull();
+    expect(useStore.getState().error).toBe(NON_EQUIPMENT_MSG);
+    expect(useStore.getState().todayPlanConflictReason()).toBe('non_equipment');
+
+    // Restore equipment while niggle persists -> update replaces knee-loaded slots and allows startSession.
+    useStore.getState().saveProfile({ equipment_inventory: OWNED_EQUIPMENT });
+    expect(useStore.getState().updateTodayPlannedWorkout()).toBe(true);
+    expect(useStore.getState().todayPlanEquipmentConflict()).toBe(false);
+    expect(useStore.getState().todayPlanConflictReason()).toBeNull();
+    expect(otherPlannedDays(raw, todayId)).toEqual(beforeOthers);
+    useStore.getState().startSession();
+    expect(useStore.getState().error).toBeNull();
+    expect(useStore.getState().session).not.toBeNull();
+  });
+
+  test('tier ceiling classifies as non-equipment on Today and startSession and update repairs today', async () => {
+    const tierBoot = await bootStore();
+    tierBoot.useStore.getState().saveProfile({
+      training_age: 'advanced',
+      equipment_inventory: OWNED_EQUIPMENT,
+      objective: 'strength',
+    });
+    tierBoot.useStore.getState().generateNewBlock('LINEAR');
+    expect(tierBoot.useStore.getState().todayPlan).not.toBeNull();
+    tierBoot.useStore.getState().saveProfile({ training_age: 'beginner' });
+    expect(tierBoot.useStore.getState().todayPlanEquipmentConflict()).toBe(true);
+    expect(tierBoot.useStore.getState().todayPlanConflictReason()).toBe('non_equipment');
+    tierBoot.useStore.getState().startSession();
+    expect(tierBoot.useStore.getState().session).toBeNull();
+    expect(tierBoot.useStore.getState().error).toBe(NON_EQUIPMENT_MSG);
+    expect(tierBoot.useStore.getState().updateTodayPlannedWorkout()).toBe(true);
+    expect(tierBoot.useStore.getState().todayPlanConflictReason()).toBeNull();
+    tierBoot.useStore.getState().startSession();
+    expect(tierBoot.useStore.getState().session).not.toBeNull();
+  });
+
+  test('capability prerequisite only classifies as non-equipment on Today and startSession', async () => {
+    const capBoot = await freezeSingleMoveRoutine('advanced', 'Front Squat');
+    capBoot.useStore.getState().saveProfile({ training_age: 'intermediate', objective: 'gpp' });
+    expect(capBoot.useStore.getState().todayPlanEquipmentConflict()).toBe(true);
+    expect(capBoot.useStore.getState().todayPlanConflictReason()).toBe('non_equipment');
+    capBoot.useStore.getState().startSession();
+    expect(capBoot.useStore.getState().session).toBeNull();
+    expect(capBoot.useStore.getState().error).toBe(NON_EQUIPMENT_MSG);
+  });
+
+  test('routine-frozen workout failing access boundary can be updated (clearing routine freeze); valid intermediate routine stays locked', async () => {
+    const { useStore, raw, templateId, plannedSessionId } = await freezeSingleMoveRoutine(
+      'intermediate',
+      'Barbell Bench Press - Medium Grip',
+    );
+    expect(useStore.getState().profile.training_age).toBe('intermediate');
+
+    // Negative invariant: while valid for intermediate, update refuses with the routine refusal.
+    expect(useStore.getState().todayPlanEquipmentConflict()).toBe(false);
+    expect(useStore.getState().updateTodayPlannedWorkout()).toBe(false);
+    expect(useStore.getState().error).toBe("Today's workout comes from a routine. Edit the routine to change it.");
+
+    // Equipment change makes routine workout fail access boundary -> update replaces & clears routine lock.
+    useStore.getState().saveProfile({ equipment_inventory: [] });
+    expect(useStore.getState().todayPlanEquipmentConflict()).toBe(true);
+    expect(useStore.getState().updateTodayPlannedWorkout()).toBe(true);
+    expect(useStore.getState().error).toBeNull();
+    expect(useStore.getState().todayPlanConflictReason()).toBeNull();
+    expect(raw.prepare('SELECT COUNT(*) AS c FROM planned_session_method WHERE planned_session_id = ?').get(plannedSessionId).c).toBe(0);
+    expect(raw.prepare('SELECT COUNT(*) AS c FROM planned_session_routine_context WHERE planned_session_id = ?').get(plannedSessionId).c).toBe(0);
+    expect(raw.prepare('SELECT COUNT(*) AS c FROM routine_template WHERE routine_template_id = ?').get(templateId).c).toBe(1);
+
+    useStore.getState().startSession();
+    expect(useStore.getState().error).toBeNull();
+    expect(useStore.getState().session).not.toBeNull();
+  });
+
+  test('beginner inherited routine lock (even with beginner-safe movement) surfaces update and clears lock cleanly', async () => {
+    const { useStore, raw, templateId, plannedSessionId } = await freezeSingleMoveRoutine(
+      'intermediate',
+      'Barbell Bench Press - Medium Grip',
+    );
+    useStore.getState().saveProfile({ training_age: 'beginner', objective: 'strength' });
+
+    const todaySlotMovementId = useStore.getState().todayPlan.slots[0].movementId;
+    const verdictForBeginner = useStore.getState()
+      .getMovementAvailabilityVerdicts('weight_room')
+      .find((v) => v.movementId === todaySlotMovementId);
+    expect(verdictForBeginner?.state).toBe('available');
+
+    expect(useStore.getState().todayPlanEquipmentConflict()).toBe(true);
+    expect(useStore.getState().todayPlanConflictReason()).toBe('non_equipment');
+    expect(useStore.getState().updateTodayPlannedWorkout()).toBe(true);
+    expect(useStore.getState().error).toBeNull();
+    expect(raw.prepare('SELECT COUNT(*) AS c FROM planned_session_method WHERE planned_session_id = ?').get(plannedSessionId).c).toBe(0);
+    expect(raw.prepare('SELECT COUNT(*) AS c FROM planned_session_routine_context WHERE planned_session_id = ?').get(plannedSessionId).c).toBe(0);
+    expect(raw.prepare('SELECT COUNT(*) AS c FROM routine_template WHERE routine_template_id = ?').get(templateId).c).toBe(1);
+
+    useStore.getState().startSession();
+    expect(useStore.getState().error).toBeNull();
+    expect(useStore.getState().session).not.toBeNull();
+  });
+});
