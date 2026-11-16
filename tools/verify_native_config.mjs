@@ -541,22 +541,29 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
     if (afterLoop900Start === -1) return false;
     const insideLoop900 = between.slice(0, afterLoop900Start);
     const postLoop = between.slice(afterLoop900Start);
+    const deadlineLoopIdx = postLoop.search(/while\s+Date\(\)\s*<\s*\w+/);
+    if (deadlineLoopIdx === -1) return false;
+    const afterDeadlineIdx = postLoop.indexOf('\n    }', deadlineLoopIdx);
+    if (afterDeadlineIdx === -1) return false;
+    const insidePostLoop = postLoop.slice(0, afterDeadlineIdx);
+    const afterDeadline = postLoop.slice(afterDeadlineIdx);
     return /\bvar\s+restoreOfferHandled\s*=\s*false\b/.test(preLoop900)
       && /\brestoreOfferHandled\s*=\s*true\b/.test(insideLoop900)
-      && /addingTimeInterval\(\s*60\s*\)/.test(postLoop)
-      && /while\s+Date\(\)\s*<\s*\w+/.test(postLoop)
-      && postLoop.includes('(try? element("Create program").snapshot()) != nil')
-      && postLoop.includes('(try? element("Cancel").snapshot()) != nil')
-      && postLoop.includes('dismissSetUpOfferIfShown("after the restore")')
-      && /\brestoreOfferHandled\s*=\s*true\b/.test(postLoop)
-      && postLoop.includes('openProfile()')
-      && /if\s+restoreOfferHandled\s*,\s*let\s+now\s*=\s*currentLabel\(restoreStatus\)\s*,\s*now\.hasPrefix\("Restore complete\."\)/.test(postLoop)
-      && !/\bif\s+let\s+now\s*=\s*currentLabel\(restoreStatus\)\s*,\s*now\.hasPrefix\("Restore complete\."\)/.test(postLoop)
+      && /addingTimeInterval\(\s*60\s*\)/.test(insidePostLoop)
+      && /while\s+Date\(\)\s*<\s*\w+/.test(insidePostLoop)
+      && insidePostLoop.includes('(try? element("Create program").snapshot()) != nil')
+      && insidePostLoop.includes('(try? element("Cancel").snapshot()) != nil')
+      && insidePostLoop.includes('dismissSetUpOfferIfShown("after the restore")')
+      && /\brestoreOfferHandled\s*=\s*true\b/.test(insidePostLoop)
+      && insidePostLoop.includes('openProfile()')
+      && /if\s+restoreOfferHandled\s*,\s*let\s+now\s*=\s*currentLabel\(restoreStatus\)\s*,\s*now\.hasPrefix\("Restore complete\."\)/.test(insidePostLoop)
+      && !/\bif\s+let\s+now\s*=\s*currentLabel\(restoreStatus\)\s*,\s*now\.hasPrefix\("Restore complete\."\)/.test(insidePostLoop)
+      && /\bXCTAssertTrue\(\s*restoreOfferHandled\b/.test(afterDeadline)
       && code.slice(settledCall).includes('Coach mode, 1 athlete')
       && code.slice(settledCall).includes('After Backup');
   };
   check(
-    'test4_backupToFilesAndRestore keeps post-restore BUILD YOUR PROGRAM offer handling active until restoreOfferHandled && Restore complete.',
+    'test4_backupToFilesAndRestore keeps post-restore BUILD YOUR PROGRAM offer handling active until restoreOfferHandled && Restore complete. and fails closed at deadline',
     hasPostRestoreOfferLoop(test4Body),
   );
   const oneShotPostRestore = [
@@ -589,6 +596,7 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
     '      if let now = currentLabel(restoreStatus), now.hasPrefix("Restore complete.") { break }',
     '      usleep(500_000)',
     '    }',
+    '    XCTAssertTrue(restoreOfferHandled, "the restored athlete\'s set-up offer was not handled before the 60 s post-restore deadline")',
     '    settledLabel(restoreStatus, beginsWith: "Restore complete.", "status after restore", timeout: 60)',
     '    Coach mode, 1 athlete',
     '    After Backup',
@@ -596,6 +604,31 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
   check(
     'falsifier: breaking post-restore offer polling on Restore complete. before restoreOfferHandled fails the restore race contract',
     !hasPostRestoreOfferLoop(ungatedPostRestoreBreak),
+  );
+  const silentDeadlineExitPostRestore = [
+    '    var restoreOfferHandled = false',
+    '    while Date().timeIntervalSince(restoreStart) < 900 {',
+    '      restoreOfferHandled = true',
+    '      sleep(2)',
+    '    }',
+    '    let postRestoreDeadline = Date().addingTimeInterval(60)',
+    '    while Date() < postRestoreDeadline {',
+    '      if (try? element("Create program").snapshot()) != nil && (try? element("Cancel").snapshot()) != nil {',
+    '        dismissSetUpOfferIfShown("after the restore")',
+    '        restoreOfferHandled = true',
+    '        openProfile()',
+    '        continue',
+    '      }',
+    '      if restoreOfferHandled, let now = currentLabel(restoreStatus), now.hasPrefix("Restore complete.") { break }',
+    '      usleep(500_000)',
+    '    }',
+    '    settledLabel(restoreStatus, beginsWith: "Restore complete.", "status after restore", timeout: 60)',
+    '    Coach mode, 1 athlete',
+    '    After Backup',
+  ].join('\n');
+  check(
+    'falsifier: silently exiting the 60 s post-restore loop with restoreOfferHandled == false fails the restore race contract',
+    !hasPostRestoreOfferLoop(silentDeadlineExitPostRestore),
   );
 }
 

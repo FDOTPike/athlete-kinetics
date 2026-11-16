@@ -925,6 +925,7 @@ final class AthleteKineticsUITests: XCTestCase {
       if restoreOfferHandled, let now = currentLabel(restoreStatus), now.hasPrefix("Restore complete.") { break }
       usleep(500_000)
     }
+    XCTAssertTrue(restoreOfferHandled, "the restored athlete's set-up offer was not handled before the 60 s post-restore deadline")
     settledLabel(restoreStatus, beginsWith: "Restore complete.", "status after restore", timeout: 60)
     wait(element("shell-root"), "the app after restore")
     openProfile()
