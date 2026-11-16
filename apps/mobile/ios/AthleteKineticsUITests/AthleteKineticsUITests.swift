@@ -695,13 +695,9 @@ final class AthleteKineticsUITests: XCTestCase {
     XCTAssertTrue(askButton.isEnabled && askButton.isHittable, "Ask button is not enabled and hittable")
     askButton.tap()
 
-    let answerCard = wait(element("question-answer-card"), "the QuestionBox answer card", timeout: 60)
+    wait(element("question-answer-card"), "the QuestionBox answer card", timeout: 60)
     wait(element("DELOAD"), "the DELOAD answer title", timeout: 60)
-    XCTAssertTrue(
-      answerCard.descendants(matching: .any).matching(NSPredicate(format: "label == %@", "DELOAD")).firstMatch.exists
-        || answerCard.label.contains("DELOAD"),
-      "question-answer-card did not display DELOAD: \(answerCard.label)",
-    )
+    wait(element(labelBeginsWith: "A planned easy week."), "the DELOAD answer definition", timeout: 60)
     log("question box: routed to DELOAD")
 
     let backToAthlete = element("Back to Athlete Profile")
