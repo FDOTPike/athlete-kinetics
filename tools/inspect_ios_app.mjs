@@ -9,7 +9,7 @@
  *   - Archivo font present with the Android-pinned SHA-256, registered in UIAppFonts;
  *   - PrivacyInfo.xcprivacy present in the app bundle (React Native's pod
  *     post-install adds it to Copy Bundle Resources — inspected, not assumed);
- *   - Info.plist: bundle id, display name, Health READ usage text, no Health
+ *   - Info.plist: bundle id, marketing version (1.0.0), display name, Health READ usage text, no Health
  *     write usage, no empty usage strings;
  *   - op-sqlite compiled with -DSQLITE_ENABLE_MATH_FUNCTIONS=1 (from the build log).
  * Writes a JSON report (artifact identity + every check) and exits non-zero on
@@ -50,6 +50,7 @@ check('privacy manifest present in the app bundle', existsSync(join(app, 'Privac
 check('bundle identifier is not a template value', typeof plist.CFBundleIdentifier === 'string'
   && !plist.CFBundleIdentifier.startsWith('org.reactjs.native.example'), plist.CFBundleIdentifier);
 check('display name', plist.CFBundleDisplayName === 'pikeMethods', plist.CFBundleDisplayName);
+check('marketing version is 1.0.0', plist.CFBundleShortVersionString === '1.0.0', plist.CFBundleShortVersionString);
 check('Health read usage text present', typeof plist.NSHealthShareUsageDescription === 'string' && plist.NSHealthShareUsageDescription.length > 40);
 check('no Health write usage (read-only)', plist.NSHealthUpdateUsageDescription === undefined);
 const empty = Object.entries(plist).filter(([k, v]) => k.endsWith('UsageDescription') && (typeof v !== 'string' || v.trim() === '')).map(([k]) => k);

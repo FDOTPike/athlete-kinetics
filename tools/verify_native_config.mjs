@@ -195,6 +195,51 @@ console.log('[N5] identity');
     typeof registered === 'string' && iosModule === registered && androidModule === registered,
     `registered=${registered} ios=${iosModule} android=${androidModule}`);
   check('no development team is committed (owner-supplied at signing time)', !/DEVELOPMENT_TEAM = [A-Z0-9]{10};/.test(pbx));
+  const inspectAppVersionConfigs = (pbxSrc) => {
+    const blocks = [...pbxSrc.matchAll(/isa = XCBuildConfiguration;[\s\S]*?\n\t\t\};/g)].map((m) => m[0]);
+    const appBlocks = blocks.filter(
+      (b) => b.includes('PRODUCT_BUNDLE_IDENTIFIER = com.pikemethods.training;') && !b.includes('TEST_TARGET_NAME'),
+    );
+    const byName = new Map();
+    for (const block of appBlocks) {
+      const name = block.match(/\bname = ([^;]+);/)?.[1]?.trim();
+      if (!name || byName.has(name)) return { ok: false, detail: `duplicate-or-unnamed:${appBlocks.length}` };
+      const marketing = [...block.matchAll(/\bMARKETING_VERSION\s*=\s*([^;]+);/g)].map((m) => m[1].trim());
+      const build = [...block.matchAll(/\bCURRENT_PROJECT_VERSION\s*=\s*([^;]+);/g)].map((m) => m[1].trim());
+      byName.set(name, {
+        marketing: marketing.length === 1 ? marketing[0] : marketing.join(','),
+        build: build.length === 1 ? build[0] : build.join(','),
+      });
+    }
+    const dbg = byName.get('Debug');
+    const rel = byName.get('Release');
+    const ok = byName.size === 2
+      && dbg !== undefined && rel !== undefined
+      && dbg.marketing === '1.0.0' && rel.marketing === '1.0.0'
+      && dbg.build === '1' && rel.build === '1';
+    return {
+      ok,
+      detail: `Debug=${dbg?.marketing ?? 'missing'}(${dbg?.build ?? 'missing'}) Release=${rel?.marketing ?? 'missing'}(${rel?.build ?? 'missing'})`,
+    };
+  };
+  const versionState = inspectAppVersionConfigs(pbx);
+  check(
+    'AthleteKinetics Debug and Release configs set MARKETING_VERSION = 1.0.0 and CURRENT_PROJECT_VERSION = 1 (with Info.plist placeholders)',
+    versionState.ok
+      && plist.get('CFBundleShortVersionString') === '$(MARKETING_VERSION)'
+      && plist.get('CFBundleVersion') === '$(CURRENT_PROJECT_VERSION)',
+    versionState.detail,
+  );
+  const shortMarketingPbx = pbx.replace(/\bMARKETING_VERSION\s*=\s*[^;]+;/g, 'MARKETING_VERSION = 1.0;');
+  const prereleaseMarketingPbx = pbx.replace(/\bMARKETING_VERSION\s*=\s*[^;]+;/g, 'MARKETING_VERSION = 1.0.0-beta.1;');
+  const shortState = inspectAppVersionConfigs(shortMarketingPbx);
+  const prereleaseState = inspectAppVersionConfigs(prereleaseMarketingPbx);
+  check(
+    'falsifier: MARKETING_VERSION = 1.0 or 1.0.0-beta.1 fails the app marketing-version contract',
+    (pbx.match(/\bMARKETING_VERSION\s*=\s*[^;]+;/g) ?? []).length === 2
+      && !shortState.ok && shortState.detail.includes('1.0(1)')
+      && !prereleaseState.ok && prereleaseState.detail.includes('1.0.0-beta.1(1)'),
+  );
 }
 
 console.log('[N6] platform-scoped native health modules');
@@ -629,6 +674,24 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
   check(
     'falsifier: silently exiting the 60 s post-restore loop with restoreOfferHandled == false fails the restore race contract',
     !hasPostRestoreOfferLoop(silentDeadlineExitPostRestore),
+  );
+  const unlockBody = suite.match(/private func unlockAdvancedTools\([\s\S]*?\n  \}/)?.[0] ?? '';
+  const hasDecoupledBuildUnlock = (src) => {
+    const code = stripSwiftComments(src);
+    return /\blet\s+build\s*=\s*element\(\s*labelBeginsWith:\s*"Build "\s*\)/.test(code)
+      && !src.includes('"Build 0.1.0"')
+      && /\bfor\s+_\s+in\s+1\.\.\.7\s*\{[^}]*\.tap\(\)/.test(code)
+      && /\bwait\(\s*element\(\s*"advanced-athlete-manager"\s*\)/.test(code);
+  };
+  check(
+    'unlockAdvancedTools uses element(labelBeginsWith: "Build "), omits "Build 0.1.0", and preserves the 7-tap unlock wait',
+    hasDecoupledBuildUnlock(unlockBody),
+    unlockBody.match(/let\s+build\s*=\s*[^\n]+/)?.[0]?.trim() ?? 'missing',
+  );
+  const hardcodedBuildUnlock = unlockBody.replace(/let\s+build\s*=\s*element\([^)]+\)/, 'let build = element("Build 0.1.0")');
+  check(
+    'falsifier: unlockAdvancedTools using element("Build 0.1.0") fails the decoupled build-label contract',
+    hardcodedBuildUnlock.includes('element("Build 0.1.0")') && !hasDecoupledBuildUnlock(hardcodedBuildUnlock),
   );
 }
 
