@@ -266,19 +266,40 @@ test('maps caller rules to approved SessionFeelReason IDs and derives ratified s
     ks_gct_delta_pct: 6.5,
     ks_cop_x_mean: 0.48,
   };
+  const defaultThresholds = {
+    maxGctDeltaPct: bridge.KINESTRIKE_BRIDGE_DEFAULTS.gctDeltaPctWarn,
+    maxHrvZForSoreness: bridge.KINESTRIKE_BRIDGE_DEFAULTS.zHrvFatigueMax,
+    minCopXLateralGuard: bridge.KINESTRIKE_BRIDGE_DEFAULTS.copXLateralGuardWarn,
+    maxCopXMedialShift: bridge.KINESTRIKE_BRIDGE_DEFAULTS.copXMedialShiftWarn,
+  };
+
+  // Ruling 6.2 (C): telemetry never emits 'pain' from CoP-X asymmetry; non-pain soreness stays intact.
+  expect(
+    bridge.evaluateKineStrikeFeelSuggestions(summary, { z_hrv_7d: -0.55 }, defaultThresholds),
+  ).toEqual(['soreness']);
   expect(
     bridge.evaluateKineStrikeFeelSuggestions(
-      summary,
+      { ...summary, ks_gct_delta_pct: 2.0, ks_cop_x_mean: 1.001 },
       { z_hrv_7d: -0.55 },
-      {
-        maxGctDeltaPct: bridge.KINESTRIKE_BRIDGE_DEFAULTS.gctDeltaPctWarn,
-        maxHrvZForSoreness: bridge.KINESTRIKE_BRIDGE_DEFAULTS.zHrvFatigueMax,
-        minCopXLateralGuard: bridge.KINESTRIKE_BRIDGE_DEFAULTS.copXLateralGuardWarn,
-        maxCopXMedialShift: bridge.KINESTRIKE_BRIDGE_DEFAULTS.copXMedialShiftWarn,
-      },
+      defaultThresholds,
     ),
-  ).toEqual(['soreness', 'pain']);
+  ).toEqual([]);
+  expect(
+    bridge.evaluateKineStrikeFeelSuggestions(
+      { ...summary, ks_gct_delta_pct: 2.0, ks_cop_x_mean: -0.95 },
+      { z_hrv_7d: 0.0 },
+      defaultThresholds,
+    ),
+  ).toEqual([]);
+  expect(() =>
+    bridge.evaluateKineStrikeFeelSuggestions(
+      summary,
+      { z_hrv_7d: 0.0 },
+      { ...defaultThresholds, maxCopXMedialShift: Number.NaN },
+    ),
+  ).toThrow('Invalid KineStrike thresholds');
 
+  // Ruling 6.2 Option C: retain ratified CoP-X sub-chip defaults (0.45 / -0.35), not peakLoadCvWarn (0.18).
   expect(bridge.deriveKineStrikeSubChips(summary)).toEqual(['medial_shift', 'gct_drift']);
   expect(
     bridge.deriveKineStrikeSubChips({
@@ -287,6 +308,89 @@ test('maps caller rules to approved SessionFeelReason IDs and derives ratified s
       ks_gct_delta_pct: 2.0,
     }),
   ).toEqual(['lateral_guard']);
+  expect(
+    bridge.deriveKineStrikeSubChips({
+      ...summary,
+      ks_cop_x_mean: 0.44,
+      ks_gct_delta_pct: 5.9,
+    }),
+  ).toEqual([]);
+  expect(
+    bridge.deriveKineStrikeSubChips({
+      ...summary,
+      ks_cop_x_mean: -0.34,
+      ks_gct_delta_pct: 5.9,
+    }),
+  ).toEqual([]);
+
+  // Ruling 6.1 (A): retain decimal rounding slack ([0, 1.001], [-1.001, 1.001], share sum 0.95..1.05)
+  // for ontarget_live_esp32.ino %.4f float formatting quantization.
+  expect(
+    bridge.parseKineStrikeSessionLog([
+      line('E,1,100,300,200,10,0.5'),
+      line('B,1,100,300,0.2500,0.2500,0.2500,0.2000,-1.0010'),
+    ]),
+  ).toMatchObject({
+    ks_heel_share_mean: 0.25,
+    ks_toe_share_mean: 0.2,
+    ks_cop_x_mean: -1.001,
+  });
+  expect(
+    bridge.parseKineStrikeSessionLog([
+      line('E,1,100,300,200,10,0.5'),
+      line('B,1,100,300,0.3500,0.3500,0.2000,0.1500,1.0010'),
+    ]),
+  ).toMatchObject({
+    ks_heel_share_mean: 0.35,
+    ks_toe_share_mean: 0.15,
+    ks_cop_x_mean: 1.001,
+  });
+  expect(
+    bridge.parseKineStrikeSessionLog([
+      line('E,1,100,300,200,10,0.5'),
+      line('B,1,100,300,1.0010,0,0,0,1.0010'),
+    ]),
+  ).toMatchObject({
+    ks_heel_share_mean: 1.001,
+    ks_cop_x_mean: 1.001,
+  });
+  expect(
+    bridge.parseKineStrikeSessionLog([
+      line('E,1,100,300,200,10,0.5'),
+      line('B,1,100,300,0.2500,0.2500,0.2500,0.1999,0.0000'),
+    ]).ks_heel_share_mean,
+  ).toBeNull();
+  expect(
+    bridge.parseKineStrikeSessionLog([
+      line('E,1,100,300,200,10,0.5'),
+      line('B,1,100,300,0.3500,0.3500,0.2000,0.1501,0.0000'),
+    ]).ks_heel_share_mean,
+  ).toBeNull();
+  expect(
+    bridge.parseKineStrikeSessionLog([
+      line('E,1,100,300,200,10,0.5'),
+      line('B,1,100,300,1.0011,0,0,0,0.0000'),
+    ]).ks_heel_share_mean,
+  ).toBeNull();
+  expect(
+    bridge.parseKineStrikeSessionLog([
+      line('E,1,100,300,200,10,0.5'),
+      line('B,1,100,300,0.5000,0.5000,0,0,-1.0011'),
+    ]).ks_cop_x_mean,
+  ).toBeNull();
+  expect(
+    bridge.isKineStrikeBiometricBridgeV1({
+      ...payload(),
+      ks_heel_share_mean: 1.001,
+      ks_cop_x_mean: -1.001,
+    }),
+  ).toBe(true);
+  expect(
+    bridge.isKineStrikeBiometricBridgeV1({
+      ...payload(),
+      ks_cop_x_mean: 1.0011,
+    }),
+  ).toBe(false);
 });
 
 test('invalid configuration cannot suggest an unapproved reason', () => {

@@ -120,6 +120,8 @@ const NUMBER_BOUNDS = {
   ks_gct_delta_pct: [-Infinity, Infinity],
   ks_peak_load_mean: [0, Infinity],
   ks_peak_load_cv: [0, Infinity],
+  // Ruling 6.1 (A): retain [0, 1.001] and [-1.001, 1.001] decimal rounding slack
+  // for ontarget_live_esp32.ino %.4f serialization quantization (matching ks_live_common.py).
   ks_heel_share_mean: [0, 1.001],
   ks_medial_share_mean: [0, 1.001],
   ks_lateral_share_mean: [0, 1.001],
@@ -316,6 +318,8 @@ export function parseKineStrikeSessionLog(
       const v = numbers(p, [1, 2, 3, 4, 5, 6, 7, 8]);
       if (!v) continue;
       const [seq, start, end, ...shares] = v;
+      // Ruling 6.1 (A): retain [0, 1.001], [-1.001, 1.001], and 0.95..1.05 tolerances
+      // for ontarget_live_esp32.ino %.4f serialization quantization (matching ks_live_common.py).
       if (
         !uint(seq) ||
         seq === 0 ||
@@ -455,7 +459,12 @@ export function mapKineStrikeSessionFeelReasons(
   return [...result];
 }
 
-/** Advisory reason IDs use caller-supplied thresholds and never record an answer. */
+/**
+ * Advisory reason IDs use caller-supplied thresholds and never record an answer.
+ * Ruling 6.2 (C): telemetry may suggest `'soreness'` only; CoP-X asymmetry surfaces
+ * informational sub-chips via `deriveKineStrikeSubChips` and never emits `'pain'`.
+ * CoP-X threshold fields remain validated on `thresholds` for caller compatibility.
+ */
 export function evaluateKineStrikeFeelSuggestions(
   summary: KineStrikeTelemetrySummary,
   readiness: { z_hrv_7d: number | null },
@@ -485,13 +494,6 @@ export function evaluateKineStrikeFeelSuggestions(
     readiness.z_hrv_7d <= thresholds.maxHrvZForSoreness
   ) {
     result.push('soreness');
-  }
-  if (
-    finite(summary.ks_cop_x_mean) &&
-    (summary.ks_cop_x_mean <= thresholds.minCopXLateralGuard ||
-      summary.ks_cop_x_mean >= thresholds.maxCopXMedialShift)
-  ) {
-    result.push('pain');
   }
   return result;
 }

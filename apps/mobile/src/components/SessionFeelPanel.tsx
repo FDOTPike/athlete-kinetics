@@ -234,7 +234,10 @@ export function SessionFeelPanel({
     if (kind !== feel) {
       if (feel === null && saved === null && !reasonToggledByUser.current && suggestedReasons.length > 0) {
         const offered = sessionFeelOfferedReasons(kind, saved);
-        setReasons(suggestedReasons.filter((reason) => offered.includes(reason)));
+        // Ruling 6.2 (C): telemetry must never pre-select 'pain'; explicit athlete tap required.
+        setReasons(
+          suggestedReasons.filter((reason) => reason !== 'pain' && offered.includes(reason)),
+        );
       } else {
         setReasons([]);
       }

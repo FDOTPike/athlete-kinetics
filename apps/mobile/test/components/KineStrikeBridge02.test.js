@@ -159,7 +159,7 @@ describe('WO-KS-BRIDGE-02 Deliverable B: SessionFeelPanel 1-Tap Pre-Selection & 
     });
   });
 
-  test('pre-highlights suggestedReasonCodes on first harder/stopped_early selection and renders ratified sub-chips', () => {
+  test('surfaces ratified sub-chips and requires explicit tap for pain while preserving non-pain suggestions', () => {
     const onSave = ruleOnly();
     const onClose = jest.fn();
     render(
@@ -182,18 +182,70 @@ describe('WO-KS-BRIDGE-02 Deliverable B: SessionFeelPanel 1-Tap Pre-Selection & 
     );
     expect(screen.queryByTestId('session-feel-kinestrike-subchip-lateral_guard')).toBeNull();
 
-    // 1-tap flow: tap "Harder than planned" -> suggested reasons ('pain' and 'tired' mapped from 'soreness') are pre-selected
+    // Ruling 6.2 (C): tapping "Harder than planned" keeps non-pain suggestion ('tired' mapped from 'soreness')
+    // pre-selected, and NEVER pre-selects 'pain' from telemetry.
     fireEvent.press(screen.getByTestId('session-feel-harder'));
-    expect(screen.getByTestId('session-feel-reason-pain').props.accessibilityState.selected).toBe(true);
+    expect(screen.getByTestId('session-feel-reason-pain').props.accessibilityState.selected).toBe(false);
     expect(screen.getByTestId('session-feel-reason-tired').props.accessibilityState.selected).toBe(true);
 
-    // Athlete can save directly in 1 tap or untoggle a pre-selected reason first
+    // Saving without tapping 'pain' persists only the non-pain suggestion; never stores reason_pain.
+    fireEvent.press(screen.getByTestId('session-feel-save'));
+    expect(onSave).toHaveBeenLastCalledWith({ feel: 'harder', reasons: ['tired'] }, '');
+    expect(onClose).toHaveBeenCalledTimes(1);
+
+    // Explicit athlete tap on session-feel-reason-pain is required before 'pain' is selected or persisted.
     fireEvent.press(screen.getByTestId('session-feel-reason-tired'));
     expect(screen.getByTestId('session-feel-reason-tired').props.accessibilityState.selected).toBe(false);
+    fireEvent.press(screen.getByTestId('session-feel-reason-pain'));
+    expect(screen.getByTestId('session-feel-reason-pain').props.accessibilityState.selected).toBe(true);
 
     fireEvent.press(screen.getByTestId('session-feel-save'));
     expect(onSave).toHaveBeenLastCalledWith({ feel: 'harder', reasons: ['pain'] }, '');
-    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onClose).toHaveBeenCalledTimes(2);
+  });
+
+  test('never pre-selects pain from telemetry on stopped_early or easier initial selection', () => {
+    const onSaveStopped = ruleOnly();
+    render(
+      <SessionFeelPanel
+        saved={null}
+        note={null}
+        suggestedReasonCodes={['pain', 'soreness']}
+        suggestedKineStrikeSubChips={['lateral_guard']}
+        onSave={onSaveStopped}
+        onClose={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('session-feel-kinestrike-subchip-lateral_guard')).toBeOnTheScreen();
+    fireEvent.press(screen.getByTestId('session-feel-stopped_early'));
+    expect(screen.getByTestId('session-feel-reason-pain').props.accessibilityState.selected).toBe(false);
+    expect(screen.getByTestId('session-feel-reason-tired').props.accessibilityState.selected).toBe(true);
+    fireEvent.press(screen.getByTestId('session-feel-save'));
+    expect(onSaveStopped).toHaveBeenLastCalledWith({ feel: 'stopped_early', reasons: ['tired'] }, '');
+  });
+
+  test('never pre-selects pain from telemetry on easier initial selection', () => {
+    const onSaveEasier = ruleOnly();
+    render(
+      <SessionFeelPanel
+        saved={null}
+        note={null}
+        suggestedReasonCodes={['pain', 'soreness']}
+        suggestedKineStrikeSubChips={['medial_shift']}
+        onSave={onSaveEasier}
+        onClose={jest.fn()}
+      />,
+    );
+
+    fireEvent.press(screen.getByTestId('session-feel-easier'));
+    expect(
+      screen.queryByTestId('session-feel-reason-pain')?.props?.accessibilityState?.selected ?? false,
+    ).toBe(false);
+    fireEvent.press(screen.getByTestId('session-feel-save'));
+    for (const [savedAnswer] of onSaveEasier.mock.calls) {
+      expect(savedAnswer.reasons).not.toContain('pain');
+    }
   });
 
   test('never overwrites an already-saved answer and ignores poisoned/unknown suggestion codes', () => {
