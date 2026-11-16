@@ -8,9 +8,9 @@
  * router (`computeSubstitutions`).
  *
  * Architectural boundaries enforced by construction:
- *   1. No module-level candidate threshold defaults (`LongitudinalAutopilotPolicy`
- *      must be explicitly supplied by the caller; null or invalid policy fails
- *      closed to a neutral overlay).
+ *   1. `LongitudinalAutopilotPolicy` must be explicitly supplied by the caller
+ *      (including the ratified `DEFAULT_LONGITUDINAL_AUTOPILOT_POLICY`); null or
+ *      invalid policy fails closed to a neutral overlay without internal fallback.
  *   2. Cross-block `073` slot-replacement + joint-discomfort memory promotes
  *      a movement to `MOVEMENT_PREFERENCE.AVOID` (`-1`) + Layer 1 green
  *      regression (`selectSubstitution`) across the trailing `swapWindowBlocks`
@@ -39,21 +39,23 @@ import {
 } from './types';
 import { LOAD_MODIFIER_LITERALS } from './outputSchema';
 import type { Guardrail } from './semantic/codebase';
-import type {
-  BlockPlan,
-  BlockTimeBudget,
-  PlannedSessionPlan,
-  PlannedSessionTime,
-  PlannedSlotPlan,
+import {
+  generateBlock,
+  type BlockInput,
+  type BlockPlan,
+  type BlockTimeBudget,
+  type PlannedSessionPlan,
+  type PlannedSessionTime,
+  type PlannedSlotPlan,
 } from './blockGenerator';
 import type { ExecutableMovementAccessContext } from './tierPolicy';
 import {
   SESSION_TIME_CONTRACT_VERSION,
   describeSessionTimeConflict,
-  feasibleSessionAlternatives,
   fitSessionToCap,
   normalizedCapMin,
   preparationPlanningMinutes,
+  type SessionTimeAlternative,
   type SessionTimeEstimate,
 } from './sessionTimeBudget';
 import {
@@ -75,11 +77,13 @@ import {
 import {
   buildCompletionWindow,
   deriveCompletionAction,
+  isValidCompletionActionPolicy,
   summarizeCompletionWindow,
   type CompletionActionPolicy,
   type WindowCompletionRow,
 } from './completionAction';
 import {
+  JOINTS,
   PATTERN_JOINTS,
   SUBSTITUTION_COLORS,
   computeSubstitutions,
@@ -120,9 +124,27 @@ export interface LongitudinalAutopilotPolicy {
   readonly mClean: number;
   /** Explicit completion shortfall policy; null disables completion reduction. */
   readonly completionPolicy: CompletionActionPolicy | null;
-  /** Optional explicit Week-3 7-day completion observation floor (>= 1); falls back to `completionPolicy.minObservationDays`. */
+  /** Optional explicit Week-3 7-day completion observation floor (1..7); falls back to `completionPolicy.minObservationDays`. */
   readonly week3CompletionMinObservationDays?: number;
 }
+
+/** Ratified V1 default longitudinal autopilot policy (Ruling 1.1). */
+export const DEFAULT_LONGITUDINAL_AUTOPILOT_POLICY: LongitudinalAutopilotPolicy =
+  Object.freeze({
+    kTrigger: 2,
+    swapWindowBlocks: 3,
+    mCadence: 2,
+    mClean: 2,
+    week3CompletionMinObservationDays: 2,
+    completionPolicy: Object.freeze({
+      minObservationDays: 5,
+      deficitThreshold: 0.2,
+      strongThreshold: 0.4,
+      moderateSetReduction: -1,
+      strongSetReduction: -2,
+      strongLoadFactor: 0.95,
+    }),
+  });
 
 export type LongitudinalSwapCause =
   | 'joint_discomfort'
@@ -270,6 +292,8 @@ export interface ApplyLongitudinalOverlayOptions {
   readonly protectedSlotKeys?: ReadonlySet<string>;
   /** Optional weekly training frequency override; defaults to Week-1 session count. */
   readonly weeklyFrequency?: number;
+  /** Optional originating `BlockInput` used to re-plan and verify time-budget conflict offers. */
+  readonly blockInput?: BlockInput;
 }
 
 // ---------------------------------------------------------------------------
@@ -306,29 +330,6 @@ const defaultPatternMap = <T>(fill: T): Record<MovementPattern, T> => {
   return out;
 };
 
-const isValidCompletionPolicy = (
-  candidate: unknown,
-): candidate is CompletionActionPolicy => {
-  if (candidate === null || typeof candidate !== 'object') return false;
-  const record = candidate as Record<string, unknown>;
-  const minObs = record.minObservationDays;
-  const deficit = record.deficitThreshold;
-  const strong = record.strongThreshold;
-  return (
-    typeof minObs === 'number' &&
-    Number.isInteger(minObs) &&
-    minObs >= 1 &&
-    typeof deficit === 'number' &&
-    Number.isFinite(deficit) &&
-    deficit > 0 &&
-    deficit <= 1 &&
-    typeof strong === 'number' &&
-    Number.isFinite(strong) &&
-    strong >= deficit &&
-    strong <= 1
-  );
-};
-
 /** Validate explicit longitudinal policy without supplying fallback numbers. */
 export function isValidLongitudinalAutopilotPolicy(
   policy: unknown,
@@ -347,7 +348,8 @@ export function isValidLongitudinalAutopilotPolicy(
     week3CompletionMinObservationDays === undefined ||
     (typeof week3CompletionMinObservationDays === 'number' &&
       Number.isInteger(week3CompletionMinObservationDays) &&
-      week3CompletionMinObservationDays >= 1);
+      week3CompletionMinObservationDays >= 1 &&
+      week3CompletionMinObservationDays <= 7);
   return (
     typeof kTrigger === 'number' &&
     Number.isInteger(kTrigger) &&
@@ -362,7 +364,7 @@ export function isValidLongitudinalAutopilotPolicy(
     Number.isInteger(mClean) &&
     mClean >= 1 &&
     validWeek3MinObs &&
-    (completionPolicy === null || isValidCompletionPolicy(completionPolicy))
+    (completionPolicy === null || isValidCompletionActionPolicy(completionPolicy))
   );
 }
 
@@ -415,6 +417,22 @@ const isReductionCorrection = (corr: PatternCorrection): boolean =>
   corr.dRpe_p < 0 ||
   corr.prefBias_p < 0;
 
+const finalizeControlAction = (
+  corrections: Record<MovementPattern, PatternCorrection>,
+): ControlAction => ({
+  corrections,
+  blockAddedSets: MOVEMENT_PATTERNS.reduce(
+    (sum, pattern) => sum + Math.max(0, corrections[pattern].dSet_p),
+    0,
+  ),
+  blockAddedRpe: round4(
+    MOVEMENT_PATTERNS.reduce(
+      (sum, pattern) => sum + Math.max(0, corrections[pattern].dRpe_p),
+      0,
+    ),
+  ),
+});
+
 /** Compose RPE action with objective completion reductions and beginner load clamp. */
 const composeBlockBoundaryAction = (
   rpeAction: ControlAction,
@@ -449,23 +467,62 @@ const composeBlockBoundaryAction = (
 
     corrections[pattern] = {
       dLoad_p: snapToLiteral(dLoad, LOAD_MODIFIER_LITERALS),
-      dSet_p: clampInt(dSet, -1, 1),
+      dSet_p: clampInt(dSet, -2, 1),
       dRpe_p: Math.round(Math.min(0.5, Math.max(-0.5, dRpe)) * 2) / 2,
       prefBias_p: clampInt(prefBias, -1, 1) as -1 | 0 | 1,
     };
   }
 
-  const blockAddedSets = MOVEMENT_PATTERNS.reduce(
-    (sum, pattern) => sum + Math.max(0, corrections[pattern].dSet_p),
-    0,
-  );
-  const blockAddedRpe = round4(
-    MOVEMENT_PATTERNS.reduce(
-      (sum, pattern) => sum + Math.max(0, corrections[pattern].dRpe_p),
-      0,
-    ),
-  );
-  return { corrections, blockAddedSets, blockAddedRpe };
+  return finalizeControlAction(corrections);
+};
+
+/** Resolve joints carrying an active non-halting upcoming niggle in [triageMin, haltMin). */
+const resolveUpcomingTriageJoints = (
+  niggles: readonly NiggleInput[] | undefined,
+  triageMin: number,
+  haltMin: number,
+): Set<Joint> => {
+  const joints = new Set<Joint>();
+  for (const niggle of niggles ?? []) {
+    if (niggle.severity < triageMin || niggle.severity >= haltMin) continue;
+    const region = niggle.region.toLowerCase();
+    for (const joint of JOINTS) {
+      if (region.includes(joint) || region.includes(joint.replace('_', ' '))) {
+        joints.add(joint);
+      }
+    }
+  }
+  return joints;
+};
+
+/**
+ * Clamp positive prescription progression (dLoad_p, dSet_p, dRpe_p, prefBias_p)
+ * on patterns loading any joint in `upcomingTriageJoints` without adding a
+ * double-negative pull-down.
+ */
+const clampActionForUpcomingNiggles = (
+  action: ControlAction,
+  upcomingTriageJoints: ReadonlySet<Joint>,
+): ControlAction => {
+  if (upcomingTriageJoints.size === 0) return action;
+  const corrections = {} as Record<MovementPattern, PatternCorrection>;
+  for (const pattern of MOVEMENT_PATTERNS) {
+    const corr = action.corrections[pattern] ?? NEUTRAL_CORRECTION;
+    const loadsAffectedJoint = (PATTERN_JOINTS[pattern] ?? []).some((joint) =>
+      upcomingTriageJoints.has(joint),
+    );
+    if (!loadsAffectedJoint) {
+      corrections[pattern] = corr;
+      continue;
+    }
+    corrections[pattern] = {
+      dLoad_p: Math.min(NEUTRAL_LOAD_MODIFIER, corr.dLoad_p),
+      dSet_p: Math.min(0, corr.dSet_p),
+      dRpe_p: Math.min(0, corr.dRpe_p),
+      prefBias_p: Math.min(0, corr.prefBias_p) as -1 | 0 | 1,
+    };
+  }
+  return finalizeControlAction(corrections);
 };
 
 // ---------------------------------------------------------------------------
@@ -957,6 +1014,15 @@ export function evaluateLongitudinalAutopilot(
       input.profile,
       effectiveGuardrail,
     );
+    const upcomingTriageJoints = resolveUpcomingTriageJoints(
+      input.upcomingBlockNiggles,
+      triageMin,
+      haltMin,
+    );
+    controlAction = clampActionForUpcomingNiggles(
+      controlAction,
+      upcomingTriageJoints,
+    );
   }
 
   const cumulativeMacrocycleRpeGranted = round4(
@@ -1011,6 +1077,73 @@ const lookupTimePolicy = (
   return (timePolicyByMovementId as Readonly<Record<number, MovementTimePolicyInput>>)[
     movementId
   ];
+};
+
+const verifiedOverlayAlternatives = (
+  blockInput: BlockInput,
+  capMin: number,
+  requiredMin: number,
+  frequency: number,
+  movementPatternById:
+    | ReadonlyMap<number, MovementPattern>
+    | Readonly<Record<number, MovementPattern>>,
+  overlay: LongitudinalAutopilotResult,
+  options: ApplyLongitudinalOverlayOptions,
+): readonly SessionTimeAlternative[] => {
+  const conflictFree = (candidate: BlockInput): boolean => {
+    try {
+      const projected = applyLongitudinalOverlayToBlockPlan(
+        generateBlock(candidate),
+        movementPatternById,
+        overlay,
+        { ...options, blockInput: undefined },
+      );
+      return projected.timeBudget.conflicts.length === 0;
+    } catch {
+      return false;
+    }
+  };
+
+  const clampedFrequency = clampInt(frequency, 1, 7);
+  const first = Math.max(
+    Math.ceil(requiredMin / 15) * 15,
+    (Math.floor(capMin / 15) + 1) * 15,
+  );
+  for (let candidateCap = first; candidateCap <= 240; candidateCap += 15) {
+    if (
+      !conflictFree({
+        ...blockInput,
+        profile: { ...blockInput.profile, session_duration_cap_min: candidateCap },
+      })
+    ) {
+      continue;
+    }
+    const offers: SessionTimeAlternative[] = [
+      { kind: 'extend_session', capMin: candidateCap },
+    ];
+    const fewerDays = Math.floor((clampedFrequency * capMin) / candidateCap);
+    if (fewerDays >= 1 && fewerDays < clampedFrequency) {
+      const { programDays: _programDays, ...withoutDays } = blockInput;
+      if (
+        conflictFree({
+          ...withoutDays,
+          profile: {
+            ...blockInput.profile,
+            weekly_frequency: fewerDays,
+            session_duration_cap_min: candidateCap,
+          },
+        })
+      ) {
+        offers.push({
+          kind: 'fewer_longer_sessions',
+          weeklyFrequency: fewerDays,
+          capMin: candidateCap,
+        });
+      }
+    }
+    return offers;
+  }
+  return [];
 };
 
 /**
@@ -1138,6 +1271,7 @@ export function applyLongitudinalOverlayToBlockPlan(
 
   for (const session of sessions) {
     const deloadSession = session.phase === 'deload';
+    const preserved = deloadSession || blockPlan.recovery;
     const fit = fitSessionToCap({
       capMin,
       preparationMin: preparationAllowance,
@@ -1165,7 +1299,7 @@ export function applyLongitudinalOverlayToBlockPlan(
             !protectedSlots.has(`${session.week_index}:${session.day_index}:${slot.slot_index}`)
               ? 0
               : 1,
-          trimmable: !locomotion,
+          trimmable: !locomotion && !preserved,
         };
       }),
     });
@@ -1202,14 +1336,18 @@ export function applyLongitudinalOverlayToBlockPlan(
     options?.weeklyFrequency ??
     Math.max(1, sessions.filter((session) => session.week_index === 1).length);
   const alternatives =
-    worstRequiredMin === 0
+    worstRequiredMin === 0 || options?.blockInput === undefined
       ? []
       : [
-          ...feasibleSessionAlternatives({
+          ...verifiedOverlayAlternatives(
+            options.blockInput,
             capMin,
-            requiredMin: worstRequiredMin,
-            weeklyFrequency: derivedFrequency,
-          }),
+            worstRequiredMin,
+            derivedFrequency,
+            movementPatternById,
+            overlay,
+            options,
+          ),
         ];
   for (const pending of pendingConflicts) {
     conflictSet.add(

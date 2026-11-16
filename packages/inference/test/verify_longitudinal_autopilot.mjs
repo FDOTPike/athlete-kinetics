@@ -34,6 +34,7 @@ import { join } from 'node:path';
 const require = createRequire(import.meta.url);
 const longitudinalMod = require('./.build/longitudinalAutopilot.js');
 const {
+  DEFAULT_LONGITUDINAL_AUTOPILOT_POLICY,
   EQUIPMENT_NON_PATHOLOGICAL_CAUSES,
   EQUIPMENT_NON_PATHOLOGICAL_PHRASE_IDS,
   LONGITUDINAL_MRV_MAX_SETS,
@@ -537,6 +538,7 @@ const makeBlockRecord = ({
 console.log('\n[longitudinal 1] export surface & negative source invariants');
 
 const EXPECTED_EXPORTS = [
+  'DEFAULT_LONGITUDINAL_AUTOPILOT_POLICY',
   'EQUIPMENT_NON_PATHOLOGICAL_CAUSES',
   'EQUIPMENT_NON_PATHOLOGICAL_PHRASE_IDS',
   'LONGITUDINAL_MRV_MAX_SETS',
@@ -547,8 +549,24 @@ const EXPECTED_EXPORTS = [
   'selectSubstitution',
 ].sort();
 
-check('exported runtime surface is exact (no unratified default policy constants)', () => {
+check('exported runtime surface is exact and includes ratified DEFAULT_LONGITUDINAL_AUTOPILOT_POLICY (Ruling 1.1)', () => {
   assert.deepEqual(Object.keys(longitudinalMod).sort(), EXPECTED_EXPORTS);
+  assert.deepEqual(DEFAULT_LONGITUDINAL_AUTOPILOT_POLICY, {
+    kTrigger: 2,
+    swapWindowBlocks: 3,
+    mCadence: 2,
+    mClean: 2,
+    week3CompletionMinObservationDays: 2,
+    completionPolicy: {
+      minObservationDays: 5,
+      deficitThreshold: 0.2,
+      strongThreshold: 0.4,
+      moderateSetReduction: -1,
+      strongSetReduction: -2,
+      strongLoadFactor: 0.95,
+    },
+  });
+  assert.equal(isValidLongitudinalAutopilotPolicy(DEFAULT_LONGITUDINAL_AUTOPILOT_POLICY), true);
   assert.equal(LONGITUDINAL_MRV_MIN_SETS, 1);
   assert.equal(LONGITUDINAL_MRV_MAX_SETS, 10);
   assert.deepEqual([...EQUIPMENT_NON_PATHOLOGICAL_CAUSES], ['equipment_busy']);
@@ -624,7 +642,47 @@ check('null or malformed policy fails closed to neutral overlay', () => {
       swapWindowBlocks: 3,
       mCadence: 2,
       mClean: 2,
+      week3CompletionMinObservationDays: 8,
+      completionPolicy: null,
+    },
+    {
+      kTrigger: 2,
+      swapWindowBlocks: 3,
+      mCadence: 2,
+      mClean: 2,
+      week3CompletionMinObservationDays: 1.5,
+      completionPolicy: null,
+    },
+    {
+      kTrigger: 2,
+      swapWindowBlocks: 3,
+      mCadence: 2,
+      mClean: 2,
       completionPolicy: { minObservationDays: 0, deficitThreshold: 0, strongThreshold: Number.NaN },
+    },
+    {
+      kTrigger: 2,
+      swapWindowBlocks: 3,
+      mCadence: 2,
+      mClean: 2,
+      completionPolicy: {
+        minObservationDays: 5,
+        deficitThreshold: 0.2,
+        strongThreshold: 0.4,
+        strongSetReduction: -3,
+      },
+    },
+    {
+      kTrigger: 2,
+      swapWindowBlocks: 3,
+      mCadence: 2,
+      mClean: 2,
+      completionPolicy: {
+        minObservationDays: 5,
+        deficitThreshold: 0.2,
+        strongThreshold: 0.4,
+        strongLoadFactor: 1.2,
+      },
     },
   ]) {
     assert.equal(isValidLongitudinalAutopilotPolicy(badPolicy), false);
@@ -1293,14 +1351,27 @@ check('Week-3 completion overreach honours policy observation-day floor instead 
   });
   assert.equal(oneDayOut.week3SetTrimByPattern.squat, 0);
 
-  // Explicit caller-supplied week3CompletionMinObservationDays: 2 engages at 2 days.
+  // Explicit caller-supplied week3CompletionMinObservationDays: 2 engages at 2 days,
+  // and validation bounds Week-3 observation days strictly to integer 1..7 (Ruling 1.2).
   const twoDayPolicy = {
     ...EXPLICIT_POLICY,
     week3CompletionMinObservationDays: 2,
   };
   assert.equal(isValidLongitudinalAutopilotPolicy(twoDayPolicy), true);
   assert.equal(
+    isValidLongitudinalAutopilotPolicy({ ...EXPLICIT_POLICY, week3CompletionMinObservationDays: 1 }),
+    true,
+  );
+  assert.equal(
+    isValidLongitudinalAutopilotPolicy({ ...EXPLICIT_POLICY, week3CompletionMinObservationDays: 7 }),
+    true,
+  );
+  assert.equal(
     isValidLongitudinalAutopilotPolicy({ ...EXPLICIT_POLICY, week3CompletionMinObservationDays: 0 }),
+    false,
+  );
+  assert.equal(
+    isValidLongitudinalAutopilotPolicy({ ...EXPLICIT_POLICY, week3CompletionMinObservationDays: 8 }),
     false,
   );
   const twoDayOut = evaluateLongitudinalAutopilot({
@@ -1313,6 +1384,25 @@ check('Week-3 completion overreach honours policy observation-day floor instead 
     policy: twoDayPolicy,
   });
   assert.equal(twoDayOut.week3SetTrimByPattern.squat, -1);
+
+  // DEFAULT_LONGITUDINAL_AUTOPILOT_POLICY uses week3CompletionMinObservationDays=2 for 7-day
+  // Week-3 evaluation while keeping 21-day completionPolicy.minObservationDays=5 untouched.
+  const defaultSepOut = evaluateLongitudinalAutopilot({
+    profile: { ...DEFAULT_PROFILE, training_age: 'intermediate' },
+    library: TEST_LIBRARY,
+    inventory: STANDARD_EQUIPMENT_ITEMS,
+    blocks: [mkSingleDayW3Comp(1, '2026-01-05', 2), mkSingleDayW3Comp(2, '2026-02-02', 2)],
+    upcomingMacroBlockIndex: 3,
+    upcomingMacroPhase: 'hypertrophy',
+    policy: DEFAULT_LONGITUDINAL_AUTOPILOT_POLICY,
+  });
+  assert.equal(defaultSepOut.week3SetTrimByPattern.squat, -1);
+  assert.deepEqual(defaultSepOut.controlAction.corrections.squat, {
+    dLoad_p: 1,
+    dSet_p: 0,
+    dRpe_p: 0,
+    prefBias_p: 0,
+  });
 });
 
 check('acute upcoming halt exposes haltAdvised === true and refuses non-recovery BlockPlan projection, while recomputed timeBudget flags over-cap substitutions', () => {
@@ -1406,6 +1496,158 @@ check('acute upcoming halt exposes haltAdvised === true and refuses non-recovery
     overCapProjected.timeBudget.sessions.some((s) => !s.feasible && s.overByMin > 0),
     true,
   );
+  // Without blockInput, verified time-budget alternatives fail closed to [].
+  assert.deepEqual(overCapProjected.timeBudget.alternatives, []);
+});
+
+check('applyLongitudinalOverlayToBlockPlan keeps deload & recovery sets fixed when over cap (4566068336) and verifies alternatives when blockInput provided (4566068346)', () => {
+  const blockInput = {
+    profile: { ...DEFAULT_PROFILE, objective: 'strength', training_age: 'intermediate', session_duration_cap_min: 60 },
+    movements: GENERATOR_LIBRARY,
+    startDate: '2026-03-02',
+    macroBlockIndex: 3,
+  };
+  const basePlan = generateBlock(blockInput);
+  const patternById = new Map(GENERATOR_LIBRARY.map((m) => [m.movement_id, m.pattern]));
+  const neutralOverlay = evaluateLongitudinalAutopilot({
+    profile: blockInput.profile,
+    library: TEST_LIBRARY,
+    inventory: STANDARD_EQUIPMENT_ITEMS,
+    blocks: [],
+    upcomingMacroBlockIndex: 3,
+    upcomingMacroPhase: 'hypertrophy',
+    policy: EXPLICIT_POLICY,
+  });
+
+  // 1. Deload sessions must never be trimmed in fitSessionToCap even when exceeding capMin.
+  const tightDeloadPlan = {
+    ...clone(basePlan),
+    timeBudget: {
+      ...clone(basePlan.timeBudget),
+      capMin: 15,
+    },
+  };
+  const deloadBeforeSets = tightDeloadPlan.sessions
+    .filter((s) => s.phase === 'deload')
+    .map((s) => s.slots.map((sl) => sl.sets));
+  const projectedTightDeload = applyLongitudinalOverlayToBlockPlan(
+    tightDeloadPlan,
+    patternById,
+    neutralOverlay,
+  );
+  const deloadSessionsAfter = projectedTightDeload.sessions.filter((s) => s.phase === 'deload');
+  const deloadSessionTimesAfter = projectedTightDeload.timeBudget.sessions.filter(
+    (_, idx) => projectedTightDeload.sessions[idx].phase === 'deload',
+  );
+  assert.equal(deloadSessionsAfter.length > 0, true);
+  assert.deepEqual(
+    deloadSessionsAfter.map((s) => s.slots.map((sl) => sl.sets)),
+    deloadBeforeSets,
+  );
+  for (const st of deloadSessionTimesAfter) {
+    assert.deepEqual(st.trimmedSlotIndexes, []);
+    assert.equal(st.feasible, false);
+  }
+  assert.equal(projectedTightDeload.timeBudget.conflicts.length > 0, true);
+
+  // 2. Recovery blocks must also remain untouched (trimmable = false) under time fitting.
+  const recoveryPlan = {
+    ...clone(tightDeloadPlan),
+    recovery: true,
+  };
+  const projectedRecovery = applyLongitudinalOverlayToBlockPlan(
+    recoveryPlan,
+    patternById,
+    neutralOverlay,
+  );
+  assert.deepEqual(
+    projectedRecovery.sessions.map((s) => s.slots.map((sl) => sl.sets)),
+    recoveryPlan.sessions.map((s) => s.slots.map((sl) => sl.sets)),
+  );
+  for (const st of projectedRecovery.timeBudget.sessions) {
+    assert.deepEqual(st.trimmedSlotIndexes, []);
+  }
+
+  // 3. Verified alternatives with blockInput: every offered option actually replans + overlays conflict-free.
+  const d = makeWindowDates('2026-01-05', 21);
+  const swapBlock1 = makeBlockRecord({
+    blockSequence: 1,
+    macroBlockIndex: 1,
+    startDate: '2026-01-05',
+    niggleRows: [{ date: d[8], region: 'shoulder', severity: 5 }],
+    swapRecords: [
+      {
+        sessionDate: addDaysIso('2026-01-05', 8),
+        sessionPlanSlotId: 10,
+        replacedBySessionPlanSlotId: 11,
+        originalMovementId: 201,
+        replacementMovementId: 203,
+        pattern: 'push_h',
+        cause: 'joint_discomfort',
+      },
+    ],
+  });
+  const swapBlock2 = makeBlockRecord({
+    blockSequence: 2,
+    macroBlockIndex: 2,
+    startDate: '2026-02-02',
+    niggleRows: [{ date: addDaysIso('2026-02-02', 8), region: 'shoulder', severity: 5 }],
+    swapRecords: [
+      {
+        sessionDate: addDaysIso('2026-02-02', 8),
+        sessionPlanSlotId: 20,
+        replacedBySessionPlanSlotId: 21,
+        originalMovementId: 201,
+        replacementMovementId: 203,
+        pattern: 'push_h',
+        cause: 'joint_discomfort',
+      },
+    ],
+  });
+  const subOverlay = evaluateLongitudinalAutopilot({
+    profile: blockInput.profile,
+    library: TEST_LIBRARY,
+    inventory: STANDARD_EQUIPMENT_ITEMS,
+    blocks: [swapBlock1, swapBlock2],
+    upcomingMacroBlockIndex: 3,
+    upcomingMacroPhase: 'hypertrophy',
+    policy: EXPLICIT_POLICY,
+  });
+  const verifyOptions = {
+    timePolicyByMovementId: { 203: { defaultSets: 4, targetSeconds: 600 } },
+    blockInput,
+  };
+  const verifiedConflict = applyLongitudinalOverlayToBlockPlan(
+    basePlan,
+    patternById,
+    subOverlay,
+    verifyOptions,
+  );
+  assert.equal(verifiedConflict.timeBudget.conflicts.length > 0, true, 'expected time conflict at 60m cap');
+  assert.equal(verifiedConflict.timeBudget.alternatives.length > 0, true, 'expected verified alternatives');
+  for (const alt of verifiedConflict.timeBudget.alternatives) {
+    const candidateInput =
+      alt.kind === 'extend_session'
+        ? {
+            ...blockInput,
+            profile: { ...blockInput.profile, session_duration_cap_min: alt.capMin },
+          }
+        : {
+            ...blockInput,
+            profile: {
+              ...blockInput.profile,
+              weekly_frequency: alt.weeklyFrequency,
+              session_duration_cap_min: alt.capMin,
+            },
+          };
+    const verifiedPlan = applyLongitudinalOverlayToBlockPlan(
+      generateBlock(candidateInput),
+      patternById,
+      subOverlay,
+      { timePolicyByMovementId: verifyOptions.timePolicyByMovementId },
+    );
+    assert.equal(verifiedPlan.timeBudget.conflicts.length, 0);
+  }
 });
 
 // ===========================================================================
@@ -1576,6 +1818,224 @@ check('multi-macrocycle trajectory counts each boundary grant once, enforces <= 
     policy: EXPLICIT_POLICY,
   });
   assert.equal(suspendedOut.controlAction.blockAddedRpe, 0);
+});
+
+check('Ruling 1.1 DEFAULT_LONGITUDINAL_AUTOPILOT_POLICY strong completion shortfall (0.4) emits dSet_p = -2 while null policy fails closed', () => {
+  const d = makeWindowDates('2026-01-05', 21);
+  const mismatchBlock = makeBlockRecord({
+    blockSequence: 1,
+    macroBlockIndex: 1,
+    startDate: '2026-01-05',
+    setRows: makePatternSetRows(d, 'squat', -1.5, 4),
+    completionRows: d.slice(14, 21).map((date) => ({
+      date,
+      pattern: 'squat',
+      evidenceCount: 4,
+      sumShortfall: 1.6, // 0.4 >= ratified strongThreshold 0.4
+    })),
+  });
+
+  const out = evaluateLongitudinalAutopilot({
+    profile: { ...DEFAULT_PROFILE, training_age: 'intermediate' },
+    library: TEST_LIBRARY,
+    inventory: STANDARD_EQUIPMENT_ITEMS,
+    blocks: [mismatchBlock],
+    upcomingMacroBlockIndex: 2,
+    upcomingMacroPhase: 'gpp',
+    policy: DEFAULT_LONGITUDINAL_AUTOPILOT_POLICY,
+  });
+
+  assert.equal(out.policyApplied, true);
+  assert.deepEqual(out.controlAction.corrections.squat, {
+    dLoad_p: 0.95,
+    dSet_p: -2,
+    dRpe_p: -0.5,
+    prefBias_p: -1,
+  });
+
+  const nullOut = evaluateLongitudinalAutopilot({
+    profile: { ...DEFAULT_PROFILE, training_age: 'intermediate' },
+    library: TEST_LIBRARY,
+    inventory: STANDARD_EQUIPMENT_ITEMS,
+    blocks: [mismatchBlock],
+    upcomingMacroBlockIndex: 2,
+    upcomingMacroPhase: 'gpp',
+    policy: null,
+  });
+  assert.equal(nullOut.policyApplied, false);
+});
+
+check('Ruling 1.3 (4565142044) upcoming non-halting niggles clamp positive dLoad_p/dSet_p/dRpe_p/prefBias_p on joint-coupled patterns without double negative pull-down', () => {
+  const d = makeWindowDates('2026-01-05', 21);
+  const headroomBlock = makeBlockRecord({
+    blockSequence: 1,
+    macroBlockIndex: 1,
+    startDate: '2026-01-05',
+    // Both squat (knee+hip) and push_h (shoulder+elbow) qualify for latent_headroom progression;
+    // zero niggles in the 21-day window.
+    setRows: [
+      ...makePatternSetRows(d, 'squat', -1.8, 4),
+      ...makePatternSetRows(d, 'push_h', -1.8, 4),
+    ],
+  });
+
+  const cleanOut = evaluateLongitudinalAutopilot({
+    profile: { ...DEFAULT_PROFILE, training_age: 'intermediate' },
+    library: TEST_LIBRARY,
+    inventory: STANDARD_EQUIPMENT_ITEMS,
+    blocks: [headroomBlock],
+    upcomingMacroBlockIndex: 2,
+    upcomingMacroPhase: 'gpp',
+    policy: DEFAULT_LONGITUDINAL_AUTOPILOT_POLICY,
+  });
+  assert.deepEqual(cleanOut.controlAction.corrections.squat, {
+    dLoad_p: 1.05,
+    dSet_p: 1,
+    dRpe_p: 0.5,
+    prefBias_p: 1,
+  });
+  // Per kinematicAutopilot MAX_RPE_RAISE_PER_BLOCK=0.5, squat takes the single 0.5 dRpe_p grant
+  // while push_h receives load/set/pref progression (blockAddedSets=2, blockAddedRpe=0.5).
+  assert.deepEqual(cleanOut.controlAction.corrections.push_h, {
+    dLoad_p: 1.05,
+    dSet_p: 1,
+    dRpe_p: 0,
+    prefBias_p: 1,
+  });
+  assert.equal(cleanOut.controlAction.blockAddedSets, 2);
+  assert.equal(cleanOut.controlAction.blockAddedRpe, 0.5);
+
+  // Intermediate triageMin = 4, haltMin = 8. Severity 4 on 'knee' is non-halting and must clamp
+  // squat/lunge/locomotion positive progression to neutral (0 / 1.0), preserving push_h.
+  const kneeTriageOut = evaluateLongitudinalAutopilot({
+    profile: { ...DEFAULT_PROFILE, training_age: 'intermediate' },
+    library: TEST_LIBRARY,
+    inventory: STANDARD_EQUIPMENT_ITEMS,
+    blocks: [headroomBlock],
+    upcomingMacroBlockIndex: 2,
+    upcomingMacroPhase: 'gpp',
+    upcomingBlockNiggles: [{ region: 'knee', severity: 4 }],
+    policy: DEFAULT_LONGITUDINAL_AUTOPILOT_POLICY,
+  });
+  assert.equal(kneeTriageOut.haltAdvised, false);
+  for (const kneePattern of ['squat', 'lunge', 'locomotion']) {
+    assert.deepEqual(kneeTriageOut.controlAction.corrections[kneePattern], {
+      dLoad_p: 1.0,
+      dSet_p: 0,
+      dRpe_p: 0,
+      prefBias_p: 0,
+    });
+  }
+  assert.deepEqual(kneeTriageOut.controlAction.corrections.push_h, {
+    dLoad_p: 1.05,
+    dSet_p: 1,
+    dRpe_p: 0,
+    prefBias_p: 1,
+  });
+  assert.equal(kneeTriageOut.controlAction.blockAddedSets, 1);
+  assert.equal(kneeTriageOut.controlAction.blockAddedRpe, 0);
+  assert.equal(kneeTriageOut.cumulativeMacrocycleRpeGranted, 0);
+
+  // Severity 4 on 'shoulder' leaves squat untouched (retaining dRpe_p=0.5) while clamping push_h.
+  const shoulderTriageOut = evaluateLongitudinalAutopilot({
+    profile: { ...DEFAULT_PROFILE, training_age: 'intermediate' },
+    library: TEST_LIBRARY,
+    inventory: STANDARD_EQUIPMENT_ITEMS,
+    blocks: [headroomBlock],
+    upcomingMacroBlockIndex: 2,
+    upcomingMacroPhase: 'gpp',
+    upcomingBlockNiggles: [{ region: 'shoulder', severity: 4 }],
+    policy: DEFAULT_LONGITUDINAL_AUTOPILOT_POLICY,
+  });
+  assert.deepEqual(shoulderTriageOut.controlAction.corrections.squat, {
+    dLoad_p: 1.05,
+    dSet_p: 1,
+    dRpe_p: 0.5,
+    prefBias_p: 1,
+  });
+  assert.deepEqual(shoulderTriageOut.controlAction.corrections.push_h, {
+    dLoad_p: 1.0,
+    dSet_p: 0,
+    dRpe_p: 0,
+    prefBias_p: 0,
+  });
+  assert.equal(shoulderTriageOut.controlAction.blockAddedSets, 1);
+  assert.equal(shoulderTriageOut.controlAction.blockAddedRpe, 0.5);
+  assert.equal(shoulderTriageOut.cumulativeMacrocycleRpeGranted, 0.5);
+
+  // Sub-triage severity (3 < 4 for intermediate) leaves squat progression untouched.
+  const subTriageOut = evaluateLongitudinalAutopilot({
+    profile: { ...DEFAULT_PROFILE, training_age: 'intermediate' },
+    library: TEST_LIBRARY,
+    inventory: STANDARD_EQUIPMENT_ITEMS,
+    blocks: [headroomBlock],
+    upcomingMacroBlockIndex: 2,
+    upcomingMacroPhase: 'gpp',
+    upcomingBlockNiggles: [{ region: 'knee', severity: 3 }],
+    policy: DEFAULT_LONGITUDINAL_AUTOPILOT_POLICY,
+  });
+  assert.deepEqual(subTriageOut.controlAction.corrections.squat, {
+    dLoad_p: 1.05,
+    dSet_p: 1,
+    dRpe_p: 0.5,
+    prefBias_p: 1,
+  });
+
+  // Case/space normalization matches 'Lower Back' to PATTERN_JOINTS.hinge.
+  const hingeHeadroomBlock = makeBlockRecord({
+    blockSequence: 1,
+    macroBlockIndex: 1,
+    startDate: '2026-01-05',
+    setRows: makePatternSetRows(d, 'hinge', -1.8, 4),
+  });
+  const lowerBackOut = evaluateLongitudinalAutopilot({
+    profile: { ...DEFAULT_PROFILE, training_age: 'intermediate' },
+    library: TEST_LIBRARY,
+    inventory: STANDARD_EQUIPMENT_ITEMS,
+    blocks: [hingeHeadroomBlock],
+    upcomingMacroBlockIndex: 2,
+    upcomingMacroPhase: 'gpp',
+    upcomingBlockNiggles: [{ region: 'Lower Back', severity: 4 }],
+    policy: DEFAULT_LONGITUDINAL_AUTOPILOT_POLICY,
+  });
+  assert.deepEqual(lowerBackOut.controlAction.corrections.hinge, {
+    dLoad_p: 1.0,
+    dSet_p: 0,
+    dRpe_p: 0,
+    prefBias_p: 0,
+  });
+
+  // Existing 21-day capacity_deficit reductions are preserved without double negative pull-down.
+  const deficitBlock = makeBlockRecord({
+    blockSequence: 1,
+    macroBlockIndex: 1,
+    startDate: '2026-01-05',
+    setRows: makePatternSetRows(d, 'squat', 1.8, 4),
+  });
+  const deficitCleanOut = evaluateLongitudinalAutopilot({
+    profile: { ...DEFAULT_PROFILE, training_age: 'intermediate' },
+    library: TEST_LIBRARY,
+    inventory: STANDARD_EQUIPMENT_ITEMS,
+    blocks: [deficitBlock],
+    upcomingMacroBlockIndex: 2,
+    upcomingMacroPhase: 'gpp',
+    policy: EXPLICIT_POLICY,
+  });
+  const deficitTriageOut = evaluateLongitudinalAutopilot({
+    profile: { ...DEFAULT_PROFILE, training_age: 'intermediate' },
+    library: TEST_LIBRARY,
+    inventory: STANDARD_EQUIPMENT_ITEMS,
+    blocks: [deficitBlock],
+    upcomingMacroBlockIndex: 2,
+    upcomingMacroPhase: 'gpp',
+    upcomingBlockNiggles: [{ region: 'knee', severity: 4 }],
+    policy: EXPLICIT_POLICY,
+  });
+  assert.equal(deficitCleanOut.controlAction.corrections.squat.dSet_p, -1);
+  assert.deepEqual(
+    deficitTriageOut.controlAction.corrections.squat,
+    deficitCleanOut.controlAction.corrections.squat,
+  );
 });
 
 // ===========================================================================

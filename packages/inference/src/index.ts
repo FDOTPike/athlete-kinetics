@@ -186,14 +186,17 @@ export {
   buildCompletionWindow,
   composeControlActions,
   deriveCompletionAction,
+  isValidCompletionActionPolicy,
   loggedCompletionShortfall,
   summarizeCompletionWindow,
   type CompletionActionPolicy,
   type CompletionPatternSummary,
+  type CompletionSetReduction,
   type PatternDailyCompletion,
   type WindowCompletionRow,
 } from './completionAction';
 export {
+  DEFAULT_LONGITUDINAL_AUTOPILOT_POLICY,
   EQUIPMENT_NON_PATHOLOGICAL_CAUSES,
   EQUIPMENT_NON_PATHOLOGICAL_PHRASE_IDS,
   LONGITUDINAL_MRV_MAX_SETS,

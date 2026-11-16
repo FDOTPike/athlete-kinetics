@@ -13221,3 +13221,25 @@ The appendix held the code around the read, every match for `0286` and "record o
   - **Boundary Clamps, Halt Propagation & Side-Channel Isolation:** Propagates `haltAdvised` fail-closed onto `LongitudinalAutopilotResult` (refusing non-recovery `BlockPlan` projection while `haltAdvised` is set), counts each historical macrocycle RPE boundary grant once at the block that applied it, enforces beginner `dLoad_p <= 1.0`, macrocycle positive RPE raise ceiling (`<= 2.5` across positions `1..8`, `0.0` in `6..8`, `0.0` under open suspension, clean rollover at Macrocycle 2 position `1`), and byte-identical date-axis-aligned isolation from `acwr`, `072_question_log`, and KineStrike `ks_*` descriptive fields.
 - Added fail-first verification suite `packages/inference/test/verify_longitudinal_autopilot.mjs` (`21` checks) and wired it into `build:inference-test` and `verify:autopilot` in `package.json`.
 - **Branch:** `feat/v1-longitudinal-engine`.
+
+
+## Entry 0302 — 2026-11-16 · PR #359 Ruling Group 1 (`1.1` / `1.2` / `1.3`) & CodeRabbit Review Resolutions
+
+**Executor:** longitudinal engine implementation stream (`feat/v1-longitudinal-engine` -> `claude/beta-question-box-2026-10-28`).
+
+### Ratified Changes Implemented
+
+- **Ruling 1.1 (`DEFAULT_LONGITUDINAL_AUTOPILOT_POLICY` & `CompletionActionPolicy`):**
+  - Exported frozen `DEFAULT_LONGITUDINAL_AUTOPILOT_POLICY` from `packages/inference/src/longitudinalAutopilot.ts` and `packages/inference/src/index.ts` matching `{ kTrigger: 2, swapWindowBlocks: 3, mCadence: 2, mClean: 2, week3CompletionMinObservationDays: 2, completionPolicy: { minObservationDays: 5, deficitThreshold: 0.2, strongThreshold: 0.4, moderateSetReduction: -1, strongSetReduction: -2, strongLoadFactor: 0.95 } }`, while preserving fail-closed `policyApplied: false` behavior for `null` or invalid explicit `policy`.
+  - Extended `CompletionActionPolicy` (`packages/inference/src/completionAction.ts`) with optional `moderateSetReduction`, `strongSetReduction` (`-2 | -1 | 0`), and `strongLoadFactor` (`0 < x <= 1`) validated by exported `isValidCompletionActionPolicy`, preserving `-1` defaults when omitted and applying `-2` when supplied; widened `composeBlockBoundaryAction` `dSet_p` clamp from `[-1, 1]` to `[-2, 1]` (matching `SET_MODIFIER_LITERALS`).
+- **Ruling 1.2 (CodeRabbit thread `4565142005`):**
+  - Bounded `week3CompletionMinObservationDays` validation in `isValidLongitudinalAutopilotPolicy` to integers in `1..7` (`default: 2`), separating 7-day Week-3 overreach evaluation from 21-day `completionPolicy.minObservationDays` (`5`).
+- **Ruling 1.3 (CodeRabbit thread `4565142044`):**
+  - In `evaluateLongitudinalAutopilot`, resolved joints from `upcomingBlockNiggles` in `[triageMin, haltMin)` (`resolveUpcomingTriageJoints` using `JOINTS`) and clamped positive progression (`dLoad_p > 1.0 -> 1.0`, `dSet_p > 0 -> 0`, `dRpe_p > 0 -> 0`, `prefBias_p > 0 -> 0`) on patterns whose `PATTERN_JOINTS[p]` includes an affected joint (`clampActionForUpcomingNiggles`), recomputing `blockAddedSets`, `blockAddedRpe`, and `cumulativeMacrocycleRpeGranted` while leaving existing 21-day negative reductions intact without double negative pull-down.
+- **CodeRabbit `4c5c5b73` time-budget findings (`4566068336`, `4566068346` inside `longitudinalAutopilot.ts`):**
+  - `4566068336`: Marked `preserved = deloadSession || blockPlan.recovery` sessions non-trimmable (`trimmable: !locomotion && !preserved`) inside `applyLongitudinalOverlayToBlockPlan`.
+  - `4566068346`: Added optional `readonly blockInput?: BlockInput` to `ApplyLongitudinalOverlayOptions` and replaced unverified duration-only offers with `verifiedOverlayAlternatives` (`generateBlock` + `applyLongitudinalOverlayToBlockPlan(..., { ...options, blockInput: undefined })` checking `timeBudget.conflicts.length === 0`, or failing closed to `[]` when `blockInput` is absent).
+- **Evidence Capture (`EVIDENCE CAPTURED`):**
+  - Fail-first run recorded prior to `src/` edits (`pr359_fail_first.txt`: `COMPLETION_EXIT=1`, `3 COMPLETION ACTION CHECK(S) FAILED`; `LONGITUDINAL_EXIT=1`, `7 LONGITUDINAL AUTOPILOT CHECK(S) FAILED`).
+  - Guard break/restore demonstration recorded (`pr359_guard_break.txt`: `GUARD_BREAK_EXIT=1`, `3 LONGITUDINAL AUTOPILOT CHECK(S) FAILED`), followed by full restoration in `packages/inference/src/longitudinalAutopilot.ts`.
+  - Targeted unit/module suites verified green (`verify_completion_action.mjs` and `verify_longitudinal_autopilot.mjs`: `ALL 24 LONGITUDINAL AUTOPILOT CHECKS VERIFIED`), with final CI run (`npm run verify:ci`) executed after final edits.
