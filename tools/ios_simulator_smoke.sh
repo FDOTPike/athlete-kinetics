@@ -9,6 +9,9 @@
 # app exiting early are all failures. Evidence (report, console capture,
 # simulator identity) is written to <out-dir> for upload.
 set -euo pipefail
+# Keep ONNX Runtime strictly offline in the simulator child environment too.
+export ORT_DISABLE_TELEMETRY=1
+export SIMCTL_CHILD_ORT_DISABLE_TELEMETRY=1
 APP="$1"; BUNDLE_ID="$2"; OUT="$3"
 TIMEOUT_S="${AK_SMOKE_TIMEOUT_S:-600}"  # above the in-app bound (each step <= 90 s)
 mkdir -p "$OUT"

@@ -213,6 +213,7 @@ final class AthleteKineticsUITests: XCTestCase {
         effectiveArguments += ["-AKUITestResetStorage", "1"]
       }
     }
+    app.launchEnvironment["ORT_DISABLE_TELEMETRY"] = "1"
     app.launchArguments = effectiveArguments
     app.launch()
     wait(element("shell-root"), "the app shell", timeout: 90)
@@ -678,18 +679,39 @@ final class AthleteKineticsUITests: XCTestCase {
     wait(element("question-box"), "the Question box panel")
     issues += audit("QuestionBox")
 
-    enterText(into: "Question", "what is a deload week", submit: false)
-    for targetName in ["Answers from the glossary only. This is not medical advice.", "GLOSSARY"] {
-      if !app.keyboards.firstMatch.exists { break }
-      let blurTarget = element(targetName)
-      reveal(blurTarget, "the Question box blur target (\(targetName))")
-      bringClear(blurTarget, "the Question box blur target (\(targetName))")
-      blurTarget.tap()
-      log("question box keyboard: tapped \(targetName) to dismiss")
-      let hidden = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: app.keyboards.firstMatch)
-      if XCTWaiter.wait(for: [hidden], timeout: 5) == .completed { break }
+    let questionInput = app.textViews["Question"].firstMatch
+    XCTAssertTrue(questionInput.waitForExistence(timeout: 30), "the Question textView did not appear")
+    reveal(questionInput, "Question")
+    bringClear(questionInput, "Question")
+    for attempt in 1...3 {
+      if attempt > 1 {
+        log("FOCUS-RETRY Question: keyboard not shown 5 s after tap \(attempt - 1); tapping again")
+      }
+      questionInput.tap()
+      let deadline = Date().addingTimeInterval(5)
+      while Date() < deadline {
+        if (try? app.keyboards.firstMatch.snapshot()) != nil { break }
+        usleep(250_000)
+      }
+      if (try? app.keyboards.firstMatch.snapshot()) != nil { break }
     }
-    let askButton = element("Ask")
+    XCTAssertNotNil(try? app.keyboards.firstMatch.snapshot(), "the Question keyboard did not appear")
+    app.typeText("what is a deload week")
+    for targetName in ["Answers from the glossary only. This is not medical advice.", "Question box"] {
+      if (try? app.keyboards.firstMatch.snapshot()) == nil { break }
+      let blurTarget = app.staticTexts[targetName].firstMatch
+      if (try? blurTarget.snapshot()) != nil {
+        blurTarget.tap()
+        log("question box keyboard: tapped \(targetName) to dismiss")
+        let deadline = Date().addingTimeInterval(5)
+        while Date() < deadline && (try? app.keyboards.firstMatch.snapshot()) != nil {
+          usleep(250_000)
+        }
+        if (try? app.keyboards.firstMatch.snapshot()) == nil { break }
+      }
+    }
+    XCTAssertNil(try? app.keyboards.firstMatch.snapshot(), "the Question keyboard did not dismiss")
+    let askButton = app.buttons["Ask"].firstMatch
     reveal(askButton, "Ask")
     bringClear(askButton, "Ask")
     XCTAssertTrue(askButton.isEnabled && askButton.isHittable, "Ask button is not enabled and hittable")

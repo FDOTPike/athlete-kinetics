@@ -114,7 +114,7 @@ export async function runNativeSmoke(): Promise<void> {
     const vector = await embedder.embed(entry.text);
     const norm = Math.sqrt(vector.reduce((sum, x) => sum + x * x, 0));
     const routed = triage(vector, codebase);
-    if (vector.length !== 384 || Math.abs(norm - 1) > 1e-3) throw new Error(`dims=${vector.length} norm=${norm}`);
+    if (vector.length !== 384 || !(Math.abs(norm - 1) <= 1e-3)) throw new Error(`dims=${vector.length} norm=${norm}`);
     if (!routed.confident || routed.entry?.id !== entry.id) {
       throw new Error(`routed ${routed.entry?.id ?? 'none'} (${routed.similarity.toFixed(4)}), expected ${entry.id}`);
     }
@@ -142,7 +142,7 @@ export async function runNativeSmoke(): Promise<void> {
     const question = 'what is a deload week';
     const vector = await embedder.embed(question);
     const norm = Math.sqrt(vector.reduce((sum, x) => sum + x * x, 0));
-    if (vector.length !== 384 || Math.abs(norm - 1) > 1e-3) throw new Error(`dims=${vector.length} norm=${norm}`);
+    if (vector.length !== 384 || !(Math.abs(norm - 1) <= 1e-3)) throw new Error(`dims=${vector.length} norm=${norm}`);
     const routed = routeQuestion(question, vector, questionIndex);
     if (routed.outcome !== 'DELOAD' || routed.shown[0] !== 'DELOAD') {
       throw new Error(`routed outcome=${routed.outcome} shown=${JSON.stringify(routed.shown)}`);
