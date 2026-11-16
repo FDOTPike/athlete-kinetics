@@ -849,6 +849,153 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
     'falsifier: overwriting the 1 s probe boolean before logging fails the immutable probe contract',
     !hasCompatibilityHealthAlertHandling(overwritten1sDismiss),
   );
+  const expandCoachBody = suite.match(/private func expandCoachMode\([\s\S]*?\n  \}/)?.[0] ?? '';
+  const isHardenedExpandCoachMode = (src) => {
+    const code = stripSwiftComments(src);
+    const unlockIdx = code.indexOf('unlockAdvancedTools()');
+    const revealIdx = code.search(/reveal\(\s*coach\s*,\s*"Coach mode"\s*\)/);
+    const bringClearIdx = code.search(/bringClear\(\s*coach\s*,\s*"Coach mode"\s*\)/);
+    const tapIdx = code.indexOf('coach.tap()');
+    const settledIdx = code.search(/settledLabel\(\s*coach\s*,\s*beginsWith:\s*"Coach mode,"\s*,\s*"Coach Mode"\s*,\s*timeout:\s*10\s*\)/);
+    if (unlockIdx === -1 || revealIdx === -1 || bringClearIdx === -1 || tapIdx === -1 || settledIdx === -1) return false;
+    if (!(unlockIdx < revealIdx && revealIdx < bringClearIdx && bringClearIdx < tapIdx && tapIdx < settledIdx)) return false;
+    const preReveal = code.slice(unlockIdx, revealIdx);
+    const preTap = code.slice(bringClearIdx, tapIdx);
+    const postSettled = code.slice(settledIdx);
+    return preReveal.includes('currentLabel(coach)')
+      && preReveal.includes('"Coach mode,"')
+      && /while\s+Date\(\)\s*</.test(preReveal)
+      && preReveal.includes('pollCoachLabel(')
+      && preTap.includes('pollCoachLabel(')
+      && preTap.includes('.hasSuffix("collapsed")')
+      && /XCTAssertFalse\(\s*label\.hasSuffix\("collapsed"\)/.test(postSettled)
+      && !/\bcoach\.label\b|\.exists\b|waitForExistence|XCTWaiter|XCTNSPredicateExpectation/.test(code);
+  };
+  check(
+    'expandCoachMode polls currentLabel(coach), brings header clear, taps only when collapsed, and asserts expansion',
+    isHardenedExpandCoachMode(expandCoachBody),
+  );
+  const unhardenedExpandCoach = [
+    'private func expandCoachMode() -> String {',
+    '  unlockAdvancedTools()',
+    '  let coach = element(labelBeginsWith: "Coach mode,")',
+    '  reveal(coach, "Coach mode")',
+    '  if coach.label.hasSuffix("collapsed") { coach.tap() }',
+    '  let label = settledLabel(coach, beginsWith: "Coach mode,", "Coach Mode", timeout: 10)',
+    '  return label',
+    '}',
+  ].join('\n');
+  check(
+    'falsifier: unhardened expandCoachMode reading coach.label without pre-reveal polling or bringClear fails',
+    !isHardenedExpandCoachMode(unhardenedExpandCoach),
+  );
+
+  const cancelFilesBody = suite.match(/private func cancelFilesSheet\([\s\S]*?\n  \}/)?.[0] ?? '';
+  const inventoryBody = suite.match(/private func filesSheetInventory\([\s\S]*?\n  \}/)?.[0] ?? '';
+  const isHardenedCancelFilesSheet = (cancelSrc, inventorySrc = inventoryBody) => {
+    const cancelCode = stripSwiftComments(cancelSrc);
+    const inventoryCode = stripSwiftComments(inventorySrc);
+    if (/\.exists\b|waitForExistence/.test(cancelCode) || /\.exists\b/.test(inventoryCode)) return false;
+    if (!inventoryCode.includes('(try? bar.snapshot()) == nil')) return false;
+    const whileIdx = cancelCode.indexOf('while Date().timeIntervalSince(opened) < 30');
+    const guardIdx = cancelCode.indexOf('guard let cancel = found else');
+    if (whileIdx === -1 || guardIdx === -1 || guardIdx <= whileIdx) return false;
+    const beforeLoop = cancelCode.slice(0, whileIdx);
+    const rootButtonsIdx = beforeLoop.indexOf('root.buttons.matching(named)');
+    const rootDescIdx = beforeLoop.indexOf('root.descendants(matching: .any).matching(named)');
+    const barSnapIdx = beforeLoop.indexOf('(try? bar.snapshot()) != nil');
+    const barCallIdx = beforeLoop.indexOf('if barPresent, let match = firstIn(bar, fromBar: true)');
+    const wholeWaitIdx = beforeLoop.search(/Date\(\)\.timeIntervalSince\(\s*opened\s*\)\s*>=\s*10/);
+    const appCallIdx = beforeLoop.indexOf('firstIn(self.app, fromBar: false)');
+    if ([rootButtonsIdx, rootDescIdx, barSnapIdx, barCallIdx, wholeWaitIdx, appCallIdx].some((i) => i === -1)) {
+      return false;
+    }
+    if (!(rootButtonsIdx < rootDescIdx && barSnapIdx < barCallIdx && barCallIdx < wholeWaitIdx && wholeWaitIdx < appCallIdx)) {
+      return false;
+    }
+    if (/self\.app\.(buttons|descendants)|firstIn\(\s*self\.app/.test(beforeLoop.slice(0, wholeWaitIdx))) return false;
+    const afterLoop = cancelCode.slice(whileIdx, guardIdx);
+    const loopEndIdx = afterLoop.indexOf('usleep(500_000)');
+    if (loopEndIdx === -1) return false;
+    const postLoop = afterLoop.slice(loopEndIdx);
+    return postLoop.includes('found == nil')
+      && postLoop.includes('!lastFrame.isNull')
+      && postLoop.includes('!lastIdentity.isEmpty')
+      && postLoop.includes('currentChoice()')
+      && postLoop.includes('frame == lastFrame && identity == lastIdentity')
+      && postLoop.includes('found = candidate');
+  };
+  check(
+    'cancelFilesSheet gates bar/whole-app queries via bar.snapshot(), performs final 30s-boundary confirmation read, and filesSheetInventory uses bar.snapshot()',
+    isHardenedCancelFilesSheet(cancelFilesBody),
+  );
+  const unhardenedCancelFiles = [
+    '  func currentChoice() -> (XCUIElement, XCUIElementSnapshot, CGRect, String, Bool)? {',
+    '    let bar = filesSheetBar()',
+    '    let sources: [(() -> XCUIElement, Bool)] = [',
+    '      ({ bar.buttons.matching(named).firstMatch }, true),',
+    '      ({ bar.descendants(matching: .any).matching(named).firstMatch }, true),',
+    '      ({ self.app.buttons.matching(named).firstMatch }, false),',
+    '      ({ self.app.descendants(matching: .any).matching(named).firstMatch }, false),',
+    '    ]',
+    '    return nil',
+    '  }',
+    '  while Date().timeIntervalSince(opened) < 30 {',
+    '    if let (candidate, snap, frame, identity, fromBar) = currentChoice() {',
+    '      if frame == lastFrame && identity == lastIdentity { found = candidate; break }',
+    '      lastFrame = frame; lastIdentity = identity',
+    '    }',
+    '    usleep(500_000)',
+    '  }',
+    '  guard let cancel = found else { return Date() }',
+  ].join('\n');
+  const unhardenedInventory = 'private func filesSheetInventory() -> String { return !bar.exists ? "absent" : "" }';
+  check(
+    'falsifier: unhardened cancelFilesSheet and .exists-based filesSheetInventory fail closed',
+    !isHardenedCancelFilesSheet(unhardenedCancelFiles, inventoryBody)
+      && !isHardenedCancelFilesSheet(cancelFilesBody, unhardenedInventory),
+  );
+
+  const saveInFilesBody = suite.match(/private func saveInFiles\([\s\S]*?\n  \}/)?.[0] ?? '';
+  const isHardenedSaveInFiles = (src) => {
+    const code = stripSwiftComments(src);
+    const whileIdx = code.indexOf('while Date() < deadline');
+    const onMyIPhoneIdx = code.indexOf('onMyIPhone()');
+    const failIdx = code.indexOf('XCTFail("the Files export sheet had no enabled Save/Move action")');
+    if (whileIdx === -1 || onMyIPhoneIdx === -1 || failIdx === -1) return false;
+    if (!(whileIdx < onMyIPhoneIdx && onMyIPhoneIdx < failIdx)) return false;
+    const waitLoop = code.slice(whileIdx, onMyIPhoneIdx);
+    const tailLog = code.slice(onMyIPhoneIdx, failIdx);
+    return waitLoop.includes('(try? filesControl(["Save", "Move", "Done", "Open", "Cancel"]).snapshot()) != nil')
+      && waitLoop.includes('currentLabel(status)')
+      && tailLog.includes('currentLabel(status)')
+      && !/\.exists\b|\.label\b/.test(code);
+  };
+  check(
+    'saveInFiles uses snapshot() and currentLabel(status) instead of blocking .exists/.label in wait loop and failure log',
+    isHardenedSaveInFiles(saveInFilesBody),
+  );
+  const unhardenedSaveInFiles = [
+    'private func saveInFiles() {',
+    '  let status = element("backup-status-message")',
+    '  let deadline = Date().addingTimeInterval(300)',
+    '  var lastStatus = ""',
+    '  while Date() < deadline {',
+    '    if filesControl(["Save", "Move", "Done", "Open", "Cancel"]).exists { break }',
+    '    if status.exists && status.label != lastStatus {',
+    '      lastStatus = status.label',
+    '    }',
+    '    sleep(2)',
+    '  }',
+    '  onMyIPhone()',
+    '  log("status=\\(element("backup-status-message").exists ? element("backup-status-message").label : "-")")',
+    '  XCTFail("the Files export sheet had no enabled Save/Move action")',
+    '}',
+  ].join('\n');
+  check(
+    'falsifier: unhardened saveInFiles using .exists and .label fails closed',
+    !isHardenedSaveInFiles(unhardenedSaveInFiles),
+  );
 }
 
 console.log('[N11] beta orientation lock (#168)');
