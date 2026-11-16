@@ -735,9 +735,14 @@ describe('every registered pre-upgrade schema restores, not only the first', () 
     expect([v75.migrationSlot, v75.tableCount]).toEqual([76, v74.tableCount]);
     // 077 adds two side-car tables.
     const v76 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 76);
-    expect(v76).toBe(CURRENT);
+    expect(v76).not.toBe(CURRENT);
     expect(v76.fingerprint).not.toBe(v75.fingerprint);
     expect([v76.migrationSlot, v76.tableCount]).toEqual([77, v75.tableCount + 2]);
+    // 078 adds sport_peaking_movement and 4 Phase 2 side-car tables + rebuilds both sport tables.
+    const v77 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 77);
+    expect(v77).toBe(CURRENT);
+    expect(v77.fingerprint).not.toBe(v76.fingerprint);
+    expect([v77.migrationSlot, v77.tableCount]).toEqual([78, v76.tableCount + 5]);
     expect(v70.fingerprint).not.toBe(v69.fingerprint);
     expect([v70.migrationSlot, v70.tableCount]).toEqual([71, v69.tableCount + 2]);
     expect(PRE_UPGRADE.length).toBeGreaterThanOrEqual(7);

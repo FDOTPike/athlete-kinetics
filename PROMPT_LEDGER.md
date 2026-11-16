@@ -13207,3 +13207,39 @@ The appendix held the code around the read, every match for `0286` and "record o
   - `npm run verify:store`: ALL CHECKS PASSED.
   - Jest on `SessionSummarySkipped.test.js` and `SessionSummary.test.js`: 2 suites, 48 of 48 tests pass.
 - **Branch:** `claude/summary-skipped-2026-11-03`, PR #116 into `claude/beta-question-box-2026-10-28`.
+
+---
+
+## Entry 0304 — 2026-11-16 · Phase 2 Strength & Competitive Meet Programming (`#219`, `#229`, `question1`)
+
+**Executor:** `phase2-strength-meet` in `v1_phase2_219_229` (`feat/v1-phase2-219-229-strength-meet` targeting `claude/beta-question-box-2026-10-28`).
+
+### Input (Ratified Owner Rulings Summary)
+
+- **Group 2 (`#219`):**
+  - `Q1A`: Primary strength slots (`slot_index < 3` on `squat`, `push_h`, `hinge`, `push_v`) step `5 -> 4 -> 3` reps across Weeks 1–3 (`WAVE` keeps `[5,4,6]`) with `+0.5/week` RPE up to `base_rpe_cap`; primary `Deadlift` capped at `1` top set (`5 -> 4 -> 3`) + `2x5` back-off sets at `-7.5%` (`0.925`); accessory slots (`slot_index >= 3`, weighted) step `8 -> 8 -> 6` reps.
+  - `Q4` (`B`): Keep `3–4` movements (`~12–15` sets); treat `session_duration_cap_min` as an upper ceiling, not a quota to pad.
+- **Group 3 (`#229` + `question1`):**
+  - `Q1` (`A`): Backward meet-driven countdown (`volume -> intensity -> peak/taper`) ending on `competitionDate` (`1..224` days away); fallback to standard cycle when unset.
+  - `Q2` (`A`): Heavy top single (`@ RPE 8.0 -> 8.5 -> 9.0`, or `9.5` in peak W3 when `base_rpe_cap >= 9.5`) + `-10%` back-off sets for `advanced`/`elite` strength `volume`/`peak` Squat, Bench, Deadlift.
+  - `Q3` (`B`): Never schedule heavy Squat, Bench, and Deadlift all primary in the same session; weekly caps Deadlift `<= 2x`, Squat `<= 3x`, Bench `<= 4x`.
+  - `Q4` (`A`): Default `base_rpe_cap = 9.0`; `advanced`/`elite` may manually opt into `9.5` in Fine-tune; never default to `10.0`.
+  - `Q5` (`A`): Display `"Block {current} of {total} · {weeks} weeks to competition"` header on Plan while keeping the session list scoped to the active 4-week block.
+  - `Q6` (`A`): Single canonical competition/target date synced across Sport, Goal deadline, and Review horizon.
+  - `Q7` (`A`): Add `olympic_weightlifting` and `strongman` alongside `powerlifting` (`24` sports total, `matches_per_week 0..52`, zero outside sport practice load) with exact verbatim prompts: `"How long have you trained for competition?"`, `"Competitions a year"`, and `"Since this is your main lifting goal, we won't count your gym sessions twice as outside sport practice."`
+  - `Q8` (`B`): Keep the existing 11-item `EQUIPMENT_ITEMS` set untouched.
+  - `question1`: Separate extensible `sport_peaking_movement` catalog (`basketball` seeded with 3 entries; non-lifting fallback `"Sport-specific peaking movements for {sport} will be added over time."`).
+
+### Output
+
+- **Inference (`packages/inference/src/{sportProfile.ts,programEmphasis.ts,derivePrescription.ts,blockGenerator.ts,index.ts}`, tests in `packages/inference/test/{verify_phase2_strength_meet.mjs,verify_blocks.mjs,verify_emphasis.mjs,verify_pipeline.mjs,verify_r05.mjs}`):**
+  - Implemented `#219 Q1A/Q4`, `#229 Q1–Q8`, and `question1` catalog/countdown helpers (`resolveCompetitionCountdownHorizon`, `countdownMacroBlockIndex`, `computeBackOffLoadKg`, `isLiftingSport`, `SPORT_COMPETITIONS_PER_YEAR_MAX`, `sportPeakingMovementsFor`, `sportPeakingFallbackCopy`).
+  - `derivePrescription.ts` omits `backOff` (`undefined`) when eased `sets <= 1` (`set_modifier: -2` pin covered in `verify_phase2_strength_meet.mjs`); `verify_blocks.mjs [9b]` verifies weighted `'BB'` `5 -> 4 -> 3` primary / `8 -> 8 -> 6` accessory progression alongside `'Bodyweight'` flat-reps + rising-sets; `verify_r05.mjs` checks non-SBD invariance across both `minutes === 15` and `minutes === 90`.
+- **Database Migration & Lineage (`packages/core-db/src/schema/078_sport_peaking_and_lifting_taxonomy.sql`, `migrations.ts`, `migrationRunner.ts`, `backup/schemaContract.ts`, `MIGRATION_LINEAGE.{json,md}`, `docs/audits/accessible-coach/WO03_DURABLE_DATA_INVENTORY.md`, tests `verify_migrations.mjs`, `verify_backup_contract.mjs`, `verify_phase2_migration_078.mjs`):**
+  - Slot `078` (`ordinal: 77`, `userVersion: 77`, `132` durable tables, `221` backup contract objects): rebuilds `athlete_sport_profile` and `athlete_secondary_sport_profile` for `24` sports and `0..52` competition frequency, seeds `sport_peaking_movement`, and adds `planned_slot_backoff`, `session_slot_backoff`, `training_program_meet_countdown`, `training_block_meet_meta`.
+- **Store & UI (`apps/mobile/src/state/useStore.ts`, `components/{SportFields.tsx,SportPanel.tsx}`, `screens/{ProgramSetupScreen.tsx,BlockScreen.tsx,TodayScreen.tsx,SessionScreen.tsx}`, tests in `apps/mobile/test/{verify_store_sql.mjs,components/{Phase2StrengthMeet,BackupForwardRestore,OnboardingFocusGoal,SportEmphasisStore,SportProfileTaxonomy,SportScreens}.test.js}`):**
+  - Persisted/hydrated back-off side-cars, canonical Sport <-> Goal <-> Program competition date synchronization (preserving `competitionDate` across `continueTrainingProgram()`, and cleaning `training_block_meet_meta` + reverting program horizon to `'weeks'`/`NULL` when `competitionDate` is cleared to `null`), Plan countdown header (`Math.max(0, Math.ceil(daysUntilMeet / 7))`) + `sportId !== 'powerlifting'` peaking catalog display in both `BlockScreen` and `SportPanel`, `backOff.sets > 0` UI guards, Fine-tune RPE `9.5` opt-in (`program-rpe-cap-9-5`), and SessionScreen Set 2 `-10%` pre-fill + `set_dose_target` / `set_target` binding.
+- **Verification Evidence Captured (before amending commit `feat/v1-phase2-219-229-strength-meet`):**
+  - Fail-first baseline (`phase2_219_229_fail_first.txt`): `INFERENCE_EXIT=1` (`29 failed`), `MIGRATION_EXIT=1` (`7 failed`), `JEST_EXIT=1` (`7 failed`).
+  - Guard break/restore (`guard_broken.txt`, `guard_restored.txt`): bypassing `wouldMakeAllThree` in `blockGenerator.ts` failed `never schedules Squat + Bench + Deadlift all in same session` (`31 passed, 1 failed`, `GUARD_BROKEN_EXIT=1`), and restoring returned `GUARD_RESTORED_EXIT=0` (`32 passed, 0 failed`) plus `PHASE2_078_EXIT=0` (`9 passed, 0 failed`).
+  - Full verification (`phase2_219_229_verify_ci.txt`): `PHASE2_INF_EXIT=0` (`32 passed, 0 failed`), `R05_EXIT=0`, `PHASE2_078_EXIT=0` (`9 passed, 0 failed`), `PREFLIGHT OK`, `verify:store SQL — 830/830 checks green`, `pipeline verification: 55 checks passed`, `Test Suites: 249 passed, 249 total`, `Tests: 6808 passed, 6808 total`, `VERIFY_CI_EXIT=0`.

@@ -35,10 +35,43 @@ export function verifyR05Blocks(reports = [undefined]) {
         const baseline = generateBlock(input);
         assert.equal(baseline.sessions.length, 12, 'R05 non-vacuity: all scheduled sessions execute');
         assert.ok(baseline.sessions.every((s) => s.slots.length > 0), 'R05 non-vacuity: every session has work');
+        const isQ2CarveOut =
+          objective === 'strength' &&
+          (macroBlockIndex === 5 || macroBlockIndex === 7) &&
+          plannedImplement === 'Barbell';
         for (const training_age of TRAINING_AGES.filter((age) => age !== 'beginner')) {
           const actual = generateBlock({ ...input, profile: { ...input.profile, training_age } });
-          assert.deepEqual(actual, baseline,
-            `R05 block tier-only dose: ${objective}/${schemaType}/${macroBlockIndex}/${minutes}/${plannedImplement}/${training_age}`);
+          if (isQ2CarveOut && (training_age === 'advanced' || training_age === 'elite')) {
+            // Ratified #229 Q2 carve-out: advanced/elite strength intensification (volume, 5)
+            // and peak (7) blocks prescribe 1 heavy top single + back-offs on primary S/B/D.
+            assert.equal(actual.sessions.length, baseline.sessions.length, 'R05 Q2 carve-out keeps session count');
+            actual.sessions.forEach((session, i) => {
+              const baseSession = baseline.sessions[i];
+              if (session.phase === 'deload' || session.focus === 'conditioning' || session.focus === 'sport' || session.focus === 'recovery') {
+                assert.deepEqual(session, baseSession,
+                  `R05 Q2 carve-out leaves deload/non-strength sessions identical: ${schemaType}/${macroBlockIndex}/${training_age}`);
+              } else {
+                session.slots.forEach((slot, j) => {
+                  const baseSlot = baseSession.slots[j];
+                  const mv = movements.find((m) => m.movement_id === slot.movement_id);
+                  const isSbdPrimary = slot.slot_index < 3 && (mv.pattern === 'squat' || mv.pattern === 'push_h' || mv.pattern === 'hinge');
+                  if (isSbdPrimary) {
+                    assert.equal(slot.reps, 1, 'R05 Q2 top single reps === 1');
+                    assert.ok(slot.backOff !== undefined, 'R05 Q2 top single carries backOff');
+                    if (baseSlot !== undefined) {
+                      assert.ok(slot.sets <= baseSlot.sets, 'R05 Q2 carve-out does not add working sets beyond baseline');
+                    }
+                  } else if (baseSlot !== undefined) {
+                    assert.deepEqual(slot, baseSlot,
+                      `R05 Q2 carve-out leaves non-SBD slot identical: ${schemaType}/${macroBlockIndex}/${training_age}/${minutes}`);
+                  }
+                });
+              }
+            });
+          } else {
+            assert.deepEqual(actual, baseline,
+              `R05 block tier-only dose: ${objective}/${schemaType}/${macroBlockIndex}/${minutes}/${plannedImplement}/${training_age}`);
+          }
           cases += 1;
         }
         const beginner = generateBlock({ ...input, profile: { ...input.profile, training_age: 'beginner' } });

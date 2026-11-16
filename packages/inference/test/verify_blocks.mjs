@@ -725,6 +725,53 @@ check('the two classes actually diverge in set count (the fix is observable)',
   bw[1].sets !== loaded[1].sets && bw[2].sets !== loaded[2].sets,
   `bw ${bw[1].sets}/${bw[2].sets} vs loaded ${loaded[1].sets}/${loaded[2].sets}`);
 
+// --- weighted 'BB' strength primary slots step 5 -> 4 -> 3 while accessories step 8 -> 8 -> 6 (#219 Q1A / #32) ---
+{
+  const weightedBbPool = movements.map((m) => ({
+    ...m,
+    progressionGroup: undefined,
+    plannedImplement: (prefixesById.get(m.movement_id) ?? []).includes('BB') ? 'BB' : m.plannedImplement,
+  }));
+  const bbStrengthPlan = generateBlock({
+    profile: prof({
+      objective: 'strength',
+      training_age: 'intermediate',
+      equipment_inventory: ['barbell', 'squat_rack', 'bench', 'dumbbells'],
+    }),
+    movements: weightedBbPool,
+    startDate: START,
+    schemaType: 'LINEAR',
+  });
+  const bbPrimarySquatReps = [1, 2, 3].map((w) =>
+    bbStrengthPlan.sessions
+      .filter((s) => s.week_index === w)
+      .flatMap((s) => s.slots)
+      .find((sl) => sl.slot_index < 3 && patternById.get(sl.movement_id) === 'squat')
+      ?.reps);
+  const bbPrimaryBenchReps = [1, 2, 3].map((w) =>
+    bbStrengthPlan.sessions
+      .filter((s) => s.week_index === w)
+      .flatMap((s) => s.slots)
+      .find((sl) => sl.slot_index < 3 && patternById.get(sl.movement_id) === 'push_h')
+      ?.reps);
+  const bbAccessoryReps = [1, 2, 3].map((w) =>
+    bbStrengthPlan.sessions
+      .filter((s) => s.week_index === w)
+      .flatMap((s) => s.slots)
+      .find((sl) => sl.slot_index >= 3 && patternById.get(sl.movement_id) !== 'cardio'
+        && weightedBbPool.find((m) => m.movement_id === sl.movement_id)?.plannedImplement !== 'Bodyweight')
+      ?.reps);
+  check("weighted 'BB' primary squat strength steps 5 -> 4 -> 3 across weeks 1-3 (#219 Q1A)",
+    JSON.stringify(bbPrimarySquatReps) === '[5,4,3]',
+    JSON.stringify(bbPrimarySquatReps));
+  check("weighted 'BB' primary bench strength steps 5 -> 4 -> 3 across weeks 1-3 (#219 Q1A)",
+    JSON.stringify(bbPrimaryBenchReps) === '[5,4,3]',
+    JSON.stringify(bbPrimaryBenchReps));
+  check('weighted strength accessory slots (slot_index >= 3) step 8 -> 8 -> 6 across weeks 1-3 (#219 Q1A)',
+    JSON.stringify(bbAccessoryReps) === '[8,8,6]',
+    JSON.stringify(bbAccessoryReps));
+}
+
 // --- fail-toward-external-load (P2-2) ----------------------------------------
 const noPrefixPool = movements.map((m) => ({ ...m, plannedImplement: undefined }));
 const emptyPrefixSlots = pushSlots(noPrefixPool);
@@ -793,35 +840,49 @@ console.log('[9c] RR-04 — phase set delta lands on primary slots only');
     const mv = movements.find((x) => x.movement_id === sl.movement_id);
     return mv !== undefined && mv.pattern !== 'locomotion' && mv.plannedImplement !== 'Bodyweight';
   };
+  const patternOf = (sl) => movements.find((x) => x.movement_id === sl.movement_id)?.pattern;
+  // On strength with #219 Q1A/Q4, non-hinge barbell primaries gain the +1
+  // volume set (5 sets vs 3 on accessories), while Deadlift stays capped at 3.
   let biased = true; let compared = 0;
   for (const sess of work) {
-    const primary = sess.slots.filter((sl) => sl.slot_index < 3 && isLoaded(sl));
+    const primaryNonHinge = sess.slots.filter((sl) => sl.slot_index < 3 && isLoaded(sl) && patternOf(sl) !== 'hinge');
     const accessory = sess.slots.filter((sl) => sl.slot_index >= 3 && isLoaded(sl));
-    if (primary.length === 0 || accessory.length === 0) continue;
+    if (primaryNonHinge.length === 0 || accessory.length === 0) continue;
     compared += 1;
-    if (!(Math.min(...primary.map((sl) => sl.sets)) > Math.max(...accessory.map((sl) => sl.sets)))) {
+    if (!(Math.min(...primaryNonHinge.map((sl) => sl.sets)) > Math.max(...accessory.map((sl) => sl.sets)))) {
       biased = false;
     }
   }
-  check('volume: every LOADED primary carries strictly more sets than every loaded accessory',
+  check('volume: non-hinge loaded primaries carry strictly more sets than loaded accessories',
     compared > 0 && biased, `${compared} sessions compared`);
 
-  // The contrast that proves the delta, not just an ordering artefact: a phase
-  // with sets delta 0 must show NO primary/accessory set difference.
-  const gppBlock = generateBlock({
-    profile: prof({ objective: 'strength' }), movements, startDate: START,
+  // The contrast that proves the delta on general (gpp) objective (no Round 2 hypertrophy accessory delta and no #219 strength cap):
+  const gppObjVolume = generateBlock({
+    profile: prof({ objective: 'gpp' }), movements, startDate: START,
+    schemaType: 'LINEAR', macroBlockIndex: 5 });
+  const gppObjGpp = generateBlock({
+    profile: prof({ objective: 'gpp' }), movements, startDate: START,
     schemaType: 'LINEAR', macroBlockIndex: 1 });
-  check('macroBlockIndex 1 resolves to gpp (sets delta 0)', gppBlock.macroPhase === 'gpp');
+  check('macroBlockIndex 1 resolves to gpp (sets delta 0)', gppObjGpp.macroPhase === 'gpp');
   let flat = true;
-  for (const sess of gppBlock.sessions.filter((x) => x.phase !== 'deload')) {
-    const loaded = sess.slots.filter((sl) => {
-      const mv = movements.find((x) => x.movement_id === sl.movement_id);
-      return mv !== undefined && mv.pattern !== 'locomotion' && mv.plannedImplement !== 'Bodyweight';
-    });
+  for (const sess of gppObjGpp.sessions.filter((x) => x.phase !== 'deload')) {
+    const loaded = sess.slots.filter((sl) => isLoaded(sl));
     if (loaded.length < 2) continue;
     if (new Set(loaded.map((sl) => sl.sets)).size !== 1) flat = false;
   }
-  check('gpp: loaded primary and accessory sets are equal (no delta to bias)', flat);
+  check('gpp (gpp objective): loaded primary and accessory sets are equal (no delta to bias)', flat);
+  let gppBiased = true; let gppCompared = 0;
+  for (const sess of gppObjVolume.sessions.filter((x) => x.phase !== 'deload' && x.slots.length >= 3)) {
+    const primary = sess.slots.filter((sl) => sl.slot_index < 3 && isLoaded(sl));
+    const accessory = sess.slots.filter((sl) => sl.slot_index >= 3 && isLoaded(sl));
+    if (primary.length === 0 || accessory.length === 0) continue;
+    gppCompared += 1;
+    if (!(Math.min(...primary.map((sl) => sl.sets)) > Math.max(...accessory.map((sl) => sl.sets)))) {
+      gppBiased = false;
+    }
+  }
+  check('volume (gpp objective): every loaded primary carries strictly more sets than every loaded accessory',
+    gppCompared > 0 && gppBiased, `${gppCompared} sessions compared`);
 }
 
 // --- [9d] ladder reconciliation ----------------------------------------------
@@ -2556,7 +2617,8 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
   // 075 (session plan slot planned count side-car) adds no library rows and
   // advances the chain to 74.
   // 076 (sport taxonomy expansion to 22 sports) adds no library rows and
-  // advances the chain to 75.
+  // advances the chain to 75. 078 (Phase 2 lifting taxonomy & side-cars) adds
+  // no library rows and advances the chain to 77.
   const chain = readdirSync(SCHEMA_DIR)
     .filter((f) => f.endsWith('.sql') && !f.startsWith('004_'))
     .sort((a, b) => Number(a.slice(0, 3)) - Number(b.slice(0, 3)));
@@ -2569,7 +2631,7 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
   // Pin the corpus itself, so a library change cannot move the figures below
   // without announcing itself.
   check('[F2-corpus] the shipped catalogue is the one being measured',
-    rows.length === 300 && chain.length === 76,
+    rows.length === 300 && chain.length === 77,
     `${rows.length} movements from ${chain.length} migrations`);
 
   // Round-2 finding 1. Gate [11] validates supported_prefixes tokens against

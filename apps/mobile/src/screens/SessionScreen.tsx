@@ -1,7 +1,7 @@
 /** Phase 17 utility-first active-session surface. */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions, type HostInstance } from 'react-native';
-import { JOINTS, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING_NOTE, EFFORT_STOP_GUIDANCE, effortCue, effectiveRpeCeiling, mapRirToRpe, RIR_OPTIONS, PREPARATION_STATUS_LABEL, isTerminalPreparationStatus, preparationDoseUnit, type EffortAnswer, type RunnerHaltReason } from '@ak/inference';
+import { JOINTS, computeBackOffLoadKg, isDifficultyAllowed, nextUp as nextRunnerWork, EFFORT_BREATHING_NOTE, EFFORT_STOP_GUIDANCE, effortCue, effectiveRpeCeiling, mapRirToRpe, RIR_OPTIONS, PREPARATION_STATUS_LABEL, isTerminalPreparationStatus, preparationDoseUnit, type EffortAnswer, type RunnerHaltReason } from '@ak/inference';
 import { EXPERIENCE_SEVERITY, runnerTierForTrainingAge } from '../../../../packages/inference/src/sessionRunner';
 import { formatTeachingOnlyReason, freeFormStartIsEmpty, useStore, type LoadCopyFacts, type LoadSelection,type LoggedSet, type SetLoadShown, type Movement, type MovementAvailability, type PlanSlot, type SetMetricPatch, type SlotTarget } from '../state/useStore';
 import { useNavigation, useSubViewBack } from '../navigation/navigation';
@@ -805,6 +805,15 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   // never diverge. Mutable Actual RPE is completion evidence and must not
   // recalculate source/advisory copy or rewrite load draft state.
   const stableTargetRpe = currentSlot?.targetRpe ?? 8;
+  const inBackOffPhase =
+    currentSlot?.backOff !== undefined && currentSlot.backOff.sets > 0
+    && target?.kind === 'reps' && currentLogged >= 1;
+  const activeTargetReps = inBackOffPhase
+    ? currentSlot.backOff!.reps
+    : (target?.kind === 'reps' ? target.reps : null);
+  const activeTargetRpe = inBackOffPhase
+    ? currentSlot.backOff!.targetRpe
+    : stableTargetRpe;
   // #131: copy facts (eased today, this-session history) ride along with the
   // resolver's selection; they never change the load itself.
   const loadSelection: (LoadSelection & Partial<LoadCopyFacts>) | null = currentSlot === null || target === null
@@ -813,8 +822,8 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
         ...state.resolveSlotLoad({
           movementId: currentSlot.movementId,
           bodyweightMode,
-          targetReps: target.kind === 'reps' ? target.reps : null,
-          targetRpe: stableTargetRpe,
+          targetReps: activeTargetReps,
+          targetRpe: activeTargetRpe,
           overrideLoadKg: currentSlot.overrideLoadKg,
           sessionPlanSlotId: currentSlot.sessionPlanSlotId,
         }),
@@ -825,17 +834,13 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   // Android walk (#231): within the same slot, after a set has been logged in
   // this session, start the next set's field at the load of the previous set
   // while keeping today's coach suggestion visible next to it.
-  const latestSlotSet = currentSlot === null
-    ? null
+  const slotSets = currentSlot === null
+    ? []
     : (session?.sets.filter((set) => sameSlot(set, currentSlot)) ?? [])
-        .reduce<LoggedSet | null>(
-          (latest, candidate) => latest === null
-            || candidate.set_index > latest.set_index
-            || (candidate.set_index === latest.set_index && candidate.set_id > latest.set_id)
-            ? candidate
-            : latest,
-          null,
-        );
+        .slice()
+        .sort((a, b) => a.set_index - b.set_index || a.set_id - b.set_id);
+  const firstSlotSet = slotSets[0] ?? null;
+  const latestSlotSet = slotSets.length > 0 ? slotSets[slotSets.length - 1]! : null;
   const previousSlotLoadKg = latestSlotSet !== null
     && Number.isFinite(latestSlotSet.load_kg)
     && latestSlotSet.load_kg >= 0
@@ -855,8 +860,8 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
         oneRm,
         currentSlot?.overrideLoadKg ?? null,
         target?.kind === 'time',
-        firstTimeAim(target?.kind === 'reps' ? target.reps : null, currentSlot?.targetRpe ?? null),
-        target?.kind === 'reps' ? target.reps : null,
+        firstTimeAim(activeTargetReps, inBackOffPhase ? activeTargetRpe : (currentSlot?.targetRpe ?? null)),
+        activeTargetReps,
         previousSlotLoadKg,
       );
   const loadLoggable = bandOnly || (isLoadDraftLoggable(loadText) && !loadInvalid);
@@ -908,7 +913,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   useEffect(() => {
     if (currentSlot === null || target === null) return;
     setDetailsOpen(false); setSafetyOpen(false); setNiggleRegion(null); setNiggleSeverity(null); setNiggleSavedNotice(false); setBandLevel(null);
-    setReps(target.kind === 'reps' ? target.reps : 1);
+    setReps(activeTargetReps ?? 1);
     setSeconds(target.kind === 'time' ? target.seconds : 30);
     // Initialize the load draft ONCE per set key from the resolver output.
     // null = blank (athlete must choose); 0 = identity/explicit zero. The
@@ -918,12 +923,16 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
     const seed = state.resolveSlotLoad({
       movementId: currentSlot.movementId,
       bodyweightMode,
-      targetReps: target.kind === 'reps' ? target.reps : null,
-      targetRpe: stableTargetRpe,
+      targetReps: activeTargetReps,
+      targetRpe: activeTargetRpe,
       overrideLoadKg: currentSlot.overrideLoadKg,
       sessionPlanSlotId: currentSlot.sessionPlanSlotId,
     });
-    const initial = previousSlotLoadKg ?? seed.initialLoadKg;
+    const backOffInitial = inBackOffPhase && currentLogged === 1
+      && firstSlotSet !== null && Number.isFinite(firstSlotSet.load_kg) && firstSlotSet.load_kg > 0
+      ? computeBackOffLoadKg(firstSlotSet.load_kg, currentSlot.backOff!.loadMultiplier)
+      : null;
+    const initial = backOffInitial ?? (previousSlotLoadKg ?? seed.initialLoadKg);
     // The record holds the number the field showed (one decimal, two for a
     // quarter kilogram), not the
     // resolver's unrounded value; null stays null (a blank field).
@@ -950,6 +959,9 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
     currentMovement?.movement_id,
     target?.kind,
     target?.kind === 'reps' ? target.reps : target?.seconds,
+    activeTargetReps,
+    activeTargetRpe,
+    inBackOffPhase,
     currentSlot?.overrideLoadKg,
   ]);
 
@@ -974,8 +986,8 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
     const seed = state.resolveSlotLoad({
       movementId: currentSlot.movementId,
       bodyweightMode,
-      targetReps: target.kind === 'reps' ? target.reps : null,
-      targetRpe: stableTargetRpe,
+      targetReps: activeTargetReps,
+      targetRpe: activeTargetRpe,
       overrideLoadKg: currentSlot.overrideLoadKg,
       sessionPlanSlotId: currentSlot.sessionPlanSlotId,
     });
@@ -1998,7 +2010,12 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                       <View style={{ gap: theme.space[3] }}>
                         <Text style={styles.currentLabel}>CURRENT · SET {Math.min(slot.plannedSets, currentLogged + 1)} OF {slot.plannedSets}</Text>
                         <Text style={styles.movementName}>{movement?.name ?? 'Movement'}</Text>
-                        <Text style={styles.targetLine} testID="session-target-line">Target {targetText(slot)}{targetEffortText(slot)}</Text>
+                        <Text style={styles.targetLine} testID="session-target-line">
+                          Target {targetText(slot)}{targetEffortText(slot)}
+                          {slot.backOff !== undefined && slot.backOff.sets > 0
+                            ? ` + ${slot.backOff.sets}×${slot.backOff.reps} (-${Math.round((1 - slot.backOff.loadMultiplier) * 100)}% @ RPE ${slot.backOff.targetRpe.toFixed(1)})`
+                            : ''}
+                        </Text>
                         {/* #182: no "pick a weight" on a slot a report holds back. */}
                         {!heldByReport(slot.sessionPlanSlotId) && (
                           <Text
@@ -2043,7 +2060,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                           />
                           {target?.kind !== 'time' && (
                             <Text style={styles.effortCue} testID="actual-reps-cue">
-                              Target: {target?.kind === 'reps' ? target.reps : '—'} reps. Log the reps you actually completed.
+                              Target: {activeTargetReps ?? '—'} reps. Log the reps you actually completed.
                             </Text>
                           )}
                           {/* #182: a slot a report holds back asks for no load. */}

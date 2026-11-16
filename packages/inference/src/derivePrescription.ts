@@ -125,6 +125,13 @@ export function applyLoadModifier(
   return Math.max(0, Math.min(loadKg, scaled));
 }
 
+export interface SlotBackOffShape {
+  sets: number;
+  reps: number;
+  targetRpe: number;
+  loadMultiplier: number;
+}
+
 export function applyPrescriptionToSlot<
   T extends {
     sets: number;
@@ -132,6 +139,7 @@ export function applyPrescriptionToSlot<
     overrideLoadKg?: number | null;
     target?: { kind: 'reps'; reps: number } | { kind: 'time'; seconds: number };
     routineDecision?: unknown;
+    backOff?: SlotBackOffShape;
   },
 >(
   slot: T,
@@ -146,12 +154,26 @@ export function applyPrescriptionToSlot<
   const overrideLoadKg = slot.overrideLoadKg === undefined
     ? undefined
     : applyLoadModifier(slot.overrideLoadKg, vector);
-  return {
+  const remainingBackOffSets = Math.max(0, sets - 1);
+  const backOff = slot.backOff === undefined || remainingBackOffSets <= 0
+    ? undefined
+    : {
+        ...slot.backOff,
+        sets: Math.min(slot.backOff.sets, remainingBackOffSets),
+        targetRpe: Math.min(slot.backOff.targetRpe, targetRpe, vector.rpe_cap),
+      };
+  const next: T = {
     ...slot,
     sets,
     targetRpe,
     ...(overrideLoadKg === undefined ? {} : { overrideLoadKg }),
   };
+  if (backOff === undefined) {
+    delete next.backOff;
+  } else {
+    next.backOff = backOff;
+  }
+  return next;
 }
 
 export function isPrescriptionReduced(

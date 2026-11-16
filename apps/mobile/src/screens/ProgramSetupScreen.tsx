@@ -121,6 +121,7 @@ export default function ProgramSetupScreen({
   const movementAvailabilityRevision = useStore((s) => s.movementAvailabilityRevision);
   const confirmMovementPriorExperience = useStore((s) => s.confirmMovementPriorExperience);
   const activePriorExperienceMovementIds = useStore((s) => s.activePriorExperienceMovementIds);
+  const saveProfile = useStore((s) => s.saveProfile);
   const storeError = useStore((s) => s.error);
 
   const initialFrequency = program?.days.length ?? profile.weekly_frequency;
@@ -132,13 +133,26 @@ export default function ProgramSetupScreen({
   const [buildMode, setBuildMode] = useState<'coach' | 'custom'>(
     editing && (program?.movementPreferences.length ?? 0) > 0 ? 'custom' : recommended.buildMode,
   );
+  const countdownCompDate = useMemo(() => {
+    const cd = sport?.competitionDate;
+    if (cd == null || cd.trim() === '') return null;
+    const tMs = Date.parse(`${today}T00:00:00Z`);
+    const cMs = Date.parse(`${cd}T00:00:00Z`);
+    if (!Number.isFinite(tMs) || !Number.isFinite(cMs)) return null;
+    const days = Math.floor((cMs - tMs) / 86400000);
+    return days >= 1 && days <= 224 ? cd : null;
+  }, [sport?.competitionDate, today]);
   const [horizonKind, setHorizonKind] = useState<'weeks' | 'date'>(
-    editing ? (program?.horizonKind ?? recommended.horizonKind) : recommended.horizonKind,
+    editing
+      ? (program?.horizonKind ?? recommended.horizonKind)
+      : (countdownCompDate !== null ? 'date' : recommended.horizonKind),
   );
   const [blockCount, setBlockCount] = useState<number>(
     editing ? (program?.plannedBlockCount ?? recommended.blockCount) : recommended.blockCount,
   );
-  const [reviewDate, setReviewDate] = useState(program?.requestedReviewDate ?? '');
+  const [reviewDate, setReviewDate] = useState(
+    program?.requestedReviewDate ?? countdownCompDate ?? '',
+  );
   const [schemaType, setSchemaType] = useState<SchemaType>(
     editing ? (program?.schemaType ?? recommended.schemaType) : recommended.schemaType,
   );
@@ -656,9 +670,9 @@ export default function ProgramSetupScreen({
                 from it. Disclosing both is required by the ratified contract. */}
             {horizonKind === 'date' && (
               <Text style={styles.caption}>
-                Blocks are whole 4-week units, so this rounds up to the next full block and can fall
-                up to 27 days after the date you chose. It is a review checkpoint, not a competition
-                date — your training phases are not scheduled around it.
+                {sport?.competitionDate != null && reviewDate.trim() === sport.competitionDate
+                  ? 'Your blocks count down to peak and taper for competition day, synced with your goal review.'
+                  : 'Blocks are whole 4-week units, so this rounds up to the next full block and can fall up to 27 days after the date you chose. It is a review checkpoint, not a competition date — your training phases are not scheduled around it.'}
               </Text>
             )}
           </>
@@ -757,6 +771,24 @@ export default function ProgramSetupScreen({
               })}
             </View>
           ))}
+        </View>
+      )}
+      {(profile.training_age === 'advanced' || profile.training_age === 'elite') && (
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Effort cap</Text>
+          <View style={styles.wrap}>
+            <Chip
+              label="RPE 9.0 (default)"
+              selected={profile.base_rpe_cap < 9.5}
+              onPress={() => saveProfile({ base_rpe_cap: 9.0 })}
+            />
+            <Chip
+              testID="program-rpe-cap-9-5"
+              label="RPE 9.5"
+              selected={profile.base_rpe_cap >= 9.5}
+              onPress={() => saveProfile({ base_rpe_cap: profile.base_rpe_cap >= 9.5 ? 9.0 : 9.5 })}
+            />
+          </View>
         </View>
       )}
       </Disclosure>

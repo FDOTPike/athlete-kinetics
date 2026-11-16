@@ -217,10 +217,13 @@ import {
   type LoadPreference,
   type LoadSelection,
   type LoadSource,
+  countdownMacroBlockIndex,
+  resolveCompetitionCountdownHorizon,
+  type PlannedSlotBackOff,
 } from '@ak/inference';
 
 export type { MovementAvailability };
-export type { LoadPreference, LoadSelection, LoadSource } from '@ak/inference';
+export type { LoadPreference, LoadSelection, LoadSource, PlannedSlotBackOff } from '@ak/inference';
 export { applyLoadModifier, applyPrescriptionToSlot, isPrescriptionReduced } from '@ak/inference';
 
 /** What the load entry was seeded with for the set being logged, as the session
@@ -606,6 +609,7 @@ export interface PlanSlot {
    *  overwrote plannedSets with the sets the runner keeps (075). Null, or absent on a
    *  slot built before this was recorded: the screens then use the earlier wording. */
   originalPlannedSets?: number | null;
+  backOff?: PlannedSlotBackOff;
 }
 
 // --- 4-week block (007 tables) ----------------------------------------------
@@ -672,6 +676,7 @@ export interface TodaySlot {
     stressDose: number;
     adaptations: string[];
   };
+  backOff?: PlannedSlotBackOff;
 }
 
 /**
@@ -694,6 +699,12 @@ export interface BlockMeta {
   macroBlockIndex: number;
   macroPhase: string;
   peakShifted: boolean;
+}
+
+export interface BlockMeetMeta {
+  competitionDate: string;
+  blockNumber: number;
+  totalBlocks: number;
 }
 
 /** Today's planned session, null on rest days (the UI renders that state). */
@@ -933,6 +944,7 @@ interface KineticsStore {
   /** Active 4-week block, its grid, and today's planned session. */
   block: ActiveBlock | null;
   blockMeta: BlockMeta | null;
+  blockMeetMeta: BlockMeetMeta | null;
   blockSessions: BlockSessionSummary[];
   todayPlan: TodayPlan | null;
   hasArchivedBlock: boolean;
@@ -2383,6 +2395,17 @@ const runBlockWipe = (d: DB, today: string): void => {
   // Named explicitly: with foreign keys off the cascade would not run, and a
   // block id is reused once its row is gone.
   deleteBlockEmphasisFor(d, 'active');
+  d.executeSync(
+    `DELETE FROM planned_slot_backoff WHERE planned_slot_id IN (
+       SELECT ps.planned_slot_id FROM planned_slot ps
+       JOIN planned_session p ON p.planned_session_id = ps.planned_session_id
+       JOIN training_block tb ON tb.block_id = p.block_id
+       WHERE tb.status = 'active'
+     )`,
+  );
+  d.executeSync(
+    "DELETE FROM training_block_meet_meta WHERE block_id IN (SELECT block_id FROM training_block WHERE status = 'active')",
+  );
   d.executeSync("DELETE FROM training_block WHERE status = 'active'");
   d.executeSync('DELETE FROM subjective_report WHERE date = ?', [today]);
   d.executeSync('DELETE FROM niggle WHERE reported_at_ms >= ?', [startOfTodayMs()]);
@@ -2717,6 +2740,10 @@ const deleteEmptySessionRows = (d: DB, sessionId: number): void => {
   // session's id.
   deleteSessionPreparation(d, sessionId);
   d.executeSync('DELETE FROM session_slot_target WHERE session_plan_slot_id IN (SELECT session_plan_slot_id FROM session_plan_slot WHERE session_id = ?)', [sessionId]);
+  d.executeSync(
+    'DELETE FROM session_slot_backoff WHERE session_plan_slot_id IN (SELECT session_plan_slot_id FROM session_plan_slot WHERE session_id = ?)',
+    [sessionId],
+  );
   d.executeSync('DELETE FROM planned_slot_disposition WHERE session_id = ?', [sessionId]);
   d.executeSync('DELETE FROM session_plan_slot WHERE session_id = ?', [sessionId]);
   d.executeSync('DELETE FROM session_origin WHERE session_id = ?', [sessionId]);
@@ -3156,7 +3183,21 @@ const isoUtcMs = (value: string): number => {
   return ms;
 };
 
-const trainingProgramShape = (profile: UserProfile, input: TrainingProgramInput, horizonAnchorDate: string) => {
+const competitionCountdownDaysAway = (anchorDate: string, competitionDate: string | null | undefined): number | null => {
+  if (competitionDate === null || competitionDate === undefined || competitionDate.trim() === '') return null;
+  const anchorMs = Date.parse(`${anchorDate}T00:00:00Z`);
+  const compMs = Date.parse(`${competitionDate}T00:00:00Z`);
+  if (!Number.isFinite(anchorMs) || !Number.isFinite(compMs)) return null;
+  const daysAway = Math.floor((compMs - anchorMs) / 86400000);
+  return daysAway >= 1 && daysAway <= 224 ? daysAway : null;
+};
+
+const trainingProgramShape = (
+  profile: UserProfile,
+  input: TrainingProgramInput,
+  horizonAnchorDate: string,
+  competitionDate?: string | null,
+) => {
   const selected = [...new Set(input.dayIndices)].sort((a, b) => a - b);
   if (selected.length < 1 || selected.length > 7
       || selected.some((day) => !Number.isInteger(day) || day < 1 || day > 7)) {
@@ -3165,8 +3206,14 @@ const trainingProgramShape = (profile: UserProfile, input: TrainingProgramInput,
   // The horizon is measured from the program's stable anchor, never from the
   // edit date: editing an active program must not restart its review horizon
   // (master 7bebc15 behaviour, preserved through the lineage integration).
+  const normalizedHorizon = normalizeProgramHorizon(horizonAnchorDate, input.horizon);
+  const compDays = competitionCountdownDaysAway(horizonAnchorDate, competitionDate);
   const { plannedBlockCount, requestedReviewDate, plannedEndDate } =
-    normalizeProgramHorizon(horizonAnchorDate, input.horizon);
+    competitionDate != null && compDays !== null
+    && input.horizon.kind === 'date'
+    && input.horizon.requestedReviewDate === competitionDate
+      ? resolveCompetitionCountdownHorizon(horizonAnchorDate, competitionDate)
+      : normalizedHorizon;
   const focuses = programFocuses(profile.objective, selected.length);
   const inputDaysMap = new Map(input.days?.map((d) => [d.dayIndex, d.focus]));
   const days: TrainingProgramDay[] = selected.map((dayIndex, i) => {
@@ -3201,6 +3248,121 @@ const trainingProgramShape = (profile: UserProfile, input: TrainingProgramInput,
     plannedEndDate,
     days, movementPreferences, programDays,
   };
+};
+
+const syncCanonicalCompetitionDate = (
+  d: DB,
+  targetDate: string | null,
+  options: { syncSport: boolean; syncGoals: boolean; syncProgram: boolean; nowMs: number },
+): void => {
+  if (options.syncSport) {
+    const sport = readSportProfile(d);
+    if (sport !== null && sport.competitionDate !== targetDate) {
+      writeSportProfile(d, { ...sport, competitionDate: targetDate }, options.nowMs);
+    }
+  }
+  if (options.syncGoals && targetDate !== null) {
+    for (const g of readAthleteGoals(d)) {
+      if (g.status === 'active' && g.goal.requestedDeadline !== targetDate) {
+        reviseAthleteGoal(d, g.goalId, g.revision, { ...g.goal, requestedDeadline: targetDate }, options.nowMs);
+      }
+    }
+  }
+  if (options.syncProgram) {
+    const activeProg = rowsOf<{
+      program_id: number;
+      start_date: string;
+      planned_end_date: string;
+      planned_block_count: number;
+      created_at_ms: number;
+    }>(d.executeSync(
+      "SELECT program_id, start_date, planned_end_date, planned_block_count, created_at_ms FROM training_program WHERE status IN ('active','review_due') LIMIT 1",
+    ))[0];
+    if (activeProg !== undefined) {
+      if (targetDate === null) {
+        const hadCountdown = rowsOf<{ program_id: number }>(d.executeSync(
+          'SELECT program_id FROM training_program_meet_countdown WHERE program_id = ? LIMIT 1',
+          [activeProg.program_id],
+        )).length > 0;
+        d.executeSync('DELETE FROM training_program_meet_countdown WHERE program_id = ?', [activeProg.program_id]);
+        if (hadCountdown) {
+          const reverted = normalizeProgramHorizon(activeProg.start_date, {
+            kind: 'weeks',
+            blockCount: activeProg.planned_block_count,
+          });
+          d.executeSync(
+            "UPDATE training_program SET horizon_kind = 'weeks', requested_review_date = NULL, planned_end_date = ?, updated_at_ms = ? WHERE program_id = ?",
+            [reverted.plannedEndDate, Math.max(options.nowMs, activeProg.created_at_ms), activeProg.program_id],
+          );
+        }
+      } else {
+        const compDays = competitionCountdownDaysAway(activeProg.start_date, targetDate);
+        const h = compDays !== null ? resolveCompetitionCountdownHorizon(activeProg.start_date, targetDate) : null;
+        d.executeSync(
+          "UPDATE training_program SET horizon_kind = 'date', requested_review_date = ?, planned_end_date = ?, planned_block_count = ?, updated_at_ms = ? WHERE program_id = ?",
+          [
+            targetDate,
+            h !== null ? h.plannedEndDate : activeProg.planned_end_date,
+            h !== null ? h.plannedBlockCount : activeProg.planned_block_count,
+            Math.max(options.nowMs, activeProg.created_at_ms),
+            activeProg.program_id,
+          ],
+        );
+        d.executeSync(
+          `INSERT INTO training_program_meet_countdown (program_id, competition_date) VALUES (?, ?)
+           ON CONFLICT(program_id) DO UPDATE SET competition_date = excluded.competition_date`,
+          [activeProg.program_id, targetDate],
+        );
+      }
+    }
+    if (targetDate === null) {
+      d.executeSync(
+        "DELETE FROM training_block_meet_meta WHERE block_id IN (SELECT block_id FROM training_block WHERE status = 'active')",
+      );
+    } else {
+      const activeBlock = rowsOf<{ block_id: number; start_date: string; block_number: number }>(d.executeSync(
+        `SELECT m.block_id, tb.start_date, m.block_number
+         FROM training_block_meet_meta m
+         JOIN training_block tb ON tb.block_id = m.block_id
+         WHERE tb.status = 'active' LIMIT 1`,
+      ))[0];
+      if (activeBlock !== undefined && competitionCountdownDaysAway(activeBlock.start_date, targetDate) !== null) {
+        d.executeSync(
+          'UPDATE training_block_meet_meta SET competition_date = ? WHERE block_id = ?',
+          [targetDate, activeBlock.block_id],
+        );
+      }
+    }
+  }
+};
+
+const persistBlockMeetCountdown = (
+  d: DB,
+  blockId: number,
+  programId: number | null,
+  meetCountdown: { competitionDate: string; blockNumber: number; totalBlocks: number } | null,
+  isSuspensionBlock: boolean,
+): void => {
+  d.executeSync('DELETE FROM training_block_meet_meta WHERE block_id = ?', [blockId]);
+  if (meetCountdown === null || isSuspensionBlock) return;
+  if (programId !== null) {
+    d.executeSync(
+      `INSERT INTO training_program_meet_countdown (program_id, competition_date) VALUES (?, ?)
+       ON CONFLICT(program_id) DO UPDATE SET competition_date = excluded.competition_date`,
+      [programId, meetCountdown.competitionDate],
+    );
+  }
+  d.executeSync(
+    'INSERT INTO training_block_meet_meta (block_id, competition_date, block_number, total_blocks) VALUES (?, ?, ?, ?)',
+    [blockId, meetCountdown.competitionDate, meetCountdown.blockNumber, meetCountdown.totalBlocks],
+  );
+};
+
+const deletePlannedSlotBackOffForSession = (d: DB, plannedSessionId: number): void => {
+  d.executeSync(
+    'DELETE FROM planned_slot_backoff WHERE planned_slot_id IN (SELECT planned_slot_id FROM planned_slot WHERE planned_session_id = ?)',
+    [plannedSessionId],
+  );
 };
 
 /** Everything per-athlete in the store, cleared on a Coach Mode file swap so
@@ -3238,7 +3400,7 @@ const PER_ATHLETE_RESET: Partial<KineticsStore> = {
   profileNotes: [], profile: DEFAULT_PROFILE, triaging: false, lastTriage: null,
   sessionPlan: [], activeSessionPlanSlotId: null, activeMovementId: null, runner: null, sessionMode: null, preparation: null, substitution: null, niggles: [],
   activePriorExperienceMovementIds: [], movementAvailabilityRevision: 0, activeSessionAccessContext: null,
-  block: null, blockMeta: null, blockSessions: [], todayPlan: null, program: null, routineTemplates: [], pendingAutopilotAdjustments: [],
+  block: null, blockMeta: null, blockMeetMeta: null, blockSessions: [], todayPlan: null, program: null, routineTemplates: [], pendingAutopilotAdjustments: [],
   // Suspension is per-athlete DURABLE state living in that athlete's own DB
   // file, so it belongs here with every other per-athlete surface. boot() ends
   // with refreshSuspension(), but the window between this set() and that call
@@ -3361,6 +3523,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
   activeSessionAccessContext: null,
   block: null,
   blockMeta: null,
+  blockMeetMeta: null,
   blockSessions: [],
   todayPlan: null,
   hasArchivedBlock: false,
@@ -3592,15 +3755,22 @@ export const useStore = create<KineticsStore>()((set, get) => {
           override_reason: string | null;
           replaced_by_session_plan_slot_id: number | null;
           original_planned_sets: number | null;
+          backoff_sets: number | null;
+          backoff_reps: number | null;
+          backoff_target_rpe: number | null;
+          backoff_load_multiplier: number | null;
         }>(
           db!.executeSync(
             `SELECT sps.session_plan_slot_id, sps.movement_id, sps.planned_sets, sps.planned_reps,
                     sst.target_kind, sst.target_reps, sst.target_seconds,
                     sps.provenance_kind, sps.target_rpe, sps.source_planned_slot_id,
                     sps.original_movement_id, sps.original_session_date, sps.override_load_kg, sps.override_reason,
-                    spsr.replaced_by_session_plan_slot_id, spc.original_planned_sets
+                    spsr.replaced_by_session_plan_slot_id, spc.original_planned_sets,
+                    ssb.sets AS backoff_sets, ssb.reps AS backoff_reps,
+                    ssb.target_rpe AS backoff_target_rpe, ssb.load_multiplier AS backoff_load_multiplier
              FROM session_plan_slot sps
              LEFT JOIN session_slot_target sst ON sst.session_plan_slot_id = sps.session_plan_slot_id
+             LEFT JOIN session_slot_backoff ssb ON ssb.session_plan_slot_id = sps.session_plan_slot_id
              LEFT JOIN session_plan_slot_replacement spsr ON spsr.session_plan_slot_id = sps.session_plan_slot_id
              LEFT JOIN session_plan_slot_planned_count spc ON spc.session_plan_slot_id = sps.session_plan_slot_id
              WHERE sps.session_id = ?
@@ -3623,6 +3793,15 @@ export const useStore = create<KineticsStore>()((set, get) => {
           overrideReason: ps.override_reason,
           replacedBySessionPlanSlotId: ps.replaced_by_session_plan_slot_id ?? null,
           originalPlannedSets: ps.original_planned_sets ?? null,
+          backOff: ps.backoff_sets !== null && ps.backoff_reps !== null
+            && ps.backoff_target_rpe !== null && ps.backoff_load_multiplier !== null
+            ? {
+                sets: ps.backoff_sets,
+                reps: ps.backoff_reps,
+                targetRpe: ps.backoff_target_rpe,
+                loadMultiplier: ps.backoff_load_multiplier,
+              }
+            : undefined,
         }));
         const checkpoint = rowsOf<{
           session_mode: string;
@@ -4061,7 +4240,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
     }
     set({
       profile: loaded,
-      block: null, blockMeta: null, blockSessions: [], todayPlan: null, program: null,
+      block: null, blockMeta: null, blockMeetMeta: null, blockSessions: [], todayPlan: null, program: null,
       niggles: [], lastTriage: null,
     });
     get().refreshProfileSlots();
@@ -4094,7 +4273,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
     // Clear EVERY piece of UI state derived from the wiped rows (audit: stale
     // prescription/substitution/plan state survived the wipe). profileNotes are
     // NOT cleared — athlete_profile is intentionally preserved by this wipe.
-    set({ block: null, blockMeta: null, blockSessions: [], todayPlan: null, program: null, niggles: [], lastTriage: null, prescription: null, substitution: null, sessionPlan: [], activeSessionPlanSlotId: null, activeMovementId: null, runner: null, sessionMode: null, lastEndedSessionId: null });
+    set({ block: null, blockMeta: null, blockMeetMeta: null, blockSessions: [], todayPlan: null, program: null, niggles: [], lastTriage: null, prescription: null, substitution: null, sessionPlan: [], activeSessionPlanSlotId: null, activeMovementId: null, runner: null, sessionMode: null, lastEndedSessionId: null });
     get().refreshNiggles();
     get().refreshBlock();
     get().refreshProgram();
@@ -4536,17 +4715,37 @@ export const useStore = create<KineticsStore>()((set, get) => {
     }
     const d = getDb();
     const nowMs = Date.now();
+    const currentSport = readSportProfile(d);
+    const goalToSave = existing === undefined
+      && validated.goal.requestedDeadline === null
+      && currentSport?.competitionDate != null
+      && currentSport.competitionDate >= localToday()
+      ? { ...validated.goal, requestedDeadline: currentSport.competitionDate }
+      : validated.goal;
     let applied = true;
     d.executeSync('BEGIN');
     try {
       const goalId = existing?.goalId ?? `goal-${nowMs}-${Math.floor(Math.random() * 1e9).toString(36)}`;
       if (existing === undefined) {
-        insertAthleteGoal(d, goalId, validated.goal, nowMs);
+        insertAthleteGoal(d, goalId, goalToSave, nowMs);
       } else {
-        applied = reviseAthleteGoal(d, existing.goalId, existing.expectedRevision, validated.goal, nowMs);
+        applied = reviseAthleteGoal(d, existing.goalId, existing.expectedRevision, goalToSave, nowMs);
       }
       // The exercise link is saved with the goal or not at all.
       if (applied && movementId !== undefined) setGoalMovementLink(d, goalId, movementId, nowMs);
+      if (applied && goalToSave.requestedDeadline !== null) {
+        const shouldSyncCanonical =
+          existing !== undefined
+          || (currentSport !== null && currentSport.competitionDate === null);
+        if (shouldSyncCanonical) {
+          syncCanonicalCompetitionDate(d, goalToSave.requestedDeadline, {
+            syncSport: true,
+            syncGoals: true,
+            syncProgram: true,
+            nowMs,
+          });
+        }
+      }
       d.executeSync('COMMIT');
     } catch (e) {
       try { d.executeSync('ROLLBACK'); } catch { /* nothing partial is kept */ }
@@ -4555,6 +4754,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
     }
     set({ goals: readAthleteGoals(d), error: applied ? null : 'This goal changed since you opened it. Review it and try again.' });
     get().refreshSport();
+    get().refreshProgram();
+    get().refreshBlock();
     return applied;
   },
 
@@ -4580,18 +4781,46 @@ export const useStore = create<KineticsStore>()((set, get) => {
       profile = validated.profile;
     }
     const d = getDb();
+    const nowMs = Date.now();
     d.executeSync('BEGIN');
     try {
-      if (profile === null) clearSportProfile(d);
-      else writeSportProfile(d, profile, Date.now());
+      const prevSport = readSportProfile(d);
+      if (profile === null) {
+        clearSportProfile(d);
+        syncCanonicalCompetitionDate(d, null, {
+          syncSport: false,
+          syncGoals: false,
+          syncProgram: true,
+          nowMs,
+        });
+      } else {
+        writeSportProfile(d, profile, nowMs);
+        if (profile.competitionDate !== null) {
+          syncCanonicalCompetitionDate(d, profile.competitionDate, {
+            syncSport: false,
+            syncGoals: true,
+            syncProgram: true,
+            nowMs,
+          });
+        } else if (prevSport?.competitionDate != null) {
+          syncCanonicalCompetitionDate(d, null, {
+            syncSport: false,
+            syncGoals: false,
+            syncProgram: true,
+            nowMs,
+          });
+        }
+      }
       d.executeSync('COMMIT');
     } catch (e) {
       try { d.executeSync('ROLLBACK'); } catch { /* nothing partial is kept */ }
       set({ error: e instanceof Error ? e.message : String(e) });
       return false;
     }
-    set({ error: null });
+    set({ goals: readAthleteGoals(d), error: null });
     get().refreshSport();
+    get().refreshProgram();
+    get().refreshBlock();
     return true;
   },
 
@@ -4876,12 +5105,18 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const planningProfile = activeProgram === null ? profile
       : { ...profile, objective: activeProgram.objective };
     const startDate = localToday();
+    const d = getDb();
     const horizonAnchorDate = activeProgram === null
       ? startDate
-      : programHorizonAnchor(activeProgram.plannedEndDate, activeProgram.plannedBlockCount);
-    let shape = trainingProgramShape(planningProfile, input, horizonAnchorDate);
+      : (rowsOf<{ c: number }>(d.executeSync(
+          'SELECT COUNT(*) AS c FROM training_program_meet_countdown WHERE program_id = ?',
+          [activeProgram.programId],
+        ))[0]?.c ?? 0) > 0
+        ? activeProgram.startDate
+        : programHorizonAnchor(activeProgram.plannedEndDate, activeProgram.plannedBlockCount);
+    const sport = readSportProfile(d);
+    let shape = trainingProgramShape(planningProfile, input, horizonAnchorDate, sport?.competitionDate);
     const byId = new Map(movements.map((movement) => [movement.movement_id, movement]));
-    const d = getDb();
     const safetyExcluded = safetyExcludedMovementIdsFor(movements, profile, niggles);
     const priorExperience = new Set(get().activePriorExperienceMovementIds);
     const capabilityAvailableWeightRoom = capabilityAvailableMovementIds(
@@ -4919,7 +5154,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       // it shows that week instead of throwing.
       const placeable = shape.movementPreferences.filter((preference) => preferenceProblem(preference) === null);
       if (placeable.length !== shape.movementPreferences.length) {
-        shape = trainingProgramShape(planningProfile, { ...input, movementPreferences: placeable }, horizonAnchorDate);
+        shape = trainingProgramShape(planningProfile, { ...input, movementPreferences: placeable }, horizonAnchorDate, sport?.competitionDate);
       }
     }
     for (const preference of shape.movementPreferences) {
@@ -4955,13 +5190,20 @@ export const useStore = create<KineticsStore>()((set, get) => {
     // preview shows the NEXT program block at starting + (sequence-1) mod 8 —
     // the identical derivation committed generation uses. Only a brand-new
     // program (no program row yet) anchors to the athlete's global position.
-    const macroBlockIndex = activeProgram !== null
+    const baseMacroBlockIndex = activeProgram !== null
       ? programMacroIndex(activeProgram.startingMacroBlockIndex, activeProgram.currentSequenceIndex + 1)
       // R3 (REVIEW_BOUNDARY, ratified 2026-08-22): the selected date sets the
       // review horizon and block COUNT only. It confers no peak authority, so a
       // dated program takes the athlete's rotation position exactly as an
       // undated one does. Dedicated competition preparation is deferred.
       : nextMacroPosition(d).macroBlockIndex;
+    const compDays = competitionCountdownDaysAway(horizonAnchorDate, sport?.competitionDate);
+    const totalCountdownBlocks = sport?.competitionDate != null && compDays !== null
+      ? resolveCompetitionCountdownHorizon(horizonAnchorDate, sport.competitionDate).plannedBlockCount
+      : null;
+    const macroBlockIndex = totalCountdownBlocks !== null
+      ? countdownMacroBlockIndex(activeProgram !== null ? activeProgram.currentSequenceIndex + 1 : 1, totalCountdownBlocks)
+      : baseMacroBlockIndex;
     const effectiveProfile = {
       ...planningProfile,
       weekly_frequency: shape.days.length,
@@ -4976,6 +5218,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
       programDays: shape.programDays,
       powerPreferredMovementNames: powerNames,
       ...(previewEmphasis === null ? {} : { emphasis: previewEmphasis }),
+      competitionDate: sport?.competitionDate ?? null,
+      sportId: sport?.sportId ?? null,
     });
     const support = supportDecision(plan.sessions.flatMap((day) => day.slots.map((slot) => slot.movement_id)));
     if (support.status !== 'available') throw new Error(supportMessage(support));
@@ -5005,7 +5249,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const capChanges = chosenCapMin !== null && chosenCapMin !== priorCapMin;
     try {
       const preview = get().previewTrainingProgram(input);
-      const shape = trainingProgramShape(get().profile, input, preview.startDate);
+      const shape = trainingProgramShape(get().profile, input, preview.startDate, get().sport?.competitionDate);
       pendingProgramCreation = {
         input, preview, programDays: shape.programDays,
         sessionDurationCapMin: capChanges ? chosenCapMin : null,
@@ -5068,14 +5312,35 @@ export const useStore = create<KineticsStore>()((set, get) => {
       return;
     }
     const d = getDb();
+    const sportForMeet = readSportProfile(d);
+    const meetAnchorDate = pendingProgramCreation !== null
+      ? pendingProgramCreation.preview.startDate
+      : (pendingProgramContinuation !== null ? (get().program?.startDate ?? localToday()) : localToday());
+    const meetSeqIdx = pendingProgramContinuation !== null ? pendingProgramContinuation.sequenceIndex : 1;
+    const effectiveMeetDate = pendingProgramCreation !== null
+      && pendingProgramCreation.input.horizon.kind === 'date'
+      && sportForMeet !== null
+      ? (pendingProgramCreation.preview.requestedReviewDate ?? sportForMeet.competitionDate)
+      : (sportForMeet?.competitionDate ?? null);
+    const meetCompDays = competitionCountdownDaysAway(meetAnchorDate, effectiveMeetDate);
+    const meetCountdown = effectiveMeetDate !== null && meetCompDays !== null
+      ? (() => {
+          const totalBlocks = resolveCompetitionCountdownHorizon(meetAnchorDate, effectiveMeetDate).plannedBlockCount;
+          const blockNumber = clamp(meetSeqIdx, 1, totalBlocks);
+          return { competitionDate: effectiveMeetDate, blockNumber, totalBlocks };
+        })()
+      : null;
     // Macro continuation: STANDALONE blocks advance through the athlete's
     // GLOBAL 32-week cycle from wherever the last generated block sat. A
     // guided-program continuation OWNS its macro position (AUD-GP-2): block N
     // sits at starting_macro_block_index + (N-1) mod 8 — the SAME derivation
     // the preview used, never the global counter.
-    const macroBlockIndex = pendingProgramContinuation !== null
+    const baseMacroBlockIndex = pendingProgramContinuation !== null
       ? programMacroIndex(pendingProgramContinuation.startingMacroBlockIndex, pendingProgramContinuation.sequenceIndex)
       : nextMacroPosition(d).macroBlockIndex; // R3: no date-derived peak anchor
+    const macroBlockIndex = meetCountdown !== null
+      ? countdownMacroBlockIndex(meetCountdown.blockNumber, meetCountdown.totalBlocks)
+      : baseMacroBlockIndex;
     // The generator is pure; everything stateful happens in ONE transaction
     // below so a mid-write crash leaves the previous block fully active.
     const declaredIntents = readMovementLoadIntents(d);
@@ -5113,6 +5378,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
           sets: slot.sets,
           reps: slot.reps,
           targetRpe: slot.target_rpe,
+          backOff: slot.backOff ?? null,
           appliedPrefixes: slot.applied_prefixes ?? [],
           autopilotDelta: slot.autopilotDelta ?? null,
         })),
@@ -5150,6 +5416,14 @@ export const useStore = create<KineticsStore>()((set, get) => {
             'UPDATE athlete_profile SET session_duration_cap_min = ?, updated_at_ms = ? WHERE profile_id = 1',
             [programDraft.sessionDurationCapMin, Date.now()],
           );
+        }
+        if (programId !== null && programDraft.input.horizon.kind === 'date' && sportForMeet !== null) {
+          syncCanonicalCompetitionDate(d, programDraft.preview.requestedReviewDate ?? null, {
+            syncSport: true,
+            syncGoals: true,
+            syncProgram: false,
+            nowMs: Date.now(),
+          });
         }
       }
       if (pendingProgramContinuation !== null) {
@@ -5193,6 +5467,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
         'INSERT INTO block_meta (block_id, macro_block_index, macro_phase, schema_type, peak_shifted) VALUES (?, ?, ?, ?, ?)',
         [blockId, plan.macroBlockIndex, plan.macroPhase, plan.schemaType, plan.peakShifted ? 1 : 0],
       );
+      persistBlockMeetCountdown(d, blockId, programId, meetCountdown, openAtGeneration !== null);
       // S6(b): the athlete may keep training while suspended, but this block
       // must not consume the frozen position. Attribute it to the open episode
       // (059) inside the SAME transaction as the block itself, so a crash can
@@ -5222,6 +5497,10 @@ export const useStore = create<KineticsStore>()((set, get) => {
     // State follows the commit: the chosen length (if any) is the profile's now.
     if (pendingFrequency !== undefined || pendingCapMin !== undefined) set({ profile });
     if (pendingCapMin !== undefined && get().prescription !== null) get().computePrescription([]);
+    if (pendingProgramCreation !== null && pendingProgramCreation.input.horizon.kind === 'date' && sportForMeet !== null) {
+      get().refreshSport();
+      get().refreshFocusAndGoals();
+    }
     get().refreshBlock();
     get().refreshProgram();
     get().refreshReturnCheckin();
@@ -5345,6 +5624,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       if (plannedSessionStarted(d, plan.plannedSessionId)) {
         throw new Error("Today's workout has already started, so it is not changed.");
       }
+      deletePlannedSlotBackOffForSession(d, plan.plannedSessionId);
       d.executeSync('DELETE FROM planned_slot WHERE planned_session_id = ?', [plan.plannedSessionId]);
       insertPlannedSlots(d, plan.plannedSessionId, slots, {
         movements: state.movements, declaredIntents, profile: state.profile,
@@ -5372,13 +5652,19 @@ export const useStore = create<KineticsStore>()((set, get) => {
       "SELECT block_id, start_date, objective, created_at_ms FROM training_block WHERE status = 'active' ORDER BY block_id DESC LIMIT 1",
     ))[0];
     if (blockRow === undefined) {
-      set({ block: null, blockMeta: null, blockSessions: [], todayPlan: null, pendingAutopilotAdjustments: [], hasArchivedBlock, blockEmphasis: null });
+      set({ block: null, blockMeta: null, blockMeetMeta: null, blockSessions: [], todayPlan: null, pendingAutopilotAdjustments: [], hasArchivedBlock, blockEmphasis: null });
       return;
     }
     const metaRow = rowsOf<{
       macro_block_index: number; macro_phase: string; schema_type: string; peak_shifted: number;
     }>(d.executeSync(
       'SELECT macro_block_index, macro_phase, schema_type, peak_shifted FROM block_meta WHERE block_id = ?',
+      [blockRow.block_id],
+    ))[0];
+    const meetMetaRow = rowsOf<{
+      competition_date: string; block_number: number; total_blocks: number;
+    }>(d.executeSync(
+      'SELECT competition_date, block_number, total_blocks FROM training_block_meet_meta WHERE block_id = ?',
       [blockRow.block_id],
     ))[0];
     const sessions = rowsOf<{
@@ -5451,6 +5737,13 @@ export const useStore = create<KineticsStore>()((set, get) => {
             peakShifted: metaRow.peak_shifted === 1,
           }
         : null, // pre-009 blocks have no meta; UI treats them as LINEAR-era
+      blockMeetMeta: meetMetaRow !== undefined
+        ? {
+            competitionDate: meetMetaRow.competition_date,
+            blockNumber: meetMetaRow.block_number,
+            totalBlocks: meetMetaRow.total_blocks,
+          }
+        : null,
       blockSessions,
       todayPlan,
       pendingAutopilotAdjustments,
@@ -5520,6 +5813,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       }
       const d = getDb();
       const now = Date.now();
+      const sportOnEdit = readSportProfile(d);
       d.executeSync('BEGIN');
       try {
         d.executeSync(
@@ -5542,6 +5836,19 @@ export const useStore = create<KineticsStore>()((set, get) => {
             [current.programId, preference.dayIndex, preference.slotIndex, preference.pattern, preference.movementId],
           );
         }
+        if (input.horizon.kind === 'date' && sportOnEdit !== null && preview.requestedReviewDate !== null) {
+          syncCanonicalCompetitionDate(d, preview.requestedReviewDate, {
+            syncSport: true,
+            syncGoals: true,
+            syncProgram: false,
+            nowMs: now,
+          });
+          d.executeSync(
+            `INSERT INTO training_program_meet_countdown (program_id, competition_date) VALUES (?, ?)
+             ON CONFLICT(program_id) DO UPDATE SET competition_date = excluded.competition_date`,
+            [current.programId, preview.requestedReviewDate],
+          );
+        }
         d.executeSync('UPDATE athlete_profile SET weekly_frequency = ?, updated_at_ms = ? WHERE profile_id = 1',
           [preview.days.length, now]);
         d.executeSync('COMMIT');
@@ -5550,6 +5857,10 @@ export const useStore = create<KineticsStore>()((set, get) => {
         throw e;
       }
       set({ profile: { ...get().profile, weekly_frequency: preview.days.length }, error: null });
+      if (input.horizon.kind === 'date' && sportOnEdit !== null) {
+        get().refreshSport();
+        get().refreshFocusAndGoals();
+      }
       get().refreshProgram();
       return true;
     } catch (e) {
@@ -5622,12 +5933,18 @@ export const useStore = create<KineticsStore>()((set, get) => {
         slot_index: p.slotIndex, pattern: p.pattern, movement_id: p.movementId,
       })),
     }));
+    const countdownRow = rowsOf<{ competition_date: string }>(getDb().executeSync(
+      'SELECT competition_date FROM training_program_meet_countdown WHERE program_id = ?',
+      [current.programId],
+    ))[0];
     const nextSequence = current.currentSequenceIndex + 1;
     const remainingBlocks = current.plannedBlockCount - current.currentSequenceIndex;
     pendingProgramContinuation = {
       programId: current.programId, sequenceIndex: nextSequence,
       startingMacroBlockIndex: current.startingMacroBlockIndex,
-      plannedEndDate: addDaysIso(localToday(), remainingBlocks * 28),
+      plannedEndDate: countdownRow !== undefined
+        ? countdownRow.competition_date
+        : addDaysIso(localToday(), remainingBlocks * 28),
       objective: current.objective,
       programDays, weeklyFrequency: current.days.length,
     };
@@ -6050,6 +6367,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
           "UPDATE planned_session SET focus = 'full', phase = ?, session_date = ? WHERE planned_session_id = ?",
           [weekIndex === 4 ? 'deload' : 'accumulation', today, plannedSessionId],
         );
+        deletePlannedSlotBackOffForSession(d, plannedSessionId);
         d.executeSync('DELETE FROM planned_slot WHERE planned_session_id = ?', [plannedSessionId]);
       } else {
         d.executeSync(
@@ -6649,6 +6967,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
       stress_purpose: RoutineStressPurpose | null; stress_coefficient: number | null;
       equivalent_volume: number | null; stress_dose: number | null;
       routine_adaptations_json: string | null;
+      backoff_sets: number | null; backoff_reps: number | null;
+      backoff_target_rpe: number | null; backoff_load_multiplier: number | null;
     }>(getDb().executeSync(
       `SELECT sl.slot_index, sl.planned_slot_id, sl.movement_id, m.name AS movement_name,
               sl.sets, sl.reps, sl.target_rpe,
@@ -6657,10 +6977,13 @@ export const useStore = create<KineticsStore>()((set, get) => {
               so.target_load_kg AS override_load_kg, so.reason AS override_reason,
               rd.role AS routine_role, rd.lift_family, rd.stress_purpose,
               rd.stress_coefficient, rd.equivalent_volume, rd.stress_dose,
-              rd.adaptations_json AS routine_adaptations_json
+              rd.adaptations_json AS routine_adaptations_json,
+              sb.sets AS backoff_sets, sb.reps AS backoff_reps,
+              sb.target_rpe AS backoff_target_rpe, sb.load_multiplier AS backoff_load_multiplier
        FROM planned_slot sl
        JOIN movement m ON m.movement_id = sl.movement_id
        LEFT JOIN planned_slot_target st ON st.planned_slot_id = sl.planned_slot_id
+       LEFT JOIN planned_slot_backoff sb ON sb.planned_slot_id = sl.planned_slot_id
        LEFT JOIN planned_slot_autopilot pa ON pa.planned_slot_id = sl.planned_slot_id
        LEFT JOIN slot_override so ON so.planned_slot_id = sl.planned_slot_id
        LEFT JOIN planned_slot_routine_decision rd ON rd.planned_slot_id = sl.planned_slot_id
@@ -6694,6 +7017,15 @@ export const useStore = create<KineticsStore>()((set, get) => {
         stressDose: sl.stress_dose ?? 0,
         adaptations: parseStringArray(sl.routine_adaptations_json),
       },
+      backOff: sl.backoff_sets !== null && sl.backoff_reps !== null
+        && sl.backoff_target_rpe !== null && sl.backoff_load_multiplier !== null
+        ? {
+            sets: sl.backoff_sets,
+            reps: sl.backoff_reps,
+            targetRpe: sl.backoff_target_rpe,
+            loadMultiplier: sl.backoff_load_multiplier,
+          }
+        : undefined,
     }));
   },
 
@@ -7088,6 +7420,9 @@ export const useStore = create<KineticsStore>()((set, get) => {
         // hard upper dose. Readiness may ease either prescription, but a good
         // day cannot silently grow it past the frozen bound.
         const adjusted = applyPrescriptionToSlot(sl, todaysVector);
+        const adjustedBackOff = adjusted.backOff !== undefined && sl.target.kind === 'reps' && adjusted.sets > 1
+          ? { ...adjusted.backOff, sets: Math.min(adjusted.backOff.sets, adjusted.sets - 1) }
+          : undefined;
         return {
           sessionPlanSlotId: 0,
           movementId: sl.movementId,
@@ -7102,6 +7437,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
           overrideLoadKg: sl.overrideLoadKg,
           overrideReason: sl.overrideReason,
           replacedBySessionPlanSlotId: null,
+          backOff: adjustedBackOff,
         };
       });
     } else {
@@ -7160,6 +7496,13 @@ export const useStore = create<KineticsStore>()((set, get) => {
             sl.target.kind === 'time' ? sl.target.seconds : null,
           ],
         );
+        if (sl.backOff !== undefined && sl.backOff.sets > 0) {
+          d.executeSync(
+            `INSERT INTO session_slot_backoff (session_plan_slot_id, sets, reps, target_rpe, load_multiplier)
+             VALUES (?, ?, ?, ?, ?)`,
+            [slotId, sl.backOff.sets, sl.backOff.reps, sl.backOff.targetRpe, sl.backOff.loadMultiplier],
+          );
+        }
         updatedSessionPlan.push({
           ...sl,
           sessionPlanSlotId: slotId,
@@ -8104,12 +8447,17 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const futureSlotInfo = rowsOf<{
       target_rpe: number | null; movement_id: number; session_date: string; reps: number;
       target_kind: string | null; target_reps: number | null; target_seconds: number | null;
+      backoff_sets: number | null; backoff_reps: number | null;
+      backoff_target_rpe: number | null; backoff_load_multiplier: number | null;
     }>(d.executeSync(
       `SELECT sl.target_rpe, sl.movement_id, ps.session_date, sl.reps,
-              pst.target_kind, pst.target_reps, pst.target_seconds
+              pst.target_kind, pst.target_reps, pst.target_seconds,
+              psb.sets AS backoff_sets, psb.reps AS backoff_reps,
+              psb.target_rpe AS backoff_target_rpe, psb.load_multiplier AS backoff_load_multiplier
        FROM planned_slot sl
        JOIN planned_session ps ON ps.planned_session_id = sl.planned_session_id
        LEFT JOIN planned_slot_target pst ON pst.planned_slot_id = sl.planned_slot_id
+       LEFT JOIN planned_slot_backoff psb ON psb.planned_slot_id = sl.planned_slot_id
        WHERE sl.planned_slot_id = ?`,
       [option.plannedSlotId]
     ))[0];
@@ -8123,6 +8471,18 @@ export const useStore = create<KineticsStore>()((set, get) => {
       futureSlotInfo?.reps ?? 5,
     );
     const movedReps = movedTarget.kind === 'reps' ? movedTarget.reps : null;
+    const movedBackOff: PlannedSlotBackOff | undefined =
+      futureSlotInfo !== undefined
+      && futureSlotInfo.backoff_sets !== null && futureSlotInfo.backoff_reps !== null
+      && futureSlotInfo.backoff_target_rpe !== null && futureSlotInfo.backoff_load_multiplier !== null
+      && movedTarget.kind === 'reps'
+        ? {
+            sets: futureSlotInfo.backoff_sets,
+            reps: futureSlotInfo.backoff_reps,
+            targetRpe: futureSlotInfo.backoff_target_rpe,
+            loadMultiplier: futureSlotInfo.backoff_load_multiplier,
+          }
+        : undefined;
 
     const overrideRow = rowsOf<{ target_load_kg: number; reason: string | null }>(d.executeSync(
       'SELECT target_load_kg, reason FROM slot_override WHERE planned_slot_id = ?',
@@ -8156,6 +8516,9 @@ export const useStore = create<KineticsStore>()((set, get) => {
       let newSlotId = 0;
       let nextRunner = runner;
       const retainedSets = retainedSetsForSwap(runner, targetSlot.sessionPlanSlotId, loggedSetsCount);
+      const daySwapLoggedBackOff = movedBackOff !== undefined && chosenCount > 1
+        ? { ...movedBackOff, sets: Math.min(movedBackOff.sets, chosenCount - 1) }
+        : undefined;
       d.executeSync('BEGIN');
       try {
         d.executeSync(
@@ -8223,6 +8586,19 @@ export const useStore = create<KineticsStore>()((set, get) => {
             movedTarget.kind === 'time' ? movedTarget.seconds : null,
           ],
         );
+        if (daySwapLoggedBackOff !== undefined) {
+          d.executeSync(
+            `INSERT INTO session_slot_backoff (session_plan_slot_id, sets, reps, target_rpe, load_multiplier)
+             VALUES (?, ?, ?, ?, ?)`,
+            [
+              newSlotId,
+              daySwapLoggedBackOff.sets,
+              daySwapLoggedBackOff.reps,
+              daySwapLoggedBackOff.targetRpe,
+              daySwapLoggedBackOff.loadMultiplier,
+            ],
+          );
+        }
         d.executeSync(
           'INSERT INTO session_plan_slot_replacement (session_plan_slot_id, replaced_by_session_plan_slot_id) VALUES (?, ?)',
           [targetSlot.sessionPlanSlotId, newSlotId],
@@ -8268,6 +8644,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
         overrideLoadKg: overrideLoad,
         overrideReason: overrideReason,
         replacedBySessionPlanSlotId: null,
+        backOff: daySwapLoggedBackOff,
       };
       const nextPlan = sessionPlan.flatMap((slot) =>
         slot.sessionPlanSlotId === targetSlot.sessionPlanSlotId
@@ -8287,6 +8664,9 @@ export const useStore = create<KineticsStore>()((set, get) => {
     }
 
     const movedSets = Math.max(1, Math.round(option.setsConserved));
+    const daySwapUnloggedBackOff = movedBackOff !== undefined && movedSets > 1
+      ? { ...movedBackOff, sets: Math.min(movedBackOff.sets, movedSets - 1) }
+      : undefined;
     const nextPlan = sessionPlan.map((slot) =>
       slot.sessionPlanSlotId === targetSlot.sessionPlanSlotId
         ? {
@@ -8302,6 +8682,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
             originalSessionDate: originDate,
             overrideLoadKg: overrideLoad,
             overrideReason: overrideReason,
+            backOff: daySwapUnloggedBackOff,
           }
         : slot
     );
@@ -8364,6 +8745,20 @@ export const useStore = create<KineticsStore>()((set, get) => {
              target_seconds = excluded.target_seconds`,
           [targetSlot.sessionPlanSlotId, movedTarget.kind, movedTarget.kind === 'reps' ? movedTarget.reps : null, movedTarget.kind === 'time' ? movedTarget.seconds : null],
         );
+        d.executeSync('DELETE FROM session_slot_backoff WHERE session_plan_slot_id = ?', [targetSlot.sessionPlanSlotId]);
+        if (daySwapUnloggedBackOff !== undefined) {
+          d.executeSync(
+            `INSERT INTO session_slot_backoff (session_plan_slot_id, sets, reps, target_rpe, load_multiplier)
+             VALUES (?, ?, ?, ?, ?)`,
+            [
+              targetSlot.sessionPlanSlotId,
+              daySwapUnloggedBackOff.sets,
+              daySwapUnloggedBackOff.reps,
+              daySwapUnloggedBackOff.targetRpe,
+              daySwapUnloggedBackOff.loadMultiplier,
+            ],
+          );
+        }
         if (nextRunner !== null && sessionMode !== null) {
           persistRunnerCheckpoint(d, session.sessionId, sessionMode, nextRunner);
         }
@@ -8513,14 +8908,6 @@ export const useStore = create<KineticsStore>()((set, get) => {
     }
 
     const d = getDb();
-    let provKind: SlotProvenanceKind = planSlot?.provenanceKind ?? 'free_form';
-    const rawTarget = planSlot?.targetRpe ?? null;
-    const rpeSafetyCap = state.prescription?.vector.rpe_cap ?? 10.0;
-    const provTarget: number | null = rawTarget !== null ? Math.min(rawTarget, rpeSafetyCap) : null;
-    const provSlotId: number | null = planSlot?.sourcePlannedSlotId ?? null;
-    if (provTarget === null && provKind !== 'added') provKind = 'free_form';
-    if (provTarget !== null && provKind === 'free_form') provKind = 'added';
-
     const setIndex = planSlot !== undefined
       ? (rowsOf<{ next: number }>(d.executeSync(
           `SELECT COUNT(*) + 1 AS next
@@ -8531,6 +8918,20 @@ export const useStore = create<KineticsStore>()((set, get) => {
           'SELECT COALESCE(MAX(set_index), 0) + 1 AS next FROM set_record WHERE session_id = ? AND movement_id = ?',
           [s.sessionId, movementId],
         ))[0]?.next ?? 1);
+    const activeBackOff = setIndex >= 2 && planSlot?.backOff !== undefined && planSlot.target.kind === 'reps'
+      ? planSlot.backOff
+      : undefined;
+    const effectiveDose: SlotTarget | null = activeBackOff !== undefined
+      ? { kind: 'reps', reps: activeBackOff.reps }
+      : prescribedDose;
+
+    let provKind: SlotProvenanceKind = planSlot?.provenanceKind ?? 'free_form';
+    const rawTarget = activeBackOff?.targetRpe ?? (planSlot?.targetRpe ?? null);
+    const rpeSafetyCap = state.prescription?.vector.rpe_cap ?? 10.0;
+    const provTarget: number | null = rawTarget !== null ? Math.min(rawTarget, rpeSafetyCap) : null;
+    const provSlotId: number | null = planSlot?.sourcePlannedSlotId ?? null;
+    if (provTarget === null && provKind !== 'added') provKind = 'free_form';
+    if (provTarget !== null && provKind === 'free_form') provKind = 'added';
 
     const applied = (appliedPrefixes ?? []).filter((prefix, index, all) => all.indexOf(prefix) === index);
     const conds = applied.length > 0
@@ -8551,16 +8952,19 @@ export const useStore = create<KineticsStore>()((set, get) => {
          VALUES (?, ?, ?, ?, ?, ?)`,
         [setId, planSlot?.sessionPlanSlotId ?? null, provKind, provTarget, provSlotId, loggedAtMs],
       );
-      if (prescribedDose !== null) {
-        d.executeSync(
-          'INSERT INTO set_dose_target (set_id, target_kind, target_reps, target_seconds) VALUES (?, ?, ?, ?)',
-          [
-            setId,
-            prescribedDose.kind,
-            prescribedDose.kind === 'reps' ? prescribedDose.reps : null,
-            prescribedDose.kind === 'time' ? prescribedDose.seconds : null,
-          ],
-        );
+      {
+        const prescribedDose: SlotTarget | null = effectiveDose;
+        if (prescribedDose !== null) {
+          d.executeSync(
+            'INSERT INTO set_dose_target (set_id, target_kind, target_reps, target_seconds) VALUES (?, ?, ?, ?)',
+            [
+              setId,
+              prescribedDose.kind,
+              prescribedDose.kind === 'reps' ? prescribedDose.reps : null,
+              prescribedDose.kind === 'time' ? prescribedDose.seconds : null,
+            ],
+          );
+        }
       }
       // 071: what the entry was seeded with. Same transaction as the set, so a
       // fault here rolls the set back with it; a missing or malformed seed
@@ -9184,6 +9588,10 @@ export const useStore = create<KineticsStore>()((set, get) => {
           'SELECT (SELECT count(*) FROM athlete_goal_observation)'
           + ' + (SELECT count(*) FROM session_preparation_item)'
           + ' + (SELECT count(*) FROM session_preparation)'
+          + ' + (SELECT count(*) FROM session_slot_backoff)'
+          + ' + (SELECT count(*) FROM planned_slot_backoff)'
+          + ' + (SELECT count(*) FROM training_program_meet_countdown)'
+          + ' + (SELECT count(*) FROM training_block_meet_meta)'
           + ' + (SELECT count(*) FROM block_emphasis) AS c';
         had = rowsOf<{ c: number }>(d.executeSync(
           'SELECT (SELECT count(*) FROM history_import_capability_evidence) + (SELECT count(*) FROM history_import_set) + (SELECT count(*) FROM history_import_session) + (SELECT count(*) FROM history_import) + (SELECT count(*) FROM import_readiness_daily) + (SELECT count(*) FROM bodyweight_daily) + (SELECT count(*) FROM movement_capability_attestation) + (SELECT count(*) FROM movement_prior_experience) + (SELECT count(*) FROM capability_session_evidence) + (SELECT count(*) FROM set_target) + (SELECT count(*) FROM session_runner_checkpoint) + (SELECT count(*) FROM session_slot_target) + (SELECT count(*) FROM planned_slot_disposition) + (SELECT count(*) FROM planned_slot_autopilot) + (SELECT count(*) FROM planned_slot_legacy_role_allowance) + (SELECT count(*) FROM planned_slot_routine_decision) + (SELECT count(*) FROM planned_slot_target) + (SELECT count(*) FROM planned_slot_load_intent) + (SELECT count(*) FROM planned_session_routine_context) + (SELECT count(*) FROM planned_session_method) + (SELECT count(*) FROM session_plan_slot) + (SELECT count(*) FROM session_origin) + (SELECT count(*) FROM set_prefix) + (SELECT count(*) FROM set_metric) + (SELECT count(*) FROM set_record) + (SELECT count(*) FROM set_dose_target) + (SELECT count(*) FROM session_note) + (SELECT count(*) FROM session_feel) + (SELECT count(*) FROM session_feel_extra_reason) + (SELECT count(*) FROM question_log) + (SELECT count(*) FROM report_severity) + (SELECT count(*) FROM slot_override) + (SELECT count(*) FROM planned_slot) + (SELECT count(*) FROM planned_session) + (SELECT count(*) FROM block_meta) + (SELECT count(*) FROM suspension_episode WHERE ended_at_ms IS NULL) + (SELECT count(*) FROM training_program_movement_preference) + (SELECT count(*) FROM training_program_day) + (SELECT count(*) FROM training_block_program) + (SELECT count(*) FROM training_program) + (SELECT count(*) FROM session) + (SELECT count(*) FROM session_outcome) + (SELECT count(*) FROM micro_cycle) + (SELECT count(*) FROM macro_cycle) + (SELECT count(*) FROM training_block) + (SELECT count(*) FROM suspension_episode_program) + (SELECT count(*) FROM block_suspension_origin) + (SELECT count(*) FROM subjective_report) + (SELECT count(*) FROM niggle) + (SELECT count(*) FROM one_rep_max) + (SELECT count(*) FROM return_checkin_ack) + (SELECT count(*) FROM hrv_daily) + (SELECT count(*) FROM resting_hr_daily) + (SELECT count(*) FROM sleep_daily) + (SELECT count(*) FROM spo2_daily) + (SELECT count(*) FROM spo2_sample) + (SELECT count(*) FROM mech_daily) + (SELECT count(*) FROM state_vector) AS c',
@@ -9236,6 +9644,10 @@ export const useStore = create<KineticsStore>()((set, get) => {
       // and an orphan surviving an FK-OFF reset would attach an old record to
       // new work.
       d.executeSync('DELETE FROM session_skipped_slot');
+      d.executeSync('DELETE FROM session_slot_backoff');
+      d.executeSync('DELETE FROM planned_slot_backoff');
+      d.executeSync('DELETE FROM training_program_meet_countdown');
+      d.executeSync('DELETE FROM training_block_meet_meta');
       d.executeSync('DELETE FROM session_plan_slot_planned_count');
       d.executeSync('DELETE FROM session_plan_slot_replacement');
       d.executeSync('DELETE FROM session_plan_slot');
@@ -9333,7 +9745,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       movementAvailabilityRevision: get().movementAvailabilityRevision + 1,
       prescription: null, substitution: null, lastTriage: null, niggles: [],
       returnCheckin: null,
-      block: null, blockMeta: null, blockSessions: [], todayPlan: null, program: null,
+      block: null, blockMeta: null, blockMeetMeta: null, blockSessions: [], todayPlan: null, program: null,
       blockEmphasis: null,
       lastEndedSessionId: null,
       // The open episode was just deleted above; leaving the field set would
@@ -9676,6 +10088,7 @@ const generateBlockFromStoredState = (args: {
   // no autopilot effort raise. It consumes no macro position (S6(b)), so the
   // per-position ceiling on raises would not count it. Read once here and
   // checked again at commit, where the block is attributed to the episode.
+  const sport = readSportProfile(d);
   const suspensionBeforeGeneration = openSuspension(d);
   const plan = generateBlock({
     profile,
@@ -9688,6 +10101,8 @@ const generateBlockFromStoredState = (args: {
     flawReport,
     powerPreferredMovementNames: powerNamesGenerate,
     ...(blockEmphasisInput === null ? {} : { emphasis: blockEmphasisInput }),
+    competitionDate: sport?.competitionDate ?? null,
+    sportId: sport?.sportId ?? null,
   });
   return { plan, suspensionBeforeGeneration, blockEmphasisInput };
 };
@@ -9781,5 +10196,12 @@ const insertPlannedSlots = (
         target.kind === 'time' ? target.seconds : null,
       ],
     );
+    if (sl.backOff !== undefined && target.kind === 'reps') {
+      d.executeSync(
+        `INSERT INTO planned_slot_backoff (planned_slot_id, sets, reps, target_rpe, load_multiplier)
+         VALUES (?, ?, ?, ?, ?)`,
+        [plannedSlotId, sl.backOff.sets, sl.backOff.reps, sl.backOff.targetRpe, sl.backOff.loadMultiplier],
+      );
+    }
   }
 };

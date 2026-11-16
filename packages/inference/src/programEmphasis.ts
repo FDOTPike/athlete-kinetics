@@ -370,9 +370,9 @@ export function sportReportLines(emphasis: ProgramEmphasis): { applied: string[]
     applied.push(`${emphasis.sport.name} — ${emphasis.sport.outcomeLabel.toLowerCase()}: ${emphasis.sport.summary}`);
     omitted.push(...emphasis.sport.limits);
     if (emphasis.sport.competitionDate !== null) {
-      omitted.push(`Your competition on ${emphasis.sport.competitionDate} does not change this plan. ${COMPETITION_DATE_NOTE}`);
+      applied.push(`Your blocks count down to peak and taper for competition on ${emphasis.sport.competitionDate}. ${COMPETITION_DATE_NOTE}`);
     } else if (emphasis.sport.competitionLifts) {
-      omitted.push('The app does not plan a peak, a taper or a maximum test for a meet.');
+      omitted.push('The app does not plan a peak, a taper or a maximum test without a competition date.');
     }
   }
   if (emphasis.workload !== null) {

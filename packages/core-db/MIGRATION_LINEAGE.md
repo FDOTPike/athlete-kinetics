@@ -41,6 +41,12 @@ The ninth is `077_multisport_and_flexibility` (ordinal 76): adds the
 `athlete_secondary_sport_profile` and `activity_flexibility_tag` side-car tables
 and their guards, leaving `activity_definition` and the singleton sport profile
 byte-identical for the 067 verifier.
+The tenth is `078_sport_peaking_and_lifting_taxonomy` (ordinal 77): rebuilds
+`athlete_sport_profile` and `athlete_secondary_sport_profile` with the 24
+SportIds (adding `olympic_weightlifting` and `strongman`) and 0..52
+`matches_per_week` for lifting sports, creates seeded `sport_peaking_movement`,
+and adds `planned_slot_backoff`, `session_slot_backoff`,
+`training_program_meet_countdown`, and `training_block_meet_meta`.
 `MIGRATION_LINEAGE.json` records the SHA-256 of every shipped file and its
 ordinal, and of master's 34-entry chain. Master's exact `034`/`058` bytes and its
 registry live under `test/fixtures/lineage/master-1da218d/`.

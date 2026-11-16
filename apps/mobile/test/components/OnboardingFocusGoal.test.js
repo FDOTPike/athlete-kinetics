@@ -347,9 +347,9 @@ describe('the detailed target is optional', () => {
     press('onboarding-wants-target');
     next();
     press('sport-family-strength');
+    press('sport-powerlifting');
     press('sport-outcome-bigger_competition_lifts');
     press('sport-experience-new');
-    press('sport-practice-unsure');
     press('sport-matches-unsure');
     next();
     fillTarget();
