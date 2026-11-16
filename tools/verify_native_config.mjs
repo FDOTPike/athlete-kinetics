@@ -419,6 +419,8 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
       (_, flag, inner) => (Object.hasOwn(flags, flag) ? (flags[flag] ? inner : '') : `...(${flag}?...)`),
     );
     if (resolved.includes('...') || resolved.includes('?')) return null;
+    const entries = resolved.replace(/\s+as const\b/g, '');
+    if (entries.replace(/'[a-z_]+'/g, '').replace(/[\s,]/g, '') !== '') return null;
     return [...resolved.matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
   };
   const computeOnboardingContract = (typesSource, onboardingSource) => {
@@ -502,6 +504,18 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
       && parseDefaultSteps("'welcome', ...extraSteps, 'limits'", { wantsSport: true, wantsTarget: true, asksMaxes: true }) === null
       && poisonedSpreadContract.defaultSteps === null
       && poisonedSpreadContract.expectedOnboardingSteps === null,
+  );
+  const bareEntryOnboarding = onboardingSrc.replace(
+    /const steps:\s*StepKey\[\]\s*=\s*useMemo\(\s*\(\)\s*=>\s*\[/,
+    'const steps: StepKey[] = useMemo(() => [\n      extraStep,',
+  );
+  const poisonedEntryContract = computeOnboardingContract(typesSrc, bareEntryOnboarding);
+  check(
+    'falsifier: bare identifier entry (extraStep) in onboarding steps parses as null and fails closed',
+    bareEntryOnboarding !== onboardingSrc
+      && parseDefaultSteps("'welcome', extraStep, 'limits'", { wantsSport: true, wantsTarget: true, asksMaxes: true }) === null
+      && poisonedEntryContract.defaultSteps === null
+      && poisonedEntryContract.expectedOnboardingSteps === null,
   );
   const stripSwiftComments = (src) => src.replace(/\/\*[\s\S]*?\*\/|^\s*\/\/.*$/gm, '');
   const currentLabelBody = suite.match(/private func currentLabel\([\s\S]*?\n  \}/)?.[0] ?? '';
