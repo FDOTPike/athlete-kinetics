@@ -139,12 +139,13 @@ console.log('[N2] pinned embedder model staged into the iOS bundle');
     const stepTail = code.slice(stepStart);
     const nextStep = stepTail.indexOf('\n  await step(');
     const stepBody = nextStep === -1 ? stepTail : stepTail.slice(0, nextStep);
+    const shapeGuard = /if\s*\(\s*asset\.dim\s*!==\s*384\s*\|\|\s*asset\.entryIds\.length\s*!==\s*1111\s*\|\|\s*asset\.vectors\.length\s*!==\s*1111\s*\)\s*(?:\{\s*)?throw\s+new\s+Error\b/;
+    const vectorGuard = /if\s*\(\s*vector\.length\s*!==\s*384\s*\|\|\s*!\(Math\.abs\(norm\s*-\s*1\)\s*<=\s*1e-3\)\s*\)\s*(?:\{\s*)?throw\s+new\s+Error\b/;
     return stepBody.includes('tryCreateDeviceEmbedder()')
-      && code.includes('question-vectors.json')
+      && stepBody.includes('question-vectors.json')
+      && shapeGuard.test(stepBody)
       && /packVectors\([^,]+,\s*asset\.dim\)/.test(stepBody)
-      && stepBody.includes('1111')
-      && stepBody.includes('384')
-      && stepBody.includes('!(Math.abs(norm - 1) <= 1e-3)')
+      && vectorGuard.test(stepBody)
       && /(?:routeQuestion\(\s*['"]what is a deload week['"]|const\s+question\s*=\s*['"]what is a deload week['"][\s\S]*routeQuestion\(\s*question\b)/.test(stepBody)
       && stepBody.includes("routed.outcome !== 'DELOAD'")
       && stepBody.includes("routed.shown[0] !== 'DELOAD'")
@@ -161,11 +162,20 @@ console.log('[N2] pinned embedder model staged into the iOS bundle');
   );
   const weakNormSmoke = smoke.replaceAll('!(Math.abs(norm - 1) <= 1e-3)', 'Math.abs(norm - 1) > 1e-3');
   const droppedStepSmoke = smoke.replace("'question box inference + routing'", "'dropped'");
+  const noShapeGuardSmoke = smoke.replace(
+    /\n\s*if\s*\(\s*asset\.dim\s*!==\s*384\s*\|\|\s*asset\.entryIds\.length\s*!==\s*1111\s*\|\|\s*asset\.vectors\.length\s*!==\s*1111\s*\)\s*\{[\s\S]*?\n\s*\}/,
+    '',
+  );
+  const noVectorDimSmoke = smoke.replaceAll('vector.length !== 384 || !(Math.abs(norm - 1) <= 1e-3)', '!(Math.abs(norm - 1) <= 1e-3)');
   check(
-    'falsifier: dropping the question box smoke step or weakening the NaN-safe norm guard fails closed',
+    'falsifier: dropping the question box smoke step, removing the 1111x384 shape guard, dropping vector.length !== 384, or weakening the NaN-safe norm guard fails closed',
     weakNormSmoke !== smoke
       && droppedStepSmoke !== smoke
+      && noShapeGuardSmoke !== smoke
+      && noVectorDimSmoke !== smoke
       && !hasQuestionBoxSmoke(droppedStepSmoke, smokeScriptSrc)
+      && !hasQuestionBoxSmoke(noShapeGuardSmoke, smokeScriptSrc)
+      && !hasQuestionBoxSmoke(noVectorDimSmoke, smokeScriptSrc)
       && !hasQuestionBoxSmoke(weakNormSmoke, smokeScriptSrc),
   );
   const stripCComments = (src) => src.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
@@ -1289,7 +1299,8 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
       /"Question"[\s\S]*?"what is a deload week"/,
       /"Ask"[\s\S]*?\.tap\(\)/,
       /wait\(\s*element\(\s*"question-answer-card"\s*\)[^\n]*timeout:\s*60\s*\)/,
-      /"DELOAD"/,
+      /wait\(\s*element\(\s*"DELOAD"\s*\)[^\n]*timeout:\s*60\s*\)/,
+      /wait\(\s*element\(\s*labelBeginsWith:\s*"A planned easy week\."\s*\)[^\n]*timeout:\s*60\s*\)/,
       /"Back to Athlete Profile"/,
       /wait\(\s*element\(\s*"athlete-screen-shown"\s*\)/,
     ];
@@ -1329,6 +1340,7 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
     '      element("Ask").tap()',
     '      wait(element("question-answer-card"), "answer", timeout: 60)',
     '      wait(element("DELOAD"), "deload", timeout: 60)',
+    '      wait(element(labelBeginsWith: "A planned easy week."), "deload def", timeout: 60)',
     '    }',
     '    tap("Back to Athlete Profile")',
     '    wait(element("athlete-screen-shown"), "profile")',
@@ -1351,6 +1363,7 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
     '      element("Ask").tap()',
     '      wait(element("question-answer-card"), "answer", timeout: 60)',
     '      wait(element("DELOAD"), "deload", timeout: 60)',
+    '      wait(element(labelBeginsWith: "A planned easy week."), "deload def", timeout: 60)',
     '      tap("Back to Athlete Profile")',
     '      wait(element("athlete-screen-shown"), "profile")',
     '    }',
@@ -1373,6 +1386,7 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
     '    element("Ask").tap()',
     '    wait(element("question-answer-card"), "answer", timeout: 60)',
     '    wait(element("DELOAD"), "deload", timeout: 60)',
+    '    wait(element(labelBeginsWith: "A planned easy week."), "deload def", timeout: 60)',
     '    tap("Back to Athlete Profile")',
     '    wait(element("athlete-screen-shown"), "profile")',
     '    XCTAssertTrue(issues.isEmpty)',
@@ -1389,13 +1403,25 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
     '    issues += audit("Glossary")',
     '  }',
   ].join('\n');
+  const deloadLogOnlyTest1 = test1Body.replace(
+    /wait\(\s*element\(\s*"DELOAD"\s*\)[^\n]*\)\s*\n\s*wait\(\s*element\(\s*labelBeginsWith:\s*"A planned easy week\."[^\n]*\)/,
+    'log("DELOAD")',
+  );
+  const missingDeloadDefTest1 = test1Body.replace(
+    /\n\s*wait\(\s*element\(\s*labelBeginsWith:\s*"A planned easy week\."[^\n]*/,
+    '',
+  );
   check(
-    'falsifier: plain 7-destination test1, conditional or if-false QuestionBox wrappers, early return, or early issues.isEmpty assertion all fail closed',
-    !hasGlossaryAndQuestionBoxInTest1(plainSevenScreenTest1)
+    'falsifier: plain 7-destination test1, conditional or if-false QuestionBox wrappers, early return, early issues.isEmpty assertion, or log("DELOAD") without title+definition waits all fail closed',
+    deloadLogOnlyTest1 !== test1Body
+      && missingDeloadDefTest1 !== test1Body
+      && !hasGlossaryAndQuestionBoxInTest1(plainSevenScreenTest1)
       && !hasGlossaryAndQuestionBoxInTest1(conditionalQuestionBoxTest1)
       && !hasGlossaryAndQuestionBoxInTest1(ifFalseWrappedTest1)
       && !hasGlossaryAndQuestionBoxInTest1(earlyReturnTest1)
-      && !hasGlossaryAndQuestionBoxInTest1(earlyAssertTest1),
+      && !hasGlossaryAndQuestionBoxInTest1(earlyAssertTest1)
+      && !hasGlossaryAndQuestionBoxInTest1(deloadLogOnlyTest1)
+      && !hasGlossaryAndQuestionBoxInTest1(missingDeloadDefTest1),
   );
   const holdsFocusBody = suite.match(/private func holdsKeyboardFocus\([\s\S]*?\n  \}/)?.[0] ?? '';
   const enterTextBody = suite.match(/private func enterText\([\s\S]*?\n  \}/)?.[0] ?? '';
