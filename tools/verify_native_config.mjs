@@ -766,6 +766,7 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
     return code.includes('found.place == "the app", !alertFrame.isNull, alertFrame.midY < targetFrame.midY')
       && code.includes('abs(nf.width - targetFrame.width) <= 2')
       && code.includes('findSheetContainer')
+      && /\bif\s+offsetSource\s*==\s*"none",\s*let\s+container\s*=\s*findSheetContainer\(root\)/.test(code)
       && code.includes('targetFrame.width < sbFrame.width - 2 && targetFrame.height < sbFrame.height - 2')
       && code.includes('springboard.coordinate(withNormalizedOffset:')
       && /\blet\s+stillShownAfter1s\s*=\s*probeAlertOKStillShown\(\s*"after-1s"\s*\)/.test(code)
@@ -849,6 +850,14 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
     'falsifier: overwriting the 1 s probe boolean before logging fails the immutable probe contract',
     !hasCompatibilityHealthAlertHandling(overwritten1sDismiss),
   );
+  const elseIfSheetContainerDismiss = dismissBody.replace(
+    /\}\s*\n\s*if\s+offsetSource\s*==\s*"none",\s*let\s+container\s*=\s*findSheetContainer\(root\)/,
+    '} else if let container = findSheetContainer(root)',
+  );
+  check(
+    'falsifier: tying findSheetContainer(root) to else-if after findAlertAncestors fails the fallback contract',
+    elseIfSheetContainerDismiss !== dismissBody && !hasCompatibilityHealthAlertHandling(elseIfSheetContainerDismiss),
+  );
   const expandCoachBody = suite.match(/private func expandCoachMode\([\s\S]*?\n  \}/)?.[0] ?? '';
   const isHardenedExpandCoachMode = (src) => {
     const code = stripSwiftComments(src);
@@ -861,13 +870,14 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
     if (!(unlockIdx < revealIdx && revealIdx < bringClearIdx && bringClearIdx < tapIdx && tapIdx < settledIdx)) return false;
     const preReveal = code.slice(unlockIdx, revealIdx);
     const preTap = code.slice(bringClearIdx, tapIdx);
+    const tapBlock = code.slice(bringClearIdx, settledIdx);
     const postSettled = code.slice(settledIdx);
     return preReveal.includes('currentLabel(coach)')
       && preReveal.includes('"Coach mode,"')
       && /while\s+Date\(\)\s*</.test(preReveal)
       && preReveal.includes('pollCoachLabel(')
       && preTap.includes('pollCoachLabel(')
-      && preTap.includes('.hasSuffix("collapsed")')
+      && /\bif\s*\(?\s*(?!\s*!)[^!{}\n]*?\.hasSuffix\(\s*"collapsed"\s*\)\s*\)?\s*\{\s*coach\.tap\(\)/.test(tapBlock)
       && /XCTAssertFalse\(\s*label\.hasSuffix\("collapsed"\)/.test(postSettled)
       && !/\bcoach\.label\b|\.exists\b|waitForExistence|XCTWaiter|XCTNSPredicateExpectation/.test(code);
   };
@@ -885,9 +895,17 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
     '  return label',
     '}',
   ].join('\n');
+  const negatedTapExpandCoach = expandCoachBody.replace(
+    '(preTapLabel ?? "").hasSuffix("collapsed")',
+    '!(preTapLabel ?? "").hasSuffix("collapsed")',
+  );
   check(
     'falsifier: unhardened expandCoachMode reading coach.label without pre-reveal polling or bringClear fails',
     !isHardenedExpandCoachMode(unhardenedExpandCoach),
+  );
+  check(
+    'falsifier: negated collapsed check gating coach.tap() fails the expandCoachMode contract',
+    negatedTapExpandCoach !== expandCoachBody && !isHardenedExpandCoachMode(negatedTapExpandCoach),
   );
 
   const cancelFilesBody = suite.match(/private func cancelFilesSheet\([\s\S]*?\n  \}/)?.[0] ?? '';
@@ -905,7 +923,7 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
     const rootDescIdx = beforeLoop.indexOf('root.descendants(matching: .any).matching(named)');
     const barSnapIdx = beforeLoop.indexOf('(try? bar.snapshot()) != nil');
     const barCallIdx = beforeLoop.indexOf('if barPresent, let match = firstIn(bar, fromBar: true)');
-    const wholeWaitIdx = beforeLoop.search(/Date\(\)\.timeIntervalSince\(\s*opened\s*\)\s*>=\s*10/);
+    const wholeWaitIdx = beforeLoop.search(/if\s+Date\(\)\.timeIntervalSince\(\s*opened\s*\)\s*>=\s*10\s*,\s*\n?\s*let\s+match\s*=\s*firstIn\(\s*self\.app\s*,\s*fromBar:\s*false\s*\)/);
     const appCallIdx = beforeLoop.indexOf('firstIn(self.app, fromBar: false)');
     if ([rootButtonsIdx, rootDescIdx, barSnapIdx, barCallIdx, wholeWaitIdx, appCallIdx].some((i) => i === -1)) {
       return false;
@@ -914,10 +932,15 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
       return false;
     }
     if (/self\.app\.(buttons|descendants)|firstIn\(\s*self\.app/.test(beforeLoop.slice(0, wholeWaitIdx))) return false;
+    if (/fallback\s*==\s*nil[\s\S]{0,40}Date\(\)\.timeIntervalSince\(\s*opened\s*\)\s*>=\s*10/.test(beforeLoop)) return false;
     const afterLoop = cancelCode.slice(whileIdx, guardIdx);
-    const loopEndIdx = afterLoop.indexOf('usleep(500_000)');
-    if (loopEndIdx === -1) return false;
-    const postLoop = afterLoop.slice(loopEndIdx);
+    const loopCloseMatch = afterLoop.match(/usleep\(500_000\)\s*\n\s*\}/);
+    if (!loopCloseMatch) return false;
+    const inLoop = afterLoop.slice(0, loopCloseMatch.index);
+    if (!/\(\s*candidate\.isHittable\s*\|\|\s*Date\(\)\.timeIntervalSince\(\s*opened\s*\)\s*>=\s*10\s*\)[\s\S]{0,80}frame\s*==\s*lastFrame\s*&&\s*identity\s*==\s*lastIdentity/.test(inLoop)) {
+      return false;
+    }
+    const postLoop = afterLoop.slice(loopCloseMatch.index + loopCloseMatch[0].length);
     return postLoop.includes('found == nil')
       && postLoop.includes('!lastFrame.isNull')
       && postLoop.includes('!lastIdentity.isEmpty')
@@ -926,7 +949,7 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
       && postLoop.includes('found = candidate');
   };
   check(
-    'cancelFilesSheet gates bar/whole-app queries via bar.snapshot(), performs final 30s-boundary confirmation read, and filesSheetInventory uses bar.snapshot()',
+    'cancelFilesSheet gates bar/whole-app queries via bar.snapshot(), prioritizes hittable candidates before 10 s fallback, performs final 30s-boundary confirmation read, and filesSheetInventory uses bar.snapshot()',
     isHardenedCancelFilesSheet(cancelFilesBody),
   );
   const unhardenedCancelFiles = [
@@ -950,10 +973,33 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
     '  guard let cancel = found else { return Date() }',
   ].join('\n');
   const unhardenedInventory = 'private func filesSheetInventory() -> String { return !bar.exists ? "absent" : "" }';
+  const insideLoopConfirmationCancel = cancelFilesBody.replace(
+    /usleep\(500_000\)\s*\n    \}\s*\n    (if\s+found\s*==\s*nil[\s\S]*?\n    \})/,
+    'usleep(500_000)\n      $1\n    }',
+  );
+  const fallbackGatedWholeAppCancel = cancelFilesBody.replace(
+    /if\s+Date\(\)\.timeIntervalSince\(opened\)\s*>=\s*10/,
+    'if fallback == nil && Date().timeIntervalSince(opened) >= 10',
+  );
+  const earlyNonHittableAcceptCancel = cancelFilesBody.replace(
+    /\(candidate\.isHittable\s*\|\|\s*Date\(\)\.timeIntervalSince\(opened\)\s*>=\s*10\),\s*\n\s*frame\s*==\s*lastFrame/,
+    'frame == lastFrame',
+  );
   check(
     'falsifier: unhardened cancelFilesSheet and .exists-based filesSheetInventory fail closed',
     !isHardenedCancelFilesSheet(unhardenedCancelFiles, inventoryBody)
       && !isHardenedCancelFilesSheet(cancelFilesBody, unhardenedInventory),
+  );
+  check(
+    'falsifier: moving 30s confirmation block inside the while loop after usleep fails closed',
+    insideLoopConfirmationCancel !== cancelFilesBody && !isHardenedCancelFilesSheet(insideLoopConfirmationCancel),
+  );
+  check(
+    'falsifier: gating >= 10s whole-app lookup on fallback == nil or accepting non-hittable Cancel before 10s fails closed',
+    fallbackGatedWholeAppCancel !== cancelFilesBody
+      && earlyNonHittableAcceptCancel !== cancelFilesBody
+      && !isHardenedCancelFilesSheet(fallbackGatedWholeAppCancel)
+      && !isHardenedCancelFilesSheet(earlyNonHittableAcceptCancel),
   );
 
   const saveInFilesBody = suite.match(/private func saveInFiles\([\s\S]*?\n  \}/)?.[0] ?? '';

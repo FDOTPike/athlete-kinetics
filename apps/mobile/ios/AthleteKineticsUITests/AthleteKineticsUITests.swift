@@ -529,7 +529,8 @@ final class AthleteKineticsUITests: XCTestCase {
                 break
               }
             }
-          } else if let container = findSheetContainer(root) {
+          }
+          if offsetSource == "none", let container = findSheetContainer(root) {
             let nf = container.frame
             measuredOffset = max(nf.minY, targetFrame.height - nf.height)
             offsetSource = "sheetContainer"
@@ -1187,21 +1188,23 @@ final class AthleteKineticsUITests: XCTestCase {
       let barPresent = (try? bar.snapshot()) != nil
       if barPresent, let match = firstIn(bar, fromBar: true) { return match }
       // Avoid whole-app .descendants(matching: .any) traversals while
-      // DOCService / filesSheetBar() is initially mounting; fall back to
-      // whole-app lookup only if the bar stays absent or without Cancel >= 10 s.
-      if fallback == nil && Date().timeIntervalSince(opened) >= 10,
+      // DOCService / filesSheetBar() is initially mounting; after 10 s check
+      // whole-app candidates so a hittable sheet Cancel overrides a
+      // non-hittable bar fallback before falling back to non-hittable.
+      if Date().timeIntervalSince(opened) >= 10,
          let match = firstIn(self.app, fromBar: false) { return match }
       return fallback
     }
     while Date().timeIntervalSince(opened) < 30 {
       // Prefer the first enabled, hittable candidate in the sheet's bar, then
       // (after the initial 10 s mount window) the whole-app lookup, before
-      // falling back to an enabled non-hittable candidate.
+      // accepting an enabled non-hittable fallback once >= 10 s have elapsed.
       if let (candidate, snap, frame, identity, fromBar) = currentChoice() {
         // Settled: the same element (type, identifier, label, lookup) at the
         // same frame on two reads half a second apart, so the tap is not aimed
         // at a sheet still sliding in.
-        if frame == lastFrame && identity == lastIdentity {
+        if (candidate.isHittable || Date().timeIntervalSince(opened) >= 10),
+           frame == lastFrame && identity == lastIdentity {
           found = candidate; foundSnap = snap; inBar = fromBar; break
         }
         lastFrame = frame; lastIdentity = identity
@@ -1213,6 +1216,7 @@ final class AthleteKineticsUITests: XCTestCase {
     }
     if found == nil && !lastFrame.isNull && !lastIdentity.isEmpty {
       if let (candidate, snap, frame, identity, fromBar) = currentChoice(),
+         (candidate.isHittable || Date().timeIntervalSince(opened) >= 10),
          frame == lastFrame && identity == lastIdentity {
         found = candidate; foundSnap = snap; inBar = fromBar
       }
