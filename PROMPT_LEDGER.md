@@ -13207,3 +13207,24 @@ The appendix held the code around the read, every match for `0286` and "record o
   - `npm run verify:store`: ALL CHECKS PASSED.
   - Jest on `SessionSummarySkipped.test.js` and `SessionSummary.test.js`: 2 suites, 48 of 48 tests pass.
 - **Branch:** `claude/summary-skipped-2026-11-03`, PR #116 into `claude/beta-question-box-2026-10-28`.
+
+## Entry 0303 — 2026-11-16 · Issue #208 (Ruling Group 5): Neutral Exercise Swap, Parity List & Scope Persistence
+
+**Status:** EVIDENCE CAPTURED
+
+**Scope & ratified rulings (`RATIFIED_OWNER_RULINGS_GROUPS_1_TO_7.md`, Ruling Group 5 — #208):**
+
+- **`Q1` (`A` for entry button, sheet copy, unselected chips, and parity ordering):**
+  - Entry quick-action button on active workout card alongside `"Report discomfort"` reads `"Swap exercise"` (with accessibility label `"Swap exercise: {name}"`), opening the neutral sheet `"Swap exercise"` with subtitle `"Pick an available exercise for the same movement pattern."`. Discomfort substitution flow (`"Report discomfort"` -> `openSubstitution`) remains untouched.
+  - Three reason chips start unselected (`null`): `"Equipment busy"` (`cause = 'equipment_busy'`), `"Prefer another exercise"` (`cause = 'preference'`), and `"Short on time"` (`cause = 'time'`).
+  - `computeNeutralSwapOptions` in `packages/inference/src/substitution.ts` ranks available same-pattern movements at matched difficulty first (`|tierDelta| === 0`, then `1`) with neutral row subtitle `"Same movement pattern · Uses your available equipment"` and zero biomechanical-regression copy.
+- **`Q2` (`C` for persistence scope & Phase 1 Mechanism 1 protection):**
+  - Two persistence buttons (`"For today only"` and `"For the rest of this block"`) stay disabled until both a reason chip and a candidate option are selected.
+  - `"For today only"` (`scope = 'today_only'`) updates only the active session (`session_plan_slot`, `073` `session_plan_slot_replacement` when sets > 0, and `078` `session_slot_swap_cause`).
+  - `"For the rest of this block"` (`scope = 'rest_of_block'`) updates the current session plus remaining unstarted `planned_slot` rows in the active `training_block`, and updates `033` `training_program_movement_preference` ONLY when `cause === 'preference'` (kept untouched for `'equipment_busy'` and `'time'`).
+  - Migration `078_session_slot_swap_cause.sql` (`ordinal: 77`, `userVersion: 77`, `migrationSlot: 78`, `128` durable tables, `217` schema objects) records `cause` and `scope` on `session_slot_swap_cause`. Neither `openNeutralSwap` nor `applyNeutralSwap` writes `-1` to `010` `movement_preference`, and `deriveAvoidPromotionsFromSwaps` skips all `NON_PATHOLOGICAL_SWAP_CAUSES` (`'equipment_busy'`, `'preference'`, `'time'`) so Mechanism 1 (`kTrigger`) promotes zero `Avoid (-1)` on neutral swaps.
+- **Evidence captured (`feat/v1-phase2-208-neutral-swap`):**
+  - Fail-first before implementation: `NEUTRAL_SWAP_VERIFY_FAILED (4 failure(s))` (`INFERENCE_EXIT=1`) and `SessionNeutralSwap208.test.js` 3/3 failed (`JEST_EXIT=1`).
+  - Guard break/restore (`packages/inference/src/substitution.ts` `isNonPathologicalSwapCause`): guard disabled -> `GUARD_BROKEN_INF_EXIT=1 GUARD_BROKEN_JEST_EXIT=1`; guard restored -> `GUARD_RESTORED_INF_EXIT=0 GUARD_RESTORED_JEST_EXIT=0`.
+  - Full CI (`npm run verify:ci`): `PREFLIGHT OK`, `verify:store SQL — 826/826 checks green`, `pipeline verification: 55 checks` green, `249/249` Jest suites (`6799/6799` tests) green, `VERIFY_CI_EXIT=0`.
+- **Branch:** `feat/v1-phase2-208-neutral-swap` -> `claude/beta-question-box-2026-10-28` (`Closes #208`).

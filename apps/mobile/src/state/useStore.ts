@@ -84,7 +84,9 @@ import {
   programHorizonAnchor,
   composeRoutineMicrocycle,
   contextualRoutineRoles,
+  computeNeutralSwapOptions,
   computeSubstitutions,
+  NON_PATHOLOGICAL_SWAP_CAUSES,
   DEFAULT_PROFILE,
   detectFlaws,
   applyLoadModifier,
@@ -134,6 +136,10 @@ import {
   type MovementAvailability,
   type MovementAccessContext,
   type ExecutableMovementAccessContext,
+  type NeutralSwapCause,
+  type NeutralSwapOption,
+  type SwapCause,
+  type SwapScope,
   type RoutineRole,
   type RoutineAssistanceContract,
   type RoutineFamilyStressDecision,
@@ -221,6 +227,7 @@ import {
 
 export type { MovementAvailability };
 export type { LoadPreference, LoadSelection, LoadSource } from '@ak/inference';
+export type { NeutralSwapCause, NeutralSwapOption, SwapCause, SwapScope } from '@ak/inference';
 export { applyLoadModifier, applyPrescriptionToSlot, isPrescriptionReduced } from '@ak/inference';
 
 /** What the load entry was seeded with for the set being logged, as the session
@@ -920,7 +927,13 @@ interface KineticsStore {
   /** heldByReportedArea: the reported-area safety exclusion removed candidates
    *  the engine would otherwise have offered (or the joint guardrail blocked
    *  some). Only the empty sheet's wording reads it. */
-  substitution: { targetId: number; result: SubstitutionResult; heldByReportedArea?: boolean } | null;
+  substitution: {
+    targetId: number;
+    result: SubstitutionResult;
+    heldByReportedArea?: boolean;
+    mode?: 'neutral' | 'discomfort';
+    neutralOptions?: NeutralSwapOption[];
+  } | null;
   /** Today's active niggles (region + severity), fed verbatim into
    *  computeSubstitutions — they drive the injury guardrail and Layer 3. */
   niggles: NiggleInput[];
@@ -1255,7 +1268,24 @@ interface KineticsStore {
    *  message) and false when it did not (unknown movement, a support hold, or
    *  an unverifiable session context). */
   openSubstitution: (targetMovementId: number) => boolean;
+  /** Open the neutral exercise-swap sheet (#208) without setting 010 Avoid (-1)
+   *  or tripping runnerThumbsDown. Offers same-pattern available alternatives
+   *  ranked by matched difficulty (`|tierDelta| === 0`, then `1`). */
+  openNeutralSwap: (targetMovementId: number) => boolean;
   closeSubstitution: () => void;
+  /** Apply a neutral exercise swap (#208) with explicit cause + scope:
+   *  - `'today_only'` updates the current session slot (`073` + `078`).
+   *  - `'rest_of_block'` also updates remaining unstarted `planned_slot` rows
+   *    in the active block, and updates `033` `training_program_movement_preference`
+   *    only when `cause === 'preference'`.
+   *  Never writes `-1` to `010` `movement_preference`. */
+  applyNeutralSwap: (
+    targetMovementId: number,
+    optionMovementId: number,
+    cause: NeutralSwapCause,
+    scope: SwapScope,
+    replacementSets?: number,
+  ) => boolean;
   /** Apply a Layer-1 regression: swap the target slot for the chosen movement
    *  (logged sets stand as history). */
   applyRegression: (targetMovementId: number, optionMovementId: number, replacementSets?: number) => void;
@@ -2703,6 +2733,10 @@ const earlierOpenSessionEntries = (
  *  and removes the runner checkpoint. */
 const deleteEmptySessionRows = (d: DB, sessionId: number): void => {
   d.executeSync(
+    'DELETE FROM session_slot_swap_cause WHERE session_plan_slot_id IN (SELECT session_plan_slot_id FROM session_plan_slot WHERE session_id = ?) OR replaced_by_session_plan_slot_id IN (SELECT session_plan_slot_id FROM session_plan_slot WHERE session_id = ?)',
+    [sessionId, sessionId],
+  );
+  d.executeSync(
     'DELETE FROM session_plan_slot_planned_count WHERE session_plan_slot_id IN (SELECT session_plan_slot_id FROM session_plan_slot WHERE session_id = ?)',
     [sessionId],
   );
@@ -3325,6 +3359,354 @@ export const useStore = create<KineticsStore>()((set, get) => {
     } else if (get().biometricsStatus === 'ready') {
       void syncBiometricsAtStartup(operation);
     }
+  };
+
+  /** Build the deterministic substitution / neutral-swap context without touching 010 Avoid (-1). */
+  const buildSubstitutionContext = (targetMovementId: number) => {
+    const state = get();
+    const { movements, profile, block } = state;
+    const target = movements.find((m) => m.movement_id === targetMovementId);
+    if (target === undefined) return null;
+    const activeTargetSlot = state.activeSessionPlanSlotId !== null
+      ? state.sessionPlan.find((slot) => slot.sessionPlanSlotId === state.activeSessionPlanSlotId)
+      : undefined;
+    const targetSlot = activeTargetSlot?.movementId === targetMovementId
+      ? activeTargetSlot
+      : state.sessionPlan.find((slot) => slot.movementId === targetMovementId);
+    if (!get().requireTrainingSupport('substitution-preview', [targetMovementId],
+      `session:${state.session?.sessionId ?? `draft-${state.today}`}:slot:${targetSlot?.sessionPlanSlotId ?? 'pending'}:movement:${targetMovementId}`)) return null;
+    // Re-read today's niggles from 011 so a midnight crossing while the app sat
+    // foregrounded (no AppState 'active' -> no rolloverDay) can't feed yesterday's niggles.
+    get().refreshNiggles();
+    const d = getDb();
+    const today = localToday();
+    const byId = new Map(movements.map((m) => [m.movement_id, m]));
+    const accessContext = executionContextForState(get());
+    if (accessContext === null) {
+      set({ error: 'The active session access context cannot be verified. Reopen the session before substituting.' });
+      return null;
+    }
+    const priorExperience = new Set(get().activePriorExperienceMovementIds);
+    const safetyExcluded = safetyExcludedMovementIdsFor(movements, profile, get().niggles);
+    const capabilityAvailable = capabilityAvailableMovementIds(
+      d, movements, profile, accessContext, priorExperience, safetyExcluded,
+    );
+    const supportSnapshot = supportAdapter().captureEvaluation();
+    let futureRows: { row: { planned_slot_id: number; session_date: string; sets: number; day_index: number }; movement: Movement }[] = [];
+    let currentDayIndex = 0;
+    if (block !== null) {
+      currentDayIndex = Number(
+        rowsOf<{ d: number }>(
+          d.executeSync('SELECT CAST(julianday(?) - julianday(?) AS INTEGER) AS d', [today, block.startDate]),
+        )[0]?.d ?? 0,
+      );
+      const rows = rowsOf<{
+        planned_slot_id: number; session_date: string; movement_id: number;
+        sets: number; day_index: number;
+      }>(
+        d.executeSync(
+          `SELECT sl.planned_slot_id, ps.session_date, sl.movement_id, sl.sets,
+                  CAST(julianday(ps.session_date) - julianday(?) AS INTEGER) AS day_index
+           FROM planned_slot sl
+           JOIN planned_session ps ON ps.planned_session_id = sl.planned_session_id
+           WHERE ps.block_id = ? AND ps.session_date > ?
+             AND sl.planned_slot_id NOT IN (SELECT planned_slot_id FROM planned_slot_disposition WHERE disposition = 'swapped')
+           ORDER BY ps.session_date, sl.slot_index`,
+          [block.startDate, block.blockId, today],
+        ),
+      );
+      futureRows = rows.flatMap((r) => {
+        const mv = byId.get(r.movement_id);
+        return mv === undefined ? [] : [{ row: r, movement: mv }];
+      });
+    }
+    const inputFor = (available: ReadonlySet<number>, niggles: readonly NiggleInput[]): SubstitutionInput => ({
+      target: toSubMovement(target, available),
+      library: movements.filter((movement) => supportSnapshot.evaluate(movementSupportTargets([movement.movement_id])).status === 'available')
+        .map((movement) => toSubMovement(movement, available)),
+      inventory: profile.equipment_inventory,
+      niggles,
+      futureSlots: futureRows
+        .filter(({ movement }) => supportSnapshot.evaluate(movementSupportTargets([movement.movement_id])).status === 'available')
+        .map(({ row, movement }): FutureSlot => ({
+          plannedSlotId: row.planned_slot_id,
+          dayIndex: row.day_index,
+          sessionDate: row.session_date,
+          movement: toSubMovement(movement, available),
+          sets: row.sets,
+        })),
+      currentDayIndex,
+      trainingAge: profile.training_age,
+      accessContext,
+    });
+    return { d, movements, profile, accessContext, priorExperience, capabilityAvailable, inputFor };
+  };
+
+  /** Commit a slot swap in-place (0 logged sets) or split-slot (logged sets > 0),
+   *  optionally recording the swap cause and persistence scope in 078. */
+  const executeSlotSwap = (
+    oldMovementId: number,
+    newMovementId: number,
+    replacementSets?: number,
+    causeRecord?: { cause: SwapCause; scope: SwapScope },
+  ): boolean => {
+    const state = get();
+    const { sessionPlan, activeSessionPlanSlotId, session, runner, sessionMode, movements, profile } = state;
+    const slot = activeSessionPlanSlotId !== null
+      ? sessionPlan.find((candidate) => candidate.sessionPlanSlotId === activeSessionPlanSlotId)
+      : sessionPlan.find((candidate) => candidate.movementId === oldMovementId);
+    const replacement = movements.find((movement) => movement.movement_id === newMovementId);
+    if (slot === undefined || replacement === undefined) return false;
+    const loggedSetsCount = session?.sets.filter((setRow) =>
+      setRow.session_plan_slot_id !== null
+        ? setRow.session_plan_slot_id === slot.sessionPlanSlotId
+        : setRow.movement_id === slot.movementId
+    ).length ?? 0;
+    if (
+      replacementSets !== undefined &&
+      (typeof replacementSets !== 'number' || !Number.isInteger(replacementSets) || replacementSets < 1 || replacementSets > 6)
+    ) {
+      return false;
+    }
+    if (
+      loggedSetsCount > 0 &&
+      (typeof replacementSets !== 'number' || !Number.isInteger(replacementSets) || replacementSets < 1 || replacementSets > 6)
+    ) {
+      return false;
+    }
+    if (!get().requireTrainingSupport('swap-movement', [oldMovementId, newMovementId],
+      `session:${session?.sessionId ?? 'draft'}:slot:${slot.sessionPlanSlotId}:movement:${oldMovementId}->${newMovementId}`)) return false;
+    const accessContext = executionContextForState(state);
+    if (accessContext === null) {
+      set({ error: 'The active session access context cannot be verified. Reopen the session before editing it.' });
+      return false;
+    }
+    const availability = capabilityMovementAvailability(
+      getDb(), movements, profile, accessContext,
+      new Set(state.activePriorExperienceMovementIds),
+      safetyExcludedMovementIdsFor(movements, profile, state.niggles),
+    )
+      .find((r) => r.movementId === newMovementId);
+    if (!permittedForProfile(replacement, profile, accessContext) || availability?.state !== 'available') {
+      set({ error: formatTeachingOnlyReason(availability) });
+      return false;
+    }
+
+    const originalMv = slot.originalMovementId ?? slot.movementId;
+    const newProvKind: SlotProvenanceKind = slot.targetRpe !== null ? 'substituted' : slot.provenanceKind;
+
+    if (loggedSetsCount > 0 && session !== null) {
+      // A halted session stays stopped; refuse before any write.
+      if (runner?.phase === 'halted') return false;
+      const chosenCount = replacementSets as number;
+      const d = getDb();
+      let newSlotId = 0;
+      let nextRunner = runner;
+      const retainedSets = retainedSetsForSwap(runner, slot.sessionPlanSlotId, loggedSetsCount);
+      d.executeSync('BEGIN');
+      try {
+        const originalSlotRow = rowsOf<{ slot_index: number }>(
+          d.executeSync(
+            'SELECT slot_index FROM session_plan_slot WHERE session_plan_slot_id = ?',
+            [slot.sessionPlanSlotId],
+          ),
+        )[0];
+        if (originalSlotRow === undefined) {
+          throw new Error('Target session slot is missing.');
+        }
+        // 075 (issue #144): keep the count planned before this swap. planned_sets
+        // below becomes the runner's count and the checkpoint check still reads it.
+        d.executeSync(
+          'INSERT OR IGNORE INTO session_plan_slot_planned_count (session_plan_slot_id, original_planned_sets) SELECT session_plan_slot_id, planned_sets FROM session_plan_slot WHERE session_plan_slot_id = ?',
+          [slot.sessionPlanSlotId],
+        );
+        d.executeSync(
+          'UPDATE session_plan_slot SET planned_sets = ? WHERE session_plan_slot_id = ?',
+          [retainedSets, slot.sessionPlanSlotId],
+        );
+        const laterSlots = rowsOf<{ session_plan_slot_id: number; slot_index: number }>(
+          d.executeSync(
+            'SELECT session_plan_slot_id, slot_index FROM session_plan_slot WHERE session_id = ? AND slot_index > ? ORDER BY slot_index DESC',
+            [session.sessionId, originalSlotRow.slot_index],
+          ),
+        );
+        for (const later of laterSlots) {
+          d.executeSync(
+            'UPDATE session_plan_slot SET slot_index = ? WHERE session_plan_slot_id = ?',
+            [later.slot_index + 1, later.session_plan_slot_id],
+          );
+        }
+        d.executeSync(
+          `INSERT INTO session_plan_slot (session_id, slot_index, movement_id, planned_sets, planned_reps, provenance_kind, target_rpe, source_planned_slot_id, original_movement_id, original_session_date, override_load_kg, override_reason)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            session.sessionId,
+            originalSlotRow.slot_index + 1,
+            newMovementId,
+            chosenCount,
+            slot.plannedReps,
+            newProvKind,
+            slot.targetRpe,
+            slot.sourcePlannedSlotId,
+            originalMv,
+            slot.originalSessionDate,
+            slot.overrideLoadKg,
+            slot.overrideReason,
+          ],
+        );
+        newSlotId = rowsOf<{ id: number }>(d.executeSync('SELECT last_insert_rowid() AS id'))[0]!.id;
+        d.executeSync(
+          `INSERT INTO session_slot_target (session_plan_slot_id, target_kind, target_reps, target_seconds)
+           VALUES (?, ?, ?, ?)`,
+          [
+            newSlotId,
+            slot.target.kind,
+            slot.target.kind === 'reps' ? slot.target.reps : null,
+            slot.target.kind === 'time' ? slot.target.seconds : null,
+          ],
+        );
+        d.executeSync(
+          'INSERT INTO session_plan_slot_replacement (session_plan_slot_id, replaced_by_session_plan_slot_id) VALUES (?, ?)',
+          [slot.sessionPlanSlotId, newSlotId],
+        );
+        if (causeRecord !== undefined) {
+          d.executeSync(
+            `INSERT INTO session_slot_swap_cause
+               (session_plan_slot_id, cause, scope, replaced_movement_id, replaced_by_session_plan_slot_id, recorded_at_ms)
+             VALUES (?, ?, ?, ?, ?, ?)
+             ON CONFLICT(session_plan_slot_id) DO UPDATE SET
+               cause = excluded.cause,
+               scope = excluded.scope,
+               replaced_movement_id = excluded.replaced_movement_id,
+               replaced_by_session_plan_slot_id = excluded.replaced_by_session_plan_slot_id,
+               recorded_at_ms = excluded.recorded_at_ms`,
+            [slot.sessionPlanSlotId, causeRecord.cause, causeRecord.scope, oldMovementId, newSlotId, Date.now()],
+          );
+        }
+        if (runner !== null) {
+          const origRunnerSlot = runner.slots.find((candidate) => candidate.sessionPlanSlotId === slot.sessionPlanSlotId);
+          nextRunner = replaceSlotAfterLoggedSets(runner, {
+            targetSessionPlanSlotId: slot.sessionPlanSlotId,
+            completedSets: retainedSets,
+            replacementSlot: {
+              sessionPlanSlotId: newSlotId,
+              plannedSlotId: slot.sourcePlannedSlotId,
+              movementId: newMovementId,
+              movementName: replacement.name,
+              sets: chosenCount,
+              target: slot.target,
+              targetRpe: origRunnerSlot?.targetRpe ?? slot.targetRpe ?? 8,
+            },
+            atMs: Date.now(),
+          });
+          if (sessionMode !== null) {
+            persistRunnerCheckpoint(d, session.sessionId, sessionMode, nextRunner);
+          }
+        }
+        d.executeSync('COMMIT');
+      } catch (error) {
+        try { d.executeSync('ROLLBACK'); } catch { /* no partial substitution */ }
+        set({ error: error instanceof Error ? error.message : String(error) });
+        return false;
+      }
+
+      const newSlot: PlanSlot = {
+        sessionPlanSlotId: newSlotId,
+        movementId: newMovementId,
+        plannedSets: chosenCount,
+        plannedReps: slot.plannedReps,
+        target: slot.target,
+        provenanceKind: newProvKind,
+        targetRpe: slot.targetRpe,
+        sourcePlannedSlotId: slot.sourcePlannedSlotId,
+        originalMovementId: originalMv,
+        originalSessionDate: slot.originalSessionDate,
+        overrideLoadKg: slot.overrideLoadKg,
+        overrideReason: slot.overrideReason,
+        replacedBySessionPlanSlotId: null,
+      };
+      const nextPlan = sessionPlan.flatMap((candidate) =>
+        candidate.sessionPlanSlotId === slot.sessionPlanSlotId
+          ? [{ ...candidate, plannedSets: retainedSets, replacedBySessionPlanSlotId: newSlotId, originalPlannedSets: candidate.originalPlannedSets ?? candidate.plannedSets }, newSlot]
+          : [candidate],
+      );
+      set({
+        sessionPlan: nextPlan,
+        activeSessionPlanSlotId: newSlotId,
+        activeMovementId: newMovementId,
+        ...(nextRunner !== null ? runnerSelection(nextRunner) : {}),
+      });
+      return true;
+    }
+
+    const nextPlan = sessionPlan.map((candidate) =>
+      candidate.sessionPlanSlotId === slot.sessionPlanSlotId
+        ? { ...candidate, movementId: newMovementId, provenanceKind: newProvKind, originalMovementId: originalMv }
+        : candidate,
+    );
+    let nextRunner = runner;
+    const current = runner === null ? null : currentRunnerSlot(runner);
+    const runnerSlotIndex = runner?.slots.findIndex((candidate) => candidate.sessionPlanSlotId === slot.sessionPlanSlotId) ?? -1;
+    if (runner !== null && runnerSlotIndex >= 0) {
+      const throughSubstitution = current?.sessionPlanSlotId === slot.sessionPlanSlotId &&
+        runner.substitutionOfferedForSessionPlanSlotId === slot.sessionPlanSlotId
+        ? advanceSessionRunner(runner, {
+            kind: 'SUBSTITUTE', atMs: Date.now(), movementId: newMovementId, movementName: replacement.name,
+          })
+        : runner;
+      // Self-directed mode may replace a future slot. Keep the durable runner
+      // snapshot in lockstep even when its cursor is elsewhere.
+      nextRunner = throughSubstitution === runner
+        ? {
+            ...runner,
+            slots: runner.slots.map((candidate) => candidate.sessionPlanSlotId === slot.sessionPlanSlotId
+              ? { ...candidate, movementId: newMovementId, movementName: replacement.name }
+              : candidate),
+            updatedAtMs: Date.now(),
+          }
+        : throughSubstitution;
+    }
+
+    if (session !== null) {
+      const d = getDb();
+      d.executeSync('BEGIN');
+      try {
+        d.executeSync(
+          `UPDATE session_plan_slot
+           SET movement_id = ?, provenance_kind = ?, original_movement_id = ?
+           WHERE session_plan_slot_id = ?`,
+          [newMovementId, newProvKind, originalMv, slot.sessionPlanSlotId],
+        );
+        if (causeRecord !== undefined) {
+          d.executeSync(
+            `INSERT INTO session_slot_swap_cause
+               (session_plan_slot_id, cause, scope, replaced_movement_id, replaced_by_session_plan_slot_id, recorded_at_ms)
+             VALUES (?, ?, ?, ?, NULL, ?)
+             ON CONFLICT(session_plan_slot_id) DO UPDATE SET
+               cause = excluded.cause,
+               scope = excluded.scope,
+               replaced_movement_id = excluded.replaced_movement_id,
+               replaced_by_session_plan_slot_id = NULL,
+               recorded_at_ms = excluded.recorded_at_ms`,
+            [slot.sessionPlanSlotId, causeRecord.cause, causeRecord.scope, oldMovementId, Date.now()],
+          );
+        }
+        if (nextRunner !== null && sessionMode !== null) {
+          persistRunnerCheckpoint(d, session.sessionId, sessionMode, nextRunner);
+        }
+        d.executeSync('COMMIT');
+      } catch (error) {
+        try { d.executeSync('ROLLBACK'); } catch { /* no partial substitution */ }
+        set({ error: error instanceof Error ? error.message : String(error) });
+        return false;
+      }
+    }
+    set({
+      sessionPlan: nextPlan,
+      activeMovementId: newMovementId,
+      ...(nextRunner !== null ? runnerSelection(nextRunner) : {}),
+    });
+    return true;
   };
   return {
   status: 'booting',
@@ -7598,234 +7980,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
   },
 
   swapMovement: (oldMovementId, newMovementId, replacementSets) => {
-    const state = get();
-    const { sessionPlan, activeSessionPlanSlotId, session, runner, sessionMode, movements, profile } = state;
-    const slot = activeSessionPlanSlotId !== null
-      ? sessionPlan.find((candidate) => candidate.sessionPlanSlotId === activeSessionPlanSlotId)
-      : sessionPlan.find((candidate) => candidate.movementId === oldMovementId);
-    const replacement = movements.find((movement) => movement.movement_id === newMovementId);
-    if (slot === undefined || replacement === undefined) return;
-    const loggedSetsCount = session?.sets.filter((setRow) =>
-      setRow.session_plan_slot_id !== null
-        ? setRow.session_plan_slot_id === slot.sessionPlanSlotId
-        : setRow.movement_id === slot.movementId
-    ).length ?? 0;
-    if (
-      replacementSets !== undefined &&
-      (typeof replacementSets !== 'number' || !Number.isInteger(replacementSets) || replacementSets < 1 || replacementSets > 6)
-    ) {
-      return;
-    }
-    if (
-      loggedSetsCount > 0 &&
-      (typeof replacementSets !== 'number' || !Number.isInteger(replacementSets) || replacementSets < 1 || replacementSets > 6)
-    ) {
-      return;
-    }
-    if (!get().requireTrainingSupport('swap-movement', [oldMovementId, newMovementId],
-      `session:${session?.sessionId ?? 'draft'}:slot:${slot.sessionPlanSlotId}:movement:${oldMovementId}->${newMovementId}`)) return;
-    const accessContext = executionContextForState(state);
-    if (accessContext === null) {
-      set({ error: 'The active session access context cannot be verified. Reopen the session before editing it.' });
-      return;
-    }
-    const availability = capabilityMovementAvailability(
-      getDb(), movements, profile, accessContext,
-      new Set(state.activePriorExperienceMovementIds),
-      safetyExcludedMovementIdsFor(movements, profile, state.niggles),
-    )
-      .find((r) => r.movementId === newMovementId);
-    if (!permittedForProfile(replacement, profile, accessContext) || availability?.state !== 'available') {
-      set({ error: formatTeachingOnlyReason(availability) });
-      return;
-    }
-
-    const originalMv = slot.originalMovementId ?? slot.movementId;
-    const newProvKind: SlotProvenanceKind = slot.targetRpe !== null ? 'substituted' : slot.provenanceKind;
-
-    if (loggedSetsCount > 0 && session !== null) {
-      // A halted session stays stopped; refuse before any write.
-      if (runner?.phase === 'halted') return;
-      const chosenCount = replacementSets as number;
-      const d = getDb();
-      let newSlotId = 0;
-      let nextRunner = runner;
-      const retainedSets = retainedSetsForSwap(runner, slot.sessionPlanSlotId, loggedSetsCount);
-      d.executeSync('BEGIN');
-      try {
-        const originalSlotRow = rowsOf<{ slot_index: number }>(
-          d.executeSync(
-            'SELECT slot_index FROM session_plan_slot WHERE session_plan_slot_id = ?',
-            [slot.sessionPlanSlotId],
-          ),
-        )[0];
-        if (originalSlotRow === undefined) {
-          throw new Error('Target session slot is missing.');
-        }
-        // 075 (issue #144): keep the count planned before this swap. planned_sets
-        // below becomes the runner's count and the checkpoint check still reads it.
-        d.executeSync(
-          'INSERT OR IGNORE INTO session_plan_slot_planned_count (session_plan_slot_id, original_planned_sets) SELECT session_plan_slot_id, planned_sets FROM session_plan_slot WHERE session_plan_slot_id = ?',
-          [slot.sessionPlanSlotId],
-        );
-        d.executeSync(
-          'UPDATE session_plan_slot SET planned_sets = ? WHERE session_plan_slot_id = ?',
-          [retainedSets, slot.sessionPlanSlotId],
-        );
-        const laterSlots = rowsOf<{ session_plan_slot_id: number; slot_index: number }>(
-          d.executeSync(
-            'SELECT session_plan_slot_id, slot_index FROM session_plan_slot WHERE session_id = ? AND slot_index > ? ORDER BY slot_index DESC',
-            [session.sessionId, originalSlotRow.slot_index],
-          ),
-        );
-        for (const later of laterSlots) {
-          d.executeSync(
-            'UPDATE session_plan_slot SET slot_index = ? WHERE session_plan_slot_id = ?',
-            [later.slot_index + 1, later.session_plan_slot_id],
-          );
-        }
-        d.executeSync(
-          `INSERT INTO session_plan_slot (session_id, slot_index, movement_id, planned_sets, planned_reps, provenance_kind, target_rpe, source_planned_slot_id, original_movement_id, original_session_date, override_load_kg, override_reason)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            session.sessionId,
-            originalSlotRow.slot_index + 1,
-            newMovementId,
-            chosenCount,
-            slot.plannedReps,
-            newProvKind,
-            slot.targetRpe,
-            slot.sourcePlannedSlotId,
-            originalMv,
-            slot.originalSessionDate,
-            slot.overrideLoadKg,
-            slot.overrideReason,
-          ],
-        );
-        newSlotId = rowsOf<{ id: number }>(d.executeSync('SELECT last_insert_rowid() AS id'))[0]!.id;
-        d.executeSync(
-          `INSERT INTO session_slot_target (session_plan_slot_id, target_kind, target_reps, target_seconds)
-           VALUES (?, ?, ?, ?)`,
-          [
-            newSlotId,
-            slot.target.kind,
-            slot.target.kind === 'reps' ? slot.target.reps : null,
-            slot.target.kind === 'time' ? slot.target.seconds : null,
-          ],
-        );
-        d.executeSync(
-          'INSERT INTO session_plan_slot_replacement (session_plan_slot_id, replaced_by_session_plan_slot_id) VALUES (?, ?)',
-          [slot.sessionPlanSlotId, newSlotId],
-        );
-        if (runner !== null) {
-          const origRunnerSlot = runner.slots.find((candidate) => candidate.sessionPlanSlotId === slot.sessionPlanSlotId);
-          nextRunner = replaceSlotAfterLoggedSets(runner, {
-            targetSessionPlanSlotId: slot.sessionPlanSlotId,
-            completedSets: retainedSets,
-            replacementSlot: {
-              sessionPlanSlotId: newSlotId,
-              plannedSlotId: slot.sourcePlannedSlotId,
-              movementId: newMovementId,
-              movementName: replacement.name,
-              sets: chosenCount,
-              target: slot.target,
-              targetRpe: origRunnerSlot?.targetRpe ?? slot.targetRpe ?? 8,
-            },
-            atMs: Date.now(),
-          });
-          if (sessionMode !== null) {
-            persistRunnerCheckpoint(d, session.sessionId, sessionMode, nextRunner);
-          }
-        }
-        d.executeSync('COMMIT');
-      } catch (error) {
-        try { d.executeSync('ROLLBACK'); } catch { /* no partial substitution */ }
-        set({ error: error instanceof Error ? error.message : String(error) });
-        return;
-      }
-
-      const newSlot: PlanSlot = {
-        sessionPlanSlotId: newSlotId,
-        movementId: newMovementId,
-        plannedSets: chosenCount,
-        plannedReps: slot.plannedReps,
-        target: slot.target,
-        provenanceKind: newProvKind,
-        targetRpe: slot.targetRpe,
-        sourcePlannedSlotId: slot.sourcePlannedSlotId,
-        originalMovementId: originalMv,
-        originalSessionDate: slot.originalSessionDate,
-        overrideLoadKg: slot.overrideLoadKg,
-        overrideReason: slot.overrideReason,
-        replacedBySessionPlanSlotId: null,
-      };
-      const nextPlan = sessionPlan.flatMap((candidate) =>
-        candidate.sessionPlanSlotId === slot.sessionPlanSlotId
-          ? [{ ...candidate, plannedSets: retainedSets, replacedBySessionPlanSlotId: newSlotId, originalPlannedSets: candidate.originalPlannedSets ?? candidate.plannedSets }, newSlot]
-          : [candidate],
-      );
-      set({
-        sessionPlan: nextPlan,
-        activeSessionPlanSlotId: newSlotId,
-        activeMovementId: newMovementId,
-        ...(nextRunner !== null ? runnerSelection(nextRunner) : {}),
-      });
-      return;
-    }
-
-    const nextPlan = sessionPlan.map((candidate) =>
-      candidate.sessionPlanSlotId === slot.sessionPlanSlotId
-        ? { ...candidate, movementId: newMovementId, provenanceKind: newProvKind, originalMovementId: originalMv }
-        : candidate,
-    );
-    let nextRunner = runner;
-    const current = runner === null ? null : currentRunnerSlot(runner);
-    const runnerSlotIndex = runner?.slots.findIndex((candidate) => candidate.sessionPlanSlotId === slot.sessionPlanSlotId) ?? -1;
-    if (runner !== null && runnerSlotIndex >= 0) {
-      const throughSubstitution = current?.sessionPlanSlotId === slot.sessionPlanSlotId &&
-        runner.substitutionOfferedForSessionPlanSlotId === slot.sessionPlanSlotId
-        ? advanceSessionRunner(runner, {
-            kind: 'SUBSTITUTE', atMs: Date.now(), movementId: newMovementId, movementName: replacement.name,
-          })
-        : runner;
-      // Self-directed mode may replace a future slot. Keep the durable runner
-      // snapshot in lockstep even when its cursor is elsewhere.
-      nextRunner = throughSubstitution === runner
-        ? {
-            ...runner,
-            slots: runner.slots.map((candidate) => candidate.sessionPlanSlotId === slot.sessionPlanSlotId
-              ? { ...candidate, movementId: newMovementId, movementName: replacement.name }
-              : candidate),
-            updatedAtMs: Date.now(),
-          }
-        : throughSubstitution;
-    }
-
-    if (session !== null) {
-      const d = getDb();
-      d.executeSync('BEGIN');
-      try {
-        d.executeSync(
-          `UPDATE session_plan_slot
-           SET movement_id = ?, provenance_kind = ?, original_movement_id = ?
-           WHERE session_plan_slot_id = ?`,
-          [newMovementId, newProvKind, originalMv, slot.sessionPlanSlotId],
-        );
-        if (nextRunner !== null && sessionMode !== null) {
-          persistRunnerCheckpoint(d, session.sessionId, sessionMode, nextRunner);
-        }
-        d.executeSync('COMMIT');
-      } catch (error) {
-        try { d.executeSync('ROLLBACK'); } catch { /* no partial substitution */ }
-        set({ error: error instanceof Error ? error.message : String(error) });
-        return;
-      }
-    }
-    set({
-      sessionPlan: nextPlan,
-      activeMovementId: newMovementId,
-      ...(nextRunner !== null ? runnerSelection(nextRunner) : {}),
-    });
+    executeSlotSwap(oldMovementId, newMovementId, replacementSets);
   },
   setMovementPreference: (movementId, preference) => {
     const d = getDb();
@@ -7847,94 +8002,10 @@ export const useStore = create<KineticsStore>()((set, get) => {
   },
 
   openSubstitution: (targetMovementId) => {
-    const state = get();
-    const { movements, profile, block } = state;
-    const target = movements.find((m) => m.movement_id === targetMovementId);
-    if (target === undefined) return false;
-    const activeTargetSlot = state.activeSessionPlanSlotId !== null
-      ? state.sessionPlan.find((slot) => slot.sessionPlanSlotId === state.activeSessionPlanSlotId)
-      : undefined;
-    const targetSlot = activeTargetSlot?.movementId === targetMovementId
-      ? activeTargetSlot
-      : state.sessionPlan.find((slot) => slot.movementId === targetMovementId);
-    if (!get().requireTrainingSupport('substitution-preview', [targetMovementId],
-      `session:${state.session?.sessionId ?? `draft-${state.today}`}:slot:${targetSlot?.sessionPlanSlotId ?? 'pending'}:movement:${targetMovementId}`)) return false;
-    // Re-read today's niggles from 011 so a midnight crossing while the app sat
-    // foregrounded (no AppState 'active' -> no rolloverDay) can't feed the
-    // engine yesterday's niggles. set() is synchronous, so get().niggles below
-    // is the fresh set.
-    get().refreshNiggles();
-    const d = getDb();
-    const today = localToday();
-    const byId = new Map(movements.map((m) => [m.movement_id, m]));
-    const accessContext = executionContextForState(get());
-    if (accessContext === null) {
-      set({ error: 'The active session access context cannot be verified. Reopen the session before substituting.' });
-      return false;
-    }
-    // The reported-area exclusion is the only safety filter that removes
-    // candidates before the engine sees them. Keep its set so the empty sheet
-    // can tell whether it removed anything (see heldByReportedArea below).
-    const priorExperience = new Set(get().activePriorExperienceMovementIds);
-    const safetyExcluded = safetyExcludedMovementIdsFor(movements, profile, get().niggles);
-    const capabilityAvailable = capabilityAvailableMovementIds(
-      d, movements, profile, accessContext, priorExperience, safetyExcluded,
-    );
-    // Candidate publication is one preview operation: capture decisive support
-    // rows once, then evaluate every candidate in memory. Actual substitutions
-    // still re-check through requireTrainingSupport at their tap/commit boundary.
-    const supportSnapshot = supportAdapter().captureEvaluation();
-    let futureRows: { row: { planned_slot_id: number; session_date: string; sets: number; day_index: number }; movement: Movement }[] = [];
-    let currentDayIndex = 0;
-    // Layer 2 (day-swap) needs the active block's later days. With no block,
-    // futureSlots stays empty and only Layer 1 (regression) can yield options.
-    if (block !== null) {
-      currentDayIndex = Number(
-        rowsOf<{ d: number }>(
-          d.executeSync('SELECT CAST(julianday(?) - julianday(?) AS INTEGER) AS d', [today, block.startDate]),
-        )[0]?.d ?? 0,
-      );
-      const rows = rowsOf<{
-        planned_slot_id: number; session_date: string; movement_id: number;
-        sets: number; day_index: number;
-      }>(
-        d.executeSync(
-          `SELECT sl.planned_slot_id, ps.session_date, sl.movement_id, sl.sets,
-                  CAST(julianday(ps.session_date) - julianday(?) AS INTEGER) AS day_index
-           FROM planned_slot sl
-           JOIN planned_session ps ON ps.planned_session_id = sl.planned_session_id
-           WHERE ps.block_id = ? AND ps.session_date > ?
-             AND sl.planned_slot_id NOT IN (SELECT planned_slot_id FROM planned_slot_disposition WHERE disposition = 'swapped')
-           ORDER BY ps.session_date, sl.slot_index`,
-          [block.startDate, block.blockId, today],
-        ),
-      );
-      futureRows = rows.flatMap((r) => {
-        const mv = byId.get(r.movement_id);
-        return mv === undefined ? [] : [{ row: r, movement: mv }];
-      });
-    }
-    const inputFor = (available: ReadonlySet<number>, niggles: readonly NiggleInput[]): SubstitutionInput => ({
-      target: toSubMovement(target, available),
-      library: movements.filter((movement) => supportSnapshot.evaluate(movementSupportTargets([movement.movement_id])).status === 'available')
-        .map((movement) => toSubMovement(movement, available)),
-      inventory: profile.equipment_inventory,
-      niggles, // active niggles drive the guardrail + Layer 3
-      futureSlots: futureRows
-        .filter(({ movement }) => supportSnapshot.evaluate(movementSupportTargets([movement.movement_id])).status === 'available')
-        .map(({ row, movement }): FutureSlot => ({
-          plannedSlotId: row.planned_slot_id,
-          dayIndex: row.day_index,
-          sessionDate: row.session_date,
-          movement: toSubMovement(movement, available),
-          sets: row.sets,
-        })),
-      currentDayIndex,
-      trainingAge: profile.training_age, // experience-weighted severity thresholds
-      accessContext,
-    });
+    const ctx = buildSubstitutionContext(targetMovementId);
+    if (ctx === null) return false;
     const offeredCount = (r: SubstitutionResult): number => r.layer1Regression.options.length + r.layer2DaySwap.options.length;
-    const result = computeSubstitutions(inputFor(capabilityAvailable, get().niggles));
+    const result = computeSubstitutions(ctx.inputFor(ctx.capabilityAvailable, get().niggles));
     // heldByReportedArea: the sheet shows only Layers 1 and 2. It is true only when
     // both are empty AND a read-only second run, with the reported-area exclusion
     // lifted and no niggles, would offer a Layer 1 or Layer 2 option. Layer 3 and
@@ -7942,10 +8013,202 @@ export const useStore = create<KineticsStore>()((set, get) => {
     // The second run's result is used for this boolean alone.
     let heldByReportedArea = false;
     if (offeredCount(result) === 0) {
-      const withoutArea = capabilityAvailableMovementIds(d, movements, profile, accessContext, priorExperience, new Set<number>());
-      heldByReportedArea = offeredCount(computeSubstitutions(inputFor(withoutArea, []))) > 0;
+      const withoutArea = capabilityAvailableMovementIds(ctx.d, ctx.movements, ctx.profile, ctx.accessContext, ctx.priorExperience, new Set<number>());
+      heldByReportedArea = offeredCount(computeSubstitutions(ctx.inputFor(withoutArea, []))) > 0;
     }
-    set({ substitution: { targetId: targetMovementId, result, heldByReportedArea } });
+    set({ substitution: { targetId: targetMovementId, result, heldByReportedArea, mode: 'discomfort' } });
+    return true;
+  },
+
+  openNeutralSwap: (targetMovementId) => {
+    const ctx = buildSubstitutionContext(targetMovementId);
+    if (ctx === null) return false;
+    const input = ctx.inputFor(ctx.capabilityAvailable, get().niggles);
+    const result = computeSubstitutions(input);
+    const neutralOptions = computeNeutralSwapOptions(input);
+    let heldByReportedArea = false;
+    if (neutralOptions.length === 0) {
+      const withoutArea = capabilityAvailableMovementIds(ctx.d, ctx.movements, ctx.profile, ctx.accessContext, ctx.priorExperience, new Set<number>());
+      heldByReportedArea = computeNeutralSwapOptions(ctx.inputFor(withoutArea, [])).length > 0;
+    }
+    set({
+      substitution: {
+        targetId: targetMovementId,
+        result,
+        heldByReportedArea,
+        mode: 'neutral',
+        neutralOptions,
+      },
+    });
+    return true;
+  },
+
+  applyNeutralSwap: (targetMovementId, optionMovementId, cause, scope, replacementSets) => {
+    if (!NON_PATHOLOGICAL_SWAP_CAUSES.has(cause)) return false;
+    if (scope !== 'today_only' && scope !== 'rest_of_block') return false;
+    const preState = get();
+    const targetSlot = preState.activeSessionPlanSlotId !== null
+      ? preState.sessionPlan.find((candidate) => candidate.sessionPlanSlotId === preState.activeSessionPlanSlotId)
+      : preState.sessionPlan.find((candidate) => candidate.movementId === targetMovementId);
+    if (targetSlot === undefined) return false;
+    const targetMovement = preState.movements.find((m) => m.movement_id === targetMovementId);
+    const optionMovement = preState.movements.find((m) => m.movement_id === optionMovementId);
+    if (targetMovement === undefined || optionMovement === undefined) return false;
+
+    const swapped = executeSlotSwap(targetMovementId, optionMovementId, replacementSets, { cause, scope });
+    if (!swapped) return false;
+
+    if (scope === 'rest_of_block') {
+      const d = getDb();
+      const today = localToday();
+      const patternById = new Map(get().movements.map((m) => [m.movement_id, m.pattern]));
+      const replacedIds = new Set<number>([targetMovementId]);
+      if (targetSlot.originalMovementId !== null) replacedIds.add(targetSlot.originalMovementId);
+
+      const sourceSlotRow = targetSlot.sourcePlannedSlotId !== null
+        ? rowsOf<{ block_id: number; day_index: number; slot_index: number }>(
+            d.executeSync(
+              `SELECT ps.block_id, ps.day_index, sl.slot_index
+                 FROM planned_slot sl
+                 JOIN planned_session ps ON ps.planned_session_id = sl.planned_session_id
+                WHERE sl.planned_slot_id = ?`,
+              [targetSlot.sourcePlannedSlotId],
+            ),
+          )[0]
+        : undefined;
+
+      const originSessionRow = preState.session !== null
+        ? rowsOf<{ block_id: number; day_index: number }>(
+            d.executeSync(
+              `SELECT ps.block_id, ps.day_index
+                 FROM session_origin so
+                 JOIN planned_session ps ON ps.planned_session_id = so.source_planned_session_id
+                WHERE so.session_id = ?`,
+              [preState.session.sessionId],
+            ),
+          )[0]
+        : undefined;
+
+      const activeBlockId = sourceSlotRow?.block_id ?? originSessionRow?.block_id ?? get().block?.blockId ?? null;
+      const originDayIndex = sourceSlotRow?.day_index ?? originSessionRow?.day_index ?? null;
+      const originSlotIndex = sourceSlotRow?.slot_index ?? null;
+
+      d.executeSync('BEGIN');
+      try {
+        if (activeBlockId !== null) {
+          const candidateSlots = rowsOf<{
+            planned_slot_id: number;
+            day_index: number;
+            slot_index: number;
+            movement_id: number;
+            reps: number;
+          }>(
+            d.executeSync(
+              `SELECT sl.planned_slot_id, ps.day_index, sl.slot_index, sl.movement_id, sl.reps
+                 FROM planned_slot sl
+                 JOIN planned_session ps ON ps.planned_session_id = sl.planned_session_id
+                WHERE ps.block_id = ?
+                  AND ps.session_date >= ?
+                  AND NOT EXISTS (
+                    SELECT 1 FROM session_origin so
+                     WHERE so.source_planned_session_id = ps.planned_session_id
+                  )
+                  AND sl.planned_slot_id NOT IN (
+                    SELECT planned_slot_id FROM planned_slot_disposition WHERE disposition = 'swapped'
+                  )
+                ORDER BY ps.session_date, sl.slot_index`,
+              [activeBlockId, today],
+            ),
+          );
+          for (const row of candidateSlots) {
+            if (row.movement_id === optionMovementId) continue;
+            const sameReplacedMovement = replacedIds.has(row.movement_id);
+            const sameSlotPattern =
+              originDayIndex !== null &&
+              originSlotIndex !== null &&
+              row.day_index === originDayIndex &&
+              row.slot_index === originSlotIndex &&
+              patternById.get(row.movement_id) === targetMovement.pattern;
+            if (!sameReplacedMovement && !sameSlotPattern) continue;
+
+            d.executeSync(
+              'UPDATE planned_slot SET movement_id = ? WHERE planned_slot_id = ?',
+              [optionMovementId, row.planned_slot_id],
+            );
+            const targetForRow = targetForMovement(optionMovement, row.reps);
+            d.executeSync(
+              `INSERT INTO planned_slot_target (planned_slot_id, target_kind, target_reps, target_seconds)
+               VALUES (?, ?, ?, ?)
+               ON CONFLICT(planned_slot_id) DO UPDATE SET
+                 target_kind = excluded.target_kind,
+                 target_reps = excluded.target_reps,
+                 target_seconds = excluded.target_seconds`,
+              [
+                row.planned_slot_id,
+                targetForRow.kind,
+                targetForRow.kind === 'reps' ? targetForRow.reps : null,
+                targetForRow.kind === 'time' ? targetForRow.seconds : null,
+              ],
+            );
+            d.executeSync('DELETE FROM slot_override WHERE planned_slot_id = ?', [row.planned_slot_id]);
+            d.executeSync('DELETE FROM planned_slot_load_intent WHERE planned_slot_id = ?', [row.planned_slot_id]);
+          }
+
+          // Update 033 training_program_movement_preference ONLY when cause === 'preference'.
+          if (cause === 'preference') {
+            const programRow = rowsOf<{ program_id: number }>(
+              d.executeSync(
+                `SELECT p.program_id
+                   FROM training_block_program tbp
+                   JOIN training_program p ON p.program_id = tbp.program_id
+                  WHERE tbp.block_id = ? AND p.status = 'active'`,
+                [activeBlockId],
+              ),
+            )[0];
+            const programId = programRow?.program_id ?? get().program?.programId ?? null;
+            if (programId !== null && originDayIndex !== null) {
+              const dayExists = rowsOf<{ ok: number }>(
+                d.executeSync(
+                  'SELECT 1 AS ok FROM training_program_day WHERE program_id = ? AND day_index = ?',
+                  [programId, originDayIndex],
+                ),
+              )[0];
+              const existingPref = rowsOf<{ slot_index: number }>(
+                d.executeSync(
+                  'SELECT slot_index FROM training_program_movement_preference WHERE program_id = ? AND day_index = ? AND (movement_id = ? OR movement_id = ?) LIMIT 1',
+                  [programId, originDayIndex, targetMovementId, targetSlot.originalMovementId ?? targetMovementId],
+                ),
+              )[0];
+              const resolvedSlotIndex = existingPref?.slot_index ?? originSlotIndex;
+              if (dayExists !== undefined && resolvedSlotIndex !== null && resolvedSlotIndex >= 1 && resolvedSlotIndex <= 5) {
+                d.executeSync(
+                  'DELETE FROM training_program_movement_preference WHERE program_id = ? AND day_index = ? AND movement_id = ? AND slot_index <> ?',
+                  [programId, originDayIndex, optionMovementId, resolvedSlotIndex],
+                );
+                d.executeSync(
+                  `INSERT INTO training_program_movement_preference
+                     (program_id, day_index, slot_index, pattern, movement_id)
+                   VALUES (?, ?, ?, ?, ?)
+                   ON CONFLICT(program_id, day_index, slot_index) DO UPDATE SET
+                     pattern = excluded.pattern,
+                     movement_id = excluded.movement_id`,
+                  [programId, originDayIndex, resolvedSlotIndex, targetMovement.pattern, optionMovementId],
+                );
+              }
+            }
+          }
+        }
+        d.executeSync('COMMIT');
+      } catch (error) {
+        try { d.executeSync('ROLLBACK'); } catch { /* rollback block swap */ }
+        set({ error: error instanceof Error ? error.message : String(error) });
+        return false;
+      }
+      get().refreshBlock();
+      get().refreshProgram();
+    }
+
+    set({ substitution: null });
     return true;
   },
 
@@ -8047,29 +8310,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
   },
 
   applyRegression: (targetMovementId, optionMovementId, replacementSets) => {
-    const loggedSetsCount = get().session?.sets.filter((setRow) => {
-      const { sessionPlan, activeSessionPlanSlotId } = get();
-      const slot = activeSessionPlanSlotId !== null
-        ? sessionPlan.find((candidate) => candidate.sessionPlanSlotId === activeSessionPlanSlotId)
-        : sessionPlan.find((candidate) => candidate.movementId === targetMovementId);
-      if (slot === undefined) return false;
-      return setRow.session_plan_slot_id !== null
-        ? setRow.session_plan_slot_id === slot.sessionPlanSlotId
-        : setRow.movement_id === slot.movementId;
-    }).length ?? 0;
-    if (
-      replacementSets !== undefined &&
-      (typeof replacementSets !== 'number' || !Number.isInteger(replacementSets) || replacementSets < 1 || replacementSets > 6)
-    ) {
-      return;
-    }
-    if (
-      loggedSetsCount > 0 &&
-      (typeof replacementSets !== 'number' || !Number.isInteger(replacementSets) || replacementSets < 1 || replacementSets > 6)
-    ) {
-      return;
-    }
-    get().swapMovement(targetMovementId, optionMovementId, replacementSets);
+    executeSlotSwap(targetMovementId, optionMovementId, replacementSets, { cause: 'joint_discomfort', scope: 'today_only' });
     set({ substitution: null });
   },
 
@@ -8227,6 +8468,18 @@ export const useStore = create<KineticsStore>()((set, get) => {
           'INSERT INTO session_plan_slot_replacement (session_plan_slot_id, replaced_by_session_plan_slot_id) VALUES (?, ?)',
           [targetSlot.sessionPlanSlotId, newSlotId],
         );
+        d.executeSync(
+          `INSERT INTO session_slot_swap_cause
+             (session_plan_slot_id, cause, scope, replaced_movement_id, replaced_by_session_plan_slot_id, recorded_at_ms)
+           VALUES (?, 'joint_discomfort', 'today_only', ?, ?, ?)
+           ON CONFLICT(session_plan_slot_id) DO UPDATE SET
+             cause = excluded.cause,
+             scope = excluded.scope,
+             replaced_movement_id = excluded.replaced_movement_id,
+             replaced_by_session_plan_slot_id = excluded.replaced_by_session_plan_slot_id,
+             recorded_at_ms = excluded.recorded_at_ms`,
+          [targetSlot.sessionPlanSlotId, targetMovementId, newSlotId, Date.now()],
+        );
         if (runner !== null) {
           const origRunnerSlot = runner.slots.find((slot) => slot.sessionPlanSlotId === targetSlot.sessionPlanSlotId);
           nextRunner = replaceSlotAfterLoggedSets(runner, {
@@ -8363,6 +8616,18 @@ export const useStore = create<KineticsStore>()((set, get) => {
              target_reps = excluded.target_reps,
              target_seconds = excluded.target_seconds`,
           [targetSlot.sessionPlanSlotId, movedTarget.kind, movedTarget.kind === 'reps' ? movedTarget.reps : null, movedTarget.kind === 'time' ? movedTarget.seconds : null],
+        );
+        d.executeSync(
+          `INSERT INTO session_slot_swap_cause
+             (session_plan_slot_id, cause, scope, replaced_movement_id, replaced_by_session_plan_slot_id, recorded_at_ms)
+           VALUES (?, 'joint_discomfort', 'today_only', ?, NULL, ?)
+           ON CONFLICT(session_plan_slot_id) DO UPDATE SET
+             cause = excluded.cause,
+             scope = excluded.scope,
+             replaced_movement_id = excluded.replaced_movement_id,
+             replaced_by_session_plan_slot_id = NULL,
+             recorded_at_ms = excluded.recorded_at_ms`,
+          [targetSlot.sessionPlanSlotId, targetMovementId, Date.now()],
         );
         if (nextRunner !== null && sessionMode !== null) {
           persistRunnerCheckpoint(d, session.sessionId, sessionMode, nextRunner);
@@ -9186,7 +9451,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
           + ' + (SELECT count(*) FROM session_preparation)'
           + ' + (SELECT count(*) FROM block_emphasis) AS c';
         had = rowsOf<{ c: number }>(d.executeSync(
-          'SELECT (SELECT count(*) FROM history_import_capability_evidence) + (SELECT count(*) FROM history_import_set) + (SELECT count(*) FROM history_import_session) + (SELECT count(*) FROM history_import) + (SELECT count(*) FROM import_readiness_daily) + (SELECT count(*) FROM bodyweight_daily) + (SELECT count(*) FROM movement_capability_attestation) + (SELECT count(*) FROM movement_prior_experience) + (SELECT count(*) FROM capability_session_evidence) + (SELECT count(*) FROM set_target) + (SELECT count(*) FROM session_runner_checkpoint) + (SELECT count(*) FROM session_slot_target) + (SELECT count(*) FROM planned_slot_disposition) + (SELECT count(*) FROM planned_slot_autopilot) + (SELECT count(*) FROM planned_slot_legacy_role_allowance) + (SELECT count(*) FROM planned_slot_routine_decision) + (SELECT count(*) FROM planned_slot_target) + (SELECT count(*) FROM planned_slot_load_intent) + (SELECT count(*) FROM planned_session_routine_context) + (SELECT count(*) FROM planned_session_method) + (SELECT count(*) FROM session_plan_slot) + (SELECT count(*) FROM session_origin) + (SELECT count(*) FROM set_prefix) + (SELECT count(*) FROM set_metric) + (SELECT count(*) FROM set_record) + (SELECT count(*) FROM set_dose_target) + (SELECT count(*) FROM session_note) + (SELECT count(*) FROM session_feel) + (SELECT count(*) FROM session_feel_extra_reason) + (SELECT count(*) FROM question_log) + (SELECT count(*) FROM report_severity) + (SELECT count(*) FROM slot_override) + (SELECT count(*) FROM planned_slot) + (SELECT count(*) FROM planned_session) + (SELECT count(*) FROM block_meta) + (SELECT count(*) FROM suspension_episode WHERE ended_at_ms IS NULL) + (SELECT count(*) FROM training_program_movement_preference) + (SELECT count(*) FROM training_program_day) + (SELECT count(*) FROM training_block_program) + (SELECT count(*) FROM training_program) + (SELECT count(*) FROM session) + (SELECT count(*) FROM session_outcome) + (SELECT count(*) FROM micro_cycle) + (SELECT count(*) FROM macro_cycle) + (SELECT count(*) FROM training_block) + (SELECT count(*) FROM suspension_episode_program) + (SELECT count(*) FROM block_suspension_origin) + (SELECT count(*) FROM subjective_report) + (SELECT count(*) FROM niggle) + (SELECT count(*) FROM one_rep_max) + (SELECT count(*) FROM return_checkin_ack) + (SELECT count(*) FROM hrv_daily) + (SELECT count(*) FROM resting_hr_daily) + (SELECT count(*) FROM sleep_daily) + (SELECT count(*) FROM spo2_daily) + (SELECT count(*) FROM spo2_sample) + (SELECT count(*) FROM mech_daily) + (SELECT count(*) FROM state_vector) AS c',
+          'SELECT (SELECT count(*) FROM history_import_capability_evidence) + (SELECT count(*) FROM history_import_set) + (SELECT count(*) FROM history_import_session) + (SELECT count(*) FROM history_import) + (SELECT count(*) FROM import_readiness_daily) + (SELECT count(*) FROM bodyweight_daily) + (SELECT count(*) FROM movement_capability_attestation) + (SELECT count(*) FROM movement_prior_experience) + (SELECT count(*) FROM capability_session_evidence) + (SELECT count(*) FROM set_target) + (SELECT count(*) FROM session_runner_checkpoint) + (SELECT count(*) FROM session_slot_target) + (SELECT count(*) FROM planned_slot_disposition) + (SELECT count(*) FROM planned_slot_autopilot) + (SELECT count(*) FROM planned_slot_legacy_role_allowance) + (SELECT count(*) FROM planned_slot_routine_decision) + (SELECT count(*) FROM planned_slot_target) + (SELECT count(*) FROM planned_slot_load_intent) + (SELECT count(*) FROM planned_session_routine_context) + (SELECT count(*) FROM planned_session_method) + (SELECT count(*) FROM session_plan_slot) + (SELECT count(*) FROM session_slot_swap_cause) + (SELECT count(*) FROM session_origin) + (SELECT count(*) FROM set_prefix) + (SELECT count(*) FROM set_metric) + (SELECT count(*) FROM set_record) + (SELECT count(*) FROM set_dose_target) + (SELECT count(*) FROM session_note) + (SELECT count(*) FROM session_feel) + (SELECT count(*) FROM session_feel_extra_reason) + (SELECT count(*) FROM question_log) + (SELECT count(*) FROM report_severity) + (SELECT count(*) FROM slot_override) + (SELECT count(*) FROM planned_slot) + (SELECT count(*) FROM planned_session) + (SELECT count(*) FROM block_meta) + (SELECT count(*) FROM suspension_episode WHERE ended_at_ms IS NULL) + (SELECT count(*) FROM training_program_movement_preference) + (SELECT count(*) FROM training_program_day) + (SELECT count(*) FROM training_block_program) + (SELECT count(*) FROM training_program) + (SELECT count(*) FROM session) + (SELECT count(*) FROM session_outcome) + (SELECT count(*) FROM micro_cycle) + (SELECT count(*) FROM macro_cycle) + (SELECT count(*) FROM training_block) + (SELECT count(*) FROM suspension_episode_program) + (SELECT count(*) FROM block_suspension_origin) + (SELECT count(*) FROM subjective_report) + (SELECT count(*) FROM niggle) + (SELECT count(*) FROM one_rep_max) + (SELECT count(*) FROM return_checkin_ack) + (SELECT count(*) FROM hrv_daily) + (SELECT count(*) FROM resting_hr_daily) + (SELECT count(*) FROM sleep_daily) + (SELECT count(*) FROM spo2_daily) + (SELECT count(*) FROM spo2_sample) + (SELECT count(*) FROM mech_daily) + (SELECT count(*) FROM state_vector) AS c',
         ))[0];
         hadModuleTables = rowsOf<{ c: number }>(d.executeSync(moduleTablesCountSql))[0];
         d.executeSync('BEGIN');
@@ -9236,6 +9501,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       // and an orphan surviving an FK-OFF reset would attach an old record to
       // new work.
       d.executeSync('DELETE FROM session_skipped_slot');
+      d.executeSync('DELETE FROM session_slot_swap_cause');
       d.executeSync('DELETE FROM session_plan_slot_planned_count');
       d.executeSync('DELETE FROM session_plan_slot_replacement');
       d.executeSync('DELETE FROM session_plan_slot');

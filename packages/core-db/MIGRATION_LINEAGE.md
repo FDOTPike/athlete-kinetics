@@ -41,6 +41,10 @@ The ninth is `077_multisport_and_flexibility` (ordinal 76): adds the
 `athlete_secondary_sport_profile` and `activity_flexibility_tag` side-car tables
 and their guards, leaving `activity_definition` and the singleton sport profile
 byte-identical for the 067 verifier.
+The tenth is `078_session_slot_swap_cause` (ordinal 77): adds the
+`session_slot_swap_cause` side-car table recording why a slot was swapped
+(`cause`) and its persistence scope (`today_only` vs `rest_of_block`) without
+altering `session_plan_slot_replacement`.
 `MIGRATION_LINEAGE.json` records the SHA-256 of every shipped file and its
 ordinal, and of master's 34-entry chain. Master's exact `034`/`058` bytes and its
 registry live under `test/fixtures/lineage/master-1da218d/`.

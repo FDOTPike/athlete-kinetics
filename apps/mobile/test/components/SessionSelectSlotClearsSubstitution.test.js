@@ -77,17 +77,19 @@ test('switching the active exercise in self-directed mode clears an open substit
 
   render(<SessionScreen />);
 
-  // Open substitution on Slot 1 (Push-up).
-  fireEvent.press(screen.getByLabelText('Swap or avoid this: Push-up'));
-  expect(screen.getByLabelText('Use Incline Push-Up instead')).toBeOnTheScreen();
+  // Open neutral swap on Slot 1 (Push-up).
+  fireEvent.press(screen.getByLabelText('Swap exercise: Push-up'));
+  expect(screen.getByTestId(`neutral-swap-option-${inclinePushUpId}`)).toBeOnTheScreen();
 
   // Switch active exercise to Slot 2 (Push-Up Wide).
   fireEvent.press(screen.getByLabelText('Choose Push-Up Wide as the current exercise'));
 
-  // If the stale Push-up substitution sheet is still rendered and tapped, it overwrites Slot 2 (Push-Up Wide).
-  const staleOption = screen.queryByLabelText('Use Incline Push-Up instead');
+  // If the stale Push-up swap sheet remained open, selecting the candidate would replace Slot 2 (Push-Up Wide).
+  const staleOption = screen.queryByTestId(`neutral-swap-option-${inclinePushUpId}`);
   if (staleOption !== null) {
+    fireEvent.press(screen.getByTestId('neutral-swap-reason-equipment_busy'));
     fireEvent.press(staleOption);
+    fireEvent.press(screen.getByLabelText('For today only'));
   }
 
   expect({

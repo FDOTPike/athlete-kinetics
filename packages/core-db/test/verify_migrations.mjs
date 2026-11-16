@@ -70,7 +70,8 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '068_movement_content_correction_v2.sql',
   '069_resting_heart_rate.sql',
   '070_session_feel.sql', '071_beta_recording.sql', '072_question_log.sql', '073_session_slot_replaced_by.sql',
-  '074_session_feel_reasons.sql', '075_session_plan_slot_planned_count.sql', '076_sport_taxonomy_expansion.sql', '077_multisport_and_flexibility.sql'];
+  '074_session_feel_reasons.sql', '075_session_plan_slot_planned_count.sql', '076_sport_taxonomy_expansion.sql', '077_multisport_and_flexibility.sql',
+  '078_session_slot_swap_cause.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
@@ -1767,11 +1768,11 @@ console.log('[2u] 057 block_meta phase/index repair + enforcement');
     const db = freshDb();
     runMigrations(db, MIGRATIONS);
     // Slot 004 is the parameterized materialize script, never a migration:
-    // 75 files (slots 001-076, no 004) -> user_version 75. This count is
+    // 77 files (slots 001-078, no 004) -> user_version 77. This count is
     // pinned deliberately so adding a migration is a conscious act, not a
-    // silent one. Re-pinned for 076 (sport_taxonomy_expansion).
-    check('fresh install reaches user_version 76 (76 files, no slot 004)',
-      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 76,
+    // silent one. Re-pinned for 078 (session_slot_swap_cause).
+    check('fresh install reaches user_version 77 (77 files, no slot 004)',
+      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 77,
       String(uv(db)));
     const trig = db.raw.prepare(
       `SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'trigger'
@@ -4705,7 +4706,7 @@ console.log('\n[one statement per database call]');
 console.log('[076] sport taxonomy expansion (athlete_sport_profile CHECK widened)');
 {
   const index = FILES.indexOf('076_sport_taxonomy_expansion.sql');
-  check('076 is appended before 077', index === MIGRATIONS.length - 2 && FILES[index + 1] === '077_multisport_and_flexibility.sql');
+  check('076 is appended before 077', index === 74 && FILES[index + 1] === '077_multisport_and_flexibility.sql');
   const upgraded = freshDb();
   applyRaw(upgraded, MIGRATIONS, 0, index); // through 075
   upgraded.raw.exec("INSERT INTO athlete_sport_profile (sport_profile_id, sport_id, outcome_id, experience_id, revision, updated_at_ms) VALUES (1, 'basketball', 'general_support', 'new', 1, 0)");
@@ -4728,7 +4729,7 @@ console.log('[076] sport taxonomy expansion (athlete_sport_profile CHECK widened
 console.log('[077] multisport and flexibility (secondary sport + flexibility tag)');
 {
   const index = FILES.indexOf('077_multisport_and_flexibility.sql');
-  check('077 is the last migration in the chain', index === MIGRATIONS.length - 1);
+  check('077 is appended before 078', index === 75 && FILES[index + 1] === '078_session_slot_swap_cause.sql');
   const d = freshDb();
   runMigrations(d, MIGRATIONS);
   const has = (name) => d.raw.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name=?").get(name).c === 1;
@@ -4750,6 +4751,30 @@ console.log('[077] multisport and flexibility (secondary sport + flexibility tag
   tag('flex1');
   check('077 accepts tagging a low-demand activity', d.raw.prepare('SELECT COUNT(*) c FROM activity_flexibility_tag').get().c === 1);
   check('077 blocks reclassifying a tagged activity away from low demand', throws(() => d.raw.exec("UPDATE activity_definition SET demand_class = 'moderate' WHERE activity_id = 'flex1'")));
+}
+
+// =============================================================================
+// [078] Session slot swap cause & scope side-car (#208)
+// =============================================================================
+console.log('[078] session slot swap cause & scope side-car (session_slot_swap_cause)');
+{
+  const index = FILES.indexOf('078_session_slot_swap_cause.sql');
+  check('078 is the last migration in the chain', index === MIGRATIONS.length - 1);
+  const d = freshDb();
+  runMigrations(d, MIGRATIONS);
+  const has = (name) => d.raw.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name=?").get(name).c === 1;
+  check('078 creates session_slot_swap_cause', has('session_slot_swap_cause'));
+  d.raw.exec("INSERT INTO session (session_id, micro_cycle_id, session_date, started_at_ms) VALUES (9780, NULL, '2026-11-10', 1000)");
+  d.raw.exec("INSERT INTO session_plan_slot (session_plan_slot_id, session_id, slot_index, movement_id, planned_sets, planned_reps, provenance_kind, target_rpe) VALUES (9781, 9780, 1, 1, 3, 5, 'free_form', NULL)");
+  d.raw.exec("INSERT INTO session_plan_slot (session_plan_slot_id, session_id, slot_index, movement_id, planned_sets, planned_reps, provenance_kind, target_rpe) VALUES (9782, 9780, 2, 2, 2, 5, 'free_form', NULL)");
+  d.raw.exec("INSERT INTO session_slot_swap_cause (session_plan_slot_id, cause, scope, replaced_movement_id, replaced_by_session_plan_slot_id, recorded_at_ms) VALUES (9781, 'equipment_busy', 'today_only', 1, 9782, 12345)");
+  check('078 persists swap cause and scope row', d.raw.prepare("SELECT cause, scope, replaced_movement_id FROM session_slot_swap_cause WHERE session_plan_slot_id = 9781").get()?.cause === 'equipment_busy');
+  check('078 enforces cause CHECK constraint', throws(() => d.raw.exec("INSERT INTO session_slot_swap_cause (session_plan_slot_id, cause, scope, recorded_at_ms) VALUES (9782, 'invented_reason', 'today_only', 1)")));
+  check('078 enforces scope CHECK constraint', throws(() => d.raw.exec("INSERT INTO session_slot_swap_cause (session_plan_slot_id, cause, scope, recorded_at_ms) VALUES (9782, 'preference', 'forever', 1)")));
+  d.raw.exec('DROP TABLE session_slot_swap_cause');
+  check('078 poison detection spots missing session_slot_swap_cause sentinel', sentinelsMissing(d).includes('session_slot_swap_cause'));
+  runMigrations(d, MIGRATIONS);
+  check('078 self-heal restores session_slot_swap_cause', has('session_slot_swap_cause'));
 }
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);

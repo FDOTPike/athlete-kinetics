@@ -86,7 +86,8 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   '074_session_feel_reasons.sql',
   // 075 adds session_plan_slot_planned_count, which the store writes when a swap
   // after logged sets overwrites planned_sets, and empties on reset and discard.
-  '075_session_plan_slot_planned_count.sql', '077_multisport_and_flexibility.sql'];
+  '075_session_plan_slot_planned_count.sql', '077_multisport_and_flexibility.sql',
+  '078_session_slot_swap_cause.sql'];
 
 
 const db = new DatabaseSync(':memory:');
@@ -2731,6 +2732,61 @@ console.log('[R8 identity + offline posture (static sources)]');
   } else {
     a('MainActivity.getMainComponentName matches the JS-registered app.json name',
       false, 'MainActivity.kt not found');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// [#208] Neutral swap store contract + 078_session_slot_swap_cause invariants
+// ---------------------------------------------------------------------------
+console.log('[208 neutral swap + 078 session_slot_swap_cause SQL contract]');
+{
+  const openNeutralStart = src.indexOf('openNeutralSwap: (targetMovementId) => {');
+  const applyNeutralStart = src.indexOf('applyNeutralSwap: (targetMovementId,');
+  const closeSubStart = src.indexOf('closeSubstitution: () => set({ substitution: null })');
+  const openNeutralBody = openNeutralStart >= 0 && applyNeutralStart > openNeutralStart
+    ? src.slice(openNeutralStart, applyNeutralStart) : '';
+  const applyNeutralBody = applyNeutralStart >= 0 && closeSubStart > applyNeutralStart
+    ? src.slice(applyNeutralStart, closeSubStart) : '';
+  check(
+    'openNeutralSwap + applyNeutralSwap bodies located and NEVER touch 010 movement_preference (-1)',
+    openNeutralBody.includes('computeNeutralSwapOptions')
+      && openNeutralBody.includes("mode: 'neutral'")
+      && !/\bmovement_preference\b/.test(openNeutralBody)
+      && applyNeutralBody.includes('executeSlotSwap')
+      && applyNeutralBody.includes("cause === 'preference'")
+      && !/\bmovement_preference\b/.test(applyNeutralBody)
+      && !applyNeutralBody.includes('setMovementPreference'),
+  );
+
+  const prevFk = db.prepare('PRAGMA foreign_keys').get().foreign_keys;
+  db.exec('PRAGMA foreign_keys = ON');
+  db.exec('BEGIN');
+  try {
+    db.exec("INSERT INTO movement (movement_id,name,pattern,is_compound) VALUES (9901,'Swap Test Press A','push_h',1)");
+    db.exec("INSERT INTO movement (movement_id,name,pattern,is_compound) VALUES (9902,'Swap Test Press B','push_h',1)");
+    db.exec("INSERT INTO session (session_id,session_date,started_at_ms) VALUES (9901,'2026-11-01',1000)");
+    db.exec("INSERT INTO session_plan_slot (session_plan_slot_id,session_id,slot_index,movement_id,planned_sets,provenance_kind) VALUES (9901,9901,0,9901,3,'free_form')");
+
+    let rejectedCause = false;
+    try {
+      db.exec("INSERT INTO session_slot_swap_cause (session_plan_slot_id,cause,scope,replaced_movement_id,recorded_at_ms) VALUES (9901,'unknown_reason','today_only',9901,2000)");
+    } catch { rejectedCause = true; }
+    let rejectedScope = false;
+    try {
+      db.exec("INSERT INTO session_slot_swap_cause (session_plan_slot_id,cause,scope,replaced_movement_id,recorded_at_ms) VALUES (9901,'equipment_busy','forever',9901,2000)");
+    } catch { rejectedScope = true; }
+    a('078 CHECK constraints reject invalid cause and invalid scope', rejectedCause && rejectedScope);
+
+    db.exec("INSERT INTO session_slot_swap_cause (session_plan_slot_id,cause,scope,replaced_movement_id,recorded_at_ms) VALUES (9901,'equipment_busy','today_only',9901,2000)");
+    const row078 = db.prepare('SELECT cause, scope, replaced_movement_id FROM session_slot_swap_cause WHERE session_plan_slot_id = 9901').get();
+    a('078 inserts and reads back neutral swap cause + scope', row078?.cause === 'equipment_busy' && row078?.scope === 'today_only');
+
+    db.exec('DELETE FROM session_plan_slot WHERE session_plan_slot_id = 9901');
+    const afterCascade = db.prepare('SELECT COUNT(*) AS c FROM session_slot_swap_cause WHERE session_plan_slot_id = 9901').get().c;
+    a('078 cascades cleanly when parent session_plan_slot is deleted', afterCascade === 0);
+  } finally {
+    db.exec('ROLLBACK');
+    db.exec(`PRAGMA foreign_keys = ${prevFk ? 'ON' : 'OFF'}`);
   }
 }
 

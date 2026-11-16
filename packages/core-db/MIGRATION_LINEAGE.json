@@ -386,6 +386,11 @@
         "ordinal": 76,
         "file": "077_multisport_and_flexibility.sql",
         "sha256": "5f69c01523e09cf03dc8572a0c5798fcf0f7f8ff1856ab8ab96c6a81768d62f9"
+      },
+      {
+        "ordinal": 77,
+        "file": "078_session_slot_swap_cause.sql",
+        "sha256": "32795ecde910d9f78852ea60ad2e4bdc20766b4580b8d4e08631e1143f245200"
       }
     ]
   },
