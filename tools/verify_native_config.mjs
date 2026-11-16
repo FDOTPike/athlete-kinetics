@@ -373,7 +373,7 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
       /\.\.\.\(\s*(\w+)\s*\?\s*\[([^\]]*)\]\s*:\s*\[\s*\]\s*\)/g,
       (_, flag, inner) => (Object.hasOwn(flags, flag) ? (flags[flag] ? inner : '') : `...(${flag}?...)`),
     );
-    if (resolved.includes('...(') || resolved.includes('?')) return null;
+    if (resolved.includes('...') || resolved.includes('?')) return null;
     return [...resolved.matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
   };
   const computeOnboardingContract = (typesSource, onboardingSource) => {
@@ -445,6 +445,18 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
       && poisonedSportContract.expectedOnboardingSteps === null
       && poisonedTargetContract.wantsTarget === null
       && poisonedTargetContract.expectedOnboardingSteps === null,
+  );
+  const bareSpreadOnboarding = onboardingSrc.replace(
+    /const steps:\s*StepKey\[\]\s*=\s*useMemo\(\s*\(\)\s*=>\s*\[/,
+    'const steps: StepKey[] = useMemo(() => [\n      ...extraSteps,',
+  );
+  const poisonedSpreadContract = computeOnboardingContract(typesSrc, bareSpreadOnboarding);
+  check(
+    'falsifier: unresolved spread (...extraSteps) in onboarding steps parses as null and fails closed',
+    bareSpreadOnboarding !== onboardingSrc
+      && parseDefaultSteps("'welcome', ...extraSteps, 'limits'", { wantsSport: true, wantsTarget: true, asksMaxes: true }) === null
+      && poisonedSpreadContract.defaultSteps === null
+      && poisonedSpreadContract.expectedOnboardingSteps === null,
   );
   const stripSwiftComments = (src) => src.replace(/\/\*[\s\S]*?\*\/|^\s*\/\/.*$/gm, '');
   const currentLabelBody = suite.match(/private func currentLabel\([\s\S]*?\n  \}/)?.[0] ?? '';
@@ -523,23 +535,28 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
     const loop900 = code.indexOf('Date().timeIntervalSince(restoreStart) < 900');
     const settledCall = code.indexOf('settledLabel(restoreStatus, beginsWith: "Restore complete."');
     if (loop900 === -1 || settledCall === -1 || settledCall <= loop900) return false;
+    const preLoop900 = code.slice(0, loop900);
     const between = code.slice(loop900, settledCall);
     const afterLoop900Start = between.indexOf('\n    }');
     if (afterLoop900Start === -1) return false;
+    const insideLoop900 = between.slice(0, afterLoop900Start);
     const postLoop = between.slice(afterLoop900Start);
-    return /addingTimeInterval\(\s*60\s*\)/.test(postLoop)
+    return /\bvar\s+restoreOfferHandled\s*=\s*false\b/.test(preLoop900)
+      && /\brestoreOfferHandled\s*=\s*true\b/.test(insideLoop900)
+      && /addingTimeInterval\(\s*60\s*\)/.test(postLoop)
       && /while\s+Date\(\)\s*<\s*\w+/.test(postLoop)
       && postLoop.includes('(try? element("Create program").snapshot()) != nil')
       && postLoop.includes('(try? element("Cancel").snapshot()) != nil')
       && postLoop.includes('dismissSetUpOfferIfShown("after the restore")')
+      && /\brestoreOfferHandled\s*=\s*true\b/.test(postLoop)
       && postLoop.includes('openProfile()')
-      && postLoop.includes('currentLabel(restoreStatus)')
-      && postLoop.includes('hasPrefix("Restore complete.")')
+      && /if\s+restoreOfferHandled\s*,\s*let\s+now\s*=\s*currentLabel\(restoreStatus\)\s*,\s*now\.hasPrefix\("Restore complete\."\)/.test(postLoop)
+      && !/\bif\s+let\s+now\s*=\s*currentLabel\(restoreStatus\)\s*,\s*now\.hasPrefix\("Restore complete\."\)/.test(postLoop)
       && code.slice(settledCall).includes('Coach mode, 1 athlete')
       && code.slice(settledCall).includes('After Backup');
   };
   check(
-    'test4_backupToFilesAndRestore polls and dismisses late post-restore BUILD YOUR PROGRAM offers before settledLabel',
+    'test4_backupToFilesAndRestore keeps post-restore BUILD YOUR PROGRAM offer handling active until restoreOfferHandled && Restore complete.',
     hasPostRestoreOfferLoop(test4Body),
   );
   const oneShotPostRestore = [
@@ -554,6 +571,31 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
   check(
     'falsifier: one-shot dismissSetUpOfferIfShown without a post-restore poll loop fails the restore race contract',
     !hasPostRestoreOfferLoop(oneShotPostRestore),
+  );
+  const ungatedPostRestoreBreak = [
+    '    var restoreOfferHandled = false',
+    '    while Date().timeIntervalSince(restoreStart) < 900 {',
+    '      restoreOfferHandled = true',
+    '      sleep(2)',
+    '    }',
+    '    let postRestoreDeadline = Date().addingTimeInterval(60)',
+    '    while Date() < postRestoreDeadline {',
+    '      if (try? element("Create program").snapshot()) != nil && (try? element("Cancel").snapshot()) != nil {',
+    '        dismissSetUpOfferIfShown("after the restore")',
+    '        restoreOfferHandled = true',
+    '        openProfile()',
+    '        continue',
+    '      }',
+    '      if let now = currentLabel(restoreStatus), now.hasPrefix("Restore complete.") { break }',
+    '      usleep(500_000)',
+    '    }',
+    '    settledLabel(restoreStatus, beginsWith: "Restore complete.", "status after restore", timeout: 60)',
+    '    Coach mode, 1 athlete',
+    '    After Backup',
+  ].join('\n');
+  check(
+    'falsifier: breaking post-restore offer polling on Restore complete. before restoreOfferHandled fails the restore race contract',
+    !hasPostRestoreOfferLoop(ungatedPostRestoreBreak),
   );
 }
 

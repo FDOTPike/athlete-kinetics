@@ -887,6 +887,7 @@ final class AthleteKineticsUITests: XCTestCase {
     let restoreStatus = element("backup-status-message")
     let restoreStart = Date()
     var lastRestoreStatus = ""
+    var restoreOfferHandled = false
     while Date().timeIntervalSince(restoreStart) < 900 {
       // The restore reopens the app on the restored active athlete; without a
       // program that athlete is offered set-up, which covers the Profile.
@@ -895,6 +896,7 @@ final class AthleteKineticsUITests: XCTestCase {
       if (try? element("Cancel").snapshot()) != nil && (try? element("Create program").snapshot()) != nil {
         log("restore t=\(Int(Date().timeIntervalSince(restoreStart)))s: set-up offered for the restored athlete; cancelled")
         element("Cancel").tap()
+        restoreOfferHandled = true
         openProfile()
         continue
       }
@@ -909,14 +911,18 @@ final class AthleteKineticsUITests: XCTestCase {
       if (now.hasPrefix("Restore ") && !now.hasPrefix("Restore cancelled")) || now.hasPrefix("A restored database") { break }
       sleep(2)
     }
+    // confirmRestore publishes "Restore complete." in backupStore before its
+    // finally block calls restartStoreAfterRestore() to boot the restored
+    // athlete, so wait for both the offer dismissal and the completion label.
     let postRestoreDeadline = Date().addingTimeInterval(60)
     while Date() < postRestoreDeadline {
       if (try? element("Create program").snapshot()) != nil && (try? element("Cancel").snapshot()) != nil {
         dismissSetUpOfferIfShown("after the restore")
+        restoreOfferHandled = true
         openProfile()
         continue
       }
-      if let now = currentLabel(restoreStatus), now.hasPrefix("Restore complete.") { break }
+      if restoreOfferHandled, let now = currentLabel(restoreStatus), now.hasPrefix("Restore complete.") { break }
       usleep(500_000)
     }
     settledLabel(restoreStatus, beginsWith: "Restore complete.", "status after restore", timeout: 60)
