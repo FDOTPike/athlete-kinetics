@@ -48,7 +48,7 @@ const FOCUS_SPLIT_WORD: Record<BlockFocus, string> = {
   push: 'push',
   pull: 'pull',
   legs: 'legs',
-  accessories: 'accessories',
+  accessories: 'accessory',
   conditioning: 'conditioning',
   bjj: 'BJJ',
 };

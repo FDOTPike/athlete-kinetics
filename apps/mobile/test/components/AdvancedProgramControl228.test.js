@@ -9,8 +9,9 @@ import {
   authorizeAthleteDataBoot,
   resetDataMaintenanceLockForTests,
 } from '../../src/state/dataMaintenanceLock';
-import ProgramSetupScreen from '../../src/screens/ProgramSetupScreen';
+import ProgramSetupScreen, { chosenSplitText } from '../../src/screens/ProgramSetupScreen';
 import BlockScreen from '../../src/screens/BlockScreen';
+import { offPlanSessionName } from '../../src/state/offPlanStart';
 import { makeNodeSqliteDriver } from '../helpers/nodeSqliteOpDriver';
 
 let mockDrivers;
@@ -241,6 +242,10 @@ describe('#228 Phase 2 Advanced Athlete Control', () => {
 
     render(<BlockScreen />);
     expect(screen.getAllByText('ACC').length).toBeGreaterThan(0);
+
+    // #33 FOCUS_SPLIT_WORD + FOCUS_WORD for 'accessories' must use 'accessory'
+    expect(chosenSplitText('strength', ['accessories'])).toBe('1 accessory session a week, as you chose.');
+    expect(offPlanSessionName({ sessionDate: '2026-11-16', focus: 'accessories' })).toBe("Monday's accessory session");
   });
 
   test('longitudinal patternMrvSets wiring: coach-build clamps to MRV_p while Customize override > MRV_p shows exact note & keeps [1,10]', async () => {

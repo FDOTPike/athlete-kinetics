@@ -13252,7 +13252,7 @@ The appendix held the code around the read, every match for `0286` and "record o
 
 - **Q2 Extended Session Foci (`push`, `pull`, `legs`, `accessories`):**
   - Added `'push'`, `'pull'`, `'legs'`, and `'accessories'` to `BlockFocus`, `FOCUS_PATTERNS`, `FOCUS_SCOPE_SLOT`, `STRENGTH_FOCI` (`push`, `pull`, `legs`), and `emphasisDayForFocus` (`push`/`pull -> 'upper'`, `legs -> 'lower'`, `accessories -> 'full'`) in `packages/inference/src/blockGenerator.ts`.
-  - Updated `apps/mobile/src/screens/ProgramSetupScreen.tsx` to render focus chips via `sessionFocusName(focus)`, `apps/mobile/src/screens/BlockScreen.tsx` `FOCUS_ABBREV` (`PSH`, `PUL`, `LEG`, `ACC`), and `apps/mobile/src/state/offPlanStart.ts` `FOCUS_WORD`.
+  - Updated `apps/mobile/src/screens/ProgramSetupScreen.tsx` to render focus chips via `sessionFocusName(focus)` and map `FOCUS_SPLIT_WORD.accessories = 'accessory'`, `apps/mobile/src/screens/BlockScreen.tsx` `FOCUS_ABBREV` (`PSH`, `PUL`, `LEG`, `ACC`), and `apps/mobile/src/state/offPlanStart.ts` `FOCUS_WORD` (`accessories: 'accessory'`).
 - **Q3 Explicit Fixed `Mon–Sun` ISO Weekdays (`1 = Mon .. 7 = Sun`):**
   - Defaulted `generateBlock` `scheduleMode` to `'iso_weekday'`, mapping each selected ISO weekday chronologically within each 7-day block week (`offsetInWeek = (isoWeekday - startIsoWeekday + 7) % 7`) and keeping `'relative_day_index'` fallback for pre-078 stored programs.
   - Updated `ProgramSetupScreen.tsx` `3. Training days` to fixed `Mon`–`Sun` chips with exact caption `"Choose the days of the week you train. Your schedule repeats every week."`, and updated `BlockScreen.weekRowsFor` to align week grid cells by calendar `sessionDate`.
@@ -13264,6 +13264,6 @@ The appendix held the code around the read, every match for `0286` and "record o
 - **Additive Schema Migration `078_advanced_program_control.sql`:**
   - Added six `STRICT` additive side-car tables (`training_program_day_focus_ext`, `planned_session_focus_ext`, `training_program_schedule_mode`, `training_program_slot_override`, `training_program_day_routine`, `planned_slot_athlete_override`) with `078` shared persistence helper (`writeProgramAdvancedControl`, `mapBaseProgramFocus`) across `packages/core-db/` (`ordinal: 77`, `userVersion: 77`, `migrationSlot: 78`).
 - **Verification Scope (`EVIDENCE CAPTURED`):**
-  - Fail-first (`pr228_fail_first.txt`, `pr228_fail_first_db_and_jest.txt`, `pr228_fail_first_migrations.txt`), guard-break/restore (`pr228_guard_break.txt`, `pr228_guard_restored.txt`), and post-edit `npm run typecheck` + `npm run verify:ci` (`pr228_verify_ci.txt`) captured outside git working tree.
+  - Fail-first (`pr228_fail_first.txt`, `pr228_fail_first_db_and_jest.txt`, `pr228_fail_first_migrations.txt`, `pr228_fail_first_split_word.txt`), guard-break/restore (`pr228_guard_break.txt`, `pr228_guard_restored.txt`), and post-edit `npm run typecheck` + `npm run verify:ci` (`pr228_verify_ci.txt`, `pr228_verify_ci_final.txt`) captured outside git working tree.
   - Note: Entry `0304` leaves `0303` available for sibling concurrent branch `#208` / PR `#366`, and migration slot `078` will be reconciled if PR `#366` merges to base prior to `#228`.
 

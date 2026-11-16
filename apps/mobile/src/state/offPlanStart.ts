@@ -45,7 +45,7 @@ const FOCUS_WORD: Readonly<Record<string, string>> = {
   push: 'push',
   pull: 'pull',
   legs: 'legs',
-  accessories: 'accessories',
+  accessories: 'accessory',
   conditioning: 'conditioning',
   bjj: 'BJJ',
 };
