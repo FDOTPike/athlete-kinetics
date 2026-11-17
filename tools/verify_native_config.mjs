@@ -373,7 +373,7 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
       /\.\.\.\(\s*(\w+)\s*\?\s*\[([^\]]*)\]\s*:\s*\[\s*\]\s*\)/g,
       (_, flag, inner) => (Object.hasOwn(flags, flag) ? (flags[flag] ? inner : '') : `...(${flag}?...)`),
     );
-    if (resolved.includes('...(') || resolved.includes('?')) return null;
+    if (resolved.includes('...') || resolved.includes('?')) return null;
     return [...resolved.matchAll(/'([a-z_]+)'/g)].map((m) => m[1]);
   };
   const computeOnboardingContract = (typesSource, onboardingSource) => {
@@ -445,6 +445,190 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
       && poisonedSportContract.expectedOnboardingSteps === null
       && poisonedTargetContract.wantsTarget === null
       && poisonedTargetContract.expectedOnboardingSteps === null,
+  );
+  const bareSpreadOnboarding = onboardingSrc.replace(
+    /const steps:\s*StepKey\[\]\s*=\s*useMemo\(\s*\(\)\s*=>\s*\[/,
+    'const steps: StepKey[] = useMemo(() => [\n      ...extraSteps,',
+  );
+  const poisonedSpreadContract = computeOnboardingContract(typesSrc, bareSpreadOnboarding);
+  check(
+    'falsifier: unresolved spread (...extraSteps) in onboarding steps parses as null and fails closed',
+    bareSpreadOnboarding !== onboardingSrc
+      && parseDefaultSteps("'welcome', ...extraSteps, 'limits'", { wantsSport: true, wantsTarget: true, asksMaxes: true }) === null
+      && poisonedSpreadContract.defaultSteps === null
+      && poisonedSpreadContract.expectedOnboardingSteps === null,
+  );
+  const stripSwiftComments = (src) => src.replace(/\/\*[\s\S]*?\*\/|^\s*\/\/.*$/gm, '');
+  const currentLabelBody = suite.match(/private func currentLabel\([\s\S]*?\n  \}/)?.[0] ?? '';
+  const settledLabelBody = suite.match(/private func settledLabel\([\s\S]*?\n  \}/)?.[0] ?? '';
+  const isSnapshotPollingSettledLabel = (src, labelHelperSrc = currentLabelBody) => {
+    const code = stripSwiftComments(src);
+    const helperCode = stripSwiftComments(labelHelperSrc);
+    return helperCode.includes('try? el.snapshot()')
+      && !/\.exists\b/.test(helperCode)
+      && code.includes('currentLabel(')
+      && /usleep\(\s*500_000\s*\)/.test(code)
+      && code.includes('Date() >= deadline')
+      && code.includes('lastLabel ?? "<absent>"')
+      && code.includes('XCTFail(')
+      && !/XCTWaiter|XCTNSPredicateExpectation|\.exists\b/.test(code);
+  };
+  check(
+    'settledLabel polls currentLabel via snapshot() instead of XCTWaiter/NSPredicate or blocking .exists',
+    isSnapshotPollingSettledLabel(settledLabelBody),
+  );
+  const waiterSettledLabel = [
+    'private func settledLabel(_ el: XCUIElement, beginsWith prefix: String, _ what: String, timeout: TimeInterval = 120) -> String {',
+    '  let done = NSPredicate(format: "label BEGINSWITH %@", prefix)',
+    '  let result = XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: done, object: el)], timeout: timeout)',
+    '  let label = el.exists ? el.label : "<absent>"',
+    '  if result != .completed { XCTFail("\\(what)") }',
+    '  return label',
+    '}',
+  ].join('\n');
+  check(
+    'falsifier: XCTWaiter-based settledLabel fails the snapshot-polling contract',
+    !isSnapshotPollingSettledLabel(waiterSettledLabel),
+  );
+  const hasSafeOnboardingTransition = (src) => {
+    const code = stripSwiftComments(src);
+    const startIdx = code.indexOf('"START TRAINING"');
+    if (startIdx === -1) return false;
+    const tail = code.slice(startIdx);
+    const firstTap = tail.indexOf('startBtn.tap()');
+    if (firstTap === -1) return false;
+    const preTap = tail.slice(0, firstTap);
+    const postTap = tail.slice(firstTap + 'startBtn.tap()'.length);
+    return !/\btap\("START TRAINING"\)/.test(tail)
+      && /reveal\(\s*startBtn\s*,\s*"START TRAINING"\s*\)/.test(preTap)
+      && /bringClear\(\s*startBtn\s*,\s*"START TRAINING"\s*\)/.test(preTap)
+      && !/waitForExistence\(\s*timeout:\s*8\s*\)/.test(postTap)
+      && /addingTimeInterval\(\s*60\s*\)/.test(postTap)
+      && /while\s+Date\(\)\s*<\s*\w+/.test(postTap)
+      && postTap.includes('(try? element("Create program").snapshot()) != nil')
+      && postTap.includes('(try? element("Cancel").snapshot()) != nil')
+      && postTap.includes('XCTAssertTrue(create.isEnabled')
+      && postTap.includes('START-TRAINING-RETRY')
+      && /startBtn\.isHittable/.test(postTap)
+      && /Date\(\)\.timeIntervalSince\(\w+\)\s*>=\s*5/.test(postTap)
+      && postTap.includes('(try? element("shell-primary-tabs").snapshot()) != nil')
+      && /offerHandled\s*\|\|\s*Date\(\)\.timeIntervalSince\(\w+\)\s*>=\s*8/.test(postTap)
+      && postTap.includes('XCTFail(');
+  };
+  check(
+    'completeOnboarding brings START TRAINING clear, retries if unmounted transition stalls, and handles late BUILD YOUR PROGRAM offers up to 60 s',
+    hasSafeOnboardingTransition(onboardingBody),
+  );
+  const staleStartOnboarding = [
+    '  tap("START TRAINING")',
+    '  let cancel = element("Cancel")',
+    '  if cancel.waitForExistence(timeout: 8) { cancel.tap() }',
+    '  wait(element("shell-primary-tabs"), "the primary tabs", timeout: 60)',
+  ].join('\n');
+  check(
+    'falsifier: bare tap("START TRAINING") with 8 s Cancel wait fails the onboarding transition contract',
+    !hasSafeOnboardingTransition(staleStartOnboarding),
+  );
+  const test4Body = suite.match(/func test4_backupToFilesAndRestore\([\s\S]*?\n  \}/)?.[0] ?? '';
+  const hasPostRestoreOfferLoop = (src) => {
+    const code = stripSwiftComments(src);
+    const loop900 = code.indexOf('Date().timeIntervalSince(restoreStart) < 900');
+    const settledCall = code.indexOf('settledLabel(restoreStatus, beginsWith: "Restore complete."');
+    if (loop900 === -1 || settledCall === -1 || settledCall <= loop900) return false;
+    const preLoop900 = code.slice(0, loop900);
+    const between = code.slice(loop900, settledCall);
+    const afterLoop900Start = between.indexOf('\n    }');
+    if (afterLoop900Start === -1) return false;
+    const insideLoop900 = between.slice(0, afterLoop900Start);
+    const postLoop = between.slice(afterLoop900Start);
+    const deadlineLoopIdx = postLoop.search(/while\s+Date\(\)\s*<\s*\w+/);
+    if (deadlineLoopIdx === -1) return false;
+    const afterDeadlineIdx = postLoop.indexOf('\n    }', deadlineLoopIdx);
+    if (afterDeadlineIdx === -1) return false;
+    const insidePostLoop = postLoop.slice(0, afterDeadlineIdx);
+    const afterDeadline = postLoop.slice(afterDeadlineIdx);
+    return /\bvar\s+restoreOfferHandled\s*=\s*false\b/.test(preLoop900)
+      && /\brestoreOfferHandled\s*=\s*true\b/.test(insideLoop900)
+      && /addingTimeInterval\(\s*60\s*\)/.test(insidePostLoop)
+      && /while\s+Date\(\)\s*<\s*\w+/.test(insidePostLoop)
+      && insidePostLoop.includes('(try? element("Create program").snapshot()) != nil')
+      && insidePostLoop.includes('(try? element("Cancel").snapshot()) != nil')
+      && insidePostLoop.includes('dismissSetUpOfferIfShown("after the restore")')
+      && /\brestoreOfferHandled\s*=\s*true\b/.test(insidePostLoop)
+      && insidePostLoop.includes('openProfile()')
+      && /if\s+restoreOfferHandled\s*,\s*let\s+now\s*=\s*currentLabel\(restoreStatus\)\s*,\s*now\.hasPrefix\("Restore complete\."\)/.test(insidePostLoop)
+      && !/\bif\s+let\s+now\s*=\s*currentLabel\(restoreStatus\)\s*,\s*now\.hasPrefix\("Restore complete\."\)/.test(insidePostLoop)
+      && /\bXCTAssertTrue\(\s*restoreOfferHandled\b/.test(afterDeadline)
+      && code.slice(settledCall).includes('Coach mode, 1 athlete')
+      && code.slice(settledCall).includes('After Backup');
+  };
+  check(
+    'test4_backupToFilesAndRestore keeps post-restore BUILD YOUR PROGRAM offer handling active until restoreOfferHandled && Restore complete. and fails closed at deadline',
+    hasPostRestoreOfferLoop(test4Body),
+  );
+  const oneShotPostRestore = [
+    '    while Date().timeIntervalSince(restoreStart) < 900 {',
+    '      sleep(2)',
+    '    }',
+    '    dismissSetUpOfferIfShown("after the restore")',
+    '    settledLabel(restoreStatus, beginsWith: "Restore complete.", "status after restore", timeout: 60)',
+    '    Coach mode, 1 athlete',
+    '    After Backup',
+  ].join('\n');
+  check(
+    'falsifier: one-shot dismissSetUpOfferIfShown without a post-restore poll loop fails the restore race contract',
+    !hasPostRestoreOfferLoop(oneShotPostRestore),
+  );
+  const ungatedPostRestoreBreak = [
+    '    var restoreOfferHandled = false',
+    '    while Date().timeIntervalSince(restoreStart) < 900 {',
+    '      restoreOfferHandled = true',
+    '      sleep(2)',
+    '    }',
+    '    let postRestoreDeadline = Date().addingTimeInterval(60)',
+    '    while Date() < postRestoreDeadline {',
+    '      if (try? element("Create program").snapshot()) != nil && (try? element("Cancel").snapshot()) != nil {',
+    '        dismissSetUpOfferIfShown("after the restore")',
+    '        restoreOfferHandled = true',
+    '        openProfile()',
+    '        continue',
+    '      }',
+    '      if let now = currentLabel(restoreStatus), now.hasPrefix("Restore complete.") { break }',
+    '      usleep(500_000)',
+    '    }',
+    '    XCTAssertTrue(restoreOfferHandled, "the restored athlete\'s set-up offer was not handled before the 60 s post-restore deadline")',
+    '    settledLabel(restoreStatus, beginsWith: "Restore complete.", "status after restore", timeout: 60)',
+    '    Coach mode, 1 athlete',
+    '    After Backup',
+  ].join('\n');
+  check(
+    'falsifier: breaking post-restore offer polling on Restore complete. before restoreOfferHandled fails the restore race contract',
+    !hasPostRestoreOfferLoop(ungatedPostRestoreBreak),
+  );
+  const silentDeadlineExitPostRestore = [
+    '    var restoreOfferHandled = false',
+    '    while Date().timeIntervalSince(restoreStart) < 900 {',
+    '      restoreOfferHandled = true',
+    '      sleep(2)',
+    '    }',
+    '    let postRestoreDeadline = Date().addingTimeInterval(60)',
+    '    while Date() < postRestoreDeadline {',
+    '      if (try? element("Create program").snapshot()) != nil && (try? element("Cancel").snapshot()) != nil {',
+    '        dismissSetUpOfferIfShown("after the restore")',
+    '        restoreOfferHandled = true',
+    '        openProfile()',
+    '        continue',
+    '      }',
+    '      if restoreOfferHandled, let now = currentLabel(restoreStatus), now.hasPrefix("Restore complete.") { break }',
+    '      usleep(500_000)',
+    '    }',
+    '    settledLabel(restoreStatus, beginsWith: "Restore complete.", "status after restore", timeout: 60)',
+    '    Coach mode, 1 athlete',
+    '    After Backup',
+  ].join('\n');
+  check(
+    'falsifier: silently exiting the 60 s post-restore loop with restoreOfferHandled == false fails the restore race contract',
+    !hasPostRestoreOfferLoop(silentDeadlineExitPostRestore),
   );
 }
 
