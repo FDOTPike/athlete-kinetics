@@ -13229,3 +13229,38 @@ The appendix held the code around the read, every match for `0286` and "record o
 - Guard-break/restore (`stagea_guard_break.txt`): verified fail-on-break (`EXIT=1`) and byte-for-byte SHA-256 restore (`sha256 verified identical=true`, `EXIT=0`) across `#352`, `#354`, and `#351`.
 - Parity & full CI after final code/test edits (`stagea_verify_ci.txt`): `Question routing parity: 196/196 identical outcomes (lab c6cbef87435d0cfb9570cff1dc054c00d79d347c); sealed guard active.` (`PARITY_EXIT=0`), `verify:store SQL — 810/810 checks green`, routine templates checks (`16/16` green, `0 failed`), Jest `248/248` suites / `6815/6815` checks green (`VERIFY_CI_EXIT=0`).
 - **Branch:** `fix/android-351-358-stagea-rulings` stacked on `40c4dba9` (`fix/android-271-298-226-140-297-remaining-rulings`).
+## Entry 0301 — 2026-11-14 · Stage B Phase 1 (`WO-LONG-ENGINE-01`): V1 9-Month Longitudinal Autopilot Overlay
+
+**Status:** EVIDENCE CAPTURED (pure inference overlay + verification suite); NOT VERIFIED — production parameter tuple ratification pending empirical simulation artifact (`bench-longitudinal/results.json` absent on disk).
+
+### Summary
+
+- Implemented `packages/inference/src/longitudinalAutopilot.ts` and exported its public contract from `packages/inference/src/index.ts`:
+  - **Explicit Policy Gate (`LongitudinalAutopilotPolicy`):** Follows `completionAction.ts` by embedding zero module-level candidate threshold defaults (`kTrigger`, `swapWindowBlocks`, `mCadence`, `mClean`, `completionPolicy`); `null` or invalid policy fails closed to a neutral overlay (`policyApplied: false`).
+  - **Mechanism 1 (Cross-Block `073` Swap + Joint-Discomfort Memory):** Evaluates trailing `swapWindowBlocks` completed blocks, promoting a movement to `MOVEMENT_PREFERENCE.AVOID` (`-1`) and selecting its deterministic Layer 1 green regression (`selectSubstitution` wrapping `computeSubstitutions`) when joint-coupled swap/discomfort triggers reach `kTrigger`, while excluding `cause === 'equipment_busy'`, `matched_phrase_entry_id === 'equipment-improvised'`, `preference`, and `time`.
+  - **Mechanism 2 (Bounded Per-Pattern `MRV_p` in `[1, 10]` & Week-3 Cadence Modulator):** Bounds working-set ceilings strictly inside `[1, 10]` on working weeks, engages `-1` Week-3 working-set trim after `mCadence` consecutive Week-3 overreach blocks (reading policy observation-day floors rather than any literal), holds across neutral/interrupted blocks, preserves Week 4 deload and recovery sessions untouched across `MRV_p`, Week-3 trim, and substitutions, recomputes `BlockPlan.timeBudget` under `sessionTimeBudget` after projection, and steps back up by `+1` only after `mClean` consecutive clean `latent_headroom` blocks.
+  - **Boundary Clamps, Halt Propagation & Side-Channel Isolation:** Propagates `haltAdvised` fail-closed onto `LongitudinalAutopilotResult` (refusing non-recovery `BlockPlan` projection while `haltAdvised` is set), counts each historical macrocycle RPE boundary grant once at the block that applied it, enforces beginner `dLoad_p <= 1.0`, macrocycle positive RPE raise ceiling (`<= 2.5` across positions `1..8`, `0.0` in `6..8`, `0.0` under open suspension, clean rollover at Macrocycle 2 position `1`), and byte-identical date-axis-aligned isolation from `acwr`, `072_question_log`, and KineStrike `ks_*` descriptive fields.
+- Added fail-first verification suite `packages/inference/test/verify_longitudinal_autopilot.mjs` (`21` checks) and wired it into `build:inference-test` and `verify:autopilot` in `package.json`.
+- **Branch:** `feat/v1-longitudinal-engine`.
+
+
+## Entry 0302 — 2026-11-16 · PR #359 Ruling Group 1 (`1.1` / `1.2` / `1.3`) & CodeRabbit Review Resolutions
+
+**Executor:** longitudinal engine implementation stream (`feat/v1-longitudinal-engine` -> `claude/beta-question-box-2026-10-28`).
+
+### Ratified Changes Implemented
+
+- **Ruling 1.1 (`DEFAULT_LONGITUDINAL_AUTOPILOT_POLICY` & `CompletionActionPolicy`):**
+  - Exported frozen `DEFAULT_LONGITUDINAL_AUTOPILOT_POLICY` from `packages/inference/src/longitudinalAutopilot.ts` and `packages/inference/src/index.ts` matching `{ kTrigger: 2, swapWindowBlocks: 3, mCadence: 2, mClean: 2, week3CompletionMinObservationDays: 2, completionPolicy: { minObservationDays: 5, deficitThreshold: 0.2, strongThreshold: 0.4, moderateSetReduction: -1, strongSetReduction: -2, strongLoadFactor: 0.95 } }`, while preserving fail-closed `policyApplied: false` behavior for `null` or invalid explicit `policy`.
+  - Extended `CompletionActionPolicy` (`packages/inference/src/completionAction.ts`) with optional `moderateSetReduction`, `strongSetReduction` (`-2 | -1 | 0`), and `strongLoadFactor` (`0 < x <= 1`) validated by exported `isValidCompletionActionPolicy`, preserving `-1` defaults when omitted and applying `-2` when supplied; widened `composeBlockBoundaryAction` `dSet_p` clamp from `[-1, 1]` to `[-2, 1]` (matching `SET_MODIFIER_LITERALS`).
+- **Ruling 1.2 (CodeRabbit thread `4565142005`):**
+  - Bounded `week3CompletionMinObservationDays` validation in `isValidLongitudinalAutopilotPolicy` to integers in `1..7` (`default: 2`), separating 7-day Week-3 overreach evaluation from 21-day `completionPolicy.minObservationDays` (`5`).
+- **Ruling 1.3 (CodeRabbit thread `4565142044`):**
+  - In `evaluateLongitudinalAutopilot`, resolved joints from `upcomingBlockNiggles` in `[triageMin, haltMin)` (`resolveUpcomingTriageJoints` using `JOINTS`) and clamped positive progression (`dLoad_p > 1.0 -> 1.0`, `dSet_p > 0 -> 0`, `dRpe_p > 0 -> 0`, `prefBias_p > 0 -> 0`) on patterns whose `PATTERN_JOINTS[p]` includes an affected joint (`clampActionForUpcomingNiggles`), recomputing `blockAddedSets`, `blockAddedRpe`, and `cumulativeMacrocycleRpeGranted` while leaving existing 21-day negative reductions intact without double negative pull-down.
+- **CodeRabbit `4c5c5b73` time-budget findings (`4566068336`, `4566068346` inside `longitudinalAutopilot.ts`):**
+  - `4566068336`: Marked `preserved = deloadSession || blockPlan.recovery` sessions non-trimmable (`trimmable: !locomotion && !preserved`) inside `applyLongitudinalOverlayToBlockPlan`.
+  - `4566068346`: Added optional `readonly blockInput?: BlockInput` to `ApplyLongitudinalOverlayOptions` and replaced unverified duration-only offers with `verifiedOverlayAlternatives` (`generateBlock` + `applyLongitudinalOverlayToBlockPlan(..., { ...options, blockInput: undefined })` checking `timeBudget.conflicts.length === 0`, or failing closed to `[]` when `blockInput` is absent).
+- **Evidence Capture (`EVIDENCE CAPTURED`):**
+  - Fail-first run recorded prior to `src/` edits (`pr359_fail_first.txt`: `COMPLETION_EXIT=1`, `3 COMPLETION ACTION CHECK(S) FAILED`; `LONGITUDINAL_EXIT=1`, `7 LONGITUDINAL AUTOPILOT CHECK(S) FAILED`).
+  - Guard break/restore demonstration recorded (`pr359_guard_break.txt`: `GUARD_BREAK_EXIT=1`, `3 LONGITUDINAL AUTOPILOT CHECK(S) FAILED`), followed by full restoration in `packages/inference/src/longitudinalAutopilot.ts`.
+  - Targeted unit/module suites verified green (`verify_completion_action.mjs` and `verify_longitudinal_autopilot.mjs`: `ALL 24 LONGITUDINAL AUTOPILOT CHECKS VERIFIED`), with final CI run (`npm run verify:ci`) executed after final edits.
