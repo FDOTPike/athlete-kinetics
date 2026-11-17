@@ -49,6 +49,9 @@ const CATEGORY_CHIPS: readonly { readonly id: FilterCategory; readonly label: st
   { id: 'general', label: 'GENERAL' },
 ];
 
+const categoryChipLabel = (id: FilterCategory): string =>
+  CATEGORY_CHIPS.find((chip) => chip.id === id)?.label ?? id.toUpperCase();
+
 export default function GlossaryScreen({ onClose }: GlossaryScreenProps): React.JSX.Element {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<FilterCategory>('all');
@@ -145,7 +148,7 @@ export default function GlossaryScreen({ onClose }: GlossaryScreenProps): React.
         <View style={styles.emptyContainer} testID="glossary-empty-state">
           <Text style={styles.emptyTitle}>No matching terms found</Text>
           <Text style={styles.emptyDetail}>
-            No entries match &ldquo;{searchQuery}&rdquo; in {activeCategory === 'all' ? 'the glossary' : activeCategory}. Try a different search query or select another category.
+            No entries match &ldquo;{searchQuery}&rdquo; in {activeCategory === 'all' ? 'the glossary' : categoryChipLabel(activeCategory)}. Try a different search query or select another category.
           </Text>
         </View>
       ) : (
@@ -155,7 +158,7 @@ export default function GlossaryScreen({ onClose }: GlossaryScreenProps): React.
               <View style={styles.cardHeader}>
                 <Text style={styles.termTitle}>{glossaryTitle(entry)}</Text>
                 <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{entry.category.toUpperCase()}</Text>
+                  <Text style={styles.badgeText}>{categoryChipLabel(entry.category)}</Text>
                 </View>
               </View>
               <Text style={styles.definitionText}>{entry.definition}</Text>

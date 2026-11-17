@@ -47,9 +47,14 @@ const topBox = () => {
   const card = within(screen.getByTestId('program-recommendation-card'));
   return card.getByTestId('program-choice-disclosure').props.children;
 };
+const topHeading = () => {
+  const card = within(screen.getByTestId('program-recommendation-card'));
+  return card.getByTestId('program-recommendation-heading').props.children;
+};
 
-test('with nothing changed, the top box shows the recommended defaults', () => {
+test('with nothing changed, the top box shows the recommended defaults and coach heading', () => {
   render(<ProgramSetupScreen />);
+  expect(topHeading()).toBe('What the coach has picked for you');
   expect(topBox()).toBe(recommendedProgramDefaults(mockState.profile).disclosure);
   // Pinned to the approved default sentence, not only to the shared builder.
   expect(topBox()).toBe('Coach picks the movements, on a linear progression, with a review after 12 weeks (3 four-week blocks). Change any of it below.');
@@ -58,20 +63,30 @@ test('with nothing changed, the top box shows the recommended defaults', () => {
 test.each([
   ['Undulating', 'undulating'],
   ['Autoregulated', 'autoregulated'],
-])('after choosing %s, the top box names it and no longer says linear', (chip, word) => {
+])('after choosing %s, the top box names it, no longer says linear, and switches the heading (#271)', (chip, word) => {
   render(<ProgramSetupScreen />);
   openAdvanced();
   fireEvent.press(screen.getByText(chip));
+  expect(topHeading()).toBe('Your program choices');
   expect(topBox()).toContain(word);
   expect(topBox()).not.toMatch(/linear/i);
 });
 
-test('after changing the review length to 8 weeks, the top box says 8 weeks', () => {
+test('after changing the review length to 8 weeks, the top box says 8 weeks and switches the heading (#271)', () => {
   render(<ProgramSetupScreen />);
   openAdvanced();
   fireEvent.press(screen.getByText('8 wk'));
+  expect(topHeading()).toBe('Your program choices');
   expect(topBox()).toContain('8 weeks');
   expect(topBox()).not.toContain('12 weeks');
+});
+
+test('when Date is chosen and no date is typed yet, the top box already discloses four-week block rounding (#271)', () => {
+  render(<ProgramSetupScreen />);
+  openAdvanced();
+  fireEvent.press(screen.getByText('Date'));
+  expect(topHeading()).toBe('Your program choices');
+  expect(topBox()).toBe('Coach picks the movements, on a linear progression, with a review around the date you enter (rounded up to whole four-week blocks). Change any of it below.');
 });
 
 test('after entering a date horizon, the top box uses the trimmed date', () => {
@@ -83,9 +98,10 @@ test('after entering a date horizon, the top box uses the trimmed date', () => {
   expect(topBox()).not.toContain('around  2026-12-01  (');
 });
 
-test('choosing Customize says the athlete picks the movements', () => {
+test('choosing Customize says the athlete picks the movements and switches the heading (#271)', () => {
   render(<ProgramSetupScreen />);
   openAdvanced();
   fireEvent.press(screen.getByText('Customize'));
+  expect(topHeading()).toBe('Your program choices');
   expect(topBox()).toMatch(/^You pick the movements/);
 });

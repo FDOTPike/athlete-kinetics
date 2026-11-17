@@ -88,7 +88,9 @@ export const programChoiceDisclosure = (choices: ProgramChoices): string => {
   const article = /^[aeiou]/.test(method) ? 'an' : 'a';
   const date = choices.reviewDate?.trim() ?? '';
   const review = choices.horizonKind === 'date'
-    ? (date === '' ? 'with a review on the date you enter' : `with a review around ${date} (rounded up to whole four-week blocks)`)
+    ? (date === ''
+      ? 'with a review around the date you enter (rounded up to whole four-week blocks)'
+      : `with a review around ${date} (rounded up to whole four-week blocks)`)
     : `with a review after ${choices.blockCount * 4} weeks (${choices.blockCount} four-week block${choices.blockCount === 1 ? '' : 's'})`;
   return `${who}, on ${article} ${method} progression, ${review}. Change any of it below.`;
 };

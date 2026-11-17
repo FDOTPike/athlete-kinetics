@@ -342,4 +342,19 @@ describe('2026-11-05 Glossary Rulings (#285)', () => {
       'A planned easy week. Sets drop and the RPE cap comes down so you absorb the block instead of digging a hole.'
     );
   });
+
+  test('category chips, card badges, and empty-state text use the same plural chip labels (#151)', () => {
+    const { getByLabelText, getByPlaceholderText, getByText, getAllByText } = render(<GlossaryScreen />);
+    // Card badges use plural chip labels (PATTERNS, METRICS, GOALS, ROLES) rather than singular category ids.
+    expect(getAllByText('METRICS').length).toBeGreaterThan(1);
+    expect(getAllByText('GOALS').length).toBeGreaterThan(1);
+    expect(getAllByText('PATTERNS').length).toBeGreaterThan(1);
+    expect(getAllByText('ROLES').length).toBeGreaterThan(1);
+
+    fireEvent.press(getByLabelText('Filter category: GOALS'));
+    fireEvent.changeText(getByPlaceholderText(/search/i), 'readiness');
+    expect(
+      getByText('No entries match “readiness” in GOALS. Try a different search query or select another category.')
+    ).toBeOnTheScreen();
+  });
 });
