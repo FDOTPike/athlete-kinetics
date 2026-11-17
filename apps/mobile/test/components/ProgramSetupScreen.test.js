@@ -401,8 +401,8 @@ test('custom week-one rows use the middle dot between day number and focus', () 
   fireEvent.press(screen.getByText('Customize'));
 
   // The literal separator is U+00B7 MIDDLE DOT, never '?'.
-  expect(screen.getAllByText(/Day \d+ · /).length).toBeGreaterThan(0);
-  expect(screen.queryByText(/Day \d+ \? /)).toBeNull();
+  expect(screen.getAllByText(/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) · /).length).toBeGreaterThan(0);
+  expect(screen.queryByText(/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) \? /)).toBeNull();
 });
 
 // ---------------------------------------------------------------------------

@@ -538,7 +538,7 @@ check('AK_HISTORY_V1.md template parses with zero errors', () => {
 
   check('the acceptance database is the real 001-078 chain, not a trimmed subset', () => {
     assert.equal(fullChain[0], '001_mechanical_input.sql');
-    assert.equal(fullChain[fullChain.length - 1], '080_sport_peaking_and_lifting_taxonomy.sql');
+    assert.equal(fullChain[fullChain.length - 1], '081_advanced_program_control.sql');
     assert.equal(fullChain.length, 77, `applied ${fullChain.length} migrations`);
     assert.equal(Number(db.prepare('SELECT COUNT(*) AS c FROM movement').get().c), 300);
   });

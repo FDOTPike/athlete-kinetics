@@ -55,6 +55,11 @@ SportIds (adding `olympic_weightlifting` and `strongman`) and 0..52
 `matches_per_week` for lifting sports, creates seeded `sport_peaking_movement`,
 and adds `planned_slot_backoff`, `session_slot_backoff`,
 `training_program_meet_countdown`, and `training_block_meet_meta`.
+The thirteenth is `081_advanced_program_control` (ordinal 80): adds the six Phase 2
+(`#228` + `A7`) side-car tables (`training_program_day_focus_ext`,
+`planned_session_focus_ext`, `training_program_schedule_mode`,
+`training_program_slot_override`, `training_program_day_routine`, and
+`planned_slot_athlete_override`).
 `MIGRATION_LINEAGE.json` records the SHA-256 of every shipped file and its
 ordinal, and of master's 34-entry chain. Master's exact `034`/`058` bytes and its
 registry live under `test/fixtures/lineage/master-1da218d/`.

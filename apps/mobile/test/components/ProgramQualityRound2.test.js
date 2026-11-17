@@ -236,8 +236,8 @@ describe('Round 2: ProgramSetupScreen power explanation, capacity law, progressi
     fireEvent.press(screen.getByText('Coach build'));
     fireEvent.press(screen.getByText('Duration'));
     fireEvent.press(screen.getByText('4 wk'));
-    fireEvent.press(screen.getAllByText('Day 2, Wednesday')[0]);
-    fireEvent.press(screen.getAllByText('Day 6, Sunday')[0]);
+    fireEvent.press(screen.getAllByText('Tue')[0]);
+    fireEvent.press(screen.getAllByText('Sat')[0]);
     const shaped = strengthAnchorCapacity(
       mockState.profile, programFocuses, defaultProgramDayIndices,
       [{ dayIndex: 1, focus: 'lower' }, { dayIndex: 4, focus: 'lower' }],
@@ -253,8 +253,8 @@ describe('Round 2: ProgramSetupScreen power explanation, capacity law, progressi
     // Simulated edits: with two lower days, changing either day's focus to
     // upper (or full) covers all three roles — both are real fixes.
     const fixLine = screen.getByTestId('capacity-focus-fixes').props.children.join('');
-    expect(fixLine).toContain("set Day 1, Tuesday's focus to upper");
-    expect(fixLine).toContain("set Day 4, Friday's focus to upper");
+    expect(fixLine).toContain("set Mon's focus to Upper");
+    expect(fixLine).toContain("set Thu's focus to Upper");
     // No stale/conflicting copy (Round 6 removals).
     expect(screen.queryByText(/Not enough training days for the big three/)).toBeNull();
     expect(screen.queryByText(/Easiest fix/)).toBeNull();
@@ -279,14 +279,14 @@ describe('Round 2: ProgramSetupScreen power explanation, capacity law, progressi
     fireEvent.press(screen.getByText('Coach build'));
     fireEvent.press(screen.getByText('Duration'));
     fireEvent.press(screen.getByText('4 wk'));
-    fireEvent.press(screen.getAllByText('Day 2, Wednesday')[0]);
-    fireEvent.press(screen.getAllByText('Day 6, Sunday')[0]);
+    fireEvent.press(screen.getAllByText('Tue')[0]);
+    fireEvent.press(screen.getAllByText('Sat')[0]);
     // 60 min -> budget 3; lower menu [squat, hinge, lunge] keeps both anchor
     // roles, so the draft covers squat+hinge (2). Changing a day to upper
     // adds push_h -> 3 roles: the fix IS claimable.
     expect(screen.getByTestId('strength-capacity-warning')).toBeOnTheScreen();
     const fixLine = screen.getByTestId('capacity-focus-fixes').props.children.join('');
-    expect(fixLine).toContain("set Day 1, Tuesday's focus to upper");
+    expect(fixLine).toContain("set Mon's focus to Upper");
     expect(screen.queryByTestId('capacity-day-fix')).toBeNull();
   });
 
@@ -298,14 +298,12 @@ describe('Round 2: ProgramSetupScreen power explanation, capacity law, progressi
     fireEvent.press(screen.getByText('Coach build'));
     fireEvent.press(screen.getByText('Duration'));
     fireEvent.press(screen.getByText('4 wk'));
-    // The directive's scenario: ONE 15-minute lower day (drop Tomorrow,
-    // Day 4, Day 6). No single-focus day carries all three roles at a
-    // 2-slot budget, so NO focus-only edit is claimed; the advice is to
-    // add a day. (With TWO lower days an upper swap does fix it — covered
-    // by the 60-minute case above.)
-    fireEvent.press(screen.getAllByText('Day 2, Wednesday')[0]);
-    fireEvent.press(screen.getAllByText('Day 4, Friday')[0]);
-    fireEvent.press(screen.getAllByText('Day 6, Sunday')[0]);
+    // The directive's scenario: ONE 15-minute lower day (drop Tue, Thu, Sat).
+    // No single-focus day carries all three roles at a 2-slot budget, so NO
+    // focus-only edit is claimed; the advice is to add a day.
+    fireEvent.press(screen.getAllByText('Tue')[0]);
+    fireEvent.press(screen.getAllByText('Thu')[0]);
+    fireEvent.press(screen.getAllByText('Sat')[0]);
     expect(screen.getByTestId('strength-capacity-warning')).toBeOnTheScreen();
     expect(screen.queryByTestId('capacity-focus-fixes')).toBeNull();
     expect(screen.getByTestId('capacity-day-fix').props.children.join(''))
@@ -364,14 +362,13 @@ describe('Round 2: ProgramSetupScreen power explanation, capacity law, progressi
   });
 });
 
-// #228: relative days carry their weekday names; Day 1 is the day a new
-// program starts (today), and a saved program's days stay numbered.
+// #228 Q3: explicit Mon–Sun ISO weekday labels (1 = Mon .. 7 = Sun).
 describe('#228 weekday labels', () => {
   const { programDayLabel } = require('../../src/screens/ProgramSetupScreen');
-  test('Day 1 is today with its weekday; the week wraps', () => {
-    expect(programDayLabel(1, '2026-11-07')).toBe('Day 1, Saturday');
-    expect(programDayLabel(2, '2026-11-07')).toBe('Day 2, Sunday');
-    expect(programDayLabel(7, '2026-11-07')).toBe('Day 7, Friday');
-    expect(programDayLabel(3, null)).toBe('Day 3');
+  test('ISO weekdays map 1..7 directly to Mon..Sun', () => {
+    expect(programDayLabel(1, '2026-11-07')).toBe('Mon');
+    expect(programDayLabel(2, '2026-11-07')).toBe('Tue');
+    expect(programDayLabel(7, '2026-11-07')).toBe('Sun');
+    expect(programDayLabel(3, null)).toBe('Wed');
   });
 });

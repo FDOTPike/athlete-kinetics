@@ -35,7 +35,7 @@
  *     and equipment/safety remain outer gates upstream in the resolver.
  */
 import type { SportId } from './sportProfile';
-import type { DifficultyRating, MacroPhase, MovementPattern, MovementPrefix, Objective, SchemaType, UserProfile } from './types';
+import type { DifficultyRating, MacroPhase, MovementPattern, MovementPrefix, Objective, SchemaType, TrainingAge, UserProfile } from './types';
 import { EXPERIENCE_SEVERITY } from './types';
 import { isDifficultyAllowed, type ExecutableMovementAccessContext } from './tierPolicy';
 // W3 (program-quality work order): the pure, deterministic movement-ranking
@@ -185,8 +185,39 @@ export const isLoadedForSpacing = (m: GeneratorMovement): boolean =>
     ? m.plannedImplement !== 'Bodyweight'
     : m.bodyweightSupported !== true;
 
-export type BlockFocus = 'lower' | 'upper' | 'full' | 'conditioning' | 'bjj';
+export type BlockFocus =
+  | 'lower'
+  | 'upper'
+  | 'full'
+  | 'push'
+  | 'pull'
+  | 'legs'
+  | 'accessories'
+  | 'conditioning'
+  | 'bjj';
 export type BlockPhase = 'accumulation' | 'intensification' | 'realization' | 'deload';
+export type ProgramScheduleMode = 'iso_weekday' | 'relative_day_index';
+
+/** Ratified non-blocking coach notes & tier intro caps (#228 Q1 + #53). */
+export const INTRO_WEEK_SESSIONS_BY_AGE: Record<TrainingAge, number> = {
+  beginner: 2,
+  intermediate: 3,
+  advanced: 4,
+  elite: 5,
+};
+
+export const INTRODUCTORY_WEEK1_NOTE =
+  'Week 1 is an introductory week with lighter volume to gauge your work capacity before stepping up in Weeks 2 and 3.';
+
+export const mrvCeilingNote = (mrvSets: number): string =>
+  `Above your recent recovery ceiling of ${mrvSets} sets.`;
+
+export interface PlannedSlotAthleteOverrideMeta {
+  source: 'slot_override' | 'routine_assignment';
+  mrv_ceiling_sets: number | null;
+  above_mrv: boolean;
+  sets_frozen?: boolean;
+}
 
 /** The executable access context a scheduled day runs in. Conditioning and BJJ
  *  are sport/performance work: that context intentionally carries NO
@@ -226,6 +257,8 @@ export interface PlannedSlotPlan {
   autopilotDelta?: AutopilotSlotDelta;
   /** Phase 2 (#219/#229): back-off set prescription following Set 1 top set. */
   backOff?: PlannedSlotBackOff;
+  /** Phase 2 (#228): athlete Customize / routine override freeze provenance. */
+  athleteOverride?: PlannedSlotAthleteOverrideMeta;
 }
 
 export type AutopilotSlotReason = 'eased' | 'raised' | 'held_safety';
@@ -299,6 +332,8 @@ export interface BlockPlan {
    *  what they could not change, in plain language. Present only when an
    *  emphasis was supplied. */
   emphasis?: EmphasisReport;
+  /** Non-blocking athlete-facing coach notes (#228 MRV ceiling / A7 intro week). */
+  coachNotes?: string[];
 }
 
 export interface ProgramMovementPreference {
@@ -307,10 +342,39 @@ export interface ProgramMovementPreference {
   movement_id: number;
 }
 
+export interface ProgramSlotOverride {
+  slot_index: number;
+  sets?: number | null;
+  reps?: number | null;
+  target_rpe?: number | null;
+}
+
+export interface ProgramRoutineSlotInput {
+  slot_index: number;
+  movement_id: number;
+  sets: number;
+  reps: number;
+  target_rpe: number;
+}
+
+export interface ProgramRoutineDayAssignment {
+  routine_template_id: number;
+  routine_day_index: number;
+  routine_name: string;
+  slots: readonly ProgramRoutineSlotInput[];
+}
+
 export interface ProgramDayPreference {
   day_index: number;
   focus: BlockFocus;
   movement_preferences?: readonly ProgramMovementPreference[];
+  slot_overrides?: readonly ProgramSlotOverride[];
+  routine_assignment?: ProgramRoutineDayAssignment | null;
+}
+
+export interface BlockLongitudinalControl {
+  readonly patternMrvSets?: Partial<Record<MovementPattern, number>>;
+  readonly introductoryWeek1?: boolean;
 }
 
 export interface BlockInput {
@@ -347,6 +411,10 @@ export interface BlockInput {
    * every existing caller).
    */
   powerPreferredMovementNames?: readonly string[];
+  /** Explicit Mon-Sun ISO weekday scheduling ('iso_weekday', default) vs legacy relative day offset. */
+  scheduleMode?: ProgramScheduleMode;
+  /** Optional longitudinal recovery-ceiling & work-capacity context (#228 + A7). */
+  longitudinalControl?: BlockLongitudinalControl;
 
   /**
    * Work order 3: the athlete's focus, goal exercises, sport objective and
@@ -452,24 +520,44 @@ const FOCUS_PATTERNS: Record<BlockFocus, readonly MovementPattern[]> = {
   lower: ['squat', 'hinge', 'lunge', 'isolation'],
   upper: ['push_h', 'pull_h', 'push_v', 'pull_v'],
   full: ['squat', 'push_h', 'hinge', 'pull_h', 'carry'],
+  push: ['push_h', 'push_v', 'isolation'],
+  pull: ['pull_h', 'pull_v', 'isolation'],
+  legs: ['squat', 'hinge', 'lunge', 'isolation'],
+  accessories: ['isolation', 'carry', 'rotation'],
   conditioning: ['locomotion', 'carry', 'rotation'],
   bjj: ['locomotion', 'rotation', 'isolation'],
 };
 
 /** Focus slots that prefer a full-body-scoped movement before falling back to
- *  the slot's pattern. Index into FOCUS_PATTERNS[focus]; null = no scope slot.
- *
- *  Why a separate axis: FOCUS_PATTERNS.full already holds exactly five entries
- *  and slotBudget caps at 5, so a sixth pattern slot is unreachable — a
- *  full-body movement cannot be routed by adding a pattern. The guard
- *  "slotBudget === 5" is self-enforcing here: `patterns` is sliced to
- *  slotBudget, so index 4 only exists when the budget reaches five. */
+ *  the slot's pattern. Index into FOCUS_PATTERNS[focus]; null = no scope slot. */
 const FOCUS_SCOPE_SLOT: Record<BlockFocus, number | null> = {
-  lower: null, upper: null, full: 4, conditioning: null, bjj: null,
+  lower: null,
+  upper: null,
+  full: 4,
+  push: null,
+  pull: null,
+  legs: null,
+  accessories: null,
+  conditioning: null,
+  bjj: null,
 };
 
 /** Strength-side foci (the volume hybrid damping applies to). */
-const STRENGTH_FOCI: ReadonlySet<BlockFocus> = new Set(['lower', 'upper', 'full']);
+const STRENGTH_FOCI: ReadonlySet<BlockFocus> = new Set([
+  'lower',
+  'upper',
+  'full',
+  'push',
+  'pull',
+  'legs',
+]);
+
+const emphasisDayForFocus = (focus: BlockFocus): EmphasisDayRegion | null => {
+  if (focus === 'lower' || focus === 'legs') return 'lower';
+  if (focus === 'upper' || focus === 'push' || focus === 'pull') return 'upper';
+  if (focus === 'full' || focus === 'accessories') return 'full';
+  return null;
+};
 
 /** Partner grappling rounds. They belong on a BJJ day only: a conditioning
  *  day is general work, and an athlete who owns mats has not said they
@@ -540,7 +628,17 @@ export const programFocuses = (objective: Objective, frequency: number): readonl
 export const defaultProgramDayIndices = (frequency: number): readonly number[] =>
   DAY_SPREAD[clamp(Math.round(frequency), 1, 7) - 1];
 
-export const BLOCK_FOCUS_LIST: readonly BlockFocus[] = ['lower', 'upper', 'full', 'conditioning', 'bjj'] as const;
+export const BLOCK_FOCUS_LIST: readonly BlockFocus[] = [
+  'lower',
+  'upper',
+  'full',
+  'push',
+  'pull',
+  'legs',
+  'accessories',
+  'conditioning',
+  'bjj',
+] as const;
 export const BLOCK_FOCI: ReadonlySet<BlockFocus> = new Set(BLOCK_FOCUS_LIST);
 
 /**
@@ -878,6 +976,22 @@ export const addDaysIso = (iso: string, days: number): string => {
   return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10);
 };
 
+/** ISO weekday for an ISO YYYY-MM-DD calendar date (1 = Monday .. 7 = Sunday). */
+export const isoWeekdayOfIso = (iso: string): number => {
+  const [y, m, d] = iso.split('-').map(Number);
+  const utcDay = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  return utcDay === 0 ? 7 : utcDay;
+};
+
+/** Offset 0..6 inside each 7-day block week starting at `startIsoWeekday`. */
+export const sessionOffsetInWeek = (
+  dayIndex: number,
+  startIsoWeekday: number,
+  scheduleMode: ProgramScheduleMode = 'iso_weekday',
+): number => (scheduleMode === 'iso_weekday'
+  ? (dayIndex - startIsoWeekday + 7) % 7
+  : dayIndex - 1);
+
 export type ProgramReviewHorizon =
   | { kind: 'weeks'; blockCount: number }
   | { kind: 'date'; requestedReviewDate: string };
@@ -1156,11 +1270,21 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
   const frequency = clamp(profile.weekly_frequency, 1, 7);
   const split = SPLITS[profile.objective][frequency - 1];
   const spread = DAY_SPREAD[frequency - 1];
+  const effectiveRpeCap = Math.min(profile.base_rpe_cap, profile.objective === 'rehab' ? 7.0 : 10.0);
+  const longitudinalControl = input.longitudinalControl;
+  const scheduleMode: ProgramScheduleMode = input.scheduleMode ?? 'iso_weekday';
+  const startIsoWeekday = isoWeekdayOfIso(startDate);
+  const movementById = new Map(input.movements.map((movement) => [movement.movement_id, movement]));
   const programSchedule = input.programDays === undefined
     ? null
     : [...input.programDays]
         .sort((a, b) => a.day_index - b.day_index)
-        .map((day) => ({ ...day, movement_preferences: [...(day.movement_preferences ?? [])] }));
+        .map((day) => ({
+          ...day,
+          movement_preferences: [...(day.movement_preferences ?? [])],
+          slot_overrides: [...(day.slot_overrides ?? [])],
+          routine_assignment: day.routine_assignment ?? null,
+        }));
   if (programSchedule !== null) {
     if (programSchedule.length < 1 || programSchedule.length > 7) {
       throw new Error('Program schedule must contain 1-7 days.');
@@ -1183,11 +1307,65 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
         seenSlots.add(preference.slot_index);
         seenPatterns.add(preference.pattern);
       }
+      if (profile.training_age === 'beginner'
+          && (day.slot_overrides.length > 0 || day.routine_assignment !== null)) {
+        throw new Error('Beginner athletes cannot customize sets, reps, target RPE, or assign routines to program days.');
+      }
+      const seenOverrideSlots = new Set<number>();
+      for (const override of day.slot_overrides) {
+        const hasSets = override.sets !== undefined && override.sets !== null;
+        const hasReps = override.reps !== undefined && override.reps !== null;
+        const hasRpe = override.target_rpe !== undefined && override.target_rpe !== null;
+        if (!Number.isInteger(override.slot_index) || override.slot_index < 1 || override.slot_index > 6
+            || seenOverrideSlots.has(override.slot_index)
+            || (!hasSets && !hasReps && !hasRpe)) {
+          throw new Error('Program schedule contains an invalid slot override.');
+        }
+        if (hasSets && (!Number.isInteger(override.sets) || override.sets! < 1 || override.sets! > 10)) {
+          throw new Error('Slot override sets must be an integer between 1 and 10.');
+        }
+        if (hasReps && (!Number.isInteger(override.reps) || override.reps! < 1 || override.reps! > 30)) {
+          throw new Error('Slot override reps must be an integer between 1 and 30.');
+        }
+        if (hasRpe && (!Number.isFinite(override.target_rpe) || override.target_rpe! < 5.0 || override.target_rpe! > 10.0)) {
+          throw new Error('Slot override target_rpe must be between 5.0 and 10.0.');
+        }
+        seenOverrideSlots.add(override.slot_index);
+      }
+      if (day.routine_assignment !== null) {
+        const ra = day.routine_assignment;
+        if (!Number.isInteger(ra.routine_template_id) || ra.routine_template_id < 1
+            || !Number.isInteger(ra.routine_day_index) || ra.routine_day_index < 1 || ra.routine_day_index > 7
+            || !Array.isArray(ra.slots) || ra.slots.length < 1 || ra.slots.length > 6) {
+          throw new Error('Program schedule contains an invalid routine assignment.');
+        }
+        const seenRoutineSlots = new Set<number>();
+        for (const rSlot of ra.slots) {
+          if (!Number.isInteger(rSlot.slot_index) || rSlot.slot_index < 1 || rSlot.slot_index > 6
+              || seenRoutineSlots.has(rSlot.slot_index)
+              || !Number.isInteger(rSlot.movement_id) || rSlot.movement_id < 1
+              || !Number.isInteger(rSlot.sets) || rSlot.sets < 1 || rSlot.sets > 10
+              || !Number.isInteger(rSlot.reps) || rSlot.reps < 1 || rSlot.reps > 100
+              || !Number.isFinite(rSlot.target_rpe) || rSlot.target_rpe < 5.0 || rSlot.target_rpe > 10.0) {
+            throw new Error('Program schedule contains an invalid routine slot.');
+          }
+          seenRoutineSlots.add(rSlot.slot_index);
+        }
+      }
     }
   }
-  const schedule = programSchedule ?? split.map((focus, i) => ({
-    day_index: spread[i], focus, movement_preferences: [] as ProgramMovementPreference[],
+  const rawSchedule = programSchedule ?? split.map((focus, i) => ({
+    day_index: spread[i],
+    focus,
+    movement_preferences: [] as ProgramMovementPreference[],
+    slot_overrides: [] as ProgramSlotOverride[],
+    routine_assignment: null as ProgramRoutineDayAssignment | null,
   }));
+  const schedule = [...rawSchedule].sort((a, b) => {
+    const da = sessionOffsetInWeek(a.day_index, startIsoWeekday, scheduleMode);
+    const db = sessionOffsetInWeek(b.day_index, startIsoWeekday, scheduleMode);
+    return da !== db ? da - db : a.day_index - b.day_index;
+  });
   const equipPool = availableMovements(input.movements, profile.equipment_inventory);
   // Session slot budget from the duration cap, with preparation reserved
   // first. The SAME helper feeds strengthAnchorCapacity/strengthAnchorRoleNames,
@@ -1207,6 +1385,17 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
   const scheduledPatterns = new Set<MovementPattern>();
   for (let schedIdx = 0; schedIdx < schedule.length; schedIdx += 1) {
     const day = schedule[schedIdx]!;
+    if (day.routine_assignment !== null) {
+      for (const rSlot of day.routine_assignment.slots) {
+        const rm = movementById.get(rSlot.movement_id);
+        if (rm === undefined) continue;
+        scheduledPatterns.add(rm.pattern);
+        if (STRENGTH_FOCI.has(day.focus)) {
+          weeklyPatternDays.set(rm.pattern, (weeklyPatternDays.get(rm.pattern) ?? 0) + 1);
+        }
+      }
+      continue;
+    }
     const dayPatterns = schedulePatterns[schedIdx]!;
     for (const pattern of dayPatterns) scheduledPatterns.add(pattern);
     if (!STRENGTH_FOCI.has(day.focus)) continue;
@@ -1284,6 +1473,9 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
   const emphasisDayExists = new Set<MuscleGroupId>();
   /** `week:day:slot` of goal and emphasis slots — trimmed last, not first. */
   const protectedSlots = new Set<string>();
+  /** `week:day:slot` of explicit athlete-overridden or routine-assigned working sets — protected from silent time trimming. */
+  const athleteFixedSetsKeys = new Set<string>();
+  const coachNotes = new Set<string>();
 
   const warnings = new Set<string>();
   const sessions: PlannedSessionPlan[] = [];
@@ -1316,11 +1508,33 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
     // neighbour across the week boundary is this week's day 1.
     const weekMainLifts = new Map<number, ReadonlySet<number>>();
     const wmod = SCHEMA_WEEKS[schemaType][progIdx as 0 | 1 | 2];
+    const introActiveThisWeek = week === 1 && !deload && longitudinalControl?.introductoryWeek1 === true;
+    const introSessionCap = INTRO_WEEK_SESSIONS_BY_AGE[profile.training_age];
+    const weekSchedule = introActiveThisWeek && schedule.length > introSessionCap
+      ? schedule.filter((day, idx) =>
+          idx < introSessionCap
+          || day.slot_overrides.length > 0
+          || day.movement_preferences.length > 0
+          || day.routine_assignment !== null)
+      : schedule;
+    if (introActiveThisWeek && weekSchedule.length < schedule.length) {
+      coachNotes.add(INTRODUCTORY_WEEK1_NOTE);
+    }
 
-    for (let schedIdx = 0; schedIdx < schedule.length; schedIdx += 1) {
-      const { focus, day_index: dayIndex, movement_preferences: preferences } = schedule[schedIdx]!;
-      const sessionDate = addDaysIso(startDate, (week - 1) * 7 + (dayIndex - 1));
+    for (const day of weekSchedule) {
+      const schedIdx = schedule.indexOf(day);
+      const {
+      focus,
+      day_index: dayIndex,
+      movement_preferences: preferences,
+      slot_overrides: slotOverrides,
+      routine_assignment: routineAssignment,
+      } = day;
+      const sessionDate = addDaysIso(startDate, (week - 1) * 7 + sessionOffsetInWeek(dayIndex, startIsoWeekday, scheduleMode));
       if (competitionDateIso !== null && sessionDate >= competitionDateIso) continue;
+      const overrideBySlot = new Map<number, ProgramSlotOverride>(
+        (slotOverrides ?? []).map((override) => [override.slot_index, override]),
+      );
       // Per-day access, rebuilt from THIS day's focus. A weight-room day keeps
       // the difficulty-tier ceiling as a hard bound; a conditioning/BJJ day
       // has that ceiling removed on purpose (performance context, not
@@ -1439,8 +1653,8 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
       const sessionRankingNotes: Set<string> = new Set();
       // Work order 3: the emphasis applies on strength days only. A sport or
       // conditioning day is the sport's own work and is left alone.
-      const emphasisDay: EmphasisDayRegion | null = emphasisIndex !== null && STRENGTH_FOCI.has(focus)
-        ? focus as EmphasisDayRegion
+      const emphasisDay: EmphasisDayRegion | null = emphasisIndex !== null
+        ? emphasisDayForFocus(focus)
         : null;
       const sessionCovered = new Set<MuscleGroupId>();
       const dayMuscles = emphasisDay === null || emphasisIndex === null ? [] : emphasisIndex.musclesForDay(emphasisDay);
@@ -1533,10 +1747,22 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
             : wmod.setsDelta,
           primarySlot ? phaseMod.sets : 0,
         );
+        let slotReps = chainScopedRepsFor(m);
+        const override = overrideBySlot.get(slotIndex);
+        const hasExplicitSets = !deload && override?.sets !== undefined && override?.sets !== null;
+        const hasExplicitReps = !deload && override?.reps !== undefined && override?.reps !== null;
+        const hasExplicitRpe = !deload && override?.target_rpe !== undefined && override?.target_rpe !== null;
+        const mrvCeiling = longitudinalControl?.patternMrvSets?.[m.pattern];
+        const applyIntroWeek1 = longitudinalControl?.introductoryWeek1 === true
+          && week === 1
+          && !deload
+          && !locomotion;
+        const introCappedWorkingSets = applyIntroWeek1 && !hasExplicitSets
+          ? Math.max(2, slotWorkingSets - 1)
+          : slotWorkingSets;
         let slotSets = locomotion
           ? (deload ? Math.max(1, Math.ceil(LOCOMOTION_SETS / 2)) : LOCOMOTION_SETS)
-          : Math.max(1, slotWorkingSets - (taxed ? accessoryCut : 0));
-        let slotReps = chainScopedRepsFor(m);
+          : Math.max(1, introCappedWorkingSets - (taxed ? accessoryCut : 0));
         let slotRpe = rpe;
         let slotBackOff: PlannedSlotBackOff | undefined;
         // W4 bodyweight rep law (owner's regression case, WO §6.5): a strictly
@@ -1549,7 +1775,7 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
         // and the floor is neither updated nor erased by it. Loaded and
         // undeclared slots are untouched.
         const bwFloorKey = `${dayIndex}:${slotIndex}`;
-        if (bodyweightSlot && !deload) {
+        if (!hasExplicitReps && bodyweightSlot && !deload) {
           const previous = bodyweightRepFloors.get(bwFloorKey);
           if (previous !== undefined && slotReps < previous) slotReps = previous;
           bodyweightRepFloors.set(bwFloorKey, slotReps);
@@ -1616,20 +1842,27 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
             slotSets = Math.max(1, trimmedBase - (taxed ? accessoryCut : 0));
           }
         }
+        if (applyIntroWeek1 && !hasExplicitSets) slotSets = Math.min(slotSets, introCappedWorkingSets);
+
+        // Coach-build strictly clamps pattern volume to patternMrvSets[p]
+        // BEFORE capturing preAutopilotSets so autopilot attribution only
+        // reflects autopilot's own deltas, not the initial MRV clamp.
+        if (!hasExplicitSets && !deload && !locomotion && mrvCeiling !== undefined) {
+          slotSets = Math.min(slotSets, Math.max(1, mrvCeiling));
+        }
+
         const preAutopilotSets = slotSets;
         const preAutopilotRpe = slotRpe;
         let autopilotDelta: AutopilotSlotDelta | undefined;
         // Phase 13 Step 4: apply the autopilot's per-pattern correction. Only on
-        // NON-deload weeks (the deload is sacred) and not locomotion rounds.
-        // dRpe shifts the prescribed effort (re-clamped to [5, base_rpe_cap],
-        // rehab ≤ 7, 0.5 grid). R1 applies a positive dRpe grant once in the
-        // block while negative dRpe still reaches every occurrence. dSet trims
-        // every occurrence but ADDS at most once per pattern (block-wide +2 cap).
-        if (control !== null && !deload && !locomotion) {
+        // NON-deload weeks (the deload is sacred), not locomotion rounds, and
+        // never overriding an explicit athlete dose edit or A7 intro week 1.
+        if (control !== null && !deload && !locomotion && !applyIntroWeek1) {
           const corr = control.corrections[m.pattern];
-          const mayApplyRpe =
+          const mayApplyRpe = !hasExplicitRpe && (
             corr.dRpe_p < 0 ||
-            (corr.dRpe_p > 0 && !positiveRpeApplied.has(m.pattern));
+            (corr.dRpe_p > 0 && !positiveRpeApplied.has(m.pattern))
+          );
           if (mayApplyRpe) {
             const previousRpe = slotRpe;
             let r = slotRpe + corr.dRpe_p;
@@ -1641,15 +1874,22 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
               autopilotAdjusted.add(m.pattern);
             }
           }
-          if (corr.dSet_p < 0) {
-            slotSets = Math.max(1, slotSets + corr.dSet_p);
-            autopilotAdjusted.add(m.pattern);
-          } else if (corr.dSet_p > 0 && !positiveApplied.has(m.pattern)) {
-            slotSets = Math.min(10, slotSets + corr.dSet_p);
-            positiveApplied.add(m.pattern);
-            autopilotAdjusted.add(m.pattern);
+          if (!hasExplicitSets) {
+            if (corr.dSet_p < 0) {
+              slotSets = Math.max(1, slotSets + corr.dSet_p);
+              autopilotAdjusted.add(m.pattern);
+            } else if (corr.dSet_p > 0 && !positiveApplied.has(m.pattern)) {
+              slotSets = Math.min(10, slotSets + corr.dSet_p);
+              positiveApplied.add(m.pattern);
+              autopilotAdjusted.add(m.pattern);
+            }
           }
         }
+        // Autopilot strictly obeys MRV_p ceiling too unless athlete overrides.
+        if (!hasExplicitSets && !deload && !locomotion && mrvCeiling !== undefined) {
+          slotSets = Math.min(slotSets, Math.max(1, mrvCeiling));
+        }
+
         const rpeDelta = Math.round((slotRpe - preAutopilotRpe) * 2) / 2;
         const setDelta = slotSets - preAutopilotSets;
         if (rpeDelta !== 0 || setDelta !== 0) {
@@ -1686,6 +1926,56 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
             };
           }
         }
+
+        if (applyIntroWeek1) {
+          if (!hasExplicitRpe) {
+            const safetyRpeCap = globalSafetyOverride !== undefined && globalSafetyOverride !== null
+              ? globalSafetyOverride.rpe_cap_max
+              : 10;
+            slotRpe = Math.max(5.0, Math.min(slotRpe, 7.0, effectiveRpeCap, safetyRpeCap));
+          }
+          if (!hasExplicitSets || !hasExplicitRpe) {
+            coachNotes.add(INTRODUCTORY_WEEK1_NOTE);
+          }
+        }
+
+        if (!deload && override !== undefined) {
+          if (hasExplicitSets) {
+            slotSets = override.sets!;
+            athleteFixedSetsKeys.add(`${week}:${dayIndex}:${slotIndex}`);
+          }
+          if (hasExplicitReps) {
+            slotReps = override.reps!;
+          }
+          if (hasExplicitRpe) {
+            slotRpe = clamp(Math.round(override.target_rpe! * 2) / 2, 5.0, effectiveRpeCap);
+          }
+        } else if (deload && override !== undefined) {
+          if (override.sets !== undefined && override.sets !== null) {
+            const scaled = override.sets > 1
+              ? Math.max(1, Math.min(Math.ceil(override.sets / 2), override.sets - 1))
+              : 1;
+            slotSets = Math.min(slotSets, scaled);
+          }
+          if (override.target_rpe !== undefined && override.target_rpe !== null) {
+            slotRpe = Math.min(slotRpe, Math.max(5.0, Math.round((override.target_rpe - 0.5) * 2) / 2));
+          }
+        }
+
+        let athleteOverride: PlannedSlotAthleteOverrideMeta | undefined;
+        if (hasExplicitSets || hasExplicitReps || hasExplicitRpe) {
+          const aboveMrv = hasExplicitSets && mrvCeiling !== undefined && slotSets > mrvCeiling;
+          if (aboveMrv) {
+            coachNotes.add(mrvCeilingNote(mrvCeiling!));
+          }
+          athleteOverride = {
+            source: 'slot_override',
+            mrv_ceiling_sets: mrvCeiling ?? null,
+            above_mrv: aboveMrv,
+            ...(hasExplicitSets ? { sets_frozen: true } : {}),
+          };
+        }
+
         if (slotBackOff !== undefined) {
           const boSets = Math.max(0, slotSets - 1);
           if (boSets === 0) slotBackOff = undefined;
@@ -1705,10 +1995,83 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
           target_rpe: slotRpe,
           ...(autopilotDelta === undefined ? {} : { autopilotDelta }),
           ...(slotBackOff === undefined ? {} : { backOff: slotBackOff }),
+          ...(athleteOverride === undefined ? {} : { athleteOverride }),
         });
       };
 
-      for (const [slotIdx, pattern] of patterns.entries()) {
+      if (routineAssignment !== null) {
+        const sortedRoutineSlots = [...routineAssignment.slots].sort((a, b) => a.slot_index - b.slot_index);
+        for (const rSlot of sortedRoutineSlots) {
+          const rm = movementById.get(rSlot.movement_id);
+          usedIds.add(rSlot.movement_id);
+          if (rm !== undefined) {
+            const directMuscles = emphasisIndex?.primaryFor(rm.movement_id) ?? [];
+            for (const muscle of directMuscles) {
+              sessionCovered.add(muscle);
+              weekCovered.add(muscle);
+              emphasisCovered.add(muscle);
+            }
+            if (goalLinks.has(rm.movement_id)) {
+              goalPlaced.add(rm.movement_id);
+              weekGoalPlaced.add(rm.movement_id);
+            }
+            if (goalLinks.has(rm.movement_id) || directMuscles.length > 0) {
+              protectedSlots.add(`${week}:${dayIndex}:${rSlot.slot_index}`);
+            }
+          }
+          const override = overrideBySlot.get(rSlot.slot_index);
+          const workingSets = override?.sets ?? rSlot.sets;
+          const workingReps = clamp(override?.reps ?? rSlot.reps, 1, 30);
+          const workingRpe = clamp(
+            Math.round((override?.target_rpe ?? rSlot.target_rpe) * 2) / 2,
+            5.0,
+            effectiveRpeCap,
+          );
+          const mrvCeiling = rm !== undefined ? longitudinalControl?.patternMrvSets?.[rm.pattern] : undefined;
+          if (!deload) {
+            const aboveMrv = mrvCeiling !== undefined && workingSets > mrvCeiling;
+            if (aboveMrv) {
+              coachNotes.add(mrvCeilingNote(mrvCeiling!));
+            }
+            athleteFixedSetsKeys.add(`${week}:${dayIndex}:${rSlot.slot_index}`);
+            slots.push({
+              slot_index: rSlot.slot_index,
+              movement_id: rSlot.movement_id,
+              sets: workingSets,
+              reps: workingReps,
+              target_rpe: workingRpe,
+              athleteOverride: {
+                source: override?.sets !== undefined && override?.sets !== null
+                  ? 'slot_override'
+                  : 'routine_assignment',
+                mrv_ceiling_sets: mrvCeiling ?? null,
+                above_mrv: aboveMrv,
+                sets_frozen: true,
+              },
+            });
+          } else {
+            let deloadSets = workingSets > 1
+              ? Math.min(workingSets - 1, Math.max(1, Math.ceil(workingSets / 2)))
+              : 1;
+            if (mrvCeiling !== undefined && rm?.pattern !== 'locomotion') {
+              deloadSets = Math.min(deloadSets, Math.max(1, mrvCeiling));
+            }
+            const deloadRpe = clamp(
+              Math.round(Math.min(rpe, workingRpe > 5.0 ? workingRpe - 0.5 : 5.0) * 2) / 2,
+              5.0,
+              effectiveRpeCap,
+            );
+            slots.push({
+              slot_index: rSlot.slot_index,
+              movement_id: rSlot.movement_id,
+              sets: deloadSets,
+              reps: workingReps,
+              target_rpe: deloadRpe,
+            });
+          }
+        }
+      } else {
+        for (const [slotIdx, pattern] of patterns.entries()) {
         const preferred = preferences.find((p) => p.pattern === pattern);
         const preferredMovement = preferred === undefined
           ? undefined
@@ -1948,6 +2311,7 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
           placeSlot(extra.movement);
         }
       }
+      }
       if (slots.length === 0) {
         warnings.add(`${focus}: session dropped, no available movements at all`);
         continue;
@@ -1956,9 +2320,9 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
         const totalWorkingSets = () => slots.reduce((sum, s) => sum + s.sets, 0);
         while (totalWorkingSets() > 15) {
           const trimCandidate =
-            [...slots].reverse().find((s) => s.slot_index >= ACCESSORY_SLOT_FROM && s.sets > 2)
-            ?? [...slots].reverse().find((s) => s.backOff === undefined && s.sets > 2)
-            ?? [...slots].reverse().find((s) => s.sets > 2);
+            [...slots].reverse().find((s) => s.slot_index >= ACCESSORY_SLOT_FROM && s.sets > 2 && !athleteFixedSetsKeys.has(`${week}:${dayIndex}:${s.slot_index}`))
+            ?? [...slots].reverse().find((s) => s.backOff === undefined && s.sets > 2 && !athleteFixedSetsKeys.has(`${week}:${dayIndex}:${s.slot_index}`))
+            ?? [...slots].reverse().find((s) => s.sets > 2 && !athleteFixedSetsKeys.has(`${week}:${dayIndex}:${s.slot_index}`));
           if (trimCandidate === undefined) break;
           trimCandidate.sets -= 1;
           if (trimCandidate.backOff !== undefined) {
@@ -1992,11 +2356,11 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
   // INSIDE the athlete's session limit. A session that is over is repaired in
   // a fixed order — condense preparation to the reviewed floor, then trim sets
   // (accessory slots first, never below the generator's own 2-set floor, never
-  // a deload below 1, never a sport round) — and anything that still does not
-  // fit is reported as a conflict instead of being quietly shipped.
+  // a deload below 1, never a sport round, never an explicit athlete set override)
+  // — and anything that still does not fit is reported as a conflict instead of
+  // being quietly shipped.
   // -------------------------------------------------------------------------
   const capMin = normalizedCapMin(profile.session_duration_cap_min);
-  const movementById = new Map(input.movements.map((movement) => [movement.movement_id, movement]));
   const sessionTimes: PlannedSessionTime[] = [];
   const conflicts = new Set<string>();
   const pendingConflicts: { label: string; estimate: SessionTimeEstimate }[] = [];
@@ -2023,16 +2387,18 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
             trimmable: false,
           };
         }
+        const athleteFixed = !deloadSession
+          && athleteFixedSetsKeys.has(`${session.week_index}:${session.day_index}:${slot.slot_index}`);
         return {
           sets: slot.sets,
           target: { kind: 'reps' as const, reps: slot.reps },
           targetRpe: slot.target_rpe,
-          minSets: Math.min(slot.sets, deloadSession ? 1 : 2),
+          minSets: athleteFixed ? slot.sets : Math.min(slot.sets, deloadSession ? 1 : 2),
           // A goal exercise or an emphasis slot is trimmed with the main
           // lifts, after the other accessories.
           trimPriority: slot.slot_index >= ACCESSORY_SLOT_FROM
             && !protectedSlots.has(`${session.week_index}:${session.day_index}:${slot.slot_index}`) ? 0 : 1,
-          trimmable: !locomotion,
+          trimmable: !locomotion && !athleteFixed,
         };
       }),
     });
@@ -2121,7 +2487,7 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
         // a spare accessory slot of a strength day, so it is judged against the
         // strength days in that case.
         const ownDays = schedule.filter((_day, idx) => patternsOfIdx(idx).includes(movement.pattern));
-        const days = ownDays.length > 0 ? ownDays : schedule.filter((day) => STRENGTH_FOCI.has(day.focus));
+        const days = ownDays.length > 0 ? ownDays : schedule.filter((day) => emphasisDayForFocus(day.focus) !== null);
         const contexts = days.map((day) => accessContextForBlockFocus(day.focus));
         if (days.length === 0) gap = 'no_slot';
         else if (!equipIds.has(movementId)) gap = 'equipment';
@@ -2162,6 +2528,7 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
       alternatives: [...timeAlternatives],
     },
     ...(emphasisReport === undefined ? {} : { emphasis: emphasisReport }),
+    ...(coachNotes.size === 0 ? {} : { coachNotes: [...coachNotes].sort() }),
   };
 }
 

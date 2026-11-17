@@ -45,7 +45,7 @@ The inventory comes from the complete migration chain and the recovery sentinels
 - `movement_capability_attestation` — athlete capability attestations.
 - `one_rep_max` — athlete-entered or updated movement load estimates.
 
-### Programs, routines, plans, provenance, and suspension state (27)
+### Programs, routines, plans, provenance, and suspension state (33)
 
 - `block_emphasis` — frozen, immutable record of what focus, goal, sport and sport workload changed in a block and what they could not change (067).
 - `macro_cycle`
@@ -53,7 +53,9 @@ The inventory comes from the complete migration chain and the recovery sentinels
 - `training_block`
 - `block_meta`
 - `planned_session`
+- `planned_session_focus_ext`
 - `planned_slot`
+- `planned_slot_athlete_override`
 - `slot_override`
 - `planned_session_method`
 - `planned_slot_target`
@@ -64,8 +66,12 @@ The inventory comes from the complete migration chain and the recovery sentinels
 - `planned_slot_routine_decision`
 - `planned_slot_legacy_role_allowance`
 - `training_program`
+- `training_program_schedule_mode`
 - `training_program_day`
+- `training_program_day_focus_ext`
 - `training_program_movement_preference`
+- `training_program_slot_override`
+- `training_program_day_routine`
 - `training_block_program`
 - `routine_template`
 - `routine_template_slot`
@@ -255,3 +261,6 @@ Final live durable tables: 129 (including `state_vector_kinestrike` and `session
 Final live durable tables: 134 (including the prior KineStrike and swap tables, and `sport_peaking_movement`, `planned_slot_backoff`, `session_slot_backoff`, `training_program_meet_countdown`, `training_block_meet_meta`). The migration array has 79 entries through slot `080`, so `PRAGMA user_version = 79`. The current backup contract fingerprints 223 durable table/index/trigger objects; all earlier schema contracts remain registered unchanged.
 
 `080` rebuilds `athlete_sport_profile` and `athlete_secondary_sport_profile` to allow the 24 `SportId`s (adding `olympic_weightlifting` and `strongman`) and `matches_per_week` `0..52` for lifting sports, creates and seeds `sport_peaking_movement` (reference catalog — kept across Reset training data), and adds the 4 athlete-owned STRICT side-cars (`planned_slot_backoff`, `session_slot_backoff`, `training_program_meet_countdown`, `training_block_meet_meta`), which travel in encrypted backup and cascade/clear on Reset training data.
+## Update — migration 081 (#228 + A7 advanced program control)
+
+Final live durable tables: 140 (the 134 above, plus `training_program_day_focus_ext`, `planned_session_focus_ext`, `training_program_schedule_mode`, `training_program_slot_override`, `training_program_day_routine`, and `planned_slot_athlete_override`). The migration array has 80 entries through slot `081`, so `PRAGMA user_version = 80`. The current backup contract fingerprints 229 durable table/index/trigger objects; all earlier schema contracts remain registered unchanged.

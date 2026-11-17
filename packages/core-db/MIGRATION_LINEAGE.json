@@ -401,6 +401,11 @@
         "ordinal": 79,
         "file": "080_sport_peaking_and_lifting_taxonomy.sql",
         "sha256": "89c69e7016a87c43420f3ee35d65e4966bc8049eb0ca9ebe70b68bdf259c844d"
+      },
+      {
+        "ordinal": 80,
+        "file": "081_advanced_program_control.sql",
+        "sha256": "7afab8b7a051d7636d1fbfc214954d84ab1278813efbdfa11d1f2764f75f3bf0"
       }
     ]
   },

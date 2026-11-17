@@ -349,6 +349,12 @@ export const SENTINELS: readonly MigrationSentinel[] = [
   { type: 'table', name: 'session_slot_backoff' },                            // 080
   { type: 'table', name: 'training_program_meet_countdown' },                 // 080
   { type: 'table', name: 'training_block_meet_meta' },                        // 080
+  { type: 'table', name: 'training_program_day_focus_ext' },                  // 081
+  { type: 'table', name: 'planned_session_focus_ext' },                       // 081
+  { type: 'table', name: 'training_program_schedule_mode' },                  // 081
+  { type: 'table', name: 'training_program_slot_override' },                  // 081
+  { type: 'table', name: 'training_program_day_routine' },                    // 081
+  { type: 'table', name: 'planned_slot_athlete_override' },                   // 081
 ];
 
 /** Durable tables deliberately absent from SENTINELS, each with the reason it

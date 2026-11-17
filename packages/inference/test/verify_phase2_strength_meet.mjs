@@ -403,5 +403,24 @@ console.log('[Phase2 #229 Q7] Lifting taxonomy & outside workload exclusion');
     JSON.stringify(easedSingleSet));
 }
 
+{
+  const combinedInput = mkInput({
+    profile: mkProfile({ training_age: 'advanced', weekly_frequency: 1, session_duration_cap_min: 240 }),
+    startDate: '2026-11-18',
+    macroBlockIndex: 5,
+    programDays: [{ day_index: 3, focus: 'full', slot_overrides: [
+      { slot_index: 1, sets: 10 }, { slot_index: 2, sets: 10 },
+    ] }],
+  });
+  const normal = generateBlock(combinedInput);
+  const first = normal.sessions.find((session) => session.week_index === 1);
+  check('strength set trimming preserves explicit athlete set overrides',
+    first !== undefined && JSON.stringify(first.slots.slice(0, 2).map((slot) => slot.sets)) === '[10,10]');
+  const meet = generateBlock({ ...combinedInput, competitionDate: '2026-11-24', sportId: 'powerlifting' });
+  check('weekday scheduling keeps every meet session before competition',
+    meet.sessions.length > 0 && meet.sessions.every((session) => session.session_date < '2026-11-24')
+      && meet.sessions[0].session_date === '2026-11-18');
+}
+
 console.log(`\nPhase 2 Inference Summary: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

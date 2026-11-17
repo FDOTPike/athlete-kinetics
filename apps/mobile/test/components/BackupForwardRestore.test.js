@@ -742,9 +742,24 @@ describe('every registered pre-upgrade schema restores, not only the first', () 
     expect([v76.migrationSlot, v76.tableCount]).toEqual([77, v75.tableCount + 2]);
     // 078 (WO-KS-BRIDGE-02): one side-car table added for KineStrike telemetry.
     const v77 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 77);
-    expect(v77).toBe(CURRENT);
+    expect(v77).not.toBe(CURRENT);
     expect(v77.fingerprint).not.toBe(v76.fingerprint);
     expect([v77.migrationSlot, v77.tableCount]).toEqual([78, v76.tableCount + 1]);
+    // 079 adds a swap-cause side-car.
+    const v78 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 78);
+    expect(v78).not.toBe(CURRENT);
+    expect(v78.fingerprint).not.toBe(v77.fingerprint);
+    expect([v78.migrationSlot, v78.tableCount]).toEqual([79, v77.tableCount + 1]);
+    // 080 adds a reference catalog and four strength/meet side-cars.
+    const v79 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 79);
+    expect(v79).not.toBe(CURRENT);
+    expect(v79.fingerprint).not.toBe(v78.fingerprint);
+    expect([v79.migrationSlot, v79.tableCount]).toEqual([80, v78.tableCount + 5]);
+    // 081 (#228) adds six additive program-control side-car tables.
+    const v80 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 80);
+    expect(v80).toBe(CURRENT);
+    expect(v80.fingerprint).not.toBe(v79.fingerprint);
+    expect([v80.migrationSlot, v80.tableCount]).toEqual([81, v79.tableCount + 6]);
     expect(v70.fingerprint).not.toBe(v69.fingerprint);
     expect([v70.migrationSlot, v70.tableCount]).toEqual([71, v69.tableCount + 2]);
     expect(PRE_UPGRADE.length).toBeGreaterThanOrEqual(7);
