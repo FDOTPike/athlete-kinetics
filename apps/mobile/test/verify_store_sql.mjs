@@ -71,7 +71,7 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   // adapters are separate modules, but the real store database must migrate it.
   '064_accessible_coach_support.sql',
   // 066 adds athlete_focus/athlete_goal and 067 adds athlete_sport_profile/block_emphasis,
-  // which 076 and 078 rebuild and foreign-key to.
+  // which 076 and 080 rebuild and foreign-key to.
   '066_focus_and_goals.sql',
   '067_sport_and_emphasis.sql',
   // 069 adds resting_hr_daily, which the store writes on every biometrics sync,
