@@ -18,6 +18,8 @@ import {
   SPORT_OUTCOME_LABEL,
   sportDisplayName,
   sportEmphasisFor,
+  sportPeakingFallbackCopy,
+  sportPeakingMovementsFor,
   sportWorkloadEffect,
   validateSportProfile,
   type SportProfile,
@@ -144,9 +146,23 @@ export function SportPanel(): React.JSX.Element | null {
           {emphasis !== null && <Text style={styles.dim} testID="profile-sport-emphasis">{emphasis.summary}</Text>}
           {sport.competitionDate !== null && (
             <Text style={styles.dim} testID="profile-sport-competition">
-              {`Next competition: ${sport.competitionDate}. It is used for reminders and goal review only.`}
+              {`Next competition: ${sport.competitionDate}. Your blocks count down to peak and taper for competition day, synced with your goal review.`}
             </Text>
           )}
+          {sport.competitionDate !== null && sport.sportId !== 'powerlifting' && (() => {
+            const peakingCatalog = sportPeakingMovementsFor(sport.sportId);
+            return (
+              <View testID="profile-sport-peaking">
+                {peakingCatalog.length > 0 ? (
+                  peakingCatalog.map((item) => (
+                    <Text key={item.movementId} style={styles.dim}>{item.name}</Text>
+                  ))
+                ) : (
+                  <Text style={styles.dim}>{sportPeakingFallbackCopy(sportDisplayName(sport))}</Text>
+                )}
+              </View>
+            );
+          })()}
         </>
       )}
       {/* #176: said of the next block, in the future tense: nothing changes until one is made. */}

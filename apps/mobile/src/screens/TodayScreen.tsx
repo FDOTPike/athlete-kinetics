@@ -426,9 +426,9 @@ function AvailableTodayScreen({
                 const effective = applyPrescriptionToSlot(slot, todaysVector);
                 return (
                   <Text key={slot.plannedSlotId} style={styles.previewRow}>
-                    {slot.movementName} · {effective.sets}×{slot.target.kind === 'time'
-                      ? `${slot.target.seconds}s`
-                      : slot.target.reps}
+                    {slot.movementName} · {effective.backOff !== undefined && effective.backOff.sets > 0 && slot.target.kind === 'reps'
+                      ? `1×${slot.target.reps} + ${effective.backOff.sets}×${effective.backOff.reps}`
+                      : `${effective.sets}×${slot.target.kind === 'time' ? `${slot.target.seconds}s` : slot.target.reps}`}
                   </Text>
                 );
               })}

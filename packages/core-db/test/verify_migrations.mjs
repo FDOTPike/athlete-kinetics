@@ -71,7 +71,7 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '069_resting_heart_rate.sql',
   '070_session_feel.sql', '071_beta_recording.sql', '072_question_log.sql', '073_session_slot_replaced_by.sql',
   '074_session_feel_reasons.sql', '075_session_plan_slot_planned_count.sql', '076_sport_taxonomy_expansion.sql', '077_multisport_and_flexibility.sql',
-  '078_kinestrike_telemetry.sql', '079_session_slot_swap_cause.sql'];
+  '078_kinestrike_telemetry.sql', '079_session_slot_swap_cause.sql', '080_sport_peaking_and_lifting_taxonomy.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
@@ -1768,11 +1768,11 @@ console.log('[2u] 057 block_meta phase/index repair + enforcement');
     const db = freshDb();
     runMigrations(db, MIGRATIONS);
     // Slot 004 is the parameterized materialize script, never a migration:
-    // 78 files (slots 001-079, no 004) -> user_version 78. This count is
+    // 79 files (slots 001-080, no 004) -> user_version 79. This count is
     // pinned deliberately so adding a migration is a conscious act, not a
-    // silent one. Re-pinned for 079 (session_slot_swap_cause).
-    check('fresh install reaches user_version 78 (78 files, no slot 004)',
-      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 78,
+    // silent one. Re-pinned for 080 (sport_peaking_and_lifting_taxonomy).
+    check('fresh install reaches user_version 79 (79 files, no slot 004)',
+      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 79,
       String(uv(db)));
     const trig = db.raw.prepare(
       `SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'trigger'
@@ -4778,7 +4778,7 @@ console.log('[078] KineStrike plantar telemetry side-car (state_vector_kinestrik
 console.log('[079] session slot swap cause & scope side-car (session_slot_swap_cause)');
 {
   const index = FILES.indexOf('079_session_slot_swap_cause.sql');
-  check('079 is the last migration in the chain', index === MIGRATIONS.length - 1);
+  check('079 precedes 080', index === 77 && FILES[index + 1] === '080_sport_peaking_and_lifting_taxonomy.sql');
   const d = freshDb();
   runMigrations(d, MIGRATIONS);
   const has = (name) => d.raw.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name=?").get(name).c === 1;
@@ -4794,6 +4794,27 @@ console.log('[079] session slot swap cause & scope side-car (session_slot_swap_c
   check('079 poison detection spots missing session_slot_swap_cause sentinel', sentinelsMissing(d).includes('session_slot_swap_cause'));
   runMigrations(d, MIGRATIONS);
   check('079 self-heal restores session_slot_swap_cause', has('session_slot_swap_cause'));
+}
+
+// =============================================================================
+// [080] sport peaking catalog, lifting taxonomy, back-off & meet countdown
+// =============================================================================
+console.log('[080] sport peaking catalog, lifting taxonomy, and meet countdown side-cars');
+{
+  const index = FILES.indexOf('080_sport_peaking_and_lifting_taxonomy.sql');
+  check('080 is the last migration in the chain', index === MIGRATIONS.length - 1);
+  const d = freshDb();
+  runMigrations(d, MIGRATIONS);
+  d.raw.exec("INSERT INTO athlete_sport_profile (sport_profile_id, sport_id, other_sport_name, outcome_id, experience_id, matches_per_week, revision, updated_at_ms) VALUES (1, 'olympic_weightlifting', NULL, 'general_support', 'over_5_years', 52, 1, 0)");
+  check('080 allows olympic_weightlifting and matches_per_week = 52',
+    d.raw.prepare('SELECT sport_id, matches_per_week FROM athlete_sport_profile').get().matches_per_week === 52);
+  let nonLiftingRejected = false;
+  try {
+    d.raw.exec("UPDATE athlete_sport_profile SET sport_id = 'basketball' WHERE sport_profile_id = 1");
+  } catch { nonLiftingRejected = true; }
+  check('080 keeps matches_per_week <= 14 for non-lifting sports', nonLiftingRejected);
+  check('080 seeds 3 basketball entries in sport_peaking_movement',
+    Number(d.raw.prepare("SELECT COUNT(*) AS c FROM sport_peaking_movement WHERE sport_id = 'basketball'").get().c) === 3);
 }
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);

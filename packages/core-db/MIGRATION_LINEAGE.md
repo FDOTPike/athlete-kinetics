@@ -49,6 +49,12 @@ The eleventh is `079_session_slot_swap_cause` (ordinal 78): adds the
 `session_slot_swap_cause` side-car table recording why a slot was swapped
 (`cause`) and its persistence scope (`today_only` vs `rest_of_block`) without
 altering `session_plan_slot_replacement`.
+The twelfth is `080_sport_peaking_and_lifting_taxonomy` (ordinal 79): rebuilds
+`athlete_sport_profile` and `athlete_secondary_sport_profile` with the 24
+SportIds (adding `olympic_weightlifting` and `strongman`) and 0..52
+`matches_per_week` for lifting sports, creates seeded `sport_peaking_movement`,
+and adds `planned_slot_backoff`, `session_slot_backoff`,
+`training_program_meet_countdown`, and `training_block_meet_meta`.
 `MIGRATION_LINEAGE.json` records the SHA-256 of every shipped file and its
 ordinal, and of master's 34-entry chain. Master's exact `034`/`058` bytes and its
 registry live under `test/fixtures/lineage/master-1da218d/`.

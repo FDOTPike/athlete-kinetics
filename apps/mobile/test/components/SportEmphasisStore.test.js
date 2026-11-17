@@ -17,6 +17,7 @@
  *   - onboarding saves sport and goal exercise with everything else, or not
  *     at all.
  */
+import { COMPETITION_DATE_NOTE } from '@ak/inference';
 import { useStore } from '../../src/state/useStore';
 import { authorizeAthleteDataBoot, resetDataMaintenanceLockForTests } from '../../src/state/dataMaintenanceLock';
 import { makeNodeSqliteDriver } from '../helpers/nodeSqliteOpDriver';
@@ -481,7 +482,8 @@ describe('a competition date is context only', () => {
         ? report.applied.some((line) => line.startsWith('Competition lifts planned as main lifts:') && line.includes(lift))
         : report.omitted.some((line) => line.startsWith(`${lift} is not planned as a main lift`))).toBe(true);
     }
-    expect(report.omitted.join(' ')).toMatch(/Your competition on 2099-03-01 does not change this plan/);
+    expect(report.applied.some((line) => line === `Your blocks count down to peak and taper for competition on 2099-03-01. ${COMPETITION_DATE_NOTE}`)).toBe(true);
+    expect(report.omitted.some((line) => /does not change this plan/.test(line))).toBe(false);
     expect(dated.some((row) => row.phase === 'deload')).toBe(true);
 
     state().switchAthlete('athlete-b');
@@ -491,6 +493,8 @@ describe('a competition date is context only', () => {
     createProgram();
     const undated = all(`SELECT ps.week_index, ps.day_index, ps.phase, sl.slot_index, sl.movement_id, sl.sets, sl.reps, sl.target_rpe
       FROM planned_slot sl JOIN planned_session ps USING(planned_session_id) ORDER BY 1, 2, 4`, B);
+    // 2099-03-01 is > 32 weeks away, so only the countdown window triggers phase shaping while
+    // competition-lift emphasis matches either way.
     expect(undated).toEqual(dated);
   });
 });

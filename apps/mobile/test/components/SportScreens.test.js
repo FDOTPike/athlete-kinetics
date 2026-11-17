@@ -153,10 +153,16 @@ describe('the sport screen in the interview', () => {
     press('sport-family-hockey');
     expect(screen.getByLabelText('Field hockey. Played on grass or turf.')).toBeTruthy();
     expect(screen.getByLabelText('Ice hockey. Played on ice, on skates.')).toBeTruthy();
-    // strength is the single-code family in the 22-sport catalog: powerlifting only.
-    press('sport-family-strength');
-    expect(screen.queryByText(/WHICH KIND OF/)).toBeNull();
+    // strength now holds 3 strength sports: Powerlifting, Olympic weightlifting, Strongman (#229 Q7).
+    fireEvent.press(screen.getByTestId('sport-family-strength'));
+    expect(screen.getByText('WHICH KIND OF STRENGTH?')).toBeTruthy();
+    press('sport-powerlifting');
     expect(screen.getByTestId('sport-outcome-bigger_competition_lifts')).toBeTruthy();
+    expect(screen.getByText('How long have you trained for competition?')).toBeTruthy();
+    expect(screen.getByText(/^Competitions a year$/i)).toBeTruthy();
+    expect(screen.getByLabelText('Increase Competitions a year')).toBeTruthy();
+    expect(screen.getByText("Since this is your main lifting goal, we won't count your gym sessions twice as outside sport practice.")).toBeTruthy();
+    expect(screen.queryByTestId('sport-practice')).toBeNull();
   });
 
   test('choosing an outcome says what the plan will do, what it cannot do, and on what basis', () => {
@@ -178,9 +184,10 @@ describe('the sport screen in the interview', () => {
     expect(screen.queryByTestId('sport-emphasis-basis')).toBeNull();
   });
 
-  test('"not sure" is the starting workload answer; the competition date is context only', () => {
+  test('"not sure" is the starting workload answer; the competition date note is updated for meet countdown (#229)', () => {
     openSportSlide();
-    press('sport-family-strength');
+    press('sport-family-football');
+    press('sport-football_association');
     expect(screen.getByLabelText('practice sessions a week Not sure')).toBeTruthy();
     expect(screen.getByLabelText('matches or competitions a week Not sure')).toBeTruthy();
     expect(selected('sport-practice-unsure')).toBe(true);
@@ -191,8 +198,8 @@ describe('the sport screen in the interview', () => {
     press('sport-practice-unsure');
     expect(screen.getByLabelText('practice sessions a week Not sure')).toBeTruthy();
     expect(screen.getByTestId('sport-competition-note').props.children)
-      .toBe('If you add a competition date, it is recorded. For now the plan does not peak, taper or test for it. The date is used for reminders and for reviewing your goals.');
-    press('sport-outcome-bigger_competition_lifts');
+      .toBe('If you add a competition date, your blocks count down to peak and taper for competition day, and the date stays synced with your goal review.');
+    press('sport-outcome-stay_available');
     press('sport-experience-over_5_years');
     expect(nextDisabled()).toBe(false);
     type('sport-competition', '2020-01-01');
@@ -208,11 +215,10 @@ describe('the sport screen in the interview', () => {
   test('the date note is shown above the date field, before any date is typed (#229)', () => {
     openSportSlide();
     press('sport-family-strength');
+    press('sport-powerlifting');
     expect(screen.getByTestId('sport-competition').props.value).toBe('');
-    expect(screen.getByTestId('sport-competition-note').props.children).toMatch(/does not peak, taper or test for it/);
-    // The field is still blank, so the note must not claim a date is already recorded.
     expect(screen.getByTestId('sport-competition-note').props.children)
-      .toBe('If you add a competition date, it is recorded. For now the plan does not peak, taper or test for it. The date is used for reminders and for reviewing your goals.');
+      .toBe('If you add a competition date, your blocks count down to peak and taper for competition day, and the date stays synced with your goal review.');
     expect(screen.getByTestId('sport-competition-note').props.children).not.toContain('Your competition date is recorded.');
     // Render order: the note comes before the date field, so it is read first.
     const order = [];

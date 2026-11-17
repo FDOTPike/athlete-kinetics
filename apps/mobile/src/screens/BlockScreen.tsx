@@ -13,6 +13,9 @@ import {
   applyLoadModifier,
   applyPrescriptionToSlot,
   isPrescriptionReduced,
+  sportDisplayName,
+  sportPeakingFallbackCopy,
+  sportPeakingMovementsFor,
   targetLoadKg,
   splitExplainer,
   SPLIT_EXPLAINER_FOOTER,
@@ -173,9 +176,12 @@ export function pausedHeldText(
 }
 
 function targetLabel(slot: TodaySlot): string {
-  return slot.target.kind === 'time'
-    ? `${slot.sets} x ${slot.target.seconds}s`
-    : `${slot.sets} x ${slot.target.reps}`;
+  if (slot.target.kind === 'time') return `${slot.sets} x ${slot.target.seconds}s`;
+  if (slot.backOff !== undefined && slot.backOff.sets > 0) {
+    const pct = Math.round((1 - slot.backOff.loadMultiplier) * 100);
+    return `1 x ${slot.target.reps} + ${slot.backOff.sets} x ${slot.backOff.reps} (-${pct}% @ RPE ${slot.backOff.targetRpe.toFixed(1)})`;
+  }
+  return `${slot.sets} x ${slot.target.reps}`;
 }
 
 /** The slot's load from the athlete's 1RM (or its load override), with the
@@ -296,6 +302,8 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
   const lastTriage = useStore((s) => s.lastTriage);
   const block = useStore((s) => s.block);
   const blockMeta = useStore((s) => s.blockMeta);
+  const blockMeetMeta = useStore((s) => s.blockMeetMeta) ?? null;
+  const sport = useStore((s) => s.sport) ?? null;
   const oneRepMaxes = useStore((s) => s.oneRepMaxes);
   const blockSessions = useStore((s) => s.blockSessions);
   const todayPlan = useStore((s) => s.todayPlan);
@@ -613,7 +621,21 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
     setDetail({ summary, slots: loadSessionSlots(summary.plannedSessionId) });
   };
 
-  const renderTrajectorySection = (): React.JSX.Element => (
+  const renderTrajectorySection = (): React.JSX.Element => {
+    const meetHeader = blockMeetMeta !== null
+      ? (() => {
+          const weeksLeft = Math.max(
+            0,
+            Math.ceil((Date.parse(`${blockMeetMeta.competitionDate}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / (7 * 86400000)),
+          );
+          return `Block ${blockMeetMeta.blockNumber} of ${blockMeetMeta.totalBlocks} · ${weeksLeft} weeks to competition`;
+        })()
+      : null;
+    const peakingCatalog = sport !== null ? sportPeakingMovementsFor(sport.sportId) : [];
+    const showPeakingSection = sport !== null
+      && sport.sportId !== 'powerlifting'
+      && (blockMeetMeta !== null || sport.competitionDate !== null);
+    return (
     <View
       style={styles.section}
       onLayout={(event) => { trajectorySectionY.current = event.nativeEvent.layout.y; }}
@@ -626,6 +648,20 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           </View>
         )}
       </View>
+      {meetHeader !== null && (
+        <Text style={styles.captionText} testID="plan-meet-countdown-header">{meetHeader}</Text>
+      )}
+      {showPeakingSection && sport !== null && (
+        <View testID="plan-sport-peaking">
+          {peakingCatalog.length > 0 ? (
+            peakingCatalog.map((item) => (
+              <Text key={item.movementId} style={styles.captionText}>{item.name}</Text>
+            ))
+          ) : (
+            <Text style={styles.captionText}>{sportPeakingFallbackCopy(sportDisplayName(sport))}</Text>
+          )}
+        </View>
+      )}
       {blockMeta != null && blockMeta.macroBlockIndex >= 6 && (
         <View style={styles.blockAttribution}>
           <Pressable
@@ -813,7 +849,8 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
         </>
       )}
     </View>
-  );
+    );
+  };
 
   // #302 Bug 3 / 194c: pause & resume card rendered both in the pre-readiness gate
   // and in the full screen so suspension remains accessible before readiness arrives.

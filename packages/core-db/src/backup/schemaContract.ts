@@ -168,6 +168,16 @@ export const SUPPORTED_BACKUP_SCHEMA_CONTRACTS: readonly BackupSchemaContract[] 
     objectCount: 218,
     fingerprint: 'c3debf653091b89f0d4f7703ea39a1543b83baa1a7f810c77848ef20aea143cc',
   },
+  // Through 080_sport_peaking_and_lifting_taxonomy: widens primary & secondary
+  // sport tables to 24 sports and 0..52 matches_per_week for lifting sports, and
+  // adds sport_peaking_movement plus 4 Phase 2 side-car tables.
+  {
+    userVersion: 79,
+    migrationSlot: 80,
+    tableCount: 134,
+    objectCount: 223,
+    fingerprint: 'a098fc6fe8d1d0ab3851d3ce06aaf007c09ab3e3d348f6b0dd1bd8bc04ccaf2d',
+  },
 ];
 
 export const CURRENT_BACKUP_SCHEMA_CONTRACT: BackupSchemaContract =

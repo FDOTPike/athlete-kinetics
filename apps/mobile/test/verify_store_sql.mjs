@@ -70,6 +70,10 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   // 064 is the shared neutral activity/support persistence contract. Feature
   // adapters are separate modules, but the real store database must migrate it.
   '064_accessible_coach_support.sql',
+  // 066 adds athlete_focus/athlete_goal and 067 adds athlete_sport_profile/block_emphasis,
+  // which 076 and 078 rebuild and foreign-key to.
+  '066_focus_and_goals.sql',
+  '067_sport_and_emphasis.sql',
   // 069 adds resting_hr_daily, which the store writes on every biometrics sync,
   // reads for measured history and empties on reset. It depends only on 001.
   '069_resting_heart_rate.sql',
@@ -86,8 +90,8 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   '074_session_feel_reasons.sql',
   // 075 adds session_plan_slot_planned_count, which the store writes when a swap
   // after logged sets overwrites planned_sets, and empties on reset and discard.
-  '075_session_plan_slot_planned_count.sql', '077_multisport_and_flexibility.sql',
-  '078_kinestrike_telemetry.sql', '079_session_slot_swap_cause.sql'];
+  '075_session_plan_slot_planned_count.sql', '076_sport_taxonomy_expansion.sql', '077_multisport_and_flexibility.sql',
+  '078_kinestrike_telemetry.sql', '079_session_slot_swap_cause.sql', '080_sport_peaking_and_lifting_taxonomy.sql'];
 
 
 const db = new DatabaseSync(':memory:');

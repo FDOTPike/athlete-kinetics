@@ -396,6 +396,11 @@
         "ordinal": 78,
         "file": "079_session_slot_swap_cause.sql",
         "sha256": "32795ecde910d9f78852ea60ad2e4bdc20766b4580b8d4e08631e1143f245200"
+      },
+      {
+        "ordinal": 79,
+        "file": "080_sport_peaking_and_lifting_taxonomy.sql",
+        "sha256": "89c69e7016a87c43420f3ee35d65e4966bc8049eb0ca9ebe70b68bdf259c844d"
       }
     ]
   },

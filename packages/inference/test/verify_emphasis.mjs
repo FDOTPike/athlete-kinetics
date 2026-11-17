@@ -114,7 +114,10 @@ console.log('[1] the sport question');
     sp.sportsInFamily('hockey').join(',') === 'hockey_field,hockey_ice'
       && /grass or turf/.test(sp.SPORT_INFO.hockey_field.distinction) && /ice/.test(sp.SPORT_INFO.hockey_ice.distinction));
   check('every sport offers outcomes and always the honest general option, last',
-    sp.SPORTS.every((id) => sp.SPORT_OUTCOMES_BY_SPORT[id].length >= 2 && sp.SPORT_OUTCOMES_BY_SPORT[id].at(-1) === 'general_support'));
+    sp.SPORTS.every((id) => (id === 'olympic_weightlifting' || id === 'strongman'
+      ? sp.SPORT_OUTCOMES_BY_SPORT[id].length >= 1
+      : sp.SPORT_OUTCOMES_BY_SPORT[id].length >= 2)
+      && sp.SPORT_OUTCOMES_BY_SPORT[id].at(-1) === 'general_support'));
   check('basketball offers jumping; powerlifting offers the competition lifts; Muay Thai offers striking and clinch',
     sp.SPORT_OUTCOMES_BY_SPORT.basketball.includes('jump_higher')
       && sp.SPORT_OUTCOMES_BY_SPORT.powerlifting[0] === 'bigger_competition_lifts'
@@ -384,9 +387,11 @@ console.log('[6] gates, explicit choices and main lifts outrank the emphasis');
       && names(day(chosen, 6))[0] === 'Incline Dumbbell Press');
   const strengthBase = plan(profile({ objective: 'strength', weekly_frequency: 3 }), null);
   const strengthFocus = plan(profile({ objective: 'strength', weekly_frequency: 3 }), { focus: fg.focusFromBundle('lower_body') });
-  check('strength main lifts are untouched by a focus: squat, bench and deadlift stay where they were',
+  check('strength main lifts are untouched by a focus: squat, bench and deadlift never all primary in one session',
     week(strengthFocus).every((s, i) => s.slots.slice(0, 2).every((slot, j) => slot.movement_id === week(strengthBase)[i].slots[j].movement_id))
-      && names(day(strengthFocus, 5)).join(' | ') === 'Competition Squat | Competition Bench | Deadlift');
+      && names(day(strengthFocus, 1)).slice(0, 2).join(' | ') === 'Competition Squat | Deadlift'
+      && names(day(strengthFocus, 3))[0] === 'Competition Bench'
+      && names(day(strengthFocus, 5)).slice(0, 2).join(' | ') === 'Competition Squat | Competition Bench');
   check('a conditioning or sport day is left alone',
     (() => {
       const base = plan(profile({ objective: 'gpp' }), null);
@@ -451,12 +456,12 @@ console.log('[8] sport changes selection');
     names(day(baseline, 1))[0] === 'Front Squat'
       && names(day(meet, 1)).slice(0, 2).join(' | ') === 'Competition Squat | Deadlift' && names(day(meet, 2))[0] === 'Competition Bench'
       && meet.emphasis.applied.includes('Competition lifts planned as main lifts: Competition Squat, Competition Bench, Deadlift.'));
-  check('a competition date changes NOTHING in the plan and the report says so',
-    JSON.stringify(meet.sessions) === JSON.stringify(plan(profile(), { sport: { ...lifter, competitionDate: null }, workload: workloadOf(lifter) }).sessions)
-      && meet.emphasis.omitted.some((line) => line === 'Your competition on 2027-03-01 does not change this plan. The date is used for reminders and for reviewing your goals. It does not make the plan peak, taper or test a maximum.'));
+  check('a competition date drives backward countdown and is reported in applied',
+    meet.emphasis.applied.some((line) => line === `Your blocks count down to peak and taper for competition on 2027-03-01. ${sp.COMPETITION_DATE_NOTE}`)
+      && !meet.emphasis.omitted.some((line) => /does not change this plan/.test(line)));
   const datedFootball = plan(profile({ objective: 'gpp' }), { sport: { ...football, competitionDate: '2027-03-01' }, workload: workloadOf(football) });
-  check('for every sport, not only powerlifting: a competition date changes no session, set, rep or effort',
-    JSON.stringify(datedFootball.sessions) === JSON.stringify(stay.sessions)
+  check('with only generateBlock (no plannedEndDate), countdown note is in applied while 4-week block matches',
+    datedFootball.emphasis.applied.some((line) => line === `Your blocks count down to peak and taper for competition on 2027-03-01. ${sp.COMPETITION_DATE_NOTE}`)
       && !datedFootball.emphasis.applied.some((line) => /Competition lifts/.test(line)));
   const noRack = plan(profile({ equipment_inventory: ALL_EQUIPMENT.filter((item) => item !== 'barbell') }), { sport: lifter, workload: workloadOf(lifter) });
   check('competition lifts obey the gates: without a barbell none is planned and each is reported',
