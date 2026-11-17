@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import SessionScreen from '../../src/screens/SessionScreen';
 import { useStore } from '../../src/state/useStore';
 import { authorizeAthleteDataBoot } from '../../src/state/dataMaintenanceLock';
@@ -88,8 +88,8 @@ test('applying a day-swap option on Set 3 of 3 when the pulled-forward slot has 
 
   render(<SessionScreen />);
 
-  // Open substitution via "Swap or avoid this" and tap the Layer-2 Day-Swap option.
-  fireEvent.press(screen.getByLabelText('Swap or avoid this: Push-up'));
+  // Open discomfort substitution sheet and tap the Layer-2 Day-Swap option.
+  act(() => { state().openSubstitution(pushUpId); });
   expect(screen.getByText('Your completed sets stay recorded. The replacement carries the remaining work.')).toBeOnTheScreen();
 
   const daySwapButton = screen.getByLabelText('Move Incline Push-Up forward into this session');

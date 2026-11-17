@@ -2557,8 +2557,8 @@ console.log('\n[28] prospective load intent (L1a) and chain-scoped ladder floor 
   // advances the chain to 74.
   // 076 (sport taxonomy expansion to 22 sports) adds no library rows and
   // advances the chain to 75.
-  // 077 (swap memory and question tracking side-cars) and 078 (KineStrike
-  // telemetry side-car) add no library rows and advance the chain to 77.
+  // 077 (multisport), 078 (KineStrike telemetry), and 079 (swap cause)
+  // add no library rows and advance the migration chain.
   const chain = readdirSync(SCHEMA_DIR)
     .filter((f) => f.endsWith('.sql') && !f.startsWith('004_'))
     .sort((a, b) => Number(a.slice(0, 3)) - Number(b.slice(0, 3)));

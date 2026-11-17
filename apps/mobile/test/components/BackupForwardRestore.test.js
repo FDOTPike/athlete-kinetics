@@ -865,6 +865,28 @@ test('round trip at the current schema: focus, goals, every revision and measure
     } finally { reader.close(); }
   };
   const recordsBefore = sessionRecords(livePath);
+  // Seed a neutral swap cause row (078) on one of the session's plan slots so
+  // current-schema backup round-trip and CASCADE delete are covered end to end.
+  const causeDb = open(livePath);
+  let seededSlotId;
+  try {
+    seededSlotId = Number(causeDb.prepare('SELECT session_plan_slot_id FROM session_plan_slot WHERE session_id = 7100 ORDER BY session_plan_slot_id LIMIT 1').get().session_plan_slot_id);
+    causeDb.prepare(
+      'INSERT INTO session_slot_swap_cause (session_plan_slot_id, cause, scope, replaced_movement_id, recorded_at_ms) VALUES (?, ?, ?, ?, ?)',
+    ).run(seededSlotId, 'equipment_busy', 'rest_of_block', 1, 9600);
+  } finally { causeDb.close(); }
+  const swapCauseRows = (path) => {
+    const reader = open(path);
+    try {
+      return hasTable(reader, 'session_slot_swap_cause')
+        ? reader.prepare('SELECT session_plan_slot_id, cause, scope, replaced_movement_id, recorded_at_ms FROM session_slot_swap_cause ORDER BY session_plan_slot_id').all()
+        : [];
+    } finally { reader.close(); }
+  };
+  const swapCauseBefore = swapCauseRows(livePath);
+  expect(swapCauseBefore).toEqual([
+    { session_plan_slot_id: seededSlotId, cause: 'equipment_busy', scope: 'rest_of_block', replaced_movement_id: 1, recorded_at_ms: 9600 },
+  ]);
   expect(JSON.parse(recordsBefore)).toMatchObject({
     feel: [{ session_id: 7100, feel: 'harder' }],
     questions: [{ id: 1, asked_at: 9501, question_text: 'private-question', outcome_kind: 'card', glossary_term_id: 'RPE' }],
@@ -903,6 +925,7 @@ test('round trip at the current schema: focus, goals, every revision and measure
   wipe.close();
   // The session's records went with it.
   expect(JSON.parse(sessionRecords(livePath))).toEqual({ feel: [], skipped: [], shown: [], questions: [] });
+  expect(swapCauseRows(livePath)).toEqual([]);
   expect(JSON.parse(telemetryRows(livePath))).toEqual({ hrv: [], restingHr: [], kinestrike: [] });
   expect(focusGoalRows(livePath)).toBe(NO_FOCUS_OR_GOALS);
   // The goal link and the block explanation went with their parents.
@@ -919,6 +942,7 @@ test('round trip at the current schema: focus, goals, every revision and measure
   expect(sportRows(livePath)).toBe(before.sport);
   expect(telemetryRows(livePath)).toBe(before.telemetry);
   expect(sessionRecords(livePath)).toBe(recordsBefore);
+  expect(swapCauseRows(livePath)).toEqual(swapCauseBefore);
   expect(athleteData(livePath)).toBe(before.athlete);
   expect(seedCounts(livePath)).toEqual(before.seeds);
   // The restored file is the real current schema again, guards included.

@@ -391,6 +391,11 @@
         "ordinal": 77,
         "file": "078_kinestrike_telemetry.sql",
         "sha256": "6c4755b83c5bec60107f4e7e03045a583c3e9621a1dcc6303d87582259637570"
+      },
+      {
+        "ordinal": 78,
+        "file": "079_session_slot_swap_cause.sql",
+        "sha256": "32795ecde910d9f78852ea60ad2e4bdc20766b4580b8d4e08631e1143f245200"
       }
     ]
   },

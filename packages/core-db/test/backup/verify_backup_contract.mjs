@@ -155,6 +155,7 @@ function makeDatabase(file, label) {
   db.prepare('INSERT INTO session_feel_extra_reason (session_id, reason_too_heavy, reason_too_light, reason_rested_well) VALUES (?,?,?,?)').run(7001, 1, 0, 0);
   db.prepare('INSERT INTO session_plan_slot_planned_count (session_plan_slot_id, original_planned_sets) VALUES (?,?)').run(7101, 2);
   db.prepare('INSERT INTO state_vector_kinestrike (date, ks_foot, ks_strike_count, ks_gct_mean_ms) VALUES (?,?,?,?)').run('2026-09-11', 'L', 42, 238.5);
+  db.prepare('INSERT INTO session_slot_swap_cause (session_plan_slot_id, cause, scope, replaced_movement_id, replaced_by_session_plan_slot_id, recorded_at_ms) VALUES (?,?,?,?,?,?)').run(7101, 'equipment_busy', 'today_only', 1, 7102, 8500);
   db.exec('PRAGMA user_version=74');
   assert.equal(db.prepare('PRAGMA quick_check').get().quick_check, 'ok');
   const schemaObjects = db.prepare("SELECT type,name,tbl_name,coalesce(sql,'') AS sql FROM sqlite_master WHERE type IN ('table','index','trigger') AND name NOT GLOB 'sqlite_*' ORDER BY type,name").all()

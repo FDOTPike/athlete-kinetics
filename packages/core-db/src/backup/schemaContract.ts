@@ -160,6 +160,14 @@ export const SUPPORTED_BACKUP_SCHEMA_CONTRACTS: readonly BackupSchemaContract[] 
     objectCount: 217,
     fingerprint: 'eab1ec16b39fb6cf884344340a726775960bfc0af5c0828c4d68ac76691c89b2',
   },
+  // Through 079_session_slot_swap_cause: adds the session_slot_swap_cause side-car table.
+  {
+    userVersion: 78,
+    migrationSlot: 79,
+    tableCount: 129,
+    objectCount: 218,
+    fingerprint: 'c3debf653091b89f0d4f7703ea39a1543b83baa1a7f810c77848ef20aea143cc',
+  },
 ];
 
 export const CURRENT_BACKUP_SCHEMA_CONTRACT: BackupSchemaContract =

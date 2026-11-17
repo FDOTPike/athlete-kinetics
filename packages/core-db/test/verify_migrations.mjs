@@ -71,7 +71,7 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '069_resting_heart_rate.sql',
   '070_session_feel.sql', '071_beta_recording.sql', '072_question_log.sql', '073_session_slot_replaced_by.sql',
   '074_session_feel_reasons.sql', '075_session_plan_slot_planned_count.sql', '076_sport_taxonomy_expansion.sql', '077_multisport_and_flexibility.sql',
-  '078_kinestrike_telemetry.sql'];
+  '078_kinestrike_telemetry.sql', '079_session_slot_swap_cause.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
@@ -1768,11 +1768,11 @@ console.log('[2u] 057 block_meta phase/index repair + enforcement');
     const db = freshDb();
     runMigrations(db, MIGRATIONS);
     // Slot 004 is the parameterized materialize script, never a migration:
-    // 77 files (slots 001-078, no 004) -> user_version 77. This count is
+    // 78 files (slots 001-079, no 004) -> user_version 78. This count is
     // pinned deliberately so adding a migration is a conscious act, not a
-    // silent one. Re-pinned for 078 (kinestrike_telemetry).
-    check('fresh install reaches user_version 77 (77 files, no slot 004)',
-      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 77,
+    // silent one. Re-pinned for 079 (session_slot_swap_cause).
+    check('fresh install reaches user_version 78 (78 files, no slot 004)',
+      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 78,
       String(uv(db)));
     const trig = db.raw.prepare(
       `SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'trigger'
@@ -4759,7 +4759,7 @@ console.log('[077] multisport and flexibility (secondary sport + flexibility tag
 console.log('[078] KineStrike plantar telemetry side-car (state_vector_kinestrike)');
 {
   const index = FILES.indexOf('078_kinestrike_telemetry.sql');
-  check('078 is the last migration in the chain', index === MIGRATIONS.length - 1);
+  check('078 precedes 079', index === 76 && FILES[index + 1] === '079_session_slot_swap_cause.sql');
   const d = freshDb();
   runMigrations(d, MIGRATIONS);
   const has = (name) => d.raw.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name=?").get(name).c === 1;
@@ -4770,6 +4770,30 @@ console.log('[078] KineStrike plantar telemetry side-car (state_vector_kinestrik
   check('078 poison detection spots missing state_vector_kinestrike sentinel', sentinelsMissing(d).includes('state_vector_kinestrike'));
   runMigrations(d, MIGRATIONS);
   check('078 self-heal restores state_vector_kinestrike', has('state_vector_kinestrike'));
+}
+
+// =============================================================================
+// [079] Session slot swap cause & scope side-car (#208)
+// =============================================================================
+console.log('[079] session slot swap cause & scope side-car (session_slot_swap_cause)');
+{
+  const index = FILES.indexOf('079_session_slot_swap_cause.sql');
+  check('079 is the last migration in the chain', index === MIGRATIONS.length - 1);
+  const d = freshDb();
+  runMigrations(d, MIGRATIONS);
+  const has = (name) => d.raw.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name=?").get(name).c === 1;
+  check('079 creates session_slot_swap_cause', has('session_slot_swap_cause'));
+  d.raw.exec("INSERT INTO session (session_id, micro_cycle_id, session_date, started_at_ms) VALUES (9780, NULL, '2026-11-10', 1000)");
+  d.raw.exec("INSERT INTO session_plan_slot (session_plan_slot_id, session_id, slot_index, movement_id, planned_sets, planned_reps, provenance_kind, target_rpe) VALUES (9781, 9780, 1, 1, 3, 5, 'free_form', NULL)");
+  d.raw.exec("INSERT INTO session_plan_slot (session_plan_slot_id, session_id, slot_index, movement_id, planned_sets, planned_reps, provenance_kind, target_rpe) VALUES (9782, 9780, 2, 2, 2, 5, 'free_form', NULL)");
+  d.raw.exec("INSERT INTO session_slot_swap_cause (session_plan_slot_id, cause, scope, replaced_movement_id, replaced_by_session_plan_slot_id, recorded_at_ms) VALUES (9781, 'equipment_busy', 'today_only', 1, 9782, 12345)");
+  check('079 persists swap cause and scope row', d.raw.prepare("SELECT cause, scope, replaced_movement_id FROM session_slot_swap_cause WHERE session_plan_slot_id = 9781").get()?.cause === 'equipment_busy');
+  check('079 enforces cause CHECK constraint', throws(() => d.raw.exec("INSERT INTO session_slot_swap_cause (session_plan_slot_id, cause, scope, recorded_at_ms) VALUES (9782, 'invented_reason', 'today_only', 1)")));
+  check('079 enforces scope CHECK constraint', throws(() => d.raw.exec("INSERT INTO session_slot_swap_cause (session_plan_slot_id, cause, scope, recorded_at_ms) VALUES (9782, 'preference', 'forever', 1)")));
+  d.raw.exec('DROP TABLE session_slot_swap_cause');
+  check('079 poison detection spots missing session_slot_swap_cause sentinel', sentinelsMissing(d).includes('session_slot_swap_cause'));
+  runMigrations(d, MIGRATIONS);
+  check('079 self-heal restores session_slot_swap_cause', has('session_slot_swap_cause'));
 }
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);

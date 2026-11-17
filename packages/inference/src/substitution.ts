@@ -202,6 +202,39 @@ export interface SubstitutionResult {
   haltAdvised: boolean;
 }
 
+export type SwapCause = 'joint_discomfort' | 'equipment_busy' | 'preference' | 'time' | 'other';
+export type NeutralSwapCause = 'equipment_busy' | 'preference' | 'time';
+export type SwapScope = 'today_only' | 'rest_of_block';
+
+export const NEUTRAL_SWAP_CAUSES: readonly NeutralSwapCause[] = [
+  'equipment_busy',
+  'preference',
+  'time',
+] as const;
+
+export const NON_PATHOLOGICAL_SWAP_CAUSES: ReadonlySet<SwapCause> = new Set<SwapCause>(
+  NEUTRAL_SWAP_CAUSES,
+);
+
+export const NEUTRAL_SWAP_SUBTITLE = 'Same movement pattern · Uses your available equipment' as const;
+
+export interface NeutralSwapOption {
+  readonly movement_id: number;
+  readonly name: string;
+  readonly pattern: MovementPattern;
+  readonly difficulty: DifficultyRating;
+  readonly preference: MovementPreference;
+  readonly tierDelta: number;
+  readonly absTierDelta: number;
+  readonly subtitle: typeof NEUTRAL_SWAP_SUBTITLE;
+}
+
+export interface SwapHistoryRecord {
+  readonly movement_id: number;
+  readonly cause: SwapCause;
+  readonly overlaps_affected_joint?: boolean;
+}
+
 // ---------------------------------------------------------------------------
 // Pure helpers
 // ---------------------------------------------------------------------------
@@ -241,12 +274,12 @@ const byTriage = (a: SubstitutionMovement, b: SubstitutionMovement): number =>
   b.preference - a.preference ||
   DIFFICULTY_RANK[a.difficulty] - DIFFICULTY_RANK[b.difficulty] ||
   a.movement_id - b.movement_id;
+const byNeutralSwap = (a: NeutralSwapOption, b: NeutralSwapOption): number =>
+  a.absTierDelta - b.absTierDelta ||
+  b.preference - a.preference ||
+  a.movement_id - b.movement_id;
 
-// ---------------------------------------------------------------------------
-// Engine
-// ---------------------------------------------------------------------------
-export function computeSubstitutions(input: SubstitutionInput): SubstitutionResult {
-  const ratio = clampInt(input.maxAccessoryRatio ?? DEFAULT_ACCESSORY_RATIO, 1, DEFAULT_ACCESSORY_RATIO);
+function createSubstitutionPredicates(input: SubstitutionInput) {
   const inventory = new Set(input.inventory);
   const niggles = input.niggles ?? [];
   // Experience-weighted thresholds (DOMS-vs-structural): a beginner tolerates
@@ -255,7 +288,6 @@ export function computeSubstitutions(input: SubstitutionInput): SubstitutionResu
   const injured = injuredJoints(niggles, triageMin);
   const guarded = injured.size > 0;
   const haltAdvised = niggles.some((n) => n.severity >= haltMin);
-  const targetCategory = PATTERN_TO_CATEGORY[input.target.pattern];
   const targetRank = DIFFICULTY_RANK[input.target.difficulty];
   const blocked = new Set<number>();
 
@@ -278,6 +310,92 @@ export function computeSubstitutions(input: SubstitutionInput): SubstitutionResu
     }
     return false;
   };
+
+  return {
+    niggles,
+    triageMin,
+    haltMin,
+    guarded,
+    haltAdvised,
+    targetRank,
+    blocked,
+    available,
+    tierBars,
+    guardrailBars,
+  };
+}
+
+export function isNonPathologicalSwapCause(cause: SwapCause): boolean {
+  return NON_PATHOLOGICAL_SWAP_CAUSES.has(cause);
+}
+
+/** Mechanism 1 (kTrigger) swap evaluation: non-pathological causes
+ *  ('equipment_busy' | 'preference' | 'time') never trigger Avoid (-1) promotions. */
+export function deriveAvoidPromotionsFromSwaps(
+  swaps: readonly SwapHistoryRecord[],
+  kTrigger: number,
+): Readonly<Record<number, typeof MOVEMENT_PREFERENCE.AVOID>> {
+  if (!Number.isInteger(kTrigger) || kTrigger < 1) {
+    throw new RangeError(`kTrigger must be a positive integer; received ${kTrigger}`);
+  }
+  const counts = new Map<number, number>();
+  for (const swap of swaps) {
+    if (isNonPathologicalSwapCause(swap.cause)) continue;
+    if (swap.overlaps_affected_joint !== true) continue;
+    counts.set(swap.movement_id, (counts.get(swap.movement_id) ?? 0) + 1);
+  }
+  const avoids: Record<number, typeof MOVEMENT_PREFERENCE.AVOID> = {};
+  for (const [movementId, count] of counts) {
+    if (count >= kTrigger) avoids[movementId] = MOVEMENT_PREFERENCE.AVOID;
+  }
+  return avoids;
+}
+
+/** Issue #208 neutral parity swap ranking: same-pattern available movements
+ *  ranked at matched difficulty first (|tierDelta| === 0, then 1) with neutral copy. */
+export function computeNeutralSwapOptions(input: SubstitutionInput): NeutralSwapOption[] {
+  const { targetRank, available, tierBars, guardrailBars } = createSubstitutionPredicates(input);
+  const options: NeutralSwapOption[] = [];
+  for (const m of input.library) {
+    if (m.movement_id === input.target.movement_id) continue;
+    if (m.pattern !== input.target.pattern) continue;
+    if (isAvoided(m) || !available(m)) continue;
+    if (tierBars(m)) continue;
+    if (guardrailBars(m)) continue;
+    const tierDelta = DIFFICULTY_RANK[m.difficulty] - targetRank;
+    options.push({
+      movement_id: m.movement_id,
+      name: m.name,
+      pattern: m.pattern,
+      difficulty: m.difficulty,
+      preference: m.preference,
+      tierDelta,
+      absTierDelta: Math.abs(tierDelta),
+      subtitle: NEUTRAL_SWAP_SUBTITLE,
+    });
+  }
+  options.sort(byNeutralSwap);
+  return options;
+}
+
+// ---------------------------------------------------------------------------
+// Engine
+// ---------------------------------------------------------------------------
+export function computeSubstitutions(input: SubstitutionInput): SubstitutionResult {
+  const ratio = clampInt(input.maxAccessoryRatio ?? DEFAULT_ACCESSORY_RATIO, 1, DEFAULT_ACCESSORY_RATIO);
+  const {
+    niggles,
+    triageMin,
+    haltMin,
+    guarded,
+    haltAdvised,
+    targetRank,
+    blocked,
+    available,
+    tierBars,
+    guardrailBars,
+  } = createSubstitutionPredicates(input);
+  const targetCategory = PATTERN_TO_CATEGORY[input.target.pattern];
 
   // --- LAYER 1: biomechanical regression (green) ---------------------------
   // Same precise pattern, difficulty NOT above the target ("reduce difficulty

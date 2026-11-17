@@ -338,6 +338,7 @@ export const SENTINELS: readonly MigrationSentinel[] = [
   { type: 'table', name: 'session_feel_extra_reason' },                       // 074
   { type: 'table', name: 'session_plan_slot_planned_count' },                 // 075
   { type: 'table', name: 'state_vector_kinestrike' },                         // 078
+  { type: 'table', name: 'session_slot_swap_cause' },                         // 079
 ];
 
 /** Durable tables deliberately absent from SENTINELS, each with the reason it
