@@ -386,6 +386,11 @@
         "ordinal": 76,
         "file": "077_multisport_and_flexibility.sql",
         "sha256": "5f69c01523e09cf03dc8572a0c5798fcf0f7f8ff1856ab8ab96c6a81768d62f9"
+      },
+      {
+        "ordinal": 77,
+        "file": "078_kinestrike_telemetry.sql",
+        "sha256": "6c4755b83c5bec60107f4e7e03045a583c3e9621a1dcc6303d87582259637570"
       }
     ]
   },

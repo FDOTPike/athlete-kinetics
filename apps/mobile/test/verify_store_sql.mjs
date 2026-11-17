@@ -86,7 +86,8 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   '074_session_feel_reasons.sql',
   // 075 adds session_plan_slot_planned_count, which the store writes when a swap
   // after logged sets overwrites planned_sets, and empties on reset and discard.
-  '075_session_plan_slot_planned_count.sql', '077_multisport_and_flexibility.sql'];
+  '075_session_plan_slot_planned_count.sql', '077_multisport_and_flexibility.sql',
+  '078_kinestrike_telemetry.sql'];
 
 
 const db = new DatabaseSync(':memory:');

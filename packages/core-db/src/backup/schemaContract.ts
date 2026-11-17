@@ -152,6 +152,14 @@ export const SUPPORTED_BACKUP_SCHEMA_CONTRACTS: readonly BackupSchemaContract[] 
     objectCount: 216,
     fingerprint: '88daea365fb6f4d9d6414c1ab2c267af5aa0aa0149c7b5b3a69a3b0b804be294',
   },
+  // Through 078_kinestrike_telemetry: adds the state_vector_kinestrike side-car table.
+  {
+    userVersion: 77,
+    migrationSlot: 78,
+    tableCount: 128,
+    objectCount: 217,
+    fingerprint: 'eab1ec16b39fb6cf884344340a726775960bfc0af5c0828c4d68ac76691c89b2',
+  },
 ];
 
 export const CURRENT_BACKUP_SCHEMA_CONTRACT: BackupSchemaContract =

@@ -299,6 +299,7 @@ const telemetryRows = (path) => {
     return JSON.stringify({
       hrv: db.prepare('SELECT * FROM hrv_daily ORDER BY date').all(),
       restingHr: hasTable(db, 'resting_hr_daily') ? db.prepare('SELECT * FROM resting_hr_daily ORDER BY date').all() : [],
+      kinestrike: hasTable(db, 'state_vector_kinestrike') ? db.prepare('SELECT * FROM state_vector_kinestrike ORDER BY date').all() : [],
     });
   } finally { db.close(); }
 };
@@ -495,6 +496,7 @@ function expectForwardRestored(legacy) {
     // an empty resting_hr_daily and copies or invents nothing into it.
     expect(telemetryRows(path)).toBe(legacy.telemetry[key]);
     expect(JSON.parse(telemetryRows(path)).restingHr).toEqual([]);
+    expect(JSON.parse(telemetryRows(path)).kinestrike).toEqual([]);
     // The forward migration brought the library text up to date: all 115 v2
     // corrections applied, only the deliberately held template rows remain.
     expect(coachingText(path)).toEqual({ v2Corrections: 115, templateRows: 29 });
@@ -735,9 +737,14 @@ describe('every registered pre-upgrade schema restores, not only the first', () 
     expect([v75.migrationSlot, v75.tableCount]).toEqual([76, v74.tableCount]);
     // 077 adds two side-car tables.
     const v76 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 76);
-    expect(v76).toBe(CURRENT);
+    expect(v76).not.toBe(CURRENT);
     expect(v76.fingerprint).not.toBe(v75.fingerprint);
     expect([v76.migrationSlot, v76.tableCount]).toEqual([77, v75.tableCount + 2]);
+    // 078 (WO-KS-BRIDGE-02): one side-car table added for KineStrike telemetry.
+    const v77 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 77);
+    expect(v77).toBe(CURRENT);
+    expect(v77.fingerprint).not.toBe(v76.fingerprint);
+    expect([v77.migrationSlot, v77.tableCount]).toEqual([78, v76.tableCount + 1]);
     expect(v70.fingerprint).not.toBe(v69.fingerprint);
     expect([v70.migrationSlot, v70.tableCount]).toEqual([71, v69.tableCount + 2]);
     expect(PRE_UPGRADE.length).toBeGreaterThanOrEqual(7);
@@ -827,9 +834,12 @@ test('round trip at the current schema: focus, goals, every revision and measure
   seedFocusAndGoals(db);
   seedSportAndEmphasis(db);
   seedLegacyHrv(db);
-  // Resting HR with no HRV beside it, from each service (069).
+  // Resting HR with no HRV beside it, from each service (069), plus KineStrike telemetry (078).
   db.exec(`INSERT INTO resting_hr_daily (date, bpm, source, synced_at_ms) VALUES
-    ('2026-09-03', 54.5, 'apple_health', 8000), ('2026-09-04', 49, 'health_connect', 8100)`);
+    ('2026-09-03', 54.5, 'apple_health', 8000), ('2026-09-04', 49, 'health_connect', 8100);
+    INSERT INTO state_vector_kinestrike
+      (date, ks_foot, ks_strike_count, ks_gct_mean_ms, ks_gct_delta_pct, ks_cop_x_mean, ks_fall_last_state)
+      VALUES ('2026-09-05', 'L', 28, 242.5, 7.6, 0.48, 'IDLE')`);
   // 070 and 071: how a finished session went, a slot that was skipped in it, and
   // what two of its sets were seeded with (a load, and a blank field with an advisory).
   db.exec(`INSERT INTO session (session_id, micro_cycle_id, session_date, started_at_ms) VALUES (7100, NULL, '2026-09-05', 9000);
@@ -866,6 +876,9 @@ test('round trip at the current schema: focus, goals, every revision and measure
     telemetry: telemetryRows(livePath),
   };
   expect(JSON.parse(before.telemetry).restingHr).toHaveLength(2);
+  expect(JSON.parse(before.telemetry).kinestrike).toEqual([
+    expect.objectContaining({ date: '2026-09-05', ks_foot: 'L', ks_strike_count: 28, ks_gct_delta_pct: 7.6 }),
+  ]);
   expect(JSON.parse(before.sport)).toMatchObject({ sport: [{ sport_id: 'other', revision: 3 }], links: [{ movement_id: 1 }] });
   expect(JSON.parse(before.sport).emphasis).toHaveLength(1);
   expect(JSON.parse(before.focusGoals)).toMatchObject({ focus: [{ bundle_id: 'lower_body', revision: 2 }] });
@@ -885,11 +898,12 @@ test('round trip at the current schema: focus, goals, every revision and measure
   const wipe = open(livePath);
   wipe.exec('PRAGMA foreign_keys = ON; DELETE FROM athlete_goal; DELETE FROM athlete_focus;'
     + ' DELETE FROM athlete_sport_profile; DELETE FROM training_block;'
-    + ' DELETE FROM hrv_daily; DELETE FROM resting_hr_daily; DELETE FROM session WHERE session_id = 7100; DELETE FROM question_log;');
+    + ' DELETE FROM hrv_daily; DELETE FROM resting_hr_daily; DELETE FROM state_vector_kinestrike;'
+    + ' DELETE FROM session WHERE session_id = 7100; DELETE FROM question_log;');
   wipe.close();
   // The session's records went with it.
   expect(JSON.parse(sessionRecords(livePath))).toEqual({ feel: [], skipped: [], shown: [], questions: [] });
-  expect(JSON.parse(telemetryRows(livePath))).toEqual({ hrv: [], restingHr: [] });
+  expect(JSON.parse(telemetryRows(livePath))).toEqual({ hrv: [], restingHr: [], kinestrike: [] });
   expect(focusGoalRows(livePath)).toBe(NO_FOCUS_OR_GOALS);
   // The goal link and the block explanation went with their parents.
   expect(sportRows(livePath)).toBe(NO_SPORT_OR_EMPHASIS);

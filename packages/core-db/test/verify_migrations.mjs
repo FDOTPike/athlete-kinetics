@@ -70,7 +70,8 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '068_movement_content_correction_v2.sql',
   '069_resting_heart_rate.sql',
   '070_session_feel.sql', '071_beta_recording.sql', '072_question_log.sql', '073_session_slot_replaced_by.sql',
-  '074_session_feel_reasons.sql', '075_session_plan_slot_planned_count.sql', '076_sport_taxonomy_expansion.sql', '077_multisport_and_flexibility.sql'];
+  '074_session_feel_reasons.sql', '075_session_plan_slot_planned_count.sql', '076_sport_taxonomy_expansion.sql', '077_multisport_and_flexibility.sql',
+  '078_kinestrike_telemetry.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
@@ -1767,11 +1768,11 @@ console.log('[2u] 057 block_meta phase/index repair + enforcement');
     const db = freshDb();
     runMigrations(db, MIGRATIONS);
     // Slot 004 is the parameterized materialize script, never a migration:
-    // 75 files (slots 001-076, no 004) -> user_version 75. This count is
+    // 77 files (slots 001-078, no 004) -> user_version 77. This count is
     // pinned deliberately so adding a migration is a conscious act, not a
-    // silent one. Re-pinned for 076 (sport_taxonomy_expansion).
-    check('fresh install reaches user_version 76 (76 files, no slot 004)',
-      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 76,
+    // silent one. Re-pinned for 078 (kinestrike_telemetry).
+    check('fresh install reaches user_version 77 (77 files, no slot 004)',
+      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 77,
       String(uv(db)));
     const trig = db.raw.prepare(
       `SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'trigger'
@@ -4705,7 +4706,7 @@ console.log('\n[one statement per database call]');
 console.log('[076] sport taxonomy expansion (athlete_sport_profile CHECK widened)');
 {
   const index = FILES.indexOf('076_sport_taxonomy_expansion.sql');
-  check('076 is appended before 077', index === MIGRATIONS.length - 2 && FILES[index + 1] === '077_multisport_and_flexibility.sql');
+  check('076 is appended before 077', index === 74 && FILES[index + 1] === '077_multisport_and_flexibility.sql');
   const upgraded = freshDb();
   applyRaw(upgraded, MIGRATIONS, 0, index); // through 075
   upgraded.raw.exec("INSERT INTO athlete_sport_profile (sport_profile_id, sport_id, outcome_id, experience_id, revision, updated_at_ms) VALUES (1, 'basketball', 'general_support', 'new', 1, 0)");
@@ -4728,7 +4729,7 @@ console.log('[076] sport taxonomy expansion (athlete_sport_profile CHECK widened
 console.log('[077] multisport and flexibility (secondary sport + flexibility tag)');
 {
   const index = FILES.indexOf('077_multisport_and_flexibility.sql');
-  check('077 is the last migration in the chain', index === MIGRATIONS.length - 1);
+  check('077 is appended before 078', index === 75 && FILES[index + 1] === '078_kinestrike_telemetry.sql');
   const d = freshDb();
   runMigrations(d, MIGRATIONS);
   const has = (name) => d.raw.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name=?").get(name).c === 1;
@@ -4750,6 +4751,25 @@ console.log('[077] multisport and flexibility (secondary sport + flexibility tag
   tag('flex1');
   check('077 accepts tagging a low-demand activity', d.raw.prepare('SELECT COUNT(*) c FROM activity_flexibility_tag').get().c === 1);
   check('077 blocks reclassifying a tagged activity away from low demand', throws(() => d.raw.exec("UPDATE activity_definition SET demand_class = 'moderate' WHERE activity_id = 'flex1'")));
+}
+
+// =============================================================================
+// [078] KineStrike plantar/IMU telemetry side-car
+// =============================================================================
+console.log('[078] KineStrike plantar telemetry side-car (state_vector_kinestrike)');
+{
+  const index = FILES.indexOf('078_kinestrike_telemetry.sql');
+  check('078 is the last migration in the chain', index === MIGRATIONS.length - 1);
+  const d = freshDb();
+  runMigrations(d, MIGRATIONS);
+  const has = (name) => d.raw.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name=?").get(name).c === 1;
+  check('078 creates state_vector_kinestrike', has('state_vector_kinestrike'));
+  d.raw.exec("INSERT INTO state_vector_kinestrike (date, ks_foot, ks_strike_count, ks_cop_x_mean, ks_fall_last_state) VALUES ('2026-11-10', 'R', 120, 0.46, 'IDLE')");
+  check('078 persists daily plantar telemetry row', d.raw.prepare("SELECT ks_foot FROM state_vector_kinestrike WHERE date='2026-11-10'").get().ks_foot === 'R');
+  d.raw.exec('DROP TABLE state_vector_kinestrike');
+  check('078 poison detection spots missing state_vector_kinestrike sentinel', sentinelsMissing(d).includes('state_vector_kinestrike'));
+  runMigrations(d, MIGRATIONS);
+  check('078 self-heal restores state_vector_kinestrike', has('state_vector_kinestrike'));
 }
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);

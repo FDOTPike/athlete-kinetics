@@ -13264,3 +13264,27 @@ The appendix held the code around the read, every match for `0286` and "record o
   - Fail-first run recorded prior to `src/` edits (`pr359_fail_first.txt`: `COMPLETION_EXIT=1`, `3 COMPLETION ACTION CHECK(S) FAILED`; `LONGITUDINAL_EXIT=1`, `7 LONGITUDINAL AUTOPILOT CHECK(S) FAILED`).
   - Guard break/restore demonstration recorded (`pr359_guard_break.txt`: `GUARD_BREAK_EXIT=1`, `3 LONGITUDINAL AUTOPILOT CHECK(S) FAILED`), followed by full restoration in `packages/inference/src/longitudinalAutopilot.ts`.
   - Targeted unit/module suites verified green (`verify_completion_action.mjs` and `verify_longitudinal_autopilot.mjs`: `ALL 24 LONGITUDINAL AUTOPILOT CHECKS VERIFIED`), with final CI run (`npm run verify:ci`) executed after final edits.
+
+## Entry 0302 — 2026-11-14 · KineStrike Telemetry Bridge (`WO-KS-BRIDGE-01` #342 & `WO-KS-BRIDGE-02` #343)
+
+**Status:** EVIDENCE CAPTURED (pure telemetry bridge `#342` + additive `078` side-car migration & non-binding `SessionFeelPanel` advisory integration `#343`).
+
+### Summary
+
+- **`WO-KS-BRIDGE-01` (#342):** Implemented `packages/inference/src/kinestrikeBridge.ts` and exported its public surface from `packages/inference/src/index.ts` (zero `fs` / `sqlite` / React Native / BLE imports):
+  - Strict ASCII XOR NMEA checksum validator (`verifyNmeaChecksum`) and fixed-width 15-token `$PKSF,1` parser (`parsePksfSentence`), rejecting unknown talkers/versions, trailing/missing fields, out-of-range zone shares (`[0, 100]` and sum `<= 100.5`), negative/NaN fields, and unknown `fall_state` values.
+  - Pure summary accumulator (`summarizePksfSession`) returning an all-`null` row when zero valid strikes exist and populating `ks_*` summary fields otherwise.
+  - Pure sport-aware suggestion mapper (`suggestSessionFeelFromKineStrike`) honoring `KINESTRIKE_BRIDGE_DEFAULTS`, canonical `isSportId(sport)` validation, non-binding advisory `suggestedReasons` / `suggestedSubChips`, and deterministic fallback to empty suggestions.
+  - Added fail-first test suite `packages/inference/src/__tests__/kinestrikeBridge.test.ts` and root `jest.config.cjs`.
+- **`WO-KS-BRIDGE-02` (#343):**
+  - Added idempotent additive side-car migration `packages/core-db/src/schema/078_kinestrike_telemetry.sql` (`state_vector_kinestrike`, `STRICT, WITHOUT ROWID`, keyed by `date`), leaving `state_vector` and `004_state_vector_materialize.sql` untouched while registering ordinal `77` across `migrations.ts`, `migrationRunner.ts`, `MIGRATION_LINEAGE.json`, `MIGRATION_LINEAGE.md`, `schemaContract.ts` (`userVersion: 77`, `migrationSlot: 78`, `tableCount: 128`, `objectCount: 217`), `WO03_DURABLE_DATA_INVENTORY.md`, `useStore.ts` (`resetTrainingData`), `verify_store_sql.mjs` (display/reset-only; zero engine reads), `verify_migrations.mjs`, `verify_backup_contract.mjs`, `verify_blocks.mjs`, `verify_pipeline.mjs`, and `BackupForwardRestore.test.js`.
+  - Extended `apps/mobile/src/components/SessionFeelPanel.tsx` with optional backwards-compatible `suggestedReasonCodes` and `suggestedKineStrikeSubChips` props (`saved === null` pre-selection only, non-binding athlete toggle override, zero change to `onSave(feel, reasons)` signature) plus `apps/mobile/test/components/KineStrikeBridge02.test.js`.
+- **Branch:** `feat/kinestrike-bridge-v1`.
+
+### Owner Ruling Group 6 Resolution (PR #360, 2026-11-15)
+
+- **Ruling 6.1 (Option A — Decimal rounding slack provenance, CodeRabbit `4565526384`):** Explicitly ratified retaining `[0, 1.001]` per-share bounds, `[-1.001, 1.001]` CoP-X bounds, and `0.95..1.05` four-zone `B`-record share-sum tolerance in `packages/inference/src/kinestrikeBridge.ts` and `078_kinestrike_telemetry.sql` to tolerate `%.4f` float formatting quantization in `KineStrike_Final/firmware/ontarget_live_esp32/ontarget_live_esp32.ino` (matching `tools/ks_live_common.py`). Boundary acceptance and rejection tests added in `packages/inference/src/__tests__/kinestrikeBridge.test.ts`.
+- **Ruling 6.2 (Option C — Informational sub-chips + explicit pain tap only, CodeRabbit `4565526401`):**
+  - Removed telemetry `'pain'` emission from `evaluateKineStrikeFeelSuggestions` (`packages/inference/src/kinestrikeBridge.ts`) while preserving caller-compatible `thresholds` validation and non-pain `'soreness'` suggestions.
+  - Retained owner-ratified CoP-X thresholds in `KINESTRIKE_BRIDGE_DEFAULTS` (`copXMedialShiftWarn: 0.45`, `copXLateralGuardWarn: -0.35`, `peakLoadCvWarn: 0.18`, `gctDeltaPctWarn: 6.0`, `zHrvFatigueMax: -0.50`) and `deriveKineStrikeSubChips`.
+  - Added belt-and-suspenders guard (`reason !== 'pain'`) in `apps/mobile/src/components/SessionFeelPanel.tsx` `chooseFeel` so selecting `'harder'`, `'easier'`, or `'stopped_early'` never pre-selects `'pain'`; an explicit athlete tap on `session-feel-reason-pain` is required before `'pain'` is selected or persisted.
