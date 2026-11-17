@@ -389,9 +389,29 @@ final class AthleteKineticsUITests: XCTestCase {
   private func expandCoachMode() -> String {
     unlockAdvancedTools()
     let coach = element(labelBeginsWith: "Coach mode,")
+    func pollCoachLabel(timeout: TimeInterval, interval: useconds_t, where matches: (String) -> Bool) -> String? {
+      let deadline = Date().addingTimeInterval(timeout)
+      while Date() < deadline {
+        if let current = currentLabel(coach), current.hasPrefix("Coach mode,"), matches(current) {
+          return current
+        }
+        usleep(interval)
+      }
+      return nil
+    }
+    guard pollCoachLabel(timeout: 30, interval: 500_000, where: { _ in true }) != nil else {
+      XCTFail("Coach mode header did not appear within 30 s")
+      return "<absent>"
+    }
     reveal(coach, "Coach mode")
-    if coach.label.hasSuffix("collapsed") { coach.tap() }
+    bringClear(coach, "Coach mode")
+    let preTapLabel = pollCoachLabel(timeout: 5, interval: 250_000) { _ in true }
+    if (preTapLabel ?? "").hasSuffix("collapsed") {
+      coach.tap()
+      _ = pollCoachLabel(timeout: 10, interval: 250_000) { !$0.hasSuffix("collapsed") }
+    }
     let label = settledLabel(coach, beginsWith: "Coach mode,", "Coach Mode", timeout: 10)
+    XCTAssertFalse(label.hasSuffix("collapsed"), "Coach mode remained collapsed: \(label)")
     return label
   }
 
@@ -509,7 +529,8 @@ final class AthleteKineticsUITests: XCTestCase {
                 break
               }
             }
-          } else if let container = findSheetContainer(root) {
+          }
+          if offsetSource == "none", let container = findSheetContainer(root) {
             let nf = container.frame
             measuredOffset = max(nf.minY, targetFrame.height - nf.height)
             offsetSource = "sheetContainer"
@@ -1149,36 +1170,41 @@ final class AthleteKineticsUITests: XCTestCase {
     }
     func currentChoice() -> (XCUIElement, XCUIElementSnapshot, CGRect, String, Bool)? {
       let bar = filesSheetBar()
-      let sources: [(() -> XCUIElement, Bool)] = [
-        ({ bar.buttons.matching(named).firstMatch }, true),
-        ({ bar.descendants(matching: .any).matching(named).firstMatch }, true),
-        ({ self.app.buttons.matching(named).firstMatch }, false),
-        ({ self.app.descendants(matching: .any).matching(named).firstMatch }, false),
-      ]
       var fallback: (XCUIElement, XCUIElementSnapshot, CGRect, String, Bool)?
-      for (source, fromBar) in sources {
-        let el = source()
-        if let (snap, f, id, hittable) = readCandidate(el, fromBar: fromBar) {
-          if hittable {
-            return (el, snap, f, id, fromBar)
-          }
-          if fallback == nil {
-            fallback = (el, snap, f, id, fromBar)
+      func firstIn(_ root: XCUIElement, fromBar: Bool) -> (XCUIElement, XCUIElementSnapshot, CGRect, String, Bool)? {
+        let sources: [() -> XCUIElement] = [
+          { root.buttons.matching(named).firstMatch },
+          { root.descendants(matching: .any).matching(named).firstMatch },
+        ]
+        for source in sources {
+          let el = source()
+          if let (snap, f, id, hittable) = readCandidate(el, fromBar: fromBar) {
+            if hittable { return (el, snap, f, id, fromBar) }
+            if fallback == nil { fallback = (el, snap, f, id, fromBar) }
           }
         }
+        return nil
       }
+      let barPresent = (try? bar.snapshot()) != nil
+      if barPresent, let match = firstIn(bar, fromBar: true) { return match }
+      // Avoid whole-app .descendants(matching: .any) traversals while
+      // DOCService / filesSheetBar() is initially mounting; after 10 s check
+      // whole-app candidates so a hittable sheet Cancel overrides a
+      // non-hittable bar fallback before falling back to non-hittable.
+      if Date().timeIntervalSince(opened) >= 10,
+         let match = firstIn(self.app, fromBar: false) { return match }
       return fallback
     }
     while Date().timeIntervalSince(opened) < 30 {
       // Prefer the first enabled, hittable candidate in the sheet's bar, then
-      // the whole-app lookup (evaluated lazily so a full-tree scan is skipped
-      // whenever the bar already holds a hittable Cancel), before falling back
-      // to an enabled non-hittable candidate.
+      // (after the initial 10 s mount window) the whole-app lookup, before
+      // accepting an enabled non-hittable fallback once >= 10 s have elapsed.
       if let (candidate, snap, frame, identity, fromBar) = currentChoice() {
         // Settled: the same element (type, identifier, label, lookup) at the
         // same frame on two reads half a second apart, so the tap is not aimed
         // at a sheet still sliding in.
-        if frame == lastFrame && identity == lastIdentity {
+        if (candidate.isHittable || Date().timeIntervalSince(opened) >= 10),
+           frame == lastFrame && identity == lastIdentity {
           found = candidate; foundSnap = snap; inBar = fromBar; break
         }
         lastFrame = frame; lastIdentity = identity
@@ -1187,6 +1213,13 @@ final class AthleteKineticsUITests: XCTestCase {
         lastIdentity = ""
       }
       usleep(500_000)
+    }
+    if found == nil && !lastFrame.isNull && !lastIdentity.isEmpty {
+      if let (candidate, snap, frame, identity, fromBar) = currentChoice(),
+         (candidate.isHittable || Date().timeIntervalSince(opened) >= 10),
+         frame == lastFrame && identity == lastIdentity {
+        found = candidate; foundSnap = snap; inBar = fromBar
+      }
     }
     guard let cancel = found else {
       log("files sheet without Cancel: \(filesSheetInventory())")
@@ -1221,8 +1254,8 @@ final class AthleteKineticsUITests: XCTestCase {
   /// What the Files sheet exposes: the elements of its bar by type, label and
   /// identifier, and the last buttons in the tree (the sheet's follow the app's).
   private func filesSheetInventory() -> String {
-    let bar = app.navigationBars.matching(NSPredicate(format: "identifier CONTAINS 'DocumentManager'")).firstMatch
-    let inBar = !bar.exists ? "absent" : bar.descendants(matching: .any).allElementsBoundByIndex.prefix(30)
+    let bar = filesSheetBar()
+    let inBar = (try? bar.snapshot()) == nil ? "absent" : bar.descendants(matching: .any).allElementsBoundByIndex.prefix(30)
       .compactMap { try? $0.snapshot() }
       .map { "\($0.elementType.rawValue):\($0.label.prefix(30))|\($0.identifier.prefix(30))" }.joined(separator: "; ")
     let lastButtons = app.buttons.allElementsBoundByIndex.suffix(20)
@@ -1258,9 +1291,9 @@ final class AthleteKineticsUITests: XCTestCase {
     let deadline = Date().addingTimeInterval(300)
     var lastStatus = ""
     while Date() < deadline {
-      if filesControl(["Save", "Move", "Done", "Open", "Cancel"]).exists { break }
-      if status.exists && status.label != lastStatus {
-        lastStatus = status.label
+      if (try? filesControl(["Save", "Move", "Done", "Open", "Cancel"]).snapshot()) != nil { break }
+      if let now = currentLabel(status), now != lastStatus {
+        lastStatus = now
         log("backup status while waiting for the Files sheet: \(lastStatus.prefix(160))")
         if !lastStatus.hasPrefix("Creating") { break }
       }
@@ -1276,7 +1309,7 @@ final class AthleteKineticsUITests: XCTestCase {
         return
       }
     }
-    log("files sheet without an enabled Save/Move action: \(filesSheetInventory()); status=\(element("backup-status-message").exists ? element("backup-status-message").label : "-")")
+    log("files sheet without an enabled Save/Move action: \(filesSheetInventory()); status=\(currentLabel(status) ?? "-")")
     XCTFail("the Files export sheet had no enabled Save/Move action")
   }
 
