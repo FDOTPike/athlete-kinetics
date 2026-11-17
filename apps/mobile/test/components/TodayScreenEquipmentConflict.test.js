@@ -155,3 +155,57 @@ test('a refusal from the store is shown on Today', () => {
 
   expect(screen.getByTestId('today-error')).toHaveTextContent(/Today.s workout has already started/);
 });
+
+// Issue #354: non-equipment access boundaries (tier, capability, active niggle)
+// and beginner inherited-routine lock show safety/experience copy instead of
+// claiming "Your equipment has changed."
+describe('TodayScreen non-equipment and beginner-routine conflicts (#354)', () => {
+  const NON_EQUIPMENT_MSG =
+    "This workout includes a movement outside your current safety or experience settings. Update today's workout to swap it for a matching alternative.";
+
+  test('non-equipment conflict renders safety/experience copy before Start and approved confirm labels', () => {
+    mockState = baseState({
+      todayPlanEquipmentConflict: jest.fn(() => true),
+      todayPlanConflictReason: jest.fn(() => 'non_equipment'),
+    });
+    render(<TodayScreen />);
+
+    const notice = screen.getByTestId('today-equipment-conflict-text');
+    expect(notice).toHaveTextContent(NON_EQUIPMENT_MSG);
+    expect(notice).not.toHaveTextContent(/Your equipment has changed/);
+
+    const texts = textsInOrder(screen.toJSON());
+    const noticeAt = texts.indexOf(NON_EQUIPMENT_MSG);
+    const startAt = texts.indexOf('Start workout');
+    expect(noticeAt).toBeGreaterThan(-1);
+    expect(noticeAt).toBeLessThan(startAt);
+
+    fireEvent.press(screen.getByLabelText("Update today's workout"));
+    expect(mockState.updateTodayPlannedWorkout).not.toHaveBeenCalled();
+    expect(screen.getByTestId('today-update-confirm')).toBeOnTheScreen();
+    expect(
+      screen.getByText(
+        "Only today's unstarted workout changes, using your current settings. Your other days stay as they are.",
+      ),
+    ).toBeOnTheScreen();
+    expect(screen.getByLabelText("Keep today's workout")).toBeOnTheScreen();
+
+    fireEvent.press(screen.getByLabelText("Confirm: update today's workout"));
+    expect(mockState.updateTodayPlannedWorkout).toHaveBeenCalledTimes(1);
+  });
+
+  test('Keep today\'s workout dismisses confirmation without updating', () => {
+    mockState = baseState({
+      todayPlanEquipmentConflict: jest.fn(() => true),
+      todayPlanConflictReason: jest.fn(() => 'non_equipment'),
+    });
+    render(<TodayScreen />);
+
+    fireEvent.press(screen.getByLabelText("Update today's workout"));
+    fireEvent.press(screen.getByLabelText("Keep today's workout"));
+
+    expect(mockState.updateTodayPlannedWorkout).not.toHaveBeenCalled();
+    expect(screen.queryByTestId('today-update-confirm')).toBeNull();
+    expect(screen.getByLabelText("Update today's workout")).toBeOnTheScreen();
+  });
+});

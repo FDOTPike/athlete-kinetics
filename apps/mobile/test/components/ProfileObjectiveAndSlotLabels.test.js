@@ -16,8 +16,8 @@ jest.mock('../../src/state/useStore', () => {
   return { ...actual, useStore };
 });
 
-import ProfileScreen from '../../src/screens/ProfileScreen';
-import { OBJECTIVE_COPY } from '../../src/screens/OnboardingScreen';
+import ProfileScreen, { objectiveChangeText } from '../../src/screens/ProfileScreen';
+import { OBJECTIVE_COPY, OBJECTIVE_LABEL } from '../../src/screens/OnboardingScreen';
 
 describe('ProfileScreen objective chip labels and saved profile slot labels (#155)', () => {
   beforeEach(() => {
@@ -127,5 +127,57 @@ describe('ProfileScreen objective chip labels and saved profile slot labels (#15
 
     const activeSlot = screen.getByRole('button', { name: 'Saved profile: Intermediate, active' });
     expect(activeSlot.props.accessibilityState.selected).toBe(true);
+  });
+
+  // Issue #353: confirmation message and button/a11y labels map through
+  // OBJECTIVE_LABEL (never exposing raw enum tokens like gpp/hybrid/rehab/weight_loss).
+  test('#353 objectiveChangeText and confirmation buttons use OBJECTIVE_LABEL for gpp, hybrid, rehab, weight_loss', () => {
+    const rawEnumPattern = /\b(gpp|hybrid|rehab|weight_loss|weight loss|strength|hypertrophy|power|endurance)\b/;
+    const pairs = [
+      ['rehab', 'gpp'],
+      ['hybrid', 'weight_loss'],
+      ['gpp', 'hybrid'],
+      ['weight_loss', 'rehab'],
+    ];
+
+    for (const [from, to] of pairs) {
+      const fromLabel = OBJECTIVE_LABEL[from];
+      const toLabel = OBJECTIVE_LABEL[to];
+      const variants = [
+        objectiveChangeText(from, to, null, false, false, false),
+        objectiveChangeText(from, to, null, true, false, false),
+        objectiveChangeText(from, to, null, false, true, false),
+        objectiveChangeText(from, to, from, true, false, false),
+        objectiveChangeText(from, to, from, true, false, true),
+      ];
+      for (const text of variants) {
+        expect(text).toContain(fromLabel);
+        expect(text).toContain(toLabel);
+        expect(rawEnumPattern.test(text)).toBe(false);
+      }
+    }
+
+    mockState = {
+      ...mockState,
+      profile: { ...mockState.profile, objective: 'hybrid' },
+      block: { blockId: 1, startDate: '2026-07-01', objective: 'hybrid', createdAtMs: 1 },
+      program: null,
+    };
+    render(<ProfileScreen />);
+    fireEvent.press(screen.getByRole('button', { name: '1 · OBJECTIVE: WEIGHT-LOSS SUPPORT' }));
+
+    const changeText = screen.getByTestId('profile-objective-change-text').props.children;
+    expect(changeText).toContain('STRENGTH + GRAPPLING');
+    expect(changeText).toContain('WEIGHT-LOSS SUPPORT');
+    expect(rawEnumPattern.test(changeText)).toBe(false);
+
+    const confirmBtn = screen.getByTestId('profile-objective-confirm');
+    expect(confirmBtn.props.accessibilityLabel).toBe('Change objective to WEIGHT-LOSS SUPPORT');
+    expect(rawEnumPattern.test(confirmBtn.props.accessibilityLabel)).toBe(false);
+
+    const keepBtn = screen.getByTestId('profile-objective-keep');
+    expect(keepBtn.props.accessibilityLabel).toBe('Keep STRENGTH + GRAPPLING');
+    expect(screen.getByText('Keep STRENGTH + GRAPPLING')).toBeOnTheScreen();
+    expect(rawEnumPattern.test(keepBtn.props.accessibilityLabel)).toBe(false);
   });
 });

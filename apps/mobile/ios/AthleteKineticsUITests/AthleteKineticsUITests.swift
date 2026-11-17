@@ -291,7 +291,7 @@ final class AthleteKineticsUITests: XCTestCase {
 
   private func unlockAdvancedTools() {
     if (try? element("advanced-athlete-manager").snapshot()) != nil { return }
-    let build = element("Build 0.1.0")
+    let build = element("Build 1.0.0-beta.1")
     // The label sits at the foot of the full Profile form, beyond reveal()'s
     // fifteen slow swipes; scroll down at normal speed first.
     wait(build, "the build label")

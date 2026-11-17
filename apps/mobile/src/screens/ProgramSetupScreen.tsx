@@ -13,6 +13,7 @@ import {
   splitExplainer,
   SPLIT_EXPLAINER_FOOTER,
   BLOCK_FOCUS_LIST,
+  SPORT_INFO,
   strengthAnchorCapacity,
   strengthAnchorRoleNames,
   weeklyProgressionSummary,
@@ -24,6 +25,7 @@ import { Chip, Disclosure, PrimaryButton, SecondaryButton } from '../components/
 import { theme } from '../theme/theme';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { EmphasisReportCard } from '../components/EmphasisReportCard';
+import { sessionFocusName } from '../state/sessionSummary';
 import { programChoiceDisclosure, recommendedProgramDefaults } from '../state/programDefaults';
 import { anchorDisplayName, priorExperienceWouldClear } from '../state/priorExperience';
 import { blockWeekTotals, describeBlockWeek } from '../state/blockWeekChanges';
@@ -70,15 +72,19 @@ export const anchorReasonText = (reasons: readonly string[]): string => {
  *  day-type chip is offered; they change nothing the generator does. */
 const GRAPPLING_SPORT_NAME = /\b(bjj|jiu[\s-]?jitsu|ju[\s-]?jitsu|jujitsu|judo|wrestl\w*|grappl\w*|sambo)\b/i;
 
-/** #210: the "bjj" day type is offered only with the Strength + Grappling goal
- *  or a grappling sport. A day already set to bjj keeps the chip (see below),
- *  so an existing choice is never hidden. */
+/** #210 / #351: the "bjj" day type is offered with the Strength + Grappling goal,
+ *  any grappling-family sport, MMA (`combat_mma`), or a matching custom sport name.
+ *  A day already set to bjj keeps the chip (see below), so an existing choice is never hidden. */
 export const offersGrapplingDays = (
   objective: string,
   sport: { sportId: string; otherSportName: string | null } | null | undefined,
 ): boolean => objective === 'hybrid'
-  || (sport != null && sport.sportId === 'other' && sport.otherSportName != null
-    && GRAPPLING_SPORT_NAME.test(sport.otherSportName));
+  || (sport != null && (
+    SPORT_INFO[sport.sportId as keyof typeof SPORT_INFO]?.family === 'grappling'
+    || sport.sportId === 'combat_mma'
+    || (sport.sportId === 'other' && sport.otherSportName != null
+      && GRAPPLING_SPORT_NAME.test(sport.otherSportName))
+  ));
 
 const SCHEMA_LABEL: Record<SchemaType, string> = {
   LINEAR: 'Linear', WAVE: 'Undulating', STEP: 'Step loading', APRE: 'Autoregulated',
@@ -709,7 +715,7 @@ export default function ProgramSetupScreen({
                     || offersGrapplingDays(profile.objective, sport)).map((focus) => (
                     <Chip
                       key={focus}
-                      label={focus}
+                      label={sessionFocusName(focus)}
                       selected={currentFocus === focus}
                       onPress={() => setDayFocus(dayIndex, focus)}
                     />
@@ -804,9 +810,13 @@ export default function ProgramSetupScreen({
           {sessionTime.conflicts.map((conflict) => (
             <Text key={conflict} style={styles.error} testID="session-time-conflict">{conflict}</Text>
           ))}
-          {!editing && sessionTime.conflicts.length > 0 && sessionTime.alternatives.length > 0 && (
+          {sessionTime.conflicts.length > 0 && sessionTime.alternatives.length > 0 && (
             <View style={styles.alternatives} testID="session-time-alternatives">
-              <Text style={styles.caption}>Choose one to redraw the plan. Nothing is saved until you create it.</Text>
+              <Text style={styles.caption}>
+                {editing
+                  ? 'Choose one to redraw the plan. Nothing is saved until you save preferences.'
+                  : 'Choose one to redraw the plan. Nothing is saved until you create it.'}
+              </Text>
               {sessionTime.alternatives.map((alternative) => (
                 <SecondaryButton
                   key={`${alternative.kind}:${alternative.capMin}`}
@@ -816,10 +826,12 @@ export default function ProgramSetupScreen({
               ))}
             </View>
           )}
-          {!editing && sessionCapOverride !== null && (
+          {sessionCapOverride !== null && (
             <View style={styles.alternatives} testID="session-time-draft">
               <Text style={styles.caption}>
-                {`This plan uses ${sessionCapOverride}-minute sessions. Your profile says ${profile.session_duration_cap_min}. Create program saves ${sessionCapOverride} minutes as your session length.`}
+                {editing
+                  ? `This plan uses ${sessionCapOverride}-minute sessions. Your profile says ${profile.session_duration_cap_min}. Save future preferences saves ${sessionCapOverride} minutes as your session length.`
+                  : `This plan uses ${sessionCapOverride}-minute sessions. Your profile says ${profile.session_duration_cap_min}. Create program saves ${sessionCapOverride} minutes as your session length.`}
               </Text>
               <SecondaryButton
                 label={`Back to ${profile.session_duration_cap_min} minutes`}
