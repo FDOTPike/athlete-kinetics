@@ -97,6 +97,7 @@ describe('#228 Phase 2 Advanced Athlete Control', () => {
       const previewInput = {
         horizon: { kind: 'weeks', blockCount: 1 },
         schemaType: 'LINEAR',
+        scheduleMode: 'iso_weekday',
         dayIndices: [1, 3, 5],
         days: [
           { dayIndex: 1, focus: 'legs' },
@@ -213,6 +214,7 @@ describe('#228 Phase 2 Advanced Athlete Control', () => {
     const ok = useStore.getState().createTrainingProgram({
       horizon: { kind: 'weeks', blockCount: 1 },
       schemaType: 'LINEAR',
+      scheduleMode: 'iso_weekday',
       dayIndices: [1],
       days: [{ dayIndex: 1, focus: 'accessories' }],
       slotOverrides: [{ dayIndex: 1, slotIndex: 1, sets: 6, reps: 14, targetRpe: 8.5 }],

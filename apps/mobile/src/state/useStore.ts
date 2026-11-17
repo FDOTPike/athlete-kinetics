@@ -3504,7 +3504,7 @@ const trainingProgramShape = (
       || selected.some((day) => !Number.isInteger(day) || day < 1 || day > 7)) {
     throw new Error('Choose between one and seven training days.');
   }
-  const scheduleMode: ProgramScheduleMode = input.scheduleMode ?? 'iso_weekday';
+  const scheduleMode: ProgramScheduleMode = input.scheduleMode ?? 'relative_day_index';
   if (scheduleMode !== 'iso_weekday' && scheduleMode !== 'relative_day_index') {
     throw new Error('Program schedule mode is invalid.');
   }
@@ -6066,7 +6066,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       d, profile, movements, niggles: get().niggles,
       priorExperience: new Set(get().activePriorExperienceMovementIds),
       today: localToday(), startDate: localToday(), schemaType, macroBlockIndex,
-      scheduleMode: pendingProgramCreation?.scheduleMode ?? pendingProgramContinuation?.scheduleMode,
+      scheduleMode: pendingProgramCreation?.scheduleMode ?? pendingProgramContinuation?.scheduleMode ?? 'relative_day_index',
       programDays: pendingProgramCreation?.programDays ?? pendingProgramContinuation?.programDays,
       introductoryWeek1: pendingProgramCreation !== null
         || (pendingProgramContinuation !== null && pendingProgramContinuation.sequenceIndex === 1),
@@ -6482,7 +6482,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
         d, profile: effectiveProfile, movements: state.movements, niggles: state.niggles,
         priorExperience, today: localToday(), startDate: state.block.startDate,
         schemaType: meta.schema_type as SchemaType, macroBlockIndex: meta.macro_block_index,
-        ...(program?.status === 'active' ? { scheduleMode: program.scheduleMode } : {}),
+        ...(program?.status === 'active' ? { scheduleMode: program.scheduleMode } : { scheduleMode: 'relative_day_index' as const }),
         programDays: effectiveProgramDays,
         introductoryWeek1: blockProgramRow?.sequence_index === 1,
       });
