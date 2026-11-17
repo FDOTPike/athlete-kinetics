@@ -208,7 +208,8 @@ final class AthleteKineticsUITests: XCTestCase {
       NSPredicate(format: "label != '' AND NOT (label ==[c] %@)", "pikemethods")).firstMatch)
   }
 
-  /// The default eight-screen onboarding, through the real UI.
+  /// The default nine-screen onboarding (includes the #218 'maxes' step for
+  /// the default intermediate profile), through the real UI.
   private func completeOnboarding(_ who: String, createProgram: Bool = false) {
     wait(element("Next"), "onboarding (\(who))", timeout: 60)
     log("onboarding started (\(who)): progress=\(element(labelBeginsWith: "Step ").exists ? element(labelBeginsWith: "Step ").label : "-")")
@@ -217,7 +218,7 @@ final class AthleteKineticsUITests: XCTestCase {
     // stood one screen short, and the failure surfaced two steps later with no
     // record of which tap had not been taken. The tap that leaves the screen
     // unchanged now fails by name; it is not repeated.
-    for step in 1...6 {
+    for step in 1...7 {
       let before = onboardingHeading()
       tap("Next", "Next (step \(step), \(who))")
       let deadline = Date().addingTimeInterval(30)
