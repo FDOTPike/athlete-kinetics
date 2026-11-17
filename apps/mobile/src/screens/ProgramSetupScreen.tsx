@@ -29,7 +29,6 @@ import { sessionFocusName } from '../state/sessionSummary';
 import { programChoiceDisclosure, recommendedProgramDefaults } from '../state/programDefaults';
 import { anchorDisplayName, priorExperienceWouldClear } from '../state/priorExperience';
 import { blockWeekTotals, describeBlockWeek } from '../state/blockWeekChanges';
-import { sessionFocusName } from '../state/sessionSummary';
 import {
   REASON_TEXT_MAP,
   useStore,
