@@ -213,6 +213,7 @@ final class AthleteKineticsUITests: XCTestCase {
         effectiveArguments += ["-AKUITestResetStorage", "1"]
       }
     }
+    app.launchEnvironment["ORT_DISABLE_TELEMETRY"] = "1"
     app.launchArguments = effectiveArguments
     app.launch()
     wait(element("shell-root"), "the app shell", timeout: 90)
@@ -640,6 +641,10 @@ final class AthleteKineticsUITests: XCTestCase {
   func test1_onboardingNavigationAndAccessibility() throws {
     launch()
     completeOnboarding("first athlete")
+    guard #available(iOS 17.0, *) else {
+      XCTFail("the accessibility audit needs iOS 17+; this runtime is older")
+      return
+    }
     var issues: [String] = []
     let destinations: [(String, String, String)] = [
       ("tab-today", "Today", "shell-primary-tabs"), ("tab-coach", "Plan", "shell-primary-tabs"),
@@ -658,12 +663,70 @@ final class AthleteKineticsUITests: XCTestCase {
         predicate: NSPredicate(format: "isSelected == true"), object: element(key))], timeout: 30)
       XCTAssertEqual(selected, .completed, "\(screen) control is not marked selected within 30 s of tapping it")
       log("visited \(screen)")
-      guard #available(iOS 17.0, *) else {
-        XCTFail("the accessibility audit needs iOS 17+; this runtime is older")
-        return
-      }
       issues += audit(screen)
     }
+    let openGlossary = element("Open terminology glossary")
+    reveal(openGlossary, "Open terminology glossary")
+    bringClear(openGlossary, "Open terminology glossary")
+    openGlossary.tap()
+    wait(element("glossary-screen"), "the Terminology Glossary screen")
+    issues += audit("Glossary")
+
+    let questionBoxButton = element("Question box")
+    reveal(questionBoxButton, "Question box")
+    bringClear(questionBoxButton, "Question box")
+    questionBoxButton.tap()
+    wait(element("question-box"), "the Question box panel")
+    issues += audit("QuestionBox")
+
+    let questionInput = app.textViews["Question"].firstMatch
+    XCTAssertTrue(questionInput.waitForExistence(timeout: 30), "the Question textView did not appear")
+    reveal(questionInput, "Question")
+    bringClear(questionInput, "Question")
+    for attempt in 1...3 {
+      if attempt > 1 {
+        log("FOCUS-RETRY Question: keyboard not shown 5 s after tap \(attempt - 1); tapping again")
+      }
+      questionInput.tap()
+      let deadline = Date().addingTimeInterval(5)
+      while Date() < deadline {
+        if (try? app.keyboards.firstMatch.snapshot()) != nil { break }
+        usleep(250_000)
+      }
+      if (try? app.keyboards.firstMatch.snapshot()) != nil { break }
+    }
+    XCTAssertNotNil(try? app.keyboards.firstMatch.snapshot(), "the Question keyboard did not appear")
+    app.typeText("what is a deload week")
+    for targetName in ["Answers from the glossary only. This is not medical advice.", "Question box"] {
+      if (try? app.keyboards.firstMatch.snapshot()) == nil { break }
+      let blurTarget = app.staticTexts[targetName].firstMatch
+      if (try? blurTarget.snapshot()) != nil {
+        blurTarget.tap()
+        log("question box keyboard: tapped \(targetName) to dismiss")
+        let deadline = Date().addingTimeInterval(5)
+        while Date() < deadline && (try? app.keyboards.firstMatch.snapshot()) != nil {
+          usleep(250_000)
+        }
+        if (try? app.keyboards.firstMatch.snapshot()) == nil { break }
+      }
+    }
+    XCTAssertNil(try? app.keyboards.firstMatch.snapshot(), "the Question keyboard did not dismiss")
+    let askButton = app.buttons["Ask"].firstMatch
+    reveal(askButton, "Ask")
+    bringClear(askButton, "Ask")
+    XCTAssertTrue(askButton.isEnabled && askButton.isHittable, "Ask button is not enabled and hittable")
+    askButton.tap()
+
+    wait(element("question-answer-card"), "the QuestionBox answer card", timeout: 60)
+    wait(element("DELOAD"), "the DELOAD answer title", timeout: 60)
+    wait(element(labelBeginsWith: "A planned easy week."), "the DELOAD answer definition", timeout: 60)
+    log("question box: routed to DELOAD")
+
+    let backToAthlete = element("Back to Athlete Profile")
+    reveal(backToAthlete, "Back to Athlete Profile")
+    bringClear(backToAthlete, "Back to Athlete Profile")
+    backToAthlete.tap()
+    wait(element("athlete-screen-shown"), "Profile after returning from Glossary")
     XCTAssertTrue(issues.isEmpty, "accessibility audit found \(issues.count) issue(s); first: \(issues.first ?? "")")
   }
 

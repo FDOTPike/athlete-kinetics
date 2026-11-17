@@ -9,6 +9,9 @@
 # app exiting early are all failures. Evidence (report, console capture,
 # simulator identity) is written to <out-dir> for upload.
 set -euo pipefail
+# Keep ONNX Runtime strictly offline in the simulator child environment too.
+export ORT_DISABLE_TELEMETRY=1
+export SIMCTL_CHILD_ORT_DISABLE_TELEMETRY=1
 APP="$1"; BUNDLE_ID="$2"; OUT="$3"
 TIMEOUT_S="${AK_SMOKE_TIMEOUT_S:-600}"  # above the in-app bound (each step <= 90 s)
 mkdir -p "$OUT"
@@ -119,7 +122,8 @@ node -e '
   for (const c of r.checks.filter((x) => x.ok)) console.log(`::notice title=native smoke check::PASS ${c.name}: ${String(c.detail).slice(0, 300)}`);
   // Every expected check must be present: a dropped check is a failure, not a pass.
   const required = ["sqlite math functions", "fresh migration chain", "embedder inference + routing",
-    "native CSPRNG (backup provider)", "device backup exclusion at startup", "Files import types resolve natively", "store boot"];
+    "question box inference + routing", "native CSPRNG (backup provider)",
+    "device backup exclusion at startup", "Files import types resolve natively", "store boot"];
   const missing = required.filter((name) => !r.checks.some((c) => c.name === name));
   for (const name of missing) console.log(`::error title=native smoke check::missing check: ${name}`);
   if (r.schema !== "ak.native-smoke/1" || r.ok !== true || missing.length > 0) { console.error("NATIVE SMOKE FAILED"); process.exit(1); }

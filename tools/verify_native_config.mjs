@@ -32,6 +32,7 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { KNOWN_SHA256 } from '../scripts/embedder-integrity.mjs';
+import { splitJobs, splitSteps, stripYamlComments } from './verify_ci_structure.mjs';
 
 const ROOT = join(import.meta.dirname, '..');
 const read = (rel) => readFileSync(join(ROOT, rel), 'utf8');
@@ -125,6 +126,121 @@ console.log('[N2] pinned embedder model staged into the iOS bundle');
     smoke.includes("'Files import types resolve natively'") && smoke.includes('backupImportTypes(Platform.OS, picker.types.allFiles)')
       && read('tools/ios_simulator_smoke.sh').includes('"Files import types resolve natively"')
       && read('tools/ios_simulator_smoke.sh').includes('missing check:'));
+  const stripJsComments = (src) => src.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
+  const smokeRequiredChecks = (scriptSrc) => {
+    const m = scriptSrc.match(/\bconst\s+required\s*=\s*\[([\s\S]*?)\];/);
+    if (m === null) return [];
+    return [...stripJsComments(m[1]).matchAll(/["']([^"']+)["']/g)].map((x) => x[1]);
+  };
+  const hasQuestionBoxSmoke = (smokeSrc, smokeScriptSrc) => {
+    const code = stripJsComments(smokeSrc);
+    const stepStart = code.indexOf("step(checks, 'question box inference + routing'");
+    if (stepStart === -1) return false;
+    const stepTail = code.slice(stepStart);
+    const nextStep = stepTail.indexOf('\n  await step(');
+    const stepBody = nextStep === -1 ? stepTail : stepTail.slice(0, nextStep);
+    const shapeGuard = /if\s*\(\s*asset\.dim\s*!==\s*384\s*\|\|\s*asset\.entryIds\.length\s*!==\s*1111\s*\|\|\s*asset\.vectors\.length\s*!==\s*1111\s*\)\s*(?:\{\s*)?throw\s+new\s+Error\b/;
+    const vectorGuard = /if\s*\(\s*vector\.length\s*!==\s*384\s*\|\|\s*!\(Math\.abs\(norm\s*-\s*1\)\s*<=\s*1e-3\)\s*\)\s*(?:\{\s*)?throw\s+new\s+Error\b/;
+    return stepBody.includes('tryCreateDeviceEmbedder()')
+      && stepBody.includes('question-vectors.json')
+      && shapeGuard.test(stepBody)
+      && /packVectors\([^,]+,\s*asset\.dim\)/.test(stepBody)
+      && vectorGuard.test(stepBody)
+      && /(?:routeQuestion\(\s*['"]what is a deload week['"]|const\s+question\s*=\s*['"]what is a deload week['"][\s\S]*routeQuestion\(\s*question\b)/.test(stepBody)
+      && stepBody.includes("routed.outcome !== 'DELOAD'")
+      && stepBody.includes("routed.shown[0] !== 'DELOAD'")
+      && smokeRequiredChecks(smokeScriptSrc).includes('question box inference + routing');
+  };
+  const smokeScriptSrc = read('tools/ios_simulator_smoke.sh');
+  check(
+    'the native smoke verifies question-vectors.json (1111 x 384) routing via ONNX and CI requires it',
+    hasQuestionBoxSmoke(smoke, smokeScriptSrc),
+  );
+  check(
+    'falsifier: dropping "question box inference + routing" from ios_simulator_smoke.sh required list fails closed',
+    !hasQuestionBoxSmoke(smoke, smokeScriptSrc.replace('"question box inference + routing"', '')),
+  );
+  const weakNormSmoke = smoke.replaceAll('!(Math.abs(norm - 1) <= 1e-3)', 'Math.abs(norm - 1) > 1e-3');
+  const droppedStepSmoke = smoke.replace("'question box inference + routing'", "'dropped'");
+  const noShapeGuardSmoke = smoke.replace(
+    /\n\s*if\s*\(\s*asset\.dim\s*!==\s*384\s*\|\|\s*asset\.entryIds\.length\s*!==\s*1111\s*\|\|\s*asset\.vectors\.length\s*!==\s*1111\s*\)\s*\{[\s\S]*?\n\s*\}/,
+    '',
+  );
+  const noVectorDimSmoke = smoke.replaceAll('vector.length !== 384 || !(Math.abs(norm - 1) <= 1e-3)', '!(Math.abs(norm - 1) <= 1e-3)');
+  check(
+    'falsifier: dropping the question box smoke step, removing the 1111x384 shape guard, dropping vector.length !== 384, or weakening the NaN-safe norm guard fails closed',
+    weakNormSmoke !== smoke
+      && droppedStepSmoke !== smoke
+      && noShapeGuardSmoke !== smoke
+      && noVectorDimSmoke !== smoke
+      && !hasQuestionBoxSmoke(droppedStepSmoke, smokeScriptSrc)
+      && !hasQuestionBoxSmoke(noShapeGuardSmoke, smokeScriptSrc)
+      && !hasQuestionBoxSmoke(noVectorDimSmoke, smokeScriptSrc)
+      && !hasQuestionBoxSmoke(weakNormSmoke, smokeScriptSrc),
+  );
+  const stripCComments = (src) => src.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
+  const hasAppDelegateOrtTelemetryDisable = (src) => {
+    const code = stripCComments(src);
+    const appStart = code.search(/func\s+application\s*\(/);
+    if (appStart === -1) return false;
+    const body = code.slice(appStart);
+    const rnStart = body.indexOf('RCTReactNativeFactory');
+    if (rnStart === -1) return false;
+    const beforeRn = body.slice(0, rnStart);
+    return /setenv\(\s*"ORT_DISABLE_TELEMETRY"\s*,\s*"1"\s*,\s*1\s*\)/.test(beforeRn);
+  };
+  const hasShellOrtTelemetryDisable = (src, launchAnchor) => {
+    const clean = stripYamlComments(src);
+    const launchIdx = clean.indexOf(launchAnchor);
+    if (launchIdx === -1) return false;
+    const beforeLaunch = clean.slice(0, launchIdx);
+    return /^\s*export\s+ORT_DISABLE_TELEMETRY=1\b/m.test(beforeLaunch)
+      && /^\s*export\s+SIMCTL_CHILD_ORT_DISABLE_TELEMETRY=1\b/m.test(beforeLaunch);
+  };
+  const hasUITestLaunchOrtTelemetryDisable = (src) => {
+    const code = stripCComments(src);
+    const launchStart = code.search(/private\s+func\s+launch\s*\(/);
+    if (launchStart === -1) return false;
+    const launchEnd = code.indexOf('\n  }', launchStart);
+    const body = launchEnd === -1 ? code.slice(launchStart) : code.slice(launchStart, launchEnd);
+    const setIdx = body.search(/app\.launchEnvironment\[\s*"ORT_DISABLE_TELEMETRY"\s*\]\s*=\s*"1"/);
+    const callIdx = body.indexOf('app.launch()');
+    return setIdx !== -1 && callIdx !== -1 && setIdx < callIdx;
+  };
+  const appDelegateForOrt = read('apps/mobile/ios/AthleteKinetics/AppDelegate.swift');
+  const uiRunnerForOrt = read('tools/ios_ui_tests.sh');
+  const uiSuiteForOrt = read('apps/mobile/ios/AthleteKineticsUITests/AthleteKineticsUITests.swift');
+  check(
+    'iOS disables ONNX Runtime telemetry in AppDelegate, UITest launchEnvironment, and simulator runner scripts',
+    hasAppDelegateOrtTelemetryDisable(appDelegateForOrt)
+      && hasUITestLaunchOrtTelemetryDisable(uiSuiteForOrt)
+      && hasShellOrtTelemetryDisable(smokeScriptSrc, 'xcrun simctl launch')
+      && hasShellOrtTelemetryDisable(uiRunnerForOrt, 'xcodebuild test-without-building'),
+  );
+  const missingOrtDelegate = appDelegateForOrt.replace(/setenv\(\s*"ORT_DISABLE_TELEMETRY"[^\n]*\n?/g, '');
+  const zeroedOrtDelegate = appDelegateForOrt.replace('"ORT_DISABLE_TELEMETRY", "1", 1', '"ORT_DISABLE_TELEMETRY", "0", 1');
+  const lateOrtDelegate = missingOrtDelegate.replace(
+    'let factory = RCTReactNativeFactory(delegate: delegate)',
+    'let factory = RCTReactNativeFactory(delegate: delegate)\n    setenv("ORT_DISABLE_TELEMETRY", "1", 1)',
+  );
+  const missingOrtUiLaunch = uiSuiteForOrt.replace(/.*launchEnvironment\[\s*"ORT_DISABLE_TELEMETRY"[^\n]*\n?/g, '');
+  const missingOrtSmoke = smokeScriptSrc.replace(/.*ORT_DISABLE_TELEMETRY[^\n]*\n?/g, '');
+  const missingOrtUi = uiRunnerForOrt.replace(/.*SIMCTL_CHILD_ORT_DISABLE_TELEMETRY[^\n]*\n?/g, '');
+  check(
+    'falsifier: missing, mis-ordered, or zeroed ORT_DISABLE_TELEMETRY fails closed',
+    missingOrtDelegate !== appDelegateForOrt
+      && zeroedOrtDelegate !== appDelegateForOrt
+      && lateOrtDelegate !== missingOrtDelegate
+      && missingOrtUiLaunch !== uiSuiteForOrt
+      && missingOrtSmoke !== smokeScriptSrc
+      && missingOrtUi !== uiRunnerForOrt
+      && !hasAppDelegateOrtTelemetryDisable(missingOrtDelegate)
+      && !hasAppDelegateOrtTelemetryDisable(zeroedOrtDelegate)
+      && !hasAppDelegateOrtTelemetryDisable(lateOrtDelegate)
+      && !hasUITestLaunchOrtTelemetryDisable(missingOrtUiLaunch)
+      && !hasShellOrtTelemetryDisable(missingOrtSmoke, 'xcrun simctl launch')
+      && !hasShellOrtTelemetryDisable(missingOrtUi, 'xcodebuild test-without-building'),
+  );
   check('iOS opens the bundled model in place (no Documents copy)', /Platform\.OS === 'ios'[\s\S]{0,200}MainBundleDir/.test(embedder));
   const stage = read('scripts/stage-native-embedder.mjs');
   check('the staging script verifies against KNOWN_SHA256 and never downloads',
@@ -406,6 +522,67 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
   check('CI builds the tests ad-hoc for the simulator only (no team, no profile) and runs them fail-closed',
     /CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER=/.test(ci) && /-sdk iphonesimulator[\s\S]*build-for-testing/.test(ci)
       && ci.includes('tools/ios_ui_tests.sh') && runner.includes('exit "$FAILED"') && runner.includes('lsof -nP -a -i -p'));
+  const checkIosBetaBuildSplit = (ciYaml) => {
+    const clean = stripYamlComments(ciYaml);
+    const jobsAt = clean.indexOf('\njobs:');
+    if (jobsAt === -1) return { ok: false, nonBetaClean: false, uiTestBetaEnabled: false };
+    const workflowHeader = clean.slice(0, jobsAt);
+    const jobs = splitJobs(clean);
+    const verifyJob = jobs.get('verify') ?? '';
+    const androidJob = jobs.get('android-apk') ?? '';
+    const iosJob = jobs.get('ios-simulator') ?? '';
+    if (!iosJob) return { ok: false, nonBetaClean: false, uiTestBetaEnabled: false };
+    const stepsIdx = iosJob.indexOf('\n    steps:');
+    if (stepsIdx === -1) return { ok: false, nonBetaClean: false, uiTestBetaEnabled: false };
+    const iosJobHeader = iosJob.slice(0, stepsIdx);
+    const steps = splitSteps(iosJob);
+    const unsignedStep = steps.find((s) => s.includes('Build unsigned Release for the simulator')) ?? '';
+    const uiTestStep = steps.find((s) => s.includes('Build the UI tests')) ?? '';
+    const otherJobsClean = [...jobs.entries()]
+      .filter(([name]) => name !== 'ios-simulator')
+      .every(([, body]) => !body.includes('AK_BETA_BUILD'));
+    const nonUiTestStepsClean = steps.every((s) => s === uiTestStep || !s.includes('AK_BETA_BUILD'));
+    const nonBetaClean = !workflowHeader.includes('AK_BETA_BUILD')
+      && !verifyJob.includes('AK_BETA_BUILD')
+      && !androidJob.includes('AK_BETA_BUILD')
+      && otherJobsClean
+      && !iosJobHeader.includes('AK_BETA_BUILD')
+      && unsignedStep !== '' && nonUiTestStepsClean;
+    const uiTestBetaEnabled = uiTestStep !== ''
+      && /\n {8}env:\s*\n(?: {10}[^\n]+\n)*? {10}AK_BETA_BUILD:\s*['"]?on['"]?\b/.test(uiTestStep)
+      && /xcodebuild[\s\S]*\bAK_BETA_BUILD=on\s+build-for-testing\b/.test(uiTestStep)
+      && !/\n(?: {8}| {6}- )(?:continue-on-error|if):/.test(uiTestStep);
+    return {
+      ok: nonBetaClean && uiTestBetaEnabled,
+      nonBetaClean,
+      uiTestBetaEnabled,
+    };
+  };
+  const betaSplit = checkIosBetaBuildSplit(ci);
+  check(
+    'CI enables AK_BETA_BUILD=on only on the iOS UI-test build step and leaves unsigned Release/Android/verify non-beta',
+    betaSplit.ok,
+    `nonBetaClean=${betaSplit.nonBetaClean} uiTestBetaEnabled=${betaSplit.uiTestBetaEnabled}`,
+  );
+  check(
+    'falsifier: removing AK_BETA_BUILD from Build the UI tests fails the CI beta-switch contract',
+    !checkIosBetaBuildSplit(ci.replace(/AK_BETA_BUILD[^\n]*\n?/g, '')).ok,
+  );
+  const workflowBetaCi = ci.replace('\nenv:\n', "\nenv:\n  AK_BETA_BUILD: 'on'\n");
+  const unsignedBetaCi = ci.replace(
+    '- name: Build unsigned Release for the simulator\n',
+    "- name: Build unsigned Release for the simulator\n        env:\n          AK_BETA_BUILD: 'on'\n",
+  );
+  const iosJobBetaCi = ci.replace('    env:\n      XCODE_MAJOR:', "    env:\n      AK_BETA_BUILD: 'on'\n      XCODE_MAJOR:");
+  check(
+    'falsifier: setting AK_BETA_BUILD at workflow env, ios-simulator job env, or Build unsigned Release fails non-beta isolation',
+    workflowBetaCi !== ci
+      && unsignedBetaCi !== ci
+      && iosJobBetaCi !== ci
+      && !checkIosBetaBuildSplit(workflowBetaCi).nonBetaClean
+      && !checkIosBetaBuildSplit(unsignedBetaCi).nonBetaClean
+      && !checkIosBetaBuildSplit(iosJobBetaCi).nonBetaClean,
+  );
   const typesSrc = read('packages/inference/src/types.ts');
   const onboardingSrc = read('apps/mobile/src/screens/OnboardingScreen.tsx');
   const parseBooleanStateInit = (src, varName) => {
@@ -1041,6 +1218,268 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
   check(
     'falsifier: unhardened saveInFiles using .exists and .label fails closed',
     !isHardenedSaveInFiles(unhardenedSaveInFiles),
+  );
+  const test1Body = suite.match(/func test1_onboardingNavigationAndAccessibility\([\s\S]*?\n  \}/)?.[0] ?? '';
+  const extractUnconditionalSwift = (src) => {
+    const chars = [...src];
+    const n = chars.length;
+    const blanked = new Array(n).fill(false);
+    const noStrings = new Array(n).fill(' ');
+    for (let i = 0; i < n; i += 1) {
+      const ch = chars[i];
+      const next = chars[i + 1];
+      if (ch === '/' && next === '/') {
+        while (i < n && chars[i] !== '\n') { blanked[i] = true; i += 1; }
+        if (i < n && chars[i] === '\n') noStrings[i] = '\n';
+        continue;
+      }
+      if (ch === '/' && next === '*') {
+        blanked[i] = true; blanked[i + 1] = true; i += 2;
+        while (i < n && !(chars[i] === '*' && chars[i + 1] === '/')) {
+          if (chars[i] === '\n') noStrings[i] = '\n';
+          blanked[i] = true; i += 1;
+        }
+        if (i + 1 < n) { blanked[i] = true; blanked[i + 1] = true; i += 1; }
+        continue;
+      }
+      if (ch === '"') {
+        i += 1;
+        while (i < n && chars[i] !== '"') {
+          if (chars[i] === '\\' && i + 1 < n) i += 2;
+          else i += 1;
+        }
+        continue;
+      }
+      noStrings[i] = ch;
+    }
+    const codeOnly = noStrings.join('');
+    if (/#if\b|\bguard\b|\breturn\b/.test(codeOnly)) return null;
+    const stack = [];
+    let condDepth = 0;
+    let lastBoundary = 0;
+    for (let i = 0; i < n; i += 1) {
+      if (condDepth > 0) blanked[i] = true;
+      const ch = noStrings[i];
+      if (ch === '{') {
+        const header = codeOnly.slice(lastBoundary, i);
+        const isCond = /(?:^|[\s;}])(?:if|else|switch|while)\b/.test(header);
+        stack.push(isCond);
+        if (isCond) {
+          condDepth += 1;
+          blanked[i] = true;
+        }
+        lastBoundary = i + 1;
+      } else if (ch === '}') {
+        if (stack.length === 0) return null;
+        if (stack.pop()) condDepth -= 1;
+        lastBoundary = i + 1;
+      } else if (ch === ';') {
+        lastBoundary = i + 1;
+      }
+    }
+    if (stack.length !== 0) return null;
+    return chars.map((ch, idx) => (blanked[idx] ? ' ' : ch)).join('');
+  };
+  const hasGlossaryAndQuestionBoxInTest1 = (src) => {
+    const code = stripSwiftComments(src);
+    const loopEnd = code.indexOf('issues += audit(screen)');
+    if (loopEnd === -1) return false;
+    const loopClose = code.indexOf('}', loopEnd);
+    const finalAssert = code.indexOf('XCTAssertTrue(issues.isEmpty');
+    if (loopClose === -1 || finalAssert === -1 || finalAssert <= loopClose) return false;
+    const unconditionalPostLoop = extractUnconditionalSwift(code.slice(loopClose + 1, finalAssert));
+    if (unconditionalPostLoop === null) return false;
+    const tokens = [
+      /"Open terminology glossary"/,
+      /wait\(\s*element\(\s*"glossary-screen"\s*\)/,
+      /issues \+=\s*audit\(\s*"Glossary"\s*\)/,
+      /"Question box"/,
+      /wait\(\s*element\(\s*"question-box"\s*\)/,
+      /issues \+=\s*audit\(\s*"QuestionBox"\s*\)/,
+      /"Question"[\s\S]*?"what is a deload week"/,
+      /"Ask"[\s\S]*?\.tap\(\)/,
+      /wait\(\s*element\(\s*"question-answer-card"\s*\)[^\n]*timeout:\s*60\s*\)/,
+      /wait\(\s*element\(\s*"DELOAD"\s*\)[^\n]*timeout:\s*60\s*\)/,
+      /wait\(\s*element\(\s*labelBeginsWith:\s*"A planned easy week\."\s*\)[^\n]*timeout:\s*60\s*\)/,
+      /"Back to Athlete Profile"/,
+      /wait\(\s*element\(\s*"athlete-screen-shown"\s*\)/,
+    ];
+    let cursor = 0;
+    for (const re of tokens) {
+      const match = re.exec(unconditionalPostLoop.slice(cursor));
+      if (match === null) return false;
+      cursor += match.index + match[0].length;
+    }
+    return true;
+  };
+  check(
+    'test1_onboardingNavigationAndAccessibility unconditionally audits Glossary and QuestionBoxPanel and verifies DELOAD routing before asserting issues.isEmpty',
+    hasGlossaryAndQuestionBoxInTest1(test1Body),
+  );
+  const plainSevenScreenTest1 = [
+    '  func test1_onboardingNavigationAndAccessibility() throws {',
+    '    for (key, screen, marker) in destinations {',
+    '      issues += audit(screen)',
+    '    }',
+    '    XCTAssertTrue(issues.isEmpty)',
+    '  }',
+  ].join('\n');
+  const conditionalQuestionBoxTest1 = [
+    '  func test1_onboardingNavigationAndAccessibility() throws {',
+    '    for (key, screen, marker) in destinations {',
+    '      issues += audit(screen)',
+    '    }',
+    '    tap("Open terminology glossary")',
+    '    wait(element("glossary-screen"), "glossary")',
+    '    issues += audit("Glossary")',
+    '    if element("Question box").waitForExistence(timeout: 3) {',
+    '      tap("Question box")',
+    '      wait(element("question-box"), "question box")',
+    '      issues += audit("QuestionBox")',
+    '      enterText(into: "Question", "what is a deload week", submit: false)',
+    '      element("Ask").tap()',
+    '      wait(element("question-answer-card"), "answer", timeout: 60)',
+    '      wait(element("DELOAD"), "deload", timeout: 60)',
+    '      wait(element(labelBeginsWith: "A planned easy week."), "deload def", timeout: 60)',
+    '    }',
+    '    tap("Back to Athlete Profile")',
+    '    wait(element("athlete-screen-shown"), "profile")',
+    '    XCTAssertTrue(issues.isEmpty)',
+    '  }',
+  ].join('\n');
+  const ifFalseWrappedTest1 = [
+    '  func test1_onboardingNavigationAndAccessibility() throws {',
+    '    for (key, screen, marker) in destinations {',
+    '      issues += audit(screen)',
+    '    }',
+    '    if false {',
+    '      tap("Open terminology glossary")',
+    '      wait(element("glossary-screen"), "glossary")',
+    '      issues += audit("Glossary")',
+    '      tap("Question box")',
+    '      wait(element("question-box"), "question box")',
+    '      issues += audit("QuestionBox")',
+    '      enterText(into: "Question", "what is a deload week", submit: false)',
+    '      element("Ask").tap()',
+    '      wait(element("question-answer-card"), "answer", timeout: 60)',
+    '      wait(element("DELOAD"), "deload", timeout: 60)',
+    '      wait(element(labelBeginsWith: "A planned easy week."), "deload def", timeout: 60)',
+    '      tap("Back to Athlete Profile")',
+    '      wait(element("athlete-screen-shown"), "profile")',
+    '    }',
+    '    XCTAssertTrue(issues.isEmpty)',
+    '  }',
+  ].join('\n');
+  const earlyReturnTest1 = [
+    '  func test1_onboardingNavigationAndAccessibility() throws {',
+    '    for (key, screen, marker) in destinations {',
+    '      issues += audit(screen)',
+    '    }',
+    '    if true { return }',
+    '    tap("Open terminology glossary")',
+    '    wait(element("glossary-screen"), "glossary")',
+    '    issues += audit("Glossary")',
+    '    tap("Question box")',
+    '    wait(element("question-box"), "question box")',
+    '    issues += audit("QuestionBox")',
+    '    enterText(into: "Question", "what is a deload week", submit: false)',
+    '    element("Ask").tap()',
+    '    wait(element("question-answer-card"), "answer", timeout: 60)',
+    '    wait(element("DELOAD"), "deload", timeout: 60)',
+    '    wait(element(labelBeginsWith: "A planned easy week."), "deload def", timeout: 60)',
+    '    tap("Back to Athlete Profile")',
+    '    wait(element("athlete-screen-shown"), "profile")',
+    '    XCTAssertTrue(issues.isEmpty)',
+    '  }',
+  ].join('\n');
+  const earlyAssertTest1 = [
+    '  func test1_onboardingNavigationAndAccessibility() throws {',
+    '    for (key, screen, marker) in destinations {',
+    '      issues += audit(screen)',
+    '    }',
+    '    XCTAssertTrue(issues.isEmpty)',
+    '    tap("Open terminology glossary")',
+    '    wait(element("glossary-screen"), "glossary")',
+    '    issues += audit("Glossary")',
+    '  }',
+  ].join('\n');
+  const deloadLogOnlyTest1 = test1Body.replace(
+    /wait\(\s*element\(\s*"DELOAD"\s*\)[^\n]*\)\s*\n\s*wait\(\s*element\(\s*labelBeginsWith:\s*"A planned easy week\."[^\n]*\)/,
+    'log("DELOAD")',
+  );
+  const missingDeloadDefTest1 = test1Body.replace(
+    /\n\s*wait\(\s*element\(\s*labelBeginsWith:\s*"A planned easy week\."[^\n]*/,
+    '',
+  );
+  check(
+    'falsifier: plain 7-destination test1, conditional or if-false QuestionBox wrappers, early return, early issues.isEmpty assertion, or log("DELOAD") without title+definition waits all fail closed',
+    deloadLogOnlyTest1 !== test1Body
+      && missingDeloadDefTest1 !== test1Body
+      && !hasGlossaryAndQuestionBoxInTest1(plainSevenScreenTest1)
+      && !hasGlossaryAndQuestionBoxInTest1(conditionalQuestionBoxTest1)
+      && !hasGlossaryAndQuestionBoxInTest1(ifFalseWrappedTest1)
+      && !hasGlossaryAndQuestionBoxInTest1(earlyReturnTest1)
+      && !hasGlossaryAndQuestionBoxInTest1(earlyAssertTest1)
+      && !hasGlossaryAndQuestionBoxInTest1(deloadLogOnlyTest1)
+      && !hasGlossaryAndQuestionBoxInTest1(missingDeloadDefTest1),
+  );
+  const holdsFocusBody = suite.match(/private func holdsKeyboardFocus\([\s\S]*?\n  \}/)?.[0] ?? '';
+  const enterTextBody = suite.match(/private func enterText\([\s\S]*?\n  \}/)?.[0] ?? '';
+  const hasIsolatedQuestionBoxEntry = (focusSrc, enterSrc, test1Src) => {
+    const f = stripSwiftComments(focusSrc);
+    const e = stripSwiftComments(enterSrc);
+    const t = stripSwiftComments(test1Src);
+    const helpersClean = !/\.textView|textViews|app\.keyboards|\.isHittable/.test(f)
+      && f.includes('value(forKey: "hasKeyboardFocus")')
+      && !/\.textView|textViews|target:/.test(e)
+      && e.includes('let el = element(key)');
+    if (!helpersClean) return false;
+    if (/enterText\(\s*into:\s*"Question"/.test(t)) return false;
+    const firstTap = t.indexOf('questionInput.tap()');
+    const dismissAssert = t.indexOf('XCTAssertNil(try? app.keyboards.firstMatch.snapshot()');
+    if (firstTap === -1 || dismissAssert === -1 || dismissAssert <= firstTap) return false;
+    const preTap = t.slice(0, firstTap);
+    const focusedSpan = t.slice(firstTap + 'questionInput.tap()'.length, dismissAssert);
+    const postDismiss = t.slice(dismissAssert);
+    const preTapOk = /let\s+questionInput\s*=\s*app\.textViews\["Question"\]\.firstMatch[\s\S]*questionInput\.waitForExistence\(\s*timeout:\s*30\s*\)[\s\S]*reveal\(\s*questionInput\s*,\s*"Question"\s*\)[\s\S]*bringClear\(\s*questionInput\s*,\s*"Question"\s*\)/.test(preTap);
+    const focusedOk = focusedSpan.includes('app.typeText("what is a deload week")')
+      && focusedSpan.includes('app.staticTexts[targetName].firstMatch')
+      && focusedSpan.includes('(try? app.keyboards.firstMatch.snapshot())')
+      && !/(?:enterText|element|reveal|bringClear)\s*\(/.test(focusedSpan)
+      && !/\bquestionInput\./.test(focusedSpan);
+    const postDismissOk = /let\s+askButton\s*=\s*app\.buttons\["Ask"\]\.firstMatch[\s\S]*reveal\(\s*askButton\s*,\s*"Ask"\s*\)[\s\S]*bringClear\(\s*askButton\s*,\s*"Ask"\s*\)[\s\S]*askButton\.tap\(\)/.test(postDismiss);
+    return preTapOk && focusedOk && postDismissOk;
+  };
+  check(
+    'holdsKeyboardFocus/enterText keep single-line UITextField behavior and test1 isolates Question UITextView focus/type/blur without element()/reveal()/bringClear()/questionInput.* while focused',
+    hasIsolatedQuestionBoxEntry(holdsFocusBody, enterTextBody, test1Body),
+  );
+  const poisonedFocus = holdsFocusBody.replace('{', '{\n    if el.elementType == .textView { return app.keyboards.firstMatch.exists && el.isHittable }');
+  const enterTextQuestionTest1 = test1Body.replace('questionInput.tap()', 'enterText(into: "Question", "what is a deload week", submit: false)\n      questionInput.tap()');
+  const focusedElementTest1 = test1Body.replace('app.typeText("what is a deload week")', 'app.typeText("what is a deload week")\n      _ = element("Ask")');
+  const focusedRevealTest1 = test1Body.replace('blurTarget.tap()', 'reveal(blurTarget, targetName)\n        blurTarget.tap()');
+  const focusedBringClearTest1 = test1Body.replace('blurTarget.tap()', 'bringClear(blurTarget, targetName)\n        blurTarget.tap()');
+  const focusedQuestionQueryTest1 = test1Body.replace('app.typeText("what is a deload week")', '_ = questionInput.isHittable\n    app.typeText("what is a deload week")');
+  const droppedAppTypeTextTest1 = test1Body.replace('app.typeText("what is a deload week")', '');
+  const poisonedEnter = enterTextBody.replace('{', '{\n    if el.elementType == .textView { return }');
+  check(
+    'falsifier: textView branches in helpers, enterText on Question, or element/reveal/bringClear/questionInput.* while focused all fail closed',
+    poisonedFocus !== holdsFocusBody
+      && poisonedEnter !== enterTextBody
+      && enterTextQuestionTest1 !== test1Body
+      && focusedElementTest1 !== test1Body
+      && focusedRevealTest1 !== test1Body
+      && focusedBringClearTest1 !== test1Body
+      && focusedQuestionQueryTest1 !== test1Body
+      && droppedAppTypeTextTest1 !== test1Body
+      && !hasIsolatedQuestionBoxEntry(poisonedFocus, enterTextBody, test1Body)
+      && !hasIsolatedQuestionBoxEntry(holdsFocusBody, poisonedEnter, test1Body)
+      && !hasIsolatedQuestionBoxEntry(holdsFocusBody, enterTextBody, enterTextQuestionTest1)
+      && !hasIsolatedQuestionBoxEntry(holdsFocusBody, enterTextBody, focusedElementTest1)
+      && !hasIsolatedQuestionBoxEntry(holdsFocusBody, enterTextBody, focusedRevealTest1)
+      && !hasIsolatedQuestionBoxEntry(holdsFocusBody, enterTextBody, focusedBringClearTest1)
+      && !hasIsolatedQuestionBoxEntry(holdsFocusBody, enterTextBody, focusedQuestionQueryTest1)
+      && !hasIsolatedQuestionBoxEntry(holdsFocusBody, enterTextBody, droppedAppTypeTextTest1),
   );
 }
 
