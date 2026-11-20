@@ -299,6 +299,7 @@ const telemetryRows = (path) => {
     return JSON.stringify({
       hrv: db.prepare('SELECT * FROM hrv_daily ORDER BY date').all(),
       restingHr: hasTable(db, 'resting_hr_daily') ? db.prepare('SELECT * FROM resting_hr_daily ORDER BY date').all() : [],
+      kinestrike: hasTable(db, 'state_vector_kinestrike') ? db.prepare('SELECT * FROM state_vector_kinestrike ORDER BY date').all() : [],
     });
   } finally { db.close(); }
 };
@@ -495,6 +496,7 @@ function expectForwardRestored(legacy) {
     // an empty resting_hr_daily and copies or invents nothing into it.
     expect(telemetryRows(path)).toBe(legacy.telemetry[key]);
     expect(JSON.parse(telemetryRows(path)).restingHr).toEqual([]);
+    expect(JSON.parse(telemetryRows(path)).kinestrike).toEqual([]);
     // The forward migration brought the library text up to date: all 115 v2
     // corrections applied, only the deliberately held template rows remain.
     expect(coachingText(path)).toEqual({ v2Corrections: 115, templateRows: 29 });
@@ -735,9 +737,29 @@ describe('every registered pre-upgrade schema restores, not only the first', () 
     expect([v75.migrationSlot, v75.tableCount]).toEqual([76, v74.tableCount]);
     // 077 adds two side-car tables.
     const v76 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 76);
-    expect(v76).toBe(CURRENT);
+    expect(v76).not.toBe(CURRENT);
     expect(v76.fingerprint).not.toBe(v75.fingerprint);
     expect([v76.migrationSlot, v76.tableCount]).toEqual([77, v75.tableCount + 2]);
+    // 078 (WO-KS-BRIDGE-02): one side-car table added for KineStrike telemetry.
+    const v77 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 77);
+    expect(v77).not.toBe(CURRENT);
+    expect(v77.fingerprint).not.toBe(v76.fingerprint);
+    expect([v77.migrationSlot, v77.tableCount]).toEqual([78, v76.tableCount + 1]);
+    // 079 adds a swap-cause side-car.
+    const v78 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 78);
+    expect(v78).not.toBe(CURRENT);
+    expect(v78.fingerprint).not.toBe(v77.fingerprint);
+    expect([v78.migrationSlot, v78.tableCount]).toEqual([79, v77.tableCount + 1]);
+    // 080 adds a reference catalog and four strength/meet side-cars.
+    const v79 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 79);
+    expect(v79).not.toBe(CURRENT);
+    expect(v79.fingerprint).not.toBe(v78.fingerprint);
+    expect([v79.migrationSlot, v79.tableCount]).toEqual([80, v78.tableCount + 5]);
+    // 081 (#228) adds six additive program-control side-car tables.
+    const v80 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 80);
+    expect(v80).toBe(CURRENT);
+    expect(v80.fingerprint).not.toBe(v79.fingerprint);
+    expect([v80.migrationSlot, v80.tableCount]).toEqual([81, v79.tableCount + 6]);
     expect(v70.fingerprint).not.toBe(v69.fingerprint);
     expect([v70.migrationSlot, v70.tableCount]).toEqual([71, v69.tableCount + 2]);
     expect(PRE_UPGRADE.length).toBeGreaterThanOrEqual(7);
@@ -827,9 +849,12 @@ test('round trip at the current schema: focus, goals, every revision and measure
   seedFocusAndGoals(db);
   seedSportAndEmphasis(db);
   seedLegacyHrv(db);
-  // Resting HR with no HRV beside it, from each service (069).
+  // Resting HR with no HRV beside it, from each service (069), plus KineStrike telemetry (078).
   db.exec(`INSERT INTO resting_hr_daily (date, bpm, source, synced_at_ms) VALUES
-    ('2026-09-03', 54.5, 'apple_health', 8000), ('2026-09-04', 49, 'health_connect', 8100)`);
+    ('2026-09-03', 54.5, 'apple_health', 8000), ('2026-09-04', 49, 'health_connect', 8100);
+    INSERT INTO state_vector_kinestrike
+      (date, ks_foot, ks_strike_count, ks_gct_mean_ms, ks_gct_delta_pct, ks_cop_x_mean, ks_fall_last_state)
+      VALUES ('2026-09-05', 'L', 28, 242.5, 7.6, 0.48, 'IDLE')`);
   // 070 and 071: how a finished session went, a slot that was skipped in it, and
   // what two of its sets were seeded with (a load, and a blank field with an advisory).
   db.exec(`INSERT INTO session (session_id, micro_cycle_id, session_date, started_at_ms) VALUES (7100, NULL, '2026-09-05', 9000);
@@ -855,6 +880,28 @@ test('round trip at the current schema: focus, goals, every revision and measure
     } finally { reader.close(); }
   };
   const recordsBefore = sessionRecords(livePath);
+  // Seed a neutral swap cause row (078) on one of the session's plan slots so
+  // current-schema backup round-trip and CASCADE delete are covered end to end.
+  const causeDb = open(livePath);
+  let seededSlotId;
+  try {
+    seededSlotId = Number(causeDb.prepare('SELECT session_plan_slot_id FROM session_plan_slot WHERE session_id = 7100 ORDER BY session_plan_slot_id LIMIT 1').get().session_plan_slot_id);
+    causeDb.prepare(
+      'INSERT INTO session_slot_swap_cause (session_plan_slot_id, cause, scope, replaced_movement_id, recorded_at_ms) VALUES (?, ?, ?, ?, ?)',
+    ).run(seededSlotId, 'equipment_busy', 'rest_of_block', 1, 9600);
+  } finally { causeDb.close(); }
+  const swapCauseRows = (path) => {
+    const reader = open(path);
+    try {
+      return hasTable(reader, 'session_slot_swap_cause')
+        ? reader.prepare('SELECT session_plan_slot_id, cause, scope, replaced_movement_id, recorded_at_ms FROM session_slot_swap_cause ORDER BY session_plan_slot_id').all()
+        : [];
+    } finally { reader.close(); }
+  };
+  const swapCauseBefore = swapCauseRows(livePath);
+  expect(swapCauseBefore).toEqual([
+    { session_plan_slot_id: seededSlotId, cause: 'equipment_busy', scope: 'rest_of_block', replaced_movement_id: 1, recorded_at_ms: 9600 },
+  ]);
   expect(JSON.parse(recordsBefore)).toMatchObject({
     feel: [{ session_id: 7100, feel: 'harder' }],
     questions: [{ id: 1, asked_at: 9501, question_text: 'private-question', outcome_kind: 'card', glossary_term_id: 'RPE' }],
@@ -866,6 +913,9 @@ test('round trip at the current schema: focus, goals, every revision and measure
     telemetry: telemetryRows(livePath),
   };
   expect(JSON.parse(before.telemetry).restingHr).toHaveLength(2);
+  expect(JSON.parse(before.telemetry).kinestrike).toEqual([
+    expect.objectContaining({ date: '2026-09-05', ks_foot: 'L', ks_strike_count: 28, ks_gct_delta_pct: 7.6 }),
+  ]);
   expect(JSON.parse(before.sport)).toMatchObject({ sport: [{ sport_id: 'other', revision: 3 }], links: [{ movement_id: 1 }] });
   expect(JSON.parse(before.sport).emphasis).toHaveLength(1);
   expect(JSON.parse(before.focusGoals)).toMatchObject({ focus: [{ bundle_id: 'lower_body', revision: 2 }] });
@@ -885,11 +935,13 @@ test('round trip at the current schema: focus, goals, every revision and measure
   const wipe = open(livePath);
   wipe.exec('PRAGMA foreign_keys = ON; DELETE FROM athlete_goal; DELETE FROM athlete_focus;'
     + ' DELETE FROM athlete_sport_profile; DELETE FROM training_block;'
-    + ' DELETE FROM hrv_daily; DELETE FROM resting_hr_daily; DELETE FROM session WHERE session_id = 7100; DELETE FROM question_log;');
+    + ' DELETE FROM hrv_daily; DELETE FROM resting_hr_daily; DELETE FROM state_vector_kinestrike;'
+    + ' DELETE FROM session WHERE session_id = 7100; DELETE FROM question_log;');
   wipe.close();
   // The session's records went with it.
   expect(JSON.parse(sessionRecords(livePath))).toEqual({ feel: [], skipped: [], shown: [], questions: [] });
-  expect(JSON.parse(telemetryRows(livePath))).toEqual({ hrv: [], restingHr: [] });
+  expect(swapCauseRows(livePath)).toEqual([]);
+  expect(JSON.parse(telemetryRows(livePath))).toEqual({ hrv: [], restingHr: [], kinestrike: [] });
   expect(focusGoalRows(livePath)).toBe(NO_FOCUS_OR_GOALS);
   // The goal link and the block explanation went with their parents.
   expect(sportRows(livePath)).toBe(NO_SPORT_OR_EMPHASIS);
@@ -905,6 +957,7 @@ test('round trip at the current schema: focus, goals, every revision and measure
   expect(sportRows(livePath)).toBe(before.sport);
   expect(telemetryRows(livePath)).toBe(before.telemetry);
   expect(sessionRecords(livePath)).toBe(recordsBefore);
+  expect(swapCauseRows(livePath)).toEqual(swapCauseBefore);
   expect(athleteData(livePath)).toBe(before.athlete);
   expect(seedCounts(livePath)).toEqual(before.seeds);
   // The restored file is the real current schema again, guards included.

@@ -750,6 +750,13 @@ describe('the record-only sentence names only a report place that exists', () =>
     const sentence = screen.getByTestId('session-feel-record-only');
     expect(sentence).toHaveTextContent(SESSION_FEEL_RECORD_ONLY_TEXT_NO_PLAN_FORM);
     expect(sentence).not.toHaveTextContent(/Something feels off/);
+    // "Report discomfort" takes only a joint and a severity, so this sentence
+    // does not send an unwell athlete there (owner ruling on #180).
+    expect(SESSION_FEEL_RECORD_ONLY_TEXT_NO_PLAN_FORM).toBe(
+      'This is a record only. It does not adjust your training. If something hurts, '
+      + 'use "Report discomfort" on the lift during a session.',
+    );
+    expect(sentence).not.toHaveTextContent(/unwell/);
     expect(SESSION_FEEL_RECORD_ONLY_TEXT_NO_PLAN_FORM).toMatch(/^This is a record only\. It does not adjust your training\./);
     expect(SESSION_FEEL_RECORD_ONLY_TEXT_NO_PLAN_FORM).toContain('"Report discomfort"');
     expect(SESSION_FEEL_RECORD_ONLY_TEXT_NO_PLAN_FORM).not.toMatch(/\b(should|must|rest|doctor|physio|treat)\b/i);

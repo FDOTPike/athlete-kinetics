@@ -197,3 +197,145 @@ describe('ProgramSetupScreen: a beginner is told the session is short on purpose
     expect(screen.queryByTestId('session-time-beginner')).toBeNull();
   });
 });
+
+// Issue #352: Manage program (editing={true}) renders sessionTime.alternatives
+// and sessionCapOverride, and updateProgramPreferences enforces timeBudget
+// conflicts and persists sessionDurationCapMin to athlete_profile.
+describe('ProgramSetupScreen edit mode & updateProgramPreferences session time contract (#352)', () => {
+  const seedActiveProgramAt = (capMin) => {
+    act(() => {
+      useStore.getState().saveProfile({
+        objective: 'gpp',
+        weekly_frequency: 3,
+        session_duration_cap_min: capMin,
+      });
+    });
+    const ok = useStore.getState().createTrainingProgram({
+      horizon: { kind: 'weeks', blockCount: 2 },
+      schemaType: 'LINEAR',
+      dayIndices: [1, 3, 5],
+      days: [
+        { dayIndex: 1, focus: 'full' },
+        { dayIndex: 3, focus: 'conditioning' },
+        { dayIndex: 5, focus: 'full' },
+      ],
+      movementPreferences: [],
+    });
+    expect(ok).toBe(true);
+    expect(useStore.getState().program).not.toBeNull();
+  };
+
+  const saveDisabled = () =>
+    screen.getByLabelText('Save future preferences').props.accessibilityState?.disabled === true;
+
+  test('editing mode shows alternatives and draft override with approved copy, and Save persists sessionDurationCapMin', () => {
+    seedActiveProgramAt(60);
+    act(() => {
+      useStore.getState().saveProfile({ session_duration_cap_min: SHORT_CAP });
+    });
+
+    const onComplete = jest.fn();
+    render(<ProgramSetupScreen editing onComplete={onComplete} />);
+
+    expect(screen.getAllByTestId('session-time-conflict').length).toBeGreaterThan(0);
+    expect(saveDisabled()).toBe(true);
+    expect(screen.getByTestId('session-time-alternatives')).toBeOnTheScreen();
+    expect(
+      screen.getByText('Choose one to redraw the plan. Nothing is saved until you save preferences.'),
+    ).toBeOnTheScreen();
+    expect(
+      screen.queryByText('Choose one to redraw the plan. Nothing is saved until you create it.'),
+    ).toBeNull();
+
+    const longer = screen.getByText(/^Use \d+-minute sessions$/);
+    const chosen = Number(/Use (\d+)-minute/.exec(longer.props.children)[1]);
+    expect(chosen).toBeGreaterThan(SHORT_CAP);
+    fireEvent.press(longer);
+
+    expect(screen.queryAllByTestId('session-time-conflict')).toHaveLength(0);
+    expect(screen.getByTestId('session-time-draft')).toBeOnTheScreen();
+    expect(
+      screen.getByText(
+        `This plan uses ${chosen}-minute sessions. Your profile says ${SHORT_CAP}. Save future preferences saves ${chosen} minutes as your session length.`,
+      ),
+    ).toBeOnTheScreen();
+    expect(saveDisabled()).toBe(false);
+
+    // Reverting restores the profile cap and disables save again.
+    fireEvent.press(screen.getByText(`Back to ${SHORT_CAP} minutes`));
+    expect(screen.queryByTestId('session-time-draft')).toBeNull();
+    expect(saveDisabled()).toBe(true);
+
+    // Re-pick and save inside one transaction.
+    fireEvent.press(screen.getByText(/^Use \d+-minute sessions$/));
+    fireEvent.press(screen.getByLabelText('Save future preferences'));
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    expect(useStore.getState().error).toBeNull();
+    expect(useStore.getState().profile.session_duration_cap_min).toBe(chosen);
+
+    const driver = mockDrivers.get('athlete_kinetics.db');
+    const row = driver.raw.prepare('SELECT session_duration_cap_min AS cap FROM athlete_profile WHERE profile_id = 1').get();
+    expect(Number(row.cap)).toBe(chosen);
+  });
+
+  test('updateProgramPreferences refuses timeBudget conflicts and persists/preserves cap atomically', () => {
+    seedActiveProgramAt(60);
+    const baseInput = {
+      horizon: { kind: 'weeks', blockCount: 2 },
+      schemaType: 'LINEAR',
+      dayIndices: [1, 3, 5],
+      days: [
+        { dayIndex: 1, focus: 'full' },
+        { dayIndex: 3, focus: 'conditioning' },
+        { dayIndex: 5, focus: 'full' },
+      ],
+      movementPreferences: [],
+    };
+
+    // Calling directly under SHORT_CAP without override must fail and not touch the program.
+    act(() => {
+      useStore.getState().saveProfile({ session_duration_cap_min: SHORT_CAP });
+    });
+    const driver = mockDrivers.get('athlete_kinetics.db');
+    const daysBeforeReject = driver.raw.prepare('SELECT * FROM training_program_day ORDER BY day_index').all();
+    expect(useStore.getState().updateProgramPreferences({ ...baseInput, dayIndices: [1, 4], days: [
+      { dayIndex: 1, focus: 'full' }, { dayIndex: 4, focus: 'conditioning' },
+    ] })).toBe(false);
+    expect(useStore.getState().error).toBeTruthy();
+    expect(driver.raw.prepare('SELECT * FROM training_program_day ORDER BY day_index').all()).toEqual(daysBeforeReject);
+
+    // Omitting sessionDurationCapMin under a valid cap (60) preserves 60 in DB and state.
+    act(() => {
+      useStore.getState().saveProfile({ session_duration_cap_min: 60 });
+    });
+    expect(useStore.getState().updateProgramPreferences({
+      ...baseInput,
+      dayIndices: [1, 4],
+      days: [{ dayIndex: 1, focus: 'full' }, { dayIndex: 4, focus: 'full' }],
+    })).toBe(true);
+    expect(useStore.getState().profile.session_duration_cap_min).toBe(60);
+    expect(Number(driver.raw.prepare('SELECT session_duration_cap_min AS cap FROM athlete_profile WHERE profile_id = 1').get().cap)).toBe(60);
+
+    // Passing sessionDurationCapMin updates atomically and rolls back both program & cap on TX failure.
+    const original = driver.executeSync;
+    driver.executeSync = (sql, params) => {
+      if (/^\s*UPDATE athlete_profile\b/.test(String(sql)) && /session_duration_cap_min/.test(String(sql))) {
+        throw new Error('synthetic cap write failure');
+      }
+      return original.call(driver, sql, params);
+    };
+    try {
+      expect(useStore.getState().updateProgramPreferences({
+        ...baseInput,
+        dayIndices: [1, 3, 5],
+        days: baseInput.days,
+        sessionDurationCapMin: 75,
+      })).toBe(false);
+    } finally {
+      driver.executeSync = original;
+    }
+    expect(useStore.getState().profile.session_duration_cap_min).toBe(60);
+    expect(driver.raw.prepare('SELECT day_index FROM training_program_day ORDER BY day_index').all().map((r) => r.day_index))
+      .toEqual([1, 4]);
+  });
+});

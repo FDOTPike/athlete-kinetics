@@ -41,6 +41,8 @@ jest.mock('@ak/inference', () => {
     RIR_CHOICES: actual.RIR_CHOICES,
     RIR_OPTIONS: actual.RIR_OPTIONS,
     effectiveRpeCeiling: actual.effectiveRpeCeiling,
+    NEUTRAL_SWAP_CAUSES: actual.NEUTRAL_SWAP_CAUSES,
+    NEUTRAL_SWAP_SUBTITLE: actual.NEUTRAL_SWAP_SUBTITLE,
   };
 });
 const resolveLoadSelectionSpy = jest.fn((input) => actualResolveLoadSelection(input));
@@ -108,7 +110,7 @@ const state = (overrides = {}) => {
     movementAvailabilityRevision: 0, activeSessionAccessContext: 'weight_room', niggles: [],
     oneRepMaxes: {}, lastLoggedLoads: {}, lastTriage: null, substitution: null,
     startSession: jest.fn(), selectMovementSlot: jest.fn(), setMovementPreference: jest.fn(),
-    openSubstitution: jest.fn(), closeSubstitution: jest.fn(), applyRegression: jest.fn(), applyDaySwap: jest.fn(),
+    openSubstitution: jest.fn(), openNeutralSwap: jest.fn(), closeSubstitution: jest.fn(), applyNeutralSwap: jest.fn(), applyRegression: jest.fn(), applyDaySwap: jest.fn(),
     reportNiggle: jest.fn(() => true), logSet: jest.fn(), editSet: jest.fn(), endSession: jest.fn(),
     runner: runner(), sessionMode: 'guided',
     uiPreferences: { sessionModeOverride: null, readinessDetail: 'summary', restTimerEnabled: true, textScale: 'system' },
@@ -1383,15 +1385,41 @@ describe('safety controls on the rest card', () => {
   });
 });
 
-// Issue #208: the button is neutral and the sheet says the swap is for today.
-test('the swap button reads "Swap or avoid this" and the sheet says the swap is for today only', () => {
+// Issue #208 (Q1 + Q2 C): the entry button is "Swap exercise", opens the neutral sheet, and discomfort alternatives note today-only scope.
+test('the swap button reads "Swap exercise" and opens the neutral swap sheet while discomfort alternatives stay today-only', () => {
   render(<SessionScreen />);
-  expect(screen.getByText('Swap or avoid this')).toBeOnTheScreen();
+  expect(screen.getByText('Swap exercise')).toBeOnTheScreen();
+  expect(screen.queryByText('Swap or avoid this')).toBeNull();
   expect(screen.queryByText('Doesn’t feel right')).toBeNull();
-  const button = screen.getByLabelText('Swap or avoid this: First movement');
+  const button = screen.getByLabelText('Swap exercise: First movement');
   fireEvent.press(button);
-  expect(mockState.runnerThumbsDown).toHaveBeenCalledTimes(1);
+  expect(mockState.openNeutralSwap).toHaveBeenCalledWith(1);
+  expect(mockState.runnerThumbsDown).not.toHaveBeenCalled();
   mockState.substitution = {
+    mode: 'neutral',
+    targetId: 1,
+    neutralOptions: [
+      {
+        movement_id: 2,
+        name: 'Later movement',
+        pattern: 'push_h',
+        difficulty: 'Beginner',
+        absTierDelta: 0,
+        subtitle: 'Same movement pattern · Uses your available equipment',
+      },
+    ],
+    result: {
+      haltAdvised: false,
+      layer1Regression: { options: [] },
+      layer2DaySwap: { options: [] },
+    },
+  };
+  screen.rerender(<SessionScreen />);
+  expect(screen.getByText('Pick an available exercise for the same movement pattern.')).toBeOnTheScreen();
+  expect(screen.getByText('For today only')).toBeOnTheScreen();
+  expect(screen.getByText('For the rest of this block')).toBeOnTheScreen();
+  mockState.substitution = {
+    mode: 'discomfort',
     targetId: 1,
     result: {
       haltAdvised: false,
@@ -1407,10 +1435,11 @@ test('the swap button reads "Swap or avoid this" and the sheet says the swap is 
   );
 });
 
-test('thumbs-down delegates the durable Avoid plus substitution transition to the runner store action', () => {
+test('pressing "Swap exercise" delegates to openNeutralSwap without writing Avoid (-1) or calling openSubstitution', () => {
   render(<SessionScreen />);
-  fireEvent.press(screen.getByLabelText('Swap or avoid this: First movement'));
-  expect(mockState.runnerThumbsDown).toHaveBeenCalledTimes(1);
+  fireEvent.press(screen.getByLabelText('Swap exercise: First movement'));
+  expect(mockState.openNeutralSwap).toHaveBeenCalledWith(1);
+  expect(mockState.runnerThumbsDown).not.toHaveBeenCalled();
   expect(mockState.setMovementPreference).not.toHaveBeenCalled();
   expect(mockState.openSubstitution).not.toHaveBeenCalled();
 });
@@ -1784,9 +1813,9 @@ test('idle after a Stop report says the athlete stopped today\'s session after a
   expect(screen.queryByLabelText('Start a new workout session')).toBeNull();
 });
 
-test('runner substitution offer: thumbs-down after an earlier set uses runner path and not the legacy preference path', () => {
-  // After completing one set, thumbs-down should route through the runner store
-  // action (not the legacy setMovementPreference + openSubstitution pair).
+test('neutral swap mid-session after an earlier set delegates to openNeutralSwap without touching Avoid or legacy substitution', () => {
+  // After completing one set, tapping Swap exercise should open the neutral
+  // swap sheet through openNeutralSwap without triggering Avoid (-1) or discomfort openSubstitution.
   // The runner state has 1 completed set for slot 1 to simulate a mid-session offer.
   mockState = state({
     runner: runner({ slotSetCounts: [1, 0], loggedSets: 1, setIndex: 2 }),
@@ -1798,9 +1827,10 @@ test('runner substitution offer: thumbs-down after an earlier set uses runner pa
     },
   });
   render(<SessionScreen />);
-  fireEvent.press(screen.getByLabelText('Swap or avoid this: First movement'));
-  expect(mockState.runnerThumbsDown).toHaveBeenCalledTimes(1);
-  // Must NOT touch the legacy paths
+  fireEvent.press(screen.getByLabelText('Swap exercise: First movement'));
+  expect(mockState.openNeutralSwap).toHaveBeenCalledWith(1);
+  // Must NOT touch Avoid or discomfort paths
+  expect(mockState.runnerThumbsDown).not.toHaveBeenCalled();
   expect(mockState.setMovementPreference).not.toHaveBeenCalled();
   expect(mockState.openSubstitution).not.toHaveBeenCalled();
 });
@@ -1938,7 +1968,8 @@ test('post-session Outcome view displays correct copy for all mappings (beginner
 });
 
 // --- P1-2: grid/range validation tests ---------------------------------------
-// Owner ruling 2026-11-03 (Entry 0288): the logging grid is 0.5 kg, so the
+// Owner ruling 2026-11-03 (PR #194, commit b4fe6b42; Entry 0300; issue #297):
+// the logging grid is 0.5 kg, so the
 // off-grid examples are now 1.3 and 61.2 (1 and 61 are loggable).
 test('off-grid load 1.3 shows validation, disables Log set, and never calls logSet', () => {
   render(<SessionScreen />);
@@ -1992,7 +2023,7 @@ test.each([
   ['2,5', 2.5],
   ['60', 60],
   ['500', 500],
-  // Owner ruling 2026-11-03 (Entry 0288): dumbbell and kettlebell sizes.
+  // Owner ruling 2026-11-03 (PR #194, commit b4fe6b42; Entry 0300; issue #297): dumbbell and kettlebell sizes.
   ['12', 12],
   ['16', 16],
   ['24', 24],
@@ -3346,7 +3377,7 @@ describe('large text at font scale 2.0 (issue 158)', () => {
     render(<SessionScreen />);
     expect(StyleSheet.flatten(screen.getByTestId('workout-quick-row').props.style)).toMatchObject({ flexDirection: 'column' });
     expect(StyleSheet.flatten(screen.getByLabelText('Report discomfort').props.style)).toMatchObject({ alignSelf: 'stretch' });
-    expect(StyleSheet.flatten(screen.getByLabelText(/^Swap or avoid this: .+$/).props.style)).toMatchObject({ alignSelf: 'stretch' });
+    expect(StyleSheet.flatten(screen.getByLabelText(/^Swap exercise: .+$/).props.style)).toMatchObject({ alignSelf: 'stretch' });
   });
 
   test('at the default font scale the two workout buttons stay side by side', () => {

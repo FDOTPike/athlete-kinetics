@@ -152,6 +152,40 @@ export const SUPPORTED_BACKUP_SCHEMA_CONTRACTS: readonly BackupSchemaContract[] 
     objectCount: 216,
     fingerprint: '88daea365fb6f4d9d6414c1ab2c267af5aa0aa0149c7b5b3a69a3b0b804be294',
   },
+  // Through 078_kinestrike_telemetry: adds the state_vector_kinestrike side-car table.
+  {
+    userVersion: 77,
+    migrationSlot: 78,
+    tableCount: 128,
+    objectCount: 217,
+    fingerprint: 'eab1ec16b39fb6cf884344340a726775960bfc0af5c0828c4d68ac76691c89b2',
+  },
+  // Through 079_session_slot_swap_cause: adds the session_slot_swap_cause side-car table.
+  {
+    userVersion: 78,
+    migrationSlot: 79,
+    tableCount: 129,
+    objectCount: 218,
+    fingerprint: 'c3debf653091b89f0d4f7703ea39a1543b83baa1a7f810c77848ef20aea143cc',
+  },
+  // Through 080_sport_peaking_and_lifting_taxonomy: widens primary & secondary
+  // sport tables to 24 sports and 0..52 matches_per_week for lifting sports, and
+  // adds sport_peaking_movement plus 4 Phase 2 side-car tables.
+  {
+    userVersion: 79,
+    migrationSlot: 80,
+    tableCount: 134,
+    objectCount: 223,
+    fingerprint: 'a098fc6fe8d1d0ab3851d3ce06aaf007c09ab3e3d348f6b0dd1bd8bc04ccaf2d',
+  },
+  // Through 081_advanced_program_control: six side-car tables for Phase 2 (#228 + A7).
+  {
+    userVersion: 80,
+    migrationSlot: 81,
+    tableCount: 140,
+    objectCount: 229,
+    fingerprint: '18e8e595edc07baf10fd1c4ae85de155830f99859b2936d990dbaf78bdeae892',
+  },
 ];
 
 export const CURRENT_BACKUP_SCHEMA_CONTRACT: BackupSchemaContract =

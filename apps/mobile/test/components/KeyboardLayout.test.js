@@ -1,12 +1,13 @@
 import React from 'react';
-import { Platform, StyleSheet, TextInput } from 'react-native';
-import { render, screen } from '@testing-library/react-native';
+import { Keyboard, Platform, StyleSheet, TextInput } from 'react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import fs from 'fs';
 import path from 'path';
 import KeyboardAwareScrollView, {
   DEFAULT_KEYBOARD_EXTRA_SCROLL_HEIGHT,
   scrollFocusedInputIntoView,
 } from '../../src/components/KeyboardAwareScrollView';
+import { theme } from '../../src/theme/theme';
 
 describe('KeyboardAwareScrollView contract', () => {
   test('keeps every product TextInput in the app surface instead of Android landscape extract mode', () => {
@@ -187,5 +188,239 @@ describe('app shell keyboard avoidance', () => {
     expect(removers).toHaveLength(2);
     for (const remove of removers) expect(remove).toHaveBeenCalledTimes(1);
     spy.mockRestore();
+  });
+});
+
+describe('#379 iOS Fabric focus, layout-shrink timing, and footer viewport clearance', () => {
+  test('resolves TextInput.State.currentlyFocusedInput() on Fabric when event.nativeEvent.target is 0, and re-scrolls on iOS keyboardWillShow and keyboardDidShow', () => {
+    const originalOs = Platform.OS;
+    Platform.OS = 'ios';
+    const listeners = {};
+    const addListenerSpy = jest.spyOn(Keyboard, 'addListener').mockImplementation((event, handler) => {
+      (listeners[event] ??= []).push(handler);
+      return { remove: jest.fn() };
+    });
+    const rafSpy = jest.spyOn(global, 'requestAnimationFrame').mockImplementation((cb) => {
+      cb(0);
+      return 1;
+    });
+    const focusedHost = { measureLayout: jest.fn(), measureInWindow: jest.fn() };
+    const focusStateSpy = jest.spyOn(TextInput.State, 'currentlyFocusedInput').mockReturnValue(focusedHost);
+    const scrollToKeyboard = jest.fn();
+
+    try {
+      render(
+        <KeyboardAwareScrollView
+          extraScrollHeight={213}
+          ref={(node) => {
+            if (node !== null) {
+              node.scrollResponderScrollNativeHandleToKeyboard = scrollToKeyboard;
+            }
+          }}
+        >
+          <TextInput disableFullscreenUI accessibilityLabel="Sport minutes" />
+        </KeyboardAwareScrollView>,
+      );
+
+      const scroll = screen.getByTestId('keyboard-aware-scroll-view');
+      act(() => {
+        fireEvent(scroll, 'focus', { nativeEvent: { target: 0 } });
+      });
+      expect(scrollToKeyboard).toHaveBeenCalledTimes(1);
+      expect(scrollToKeyboard).toHaveBeenLastCalledWith(focusedHost, 213, true);
+
+      act(() => {
+        for (const handler of listeners.keyboardWillShow ?? []) handler();
+      });
+      expect(scrollToKeyboard).toHaveBeenCalledTimes(2);
+      expect(scrollToKeyboard).toHaveBeenLastCalledWith(focusedHost, 213, true);
+
+      act(() => {
+        for (const handler of listeners.keyboardDidShow ?? []) handler();
+      });
+      expect(scrollToKeyboard).toHaveBeenCalledTimes(3);
+      expect(scrollToKeyboard).toHaveBeenLastCalledWith(focusedHost, 213, true);
+
+      act(() => {
+        for (const handler of listeners.keyboardDidHide ?? []) handler();
+      });
+      expect(scrollToKeyboard).toHaveBeenCalledTimes(4);
+      expect(scrollToKeyboard).toHaveBeenLastCalledWith(focusedHost, 213, true);
+    } finally {
+      Platform.OS = originalOs;
+      focusStateSpy.mockRestore();
+      rafSpy.mockRestore();
+      addListenerSpy.mockRestore();
+    }
+  });
+
+  test('ignores target === 0 when TextInput.State.currentlyFocusedInput() is null', () => {
+    const rafSpy = jest.spyOn(global, 'requestAnimationFrame').mockImplementation((cb) => {
+      cb(0);
+      return 1;
+    });
+    const focusStateSpy = jest.spyOn(TextInput.State, 'currentlyFocusedInput').mockReturnValue(null);
+    const scrollToKeyboard = jest.fn();
+
+    try {
+      render(
+        <KeyboardAwareScrollView
+          ref={(node) => {
+            if (node !== null) {
+              node.scrollResponderScrollNativeHandleToKeyboard = scrollToKeyboard;
+            }
+          }}
+        >
+          <TextInput disableFullscreenUI accessibilityLabel="Target input" />
+        </KeyboardAwareScrollView>,
+      );
+
+      const scroll = screen.getByTestId('keyboard-aware-scroll-view');
+      act(() => {
+        fireEvent(scroll, 'focus', { nativeEvent: { target: 0 } });
+      });
+      expect(scrollToKeyboard).not.toHaveBeenCalled();
+    } finally {
+      focusStateSpy.mockRestore();
+      rafSpy.mockRestore();
+    }
+  });
+
+  test('re-scrolls when ScrollView shrinks onLayout while focused, forwards onLayout, and stops re-scrolling on shrink after blur', () => {
+    const originalOs = Platform.OS;
+    Platform.OS = 'ios';
+    const rafSpy = jest.spyOn(global, 'requestAnimationFrame').mockImplementation((cb) => {
+      cb(0);
+      return 1;
+    });
+    const focusedHost = { measureLayout: jest.fn(), measureInWindow: jest.fn() };
+    const focusStateSpy = jest.spyOn(TextInput.State, 'currentlyFocusedInput').mockReturnValue(focusedHost);
+    const scrollToKeyboard = jest.fn();
+    const onLayoutProp = jest.fn();
+
+    try {
+      render(
+        <KeyboardAwareScrollView
+          onLayout={onLayoutProp}
+          ref={(node) => {
+            if (node !== null) {
+              node.scrollResponderScrollNativeHandleToKeyboard = scrollToKeyboard;
+            }
+          }}
+        >
+          <TextInput disableFullscreenUI accessibilityLabel="Target input" />
+        </KeyboardAwareScrollView>,
+      );
+
+      const scroll = screen.getByTestId('keyboard-aware-scroll-view');
+      act(() => {
+        fireEvent(scroll, 'focus', { nativeEvent: { target: 0 } });
+      });
+      expect(scrollToKeyboard).toHaveBeenCalledTimes(1);
+
+      act(() => {
+        fireEvent(scroll, 'layout', { nativeEvent: { layout: { x: 0, y: 110, width: 414, height: 667 } } });
+      });
+      expect(onLayoutProp).toHaveBeenCalledTimes(1);
+      expect(scrollToKeyboard).toHaveBeenCalledTimes(1);
+
+      act(() => {
+        fireEvent(scroll, 'layout', { nativeEvent: { layout: { x: 0, y: 110, width: 414, height: 383 } } });
+      });
+      expect(onLayoutProp).toHaveBeenCalledTimes(2);
+      expect(scrollToKeyboard).toHaveBeenCalledTimes(2);
+
+      act(() => {
+        fireEvent(scroll, 'blur', { nativeEvent: { target: 0 } });
+        fireEvent(scroll, 'layout', { nativeEvent: { layout: { x: 0, y: 110, width: 414, height: 300 } } });
+      });
+      expect(onLayoutProp).toHaveBeenCalledTimes(3);
+      expect(scrollToKeyboard).toHaveBeenCalledTimes(2);
+    } finally {
+      Platform.OS = originalOs;
+      focusStateSpy.mockRestore();
+      rafSpy.mockRestore();
+    }
+  });
+
+  test('scrolls an occluded bottom input clear of ScrollView bottom via measureInWindow + measureLayout, leaves clear inputs alone, and rescues top-clipped inputs', () => {
+    const rafSpy = jest.spyOn(global, 'requestAnimationFrame').mockImplementation((cb) => {
+      cb(0);
+      return 1;
+    });
+    let innerY = -1826;
+    let inputTopInContent = 2331;
+    const nativeScroll = {
+      measureInWindow: jest.fn((cb) => cb(0, 110, 414, 383)),
+    };
+    const innerView = {
+      measureInWindow: jest.fn((cb) => cb(0, innerY, 414, 2852)),
+    };
+    const focusedHost = {
+      measureLayout: jest.fn((relativeTo, onSuccess) => {
+        if (relativeTo === innerView) {
+          onSuccess(17, inputTopInContent, 380, 54);
+        }
+      }),
+      measureInWindow: jest.fn((cb) => cb(17, innerY + inputTopInContent, 380, 54)),
+    };
+    const focusStateSpy = jest.spyOn(TextInput.State, 'currentlyFocusedInput').mockReturnValue(focusedHost);
+    const scrollToKeyboard = jest.fn();
+    const scrollToMock = jest.fn();
+
+    try {
+      render(
+        <KeyboardAwareScrollView
+          ref={(node) => {
+            if (node !== null) {
+              node.scrollResponderScrollNativeHandleToKeyboard = scrollToKeyboard;
+              node.getNativeScrollRef = () => nativeScroll;
+              node.getInnerViewRef = () => innerView;
+              node.scrollTo = scrollToMock;
+            }
+          }}
+        >
+          <TextInput disableFullscreenUI accessibilityLabel="Sport minutes" />
+        </KeyboardAwareScrollView>,
+      );
+
+      const scroll = screen.getByTestId('keyboard-aware-scroll-view');
+
+      // Case 1: sport-minutes at 505..559 below footer.minY (493 = 110 + 383).
+      act(() => {
+        fireEvent(scroll, 'focus', { nativeEvent: { target: 0 } });
+      });
+      expect(scrollToMock).toHaveBeenCalledTimes(1);
+      expect(scrollToMock).toHaveBeenLastCalledWith({
+        x: 0,
+        y: 2331 + 54 - (383 - theme.space[4]),
+        animated: true,
+      });
+
+      // Case 2: already clear input (SQUAT at topInContent=185, height=54, scrollY=0).
+      scrollToMock.mockClear();
+      innerY = 110;
+      inputTopInContent = 185;
+      act(() => {
+        fireEvent(scroll, 'focus', { nativeEvent: { target: 0 } });
+      });
+      expect(scrollToMock).not.toHaveBeenCalled();
+
+      // Case 3: top-clipped input (topInContent=100, scrollY=200 => iy=10).
+      innerY = -90;
+      inputTopInContent = 100;
+      act(() => {
+        fireEvent(scroll, 'focus', { nativeEvent: { target: 0 } });
+      });
+      expect(scrollToMock).toHaveBeenCalledTimes(1);
+      expect(scrollToMock).toHaveBeenLastCalledWith({
+        x: 0,
+        y: 100 - theme.space[4],
+        animated: true,
+      });
+    } finally {
+      focusStateSpy.mockRestore();
+      rafSpy.mockRestore();
+    }
   });
 });

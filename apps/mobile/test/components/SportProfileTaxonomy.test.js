@@ -21,18 +21,18 @@ const {
 const offeredPairs = () =>
   SPORTS.flatMap((sport) => SPORT_OUTCOMES_BY_SPORT[sport].map((outcome) => [sport, outcome]));
 
-describe('22-sport taxonomy proposal', () => {
-  test('carries 22 sports across 10 families, each sport listed once', () => {
-    expect(SPORTS).toHaveLength(22);
-    expect(new Set(SPORTS).size).toBe(22);
+describe('24-sport taxonomy (#229 Q7 lifting expansion)', () => {
+  test('carries 24 sports across 10 families, each sport listed once', () => {
+    expect(SPORTS).toHaveLength(24);
+    expect(new Set(SPORTS).size).toBe(24);
     expect(SPORT_FAMILIES).toHaveLength(10);
     const grouped = SPORT_FAMILIES.flatMap((family) => sportsInFamily(family));
     expect([...grouped].sort()).toEqual([...SPORTS].sort());
   });
 
-  test('offers 92 sport/outcome pairs and every pair resolves to complete copy', () => {
+  test('offers 94 sport/outcome pairs and every pair resolves to complete copy', () => {
     const pairs = offeredPairs();
-    expect(pairs).toHaveLength(92);
+    expect(pairs).toHaveLength(94);
     for (const [sport, outcome] of pairs) {
       const emphasis = sportEmphasisFor({ sportId: sport, outcomeId: outcome, otherSportName: null });
       expect(typeof emphasis.summary).toBe('string');

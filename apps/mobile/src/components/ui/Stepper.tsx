@@ -131,13 +131,18 @@ const styles = StyleSheet.create({
   },
   labelRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
+    justifyContent: 'center',
+    maxWidth: '100%',
     marginBottom: theme.space[2], // 8
   },
   label: {
     ...theme.font.eyebrow,
     fontFamily: theme.font.family,
     color: theme.color.textMid,
+    flexShrink: 1,
+    textAlign: 'center',
   },
   row: {
     flexDirection: 'row',

@@ -62,6 +62,7 @@ import { HALT_NEXT_TEXT } from '../state/haltCopy';
 import { operativeReportLine } from '../state/operativeReportLine';
 import { offPlanStartCaption, offPlanStartTarget } from '../state/offPlanStart';
 import { isSessionReportStop, SESSION_REPORT_STOP_SENTENCE } from '../state/sessionReportStop';
+import { NON_EQUIPMENT_ACCESS_CONFLICT_MESSAGE } from '../state/accessConflictCopy';
 
 export interface TodayScreenProps {
   /** Shell-supplied: go to the live session surface. */
@@ -125,6 +126,7 @@ function AvailableTodayScreen({
   const startSession = useStore((s) => s.startSession);
   const storeFreeFormStartIsEmpty = useStore((s) => s.freeFormStartIsEmpty);
   const storeEquipmentConflict = useStore((s) => s.todayPlanEquipmentConflict);
+  const storeConflictReason = useStore((s) => s.todayPlanConflictReason);
   const storeUpdateTodayWorkout = useStore((s) => s.updateTodayPlannedWorkout);
   const refreshVector = useStore((s) => s.refreshVector);
   const recordedDurationsForFocus = useStore((s) => s.recordedDurationsForFocus);
@@ -140,8 +142,13 @@ function AvailableTodayScreen({
   const [emptyStartPromptOpen, setEmptyStartPromptOpen] = React.useState(false);
   const [updateConfirmOpen, setUpdateConfirmOpen] = React.useState(false);
   // The same access check Start runs, so this notice and Start's refusal agree.
-  // Read on every render; a profile (equipment) change re-renders this screen.
-  const equipmentConflict = typeof storeEquipmentConflict === 'function' && storeEquipmentConflict();
+  // Read on every render; a profile (equipment / safety / experience) change re-renders this screen.
+  const conflictReason: 'equipment' | 'non_equipment' | null =
+    typeof storeConflictReason === 'function'
+      ? storeConflictReason()
+      : (typeof storeEquipmentConflict === 'function' && storeEquipmentConflict() ? 'equipment' : null);
+  const equipmentConflict = conflictReason !== null;
+  const nonEquipmentConflict = conflictReason === 'non_equipment';
   const confirmUpdateToday = React.useCallback(() => {
     setUpdateConfirmOpen(false);
     if (typeof storeUpdateTodayWorkout === 'function') storeUpdateTodayWorkout();
@@ -419,9 +426,9 @@ function AvailableTodayScreen({
                 const effective = applyPrescriptionToSlot(slot, todaysVector);
                 return (
                   <Text key={slot.plannedSlotId} style={styles.previewRow}>
-                    {slot.movementName} · {effective.sets}×{slot.target.kind === 'time'
-                      ? `${slot.target.seconds}s`
-                      : slot.target.reps}
+                    {slot.movementName} · {effective.backOff !== undefined && effective.backOff.sets > 0 && slot.target.kind === 'reps'
+                      ? `1×${slot.target.reps} + ${effective.backOff.sets}×${effective.backOff.reps}`
+                      : `${effective.sets}×${slot.target.kind === 'time' ? `${slot.target.seconds}s` : slot.target.reps}`}
                   </Text>
                 );
               })}
@@ -432,25 +439,35 @@ function AvailableTodayScreen({
             {equipmentConflict && (
               <View style={styles.preview} testID="today-equipment-conflict">
                 <Text style={styles.body} testID="today-equipment-conflict-text">
-                  Your equipment has changed. This workout includes a movement your current equipment
-                  does not cover, so it cannot start as planned.
+                  {nonEquipmentConflict
+                    ? NON_EQUIPMENT_ACCESS_CONFLICT_MESSAGE
+                    : 'Your equipment has changed. This workout includes a movement your current equipment does not cover, so it cannot start as planned.'}
                 </Text>
                 {updateConfirmOpen ? (
                   <View testID="today-update-confirm">
                     <Text style={styles.caption}>
-                      Only today&apos;s unstarted workout changes, using your current equipment. Your other
-                      days stay as they are.
+                      {nonEquipmentConflict
+                        ? "Only today's unstarted workout changes, using your current settings. Your other days stay as they are."
+                        : "Only today's unstarted workout changes, using your current equipment. Your other days stay as they are."}
                     </Text>
                     <PrimaryButton
                       label="Update today's workout"
                       onPress={confirmUpdateToday}
-                      accessibilityLabel="Confirm: update today's workout to fit your equipment"
+                      accessibilityLabel={
+                        nonEquipmentConflict
+                          ? "Confirm: update today's workout"
+                          : "Confirm: update today's workout to fit your equipment"
+                      }
                       testID="today-update-confirm-yes"
                     />
                     <QuietAction
-                      label="Cancel"
+                      label={nonEquipmentConflict ? "Keep today's workout" : 'Cancel'}
                       onPress={() => setUpdateConfirmOpen(false)}
-                      accessibilityLabel="Cancel updating today's workout"
+                      accessibilityLabel={
+                        nonEquipmentConflict
+                          ? "Keep today's workout"
+                          : "Cancel updating today's workout"
+                      }
                       testID="today-update-confirm-no"
                     />
                   </View>
@@ -458,7 +475,11 @@ function AvailableTodayScreen({
                   <QuietAction
                     label="Update today's workout"
                     onPress={() => setUpdateConfirmOpen(true)}
-                    accessibilityLabel="Update today's workout to fit your equipment"
+                    accessibilityLabel={
+                      nonEquipmentConflict
+                        ? "Update today's workout"
+                        : "Update today's workout to fit your equipment"
+                    }
                     testID="today-update-workout"
                   />
                 )}

@@ -25,9 +25,11 @@ import {
   generateDemoHistory,
   insertTrainingProgram,
   linkTrainingBlockProgram,
+  mapBaseProgramFocus,
   migrate,
   openKineticsDb,
   updateTrainingProgramEndDate,
+  writeProgramAdvancedControl,
   type DemoSql,
 } from '@ak/core-db';
 import {
@@ -77,6 +79,7 @@ import {
   type OneOffActivityInput,
   type WeeklyActivityInput,
 } from './activityStore';
+import { NON_EQUIPMENT_ACCESS_CONFLICT_MESSAGE } from './accessConflictCopy';
 import {
   buildPatternWindow,
   addDaysIso,
@@ -84,9 +87,14 @@ import {
   programHorizonAnchor,
   composeRoutineMicrocycle,
   contextualRoutineRoles,
+  computeNeutralSwapOptions,
   computeSubstitutions,
+  NON_PATHOLOGICAL_SWAP_CAUSES,
+  DEFAULT_LONGITUDINAL_AUTOPILOT_POLICY,
   DEFAULT_PROFILE,
   detectFlaws,
+  evaluateLongitudinalAutopilot,
+  type LongitudinalBlockEvidence,
   applyLoadModifier,
   applyPrescriptionToSlot,
   derivePrescription,
@@ -134,6 +142,10 @@ import {
   type MovementAvailability,
   type MovementAccessContext,
   type ExecutableMovementAccessContext,
+  type NeutralSwapCause,
+  type NeutralSwapOption,
+  type SwapCause,
+  type SwapScope,
   type RoutineRole,
   type RoutineAssistanceContract,
   type RoutineFamilyStressDecision,
@@ -146,7 +158,11 @@ import {
   type ReturnAction,
   type BlockPlan,
   type BlockFocus,
+  type BlockLongitudinalControl,
   type ProgramDayPreference,
+  type ProgramRoutineDayAssignment,
+  type ProgramScheduleMode,
+  type ProgramSlotOverride,
   type FutureSlot,
   type GeneratorMovement,
   type Guardrail,
@@ -217,10 +233,14 @@ import {
   type LoadPreference,
   type LoadSelection,
   type LoadSource,
+  countdownMacroBlockIndex,
+  resolveCompetitionCountdownHorizon,
+  type PlannedSlotBackOff,
 } from '@ak/inference';
 
 export type { MovementAvailability };
-export type { LoadPreference, LoadSelection, LoadSource } from '@ak/inference';
+export type { LoadPreference, LoadSelection, LoadSource, PlannedSlotBackOff } from '@ak/inference';
+export type { NeutralSwapCause, NeutralSwapOption, SwapCause, SwapScope } from '@ak/inference';
 export { applyLoadModifier, applyPrescriptionToSlot, isPrescriptionReduced } from '@ak/inference';
 
 /** What the load entry was seeded with for the set being logged, as the session
@@ -606,6 +626,7 @@ export interface PlanSlot {
    *  overwrote plannedSets with the sets the runner keeps (075). Null, or absent on a
    *  slot built before this was recorded: the screens then use the earlier wording. */
   originalPlannedSets?: number | null;
+  backOff?: PlannedSlotBackOff;
 }
 
 // --- 4-week block (007 tables) ----------------------------------------------
@@ -662,6 +683,12 @@ export interface TodaySlot {
   overrideReason: string | null;
   /** Optional planned_slot_autopilot provenance; absent means untouched. */
   autopilot?: AutopilotAttribution;
+  /** Optional Phase 2 (#228) athlete Customize / routine override provenance. */
+  athleteOverride?: {
+    source: 'slot_override' | 'routine_assignment';
+    mrvCeilingSets: number | null;
+    aboveMrv: boolean;
+  };
   /** Frozen bounded-dose decision for routine-derived slots. */
   routineDecision?: {
     role: RoutineRole;
@@ -672,6 +699,7 @@ export interface TodaySlot {
     stressDose: number;
     adaptations: string[];
   };
+  backOff?: PlannedSlotBackOff;
 }
 
 /**
@@ -694,6 +722,12 @@ export interface BlockMeta {
   macroBlockIndex: number;
   macroPhase: string;
   peakShifted: boolean;
+}
+
+export interface BlockMeetMeta {
+  competitionDate: string;
+  blockNumber: number;
+  totalBlocks: number;
 }
 
 /** Today's planned session, null on rest days (the UI renders that state). */
@@ -726,6 +760,25 @@ export interface TrainingProgramMovementPreference {
 export interface TrainingProgramDay {
   dayIndex: number;
   focus: string;
+  routineAssignment?: {
+    routineTemplateId: number;
+    routineDayIndex: number;
+    routineName: string;
+  };
+}
+
+export interface TrainingProgramSlotOverride {
+  dayIndex: number;
+  slotIndex: number;
+  sets?: number | null;
+  reps?: number | null;
+  targetRpe?: number | null;
+}
+
+export interface TrainingProgramDayRoutineAssignment {
+  dayIndex: number;
+  routineTemplateId: number;
+  routineDayIndex: number;
 }
 
 export interface TrainingProgram {
@@ -740,8 +793,11 @@ export interface TrainingProgram {
   schemaType: SchemaType;
   status: 'active' | 'review_due' | 'archived';
   currentSequenceIndex: number;
+  scheduleMode: ProgramScheduleMode;
   days: TrainingProgramDay[];
   movementPreferences: TrainingProgramMovementPreference[];
+  slotOverrides: TrainingProgramSlotOverride[];
+  routineAssignments: TrainingProgramDayRoutineAssignment[];
 }
 
 export type TrainingProgramHorizon =
@@ -752,17 +808,26 @@ export interface TrainingProgramInput {
   horizon: TrainingProgramHorizon;
   schemaType: SchemaType;
   dayIndices: number[];
+  scheduleMode?: ProgramScheduleMode;
   movementPreferences?: TrainingProgramMovementPreference[];
   days?: TrainingProgramDay[];
+  slotOverrides?: TrainingProgramSlotOverride[];
+  routineAssignments?: TrainingProgramDayRoutineAssignment[];
   /** A session length the athlete chose on the Build screen from the plan's
    *  own offers (Android walk 2026-11-03, W1-4). The preview plans with it;
    *  creating the program saves it to the profile. Absent = the profile's. */
   sessionDurationCapMin?: number;
+  /** Draft effort cap (base_rpe_cap) chosen on the Program Setup screen;
+   *  used for preview and persisted only when the athlete confirms save/create. */
+  baseRpeCap?: number;
   /** Continuation preview only (review, PR 194): saved preferences that no
    *  longer pass the day, profile or capability gates are left out, as the
    *  continuation generator leaves them out, instead of refused. New choices
    *  are always checked strictly. */
   keepPlaceablePreferencesOnly?: boolean;
+  /** Continuation preview only: include the completed outgoing block's logged
+   *  evidence before it is archived so recovery ceilings match continuation commit. */
+  includeCompletedBlockId?: number;
 }
 
 export interface TrainingProgramPreview {
@@ -772,7 +837,13 @@ export interface TrainingProgramPreview {
   plannedEndDate: string;
   plannedBlockCount: number;
   schemaType: SchemaType;
+  scheduleMode: ProgramScheduleMode;
   days: TrainingProgramDay[];
+  slotOverrides: TrainingProgramSlotOverride[];
+  routineAssignments: TrainingProgramDayRoutineAssignment[];
+  patternMrvSets?: Partial<Record<MovementPattern, number>>;
+  /** True when the resolved preview horizon actually builds a competition countdown. */
+  countdownApplied?: boolean;
   plan: BlockPlan;
 }
 
@@ -920,7 +991,14 @@ interface KineticsStore {
   /** heldByReportedArea: the reported-area safety exclusion removed candidates
    *  the engine would otherwise have offered (or the joint guardrail blocked
    *  some). Only the empty sheet's wording reads it. */
-  substitution: { targetId: number; result: SubstitutionResult; heldByReportedArea?: boolean } | null;
+  substitution: {
+    targetId: number;
+    targetSessionPlanSlotId?: number | null;
+    result: SubstitutionResult;
+    heldByReportedArea?: boolean;
+    mode?: 'neutral' | 'discomfort';
+    neutralOptions?: NeutralSwapOption[];
+  } | null;
   /** Today's active niggles (region + severity), fed verbatim into
    *  computeSubstitutions — they drive the injury guardrail and Layer 3. */
   niggles: NiggleInput[];
@@ -933,6 +1011,7 @@ interface KineticsStore {
   /** Active 4-week block, its grid, and today's planned session. */
   block: ActiveBlock | null;
   blockMeta: BlockMeta | null;
+  blockMeetMeta: BlockMeetMeta | null;
   blockSessions: BlockSessionSummary[];
   todayPlan: TodayPlan | null;
   hasArchivedBlock: boolean;
@@ -988,9 +1067,11 @@ interface KineticsStore {
    *  SQLite transaction). Deterministic: profile + equipment + schema +
    *  macro position + today. Continues the 32-week macro-cycle. */
   generateNewBlock: (schemaType?: SchemaType) => void;
-  /** True when today's unstarted planned workout has a movement the current equipment does not cover. */
+  /** Classifies why today's unstarted planned workout needs updating, keeping non-equipment reasons ahead of equipment. */
+  todayPlanConflictReason: () => 'equipment' | 'non_equipment' | null;
+  /** True when today's unstarted planned workout cannot start as planned (or needs updating for a beginner routine). */
   todayPlanEquipmentConflict: () => boolean;
-  /** Rebuilds only today's unstarted planned workout with the current equipment. Returns true when it was rebuilt. */
+  /** Rebuilds only today's unstarted planned workout with the current settings. Returns true when it was rebuilt. */
   updateTodayPlannedWorkout: () => boolean;
   refreshReturnCheckin: () => void;
   confirmReturnCheckin: (action: ReturnAction) => void;
@@ -1255,7 +1336,24 @@ interface KineticsStore {
    *  message) and false when it did not (unknown movement, a support hold, or
    *  an unverifiable session context). */
   openSubstitution: (targetMovementId: number) => boolean;
+  /** Open the neutral exercise-swap sheet (#208) without setting 010 Avoid (-1)
+   *  or tripping runnerThumbsDown. Offers same-pattern available alternatives
+   *  ranked by matched difficulty (`|tierDelta| === 0`, then `1`). */
+  openNeutralSwap: (targetMovementId: number) => boolean;
   closeSubstitution: () => void;
+  /** Apply a neutral exercise swap (#208) with explicit cause + scope:
+   *  - `'today_only'` updates the current session slot (`073` + `078`).
+   *  - `'rest_of_block'` also updates remaining unstarted `planned_slot` rows
+   *    in the active block, and updates `033` `training_program_movement_preference`
+   *    only when `cause === 'preference'`.
+   *  Never writes `-1` to `010` `movement_preference`. */
+  applyNeutralSwap: (
+    targetMovementId: number,
+    optionMovementId: number,
+    cause: NeutralSwapCause,
+    scope: SwapScope,
+    replacementSets?: number,
+  ) => boolean;
   /** Apply a Layer-1 regression: swap the target slot for the chosen movement
    *  (logged sets stand as history). */
   applyRegression: (targetMovementId: number, optionMovementId: number, replacementSets?: number) => void;
@@ -2383,6 +2481,17 @@ const runBlockWipe = (d: DB, today: string): void => {
   // Named explicitly: with foreign keys off the cascade would not run, and a
   // block id is reused once its row is gone.
   deleteBlockEmphasisFor(d, 'active');
+  d.executeSync(
+    `DELETE FROM planned_slot_backoff WHERE planned_slot_id IN (
+       SELECT ps.planned_slot_id FROM planned_slot ps
+       JOIN planned_session p ON p.planned_session_id = ps.planned_session_id
+       JOIN training_block tb ON tb.block_id = p.block_id
+       WHERE tb.status = 'active'
+     )`,
+  );
+  d.executeSync(
+    "DELETE FROM training_block_meet_meta WHERE block_id IN (SELECT block_id FROM training_block WHERE status = 'active')",
+  );
   d.executeSync("DELETE FROM training_block WHERE status = 'active'");
   d.executeSync('DELETE FROM subjective_report WHERE date = ?', [today]);
   d.executeSync('DELETE FROM niggle WHERE reported_at_ms >= ?', [startOfTodayMs()]);
@@ -2473,9 +2582,11 @@ const persistRunnerCheckpoint = (
 
 interface FinalizationLoggedSet {
   readonly setId: number;
+  readonly setIndex: number;
   readonly movementId: number;
   readonly sessionPlanSlotId: number | null;
   readonly sourcePlannedSlotId: number | null;
+  readonly prescribedReps: number | null;
   readonly reps: number;
   readonly rpe: number | null;
 }
@@ -2563,6 +2674,7 @@ const hydrateSessionFinalization = (d: DB, sessionId: number): SessionFinalizati
 
   const setRows = rowsOf<{
     set_id: number;
+    set_index: number;
     movement_id: number;
     reps: number;
     rpe: number | null;
@@ -2574,7 +2686,7 @@ const hydrateSessionFinalization = (d: DB, sessionId: number): SessionFinalizati
     target_seconds: number | null;
     time_s: number | null;
   }>(d.executeSync(
-    "SELECT sr.set_id, sr.movement_id, sr.reps, sr.rpe, st.session_plan_slot_id, st.source_planned_slot_id, st.provenance_kind, sdt.target_kind, sdt.target_reps, sdt.target_seconds, tm.value AS time_s FROM set_record sr LEFT JOIN set_target st ON st.set_id = sr.set_id LEFT JOIN set_dose_target sdt ON sdt.set_id = sr.set_id LEFT JOIN set_metric tm ON tm.set_id = sr.set_id AND tm.metric = 'time_s' WHERE sr.session_id = ? ORDER BY sr.set_id",
+    "SELECT sr.set_id, sr.set_index, sr.movement_id, sr.reps, sr.rpe, st.session_plan_slot_id, st.source_planned_slot_id, st.provenance_kind, sdt.target_kind, sdt.target_reps, sdt.target_seconds, tm.value AS time_s FROM set_record sr LEFT JOIN set_target st ON st.set_id = sr.set_id LEFT JOIN set_dose_target sdt ON sdt.set_id = sr.set_id LEFT JOIN set_metric tm ON tm.set_id = sr.set_id AND tm.metric = 'time_s' WHERE sr.session_id = ? ORDER BY sr.set_id",
     [sessionId],
   ));
   const sets: SessionOutcomeInput['sets'] = setRows.map((row) => {
@@ -2616,9 +2728,11 @@ const hydrateSessionFinalization = (d: DB, sessionId: number): SessionFinalizati
     sets,
     loggedSets: setRows.map((row) => ({
       setId: row.set_id,
+      setIndex: row.set_index,
       movementId: row.movement_id,
       sessionPlanSlotId: row.session_plan_slot_id,
       sourcePlannedSlotId: row.source_planned_slot_id,
+      prescribedReps: row.target_kind === 'reps' ? row.target_reps : null,
       reps: row.reps,
       rpe: row.rpe,
     })),
@@ -2703,6 +2817,10 @@ const earlierOpenSessionEntries = (
  *  and removes the runner checkpoint. */
 const deleteEmptySessionRows = (d: DB, sessionId: number): void => {
   d.executeSync(
+    'DELETE FROM session_slot_swap_cause WHERE session_plan_slot_id IN (SELECT session_plan_slot_id FROM session_plan_slot WHERE session_id = ?) OR replaced_by_session_plan_slot_id IN (SELECT session_plan_slot_id FROM session_plan_slot WHERE session_id = ?)',
+    [sessionId, sessionId],
+  );
+  d.executeSync(
     'DELETE FROM session_plan_slot_planned_count WHERE session_plan_slot_id IN (SELECT session_plan_slot_id FROM session_plan_slot WHERE session_id = ?)',
     [sessionId],
   );
@@ -2717,6 +2835,10 @@ const deleteEmptySessionRows = (d: DB, sessionId: number): void => {
   // session's id.
   deleteSessionPreparation(d, sessionId);
   d.executeSync('DELETE FROM session_slot_target WHERE session_plan_slot_id IN (SELECT session_plan_slot_id FROM session_plan_slot WHERE session_id = ?)', [sessionId]);
+  d.executeSync(
+    'DELETE FROM session_slot_backoff WHERE session_plan_slot_id IN (SELECT session_plan_slot_id FROM session_plan_slot WHERE session_id = ?)',
+    [sessionId],
+  );
   d.executeSync('DELETE FROM planned_slot_disposition WHERE session_id = ?', [sessionId]);
   d.executeSync('DELETE FROM session_plan_slot WHERE session_id = ?', [sessionId]);
   d.executeSync('DELETE FROM session_origin WHERE session_id = ?', [sessionId]);
@@ -3065,16 +3187,33 @@ const applyApreFinalization = (
   ))[0];
   if (source === undefined || source.week_index >= 4) return;
 
-  const sourceSlots = rowsOf<{ planned_slot_id: number; movement_id: number; reps: number; one_rm_kg: number | null }>(d.executeSync(
-    'SELECT sl.planned_slot_id, sl.movement_id, sl.reps, orm.load_kg AS one_rm_kg FROM planned_slot sl LEFT JOIN one_rep_max orm ON orm.movement_id = sl.movement_id WHERE sl.planned_session_id = ? ORDER BY sl.slot_index',
+  const sourceSlots = rowsOf<{
+    planned_slot_id: number;
+    movement_id: number;
+    reps: number;
+    one_rm_kg: number | null;
+    backoff_sets: number | null;
+  }>(d.executeSync(
+    `SELECT sl.planned_slot_id, sl.movement_id, sl.reps, orm.load_kg AS one_rm_kg, psb.sets AS backoff_sets
+       FROM planned_slot sl
+       LEFT JOIN one_rep_max orm ON orm.movement_id = sl.movement_id
+       LEFT JOIN planned_slot_backoff psb ON psb.planned_slot_id = sl.planned_slot_id
+      WHERE sl.planned_session_id = ?
+      ORDER BY sl.slot_index`,
     [sourcePlannedSessionId],
   ));
   for (const slot of sourceSlots) {
     if (supportDecision([slot.movement_id], 'apre-next-week',
       `planned-slot:${slot.planned_slot_id}:movement:${slot.movement_id}`).status !== 'available') continue;
     if (slot.one_rm_kg === null) continue;
+    const hasBackOff = slot.backoff_sets !== null && slot.backoff_sets > 0;
     const bestReps = loggedSets
-      .filter((loggedSet) => loggedSet.sourcePlannedSlotId === slot.planned_slot_id && loggedSet.movementId === slot.movement_id)
+      .filter((loggedSet) =>
+        loggedSet.sourcePlannedSlotId === slot.planned_slot_id
+        && loggedSet.movementId === slot.movement_id
+        && (hasBackOff
+          ? loggedSet.setIndex === 1
+          : (loggedSet.prescribedReps === null || loggedSet.prescribedReps === slot.reps)))
       .reduce((best, loggedSet) => Math.max(best, loggedSet.reps), 0);
     const surplus = bestReps - slot.reps;
     if (surplus <= 0) continue;
@@ -3127,9 +3266,15 @@ interface PendingProgramCreation {
   input: TrainingProgramInput;
   preview: TrainingProgramPreview;
   programDays: ProgramDayPreference[];
+  scheduleMode: ProgramScheduleMode;
+  slotOverrides: TrainingProgramSlotOverride[];
+  routineAssignments: TrainingProgramDayRoutineAssignment[];
   /** A session length chosen on the Build screen, saved to the profile in the
    *  same transaction as the program (null: the profile's length is kept). */
   sessionDurationCapMin: number | null;
+  /** An effort cap chosen on the Build screen, saved to the profile in the
+   *  same transaction as the program (null: the profile's cap is kept). */
+  baseRpeCap: number | null;
 }
 
 let pendingProgramCreation: PendingProgramCreation | null = null;
@@ -3143,8 +3288,13 @@ interface PendingProgramContinuation {
   startingMacroBlockIndex: number;
   plannedEndDate: string;
   programDays: ProgramDayPreference[];
+  scheduleMode: ProgramScheduleMode;
   weeklyFrequency: number;
   objective: UserProfile['objective'];
+  /** Completed outgoing block id included in continuation longitudinal evidence before archiving. */
+  outgoingBlockId: number;
+  /** Program-scoped competition countdown date from training_program_meet_countdown, or null when inactive. */
+  countdownDate: string | null;
 }
 
 let pendingProgramContinuation: PendingProgramContinuation | null = null;
@@ -3156,17 +3306,268 @@ const isoUtcMs = (value: string): number => {
   return ms;
 };
 
-const trainingProgramShape = (profile: UserProfile, input: TrainingProgramInput, horizonAnchorDate: string) => {
+const competitionCountdownDaysAway = (anchorDate: string, competitionDate: string | null | undefined): number | null => {
+  if (competitionDate === null || competitionDate === undefined || competitionDate.trim() === '') return null;
+  const anchorMs = Date.parse(`${anchorDate}T00:00:00Z`);
+  const compMs = Date.parse(`${competitionDate}T00:00:00Z`);
+  if (!Number.isFinite(anchorMs) || !Number.isFinite(compMs)) return null;
+  const daysAway = Math.floor((compMs - anchorMs) / 86400000);
+  return daysAway >= 1 && daysAway <= 224 ? daysAway : null;
+};
+
+const readRoutineAssignmentMap = (
+  d: DB,
+  assignments: readonly TrainingProgramDayRoutineAssignment[],
+): Map<string, ProgramRoutineDayAssignment> => {
+  const result = new Map<string, ProgramRoutineDayAssignment>();
+  const templateIds = [...new Set(assignments.map((a) => a.routineTemplateId))];
+  for (const templateId of templateIds) {
+    const templateRow = rowsOf<{ name: string }>(d.executeSync(
+      'SELECT name FROM routine_template WHERE routine_template_id = ?',
+      [templateId],
+    ))[0];
+    if (templateRow === undefined) continue;
+    const slotRows = rowsOf<{
+      day_index: number;
+      slot_index: number;
+      movement_id: number;
+      sets: number;
+      reps: number;
+      target_rpe: number;
+    }>(d.executeSync(
+      `SELECT day_index, slot_index, movement_id, sets, reps, target_rpe
+         FROM routine_template_slot
+        WHERE routine_template_id = ?
+        ORDER BY day_index, slot_index`,
+      [templateId],
+    ));
+    for (const row of slotRows) {
+      const key = `${templateId}:${row.day_index}`;
+      const existing = result.get(key);
+      const slot = {
+        slot_index: row.slot_index,
+        movement_id: row.movement_id,
+        sets: row.sets,
+        reps: row.reps,
+        target_rpe: row.target_rpe,
+      };
+      if (existing === undefined) {
+        result.set(key, {
+          routine_template_id: templateId,
+          routine_day_index: row.day_index,
+          routine_name: templateRow.name,
+          slots: [slot],
+        });
+      } else {
+        result.set(key, { ...existing, slots: [...existing.slots, slot] });
+      }
+    }
+  }
+  return result;
+};
+
+const readLongitudinalControlContext = (
+  d: DB,
+  args: {
+    profile: UserProfile;
+    movements: readonly Movement[];
+    macroBlockIndex: number;
+    introductoryWeek1?: boolean;
+    includeCompletedBlockId?: number;
+  },
+): BlockLongitudinalControl => {
+  const introFlag = args.introductoryWeek1 === true ? { introductoryWeek1: true as const } : {};
+  const patternRows = rowsOf<{ pattern: MovementPattern }>(d.executeSync(
+    `SELECT DISTINCT m.pattern
+       FROM set_record sr
+       JOIN movement m ON m.movement_id = sr.movement_id
+     UNION
+     SELECT DISTINCT m.pattern
+       FROM history_import_set his
+       JOIN movement m ON m.movement_id = his.movement_id`,
+  ));
+  const loggedPatterns = new Set(patternRows.map((row) => row.pattern));
+  if (loggedPatterns.size === 0) {
+    return introFlag;
+  }
+  const blockRows = rowsOf<{
+    block_id: number;
+    start_date: string;
+    macro_block_index: number;
+    suspension_attributed: number;
+  }>(args.includeCompletedBlockId !== undefined
+    ? d.executeSync(
+      `SELECT tb.block_id, tb.start_date,
+              COALESCE(bm.macro_block_index, 1) AS macro_block_index,
+              EXISTS(SELECT 1 FROM block_suspension_origin bso WHERE bso.block_id = tb.block_id) AS suspension_attributed
+         FROM training_block tb
+         LEFT JOIN block_meta bm ON bm.block_id = tb.block_id
+        WHERE tb.status = 'archived' OR tb.block_id = ?
+        ORDER BY tb.block_id ASC`,
+      [args.includeCompletedBlockId],
+    )
+    : d.executeSync(
+      `SELECT tb.block_id, tb.start_date,
+              COALESCE(bm.macro_block_index, 1) AS macro_block_index,
+              EXISTS(SELECT 1 FROM block_suspension_origin bso WHERE bso.block_id = tb.block_id) AS suspension_attributed
+         FROM training_block tb
+         LEFT JOIN block_meta bm ON bm.block_id = tb.block_id
+        WHERE tb.status = 'archived'
+        ORDER BY tb.block_id ASC`,
+    ));
+  if (blockRows.length === 0) {
+    return introFlag;
+  }
+  const minStartDate = blockRows[0].start_date;
+  const maxEndDate = addDaysIso(blockRows[blockRows.length - 1].start_date, 27);
+  const allSetAgg = rowsOf<{
+    date: string; pattern: MovementPattern; set_count: number;
+    sum_delta_rpe: number; delta_count: number; sum_attenuation: number;
+  }>(d.executeSync(
+    `SELECT s.session_date AS date, m.pattern AS pattern, COUNT(*) AS set_count,
+            COALESCE(SUM(CASE WHEN sr.rpe IS NOT NULL AND st.target_rpe IS NOT NULL THEN sr.rpe - st.target_rpe END), 0) AS sum_delta_rpe,
+            SUM(CASE WHEN sr.rpe IS NOT NULL AND st.target_rpe IS NOT NULL THEN 1 ELSE 0 END) AS delta_count,
+            SUM(1.0 / MAX(1.0, COALESCE(sp.effective_load_kg, sr.load_kg) / MAX(sr.load_kg, 0.01))) AS sum_attenuation
+       FROM set_record sr
+       JOIN session s ON s.session_id = sr.session_id
+       JOIN movement m ON m.movement_id = sr.movement_id
+       LEFT JOIN set_prefix sp ON sp.set_id = sr.set_id
+       LEFT JOIN set_target st ON st.set_id = sr.set_id
+      WHERE s.session_date >= ? AND s.session_date <= ?
+      GROUP BY s.session_date, m.pattern`,
+    [minStartDate, maxEndDate],
+  ));
+  const [minY, minM, minD] = minStartDate.split('-').map(Number);
+  const minStartMs = new Date(minY, minM - 1, minD, 0, 0, 0, 0).getTime();
+  const allNiggles = rowsOf<{ region: string; severity: number; reported_at_ms: number }>(d.executeSync(
+    'SELECT region, severity, reported_at_ms FROM niggle WHERE reported_at_ms >= ?',
+    [minStartMs],
+  )).map((r) => ({ date: localDateOf(r.reported_at_ms), region: r.region as Joint, severity: r.severity }));
+  const peakRows = rowsOf<{ block_id: number; pattern: MovementPattern; max_sets: number }>(d.executeSync(
+    `SELECT ps.block_id, m.pattern, MAX(sl.sets) AS max_sets
+       FROM planned_slot sl
+       JOIN planned_session ps ON ps.planned_session_id = sl.planned_session_id
+       JOIN movement m ON m.movement_id = sl.movement_id
+      WHERE ps.week_index <= 3
+      GROUP BY ps.block_id, m.pattern`,
+  ));
+  const peakByBlock = new Map<number, Partial<Record<MovementPattern, number>>>();
+  for (const row of peakRows) {
+    const existing = peakByBlock.get(row.block_id) ?? {};
+    existing[row.pattern] = row.max_sets;
+    peakByBlock.set(row.block_id, existing);
+  }
+  const blocks: LongitudinalBlockEvidence[] = blockRows.map((b, idx) => {
+    const windowDates = demoDates(addDaysIso(b.start_date, 20), 21);
+    const windowSet = new Set(windowDates);
+    return {
+      blockSequence: idx + 1,
+      macroBlockIndex: b.macro_block_index,
+      windowDates,
+      stateVectors: [],
+      setRows: allSetAgg
+        .filter((r) => windowSet.has(r.date))
+        .map((r) => ({
+          date: r.date,
+          pattern: r.pattern,
+          setCount: r.set_count,
+          sumDeltaRpe: r.sum_delta_rpe,
+          deltaCount: r.delta_count,
+          sumAttenuation: r.sum_attenuation,
+        })),
+      niggleRows: allNiggles.filter((r) => windowSet.has(r.date)),
+      isSuspended: b.suspension_attributed === 1,
+      peakPrescribedSetsByPattern: peakByBlock.get(b.block_id),
+    };
+  });
+  const subLibrary: SubstitutionMovement[] = args.movements.map((m) => ({
+    movement_id: m.movement_id,
+    beginnerOk: m.beginnerOk,
+    capabilityAvailable: true,
+    sportTracking: m.sportTracking,
+    name: m.name,
+    pattern: m.pattern as MovementPattern,
+    is_compound: m.is_compound,
+    difficulty: m.difficulty,
+    family: m.baseName,
+    required: m.required,
+    preference: m.preference,
+  }));
+  const overlay = evaluateLongitudinalAutopilot({
+    profile: args.profile,
+    library: subLibrary,
+    inventory: args.profile.equipment_inventory,
+    blocks,
+    upcomingMacroBlockIndex: args.macroBlockIndex,
+    upcomingMacroPhase: macroPhaseOf(args.macroBlockIndex) as MacroPhase,
+    policy: DEFAULT_LONGITUDINAL_AUTOPILOT_POLICY,
+  });
+  const patternMrvSets: Partial<Record<MovementPattern, number>> = {};
+  for (const pattern of loggedPatterns) {
+    patternMrvSets[pattern] = overlay.patternMrvSets[pattern];
+  }
+  return {
+    patternMrvSets,
+    ...introFlag,
+  };
+};
+
+const buildProgramDayPreferences = (
+  days: readonly TrainingProgramDay[],
+  movementPreferences: readonly TrainingProgramMovementPreference[],
+  slotOverrides: readonly TrainingProgramSlotOverride[],
+  routineAssignments: readonly TrainingProgramDayRoutineAssignment[],
+  routineByDayKey: ReadonlyMap<string, ProgramRoutineDayAssignment>,
+): ProgramDayPreference[] =>
+  days.map((day) => {
+    const ra = routineAssignments.find((item) => item.dayIndex === day.dayIndex);
+    const routineAssignment = ra === undefined
+      ? null
+      : (routineByDayKey.get(`${ra.routineTemplateId}:${ra.routineDayIndex}`) ?? null);
+    return {
+      day_index: day.dayIndex,
+      focus: day.focus as ProgramDayPreference['focus'],
+      movement_preferences: movementPreferences
+        .filter((p) => p.dayIndex === day.dayIndex)
+        .map((p) => ({ slot_index: p.slotIndex, pattern: p.pattern, movement_id: p.movementId })),
+      slot_overrides: slotOverrides
+        .filter((o) => o.dayIndex === day.dayIndex)
+        .map((o) => ({
+          slot_index: o.slotIndex,
+          ...(o.sets !== undefined ? { sets: o.sets } : {}),
+          ...(o.reps !== undefined ? { reps: o.reps } : {}),
+          ...(o.targetRpe !== undefined ? { target_rpe: o.targetRpe } : {}),
+        })),
+      routine_assignment: routineAssignment,
+    };
+  });
+
+const trainingProgramShape = (
+  profile: UserProfile,
+  input: TrainingProgramInput,
+  horizonAnchorDate: string,
+  competitionDate?: string | null,
+  routineByDayKey: ReadonlyMap<string, ProgramRoutineDayAssignment> = new Map(),
+) => {
   const selected = [...new Set(input.dayIndices)].sort((a, b) => a - b);
   if (selected.length < 1 || selected.length > 7
       || selected.some((day) => !Number.isInteger(day) || day < 1 || day > 7)) {
     throw new Error('Choose between one and seven training days.');
   }
+  const scheduleMode: ProgramScheduleMode = input.scheduleMode ?? 'relative_day_index';
+  if (scheduleMode !== 'iso_weekday' && scheduleMode !== 'relative_day_index') {
+    throw new Error('Program schedule mode is invalid.');
+  }
   // The horizon is measured from the program's stable anchor, never from the
   // edit date: editing an active program must not restart its review horizon
   // (master 7bebc15 behaviour, preserved through the lineage integration).
+  const compDays = competitionCountdownDaysAway(horizonAnchorDate, competitionDate);
   const { plannedBlockCount, requestedReviewDate, plannedEndDate } =
-    normalizeProgramHorizon(horizonAnchorDate, input.horizon);
+    competitionDate != null && compDays !== null
+    && input.horizon.kind === 'date'
+    && input.horizon.requestedReviewDate === competitionDate
+      ? resolveCompetitionCountdownHorizon(horizonAnchorDate, competitionDate)
+      : normalizeProgramHorizon(horizonAnchorDate, input.horizon);
   const focuses = programFocuses(profile.objective, selected.length);
   const inputDaysMap = new Map(input.days?.map((d) => [d.dayIndex, d.focus]));
   const days: TrainingProgramDay[] = selected.map((dayIndex, i) => {
@@ -3189,18 +3590,177 @@ const trainingProgramShape = (profile: UserProfile, input: TrainingProgramInput,
     }
     seenSlots.add(key);
   }
-  const programDays: ProgramDayPreference[] = days.map((day) => ({
-    day_index: day.dayIndex,
-    focus: day.focus as ProgramDayPreference['focus'],
-    movement_preferences: movementPreferences.filter((p) => p.dayIndex === day.dayIndex).map((p) => ({
-      slot_index: p.slotIndex, pattern: p.pattern, movement_id: p.movementId,
-    })),
-  }));
+  const seenOverrideKeys = new Set<string>();
+  const slotOverrides = [...(input.slotOverrides ?? [])]
+    .filter((o) => o.sets != null || o.reps != null || o.targetRpe != null)
+    .sort((a, b) => a.dayIndex - b.dayIndex || a.slotIndex - b.slotIndex);
+  for (const ov of slotOverrides) {
+    const key = `${ov.dayIndex}:${ov.slotIndex}`;
+    if (!allowedDays.has(ov.dayIndex) || !Number.isInteger(ov.slotIndex)
+        || ov.slotIndex < 1 || ov.slotIndex > 6 || seenOverrideKeys.has(key)) {
+      throw new Error('A slot dose override points to an invalid program slot.');
+    }
+    if (ov.sets != null && (!Number.isInteger(ov.sets) || ov.sets < 1 || ov.sets > 10)) {
+      throw new Error('Slot override sets must be an integer between 1 and 10.');
+    }
+    if (ov.reps != null && (!Number.isInteger(ov.reps) || ov.reps < 1 || ov.reps > 30)) {
+      throw new Error('Slot override reps must be an integer between 1 and 30.');
+    }
+    if (ov.targetRpe != null && (!Number.isFinite(ov.targetRpe) || ov.targetRpe < 5.0 || ov.targetRpe > 10.0)) {
+      throw new Error('Slot override target RPE must be between 5.0 and 10.0.');
+    }
+    seenOverrideKeys.add(key);
+  }
+  const seenRoutineDays = new Set<number>();
+  const routineAssignmentsRaw = [...(input.routineAssignments ?? [])].sort(
+    (a, b) => a.dayIndex - b.dayIndex,
+  );
+  const routineAssignments: TrainingProgramDayRoutineAssignment[] = [];
+  for (const ra of routineAssignmentsRaw) {
+    if (!allowedDays.has(ra.dayIndex) || seenRoutineDays.has(ra.dayIndex)
+        || !Number.isInteger(ra.routineDayIndex) || ra.routineDayIndex < 1 || ra.routineDayIndex > 7) {
+      throw new Error('A routine assignment points to an invalid program day.');
+    }
+    seenRoutineDays.add(ra.dayIndex);
+    const resolved = routineByDayKey.get(`${ra.routineTemplateId}:${ra.routineDayIndex}`);
+    if (resolved === undefined || resolved.slots.length === 0) {
+      if (input.keepPlaceablePreferencesOnly === true) continue;
+      throw new Error('Assigned routine day was not found or has no exercises.');
+    }
+    routineAssignments.push(ra);
+  }
+  if (profile.training_age === 'beginner'
+      && (slotOverrides.length > 0 || routineAssignments.length > 0)) {
+    throw new Error('Beginner athletes cannot customize sets, reps, target RPE, or assign routines to program days.');
+  }
+  const programDays = buildProgramDayPreferences(
+    days,
+    movementPreferences,
+    slotOverrides,
+    routineAssignments,
+    routineByDayKey,
+  );
   return {
     requestedReviewDate, plannedBlockCount,
     plannedEndDate,
-    days, movementPreferences, programDays,
+    scheduleMode,
+    days, movementPreferences, slotOverrides, routineAssignments, programDays,
   };
+};
+
+const syncCanonicalCompetitionDate = (
+  d: DB,
+  targetDate: string | null,
+  options: { syncSport: boolean; syncGoals: boolean; syncProgram: boolean; nowMs: number },
+): void => {
+  if (options.syncSport) {
+    const sport = readSportProfile(d);
+    if (sport !== null && sport.competitionDate !== targetDate) {
+      writeSportProfile(d, { ...sport, competitionDate: targetDate }, options.nowMs);
+    }
+  }
+  if (options.syncGoals && targetDate !== null) {
+    for (const g of readAthleteGoals(d)) {
+      if (g.status === 'active' && g.goal.requestedDeadline !== targetDate) {
+        reviseAthleteGoal(d, g.goalId, g.revision, { ...g.goal, requestedDeadline: targetDate }, options.nowMs);
+      }
+    }
+  }
+  if (options.syncProgram) {
+    const activeProg = rowsOf<{
+      program_id: number;
+      start_date: string;
+      planned_end_date: string;
+      planned_block_count: number;
+      created_at_ms: number;
+    }>(d.executeSync(
+      "SELECT program_id, start_date, planned_end_date, planned_block_count, created_at_ms FROM training_program WHERE status IN ('active','review_due') LIMIT 1",
+    ))[0];
+    if (activeProg !== undefined) {
+      if (targetDate === null) {
+        const hadCountdown = rowsOf<{ program_id: number }>(d.executeSync(
+          'SELECT program_id FROM training_program_meet_countdown WHERE program_id = ? LIMIT 1',
+          [activeProg.program_id],
+        )).length > 0;
+        d.executeSync('DELETE FROM training_program_meet_countdown WHERE program_id = ?', [activeProg.program_id]);
+        if (hadCountdown) {
+          const reverted = normalizeProgramHorizon(activeProg.start_date, {
+            kind: 'weeks',
+            blockCount: activeProg.planned_block_count,
+          });
+          d.executeSync(
+            "UPDATE training_program SET horizon_kind = 'weeks', requested_review_date = NULL, planned_end_date = ?, updated_at_ms = ? WHERE program_id = ?",
+            [reverted.plannedEndDate, Math.max(options.nowMs, activeProg.created_at_ms), activeProg.program_id],
+          );
+        }
+      } else {
+        const compDays = competitionCountdownDaysAway(activeProg.start_date, targetDate);
+        const h = compDays !== null ? resolveCompetitionCountdownHorizon(activeProg.start_date, targetDate) : null;
+        d.executeSync(
+          "UPDATE training_program SET horizon_kind = 'date', requested_review_date = ?, planned_end_date = ?, planned_block_count = ?, updated_at_ms = ? WHERE program_id = ?",
+          [
+            targetDate,
+            h !== null ? h.plannedEndDate : activeProg.planned_end_date,
+            h !== null ? h.plannedBlockCount : activeProg.planned_block_count,
+            Math.max(options.nowMs, activeProg.created_at_ms),
+            activeProg.program_id,
+          ],
+        );
+        d.executeSync(
+          `INSERT INTO training_program_meet_countdown (program_id, competition_date) VALUES (?, ?)
+           ON CONFLICT(program_id) DO UPDATE SET competition_date = excluded.competition_date`,
+          [activeProg.program_id, targetDate],
+        );
+      }
+    }
+    if (targetDate === null) {
+      d.executeSync(
+        "DELETE FROM training_block_meet_meta WHERE block_id IN (SELECT block_id FROM training_block WHERE status = 'active')",
+      );
+    } else {
+      const activeBlock = rowsOf<{ block_id: number; start_date: string; block_number: number }>(d.executeSync(
+        `SELECT m.block_id, tb.start_date, m.block_number
+         FROM training_block_meet_meta m
+         JOIN training_block tb ON tb.block_id = m.block_id
+         WHERE tb.status = 'active' LIMIT 1`,
+      ))[0];
+      if (activeBlock !== undefined && competitionCountdownDaysAway(activeBlock.start_date, targetDate) !== null) {
+        d.executeSync(
+          'UPDATE training_block_meet_meta SET competition_date = ? WHERE block_id = ?',
+          [targetDate, activeBlock.block_id],
+        );
+      }
+    }
+  }
+};
+
+const persistBlockMeetCountdown = (
+  d: DB,
+  blockId: number,
+  programId: number | null,
+  meetCountdown: { competitionDate: string; blockNumber: number; totalBlocks: number } | null,
+  isSuspensionBlock: boolean,
+): void => {
+  d.executeSync('DELETE FROM training_block_meet_meta WHERE block_id = ?', [blockId]);
+  if (meetCountdown === null || isSuspensionBlock) return;
+  if (programId !== null) {
+    d.executeSync(
+      `INSERT INTO training_program_meet_countdown (program_id, competition_date) VALUES (?, ?)
+       ON CONFLICT(program_id) DO UPDATE SET competition_date = excluded.competition_date`,
+      [programId, meetCountdown.competitionDate],
+    );
+  }
+  d.executeSync(
+    'INSERT INTO training_block_meet_meta (block_id, competition_date, block_number, total_blocks) VALUES (?, ?, ?, ?)',
+    [blockId, meetCountdown.competitionDate, meetCountdown.blockNumber, meetCountdown.totalBlocks],
+  );
+};
+
+const deletePlannedSlotBackOffForSession = (d: DB, plannedSessionId: number): void => {
+  d.executeSync(
+    'DELETE FROM planned_slot_backoff WHERE planned_slot_id IN (SELECT planned_slot_id FROM planned_slot WHERE planned_session_id = ?)',
+    [plannedSessionId],
+  );
 };
 
 /** Everything per-athlete in the store, cleared on a Coach Mode file swap so
@@ -3238,7 +3798,7 @@ const PER_ATHLETE_RESET: Partial<KineticsStore> = {
   profileNotes: [], profile: DEFAULT_PROFILE, triaging: false, lastTriage: null,
   sessionPlan: [], activeSessionPlanSlotId: null, activeMovementId: null, runner: null, sessionMode: null, preparation: null, substitution: null, niggles: [],
   activePriorExperienceMovementIds: [], movementAvailabilityRevision: 0, activeSessionAccessContext: null,
-  block: null, blockMeta: null, blockSessions: [], todayPlan: null, program: null, routineTemplates: [], pendingAutopilotAdjustments: [],
+  block: null, blockMeta: null, blockMeetMeta: null, blockSessions: [], todayPlan: null, program: null, routineTemplates: [], pendingAutopilotAdjustments: [],
   // Suspension is per-athlete DURABLE state living in that athlete's own DB
   // file, so it belongs here with every other per-athlete surface. boot() ends
   // with refreshSuspension(), but the window between this set() and that call
@@ -3326,6 +3886,364 @@ export const useStore = create<KineticsStore>()((set, get) => {
       void syncBiometricsAtStartup(operation);
     }
   };
+
+  /** Build the deterministic substitution / neutral-swap context without touching 010 Avoid (-1). */
+  const buildSubstitutionContext = (targetMovementId: number) => {
+    const state = get();
+    const { movements, profile, block } = state;
+    const target = movements.find((m) => m.movement_id === targetMovementId);
+    if (target === undefined) return null;
+    const activeTargetSlot = state.activeSessionPlanSlotId !== null
+      ? state.sessionPlan.find((slot) => slot.sessionPlanSlotId === state.activeSessionPlanSlotId)
+      : undefined;
+    const targetSlot = activeTargetSlot?.movementId === targetMovementId
+      ? activeTargetSlot
+      : state.sessionPlan.find((slot) => slot.movementId === targetMovementId);
+    if (!get().requireTrainingSupport('substitution-preview', [targetMovementId],
+      `session:${state.session?.sessionId ?? `draft-${state.today}`}:slot:${targetSlot?.sessionPlanSlotId ?? 'pending'}:movement:${targetMovementId}`)) return null;
+    // Re-read today's niggles from 011 so a midnight crossing while the app sat
+    // foregrounded (no AppState 'active' -> no rolloverDay) can't feed yesterday's niggles.
+    get().refreshNiggles();
+    const d = getDb();
+    const today = localToday();
+    const byId = new Map(movements.map((m) => [m.movement_id, m]));
+    const accessContext = executionContextForState(get());
+    if (accessContext === null) {
+      set({ error: 'The active session access context cannot be verified. Reopen the session before substituting.' });
+      return null;
+    }
+    const priorExperience = new Set(get().activePriorExperienceMovementIds);
+    const safetyExcluded = safetyExcludedMovementIdsFor(movements, profile, get().niggles);
+    const capabilityAvailable = capabilityAvailableMovementIds(
+      d, movements, profile, accessContext, priorExperience, safetyExcluded,
+    );
+    const supportSnapshot = supportAdapter().captureEvaluation();
+    let futureRows: { row: { planned_slot_id: number; session_date: string; sets: number; day_index: number }; movement: Movement }[] = [];
+    let currentDayIndex = 0;
+    if (block !== null) {
+      currentDayIndex = Number(
+        rowsOf<{ d: number }>(
+          d.executeSync('SELECT CAST(julianday(?) - julianday(?) AS INTEGER) AS d', [today, block.startDate]),
+        )[0]?.d ?? 0,
+      );
+      const rows = rowsOf<{
+        planned_slot_id: number; session_date: string; movement_id: number;
+        sets: number; day_index: number;
+      }>(
+        d.executeSync(
+          `SELECT sl.planned_slot_id, ps.session_date, sl.movement_id, sl.sets,
+                  CAST(julianday(ps.session_date) - julianday(?) AS INTEGER) AS day_index
+           FROM planned_slot sl
+           JOIN planned_session ps ON ps.planned_session_id = sl.planned_session_id
+           WHERE ps.block_id = ? AND ps.session_date > ?
+             AND sl.planned_slot_id NOT IN (SELECT planned_slot_id FROM planned_slot_disposition WHERE disposition = 'swapped')
+           ORDER BY ps.session_date, sl.slot_index`,
+          [block.startDate, block.blockId, today],
+        ),
+      );
+      futureRows = rows.flatMap((r) => {
+        const mv = byId.get(r.movement_id);
+        return mv === undefined ? [] : [{ row: r, movement: mv }];
+      });
+    }
+    const inputFor = (available: ReadonlySet<number>, niggles: readonly NiggleInput[]): SubstitutionInput => ({
+      target: toSubMovement(target, available),
+      library: movements.filter((movement) => supportSnapshot.evaluate(movementSupportTargets([movement.movement_id])).status === 'available')
+        .map((movement) => toSubMovement(movement, available)),
+      inventory: profile.equipment_inventory,
+      niggles,
+      futureSlots: futureRows
+        .filter(({ movement }) => supportSnapshot.evaluate(movementSupportTargets([movement.movement_id])).status === 'available')
+        .map(({ row, movement }): FutureSlot => ({
+          plannedSlotId: row.planned_slot_id,
+          dayIndex: row.day_index,
+          sessionDate: row.session_date,
+          movement: toSubMovement(movement, available),
+          sets: row.sets,
+        })),
+      currentDayIndex,
+      trainingAge: profile.training_age,
+      accessContext,
+    });
+    return { d, movements, profile, accessContext, priorExperience, capabilityAvailable, targetSlot, inputFor };
+  };
+
+  /** Commit a slot swap in-place (0 logged sets) or split-slot (logged sets > 0),
+   *  optionally recording the swap cause and persistence scope in 078 and executing
+   *  atomic follow-up writes inside the SAME transaction before publishing state. */
+  const executeSlotSwap = (
+    oldMovementId: number,
+    newMovementId: number,
+    replacementSets?: number,
+    causeRecord?: { cause: SwapCause; scope: SwapScope },
+    options?: {
+      boundSessionPlanSlotId?: number | null;
+      afterSlotWriteInTx?: (d: DB, slot: PlanSlot) => void;
+    },
+  ): boolean => {
+    const state = get();
+    const { sessionPlan, activeSessionPlanSlotId, session, runner, sessionMode, movements, profile } = state;
+    const requestedSlotId = options?.boundSessionPlanSlotId !== undefined
+      ? options.boundSessionPlanSlotId
+      : activeSessionPlanSlotId;
+    const slot = requestedSlotId !== null
+      ? sessionPlan.find((candidate) => candidate.sessionPlanSlotId === requestedSlotId)
+      : sessionPlan.find((candidate) => candidate.movementId === oldMovementId);
+    const replacement = movements.find((movement) => movement.movement_id === newMovementId);
+    if (slot === undefined || slot.movementId !== oldMovementId || replacement === undefined) return false;
+    const loggedSetsCount = session?.sets.filter((setRow) =>
+      setRow.session_plan_slot_id !== null
+        ? setRow.session_plan_slot_id === slot.sessionPlanSlotId
+        : setRow.movement_id === slot.movementId
+    ).length ?? 0;
+    if (
+      replacementSets !== undefined &&
+      (typeof replacementSets !== 'number' || !Number.isInteger(replacementSets) || replacementSets < 1 || replacementSets > 6)
+    ) {
+      return false;
+    }
+    if (
+      loggedSetsCount > 0 &&
+      (typeof replacementSets !== 'number' || !Number.isInteger(replacementSets) || replacementSets < 1 || replacementSets > 6)
+    ) {
+      return false;
+    }
+    if (!get().requireTrainingSupport('swap-movement', [oldMovementId, newMovementId],
+      `session:${session?.sessionId ?? 'draft'}:slot:${slot.sessionPlanSlotId}:movement:${oldMovementId}->${newMovementId}`)) return false;
+    const accessContext = executionContextForState(state);
+    if (accessContext === null) {
+      set({ error: 'The active session access context cannot be verified. Reopen the session before editing it.' });
+      return false;
+    }
+    const availability = capabilityMovementAvailability(
+      getDb(), movements, profile, accessContext,
+      new Set(state.activePriorExperienceMovementIds),
+      safetyExcludedMovementIdsFor(movements, profile, state.niggles),
+    )
+      .find((r) => r.movementId === newMovementId);
+    if (!permittedForProfile(replacement, profile, accessContext) || availability?.state !== 'available') {
+      set({ error: formatTeachingOnlyReason(availability) });
+      return false;
+    }
+
+    const originalMv = slot.originalMovementId ?? slot.movementId;
+    const newProvKind: SlotProvenanceKind = slot.targetRpe !== null ? 'substituted' : slot.provenanceKind;
+
+    if (loggedSetsCount > 0 && session !== null) {
+      // A halted session stays stopped; refuse before any write.
+      if (runner?.phase === 'halted') return false;
+      const chosenCount = replacementSets as number;
+      const d = getDb();
+      let newSlotId = 0;
+      let nextRunner = runner;
+      const retainedSets = retainedSetsForSwap(runner, slot.sessionPlanSlotId, loggedSetsCount);
+      d.executeSync('BEGIN');
+      try {
+        const originalSlotRow = rowsOf<{ slot_index: number }>(
+          d.executeSync(
+            'SELECT slot_index FROM session_plan_slot WHERE session_plan_slot_id = ?',
+            [slot.sessionPlanSlotId],
+          ),
+        )[0];
+        if (originalSlotRow === undefined) {
+          throw new Error('Target session slot is missing.');
+        }
+        // 075 (issue #144): keep the count planned before this swap. planned_sets
+        // below becomes the runner's count and the checkpoint check still reads it.
+        d.executeSync(
+          'INSERT OR IGNORE INTO session_plan_slot_planned_count (session_plan_slot_id, original_planned_sets) SELECT session_plan_slot_id, planned_sets FROM session_plan_slot WHERE session_plan_slot_id = ?',
+          [slot.sessionPlanSlotId],
+        );
+        d.executeSync(
+          'UPDATE session_plan_slot SET planned_sets = ? WHERE session_plan_slot_id = ?',
+          [retainedSets, slot.sessionPlanSlotId],
+        );
+        const laterSlots = rowsOf<{ session_plan_slot_id: number; slot_index: number }>(
+          d.executeSync(
+            'SELECT session_plan_slot_id, slot_index FROM session_plan_slot WHERE session_id = ? AND slot_index > ? ORDER BY slot_index DESC',
+            [session.sessionId, originalSlotRow.slot_index],
+          ),
+        );
+        for (const later of laterSlots) {
+          d.executeSync(
+            'UPDATE session_plan_slot SET slot_index = ? WHERE session_plan_slot_id = ?',
+            [later.slot_index + 1, later.session_plan_slot_id],
+          );
+        }
+        d.executeSync(
+          `INSERT INTO session_plan_slot (session_id, slot_index, movement_id, planned_sets, planned_reps, provenance_kind, target_rpe, source_planned_slot_id, original_movement_id, original_session_date, override_load_kg, override_reason)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            session.sessionId,
+            originalSlotRow.slot_index + 1,
+            newMovementId,
+            chosenCount,
+            slot.plannedReps,
+            newProvKind,
+            slot.targetRpe,
+            slot.sourcePlannedSlotId,
+            originalMv,
+            slot.originalSessionDate,
+            slot.overrideLoadKg,
+            slot.overrideReason,
+          ],
+        );
+        newSlotId = rowsOf<{ id: number }>(d.executeSync('SELECT last_insert_rowid() AS id'))[0]!.id;
+        d.executeSync(
+          `INSERT INTO session_slot_target (session_plan_slot_id, target_kind, target_reps, target_seconds)
+           VALUES (?, ?, ?, ?)`,
+          [
+            newSlotId,
+            slot.target.kind,
+            slot.target.kind === 'reps' ? slot.target.reps : null,
+            slot.target.kind === 'time' ? slot.target.seconds : null,
+          ],
+        );
+        d.executeSync(
+          'INSERT INTO session_plan_slot_replacement (session_plan_slot_id, replaced_by_session_plan_slot_id) VALUES (?, ?)',
+          [slot.sessionPlanSlotId, newSlotId],
+        );
+        if (causeRecord !== undefined) {
+          d.executeSync(
+            `INSERT INTO session_slot_swap_cause
+               (session_plan_slot_id, cause, scope, replaced_movement_id, replaced_by_session_plan_slot_id, recorded_at_ms)
+             VALUES (?, ?, ?, ?, ?, ?)
+             ON CONFLICT(session_plan_slot_id) DO UPDATE SET
+               cause = excluded.cause,
+               scope = excluded.scope,
+               replaced_movement_id = excluded.replaced_movement_id,
+               replaced_by_session_plan_slot_id = excluded.replaced_by_session_plan_slot_id,
+               recorded_at_ms = excluded.recorded_at_ms`,
+            [slot.sessionPlanSlotId, causeRecord.cause, causeRecord.scope, oldMovementId, newSlotId, Date.now()],
+          );
+        }
+        if (runner !== null) {
+          const origRunnerSlot = runner.slots.find((candidate) => candidate.sessionPlanSlotId === slot.sessionPlanSlotId);
+          nextRunner = replaceSlotAfterLoggedSets(runner, {
+            targetSessionPlanSlotId: slot.sessionPlanSlotId,
+            completedSets: retainedSets,
+            replacementSlot: {
+              sessionPlanSlotId: newSlotId,
+              plannedSlotId: slot.sourcePlannedSlotId,
+              movementId: newMovementId,
+              movementName: replacement.name,
+              sets: chosenCount,
+              target: slot.target,
+              targetRpe: origRunnerSlot?.targetRpe ?? slot.targetRpe ?? 8,
+            },
+            atMs: Date.now(),
+          });
+          if (sessionMode !== null) {
+            persistRunnerCheckpoint(d, session.sessionId, sessionMode, nextRunner);
+          }
+        }
+        options?.afterSlotWriteInTx?.(d, slot);
+        d.executeSync('COMMIT');
+      } catch (error) {
+        try { d.executeSync('ROLLBACK'); } catch { /* no partial substitution */ }
+        set({ error: error instanceof Error ? error.message : String(error) });
+        return false;
+      }
+
+      const newSlot: PlanSlot = {
+        sessionPlanSlotId: newSlotId,
+        movementId: newMovementId,
+        plannedSets: chosenCount,
+        plannedReps: slot.plannedReps,
+        target: slot.target,
+        provenanceKind: newProvKind,
+        targetRpe: slot.targetRpe,
+        sourcePlannedSlotId: slot.sourcePlannedSlotId,
+        originalMovementId: originalMv,
+        originalSessionDate: slot.originalSessionDate,
+        overrideLoadKg: slot.overrideLoadKg,
+        overrideReason: slot.overrideReason,
+        replacedBySessionPlanSlotId: null,
+      };
+      const nextPlan = sessionPlan.flatMap((candidate) =>
+        candidate.sessionPlanSlotId === slot.sessionPlanSlotId
+          ? [{ ...candidate, plannedSets: retainedSets, replacedBySessionPlanSlotId: newSlotId, originalPlannedSets: candidate.originalPlannedSets ?? candidate.plannedSets }, newSlot]
+          : [candidate],
+      );
+      set({
+        sessionPlan: nextPlan,
+        activeSessionPlanSlotId: newSlotId,
+        activeMovementId: newMovementId,
+        ...(nextRunner !== null ? runnerSelection(nextRunner) : {}),
+      });
+      return true;
+    }
+
+    const nextPlan = sessionPlan.map((candidate) =>
+      candidate.sessionPlanSlotId === slot.sessionPlanSlotId
+        ? { ...candidate, movementId: newMovementId, provenanceKind: newProvKind, originalMovementId: originalMv }
+        : candidate,
+    );
+    let nextRunner = runner;
+    const current = runner === null ? null : currentRunnerSlot(runner);
+    const runnerSlotIndex = runner?.slots.findIndex((candidate) => candidate.sessionPlanSlotId === slot.sessionPlanSlotId) ?? -1;
+    if (runner !== null && runnerSlotIndex >= 0) {
+      const throughSubstitution = current?.sessionPlanSlotId === slot.sessionPlanSlotId &&
+        runner.substitutionOfferedForSessionPlanSlotId === slot.sessionPlanSlotId
+        ? advanceSessionRunner(runner, {
+            kind: 'SUBSTITUTE', atMs: Date.now(), movementId: newMovementId, movementName: replacement.name,
+          })
+        : runner;
+      // Self-directed mode may replace a future slot. Keep the durable runner
+      // snapshot in lockstep even when its cursor is elsewhere.
+      nextRunner = throughSubstitution === runner
+        ? {
+            ...runner,
+            slots: runner.slots.map((candidate) => candidate.sessionPlanSlotId === slot.sessionPlanSlotId
+              ? { ...candidate, movementId: newMovementId, movementName: replacement.name }
+              : candidate),
+            updatedAtMs: Date.now(),
+          }
+        : throughSubstitution;
+    }
+
+    if (session !== null) {
+      const d = getDb();
+      d.executeSync('BEGIN');
+      try {
+        d.executeSync(
+          `UPDATE session_plan_slot
+           SET movement_id = ?, provenance_kind = ?, original_movement_id = ?
+           WHERE session_plan_slot_id = ?`,
+          [newMovementId, newProvKind, originalMv, slot.sessionPlanSlotId],
+        );
+        if (causeRecord !== undefined) {
+          d.executeSync(
+            `INSERT INTO session_slot_swap_cause
+               (session_plan_slot_id, cause, scope, replaced_movement_id, replaced_by_session_plan_slot_id, recorded_at_ms)
+             VALUES (?, ?, ?, ?, NULL, ?)
+             ON CONFLICT(session_plan_slot_id) DO UPDATE SET
+               cause = excluded.cause,
+               scope = excluded.scope,
+               replaced_movement_id = excluded.replaced_movement_id,
+               replaced_by_session_plan_slot_id = NULL,
+               recorded_at_ms = excluded.recorded_at_ms`,
+            [slot.sessionPlanSlotId, causeRecord.cause, causeRecord.scope, oldMovementId, Date.now()],
+          );
+        }
+        if (nextRunner !== null && sessionMode !== null) {
+          persistRunnerCheckpoint(d, session.sessionId, sessionMode, nextRunner);
+        }
+        options?.afterSlotWriteInTx?.(d, slot);
+        d.executeSync('COMMIT');
+      } catch (error) {
+        try { d.executeSync('ROLLBACK'); } catch { /* no partial substitution */ }
+        set({ error: error instanceof Error ? error.message : String(error) });
+        return false;
+      }
+    }
+    set({
+      sessionPlan: nextPlan,
+      activeMovementId: newMovementId,
+      ...(nextRunner !== null ? runnerSelection(nextRunner) : {}),
+    });
+    return true;
+  };
   return {
   status: 'booting',
   error: null,
@@ -3361,6 +4279,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
   activeSessionAccessContext: null,
   block: null,
   blockMeta: null,
+  blockMeetMeta: null,
   blockSessions: [],
   todayPlan: null,
   hasArchivedBlock: false,
@@ -3592,15 +4511,22 @@ export const useStore = create<KineticsStore>()((set, get) => {
           override_reason: string | null;
           replaced_by_session_plan_slot_id: number | null;
           original_planned_sets: number | null;
+          backoff_sets: number | null;
+          backoff_reps: number | null;
+          backoff_target_rpe: number | null;
+          backoff_load_multiplier: number | null;
         }>(
           db!.executeSync(
             `SELECT sps.session_plan_slot_id, sps.movement_id, sps.planned_sets, sps.planned_reps,
                     sst.target_kind, sst.target_reps, sst.target_seconds,
                     sps.provenance_kind, sps.target_rpe, sps.source_planned_slot_id,
                     sps.original_movement_id, sps.original_session_date, sps.override_load_kg, sps.override_reason,
-                    spsr.replaced_by_session_plan_slot_id, spc.original_planned_sets
+                    spsr.replaced_by_session_plan_slot_id, spc.original_planned_sets,
+                    ssb.sets AS backoff_sets, ssb.reps AS backoff_reps,
+                    ssb.target_rpe AS backoff_target_rpe, ssb.load_multiplier AS backoff_load_multiplier
              FROM session_plan_slot sps
              LEFT JOIN session_slot_target sst ON sst.session_plan_slot_id = sps.session_plan_slot_id
+             LEFT JOIN session_slot_backoff ssb ON ssb.session_plan_slot_id = sps.session_plan_slot_id
              LEFT JOIN session_plan_slot_replacement spsr ON spsr.session_plan_slot_id = sps.session_plan_slot_id
              LEFT JOIN session_plan_slot_planned_count spc ON spc.session_plan_slot_id = sps.session_plan_slot_id
              WHERE sps.session_id = ?
@@ -3623,6 +4549,15 @@ export const useStore = create<KineticsStore>()((set, get) => {
           overrideReason: ps.override_reason,
           replacedBySessionPlanSlotId: ps.replaced_by_session_plan_slot_id ?? null,
           originalPlannedSets: ps.original_planned_sets ?? null,
+          backOff: ps.backoff_sets !== null && ps.backoff_reps !== null
+            && ps.backoff_target_rpe !== null && ps.backoff_load_multiplier !== null
+            ? {
+                sets: ps.backoff_sets,
+                reps: ps.backoff_reps,
+                targetRpe: ps.backoff_target_rpe,
+                loadMultiplier: ps.backoff_load_multiplier,
+              }
+            : undefined,
         }));
         const checkpoint = rowsOf<{
           session_mode: string;
@@ -4061,7 +4996,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
     }
     set({
       profile: loaded,
-      block: null, blockMeta: null, blockSessions: [], todayPlan: null, program: null,
+      block: null, blockMeta: null, blockMeetMeta: null, blockSessions: [], todayPlan: null, program: null,
       niggles: [], lastTriage: null,
     });
     get().refreshProfileSlots();
@@ -4094,7 +5029,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
     // Clear EVERY piece of UI state derived from the wiped rows (audit: stale
     // prescription/substitution/plan state survived the wipe). profileNotes are
     // NOT cleared — athlete_profile is intentionally preserved by this wipe.
-    set({ block: null, blockMeta: null, blockSessions: [], todayPlan: null, program: null, niggles: [], lastTriage: null, prescription: null, substitution: null, sessionPlan: [], activeSessionPlanSlotId: null, activeMovementId: null, runner: null, sessionMode: null, lastEndedSessionId: null });
+    set({ block: null, blockMeta: null, blockMeetMeta: null, blockSessions: [], todayPlan: null, program: null, niggles: [], lastTriage: null, prescription: null, substitution: null, sessionPlan: [], activeSessionPlanSlotId: null, activeMovementId: null, runner: null, sessionMode: null, lastEndedSessionId: null });
     get().refreshNiggles();
     get().refreshBlock();
     get().refreshProgram();
@@ -4536,17 +5471,37 @@ export const useStore = create<KineticsStore>()((set, get) => {
     }
     const d = getDb();
     const nowMs = Date.now();
+    const currentSport = readSportProfile(d);
+    const goalToSave = existing === undefined
+      && validated.goal.requestedDeadline === null
+      && currentSport?.competitionDate != null
+      && currentSport.competitionDate >= localToday()
+      ? { ...validated.goal, requestedDeadline: currentSport.competitionDate }
+      : validated.goal;
     let applied = true;
     d.executeSync('BEGIN');
     try {
       const goalId = existing?.goalId ?? `goal-${nowMs}-${Math.floor(Math.random() * 1e9).toString(36)}`;
       if (existing === undefined) {
-        insertAthleteGoal(d, goalId, validated.goal, nowMs);
+        insertAthleteGoal(d, goalId, goalToSave, nowMs);
       } else {
-        applied = reviseAthleteGoal(d, existing.goalId, existing.expectedRevision, validated.goal, nowMs);
+        applied = reviseAthleteGoal(d, existing.goalId, existing.expectedRevision, goalToSave, nowMs);
       }
       // The exercise link is saved with the goal or not at all.
       if (applied && movementId !== undefined) setGoalMovementLink(d, goalId, movementId, nowMs);
+      if (applied && goalToSave.requestedDeadline !== null) {
+        const shouldSyncCanonical =
+          existing !== undefined
+          || (currentSport !== null && currentSport.competitionDate === null);
+        if (shouldSyncCanonical) {
+          syncCanonicalCompetitionDate(d, goalToSave.requestedDeadline, {
+            syncSport: true,
+            syncGoals: true,
+            syncProgram: true,
+            nowMs,
+          });
+        }
+      }
       d.executeSync('COMMIT');
     } catch (e) {
       try { d.executeSync('ROLLBACK'); } catch { /* nothing partial is kept */ }
@@ -4555,6 +5510,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
     }
     set({ goals: readAthleteGoals(d), error: applied ? null : 'This goal changed since you opened it. Review it and try again.' });
     get().refreshSport();
+    get().refreshProgram();
+    get().refreshBlock();
     return applied;
   },
 
@@ -4580,18 +5537,46 @@ export const useStore = create<KineticsStore>()((set, get) => {
       profile = validated.profile;
     }
     const d = getDb();
+    const nowMs = Date.now();
     d.executeSync('BEGIN');
     try {
-      if (profile === null) clearSportProfile(d);
-      else writeSportProfile(d, profile, Date.now());
+      const prevSport = readSportProfile(d);
+      if (profile === null) {
+        clearSportProfile(d);
+        syncCanonicalCompetitionDate(d, null, {
+          syncSport: false,
+          syncGoals: false,
+          syncProgram: true,
+          nowMs,
+        });
+      } else {
+        writeSportProfile(d, profile, nowMs);
+        if (profile.competitionDate !== null) {
+          syncCanonicalCompetitionDate(d, profile.competitionDate, {
+            syncSport: false,
+            syncGoals: true,
+            syncProgram: true,
+            nowMs,
+          });
+        } else if (prevSport?.competitionDate != null) {
+          syncCanonicalCompetitionDate(d, null, {
+            syncSport: false,
+            syncGoals: false,
+            syncProgram: true,
+            nowMs,
+          });
+        }
+      }
       d.executeSync('COMMIT');
     } catch (e) {
       try { d.executeSync('ROLLBACK'); } catch { /* nothing partial is kept */ }
       set({ error: e instanceof Error ? e.message : String(e) });
       return false;
     }
-    set({ error: null });
+    set({ goals: readAthleteGoals(d), error: null });
     get().refreshSport();
+    get().refreshProgram();
+    get().refreshBlock();
     return true;
   },
 
@@ -4876,12 +5861,22 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const planningProfile = activeProgram === null ? profile
       : { ...profile, objective: activeProgram.objective };
     const startDate = localToday();
+    const d = getDb();
     const horizonAnchorDate = activeProgram === null
       ? startDate
-      : programHorizonAnchor(activeProgram.plannedEndDate, activeProgram.plannedBlockCount);
-    let shape = trainingProgramShape(planningProfile, input, horizonAnchorDate);
+      : (rowsOf<{ c: number }>(d.executeSync(
+          'SELECT COUNT(*) AS c FROM training_program_meet_countdown WHERE program_id = ?',
+          [activeProgram.programId],
+        ))[0]?.c ?? 0) > 0
+        ? activeProgram.startDate
+        : programHorizonAnchor(activeProgram.plannedEndDate, activeProgram.plannedBlockCount);
+    const sport = readSportProfile(d);
+    const previewCompetitionDate = input.horizon.kind === 'date' && sport !== null
+      ? input.horizon.requestedReviewDate
+      : null;
+    const routineByDayKey = readRoutineAssignmentMap(d, input.routineAssignments ?? []);
+    let shape = trainingProgramShape(planningProfile, input, horizonAnchorDate, previewCompetitionDate, routineByDayKey);
     const byId = new Map(movements.map((movement) => [movement.movement_id, movement]));
-    const d = getDb();
     const safetyExcluded = safetyExcludedMovementIdsFor(movements, profile, niggles);
     const priorExperience = new Set(get().activePriorExperienceMovementIds);
     const capabilityAvailableWeightRoom = capabilityAvailableMovementIds(
@@ -4919,7 +5914,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       // it shows that week instead of throwing.
       const placeable = shape.movementPreferences.filter((preference) => preferenceProblem(preference) === null);
       if (placeable.length !== shape.movementPreferences.length) {
-        shape = trainingProgramShape(planningProfile, { ...input, movementPreferences: placeable }, horizonAnchorDate);
+        shape = trainingProgramShape(planningProfile, { ...input, movementPreferences: placeable }, horizonAnchorDate, previewCompetitionDate, routineByDayKey);
       }
     }
     for (const preference of shape.movementPreferences) {
@@ -4955,34 +5950,75 @@ export const useStore = create<KineticsStore>()((set, get) => {
     // preview shows the NEXT program block at starting + (sequence-1) mod 8 —
     // the identical derivation committed generation uses. Only a brand-new
     // program (no program row yet) anchors to the athlete's global position.
-    const macroBlockIndex = activeProgram !== null
+    const baseMacroBlockIndex = activeProgram !== null
       ? programMacroIndex(activeProgram.startingMacroBlockIndex, activeProgram.currentSequenceIndex + 1)
       // R3 (REVIEW_BOUNDARY, ratified 2026-08-22): the selected date sets the
       // review horizon and block COUNT only. It confers no peak authority, so a
       // dated program takes the athlete's rotation position exactly as an
       // undated one does. Dedicated competition preparation is deferred.
       : nextMacroPosition(d).macroBlockIndex;
+    const effectiveCompetitionDate = input.horizon.kind === 'date' && sport !== null
+      ? (shape.requestedReviewDate ?? sport.competitionDate)
+      : null;
+    const compDays = competitionCountdownDaysAway(horizonAnchorDate, effectiveCompetitionDate);
+    const totalCountdownBlocks = effectiveCompetitionDate !== null && compDays !== null
+      ? resolveCompetitionCountdownHorizon(horizonAnchorDate, effectiveCompetitionDate).plannedBlockCount
+      : null;
+    const macroBlockIndex = totalCountdownBlocks !== null
+      ? countdownMacroBlockIndex(activeProgram !== null ? activeProgram.currentSequenceIndex + 1 : 1, totalCountdownBlocks)
+      : baseMacroBlockIndex;
     const effectiveProfile = {
       ...planningProfile,
       weekly_frequency: shape.days.length,
       ...(input.sessionDurationCapMin === undefined ? {} : {
         session_duration_cap_min: Math.round(clamp(input.sessionDurationCapMin, 15, 240)),
       }),
+      ...(input.baseRpeCap === undefined ? {} : {
+        base_rpe_cap: clamp(input.baseRpeCap, 5.0, 10.0),
+      }),
     };
-    const previewEmphasis = programEmphasisFor(d, startDate);
+    const rawPreviewEmphasis = programEmphasisFor(d, startDate);
+    const previewEmphasis = rawPreviewEmphasis !== null && rawPreviewEmphasis.sport !== null
+      ? {
+          ...rawPreviewEmphasis,
+          sport: { ...rawPreviewEmphasis.sport, competitionDate: effectiveCompetitionDate },
+        }
+      : rawPreviewEmphasis;
+    const longitudinalControl = readLongitudinalControlContext(d, {
+      profile: effectiveProfile,
+      movements,
+      macroBlockIndex,
+      introductoryWeek1: activeProgram === null || activeProgram.currentSequenceIndex === 0,
+      ...(input.includeCompletedBlockId !== undefined
+        ? { includeCompletedBlockId: input.includeCompletedBlockId }
+        : {}),
+    });
     const plan = generateBlock({
       profile: effectiveProfile, movements: genMovements, startDate,
       schemaType: input.schemaType, macroBlockIndex,
+      scheduleMode: shape.scheduleMode,
       programDays: shape.programDays,
+      longitudinalControl,
       powerPreferredMovementNames: powerNames,
       ...(previewEmphasis === null ? {} : { emphasis: previewEmphasis }),
+      competitionDate: effectiveCompetitionDate,
+      sportId: sport?.sportId ?? null,
     });
     const support = supportDecision(plan.sessions.flatMap((day) => day.slots.map((slot) => slot.movement_id)));
     if (support.status !== 'available') throw new Error(supportMessage(support));
     return {
       objective: planningProfile.objective, startDate, requestedReviewDate: shape.requestedReviewDate,
       plannedEndDate: shape.plannedEndDate, plannedBlockCount: shape.plannedBlockCount,
-      schemaType: input.schemaType, days: shape.days, plan,
+      schemaType: input.schemaType,
+      scheduleMode: shape.scheduleMode,
+      days: shape.days,
+      slotOverrides: shape.slotOverrides,
+      routineAssignments: shape.routineAssignments,
+      ...(longitudinalControl.patternMrvSets !== undefined
+        ? { patternMrvSets: longitudinalControl.patternMrvSets }
+        : {}),
+      countdownApplied: totalCountdownBlocks !== null,
+      plan,
     };
   },
 
@@ -5003,12 +6039,24 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const chosenCapMin = input.sessionDurationCapMin === undefined ? null
       : Math.round(clamp(input.sessionDurationCapMin, 15, 240));
     const capChanges = chosenCapMin !== null && chosenCapMin !== priorCapMin;
+    const priorRpeCap = get().profile.base_rpe_cap;
+    const chosenRpeCap = input.baseRpeCap === undefined ? null
+      : clamp(input.baseRpeCap, 5.0, 10.0);
+    const rpeCapChanges = chosenRpeCap !== null && chosenRpeCap !== priorRpeCap;
     try {
       const preview = get().previewTrainingProgram(input);
-      const shape = trainingProgramShape(get().profile, input, preview.startDate);
+      const routineByDayKey = readRoutineAssignmentMap(getDb(), input.routineAssignments ?? []);
+      const creationCompDate = input.horizon.kind === 'date' && get().sport !== null
+        ? (preview.requestedReviewDate ?? get().sport?.competitionDate ?? null)
+        : null;
+      const shape = trainingProgramShape(get().profile, input, preview.startDate, creationCompDate, routineByDayKey);
       pendingProgramCreation = {
         input, preview, programDays: shape.programDays,
+        scheduleMode: shape.scheduleMode,
+        slotOverrides: shape.slotOverrides,
+        routineAssignments: shape.routineAssignments,
         sessionDurationCapMin: capChanges ? chosenCapMin : null,
+        baseRpeCap: rpeCapChanges ? chosenRpeCap : null,
       };
       set({ error: null });
       get().generateNewBlock(input.schemaType);
@@ -5049,12 +6097,15 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const pendingObjective = pendingProgramCreation?.preview.objective
       ?? pendingProgramContinuation?.objective;
     const pendingCapMin = pendingProgramCreation?.sessionDurationCapMin ?? undefined;
-    const profile = pendingFrequency === undefined && pendingObjective === undefined && pendingCapMin === undefined ? storedProfile
+    const pendingBaseRpeCap = pendingProgramCreation?.baseRpeCap ?? undefined;
+    const profile = pendingFrequency === undefined && pendingObjective === undefined
+      && pendingCapMin === undefined && pendingBaseRpeCap === undefined ? storedProfile
       : {
         ...storedProfile,
         weekly_frequency: pendingFrequency ?? storedProfile.weekly_frequency,
         objective: pendingObjective ?? storedProfile.objective,
         session_duration_cap_min: pendingCapMin ?? storedProfile.session_duration_cap_min,
+        base_rpe_cap: pendingBaseRpeCap ?? storedProfile.base_rpe_cap,
       };
     if (status !== 'ready') return;
     // Audit A2: regenerating mid-session archives the plan the live session
@@ -5068,14 +6119,37 @@ export const useStore = create<KineticsStore>()((set, get) => {
       return;
     }
     const d = getDb();
+    const sportForMeet = readSportProfile(d);
+    const meetAnchorDate = pendingProgramCreation !== null
+      ? pendingProgramCreation.preview.startDate
+      : (pendingProgramContinuation !== null ? (get().program?.startDate ?? localToday()) : localToday());
+    const meetSeqIdx = pendingProgramContinuation !== null ? pendingProgramContinuation.sequenceIndex : 1;
+    const effectiveMeetDate = pendingProgramCreation !== null
+      ? (pendingProgramCreation.input.horizon.kind === 'date' && sportForMeet !== null
+          ? (pendingProgramCreation.preview.requestedReviewDate ?? sportForMeet.competitionDate)
+          : null)
+      : pendingProgramContinuation !== null
+        ? pendingProgramContinuation.countdownDate
+        : (sportForMeet?.competitionDate ?? null);
+    const meetCompDays = competitionCountdownDaysAway(meetAnchorDate, effectiveMeetDate);
+    const meetCountdown = effectiveMeetDate !== null && meetCompDays !== null
+      ? (() => {
+          const totalBlocks = resolveCompetitionCountdownHorizon(meetAnchorDate, effectiveMeetDate).plannedBlockCount;
+          const blockNumber = clamp(meetSeqIdx, 1, totalBlocks);
+          return { competitionDate: effectiveMeetDate, blockNumber, totalBlocks };
+        })()
+      : null;
     // Macro continuation: STANDALONE blocks advance through the athlete's
     // GLOBAL 32-week cycle from wherever the last generated block sat. A
     // guided-program continuation OWNS its macro position (AUD-GP-2): block N
     // sits at starting_macro_block_index + (N-1) mod 8 — the SAME derivation
     // the preview used, never the global counter.
-    const macroBlockIndex = pendingProgramContinuation !== null
+    const baseMacroBlockIndex = pendingProgramContinuation !== null
       ? programMacroIndex(pendingProgramContinuation.startingMacroBlockIndex, pendingProgramContinuation.sequenceIndex)
       : nextMacroPosition(d).macroBlockIndex; // R3: no date-derived peak anchor
+    const macroBlockIndex = meetCountdown !== null
+      ? countdownMacroBlockIndex(meetCountdown.blockNumber, meetCountdown.totalBlocks)
+      : baseMacroBlockIndex;
     // The generator is pure; everything stateful happens in ONE transaction
     // below so a mid-write crash leaves the previous block fully active.
     const declaredIntents = readMovementLoadIntents(d);
@@ -5083,7 +6157,14 @@ export const useStore = create<KineticsStore>()((set, get) => {
       d, profile, movements, niggles: get().niggles,
       priorExperience: new Set(get().activePriorExperienceMovementIds),
       today: localToday(), startDate: localToday(), schemaType, macroBlockIndex,
+      scheduleMode: pendingProgramCreation?.scheduleMode ?? pendingProgramContinuation?.scheduleMode ?? 'relative_day_index',
       programDays: pendingProgramCreation?.programDays ?? pendingProgramContinuation?.programDays,
+      introductoryWeek1: pendingProgramCreation !== null
+        || (pendingProgramContinuation !== null && pendingProgramContinuation.sequenceIndex === 1),
+      competitionDateOverride: effectiveMeetDate,
+      ...(pendingProgramContinuation !== null
+        ? { includeCompletedBlockId: pendingProgramContinuation.outgoingBlockId }
+        : {}),
     });
     // Session-time contract: a block whose sessions cannot fit preparation,
     // rest and changeovers inside the session limit is not committed. The
@@ -5113,6 +6194,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
           sets: slot.sets,
           reps: slot.reps,
           targetRpe: slot.target_rpe,
+          backOff: slot.backOff ?? null,
           appliedPrefixes: slot.applied_prefixes ?? [],
           autopilotDelta: slot.autopilotDelta ?? null,
         })),
@@ -5137,10 +6219,19 @@ export const useStore = create<KineticsStore>()((set, get) => {
           plannedBlockCount: programDraft.preview.plannedBlockCount,
           startingMacroBlockIndex: plan.macroBlockIndex, // R3: rotation, not the date
           schemaType,
-          days: programDraft.preview.days,
+          days: programDraft.preview.days.map((day) => ({
+            dayIndex: day.dayIndex,
+            focus: mapBaseProgramFocus(day.focus),
+          })),
           movementPreferences: programDraft.input.movementPreferences ?? [],
           weeklyFrequency: programDraft.preview.days.length,
           now: Date.now(),
+        });
+        writeProgramAdvancedControl(d, programId, {
+          scheduleMode: programDraft.scheduleMode,
+          days: programDraft.preview.days,
+          slotOverrides: programDraft.slotOverrides,
+          routineAssignments: programDraft.routineAssignments,
         });
         // Review (PR 194): the chosen session length is written in the same
         // transaction as the program, so a stop between two commits can no
@@ -5150,6 +6241,20 @@ export const useStore = create<KineticsStore>()((set, get) => {
             'UPDATE athlete_profile SET session_duration_cap_min = ?, updated_at_ms = ? WHERE profile_id = 1',
             [programDraft.sessionDurationCapMin, Date.now()],
           );
+        }
+        if (programDraft.baseRpeCap !== null) {
+          d.executeSync(
+            'UPDATE athlete_profile SET base_rpe_cap = ?, updated_at_ms = ? WHERE profile_id = 1',
+            [programDraft.baseRpeCap, Date.now()],
+          );
+        }
+        if (programId !== null && programDraft.input.horizon.kind === 'date' && sportForMeet !== null) {
+          syncCanonicalCompetitionDate(d, programDraft.preview.requestedReviewDate ?? null, {
+            syncSport: true,
+            syncGoals: true,
+            syncProgram: false,
+            nowMs: Date.now(),
+          });
         }
       }
       if (pendingProgramContinuation !== null) {
@@ -5193,6 +6298,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
         'INSERT INTO block_meta (block_id, macro_block_index, macro_phase, schema_type, peak_shifted) VALUES (?, ?, ?, ?, ?)',
         [blockId, plan.macroBlockIndex, plan.macroPhase, plan.schemaType, plan.peakShifted ? 1 : 0],
       );
+      persistBlockMeetCountdown(d, blockId, programId, meetCountdown, openAtGeneration !== null);
       // S6(b): the athlete may keep training while suspended, but this block
       // must not consume the frozen position. Attribute it to the open episode
       // (059) inside the SAME transaction as the block itself, so a crash can
@@ -5204,13 +6310,20 @@ export const useStore = create<KineticsStore>()((set, get) => {
         );
       }
       for (const s of plan.sessions) {
+        const baseSessionFocus = mapBaseProgramFocus(s.focus);
         d.executeSync(
           'INSERT INTO planned_session (block_id, week_index, day_index, focus, phase, session_date) VALUES (?, ?, ?, ?, ?, ?)',
-          [blockId, s.week_index, s.day_index, s.focus, s.phase, s.session_date],
+          [blockId, s.week_index, s.day_index, baseSessionFocus, s.phase, s.session_date],
         );
         const sessionId = rowsOf<{ id: number }>(
           d.executeSync('SELECT last_insert_rowid() AS id'),
         )[0]!.id;
+        if (s.focus !== baseSessionFocus) {
+          d.executeSync(
+            'INSERT INTO planned_session_focus_ext (planned_session_id, focus) VALUES (?, ?)',
+            [sessionId, s.focus],
+          );
+        }
         insertPlannedSlots(d, sessionId, s.slots, { movements, declaredIntents, profile });
       }
       d.executeSync('COMMIT');
@@ -5219,145 +6332,16 @@ export const useStore = create<KineticsStore>()((set, get) => {
       set({ error: e instanceof Error ? e.message : String(e) });
       return;
     }
-    // State follows the commit: the chosen length (if any) is the profile's now.
-    if (pendingFrequency !== undefined || pendingCapMin !== undefined) set({ profile });
-    if (pendingCapMin !== undefined && get().prescription !== null) get().computePrescription([]);
+    // State follows the commit: the chosen length / effort cap (if any) is the profile's now.
+    if (pendingFrequency !== undefined || pendingCapMin !== undefined || pendingBaseRpeCap !== undefined) set({ profile });
+    if ((pendingCapMin !== undefined || pendingBaseRpeCap !== undefined) && get().prescription !== null) get().computePrescription([]);
+    if (pendingProgramCreation !== null && pendingProgramCreation.input.horizon.kind === 'date' && sportForMeet !== null) {
+      get().refreshSport();
+      get().refreshFocusAndGoals();
+    }
     get().refreshBlock();
     get().refreshProgram();
     get().refreshReturnCheckin();
-  },
-
-  todayPlanEquipmentConflict: () => {
-    const state = get();
-    const plan = state.todayPlan;
-    if (state.status !== 'ready' || plan === null) return false;
-    const d = getDb();
-    if (plannedSessionStarted(d, plan.plannedSessionId)) return false;
-    return todayPlanOutsideAccessBoundary(
-      d, plan, state.movements, state.profile,
-      new Set(state.activePriorExperienceMovementIds), state.niggles,
-    );
-  },
-
-  updateTodayPlannedWorkout: () => {
-    const state = get();
-    if (state.status !== 'ready' || state.block === null) return false;
-    if (state.session !== null) {
-      set({ error: "End the active session before updating today's workout." });
-      return false;
-    }
-    const plan = state.todayPlan;
-    if (plan === null) {
-      set({ error: 'There is no planned workout today to update.' });
-      return false;
-    }
-    const d = getDb();
-    if (plannedSessionStarted(d, plan.plannedSessionId)) {
-      set({ error: "Today's workout has already started, so it is not changed." });
-      return false;
-    }
-    // A routine-frozen session answers to its frozen routine, not the generator.
-    const fromRoutine = rowsOf<{ planned_session_id: number }>(d.executeSync(
-      'SELECT planned_session_id FROM planned_session_method WHERE planned_session_id = ?',
-      [plan.plannedSessionId],
-    )).length > 0;
-    if (fromRoutine) {
-      set({ error: "Today's workout comes from a routine. Edit the routine to change it." });
-      return false;
-    }
-    const priorExperience = new Set(state.activePriorExperienceMovementIds);
-    if (!todayPlanOutsideAccessBoundary(d, plan, state.movements, state.profile, priorExperience, state.niggles)) {
-      set({ error: "Today's workout already fits your equipment." });
-      return false;
-    }
-    const row = rowsOf<{
-      week_index: number; day_index: number; focus: string; phase: string; session_date: string;
-    }>(d.executeSync(
-      'SELECT week_index, day_index, focus, phase, session_date FROM planned_session WHERE planned_session_id = ?',
-      [plan.plannedSessionId],
-    ))[0];
-    const meta = rowsOf<{ macro_block_index: number; schema_type: string }>(d.executeSync(
-      'SELECT macro_block_index, schema_type FROM block_meta WHERE block_id = ?',
-      [state.block.blockId],
-    ))[0];
-    if (row === undefined || meta === undefined) {
-      set({ error: "Today's workout cannot be rebuilt because its block's plan details are missing. Nothing was changed." });
-      return false;
-    }
-    const program = state.program;
-    const programDays: ProgramDayPreference[] | undefined = program?.status === 'active'
-      ? program.days.map((day) => ({
-          day_index: day.dayIndex,
-          focus: day.focus as ProgramDayPreference['focus'],
-          movement_preferences: program.movementPreferences
-            .filter((p) => p.dayIndex === day.dayIndex)
-            .map((p) => ({ slot_index: p.slotIndex, pattern: p.pattern, movement_id: p.movementId })),
-        }))
-      : undefined;
-    // The same generator and the same inputs a block generation uses, run on
-    // the block's own start date. Only today's day is taken from the result.
-    let rebuilt: BlockPlan['sessions'][number] | undefined;
-    try {
-      const { plan: generated } = generateBlockFromStoredState({
-        d, profile: state.profile, movements: state.movements, niggles: state.niggles,
-        priorExperience, today: localToday(), startDate: state.block.startDate,
-        schemaType: meta.schema_type as SchemaType, macroBlockIndex: meta.macro_block_index, programDays,
-      });
-      if (generated.timeBudget.conflicts.length > 0) {
-        set({ error: generated.timeBudget.conflicts.join(' ') });
-        return false;
-      }
-      rebuilt = generated.sessions.find((s) => s.week_index === row.week_index && s.day_index === row.day_index);
-    } catch (e) {
-      set({ error: e instanceof Error ? e.message : String(e) });
-      return false;
-    }
-    if (rebuilt === undefined || rebuilt.session_date !== row.session_date
-      || rebuilt.focus !== row.focus || rebuilt.phase !== row.phase) {
-      set({ error: "Today's workout could not be rebuilt in its place. Nothing was changed." });
-      return false;
-    }
-    // No load goes up. A movement kept from today's plan keeps at most its planned
-    // sets and target RPE, and a raised autopilot change is not written, because
-    // it would describe a raise that no longer exists.
-    const planned = rowsOf<{ movement_id: number; sets: number; target_rpe: number | null }>(d.executeSync(
-      'SELECT movement_id, sets, target_rpe FROM planned_slot WHERE planned_session_id = ?',
-      [plan.plannedSessionId],
-    ));
-    const slots = rebuilt.slots.map((sl) => {
-      const autopilotDelta = sl.autopilotDelta?.reason === 'raised' ? undefined : sl.autopilotDelta;
-      const before = planned.filter((p) => p.movement_id === sl.movement_id);
-      if (before.length === 0) return { ...sl, autopilotDelta };
-      const priorRpes = before.flatMap((p) => (p.target_rpe === null ? [] : [p.target_rpe]));
-      return {
-        ...sl,
-        sets: Math.min(sl.sets, ...before.map((p) => p.sets)),
-        target_rpe: priorRpes.length === 0 ? sl.target_rpe : Math.min(sl.target_rpe, ...priorRpes),
-        autopilotDelta,
-      };
-    });
-    const movementIds = slots.map((sl) => sl.movement_id);
-    const identity = `planned-session-rebuild:${plan.plannedSessionId}:${supportMovementIdentity(movementIds)}`;
-    if (!get().requireTrainingSupport('block-generate', movementIds, identity)) return false;
-    const declaredIntents = readMovementLoadIntents(d);
-    d.executeSync('BEGIN');
-    try {
-      if (plannedSessionStarted(d, plan.plannedSessionId)) {
-        throw new Error("Today's workout has already started, so it is not changed.");
-      }
-      d.executeSync('DELETE FROM planned_slot WHERE planned_session_id = ?', [plan.plannedSessionId]);
-      insertPlannedSlots(d, plan.plannedSessionId, slots, {
-        movements: state.movements, declaredIntents, profile: state.profile,
-      });
-      d.executeSync('COMMIT');
-    } catch (e) {
-      d.executeSync('ROLLBACK');
-      set({ error: e instanceof Error ? e.message : String(e) });
-      return false;
-    }
-    get().refreshBlock();
-    set({ error: null });
-    return true;
   },
 
   refreshBlock: () => {
@@ -5372,7 +6356,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       "SELECT block_id, start_date, objective, created_at_ms FROM training_block WHERE status = 'active' ORDER BY block_id DESC LIMIT 1",
     ))[0];
     if (blockRow === undefined) {
-      set({ block: null, blockMeta: null, blockSessions: [], todayPlan: null, pendingAutopilotAdjustments: [], hasArchivedBlock, blockEmphasis: null });
+      set({ block: null, blockMeta: null, blockMeetMeta: null, blockSessions: [], todayPlan: null, pendingAutopilotAdjustments: [], hasArchivedBlock, blockEmphasis: null });
       return;
     }
     const metaRow = rowsOf<{
@@ -5381,12 +6365,19 @@ export const useStore = create<KineticsStore>()((set, get) => {
       'SELECT macro_block_index, macro_phase, schema_type, peak_shifted FROM block_meta WHERE block_id = ?',
       [blockRow.block_id],
     ))[0];
+    const meetMetaRow = rowsOf<{
+      competition_date: string; block_number: number; total_blocks: number;
+    }>(d.executeSync(
+      'SELECT competition_date, block_number, total_blocks FROM training_block_meet_meta WHERE block_id = ?',
+      [blockRow.block_id],
+    ))[0];
     const sessions = rowsOf<{
       planned_session_id: number; week_index: number; day_index: number;
       focus: string; phase: string; session_date: string; slot_count: number;
       completion_status: string | null;
     }>(d.executeSync(
-      `SELECT ps.planned_session_id, ps.week_index, ps.day_index, ps.focus, ps.phase,
+      `SELECT ps.planned_session_id, ps.week_index, ps.day_index,
+              COALESCE(psfe.focus, ps.focus) AS focus, ps.phase,
               ps.session_date, count(sl.planned_slot_id) AS slot_count,
               CASE
                 WHEN EXISTS (
@@ -5404,6 +6395,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
                 ELSE NULL
               END AS completion_status
        FROM planned_session ps
+       LEFT JOIN planned_session_focus_ext psfe ON psfe.planned_session_id = ps.planned_session_id
        LEFT JOIN planned_slot sl ON sl.planned_session_id = ps.planned_session_id
        WHERE ps.block_id = ?
        GROUP BY ps.planned_session_id
@@ -5451,11 +6443,228 @@ export const useStore = create<KineticsStore>()((set, get) => {
             peakShifted: metaRow.peak_shifted === 1,
           }
         : null, // pre-009 blocks have no meta; UI treats them as LINEAR-era
+      blockMeetMeta: meetMetaRow !== undefined
+        ? {
+            competitionDate: meetMetaRow.competition_date,
+            blockNumber: meetMetaRow.block_number,
+            totalBlocks: meetMetaRow.total_blocks,
+          }
+        : null,
       blockSessions,
       todayPlan,
       pendingAutopilotAdjustments,
       blockEmphasis: readBlockEmphasis(d, blockRow.block_id),
     });
+  },
+
+  todayPlanConflictReason: () => {
+    const state = get();
+    const plan = state.todayPlan;
+    if (state.status !== 'ready' || plan === null) return null;
+    const d = getDb();
+    if (plannedSessionStarted(d, plan.plannedSessionId)) return null;
+    const accessReason = todayPlanAccessConflictReason(
+      d, plan, state.movements, state.profile,
+      new Set(state.activePriorExperienceMovementIds), state.niggles,
+    );
+    if (accessReason !== null) return accessReason;
+    if (state.profile.training_age === 'beginner' && plannedSessionIsFromRoutine(d, plan.plannedSessionId)) {
+      return 'non_equipment';
+    }
+    return null;
+  },
+
+  todayPlanEquipmentConflict: () => get().todayPlanConflictReason() !== null,
+
+  updateTodayPlannedWorkout: () => {
+    const state = get();
+    if (state.status !== 'ready' || state.block === null) return false;
+    if (state.session !== null) {
+      set({ error: "End the active session before updating today's workout." });
+      return false;
+    }
+    const plan = state.todayPlan;
+    if (plan === null) {
+      set({ error: 'There is no planned workout today to update.' });
+      return false;
+    }
+    const d = getDb();
+    if (plannedSessionStarted(d, plan.plannedSessionId)) {
+      set({ error: "Today's workout has already started, so it is not changed." });
+      return false;
+    }
+    // A routine-frozen session normally answers to its frozen routine, not the
+    // generator. Allow replacing it (and clearing its routine freeze) when the
+    // athlete is outside the access boundary or is on Beginner (inherited lock).
+    const fromRoutine = plannedSessionIsFromRoutine(d, plan.plannedSessionId);
+    const priorExperience = new Set(state.activePriorExperienceMovementIds);
+    const outsideAccess = todayPlanOutsideAccessBoundary(
+      d, plan, state.movements, state.profile, priorExperience, state.niggles,
+    );
+    const beginnerRoutineLock = fromRoutine && state.profile.training_age === 'beginner';
+    if (fromRoutine && !outsideAccess && !beginnerRoutineLock) {
+      set({ error: "Today's workout comes from a routine. Edit the routine to change it." });
+      return false;
+    }
+    if (!outsideAccess && !beginnerRoutineLock) {
+      set({ error: "Today's workout already fits your equipment." });
+      return false;
+    }
+    const row = rowsOf<{
+      week_index: number; day_index: number; focus: string; phase: string; session_date: string;
+    }>(d.executeSync(
+      `SELECT ps.week_index, ps.day_index, COALESCE(psfe.focus, ps.focus) AS focus, ps.phase, ps.session_date
+         FROM planned_session ps
+         LEFT JOIN planned_session_focus_ext psfe ON psfe.planned_session_id = ps.planned_session_id
+        WHERE ps.planned_session_id = ?`,
+      [plan.plannedSessionId],
+    ))[0];
+    const meta = rowsOf<{ macro_block_index: number; schema_type: string }>(d.executeSync(
+      'SELECT macro_block_index, schema_type FROM block_meta WHERE block_id = ?',
+      [state.block.blockId],
+    ))[0];
+    const blockProgramRow = rowsOf<{ sequence_index: number }>(d.executeSync(
+      'SELECT sequence_index FROM training_block_program WHERE block_id = ?',
+      [state.block.blockId],
+    ))[0];
+    if (row === undefined || meta === undefined) {
+      set({ error: "Today's workout cannot be rebuilt because its block's plan details are missing. Nothing was changed." });
+      return false;
+    }
+    const program = state.program;
+    const programDays: ProgramDayPreference[] | undefined = program?.status === 'active'
+      ? buildProgramDayPreferences(
+          program.days, program.movementPreferences, program.slotOverrides, program.routineAssignments,
+          readRoutineAssignmentMap(d, program.routineAssignments),
+        )
+      : undefined;
+    const effectiveProgramDays: ProgramDayPreference[] | undefined = !fromRoutine
+      ? programDays
+      : (() => {
+          if (programDays !== undefined) {
+            const hasToday = programDays.some((day) => day.day_index === row.day_index);
+            return hasToday
+              ? programDays.map((day) => (day.day_index === row.day_index
+                  ? { day_index: row.day_index, focus: row.focus as ProgramDayPreference['focus'], movement_preferences: [] }
+                  : day))
+              : [...programDays, { day_index: row.day_index, focus: row.focus as ProgramDayPreference['focus'], movement_preferences: [] }]
+                  .sort((a, b) => a.day_index - b.day_index);
+          }
+          const existingDayRows = rowsOf<{ day_index: number; focus: string }>(d.executeSync(
+            'SELECT day_index, focus FROM planned_session WHERE block_id = ? AND week_index = ? ORDER BY day_index',
+            [state.block.blockId, row.week_index],
+          ));
+          const focusByDay = new Map<number, ProgramDayPreference['focus']>();
+          for (const dRow of existingDayRows) {
+            if (!focusByDay.has(dRow.day_index)) {
+              focusByDay.set(dRow.day_index, dRow.focus as ProgramDayPreference['focus']);
+            }
+          }
+          focusByDay.set(row.day_index, row.focus as ProgramDayPreference['focus']);
+          const count = Math.max(state.profile.weekly_frequency, ...focusByDay.keys());
+          const daysList: ProgramDayPreference[] = [];
+          for (let dayIdx = 1; dayIdx <= count; dayIdx += 1) {
+            daysList.push({
+              day_index: dayIdx,
+              focus: focusByDay.get(dayIdx) ?? 'full',
+              movement_preferences: [],
+            });
+          }
+          return daysList;
+        })();
+    const effectiveProfile = effectiveProgramDays !== undefined && effectiveProgramDays.length !== state.profile.weekly_frequency
+      ? { ...state.profile, weekly_frequency: effectiveProgramDays.length }
+      : state.profile;
+    // The same generator and the same inputs a block generation uses, run on
+    // the block's own start date. Only today's day is taken from the result.
+    let rebuilt: BlockPlan['sessions'][number] | undefined;
+    try {
+      const { plan: generated } = generateBlockFromStoredState({
+        d, profile: effectiveProfile, movements: state.movements, niggles: state.niggles,
+        priorExperience, today: localToday(), startDate: state.block.startDate,
+        schemaType: meta.schema_type as SchemaType, macroBlockIndex: meta.macro_block_index,
+        ...(program?.status === 'active' ? { scheduleMode: program.scheduleMode } : { scheduleMode: 'relative_day_index' as const }),
+        programDays: effectiveProgramDays,
+        introductoryWeek1: blockProgramRow?.sequence_index === 1,
+      });
+      if (generated.timeBudget.conflicts.length > 0) {
+        set({ error: generated.timeBudget.conflicts.join(' ') });
+        return false;
+      }
+      rebuilt = generated.sessions.find((s) => s.week_index === row.week_index && s.day_index === row.day_index);
+    } catch (e) {
+      set({ error: e instanceof Error ? e.message : String(e) });
+      return false;
+    }
+    if (rebuilt === undefined
+      || rebuilt.focus !== row.focus
+      || (!fromRoutine && (rebuilt.session_date !== row.session_date || rebuilt.phase !== row.phase))) {
+      set({ error: "Today's workout could not be rebuilt in its place. Nothing was changed." });
+      return false;
+    }
+    // No load goes up. A movement kept from today's plan keeps at most its planned
+    // sets and target RPE, and a raised autopilot change is not written, because
+    // it would describe a raise that no longer exists.
+    const planned = rowsOf<{ movement_id: number; sets: number; target_rpe: number | null; backoff_target_rpe: number | null }>(d.executeSync(
+      `SELECT ps.movement_id, ps.sets, ps.target_rpe, psb.target_rpe AS backoff_target_rpe
+       FROM planned_slot ps
+       LEFT JOIN planned_slot_backoff psb ON psb.planned_slot_id = ps.planned_slot_id
+       WHERE ps.planned_session_id = ?`,
+      [plan.plannedSessionId],
+    ));
+    const slots = rebuilt.slots.map((sl) => {
+      const autopilotDelta = sl.autopilotDelta?.reason === 'raised' ? undefined : sl.autopilotDelta;
+      const before = planned.filter((p) => p.movement_id === sl.movement_id);
+      if (before.length === 0) return { ...sl, autopilotDelta };
+      const priorRpes = before.flatMap((p) => (p.target_rpe === null ? [] : [p.target_rpe]));
+      const priorBackOffRpes = before.flatMap((p) => (p.backoff_target_rpe === null ? [] : [p.backoff_target_rpe]));
+      const clampedSets = Math.min(sl.sets, ...before.map((p) => p.sets));
+      const clampedRpe = priorRpes.length === 0 ? sl.target_rpe : Math.min(sl.target_rpe, ...priorRpes);
+      const clampedBackOff = sl.backOff !== undefined && clampedSets > 1
+        ? {
+            ...sl.backOff,
+            sets: Math.min(sl.backOff.sets, clampedSets - 1),
+            targetRpe: Math.min(sl.backOff.targetRpe, clampedRpe, ...priorBackOffRpes),
+          }
+        : undefined;
+      return {
+        ...sl,
+        sets: clampedSets,
+        target_rpe: clampedRpe,
+        ...(clampedBackOff === undefined ? { backOff: undefined } : { backOff: clampedBackOff }),
+        autopilotDelta,
+      };
+    });
+    const movementIds = slots.map((sl) => sl.movement_id);
+    const identity = `planned-session-rebuild:${plan.plannedSessionId}:${supportMovementIdentity(movementIds)}`;
+    if (!get().requireTrainingSupport('block-generate', movementIds, identity)) return false;
+    const declaredIntents = readMovementLoadIntents(d);
+    d.executeSync('BEGIN');
+    try {
+      if (plannedSessionStarted(d, plan.plannedSessionId)) {
+        throw new Error("Today's workout has already started, so it is not changed.");
+      }
+      if (fromRoutine) {
+        d.executeSync('DELETE FROM planned_session_routine_context WHERE planned_session_id = ?', [plan.plannedSessionId]);
+        d.executeSync('DELETE FROM planned_session_method WHERE planned_session_id = ?', [plan.plannedSessionId]);
+        if (rebuilt.phase !== row.phase) {
+          d.executeSync('UPDATE planned_session SET phase = ? WHERE planned_session_id = ?', [rebuilt.phase, plan.plannedSessionId]);
+        }
+      }
+      deletePlannedSlotBackOffForSession(d, plan.plannedSessionId);
+      d.executeSync('DELETE FROM planned_slot WHERE planned_session_id = ?', [plan.plannedSessionId]);
+      insertPlannedSlots(d, plan.plannedSessionId, slots, {
+        movements: state.movements, declaredIntents, profile: state.profile,
+      });
+      d.executeSync('COMMIT');
+    } catch (e) {
+      d.executeSync('ROLLBACK');
+      set({ error: e instanceof Error ? e.message : String(e) });
+      return false;
+    }
+    get().refreshBlock();
+    set({ error: null });
+    return true;
   },
 
   refreshProgram: () => {
@@ -5480,7 +6689,11 @@ export const useStore = create<KineticsStore>()((set, get) => {
       return;
     }
     const days = rowsOf<{ day_index: number; focus: string }>(d.executeSync(
-      'SELECT day_index, focus FROM training_program_day WHERE program_id = ? ORDER BY day_index',
+      `SELECT tpd.day_index, COALESCE(tpdfe.focus, tpd.focus) AS focus
+         FROM training_program_day tpd
+         LEFT JOIN training_program_day_focus_ext tpdfe
+           ON tpdfe.program_id = tpd.program_id AND tpdfe.day_index = tpd.day_index
+        WHERE tpd.program_id = ? ORDER BY tpd.day_index`,
       [row.program_id],
     )).map((day) => ({ dayIndex: day.day_index, focus: day.focus }));
     const movementPreferences = rowsOf<{
@@ -5494,12 +6707,59 @@ export const useStore = create<KineticsStore>()((set, get) => {
       dayIndex: preference.day_index, slotIndex: preference.slot_index,
       pattern: preference.pattern, movementId: preference.movement_id,
     }));
+    const scheduleModeRow = rowsOf<{ mode: ProgramScheduleMode }>(d.executeSync(
+      'SELECT mode FROM training_program_schedule_mode WHERE program_id = ?',
+      [row.program_id],
+    ))[0];
+    // Pre-078 legacy programs keep relative offset semantics unless explicitly updated.
+    const scheduleMode: ProgramScheduleMode = scheduleModeRow?.mode ?? 'relative_day_index';
+    const slotOverrides = rowsOf<{
+      day_index: number; slot_index: number; sets: number | null; reps: number | null; target_rpe: number | null;
+    }>(d.executeSync(
+      `SELECT day_index, slot_index, sets, reps, target_rpe
+         FROM training_program_slot_override
+        WHERE program_id = ? ORDER BY day_index, slot_index`,
+      [row.program_id],
+    )).map((ov) => ({
+      dayIndex: ov.day_index,
+      slotIndex: ov.slot_index,
+      ...(ov.sets !== null ? { sets: ov.sets } : {}),
+      ...(ov.reps !== null ? { reps: ov.reps } : {}),
+      ...(ov.target_rpe !== null ? { targetRpe: ov.target_rpe } : {}),
+    }));
+    const routineAssignmentRows = rowsOf<{
+      day_index: number; routine_template_id: number; routine_day_index: number; routine_name: string;
+    }>(d.executeSync(
+      `SELECT tpdr.day_index, tpdr.routine_template_id, tpdr.routine_day_index, rt.name AS routine_name
+         FROM training_program_day_routine tpdr
+         JOIN routine_template rt ON rt.routine_template_id = tpdr.routine_template_id
+        WHERE tpdr.program_id = ? ORDER BY tpdr.day_index`,
+      [row.program_id],
+    ));
+    const routineByProgramDay = new Map(routineAssignmentRows.map((ra) => [
+      ra.day_index,
+      {
+        routineTemplateId: ra.routine_template_id,
+        routineDayIndex: ra.routine_day_index,
+        routineName: ra.routine_name,
+      },
+    ]));
+    const routineAssignments = routineAssignmentRows.map((ra) => ({
+      dayIndex: ra.day_index,
+      routineTemplateId: ra.routine_template_id,
+      routineDayIndex: ra.routine_day_index,
+    }));
+    const daysWithRoutines: TrainingProgramDay[] = days.map((day) => {
+      const assignment = routineByProgramDay.get(day.dayIndex);
+      return assignment === undefined ? day : { ...day, routineAssignment: assignment };
+    });
     set({ program: {
       programId: row.program_id, objective: row.objective as UserProfile['objective'], startDate: row.start_date,
       horizonKind: row.horizon_kind, requestedReviewDate: row.requested_review_date,
       plannedEndDate: row.planned_end_date, plannedBlockCount: row.planned_block_count,
       startingMacroBlockIndex: row.starting_macro_block_index, schemaType: row.schema_type,
-      status: row.status, currentSequenceIndex: row.current_sequence_index, days, movementPreferences,
+      status: row.status, currentSequenceIndex: row.current_sequence_index,
+      scheduleMode, days: daysWithRoutines, movementPreferences, slotOverrides, routineAssignments,
     } });
   },
 
@@ -5518,8 +6778,18 @@ export const useStore = create<KineticsStore>()((set, get) => {
       if (preview.plannedBlockCount < current.currentSequenceIndex) {
         throw new Error('The horizon cannot remove a block already started.');
       }
+      if (preview.plan.timeBudget.conflicts.length > 0) {
+        throw new Error(preview.plan.timeBudget.conflicts.join(' '));
+      }
+      const nextCapMin = input.sessionDurationCapMin === undefined
+        ? get().profile.session_duration_cap_min
+        : Math.round(clamp(input.sessionDurationCapMin, 15, 240));
+      const nextBaseRpeCap = input.baseRpeCap === undefined
+        ? get().profile.base_rpe_cap
+        : clamp(input.baseRpeCap, 5.0, 10.0);
       const d = getDb();
       const now = Date.now();
+      const sportOnEdit = readSportProfile(d);
       d.executeSync('BEGIN');
       try {
         d.executeSync(
@@ -5533,7 +6803,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
         d.executeSync('DELETE FROM training_program_day WHERE program_id = ?', [current.programId]);
         for (const day of preview.days) {
           d.executeSync('INSERT INTO training_program_day (program_id, day_index, focus) VALUES (?, ?, ?)',
-            [current.programId, day.dayIndex, day.focus]);
+            [current.programId, day.dayIndex, mapBaseProgramFocus(day.focus)]);
         }
         for (const preference of input.movementPreferences ?? []) {
           d.executeSync(
@@ -5542,14 +6812,55 @@ export const useStore = create<KineticsStore>()((set, get) => {
             [current.programId, preference.dayIndex, preference.slotIndex, preference.pattern, preference.movementId],
           );
         }
-        d.executeSync('UPDATE athlete_profile SET weekly_frequency = ?, updated_at_ms = ? WHERE profile_id = 1',
-          [preview.days.length, now]);
+        writeProgramAdvancedControl(d, current.programId, {
+          scheduleMode: preview.scheduleMode,
+          days: preview.days,
+          slotOverrides: preview.slotOverrides,
+          routineAssignments: preview.routineAssignments,
+        });
+        if (input.horizon.kind === 'date' && sportOnEdit !== null && preview.requestedReviewDate !== null) {
+          syncCanonicalCompetitionDate(d, preview.requestedReviewDate, {
+            syncSport: true,
+            syncGoals: true,
+            syncProgram: false,
+            nowMs: now,
+          });
+          d.executeSync(
+            `INSERT INTO training_program_meet_countdown (program_id, competition_date) VALUES (?, ?)
+             ON CONFLICT(program_id) DO UPDATE SET competition_date = excluded.competition_date`,
+            [current.programId, preview.requestedReviewDate],
+          );
+        } else if (input.horizon.kind === 'weeks') {
+          d.executeSync(
+            'DELETE FROM training_program_meet_countdown WHERE program_id = ?',
+            [current.programId],
+          );
+        }
+        d.executeSync(
+          'UPDATE athlete_profile SET weekly_frequency = ?, session_duration_cap_min = ?, base_rpe_cap = ?, updated_at_ms = ? WHERE profile_id = 1',
+          [preview.days.length, nextCapMin, nextBaseRpeCap, now],
+        );
         d.executeSync('COMMIT');
       } catch (e) {
         d.executeSync('ROLLBACK');
         throw e;
       }
-      set({ profile: { ...get().profile, weekly_frequency: preview.days.length }, error: null });
+      set({
+        profile: {
+          ...get().profile,
+          weekly_frequency: preview.days.length,
+          session_duration_cap_min: nextCapMin,
+          base_rpe_cap: nextBaseRpeCap,
+        },
+        error: null,
+      });
+      if (input.baseRpeCap !== undefined && get().prescription !== null) {
+        get().computePrescription([]);
+      }
+      if (input.horizon.kind === 'date' && sportOnEdit !== null) {
+        get().refreshSport();
+        get().refreshFocusAndGoals();
+      }
       get().refreshProgram();
       return true;
     } catch (e) {
@@ -5564,9 +6875,17 @@ export const useStore = create<KineticsStore>()((set, get) => {
     if (current === null || block === null || current.status !== 'active'
         || localToday() <= addDaysIso(block.startDate, 27)
         || current.currentSequenceIndex >= current.plannedBlockCount) return null;
+    const countdownRow = rowsOf<{ competition_date: string }>(getDb().executeSync(
+      'SELECT competition_date FROM training_program_meet_countdown WHERE program_id = ?',
+      [current.programId],
+    ))[0];
     const input: TrainingProgramInput = {
-      horizon: { kind: 'weeks', blockCount: current.plannedBlockCount },
-      schemaType: current.schemaType, dayIndices: current.days.map((day) => day.dayIndex),
+      horizon: countdownRow !== undefined
+        ? { kind: 'date', requestedReviewDate: countdownRow.competition_date }
+        : { kind: 'weeks', blockCount: current.plannedBlockCount },
+      schemaType: current.schemaType,
+      scheduleMode: current.scheduleMode,
+      dayIndices: current.days.map((day) => day.dayIndex),
       // The saved focuses, as continuation uses them: without them the preview
       // would plan each day on the default focus and show a different week.
       days: current.days,
@@ -5574,7 +6893,10 @@ export const useStore = create<KineticsStore>()((set, get) => {
       // profile change) are left out as continuation leaves them out, so the
       // review button cannot throw on old data.
       movementPreferences: current.movementPreferences,
+      slotOverrides: current.slotOverrides,
+      routineAssignments: current.routineAssignments,
       keepPlaceablePreferencesOnly: true,
+      includeCompletedBlockId: block.blockId,
     };
     return get().previewTrainingProgram(input).plan;
   },
@@ -5616,20 +6938,32 @@ export const useStore = create<KineticsStore>()((set, get) => {
       get().refreshProgram();
       return;
     }
-    const programDays: ProgramDayPreference[] = current.days.map((day) => ({
-      day_index: day.dayIndex, focus: day.focus as ProgramDayPreference['focus'],
-      movement_preferences: current.movementPreferences.filter((p) => p.dayIndex === day.dayIndex).map((p) => ({
-        slot_index: p.slotIndex, pattern: p.pattern, movement_id: p.movementId,
-      })),
-    }));
+    const routineByDayKey = readRoutineAssignmentMap(d, current.routineAssignments);
+    const programDays = buildProgramDayPreferences(
+      current.days,
+      current.movementPreferences,
+      current.slotOverrides,
+      current.routineAssignments,
+      routineByDayKey,
+    );
+    const countdownRow = rowsOf<{ competition_date: string }>(getDb().executeSync(
+      'SELECT competition_date FROM training_program_meet_countdown WHERE program_id = ?',
+      [current.programId],
+    ))[0];
     const nextSequence = current.currentSequenceIndex + 1;
     const remainingBlocks = current.plannedBlockCount - current.currentSequenceIndex;
     pendingProgramContinuation = {
       programId: current.programId, sequenceIndex: nextSequence,
       startingMacroBlockIndex: current.startingMacroBlockIndex,
-      plannedEndDate: addDaysIso(localToday(), remainingBlocks * 28),
+      plannedEndDate: countdownRow !== undefined
+        ? countdownRow.competition_date
+        : addDaysIso(localToday(), remainingBlocks * 28),
       objective: current.objective,
-      programDays, weeklyFrequency: current.days.length,
+      programDays,
+      scheduleMode: current.scheduleMode,
+      weeklyFrequency: current.days.length,
+      outgoingBlockId: block.blockId,
+      countdownDate: countdownRow?.competition_date ?? null,
     };
     try {
       set({ error: null });
@@ -5917,6 +7251,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       throw error;
     }
     get().loadRoutineTemplates();
+    get().refreshProgram();
   },
 
   freezeRoutineTemplateToPlannedSession: (routineTemplateId, sessionDate, routineDayIndex = 1) => {
@@ -6050,6 +7385,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
           "UPDATE planned_session SET focus = 'full', phase = ?, session_date = ? WHERE planned_session_id = ?",
           [weekIndex === 4 ? 'deload' : 'accumulation', today, plannedSessionId],
         );
+        deletePlannedSlotBackOffForSession(d, plannedSessionId);
         d.executeSync('DELETE FROM planned_slot WHERE planned_session_id = ?', [plannedSessionId]);
       } else {
         d.executeSync(
@@ -6645,23 +7981,33 @@ export const useStore = create<KineticsStore>()((set, get) => {
       target_kind: string | null; target_reps: number | null; target_seconds: number | null;
       override_load_kg: number | null; override_reason: string | null;
       autopilot_rpe_delta: number | null; autopilot_set_delta: number | null; autopilot_reason: AutopilotAttributionReason | null;
+      athlete_override_source: 'slot_override' | 'routine_assignment' | null;
+      athlete_override_mrv: number | null;
+      athlete_override_above_mrv: number | null;
       routine_role: RoutineRole | null; lift_family: string | null;
       stress_purpose: RoutineStressPurpose | null; stress_coefficient: number | null;
       equivalent_volume: number | null; stress_dose: number | null;
       routine_adaptations_json: string | null;
+      backoff_sets: number | null; backoff_reps: number | null;
+      backoff_target_rpe: number | null; backoff_load_multiplier: number | null;
     }>(getDb().executeSync(
       `SELECT sl.slot_index, sl.planned_slot_id, sl.movement_id, m.name AS movement_name,
               sl.sets, sl.reps, sl.target_rpe,
               st.target_kind, st.target_reps, st.target_seconds,
               pa.rpe_delta AS autopilot_rpe_delta, pa.set_delta AS autopilot_set_delta, pa.reason AS autopilot_reason,
+              ao.source AS athlete_override_source, ao.mrv_ceiling_sets AS athlete_override_mrv, ao.above_mrv AS athlete_override_above_mrv,
               so.target_load_kg AS override_load_kg, so.reason AS override_reason,
               rd.role AS routine_role, rd.lift_family, rd.stress_purpose,
               rd.stress_coefficient, rd.equivalent_volume, rd.stress_dose,
-              rd.adaptations_json AS routine_adaptations_json
+              rd.adaptations_json AS routine_adaptations_json,
+              sb.sets AS backoff_sets, sb.reps AS backoff_reps,
+              sb.target_rpe AS backoff_target_rpe, sb.load_multiplier AS backoff_load_multiplier
        FROM planned_slot sl
        JOIN movement m ON m.movement_id = sl.movement_id
        LEFT JOIN planned_slot_target st ON st.planned_slot_id = sl.planned_slot_id
+       LEFT JOIN planned_slot_backoff sb ON sb.planned_slot_id = sl.planned_slot_id
        LEFT JOIN planned_slot_autopilot pa ON pa.planned_slot_id = sl.planned_slot_id
+       LEFT JOIN planned_slot_athlete_override ao ON ao.planned_slot_id = sl.planned_slot_id
        LEFT JOIN slot_override so ON so.planned_slot_id = sl.planned_slot_id
        LEFT JOIN planned_slot_routine_decision rd ON rd.planned_slot_id = sl.planned_slot_id
        WHERE sl.planned_session_id = ?
@@ -6685,6 +8031,11 @@ export const useStore = create<KineticsStore>()((set, get) => {
         setDelta: sl.autopilot_set_delta ?? 0,
         reason: sl.autopilot_reason,
       },
+      athleteOverride: sl.athlete_override_source === null ? undefined : {
+        source: sl.athlete_override_source,
+        mrvCeilingSets: sl.athlete_override_mrv,
+        aboveMrv: sl.athlete_override_above_mrv === 1,
+      },
       routineDecision: sl.routine_role === null ? undefined : {
         role: sl.routine_role,
         family: sl.lift_family,
@@ -6694,6 +8045,15 @@ export const useStore = create<KineticsStore>()((set, get) => {
         stressDose: sl.stress_dose ?? 0,
         adaptations: parseStringArray(sl.routine_adaptations_json),
       },
+      backOff: sl.backoff_sets !== null && sl.backoff_reps !== null
+        && sl.backoff_target_rpe !== null && sl.backoff_load_multiplier !== null
+        ? {
+            sets: sl.backoff_sets,
+            reps: sl.backoff_reps,
+            targetRpe: sl.backoff_target_rpe,
+            loadMultiplier: sl.backoff_load_multiplier,
+          }
+        : undefined,
     }));
   },
 
@@ -6761,7 +8121,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
          FROM session s
          JOIN session_origin so ON so.session_id = s.session_id
          JOIN planned_session ps ON ps.planned_session_id = so.source_planned_session_id
-        WHERE ps.focus = ?
+         LEFT JOIN planned_session_focus_ext psfe ON psfe.planned_session_id = ps.planned_session_id
+        WHERE COALESCE(psfe.focus, ps.focus) = ?
           AND s.duration_min IS NOT NULL
         ORDER BY s.session_id DESC
         LIMIT ?`,
@@ -6957,7 +8318,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const executionContext: ExecutableMovementAccessContext = planToConsume === null
       ? 'weight_room'
       : accessContextForBlockFocus(planToConsume.focus as BlockFocus);
-    const capabilityAvailable = capabilityAvailableMovementIds(
+    const availabilityVerdicts = capabilityMovementAvailability(
       d,
       movements,
       profile,
@@ -6965,10 +8326,20 @@ export const useStore = create<KineticsStore>()((set, get) => {
       new Set(get().activePriorExperienceMovementIds),
       safetyExcludedMovementIdsFor(movements, profile, get().niggles),
     );
+    const capabilityAvailable = new Set(
+      availabilityVerdicts.filter((row) => row.state === 'available').map((row) => row.movementId),
+    );
     if (planToConsume !== null && planToConsume.slots.some((slot) =>
       slotOutsideAccessBoundary(slot, movements, profile, executionContext, capabilityAvailable)
     )) {
-      set({ error: "Today's workout includes a movement your current equipment does not cover. Update today's workout before starting." });
+      const startConflict = classifySlotsAccessConflict(
+        planToConsume.slots, movements, profile, executionContext, availabilityVerdicts,
+      );
+      set({
+        error: startConflict === 'non_equipment'
+          ? NON_EQUIPMENT_ACCESS_CONFLICT_MESSAGE
+          : "Today's workout includes a movement your current equipment does not cover. Update today's workout before starting.",
+      });
       return;
     }
     if (planToConsume !== null) {
@@ -7088,6 +8459,9 @@ export const useStore = create<KineticsStore>()((set, get) => {
         // hard upper dose. Readiness may ease either prescription, but a good
         // day cannot silently grow it past the frozen bound.
         const adjusted = applyPrescriptionToSlot(sl, todaysVector);
+        const adjustedBackOff = adjusted.backOff !== undefined && sl.target.kind === 'reps' && adjusted.sets > 1
+          ? { ...adjusted.backOff, sets: Math.min(adjusted.backOff.sets, adjusted.sets - 1) }
+          : undefined;
         return {
           sessionPlanSlotId: 0,
           movementId: sl.movementId,
@@ -7102,6 +8476,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
           overrideLoadKg: sl.overrideLoadKg,
           overrideReason: sl.overrideReason,
           replacedBySessionPlanSlotId: null,
+          backOff: adjustedBackOff,
         };
       });
     } else {
@@ -7160,6 +8535,13 @@ export const useStore = create<KineticsStore>()((set, get) => {
             sl.target.kind === 'time' ? sl.target.seconds : null,
           ],
         );
+        if (sl.backOff !== undefined && sl.backOff.sets > 0) {
+          d.executeSync(
+            `INSERT INTO session_slot_backoff (session_plan_slot_id, sets, reps, target_rpe, load_multiplier)
+             VALUES (?, ?, ?, ?, ?)`,
+            [slotId, sl.backOff.sets, sl.backOff.reps, sl.backOff.targetRpe, sl.backOff.loadMultiplier],
+          );
+        }
         updatedSessionPlan.push({
           ...sl,
           sessionPlanSlotId: slotId,
@@ -7598,234 +8980,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
   },
 
   swapMovement: (oldMovementId, newMovementId, replacementSets) => {
-    const state = get();
-    const { sessionPlan, activeSessionPlanSlotId, session, runner, sessionMode, movements, profile } = state;
-    const slot = activeSessionPlanSlotId !== null
-      ? sessionPlan.find((candidate) => candidate.sessionPlanSlotId === activeSessionPlanSlotId)
-      : sessionPlan.find((candidate) => candidate.movementId === oldMovementId);
-    const replacement = movements.find((movement) => movement.movement_id === newMovementId);
-    if (slot === undefined || replacement === undefined) return;
-    const loggedSetsCount = session?.sets.filter((setRow) =>
-      setRow.session_plan_slot_id !== null
-        ? setRow.session_plan_slot_id === slot.sessionPlanSlotId
-        : setRow.movement_id === slot.movementId
-    ).length ?? 0;
-    if (
-      replacementSets !== undefined &&
-      (typeof replacementSets !== 'number' || !Number.isInteger(replacementSets) || replacementSets < 1 || replacementSets > 6)
-    ) {
-      return;
-    }
-    if (
-      loggedSetsCount > 0 &&
-      (typeof replacementSets !== 'number' || !Number.isInteger(replacementSets) || replacementSets < 1 || replacementSets > 6)
-    ) {
-      return;
-    }
-    if (!get().requireTrainingSupport('swap-movement', [oldMovementId, newMovementId],
-      `session:${session?.sessionId ?? 'draft'}:slot:${slot.sessionPlanSlotId}:movement:${oldMovementId}->${newMovementId}`)) return;
-    const accessContext = executionContextForState(state);
-    if (accessContext === null) {
-      set({ error: 'The active session access context cannot be verified. Reopen the session before editing it.' });
-      return;
-    }
-    const availability = capabilityMovementAvailability(
-      getDb(), movements, profile, accessContext,
-      new Set(state.activePriorExperienceMovementIds),
-      safetyExcludedMovementIdsFor(movements, profile, state.niggles),
-    )
-      .find((r) => r.movementId === newMovementId);
-    if (!permittedForProfile(replacement, profile, accessContext) || availability?.state !== 'available') {
-      set({ error: formatTeachingOnlyReason(availability) });
-      return;
-    }
-
-    const originalMv = slot.originalMovementId ?? slot.movementId;
-    const newProvKind: SlotProvenanceKind = slot.targetRpe !== null ? 'substituted' : slot.provenanceKind;
-
-    if (loggedSetsCount > 0 && session !== null) {
-      // A halted session stays stopped; refuse before any write.
-      if (runner?.phase === 'halted') return;
-      const chosenCount = replacementSets as number;
-      const d = getDb();
-      let newSlotId = 0;
-      let nextRunner = runner;
-      const retainedSets = retainedSetsForSwap(runner, slot.sessionPlanSlotId, loggedSetsCount);
-      d.executeSync('BEGIN');
-      try {
-        const originalSlotRow = rowsOf<{ slot_index: number }>(
-          d.executeSync(
-            'SELECT slot_index FROM session_plan_slot WHERE session_plan_slot_id = ?',
-            [slot.sessionPlanSlotId],
-          ),
-        )[0];
-        if (originalSlotRow === undefined) {
-          throw new Error('Target session slot is missing.');
-        }
-        // 075 (issue #144): keep the count planned before this swap. planned_sets
-        // below becomes the runner's count and the checkpoint check still reads it.
-        d.executeSync(
-          'INSERT OR IGNORE INTO session_plan_slot_planned_count (session_plan_slot_id, original_planned_sets) SELECT session_plan_slot_id, planned_sets FROM session_plan_slot WHERE session_plan_slot_id = ?',
-          [slot.sessionPlanSlotId],
-        );
-        d.executeSync(
-          'UPDATE session_plan_slot SET planned_sets = ? WHERE session_plan_slot_id = ?',
-          [retainedSets, slot.sessionPlanSlotId],
-        );
-        const laterSlots = rowsOf<{ session_plan_slot_id: number; slot_index: number }>(
-          d.executeSync(
-            'SELECT session_plan_slot_id, slot_index FROM session_plan_slot WHERE session_id = ? AND slot_index > ? ORDER BY slot_index DESC',
-            [session.sessionId, originalSlotRow.slot_index],
-          ),
-        );
-        for (const later of laterSlots) {
-          d.executeSync(
-            'UPDATE session_plan_slot SET slot_index = ? WHERE session_plan_slot_id = ?',
-            [later.slot_index + 1, later.session_plan_slot_id],
-          );
-        }
-        d.executeSync(
-          `INSERT INTO session_plan_slot (session_id, slot_index, movement_id, planned_sets, planned_reps, provenance_kind, target_rpe, source_planned_slot_id, original_movement_id, original_session_date, override_load_kg, override_reason)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [
-            session.sessionId,
-            originalSlotRow.slot_index + 1,
-            newMovementId,
-            chosenCount,
-            slot.plannedReps,
-            newProvKind,
-            slot.targetRpe,
-            slot.sourcePlannedSlotId,
-            originalMv,
-            slot.originalSessionDate,
-            slot.overrideLoadKg,
-            slot.overrideReason,
-          ],
-        );
-        newSlotId = rowsOf<{ id: number }>(d.executeSync('SELECT last_insert_rowid() AS id'))[0]!.id;
-        d.executeSync(
-          `INSERT INTO session_slot_target (session_plan_slot_id, target_kind, target_reps, target_seconds)
-           VALUES (?, ?, ?, ?)`,
-          [
-            newSlotId,
-            slot.target.kind,
-            slot.target.kind === 'reps' ? slot.target.reps : null,
-            slot.target.kind === 'time' ? slot.target.seconds : null,
-          ],
-        );
-        d.executeSync(
-          'INSERT INTO session_plan_slot_replacement (session_plan_slot_id, replaced_by_session_plan_slot_id) VALUES (?, ?)',
-          [slot.sessionPlanSlotId, newSlotId],
-        );
-        if (runner !== null) {
-          const origRunnerSlot = runner.slots.find((candidate) => candidate.sessionPlanSlotId === slot.sessionPlanSlotId);
-          nextRunner = replaceSlotAfterLoggedSets(runner, {
-            targetSessionPlanSlotId: slot.sessionPlanSlotId,
-            completedSets: retainedSets,
-            replacementSlot: {
-              sessionPlanSlotId: newSlotId,
-              plannedSlotId: slot.sourcePlannedSlotId,
-              movementId: newMovementId,
-              movementName: replacement.name,
-              sets: chosenCount,
-              target: slot.target,
-              targetRpe: origRunnerSlot?.targetRpe ?? slot.targetRpe ?? 8,
-            },
-            atMs: Date.now(),
-          });
-          if (sessionMode !== null) {
-            persistRunnerCheckpoint(d, session.sessionId, sessionMode, nextRunner);
-          }
-        }
-        d.executeSync('COMMIT');
-      } catch (error) {
-        try { d.executeSync('ROLLBACK'); } catch { /* no partial substitution */ }
-        set({ error: error instanceof Error ? error.message : String(error) });
-        return;
-      }
-
-      const newSlot: PlanSlot = {
-        sessionPlanSlotId: newSlotId,
-        movementId: newMovementId,
-        plannedSets: chosenCount,
-        plannedReps: slot.plannedReps,
-        target: slot.target,
-        provenanceKind: newProvKind,
-        targetRpe: slot.targetRpe,
-        sourcePlannedSlotId: slot.sourcePlannedSlotId,
-        originalMovementId: originalMv,
-        originalSessionDate: slot.originalSessionDate,
-        overrideLoadKg: slot.overrideLoadKg,
-        overrideReason: slot.overrideReason,
-        replacedBySessionPlanSlotId: null,
-      };
-      const nextPlan = sessionPlan.flatMap((candidate) =>
-        candidate.sessionPlanSlotId === slot.sessionPlanSlotId
-          ? [{ ...candidate, plannedSets: retainedSets, replacedBySessionPlanSlotId: newSlotId, originalPlannedSets: candidate.originalPlannedSets ?? candidate.plannedSets }, newSlot]
-          : [candidate],
-      );
-      set({
-        sessionPlan: nextPlan,
-        activeSessionPlanSlotId: newSlotId,
-        activeMovementId: newMovementId,
-        ...(nextRunner !== null ? runnerSelection(nextRunner) : {}),
-      });
-      return;
-    }
-
-    const nextPlan = sessionPlan.map((candidate) =>
-      candidate.sessionPlanSlotId === slot.sessionPlanSlotId
-        ? { ...candidate, movementId: newMovementId, provenanceKind: newProvKind, originalMovementId: originalMv }
-        : candidate,
-    );
-    let nextRunner = runner;
-    const current = runner === null ? null : currentRunnerSlot(runner);
-    const runnerSlotIndex = runner?.slots.findIndex((candidate) => candidate.sessionPlanSlotId === slot.sessionPlanSlotId) ?? -1;
-    if (runner !== null && runnerSlotIndex >= 0) {
-      const throughSubstitution = current?.sessionPlanSlotId === slot.sessionPlanSlotId &&
-        runner.substitutionOfferedForSessionPlanSlotId === slot.sessionPlanSlotId
-        ? advanceSessionRunner(runner, {
-            kind: 'SUBSTITUTE', atMs: Date.now(), movementId: newMovementId, movementName: replacement.name,
-          })
-        : runner;
-      // Self-directed mode may replace a future slot. Keep the durable runner
-      // snapshot in lockstep even when its cursor is elsewhere.
-      nextRunner = throughSubstitution === runner
-        ? {
-            ...runner,
-            slots: runner.slots.map((candidate) => candidate.sessionPlanSlotId === slot.sessionPlanSlotId
-              ? { ...candidate, movementId: newMovementId, movementName: replacement.name }
-              : candidate),
-            updatedAtMs: Date.now(),
-          }
-        : throughSubstitution;
-    }
-
-    if (session !== null) {
-      const d = getDb();
-      d.executeSync('BEGIN');
-      try {
-        d.executeSync(
-          `UPDATE session_plan_slot
-           SET movement_id = ?, provenance_kind = ?, original_movement_id = ?
-           WHERE session_plan_slot_id = ?`,
-          [newMovementId, newProvKind, originalMv, slot.sessionPlanSlotId],
-        );
-        if (nextRunner !== null && sessionMode !== null) {
-          persistRunnerCheckpoint(d, session.sessionId, sessionMode, nextRunner);
-        }
-        d.executeSync('COMMIT');
-      } catch (error) {
-        try { d.executeSync('ROLLBACK'); } catch { /* no partial substitution */ }
-        set({ error: error instanceof Error ? error.message : String(error) });
-        return;
-      }
-    }
-    set({
-      sessionPlan: nextPlan,
-      activeMovementId: newMovementId,
-      ...(nextRunner !== null ? runnerSelection(nextRunner) : {}),
-    });
+    executeSlotSwap(oldMovementId, newMovementId, replacementSets);
   },
   setMovementPreference: (movementId, preference) => {
     const d = getDb();
@@ -7847,94 +9002,10 @@ export const useStore = create<KineticsStore>()((set, get) => {
   },
 
   openSubstitution: (targetMovementId) => {
-    const state = get();
-    const { movements, profile, block } = state;
-    const target = movements.find((m) => m.movement_id === targetMovementId);
-    if (target === undefined) return false;
-    const activeTargetSlot = state.activeSessionPlanSlotId !== null
-      ? state.sessionPlan.find((slot) => slot.sessionPlanSlotId === state.activeSessionPlanSlotId)
-      : undefined;
-    const targetSlot = activeTargetSlot?.movementId === targetMovementId
-      ? activeTargetSlot
-      : state.sessionPlan.find((slot) => slot.movementId === targetMovementId);
-    if (!get().requireTrainingSupport('substitution-preview', [targetMovementId],
-      `session:${state.session?.sessionId ?? `draft-${state.today}`}:slot:${targetSlot?.sessionPlanSlotId ?? 'pending'}:movement:${targetMovementId}`)) return false;
-    // Re-read today's niggles from 011 so a midnight crossing while the app sat
-    // foregrounded (no AppState 'active' -> no rolloverDay) can't feed the
-    // engine yesterday's niggles. set() is synchronous, so get().niggles below
-    // is the fresh set.
-    get().refreshNiggles();
-    const d = getDb();
-    const today = localToday();
-    const byId = new Map(movements.map((m) => [m.movement_id, m]));
-    const accessContext = executionContextForState(get());
-    if (accessContext === null) {
-      set({ error: 'The active session access context cannot be verified. Reopen the session before substituting.' });
-      return false;
-    }
-    // The reported-area exclusion is the only safety filter that removes
-    // candidates before the engine sees them. Keep its set so the empty sheet
-    // can tell whether it removed anything (see heldByReportedArea below).
-    const priorExperience = new Set(get().activePriorExperienceMovementIds);
-    const safetyExcluded = safetyExcludedMovementIdsFor(movements, profile, get().niggles);
-    const capabilityAvailable = capabilityAvailableMovementIds(
-      d, movements, profile, accessContext, priorExperience, safetyExcluded,
-    );
-    // Candidate publication is one preview operation: capture decisive support
-    // rows once, then evaluate every candidate in memory. Actual substitutions
-    // still re-check through requireTrainingSupport at their tap/commit boundary.
-    const supportSnapshot = supportAdapter().captureEvaluation();
-    let futureRows: { row: { planned_slot_id: number; session_date: string; sets: number; day_index: number }; movement: Movement }[] = [];
-    let currentDayIndex = 0;
-    // Layer 2 (day-swap) needs the active block's later days. With no block,
-    // futureSlots stays empty and only Layer 1 (regression) can yield options.
-    if (block !== null) {
-      currentDayIndex = Number(
-        rowsOf<{ d: number }>(
-          d.executeSync('SELECT CAST(julianday(?) - julianday(?) AS INTEGER) AS d', [today, block.startDate]),
-        )[0]?.d ?? 0,
-      );
-      const rows = rowsOf<{
-        planned_slot_id: number; session_date: string; movement_id: number;
-        sets: number; day_index: number;
-      }>(
-        d.executeSync(
-          `SELECT sl.planned_slot_id, ps.session_date, sl.movement_id, sl.sets,
-                  CAST(julianday(ps.session_date) - julianday(?) AS INTEGER) AS day_index
-           FROM planned_slot sl
-           JOIN planned_session ps ON ps.planned_session_id = sl.planned_session_id
-           WHERE ps.block_id = ? AND ps.session_date > ?
-             AND sl.planned_slot_id NOT IN (SELECT planned_slot_id FROM planned_slot_disposition WHERE disposition = 'swapped')
-           ORDER BY ps.session_date, sl.slot_index`,
-          [block.startDate, block.blockId, today],
-        ),
-      );
-      futureRows = rows.flatMap((r) => {
-        const mv = byId.get(r.movement_id);
-        return mv === undefined ? [] : [{ row: r, movement: mv }];
-      });
-    }
-    const inputFor = (available: ReadonlySet<number>, niggles: readonly NiggleInput[]): SubstitutionInput => ({
-      target: toSubMovement(target, available),
-      library: movements.filter((movement) => supportSnapshot.evaluate(movementSupportTargets([movement.movement_id])).status === 'available')
-        .map((movement) => toSubMovement(movement, available)),
-      inventory: profile.equipment_inventory,
-      niggles, // active niggles drive the guardrail + Layer 3
-      futureSlots: futureRows
-        .filter(({ movement }) => supportSnapshot.evaluate(movementSupportTargets([movement.movement_id])).status === 'available')
-        .map(({ row, movement }): FutureSlot => ({
-          plannedSlotId: row.planned_slot_id,
-          dayIndex: row.day_index,
-          sessionDate: row.session_date,
-          movement: toSubMovement(movement, available),
-          sets: row.sets,
-        })),
-      currentDayIndex,
-      trainingAge: profile.training_age, // experience-weighted severity thresholds
-      accessContext,
-    });
+    const ctx = buildSubstitutionContext(targetMovementId);
+    if (ctx === null) return false;
     const offeredCount = (r: SubstitutionResult): number => r.layer1Regression.options.length + r.layer2DaySwap.options.length;
-    const result = computeSubstitutions(inputFor(capabilityAvailable, get().niggles));
+    const result = computeSubstitutions(ctx.inputFor(ctx.capabilityAvailable, get().niggles));
     // heldByReportedArea: the sheet shows only Layers 1 and 2. It is true only when
     // both are empty AND a read-only second run, with the reported-area exclusion
     // lifted and no niggles, would offer a Layer 1 or Layer 2 option. Layer 3 and
@@ -7942,10 +9013,224 @@ export const useStore = create<KineticsStore>()((set, get) => {
     // The second run's result is used for this boolean alone.
     let heldByReportedArea = false;
     if (offeredCount(result) === 0) {
-      const withoutArea = capabilityAvailableMovementIds(d, movements, profile, accessContext, priorExperience, new Set<number>());
-      heldByReportedArea = offeredCount(computeSubstitutions(inputFor(withoutArea, []))) > 0;
+      const withoutArea = capabilityAvailableMovementIds(ctx.d, ctx.movements, ctx.profile, ctx.accessContext, ctx.priorExperience, new Set<number>());
+      heldByReportedArea = offeredCount(computeSubstitutions(ctx.inputFor(withoutArea, []))) > 0;
     }
-    set({ substitution: { targetId: targetMovementId, result, heldByReportedArea } });
+    set({
+      substitution: {
+        targetId: targetMovementId,
+        targetSessionPlanSlotId: ctx.targetSlot?.sessionPlanSlotId ?? null,
+        result,
+        heldByReportedArea,
+        mode: 'discomfort',
+      },
+    });
+    return true;
+  },
+
+  openNeutralSwap: (targetMovementId) => {
+    const ctx = buildSubstitutionContext(targetMovementId);
+    if (ctx === null) return false;
+    const input = ctx.inputFor(ctx.capabilityAvailable, get().niggles);
+    const result = computeSubstitutions(input);
+    const neutralOptions = result.haltAdvised ? [] : computeNeutralSwapOptions(input);
+    let heldByReportedArea = false;
+    if (!result.haltAdvised && neutralOptions.length === 0) {
+      const withoutArea = capabilityAvailableMovementIds(ctx.d, ctx.movements, ctx.profile, ctx.accessContext, ctx.priorExperience, new Set<number>());
+      heldByReportedArea = computeNeutralSwapOptions(ctx.inputFor(withoutArea, [])).length > 0;
+    }
+    set({
+      substitution: {
+        targetId: targetMovementId,
+        targetSessionPlanSlotId: ctx.targetSlot?.sessionPlanSlotId ?? null,
+        result,
+        heldByReportedArea,
+        mode: 'neutral',
+        neutralOptions,
+      },
+    });
+    return true;
+  },
+
+  applyNeutralSwap: (targetMovementId, optionMovementId, cause, scope, replacementSets) => {
+    if (!NON_PATHOLOGICAL_SWAP_CAUSES.has(cause)) return false;
+    if (scope !== 'today_only' && scope !== 'rest_of_block') return false;
+    const preState = get();
+    const ctx = buildSubstitutionContext(targetMovementId);
+    if (ctx === null) return false;
+    const subInput = ctx.inputFor(ctx.capabilityAvailable, get().niggles);
+    const subCheck = computeSubstitutions(subInput);
+    if (subCheck.haltAdvised) return false;
+    const freshNeutralOptions = computeNeutralSwapOptions(subInput);
+    if (!freshNeutralOptions.some((opt) => opt.movement_id === optionMovementId)) return false;
+    const boundSlotId = preState.substitution?.targetId === targetMovementId
+      && preState.substitution.targetSessionPlanSlotId !== undefined
+      ? preState.substitution.targetSessionPlanSlotId
+      : preState.activeSessionPlanSlotId;
+    const targetSlot = boundSlotId !== null
+      ? preState.sessionPlan.find((candidate) => candidate.sessionPlanSlotId === boundSlotId)
+      : preState.sessionPlan.find((candidate) => candidate.movementId === targetMovementId);
+    if (targetSlot === undefined || targetSlot.movementId !== targetMovementId) return false;
+    const targetMovement = preState.movements.find((m) => m.movement_id === targetMovementId);
+    const optionMovement = preState.movements.find((m) => m.movement_id === optionMovementId);
+    if (targetMovement === undefined || optionMovement === undefined) return false;
+
+    const afterSlotWriteInTx = scope === 'rest_of_block'
+      ? (d: DB, swappedSlot: PlanSlot): void => {
+          const today = localToday();
+          const patternById = new Map(preState.movements.map((m) => [m.movement_id, m.pattern]));
+          const replacedIds = new Set<number>([targetMovementId]);
+          if (swappedSlot.originalMovementId !== null) replacedIds.add(swappedSlot.originalMovementId);
+
+          const sourceSlotRow = swappedSlot.sourcePlannedSlotId !== null
+            ? rowsOf<{ block_id: number; day_index: number; slot_index: number }>(
+                d.executeSync(
+                  `SELECT ps.block_id, ps.day_index, sl.slot_index
+                     FROM planned_slot sl
+                     JOIN planned_session ps ON ps.planned_session_id = sl.planned_session_id
+                    WHERE sl.planned_slot_id = ?`,
+                  [swappedSlot.sourcePlannedSlotId],
+                ),
+              )[0]
+            : undefined;
+
+          const originSessionRow = preState.session !== null
+            ? rowsOf<{ block_id: number; day_index: number }>(
+                d.executeSync(
+                  `SELECT ps.block_id, ps.day_index
+                     FROM session_origin so
+                     JOIN planned_session ps ON ps.planned_session_id = so.source_planned_session_id
+                    WHERE so.session_id = ?`,
+                  [preState.session.sessionId],
+                ),
+              )[0]
+            : undefined;
+
+          const activeBlockId = sourceSlotRow?.block_id ?? originSessionRow?.block_id ?? preState.block?.blockId ?? null;
+          const originDayIndex = sourceSlotRow?.day_index ?? originSessionRow?.day_index ?? null;
+          const originSlotIndex = sourceSlotRow?.slot_index ?? null;
+
+          if (activeBlockId !== null) {
+            const candidateSlots = rowsOf<{
+              planned_slot_id: number;
+              day_index: number;
+              slot_index: number;
+              movement_id: number;
+              reps: number;
+            }>(
+              d.executeSync(
+                `SELECT sl.planned_slot_id, ps.day_index, sl.slot_index, sl.movement_id, sl.reps
+                   FROM planned_slot sl
+                   JOIN planned_session ps ON ps.planned_session_id = sl.planned_session_id
+                  WHERE ps.block_id = ?
+                    AND ps.session_date >= ?
+                    AND NOT EXISTS (
+                      SELECT 1 FROM session_origin so
+                       WHERE so.source_planned_session_id = ps.planned_session_id
+                    )
+                    AND sl.planned_slot_id NOT IN (
+                      SELECT planned_slot_id FROM planned_slot_disposition WHERE disposition = 'swapped'
+                    )
+                  ORDER BY ps.session_date, sl.slot_index`,
+                [activeBlockId, today],
+              ),
+            );
+            for (const row of candidateSlots) {
+              if (row.movement_id === optionMovementId) continue;
+              const sameReplacedMovement = replacedIds.has(row.movement_id);
+              const sameSlotPattern =
+                originDayIndex !== null &&
+                originSlotIndex !== null &&
+                row.day_index === originDayIndex &&
+                row.slot_index === originSlotIndex &&
+                patternById.get(row.movement_id) === targetMovement.pattern;
+              if (!sameReplacedMovement && !sameSlotPattern) continue;
+
+              d.executeSync(
+                'UPDATE planned_slot SET movement_id = ? WHERE planned_slot_id = ?',
+                [optionMovementId, row.planned_slot_id],
+              );
+              const targetForRow = targetForMovement(optionMovement, row.reps);
+              d.executeSync(
+                `INSERT INTO planned_slot_target (planned_slot_id, target_kind, target_reps, target_seconds)
+                 VALUES (?, ?, ?, ?)
+                 ON CONFLICT(planned_slot_id) DO UPDATE SET
+                   target_kind = excluded.target_kind,
+                   target_reps = excluded.target_reps,
+                   target_seconds = excluded.target_seconds`,
+                [
+                  row.planned_slot_id,
+                  targetForRow.kind,
+                  targetForRow.kind === 'reps' ? targetForRow.reps : null,
+                  targetForRow.kind === 'time' ? targetForRow.seconds : null,
+                ],
+              );
+              d.executeSync('DELETE FROM slot_override WHERE planned_slot_id = ?', [row.planned_slot_id]);
+              d.executeSync('DELETE FROM planned_slot_load_intent WHERE planned_slot_id = ?', [row.planned_slot_id]);
+            }
+
+            // Update 033 training_program_movement_preference ONLY when cause === 'preference'.
+            if (cause === 'preference') {
+              const programRow = rowsOf<{ program_id: number }>(
+                d.executeSync(
+                  `SELECT p.program_id
+                     FROM training_block_program tbp
+                     JOIN training_program p ON p.program_id = tbp.program_id
+                    WHERE tbp.block_id = ? AND p.status = 'active'`,
+                  [activeBlockId],
+                ),
+              )[0];
+              const programId = programRow?.program_id ?? preState.program?.programId ?? null;
+              if (programId !== null && originDayIndex !== null) {
+                const dayExists = rowsOf<{ ok: number }>(
+                  d.executeSync(
+                    'SELECT 1 AS ok FROM training_program_day WHERE program_id = ? AND day_index = ?',
+                    [programId, originDayIndex],
+                  ),
+                )[0];
+                const existingPref = rowsOf<{ slot_index: number }>(
+                  d.executeSync(
+                    'SELECT slot_index FROM training_program_movement_preference WHERE program_id = ? AND day_index = ? AND (movement_id = ? OR movement_id = ?) LIMIT 1',
+                    [programId, originDayIndex, targetMovementId, swappedSlot.originalMovementId ?? targetMovementId],
+                  ),
+                )[0];
+                const resolvedSlotIndex = existingPref?.slot_index ?? originSlotIndex;
+                if (dayExists !== undefined && resolvedSlotIndex !== null && resolvedSlotIndex >= 1 && resolvedSlotIndex <= 5) {
+                  d.executeSync(
+                    'DELETE FROM training_program_movement_preference WHERE program_id = ? AND day_index = ? AND movement_id = ? AND slot_index <> ?',
+                    [programId, originDayIndex, optionMovementId, resolvedSlotIndex],
+                  );
+                  d.executeSync(
+                    `INSERT INTO training_program_movement_preference
+                       (program_id, day_index, slot_index, pattern, movement_id)
+                     VALUES (?, ?, ?, ?, ?)
+                     ON CONFLICT(program_id, day_index, slot_index) DO UPDATE SET
+                       pattern = excluded.pattern,
+                       movement_id = excluded.movement_id`,
+                    [programId, originDayIndex, resolvedSlotIndex, targetMovement.pattern, optionMovementId],
+                  );
+                }
+              }
+            }
+          }
+        }
+      : undefined;
+
+    const swapped = executeSlotSwap(
+      targetMovementId,
+      optionMovementId,
+      replacementSets,
+      { cause, scope },
+      { boundSessionPlanSlotId: boundSlotId, afterSlotWriteInTx },
+    );
+    if (!swapped) return false;
+
+    if (scope === 'rest_of_block') {
+      get().refreshBlock();
+      get().refreshProgram();
+    }
+
+    set({ substitution: null });
     return true;
   },
 
@@ -8047,29 +9332,17 @@ export const useStore = create<KineticsStore>()((set, get) => {
   },
 
   applyRegression: (targetMovementId, optionMovementId, replacementSets) => {
-    const loggedSetsCount = get().session?.sets.filter((setRow) => {
-      const { sessionPlan, activeSessionPlanSlotId } = get();
-      const slot = activeSessionPlanSlotId !== null
-        ? sessionPlan.find((candidate) => candidate.sessionPlanSlotId === activeSessionPlanSlotId)
-        : sessionPlan.find((candidate) => candidate.movementId === targetMovementId);
-      if (slot === undefined) return false;
-      return setRow.session_plan_slot_id !== null
-        ? setRow.session_plan_slot_id === slot.sessionPlanSlotId
-        : setRow.movement_id === slot.movementId;
-    }).length ?? 0;
-    if (
-      replacementSets !== undefined &&
-      (typeof replacementSets !== 'number' || !Number.isInteger(replacementSets) || replacementSets < 1 || replacementSets > 6)
-    ) {
-      return;
-    }
-    if (
-      loggedSetsCount > 0 &&
-      (typeof replacementSets !== 'number' || !Number.isInteger(replacementSets) || replacementSets < 1 || replacementSets > 6)
-    ) {
-      return;
-    }
-    get().swapMovement(targetMovementId, optionMovementId, replacementSets);
+    const sub = get().substitution;
+    const boundSlotId = sub?.targetId === targetMovementId && sub.targetSessionPlanSlotId !== undefined
+      ? sub.targetSessionPlanSlotId
+      : undefined;
+    executeSlotSwap(
+      targetMovementId,
+      optionMovementId,
+      replacementSets,
+      { cause: 'joint_discomfort', scope: 'today_only' },
+      boundSlotId !== undefined ? { boundSessionPlanSlotId: boundSlotId } : undefined,
+    );
     set({ substitution: null });
   },
 
@@ -8104,12 +9377,17 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const futureSlotInfo = rowsOf<{
       target_rpe: number | null; movement_id: number; session_date: string; reps: number;
       target_kind: string | null; target_reps: number | null; target_seconds: number | null;
+      backoff_sets: number | null; backoff_reps: number | null;
+      backoff_target_rpe: number | null; backoff_load_multiplier: number | null;
     }>(d.executeSync(
       `SELECT sl.target_rpe, sl.movement_id, ps.session_date, sl.reps,
-              pst.target_kind, pst.target_reps, pst.target_seconds
+              pst.target_kind, pst.target_reps, pst.target_seconds,
+              psb.sets AS backoff_sets, psb.reps AS backoff_reps,
+              psb.target_rpe AS backoff_target_rpe, psb.load_multiplier AS backoff_load_multiplier
        FROM planned_slot sl
        JOIN planned_session ps ON ps.planned_session_id = sl.planned_session_id
        LEFT JOIN planned_slot_target pst ON pst.planned_slot_id = sl.planned_slot_id
+       LEFT JOIN planned_slot_backoff psb ON psb.planned_slot_id = sl.planned_slot_id
        WHERE sl.planned_slot_id = ?`,
       [option.plannedSlotId]
     ))[0];
@@ -8123,6 +9401,18 @@ export const useStore = create<KineticsStore>()((set, get) => {
       futureSlotInfo?.reps ?? 5,
     );
     const movedReps = movedTarget.kind === 'reps' ? movedTarget.reps : null;
+    const movedBackOff: PlannedSlotBackOff | undefined =
+      futureSlotInfo !== undefined
+      && futureSlotInfo.backoff_sets !== null && futureSlotInfo.backoff_reps !== null
+      && futureSlotInfo.backoff_target_rpe !== null && futureSlotInfo.backoff_load_multiplier !== null
+      && movedTarget.kind === 'reps'
+        ? {
+            sets: futureSlotInfo.backoff_sets,
+            reps: futureSlotInfo.backoff_reps,
+            targetRpe: futureSlotInfo.backoff_target_rpe,
+            loadMultiplier: futureSlotInfo.backoff_load_multiplier,
+          }
+        : undefined;
 
     const overrideRow = rowsOf<{ target_load_kg: number; reason: string | null }>(d.executeSync(
       'SELECT target_load_kg, reason FROM slot_override WHERE planned_slot_id = ?',
@@ -8156,6 +9446,9 @@ export const useStore = create<KineticsStore>()((set, get) => {
       let newSlotId = 0;
       let nextRunner = runner;
       const retainedSets = retainedSetsForSwap(runner, targetSlot.sessionPlanSlotId, loggedSetsCount);
+      const daySwapLoggedBackOff = movedBackOff !== undefined && chosenCount > 1
+        ? { ...movedBackOff, sets: Math.min(movedBackOff.sets, chosenCount - 1) }
+        : undefined;
       d.executeSync('BEGIN');
       try {
         d.executeSync(
@@ -8223,9 +9516,34 @@ export const useStore = create<KineticsStore>()((set, get) => {
             movedTarget.kind === 'time' ? movedTarget.seconds : null,
           ],
         );
+        if (daySwapLoggedBackOff !== undefined) {
+          d.executeSync(
+            `INSERT INTO session_slot_backoff (session_plan_slot_id, sets, reps, target_rpe, load_multiplier)
+             VALUES (?, ?, ?, ?, ?)`,
+            [
+              newSlotId,
+              daySwapLoggedBackOff.sets,
+              daySwapLoggedBackOff.reps,
+              daySwapLoggedBackOff.targetRpe,
+              daySwapLoggedBackOff.loadMultiplier,
+            ],
+          );
+        }
         d.executeSync(
           'INSERT INTO session_plan_slot_replacement (session_plan_slot_id, replaced_by_session_plan_slot_id) VALUES (?, ?)',
           [targetSlot.sessionPlanSlotId, newSlotId],
+        );
+        d.executeSync(
+          `INSERT INTO session_slot_swap_cause
+             (session_plan_slot_id, cause, scope, replaced_movement_id, replaced_by_session_plan_slot_id, recorded_at_ms)
+           VALUES (?, 'joint_discomfort', 'today_only', ?, ?, ?)
+           ON CONFLICT(session_plan_slot_id) DO UPDATE SET
+             cause = excluded.cause,
+             scope = excluded.scope,
+             replaced_movement_id = excluded.replaced_movement_id,
+             replaced_by_session_plan_slot_id = excluded.replaced_by_session_plan_slot_id,
+             recorded_at_ms = excluded.recorded_at_ms`,
+          [targetSlot.sessionPlanSlotId, targetMovementId, newSlotId, Date.now()],
         );
         if (runner !== null) {
           const origRunnerSlot = runner.slots.find((slot) => slot.sessionPlanSlotId === targetSlot.sessionPlanSlotId);
@@ -8268,6 +9586,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
         overrideLoadKg: overrideLoad,
         overrideReason: overrideReason,
         replacedBySessionPlanSlotId: null,
+        backOff: daySwapLoggedBackOff,
       };
       const nextPlan = sessionPlan.flatMap((slot) =>
         slot.sessionPlanSlotId === targetSlot.sessionPlanSlotId
@@ -8287,6 +9606,9 @@ export const useStore = create<KineticsStore>()((set, get) => {
     }
 
     const movedSets = Math.max(1, Math.round(option.setsConserved));
+    const daySwapUnloggedBackOff = movedBackOff !== undefined && movedSets > 1
+      ? { ...movedBackOff, sets: Math.min(movedBackOff.sets, movedSets - 1) }
+      : undefined;
     const nextPlan = sessionPlan.map((slot) =>
       slot.sessionPlanSlotId === targetSlot.sessionPlanSlotId
         ? {
@@ -8302,6 +9624,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
             originalSessionDate: originDate,
             overrideLoadKg: overrideLoad,
             overrideReason: overrideReason,
+            backOff: daySwapUnloggedBackOff,
           }
         : slot
     );
@@ -8364,6 +9687,32 @@ export const useStore = create<KineticsStore>()((set, get) => {
              target_seconds = excluded.target_seconds`,
           [targetSlot.sessionPlanSlotId, movedTarget.kind, movedTarget.kind === 'reps' ? movedTarget.reps : null, movedTarget.kind === 'time' ? movedTarget.seconds : null],
         );
+        d.executeSync(
+          `INSERT INTO session_slot_swap_cause
+             (session_plan_slot_id, cause, scope, replaced_movement_id, replaced_by_session_plan_slot_id, recorded_at_ms)
+           VALUES (?, 'joint_discomfort', 'today_only', ?, NULL, ?)
+           ON CONFLICT(session_plan_slot_id) DO UPDATE SET
+             cause = excluded.cause,
+             scope = excluded.scope,
+             replaced_movement_id = excluded.replaced_movement_id,
+             replaced_by_session_plan_slot_id = NULL,
+             recorded_at_ms = excluded.recorded_at_ms`,
+          [targetSlot.sessionPlanSlotId, targetMovementId, Date.now()],
+        );
+        d.executeSync('DELETE FROM session_slot_backoff WHERE session_plan_slot_id = ?', [targetSlot.sessionPlanSlotId]);
+        if (daySwapUnloggedBackOff !== undefined) {
+          d.executeSync(
+            `INSERT INTO session_slot_backoff (session_plan_slot_id, sets, reps, target_rpe, load_multiplier)
+             VALUES (?, ?, ?, ?, ?)`,
+            [
+              targetSlot.sessionPlanSlotId,
+              daySwapUnloggedBackOff.sets,
+              daySwapUnloggedBackOff.reps,
+              daySwapUnloggedBackOff.targetRpe,
+              daySwapUnloggedBackOff.loadMultiplier,
+            ],
+          );
+        }
         if (nextRunner !== null && sessionMode !== null) {
           persistRunnerCheckpoint(d, session.sessionId, sessionMode, nextRunner);
         }
@@ -8513,14 +9862,6 @@ export const useStore = create<KineticsStore>()((set, get) => {
     }
 
     const d = getDb();
-    let provKind: SlotProvenanceKind = planSlot?.provenanceKind ?? 'free_form';
-    const rawTarget = planSlot?.targetRpe ?? null;
-    const rpeSafetyCap = state.prescription?.vector.rpe_cap ?? 10.0;
-    const provTarget: number | null = rawTarget !== null ? Math.min(rawTarget, rpeSafetyCap) : null;
-    const provSlotId: number | null = planSlot?.sourcePlannedSlotId ?? null;
-    if (provTarget === null && provKind !== 'added') provKind = 'free_form';
-    if (provTarget !== null && provKind === 'free_form') provKind = 'added';
-
     const setIndex = planSlot !== undefined
       ? (rowsOf<{ next: number }>(d.executeSync(
           `SELECT COUNT(*) + 1 AS next
@@ -8531,6 +9872,25 @@ export const useStore = create<KineticsStore>()((set, get) => {
           'SELECT COALESCE(MAX(set_index), 0) + 1 AS next FROM set_record WHERE session_id = ? AND movement_id = ?',
           [s.sessionId, movementId],
         ))[0]?.next ?? 1);
+    const activeBackOff =
+      planSlot?.backOff !== undefined
+      && planSlot.backOff.sets > 0
+      && setIndex >= 2
+      && setIndex <= 1 + planSlot.backOff.sets
+      && planSlot.target.kind === 'reps'
+        ? planSlot.backOff
+        : undefined;
+    const effectiveDose: SlotTarget | null = activeBackOff !== undefined
+      ? { kind: 'reps', reps: activeBackOff.reps }
+      : prescribedDose;
+
+    let provKind: SlotProvenanceKind = planSlot?.provenanceKind ?? 'free_form';
+    const rawTarget = activeBackOff?.targetRpe ?? (planSlot?.targetRpe ?? null);
+    const rpeSafetyCap = state.prescription?.vector.rpe_cap ?? 10.0;
+    const provTarget: number | null = rawTarget !== null ? Math.min(rawTarget, rpeSafetyCap) : null;
+    const provSlotId: number | null = planSlot?.sourcePlannedSlotId ?? null;
+    if (provTarget === null && provKind !== 'added') provKind = 'free_form';
+    if (provTarget !== null && provKind === 'free_form') provKind = 'added';
 
     const applied = (appliedPrefixes ?? []).filter((prefix, index, all) => all.indexOf(prefix) === index);
     const conds = applied.length > 0
@@ -8551,16 +9911,19 @@ export const useStore = create<KineticsStore>()((set, get) => {
          VALUES (?, ?, ?, ?, ?, ?)`,
         [setId, planSlot?.sessionPlanSlotId ?? null, provKind, provTarget, provSlotId, loggedAtMs],
       );
-      if (prescribedDose !== null) {
-        d.executeSync(
-          'INSERT INTO set_dose_target (set_id, target_kind, target_reps, target_seconds) VALUES (?, ?, ?, ?)',
-          [
-            setId,
-            prescribedDose.kind,
-            prescribedDose.kind === 'reps' ? prescribedDose.reps : null,
-            prescribedDose.kind === 'time' ? prescribedDose.seconds : null,
-          ],
-        );
+      {
+        const prescribedDose: SlotTarget | null = effectiveDose;
+        if (prescribedDose !== null) {
+          d.executeSync(
+            'INSERT INTO set_dose_target (set_id, target_kind, target_reps, target_seconds) VALUES (?, ?, ?, ?)',
+            [
+              setId,
+              prescribedDose.kind,
+              prescribedDose.kind === 'reps' ? prescribedDose.reps : null,
+              prescribedDose.kind === 'time' ? prescribedDose.seconds : null,
+            ],
+          );
+        }
       }
       // 071: what the entry was seeded with. Same transaction as the set, so a
       // fault here rolls the set back with it; a missing or malformed seed
@@ -9184,9 +10547,14 @@ export const useStore = create<KineticsStore>()((set, get) => {
           'SELECT (SELECT count(*) FROM athlete_goal_observation)'
           + ' + (SELECT count(*) FROM session_preparation_item)'
           + ' + (SELECT count(*) FROM session_preparation)'
-          + ' + (SELECT count(*) FROM block_emphasis) AS c';
+          + ' + (SELECT count(*) FROM session_slot_backoff)'
+          + ' + (SELECT count(*) FROM planned_slot_backoff)'
+          + ' + (SELECT count(*) FROM training_program_meet_countdown)'
+          + ' + (SELECT count(*) FROM training_block_meet_meta)'
+          + ' + (SELECT count(*) FROM block_emphasis)'
+          + ' + (SELECT count(*) FROM activity_occurrence) AS c';
         had = rowsOf<{ c: number }>(d.executeSync(
-          'SELECT (SELECT count(*) FROM history_import_capability_evidence) + (SELECT count(*) FROM history_import_set) + (SELECT count(*) FROM history_import_session) + (SELECT count(*) FROM history_import) + (SELECT count(*) FROM import_readiness_daily) + (SELECT count(*) FROM bodyweight_daily) + (SELECT count(*) FROM movement_capability_attestation) + (SELECT count(*) FROM movement_prior_experience) + (SELECT count(*) FROM capability_session_evidence) + (SELECT count(*) FROM set_target) + (SELECT count(*) FROM session_runner_checkpoint) + (SELECT count(*) FROM session_slot_target) + (SELECT count(*) FROM planned_slot_disposition) + (SELECT count(*) FROM planned_slot_autopilot) + (SELECT count(*) FROM planned_slot_legacy_role_allowance) + (SELECT count(*) FROM planned_slot_routine_decision) + (SELECT count(*) FROM planned_slot_target) + (SELECT count(*) FROM planned_slot_load_intent) + (SELECT count(*) FROM planned_session_routine_context) + (SELECT count(*) FROM planned_session_method) + (SELECT count(*) FROM session_plan_slot) + (SELECT count(*) FROM session_origin) + (SELECT count(*) FROM set_prefix) + (SELECT count(*) FROM set_metric) + (SELECT count(*) FROM set_record) + (SELECT count(*) FROM set_dose_target) + (SELECT count(*) FROM session_note) + (SELECT count(*) FROM session_feel) + (SELECT count(*) FROM session_feel_extra_reason) + (SELECT count(*) FROM question_log) + (SELECT count(*) FROM report_severity) + (SELECT count(*) FROM slot_override) + (SELECT count(*) FROM planned_slot) + (SELECT count(*) FROM planned_session) + (SELECT count(*) FROM block_meta) + (SELECT count(*) FROM suspension_episode WHERE ended_at_ms IS NULL) + (SELECT count(*) FROM training_program_movement_preference) + (SELECT count(*) FROM training_program_day) + (SELECT count(*) FROM training_block_program) + (SELECT count(*) FROM training_program) + (SELECT count(*) FROM session) + (SELECT count(*) FROM session_outcome) + (SELECT count(*) FROM micro_cycle) + (SELECT count(*) FROM macro_cycle) + (SELECT count(*) FROM training_block) + (SELECT count(*) FROM suspension_episode_program) + (SELECT count(*) FROM block_suspension_origin) + (SELECT count(*) FROM subjective_report) + (SELECT count(*) FROM niggle) + (SELECT count(*) FROM one_rep_max) + (SELECT count(*) FROM return_checkin_ack) + (SELECT count(*) FROM hrv_daily) + (SELECT count(*) FROM resting_hr_daily) + (SELECT count(*) FROM sleep_daily) + (SELECT count(*) FROM spo2_daily) + (SELECT count(*) FROM spo2_sample) + (SELECT count(*) FROM mech_daily) + (SELECT count(*) FROM state_vector) AS c',
+          'SELECT (SELECT count(*) FROM history_import_capability_evidence) + (SELECT count(*) FROM history_import_set) + (SELECT count(*) FROM history_import_session) + (SELECT count(*) FROM history_import) + (SELECT count(*) FROM import_readiness_daily) + (SELECT count(*) FROM bodyweight_daily) + (SELECT count(*) FROM movement_capability_attestation) + (SELECT count(*) FROM movement_prior_experience) + (SELECT count(*) FROM capability_session_evidence) + (SELECT count(*) FROM set_target) + (SELECT count(*) FROM session_runner_checkpoint) + (SELECT count(*) FROM session_slot_target) + (SELECT count(*) FROM planned_slot_disposition) + (SELECT count(*) FROM planned_slot_autopilot) + (SELECT count(*) FROM planned_slot_athlete_override) + (SELECT count(*) FROM planned_slot_legacy_role_allowance) + (SELECT count(*) FROM planned_slot_routine_decision) + (SELECT count(*) FROM planned_slot_target) + (SELECT count(*) FROM planned_slot_load_intent) + (SELECT count(*) FROM planned_session_routine_context) + (SELECT count(*) FROM planned_session_method) + (SELECT count(*) FROM planned_session_focus_ext) + (SELECT count(*) FROM session_plan_slot) + (SELECT count(*) FROM session_slot_swap_cause) + (SELECT count(*) FROM session_origin) + (SELECT count(*) FROM set_prefix) + (SELECT count(*) FROM set_metric) + (SELECT count(*) FROM set_record) + (SELECT count(*) FROM set_dose_target) + (SELECT count(*) FROM session_note) + (SELECT count(*) FROM session_feel) + (SELECT count(*) FROM session_feel_extra_reason) + (SELECT count(*) FROM question_log) + (SELECT count(*) FROM report_severity) + (SELECT count(*) FROM slot_override) + (SELECT count(*) FROM planned_slot) + (SELECT count(*) FROM planned_session) + (SELECT count(*) FROM block_meta) + (SELECT count(*) FROM suspension_episode WHERE ended_at_ms IS NULL) + (SELECT count(*) FROM training_program_day_routine) + (SELECT count(*) FROM training_program_slot_override) + (SELECT count(*) FROM training_program_day_focus_ext) + (SELECT count(*) FROM training_program_schedule_mode) + (SELECT count(*) FROM training_program_movement_preference) + (SELECT count(*) FROM training_program_day) + (SELECT count(*) FROM training_block_program) + (SELECT count(*) FROM training_program) + (SELECT count(*) FROM session) + (SELECT count(*) FROM session_outcome) + (SELECT count(*) FROM micro_cycle) + (SELECT count(*) FROM macro_cycle) + (SELECT count(*) FROM training_block) + (SELECT count(*) FROM suspension_episode_program) + (SELECT count(*) FROM block_suspension_origin) + (SELECT count(*) FROM subjective_report) + (SELECT count(*) FROM niggle) + (SELECT count(*) FROM one_rep_max) + (SELECT count(*) FROM return_checkin_ack) + (SELECT count(*) FROM hrv_daily) + (SELECT count(*) FROM resting_hr_daily) + (SELECT count(*) FROM sleep_daily) + (SELECT count(*) FROM spo2_daily) + (SELECT count(*) FROM spo2_sample) + (SELECT count(*) FROM mech_daily) + (SELECT count(*) FROM state_vector_kinestrike) + (SELECT count(*) FROM state_vector) AS c',
         ))[0];
         hadModuleTables = rowsOf<{ c: number }>(d.executeSync(moduleTablesCountSql))[0];
         d.executeSync('BEGIN');
@@ -9216,6 +10584,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       d.executeSync('DELETE FROM session_slot_target');
       d.executeSync('DELETE FROM planned_slot_disposition');
       d.executeSync('DELETE FROM planned_slot_autopilot');
+      d.executeSync('DELETE FROM planned_slot_athlete_override');
       d.executeSync('DELETE FROM planned_slot_legacy_role_allowance');
       d.executeSync('DELETE FROM planned_slot_routine_decision');
       d.executeSync('DELETE FROM planned_slot_target');
@@ -9231,11 +10600,17 @@ export const useStore = create<KineticsStore>()((set, get) => {
       d.executeSync('DELETE FROM planned_slot_load_intent');
       d.executeSync('DELETE FROM planned_session_routine_context');
       d.executeSync('DELETE FROM planned_session_method');
+      d.executeSync('DELETE FROM planned_session_focus_ext');
       // 071 records, each before its parent. Named explicitly for the reason
       // given for preparation above: ids are reused once the parent is empty,
       // and an orphan surviving an FK-OFF reset would attach an old record to
       // new work.
       d.executeSync('DELETE FROM session_skipped_slot');
+      d.executeSync('DELETE FROM session_slot_swap_cause');
+      d.executeSync('DELETE FROM session_slot_backoff');
+      d.executeSync('DELETE FROM planned_slot_backoff');
+      d.executeSync('DELETE FROM training_program_meet_countdown');
+      d.executeSync('DELETE FROM training_block_meet_meta');
       d.executeSync('DELETE FROM session_plan_slot_planned_count');
       d.executeSync('DELETE FROM session_plan_slot_replacement');
       d.executeSync('DELETE FROM session_plan_slot');
@@ -9275,10 +10650,25 @@ export const useStore = create<KineticsStore>()((set, get) => {
       // 059 side-cars cascade from their OWN episode rather than being carried
       // off by a program or block parent.
       d.executeSync('DELETE FROM suspension_episode WHERE ended_at_ms IS NULL');
+      d.executeSync('DELETE FROM training_program_day_routine');
+      d.executeSync('DELETE FROM training_program_slot_override');
+      d.executeSync('DELETE FROM training_program_day_focus_ext');
+      d.executeSync('DELETE FROM training_program_schedule_mode');
       d.executeSync('DELETE FROM training_program_movement_preference');
       d.executeSync('DELETE FROM training_program_day');
       d.executeSync('DELETE FROM training_block_program');
       d.executeSync('DELETE FROM training_program');
+      // Activity ledger (#355): wipe recorded activity occurrences and their
+      // child rows, preserving recurring schedules (`activity_definition`,
+      // `activity_series`, `activity_flexibility_tag`). Fail closed any clinician
+      // support hold that pointed to a wiped occurrence.
+      d.executeSync('DELETE FROM recommendation_activity_basis');
+      d.executeSync('DELETE FROM activity_source_link');
+      d.executeSync('DELETE FROM activity_completion');
+      d.executeSync(
+        "UPDATE health_support_scope SET target_kind = 'unresolved', occurrence_id = NULL WHERE target_kind = 'activity_occurrence'",
+      );
+      d.executeSync('DELETE FROM activity_occurrence');
       d.executeSync('DELETE FROM session');
       // Same parent-first rule as set_dose_target.
       d.executeSync('DELETE FROM session_outcome');
@@ -9309,6 +10699,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       d.executeSync('DELETE FROM spo2_daily');
       d.executeSync('DELETE FROM spo2_sample');
       d.executeSync('DELETE FROM mech_daily');
+      d.executeSync('DELETE FROM state_vector_kinestrike');
       d.executeSync('DELETE FROM state_vector');
       d.executeSync('COMMIT');
       inTx = false;
@@ -9333,7 +10724,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       movementAvailabilityRevision: get().movementAvailabilityRevision + 1,
       prescription: null, substitution: null, lastTriage: null, niggles: [],
       returnCheckin: null,
-      block: null, blockMeta: null, blockSessions: [], todayPlan: null, program: null,
+      block: null, blockMeta: null, blockMeetMeta: null, blockSessions: [], todayPlan: null, program: null,
       blockEmphasis: null,
       lastEndedSessionId: null,
       // The open episode was just deleted above; leaving the field set would
@@ -9351,6 +10742,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
     // the same read every other surface here gets, and it is what makes the
     // in-memory value and the database agree after the wipe.
     get().refreshSuspension();
+    get().refreshActivityLedger();
     return ((had?.c ?? 0) + (hadModuleTables?.c ?? 0)) > 0;
     } finally {
       releaseLease();
@@ -9426,10 +10818,11 @@ export const useStore = create<KineticsStore>()((set, get) => {
         `SELECT so.session_id, so.outcome_kind, so.finalized_at_ms, so.origin_kind,
                 (SELECT COUNT(DISTINCT sr.movement_id) FROM set_record sr WHERE sr.session_id = so.session_id) AS exercise_count,
                 so.logged_set_count,
-                (SELECT MIN(ps.focus) FROM set_record sr
+                (SELECT MIN(COALESCE(psfe.focus, ps.focus)) FROM set_record sr
                    JOIN set_target st ON st.set_id = sr.set_id
                    JOIN planned_slot pl ON pl.planned_slot_id = st.source_planned_slot_id
                    JOIN planned_session ps ON ps.planned_session_id = pl.planned_session_id
+                   LEFT JOIN planned_session_focus_ext psfe ON psfe.planned_session_id = ps.planned_session_id
                   WHERE sr.session_id = so.session_id) AS focus
            FROM session_outcome so
           ORDER BY so.finalized_at_ms DESC LIMIT ?`,
@@ -9556,13 +10949,21 @@ const generateBlockFromStoredState = (args: {
   startDate: string;
   schemaType: SchemaType;
   macroBlockIndex: number;
+  scheduleMode?: ProgramScheduleMode;
   programDays: ProgramDayPreference[] | undefined;
+  introductoryWeek1?: boolean;
+  competitionDateOverride?: string | null;
+  includeCompletedBlockId?: number;
 }): {
   plan: BlockPlan;
   suspensionBeforeGeneration: ReturnType<typeof openSuspension>;
   blockEmphasisInput: ProgramEmphasis | null;
 } => {
-  const { d, profile, movements, niggles, priorExperience, today, startDate, schemaType, macroBlockIndex, programDays } = args;
+  const {
+    d, profile, movements, niggles, priorExperience, today, startDate,
+    schemaType, macroBlockIndex, scheduleMode, programDays, introductoryWeek1,
+    competitionDateOverride, includeCompletedBlockId,
+  } = args;
   const safetyExcluded = safetyExcludedMovementIdsFor(movements, profile, niggles);
   const capabilityAvailableWeightRoom = capabilityAvailableMovementIds(
     d, movements, profile, 'weight_room', priorExperience, safetyExcluded,
@@ -9574,6 +10975,13 @@ const generateBlockFromStoredState = (args: {
   // OW-001: the athlete's own declarations, read once and threaded in.
   const declaredIntents = readMovementLoadIntents(d);
   const powerNamesGenerate = powerPreferredMovementNames(d);
+  const longitudinalControl = readLongitudinalControlContext(d, {
+    profile,
+    movements,
+    macroBlockIndex,
+    introductoryWeek1,
+    ...(includeCompletedBlockId !== undefined ? { includeCompletedBlockId } : {}),
+  });
   const genMovements: GeneratorMovement[] = movements.map((m) => ({
     movement_id: m.movement_id,
     name: m.name,
@@ -9671,11 +11079,21 @@ const generateBlockFromStoredState = (args: {
     : null;
   const flawReport = detectFlaws(windowVectors, patternWindow, profile.training_age, autopilotGuardrail);
 
-  const blockEmphasisInput = programEmphasisFor(d, today);
+  const rawBlockEmphasisInput = programEmphasisFor(d, today);
   // Decision of 2026-10-13: a block generated while a suspension is open gets
   // no autopilot effort raise. It consumes no macro position (S6(b)), so the
   // per-position ceiling on raises would not count it. Read once here and
   // checked again at commit, where the block is attributed to the episode.
+  const sport = readSportProfile(d);
+  const effectiveCompetitionDate = competitionDateOverride !== undefined
+    ? competitionDateOverride
+    : (sport?.competitionDate ?? null);
+  const blockEmphasisInput = rawBlockEmphasisInput !== null && rawBlockEmphasisInput.sport !== null
+    ? {
+        ...rawBlockEmphasisInput,
+        sport: { ...rawBlockEmphasisInput.sport, competitionDate: effectiveCompetitionDate },
+      }
+    : rawBlockEmphasisInput;
   const suspensionBeforeGeneration = openSuspension(d);
   const plan = generateBlock({
     profile,
@@ -9684,10 +11102,14 @@ const generateBlockFromStoredState = (args: {
     schemaType,
     macroBlockIndex,
     autopilotRpeRaisePermitted: suspensionBeforeGeneration === null,
+    ...(scheduleMode === undefined ? {} : { scheduleMode }),
     programDays,
     flawReport,
+    longitudinalControl,
     powerPreferredMovementNames: powerNamesGenerate,
     ...(blockEmphasisInput === null ? {} : { emphasis: blockEmphasisInput }),
+    competitionDate: effectiveCompetitionDate,
+    sportId: sport?.sportId ?? null,
   });
   return { plan, suspensionBeforeGeneration, blockEmphasisInput };
 };
@@ -9703,6 +11125,23 @@ const plannedSessionStarted = (d: DB, plannedSessionId: number): boolean =>
  *  this day's context, and the capability check must make it available. startSession
  *  and Today both judge slots with this, so the conflict Today shows is the refusal
  *  Start would give. */
+const plannedSessionIsFromRoutine = (d: DB, plannedSessionId: number): boolean =>
+  rowsOf<{ planned_session_id: number }>(d.executeSync(
+    'SELECT planned_session_id FROM planned_session_method WHERE planned_session_id = ?',
+    [plannedSessionId],
+  )).length > 0
+  || rowsOf<{ hit: number }>(d.executeSync(
+    `SELECT 1 AS hit
+       FROM planned_session ps
+       JOIN training_block_program tbp ON tbp.block_id = ps.block_id
+       JOIN training_program_day_routine tpdr
+         ON tpdr.program_id = tbp.program_id AND tpdr.day_index = ps.day_index
+      WHERE ps.planned_session_id = ?
+      LIMIT 1`,
+    [plannedSessionId],
+  )).length > 0;
+
+/** One slot is outside the athlete's access boundary iff capability or profile access blocks it. */
 const slotOutsideAccessBoundary = (
   slot: { movementId: number },
   movements: readonly Movement[],
@@ -9715,7 +11154,52 @@ const slotOutsideAccessBoundary = (
     executionContext,
   ) || !capabilityAvailable.has(slot.movementId);
 
+const classifySlotsAccessConflict = (
+  slots: readonly { movementId: number }[],
+  movements: readonly Movement[],
+  profile: UserProfile,
+  executionContext: ExecutableMovementAccessContext,
+  verdicts: readonly MovementAvailability[],
+): 'equipment' | 'non_equipment' | null => {
+  const verdictById = new Map(verdicts.map((v) => [v.movementId, v]));
+  let hasEquipmentConflict = false;
+  for (const slot of slots) {
+    const movement = movements.find((m) => m.movement_id === slot.movementId);
+    if (!permittedForProfile(movement, profile, executionContext)) {
+      return 'non_equipment';
+    }
+    const verdict = verdictById.get(slot.movementId);
+    if (verdict === undefined || verdict.state !== 'available') {
+      if (
+        verdict === undefined
+        || verdict.reasons.length === 0
+        || verdict.reasons.some((reason) => reason !== 'equipment')
+      ) {
+        return 'non_equipment';
+      }
+      hasEquipmentConflict = true;
+    }
+  }
+  return hasEquipmentConflict ? 'equipment' : null;
+};
+
 /** The access boundary for a planned day, judged the same way startSession judges it. */
+const todayPlanAccessConflictReason = (
+  d: DB,
+  plan: Pick<TodayPlan, 'focus' | 'slots'>,
+  movements: readonly Movement[],
+  profile: UserProfile,
+  priorExperience: ReadonlySet<number>,
+  niggles: readonly NiggleInput[],
+): 'equipment' | 'non_equipment' | null => {
+  const executionContext = accessContextForBlockFocus(plan.focus as BlockFocus);
+  const verdicts = capabilityMovementAvailability(
+    d, movements, profile, executionContext, priorExperience,
+    safetyExcludedMovementIdsFor(movements, profile, niggles),
+  );
+  return classifySlotsAccessConflict(plan.slots, movements, profile, executionContext, verdicts);
+};
+
 const todayPlanOutsideAccessBoundary = (
   d: DB,
   plan: Pick<TodayPlan, 'focus' | 'slots'>,
@@ -9723,16 +11207,7 @@ const todayPlanOutsideAccessBoundary = (
   profile: UserProfile,
   priorExperience: ReadonlySet<number>,
   niggles: readonly NiggleInput[],
-): boolean => {
-  const executionContext = accessContextForBlockFocus(plan.focus as BlockFocus);
-  const capabilityAvailable = capabilityAvailableMovementIds(
-    d, movements, profile, executionContext, priorExperience,
-    safetyExcludedMovementIdsFor(movements, profile, niggles),
-  );
-  return plan.slots.some((slot) => slotOutsideAccessBoundary(
-    slot, movements, profile, executionContext, capabilityAvailable,
-  ));
-};
+): boolean => todayPlanAccessConflictReason(d, plan, movements, profile, priorExperience, niggles) !== null;
 
 /** Writes one planned session's slots, each with the attribution rows that go with it. */
 const insertPlannedSlots = (
@@ -9771,6 +11246,18 @@ const insertPlannedSlots = (
         [plannedSlotId, sl.autopilotDelta.rpe_delta, sl.autopilotDelta.set_delta, sl.autopilotDelta.reason],
       );
     }
+    if (sl.athleteOverride !== undefined) {
+      d.executeSync(
+        `INSERT INTO planned_slot_athlete_override (planned_slot_id, source, mrv_ceiling_sets, above_mrv)
+         VALUES (?, ?, ?, ?)`,
+        [
+          plannedSlotId,
+          sl.athleteOverride.source,
+          sl.athleteOverride.mrv_ceiling_sets,
+          sl.athleteOverride.above_mrv ? 1 : 0,
+        ],
+      );
+    }
     d.executeSync(
       `INSERT INTO planned_slot_target (planned_slot_id, target_kind, target_reps, target_seconds)
        VALUES (?, ?, ?, ?)`,
@@ -9781,5 +11268,12 @@ const insertPlannedSlots = (
         target.kind === 'time' ? target.seconds : null,
       ],
     );
+    if (sl.backOff !== undefined && target.kind === 'reps') {
+      d.executeSync(
+        `INSERT INTO planned_slot_backoff (planned_slot_id, sets, reps, target_rpe, load_multiplier)
+         VALUES (?, ?, ?, ?, ?)`,
+        [plannedSlotId, sl.backOff.sets, sl.backOff.reps, sl.backOff.targetRpe, sl.backOff.loadMultiplier],
+      );
+    }
   }
 };

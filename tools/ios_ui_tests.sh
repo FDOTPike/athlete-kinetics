@@ -12,6 +12,9 @@
 # published as annotations (job logs and artifacts are not reachable from
 # every reviewer environment).
 set -euo pipefail
+# Keep ONNX Runtime strictly offline in the simulator child environment too.
+export ORT_DISABLE_TELEMETRY=1
+export SIMCTL_CHILD_ORT_DISABLE_TELEMETRY=1
 XCTESTRUN="$1"; APP="$2"; BUNDLE_ID="$3"; OUT="$4"
 TESTS=(
   test1_onboardingNavigationAndAccessibility

@@ -6,11 +6,17 @@ export {
   archiveActiveTrainingBlock,
   insertTrainingProgram,
   linkTrainingBlockProgram,
+  mapBaseProgramFocus,
   updateTrainingProgramEndDate,
+  writeProgramAdvancedControl,
+  type BaseProgramFocus,
   type CreateProgramWrite,
   type ExecDb,
+  type ProgramAdvancedControlWrite,
   type ProgramDayWrite,
   type ProgramPreferenceWrite,
+  type ProgramRoutineDayWrite,
+  type ProgramSlotOverrideWrite,
 } from './programTx';
 export {
   DEMO_DAYS,

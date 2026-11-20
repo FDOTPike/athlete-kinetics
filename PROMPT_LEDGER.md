@@ -13207,3 +13207,164 @@ The appendix held the code around the read, every match for `0286` and "record o
   - `npm run verify:store`: ALL CHECKS PASSED.
   - Jest on `SessionSummarySkipped.test.js` and `SessionSummary.test.js`: 2 suites, 48 of 48 tests pass.
 - **Branch:** `claude/summary-skipped-2026-11-03`, PR #116 into `claude/beta-question-box-2026-10-28`.
+
+## Entry 0301 — 2026-11-16 · Stage A closed-beta fixes (#351–#358, Ruling Group 7)
+
+**Executor:** Stage A swarm worker in `stagea_fixes_351_358`, acting under owner rulings recorded in `RATIFIED_OWNER_RULINGS_GROUPS_1_TO_7.md` and Coordinator directives (`#11`, `#30`, `#38`).
+
+### Decisions & Scope
+
+- **#351 (`Option A`):** Extended `offersGrapplingDays` in `apps/mobile/src/screens/ProgramSetupScreen.tsx` to cover `SPORT_INFO[sport.sportId]?.family === 'grappling'` (`grappling_bjj`, `grappling_wrestling`, `grappling_judo`) and `sport.sportId === 'combat_mma'`.
+- **#352 (`Option A`):** Enabled `sessionTime.alternatives` and `sessionCapOverride` inside `Manage program` (`editing === true`) in `ProgramSetupScreen.tsx` with the ratified edit-mode captions; updated `updateProgramPreferences` in `apps/mobile/src/state/useStore.ts` to refuse `preview.plan.timeBudget.conflicts.length > 0` before writes and persist `session_duration_cap_min` to `athlete_profile` and store `profile`.
+- **#353:** Mapped `objectiveChangeText` and `profile-objective-confirmation` button/accessibility labels in `apps/mobile/src/screens/ProfileScreen.tsx` through `OBJECTIVE_LABEL`.
+- **#354:** Added `apps/mobile/src/state/accessConflictCopy.ts` exporting `NON_EQUIPMENT_ACCESS_CONFLICT_MESSAGE` and gave non-equipment rules (`tier`, `safety`, `capability`, or `!permittedForProfile`) precedence over equipment conflicts on `TodayScreen.tsx` and in `useStore.ts` (`todayPlanConflictReason`, `startSession`); allowed `updateTodayPlannedWorkout` to replace routine-frozen today sessions when outside the access boundary or on `training_age === 'beginner'`, clearing `planned_session_routine_context` and `planned_session_method`.
+- **#355 (`Option A`):** Preserved recurring `activity_definition`, `activity_series`, and `activity_flexibility_tag` rows across `resetTrainingData()` in `useStore.ts` while deleting `recommendation_activity_basis`, `activity_source_link`, `activity_completion`, resetting matching `health_support_scope` rows (`target_kind = 'unresolved', occurrence_id = NULL`), deleting `activity_occurrence`, adding `activity_occurrence` to `moduleTablesCountSql`, and calling `get().refreshActivityLedger()`.
+- **#356:** Synced external `ask/bank.json` to the 71-entry `apps/mobile/src/data/glossary.ts` glossary (`askVersion: "14"` preserved), regenerated `packages/inference/src/semantic/questionPhrases.ts` via `node scripts/verify-question-parity.mjs "<TrainingLMmodels>" --write-assets`, and verified parity (`196/196 identical outcomes`).
+- **#357:** Rendered `sessionFocusName(focus)` on `ProgramSetupScreen` Training days chips.
+- **#358:** Added `"version": "1.0.0-beta.1"` to `apps/mobile/app.json`, wired `ProfileScreen.tsx` footer text/accessibility label to `appJson.version`, and updated the XCUITest footer assertion in `apps/mobile/ios/AthleteKineticsUITests/AthleteKineticsUITests.swift`.
+
+### Gates & Evidence (`fix/android-351-358-stagea-rulings`)
+
+- Fail-first (`stagea_fail_first.txt`): `Test Suites: 9 failed, 9 total` / `Tests: 31 failed, 147 passed, 178 total` (`JEST_EXIT=1`, `PARITY_EXIT=1`).
+- Guard-break/restore (`stagea_guard_break.txt`): verified fail-on-break (`EXIT=1`) and byte-for-byte SHA-256 restore (`sha256 verified identical=true`, `EXIT=0`) across `#352`, `#354`, and `#351`.
+- Parity & full CI after final code/test edits (`stagea_verify_ci.txt`): `Question routing parity: 196/196 identical outcomes (lab c6cbef87435d0cfb9570cff1dc054c00d79d347c); sealed guard active.` (`PARITY_EXIT=0`), `verify:store SQL — 810/810 checks green`, routine templates checks (`16/16` green, `0 failed`), Jest `248/248` suites / `6815/6815` checks green (`VERIFY_CI_EXIT=0`).
+- **Branch:** `fix/android-351-358-stagea-rulings` stacked on `40c4dba9` (`fix/android-271-298-226-140-297-remaining-rulings`).
+## Entry 0301 — 2026-11-14 · Stage B Phase 1 (`WO-LONG-ENGINE-01`): V1 9-Month Longitudinal Autopilot Overlay
+
+**Status:** EVIDENCE CAPTURED (pure inference overlay + verification suite); NOT VERIFIED — production parameter tuple ratification pending empirical simulation artifact (`bench-longitudinal/results.json` absent on disk).
+
+### Summary
+
+- Implemented `packages/inference/src/longitudinalAutopilot.ts` and exported its public contract from `packages/inference/src/index.ts`:
+  - **Explicit Policy Gate (`LongitudinalAutopilotPolicy`):** Follows `completionAction.ts` by embedding zero module-level candidate threshold defaults (`kTrigger`, `swapWindowBlocks`, `mCadence`, `mClean`, `completionPolicy`); `null` or invalid policy fails closed to a neutral overlay (`policyApplied: false`).
+  - **Mechanism 1 (Cross-Block `073` Swap + Joint-Discomfort Memory):** Evaluates trailing `swapWindowBlocks` completed blocks, promoting a movement to `MOVEMENT_PREFERENCE.AVOID` (`-1`) and selecting its deterministic Layer 1 green regression (`selectSubstitution` wrapping `computeSubstitutions`) when joint-coupled swap/discomfort triggers reach `kTrigger`, while excluding `cause === 'equipment_busy'`, `matched_phrase_entry_id === 'equipment-improvised'`, `preference`, and `time`.
+  - **Mechanism 2 (Bounded Per-Pattern `MRV_p` in `[1, 10]` & Week-3 Cadence Modulator):** Bounds working-set ceilings strictly inside `[1, 10]` on working weeks, engages `-1` Week-3 working-set trim after `mCadence` consecutive Week-3 overreach blocks (reading policy observation-day floors rather than any literal), holds across neutral/interrupted blocks, preserves Week 4 deload and recovery sessions untouched across `MRV_p`, Week-3 trim, and substitutions, recomputes `BlockPlan.timeBudget` under `sessionTimeBudget` after projection, and steps back up by `+1` only after `mClean` consecutive clean `latent_headroom` blocks.
+  - **Boundary Clamps, Halt Propagation & Side-Channel Isolation:** Propagates `haltAdvised` fail-closed onto `LongitudinalAutopilotResult` (refusing non-recovery `BlockPlan` projection while `haltAdvised` is set), counts each historical macrocycle RPE boundary grant once at the block that applied it, enforces beginner `dLoad_p <= 1.0`, macrocycle positive RPE raise ceiling (`<= 2.5` across positions `1..8`, `0.0` in `6..8`, `0.0` under open suspension, clean rollover at Macrocycle 2 position `1`), and byte-identical date-axis-aligned isolation from `acwr`, `072_question_log`, and KineStrike `ks_*` descriptive fields.
+- Added fail-first verification suite `packages/inference/test/verify_longitudinal_autopilot.mjs` (`21` checks) and wired it into `build:inference-test` and `verify:autopilot` in `package.json`.
+- **Branch:** `feat/v1-longitudinal-engine`.
+
+
+## Entry 0302 — 2026-11-16 · PR #359 Ruling Group 1 (`1.1` / `1.2` / `1.3`) & CodeRabbit Review Resolutions
+
+**Executor:** longitudinal engine implementation stream (`feat/v1-longitudinal-engine` -> `claude/beta-question-box-2026-10-28`).
+
+### Ratified Changes Implemented
+
+- **Ruling 1.1 (`DEFAULT_LONGITUDINAL_AUTOPILOT_POLICY` & `CompletionActionPolicy`):**
+  - Exported frozen `DEFAULT_LONGITUDINAL_AUTOPILOT_POLICY` from `packages/inference/src/longitudinalAutopilot.ts` and `packages/inference/src/index.ts` matching `{ kTrigger: 2, swapWindowBlocks: 3, mCadence: 2, mClean: 2, week3CompletionMinObservationDays: 2, completionPolicy: { minObservationDays: 5, deficitThreshold: 0.2, strongThreshold: 0.4, moderateSetReduction: -1, strongSetReduction: -2, strongLoadFactor: 0.95 } }`, while preserving fail-closed `policyApplied: false` behavior for `null` or invalid explicit `policy`.
+  - Extended `CompletionActionPolicy` (`packages/inference/src/completionAction.ts`) with optional `moderateSetReduction`, `strongSetReduction` (`-2 | -1 | 0`), and `strongLoadFactor` (`0 < x <= 1`) validated by exported `isValidCompletionActionPolicy`, preserving `-1` defaults when omitted and applying `-2` when supplied; widened `composeBlockBoundaryAction` `dSet_p` clamp from `[-1, 1]` to `[-2, 1]` (matching `SET_MODIFIER_LITERALS`).
+- **Ruling 1.2 (CodeRabbit thread `4565142005`):**
+  - Bounded `week3CompletionMinObservationDays` validation in `isValidLongitudinalAutopilotPolicy` to integers in `1..7` (`default: 2`), separating 7-day Week-3 overreach evaluation from 21-day `completionPolicy.minObservationDays` (`5`).
+- **Ruling 1.3 (CodeRabbit thread `4565142044`):**
+  - In `evaluateLongitudinalAutopilot`, resolved joints from `upcomingBlockNiggles` in `[triageMin, haltMin)` (`resolveUpcomingTriageJoints` using `JOINTS`) and clamped positive progression (`dLoad_p > 1.0 -> 1.0`, `dSet_p > 0 -> 0`, `dRpe_p > 0 -> 0`, `prefBias_p > 0 -> 0`) on patterns whose `PATTERN_JOINTS[p]` includes an affected joint (`clampActionForUpcomingNiggles`), recomputing `blockAddedSets`, `blockAddedRpe`, and `cumulativeMacrocycleRpeGranted` while leaving existing 21-day negative reductions intact without double negative pull-down.
+- **CodeRabbit `4c5c5b73` time-budget findings (`4566068336`, `4566068346` inside `longitudinalAutopilot.ts`):**
+  - `4566068336`: Marked `preserved = deloadSession || blockPlan.recovery` sessions non-trimmable (`trimmable: !locomotion && !preserved`) inside `applyLongitudinalOverlayToBlockPlan`.
+  - `4566068346`: Added optional `readonly blockInput?: BlockInput` to `ApplyLongitudinalOverlayOptions` and replaced unverified duration-only offers with `verifiedOverlayAlternatives` (`generateBlock` + `applyLongitudinalOverlayToBlockPlan(..., { ...options, blockInput: undefined })` checking `timeBudget.conflicts.length === 0`, or failing closed to `[]` when `blockInput` is absent).
+- **Evidence Capture (`EVIDENCE CAPTURED`):**
+  - Fail-first run recorded prior to `src/` edits (`pr359_fail_first.txt`: `COMPLETION_EXIT=1`, `3 COMPLETION ACTION CHECK(S) FAILED`; `LONGITUDINAL_EXIT=1`, `7 LONGITUDINAL AUTOPILOT CHECK(S) FAILED`).
+  - Guard break/restore demonstration recorded (`pr359_guard_break.txt`: `GUARD_BREAK_EXIT=1`, `3 LONGITUDINAL AUTOPILOT CHECK(S) FAILED`), followed by full restoration in `packages/inference/src/longitudinalAutopilot.ts`.
+  - Targeted unit/module suites verified green (`verify_completion_action.mjs` and `verify_longitudinal_autopilot.mjs`: `ALL 24 LONGITUDINAL AUTOPILOT CHECKS VERIFIED`), with final CI run (`npm run verify:ci`) executed after final edits.
+
+## Entry 0302 — 2026-11-14 · KineStrike Telemetry Bridge (`WO-KS-BRIDGE-01` #342 & `WO-KS-BRIDGE-02` #343)
+
+**Status:** EVIDENCE CAPTURED (pure telemetry bridge `#342` + additive `078` side-car migration & non-binding `SessionFeelPanel` advisory integration `#343`).
+
+### Summary
+
+- **`WO-KS-BRIDGE-01` (#342):** Implemented `packages/inference/src/kinestrikeBridge.ts` and exported its public surface from `packages/inference/src/index.ts` (zero `fs` / `sqlite` / React Native / BLE imports):
+  - Strict ASCII XOR NMEA checksum validator (`verifyNmeaChecksum`) and fixed-width 15-token `$PKSF,1` parser (`parsePksfSentence`), rejecting unknown talkers/versions, trailing/missing fields, out-of-range zone shares (`[0, 100]` and sum `<= 100.5`), negative/NaN fields, and unknown `fall_state` values.
+  - Pure summary accumulator (`summarizePksfSession`) returning an all-`null` row when zero valid strikes exist and populating `ks_*` summary fields otherwise.
+  - Pure sport-aware suggestion mapper (`suggestSessionFeelFromKineStrike`) honoring `KINESTRIKE_BRIDGE_DEFAULTS`, canonical `isSportId(sport)` validation, non-binding advisory `suggestedReasons` / `suggestedSubChips`, and deterministic fallback to empty suggestions.
+  - Added fail-first test suite `packages/inference/src/__tests__/kinestrikeBridge.test.ts` and root `jest.config.cjs`.
+- **`WO-KS-BRIDGE-02` (#343):**
+  - Added idempotent additive side-car migration `packages/core-db/src/schema/078_kinestrike_telemetry.sql` (`state_vector_kinestrike`, `STRICT, WITHOUT ROWID`, keyed by `date`), leaving `state_vector` and `004_state_vector_materialize.sql` untouched while registering ordinal `77` across `migrations.ts`, `migrationRunner.ts`, `MIGRATION_LINEAGE.json`, `MIGRATION_LINEAGE.md`, `schemaContract.ts` (`userVersion: 77`, `migrationSlot: 78`, `tableCount: 128`, `objectCount: 217`), `WO03_DURABLE_DATA_INVENTORY.md`, `useStore.ts` (`resetTrainingData`), `verify_store_sql.mjs` (display/reset-only; zero engine reads), `verify_migrations.mjs`, `verify_backup_contract.mjs`, `verify_blocks.mjs`, `verify_pipeline.mjs`, and `BackupForwardRestore.test.js`.
+  - Extended `apps/mobile/src/components/SessionFeelPanel.tsx` with optional backwards-compatible `suggestedReasonCodes` and `suggestedKineStrikeSubChips` props (`saved === null` pre-selection only, non-binding athlete toggle override, zero change to `onSave(feel, reasons)` signature) plus `apps/mobile/test/components/KineStrikeBridge02.test.js`.
+- **Branch:** `feat/kinestrike-bridge-v1`.
+
+### Owner Ruling Group 6 Resolution (PR #360, 2026-11-15)
+
+- **Ruling 6.1 (Option A — Decimal rounding slack provenance, CodeRabbit `4565526384`):** Explicitly ratified retaining `[0, 1.001]` per-share bounds, `[-1.001, 1.001]` CoP-X bounds, and `0.95..1.05` four-zone `B`-record share-sum tolerance in `packages/inference/src/kinestrikeBridge.ts` and `078_kinestrike_telemetry.sql` to tolerate `%.4f` float formatting quantization in `KineStrike_Final/firmware/ontarget_live_esp32/ontarget_live_esp32.ino` (matching `tools/ks_live_common.py`). Boundary acceptance and rejection tests added in `packages/inference/src/__tests__/kinestrikeBridge.test.ts`.
+- **Ruling 6.2 (Option C — Informational sub-chips + explicit pain tap only, CodeRabbit `4565526401`):**
+  - Removed telemetry `'pain'` emission from `evaluateKineStrikeFeelSuggestions` (`packages/inference/src/kinestrikeBridge.ts`) while preserving caller-compatible `thresholds` validation and non-pain `'soreness'` suggestions.
+  - Retained owner-ratified CoP-X thresholds in `KINESTRIKE_BRIDGE_DEFAULTS` (`copXMedialShiftWarn: 0.45`, `copXLateralGuardWarn: -0.35`, `peakLoadCvWarn: 0.18`, `gctDeltaPctWarn: 6.0`, `zHrvFatigueMax: -0.50`) and `deriveKineStrikeSubChips`.
+  - Added belt-and-suspenders guard (`reason !== 'pain'`) in `apps/mobile/src/components/SessionFeelPanel.tsx` `chooseFeel` so selecting `'harder'`, `'easier'`, or `'stopped_early'` never pre-selects `'pain'`; an explicit athlete tap on `session-feel-reason-pain` is required before `'pain'` is selected or persisted.
+
+## Entry 0303 — 2026-11-16 · Issue #208 (Ruling Group 5): Neutral Exercise Swap, Parity List & Scope Persistence
+
+**Status:** EVIDENCE CAPTURED
+
+**Scope & ratified rulings (`RATIFIED_OWNER_RULINGS_GROUPS_1_TO_7.md`, Ruling Group 5 — #208):**
+
+- **`Q1` (`A` for entry button, sheet copy, unselected chips, and parity ordering):**
+  - Entry quick-action button on active workout card alongside `"Report discomfort"` reads `"Swap exercise"` (with accessibility label `"Swap exercise: {name}"`), opening the neutral sheet `"Swap exercise"` with subtitle `"Pick an available exercise for the same movement pattern."`. Discomfort substitution flow (`"Report discomfort"` -> `openSubstitution`) remains untouched.
+  - Three reason chips start unselected (`null`): `"Equipment busy"` (`cause = 'equipment_busy'`), `"Prefer another exercise"` (`cause = 'preference'`), and `"Short on time"` (`cause = 'time'`).
+  - `computeNeutralSwapOptions` in `packages/inference/src/substitution.ts` ranks available same-pattern movements at matched difficulty first (`|tierDelta| === 0`, then `1`) with neutral row subtitle `"Same movement pattern · Uses your available equipment"` and zero biomechanical-regression copy.
+- **`Q2` (`C` for persistence scope & Phase 1 Mechanism 1 protection):**
+  - Two persistence buttons (`"For today only"` and `"For the rest of this block"`) stay disabled until both a reason chip and a candidate option are selected.
+  - `"For today only"` (`scope = 'today_only'`) updates only the active session (`session_plan_slot`, `073` `session_plan_slot_replacement` when sets > 0, and `078` `session_slot_swap_cause`).
+  - `"For the rest of this block"` (`scope = 'rest_of_block'`) updates the current session plus remaining unstarted `planned_slot` rows in the active `training_block`, and updates `033` `training_program_movement_preference` ONLY when `cause === 'preference'` (kept untouched for `'equipment_busy'` and `'time'`).
+  - Migration `078_session_slot_swap_cause.sql` (`ordinal: 77`, `userVersion: 77`, `migrationSlot: 78`, `128` durable tables, `217` schema objects) records `cause` and `scope` on `session_slot_swap_cause`. Neither `openNeutralSwap` nor `applyNeutralSwap` writes `-1` to `010` `movement_preference`, and `deriveAvoidPromotionsFromSwaps` skips all `NON_PATHOLOGICAL_SWAP_CAUSES` (`'equipment_busy'`, `'preference'`, `'time'`) so Mechanism 1 (`kTrigger`) promotes zero `Avoid (-1)` on neutral swaps.
+- **Evidence captured (`feat/v1-phase2-208-neutral-swap`):**
+  - Fail-first before implementation: `NEUTRAL_SWAP_VERIFY_FAILED (4 failure(s))` (`INFERENCE_EXIT=1`) and `SessionNeutralSwap208.test.js` 3/3 failed (`JEST_EXIT=1`).
+  - Guard break/restore (`packages/inference/src/substitution.ts` `isNonPathologicalSwapCause`): guard disabled -> `GUARD_BROKEN_INF_EXIT=1 GUARD_BROKEN_JEST_EXIT=1`; guard restored -> `GUARD_RESTORED_INF_EXIT=0 GUARD_RESTORED_JEST_EXIT=0`.
+  - Full CI (`npm run verify:ci`): `PREFLIGHT OK`, `verify:store SQL — 826/826 checks green`, `pipeline verification: 55 checks` green, `249/249` Jest suites (`6799/6799` tests) green, `VERIFY_CI_EXIT=0`.
+- **Branch:** `feat/v1-phase2-208-neutral-swap` -> `claude/beta-question-box-2026-10-28` (`Closes #208`).
+
+---
+
+## Entry 0304 — 2026-11-16 · Phase 2 Strength & Competitive Meet Programming (`#219`, `#229`, `question1`)
+
+**Executor:** `phase2-strength-meet` in `v1_phase2_219_229` (`feat/v1-phase2-219-229-strength-meet` targeting `claude/beta-question-box-2026-10-28`).
+
+### Input (Ratified Owner Rulings Summary)
+
+- **Group 2 (`#219`):**
+  - `Q1A`: Primary strength slots (`slot_index < 3` on `squat`, `push_h`, `hinge`, `push_v`) step `5 -> 4 -> 3` reps across Weeks 1–3 (`WAVE` keeps `[5,4,6]`) with `+0.5/week` RPE up to `base_rpe_cap`; primary `Deadlift` capped at `1` top set (`5 -> 4 -> 3`) + `2x5` back-off sets at `-7.5%` (`0.925`); accessory slots (`slot_index >= 3`, weighted) step `8 -> 8 -> 6` reps.
+  - `Q4` (`B`): Keep `3–4` movements (`~12–15` sets); treat `session_duration_cap_min` as an upper ceiling, not a quota to pad.
+- **Group 3 (`#229` + `question1`):**
+  - `Q1` (`A`): Backward meet-driven countdown (`volume -> intensity -> peak/taper`) ending on `competitionDate` (`1..224` days away); fallback to standard cycle when unset.
+  - `Q2` (`A`): Heavy top single (`@ RPE 8.0 -> 8.5 -> 9.0`, or `9.5` in peak W3 when `base_rpe_cap >= 9.5`) + `-10%` back-off sets for `advanced`/`elite` strength `volume`/`peak` Squat, Bench, Deadlift.
+  - `Q3` (`B`): Never schedule heavy Squat, Bench, and Deadlift all primary in the same session; weekly caps Deadlift `<= 2x`, Squat `<= 3x`, Bench `<= 4x`.
+  - `Q4` (`A`): Default `base_rpe_cap = 9.0`; `advanced`/`elite` may manually opt into `9.5` in Fine-tune; never default to `10.0`.
+  - `Q5` (`A`): Display `"Block {current} of {total} · {weeks} weeks to competition"` header on Plan while keeping the session list scoped to the active 4-week block.
+  - `Q6` (`A`): Single canonical competition/target date synced across Sport, Goal deadline, and Review horizon.
+  - `Q7` (`A`): Add `olympic_weightlifting` and `strongman` alongside `powerlifting` (`24` sports total, `matches_per_week 0..52`, zero outside sport practice load) with exact verbatim prompts: `"How long have you trained for competition?"`, `"Competitions a year"`, and `"Since this is your main lifting goal, we won't count your gym sessions twice as outside sport practice."`
+  - `Q8` (`B`): Keep the existing 11-item `EQUIPMENT_ITEMS` set untouched.
+  - `question1`: Separate extensible `sport_peaking_movement` catalog (`basketball` seeded with 3 entries; non-lifting fallback `"Sport-specific peaking movements for {sport} will be added over time."`).
+
+### Output
+
+- **Inference (`packages/inference/src/{sportProfile.ts,programEmphasis.ts,derivePrescription.ts,blockGenerator.ts,index.ts}`, tests in `packages/inference/test/{verify_phase2_strength_meet.mjs,verify_blocks.mjs,verify_emphasis.mjs,verify_pipeline.mjs,verify_r05.mjs}`):**
+  - Implemented `#219 Q1A/Q4`, `#229 Q1–Q8`, and `question1` catalog/countdown helpers (`resolveCompetitionCountdownHorizon`, `countdownMacroBlockIndex`, `computeBackOffLoadKg`, `isLiftingSport`, `SPORT_COMPETITIONS_PER_YEAR_MAX`, `sportPeakingMovementsFor`, `sportPeakingFallbackCopy`).
+  - `derivePrescription.ts` omits `backOff` (`undefined`) when eased `sets <= 1` (`set_modifier: -2` pin covered in `verify_phase2_strength_meet.mjs`); `verify_blocks.mjs [9b]` verifies weighted `'BB'` `5 -> 4 -> 3` primary / `8 -> 8 -> 6` accessory progression alongside `'Bodyweight'` flat-reps + rising-sets; `verify_r05.mjs` checks non-SBD invariance across both `minutes === 15` and `minutes === 90`.
+- **Database Migration & Lineage (`packages/core-db/src/schema/078_sport_peaking_and_lifting_taxonomy.sql`, `migrations.ts`, `migrationRunner.ts`, `backup/schemaContract.ts`, `MIGRATION_LINEAGE.{json,md}`, `docs/audits/accessible-coach/WO03_DURABLE_DATA_INVENTORY.md`, tests `verify_migrations.mjs`, `verify_backup_contract.mjs`, `verify_phase2_migration_078.mjs`):**
+  - Slot `078` (`ordinal: 77`, `userVersion: 77`, `132` durable tables, `221` backup contract objects): rebuilds `athlete_sport_profile` and `athlete_secondary_sport_profile` for `24` sports and `0..52` competition frequency, seeds `sport_peaking_movement`, and adds `planned_slot_backoff`, `session_slot_backoff`, `training_program_meet_countdown`, `training_block_meet_meta`.
+- **Store & UI (`apps/mobile/src/state/useStore.ts`, `components/{SportFields.tsx,SportPanel.tsx}`, `screens/{ProgramSetupScreen.tsx,BlockScreen.tsx,TodayScreen.tsx,SessionScreen.tsx}`, tests in `apps/mobile/test/{verify_store_sql.mjs,components/{Phase2StrengthMeet,BackupForwardRestore,OnboardingFocusGoal,SportEmphasisStore,SportProfileTaxonomy,SportScreens}.test.js}`):**
+  - Persisted/hydrated back-off side-cars, canonical Sport <-> Goal <-> Program competition date synchronization (preserving `competitionDate` across `continueTrainingProgram()`, and cleaning `training_block_meet_meta` + reverting program horizon to `'weeks'`/`NULL` when `competitionDate` is cleared to `null`), Plan countdown header (`Math.max(0, Math.ceil(daysUntilMeet / 7))`) + `sportId !== 'powerlifting'` peaking catalog display in both `BlockScreen` and `SportPanel`, `backOff.sets > 0` UI guards, Fine-tune RPE `9.5` opt-in (`program-rpe-cap-9-5`), and SessionScreen Set 2 `-10%` pre-fill + `set_dose_target` / `set_target` binding.
+- **Verification Evidence Captured (before amending commit `feat/v1-phase2-219-229-strength-meet`):**
+  - Fail-first baseline (`phase2_219_229_fail_first.txt`): `INFERENCE_EXIT=1` (`29 failed`), `MIGRATION_EXIT=1` (`7 failed`), `JEST_EXIT=1` (`7 failed`).
+  - Guard break/restore (`guard_broken.txt`, `guard_restored.txt`): bypassing `wouldMakeAllThree` in `blockGenerator.ts` failed `never schedules Squat + Bench + Deadlift all in same session` (`31 passed, 1 failed`, `GUARD_BROKEN_EXIT=1`), and restoring returned `GUARD_RESTORED_EXIT=0` (`32 passed, 0 failed`) plus `PHASE2_078_EXIT=0` (`9 passed, 0 failed`).
+  - Full verification (`phase2_219_229_verify_ci.txt`): `PHASE2_INF_EXIT=0` (`32 passed, 0 failed`), `R05_EXIT=0`, `PHASE2_078_EXIT=0` (`9 passed, 0 failed`), `PREFLIGHT OK`, `verify:store SQL — 830/830 checks green`, `pipeline verification: 55 checks passed`, `Test Suites: 249 passed, 249 total`, `Tests: 6808 passed, 6808 total`, `VERIFY_CI_EXIT=0`.
+
+## Entry 0304 — 2026-11-16 · Phase 2 `#228` (`Q1`/`Q2`/`Q3` + Ratified `#53` Linear Intro Week 1): Advanced Athlete Program Control
+
+**Executor:** `phase2-advanced-228` (`feat/v1-phase2-228-advanced-control`, stacked on `feat/v1-longitudinal-engine` `90926159c272c02ee6bff63e4e9a23770976af9c`).
+
+### Ratified Changes Implemented
+
+- **Q2 Extended Session Foci (`push`, `pull`, `legs`, `accessories`):**
+  - Added `'push'`, `'pull'`, `'legs'`, and `'accessories'` to `BlockFocus`, `FOCUS_PATTERNS`, `FOCUS_SCOPE_SLOT`, `STRENGTH_FOCI` (`push`, `pull`, `legs`), and `emphasisDayForFocus` (`push`/`pull -> 'upper'`, `legs -> 'lower'`, `accessories -> 'full'`) in `packages/inference/src/blockGenerator.ts`.
+  - Updated `apps/mobile/src/screens/ProgramSetupScreen.tsx` to render focus chips via `sessionFocusName(focus)` and map `FOCUS_SPLIT_WORD.accessories = 'accessory'`, `apps/mobile/src/screens/BlockScreen.tsx` `FOCUS_ABBREV` (`PSH`, `PUL`, `LEG`, `ACC`), and `apps/mobile/src/state/offPlanStart.ts` `FOCUS_WORD` (`accessories: 'accessory'`).
+- **Q3 Explicit Fixed `Mon–Sun` ISO Weekdays (`1 = Mon .. 7 = Sun`):**
+  - Defaulted `generateBlock` `scheduleMode` to `'iso_weekday'`, mapping each selected ISO weekday chronologically within each 7-day block week (`offsetInWeek = (isoWeekday - startIsoWeekday + 7) % 7`) and keeping `'relative_day_index'` fallback for pre-078 stored programs.
+  - Updated `ProgramSetupScreen.tsx` `3. Training days` to fixed `Mon`–`Sun` chips with exact caption `"Choose the days of the week you train. Your schedule repeats every week."`, and updated `BlockScreen.weekRowsFor` to align week grid cells by calendar `sessionDate`.
+- **Q1 + Ratified `#53` (`intermediate+` Customize Dose Controls, Routine-Day Assignment, `MRV_p` Precedence, Onboarding Tier Defaults & Linear Intro Week 1):**
+  - Updated `WEEK_DEFAULT_BY_AGE` in `apps/mobile/src/screens/OnboardingScreen.tsx` to `beginner: { days: 3, minutes: 45 }`, `intermediate: { days: 4, minutes: 60 }`, `advanced: { days: 5, minutes: 75 }`, `elite: { days: 6, minutes: 75 }` (and updated `apps/mobile/test/components/ProfileScreens.test.js` fixtures accordingly).
+  - Enabled per-slot `sets` (`1..10`), `reps` (`1..30`), `targetRpe` (`5.0..effectiveRpeCap` step `0.5`) overrides and per-day saved routine assignment (`Generated day` / `{routineName} · Day {d}`) across working Weeks `1..3` (with automated Week 4 deload scaling) for `intermediate`, `advanced`, and `elite` (`profile.training_age !== 'beginner'`), while preserving movement-swap-only enforcement and caption `"Customize changes movements only. Sets, reps and RPE stay coach-controlled."` for `beginner`.
+  - Wired `patternMrvSets[p]` from `evaluateLongitudinalAutopilot(..., DEFAULT_LONGITUDINAL_AUTOPILOT_POLICY)` into `apps/mobile/src/state/useStore.ts`: coach-generated / non-overridden slots clamp to `patternMrvSets[p]`; explicit athlete `Customize` dose overrides (`slot_overrides.sets`) and assigned routine slots hold up to `[1, 10]`, emit non-blocking note `"Above your recent recovery ceiling of {mrv} sets."`, and remain protected (`athleteOverride`) across `applyLongitudinalOverlayToBlockPlan` and `fitSessionToCap`.
+  - Implemented simplified linear Introductory Week 1 (`INTRO_WEEK_SESSIONS_BY_AGE = { beginner: 2, intermediate: 3, advanced: 4, elite: 5 }`) enabled via `introductoryWeek1: true` on Block 1 (`sequence_index === 1` / program creation & preview, leaving bare `generateBlock(...)` calls byte-identical): Week 1 trims uncustomized/unassigned extra sessions beyond the tier lower bound chronologically, reduces non-locomotion coach slot sets by `1` (`Math.max(2, sets - 1)`), caps `target_rpe` at `7.0`, emits non-blocking note `"Week 1 is an introductory week with lighter volume to gauge your work capacity before stepping up in Weeks 2 and 3."`, and steps linearly to full scheduled sessions and sets in Weeks `2–3` (`ProgramSetupScreen` `Customize` renders all scheduled days including Week-1-paused extra days; `SportEmphasisStore.test.js` checks Week 2 full upper-day allocation).
+- **Additive Schema Migration `078_advanced_program_control.sql`:**
+  - Added six `STRICT` additive side-car tables (`training_program_day_focus_ext`, `planned_session_focus_ext`, `training_program_schedule_mode`, `training_program_slot_override`, `training_program_day_routine`, `planned_slot_athlete_override`) with `078` shared persistence helper (`writeProgramAdvancedControl`, `mapBaseProgramFocus`) across `packages/core-db/` (`ordinal: 77`, `userVersion: 77`, `migrationSlot: 78`).
+- **Verification Scope (`EVIDENCE CAPTURED`):**
+  - Fail-first (`pr228_fail_first.txt`, `pr228_fail_first_db_and_jest.txt`, `pr228_fail_first_migrations.txt`, `pr228_fail_first_split_word.txt`), guard-break/restore (`pr228_guard_break.txt`, `pr228_guard_restored.txt`), and post-edit `npm run typecheck` + `npm run verify:ci` (`pr228_verify_ci.txt`, `pr228_verify_ci_final.txt`) captured outside git working tree.
+  - Note: Entry `0304` leaves `0303` available for sibling concurrent branch `#208` / PR `#366`, and migration slot `078` will be reconciled if PR `#366` merges to base prior to `#228`.

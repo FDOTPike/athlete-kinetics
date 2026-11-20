@@ -70,6 +70,10 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   // 064 is the shared neutral activity/support persistence contract. Feature
   // adapters are separate modules, but the real store database must migrate it.
   '064_accessible_coach_support.sql',
+  // 066 adds athlete_focus/athlete_goal and 067 adds athlete_sport_profile/block_emphasis,
+  // which 076 and 080 rebuild and foreign-key to.
+  '066_focus_and_goals.sql',
+  '067_sport_and_emphasis.sql',
   // 069 adds resting_hr_daily, which the store writes on every biometrics sync,
   // reads for measured history and empties on reset. It depends only on 001.
   '069_resting_heart_rate.sql',
@@ -86,7 +90,8 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   '074_session_feel_reasons.sql',
   // 075 adds session_plan_slot_planned_count, which the store writes when a swap
   // after logged sets overwrites planned_sets, and empties on reset and discard.
-  '075_session_plan_slot_planned_count.sql', '077_multisport_and_flexibility.sql'];
+  '075_session_plan_slot_planned_count.sql', '076_sport_taxonomy_expansion.sql', '077_multisport_and_flexibility.sql',
+  '078_kinestrike_telemetry.sql', '079_session_slot_swap_cause.sql', '080_sport_peaking_and_lifting_taxonomy.sql', '081_advanced_program_control.sql'];
 
 
 const db = new DatabaseSync(':memory:');
@@ -734,7 +739,9 @@ a('the ONLY write targets are forward plan/program tables plus weekly frequency'
       'training_block_program', 'planned_slot_autopilot', 'athlete_profile',
       // 059, both forward-plan side-cars: the suspension attribution for the
       // block being minted, and this plan's prospective per-slot load intent.
-      'block_suspension_origin', 'planned_slot_load_intent'].includes(m[1])));
+      'block_suspension_origin', 'planned_slot_load_intent',
+      // 078 forward-plan side-cars for extended foci and athlete Customize provenance.
+      'planned_session_focus_ext', 'planned_slot_athlete_override'].includes(m[1])));
 const hyd = stripComments((() => { const i = gnbRaw.indexOf('autopilot hydration'); const j = gnbRaw.indexOf('generateBlock({'); return i >= 0 && j > i ? gnbRaw.slice(i, j) : ''; })());
 a('n+1-free: a SINGLE grouped per-(date,pattern) set-aggregate read', (hyd.match(/GROUP BY s\.session_date, m\.pattern/g) || []).length === 1);
 a('bounded: the hydration issues a fixed, small number of reads (≤ 4 executeSync)', (() => { const n = (hyd.match(/executeSync/g) || []).length; return n >= 1 && n <= 4; })());
@@ -971,15 +978,17 @@ if (resetTables.length >= 15) {
   db.exec("INSERT INTO niggle (id,region,severity,reported_at_ms) VALUES ('rn1','knee',5,1000)");
   db.exec("INSERT INTO one_rep_max (movement_id,load_kg,updated_at_ms) VALUES (1,100,0)");
   db.exec("INSERT INTO training_block (block_id,start_date,objective,created_at_ms) VALUES (701,'2026-06-01','strength',0)");
-  db.exec("INSERT INTO planned_session (planned_session_id,block_id,week_index,day_index,focus,phase,session_date) VALUES (701,701,1,1,'lower','accumulation','2026-06-10')");
+  db.exec("INSERT INTO planned_session (planned_session_id,block_id,week_index,day_index,focus,phase,session_date) VALUES (701,701,1,1,'upper','accumulation','2026-06-10')");
+  db.exec("INSERT INTO planned_session_focus_ext (planned_session_id,focus) VALUES (701,'push')");
   db.exec("INSERT INTO planned_session_method (planned_session_id,schema_type,routine_template_id,template_name,frozen_at_ms) VALUES (701,'APRE',NULL,'Reset probe',0)");
   db.exec("INSERT INTO planned_slot (planned_slot_id,planned_session_id,slot_index,movement_id,sets,reps,target_rpe) VALUES (701,701,1,1,4,5,8.0)");
   db.exec("INSERT INTO planned_slot_autopilot (planned_slot_id,rpe_delta,set_delta,reason) VALUES (701,-0.5,-1,'eased')");
+  db.exec("INSERT INTO planned_slot_athlete_override (planned_slot_id,source,mrv_ceiling_sets,above_mrv) VALUES (701,'slot_override',6,1)");
   db.exec("INSERT INTO planned_slot_routine_decision (planned_slot_id,role,lift_family,stress_purpose,stress_coefficient,equivalent_volume,stress_dose,adaptations_json) VALUES (701,'supplementary',NULL,NULL,0,0,0,'[]')");
   db.exec("INSERT INTO planned_slot_legacy_role_allowance (planned_slot_id,role) VALUES (701,'supplementary')");
   db.prepare(MAT).run('2026-06-10'); // materializes a state_vector row (mech_daily already filled by trigger)
   const cnt = (t) => Number(db.prepare(`SELECT count(*) c FROM ${t}`).get().c);
-  const seeded = ['session', 'set_record', 'session_plan_slot', 'session_skipped_slot', 'set_load_shown', 'set_dose_target', 'session_outcome', 'set_prefix', 'niggle', 'one_rep_max', 'training_block', 'planned_session', 'planned_session_method', 'planned_slot', 'planned_slot_autopilot', 'planned_slot_routine_decision', 'planned_slot_legacy_role_allowance', 'mech_daily', 'state_vector'];
+  const seeded = ['session', 'set_record', 'session_plan_slot', 'session_skipped_slot', 'set_load_shown', 'set_dose_target', 'session_outcome', 'set_prefix', 'niggle', 'one_rep_max', 'training_block', 'planned_session', 'planned_session_focus_ext', 'planned_session_method', 'planned_slot', 'planned_slot_autopilot', 'planned_slot_athlete_override', 'planned_slot_routine_decision', 'planned_slot_legacy_role_allowance', 'mech_daily', 'state_vector'];
   a('seed populated the history tables', seeded.every((t) => cnt(t) > 0));
   const profBefore = cnt('athlete_profile'); const movBefore = cnt('movement');
   for (const t of resetTables) db.prepare(`DELETE FROM ${t}`).run(); // the store's exact sequence
@@ -2667,15 +2676,17 @@ console.log('[O3 fail-closed equipment inventory parsing]');
     })),
   });
 
-  const week1Sessions = plan.sessions.filter((s) => s.week_index === 1);
+  const week1Sessions = plan.sessions
+    .filter((s) => s.week_index === 1)
+    .sort((a, b) => a.day_index - b.day_index);
   const week1Focuses = week1Sessions.map((s) => ({ day: s.day_index, focus: s.focus }));
   check('generated planned_session rows carry the OVERRIDDEN focus, not default from programFocuses',
     week1Focuses.length === 5
-      && week1Focuses[0].focus === 'conditioning'
-      && week1Focuses[1].focus === 'full'
-      && week1Focuses[2].focus === 'bjj'
-      && week1Focuses[3].focus === 'upper'
-      && week1Focuses[4].focus === 'lower',
+      && week1Focuses[0].day === 1 && week1Focuses[0].focus === 'conditioning'
+      && week1Focuses[1].day === 2 && week1Focuses[1].focus === 'full'
+      && week1Focuses[2].day === 4 && week1Focuses[2].focus === 'bjj'
+      && week1Focuses[3].day === 5 && week1Focuses[3].focus === 'upper'
+      && week1Focuses[4].day === 6 && week1Focuses[4].focus === 'lower',
     JSON.stringify(week1Focuses));
 }
 
@@ -2731,6 +2742,61 @@ console.log('[R8 identity + offline posture (static sources)]');
   } else {
     a('MainActivity.getMainComponentName matches the JS-registered app.json name',
       false, 'MainActivity.kt not found');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// [#208] Neutral swap store contract + 078_session_slot_swap_cause invariants
+// ---------------------------------------------------------------------------
+console.log('[208 neutral swap + 078 session_slot_swap_cause SQL contract]');
+{
+  const openNeutralStart = src.indexOf('openNeutralSwap: (targetMovementId) => {');
+  const applyNeutralStart = src.indexOf('applyNeutralSwap: (targetMovementId,');
+  const closeSubStart = src.indexOf('closeSubstitution: () => set({ substitution: null })');
+  const openNeutralBody = openNeutralStart >= 0 && applyNeutralStart > openNeutralStart
+    ? src.slice(openNeutralStart, applyNeutralStart) : '';
+  const applyNeutralBody = applyNeutralStart >= 0 && closeSubStart > applyNeutralStart
+    ? src.slice(applyNeutralStart, closeSubStart) : '';
+  check(
+    'openNeutralSwap + applyNeutralSwap bodies located and NEVER touch 010 movement_preference (-1)',
+    openNeutralBody.includes('computeNeutralSwapOptions')
+      && openNeutralBody.includes("mode: 'neutral'")
+      && !/\bmovement_preference\b/.test(openNeutralBody)
+      && applyNeutralBody.includes('executeSlotSwap')
+      && applyNeutralBody.includes("cause === 'preference'")
+      && !/\bmovement_preference\b/.test(applyNeutralBody)
+      && !applyNeutralBody.includes('setMovementPreference'),
+  );
+
+  const prevFk = db.prepare('PRAGMA foreign_keys').get().foreign_keys;
+  db.exec('PRAGMA foreign_keys = ON');
+  db.exec('BEGIN');
+  try {
+    db.exec("INSERT INTO movement (movement_id,name,pattern,is_compound) VALUES (9901,'Swap Test Press A','push_h',1)");
+    db.exec("INSERT INTO movement (movement_id,name,pattern,is_compound) VALUES (9902,'Swap Test Press B','push_h',1)");
+    db.exec("INSERT INTO session (session_id,session_date,started_at_ms) VALUES (9901,'2026-11-01',1000)");
+    db.exec("INSERT INTO session_plan_slot (session_plan_slot_id,session_id,slot_index,movement_id,planned_sets,provenance_kind) VALUES (9901,9901,0,9901,3,'free_form')");
+
+    let rejectedCause = false;
+    try {
+      db.exec("INSERT INTO session_slot_swap_cause (session_plan_slot_id,cause,scope,replaced_movement_id,recorded_at_ms) VALUES (9901,'unknown_reason','today_only',9901,2000)");
+    } catch { rejectedCause = true; }
+    let rejectedScope = false;
+    try {
+      db.exec("INSERT INTO session_slot_swap_cause (session_plan_slot_id,cause,scope,replaced_movement_id,recorded_at_ms) VALUES (9901,'equipment_busy','forever',9901,2000)");
+    } catch { rejectedScope = true; }
+    a('078 CHECK constraints reject invalid cause and invalid scope', rejectedCause && rejectedScope);
+
+    db.exec("INSERT INTO session_slot_swap_cause (session_plan_slot_id,cause,scope,replaced_movement_id,recorded_at_ms) VALUES (9901,'equipment_busy','today_only',9901,2000)");
+    const row078 = db.prepare('SELECT cause, scope, replaced_movement_id FROM session_slot_swap_cause WHERE session_plan_slot_id = 9901').get();
+    a('078 inserts and reads back neutral swap cause + scope', row078?.cause === 'equipment_busy' && row078?.scope === 'today_only');
+
+    db.exec('DELETE FROM session_plan_slot WHERE session_plan_slot_id = 9901');
+    const afterCascade = db.prepare('SELECT COUNT(*) AS c FROM session_slot_swap_cause WHERE session_plan_slot_id = 9901').get().c;
+    a('078 cascades cleanly when parent session_plan_slot is deleted', afterCascade === 0);
+  } finally {
+    db.exec('ROLLBACK');
+    db.exec(`PRAGMA foreign_keys = ${prevFk ? 'ON' : 'OFF'}`);
   }
 }
 

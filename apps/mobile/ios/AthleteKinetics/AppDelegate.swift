@@ -19,6 +19,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
+    // Keep ONNX Runtime strictly offline on every launch (device and simulator)
+    // before any React Native module initializes Ort::Env.
+    setenv("ORT_DISABLE_TELEMETRY", "1", 1)
     #if targetEnvironment(simulator)
     resetUITestStorageIfRequested()
     #endif

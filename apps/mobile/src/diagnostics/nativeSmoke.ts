@@ -24,7 +24,8 @@
  * no athlete data is read or written.
  */
 import { Platform } from 'react-native';
-import { loadCodebase, triage, type PhraseCodebase } from '@ak/inference';
+import { loadCodebase, packVectors, triage, type PhraseCodebase } from '@ak/inference';
+import { routeQuestion, type QuestionIndex } from '../../../../packages/inference/src/semantic/questionRouter';
 import { BACKUP_SCHEMA_USER_VERSION, closeKineticsDb, migrate, openKineticsDb } from '@ak/core-db';
 import { tryCreateDeviceEmbedder } from '../inference/deviceEmbedder';
 import { useStore } from '../state/useStore';
@@ -113,11 +114,40 @@ export async function runNativeSmoke(): Promise<void> {
     const vector = await embedder.embed(entry.text);
     const norm = Math.sqrt(vector.reduce((sum, x) => sum + x * x, 0));
     const routed = triage(vector, codebase);
-    if (vector.length !== 384 || Math.abs(norm - 1) > 1e-3) throw new Error(`dims=${vector.length} norm=${norm}`);
+    if (vector.length !== 384 || !(Math.abs(norm - 1) <= 1e-3)) throw new Error(`dims=${vector.length} norm=${norm}`);
     if (!routed.confident || routed.entry?.id !== entry.id) {
       throw new Error(`routed ${routed.entry?.id ?? 'none'} (${routed.similarity.toFixed(4)}), expected ${entry.id}`);
     }
     return `dims=384 norm=${norm.toFixed(6)} routed=${entry.id} similarity=${routed.similarity.toFixed(6)}`;
+  });
+
+  await step(checks, 'question box inference + routing', async () => {
+    const embedder = await tryCreateDeviceEmbedder();
+    if (embedder === null) throw new Error('embedder unavailable (model missing from bundle or ORT failed to load)');
+    const asset = require('../../../../packages/inference/assets/question-vectors.json') as {
+      dim: number;
+      entryIds: string[];
+      vectors: number[][];
+    };
+    if (asset.dim !== 384 || asset.entryIds.length !== 1111 || asset.vectors.length !== 1111) {
+      throw new Error(
+        `unexpected question index shape: dim=${asset.dim} entryIds=${asset.entryIds.length} vectors=${asset.vectors.length}`,
+      );
+    }
+    const questionIndex: QuestionIndex = {
+      matrix: packVectors(asset.vectors, asset.dim),
+      entryIds: asset.entryIds,
+      dim: asset.dim,
+    };
+    const question = 'what is a deload week';
+    const vector = await embedder.embed(question);
+    const norm = Math.sqrt(vector.reduce((sum, x) => sum + x * x, 0));
+    if (vector.length !== 384 || !(Math.abs(norm - 1) <= 1e-3)) throw new Error(`dims=${vector.length} norm=${norm}`);
+    const routed = routeQuestion(question, vector, questionIndex);
+    if (routed.outcome !== 'DELOAD' || routed.shown[0] !== 'DELOAD') {
+      throw new Error(`routed outcome=${routed.outcome} shown=${JSON.stringify(routed.shown)}`);
+    }
+    return `dims=384 rows=1111 norm=${norm.toFixed(6)} routed=${routed.outcome} shown=${routed.shown.join(',')}`;
   });
 
   // The exact production entropy path of encrypted backups (no global polyfill

@@ -51,6 +51,8 @@ export const SPORTS = [
   "combat_boxing",
   "combat_mma",
   "powerlifting",
+  "olympic_weightlifting",
+  "strongman",
   "other",
   "racquet_tennis",
   "racquet_squash",
@@ -88,7 +90,9 @@ export const SPORT_INFO: Record<SportId, SportInfo> = {
   muay_thai: { label: "Muay Thai", family: "striking", distinction: "Muay Thai: punches, kicks, knees and elbows, with a clinch." },
   combat_boxing: { label: "Boxing", family: "striking", distinction: "Boxing: punches only, with footwork and trunk rotation; no kicks or clinch knees." },
   combat_mma: { label: "Mixed martial arts", family: "striking", distinction: "Mixed martial arts: striking plus cage wrestling and ground grappling, so both the striking and the grappling demands apply at once." },
-  powerlifting: { label: "Powerlifting", family: "strength", distinction: null },
+  powerlifting: { label: "Powerlifting", family: "strength", distinction: "squat, bench press and deadlift" },
+  olympic_weightlifting: { label: "Olympic weightlifting", family: "strength", distinction: "snatch and clean & jerk" },
+  strongman: { label: "Strongman", family: "strength", distinction: "events, carries and overhead" },
   other: { label: "Another sport", family: "other", distinction: null },
   racquet_tennis: { label: "Tennis", family: "racquet", distinction: "Tennis: a net divides a 23.77 m by 8.23 m singles court, there is no player-to-player contact and no elevated target; points are built from serves, groundstrokes and net approaches." },
   racquet_squash: { label: "Squash", family: "racquet", distinction: "Squash: two players share an enclosed four-wall court 9.75 m by 6.40 m and must hit the front wall above the tin, so the ball stays in play off the walls and rallies are continuous." },
@@ -163,6 +167,8 @@ export const SPORT_OUTCOMES_BY_SPORT: Record<SportId, readonly SportOutcomeId[]>
   combat_boxing: ["last_the_whole_game", "stay_available", "general_support"],
   combat_mma: ["strength_for_contact", "last_the_whole_game", "stay_available", "general_support"],
   powerlifting: ["bigger_competition_lifts", "general_support"],
+  olympic_weightlifting: ["general_support"],
+  strongman: ["general_support"],
   other: ["jump_higher", "faster_running", "strength_for_contact", "stay_available", "last_the_whole_game", "general_support"],
   racquet_tennis: ["faster_running", "stay_available", "last_the_whole_game", "general_support"],
   racquet_squash: ["faster_running", "stay_available", "last_the_whole_game", "general_support"],
@@ -198,8 +204,14 @@ export const isSportExperienceId = (value: unknown): value is SportExperienceId 
 // The profile
 // ---------------------------------------------------------------------------
 
+export const LIFTING_SPORT_IDS: readonly SportId[] = ['powerlifting', 'olympic_weightlifting', 'strongman'] as const;
+const LIFTING_SPORT_SET: ReadonlySet<string> = new Set(LIFTING_SPORT_IDS);
+export const isLiftingSport = (sportId: string | null | undefined): boolean =>
+  typeof sportId === 'string' && LIFTING_SPORT_SET.has(sportId);
+
 export const SPORT_OTHER_NAME_MAX = 40;
 export const SPORT_SESSIONS_PER_WEEK_MAX = 14;
+export const SPORT_COMPETITIONS_PER_YEAR_MAX = 52;
 export const SPORT_SESSION_MINUTES_MAX = 600;
 
 export interface SportProfileDraft {
@@ -276,8 +288,15 @@ export function validateSportProfile(draft: SportProfileDraft, today: string): S
   if (draft.practiceSessionsPerWeek !== null && !isCount(draft.practiceSessionsPerWeek, SPORT_SESSIONS_PER_WEEK_MAX)) {
     errors.push({ field: 'practiceSessionsPerWeek', message: `Enter practice sessions a week (0 to ${SPORT_SESSIONS_PER_WEEK_MAX}), or choose "Not sure".` });
   }
-  if (draft.matchesPerWeek !== null && !isCount(draft.matchesPerWeek, SPORT_SESSIONS_PER_WEEK_MAX)) {
-    errors.push({ field: 'matchesPerWeek', message: `Enter matches a week (0 to ${SPORT_SESSIONS_PER_WEEK_MAX}), or choose "Not sure".` });
+  const lifting = isLiftingSport(draft.sportId);
+  const competitionsMax = lifting ? SPORT_COMPETITIONS_PER_YEAR_MAX : SPORT_SESSIONS_PER_WEEK_MAX;
+  if (draft.matchesPerWeek !== null && !isCount(draft.matchesPerWeek, competitionsMax)) {
+    errors.push({
+      field: 'matchesPerWeek',
+      message: lifting
+        ? `Enter competitions a year (0 to ${SPORT_COMPETITIONS_PER_YEAR_MAX}), or choose "Not sure".`
+        : `Enter matches a week (0 to ${SPORT_SESSIONS_PER_WEEK_MAX}), or choose "Not sure".`,
+    });
   }
   if (draft.typicalSessionMinutes !== null
       && (!isCount(draft.typicalSessionMinutes, SPORT_SESSION_MINUTES_MAX) || draft.typicalSessionMinutes < 1)) {
@@ -703,7 +722,7 @@ const plural = (count: number, word: string, many = `${word}s`): string => `${co
  */
 export function resolveSportWorkload(input: {
   readonly scheduled: readonly ScheduledSportSession[];
-  readonly profile: Pick<SportProfile, 'practiceSessionsPerWeek' | 'matchesPerWeek' | 'typicalSessionMinutes'> | null;
+  readonly profile: (Pick<SportProfile, 'practiceSessionsPerWeek' | 'matchesPerWeek' | 'typicalSessionMinutes'> & { readonly sportId?: string | null }) | null;
 }): SportWorkload {
   if (input.scheduled.length > 0) {
     const known = input.scheduled.filter((session) => session.expectedDurationMin !== null);
@@ -717,6 +736,17 @@ export function resolveSportWorkload(input: {
       tier: sportWorkloadTier(sessionsPerWeek),
       // Named, so the athlete can see exactly what was counted.
       description: `${plural(sessionsPerWeek, 'weekly session')} in your Activities schedule (${[...new Set(input.scheduled.map((session) => session.label))].join(', ')})`,
+    };
+  }
+  if (isLiftingSport(input.profile?.sportId)) {
+    return {
+      source: 'none',
+      sessionsPerWeek: 0,
+      knownMinutesPerWeek: 0,
+      unknownDurationSessions: 0,
+      weekdays: [],
+      tier: 'none',
+      description: 'main lifting sessions are not counted twice as outside sport practice',
     };
   }
   const practice = input.profile?.practiceSessionsPerWeek ?? null;
@@ -800,13 +830,14 @@ export function resolveMultiSportWorkload(input: {
     assertSecondarySportAllowed(input.profiles[0].sportId, input.profiles[1].sportId);
   }
   const activeSports = [...new Set(input.profiles.map((profile) => profile.sportId))];
+  const nonLiftingProfiles = input.profiles.filter((profile) => !isLiftingSport(profile.sportId));
   let sessionsPerWeek: number;
   let source: SportWorkload['source'];
   if (input.scheduled.length > 0) {
     sessionsPerWeek = input.scheduled.length;
     source = 'schedule';
-  } else if (input.profiles.length > 0) {
-    sessionsPerWeek = input.profiles.reduce(
+  } else if (nonLiftingProfiles.length > 0) {
+    sessionsPerWeek = nonLiftingProfiles.reduce(
       (sum, profile) => sum + (profile.practiceSessionsPerWeek ?? 0) + (profile.matchesPerWeek ?? 0), 0);
     source = 'stated';
   } else {
@@ -814,7 +845,8 @@ export function resolveMultiSportWorkload(input: {
     source = 'none';
   }
   const tier = sportWorkloadTier(sessionsPerWeek);
-  const known = input.scheduled.filter((session) => session.expectedDurationMin !== null);
+  const effectiveScheduled = input.scheduled;
+  const known = effectiveScheduled.filter((session) => session.expectedDurationMin !== null);
   const endurancePlusContact = activeSports.some((sport) => ENDURANCE_SPORTS.has(sport))
     && activeSports.some((sport) => CONTACT_OR_COURT_SPORTS.has(sport));
   const strengthObjective = input.profiles.some((profile) => STRENGTH_OUTCOMES.has(profile.outcomeId));
@@ -825,8 +857,8 @@ export function resolveMultiSportWorkload(input: {
     source,
     sessionsPerWeek,
     knownMinutesPerWeek: known.reduce((sum, session) => sum + (session.expectedDurationMin ?? 0), 0),
-    unknownDurationSessions: input.scheduled.length - known.length,
-    weekdays: [...new Set(input.scheduled.map((session) => session.weekday))].sort((a, b) => a - b),
+    unknownDurationSessions: effectiveScheduled.length - known.length,
+    weekdays: [...new Set(effectiveScheduled.map((session) => session.weekday))].sort((a, b) => a - b),
     tier,
     description: sessionsPerWeek === 0
       ? 'no sport sessions recorded'
@@ -899,5 +931,67 @@ export function sportWorkloadEffect(workload: SportWorkload): SportWorkloadEffec
   }
 }
 
-/** A competition date is context only. This is the whole of what it is used for. */
-export const COMPETITION_DATE_NOTE = 'The date is used for reminders and for reviewing your goals. It does not make the plan peak, taper or test a maximum.';
+/** Ratified competition-date note: blocks count down to peak and taper for competition day and stay synced with goal review. */
+export const COMPETITION_DATE_NOTE = 'If you add a competition date, your blocks count down to peak and taper for competition day, and the date stays synced with your goal review.';
+
+// ---------------------------------------------------------------------------
+// Separate extensible per-sport peaking catalog (question1)
+// ---------------------------------------------------------------------------
+
+export const SPORT_PEAKING_CATEGORIES = [
+  'competition_simulation',
+  'sport_drill',
+  'high_intensity_cardio',
+] as const;
+export type SportPeakingCategory = (typeof SPORT_PEAKING_CATEGORIES)[number];
+
+export const SPORT_PEAKING_CATEGORY_LABEL: Record<SportPeakingCategory, string> = {
+  competition_simulation: 'Competition simulation',
+  sport_drill: 'Sport-specific movement drills',
+  high_intensity_cardio: 'High-intensity sport cardio',
+};
+
+export interface SportPeakingMovement {
+  readonly movementId: string;
+  readonly sportId: SportId;
+  readonly category: SportPeakingCategory;
+  readonly name: string;
+  readonly notes?: string;
+}
+
+export const SPORT_PEAKING_CATALOG: Record<SportId, readonly SportPeakingMovement[]> = {
+  basketball: [
+    { movementId: 'peaking_bball_mock_game', sportId: 'basketball', category: 'competition_simulation', name: 'Mock basketball game' },
+    { movementId: 'peaking_bball_movement_drills', sportId: 'basketball', category: 'sport_drill', name: 'Specific basketball movement drills' },
+    { movementId: 'peaking_bball_hi_cardio', sportId: 'basketball', category: 'high_intensity_cardio', name: 'High-intensity cardio' },
+  ],
+  court_netball: [],
+  football_association: [],
+  football_australian: [],
+  football_rugby: [],
+  football_american: [],
+  hockey_field: [],
+  hockey_ice: [],
+  grappling_bjj: [],
+  grappling_wrestling: [],
+  grappling_judo: [],
+  muay_thai: [],
+  combat_boxing: [],
+  combat_mma: [],
+  powerlifting: [],
+  olympic_weightlifting: [],
+  strongman: [],
+  other: [],
+  racquet_tennis: [],
+  racquet_squash: [],
+  racquet_pickleball: [],
+  running_sprinting: [],
+  running_endurance: [],
+  swimming: [],
+};
+
+export const sportPeakingMovementsFor = (sportId: string | null | undefined): readonly SportPeakingMovement[] =>
+  isSportId(sportId) ? SPORT_PEAKING_CATALOG[sportId] : [];
+
+export const sportPeakingFallbackCopy = (sportLabel: string): string =>
+  `Sport-specific peaking movements for ${sportLabel} will be added over time.`;

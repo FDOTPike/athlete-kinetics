@@ -535,9 +535,18 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
 
     expect(screen.queryByTestId('advanced-athlete-manager')).toBeNull();
     expect(screen.queryByTestId('advanced-tools-section')).toBeNull();
-    for (let i = 0; i < 7; i += 1) fireEvent.press(screen.getByLabelText('Build 0.1.0'));
+    for (let i = 0; i < 7; i += 1) fireEvent.press(screen.getByLabelText('Build 1.0.0-beta.1'));
     expect(mockState.setAdvancedToolsUnlocked).toHaveBeenCalledTimes(1);
     expect(mockState.setAdvancedToolsUnlocked).toHaveBeenCalledWith(true);
+  });
+
+  test('#358 footer build version matches apps/mobile/app.json without hardcoded 0.1.0', () => {
+    const appJson = require('../../app.json');
+    expect(appJson.version).toBe('1.0.0-beta.1');
+    render(<ProfileScreen />);
+    expect(screen.getByLabelText(`Build ${appJson.version}`)).toBeOnTheScreen();
+    expect(screen.getByText(`BUILD ${String(appJson.version).toUpperCase()}`)).toBeOnTheScreen();
+    expect(screen.queryByText(/0\.1\.0/)).toBeNull();
   });
 
   test('unlocked tools expose the sandbox Lab and explicit relock', () => {
@@ -698,7 +707,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     pressBack();
     fireEvent.press(screen.getByLabelText(/COMPETITIVE\./));
     pressNext();
-    expect(screen.getByLabelText('training days per week 4')).toBeOnTheScreen();
+    expect(screen.getByLabelText('training days per week 6')).toBeOnTheScreen();
     expect(screen.getByLabelText('minutes in a session, tops 75 min')).toBeOnTheScreen();
   });
 
@@ -710,12 +719,12 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     pressNext();
     expect(screen.getByLabelText('minutes in a session, tops 75 min')).toBeOnTheScreen();
     fireEvent.press(screen.getByLabelText('Increase training days per week'));
-    expect(screen.getByLabelText('training days per week 5')).toBeOnTheScreen();
+    expect(screen.getByLabelText('training days per week 6')).toBeOnTheScreen();
     expect(screen.queryByTestId('onboarding-week-suggestion')).toBeNull();
     pressBack();
     fireEvent.press(screen.getByLabelText(/NEW TO THIS\./));
     pressNext();
-    expect(screen.getByLabelText('training days per week 5')).toBeOnTheScreen();
+    expect(screen.getByLabelText('training days per week 6')).toBeOnTheScreen();
     expect(screen.getByLabelText('minutes in a session, tops 75 min')).toBeOnTheScreen();
   });
 
@@ -965,7 +974,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: GET STRONGER'));
     expect(mockState.saveProfile).not.toHaveBeenCalled();
     expect(screen.getByTestId('profile-objective-change-text').props.children)
-      .toBe('Change your objective from hybrid to strength? Your current block stays as it is. Your next block will be built for strength.');
+      .toBe('Change your objective from STRENGTH + GRAPPLING to GET STRONGER? Your current block stays as it is. Your next block will be built for GET STRONGER.');
     fireEvent.press(screen.getByTestId('profile-objective-keep'));
     expect(screen.queryByTestId('profile-objective-change-text')).toBeNull();
     expect(mockState.saveProfile).not.toHaveBeenCalled();
@@ -984,7 +993,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     render(<ProfileScreen />);
     fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: BUILD MUSCLE'));
     expect(screen.getByTestId('profile-objective-change-text').props.children)
-      .toBe('Change your objective from hybrid to hypertrophy? Your current block and the rest of your program stay hybrid. Hypertrophy is used when you build your next program.');
+      .toBe('Change your objective from STRENGTH + GRAPPLING to BUILD MUSCLE? Your current block and the rest of your program stay STRENGTH + GRAPPLING. BUILD MUSCLE is used when you build your next program.');
     // Tapping the chip that is already selected asks nothing.
     fireEvent.press(screen.getByTestId('profile-objective-keep'));
     fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: STRENGTH + GRAPPLING'));
@@ -1003,17 +1012,17 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     render(<ProfileScreen />);
     fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: GET EXPLOSIVE'));
     expect(screen.getByTestId('profile-objective-change-text').props.children)
-      .toBe('Change your objective from strength to power? Your current block and the rest of your program stay hybrid. Power is used when you build your next program.');
+      .toBe('Change your objective from GET STRONGER to GET EXPLOSIVE? Your current block and the rest of your program stay STRENGTH + GRAPPLING. GET EXPLOSIVE is used when you build your next program.');
   });
 
   // Owner ruling on #176: a program in review_due has finished; there is no
   // current block or rest of the program to keep the old objective.
   test('objectiveChangeText says a finished program has finished', () => {
     expect(objectiveChangeText('strength', 'hypertrophy', 'strength', false, false, true))
-      .toBe('Change your objective from strength to hypertrophy? Your program has finished. Your next program will be built for hypertrophy.');
+      .toBe('Change your objective from GET STRONGER to BUILD MUSCLE? Your program has finished. Your next program will be built for BUILD MUSCLE.');
     // A finished program wins over a block or archived blocks.
     expect(objectiveChangeText('strength', 'hypertrophy', 'strength', true, true, true))
-      .toBe('Change your objective from strength to hypertrophy? Your program has finished. Your next program will be built for hypertrophy.');
+      .toBe('Change your objective from GET STRONGER to BUILD MUSCLE? Your program has finished. Your next program will be built for BUILD MUSCLE.');
   });
 
   test('OBJECTIVE change when the program is due for review says the program has finished', () => {
@@ -1027,7 +1036,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     render(<ProfileScreen />);
     fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: BUILD MUSCLE'));
     expect(screen.getByTestId('profile-objective-change-text').props.children)
-      .toBe('Change your objective from strength to hypertrophy? Your program has finished. Your next program will be built for hypertrophy.');
+      .toBe('Change your objective from GET STRONGER to BUILD MUSCLE? Your program has finished. Your next program will be built for BUILD MUSCLE.');
   });
 
   test('OBJECTIVE change after earlier blocks ended does not call the next block the first', () => {
@@ -1035,7 +1044,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     render(<ProfileScreen />);
     fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: GET STRONGER'));
     expect(screen.getByTestId('profile-objective-change-text').props.children)
-      .toBe('Change your objective from hybrid to strength? Your next block will be built for strength.');
+      .toBe('Change your objective from STRENGTH + GRAPPLING to GET STRONGER? Your next block will be built for GET STRONGER.');
   });
 
   test('OBJECTIVE change with no block history still says first block', () => {
@@ -1043,7 +1052,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     render(<ProfileScreen />);
     fireEvent.press(screen.getByLabelText('1 · OBJECTIVE: GET STRONGER'));
     expect(screen.getByTestId('profile-objective-change-text').props.children)
-      .toBe('Change your objective from hybrid to strength? Your first block will be built for strength.');
+      .toBe('Change your objective from STRENGTH + GRAPPLING to GET STRONGER? Your first block will be built for GET STRONGER.');
   });
 
   test('a pending OBJECTIVE change is dropped when the athlete or profile slot changes', () => {

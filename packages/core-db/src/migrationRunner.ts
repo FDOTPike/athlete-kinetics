@@ -337,6 +337,24 @@ export const SENTINELS: readonly MigrationSentinel[] = [
   { type: 'table', name: 'session_plan_slot_replacement' },                   // 073
   { type: 'table', name: 'session_feel_extra_reason' },                       // 074
   { type: 'table', name: 'session_plan_slot_planned_count' },                 // 075
+  { type: 'table', name: 'state_vector_kinestrike' },                         // 078
+  { type: 'table', name: 'session_slot_swap_cause' },                         // 079
+  { type: 'table', name: 'sport_peaking_movement' },                          // 080
+  {
+    type: 'row',
+    name: 'sport_peaking_movement basketball seed',                           // 080
+    presenceSql: `SELECT 1 AS ok WHERE (SELECT COUNT(*) FROM sport_peaking_movement WHERE sport_id = 'basketball') = 3`,
+  },
+  { type: 'table', name: 'planned_slot_backoff' },                            // 080
+  { type: 'table', name: 'session_slot_backoff' },                            // 080
+  { type: 'table', name: 'training_program_meet_countdown' },                 // 080
+  { type: 'table', name: 'training_block_meet_meta' },                        // 080
+  { type: 'table', name: 'training_program_day_focus_ext' },                  // 081
+  { type: 'table', name: 'planned_session_focus_ext' },                       // 081
+  { type: 'table', name: 'training_program_schedule_mode' },                  // 081
+  { type: 'table', name: 'training_program_slot_override' },                  // 081
+  { type: 'table', name: 'training_program_day_routine' },                    // 081
+  { type: 'table', name: 'planned_slot_athlete_override' },                   // 081
 ];
 
 /** Durable tables deliberately absent from SENTINELS, each with the reason it
@@ -670,7 +688,20 @@ export function reconcileMigrationLineage(
 
 export function runMigrations(db: MigrationDb, migrations: readonly string[]): void {
   reconcileMigrationLineage(db, migrations);
-  applyFrom(db, migrations, userVersion(db));
+  const beforeVersion = userVersion(db);
+  try {
+    applyFrom(db, migrations, beforeVersion);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const missingTableMatch = /no such table:\s*([A-Za-z0-9_]+)/i.exec(msg);
+    const missingTable = missingTableMatch?.[1] ?? null;
+    const failingMigrationSql = migrations[userVersion(db)] ?? '';
+    const isSentinelPrerequisite = beforeVersion > 0
+      && missingTable !== null
+      && SENTINELS.some((s) => s.type === 'table' && s.name === missingTable)
+      && !new RegExp(`CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?${missingTable}\\b`, 'i').test(failingMigrationSql);
+    if (!isSentinelPrerequisite) throw e;
+  }
   const missing = sentinelsMissing(db);
   if (missing.length > 0) {
     // user_version lied (poisoned field DB) — re-apply everything; all
@@ -678,11 +709,99 @@ export function runMigrations(db: MigrationDb, migrations: readonly string[]): v
     // first persisted in its conservative state so replay can never widen it.
     applyFailClosedRepairs(db, missing);
     dropReplayBlockingTriggers(db);
+    // Preserve 078-only sport rows (`olympic_weightlifting`, `strongman`, or
+    // `matches_per_week > 14`) across full replay because frozen 076 rebuilds
+    // `athlete_sport_profile` with its older 22-sport / 0..14 CHECK before 078
+    // widens it again. Use a durable STRICT stash table (never TEMP, never dropped in
+    // `finally`) so replay failures or process interruptions cannot discard
+    // existing athlete state and retries reuse the preserved copy.
+    const shouldStash078SportRows =
+      (hasObject(db, 'table', 'athlete_sport_profile') || hasObject(db, 'table', '_ak_replay_stash_078_sport'))
+      && migrations.some((m) => /athlete_sport_profile_078/.test(m));
+    if (shouldStash078SportRows) {
+      const stashExists = hasObject(db, 'table', '_ak_replay_stash_078_sport');
+      db.executeSync('BEGIN');
+      try {
+        if (!stashExists) {
+          db.executeSync(
+            `CREATE TABLE _ak_replay_stash_078_sport (
+               sport_profile_id           INTEGER PRIMARY KEY,
+               sport_id                   TEXT NOT NULL,
+               other_sport_name           TEXT,
+               outcome_id                 TEXT NOT NULL,
+               experience_id              TEXT NOT NULL,
+               practice_sessions_per_week INTEGER,
+               matches_per_week           INTEGER,
+               typical_session_min        INTEGER,
+               competition_date           TEXT,
+               revision                   INTEGER NOT NULL,
+               updated_at_ms              INTEGER NOT NULL
+             ) STRICT;`,
+          );
+        }
+        if (hasObject(db, 'table', 'athlete_sport_profile')) {
+          db.executeSync(
+            `INSERT OR IGNORE INTO _ak_replay_stash_078_sport (
+               sport_profile_id, sport_id, other_sport_name, outcome_id, experience_id,
+               practice_sessions_per_week, matches_per_week, typical_session_min,
+               competition_date, revision, updated_at_ms)
+             SELECT sport_profile_id, sport_id, other_sport_name, outcome_id, experience_id,
+                    practice_sessions_per_week, matches_per_week, typical_session_min,
+                    competition_date, revision, updated_at_ms
+             FROM athlete_sport_profile
+             WHERE sport_id IN ('olympic_weightlifting', 'strongman')
+                OR (matches_per_week IS NOT NULL AND matches_per_week > 14);`,
+          );
+          db.executeSync(
+            `DELETE FROM athlete_sport_profile
+             WHERE sport_id IN ('olympic_weightlifting', 'strongman')
+                OR (matches_per_week IS NOT NULL AND matches_per_week > 14);`,
+          );
+        }
+        db.executeSync('COMMIT');
+      } catch (e) {
+        db.executeSync('ROLLBACK');
+        throw e;
+      }
+    }
     db.executeSync('PRAGMA user_version = 0;');
     applyFrom(db, migrations, 0);
     const still = sentinelsMissing(db);
     if (still.length > 0) {
       throw new Error(`schema incomplete after full re-apply: missing ${still.join(', ')}`);
+    }
+  }
+  // If an earlier replay stashed 078-only sport rows and was interrupted or
+  // resumed via normal applyFrom, restore and verify them before dropping the stash.
+  if (hasObject(db, 'table', '_ak_replay_stash_078_sport') && hasObject(db, 'table', 'athlete_sport_profile')) {
+    db.executeSync('BEGIN');
+    try {
+      db.executeSync(
+        `INSERT OR IGNORE INTO athlete_sport_profile (
+           sport_profile_id, sport_id, other_sport_name, outcome_id, experience_id,
+           practice_sessions_per_week, matches_per_week, typical_session_min,
+           competition_date, revision, updated_at_ms)
+         SELECT sport_profile_id, sport_id, other_sport_name, outcome_id, experience_id,
+                practice_sessions_per_week, matches_per_week, typical_session_min,
+                competition_date, revision, updated_at_ms
+         FROM _ak_replay_stash_078_sport;`,
+      );
+      const missingRestored = db.executeSync(
+        `SELECT COUNT(*) AS n
+           FROM _ak_replay_stash_078_sport s
+          WHERE NOT EXISTS (
+            SELECT 1 FROM athlete_sport_profile p
+             WHERE p.sport_profile_id = s.sport_profile_id
+          );`,
+      ).rows?.[0]?.n;
+      if (Number(missingRestored ?? 0) !== 0) {
+        throw new Error(`failed to restore ${String(missingRestored)} stashed 078 sport profile row(s)`);
+      }
+      db.executeSync('DROP TABLE _ak_replay_stash_078_sport;');
+      db.executeSync('COMMIT');
+    } catch (e) {
+      db.executeSync('ROLLBACK');
+      throw e;
     }
   }
 }

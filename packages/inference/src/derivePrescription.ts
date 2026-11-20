@@ -125,6 +125,13 @@ export function applyLoadModifier(
   return Math.max(0, Math.min(loadKg, scaled));
 }
 
+export interface SlotBackOffShape {
+  sets: number;
+  reps: number;
+  targetRpe: number;
+  loadMultiplier: number;
+}
+
 export function applyPrescriptionToSlot<
   T extends {
     sets: number;
@@ -132,26 +139,44 @@ export function applyPrescriptionToSlot<
     overrideLoadKg?: number | null;
     target?: { kind: 'reps'; reps: number } | { kind: 'time'; seconds: number };
     routineDecision?: unknown;
+    backOff?: SlotBackOffShape;
   },
 >(
   slot: T,
   vector: Pick<AdjustmentVector, 'load_modifier' | 'set_modifier' | 'rpe_cap'> | null | undefined,
 ): T {
   if (vector === null || vector === undefined) return slot;
-  const adjustedSets = Math.min(6, Math.max(1, Math.round(slot.sets + vector.set_modifier)));
-  const sets = slot.target?.kind === 'time' || slot.routineDecision !== undefined
-    ? Math.min(slot.sets, adjustedSets)
+  const authoredSets = Math.max(1, Math.round(slot.sets));
+  const adjustedSets = authoredSets > 6
+    ? Math.min(authoredSets, Math.max(1, Math.round(authoredSets + vector.set_modifier)))
+    : Math.min(6, Math.max(1, Math.round(authoredSets + vector.set_modifier)));
+  const sets = slot.target?.kind === 'time' || slot.routineDecision !== undefined || slot.backOff !== undefined
+    ? Math.min(authoredSets, adjustedSets)
     : adjustedSets;
   const targetRpe = Math.min(slot.targetRpe, vector.rpe_cap);
   const overrideLoadKg = slot.overrideLoadKg === undefined
     ? undefined
     : applyLoadModifier(slot.overrideLoadKg, vector);
-  return {
+  const remainingBackOffSets = Math.max(0, sets - 1);
+  const backOff = slot.backOff === undefined || remainingBackOffSets <= 0
+    ? undefined
+    : {
+        ...slot.backOff,
+        sets: Math.min(slot.backOff.sets, remainingBackOffSets),
+        targetRpe: Math.min(slot.backOff.targetRpe, targetRpe, vector.rpe_cap),
+      };
+  const next: T = {
     ...slot,
     sets,
     targetRpe,
     ...(overrideLoadKg === undefined ? {} : { overrideLoadKg }),
   };
+  if (backOff === undefined) {
+    delete next.backOff;
+  } else {
+    next.backOff = backOff;
+  }
+  return next;
 }
 
 export function isPrescriptionReduced(

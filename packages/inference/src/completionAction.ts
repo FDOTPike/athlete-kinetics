@@ -39,13 +39,19 @@ export interface CompletionPatternSummary {
   meanShortfall: number | null;
 }
 
+export type CompletionSetReduction = -2 | -1 | 0;
+
 /**
- * Explicit candidate/ratified policy. No module-level production values exist.
+ * Explicit candidate/ratified policy. Callers supply policy explicitly; invalid
+ * policy fails closed to a neutral completion action.
  */
 export interface CompletionActionPolicy {
   minObservationDays: number;
   deficitThreshold: number;
   strongThreshold: number;
+  moderateSetReduction?: CompletionSetReduction;
+  strongSetReduction?: CompletionSetReduction;
+  strongLoadFactor?: number;
 }
 
 const NEUTRAL_CORRECTION: PatternCorrection = {
@@ -185,25 +191,53 @@ export function summarizeCompletionWindow(
   return result;
 }
 
-const validPolicy = (policy: CompletionActionPolicy): boolean =>
-  Number.isInteger(policy.minObservationDays) &&
-  policy.minObservationDays >= 1 &&
-  Number.isFinite(policy.deficitThreshold) &&
-  policy.deficitThreshold > 0 &&
-  policy.deficitThreshold <= 1 &&
-  Number.isFinite(policy.strongThreshold) &&
-  policy.strongThreshold >= policy.deficitThreshold &&
-  policy.strongThreshold <= 1;
+const isValidSetReduction = (value: unknown): value is CompletionSetReduction =>
+  typeof value === 'number' &&
+  Number.isInteger(value) &&
+  (value === -2 || value === -1 || value === 0);
+
+/** Validate explicit completion-action policy bounds without supplying defaults. */
+export function isValidCompletionActionPolicy(
+  candidate: unknown,
+): candidate is CompletionActionPolicy {
+  if (candidate === null || typeof candidate !== 'object') return false;
+  const policy = candidate as CompletionActionPolicy;
+  return (
+    typeof policy.minObservationDays === 'number' &&
+    Number.isInteger(policy.minObservationDays) &&
+    policy.minObservationDays >= 1 &&
+    typeof policy.deficitThreshold === 'number' &&
+    Number.isFinite(policy.deficitThreshold) &&
+    policy.deficitThreshold > 0 &&
+    policy.deficitThreshold <= 1 &&
+    typeof policy.strongThreshold === 'number' &&
+    Number.isFinite(policy.strongThreshold) &&
+    policy.strongThreshold >= policy.deficitThreshold &&
+    policy.strongThreshold <= 1 &&
+    (policy.moderateSetReduction === undefined ||
+      isValidSetReduction(policy.moderateSetReduction)) &&
+    (policy.strongSetReduction === undefined ||
+      isValidSetReduction(policy.strongSetReduction)) &&
+    (policy.strongLoadFactor === undefined ||
+      (typeof policy.strongLoadFactor === 'number' &&
+        Number.isFinite(policy.strongLoadFactor) &&
+        policy.strongLoadFactor > 0 &&
+        policy.strongLoadFactor <= 1))
+  );
+}
 
 /**
- * Derive a candidate completion action. This is not wired to production block
- * generation until its explicit policy has been ratified.
+ * Derive a completion shortfall action from grouped daily completion records
+ * under an explicitly supplied `CompletionActionPolicy`.
  */
 export function deriveCompletionAction(
   window: Record<MovementPattern, PatternDailyCompletion>,
   policy: CompletionActionPolicy,
 ): ControlAction {
-  if (!validPolicy(policy)) return neutralAction();
+  if (!isValidCompletionActionPolicy(policy)) return neutralAction();
+  const moderateSetReduction = policy.moderateSetReduction ?? REDUCE_CORRECTION.dSet_p;
+  const strongSetReduction = policy.strongSetReduction ?? STRONG_REDUCE_CORRECTION.dSet_p;
+  const strongLoadFactor = policy.strongLoadFactor ?? STRONG_REDUCE_CORRECTION.dLoad_p;
   const summaries = summarizeCompletionWindow(window);
   const action = neutralAction();
   for (const pattern of MOVEMENT_PATTERNS) {
@@ -215,9 +249,16 @@ export function deriveCompletionAction(
       continue;
     }
     if (summary.meanShortfall >= policy.strongThreshold) {
-      action.corrections[pattern] = { ...STRONG_REDUCE_CORRECTION };
+      action.corrections[pattern] = {
+        ...STRONG_REDUCE_CORRECTION,
+        dLoad_p: strongLoadFactor,
+        dSet_p: strongSetReduction,
+      };
     } else if (summary.meanShortfall >= policy.deficitThreshold) {
-      action.corrections[pattern] = { ...REDUCE_CORRECTION };
+      action.corrections[pattern] = {
+        ...REDUCE_CORRECTION,
+        dSet_p: moderateSetReduction,
+      };
     }
   }
   return action;

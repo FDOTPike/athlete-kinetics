@@ -41,6 +41,25 @@ The ninth is `077_multisport_and_flexibility` (ordinal 76): adds the
 `athlete_secondary_sport_profile` and `activity_flexibility_tag` side-car tables
 and their guards, leaving `activity_definition` and the singleton sport profile
 byte-identical for the 067 verifier.
+The tenth is `078_kinestrike_telemetry` (ordinal 77): adds the
+`state_vector_kinestrike` side-car table for daily KineStrike plantar/IMU
+summary telemetry, leaving `state_vector` and `004_state_vector_materialize.sql`
+byte-identical.
+The eleventh is `079_session_slot_swap_cause` (ordinal 78): adds the
+`session_slot_swap_cause` side-car table recording why a slot was swapped
+(`cause`) and its persistence scope (`today_only` vs `rest_of_block`) without
+altering `session_plan_slot_replacement`.
+The twelfth is `080_sport_peaking_and_lifting_taxonomy` (ordinal 79): rebuilds
+`athlete_sport_profile` and `athlete_secondary_sport_profile` with the 24
+SportIds (adding `olympic_weightlifting` and `strongman`) and 0..52
+`matches_per_week` for lifting sports, creates seeded `sport_peaking_movement`,
+and adds `planned_slot_backoff`, `session_slot_backoff`,
+`training_program_meet_countdown`, and `training_block_meet_meta`.
+The thirteenth is `081_advanced_program_control` (ordinal 80): adds the six Phase 2
+(`#228` + `A7`) side-car tables (`training_program_day_focus_ext`,
+`planned_session_focus_ext`, `training_program_schedule_mode`,
+`training_program_slot_override`, `training_program_day_routine`, and
+`planned_slot_athlete_override`).
 `MIGRATION_LINEAGE.json` records the SHA-256 of every shipped file and its
 ordinal, and of master's 34-entry chain. Master's exact `034`/`058` bytes and its
 registry live under `test/fixtures/lineage/master-1da218d/`.

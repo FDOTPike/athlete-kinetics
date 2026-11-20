@@ -29,7 +29,7 @@
  * Law 4: Touch targets >= 56pt.
  */
 import React, { useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Keyboard, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   BIG4_LIFTS,
   DEFAULT_PROFILE,
@@ -54,7 +54,7 @@ import {
   validateSportProfile,
 } from '@ak/inference';
 import { theme } from '../theme/theme';
-import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
+import KeyboardAwareScrollView, { DEFAULT_KEYBOARD_EXTRA_SCROLL_HEIGHT } from '../components/KeyboardAwareScrollView';
 import InfoTip from '../components/InfoTip';
 import { useStore } from '../state/useStore';
 import { anchorDisplayName } from '../state/priorExperience';
@@ -124,8 +124,8 @@ const AGE_COPY: Record<TrainingAge, { label: string; blurb: string }> = {
 export const WEEK_DEFAULT_BY_AGE: Record<TrainingAge, { readonly days: number; readonly minutes: number }> = {
   beginner: { days: 3, minutes: 45 },
   intermediate: { days: 4, minutes: 60 },
-  advanced: { days: 4, minutes: 75 },
-  elite: { days: 4, minutes: 75 },
+  advanced: { days: 5, minutes: 75 },
+  elite: { days: 6, minutes: 75 },
 };
 
 const ENERGY_COPY: Record<EnergySystem, { label: string; blurb: string }> = {
@@ -268,6 +268,9 @@ export const fallbackAthleteName = (
 export const limitationNotesLine = (count: number): string =>
   `${count} limitation ${count === 1 ? 'note' : 'notes'} recorded for your reference.`;
 
+export const ONBOARDING_FOOTER_MIN_HEIGHT =
+  1 + theme.space[3] + theme.touch.min + (Platform.OS === 'ios' ? theme.space[4] : theme.space[3]);
+
 export default function OnboardingScreen(): React.JSX.Element {
   const completeOnboarding = useStore((s) => s.completeOnboarding);
   const beginOnboardingDraft = useStore((s) => s.beginOnboardingDraft);
@@ -344,6 +347,7 @@ export default function OnboardingScreen(): React.JSX.Element {
   const toggleDeclaredAnchor = (movementId: number): void => setDeclaredAnchorIds((ids) =>
     (ids.includes(movementId) ? ids.filter((id) => id !== movementId) : [...ids, movementId]));
   const [saveAttempted, setSaveAttempted] = useState(false);
+  const [footerHeight, setFooterHeight] = useState(ONBOARDING_FOOTER_MIN_HEIGHT);
   // Issue #218: optional one-rep maxes, from SOME MILEAGE up. Held as the
   // value the store will keep (movement id -> kg) and written with the rest
   // of the interview, never before.
@@ -568,15 +572,17 @@ export default function OnboardingScreen(): React.JSX.Element {
 
   return (
     <View style={styles.root}>
-      <Text style={styles.wordmark}>pikeMethods</Text>
+      <View testID="onboarding-header" onTouchEnd={() => Keyboard.dismiss()}>
+        <Text style={styles.wordmark}>pikeMethods</Text>
 
-      {/* Progress dots (P4 ruling: keep as-is with chalk on current dot) */}
-      {/* Walk W6-7: without `accessible` Android did not expose the step. */}
-      <View style={styles.dots} accessible accessibilityRole="text" testID="onboarding-progress"
-        accessibilityLabel={`Step ${stepIdx + 1} of ${steps.length}`}>
-        {steps.map((k, i) => (
-          <View key={k} style={[styles.dot, i === stepIdx && styles.dotActive, i < stepIdx && styles.dotDone]} />
-        ))}
+        {/* Progress dots (P4 ruling: keep as-is with chalk on current dot) */}
+        {/* Walk W6-7: without `accessible` Android did not expose the step. */}
+        <View style={styles.dots} accessible accessibilityRole="text" testID="onboarding-progress"
+          accessibilityLabel={`Step ${stepIdx + 1} of ${steps.length}`}>
+          {steps.map((k, i) => (
+            <View key={k} style={[styles.dot, i === stepIdx && styles.dotActive, i < stepIdx && styles.dotDone]} />
+          ))}
+        </View>
       </View>
 
       <KeyboardAwareScrollView
@@ -584,6 +590,7 @@ export default function OnboardingScreen(): React.JSX.Element {
         testID="onboarding-scroll-view"
         style={styles.body}
         contentContainerStyle={styles.bodyContent}
+        extraScrollHeight={DEFAULT_KEYBOARD_EXTRA_SCROLL_HEIGHT + footerHeight}
       >
         {step === 'welcome' && (
           <View>
@@ -1091,50 +1098,60 @@ export default function OnboardingScreen(): React.JSX.Element {
           until an explicit yes/no answer exists (R5, Round 2); the caption
           says why, so the rule is never invisible. BACK still walks the
           draft — an unanswered limitations screen only blocks going FORWARD. */}
-      <View style={styles.footer}>
-        <QuietAction
-          label="BACK"
-          onPress={goBack}
-          disabled={stepIdx === 0}
-          accessibilityLabel="Back"
-        />
-        {!isLast && (
-          <PrimaryButton
-            label="NEXT"
-            onPress={goNext}
-            disabled={limitsGateOpen || targetGateOpen || sportGateOpen}
-            accessibilityLabel="Next"
+      <View
+        testID="onboarding-footer-container"
+        onLayout={(event) => {
+          const measured = Math.ceil(event.nativeEvent.layout.height);
+          if (measured > 0 && measured !== footerHeight) {
+            setFooterHeight(measured);
+          }
+        }}
+      >
+        <View style={styles.footer}>
+          <QuietAction
+            label="BACK"
+            onPress={goBack}
+            disabled={stepIdx === 0}
+            accessibilityLabel="Back"
           />
+          {!isLast && (
+            <PrimaryButton
+              label="NEXT"
+              onPress={goNext}
+              disabled={limitsGateOpen || targetGateOpen || sportGateOpen}
+              accessibilityLabel="Next"
+            />
+          )}
+        </View>
+        {sportGateOpen && (
+          <View style={styles.limitsGateNotice}>
+            <Text style={styles.pDim} accessibilityLiveRegion="polite">
+              Finish the sport questions to continue, or choose "Skip this" to plan general gym training.
+            </Text>
+          </View>
+        )}
+        {targetGateOpen && (
+          <View style={styles.limitsGateNotice}>
+            {/* Issue #215: name the first missing field in the validator's words. */}
+            {!goalValidation.ok && goalValidation.errors.length > 0 && (
+              <Text style={styles.p} testID="onboarding-target-gate-missing" accessibilityLiveRegion="polite">
+                {goalValidation.errors[0]!.message}
+              </Text>
+            )}
+            <Text style={styles.pDim} accessibilityLiveRegion="polite">
+              Finish the target to continue, or choose "Skip this" to train with the focus only.
+            </Text>
+          </View>
+        )}
+        {limitsGateOpen && (
+          <View style={styles.limitsGateNotice}>
+            <Text style={styles.pDim} accessibilityLiveRegion="polite">
+              Choose YES or NO to continue. This records your answer; it does not
+              change recommendations.
+            </Text>
+          </View>
         )}
       </View>
-      {sportGateOpen && (
-        <View style={styles.limitsGateNotice}>
-          <Text style={styles.pDim} accessibilityLiveRegion="polite">
-            Finish the sport questions to continue, or choose "Skip this" to plan general gym training.
-          </Text>
-        </View>
-      )}
-      {targetGateOpen && (
-        <View style={styles.limitsGateNotice}>
-          {/* Issue #215: name the first missing field in the validator's words. */}
-          {!goalValidation.ok && goalValidation.errors.length > 0 && (
-            <Text style={styles.p} testID="onboarding-target-gate-missing" accessibilityLiveRegion="polite">
-              {goalValidation.errors[0]!.message}
-            </Text>
-          )}
-          <Text style={styles.pDim} accessibilityLiveRegion="polite">
-            Finish the target to continue, or choose "Skip this" to train with the focus only.
-          </Text>
-        </View>
-      )}
-      {limitsGateOpen && (
-        <View style={styles.limitsGateNotice}>
-          <Text style={styles.pDim} accessibilityLiveRegion="polite">
-            Choose YES or NO to continue. This records your answer; it does not
-            change recommendations.
-          </Text>
-        </View>
-      )}
     </View>
   );
 }

@@ -71,7 +71,8 @@ final class AthleteKineticsUITests: XCTestCase {
   /// existence check and the read (CI evidence 5032e65: the restore status
   /// disappeared mid-read during the hand-over to the restored athlete).
   private func currentLabel(_ el: XCUIElement) -> String? {
-    (try? el.snapshot())?.label
+    guard let snap = try? el.snapshot() else { return nil }
+    return snap.label
   }
 
   private func element(labelContains text: String) -> XCUIElement {
@@ -88,12 +89,15 @@ final class AthleteKineticsUITests: XCTestCase {
   }
 
   /// Scroll until the element is hittable: down the page first, then back up.
+  /// #362: a 375 x 667 pt compatibility viewport needs up to 30 slow upward
+  /// swipes to reach controls near the bottom of ProfileScreen (such as the
+  /// backup password fields in test4).
   private func reveal(_ el: XCUIElement, _ what: String, file: StaticString = #filePath, line: UInt = #line) {
     wait(el, what, file: file, line: line)
     var tries = 0
-    while !el.isHittable && tries < 15 { app.swipeUp(velocity: .slow); tries += 1 }
+    while !el.isHittable && tries < 30 { app.swipeUp(velocity: .slow); tries += 1 }
     tries = 0
-    while !el.isHittable && tries < 30 { app.swipeDown(velocity: .slow); tries += 1 }
+    while !el.isHittable && tries < 45 { app.swipeDown(velocity: .slow); tries += 1 }
     if !el.isHittable { XCTFail("\(what) never became hittable", file: file, line: line) }
   }
 
@@ -176,16 +180,29 @@ final class AthleteKineticsUITests: XCTestCase {
     el.typeText(submit ? text + "\n" : text)
   }
 
-  /// The label once it settles to one beginning with `prefix`.
+  /// The label once it settles to one beginning with `prefix`. Polls
+  /// `currentLabel` (`try? el.snapshot()`) every 0.5 s instead of
+  /// `XCTWaiter.wait` + `.exists`, avoiding snapshot-evaluation waiter stalls.
   @discardableResult
   private func settledLabel(_ el: XCUIElement, beginsWith prefix: String, _ what: String,
-                            timeout: TimeInterval = 120) -> String {
-    let done = NSPredicate(format: "label BEGINSWITH %@", prefix)
-    let result = XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: done, object: el)], timeout: timeout)
-    let label = el.exists ? el.label : "<absent>"
-    log("\(what): \(label.prefix(220))")
-    if result != .completed { XCTFail("\(what) did not become '\(prefix)…' within \(Int(timeout)) s; it read: \(label)") }
-    return label
+                            timeout: TimeInterval = 120,
+                            file: StaticString = #filePath, line: UInt = #line) -> String {
+    let deadline = Date().addingTimeInterval(timeout)
+    var lastLabel: String?
+    while true {
+      let label = currentLabel(el)
+      lastLabel = label
+      if let label = label, label.hasPrefix(prefix) {
+        log("\(what): \(label.prefix(220))")
+        return label
+      }
+      if Date() >= deadline { break }
+      usleep(500_000)
+    }
+    let finalLabel = lastLabel ?? "<absent>"
+    log("\(what): \(finalLabel.prefix(220))")
+    XCTFail("\(what) did not become '\(prefix)…' within \(Int(timeout)) s; it read: \(finalLabel)", file: file, line: line)
+    return finalLabel
   }
 
   private func launch(_ arguments: [String] = []) {
@@ -196,6 +213,7 @@ final class AthleteKineticsUITests: XCTestCase {
         effectiveArguments += ["-AKUITestResetStorage", "1"]
       }
     }
+    app.launchEnvironment["ORT_DISABLE_TELEMETRY"] = "1"
     app.launchArguments = effectiveArguments
     app.launch()
     wait(element("shell-root"), "the app shell", timeout: 90)
@@ -208,7 +226,8 @@ final class AthleteKineticsUITests: XCTestCase {
       NSPredicate(format: "label != '' AND NOT (label ==[c] %@)", "pikemethods")).firstMatch)
   }
 
-  /// The default eight-screen onboarding, through the real UI.
+  /// The default nine-screen onboarding (includes the #218 'maxes' step for
+  /// the default intermediate profile), through the real UI.
   private func completeOnboarding(_ who: String, createProgram: Bool = false) {
     wait(element("Next"), "onboarding (\(who))", timeout: 60)
     log("onboarding started (\(who)): progress=\(element(labelBeginsWith: "Step ").exists ? element(labelBeginsWith: "Step ").label : "-")")
@@ -217,7 +236,7 @@ final class AthleteKineticsUITests: XCTestCase {
     // stood one screen short, and the failure surfaced two steps later with no
     // record of which tap had not been taken. The tap that leaves the screen
     // unchanged now fails by name; it is not repeated.
-    for step in 1...6 {
+    for step in 1...7 {
       let before = onboardingHeading()
       tap("Next", "Next (step \(step), \(who))")
       let deadline = Date().addingTimeInterval(30)
@@ -232,25 +251,73 @@ final class AthleteKineticsUITests: XCTestCase {
     }
     tap("No, nothing to note")
     tap("Next", "Next to review (\(who))")
-    tap("START TRAINING")
+    let startBtn = element("START TRAINING")
+    reveal(startBtn, "START TRAINING")
+    bringClear(startBtn, "START TRAINING")
+    startBtn.tap()
     // The program set-up offer: accepted when the flow needs a plan,
-    // otherwise kept for later.
-    let cancel = element("Cancel")
-    if cancel.waitForExistence(timeout: 8) {
-      if createProgram {
-        let create = element("Create program")
-        reveal(create, "Create program (\(who))")
-        XCTAssertTrue(create.isEnabled, "Create program is disabled for a default onboarding (\(who))")
-        create.tap()
-        log("program set-up offer: created (\(who))")
-      } else {
-        cancel.tap()
-        log("program set-up offer: cancelled (\(who))")
+    // otherwise kept for later. Poll across the full 60 s transition window
+    // because onboarding save on a loaded runner can push offer mount past 8 s,
+    // and retry START TRAINING once if the review screen stays put >= 5 s.
+    let tapTime = Date()
+    let transitionDeadline = tapTime.addingTimeInterval(60)
+    var offerHandled = false
+    var retriedStart = false
+    var tabsShown = false
+    while Date() < transitionDeadline {
+      if (try? element("Create program").snapshot()) != nil && (try? element("Cancel").snapshot()) != nil {
+        if createProgram {
+          if !offerHandled {
+            let create = element("Create program")
+            reveal(create, "Create program (\(who))")
+            bringClear(create, "Create program (\(who))")
+            XCTAssertTrue(create.isEnabled, "Create program is disabled for a default onboarding (\(who))")
+            create.tap()
+            log("program set-up offer: created (\(who))")
+            offerHandled = true
+          }
+        } else {
+          let cancel = element("Cancel")
+          reveal(cancel, "Cancel program set-up (\(who))")
+          bringClear(cancel, "Cancel program set-up (\(who))")
+          cancel.tap()
+          if !offerHandled {
+            log("program set-up offer: cancelled (\(who))")
+            offerHandled = true
+          }
+        }
+        let dismissDeadline = Date().addingTimeInterval(5)
+        while Date() < dismissDeadline
+          && (try? element("Create program").snapshot()) != nil
+          && (try? element("Cancel").snapshot()) != nil {
+          usleep(250_000)
+        }
+        continue
       }
-    } else if createProgram {
-      log("program set-up offer: not shown (\(who))")
+      if (try? element("shell-primary-tabs").snapshot()) != nil {
+        if !createProgram || offerHandled || Date().timeIntervalSince(tapTime) >= 8 {
+          if createProgram && !offerHandled {
+            log("program set-up offer: not shown (\(who))")
+          }
+          tabsShown = true
+          break
+        }
+      } else if !retriedStart && !offerHandled && Date().timeIntervalSince(tapTime) >= 5 {
+        if (try? startBtn.snapshot()) != nil && startBtn.isHittable {
+          retriedStart = true
+          log("START-TRAINING-RETRY (\(who)): review screen still visible \(Int(Date().timeIntervalSince(tapTime))) s after tap")
+          reveal(startBtn, "START TRAINING")
+          bringClear(startBtn, "START TRAINING")
+          startBtn.tap()
+          usleep(500_000)
+          continue
+        }
+      }
+      usleep(500_000)
     }
-    wait(element("shell-primary-tabs"), "the primary tabs after onboarding (\(who))", timeout: 60)
+    if !tabsShown {
+      XCTFail("the primary tabs after onboarding (\(who)) did not appear within 60 s")
+    }
     log("onboarding complete: \(who)")
   }
 
@@ -291,7 +358,7 @@ final class AthleteKineticsUITests: XCTestCase {
 
   private func unlockAdvancedTools() {
     if (try? element("advanced-athlete-manager").snapshot()) != nil { return }
-    let build = element("Build 0.1.0")
+    let build = element(labelBeginsWith: "Build ")
     // The label sits at the foot of the full Profile form, beyond reveal()'s
     // fifteen slow swipes; scroll down at normal speed first.
     wait(build, "the build label")
@@ -323,9 +390,29 @@ final class AthleteKineticsUITests: XCTestCase {
   private func expandCoachMode() -> String {
     unlockAdvancedTools()
     let coach = element(labelBeginsWith: "Coach mode,")
+    func pollCoachLabel(timeout: TimeInterval, interval: useconds_t, where matches: (String) -> Bool) -> String? {
+      let deadline = Date().addingTimeInterval(timeout)
+      while Date() < deadline {
+        if let current = currentLabel(coach), current.hasPrefix("Coach mode,"), matches(current) {
+          return current
+        }
+        usleep(interval)
+      }
+      return nil
+    }
+    guard pollCoachLabel(timeout: 30, interval: 500_000, where: { _ in true }) != nil else {
+      XCTFail("Coach mode header did not appear within 30 s")
+      return "<absent>"
+    }
     reveal(coach, "Coach mode")
-    if coach.label.hasSuffix("collapsed") { coach.tap() }
+    bringClear(coach, "Coach mode")
+    let preTapLabel = pollCoachLabel(timeout: 5, interval: 250_000) { _ in true }
+    if (preTapLabel ?? "").hasSuffix("collapsed") {
+      coach.tap()
+      _ = pollCoachLabel(timeout: 10, interval: 250_000) { !$0.hasSuffix("collapsed") }
+    }
     let label = settledLabel(coach, beginsWith: "Coach mode,", "Coach Mode", timeout: 10)
+    XCTAssertFalse(label.hasSuffix("collapsed"), "Coach mode remained collapsed: \(label)")
     return label
   }
 
@@ -410,12 +497,29 @@ final class AthleteKineticsUITests: XCTestCase {
           }
           return nil
         }
+        func findSheetContainer(_ root: XCUIElementSnapshot) -> XCUIElementSnapshot? {
+          var queue: [XCUIElementSnapshot] = [root]
+          var index = 0
+          while index < queue.count {
+            let node = queue[index]
+            index += 1
+            if node.elementType != .alert {
+              let nf = node.frame
+              if nf.minY >= 0 && nf.minY < targetFrame.midY && nf.height > targetFrame.midY
+                && nf.height < targetFrame.height - 1 && abs(nf.width - targetFrame.width) <= 2 {
+                return node
+              }
+            }
+            queue.append(contentsOf: node.children)
+          }
+          return nil
+        }
         var measuredOffset: CGFloat = 0
         var offsetSource = "none"
         var remoteContainerMinY = -1
         var remoteContainerHeight = -1
-        if found.place == "the app", !alertFrame.isNull, alertFrame.midY < targetFrame.midY {
-          if let root = targetSnap, let ancestors = findAlertAncestors(root) {
+        if found.place == "the app", !alertFrame.isNull, alertFrame.midY < targetFrame.midY, let root = targetSnap {
+          if let ancestors = findAlertAncestors(root) {
             for node in ancestors.reversed() where node.elementType != .alert {
               let nf = node.frame
               if nf.minY == 0 && nf.height > targetFrame.midY && nf.height < targetFrame.height - 1 && abs(nf.width - targetFrame.width) <= 2 {
@@ -427,10 +531,53 @@ final class AthleteKineticsUITests: XCTestCase {
               }
             }
           }
+          if offsetSource == "none", let container = findSheetContainer(root) {
+            let nf = container.frame
+            measuredOffset = max(nf.minY, targetFrame.height - nf.height)
+            offsetSource = "sheetContainer"
+            remoteContainerMinY = Int(nf.minY.rounded())
+            remoteContainerHeight = Int(nf.height.rounded())
+          }
         }
-        let rootOrigin = found.target.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
+        // #362: when an iPhone-only app runs in iPadOS's scaled compatibility box
+        // (e.g. 375x667 scaled and centered inside 820x1180 SpringBoard),
+        // `found.target.coordinate(...)` dispatches raw screen coordinates without
+        // applying the box transform, missing the OK button vertically and horizontally.
+        // Map app-window points into SpringBoard screen space when `targetFrame` is
+        // strictly smaller than `sbFrame`.
+        let sbSnapFrame = (try? springboard.snapshot())?.frame
+        let sbFrame = (sbSnapFrame != nil && sbSnapFrame!.width > 0 && sbSnapFrame!.height > 0)
+          ? sbSnapFrame!
+          : springboard.frame
+        let isCompatBox = found.place == "the app"
+          && targetFrame.width > 0 && targetFrame.height > 0
+          && targetFrame.width < sbFrame.width - 2 && targetFrame.height < sbFrame.height - 2
+        let compatScale = isCompatBox
+          ? min(sbFrame.width / targetFrame.width, sbFrame.height / targetFrame.height)
+          : 1.0
+        let compatOriginX = isCompatBox
+          ? sbFrame.minX + (sbFrame.width - targetFrame.width * compatScale) / 2
+          : 0.0
+        let compatOriginY = isCompatBox
+          ? sbFrame.minY + (sbFrame.height - targetFrame.height * compatScale) / 2
+          : 0.0
+        func tapTargetPoint(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
+          if isCompatBox {
+            let screenX = compatOriginX + (x - targetFrame.minX) * compatScale
+            let screenY = compatOriginY + (y - targetFrame.minY) * compatScale
+            springboard.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
+              .withOffset(CGVector(dx: screenX, dy: screenY))
+              .tap()
+            return CGPoint(x: screenX, y: screenY)
+          }
+          found.target.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0))
+            .withOffset(CGVector(dx: x, dy: y))
+            .tap()
+          return CGPoint(x: x, y: y)
+        }
         let initialOffsetY = found.frame.midY + measuredOffset
         var tapY = initialOffsetY
+        var tapScreen = CGPoint(x: found.frame.midX, y: initialOffsetY)
         var tapPath = measuredOffset > 0 ? "\(offsetSource)(+\(Int(measuredOffset.rounded()))pt)" : "direct"
         func probeAlertOKStillShown(_ phase: String) -> Bool {
           do {
@@ -451,19 +598,33 @@ final class AthleteKineticsUITests: XCTestCase {
             }
           }
         }
-        rootOrigin.withOffset(CGVector(dx: found.frame.midX, dy: initialOffsetY)).tap()
+        tapScreen = tapTargetPoint(found.frame.midX, initialOffsetY)
         sleep(1)
-        var stillShown = probeAlertOKStillShown("after-1s")
-        if stillShown && measuredOffset > 0 {
-          rootOrigin.withOffset(CGVector(dx: found.frame.midX, dy: found.frame.midY)).tap()
-          tapY = found.frame.midY
-          sleep(1)
-          stillShown = probeAlertOKStillShown("after-unshifted-retry")
-          tapPath = stillShown ? "\(tapPath),unshifted-retry" : "unshifted-after-\(offsetSource)"
+        let stillShownAfter1s = probeAlertOKStillShown("after-1s")
+        var stillShownAfterRetry: Bool?
+        if stillShownAfter1s {
+          if measuredOffset > 0 {
+            tapScreen = tapTargetPoint(found.frame.midX, found.frame.midY)
+            tapY = found.frame.midY
+            sleep(1)
+            let retryRemaining = probeAlertOKStillShown("after-unshifted-retry")
+            stillShownAfterRetry = retryRemaining
+            tapPath = retryRemaining ? "\(tapPath),unshifted-retry" : "unshifted-after-\(offsetSource)"
+          } else {
+            // When no shifted hosting sheet container was detected, fall back to
+            // XCUIElement's own tap rather than guessing a displacement.
+            found.ok.tap()
+            sleep(1)
+            let retryRemaining = probeAlertOKStillShown("after-element-tap-retry")
+            stillShownAfterRetry = retryRemaining
+            tapPath = retryRemaining ? "\(tapPath),element-tap-retry" : "\(tapPath)->element-tap"
+          }
         }
         sleep(2)
         let stillShownAfter3s = probeAlertOKStillShown("after-3s")
-        log("HEALTH-ALERT-OK tapped OK on a system \(kind) in \(found.place) (\(context)); title: \(title.prefix(120)); tapPath=\(tapPath) okFrame=(\(Int(found.frame.midX)),\(Int(found.frame.midY))) tapY=\(Int(tapY.rounded())) remoteContainer=(minY:\(remoteContainerMinY),h:\(remoteContainerHeight)) alertMidY=\(alertFrame.isNull ? -1 : Int(alertFrame.midY)); still shown after 1 s: \(stillShown ? "yes" : "no"); still shown 2 s later: \(stillShownAfter3s ? "yes" : "no")")
+        let compatTag = isCompatBox ? " compatScreen=(\(Int(tapScreen.x.rounded())),\(Int(tapScreen.y.rounded()))) sb=(\(Int(sbFrame.width)),\(Int(sbFrame.height)))" : ""
+        let retryTag = stillShownAfterRetry.map { "; still shown after retry: \($0 ? "yes" : "no")" } ?? ""
+        log("HEALTH-ALERT-OK tapped OK on a system \(kind) in \(found.place) (\(context)); title: \(title.prefix(120)); tapPath=\(tapPath) okFrame=(\(Int(found.frame.midX)),\(Int(found.frame.midY))) tapY=\(Int(tapY.rounded()))\(compatTag) remoteContainer=(minY:\(remoteContainerMinY),h:\(remoteContainerHeight)) alertMidY=\(alertFrame.isNull ? -1 : Int(alertFrame.midY)); still shown after 1 s: \(stillShownAfter1s ? "yes" : "no")\(retryTag); still shown 2 s later: \(stillShownAfter3s ? "yes" : "no")")
         XCTAssertFalse(stillShownAfter3s, "the Health Access alert stayed open after the OK tap")
         return true
       }
@@ -480,6 +641,10 @@ final class AthleteKineticsUITests: XCTestCase {
   func test1_onboardingNavigationAndAccessibility() throws {
     launch()
     completeOnboarding("first athlete")
+    guard #available(iOS 17.0, *) else {
+      XCTFail("the accessibility audit needs iOS 17+; this runtime is older")
+      return
+    }
     var issues: [String] = []
     let destinations: [(String, String, String)] = [
       ("tab-today", "Today", "shell-primary-tabs"), ("tab-coach", "Plan", "shell-primary-tabs"),
@@ -498,12 +663,70 @@ final class AthleteKineticsUITests: XCTestCase {
         predicate: NSPredicate(format: "isSelected == true"), object: element(key))], timeout: 30)
       XCTAssertEqual(selected, .completed, "\(screen) control is not marked selected within 30 s of tapping it")
       log("visited \(screen)")
-      guard #available(iOS 17.0, *) else {
-        XCTFail("the accessibility audit needs iOS 17+; this runtime is older")
-        return
-      }
       issues += audit(screen)
     }
+    let openGlossary = element("Open terminology glossary")
+    reveal(openGlossary, "Open terminology glossary")
+    bringClear(openGlossary, "Open terminology glossary")
+    openGlossary.tap()
+    wait(element("glossary-screen"), "the Terminology Glossary screen")
+    issues += audit("Glossary")
+
+    let questionBoxButton = element("Question box")
+    reveal(questionBoxButton, "Question box")
+    bringClear(questionBoxButton, "Question box")
+    questionBoxButton.tap()
+    wait(element("question-box"), "the Question box panel")
+    issues += audit("QuestionBox")
+
+    let questionInput = app.textViews["Question"].firstMatch
+    XCTAssertTrue(questionInput.waitForExistence(timeout: 30), "the Question textView did not appear")
+    reveal(questionInput, "Question")
+    bringClear(questionInput, "Question")
+    for attempt in 1...3 {
+      if attempt > 1 {
+        log("FOCUS-RETRY Question: keyboard not shown 5 s after tap \(attempt - 1); tapping again")
+      }
+      questionInput.tap()
+      let deadline = Date().addingTimeInterval(5)
+      while Date() < deadline {
+        if (try? app.keyboards.firstMatch.snapshot()) != nil { break }
+        usleep(250_000)
+      }
+      if (try? app.keyboards.firstMatch.snapshot()) != nil { break }
+    }
+    XCTAssertNotNil(try? app.keyboards.firstMatch.snapshot(), "the Question keyboard did not appear")
+    app.typeText("what is a deload week")
+    for targetName in ["Answers from the glossary only. This is not medical advice.", "Question box"] {
+      if (try? app.keyboards.firstMatch.snapshot()) == nil { break }
+      let blurTarget = app.staticTexts[targetName].firstMatch
+      if (try? blurTarget.snapshot()) != nil {
+        blurTarget.tap()
+        log("question box keyboard: tapped \(targetName) to dismiss")
+        let deadline = Date().addingTimeInterval(5)
+        while Date() < deadline && (try? app.keyboards.firstMatch.snapshot()) != nil {
+          usleep(250_000)
+        }
+        if (try? app.keyboards.firstMatch.snapshot()) == nil { break }
+      }
+    }
+    XCTAssertNil(try? app.keyboards.firstMatch.snapshot(), "the Question keyboard did not dismiss")
+    let askButton = app.buttons["Ask"].firstMatch
+    reveal(askButton, "Ask")
+    bringClear(askButton, "Ask")
+    XCTAssertTrue(askButton.isEnabled && askButton.isHittable, "Ask button is not enabled and hittable")
+    askButton.tap()
+
+    wait(element("question-answer-card"), "the QuestionBox answer card", timeout: 60)
+    wait(element("DELOAD"), "the DELOAD answer title", timeout: 60)
+    wait(element(labelBeginsWith: "A planned easy week."), "the DELOAD answer definition", timeout: 60)
+    log("question box: routed to DELOAD")
+
+    let backToAthlete = element("Back to Athlete Profile")
+    reveal(backToAthlete, "Back to Athlete Profile")
+    bringClear(backToAthlete, "Back to Athlete Profile")
+    backToAthlete.tap()
+    wait(element("athlete-screen-shown"), "Profile after returning from Glossary")
     XCTAssertTrue(issues.isEmpty, "accessibility audit found \(issues.count) issue(s); first: \(issues.first ?? "")")
   }
 
@@ -824,6 +1047,7 @@ final class AthleteKineticsUITests: XCTestCase {
     let restoreStatus = element("backup-status-message")
     let restoreStart = Date()
     var lastRestoreStatus = ""
+    var restoreOfferHandled = false
     while Date().timeIntervalSince(restoreStart) < 900 {
       // The restore reopens the app on the restored active athlete; without a
       // program that athlete is offered set-up, which covers the Profile.
@@ -832,6 +1056,7 @@ final class AthleteKineticsUITests: XCTestCase {
       if (try? element("Cancel").snapshot()) != nil && (try? element("Create program").snapshot()) != nil {
         log("restore t=\(Int(Date().timeIntervalSince(restoreStart)))s: set-up offered for the restored athlete; cancelled")
         element("Cancel").tap()
+        restoreOfferHandled = true
         openProfile()
         continue
       }
@@ -846,7 +1071,21 @@ final class AthleteKineticsUITests: XCTestCase {
       if (now.hasPrefix("Restore ") && !now.hasPrefix("Restore cancelled")) || now.hasPrefix("A restored database") { break }
       sleep(2)
     }
-    dismissSetUpOfferIfShown("after the restore")
+    // confirmRestore publishes "Restore complete." in backupStore before its
+    // finally block calls restartStoreAfterRestore() to boot the restored
+    // athlete, so wait for both the offer dismissal and the completion label.
+    let postRestoreDeadline = Date().addingTimeInterval(60)
+    while Date() < postRestoreDeadline {
+      if (try? element("Create program").snapshot()) != nil && (try? element("Cancel").snapshot()) != nil {
+        dismissSetUpOfferIfShown("after the restore")
+        restoreOfferHandled = true
+        openProfile()
+        continue
+      }
+      if restoreOfferHandled, let now = currentLabel(restoreStatus), now.hasPrefix("Restore complete.") { break }
+      usleep(500_000)
+    }
+    XCTAssertTrue(restoreOfferHandled, "the restored athlete's set-up offer was not handled before the 60 s post-restore deadline")
     settledLabel(restoreStatus, beginsWith: "Restore complete.", "status after restore", timeout: 60)
     wait(element("shell-root"), "the app after restore")
     openProfile()
@@ -867,7 +1106,8 @@ final class AthleteKineticsUITests: XCTestCase {
     if planned.waitForExistence(timeout: 15) {
       reveal(planned, "today's planned session"); planned.tap(); log("today: planned session started")
     } else if unplanned.exists {
-      reveal(unplanned, "an unplanned session"); unplanned.tap(); log("today: unplanned session started (\(unplanned.label))")
+      let unplannedLabel = currentLabel(unplanned) ?? "today-adhoc-session"
+      reveal(unplanned, "an unplanned session"); unplanned.tap(); log("today: unplanned session started (\(unplannedLabel))")
     } else {
       log("today: no start control; workout tab used")
       tap("header-session", "Workout")
@@ -900,11 +1140,34 @@ final class AthleteKineticsUITests: XCTestCase {
       log("load entered: 20 kg")
     }
     let reps = app.buttons.matching(NSPredicate(format: "label == %@", "2 clean reps left")).firstMatch
-    reveal(reps, "2 clean reps left")
-    bringClear(reps, "2 clean reps left")
-    reps.tap()
-    let selected = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in reps.isSelected }, object: reps)
-    XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 10), .completed, "the effort choice did not become selected")
+    if reps.waitForExistence(timeout: 5) {
+      reveal(reps, "2 clean reps left")
+      bringClear(reps, "2 clean reps left")
+      reps.tap()
+      let selected = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in reps.isSelected }, object: reps)
+      XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 10), .completed, "the effort choice did not become selected")
+    } else {
+      // Time-based movements (e.g. Saturday conditioning Road Run, 1 x 20:00) omit
+      // rep-in-reserve chips and expose direct numeric Effort entry instead.
+      // Fail closed if this set is not time-based so missing RIR chips still fail.
+      // Fixture expectation: the default 4-day GPP Saturday conditioning session
+      // schedules 3 exercises (Road Run 1x20:00 followed by Suitcase Carry and
+      // Pallof Press), so logging Set 1 of Road Run advances to the next exercise's
+      // "Log set " control verified below.
+      let secondsStepper = app.buttons.matching(NSPredicate(format: "label == %@", "Decrease Seconds")).firstMatch
+      XCTAssertTrue(secondsStepper.exists, "2 clean reps left did not appear for a non-time-based set")
+      let directToggle = app.buttons.matching(NSPredicate(format: "label == %@", "Enter Effort directly")).firstMatch
+      reveal(directToggle, "Enter Effort directly")
+      bringClear(directToggle, "Enter Effort directly")
+      directToggle.tap()
+      let effort = app.buttons.matching(NSPredicate(format: "label == %@", "Effort 7.0")).firstMatch
+      reveal(effort, "Effort 7.0")
+      bringClear(effort, "Effort 7.0")
+      effort.tap()
+      let selected = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in effort.isSelected }, object: effort)
+      XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 10), .completed, "the direct effort choice did not become selected")
+      log("effort entered via direct Effort: 7.0 (time-based set)")
+    }
     let ready = element(labelBeginsWith: "Log set 1 for ")
     reveal(ready, "Log set 1")
     XCTAssertFalse(ready.label.contains("unavailable"), "the first set cannot be logged: \(ready.label)")
@@ -994,36 +1257,41 @@ final class AthleteKineticsUITests: XCTestCase {
     }
     func currentChoice() -> (XCUIElement, XCUIElementSnapshot, CGRect, String, Bool)? {
       let bar = filesSheetBar()
-      let sources: [(() -> XCUIElement, Bool)] = [
-        ({ bar.buttons.matching(named).firstMatch }, true),
-        ({ bar.descendants(matching: .any).matching(named).firstMatch }, true),
-        ({ self.app.buttons.matching(named).firstMatch }, false),
-        ({ self.app.descendants(matching: .any).matching(named).firstMatch }, false),
-      ]
       var fallback: (XCUIElement, XCUIElementSnapshot, CGRect, String, Bool)?
-      for (source, fromBar) in sources {
-        let el = source()
-        if let (snap, f, id, hittable) = readCandidate(el, fromBar: fromBar) {
-          if hittable {
-            return (el, snap, f, id, fromBar)
-          }
-          if fallback == nil {
-            fallback = (el, snap, f, id, fromBar)
+      func firstIn(_ root: XCUIElement, fromBar: Bool) -> (XCUIElement, XCUIElementSnapshot, CGRect, String, Bool)? {
+        let sources: [() -> XCUIElement] = [
+          { root.buttons.matching(named).firstMatch },
+          { root.descendants(matching: .any).matching(named).firstMatch },
+        ]
+        for source in sources {
+          let el = source()
+          if let (snap, f, id, hittable) = readCandidate(el, fromBar: fromBar) {
+            if hittable { return (el, snap, f, id, fromBar) }
+            if fallback == nil { fallback = (el, snap, f, id, fromBar) }
           }
         }
+        return nil
       }
+      let barPresent = (try? bar.snapshot()) != nil
+      if barPresent, let match = firstIn(bar, fromBar: true) { return match }
+      // Avoid whole-app .descendants(matching: .any) traversals while
+      // DOCService / filesSheetBar() is initially mounting; after 10 s check
+      // whole-app candidates so a hittable sheet Cancel overrides a
+      // non-hittable bar fallback before falling back to non-hittable.
+      if Date().timeIntervalSince(opened) >= 10,
+         let match = firstIn(self.app, fromBar: false) { return match }
       return fallback
     }
     while Date().timeIntervalSince(opened) < 30 {
       // Prefer the first enabled, hittable candidate in the sheet's bar, then
-      // the whole-app lookup (evaluated lazily so a full-tree scan is skipped
-      // whenever the bar already holds a hittable Cancel), before falling back
-      // to an enabled non-hittable candidate.
+      // (after the initial 10 s mount window) the whole-app lookup, before
+      // accepting an enabled non-hittable fallback once >= 10 s have elapsed.
       if let (candidate, snap, frame, identity, fromBar) = currentChoice() {
         // Settled: the same element (type, identifier, label, lookup) at the
         // same frame on two reads half a second apart, so the tap is not aimed
         // at a sheet still sliding in.
-        if frame == lastFrame && identity == lastIdentity {
+        if (candidate.isHittable || Date().timeIntervalSince(opened) >= 10),
+           frame == lastFrame && identity == lastIdentity {
           found = candidate; foundSnap = snap; inBar = fromBar; break
         }
         lastFrame = frame; lastIdentity = identity
@@ -1032,6 +1300,13 @@ final class AthleteKineticsUITests: XCTestCase {
         lastIdentity = ""
       }
       usleep(500_000)
+    }
+    if found == nil && !lastFrame.isNull && !lastIdentity.isEmpty {
+      if let (candidate, snap, frame, identity, fromBar) = currentChoice(),
+         (candidate.isHittable || Date().timeIntervalSince(opened) >= 10),
+         frame == lastFrame && identity == lastIdentity {
+        found = candidate; foundSnap = snap; inBar = fromBar
+      }
     }
     guard let cancel = found else {
       log("files sheet without Cancel: \(filesSheetInventory())")
@@ -1066,8 +1341,8 @@ final class AthleteKineticsUITests: XCTestCase {
   /// What the Files sheet exposes: the elements of its bar by type, label and
   /// identifier, and the last buttons in the tree (the sheet's follow the app's).
   private func filesSheetInventory() -> String {
-    let bar = app.navigationBars.matching(NSPredicate(format: "identifier CONTAINS 'DocumentManager'")).firstMatch
-    let inBar = !bar.exists ? "absent" : bar.descendants(matching: .any).allElementsBoundByIndex.prefix(30)
+    let bar = filesSheetBar()
+    let inBar = (try? bar.snapshot()) == nil ? "absent" : bar.descendants(matching: .any).allElementsBoundByIndex.prefix(30)
       .compactMap { try? $0.snapshot() }
       .map { "\($0.elementType.rawValue):\($0.label.prefix(30))|\($0.identifier.prefix(30))" }.joined(separator: "; ")
     let lastButtons = app.buttons.allElementsBoundByIndex.suffix(20)
@@ -1103,9 +1378,9 @@ final class AthleteKineticsUITests: XCTestCase {
     let deadline = Date().addingTimeInterval(300)
     var lastStatus = ""
     while Date() < deadline {
-      if filesControl(["Save", "Move", "Done", "Open", "Cancel"]).exists { break }
-      if status.exists && status.label != lastStatus {
-        lastStatus = status.label
+      if (try? filesControl(["Save", "Move", "Done", "Open", "Cancel"]).snapshot()) != nil { break }
+      if let now = currentLabel(status), now != lastStatus {
+        lastStatus = now
         log("backup status while waiting for the Files sheet: \(lastStatus.prefix(160))")
         if !lastStatus.hasPrefix("Creating") { break }
       }
@@ -1121,7 +1396,7 @@ final class AthleteKineticsUITests: XCTestCase {
         return
       }
     }
-    log("files sheet without an enabled Save/Move action: \(filesSheetInventory()); status=\(element("backup-status-message").exists ? element("backup-status-message").label : "-")")
+    log("files sheet without an enabled Save/Move action: \(filesSheetInventory()); status=\(currentLabel(status) ?? "-")")
     XCTFail("the Files export sheet had no enabled Save/Move action")
   }
 
