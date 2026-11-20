@@ -724,17 +724,6 @@ export function resolveSportWorkload(input: {
   readonly scheduled: readonly ScheduledSportSession[];
   readonly profile: (Pick<SportProfile, 'practiceSessionsPerWeek' | 'matchesPerWeek' | 'typicalSessionMinutes'> & { readonly sportId?: string | null }) | null;
 }): SportWorkload {
-  if (isLiftingSport(input.profile?.sportId)) {
-    return {
-      source: 'none',
-      sessionsPerWeek: 0,
-      knownMinutesPerWeek: 0,
-      unknownDurationSessions: 0,
-      weekdays: [],
-      tier: 'none',
-      description: 'main lifting sessions are not counted twice as outside sport practice',
-    };
-  }
   if (input.scheduled.length > 0) {
     const known = input.scheduled.filter((session) => session.expectedDurationMin !== null);
     const sessionsPerWeek = input.scheduled.length;
@@ -747,6 +736,17 @@ export function resolveSportWorkload(input: {
       tier: sportWorkloadTier(sessionsPerWeek),
       // Named, so the athlete can see exactly what was counted.
       description: `${plural(sessionsPerWeek, 'weekly session')} in your Activities schedule (${[...new Set(input.scheduled.map((session) => session.label))].join(', ')})`,
+    };
+  }
+  if (isLiftingSport(input.profile?.sportId)) {
+    return {
+      source: 'none',
+      sessionsPerWeek: 0,
+      knownMinutesPerWeek: 0,
+      unknownDurationSessions: 0,
+      weekdays: [],
+      tier: 'none',
+      description: 'main lifting sessions are not counted twice as outside sport practice',
     };
   }
   const practice = input.profile?.practiceSessionsPerWeek ?? null;
@@ -831,13 +831,9 @@ export function resolveMultiSportWorkload(input: {
   }
   const activeSports = [...new Set(input.profiles.map((profile) => profile.sportId))];
   const nonLiftingProfiles = input.profiles.filter((profile) => !isLiftingSport(profile.sportId));
-  const allLifting = input.profiles.length > 0 && nonLiftingProfiles.length === 0;
   let sessionsPerWeek: number;
   let source: SportWorkload['source'];
-  if (allLifting) {
-    sessionsPerWeek = 0;
-    source = 'none';
-  } else if (input.scheduled.length > 0) {
+  if (input.scheduled.length > 0) {
     sessionsPerWeek = input.scheduled.length;
     source = 'schedule';
   } else if (nonLiftingProfiles.length > 0) {
@@ -849,7 +845,7 @@ export function resolveMultiSportWorkload(input: {
     source = 'none';
   }
   const tier = sportWorkloadTier(sessionsPerWeek);
-  const effectiveScheduled = allLifting ? [] : input.scheduled;
+  const effectiveScheduled = input.scheduled;
   const known = effectiveScheduled.filter((session) => session.expectedDurationMin !== null);
   const endurancePlusContact = activeSports.some((sport) => ENDURANCE_SPORTS.has(sport))
     && activeSports.some((sport) => CONTACT_OR_COURT_SPORTS.has(sport));

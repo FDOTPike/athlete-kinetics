@@ -141,14 +141,16 @@ console.log('[N2] pinned embedder model staged into the iOS bundle');
     const stepBody = nextStep === -1 ? stepTail : stepTail.slice(0, nextStep);
     const shapeGuard = /if\s*\(\s*asset\.dim\s*!==\s*384\s*\|\|\s*asset\.entryIds\.length\s*!==\s*1111\s*\|\|\s*asset\.vectors\.length\s*!==\s*1111\s*\)\s*(?:\{\s*)?throw\s+new\s+Error\b/;
     const vectorGuard = /if\s*\(\s*vector\.length\s*!==\s*384\s*\|\|\s*!\(Math\.abs\(norm\s*-\s*1\)\s*<=\s*1e-3\)\s*\)\s*(?:\{\s*)?throw\s+new\s+Error\b/;
+    const routeGuard = /if\s*\(\s*(?:routed\.outcome\s*!==\s*['"]DELOAD['"]\s*\|\|\s*routed\.shown\[0\]\s*!==\s*['"]DELOAD['"]|routed\.shown\[0\]\s*!==\s*['"]DELOAD['"]\s*\|\|\s*routed\.outcome\s*!==\s*['"]DELOAD['"])\s*\)\s*(?:\{\s*)?throw\s+new\s+Error\b/;
+    const separateOutcomeGuard = /if\s*\(\s*routed\.outcome\s*!==\s*['"]DELOAD['"]\s*\)\s*(?:\{\s*)?throw\s+new\s+Error\b/;
+    const separateShownGuard = /if\s*\(\s*routed\.shown\[0\]\s*!==\s*['"]DELOAD['"]\s*\)\s*(?:\{\s*)?throw\s+new\s+Error\b/;
     return stepBody.includes('tryCreateDeviceEmbedder()')
       && stepBody.includes('question-vectors.json')
       && shapeGuard.test(stepBody)
       && /packVectors\([^,]+,\s*asset\.dim\)/.test(stepBody)
       && vectorGuard.test(stepBody)
       && /(?:routeQuestion\(\s*['"]what is a deload week['"]|const\s+question\s*=\s*['"]what is a deload week['"][\s\S]*routeQuestion\(\s*question\b)/.test(stepBody)
-      && stepBody.includes("routed.outcome !== 'DELOAD'")
-      && stepBody.includes("routed.shown[0] !== 'DELOAD'")
+      && (routeGuard.test(stepBody) || (separateOutcomeGuard.test(stepBody) && separateShownGuard.test(stepBody)))
       && smokeRequiredChecks(smokeScriptSrc).includes('question box inference + routing');
   };
   const smokeScriptSrc = read('tools/ios_simulator_smoke.sh');
@@ -167,16 +169,22 @@ console.log('[N2] pinned embedder model staged into the iOS bundle');
     '',
   );
   const noVectorDimSmoke = smoke.replaceAll('vector.length !== 384 || !(Math.abs(norm - 1) <= 1e-3)', '!(Math.abs(norm - 1) <= 1e-3)');
+  const warnOnlyRouteSmoke = smoke.replace(
+    /if\s*\(\s*routed\.outcome\s*!==\s*['"]DELOAD['"]\s*\|\|\s*routed\.shown\[0\]\s*!==\s*['"]DELOAD['"]\s*\)\s*\{\s*throw\s+new\s+Error\b/,
+    "if (routed.outcome !== 'DELOAD' || routed.shown[0] !== 'DELOAD') {\n      console.warn",
+  );
   check(
-    'falsifier: dropping the question box smoke step, removing the 1111x384 shape guard, dropping vector.length !== 384, or weakening the NaN-safe norm guard fails closed',
+    'falsifier: dropping the question box smoke step, removing the 1111x384 shape guard, dropping vector.length !== 384, weakening the NaN-safe norm guard, or downgrading route mismatch throw to warn fails closed',
     weakNormSmoke !== smoke
       && droppedStepSmoke !== smoke
       && noShapeGuardSmoke !== smoke
       && noVectorDimSmoke !== smoke
+      && warnOnlyRouteSmoke !== smoke
       && !hasQuestionBoxSmoke(droppedStepSmoke, smokeScriptSrc)
       && !hasQuestionBoxSmoke(noShapeGuardSmoke, smokeScriptSrc)
       && !hasQuestionBoxSmoke(noVectorDimSmoke, smokeScriptSrc)
-      && !hasQuestionBoxSmoke(weakNormSmoke, smokeScriptSrc),
+      && !hasQuestionBoxSmoke(weakNormSmoke, smokeScriptSrc)
+      && !hasQuestionBoxSmoke(warnOnlyRouteSmoke, smokeScriptSrc),
   );
   const stripCComments = (src) => src.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
   const hasAppDelegateOrtTelemetryDisable = (src) => {
@@ -548,10 +556,25 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
       && otherJobsClean
       && !iosJobHeader.includes('AK_BETA_BUILD')
       && unsignedStep !== '' && nonUiTestStepsClean;
+    const stepTopKeys = (stepYaml) => {
+      const keys = [];
+      for (const rawLine of stepYaml.split('\n')) {
+        const m = rawLine.match(/^(?: {8}| {6}- )(\s*(?:"(?:[^"\\]|\\.)*"|'(?:[^']|'')*'|[^:\s][^:]*?))\s*:/);
+        if (m === null) continue;
+        let k = m[1].trim();
+        if ((k.startsWith('"') && k.endsWith('"')) || (k.startsWith("'") && k.endsWith("'"))) {
+          k = k.slice(1, -1).replace(/\\"/g, '"').replace(/''/g, "'");
+        }
+        keys.push(k);
+      }
+      return keys;
+    };
+    const uiTestKeys = stepTopKeys(uiTestStep);
     const uiTestBetaEnabled = uiTestStep !== ''
       && /\n {8}env:\s*\n(?: {10}[^\n]+\n)*? {10}AK_BETA_BUILD:\s*['"]?on['"]?\b/.test(uiTestStep)
       && /xcodebuild[\s\S]*\bAK_BETA_BUILD=on\s+build-for-testing\b/.test(uiTestStep)
-      && !/\n(?: {8}| {6}- )(?:continue-on-error|if):/.test(uiTestStep);
+      && !uiTestKeys.includes('continue-on-error')
+      && !uiTestKeys.includes('if');
     return {
       ok: nonBetaClean && uiTestBetaEnabled,
       nonBetaClean,
@@ -574,14 +597,26 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
     "- name: Build unsigned Release for the simulator\n        env:\n          AK_BETA_BUILD: 'on'\n",
   );
   const iosJobBetaCi = ci.replace('    env:\n      XCODE_MAJOR:', "    env:\n      AK_BETA_BUILD: 'on'\n      XCODE_MAJOR:");
+  const quotedIfUiTestCi = ci.replace(
+    /(- name: Build the UI tests[^\n]*\n)/,
+    '$1        "if": ${{ false }}\n',
+  );
+  const quotedContinueUiTestCi = ci.replace(
+    /(- name: Build the UI tests[^\n]*\n)/,
+    "$1        'continue-on-error': true\n",
+  );
   check(
-    'falsifier: setting AK_BETA_BUILD at workflow env, ios-simulator job env, or Build unsigned Release fails non-beta isolation',
+    'falsifier: setting AK_BETA_BUILD at workflow env, ios-simulator job env, or Build unsigned Release fails non-beta isolation, and quoted if/continue-on-error keys on Build the UI tests fail closed',
     workflowBetaCi !== ci
       && unsignedBetaCi !== ci
       && iosJobBetaCi !== ci
+      && quotedIfUiTestCi !== ci
+      && quotedContinueUiTestCi !== ci
       && !checkIosBetaBuildSplit(workflowBetaCi).nonBetaClean
       && !checkIosBetaBuildSplit(unsignedBetaCi).nonBetaClean
-      && !checkIosBetaBuildSplit(iosJobBetaCi).nonBetaClean,
+      && !checkIosBetaBuildSplit(iosJobBetaCi).nonBetaClean
+      && !checkIosBetaBuildSplit(quotedIfUiTestCi).uiTestBetaEnabled
+      && !checkIosBetaBuildSplit(quotedContinueUiTestCi).uiTestBetaEnabled,
   );
   const typesSrc = read('packages/inference/src/types.ts');
   const onboardingSrc = read('apps/mobile/src/screens/OnboardingScreen.tsx');
@@ -630,7 +665,32 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
     const codeOnly = swiftSrc.replace(/\/\*[\s\S]*?\*\/|^\s*\/\/.*$/gm, '');
     const matches = [...codeOnly.matchAll(/\bfor\s+step\s+in\s+1\.\.\.(\d+)\s*\{/g)];
     if (matches.length !== 1) return null;
-    const afterLoop = codeOnly.slice(matches[0].index + matches[0][0].length);
+    const bodyStart = matches[0].index + matches[0][0].length;
+    let depth = 1;
+    let bodyEnd = -1;
+    for (let i = bodyStart; i < codeOnly.length; i += 1) {
+      const ch = codeOnly[i];
+      if (ch === '"') {
+        i += 1;
+        while (i < codeOnly.length && codeOnly[i] !== '"') {
+          if (codeOnly[i] === '\\' && i + 1 < codeOnly.length) i += 2;
+          else i += 1;
+        }
+        continue;
+      }
+      if (ch === '{') depth += 1;
+      else if (ch === '}') {
+        depth -= 1;
+        if (depth === 0) {
+          bodyEnd = i;
+          break;
+        }
+      }
+    }
+    if (bodyEnd === -1) return null;
+    const loopBody = codeOnly.slice(bodyStart, bodyEnd);
+    const afterLoop = codeOnly.slice(bodyEnd + 1);
+    if (!/\btap\(\s*"Next"/.test(loopBody)) return null;
     if (!afterLoop.includes('tap("No, nothing to note")')) return null;
     return Number(matches[0][1]);
   };
@@ -645,11 +705,14 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
     `asksMaxes=${asksMaxes} wantsSport=${wantsSport} wantsTarget=${wantsTarget} steps=${defaultSteps?.length ?? 'unknown'} expected=${expectedOnboardingSteps ?? 'unknown'} actual=${actualOnboardingSteps ?? 'missing'}`,
   );
   const staleEightScreenOnboarding = onboardingBody.replace(/\bfor\s+step\s+in\s+1\.\.\.\d+/, 'for step in 1...6');
+  const noNextTapOnboarding = onboardingBody.replace(/\btap\(\s*"Next"[^\n]*\)/, 'log("skipped next")');
   check(
-    'falsifier: completeOnboarding with 1...6 Next taps fails against the 9-screen default onboarding',
+    'falsifier: completeOnboarding with 1...6 Next taps or missing tap("Next") inside the loop fails against the 9-screen default onboarding',
     expectedOnboardingSteps === 7
+      && noNextTapOnboarding !== onboardingBody
       && completeOnboardingStepCount(staleEightScreenOnboarding) === 6
-      && completeOnboardingStepCount(staleEightScreenOnboarding) !== expectedOnboardingSteps,
+      && completeOnboardingStepCount(staleEightScreenOnboarding) !== expectedOnboardingSteps
+      && completeOnboardingStepCount(noNextTapOnboarding) === null,
   );
   const typedSportInit = onboardingSrc.replace(
     /const \[wantsSport\b[^\]]*\]\s*=\s*useState\((?:true|false)\)/,
@@ -1262,7 +1325,7 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
       const ch = noStrings[i];
       if (ch === '{') {
         const header = codeOnly.slice(lastBoundary, i);
-        const isCond = /(?:^|[\s;}])(?:if|else|switch|while)\b/.test(header);
+        const isCond = /(?:^|[\s;}])(?:if|else|switch|while|for)\b/.test(header);
         stack.push(isCond);
         if (isCond) {
           condDepth += 1;
@@ -1411,13 +1474,16 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
     /\n\s*wait\(\s*element\(\s*labelBeginsWith:\s*"A planned easy week\."[^\n]*/,
     '',
   );
+  const emptyLoopWrappedTest1 = ifFalseWrappedTest1.replace('if false {', 'for _ in [Int]() {');
   check(
-    'falsifier: plain 7-destination test1, conditional or if-false QuestionBox wrappers, early return, early issues.isEmpty assertion, or log("DELOAD") without title+definition waits all fail closed',
+    'falsifier: plain 7-destination test1, conditional, if-false, or empty-loop QuestionBox wrappers, early return, early issues.isEmpty assertion, or log("DELOAD") without title+definition waits all fail closed',
     deloadLogOnlyTest1 !== test1Body
       && missingDeloadDefTest1 !== test1Body
+      && emptyLoopWrappedTest1 !== ifFalseWrappedTest1
       && !hasGlossaryAndQuestionBoxInTest1(plainSevenScreenTest1)
       && !hasGlossaryAndQuestionBoxInTest1(conditionalQuestionBoxTest1)
       && !hasGlossaryAndQuestionBoxInTest1(ifFalseWrappedTest1)
+      && !hasGlossaryAndQuestionBoxInTest1(emptyLoopWrappedTest1)
       && !hasGlossaryAndQuestionBoxInTest1(earlyReturnTest1)
       && !hasGlossaryAndQuestionBoxInTest1(earlyAssertTest1)
       && !hasGlossaryAndQuestionBoxInTest1(deloadLogOnlyTest1)

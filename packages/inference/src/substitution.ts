@@ -352,9 +352,11 @@ export function deriveAvoidPromotionsFromSwaps(
 }
 
 /** Issue #208 neutral parity swap ranking: same-pattern available movements
- *  ranked at matched difficulty first (|tierDelta| === 0, then 1) with neutral copy. */
+ *  ranked at matched difficulty first (|tierDelta| === 0, then 1) with neutral copy.
+ *  A halt-level niggle ends the session; neutral replacements are never offered while haltAdvised is true. */
 export function computeNeutralSwapOptions(input: SubstitutionInput): NeutralSwapOption[] {
-  const { targetRank, available, tierBars, guardrailBars } = createSubstitutionPredicates(input);
+  const { haltAdvised, targetRank, available, tierBars, guardrailBars } = createSubstitutionPredicates(input);
+  if (haltAdvised) return [];
   const options: NeutralSwapOption[] = [];
   for (const m of input.library) {
     if (m.movement_id === input.target.movement_id) continue;

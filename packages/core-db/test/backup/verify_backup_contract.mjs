@@ -160,7 +160,7 @@ function makeDatabase(file, label) {
   db.prepare('INSERT INTO session_plan_slot_planned_count (session_plan_slot_id, original_planned_sets) VALUES (?,?)').run(7101, 2);
   db.prepare('INSERT INTO state_vector_kinestrike (date, ks_foot, ks_strike_count, ks_gct_mean_ms) VALUES (?,?,?,?)').run('2026-09-11', 'L', 42, 238.5);
   db.prepare('INSERT INTO session_slot_swap_cause (session_plan_slot_id, cause, scope, replaced_movement_id, replaced_by_session_plan_slot_id, recorded_at_ms) VALUES (?,?,?,?,?,?)').run(7101, 'equipment_busy', 'today_only', 1, 7102, 8500);
-  db.exec('PRAGMA user_version=74');
+  db.exec('PRAGMA user_version=80');
   assert.equal(db.prepare('PRAGMA quick_check').get().quick_check, 'ok');
   const schemaObjects = db.prepare("SELECT type,name,tbl_name,coalesce(sql,'') AS sql FROM sqlite_master WHERE type IN ('table','index','trigger') AND name NOT GLOB 'sqlite_*' ORDER BY type,name").all()
     .map((object) => [object.type, object.name, object.tbl_name, object.sql, object.type === 'table'
@@ -178,7 +178,7 @@ function makeDatabase(file, label) {
 function snapshot(athleteId, dbName, bytes) {
   return {
     athleteId, dbName, byteLength: bytes.length, sha256Hex: cryptoProvider.sha256Hex(bytes),
-    userVersion: 74, tableCount: 125, databaseBase64: backup.bytesToBase64(bytes),
+    userVersion: 80, tableCount: 140, databaseBase64: backup.bytesToBase64(bytes),
   };
 }
 
@@ -280,8 +280,8 @@ const archive = {
   backupId: '00112233445566778899aabbccddeeff',
   createdAt: '2026-09-13T05:00:00.000Z',
   sourceAppVersion: '0.1.0',
-  sourceSchemaVersion: 74,
-  sourceMigrationSlot: 75,
+  sourceSchemaVersion: 80,
+  sourceMigrationSlot: 81,
   scope: 'all-athletes',
   restorePolicy: 'replace',
   registry: {
@@ -394,14 +394,20 @@ try {
   );
   await assert.rejects(() => backup.sealBackup(archive, 'too-short', cryptoProvider), /at least 12/);
 
-  const compatible = { readerSchemaVersion: 74, supportedSourceSchemaVersions: [63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74], readerMigrationSlot: 75, supportedSourceMigrationSlots: [64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75] };
+  const compatible = {
+    readerSchemaVersion: 80,
+    supportedSourceSchemaVersions: [63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80],
+    readerMigrationSlot: 81,
+    supportedSourceMigrationSlots: [64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81],
+  };
   assert.equal(backup.decideRestore('merge', opened.archive, compatible).code, 'merge_not_supported');
   assert.equal(backup.decideRestore('replace', opened.archive, compatible).recoveryCopyRequired, true);
   assert.equal(backup.decideRestore('replace', opened.archive, { ...compatible, readerSchemaVersion: 69 }).code, 'newer_schema');
   assert.equal(backup.decideRestore('replace', opened.archive, { ...compatible, supportedSourceSchemaVersions: [63, 64, 65, 66, 67, 68, 69] }).code, 'schema_adapter_unavailable');
-  assert.equal(backup.decideRestore('replace', { ...opened.archive, sourceMigrationSlot: 76 }, compatible).code, 'newer_schema');
-  // A supported pre-upgrade archive is restorable; it is not treated as current.
+  assert.equal(backup.decideRestore('replace', { ...opened.archive, sourceMigrationSlot: 82 }, compatible).code, 'newer_schema');
+  // Supported historical pre-upgrade archives (v63/slot 64 and v74/slot 75) remain restorable without being current.
   assert.equal(backup.decideRestore('replace', { ...opened.archive, sourceSchemaVersion: 63, sourceMigrationSlot: 64 }, compatible).ok, true);
+  assert.equal(backup.decideRestore('replace', { ...opened.archive, sourceSchemaVersion: 74, sourceMigrationSlot: 75 }, compatible).ok, true);
 
   // Archive validation is contract-driven and fails closed. A database table
   // count is compared against the count of the schema the archive DECLARES,

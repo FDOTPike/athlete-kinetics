@@ -1106,7 +1106,8 @@ final class AthleteKineticsUITests: XCTestCase {
     if planned.waitForExistence(timeout: 15) {
       reveal(planned, "today's planned session"); planned.tap(); log("today: planned session started")
     } else if unplanned.exists {
-      reveal(unplanned, "an unplanned session"); unplanned.tap(); log("today: unplanned session started (\(unplanned.label))")
+      let unplannedLabel = currentLabel(unplanned) ?? "today-adhoc-session"
+      reveal(unplanned, "an unplanned session"); unplanned.tap(); log("today: unplanned session started (\(unplannedLabel))")
     } else {
       log("today: no start control; workout tab used")
       tap("header-session", "Workout")

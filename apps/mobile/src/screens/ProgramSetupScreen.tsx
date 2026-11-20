@@ -251,7 +251,7 @@ export default function ProgramSetupScreen({
         ? { kind: 'weeks', blockCount }
         : { kind: 'date', requestedReviewDate: reviewDate.trim() },
       schemaType,
-      scheduleMode: 'iso_weekday',
+      scheduleMode: editing && program !== null ? program.scheduleMode : 'iso_weekday',
       dayIndices,
       days,
       movementPreferences: buildMode === 'custom' ? preferences : [],
@@ -260,7 +260,7 @@ export default function ProgramSetupScreen({
       ...(sessionCapOverride === null ? {} : { sessionDurationCapMin: sessionCapOverride }),
     };
   }, [
-    horizonKind, schemaType, buildMode, blockCount, reviewDate, dayIndices,
+    editing, program?.scheduleMode, horizonKind, schemaType, buildMode, blockCount, reviewDate, dayIndices,
     preferences, slotOverrides, routineAssignments, canCustomizeAdvanced,
     dayFocuses, profile.objective, sessionCapOverride,
   ]);
@@ -272,9 +272,9 @@ export default function ProgramSetupScreen({
     } catch (error) {
       return { preview: null, error: error instanceof Error ? error.message : String(error) };
     }
-    // previewTrainingProgram reads the prior-experience list from the store at
-    // call time, so a declaration (or revoke) must redraw the week (#211).
-  }, [input, previewTrainingProgram, movementAvailabilityRevision, activePriorExperienceMovementIds]);
+    // previewTrainingProgram reads the prior-experience list and profile.base_rpe_cap
+    // from the store at call time, so changes to either must redraw the preview (#211, #229).
+  }, [input, previewTrainingProgram, movementAvailabilityRevision, activePriorExperienceMovementIds, profile.base_rpe_cap]);
 
   const availableIdsByContext = useMemo(() => ({
     weight_room: new Set(getVerdicts('weight_room')
@@ -861,10 +861,17 @@ export default function ProgramSetupScreen({
         </View>
       </View>
 
-      {buildMode === 'custom' && customizeSessions.length > 0 && (
+      {buildMode === 'custom' && (customizeSessions.length > 0 || (canCustomizeAdvanced && dayIndices.length > 0)) && (
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>5. Customize generated week</Text>
-          {customizeSessions.map((session) => {
+          {(customizeSessions.length > 0
+            ? customizeSessions
+            : dayIndices.map((dayIndex, i) => ({
+                day_index: dayIndex,
+                focus: (dayFocuses[dayIndex] ?? programFocuses(profile.objective, dayIndices.length)[i] ?? 'full') as BlockFocus,
+                slots: [] as typeof customizeSessions[number]['slots'],
+              }))
+          ).map((session) => {
             const assignedRoutine = canCustomizeAdvanced
               ? routineAssignments.find((item) => item.dayIndex === session.day_index)
               : undefined;

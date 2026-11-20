@@ -699,54 +699,91 @@ export function runMigrations(db: MigrationDb, migrations: readonly string[]): v
     // Preserve 078-only sport rows (`olympic_weightlifting`, `strongman`, or
     // `matches_per_week > 14`) across full replay because frozen 076 rebuilds
     // `athlete_sport_profile` with its older 22-sport / 0..14 CHECK before 078
-    // widens it again.
+    // widens it again. Use a durable stash table (never TEMP, never dropped in
+    // `finally`) so replay failures or process interruptions cannot discard
+    // existing athlete state and retries reuse the preserved copy.
     const shouldStash078SportRows =
-      hasObject(db, 'table', 'athlete_sport_profile')
+      (hasObject(db, 'table', 'athlete_sport_profile') || hasObject(db, 'table', '_ak_replay_stash_078_sport'))
       && migrations.some((m) => /athlete_sport_profile_078/.test(m));
     if (shouldStash078SportRows) {
-      db.executeSync('DROP TABLE IF EXISTS _ak_replay_stash_078_sport;');
-      db.executeSync(
-        `CREATE TEMP TABLE _ak_replay_stash_078_sport AS
-         SELECT sport_profile_id, sport_id, other_sport_name, outcome_id, experience_id,
-                practice_sessions_per_week, matches_per_week, typical_session_min,
-                competition_date, revision, updated_at_ms
-         FROM athlete_sport_profile
-         WHERE sport_id IN ('olympic_weightlifting', 'strongman')
-            OR (matches_per_week IS NOT NULL AND matches_per_week > 14);`,
-      );
-      db.executeSync(
-        `DELETE FROM athlete_sport_profile
-         WHERE sport_id IN ('olympic_weightlifting', 'strongman')
-            OR (matches_per_week IS NOT NULL AND matches_per_week > 14);`,
-      );
-    }
-    try {
-      db.executeSync('PRAGMA user_version = 0;');
-      applyFrom(db, migrations, 0);
-      if (shouldStash078SportRows) {
-        db.executeSync(
-          `INSERT INTO athlete_sport_profile (
-             sport_profile_id, sport_id, other_sport_name, outcome_id, experience_id,
-             practice_sessions_per_week, matches_per_week, typical_session_min,
-             competition_date, revision, updated_at_ms)
-           SELECT sport_profile_id, sport_id, other_sport_name, outcome_id, experience_id,
-                  practice_sessions_per_week, matches_per_week, typical_session_min,
-                  competition_date, revision, updated_at_ms
-           FROM _ak_replay_stash_078_sport;`,
-        );
-      }
-    } finally {
-      if (shouldStash078SportRows) {
-        try {
-          db.executeSync('DROP TABLE IF EXISTS _ak_replay_stash_078_sport;');
-        } catch {
-          /* temp cleanup only */
+      const stashExists = hasObject(db, 'table', '_ak_replay_stash_078_sport');
+      db.executeSync('BEGIN');
+      try {
+        if (!stashExists) {
+          db.executeSync(
+            `CREATE TABLE _ak_replay_stash_078_sport AS
+             SELECT sport_profile_id, sport_id, other_sport_name, outcome_id, experience_id,
+                    practice_sessions_per_week, matches_per_week, typical_session_min,
+                    competition_date, revision, updated_at_ms
+             FROM athlete_sport_profile
+             WHERE sport_id IN ('olympic_weightlifting', 'strongman')
+                OR (matches_per_week IS NOT NULL AND matches_per_week > 14);`,
+          );
+        } else if (hasObject(db, 'table', 'athlete_sport_profile')) {
+          db.executeSync(
+            `INSERT OR IGNORE INTO _ak_replay_stash_078_sport (
+               sport_profile_id, sport_id, other_sport_name, outcome_id, experience_id,
+               practice_sessions_per_week, matches_per_week, typical_session_min,
+               competition_date, revision, updated_at_ms)
+             SELECT sport_profile_id, sport_id, other_sport_name, outcome_id, experience_id,
+                    practice_sessions_per_week, matches_per_week, typical_session_min,
+                    competition_date, revision, updated_at_ms
+             FROM athlete_sport_profile
+             WHERE sport_id IN ('olympic_weightlifting', 'strongman')
+                OR (matches_per_week IS NOT NULL AND matches_per_week > 14);`,
+          );
         }
+        if (hasObject(db, 'table', 'athlete_sport_profile')) {
+          db.executeSync(
+            `DELETE FROM athlete_sport_profile
+             WHERE sport_id IN ('olympic_weightlifting', 'strongman')
+                OR (matches_per_week IS NOT NULL AND matches_per_week > 14);`,
+          );
+        }
+        db.executeSync('COMMIT');
+      } catch (e) {
+        db.executeSync('ROLLBACK');
+        throw e;
       }
     }
+    db.executeSync('PRAGMA user_version = 0;');
+    applyFrom(db, migrations, 0);
     const still = sentinelsMissing(db);
     if (still.length > 0) {
       throw new Error(`schema incomplete after full re-apply: missing ${still.join(', ')}`);
+    }
+  }
+  // If an earlier replay stashed 078-only sport rows and was interrupted or
+  // resumed via normal applyFrom, restore and verify them before dropping the stash.
+  if (hasObject(db, 'table', '_ak_replay_stash_078_sport') && hasObject(db, 'table', 'athlete_sport_profile')) {
+    db.executeSync('BEGIN');
+    try {
+      db.executeSync(
+        `INSERT OR IGNORE INTO athlete_sport_profile (
+           sport_profile_id, sport_id, other_sport_name, outcome_id, experience_id,
+           practice_sessions_per_week, matches_per_week, typical_session_min,
+           competition_date, revision, updated_at_ms)
+         SELECT sport_profile_id, sport_id, other_sport_name, outcome_id, experience_id,
+                practice_sessions_per_week, matches_per_week, typical_session_min,
+                competition_date, revision, updated_at_ms
+         FROM _ak_replay_stash_078_sport;`,
+      );
+      const missingRestored = db.executeSync(
+        `SELECT COUNT(*) AS n
+           FROM _ak_replay_stash_078_sport s
+          WHERE NOT EXISTS (
+            SELECT 1 FROM athlete_sport_profile p
+             WHERE p.sport_profile_id = s.sport_profile_id
+          );`,
+      ).rows?.[0]?.n;
+      if (Number(missingRestored ?? 0) !== 0) {
+        throw new Error(`failed to restore ${String(missingRestored)} stashed 078 sport profile row(s)`);
+      }
+      db.executeSync('DROP TABLE _ak_replay_stash_078_sport;');
+      db.executeSync('COMMIT');
+    } catch (e) {
+      db.executeSync('ROLLBACK');
+      throw e;
     }
   }
 }

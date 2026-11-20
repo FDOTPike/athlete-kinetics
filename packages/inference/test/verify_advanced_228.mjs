@@ -149,12 +149,23 @@ const profileFor = (training_age = 'advanced', overrides = {}) => ({
     movements: ALL_MOVEMENTS,
     startDate: '2026-11-18',
     schemaType: 'LINEAR',
+    scheduleMode: 'iso_weekday',
     programDays: [
       { day_index: 1, focus: 'lower' },
       { day_index: 3, focus: 'upper' },
       { day_index: 5, focus: 'full' },
     ],
   });
+
+  // Omitting scheduleMode preserves relative_day_index scheduling (day 1 lands on startDate).
+  const relativeDefault = generateBlock({
+    profile: profileFor('advanced', { weekly_frequency: 1 }),
+    movements: ALL_MOVEMENTS,
+    startDate: '2026-11-18',
+    schemaType: 'LINEAR',
+  });
+  assert.equal(relativeDefault.sessions[0].session_date, '2026-11-18',
+    'omitted scheduleMode preserves relative day-1 offset on Wednesday startDate');
 
   const w1 = plan.sessions.filter((s) => s.week_index === 1);
   assert.deepEqual(

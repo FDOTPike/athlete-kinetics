@@ -408,6 +408,7 @@ console.log('[Phase2 #229 Q7] Lifting taxonomy & outside workload exclusion');
     profile: mkProfile({ training_age: 'advanced', weekly_frequency: 1, session_duration_cap_min: 240 }),
     startDate: '2026-11-18',
     macroBlockIndex: 5,
+    scheduleMode: 'iso_weekday',
     programDays: [{ day_index: 3, focus: 'full', slot_overrides: [
       { slot_index: 1, sets: 10 }, { slot_index: 2, sets: 10 },
     ] }],

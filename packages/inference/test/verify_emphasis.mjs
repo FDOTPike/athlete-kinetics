@@ -456,12 +456,37 @@ console.log('[8] sport changes selection');
     names(day(baseline, 1))[0] === 'Front Squat'
       && names(day(meet, 1)).slice(0, 2).join(' | ') === 'Competition Squat | Deadlift' && names(day(meet, 2))[0] === 'Competition Bench'
       && meet.emphasis.applied.includes('Competition lifts planned as main lifts: Competition Squat, Competition Bench, Deadlift.'));
-  check('a competition date drives backward countdown and is reported in applied',
-    meet.emphasis.applied.some((line) => line === `Your blocks count down to peak and taper for competition on 2027-03-01. ${sp.COMPETITION_DATE_NOTE}`)
-      && !meet.emphasis.omitted.some((line) => /does not change this plan/.test(line)));
-  const datedFootball = plan(profile({ objective: 'gpp' }), { sport: { ...football, competitionDate: '2027-03-01' }, workload: workloadOf(football) });
-  check('with only generateBlock (no plannedEndDate), countdown note is in applied while 4-week block matches',
-    datedFootball.emphasis.applied.some((line) => line === `Your blocks count down to peak and taper for competition on 2027-03-01. ${sp.COMPETITION_DATE_NOTE}`)
+  check('emphasis-only competitionDate without BlockInput.competitionDate does not falsely claim an applied countdown',
+    !meet.emphasis.applied.some((line) => /count down to peak and taper/.test(line)));
+  const meetCountdownDate = '2026-10-29';
+  const datedMeet = gen.generateBlock({
+    profile: profile(),
+    movements,
+    startDate: '2026-10-05',
+    schemaType: 'LINEAR',
+    emphasis: emphasisOf({ sport: { ...lifter, competitionDate: meetCountdownDate }, workload: workloadOf(lifter) }),
+    competitionDate: meetCountdownDate,
+    sportId: 'powerlifting',
+  });
+  check('BlockInput.competitionDate applies pre-meet taper, clips sessions on/after meet day, and reports applied countdown',
+    datedMeet.sessions.length > 0
+      && datedMeet.sessions.every((s) => s.session_date < meetCountdownDate)
+      && datedMeet.sessions.filter((s) => s.session_date >= '2026-10-26').length > 0
+      && datedMeet.sessions.filter((s) => s.session_date >= '2026-10-26').every((s) => s.phase === 'deload' && s.slots.every((sl) => sl.sets === 2 && sl.backOff === undefined))
+      && datedMeet.emphasis.applied.some((line) => line === `Your blocks count down to peak and taper for competition on ${meetCountdownDate}. ${sp.COMPETITION_DATE_NOTE}`));
+  const datedFootball = gen.generateBlock({
+    profile: profile({ objective: 'gpp' }),
+    movements,
+    startDate: '2026-10-05',
+    schemaType: 'LINEAR',
+    emphasis: emphasisOf({ sport: { ...football, competitionDate: meetCountdownDate }, workload: workloadOf(football) }),
+    competitionDate: meetCountdownDate,
+    sportId: 'football_association',
+  });
+  check('non-powerlifting BlockInput.competitionDate applies taper, clips meet day, and reports applied countdown without competition lifts',
+    datedFootball.sessions.length > 0
+      && datedFootball.sessions.every((s) => s.session_date < meetCountdownDate)
+      && datedFootball.emphasis.applied.some((line) => line === `Your blocks count down to peak and taper for competition on ${meetCountdownDate}. ${sp.COMPETITION_DATE_NOTE}`)
       && !datedFootball.emphasis.applied.some((line) => /Competition lifts/.test(line)));
   const noRack = plan(profile({ equipment_inventory: ALL_EQUIPMENT.filter((item) => item !== 'barbell') }), { sport: lifter, workload: workloadOf(lifter) });
   check('competition lifts obey the gates: without a barbell none is planned and each is reported',

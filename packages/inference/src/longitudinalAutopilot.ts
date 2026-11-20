@@ -1262,6 +1262,11 @@ export function applyLongitudinalOverlayToBlockPlan(
 
       if (nextSets !== slot.sets) {
         slot.sets = nextSets;
+        if (slot.backOff !== undefined) {
+          const boSets = Math.min(slot.backOff.sets, Math.max(0, slot.sets - 1));
+          if (boSets === 0) delete slot.backOff;
+          else slot.backOff = { ...slot.backOff, sets: boSets };
+        }
         adjustedPatterns.add(pattern);
       }
 
@@ -1319,7 +1324,13 @@ export function applyLongitudinalOverlayToBlockPlan(
     });
 
     for (const index of fit.trimmedSlotIndices) {
-      session.slots[index]!.sets = fit.sets[index]!;
+      const slot = session.slots[index]!;
+      slot.sets = fit.sets[index]!;
+      if (slot.backOff !== undefined) {
+        const boSets = Math.min(slot.backOff.sets, Math.max(0, slot.sets - 1));
+        if (boSets === 0) delete slot.backOff;
+        else slot.backOff = { ...slot.backOff, sets: boSets };
+      }
     }
     if (fit.trimmedSlotIndices.length > 0) {
       warnings.add(

@@ -363,15 +363,24 @@ export const describeCompetitionLifts = (planned: readonly string[], missing: re
 };
 
 /** The fixed lines every report carries for a sport answer. */
-export function sportReportLines(emphasis: ProgramEmphasis): { applied: string[]; omitted: string[] } {
+export function sportReportLines(
+  emphasis: ProgramEmphasis,
+  options?: { readonly countdownApplied?: boolean; readonly competitionDate?: string | null },
+): { applied: string[]; omitted: string[] } {
   const applied: string[] = [];
   const omitted: string[] = [];
   if (emphasis.sport !== null) {
     applied.push(`${emphasis.sport.name} — ${emphasis.sport.outcomeLabel.toLowerCase()}: ${emphasis.sport.summary}`);
     omitted.push(...emphasis.sport.limits);
-    if (emphasis.sport.competitionDate !== null) {
-      applied.push(`Your blocks count down to peak and taper for competition on ${emphasis.sport.competitionDate}. ${COMPETITION_DATE_NOTE}`);
-    } else if (emphasis.sport.competitionLifts) {
+    const countdownDate = options?.competitionDate !== undefined
+      ? options.competitionDate
+      : emphasis.sport.competitionDate;
+    const countdownApplied = options?.countdownApplied !== undefined
+      ? options.countdownApplied
+      : countdownDate !== null;
+    if (countdownApplied && countdownDate !== null) {
+      applied.push(`Your blocks count down to peak and taper for competition on ${countdownDate}. ${COMPETITION_DATE_NOTE}`);
+    } else if (emphasis.sport.competitionLifts && emphasis.sport.competitionDate === null) {
       omitted.push('The app does not plan a peak, a taper or a maximum test without a competition date.');
     }
   }

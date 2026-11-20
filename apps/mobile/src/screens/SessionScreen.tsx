@@ -823,7 +823,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
   const stableTargetRpe = currentSlot?.targetRpe ?? 8;
   const inBackOffPhase =
     currentSlot?.backOff !== undefined && currentSlot.backOff.sets > 0
-    && target?.kind === 'reps' && currentLogged >= 1;
+    && target?.kind === 'reps' && currentLogged >= 1 && currentLogged <= currentSlot.backOff.sets;
   const activeTargetReps = inBackOffPhase
     ? currentSlot.backOff!.reps
     : (target?.kind === 'reps' ? target.reps : null);
@@ -1007,7 +1007,11 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
       overrideLoadKg: currentSlot.overrideLoadKg,
       sessionPlanSlotId: currentSlot.sessionPlanSlotId,
     });
-    const initial = seed.initialLoadKg;
+    const backOffInitial = inBackOffPhase && currentLogged === 1
+      && firstSlotSet !== null && Number.isFinite(firstSlotSet.load_kg) && firstSlotSet.load_kg > 0
+      ? computeBackOffLoadKg(firstSlotSet.load_kg, currentSlot.backOff!.loadMultiplier)
+      : null;
+    const initial = backOffInitial ?? seed.initialLoadKg;
     loadShownRef.current = {
       slotId: currentSlot.sessionPlanSlotId,
       logged: currentLogged,
@@ -2398,6 +2402,19 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                     <Text style={styles.closeText}>×</Text>
                   </Pressable>
                 </View>
+                {substitution.result.haltAdvised ? (
+                  <View style={styles.subHalt} testID="neutral-swap-halt">
+                    <Text style={styles.subHaltText}>This report needs a pause rather than another exercise today.</Text>
+                    <SecondaryButton
+                      label="Stop session"
+                      onPress={() => runnerHalt('safety')}
+                      accessibilityLabel="Halt session from substitution safety advice"
+                      fullWidth={true}
+                      style={{ marginTop: theme.space[3] }}
+                    />
+                  </View>
+                ) : (
+                  <>
                 <View style={[styles.rirChoicesRow, { marginTop: theme.space[3], flexWrap: 'wrap' }]}>
                   {NEUTRAL_SWAP_CAUSES.map((cause) => (
                     <Chip
@@ -2501,6 +2518,8 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                     }}
                   />
                 </View>
+                  </>
+                )}
               </>
             ) : pendingSub !== null && subTargetLogged > 0 ? (
               <>
