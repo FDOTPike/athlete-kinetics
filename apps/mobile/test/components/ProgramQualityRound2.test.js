@@ -53,13 +53,17 @@ const previewFixture = (over = {}) => ({
 // helpers walk straight through it, leaving its default answer (balanced whole
 // body) in place. The focus and target screens themselves are covered in
 // OnboardingFocusGoal.test.js.
+// The optional one-rep-max screen (issue #218) joins from SOME MILEAGE up and
+// is walked through the same way (covered in OnboardingMaxesStep.test.js).
+const passThrough = () => screen.queryByTestId('focus-picker') !== null
+  || screen.queryByTestId('onboarding-maxes-step') !== null;
 const pressNext = () => {
   fireEvent.press(screen.getByLabelText('Next'));
-  if (screen.queryByTestId('focus-picker') !== null) fireEvent.press(screen.getByLabelText('Next'));
+  if (passThrough()) fireEvent.press(screen.getByLabelText('Next'));
 };
 const pressBack = () => {
   fireEvent.press(screen.getByLabelText('Back'));
-  if (screen.queryByTestId('focus-picker') !== null) fireEvent.press(screen.getByLabelText('Back'));
+  if (passThrough()) fireEvent.press(screen.getByLabelText('Back'));
 };
 
 describe('Round 2 R5: the limitations screen blocks NEXT until an explicit answer', () => {
@@ -152,7 +156,7 @@ describe('Round 2 R6: the review screen discloses progression methodology', () =
     };
   });
 
-  test('the coach-defaults block names the progression methodology', () => {
+  test('the coach-defaults block does not show a progression method nothing reads (#171)', () => {
     render(<OnboardingScreen />);
     for (let i = 0; i < 5; i += 1) pressNext();
     fireEvent.press(screen.getByLabelText('No, nothing to note'));
@@ -167,7 +171,9 @@ describe('Round 2 R6: the review screen discloses progression methodology', () =
       return '';
     };
     const block = screen.getByTestId('onboarding-coach-defaults');
-    expect(joinTexts(block)).toContain('Progression method: Autoregulated');
+    expect(joinTexts(block)).toContain('Energy focus:');
+    // OW-008: no planner reads progression_methodology yet, so it is not shown.
+    expect(joinTexts(block)).not.toContain('Progression method');
   });
 });
 
@@ -230,8 +236,8 @@ describe('Round 2: ProgramSetupScreen power explanation, capacity law, progressi
     fireEvent.press(screen.getByText('Coach build'));
     fireEvent.press(screen.getByText('Duration'));
     fireEvent.press(screen.getByText('4 wk'));
-    fireEvent.press(screen.getAllByText('Tomorrow')[0]);
-    fireEvent.press(screen.getAllByText('Day 6')[0]);
+    fireEvent.press(screen.getAllByText('Tue')[0]);
+    fireEvent.press(screen.getAllByText('Sat')[0]);
     const shaped = strengthAnchorCapacity(
       mockState.profile, programFocuses, defaultProgramDayIndices,
       [{ dayIndex: 1, focus: 'lower' }, { dayIndex: 4, focus: 'lower' }],
@@ -247,8 +253,8 @@ describe('Round 2: ProgramSetupScreen power explanation, capacity law, progressi
     // Simulated edits: with two lower days, changing either day's focus to
     // upper (or full) covers all three roles — both are real fixes.
     const fixLine = screen.getByTestId('capacity-focus-fixes').props.children.join('');
-    expect(fixLine).toContain("set Today's focus to upper");
-    expect(fixLine).toContain("set Day 4's focus to upper");
+    expect(fixLine).toContain("set Mon's focus to Upper");
+    expect(fixLine).toContain("set Thu's focus to Upper");
     // No stale/conflicting copy (Round 6 removals).
     expect(screen.queryByText(/Not enough training days for the big three/)).toBeNull();
     expect(screen.queryByText(/Easiest fix/)).toBeNull();
@@ -259,9 +265,9 @@ describe('Round 2: ProgramSetupScreen power explanation, capacity law, progressi
     // DRAFT, not the profile (the defect the auditor demonstrated).
     expect(strengthAnchorCapacity(mockState.profile, programFocuses, defaultProgramDayIndices)).toBe(3);
 
-    // Switching day 4 to 'upper' adds the push_h role: the draft now covers
+    // Switching day 4 to 'Upper' adds the push_h role: the draft now covers
     // all three roles and the warning disappears.
-    fireEvent.press(screen.getAllByText('upper')[1]); // day-4 row's upper chip
+    fireEvent.press(screen.getAllByText('Upper')[1]); // day-4 row's Upper chip
     expect(screen.queryByTestId('strength-capacity-warning')).toBeNull();
   });
 
@@ -273,14 +279,14 @@ describe('Round 2: ProgramSetupScreen power explanation, capacity law, progressi
     fireEvent.press(screen.getByText('Coach build'));
     fireEvent.press(screen.getByText('Duration'));
     fireEvent.press(screen.getByText('4 wk'));
-    fireEvent.press(screen.getAllByText('Tomorrow')[0]);
-    fireEvent.press(screen.getAllByText('Day 6')[0]);
+    fireEvent.press(screen.getAllByText('Tue')[0]);
+    fireEvent.press(screen.getAllByText('Sat')[0]);
     // 60 min -> budget 3; lower menu [squat, hinge, lunge] keeps both anchor
     // roles, so the draft covers squat+hinge (2). Changing a day to upper
     // adds push_h -> 3 roles: the fix IS claimable.
     expect(screen.getByTestId('strength-capacity-warning')).toBeOnTheScreen();
     const fixLine = screen.getByTestId('capacity-focus-fixes').props.children.join('');
-    expect(fixLine).toContain("set Today's focus to upper");
+    expect(fixLine).toContain("set Mon's focus to Upper");
     expect(screen.queryByTestId('capacity-day-fix')).toBeNull();
   });
 
@@ -292,14 +298,12 @@ describe('Round 2: ProgramSetupScreen power explanation, capacity law, progressi
     fireEvent.press(screen.getByText('Coach build'));
     fireEvent.press(screen.getByText('Duration'));
     fireEvent.press(screen.getByText('4 wk'));
-    // The directive's scenario: ONE 15-minute lower day (drop Tomorrow,
-    // Day 4, Day 6). No single-focus day carries all three roles at a
-    // 2-slot budget, so NO focus-only edit is claimed; the advice is to
-    // add a day. (With TWO lower days an upper swap does fix it — covered
-    // by the 60-minute case above.)
-    fireEvent.press(screen.getAllByText('Tomorrow')[0]);
-    fireEvent.press(screen.getAllByText('Day 4')[0]);
-    fireEvent.press(screen.getAllByText('Day 6')[0]);
+    // The directive's scenario: ONE 15-minute lower day (drop Tue, Thu, Sat).
+    // No single-focus day carries all three roles at a 2-slot budget, so NO
+    // focus-only edit is claimed; the advice is to add a day.
+    fireEvent.press(screen.getAllByText('Tue')[0]);
+    fireEvent.press(screen.getAllByText('Thu')[0]);
+    fireEvent.press(screen.getAllByText('Sat')[0]);
     expect(screen.getByTestId('strength-capacity-warning')).toBeOnTheScreen();
     expect(screen.queryByTestId('capacity-focus-fixes')).toBeNull();
     expect(screen.getByTestId('capacity-day-fix').props.children.join(''))
@@ -329,5 +333,42 @@ describe('Round 2: ProgramSetupScreen power explanation, capacity law, progressi
     expect(screen.getByTestId('weekly-progression-summary')).toBeOnTheScreen();
     expect(screen.getByText(/same work at a higher target effort/)).toBeOnTheScreen();
     expect(screen.getByText(/deload/)).toBeOnTheScreen();
+    // #169: the block's own week-to-week change, from the generated plan.
+    expect(screen.getByText('Week 2: the same working sets as week 1 (4), at a higher target effort (RPE 7 → 7.5).')).toBeOnTheScreen();
+    expect(screen.getByText('Week 4: fewer working sets than week 3 (4 → 2), at a lower target effort (RPE 8 → 6.5).')).toBeOnTheScreen();
+  });
+
+  test('#169 a hypertrophy block whose sets rise into week 3 is described as it is, by phase name', () => {
+    mockState.previewTrainingProgram = jest.fn(() => previewFixture({
+      plan: {
+        ...previewFixture().plan,
+        sessions: [
+          { week_index: 1, day_index: 1, focus: 'upper', phase: 'accumulation', slots: [{ slot_index: 1, movement_id: 1, sets: 3, reps: 10, target_rpe: 7 }] },
+          { week_index: 2, day_index: 1, focus: 'upper', phase: 'intensification', slots: [{ slot_index: 1, movement_id: 1, sets: 4, reps: 10, target_rpe: 7.5 }] },
+          { week_index: 3, day_index: 1, focus: 'upper', phase: 'realization', slots: [{ slot_index: 1, movement_id: 1, sets: 5, reps: 10, target_rpe: 8 }] },
+          { week_index: 4, day_index: 1, focus: 'upper', phase: 'deload', slots: [{ slot_index: 1, movement_id: 1, sets: 2, reps: 10, target_rpe: 6 }] },
+        ],
+      },
+    }));
+    mockState.movements = [{ movement_id: 1, name: 'Dumbbell Bench Press', pattern: 'push_h' }];
+    render(<ProgramSetupScreen />);
+    openProgramControls();
+    fireEvent.press(screen.getByText('Coach build'));
+    fireEvent.press(screen.getByText('Duration'));
+    fireEvent.press(screen.getByText('4 wk'));
+    fireEvent.press(screen.getByText('Linear'));
+    expect(screen.getByText('Week 3 (Realise): more working sets than week 2 (4 → 5), at a higher target effort (RPE 7.5 → 8).')).toBeOnTheScreen();
+    expect(screen.queryByText(/lowest volume|Volume comes down/i)).toBeNull();
+  });
+});
+
+// #228 Q3: explicit Mon–Sun ISO weekday labels (1 = Mon .. 7 = Sun).
+describe('#228 weekday labels', () => {
+  const { programDayLabel } = require('../../src/screens/ProgramSetupScreen');
+  test('ISO weekdays map 1..7 directly to Mon..Sun', () => {
+    expect(programDayLabel(1, '2026-11-07')).toBe('Mon');
+    expect(programDayLabel(2, '2026-11-07')).toBe('Tue');
+    expect(programDayLabel(7, '2026-11-07')).toBe('Sun');
+    expect(programDayLabel(3, null)).toBe('Wed');
   });
 });

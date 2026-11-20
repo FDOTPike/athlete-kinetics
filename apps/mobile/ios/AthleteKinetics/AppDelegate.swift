@@ -19,6 +19,12 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
+    // Keep ONNX Runtime strictly offline on every launch (device and simulator)
+    // before any React Native module initializes Ort::Env.
+    setenv("ORT_DISABLE_TELEMETRY", "1", 1)
+    #if targetEnvironment(simulator)
+    resetUITestStorageIfRequested()
+    #endif
     let delegate = ReactNativeDelegate()
     let factory = RCTReactNativeFactory(delegate: delegate)
     delegate.dependencyProvider = RCTAppDependencyProvider()
@@ -29,6 +35,50 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     return true
   }
+
+  #if targetEnvironment(simulator)
+  /// Clears persisted SQLite databases, athlete registry files, and user defaults
+  /// when launched by XCUITest at the start of a test method (-AKUITestResetStorage 1)
+  /// so repeated -test-iterations start from a clean onboarding state while
+  /// preserving mid-test relaunches. Simulator-only (#107).
+  private func resetUITestStorageIfRequested() {
+    let args = ProcessInfo.processInfo.arguments
+    guard let idx = args.firstIndex(of: "-AKUITestResetStorage"),
+          idx + 1 < args.count,
+          args[idx + 1] == "1" else { return }
+    let fm = FileManager.default
+    var removed = 0
+    var failures = 0
+    for dir in [FileManager.SearchPathDirectory.documentDirectory, .libraryDirectory] {
+      guard let root = fm.urls(for: dir, in: .userDomainMask).first else { continue }
+      let items: [URL]
+      do {
+        items = try fm.contentsOfDirectory(at: root, includingPropertiesForKeys: nil)
+      } catch {
+        failures += 1
+        NSLog("[ak-uitest] resetUITestStorageIfRequested failed to list %@ after %d item(s): %@", root.lastPathComponent, removed, String(describing: error))
+        continue
+      }
+      for item in items {
+        let name = item.lastPathComponent
+        if name == "Caches" || name == "SplashBoard" { continue }
+        do {
+          try fm.removeItem(at: item)
+          removed += 1
+        } catch {
+          failures += 1
+          NSLog("[ak-uitest] resetUITestStorageIfRequested failed to remove %@ after %d item(s): %@", name, removed, String(describing: error))
+          continue
+        }
+      }
+    }
+    if let bundleId = Bundle.main.bundleIdentifier {
+      UserDefaults.standard.removePersistentDomain(forName: bundleId)
+      UserDefaults.standard.synchronize()
+    }
+    NSLog("[ak-uitest] resetUITestStorageIfRequested removed %d item(s), %d failure(s)", removed, failures)
+  }
+  #endif
 }
 
 // The UIScene life cycle (declared in Info.plist, UIApplicationSceneManifest).

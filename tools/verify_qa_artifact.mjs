@@ -37,8 +37,8 @@
  *   node tools/verify_qa_artifact.mjs <apk-path> --fixture-mode   # synthetic only
  */
 import { execFileSync } from 'node:child_process';
-import { closeSync, existsSync, fstatSync, openSync, readFileSync, readSync, readdirSync, realpathSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { closeSync, constants, existsSync, fstatSync, openSync, readFileSync, readSync, readdirSync, realpathSync } from 'node:fs';
+import { dirname, join, relative, isAbsolute } from 'node:path';
 import { createHash } from 'node:crypto';
 import { inflateRawSync } from 'node:zlib';
 import { argv } from 'node:process';
@@ -131,6 +131,7 @@ export function readZipEntries(path) {
       }
       const method = cd.readUInt16LE(off + 10);
       const compSize = cd.readUInt32LE(off + 20);
+      const uncompSize = cd.readUInt32LE(off + 24);
       const nameLen = cd.readUInt16LE(off + 28);
       const extraLen = cd.readUInt16LE(off + 30);
       const commentLen = cd.readUInt16LE(off + 32);
@@ -143,7 +144,7 @@ export function readZipEntries(path) {
       const lNameLen = lfh.readUInt16LE(26);
       const lExtraLen = lfh.readUInt16LE(28);
       const dataOffset = lfhOffset + 30 + lNameLen + lExtraLen;
-      entries.set(name, { name, method, compSize, dataOffset });
+      entries.set(name, { name, method, compSize, uncompSize, dataOffset });
       off += 46 + nameLen + extraLen + commentLen;
     }
     return { entries, size, centralDirectoryOffset: cdOffset };
@@ -152,13 +153,16 @@ export function readZipEntries(path) {
   }
 }
 
-export function extractEntryToBuffer(path, entry) {
+export function extractEntryToBuffer(path, entry, maxOutputLength = 256 * 1024 * 1024) {
+  if (entry.compSize > maxOutputLength || entry.uncompSize > maxOutputLength) {
+    throw new Error('archive entry exceeds extraction byte budget');
+  }
   const fd = openSync(path, 'r');
   try {
     const raw = Buffer.alloc(entry.compSize);
     readSync(fd, raw, 0, entry.compSize, entry.dataOffset);
     if (entry.method === 0) return raw; // stored
-    if (entry.method === 8) return inflateRawSync(raw); // deflate
+    if (entry.method === 8) return inflateRawSync(raw, { maxOutputLength }); // deflate
     throw new Error(`unsupported compression method ${entry.method} for ${entry.name}`);
   } finally {
     closeSync(fd);
@@ -507,7 +511,9 @@ export function apksignerVerify(apksignerPath, apkPath) {
  * Fails CLOSED: if git cannot be run, provenance is UNVERIFIED, which is a
  * failure in real-candidate mode, never a pass.
  */
-export function verifyProvenance(manifest, { repoRoot, gitBin = 'git' } = {}) {
+export function verifyProvenance(manifest, { repoRoot = process.cwd(), gitBin = 'git' } = {}) {
+  const paths = validateNewFiles(manifest.newFiles);
+  if (!paths.ok) return { ok: false, status: 'MISMATCH', problems: paths.problems, filesChecked: 0, observed: {} };
   const problems = [];
   const observed = { head: null, branch: null, fingerprint: null };
   const git = (args, encoding) => execFileSync(gitBin, args, {
@@ -550,10 +556,32 @@ export function verifyProvenance(manifest, { repoRoot, gitBin = 'git' } = {}) {
 
   // Every staged/new file the manifest names must still hash to the recorded value.
   let filesChecked = 0;
+  if (problems.length) return { ok: false, status: 'MISMATCH', observed, filesChecked, problems };
+  const root = realpathSync(repoRoot);
+  const seen = new Set();
+  let bytesChecked = 0;
   for (const f of manifest.newFiles ?? []) {
     const abs = join(repoRoot, f.path);
     if (!existsSync(abs)) { problems.push(`newFiles path missing from the worktree: ${f.path}`); continue; }
-    const actual = createHash('sha256').update(readFileSync(abs)).digest('hex');
+    const canonical = realpathSync(abs);
+    const rel = relative(root, canonical);
+    const identity = process.platform === 'win32' ? canonical.toLowerCase() : canonical;
+    if (isAbsolute(rel) || rel === '..' || rel.startsWith('../') || rel.startsWith('..\\') || seen.has(identity)) {
+      problems.push(`newFiles target escapes the repository or repeats a file: ${f.path}`);
+      continue;
+    }
+    seen.add(identity);
+    const fd = openSync(canonical, constants.O_RDONLY | (constants.O_NONBLOCK ?? 0));
+    let actual;
+    try {
+      const stat = fstatSync(fd);
+      bytesChecked += stat.size;
+      if (!stat.isFile() || bytesChecked > 512 * 1024 * 1024) {
+        problems.push('newFiles exceeds regular-file or aggregate byte budget');
+        break;
+      }
+      actual = createHash('sha256').update(readFileSync(fd)).digest('hex');
+    } finally { closeSync(fd); }
     filesChecked += 1;
     if (actual !== f.sha256) {
       problems.push(`newFiles hash mismatch for ${f.path}: APK ${f.sha256.slice(0, 12)}..., worktree ${actual.slice(0, 12)}...`);
@@ -588,6 +616,7 @@ export function validateNewFiles(newFiles) {
       continue;
     }
     const p = f.path;
+    if (p.split('/').some((part) => part === '' || part === '.')) problems.push(`${where}: path is not canonical (${p})`);
     if (p.includes('\\')) problems.push(`${where}: path uses backslashes (${p})`);
     if (/^[A-Za-z]:/.test(p) || p.startsWith('/')) problems.push(`${where}: path is absolute (${p})`);
     if (p.split('/').includes('..')) problems.push(`${where}: path escapes the repository (${p})`);
@@ -694,7 +723,7 @@ export async function verifyQaArtifact(apkPath, options = {}) {
   }
   let manifest;
   try {
-    manifest = JSON.parse(extractEntryToBuffer(apkPath, manifestEntry).toString('utf8'));
+    manifest = JSON.parse(extractEntryToBuffer(apkPath, manifestEntry, 1024 * 1024).toString('utf8'));
   } catch (e) {
     check('candidate manifest parses', false, String(e.message));
     throw new QaRejectionError(`malformed candidate manifest: ${e.message}`);

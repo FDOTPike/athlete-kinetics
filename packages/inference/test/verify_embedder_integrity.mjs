@@ -157,6 +157,7 @@ const productionTransformersCallers = [
   'packages/inference/test/verify_embedder.mjs',
   'packages/inference/test/verify_semantic.mjs',
   'scripts/embed-codebase.mjs',
+  'scripts/verify-question-parity.mjs',
 ];
 const expectedCallers = [
   ...productionTransformersCallers,

@@ -8,10 +8,13 @@
  * extra work instead of hiding it.
  */
 import React from 'react';
+import { Alert } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
-import { useStore } from '../../src/state/useStore';
+import { freeFormStartIsEmpty, useStore } from '../../src/state/useStore';
 import { authorizeAthleteDataBoot } from '../../src/state/dataMaintenanceLock';
 import SessionScreen from '../../src/screens/SessionScreen';
+import TodayScreen from '../../src/screens/TodayScreen';
+import BlockScreen from '../../src/screens/BlockScreen';
 import { makeNodeSqliteDriver } from '../helpers/nodeSqliteOpDriver';
 
 let mockDriver;
@@ -73,6 +76,41 @@ test('after Start the screen shows preparation and offers no way to log a set', 
   expect(state().preparation.status).toBe('pending');
 });
 
+// Android walk (#213): the ramp sets use the same working load as the set
+// card (here from a 1RM), in kilograms; with no known load they keep the
+// percentage text.
+test('ramp sets show kilograms from the same working load as the set card, once one is known', () => {
+  startFromScreen();
+  const protocol = state().preparation.protocol;
+  const rampIndexes = protocol.items.map((item, index) => ({ item, index })).filter(({ item }) => item.stage === 'ramp');
+  expect(rampIndexes.map(({ item }) => item.dose.percentOfWorkingLoad)).toEqual([40, 80]);
+  const anchorId = rampIndexes[0].item.movementId;
+  // No 1RM and no history yet: the percentage text, no kilograms.
+  for (const { item, index } of rampIndexes) {
+    expect(screen.getByTestId(`preparation-item-${index}-dose`).props.children).toMatch(/at about \d+% of today's working load$/);
+    expect(screen.getByText(item.title)).toBeTruthy();
+  }
+
+  act(() => { state().saveOneRepMax(anchorId, 120); });
+  const slot = state().sessionPlan.find((candidate) => candidate.movementId === anchorId);
+  const working = state().resolveSlotLoad({
+    movementId: anchorId, bodyweightMode: false,
+    targetReps: slot.target.kind === 'reps' ? slot.target.reps : null,
+    targetRpe: slot.targetRpe ?? 8, overrideLoadKg: slot.overrideLoadKg, sessionPlanSlotId: slot.sessionPlanSlotId,
+  });
+  expect(working.source).toBe('derived');
+  expect(working.initialLoadKg).toBeGreaterThan(0);
+  const name = state().movements.find((movement) => movement.movement_id === anchorId).name;
+  for (const { item, index } of rampIndexes) {
+    const kg = Math.round((working.initialLoadKg * item.dose.percentOfWorkingLoad) / 100 / 2.5) * 2.5;
+    expect(screen.getByText(`Preparation set: ${name}, about ${kg} kg (${item.dose.percentOfWorkingLoad}%)`)).toBeTruthy();
+    expect(screen.getByTestId(`preparation-item-${index}-dose`).props.children)
+      .toBe(`${item.dose.reps} reps at about ${kg} kg (${item.dose.percentOfWorkingLoad}% of today's working load)`);
+  }
+  // Display only: the frozen protocol is unchanged.
+  expect(state().preparation.protocol).toEqual(protocol);
+});
+
 test('working through preparation and finishing hands over to the first working set', () => {
   startFromScreen();
   press('preparation-begin');
@@ -112,7 +150,17 @@ test('stopping from the preparation screen ends the session without logging anyt
   startFromScreen();
   const sessionId = state().session.sessionId;
   press('preparation-begin');
-  press('preparation-stop-session');
+  // #165: Stop session asks first; nothing stops until Stop is chosen.
+  const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+  try {
+    press('preparation-stop-session');
+    expect(state().session).not.toBeNull();
+    const [title, , buttons] = alert.mock.calls[0];
+    expect(title).toBe('Stop this session?');
+    act(() => { buttons.find((button) => button.text === 'Stop').onPress(); });
+  } finally {
+    alert.mockRestore();
+  }
   expect(state().session).toBeNull();
   expect(count('SELECT COUNT(*) AS c FROM set_record')).toBe(0);
   // A manual stop with no sets is an empty session: it and its preparation are discarded together.
@@ -161,4 +209,132 @@ test('a restart mid-preparation comes back to the same step', async () => {
   expect(screen.getByTestId('preparation-item-0-recorded').props.children).toBe('Done as written');
   expect(screen.getByTestId('preparation-item-1-done')).toBeTruthy();
   expect(logSetButton()).toBeNull();
+});
+
+describe('session-5: plan-first empty free-form starts', () => {
+  test('when there is no plan for today and no earlier session to repeat, Today, Plan and Session show the inline card, Go to Plan navigates, Cancel closes, and no session row is created', () => {
+    // Clear the program/block so today has no planned session and no prior logged sets exist.
+    raw().exec('DELETE FROM planned_slot; DELETE FROM planned_session; DELETE FROM training_block; DELETE FROM training_program;');
+    act(() => {
+      state().refreshBlock();
+      state().refreshProgram();
+    });
+    expect(state().todayPlan).toBeNull();
+    expect(freeFormStartIsEmpty()).toBe(true);
+    expect(count('SELECT COUNT(*) AS c FROM session')).toBe(0);
+
+    // 1. TodayScreen unplanned start
+    const openPlanFromToday = jest.fn();
+    const todayView = render(<TodayScreen onOpenPlan={openPlanFromToday} />);
+    fireEvent.press(screen.getByTestId('today-adhoc-session'));
+    expect(screen.getByText('No session is ready to start')).toBeOnTheScreen();
+    expect(
+      screen.getByText('Open your plan to see your next session.'),
+    ).toBeOnTheScreen();
+    expect(count('SELECT COUNT(*) AS c FROM session')).toBe(0);
+    expect(state().session).toBeNull();
+
+    // Cancel closes the card and restores the start control
+    fireEvent.press(screen.getByLabelText('Cancel'));
+    expect(screen.queryByText('No session is ready to start')).toBeNull();
+    expect(screen.getByTestId('today-adhoc-session')).toBeOnTheScreen();
+
+    // Re-open and press Go to Plan
+    fireEvent.press(screen.getByTestId('today-adhoc-session'));
+    fireEvent.press(screen.getByLabelText('Go to Plan'));
+    expect(openPlanFromToday).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText('No session is ready to start')).toBeNull();
+    expect(count('SELECT COUNT(*) AS c FROM session')).toBe(0);
+    todayView.unmount();
+
+    // 2. SessionScreen unplanned start
+    const openPlanFromSession = jest.fn();
+    const sessionView = render(<SessionScreen onOpenPlan={openPlanFromSession} />);
+    fireEvent.press(screen.getByLabelText('Start a new workout session'));
+    expect(screen.getByText('No session is ready to start')).toBeOnTheScreen();
+    expect(
+      screen.getByText('Open your plan to see your next session.'),
+    ).toBeOnTheScreen();
+    expect(count('SELECT COUNT(*) AS c FROM session')).toBe(0);
+    expect(state().session).toBeNull();
+
+    fireEvent.press(screen.getByLabelText('Cancel'));
+    expect(screen.queryByText('No session is ready to start')).toBeNull();
+    expect(screen.getByLabelText('Start a new workout session')).toBeOnTheScreen();
+
+    fireEvent.press(screen.getByLabelText('Start a new workout session'));
+    fireEvent.press(screen.getByLabelText('Go to Plan'));
+    expect(openPlanFromSession).toHaveBeenCalledTimes(1);
+    expect(count('SELECT COUNT(*) AS c FROM session')).toBe(0);
+    sessionView.unmount();
+
+    // 3. BlockScreen unplanned start
+    useStore.setState({
+      vector: {
+        date: state().today, readiness_score: 80, hrv_component: 80, load_component: 80,
+        sleep_component: 80, spo2_component: 80, acwr: 1.0, acute_load_kg: 1000,
+        chronic_load_kg: 1000, ln_rmssd: 4.0, hrv_z: 0, sleep_efficiency_pct: 85,
+        spo2_night_mean: 97, computed_at_ms: 1,
+      },
+    });
+    const blockView = render(<BlockScreen />);
+    fireEvent.press(screen.getByText('Start without a planned session'));
+    fireEvent.press(screen.getByLabelText('Start an unplanned session'));
+    expect(screen.getByText('No session is ready to start')).toBeOnTheScreen();
+    expect(
+      screen.getByText('Open your plan to see your next session.'),
+    ).toBeOnTheScreen();
+    expect(count('SELECT COUNT(*) AS c FROM session')).toBe(0);
+
+    fireEvent.press(screen.getByLabelText('Cancel'));
+    expect(screen.queryByText('No session is ready to start')).toBeNull();
+    expect(screen.getByLabelText('Start an unplanned session')).toBeOnTheScreen();
+    blockView.unmount();
+  });
+
+  test('an already-open empty session shows updated preparation and empty-card copy and still discards on finish', () => {
+    raw().exec('DELETE FROM planned_slot; DELETE FROM planned_session; DELETE FROM training_block; DELETE FROM training_program;');
+    act(() => {
+      state().refreshBlock();
+      state().refreshProgram();
+      state().startSession();
+    });
+    expect(state().session).not.toBeNull();
+    expect(state().sessionPlan).toHaveLength(0);
+
+    render(<SessionScreen />);
+    expect(screen.getByText('No movements are planned yet.')).toBeOnTheScreen();
+    expect(screen.queryByText('No movements are planned yet. Prepare first, then add your work.')).toBeNull();
+
+    press('preparation-already-warm');
+    expect(screen.getByText('No exercise is queued.')).toBeOnTheScreen();
+    expect(screen.getByText('Finish this session, then build your plan on the PLAN tab.')).toBeOnTheScreen();
+    expect(screen.queryByText('Return to Coach to create a session plan, then come back here.')).toBeNull();
+
+    act(() => {
+      fireEvent.press(screen.getByLabelText('Finish empty session'));
+    });
+    expect(state().session).toBeNull();
+    expect(count('SELECT COUNT(*) AS c FROM session')).toBe(0);
+  });
+});
+
+test('session-5: an unused plan for today is never treated as an empty start, even with no history', () => {
+  // startSession consumes today's unused plan, so the plan-first card must not block it.
+  expect(state().todayPlan).not.toBeNull();
+  expect(count('SELECT COUNT(*) AS c FROM set_record')).toBe(0);
+  expect(count('SELECT COUNT(*) AS c FROM session_origin')).toBe(0);
+  expect(freeFormStartIsEmpty()).toBe(false);
+});
+
+test('session-5: past midnight, before the day rolls over, the empty-start check makes no prediction', () => {
+  raw().exec('DELETE FROM planned_slot; DELETE FROM planned_session; DELETE FROM training_block; DELETE FROM training_program;');
+  act(() => {
+    state().refreshBlock();
+    state().refreshProgram();
+  });
+  expect(freeFormStartIsEmpty()).toBe(true);
+  // State still holds yesterday until startSession rolls the day over.
+  act(() => { useStore.setState({ today: '2000-01-01' }); });
+  expect(freeFormStartIsEmpty()).toBe(false);
 });

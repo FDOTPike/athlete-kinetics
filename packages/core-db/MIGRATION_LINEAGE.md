@@ -22,6 +22,44 @@ was edited. The first later append is `069_resting_heart_rate` (ordinal 68): a n
 The second is `070_session_feel` (ordinal 69): a new `session_feel` table only.
 The third is `071_beta_recording` (ordinal 70): two new record-only tables,
 `session_skipped_slot` and `set_load_shown`, and nothing else.
+The fourth is `072_question_log` (ordinal 71): local question text and its
+record-only routing outcome in `question_log`.
+The fifth is `073_session_slot_replaced_by` (ordinal 72): adds the
+`session_plan_slot_replacement` side-car table linking a slot swapped after
+logged sets to its replacement row.
+The sixth is `074_session_feel_reasons` (ordinal 73): rebuilds `session_feel`
+with the same columns and a looser CHECK (only "as planned" is held to no
+reasons), and adds the `session_feel_extra_reason` side-car table for three new
+reasons.
+The seventh is `075_session_plan_slot_planned_count` (ordinal 74): adds the
+`session_plan_slot_planned_count` side-car table, which keeps the set count a
+slot was planned with when a swap after logged sets overwrites `planned_sets`.
+The eighth is `076_sport_taxonomy_expansion` (ordinal 75): rebuilds
+`athlete_sport_profile` with the widened sport CHECK (22 SportIds from the WO-02
+v12 proposal), preserving every column and row.
+The ninth is `077_multisport_and_flexibility` (ordinal 76): adds the
+`athlete_secondary_sport_profile` and `activity_flexibility_tag` side-car tables
+and their guards, leaving `activity_definition` and the singleton sport profile
+byte-identical for the 067 verifier.
+The tenth is `078_kinestrike_telemetry` (ordinal 77): adds the
+`state_vector_kinestrike` side-car table for daily KineStrike plantar/IMU
+summary telemetry, leaving `state_vector` and `004_state_vector_materialize.sql`
+byte-identical.
+The eleventh is `079_session_slot_swap_cause` (ordinal 78): adds the
+`session_slot_swap_cause` side-car table recording why a slot was swapped
+(`cause`) and its persistence scope (`today_only` vs `rest_of_block`) without
+altering `session_plan_slot_replacement`.
+The twelfth is `080_sport_peaking_and_lifting_taxonomy` (ordinal 79): rebuilds
+`athlete_sport_profile` and `athlete_secondary_sport_profile` with the 24
+SportIds (adding `olympic_weightlifting` and `strongman`) and 0..52
+`matches_per_week` for lifting sports, creates seeded `sport_peaking_movement`,
+and adds `planned_slot_backoff`, `session_slot_backoff`,
+`training_program_meet_countdown`, and `training_block_meet_meta`.
+The thirteenth is `081_advanced_program_control` (ordinal 80): adds the six Phase 2
+(`#228` + `A7`) side-car tables (`training_program_day_focus_ext`,
+`planned_session_focus_ext`, `training_program_schedule_mode`,
+`training_program_slot_override`, `training_program_day_routine`, and
+`planned_slot_athlete_override`).
 `MIGRATION_LINEAGE.json` records the SHA-256 of every shipped file and its
 ordinal, and of master's 34-entry chain. Master's exact `034`/`058` bytes and its
 registry live under `test/fixtures/lineage/master-1da218d/`.

@@ -21,7 +21,14 @@ export interface GlossaryEntry {
   readonly category: GlossaryCategory;
   readonly definition: string;
   readonly aliases?: readonly string[];
+  /** The name shown to the athlete when it differs from `term`. `term` and
+   *  `aliases` feed the bundled question index, so renaming them needs a
+   *  rebuilt index; a display name does not. */
+  readonly displayTerm?: string;
 }
+
+/** The name an athlete sees for a glossary entry. */
+export const glossaryTitle = (entry: GlossaryEntry): string => entry.displayTerm ?? entry.term;
 
 export const GLOSSARY_ENTRIES: readonly GlossaryEntry[] = [
   // --- Effort ---
@@ -88,8 +95,8 @@ export const GLOSSARY_ENTRIES: readonly GlossaryEntry[] = [
   { id: 'EXPERIENCED', term: 'EXPERIENCED', category: 'general', definition: 'Choose this if you have at least three years of consistent, structured training.' },
   { id: 'COMPETITIVE', term: 'COMPETITIVE', category: 'general', definition: 'Choose this if you compete, or your training is planned and monitored at a competitive level.' },
   { id: 'FULL GYM', term: 'FULL GYM', category: 'general', definition: 'Selects the standard equipment found in a broad commercial gym setup. You can customize individual items afterward.' },
-  { id: 'HOME BASIC', term: 'HOME BASIC', category: 'general', definition: 'Selects a compact home setup with dumbbells, a kettlebell, bands, and mats. You can customize individual items afterward.' },
-  { id: 'MINIMAL', term: 'MINIMAL', category: 'general', definition: 'Selects no equipment. The coach can still use movements that need only your bodyweight.' },
+  { id: 'HOME BASIC', term: 'HOME BASIC', category: 'general', definition: 'Selects a compact home setup with dumbbells, a kettlebell, a pull-up bar, bands, and mats. You can customize individual items afterward.' },
+  { id: 'MINIMAL', term: 'MINIMAL', category: 'general', definition: 'Selects bands and mats only. The coach can still use movements that need only your bodyweight.' },
   { id: 'BARBELL', term: 'BARBELL', category: 'movement', definition: 'A straight bar loaded with weight plates.' },
   { id: 'SQUAT RACK', term: 'SQUAT RACK', category: 'movement', definition: 'A stable rack that supports a barbell at adjustable heights.' },
   { id: 'BENCH', term: 'BENCH', category: 'movement', definition: 'A flat or adjustable weight-training bench.' },
@@ -180,7 +187,7 @@ export const GLOSSARY_ENTRIES: readonly GlossaryEntry[] = [
     term: 'READINESS',
     category: 'metric',
     definition:
-      'A subjective and contextual signal of how prepared you feel to train today. A guide for daily adjustments, not an absolute guarantee of performance.',
+      "An estimate from 0 to 100 that the app computes each day from your synced overnight signals: heart rate variability compared with your own baseline, and sleep efficiency. Training load is shown beside it but is not part of the score. With no signals the estimate sits at a neutral default of 50. It guides how hard today's plan should be; it is not a measure of how you feel and does not guarantee performance.",
     aliases: ['readiness score', 'daily readiness', 'recovery signal'],
   },
   {
@@ -190,6 +197,14 @@ export const GLOSSARY_ENTRIES: readonly GlossaryEntry[] = [
     definition:
       'Heart Rate Variability — beat-to-beat variation in heart rhythm. A contextual trend signal reflecting training and life stress, not a diagnosis or proof of recovery.',
     aliases: ['heart rate variability', 'hrv score', 'recovery trend'],
+  },
+  {
+    id: 'bar-speed',
+    term: 'Bar speed',
+    category: 'metric',
+    definition:
+      "How fast the weight moves on the lifting part of a rep. When a weight that is normally comfortable moves noticeably slower than usual, you are more tired than usual. A report that everything feels heavy and slow can lower today's load.",
+    aliases: ['bar velocity', 'rep speed', 'slow bar'],
   },
 
   // --- Loading Methods ---
@@ -272,15 +287,18 @@ export const GLOSSARY_ENTRIES: readonly GlossaryEntry[] = [
     term: 'BUILD',
     category: 'structure',
     definition:
-      'Volume weeks. More total work at moderate effort to accumulate fitness.',
+      'The first weeks of a block, where the work is set up. How sets and effort change after that depends on your goal; the phase card in Plan shows what your own block does each week.',
     aliases: ['accumulation phase', 'volume block'],
   },
   {
     id: 'INTENSIFICATION',
+    // Walk 2 (W2-14): Plan names this phase "Build strength"; its info
+    // button asked "What does INTENSIFICATION mean?".
     term: 'INTENSIFICATION',
+    displayTerm: 'BUILD STRENGTH',
     category: 'structure',
     definition:
-      "Volume comes down, effort goes up. You do less work but it's harder.",
+      "The middle weeks of a block, where the work gets harder. Depending on your goal that can mean more sets, a higher target effort, or both; the phase card in Plan shows your block's numbers.",
     aliases: ['intensification phase', 'transmutation'],
   },
   {
@@ -288,7 +306,7 @@ export const GLOSSARY_ENTRIES: readonly GlossaryEntry[] = [
     term: 'REALISE',
     category: 'structure',
     definition:
-      "The peak week. Lowest volume, highest effort — this is where the block's work shows up.",
+      "The last working week before the deload, where the block's work comes together. Whether sets go up or down depends on your goal; the phase card in Plan shows your block's own numbers.",
     aliases: ['realization phase', 'peak week', 'realize'],
   },
   {
@@ -306,6 +324,15 @@ export const GLOSSARY_ENTRIES: readonly GlossaryEntry[] = [
     definition:
       'The pause between sets. After each set the session counts down a rest whose length follows how hard that set was — longer after a harder set. It can be switched off in Profile.',
     aliases: ['rest between sets', 'rest interval', 'rest countdown'],
+  },
+  {
+    id: 'DOMS',
+    term: 'DOMS',
+    displayTerm: 'Muscle soreness (DOMS)',
+    category: 'general',
+    definition:
+      'Delayed onset muscle soreness: the stiff, achy feeling in a muscle a day or two after training, most often after new or harder work. It is normal and is not damage. It usually eases as you warm up and fades within a few days. Pain that is sharp, sits in a joint, or gets worse as you move is not DOMS: report it under "Something feels off".',
+    aliases: ['delayed onset muscle soreness', 'muscle soreness', 'sore muscles after training'],
   },
 
   // --- Goals ---
@@ -483,7 +510,8 @@ export function getGlossaryEntry(key: string): GlossaryEntry | undefined {
   const exact = GLOSSARY_ENTRIES.find(
     (entry) =>
       entry.id.toLowerCase() === normalized ||
-      entry.term.toLowerCase() === normalized,
+      entry.term.toLowerCase() === normalized ||
+      entry.displayTerm?.toLowerCase() === normalized,
   );
   if (exact) return exact;
 
@@ -512,10 +540,11 @@ export function getGlossaryEntry(key: string): GlossaryEntry | undefined {
 export function searchGlossary(query: string): readonly GlossaryEntry[] {
   const normalized = query.trim().toLowerCase();
   if (!normalized) {
-    return [...GLOSSARY_ENTRIES].sort((a, b) => a.term.localeCompare(b.term));
+    return [...GLOSSARY_ENTRIES].sort((a, b) => glossaryTitle(a).localeCompare(glossaryTitle(b)));
   }
 
   return GLOSSARY_ENTRIES.filter((entry) => {
+    if (glossaryTitle(entry).toLowerCase().includes(normalized)) return true;
     if (entry.term.toLowerCase().includes(normalized)) return true;
     if (entry.id.toLowerCase().includes(normalized)) return true;
     if (entry.category.toLowerCase().includes(normalized)) return true;
@@ -525,8 +554,8 @@ export function searchGlossary(query: string): readonly GlossaryEntry[] {
     }
     return false;
   }).sort((a, b) => {
-    const aTermLower = a.term.toLowerCase();
-    const bTermLower = b.term.toLowerCase();
+    const aTermLower = glossaryTitle(a).toLowerCase();
+    const bTermLower = glossaryTitle(b).toLowerCase();
     const aExact = aTermLower === normalized;
     const bExact = bTermLower === normalized;
     if (aExact && !bExact) return -1;

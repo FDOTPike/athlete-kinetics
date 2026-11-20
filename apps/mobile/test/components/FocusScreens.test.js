@@ -185,7 +185,7 @@ test('READY renders the full vector only for profiles that explicitly request it
   expect(screen.getByText('82 / 100')).toBeOnTheScreen();
 });
 
-test('READY keeps a safety halt visible and routes its single action to Coach', () => {
+test('READY keeps a safety halt visible and opens the read-only report view from its single action', () => {
   const openCoach = jest.fn();
   mockState = baseState({
     lastTriage: {
@@ -197,8 +197,10 @@ test('READY keeps a safety halt visible and routes its single action to Coach', 
 
   expect(screen.getByText('Resolve today\'s safety report')).toBeOnTheScreen();
   expect(screen.getByText('Training is paused for today. Review the report before doing more work.')).toBeOnTheScreen();
+  // #185: the link opens the read-only report view, not another screen.
   fireEvent.press(screen.getByLabelText('Review safety report'));
-  expect(openCoach).toHaveBeenCalledTimes(1);
+  expect(screen.getByTestId('safety-report-view')).toBeOnTheScreen();
+  expect(openCoach).not.toHaveBeenCalled();
 });
 
 test('COACH keeps the trajectory compact and expands a session only when its day is requested', () => {
@@ -216,11 +218,23 @@ test('COACH keeps the trajectory compact and expands a session only when its day
 
   fireEvent.press(screen.getByLabelText('Why today changed'));
   expect(screen.getByText('Source')).toBeOnTheScreen();
-  expect(screen.getByText('policy')).toBeOnTheScreen();
+  expect(screen.getByText('Based on your readiness')).toBeOnTheScreen();
 
   expect(screen.getByLabelText('Manage current block')).toBeOnTheScreen();
   fireEvent.press(screen.getByLabelText('Manage current block'));
   expect(screen.getByText('Choose a loading structure')).toBeOnTheScreen();
+});
+
+// #171: with no block there is nothing for a loading structure to apply to,
+// and "Start a new block" never reads the chips, so they are not shown.
+test('Manage block shows no loading-structure chips when there is no block (#171)', () => {
+  mockState = baseState({ block: null, blockMeta: null, blockSessions: [], program: null });
+  render(<BlockScreen />);
+  // Manage block starts open when there is no block.
+  expect(screen.getByText('Coach will build from your objective, equipment, and weekly frequency.')).toBeOnTheScreen();
+  expect(screen.queryByText('Choose a loading structure')).toBeNull();
+  expect(screen.queryByText('Choose a structure for your first block')).toBeNull();
+  expect(screen.queryByLabelText('Linear loading structure')).toBeNull();
 });
 
 describe('Plan session starts navigate only after the store creates a session', () => {
@@ -475,8 +489,14 @@ test('COACH keeps trajectory labels on one line across recovery and finalized st
     flexDirection: 'column',
     alignItems: 'stretch',
   });
+  // Issue 163: the week row spans the card, shows its scroll bar, and opens at today's cell.
+  expect(screen.getByTestId('trajectory-days-week-1').props.horizontal).toBe(true);
+  expect(screen.getByTestId('trajectory-days-week-1').props.showsHorizontalScrollIndicator).toBe(true);
   expect(StyleSheet.flatten(screen.getByTestId('trajectory-days-week-1').props.style)).toMatchObject({
     width: '100%',
+  });
+  expect(StyleSheet.flatten(screen.getByTestId('trajectory-days-week-1').props.contentContainerStyle)).toMatchObject({
+    flexDirection: 'row',
   });
 
   for (const label of ['Done', 'Stopped', 'Today', 'UPR']) {
@@ -492,7 +512,20 @@ test('COACH keeps trajectory labels on one line across recovery and finalized st
   expect(screen.getByLabelText('Week 1, lower session on 2026-07-14, stopped')).toBeOnTheScreen();
 });
 
-test('COACH leaves the safety form behind its explicit action even during a halt', () => {
+test('COACH opens the trajectory week row with today\'s cell in view', () => {
+  const planned = baseState().blockSessions[0];
+  mockState = baseState({
+    today: '2026-07-16',
+    todayPlan: null,
+    block: { blockId: 1, startDate: '2026-07-13', objective: 'strength', createdAtMs: 1 },
+    blockSessions: [{ ...planned, plannedSessionId: 1, dayIndex: 1, sessionDate: '2026-07-13', completionStatus: null }],
+  });
+  render(<BlockScreen />);
+  // Day index 3 (2026-07-16) starts 3 cells of 56 dp plus 3 gaps of 4 dp in: 180 dp.
+  expect(screen.getByTestId('trajectory-days-week-1').props.contentOffset).toEqual({ x: 180, y: 0 });
+});
+
+test('COACH opens the read-only report view, not the report form, during a halt', () => {
   mockState = baseState({
     lastTriage: {
       kind: 'matched',
@@ -507,9 +540,12 @@ test('COACH leaves the safety form behind its explicit action even during a halt
 
   expect(screen.getByText('Stop training today')).toBeOnTheScreen();
   expect(screen.queryByLabelText('Describe how your body feels today')).toBeNull();
+  // #185: "Review safety report" opens the read-only report view; the
+  // report form stays behind its own "Something feels off" disclosure.
   fireEvent.press(screen.getByLabelText('Review safety report'));
   expect(screen.getByTestId('coach-screen').props.keyboardShouldPersistTaps).toBe('handled');
-  expect(screen.getByLabelText('Describe how your body feels today')).toBeOnTheScreen();
+  expect(screen.getByTestId('safety-report-view')).toBeOnTheScreen();
+  expect(screen.queryByLabelText('Describe how your body feels today')).toBeNull();
 });
 
 test('READY recovery state lowers the primary action prominence and shows a reduced-effort label', () => {
@@ -542,6 +578,19 @@ test('COACH renders a rest-day placeholder when no session is scheduled today', 
   expect(screen.getByText('Four-week trajectory')).toBeOnTheScreen();
   // No exercise slot data should appear
   expect(screen.queryByText('Goblet Squat')).toBeNull();
+});
+
+test('READY with no block does not say Rest day; it says what Today says (issue #156)', () => {
+  mockState = baseState({
+    todayPlan: null,
+    block: null,
+    uiPreferences: { sessionModeOverride: null, readinessDetail: 'full', restTimerEnabled: true, textScale: 'system' },
+  });
+  render(<ReadinessScreen />);
+
+  expect(screen.getByText('No plan yet.')).toBeOnTheScreen();
+  expect(screen.getByText('Build a plan and today gets a workout with it.')).toBeOnTheScreen();
+  expect(screen.queryByText('Rest day.')).toBeNull();
 });
 
 test('READY renders rest-day statement and metrics list when no session is scheduled', () => {
@@ -612,15 +661,20 @@ test('COACH enforces Law-2 assertion by marking only TODAY with chalk in the tra
   });
 });
 
-test('COACH displays SUBSTITUTED badge element when slot load is overridden', () => {
-  const substitutedSlot = { ...todaySlot, overrideLoadKg: 45.0 };
+test('COACH displays overrideReason badge element when slot load is overridden', () => {
+  const overriddenSlot = {
+    ...todaySlot,
+    overrideLoadKg: 45.0,
+    overrideReason: 'APRE: +2.5 kg, beat the 8-rep target by 2 last week',
+  };
   mockState = baseState({
-    loadSessionSlots: jest.fn(() => [substitutedSlot]),
+    loadSessionSlots: jest.fn(() => [overriddenSlot]),
   });
   render(<BlockScreen />);
   fireEvent.press(screen.getByLabelText(`Week 1, lower session on ${TODAY}`));
 
-  expect(screen.getByText('SUBSTITUTED')).toBeOnTheScreen();
+  expect(screen.getByText('APRE: +2.5 kg, beat the 8-rep target by 2 last week')).toBeOnTheScreen();
+  expect(screen.queryByText('SUBSTITUTED')).toBeNull();
 });
 
 test('READY renders return check-in card when layoff is detected, with truthful non-dose copy', () => {
@@ -694,7 +748,7 @@ test('READY hides return check-in card when dismissed or absent', () => {
 });
 
 describe('BlockScreen - Chooser Entry (Work Order E)', () => {
-  test('renders Plan a new block action when a block IS active and opens chooser', () => {
+  test('with an active program the button reads "Change future blocks" and says the current block stays (#172)', () => {
     mockState = baseState({
       block: { blockId: 1, startDate: '2026-07-01', objective: 'strength', createdAtMs: 1 },
       program: {
@@ -703,7 +757,25 @@ describe('BlockScreen - Chooser Entry (Work Order E)', () => {
         currentSequenceIndex: 1,
         plannedBlockCount: 2,
         plannedEndDate: '2026-08-26',
+        days: [{ dayIndex: 1, focus: 'lower' }, { dayIndex: 2, focus: 'upper' }],
+        movementPreferences: [],
       },
+    });
+
+    render(<BlockScreen />);
+
+    expect(screen.queryByText('Plan a new block')).toBeNull();
+    fireEvent.press(screen.getByText('Change future blocks'));
+    // It opens the program's future preferences directly, never a "Start a new block" chooser.
+    expect(screen.queryByText('Auto')).toBeNull();
+    expect(screen.getByText('MANAGE PROGRAM')).toBeOnTheScreen();
+    expect(screen.getByText('Your current block stays as it is. These choices apply to future blocks, except a change of training days also updates the weekly-day limit used for current targets.')).toBeOnTheScreen();
+  });
+
+  test('renders Plan a new block action when a standalone block IS active and opens chooser', () => {
+    mockState = baseState({
+      block: { blockId: 1, startDate: '2026-07-01', objective: 'strength', createdAtMs: 1 },
+      program: null,
     });
 
     render(<BlockScreen />);
@@ -718,8 +790,33 @@ describe('BlockScreen - Chooser Entry (Work Order E)', () => {
     expect(screen.getByText('Start a new block')).toBeOnTheScreen();
     expect(screen.getByText('Auto')).toBeOnTheScreen();
     expect(screen.getByText('Custom')).toBeOnTheScreen();
-    expect(screen.getByText('Guided')).toBeOnTheScreen();
-    expect(screen.getByText('Coming soon')).toBeOnTheScreen();
+    expect(screen.queryByText('Guided')).toBeNull();
+    expect(screen.queryByText('Coming soon')).toBeNull();
+  });
+
+  test('with a program whose review is due and a standalone block, the button keeps "Plan a new block" and opens the chooser (#172)', () => {
+    // The program editor only saves for an active program, so a finished
+    // program must not route this button to it.
+    mockState = baseState({
+      block: { blockId: 1, startDate: '2026-07-01', objective: 'strength', createdAtMs: 1 },
+      program: {
+        programId: 1,
+        status: 'review_due',
+        currentSequenceIndex: 2,
+        plannedBlockCount: 2,
+        plannedEndDate: '2026-08-26',
+        days: [{ dayIndex: 1, focus: 'lower' }, { dayIndex: 2, focus: 'upper' }],
+        movementPreferences: [],
+      },
+    });
+
+    render(<BlockScreen />);
+
+    expect(screen.queryByText('Change future blocks')).toBeNull();
+    fireEvent.press(screen.getByText('Plan a new block'));
+    expect(screen.getByText('Start a new block')).toBeOnTheScreen();
+    expect(screen.getByText('Custom')).toBeOnTheScreen();
+    expect(screen.queryByText('MANAGE PROGRAM')).toBeNull();
   });
 
   test('inter-block state with block === null and program !== null still opens chooser and routes to handlers', () => {
@@ -801,10 +898,188 @@ test('OW-007 a successful resume shows no error and leaves the global channel al
   expect(screen.queryByTestId('suspension-error')).toBeNull();
 });
 
-test('OW-007 the resume error is action-scoped: an unrelated store error does not populate it', () => {
+  test('OW-007 the resume error is action-scoped: an unrelated store error does not populate it', () => {
   mockState = baseState({ suspension: OPEN_EPISODE, error: 'some unrelated store failure', endSuspension: jest.fn() });
   render(<BlockScreen />);
 
   // The global error channel must never read as a refusal of this control.
   expect(screen.queryByTestId('suspension-error')).toBeNull();
+});
+
+test('#302: when readiness vector is absent, Plan still renders the pause/resume card', () => {
+  mockState = baseState({
+    vector: null,
+    suspension: OPEN_EPISODE,
+    endSuspension: jest.fn(),
+  });
+  render(<BlockScreen />);
+  expect(screen.getByTestId('suspension-resume')).toBeOnTheScreen();
+
+  mockState = baseState({
+    vector: null,
+    suspension: null,
+    program: { status: 'active', currentSequenceIndex: 1, plannedBlockCount: 3, plannedEndDate: '2026-09-30' },
+  });
+  render(<BlockScreen />);
+  expect(screen.getByTestId('suspension-begin-life')).toBeOnTheScreen();
+});
+
+describe('#210: the Pause card comes after the plan, for everyone', () => {
+  const order = () => JSON.stringify(screen.toJSON());
+
+  test.each(['beginner', 'intermediate', 'advanced', 'elite'])(
+    'for a %s athlete, PAUSE renders after the block and today\'s session',
+    (trainingAge) => {
+      mockState = baseState({ profile: { ...baseState().profile, training_age: trainingAge } });
+      render(<BlockScreen />);
+      const json = order();
+      const pause = json.indexOf('Injured, ill, or life got in the way?');
+      expect(pause).toBeGreaterThan(-1);
+      expect(json.indexOf('"TODAY"')).toBeGreaterThan(-1);
+      expect(json.indexOf('"TODAY"')).toBeLessThan(pause);
+      expect(json.indexOf('Four-week trajectory')).toBeGreaterThan(-1);
+      expect(json.indexOf('Four-week trajectory')).toBeLessThan(pause);
+    },
+  );
+
+  const goalProgram = {
+    programId: 7,
+    objective: 'strength',
+    startDate: '2026-07-01',
+    horizonKind: 'weeks',
+    requestedReviewDate: null,
+    plannedEndDate: '2026-10-21',
+    plannedBlockCount: 4,
+    startingMacroBlockIndex: 1,
+    schemaType: 'LINEAR',
+    status: 'active',
+    currentSequenceIndex: 1,
+    days: [{ dayIndex: 1, focus: 'full' }],
+    movementPreferences: [],
+  };
+  const withProgram = (trainingAge, overrides = {}) => baseState({
+    profile: { ...baseState().profile, training_age: trainingAge },
+    program: goalProgram,
+    previewNextProgramBlock: jest.fn(() => null),
+    continueTrainingProgram: jest.fn(),
+    archiveTrainingProgram: jest.fn(),
+    ...overrides,
+  });
+  /** Each label is on screen, and each one renders before the next. */
+  const expectInOrder = (json, labels) => {
+    const at = labels.map((label) => json.indexOf(label));
+    labels.forEach((label, i) => expect([label, at[i]]).not.toEqual([label, -1]));
+    for (let i = 1; i < at.length; i += 1) {
+      expect([labels[i - 1], at[i - 1] < at[i]]).toEqual([labels[i - 1], true]);
+    }
+  };
+
+  test.each(['beginner', 'intermediate', 'advanced', 'elite'])(
+    'with a goal program, a %s athlete sees GOAL PROGRAM, TODAY and the trajectory before PAUSE',
+    (trainingAge) => {
+      mockState = withProgram(trainingAge, { suspension: null });
+      render(<BlockScreen />);
+      expectInOrder(order(), [
+        '"GOAL PROGRAM"', '"TODAY"', 'Four-week trajectory', 'Injured, ill, or life got in the way?',
+      ]);
+    },
+  );
+
+  test.each(['beginner', 'intermediate', 'advanced', 'elite'])(
+    'while paused, a %s athlete sees GOAL PROGRAM, TODAY and the trajectory before PROGRAM PAUSED',
+    (trainingAge) => {
+      mockState = withProgram(trainingAge, { suspension: OPEN_EPISODE, endSuspension: jest.fn() });
+      render(<BlockScreen />);
+      const json = order();
+      expectInOrder(json, ['"GOAL PROGRAM"', '"TODAY"', 'Four-week trajectory', '"PROGRAM PAUSED"']);
+      expect(json.indexOf('Injured, ill, or life got in the way?')).toBe(-1);
+    },
+  );
+});
+
+// #169: the phase "i" cards describe what this block's plan actually does
+// from week to week, read from its own planned sets and effort, not fixed
+// glossary prose that is wrong for one objective or another.
+describe('#169 phase cards describe the generated weeks', () => {
+  const PHASES = ['accumulation', 'intensification', 'realization', 'deload'];
+  // A hypertrophy block whose sets RISE into week 3 (the walk's case).
+  const WEEK = { 1: { sets: 3, targetRpe: 7 }, 2: { sets: 4, targetRpe: 7.5 }, 3: { sets: 5, targetRpe: 8 }, 4: { sets: 2, targetRpe: 6 } };
+  const hypertrophyBlock = () => baseState({
+    block: { blockId: 1, startDate: '2026-07-13', objective: 'hypertrophy', createdAtMs: 1 },
+    blockSessions: [1, 2, 3, 4].map((week) => ({
+      plannedSessionId: week, weekIndex: week, dayIndex: 1, focus: 'upper', phase: PHASES[week - 1],
+      sessionDate: `2026-07-${String(13 + (week - 1) * 7).padStart(2, '0')}`, slotCount: 2,
+      completionStatus: null,
+    })),
+    loadSessionSlots: jest.fn((id) => [
+      { ...todaySlot, plannedSlotId: id * 10, ...WEEK[id] },
+      { ...todaySlot, plannedSlotId: id * 10 + 1, slotIndex: 1, ...WEEK[id] },
+    ]),
+  });
+
+  test('the REALISE card on a hypertrophy block says sets rise, never "lowest volume"', () => {
+    mockState = hypertrophyBlock();
+    render(<BlockScreen />);
+    fireEvent.press(screen.getByLabelText('What does REALISE mean?'));
+    expect(screen.queryByText(/lowest volume/i)).toBeNull();
+    expect(screen.getByText(/Week 3: more working sets than week 2 \(8 → 10\), at a higher target effort \(RPE 7\.5 → 8\)\./)).toBeOnTheScreen();
+    expect(screen.getByTestId('info-tip-body').props.children).toMatch(/^Realise in this block, from your plan:/);
+  });
+
+  test('the build-strength and deload cards say what those weeks do in this block', () => {
+    mockState = hypertrophyBlock();
+    render(<BlockScreen />);
+    fireEvent.press(screen.getByLabelText('What does BUILD STRENGTH mean?'));
+    expect(screen.queryByText(/Volume comes down/i)).toBeNull();
+    expect(screen.getByText(/Week 2: more working sets than week 1 \(6 → 8\), at a higher target effort \(RPE 7 → 7\.5\)\./)).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText('Close, dismiss explanation'));
+    fireEvent.press(screen.getByLabelText('What does DELOAD mean?'));
+    expect(screen.getByText(/Week 4: fewer working sets than week 3 \(10 → 4\), at a lower target effort \(RPE 8 → 6\)\./)).toBeOnTheScreen();
+  });
+});
+
+describe('#170: the neutral default of 50 is named as a default', () => {
+  const noInputs = {
+    ...vector,
+    readiness_score: 50,
+    hrv_component: 50,
+    sleep_component: 50,
+    ln_rmssd: null,
+    hrv_z: null,
+    sleep_efficiency_pct: null,
+  };
+
+  test('with no inputs, READY says it uses a neutral default and drops "Your signals support"', () => {
+    mockState = baseState({ vector: noInputs });
+    render(<ReadinessScreen />);
+    fireEvent.press(screen.getByLabelText('Why this recommendation'));
+    expect(screen.getByText('No scored signals yet. Using a neutral default of 50.')).toBeOnTheScreen();
+    expect(screen.queryByText(/Your signals support/)).toBeNull();
+    expect(screen.queryByText(/Your recovery signals support/)).toBeNull();
+  });
+
+  test('a first HRV reading with no baseline yet (hrv_z null) still reads as no scored signals', () => {
+    mockState = baseState({ vector: { ...noInputs, ln_rmssd: 4.1 } });
+    render(<ReadinessScreen />);
+    fireEvent.press(screen.getByLabelText('Why this recommendation'));
+    expect(screen.getByText('No scored signals yet. Using a neutral default of 50.')).toBeOnTheScreen();
+    expect(screen.queryByText(/^No signals yet/)).toBeNull();
+  });
+
+  test('with inputs, READY keeps the signal-based explanation', () => {
+    render(<ReadinessScreen />);
+    fireEvent.press(screen.getByLabelText('Why this recommendation'));
+    expect(screen.getByText('Your recovery signals support the planned work.')).toBeOnTheScreen();
+    expect(screen.queryByText('No scored signals yet. Using a neutral default of 50.')).toBeNull();
+  });
+
+  test('the HRV deviation shows its unit', () => {
+    mockState = baseState({
+      uiPreferences: { sessionModeOverride: null, readinessDetail: 'full', restTimerEnabled: true, textScale: 'system' },
+    });
+    render(<ReadinessScreen />);
+    fireEvent.press(screen.getByLabelText('Why this recommendation'));
+    fireEvent.press(screen.getByLabelText('Full readiness metrics'));
+    expect(screen.getByText('+0.4 SD from your baseline')).toBeOnTheScreen();
+  });
 });

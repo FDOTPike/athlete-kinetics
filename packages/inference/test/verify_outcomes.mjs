@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 const require = createRequire(import.meta.url);
 const {
   evaluateSessionOutcome,
+  evaluateAfterTheFactOutcome,
   SESSION_OUTCOME_ENGINE_VERSION,
   SessionOutcomeValidationError,
 } = require('./.build/sessionOutcome.js');
@@ -252,10 +253,11 @@ check('session feel: mean drift uses only sets that carry both a rating and a ta
   assert.equal(feel.meanRpeDrift([{ rpe: Number.NaN, targetRpe: 7 }, { rpe: 8, targetRpe: 7 }]), 1);
 });
 
-check('session feel: an answer needs a choice, and any choice but "as planned" needs a reason', () => {
+check('session feel: an answer needs a choice, and only "harder" needs a reason (issue #220)', () => {
   assert.deepEqual(feel.validateSessionFeel({ feel: null, reasons: ['tired'] }), { ok: false, problem: 'feel_required' });
-  for (const kindOfFeel of ['harder', 'easier', 'stopped_early']) {
-    assert.deepEqual(feel.validateSessionFeel({ feel: kindOfFeel, reasons: [] }), { ok: false, problem: 'reason_required' });
+  assert.deepEqual(feel.validateSessionFeel({ feel: 'harder', reasons: [] }), { ok: false, problem: 'reason_required' });
+  for (const kindOfFeel of ['easier', 'stopped_early']) {
+    assert.deepEqual(feel.validateSessionFeel({ feel: kindOfFeel, reasons: [] }), { ok: true, record: { feel: kindOfFeel, reasons: [] } });
   }
   assert.deepEqual(feel.validateSessionFeel({ feel: 'harder', reasons: ['unwell', 'tired', 'tired'] }),
     { ok: true, record: { feel: 'harder', reasons: ['tired', 'unwell'] } });
@@ -268,24 +270,149 @@ check('session feel: "as planned" is saved with no reasons, whatever was tapped 
     { ok: true, record: { feel: 'as_planned', reasons: [] } });
 });
 
+check('session feel: harder and easier keep only the reasons of their own list (issue #220)', () => {
+  assert.deepEqual([...feel.SESSION_FEEL_HARDER_REASONS], ['pain', 'tired', 'unwell', 'technique', 'equipment', 'time', 'too_heavy', 'other']);
+  assert.deepEqual([...feel.SESSION_FEEL_EASIER_REASONS], ['felt_good', 'too_light', 'rested_well', 'other']);
+  assert.deepEqual(feel.validateSessionFeel({ feel: 'easier', reasons: ['rested_well', 'pain', 'too_light'] }),
+    { ok: true, record: { feel: 'easier', reasons: ['too_light', 'rested_well'] } });
+  // A harder answer whose only reason belongs to the easier list has no reason.
+  assert.deepEqual(feel.validateSessionFeel({ feel: 'harder', reasons: ['felt_good'] }), { ok: false, problem: 'reason_required' });
+  assert.deepEqual(feel.validateSessionFeel({ feel: 'harder', reasons: ['too_heavy', 'too_light'] }),
+    { ok: true, record: { feel: 'harder', reasons: ['too_heavy'] } });
+});
+
+// Owner ruling on #220: a row saved under 070 can hold a reason the new list
+// for its answer does not offer. While the answer is unchanged, that reason is
+// shown and kept; a saved "pain" is never silently dropped.
+check('session feel: a saved reason outside the answer\'s list is offered and kept while the answer is unchanged', () => {
+  assert.equal(typeof feel.sessionFeelOfferedReasons, 'function');
+  // With nothing saved, or no answer, the offered list is the answer's own.
+  assert.deepEqual([...feel.sessionFeelOfferedReasons(null)], []);
+  assert.deepEqual([...feel.sessionFeelOfferedReasons('as_planned', { feel: 'as_planned', reasons: ['pain'] })], []);
+  assert.deepEqual([...feel.sessionFeelOfferedReasons('easier')], [...feel.SESSION_FEEL_EASIER_REASONS]);
+  assert.deepEqual([...feel.sessionFeelOfferedReasons('easier', null)], [...feel.SESSION_FEEL_EASIER_REASONS]);
+  assert.deepEqual([...feel.sessionFeelOfferedReasons('easier', { feel: 'easier', reasons: ['felt_good'] })],
+    [...feel.SESSION_FEEL_EASIER_REASONS]);
+  // Legacy easier + pain: pain is offered after the easier list.
+  const offered = feel.sessionFeelOfferedReasons('easier', { feel: 'easier', reasons: ['pain'] });
+  assert.ok(offered.includes('pain'));
+  assert.deepEqual([...offered], ['felt_good', 'too_light', 'rested_well', 'other', 'pain']);
+  assert.deepEqual(
+    [...feel.sessionFeelOfferedReasons('easier', { feel: 'easier', reasons: ['time', 'pain', 'felt_good'] })],
+    ['felt_good', 'too_light', 'rested_well', 'other', 'pain', 'time'],
+  );
+  // A saved value this build does not know is never offered.
+  assert.deepEqual([...feel.sessionFeelOfferedReasons('easier', { feel: 'easier', reasons: ['weather'] })],
+    [...feel.SESSION_FEEL_EASIER_REASONS]);
+});
+
+check('session feel: a saved "pain" is never silently dropped on re-save (owner ruling, #220)', () => {
+  const saved = { feel: 'easier', reasons: ['pain'] };
+  assert.deepEqual(feel.validateSessionFeel({ feel: 'easier', reasons: ['pain'] }, saved),
+    { ok: true, record: { feel: 'easier', reasons: ['pain'] } });
+  assert.deepEqual(feel.validateSessionFeel({ feel: 'easier', reasons: ['too_light', 'pain'] }, saved),
+    { ok: true, record: { feel: 'easier', reasons: ['pain', 'too_light'] } });
+  // Without the saved row, the same draft keeps only the easier list.
+  assert.deepEqual(feel.validateSessionFeel({ feel: 'easier', reasons: ['pain'] }),
+    { ok: true, record: { feel: 'easier', reasons: [] } });
+});
+
+check('session feel: an unchanged legacy "harder" + felt good re-saves', () => {
+  const saved = { feel: 'harder', reasons: ['felt_good'] };
+  assert.deepEqual(feel.validateSessionFeel({ feel: 'harder', reasons: ['felt_good'] }, saved),
+    { ok: true, record: { feel: 'harder', reasons: ['felt_good'] } });
+});
+
+check('session feel: untapping the legacy reason removes it; harder then needs another reason', () => {
+  assert.deepEqual(feel.validateSessionFeel({ feel: 'easier', reasons: [] }, { feel: 'easier', reasons: ['pain'] }),
+    { ok: true, record: { feel: 'easier', reasons: [] } });
+  assert.deepEqual(feel.validateSessionFeel({ feel: 'harder', reasons: [] }, { feel: 'harder', reasons: ['felt_good'] }),
+    { ok: false, problem: 'reason_required' });
+});
+
+check('session feel: a saved out-of-list reason does not carry into a different answer', () => {
+  // easier + pain saved, answer changed to "as planned": no reasons.
+  assert.deepEqual(feel.validateSessionFeel({ feel: 'as_planned', reasons: ['pain'] }, { feel: 'easier', reasons: ['pain'] }),
+    { ok: true, record: { feel: 'as_planned', reasons: [] } });
+  // harder + felt good saved, answer changed to "stopped early": felt good is not offered there.
+  assert.deepEqual(
+    feel.validateSessionFeel({ feel: 'stopped_early', reasons: ['felt_good'] }, { feel: 'harder', reasons: ['felt_good'] }),
+    { ok: true, record: { feel: 'stopped_early', reasons: [] } },
+  );
+  assert.deepEqual([...feel.sessionFeelOfferedReasons('stopped_early', { feel: 'harder', reasons: ['felt_good'] })],
+    [...feel.SESSION_FEEL_HARDER_REASONS]);
+  // easier + too light saved, answer changed to harder: too light is not offered there.
+  assert.deepEqual(
+    feel.validateSessionFeel({ feel: 'harder', reasons: ['too_light'] }, { feel: 'easier', reasons: ['too_light'] }),
+    { ok: false, problem: 'reason_required' },
+  );
+});
+
 check('session feel: a value outside the closed lists is refused', () => {
   assert.deepEqual(feel.validateSessionFeel({ feel: 'terrible', reasons: ['tired'] }), { ok: false, problem: 'unknown_value' });
   assert.deepEqual(feel.validateSessionFeel({ feel: 'harder', reasons: ['weather'] }), { ok: false, problem: 'unknown_value' });
 });
 
-check('session feel: the closed lists mirror the 070 schema exactly', () => {
+check('session feel: the closed lists mirror the 070 and 074 schema exactly', () => {
   const sql = readFileSync(new URL('../../core-db/src/schema/070_session_feel.sql', import.meta.url), 'utf8');
   const domain = /feel\s+TEXT NOT NULL CHECK \(feel IN \(([^)]+)\)\)/.exec(sql);
   assert.ok(domain, 'the feel CHECK domain was not found in 070');
   assert.deepEqual(domain[1].split(',').map((value) => value.trim().replace(/'/g, '')), [...feel.SESSION_FEEL_KINDS]);
-  const columns = [...sql.matchAll(/^\s+reason_([a-z_]+)\s+INTEGER NOT NULL DEFAULT 0 CHECK/gm)].map((match) => match[1]);
-  assert.deepEqual(columns, [...feel.SESSION_FEEL_REASONS]);
+  const reasonColumns = (text) => [...text.matchAll(/^\s+reason_([a-z_]+)\s+INTEGER NOT NULL DEFAULT 0 CHECK/gm)].map((match) => match[1]);
+  const sql074 = readFileSync(new URL('../../core-db/src/schema/074_session_feel_reasons.sql', import.meta.url), 'utf8');
+  // 074 rebuilds session_feel with the same columns and the same domain...
+  const rebuilt = /CREATE TABLE IF NOT EXISTS session_feel_074 \(([\s\S]*?)\) STRICT;/.exec(sql074);
+  assert.ok(rebuilt, 'the 074 rebuild of session_feel was not found');
+  assert.deepEqual(reasonColumns(rebuilt[1]), reasonColumns(sql));
+  const rebuiltDomain = /feel\s+TEXT NOT NULL CHECK \(feel IN \(([^)]+)\)\)/.exec(rebuilt[1]);
+  assert.equal(rebuiltDomain?.[1], domain[1]);
+  // ...and its side-car carries the newer reasons, after the 070 ones.
+  const extra = /CREATE TABLE IF NOT EXISTS session_feel_extra_reason \(([\s\S]*?)\) STRICT;/.exec(sql074);
+  assert.ok(extra, 'the 074 side-car was not found');
+  assert.deepEqual([...reasonColumns(sql), ...reasonColumns(extra[1])], [...feel.SESSION_FEEL_REASONS]);
 });
 
 check('session feel: the module reads no clock, no randomness and no free text', () => {
   const source = readFileSync(new URL('../src/sessionFeel.ts', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /Date\.now\s*\(|new\s+Date\s*\(|Math\.random\s*\(|performance\.now\s*\(/);
   assert.doesNotMatch(source, /resolveReport|scanRedFlags|triage\s*\(|embed\s*\(/);
+});
+
+// Issue 191: a workout the app never closed is finished after the fact. The
+// athlete's choice keeps what was logged as "session recorded"; only a directive
+// safety halt keeps "stopped safely". A manual stop is not a safety halt.
+check('after the fact: logged work of any shape is recorded, never a positive label', () => {
+  const afterTheFact = (patch) => evaluateAfterTheFactOutcome(input(patch));
+  assert.equal(afterTheFact({})?.kind, 'session_recorded');
+  assert.equal(afterTheFact({ originKind: 'free_form' })?.kind, 'session_recorded');
+  assert.equal(afterTheFact({ sets: [logged(1, 1, reps(4))] })?.kind, 'session_recorded');
+  const kept = afterTheFact({ sets: [logged(1, 1, reps(5))] });
+  assert.equal(kept.terminalPhase, 'complete');
+  assert.equal(kept.haltReason, null);
+  assert.equal(kept.finalizedAtMs, 1000);
+});
+
+check('after the fact: a directive safety halt keeps stopped_safely, with logs or without', () => {
+  for (const haltReason of ['safety', 'pain', 'niggle']) {
+    const withSets = evaluateAfterTheFactOutcome(input({ terminal: { phase: 'halted', haltReason } }));
+    assert.equal(withSets.kind, 'stopped_safely', haltReason);
+    assert.equal(withSets.terminalPhase, 'halted');
+    assert.equal(withSets.haltReason, haltReason);
+    const empty = evaluateAfterTheFactOutcome(input({ terminal: { phase: 'halted', haltReason }, sets: [] }));
+    assert.equal(empty.kind, 'stopped_safely', haltReason);
+  }
+});
+
+check('after the fact: an empty session with no safety halt is nothing to keep', () => {
+  assert.equal(evaluateAfterTheFactOutcome(input({ sets: [] })), null);
+  assert.equal(evaluateAfterTheFactOutcome(input({ sets: [], originKind: 'free_form' })), null);
+});
+
+check('after the fact: a manual halt is refused rather than recorded as halted', () => {
+  assert.throws(
+    () => evaluateAfterTheFactOutcome(input({ terminal: { phase: 'halted', haltReason: 'manual' } })),
+    SessionOutcomeValidationError,
+  );
 });
 
 console.log(`verify:outcomes - all ${n} checks green`);

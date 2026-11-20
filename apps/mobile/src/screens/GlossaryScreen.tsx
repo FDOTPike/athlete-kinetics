@@ -20,6 +20,7 @@ import {
 } from 'react-native';
 import {
   GLOSSARY_ENTRIES,
+  glossaryTitle,
   searchGlossary,
   type GlossaryCategory,
   type GlossaryEntry,
@@ -27,6 +28,8 @@ import {
 import { theme } from '../theme/theme';
 import { Chip, QuietAction } from '../components/ui';
 import KeyboardAwareScrollView, { KEYBOARD_TAP_BEHAVIOR } from '../components/KeyboardAwareScrollView';
+import { QUESTION_BOX_ENABLED } from '../config/features';
+import QuestionBoxPanel from '../components/QuestionBoxPanel';
 
 export interface GlossaryScreenProps {
   readonly onClose?: () => void;
@@ -43,11 +46,16 @@ const CATEGORY_CHIPS: readonly { readonly id: FilterCategory; readonly label: st
   { id: 'goal', label: 'GOALS' },
   { id: 'role', label: 'ROLES' },
   { id: 'movement', label: 'PATTERNS' },
+  { id: 'general', label: 'GENERAL' },
 ];
+
+const categoryChipLabel = (id: FilterCategory): string =>
+  CATEGORY_CHIPS.find((chip) => chip.id === id)?.label ?? id.toUpperCase();
 
 export default function GlossaryScreen({ onClose }: GlossaryScreenProps): React.JSX.Element {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<FilterCategory>('all');
+  const [questionOpen, setQuestionOpen] = useState(false);
 
   const searchResults = useMemo(() => {
     return searchGlossary(searchQuery);
@@ -80,6 +88,8 @@ export default function GlossaryScreen({ onClose }: GlossaryScreenProps): React.
         Offline reference for training concepts, loading methods, effort scales, and movement patterns.
       </Text>
 
+      {QUESTION_BOX_ENABLED && <QuietAction label="Question box" onPress={() => setQuestionOpen(!questionOpen)} />}
+      {QUESTION_BOX_ENABLED && questionOpen ? <QuestionBoxPanel onClose={() => setQuestionOpen(false)} /> : <>
       {/* Search Bar */}
       <View style={styles.searchSection}>
         <TextInput
@@ -138,7 +148,7 @@ export default function GlossaryScreen({ onClose }: GlossaryScreenProps): React.
         <View style={styles.emptyContainer} testID="glossary-empty-state">
           <Text style={styles.emptyTitle}>No matching terms found</Text>
           <Text style={styles.emptyDetail}>
-            No entries match &ldquo;{searchQuery}&rdquo; in {activeCategory === 'all' ? 'the glossary' : activeCategory}. Try a different search query or select another category.
+            No entries match &ldquo;{searchQuery}&rdquo; in {activeCategory === 'all' ? 'the glossary' : categoryChipLabel(activeCategory)}. Try a different search query or select another category.
           </Text>
         </View>
       ) : (
@@ -146,9 +156,9 @@ export default function GlossaryScreen({ onClose }: GlossaryScreenProps): React.
           {displayedEntries.map((entry) => (
             <View key={entry.id} style={styles.card} testID={`glossary-card-${entry.id}`}>
               <View style={styles.cardHeader}>
-                <Text style={styles.termTitle}>{entry.term}</Text>
+                <Text style={styles.termTitle}>{glossaryTitle(entry)}</Text>
                 <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{entry.category.toUpperCase()}</Text>
+                  <Text style={styles.badgeText}>{categoryChipLabel(entry.category)}</Text>
                 </View>
               </View>
               <Text style={styles.definitionText}>{entry.definition}</Text>
@@ -161,6 +171,7 @@ export default function GlossaryScreen({ onClose }: GlossaryScreenProps): React.
           ))}
         </View>
       )}
+      </>}
     </KeyboardAwareScrollView>
   );
 }

@@ -151,8 +151,13 @@ check('carry-forward keeps the advisory separate (carried value is not advice)',
   (() => { const r = resolve({ preference: 'manual', isFirstSet: false, currentSessionLoadKg: 47.5, overrideLoadKg: 95 }); return r.initialLoadKg === 47.5 && r.advisoryKg === 95 && r.advisoryKind === 'apre'; })());
 check('carry-forward honors an explicit zero logged earlier in the session',
   (() => { const r = resolve({ preference: 'manual', isFirstSet: false, currentSessionLoadKg: 0 }); return r.source === 'manual' && r.initialLoadKg === 0; })());
-check('auto mode does not use current-session carry-forward (evidence path only)',
-  (() => { const r = resolve({ isFirstSet: false, currentSessionLoadKg: 47.5, lastLoggedLoadKg: 40 }); return r.source === 'history' && r.initialLoadKg === 40; })());
+check('auto history subsequent set preserves current-session load while derived auto keeps the derived target',
+  (() => {
+    const hist = resolve({ isFirstSet: false, currentSessionLoadKg: 47.5, lastLoggedLoadKg: 40 });
+    const derived = resolve({ isFirstSet: false, currentSessionLoadKg: 47.5, oneRepMaxKg: 100, lastLoggedLoadKg: 40 });
+    return hist.source === 'history' && hist.initialLoadKg === 47.5
+      && derived.source === 'derived' && derived.initialLoadKg === targetLoadKg(100, 5, 8);
+  })());
 
 // --- Fail-closed on invalid numerics -----------------------------------------
 console.log('[fail-closed]');

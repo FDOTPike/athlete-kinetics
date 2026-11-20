@@ -6,7 +6,7 @@
  * of the databases it selects — the same reason the embedding model path
  * bootstraps from the document dir (deviceEmbedder precedent).
  *
- * Every function is failure-tolerant: a missing or corrupt registry yields
+ * Every function except readRegistryOrThrow is failure-tolerant: a missing or corrupt registry yields
  * the default single-athlete registry (core invariant I5), so the worst
  * possible outcome of registry damage is "the app behaves like it did before
  * Coach Mode existed." Writes are best-effort; a failed write leaves the
@@ -49,6 +49,17 @@ export async function loadRegistry(): Promise<AthleteRegistry> {
   } catch {
     return parseRegistry('');
   }
+}
+
+/** Like loadRegistry, but a read failure is thrown instead of replaced by the
+ *  default registry. For callers that must not mistake an unreadable registry
+ *  for a single-athlete one (#173: the backup-size estimate). A missing file
+ *  is still a fresh install. */
+export async function readRegistryOrThrow(): Promise<AthleteRegistry> {
+  const fs = blobFs();
+  const path = registryPath();
+  if (!(await fs.exists(path))) return parseRegistry('');
+  return parseRegistry(await fs.readFile(path, 'utf8'));
 }
 
 export async function saveRegistry(reg: AthleteRegistry): Promise<boolean> {

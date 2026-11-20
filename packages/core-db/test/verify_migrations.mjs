@@ -69,7 +69,9 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '067_sport_and_emphasis.sql',
   '068_movement_content_correction_v2.sql',
   '069_resting_heart_rate.sql',
-  '070_session_feel.sql', '071_beta_recording.sql'];
+  '070_session_feel.sql', '071_beta_recording.sql', '072_question_log.sql', '073_session_slot_replaced_by.sql',
+  '074_session_feel_reasons.sql', '075_session_plan_slot_planned_count.sql', '076_sport_taxonomy_expansion.sql', '077_multisport_and_flexibility.sql',
+  '078_kinestrike_telemetry.sql', '079_session_slot_swap_cause.sql', '080_sport_peaking_and_lifting_taxonomy.sql', '081_advanced_program_control.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
@@ -1672,7 +1674,7 @@ console.log('[2s] R1 durable-object drift guard');
   const registered = new Set(SENTINELS.map((s) => s.name));
   const exempt = new Map(DURABLE_TABLE_EXEMPTIONS.map((e) => [e.name, e.reason]));
   const durable = dbDrift.raw.prepare(
-    `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name`,
+    `SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT GLOB 'sqlite_*' ORDER BY name`,
   ).all().map((r) => r.name);
   const uncovered = durable.filter((t) => !registered.has(t) && !exempt.has(t));
   check('every durable table is a sentinel or a justified exemption',
@@ -1766,11 +1768,11 @@ console.log('[2u] 057 block_meta phase/index repair + enforcement');
     const db = freshDb();
     runMigrations(db, MIGRATIONS);
     // Slot 004 is the parameterized materialize script, never a migration:
-    // 70 files (slots 001-071, no 004) -> user_version 70. This count is
+    // 80 files (slots 001-081, no 004) -> user_version 80. This count is
     // pinned deliberately so adding a migration is a conscious act, not a
-    // silent one. Re-pinned for 071 (beta recording).
-    check('fresh install reaches user_version 70 (70 files, no slot 004)',
-      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 70,
+    // silent one. Re-pinned for 081 (advanced_program_control).
+    check('fresh install reaches user_version 80 (80 files, no slot 004)',
+      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 80,
       String(uv(db)));
     const trig = db.raw.prepare(
       `SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'trigger'
@@ -4127,9 +4129,10 @@ const IDX_070 = FILES.indexOf('070_session_feel.sql');
   check('the upgrade leaves sessions, typed notes and reports byte-identical', sessionFacts(upgrade) === before);
   check('the upgrade invents no answer (the new table starts empty)', feelRows(upgrade).length === 0);
 
-  // Domain: the one rule is in the schema.
+  // Domain: the one rule is in the schema, as 070 shipped it. (074 loosens it;
+  // its own section below checks the rule after it.)
   const fresh = freshDb();
-  runMigrations(fresh, MIGRATIONS);
+  applyRaw(fresh, MIGRATIONS, 0, IDX_070 + 1);
   fresh.raw.exec('PRAGMA foreign_keys = ON');
   for (const day of ['01', '02', '03', '04', '05']) {
     fresh.raw.exec(`INSERT INTO session (micro_cycle_id, session_date, started_at_ms) VALUES (NULL, '2026-10-${day}', 1)`);
@@ -4196,8 +4199,8 @@ const IDX_070 = FILES.indexOf('070_session_feel.sql');
 console.log('[071] beta recording (session_skipped_slot, set_load_shown)');
 const IDX_071 = FILES.indexOf('071_beta_recording.sql');
 {
-  check('071 is appended after 070 and completes the chain',
-    IDX_071 === IDX_070 + 1 && IDX_071 === MIGRATIONS.length - 1 && IDX_071 === 69, `index=${IDX_071}`);
+  check('071 is appended after 070 at its shipped ordinal',
+    IDX_071 === IDX_070 + 1 && IDX_071 === 69, `index=${IDX_071}`);
   const skippedRows = (db) => db.raw.prepare('SELECT * FROM session_skipped_slot ORDER BY session_plan_slot_id').all();
   const shownRows = (db) => db.raw.prepare('SELECT * FROM set_load_shown ORDER BY set_id').all();
   const priorFacts = (db) => JSON.stringify({
@@ -4335,6 +4338,291 @@ const IDX_071 = FILES.indexOf('071_beta_recording.sql');
   }
 }
 
+console.log('[072] question log');
+const IDX_072 = FILES.indexOf('072_question_log.sql');
+{
+  const index = IDX_072;
+  check('072 is appended after 071', index === IDX_071 + 1 && index === 70);
+  const questions = (db) => db.raw.prepare('SELECT * FROM question_log ORDER BY id').all();
+  const upgraded = freshDb();
+  applyRaw(upgraded, MIGRATIONS, 0, index);
+  upgraded.raw.exec("INSERT INTO session (session_id, session_date, started_at_ms) VALUES (72, '2026-10-28', 1)");
+  const before = upgraded.raw.prepare('SELECT * FROM session').all();
+  runMigrations(upgraded, MIGRATIONS);
+  check('a populated pre-072 install retains its sessions and starts with an empty log',
+    JSON.stringify(upgraded.raw.prepare('SELECT * FROM session').all()) === JSON.stringify(before) && questions(upgraded).length === 0);
+  const insert = upgraded.raw.prepare('INSERT INTO question_log (asked_at, question_text, outcome_kind, glossary_term_id) VALUES (?, ?, ?, ?)');
+  insert.run(1, 'What is effort?', 'card', 'RPE');
+  insert.run(2, 'unrelated', 'none', null);
+  insert.run(3, 'my knee hurts', 'refer', null);
+  check('all three outcomes retain question text and only a card carries a term id', questions(upgraded).length === 3 && questions(upgraded)[0].glossary_term_id === 'RPE');
+  const rejectsQuestion = (args) => { try { insert.run(...args); return false; } catch { return true; } };
+  check('question log rejects invalid text, timestamps, kinds and card identity combinations', [
+    [0, 'question', 'none', null], [1, ' ', 'none', null], [1, 'a'.repeat(301), 'none', null],
+    [1, 'question', 'other', null], [1, 'question', 'card', null], [1, 'question', 'card', ''],
+    [1, 'question', 'none', 'RPE'], [1, 'question', 'refer', 'RPE'],
+  ].every(rejectsQuestion));
+  const kept = JSON.stringify(questions(upgraded));
+  runMigrations(upgraded, MIGRATIONS);
+  upgraded.executeSync(`PRAGMA user_version = ${index};`);
+  runMigrations(upgraded, MIGRATIONS);
+  upgraded.executeSync('PRAGMA user_version = 0;');
+  runMigrations(upgraded, MIGRATIONS);
+  check('questions survive reboot, replay from 072 and a full re-apply', JSON.stringify(questions(upgraded)) === kept);
+  upgraded.raw.exec('DROP TABLE question_log');
+  check('a lost question log is detected', sentinelsMissing(upgraded).includes('question_log'));
+  runMigrations(upgraded, MIGRATIONS);
+  check('self-heal rebuilds the lost log while retaining session data', questions(upgraded).length === 0
+    && sentinelsMissing(upgraded).length === 0 && upgraded.raw.prepare('SELECT COUNT(*) AS c FROM session WHERE session_id = 72').get().c === 1);
+}
+
+console.log('[073] session slot replaced by (session_plan_slot_replacement)');
+{
+  const index = FILES.indexOf('073_session_slot_replaced_by.sql');
+  check('073 is appended after 072', index === IDX_072 + 1 && index === 71);
+  const replacements = (db) => db.raw.prepare('SELECT * FROM session_plan_slot_replacement ORDER BY session_plan_slot_id').all();
+  const upgraded = freshDb();
+  applyRaw(upgraded, MIGRATIONS, 0, index);
+  const firstMoveId = Number(upgraded.raw.prepare('SELECT movement_id FROM movement ORDER BY movement_id LIMIT 1').get().movement_id);
+  upgraded.raw.exec("INSERT INTO session (session_id, session_date, started_at_ms) VALUES (73, '2026-10-31', 1)");
+  upgraded.raw.prepare(
+    "INSERT INTO session_plan_slot (session_plan_slot_id, session_id, slot_index, movement_id, planned_sets, planned_reps, provenance_kind) VALUES (1, 73, 0, ?, 3, 5, 'free_form')",
+  ).run(firstMoveId);
+  const slotsBefore = JSON.stringify(upgraded.raw.prepare('SELECT * FROM session_plan_slot ORDER BY session_plan_slot_id').all());
+  runMigrations(upgraded, MIGRATIONS);
+  check('a populated pre-073 install retains its session_plan_slot rows untouched and starts with an empty replacement table',
+    JSON.stringify(upgraded.raw.prepare('SELECT * FROM session_plan_slot ORDER BY session_plan_slot_id').all()) === slotsBefore
+      && replacements(upgraded).length === 0);
+  upgraded.raw.prepare(
+    "INSERT INTO session_plan_slot (session_plan_slot_id, session_id, slot_index, movement_id, planned_sets, planned_reps, provenance_kind, original_movement_id) VALUES (2, 73, 1, ?, 2, 5, 'free_form', ?)",
+  ).run(firstMoveId, firstMoveId);
+  upgraded.raw.prepare(
+    "INSERT INTO session_plan_slot (session_plan_slot_id, session_id, slot_index, movement_id, planned_sets, planned_reps, provenance_kind) VALUES (3, 73, 2, ?, 2, 5, 'free_form')",
+  ).run(firstMoveId);
+  upgraded.raw.exec('INSERT INTO session_plan_slot_replacement (session_plan_slot_id, replaced_by_session_plan_slot_id) VALUES (1, 2)');
+  check('session_plan_slot_replacement links the original slot to its replacement row',
+    JSON.stringify(replacements(upgraded)) === JSON.stringify([{ session_plan_slot_id: 1, replaced_by_session_plan_slot_id: 2 }]));
+  const rejectsReplacement = (a, b) => {
+    try {
+      upgraded.raw.prepare('INSERT INTO session_plan_slot_replacement (session_plan_slot_id, replaced_by_session_plan_slot_id) VALUES (?, ?)').run(a, b);
+      return false;
+    } catch {
+      return true;
+    }
+  };
+  check('session_plan_slot_replacement rejects self-replacement, duplicate source, duplicate replacement target, and missing slot ids',
+    rejectsReplacement(3, 3) && rejectsReplacement(1, 3) && rejectsReplacement(3, 2) && rejectsReplacement(3, 999));
+  upgraded.executeSync(`PRAGMA user_version = ${index};`);
+  runMigrations(upgraded, MIGRATIONS);
+  upgraded.executeSync('PRAGMA user_version = 0;');
+  runMigrations(upgraded, MIGRATIONS);
+  check('073 survives replay and full re-apply with replacement row preserved',
+    JSON.stringify(replacements(upgraded)) === JSON.stringify([{ session_plan_slot_id: 1, replaced_by_session_plan_slot_id: 2 }]));
+  upgraded.raw.exec('DELETE FROM session_plan_slot WHERE session_plan_slot_id = 2');
+  check('deleting the replacement slot cascades to session_plan_slot_replacement',
+    replacements(upgraded).length === 0);
+  upgraded.raw.exec('DROP TABLE session_plan_slot_replacement');
+  check('a lost session_plan_slot_replacement table is detected',
+    sentinelsMissing(upgraded).includes('session_plan_slot_replacement'));
+  runMigrations(upgraded, MIGRATIONS);
+  check('self-heal rebuilds session_plan_slot_replacement while retaining session data',
+    replacements(upgraded).length === 0 && sentinelsMissing(upgraded).length === 0
+      && Number(upgraded.raw.prepare('SELECT COUNT(*) AS c FROM session WHERE session_id = 73').get().c) === 1);
+
+  // Applying the full chain twice to the same database (the self-heal replay)
+  // succeeds and leaves session_plan_slot_replacement present. With the earlier
+  // ALTER TABLE session_plan_slot ADD COLUMN replaced_by_session_plan_slot_id
+  // version, the second pass failed with:
+  //   Error: duplicate column name: replaced_by_session_plan_slot_id
+  const replayed = freshDb();
+  applyRaw(replayed, MIGRATIONS, 0, MIGRATIONS.length);
+  applyRaw(replayed, MIGRATIONS, 0, MIGRATIONS.length);
+  replayed.executeSync('PRAGMA user_version = 0;');
+  runMigrations(replayed, MIGRATIONS);
+  let addColumnReplayError = '';
+  try {
+    const withAddColumn = [
+      ...MIGRATIONS.slice(0, index),
+      'ALTER TABLE session_plan_slot ADD COLUMN replaced_by_session_plan_slot_id INTEGER REFERENCES session_plan_slot(session_plan_slot_id) ON DELETE SET NULL;',
+    ];
+    const broken = freshDb();
+    runMigrations(broken, withAddColumn);
+    broken.executeSync('PRAGMA user_version = 0;');
+    runMigrations(broken, withAddColumn);
+  } catch (error) {
+    addColumnReplayError = error instanceof Error ? error.message : String(error);
+  }
+  check('applying the full chain twice to the same database (self-heal replay) succeeds and session_plan_slot_replacement exists (whereas ADD COLUMN failed with duplicate column name: replaced_by_session_plan_slot_id)',
+    uv(replayed) === MIGRATIONS.length
+      && replayed.raw.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'session_plan_slot_replacement'").get() !== undefined
+      && !sentinelsMissing(replayed).includes('session_plan_slot_replacement')
+      && /duplicate column name: replaced_by_session_plan_slot_id/i.test(addColumnReplayError),
+    addColumnReplayError);
+}
+
+// =============================================================================
+// [074] session feel: a reason only for "harder", separate lists (issue #220)
+// =============================================================================
+// session_feel is rebuilt (061 pattern) with the same columns and a looser
+// CHECK, and the newer reasons go in a side-car. Proves the rebuild keeps
+// every row byte-identical, that it and the side-car survive every replay
+// (the rebuild runs again on each one), that the new rule is the schema's, and
+// that each table, lost on its own, is detected and rebuilt.
+console.log('[074] session feel reasons (session_feel rebuilt, session_feel_extra_reason)');
+{
+  const index = FILES.indexOf('074_session_feel_reasons.sql');
+  const IDX_073 = FILES.indexOf('073_session_slot_replaced_by.sql');
+  check('074 is appended after 073', index === IDX_073 + 1 && index === 72);
+  const feelRows = (db) => db.raw.prepare('SELECT * FROM session_feel ORDER BY session_id').all();
+  const extraRows = (db) => db.raw.prepare('SELECT * FROM session_feel_extra_reason ORDER BY session_id').all();
+  const rejects = (fn) => { try { fn(); return false; } catch { return true; } };
+
+  // A populated pre-074 install holding every kind of answer 070 accepted.
+  const upgraded = freshDb();
+  applyRaw(upgraded, MIGRATIONS, 0, index);
+  for (const day of ['01', '02', '03', '04', '05', '06']) {
+    upgraded.raw.exec(`INSERT INTO session (micro_cycle_id, session_date, started_at_ms) VALUES (NULL, '2026-11-${day}', 1)`);
+  }
+  upgraded.raw.exec("INSERT INTO session_feel (session_id, feel, recorded_at_ms) VALUES (1, 'as_planned', 11)");
+  upgraded.raw.exec("INSERT INTO session_feel (session_id, feel, reason_tired, reason_unwell, recorded_at_ms) VALUES (2, 'harder', 1, 1, 12)");
+  upgraded.raw.exec("INSERT INTO session_feel (session_id, feel, reason_felt_good, recorded_at_ms) VALUES (3, 'easier', 1, 13)");
+  upgraded.raw.exec("INSERT INTO session_feel (session_id, feel, reason_pain, reason_other, recorded_at_ms) VALUES (4, 'stopped_early', 1, 1, 14)");
+  upgraded.raw.exec("INSERT INTO session_note (session_id, note, created_at_ms) VALUES (2, 'tired from a night shift', 15)");
+  const before = JSON.stringify(feelRows(upgraded));
+  const notesBefore = JSON.stringify(upgraded.raw.prepare('SELECT * FROM session_note').all());
+  runMigrations(upgraded, MIGRATIONS);
+  check('a populated pre-074 install upgrades with every sentinel present',
+    uv(upgraded) === MIGRATIONS.length && sentinelsMissing(upgraded).length === 0, `uv=${uv(upgraded)}`);
+  check('the rebuild keeps every session_feel row byte-identical, and the notes, and starts the side-car empty',
+    JSON.stringify(feelRows(upgraded)) === before
+      && JSON.stringify(upgraded.raw.prepare('SELECT * FROM session_note').all()) === notesBefore
+      && extraRows(upgraded).length === 0);
+  check('no staging table is left behind',
+    upgraded.raw.prepare("SELECT COUNT(*) AS c FROM sqlite_master WHERE name = 'session_feel_074'").get().c === 0);
+
+  // The new rule, in the schema.
+  const insertFeel = (sessionId, feel, reasons = {}) => {
+    const columns = Object.keys(reasons);
+    upgraded.raw.prepare(
+      `INSERT INTO session_feel (session_id, feel${columns.map((c) => `, reason_${c}`).join('')}, recorded_at_ms)
+       VALUES (?, ?${columns.map(() => ', ?').join('')}, 1)`,
+    ).run(sessionId, feel, ...Object.values(reasons));
+  };
+  const insertExtra = (sessionId, flags) => upgraded.raw.prepare(
+    'INSERT INTO session_feel_extra_reason (session_id, reason_too_heavy, reason_too_light, reason_rested_well) VALUES (?, ?, ?, ?)',
+  ).run(sessionId, ...flags);
+  check('"easier" with no reason is accepted', !rejects(() => insertFeel(5, 'easier')));
+  check('"as planned" with a reason is still rejected', rejects(() => insertFeel(6, 'as_planned', { tired: 1 })));
+  check('an unknown answer and a flag outside 0/1 are still rejected',
+    rejects(() => insertFeel(6, 'terrible')) && rejects(() => insertFeel(6, 'harder', { pain: 2 })));
+  check('a side-car row with a newer reason is accepted', !rejects(() => insertExtra(5, [0, 1, 1])));
+  check('a side-car row with no reason, a flag outside 0/1, a text flag or no session is rejected',
+    rejects(() => insertExtra(6, [0, 0, 0])) && rejects(() => insertExtra(6, [2, 0, 0]))
+      && rejects(() => insertExtra(6, ['yes', 0, 0])) && rejects(() => insertExtra(99, [1, 0, 0])));
+  check('a second side-car row for the same session is rejected', rejects(() => insertExtra(5, [1, 0, 0])));
+
+  // Every replay re-runs the rebuild: nothing may be lost, the side-car included.
+  const kept = JSON.stringify({ feel: feelRows(upgraded), extra: extraRows(upgraded) });
+  upgraded.executeSync(`PRAGMA user_version = ${index};`);
+  runMigrations(upgraded, MIGRATIONS);
+  const afterReplay = JSON.stringify({ feel: feelRows(upgraded), extra: extraRows(upgraded) });
+  upgraded.executeSync('PRAGMA user_version = 0;');
+  runMigrations(upgraded, MIGRATIONS);
+  check('answers and newer reasons survive a replay from 074 and a full re-apply from 0',
+    afterReplay === kept && JSON.stringify({ feel: feelRows(upgraded), extra: extraRows(upgraded) }) === kept
+      && uv(upgraded) === MIGRATIONS.length && sentinelsMissing(upgraded).length === 0);
+  check('the rule after a replay is still the looser one', !rejects(() => insertFeel(6, 'stopped_early')));
+
+  upgraded.raw.exec('DELETE FROM session WHERE session_id = 5');
+  check('an answer and its newer reasons leave with their session',
+    feelRows(upgraded).every((row) => row.session_id !== 5) && extraRows(upgraded).length === 0);
+
+  // Each table, lost on its own, is detected and rebuilt with the data kept.
+  insertExtra(3, [0, 0, 1]);
+  const keptAgain = JSON.stringify(feelRows(upgraded));
+  upgraded.raw.exec('DROP TABLE session_feel_extra_reason');
+  check('a lost session_feel_extra_reason table is detected',
+    sentinelsMissing(upgraded).includes('session_feel_extra_reason'));
+  runMigrations(upgraded, MIGRATIONS);
+  check('self-heal rebuilds session_feel_extra_reason and keeps every answer',
+    sentinelsMissing(upgraded).length === 0 && extraRows(upgraded).length === 0
+      && JSON.stringify(feelRows(upgraded)) === keptAgain);
+  const lost = freshDb();
+  runMigrations(lost, MIGRATIONS);
+  lost.raw.exec('DROP TABLE session_feel');
+  const detected = sentinelsMissing(lost).includes('session_feel');
+  runMigrations(lost, MIGRATIONS);
+  check('a lost session_feel table is detected and rebuilt with the looser rule',
+    detected && sentinelsMissing(lost).length === 0
+      && /feel <> 'as_planned'/.test(lost.raw.prepare("SELECT sql FROM sqlite_master WHERE name = 'session_feel'").get().sql));
+}
+
+// =============================================================================
+// [075] planned set count kept beside a swapped slot (issue #144)
+// =============================================================================
+// session_plan_slot_planned_count keeps the count a slot was planned with when a
+// swap after logged sets overwrote planned_sets with the runner's count. It is
+// a side-car (no ADD COLUMN), so every replay re-applies it safely.
+console.log('[075] session plan slot planned count (session_plan_slot_planned_count)');
+{
+  const index = FILES.indexOf('075_session_plan_slot_planned_count.sql');
+  check('075 is appended after 074', index === 73 && FILES[index + 1] === '076_sport_taxonomy_expansion.sql');
+  const counts = (db) => db.raw.prepare('SELECT * FROM session_plan_slot_planned_count ORDER BY session_plan_slot_id').all();
+  const rejects = (fn) => { try { fn(); return false; } catch { return true; } };
+  const upgraded = freshDb();
+  applyRaw(upgraded, MIGRATIONS, 0, index);
+  upgraded.raw.exec('PRAGMA foreign_keys = ON');
+  const firstMoveId = Number(upgraded.raw.prepare('SELECT movement_id FROM movement ORDER BY movement_id LIMIT 1').get().movement_id);
+  upgraded.raw.exec("INSERT INTO session (session_id, session_date, started_at_ms) VALUES (75, '2026-11-07', 1)");
+  // A pre-075 swap: slot 1 was planned for 2 sets, kept 1 after a logged set, and
+  // slot 2 is its replacement.
+  upgraded.raw.prepare(
+    "INSERT INTO session_plan_slot (session_plan_slot_id, session_id, slot_index, movement_id, planned_sets, planned_reps, provenance_kind) VALUES (1, 75, 0, ?, 1, 5, 'free_form')",
+  ).run(firstMoveId);
+  upgraded.raw.prepare(
+    "INSERT INTO session_plan_slot (session_plan_slot_id, session_id, slot_index, movement_id, planned_sets, planned_reps, provenance_kind) VALUES (2, 75, 1, ?, 1, 5, 'free_form')",
+  ).run(firstMoveId);
+  const slotsBefore = JSON.stringify(upgraded.raw.prepare('SELECT * FROM session_plan_slot ORDER BY session_plan_slot_id').all());
+  runMigrations(upgraded, MIGRATIONS);
+  check('a populated pre-075 install retains its slots untouched and has no recorded originals (old rows read NULL)',
+    JSON.stringify(upgraded.raw.prepare('SELECT * FROM session_plan_slot ORDER BY session_plan_slot_id').all()) === slotsBefore
+      && counts(upgraded).length === 0);
+  upgraded.raw.exec('PRAGMA foreign_keys = ON');
+  upgraded.raw.exec('INSERT INTO session_plan_slot_planned_count (session_plan_slot_id, original_planned_sets) VALUES (1, 2)');
+  check('the original count sits beside the runner count, which is unchanged',
+    JSON.stringify(counts(upgraded)) === JSON.stringify([{ session_plan_slot_id: 1, original_planned_sets: 2 }])
+      && Number(upgraded.raw.prepare('SELECT planned_sets FROM session_plan_slot WHERE session_plan_slot_id = 1').get().planned_sets) === 1);
+  check('an original below 1, a second row for one slot, and a missing slot are all rejected',
+    rejects(() => upgraded.raw.exec('INSERT INTO session_plan_slot_planned_count (session_plan_slot_id, original_planned_sets) VALUES (2, 0)'))
+      && rejects(() => upgraded.raw.exec('INSERT INTO session_plan_slot_planned_count (session_plan_slot_id, original_planned_sets) VALUES (1, 3)'))
+      && rejects(() => upgraded.raw.exec('INSERT INTO session_plan_slot_planned_count (session_plan_slot_id, original_planned_sets) VALUES (999, 2)')));
+
+  // Every replay re-applies the chain; the recorded original survives it.
+  upgraded.executeSync(`PRAGMA user_version = ${index};`);
+  runMigrations(upgraded, MIGRATIONS);
+  upgraded.executeSync('PRAGMA user_version = 0;');
+  runMigrations(upgraded, MIGRATIONS);
+  check('the recorded original survives a replay from 075 and a full re-apply from 0',
+    JSON.stringify(counts(upgraded)) === JSON.stringify([{ session_plan_slot_id: 1, original_planned_sets: 2 }])
+      && uv(upgraded) === MIGRATIONS.length && sentinelsMissing(upgraded).length === 0);
+
+  upgraded.raw.exec('DELETE FROM session_plan_slot WHERE session_plan_slot_id = 1');
+  check('deleting the slot cascades to its recorded original', counts(upgraded).length === 0);
+
+  // A lost side-car is detected and rebuilt, and the slots are kept.
+  upgraded.raw.prepare(
+    "INSERT INTO session_plan_slot (session_plan_slot_id, session_id, slot_index, movement_id, planned_sets, planned_reps, provenance_kind) VALUES (3, 75, 2, ?, 1, 5, 'free_form')",
+  ).run(firstMoveId);
+  upgraded.raw.exec('INSERT INTO session_plan_slot_planned_count (session_plan_slot_id, original_planned_sets) VALUES (3, 4)');
+  upgraded.raw.exec('DROP TABLE session_plan_slot_planned_count');
+  check('a lost session_plan_slot_planned_count table is detected',
+    sentinelsMissing(upgraded).includes('session_plan_slot_planned_count'));
+  runMigrations(upgraded, MIGRATIONS);
+  check('self-heal rebuilds session_plan_slot_planned_count and keeps the slot',
+    sentinelsMissing(upgraded).length === 0 && counts(upgraded).length === 0
+      && Number(upgraded.raw.prepare('SELECT COUNT(*) AS c FROM session_plan_slot WHERE session_plan_slot_id = 3').get().c) === 1);
+}
+
 // --- one statement per database call ------------------------------------------
 // CI evidence (run 37877632952, iOS test3): op-sqlite 16.2.0 reads the rows of
 // one executeSync call at the combined column count of every statement in that
@@ -4410,6 +4698,202 @@ console.log('\n[one statement per database call]');
   check('scanner: blank pieces are dropped and names that merely contain keywords are plain names',
     split(';; CREATE TABLE end_log(trigger_name, constructor); ; -- done\n')
       === JSON.stringify(['CREATE TABLE end_log(trigger_name, constructor);']));
+}
+
+// =============================================================================
+// [076] sport taxonomy expansion (22 proposed SportIds)
+// =============================================================================
+console.log('[076] sport taxonomy expansion (athlete_sport_profile CHECK widened)');
+{
+  const index = FILES.indexOf('076_sport_taxonomy_expansion.sql');
+  check('076 is appended before 077', index === 74 && FILES[index + 1] === '077_multisport_and_flexibility.sql');
+  const upgraded = freshDb();
+  applyRaw(upgraded, MIGRATIONS, 0, index); // through 075
+  upgraded.raw.exec("INSERT INTO athlete_sport_profile (sport_profile_id, sport_id, outcome_id, experience_id, revision, updated_at_ms) VALUES (1, 'basketball', 'general_support', 'new', 1, 0)");
+  applyRaw(upgraded, MIGRATIONS, index, index + 1); // 076 only
+  const kept = upgraded.raw.prepare('SELECT sport_id FROM athlete_sport_profile WHERE sport_profile_id = 1').get();
+  check('076 preserves the existing profile row', kept && kept.sport_id === 'basketball');
+  upgraded.raw.exec("UPDATE athlete_sport_profile SET sport_id = 'grappling_bjj', outcome_id = 'stay_available' WHERE sport_profile_id = 1");
+  check('076 accepts a new proposed sport id', upgraded.raw.prepare('SELECT sport_id FROM athlete_sport_profile').get().sport_id === 'grappling_bjj');
+  let rejected = false;
+  try { upgraded.raw.exec("UPDATE athlete_sport_profile SET sport_id = 'cricket' WHERE sport_profile_id = 1"); } catch { rejected = true; }
+  check('076 still rejects an unlisted sport id', rejected);
+  const cols = upgraded.raw.prepare('PRAGMA table_info(athlete_sport_profile)').all().map((c) => c.name);
+  check('076 keeps all eleven columns', cols.length === 11 && cols.includes('competition_date') && cols.includes('updated_at_ms'), String(cols.length));
+}
+
+
+// =============================================================================
+// [077] multisport and flexibility side-cars
+// =============================================================================
+console.log('[077] multisport and flexibility (secondary sport + flexibility tag)');
+{
+  const index = FILES.indexOf('077_multisport_and_flexibility.sql');
+  check('077 is appended before 078', index === 75 && FILES[index + 1] === '078_kinestrike_telemetry.sql');
+  const d = freshDb();
+  runMigrations(d, MIGRATIONS);
+  const has = (name) => d.raw.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name=?").get(name).c === 1;
+  check('077 creates both side-car tables', has('athlete_secondary_sport_profile') && has('activity_flexibility_tag'));
+  const throws = (fn) => { try { fn(); return false; } catch { return true; } };
+  const insertSecondary = (sport) => d.raw.prepare(
+    "INSERT INTO athlete_secondary_sport_profile (priority_rank, sport_id, other_sport_name, outcome_id, experience_id, revision, updated_at_ms) VALUES (2, ?, NULL, 'general_support', 'new', 1, 0)",
+  ).run(sport);
+  d.raw.prepare("INSERT INTO athlete_sport_profile (sport_profile_id, sport_id, other_sport_name, outcome_id, experience_id, revision, updated_at_ms) VALUES (1, 'powerlifting', NULL, 'general_support', 'new', 1, 0)").run();
+  insertSecondary('grappling_bjj');
+  check('077 accepts a secondary sport beside the primary', d.raw.prepare('SELECT sport_id FROM athlete_secondary_sport_profile').get().sport_id === 'grappling_bjj');
+  const insertActivity = (id, demand) => d.raw.prepare(
+    "INSERT INTO activity_definition (activity_id, kind_id, display_name, demand_class, demand_source, provenance, created_at_ms, updated_at_ms) VALUES (?, 'custom', ?, ?, 'user_reported', 'user_reported', 0, 0)",
+  ).run(id, id, demand);
+  insertActivity('flex1', 'low');
+  insertActivity('hard1', 'high');
+  const tag = (id) => d.raw.prepare("INSERT INTO activity_flexibility_tag (activity_id, template_id, recorded_at_ms) VALUES (?, 'hips_lower_body', 0)").run(id);
+  check('077 rejects tagging a high-demand activity', throws(() => tag('hard1')));
+  tag('flex1');
+  check('077 accepts tagging a low-demand activity', d.raw.prepare('SELECT COUNT(*) c FROM activity_flexibility_tag').get().c === 1);
+  check('077 blocks reclassifying a tagged activity away from low demand', throws(() => d.raw.exec("UPDATE activity_definition SET demand_class = 'moderate' WHERE activity_id = 'flex1'")));
+}
+
+// =============================================================================
+// [078] KineStrike plantar/IMU telemetry side-car
+// =============================================================================
+console.log('[078] KineStrike plantar telemetry side-car (state_vector_kinestrike)');
+{
+  const index = FILES.indexOf('078_kinestrike_telemetry.sql');
+  check('078 precedes 079', index === 76 && FILES[index + 1] === '079_session_slot_swap_cause.sql');
+  const d = freshDb();
+  runMigrations(d, MIGRATIONS);
+  const has = (name) => d.raw.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name=?").get(name).c === 1;
+  check('078 creates state_vector_kinestrike', has('state_vector_kinestrike'));
+  d.raw.exec("INSERT INTO state_vector_kinestrike (date, ks_foot, ks_strike_count, ks_cop_x_mean, ks_fall_last_state) VALUES ('2026-11-10', 'R', 120, 0.46, 'IDLE')");
+  check('078 persists daily plantar telemetry row', d.raw.prepare("SELECT ks_foot FROM state_vector_kinestrike WHERE date='2026-11-10'").get().ks_foot === 'R');
+  d.raw.exec('DROP TABLE state_vector_kinestrike');
+  check('078 poison detection spots missing state_vector_kinestrike sentinel', sentinelsMissing(d).includes('state_vector_kinestrike'));
+  runMigrations(d, MIGRATIONS);
+  check('078 self-heal restores state_vector_kinestrike', has('state_vector_kinestrike'));
+}
+
+// =============================================================================
+// [079] Session slot swap cause & scope side-car (#208)
+// =============================================================================
+console.log('[079] session slot swap cause & scope side-car (session_slot_swap_cause)');
+{
+  const index = FILES.indexOf('079_session_slot_swap_cause.sql');
+  check('079 precedes 080', index === 77 && FILES[index + 1] === '080_sport_peaking_and_lifting_taxonomy.sql');
+  const d = freshDb();
+  runMigrations(d, MIGRATIONS);
+  const has = (name) => d.raw.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name=?").get(name).c === 1;
+  check('079 creates session_slot_swap_cause', has('session_slot_swap_cause'));
+  d.raw.exec("INSERT INTO session (session_id, micro_cycle_id, session_date, started_at_ms) VALUES (9780, NULL, '2026-11-10', 1000)");
+  d.raw.exec("INSERT INTO session_plan_slot (session_plan_slot_id, session_id, slot_index, movement_id, planned_sets, planned_reps, provenance_kind, target_rpe) VALUES (9781, 9780, 1, 1, 3, 5, 'free_form', NULL)");
+  d.raw.exec("INSERT INTO session_plan_slot (session_plan_slot_id, session_id, slot_index, movement_id, planned_sets, planned_reps, provenance_kind, target_rpe) VALUES (9782, 9780, 2, 2, 2, 5, 'free_form', NULL)");
+  d.raw.exec("INSERT INTO session_slot_swap_cause (session_plan_slot_id, cause, scope, replaced_movement_id, replaced_by_session_plan_slot_id, recorded_at_ms) VALUES (9781, 'equipment_busy', 'today_only', 1, 9782, 12345)");
+  check('079 persists swap cause and scope row', d.raw.prepare("SELECT cause, scope, replaced_movement_id FROM session_slot_swap_cause WHERE session_plan_slot_id = 9781").get()?.cause === 'equipment_busy');
+  check('079 enforces cause CHECK constraint', throws(() => d.raw.exec("INSERT INTO session_slot_swap_cause (session_plan_slot_id, cause, scope, recorded_at_ms) VALUES (9782, 'invented_reason', 'today_only', 1)")));
+  check('079 enforces scope CHECK constraint', throws(() => d.raw.exec("INSERT INTO session_slot_swap_cause (session_plan_slot_id, cause, scope, recorded_at_ms) VALUES (9782, 'preference', 'forever', 1)")));
+  d.raw.exec('DROP TABLE session_slot_swap_cause');
+  check('079 poison detection spots missing session_slot_swap_cause sentinel', sentinelsMissing(d).includes('session_slot_swap_cause'));
+  runMigrations(d, MIGRATIONS);
+  check('079 self-heal restores session_slot_swap_cause', has('session_slot_swap_cause'));
+}
+
+// =============================================================================
+// [080] sport peaking catalog, lifting taxonomy, back-off & meet countdown
+// =============================================================================
+console.log('[080] sport peaking catalog, lifting taxonomy, and meet countdown side-cars');
+{
+  const index = FILES.indexOf('080_sport_peaking_and_lifting_taxonomy.sql');
+  check('080 precedes 081', index === 78 && FILES[index + 1] === '081_advanced_program_control.sql');
+  const d = freshDb();
+  runMigrations(d, MIGRATIONS);
+  d.raw.exec("INSERT INTO athlete_sport_profile (sport_profile_id, sport_id, other_sport_name, outcome_id, experience_id, matches_per_week, revision, updated_at_ms) VALUES (1, 'olympic_weightlifting', NULL, 'general_support', 'over_5_years', 52, 1, 0)");
+  check('080 allows olympic_weightlifting and matches_per_week = 52',
+    d.raw.prepare('SELECT sport_id, matches_per_week FROM athlete_sport_profile').get().matches_per_week === 52);
+  let nonLiftingRejected = false;
+  try {
+    d.raw.exec("UPDATE athlete_sport_profile SET sport_id = 'basketball' WHERE sport_profile_id = 1");
+  } catch { nonLiftingRejected = true; }
+  check('080 keeps matches_per_week <= 14 for non-lifting sports', nonLiftingRejected);
+  check('080 seeds 3 basketball entries in sport_peaking_movement',
+    Number(d.raw.prepare("SELECT COUNT(*) AS c FROM sport_peaking_movement WHERE sport_id = 'basketball'").get().c) === 3);
+}
+
+// =============================================================================
+// [081] advanced program control side-cars
+// =============================================================================
+console.log('[081] advanced program control (focus ext, schedule mode, slot overrides, day routines, planned slot overrides)');
+{
+  const index = FILES.indexOf('081_advanced_program_control.sql');
+  check('081 is the last migration in the chain', index === MIGRATIONS.length - 1);
+  const d = freshDb();
+  runMigrations(d, MIGRATIONS);
+  const has = (name) => d.raw.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name=?").get(name).c === 1;
+  const tables = [
+    'training_program_day_focus_ext',
+    'planned_session_focus_ext',
+    'training_program_schedule_mode',
+    'training_program_slot_override',
+    'training_program_day_routine',
+    'planned_slot_athlete_override',
+  ];
+  check('081 creates all six side-car tables', tables.every((t) => has(t)));
+  const rejects = (sql) => { try { d.raw.exec(sql); return false; } catch { return true; } };
+
+  // Seed parent program + day + block + session + slot + routine_template
+  d.raw.exec(`
+    UPDATE athlete_profile SET training_age = 'advanced', objective = 'hypertrophy', weekly_frequency = 3 WHERE profile_id = 1;
+    INSERT INTO training_program (program_id, objective, start_date, horizon_kind, requested_review_date, planned_end_date, planned_block_count, starting_macro_block_index, schema_type, status, created_at_ms, updated_at_ms)
+      VALUES (1, 'hypertrophy', '2026-11-18', 'weeks', NULL, '2026-12-16', 1, 1, 'LINEAR', 'active', 1000, 1000);
+    INSERT INTO training_program_day (program_id, day_index, focus) VALUES (1, 3, 'upper');
+    INSERT INTO training_block (block_id, start_date, objective, weeks, status, created_at_ms)
+      VALUES (1, '2026-11-18', 'hypertrophy', 4, 'active', 1000);
+    INSERT INTO planned_session (planned_session_id, block_id, week_index, day_index, focus, phase, session_date)
+      VALUES (1, 1, 1, 3, 'upper', 'accumulation', '2026-11-18');
+    INSERT INTO planned_slot (planned_slot_id, planned_session_id, slot_index, movement_id, sets, reps, target_rpe)
+      VALUES (1, 1, 1, 1, 5, 8, 8.0);
+    INSERT INTO routine_template (routine_template_id, name, schema_type, created_at_ms, updated_at_ms)
+      VALUES (1, 'Push Routine', 'LINEAR', 1000, 1000);
+  `);
+
+  // Extended focus checks
+  d.raw.exec("INSERT INTO training_program_day_focus_ext (program_id, day_index, focus) VALUES (1, 3, 'push')");
+  d.raw.exec("INSERT INTO planned_session_focus_ext (planned_session_id, focus) VALUES (1, 'push')");
+  check('081 rejects unknown extended focus values',
+    rejects("INSERT INTO training_program_day_focus_ext (program_id, day_index, focus) VALUES (1, 1, 'cardio')")
+    && rejects("INSERT INTO planned_session_focus_ext (planned_session_id, focus) VALUES (999, 'cardio')"));
+
+  // Schedule mode checks
+  d.raw.exec("INSERT INTO training_program_schedule_mode (program_id, mode) VALUES (1, 'iso_weekday')");
+  check('081 rejects invalid schedule_mode value',
+    rejects("UPDATE training_program_schedule_mode SET mode = 'invalid' WHERE program_id = 1"));
+
+  // Slot override schema bounds [1,10] sets, [1,30] reps, [5.0,10.0] target_rpe & non-empty row check
+  d.raw.exec('INSERT INTO training_program_slot_override (program_id, day_index, slot_index, sets, reps, target_rpe) VALUES (1, 3, 1, 10, 30, 9.5)');
+  check('081 enforces slot_override schema bounds and non-null check',
+    rejects('INSERT INTO training_program_slot_override (program_id, day_index, slot_index, sets, reps, target_rpe) VALUES (1, 3, 2, 11, 8, 8.0)')
+    && rejects('INSERT INTO training_program_slot_override (program_id, day_index, slot_index, sets, reps, target_rpe) VALUES (1, 3, 2, 0, 8, 8.0)')
+    && rejects('INSERT INTO training_program_slot_override (program_id, day_index, slot_index, sets, reps, target_rpe) VALUES (1, 3, 2, 4, 31, 8.0)')
+    && rejects('INSERT INTO training_program_slot_override (program_id, day_index, slot_index, sets, reps, target_rpe) VALUES (1, 3, 2, 4, 8, 4.5)')
+    && rejects('INSERT INTO training_program_slot_override (program_id, day_index, slot_index, sets, reps, target_rpe) VALUES (1, 3, 2, 4, 8, 10.5)')
+    && rejects('INSERT INTO training_program_slot_override (program_id, day_index, slot_index, sets, reps, target_rpe) VALUES (1, 3, 2, NULL, NULL, NULL)'));
+
+  // Routine day assignment + planned slot athlete override provenance
+  d.raw.exec('INSERT INTO training_program_day_routine (program_id, day_index, routine_template_id, routine_day_index) VALUES (1, 3, 1, 1)');
+  d.raw.exec("INSERT INTO planned_slot_athlete_override (planned_slot_id, source, mrv_ceiling_sets, above_mrv) VALUES (1, 'slot_override', 4, 1)");
+  check('081 rejects out-of-range routine_day_index and invalid override source',
+    rejects('UPDATE training_program_day_routine SET routine_day_index = 8 WHERE program_id = 1')
+    && rejects("UPDATE planned_slot_athlete_override SET source = 'invalid' WHERE planned_slot_id = 1"));
+
+  // Cascade when routine_template is deleted
+  d.raw.exec('DELETE FROM routine_template WHERE routine_template_id = 1');
+  check('081 cascades routine_template deletion to training_program_day_routine',
+    d.raw.prepare('SELECT COUNT(*) c FROM training_program_day_routine').get().c === 0);
+
+  // Sentinel & self-heal parity
+  d.raw.exec('DROP TABLE training_program_slot_override');
+  check('081 dropped side-car is detected by sentinelsMissing',
+    sentinelsMissing(d).includes('training_program_slot_override'));
+  runMigrations(d, MIGRATIONS);
+  check('081 self-heal restores dropped side-car table', has('training_program_slot_override'));
 }
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);

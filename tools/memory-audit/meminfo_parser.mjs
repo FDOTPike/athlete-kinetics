@@ -104,10 +104,10 @@ export function parseMeminfoDump(text) {
   }
 
   // App identity comes from the "** MEMINFO in pid NNN [package] **" line.
-  const appMatch = text.match(/\*\*\s*MEMINFO in pid \d+ \[(\S+)\]\s*\*\*/);
-  const appName = appMatch ? appMatch[1] : null;
+  const appMatch = text.match(/\*\*\s*MEMINFO in pid (\d+) \[(\S+)\]\s*\*\*/);
+  const appName = appMatch ? appMatch[2] : null;
 
-  return { samples, summary, appName, totalRowFound };
+  return { samples, summary, appName, processId: appMatch ? Number(appMatch[1]) : null, totalRowFound };
 }
 
 /** Decisive metric in bytes, or null when the capture lacked it. */

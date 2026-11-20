@@ -21,7 +21,7 @@
 import React from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import {
-  COMPETITION_DATE_NOTE,
+  SPORT_COMPETITIONS_PER_YEAR_MAX,
   SPORT_EXPERIENCE,
   SPORT_EXPERIENCE_LABEL,
   SPORT_FAMILIES,
@@ -31,6 +31,7 @@ import {
   SPORT_OUTCOMES_BY_SPORT,
   SPORT_OUTCOME_LABEL,
   SPORT_SESSIONS_PER_WEEK_MAX,
+  isLiftingSport,
   sportDisplayName,
   sportEmphasisFor,
   sportsInFamily,
@@ -47,6 +48,14 @@ import { theme } from '../theme/theme';
 import { Chip, Stepper } from './ui';
 
 export const SPORT_QUESTION = 'Do you play or compete in a sport?';
+
+/**
+ * Shown above the competition date field (#229 Q1/Q6): when set, future blocks
+ * count down to peak and taper for competition day and stay synced with the
+ * goal review horizon.
+ */
+export const COMPETITION_DATE_FIRST_NOTE =
+  'If you add a competition date, your blocks count down to peak and taper for competition day, and the date stays synced with your goal review.';
 
 export interface SportFieldsState {
   readonly family: SportFamilyId | null;
@@ -129,17 +138,28 @@ export function SportEditor({ fields, onChange, today, showAllErrors = false }: 
     const members = sportsInFamily(family);
     // A family with one code IS the sport. Football and hockey wait for the
     // athlete to say which: the app never picks one for them.
-    patch({ family, sportId: members.length === 1 ? members[0]! : null, outcomeId: null });
+    const nextSportId = members.length === 1 ? members[0]! : null;
+    patch({
+      family,
+      sportId: nextSportId,
+      outcomeId: null,
+      ...(isLiftingSport(nextSportId) ? { practiceSessionsPerWeek: 0 } : {}),
+    });
   };
-  const chooseSport = (sportId: SportId): void => patch({ sportId, outcomeId: null });
+  const chooseSport = (sportId: SportId): void => patch({
+    sportId,
+    outcomeId: null,
+    ...(isLiftingSport(sportId) ? { practiceSessionsPerWeek: 0 } : {}),
+  });
+  const liftingSport = isLiftingSport(fields.sportId);
   const members = fields.family === null ? [] : sportsInFamily(fields.family);
   const emphasis = fields.sportId !== null && fields.outcomeId !== null
     ? sportEmphasisFor({ sportId: fields.sportId, outcomeId: fields.outcomeId, otherSportName: fields.otherSportName })
     : null;
 
   const count = (value: number | null): string => (value === null ? 'Not sure' : String(value));
-  const step = (value: number | null, delta: number): number =>
-    Math.max(0, Math.min(SPORT_SESSIONS_PER_WEEK_MAX, (value ?? 0) + (value === null && delta < 0 ? 0 : delta)));
+  const step = (value: number | null, delta: number, max: number = SPORT_SESSIONS_PER_WEEK_MAX): number =>
+    Math.max(0, Math.min(max, (value ?? 0) + (value === null && delta < 0 ? 0 : delta)));
 
   return (
     <View testID="sport-editor">
@@ -165,6 +185,7 @@ export function SportEditor({ fields, onChange, today, showAllErrors = false }: 
           <View style={styles.group}>
             {members.map((sportId) => (
               <Chip
+                wrap
                 key={sportId}
                 testID={`sport-${sportId}`}
                 label={`${SPORT_INFO[sportId].label.toUpperCase()} — ${SPORT_INFO[sportId].distinction ?? ''}`}
@@ -205,6 +226,7 @@ export function SportEditor({ fields, onChange, today, showAllErrors = false }: 
           <View style={styles.group}>
             {SPORT_OUTCOMES_BY_SPORT[fields.sportId].map((outcomeId) => (
               <Chip
+                wrap
                 key={outcomeId}
                 testID={`sport-outcome-${outcomeId}`}
                 label={SPORT_OUTCOME_LABEL[outcomeId].toUpperCase()}
@@ -236,10 +258,13 @@ export function SportEditor({ fields, onChange, today, showAllErrors = false }: 
 
       {fields.sportId !== null && (
         <>
-          <Text style={styles.label}>HOW LONG HAVE YOU PLAYED?</Text>
+          <Text style={styles.label}>
+            {liftingSport ? 'How long have you trained for competition?' : 'HOW LONG HAVE YOU PLAYED?'}
+          </Text>
           <View style={styles.wrap}>
             {SPORT_EXPERIENCE.map((experienceId) => (
               <Chip
+                wrap
                 key={experienceId}
                 testID={`sport-experience-${experienceId}`}
                 label={SPORT_EXPERIENCE_LABEL[experienceId].toUpperCase()}
@@ -252,30 +277,50 @@ export function SportEditor({ fields, onChange, today, showAllErrors = false }: 
           </View>
           {fieldError('experienceId', false)}
 
-          <Text style={styles.label}>A NORMAL WEEK OF YOUR SPORT</Text>
-          <Text style={styles.dim}>
-            A full sport week leaves less room for gym work, so a new plan takes it into account. If you are not sure, leave it: nothing is assumed.
-          </Text>
+          {liftingSport ? (
+            <Text style={styles.dim}>
+              {"Since this is your main lifting goal, we won't count your gym sessions twice as outside sport practice."}
+            </Text>
+          ) : (
+            <>
+              <Text style={styles.label}>A NORMAL WEEK OF YOUR SPORT</Text>
+              <Text style={styles.dim}>
+                A full sport week leaves less room for gym work, so a new plan takes it into account. If you are not sure, leave it: nothing is assumed.
+              </Text>
+              <Stepper
+                label="PRACTICE SESSIONS A WEEK"
+                value={count(fields.practiceSessionsPerWeek)}
+                onDecrement={() => patch({ practiceSessionsPerWeek: step(fields.practiceSessionsPerWeek, -1) })}
+                onIncrement={() => patch({ practiceSessionsPerWeek: step(fields.practiceSessionsPerWeek, 1) })}
+                testID="sport-practice"
+              />
+              <Chip
+                testID="sport-practice-unsure"
+                label="NOT SURE"
+                selected={fields.practiceSessionsPerWeek === null}
+                onPress={() => patch({ practiceSessionsPerWeek: null })}
+                accessibilityLabel="Not sure how many practice sessions a week"
+                style={styles.chip}
+              />
+            </>
+          )}
           <Stepper
-            label="PRACTICE SESSIONS A WEEK"
-            value={count(fields.practiceSessionsPerWeek)}
-            onDecrement={() => patch({ practiceSessionsPerWeek: step(fields.practiceSessionsPerWeek, -1) })}
-            onIncrement={() => patch({ practiceSessionsPerWeek: step(fields.practiceSessionsPerWeek, 1) })}
-            testID="sport-practice"
-          />
-          <Chip
-            testID="sport-practice-unsure"
-            label="NOT SURE"
-            selected={fields.practiceSessionsPerWeek === null}
-            onPress={() => patch({ practiceSessionsPerWeek: null })}
-            accessibilityLabel="Not sure how many practice sessions a week"
-            style={styles.chip}
-          />
-          <Stepper
-            label="MATCHES OR COMPETITIONS A WEEK"
+            label={liftingSport ? 'Competitions a year' : 'MATCHES OR COMPETITIONS A WEEK'}
             value={count(fields.matchesPerWeek)}
-            onDecrement={() => patch({ matchesPerWeek: step(fields.matchesPerWeek, -1) })}
-            onIncrement={() => patch({ matchesPerWeek: step(fields.matchesPerWeek, 1) })}
+            onDecrement={() => patch({
+              matchesPerWeek: step(
+                fields.matchesPerWeek,
+                -1,
+                liftingSport ? SPORT_COMPETITIONS_PER_YEAR_MAX : SPORT_SESSIONS_PER_WEEK_MAX,
+              ),
+            })}
+            onIncrement={() => patch({
+              matchesPerWeek: step(
+                fields.matchesPerWeek,
+                1,
+                liftingSport ? SPORT_COMPETITIONS_PER_YEAR_MAX : SPORT_SESSIONS_PER_WEEK_MAX,
+              ),
+            })}
             testID="sport-matches"
           />
           <Chip
@@ -283,7 +328,7 @@ export function SportEditor({ fields, onChange, today, showAllErrors = false }: 
             label="NOT SURE"
             selected={fields.matchesPerWeek === null}
             onPress={() => patch({ matchesPerWeek: null })}
-            accessibilityLabel="Not sure how many matches a week"
+            accessibilityLabel={liftingSport ? 'Not sure how many competitions a year' : 'Not sure how many matches a week'}
             style={styles.chip}
           />
           <Text style={styles.label}>USUAL LENGTH OF ONE SESSION, IN MINUTES (OPTIONAL)</Text>
@@ -305,6 +350,7 @@ export function SportEditor({ fields, onChange, today, showAllErrors = false }: 
           </Text>
 
           <Text style={styles.label}>NEXT COMPETITION (OPTIONAL)</Text>
+          <Text style={styles.dim} testID="sport-competition-note">{COMPETITION_DATE_FIRST_NOTE}</Text>
           <TextInput
             disableFullscreenUI
             style={styles.input}
@@ -318,7 +364,6 @@ export function SportEditor({ fields, onChange, today, showAllErrors = false }: 
             testID="sport-competition"
           />
           {fieldError('competitionDate', fields.competitionText.length > 0)}
-          <Text style={styles.dim} testID="sport-competition-note">{COMPETITION_DATE_NOTE}</Text>
         </>
       )}
     </View>

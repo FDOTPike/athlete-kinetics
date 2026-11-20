@@ -73,6 +73,8 @@ const {
 const {
   generateBlock,
   addDaysIso,
+  isoWeekdayOfIso,
+  sessionOffsetInWeek,
   accessContextForBlockFocus,
 } = require('./.build/blockGenerator.js');
 const {
@@ -732,12 +734,16 @@ function familyC() {
     assert.equal(addDaysIso('2026-04-04', 1), '2026-04-05', 'DST-end adjacent calendar date');
     assert.equal(addDaysIso('2026-04-05', 1), '2026-04-06', 'day after DST-end calendar date');
   });
-  check('[C] every session date matches the production start + (week-1)*7 + (day_index-1) formula', () => {
+  check('[C] every session date matches the relative calendar offset formula for the block week', () => {
     for (let b = 0; b < blocks.length; b += 1) {
-      const start = blocks[b].start_date;
+      const requestedStart = startDates[b];
+      assert.equal(blocks[b].start_date, requestedStart);
       for (const session of blocks[b].sessions) {
-        assert.equal(session.session_date,
-          addDaysIso(start, (session.week_index - 1) * 7 + (session.day_index - 1)));
+        const [y, m, d] = requestedStart.split('-').map(Number);
+        const expected = new Date(Date.UTC(y, m - 1, d + (session.week_index - 1) * 7 + (session.day_index - 1)))
+          .toISOString()
+          .slice(0, 10);
+        assert.equal(session.session_date, expected);
       }
     }
   });

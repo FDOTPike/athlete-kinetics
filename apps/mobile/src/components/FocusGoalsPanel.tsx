@@ -21,6 +21,7 @@ import {
   type MuscleGroupId,
 } from '@ak/inference';
 import { useStore } from '../state/useStore';
+import { useSubViewBack } from '../navigation/navigation';
 import type { StoredFocus, StoredGoal } from '../state/focusGoalStore';
 import { theme } from '../theme/theme';
 import { Disclosure, PrimaryButton, SecondaryButton } from './ui';
@@ -60,10 +61,25 @@ export function FocusGoalsPanel(): React.JSX.Element | null {
   const [goalFields, setGoalFields] = useState<GoalFields>(EMPTY_GOAL_FIELDS);
   const [showErrors, setShowErrors] = useState(false);
   const [goalExerciseId, setGoalExerciseId] = useState<number | null>(null);
+  // What the open goal form held when it was opened: Back asks before a changed
+  // form is discarded (issue #139).
+  const [goalSnapshot, setGoalSnapshot] = useState<string | null>(null);
+  const [confirmDiscardGoal, setConfirmDiscardGoal] = useState(false);
   const [measuringGoalId, setMeasuringGoalId] = useState<string | null>(null);
   const [measureValue, setMeasureValue] = useState('');
   const [measureDate, setMeasureDate] = useState('');
   const [message, setMessage] = useState<string | null>(null);
+
+  const goalFormOpen = editingGoalId !== null;
+  const goalFormChanged = goalFormOpen && goalSnapshot !== JSON.stringify({ goalFields, goalExerciseId });
+  useSubViewBack(goalFormOpen, () => {
+    if (!goalFormChanged) {
+      setEditingGoalId(null);
+      setConfirmDiscardGoal(false);
+      return;
+    }
+    setConfirmDiscardGoal(true);
+  });
 
   // Component tests drive the profile screen with partial store states; the
   // panel needs the real actions to be useful and renders nothing without them.
@@ -83,9 +99,13 @@ export function FocusGoalsPanel(): React.JSX.Element | null {
   };
 
   const beginGoalEdit = (goal: StoredGoal | null): void => {
+    const fields = goal === null ? EMPTY_GOAL_FIELDS : goalFieldsFromGoal(goal.goal);
+    const exerciseId = goal === null ? null : goalMovements[goal.goalId] ?? null;
     setEditingGoalId(goal === null ? 'new' : goal.goalId);
-    setGoalFields(goal === null ? EMPTY_GOAL_FIELDS : goalFieldsFromGoal(goal.goal));
-    setGoalExerciseId(goal === null ? null : goalMovements[goal.goalId] ?? null);
+    setGoalFields(fields);
+    setGoalExerciseId(exerciseId);
+    setGoalSnapshot(JSON.stringify({ goalFields: fields, goalExerciseId: exerciseId }));
+    setConfirmDiscardGoal(false);
     setShowErrors(false);
     setMessage(null);
   };
@@ -259,6 +279,15 @@ export function FocusGoalsPanel(): React.JSX.Element | null {
           <Text style={styles.dim}>
             A goal does not change your current plan or its four-week reviews. An exercise it names is used when your next block is created. Editing keeps the earlier version and your measurements.
           </Text>
+          {confirmDiscardGoal && (
+            <View style={styles.actions} testID="profile-goal-discard-prompt" accessibilityLiveRegion="polite">
+              <Text style={styles.body}>Discard the changes you have not saved to this goal?</Text>
+              <PrimaryButton label="DISCARD CHANGES" onPress={() => { setEditingGoalId(null); setConfirmDiscardGoal(false); }}
+                accessibilityLabel="Discard the unsaved changes to this goal" testID="profile-goal-discard" />
+              <SecondaryButton label="KEEP EDITING" fullWidth onPress={() => setConfirmDiscardGoal(false)}
+                accessibilityLabel="Keep editing this goal" testID="profile-goal-keep-editing" />
+            </View>
+          )}
           <View style={styles.actions}>
             <PrimaryButton label="SAVE GOAL" onPress={commitGoal}
               accessibilityLabel="Save this goal" testID="profile-goal-save" />

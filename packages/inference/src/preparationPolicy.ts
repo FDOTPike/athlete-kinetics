@@ -511,7 +511,8 @@ export function buildPreparationProtocol(input: PreparationInput): PreparationPr
       instruction: timed
         ? `Do one short, easy effort of ${anchor.movementName} at well below working effort to check your position and setup.`
         : anchor.externallyLoaded
-          ? `Do one set of ${anchor.movementName} with no added load or the empty bar. Use the same stance, grip and range you will use for your working sets.`
+          // Walk 2 (W2-11): a goblet squat has no bar to leave empty.
+          ? `Do one set of ${anchor.movementName} with no added load (for a barbell lift, the empty bar). Use the same stance, grip and range you will use for your working sets.`
           : `Do one easy set of ${anchor.movementName} using a shorter range or a supported version. Use the same positions you will use for your working sets.`,
       cue: 'Same technique, no strain.',
       stopInstruction: STOP_JOINT,
@@ -532,7 +533,7 @@ export function buildPreparationProtocol(input: PreparationInput): PreparationPr
           itemId: `ramp.set_${percent}`,
           itemRevision: 1,
           stage: 'ramp',
-          title: `Preparation set: ${anchor.movementName} at about ${percent}% of today's working load`,
+          title: rampItemTitle(anchor.movementName, percent, null),
           instruction: percent < 60
             ? `Load about ${percent}% of the weight you plan to use for your working sets and do ${rampReps} controlled repetitions. It should feel light.`
             : `Load about ${percent}% of the weight you plan to use for your working sets and do ${rampReps} controlled repetitions. It should feel clearly easier than a working set.`,
@@ -585,13 +586,23 @@ export function buildPreparationProtocol(input: PreparationInput): PreparationPr
     .sort((a, b) => stageOrder(a.item) - stageOrder(b.item) || a.index - b.index)
     .map(({ item }) => item);
 
+  const sum = items.reduce((seconds, item) => seconds + item.estimateSeconds, 0);
+  const roundedBudgetMin = Math.round(budgetMin);
   basis.push(input.slots.length === 0
     ? 'No movements are planned yet, so this is general preparation.'
     : `Session movements: ${patternsInOrder.map((pattern) => PATTERN_LABEL[pattern]).join(', ')}.`);
   if (anchor !== null) basis.push(`First movement prepared: ${anchor.movementName}.`);
-  basis.push(variant === 'standard'
-    ? `Full protocol within ${Math.round(budgetMin)} minutes.`
-    : `Short protocol within ${Math.round(budgetMin)} minutes.`);
+  if (sum > roundedBudgetMin * 60) {
+    basis.push(variant === 'standard'
+      ? `Full protocol: optional items were left out, and essential work exceeds the ${roundedBudgetMin}-minute limit.`
+      : `Short protocol: optional items were left out, and essential work exceeds the ${roundedBudgetMin}-minute limit.`);
+  } else {
+    basis.push(variant === 'standard'
+      // Walk 2 (W2-11): "within 10 minutes" beside "About 8 minutes" read as two
+      // durations. This is the time limit the protocol was fitted to.
+      ? `Full protocol, fitted to a ${roundedBudgetMin}-minute limit.`
+      : `Short protocol, fitted to a ${roundedBudgetMin}-minute limit.`);
+  }
   if (input.tier === 'beginner') basis.push('Experience: beginner — move slowly and use the easier option whenever unsure.');
   if (sportContext) basis.push('Sport or conditioning session: balance is included.');
   if (restricted.size > 0) basis.push('Active niggles: drills that load those areas are withheld.');
@@ -602,7 +613,6 @@ export function buildPreparationProtocol(input: PreparationInput): PreparationPr
     notes.push(input.timeConflictNote.trim());
   }
 
-  const sum = items.reduce((seconds, item) => seconds + item.estimateSeconds, 0);
   return {
     version: PREPARATION_PROTOCOL_VERSION,
     policyId: PREPARATION_POLICY_ID,
@@ -795,8 +805,31 @@ export const isExtraPreparationWork = (dose: PreparationDose, performedAmount: n
   performedAmount !== null && Number.isFinite(performedAmount)
   && performedAmount > prescribedAmount(dose) * EXTRA_WORK_RATIO;
 
-/** Plain-language dose, e.g. "30 seconds each side" or "6 reps at about 40% of today's working load". */
-export function describePreparationDose(dose: PreparationDose): string {
+/**
+ * Android walk (#213): a ramp set's load in kg, when today's working load for
+ * the movement is known (the same load the set card shows, from a 1RM or an
+ * override). Rounded to the 2.5 kg step the set card uses. Null when the
+ * working load is unknown or not a positive number. Display only: the ramp
+ * percentages are unchanged and the frozen protocol carries no kilograms.
+ */
+export function rampLoadKg(percentOfWorkingLoad: number, workingLoadKg: number | null | undefined): number | null {
+  if (workingLoadKg === null || workingLoadKg === undefined || !Number.isFinite(workingLoadKg) || workingLoadKg <= 0) return null;
+  if (!Number.isFinite(percentOfWorkingLoad) || percentOfWorkingLoad <= 0) return null;
+  return Math.round((workingLoadKg * percentOfWorkingLoad) / 100 / 2.5) * 2.5;
+}
+
+/** A ramp item's title: in kg with the percentage as support when today's
+ *  working load is known, else the planned percentage title. */
+export function rampItemTitle(movementName: string, percentOfWorkingLoad: number, workingLoadKg: number | null | undefined): string {
+  const kg = rampLoadKg(percentOfWorkingLoad, workingLoadKg);
+  return kg === null
+    ? `Preparation set: ${movementName} at about ${percentOfWorkingLoad}% of today's working load`
+    : `Preparation set: ${movementName}, about ${kg} kg (${percentOfWorkingLoad}%)`;
+}
+
+/** Plain-language dose, e.g. "30 seconds each side" or "6 reps at about 40% of today's working load".
+ *  A ramp dose names the kilograms when today's working load is known (#213). */
+export function describePreparationDose(dose: PreparationDose, workingLoadKg?: number | null): string {
   switch (dose.kind) {
     case 'time': {
       const amount = dose.seconds >= 120 && dose.seconds % 60 === 0
@@ -806,8 +839,13 @@ export function describePreparationDose(dose: PreparationDose): string {
     }
     case 'reps':
       return `${dose.reps} rep${dose.reps === 1 ? '' : 's'}${dose.perSide ? ' each side' : ''}`;
-    case 'ramp':
-      return `${dose.reps} rep${dose.reps === 1 ? '' : 's'} at about ${dose.percentOfWorkingLoad}% of today's working load`;
+    case 'ramp': {
+      const kg = rampLoadKg(dose.percentOfWorkingLoad, workingLoadKg);
+      const reps = `${dose.reps} rep${dose.reps === 1 ? '' : 's'}`;
+      return kg === null
+        ? `${reps} at about ${dose.percentOfWorkingLoad}% of today's working load`
+        : `${reps} at about ${kg} kg (${dose.percentOfWorkingLoad}% of today's working load)`;
+    }
   }
 }
 

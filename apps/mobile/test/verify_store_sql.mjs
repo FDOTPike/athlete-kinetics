@@ -70,6 +70,10 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   // 064 is the shared neutral activity/support persistence contract. Feature
   // adapters are separate modules, but the real store database must migrate it.
   '064_accessible_coach_support.sql',
+  // 066 adds athlete_focus/athlete_goal and 067 adds athlete_sport_profile/block_emphasis,
+  // which 076 and 080 rebuild and foreign-key to.
+  '066_focus_and_goals.sql',
+  '067_sport_and_emphasis.sql',
   // 069 adds resting_hr_daily, which the store writes on every biometrics sync,
   // reads for measured history and empties on reset. It depends only on 001.
   '069_resting_heart_rate.sql',
@@ -77,9 +81,17 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   // reads back for it and empties on reset. It depends only on 001.
   '070_session_feel.sql',
   // 071 adds session_skipped_slot and set_load_shown, which the store writes
-  // (at finalization and with each logged set) and empties on reset. It depends
+  // (at finalization and with each logged set) and empties on reset; the
+  // completion summary reads the skipped slots (owner ruling 2026-11-03). It depends
   // on 001 and 022.
-  '071_beta_recording.sql'];
+  '071_beta_recording.sql', '072_question_log.sql', '073_session_slot_replaced_by.sql',
+  // 074 rebuilds session_feel and adds session_feel_extra_reason, which the
+  // store writes and reads with the answer and empties on reset.
+  '074_session_feel_reasons.sql',
+  // 075 adds session_plan_slot_planned_count, which the store writes when a swap
+  // after logged sets overwrites planned_sets, and empties on reset and discard.
+  '075_session_plan_slot_planned_count.sql', '076_sport_taxonomy_expansion.sql', '077_multisport_and_flexibility.sql',
+  '078_kinestrike_telemetry.sql', '079_session_slot_swap_cause.sql', '080_sport_peaking_and_lifting_taxonomy.sql', '081_advanced_program_control.sql'];
 
 
 const db = new DatabaseSync(':memory:');
@@ -387,7 +399,9 @@ const blockSrc = readFileSync(join(ROOT, 'apps', 'mobile', 'src', 'screens', 'Bl
 const manageGateAt = blockSrc.indexOf('{program == null && (');
 const gateCloseAt = blockSrc.indexOf('\n        )}\n', manageGateAt);
 const unplannedAt = blockSrc.indexOf('<Disclosure label="Start without a planned session">');
-const feelsOffAt = blockSrc.indexOf('label="Something feels off"');
+// Anchor on the disclosure element itself: the injury pause card has a button
+// with the same label that opens it (#188), and that button sits higher up.
+const feelsOffAt = blockSrc.search(/<Disclosure\s+label="Something feels off"/);
 check(
   'the ad-hoc session path is never gated behind an active program',
   manageGateAt >= 0
@@ -704,7 +718,16 @@ if (slotHydrationSql && attributionInsertSql) {
 console.log('[autopilot wiring invariants]');
 const stripComments = (s) => s.replace(/\/\/[^\n]*/g, '');
 // Anchor on the IMPLEMENTATION (it has a default param) — not the interface decl.
-const gnbRaw = (() => { const i = src.indexOf('generateNewBlock: (schemaType ='); const j = src.indexOf('refreshBlock:', i); return i >= 0 && j > i ? src.slice(i, j) : ''; })();
+// Issue 149 moved the generator-input block out of generateNewBlock into
+// generateBlockFromStoredState (shared with the single-day rebuild). The same
+// invariants apply to that code, so its text is appended to the body under test.
+const gnbRaw = (() => {
+  const i = src.indexOf('generateNewBlock: (schemaType ='); const j = src.indexOf('refreshBlock:', i);
+  const own = i >= 0 && j > i ? src.slice(i, j) : '';
+  const h0 = src.indexOf('const generateBlockFromStoredState = (args: {');
+  const h1 = src.indexOf('const plannedSessionStarted = (', h0);
+  return own + (h0 >= 0 && h1 > h0 ? src.slice(h0, h1) : '');
+})();
 const gnb = stripComments(gnbRaw);
 a('generateNewBlock body located', gnb.length > 0);
 a('IMMUTABILITY: generateNewBlock writes NO past/raw table (session/set_record/set_prefix/mech_daily/niggle/state_vector)',
@@ -716,7 +739,9 @@ a('the ONLY write targets are forward plan/program tables plus weekly frequency'
       'training_block_program', 'planned_slot_autopilot', 'athlete_profile',
       // 059, both forward-plan side-cars: the suspension attribution for the
       // block being minted, and this plan's prospective per-slot load intent.
-      'block_suspension_origin', 'planned_slot_load_intent'].includes(m[1])));
+      'block_suspension_origin', 'planned_slot_load_intent',
+      // 078 forward-plan side-cars for extended foci and athlete Customize provenance.
+      'planned_session_focus_ext', 'planned_slot_athlete_override'].includes(m[1])));
 const hyd = stripComments((() => { const i = gnbRaw.indexOf('autopilot hydration'); const j = gnbRaw.indexOf('generateBlock({'); return i >= 0 && j > i ? gnbRaw.slice(i, j) : ''; })());
 a('n+1-free: a SINGLE grouped per-(date,pattern) set-aggregate read', (hyd.match(/GROUP BY s\.session_date, m\.pattern/g) || []).length === 1);
 a('bounded: the hydration issues a fixed, small number of reads (≤ 4 executeSync)', (() => { const n = (hyd.match(/executeSync/g) || []).length; return n >= 1 && n <= 4; })());
@@ -724,7 +749,7 @@ a('bounded: the set-aggregate carries a session_date window predicate', /WHERE s
 a('no executeSync inside a for/map/forEach in the hydration (n+1 guard)', !/(for\s*\(|\.forEach\s*\(|\.map\s*\()[^;{]*executeSync/.test(hyd));
 
 // --- [Work Order C] Next Block Panel read-only store invariants ----------------
-console.log('[Work Order C — Next Block Panel store invariants]');
+console.log('[Work Order C — Changed in this block panel store invariants - the active block applied rows]');
 const getAdjustmentsRaw = (() => {
   const i = src.indexOf('getPendingAutopilotAdjustments: (): PendingAutopilotAdjustment[]');
   const j = src.indexOf('\n  },', i);
@@ -740,7 +765,7 @@ a('READ-ONLY: getPendingAutopilotAdjustments contains NO INSERT, UPDATE, or DELE
 const adjustmentsQuerySql = statements.find((sql) =>
   sql.includes('FROM planned_slot_autopilot') && sql.includes('JOIN movement') && sql.includes("WHERE tb.status = 'active'"),
 );
-a('store exposes the next block autopilot adjustments query SQL', Boolean(adjustmentsQuerySql));
+a('store exposes the active block applied autopilot adjustments query SQL', Boolean(adjustmentsQuerySql));
 a('refreshBlock stores pendingAutopilotAdjustments in store state',
   /pendingAutopilotAdjustments\s*=\s*get\(\)\.getPendingAutopilotAdjustments\(\)/.test(src));
 if (adjustmentsQuerySql) {
@@ -760,6 +785,30 @@ if (adjustmentsQuerySql) {
       && adjustmentsRows[1].movement_name === 'Barbell Deadlift'
       && adjustmentsRows[1].reason === 'raised',
     JSON.stringify(adjustmentsRows));
+  db.exec('ROLLBACK');
+
+  // A time-mode movement with a time policy keeps the policy's set count at
+  // commit (defaultSetsForTarget), so a set-only attribution row for it was
+  // never applied and must not be listed as a change in this block.
+  db.exec('BEGIN');
+  db.exec("INSERT INTO movement (movement_id,name,pattern,is_compound) VALUES (950,'Timed Hold A','carry',0),(951,'Timed Hold B','carry',0),(952,'Timed No Policy','carry',0),(953,'Plain Row','pull_h',1)");
+  db.exec("INSERT INTO movement_logging_mode (movement_id,mode) VALUES (950,'time'),(951,'time'),(952,'time')");
+  db.exec("INSERT INTO movement_time_policy (movement_id,default_sets,target_seconds) VALUES (950,3,30),(951,3,30)");
+  db.exec("INSERT INTO training_block (block_id,start_date,objective,status,created_at_ms) VALUES (950, '2030-05-01','strength','active',0)");
+  db.exec("INSERT INTO planned_session (planned_session_id,block_id,week_index,day_index,focus,phase,session_date) VALUES (950,950,1,1,'full','accumulation','2030-05-01')");
+  db.exec("INSERT INTO planned_slot (planned_slot_id,planned_session_id,slot_index,movement_id,sets,reps,target_rpe) VALUES (950,950,1,950,3,30,7.0),(951,950,2,951,3,30,6.5),(952,950,3,952,2,30,7.0),(953,950,4,953,2,8,7.0)");
+  db.exec("INSERT INTO planned_slot_autopilot (planned_slot_id,rpe_delta,set_delta,reason) VALUES (950,0,-1,'eased'),(951,-0.5,-1,'eased'),(952,0,-1,'eased'),(953,0,-1,'eased')");
+  const timedRows = db.prepare(adjustmentsQuerySql).all();
+  const timedIds = timedRows.map((r) => r.planned_slot_id);
+  a('getPendingAutopilotAdjustments leaves out a set-only row for a time-policy movement, keeps its RPE row, a timed movement with no policy, and a reps movement',
+    JSON.stringify(timedIds) === JSON.stringify([951, 952, 953]),
+    JSON.stringify(timedIds));
+  // The kept RPE row for a time-policy movement reports no set change: the
+  // block holds the policy's set count. Other rows report the stored delta.
+  const appliedSets = timedRows.map((r) => [r.planned_slot_id, r.rpe_delta, r.applied_set_delta]);
+  a('getPendingAutopilotAdjustments reports a set change of 0 for a time-policy movement and the stored set change otherwise',
+    JSON.stringify(appliedSets) === JSON.stringify([[951, -0.5, 0], [952, 0, -1], [953, 0, -1]]),
+    JSON.stringify(appliedSets));
   db.exec('ROLLBACK');
 }
 
@@ -848,6 +897,13 @@ a('reset explicitly clears both immutable Phase 18 side-cars',
   ['set_dose_target', 'session_outcome'].every((table) => resetTables.includes(table)));
 a('reset explicitly clears the autopilot attribution side-car',
   resetTables.includes('planned_slot_autopilot'));
+// 074 (issue #220): the newer session-feel reasons are cleared with the answers.
+a('reset explicitly clears session_feel and its 074 side-car session_feel_extra_reason',
+  ['session_feel', 'session_feel_extra_reason'].every((table) => resetTables.includes(table)));
+// 075 (issue #144): the planned count kept beside a swapped slot is cleared with the slots.
+a('reset explicitly clears session_plan_slot_planned_count before session_plan_slot',
+  resetTables.includes('session_plan_slot_planned_count')
+    && resetTables.indexOf('session_plan_slot_planned_count') < resetTables.indexOf('session_plan_slot'));
 a('reset explicitly clears frozen legacy-role snapshots before their planned slots',
   resetTables.includes('planned_slot_legacy_role_allowance')
     && resetTables.indexOf('planned_slot_legacy_role_allowance') < resetTables.indexOf('planned_slot'));
@@ -922,15 +978,17 @@ if (resetTables.length >= 15) {
   db.exec("INSERT INTO niggle (id,region,severity,reported_at_ms) VALUES ('rn1','knee',5,1000)");
   db.exec("INSERT INTO one_rep_max (movement_id,load_kg,updated_at_ms) VALUES (1,100,0)");
   db.exec("INSERT INTO training_block (block_id,start_date,objective,created_at_ms) VALUES (701,'2026-06-01','strength',0)");
-  db.exec("INSERT INTO planned_session (planned_session_id,block_id,week_index,day_index,focus,phase,session_date) VALUES (701,701,1,1,'lower','accumulation','2026-06-10')");
+  db.exec("INSERT INTO planned_session (planned_session_id,block_id,week_index,day_index,focus,phase,session_date) VALUES (701,701,1,1,'upper','accumulation','2026-06-10')");
+  db.exec("INSERT INTO planned_session_focus_ext (planned_session_id,focus) VALUES (701,'push')");
   db.exec("INSERT INTO planned_session_method (planned_session_id,schema_type,routine_template_id,template_name,frozen_at_ms) VALUES (701,'APRE',NULL,'Reset probe',0)");
   db.exec("INSERT INTO planned_slot (planned_slot_id,planned_session_id,slot_index,movement_id,sets,reps,target_rpe) VALUES (701,701,1,1,4,5,8.0)");
   db.exec("INSERT INTO planned_slot_autopilot (planned_slot_id,rpe_delta,set_delta,reason) VALUES (701,-0.5,-1,'eased')");
+  db.exec("INSERT INTO planned_slot_athlete_override (planned_slot_id,source,mrv_ceiling_sets,above_mrv) VALUES (701,'slot_override',6,1)");
   db.exec("INSERT INTO planned_slot_routine_decision (planned_slot_id,role,lift_family,stress_purpose,stress_coefficient,equivalent_volume,stress_dose,adaptations_json) VALUES (701,'supplementary',NULL,NULL,0,0,0,'[]')");
   db.exec("INSERT INTO planned_slot_legacy_role_allowance (planned_slot_id,role) VALUES (701,'supplementary')");
   db.prepare(MAT).run('2026-06-10'); // materializes a state_vector row (mech_daily already filled by trigger)
   const cnt = (t) => Number(db.prepare(`SELECT count(*) c FROM ${t}`).get().c);
-  const seeded = ['session', 'set_record', 'session_plan_slot', 'session_skipped_slot', 'set_load_shown', 'set_dose_target', 'session_outcome', 'set_prefix', 'niggle', 'one_rep_max', 'training_block', 'planned_session', 'planned_session_method', 'planned_slot', 'planned_slot_autopilot', 'planned_slot_routine_decision', 'planned_slot_legacy_role_allowance', 'mech_daily', 'state_vector'];
+  const seeded = ['session', 'set_record', 'session_plan_slot', 'session_skipped_slot', 'set_load_shown', 'set_dose_target', 'session_outcome', 'set_prefix', 'niggle', 'one_rep_max', 'training_block', 'planned_session', 'planned_session_focus_ext', 'planned_session_method', 'planned_slot', 'planned_slot_autopilot', 'planned_slot_athlete_override', 'planned_slot_routine_decision', 'planned_slot_legacy_role_allowance', 'mech_daily', 'state_vector'];
   a('seed populated the history tables', seeded.every((t) => cnt(t) > 0));
   const profBefore = cnt('athlete_profile'); const movBefore = cnt('movement');
   for (const t of resetTables) db.prepare(`DELETE FROM ${t}`).run(); // the store's exact sequence
@@ -948,12 +1006,120 @@ if (resetTables.length >= 15) {
 {
   const { readdirSync, statSync } = await import('node:fs');
   const storeSrc = readFileSync(join(import.meta.dirname, '..', 'src', 'state', 'useStore.ts'), 'utf-8');
-  const sqlNaming = (table) => [...storeSrc.matchAll(new RegExp("'([^'\\n]*\\b" + table + "\\b[^'\\n]*)'", 'g'))].map((m) => m[1]);
-  a('071: the store names session_skipped_slot in one INSERT and one DELETE only',
+  // Every string literal in the code that names the table: single-quoted,
+  // double-quoted and backtick (which may span lines; whitespace is collapsed).
+  // Single quotes alone missed a backtick SELECT in review (PR 116,
+  // 2026-11-03), so a read of a record-only table went unseen. The literals
+  // come from the TypeScript parser, so a comment that quotes SQL is not code
+  // and is not counted, and a backtick in one place cannot pair with another.
+  // SQLite table names are case-insensitive, so the name is matched without
+  // regard to case: `FROM SESSION_SKIPPED_SLOT` is the same read.
+  const ts = createRequire(import.meta.url)('typescript');
+  // Review (PR 119): a constant interpolation (`session_${'skipped_slot'}`) is
+  // folded into the text, so it is read like any other literal. Any other
+  // interpolation that touches part of the table name (`session_${x}`) cannot
+  // be resolved here and is reported as UNRESOLVED, which fails the exact
+  // checks below: a verifier fails closed. Source the parser could not read
+  // is an error, not an empty result.
+  const sqlNamingIn = (src, table) => {
+    const named = new RegExp('\\b' + table + '\\b', 'i');
+    const lower = table.toLowerCase();
+    const touchesName = (fragment) => fragment !== undefined && fragment.length >= 3 && lower.includes(fragment.toLowerCase());
+    const found = [];
+    const visit = (node) => {
+      let text = null;
+      if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) text = node.text;
+      else if (ts.isTemplateExpression(node)) {
+        text = node.head.text;
+        let unresolved = false;
+        for (const span of node.templateSpans) {
+          const e = span.expression;
+          if (ts.isStringLiteral(e) || ts.isNoSubstitutionTemplateLiteral(e) || ts.isNumericLiteral(e)) {
+            text += e.text + span.literal.text;
+          } else {
+            if (touchesName(/[A-Za-z0-9_]+$/.exec(text)?.[0]) || touchesName(/^[A-Za-z0-9_]+/.exec(span.literal.text)?.[0])) unresolved = true;
+            text += '${}' + span.literal.text;
+          }
+        }
+        if (unresolved) found.push('UNRESOLVED: ' + text.replace(/\s+/g, ' ').trim());
+      }
+      if (text !== null && named.test(text)) found.push(text.replace(/\s+/g, ' ').trim());
+      ts.forEachChild(node, visit);
+    };
+    const file = ts.createSourceFile('probe.ts', src, ts.ScriptTarget.Latest, false, ts.ScriptKind.TS);
+    const problems = file.parseDiagnostics;
+    if (!Array.isArray(problems)) throw new Error('verify_store_sql: the TypeScript parser gave no diagnostics list; the parse cannot be trusted');
+    if (problems.length > 0) throw new Error(`verify_store_sql: the source does not parse (${problems.length} error(s)); the SQL check cannot read it`);
+    visit(file);
+    return found;
+  };
+  const sqlNaming = (table) => sqlNamingIn(storeSrc, table);
+  const throwsOn = (src) => { try { sqlNamingIn(src, 'probe_table'); return false; } catch { return true; } };
+  // Review (PR 119): each fixture's result is computed once and that same
+  // value is both compared and printed, so a failing case is always shown.
+  const foldedNaming = JSON.stringify(sqlNamingIn([
+      "a(`SELECT * FROM probe_${'table'}`)",
+      'b(`SELECT * FROM probe_${suffix}`)',
+      'c(`SELECT * FROM ${prefix}_table`)',
+      'd(`DELETE FROM other_table WHERE id = ${id}`)',
+    ].join('\n'), 'probe_table'));
+  a('the SQL-naming check folds constant interpolations and fails closed on names it cannot resolve',
+    foldedNaming === JSON.stringify([
+      'SELECT * FROM probe_table',
+      'UNRESOLVED: SELECT * FROM probe_${}',
+      'UNRESOLVED: SELECT * FROM ${}_table',
+    ]), foldedNaming);
+  a('the SQL-naming check refuses source it cannot parse',
+    throwsOn("x('DELETE FROM probe_table');\nconst y = ;") && !throwsOn("x('DELETE FROM probe_table');"));
+  const quotedNaming = JSON.stringify(sqlNamingIn([
+      "x('DELETE FROM probe_table')",
+      'y("INSERT INTO probe_table (a) VALUES (?)")',
+      'z(`SELECT a\n   FROM probe_table\n  WHERE a = ?`)',
+      "w('SELECT 1 FROM other_table')",
+      'v(`label ${x}`); u(`elsewhere`)',
+      "s('DELETE FROM PROBE_TABLE')",
+      'r("insert into Probe_Table (a) values (?)")',
+      'q(`SELECT a FROM Probe_table WHERE b = ${b}`)',
+      '// Documentation example: `SELECT * FROM probe_table`',
+      "/* or 'DELETE FROM probe_table' in a block comment */",
+    ].join('\n'), 'probe_table'));
+  a('the SQL-naming check sees single-quoted, double-quoted and backtick SQL alike, in any case, and not in comments',
+    quotedNaming === JSON.stringify([
+      'DELETE FROM probe_table',
+      'INSERT INTO probe_table (a) VALUES (?)',
+      'SELECT a FROM probe_table WHERE a = ?',
+      'DELETE FROM PROBE_TABLE',
+      'insert into Probe_Table (a) values (?)',
+      'SELECT a FROM Probe_table WHERE b = ${}',
+    ]), quotedNaming);
+  // Owner ruling (ledger Entry 0300; the original 2026-11-03 Entry 0286 is
+  // unrecovered, issue #297): the completion summary may
+  // read session_skipped_slot to list the skipped exercises. That display read
+  // is the one reader; no engine, readiness or progression code reads it.
+  // Walk 2 (W2-1): the read names the PLANNED movement of a swapped slot.
+  const SKIPPED_SUMMARY_READ = 'SELECT k.session_plan_slot_id, COALESCE(sps.original_movement_id, sps.movement_id) AS movement_id, '
+    + 'sps.movement_id AS current_movement_id, m.name AS movement_name, sps.planned_sets '
+    + 'FROM session_skipped_slot k JOIN session_plan_slot sps ON sps.session_plan_slot_id = k.session_plan_slot_id '
+    + 'JOIN movement m ON m.movement_id = COALESCE(sps.original_movement_id, sps.movement_id) WHERE sps.session_id = ? ORDER BY sps.slot_index';
+  a('071: the store names session_skipped_slot in one INSERT, one DELETE and the summary read only',
     JSON.stringify(sqlNaming('session_skipped_slot').sort()) === JSON.stringify([
       'DELETE FROM session_skipped_slot',
       'INSERT INTO session_skipped_slot (session_plan_slot_id) VALUES (?)',
+      SKIPPED_SUMMARY_READ,
     ]), sqlNaming('session_skipped_slot').join(' | '));
+  {
+    // The implementation, not the interface line of the same text.
+    const start = storeSrc.indexOf('loadSessionSummaryFacts: (sessionId: number) => {\n    const d = getDb();');
+    const end = storeSrc.indexOf('\n  refreshVector:', start);
+    // The slice is one property of the store's object literal; wrapped back in
+    // an object it parses on its own (the SQL check refuses source that does
+    // not parse).
+    const body = start >= 0 && end > start ? `const storeSlice = {\n${storeSrc.slice(start, end)}\n};` : '';
+    a('071: the session_skipped_slot read sits inside loadSessionSummaryFacts',
+      sqlNamingIn(body, 'session_skipped_slot').length === 1
+        && sqlNamingIn(body, 'session_skipped_slot')[0] === SKIPPED_SUMMARY_READ,
+      start < 0 ? 'loadSessionSummaryFacts not found' : String(sqlNamingIn(body, 'session_skipped_slot').length) + ' reads in the loader');
+  }
   a('071: the store names set_load_shown in one INSERT and one DELETE only',
     JSON.stringify(sqlNaming('set_load_shown').sort()) === JSON.stringify([
       'DELETE FROM set_load_shown',
@@ -973,7 +1139,8 @@ if (resetTables.length >= 15) {
   const endBody = storeSrc.slice(endStart, endEnd);
   a('071: skipped slots are written with the outcome, before the checkpoint is deleted and before COMMIT',
     endStart >= 0 && endEnd > endStart
-      && order(endBody, 'persistSessionOutcome(', 'INSERT INTO session_skipped_slot', "'DELETE FROM session_runner_checkpoint WHERE session_id = ?'", "d.executeSync('COMMIT')"));
+      && order(storeSrc.slice(storeSrc.indexOf('const finaliseOpenSessionRows ='), storeSrc.indexOf('const persistSessionOutcome =')), 'persistSessionOutcome(', 'INSERT INTO session_skipped_slot', "'DELETE FROM session_runner_checkpoint WHERE session_id = ?'")
+      && order(endBody, 'finaliseOpenSessionRows(', "d.executeSync('COMMIT')"));
   a('071: reset empties each table before its parent',
     order(resetBody, "'DELETE FROM session_skipped_slot'", "'DELETE FROM session_plan_slot'")
       && order(resetBody, "'DELETE FROM set_load_shown'", "'DELETE FROM set_record'"));
@@ -997,7 +1164,7 @@ if (resetTables.length >= 15) {
     join(ROOT, 'packages', 'core-db', 'src', 'migrationRunner.ts'),   // recovery sentinels
     join(ROOT, 'packages', 'core-db', 'src', 'backup', 'schemaContract.ts'), // a comment naming the contract
   ]);
-  const naming = sources.filter((file) => /\b(session_skipped_slot|set_load_shown)\b/.test(readFileSync(file, 'utf-8')));
+  const naming = sources.filter((file) => /\b(session_skipped_slot|set_load_shown)\b/i.test(readFileSync(file, 'utf-8')));
   a('071: no other source file in the app or the engine names either table',
     sources.length > 100 && naming.every((file) => allowed.has(file)) && naming.includes(join(ROOT, 'apps', 'mobile', 'src', 'state', 'useStore.ts')),
     naming.filter((file) => !allowed.has(file)).join(', ') || String(sources.length) + ' files scanned');
@@ -1067,7 +1234,9 @@ if (resetTables.length >= 15) {
     '028_capability_graph.sql', '029_routine_history_analytics.sql',
     '030_readiness_import_integration.sql', '031_planned_session_method.sql',
     '032_capability_content.sql', '033_goal_program.sql', '034_autopilot_attribution.sql',
-    '035_profile_load_preference.sql'
+    '035_profile_load_preference.sql',
+    // The post-session summary SELECT joins the 073 replacement and the 075 planned count (issue #144).
+    '073_session_slot_replaced_by.sql', '075_session_plan_slot_planned_count.sql'
   ];
 
   // 1. Schema shape test: applying 022 on a fresh DB produces the correct set_target schema.
@@ -1217,9 +1386,9 @@ if (resetTables.length >= 15) {
   // groupSummaryExercises to attribute planned_sets per SLOT.
   {
     const sqlStart = src.indexOf('`SELECT sr.movement_id, m.name AS movement_name, sr.reps, sr.load_kg,');
-    const sqlEnd = src.indexOf('ORDER BY sr.movement_id, sr.set_index`', sqlStart);
+    const sqlEnd = src.indexOf('ORDER BY sr.set_id`', sqlStart);
     const summarySql = sqlStart >= 0 && sqlEnd > sqlStart
-      ? src.slice(sqlStart + 1, sqlEnd + 'ORDER BY sr.movement_id, sr.set_index'.length)
+      ? src.slice(sqlStart + 1, sqlEnd + 'ORDER BY sr.set_id'.length)
       : '';
     check('F4: summary set SELECT located in useStore.ts', summarySql.length > 0);
     let summaryRows = [];
@@ -1228,6 +1397,9 @@ if (resetTables.length >= 15) {
       && summaryRows.every((r) => 'session_plan_slot_id' in r)
       && summaryRows.some((r) => r.session_plan_slot_id === 1)
       && summaryRows.some((r) => r.session_plan_slot_id === 2);
+    // Issue #230: the top set names the effort logged with it, so the same
+    // read carries each set's own rpe column (a fact, never an estimate).
+    check('#230: summary SELECT returns each set\'s logged rpe', summaryRows.length >= 2 && summaryRows.every((r) => 'rpe' in r));
     check('F4: summary SELECT returns each set\'s session_plan_slot_id (planned slot 1 and substituted slot 2)', slotIdsOk);
 
     // PR #13 review: the lifecycle's two slots both plan 3 sets, so a wrong
@@ -1338,7 +1510,10 @@ if (resetTables.length >= 15) {
   const hydrateBody = sliceBetween('const hydrateSessionFinalization =', 'const persistSessionOutcome =');
   const persistOutcomeBody = sliceBetween('const persistSessionOutcome =', 'const applyApreFinalization =');
   const applyApreBody = sliceBetween('const applyApreFinalization =', 'const runnerSelection =');
-  const endSessionBody = sliceBetween('endSession: () => {', 'computePrescription: (_patterns) => {');
+  const endSessionBody = sliceBetween('endSession: () => {', 'refreshEarlierOpenSessions: () => {');
+  // Issue 191: finalisation lives in one helper shared by endSession and the
+  // earlier-workout finish; the invariants below are checked on it.
+  const finaliseBody = sliceBetween('const finaliseOpenSessionRows =', 'const persistSessionOutcome =');
   const continueProgramBody = sliceBetween('continueTrainingProgram: () => {', 'archiveTrainingProgram: () => {');
 
   // `error` is SHARED store state and BlockScreen settles its continuation
@@ -1400,10 +1575,10 @@ if (resetTables.length >= 15) {
       && applyApreBody.includes('loggedSet.sourcePlannedSlotId === slot.planned_slot_id')
       && applyApreBody.includes('loggedSet.movementId === slot.movement_id'));
   a('finalization classifies exactly once from the hydrated snapshot',
-    (endSessionBody.match(/evaluateSessionOutcome\s*\(/g) ?? []).length === 1
-      && endSessionBody.includes('sets: snapshot.sets')
-      && endSessionBody.includes('persistSessionOutcome(')
-      && endSessionBody.includes('outcomeDecision,'));
+    (finaliseBody.match(/evaluateSessionOutcome\s*\(/g) ?? []).length === 1
+      && finaliseBody.includes('sets: snapshot.sets')
+      && finaliseBody.includes('persistSessionOutcome(')
+      && finaliseBody.includes('outcomeDecision,'));
 
   const evidenceFields = [
     'slotCount', 'plannedSetCount', 'loggedSetCount', 'exactDoseCount',
@@ -1420,16 +1595,17 @@ if (resetTables.length >= 15) {
   const endBegin = endSessionBody.indexOf("d.executeSync('BEGIN')");
   const endCommit = endSessionBody.indexOf("d.executeSync('COMMIT')", endBegin);
   const endTxn = endBegin >= 0 && endCommit > endBegin ? endSessionBody.slice(endBegin, endCommit) : '';
-  const checkpointDelete = endTxn.indexOf('DELETE FROM session_runner_checkpoint');
+  const checkpointDelete = finaliseBody.indexOf('DELETE FROM session_runner_checkpoint');
   const afterCheckpointDelete = checkpointDelete >= 0
-    ? endTxn.slice(checkpointDelete + 'DELETE FROM session_runner_checkpoint'.length)
+    ? finaliseBody.slice(checkpointDelete + 'DELETE FROM session_runner_checkpoint'.length)
     : '';
   const catchReturn = endSessionBody.indexOf('return;', endCommit);
   const successClear = endSessionBody.indexOf('session: null', catchReturn);
   a('outcome, session finalization, and checkpoint delete share one transaction',
     (endSessionBody.match(/d\.executeSync\('BEGIN'\)/g) ?? []).length === 1
       && (endSessionBody.match(/d\.executeSync\('COMMIT'\)/g) ?? []).length === 1
-      && ordered(endTxn, [
+      && ordered(endTxn, ['finaliseOpenSessionRows('])
+      && ordered(finaliseBody, [
         'hydrateSessionFinalization(',
         'evaluateSessionOutcome(',
         'UPDATE session SET session_rpe = ?, duration_min = ?',
@@ -1824,7 +2000,7 @@ if (resetTables.length >= 15) {
         src.indexOf('  // --- Coach Mode (Phase 15)'),
       )
         .includes('refreshVector()'));
-  const startBody = src.slice(src.indexOf('startSession: (repeatPlanned)'), src.indexOf('selectMovement: (movementId)'));
+  const startBody = src.slice(src.indexOf('startSession: (repeatPlanned, plannedSessionId)'), src.indexOf('selectMovement: (movementId)'));
   a('start computes consumePlan before validating only the plan it will consume',
     startBody.indexOf('const consumePlan') >= 0
       && startBody.indexOf('const planToConsume') > startBody.indexOf('const consumePlan')
@@ -2500,15 +2676,17 @@ console.log('[O3 fail-closed equipment inventory parsing]');
     })),
   });
 
-  const week1Sessions = plan.sessions.filter((s) => s.week_index === 1);
+  const week1Sessions = plan.sessions
+    .filter((s) => s.week_index === 1)
+    .sort((a, b) => a.day_index - b.day_index);
   const week1Focuses = week1Sessions.map((s) => ({ day: s.day_index, focus: s.focus }));
   check('generated planned_session rows carry the OVERRIDDEN focus, not default from programFocuses',
     week1Focuses.length === 5
-      && week1Focuses[0].focus === 'conditioning'
-      && week1Focuses[1].focus === 'full'
-      && week1Focuses[2].focus === 'bjj'
-      && week1Focuses[3].focus === 'upper'
-      && week1Focuses[4].focus === 'lower',
+      && week1Focuses[0].day === 1 && week1Focuses[0].focus === 'conditioning'
+      && week1Focuses[1].day === 2 && week1Focuses[1].focus === 'full'
+      && week1Focuses[2].day === 4 && week1Focuses[2].focus === 'bjj'
+      && week1Focuses[3].day === 5 && week1Focuses[3].focus === 'upper'
+      && week1Focuses[4].day === 6 && week1Focuses[4].focus === 'lower',
     JSON.stringify(week1Focuses));
 }
 
@@ -2564,6 +2742,61 @@ console.log('[R8 identity + offline posture (static sources)]');
   } else {
     a('MainActivity.getMainComponentName matches the JS-registered app.json name',
       false, 'MainActivity.kt not found');
+  }
+}
+
+// ---------------------------------------------------------------------------
+// [#208] Neutral swap store contract + 078_session_slot_swap_cause invariants
+// ---------------------------------------------------------------------------
+console.log('[208 neutral swap + 078 session_slot_swap_cause SQL contract]');
+{
+  const openNeutralStart = src.indexOf('openNeutralSwap: (targetMovementId) => {');
+  const applyNeutralStart = src.indexOf('applyNeutralSwap: (targetMovementId,');
+  const closeSubStart = src.indexOf('closeSubstitution: () => set({ substitution: null })');
+  const openNeutralBody = openNeutralStart >= 0 && applyNeutralStart > openNeutralStart
+    ? src.slice(openNeutralStart, applyNeutralStart) : '';
+  const applyNeutralBody = applyNeutralStart >= 0 && closeSubStart > applyNeutralStart
+    ? src.slice(applyNeutralStart, closeSubStart) : '';
+  check(
+    'openNeutralSwap + applyNeutralSwap bodies located and NEVER touch 010 movement_preference (-1)',
+    openNeutralBody.includes('computeNeutralSwapOptions')
+      && openNeutralBody.includes("mode: 'neutral'")
+      && !/\bmovement_preference\b/.test(openNeutralBody)
+      && applyNeutralBody.includes('executeSlotSwap')
+      && applyNeutralBody.includes("cause === 'preference'")
+      && !/\bmovement_preference\b/.test(applyNeutralBody)
+      && !applyNeutralBody.includes('setMovementPreference'),
+  );
+
+  const prevFk = db.prepare('PRAGMA foreign_keys').get().foreign_keys;
+  db.exec('PRAGMA foreign_keys = ON');
+  db.exec('BEGIN');
+  try {
+    db.exec("INSERT INTO movement (movement_id,name,pattern,is_compound) VALUES (9901,'Swap Test Press A','push_h',1)");
+    db.exec("INSERT INTO movement (movement_id,name,pattern,is_compound) VALUES (9902,'Swap Test Press B','push_h',1)");
+    db.exec("INSERT INTO session (session_id,session_date,started_at_ms) VALUES (9901,'2026-11-01',1000)");
+    db.exec("INSERT INTO session_plan_slot (session_plan_slot_id,session_id,slot_index,movement_id,planned_sets,provenance_kind) VALUES (9901,9901,0,9901,3,'free_form')");
+
+    let rejectedCause = false;
+    try {
+      db.exec("INSERT INTO session_slot_swap_cause (session_plan_slot_id,cause,scope,replaced_movement_id,recorded_at_ms) VALUES (9901,'unknown_reason','today_only',9901,2000)");
+    } catch { rejectedCause = true; }
+    let rejectedScope = false;
+    try {
+      db.exec("INSERT INTO session_slot_swap_cause (session_plan_slot_id,cause,scope,replaced_movement_id,recorded_at_ms) VALUES (9901,'equipment_busy','forever',9901,2000)");
+    } catch { rejectedScope = true; }
+    a('078 CHECK constraints reject invalid cause and invalid scope', rejectedCause && rejectedScope);
+
+    db.exec("INSERT INTO session_slot_swap_cause (session_plan_slot_id,cause,scope,replaced_movement_id,recorded_at_ms) VALUES (9901,'equipment_busy','today_only',9901,2000)");
+    const row078 = db.prepare('SELECT cause, scope, replaced_movement_id FROM session_slot_swap_cause WHERE session_plan_slot_id = 9901').get();
+    a('078 inserts and reads back neutral swap cause + scope', row078?.cause === 'equipment_busy' && row078?.scope === 'today_only');
+
+    db.exec('DELETE FROM session_plan_slot WHERE session_plan_slot_id = 9901');
+    const afterCascade = db.prepare('SELECT COUNT(*) AS c FROM session_slot_swap_cause WHERE session_plan_slot_id = 9901').get().c;
+    a('078 cascades cleanly when parent session_plan_slot is deleted', afterCascade === 0);
+  } finally {
+    db.exec('ROLLBACK');
+    db.exec(`PRAGMA foreign_keys = ${prevFk ? 'ON' : 'OFF'}`);
   }
 }
 

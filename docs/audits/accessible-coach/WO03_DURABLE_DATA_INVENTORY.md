@@ -202,8 +202,59 @@ The two tables belong with "Native workout history, execution checkpoints, prepa
 
 Both are athlete-owned records and are included in a backup and removed by a training-data reset like the rest of that group.
 
+## Update 2026-10-28 - migration 072 (question log)
+
+Final live durable tables: 122 (the 121 above, and `question_log`). The migration array has 71 entries through slot `072`, so `PRAGMA user_version = 71`. The current backup contract fingerprints 208 durable table/index/trigger objects; all earlier schema contracts remain registered unchanged.
+
+`question_log` stores the local question text, asked-at time, outcome kind, and nullable glossary term id. It is record-only and is not read by training decisions. It stays in the athlete database, travels only in the existing encrypted physical backup, survives forward restoration and migration replay, and is cleared by Reset training data. No automatic transfer is added.
+
 ## Correction 2026-10-29 — distinguish migrations 070 and 071
 
 The original inventory above is restored to its release-integration record through `069`: 68 migration-array entries, `user_version = 68`, 118 durable tables, 16 native workout/history tables, and 204 fingerprinted table/index/trigger objects. The October 13 note's phrase "Everything above ... through migration `070`" describes an earlier in-place edit, not that restored historical baseline.
 
 Migration `070` adds `session_feel` to the native workout/history group: 69 array entries, `user_version = 69`, backup contract v69, 119 tables, 17 in that group, and 205 fingerprinted objects. Migration `071` adds `session_skipped_slot` and `set_load_shown`: 70 array entries, `user_version = 70`, backup contract v70, **121 durable tables**, 19 in that group, and **207 fingerprinted objects**. All three additions are athlete-owned backup/reset data and are never engine inputs.
+
+## Update 2026-10-31 — migration 073 (session slot replacement)
+
+Final live durable tables: 123 (the 122 above, and `session_plan_slot_replacement`). The migration array has 72 entries through slot `073`, so `PRAGMA user_version = 72`. The current backup contract fingerprints 209 durable table/index/trigger objects; all earlier schema contracts remain registered unchanged.
+
+`session_plan_slot_replacement` links a `session_plan_slot` row swapped after logged sets to its newly inserted replacement `session_plan_slot` row. It is included in the encrypted physical backup, survives forward restoration and migration replay, and is cleared on empty-session discard and Reset training data.
+
+## Update 2026-11-06 — migration 074 (session feel reasons)
+
+Final live durable tables: 124 (the 123 above, and `session_feel_extra_reason`). The migration array has 73 entries through slot `074`, so `PRAGMA user_version = 73`. The current backup contract fingerprints 210 durable table/index/trigger objects; all earlier schema contracts remain registered unchanged.
+
+`074` rebuilds `session_feel` with the same columns and a looser CHECK (only "as planned" is held to no reasons; issue #220 requires a reason only for "harder", which the store's validation enforces), and adds `session_feel_extra_reason`, one row per session holding the newer reasons (load too heavy, load too light, rested well). Both are athlete-owned record-only data, never engine inputs. The side-car is included in the encrypted physical backup, survives forward restoration and migration replay, leaves with its session, and is cleared on Reset training data.
+
+## Update 2026-11-07 — migration 075 (planned set count for a swapped slot)
+
+Final live durable tables: 125 (the 124 above, and `session_plan_slot_planned_count`). The migration array has 74 entries through slot `075`, so `PRAGMA user_version = 74`. The current backup contract fingerprints 211 durable table/index/trigger objects; all earlier schema contracts remain registered unchanged.
+
+`session_plan_slot_planned_count` holds, for a `session_plan_slot` swapped after logged sets, the set count it was planned with before the swap (`original_planned_sets`). `session_plan_slot.planned_sets` keeps the runner's executable count, so the checkpoint check is unchanged. A slot with no row has no recorded original and is shown with the earlier wording. It is athlete-owned record-only data, included in the encrypted physical backup, survives forward restoration and migration replay, leaves with its session, and is cleared on empty-session discard and Reset training data.
+
+## Update 2026-11-08 — migrations 076 and 077 (sport taxonomy, multi-sport, flexibility tag)
+
+Final live durable tables: 127 (the 125 above, and `athlete_secondary_sport_profile` and `activity_flexibility_tag`). The migration array has 76 entries through slot `077`, so `PRAGMA user_version = 76`. The current backup contract fingerprints 216 durable table/index/trigger objects; all earlier schema contracts remain registered unchanged.
+
+`076` rebuilds `athlete_sport_profile` with the widened sport CHECK (22 proposed SportIds) and preserves every column and row. `077` adds the two side-cars: `athlete_secondary_sport_profile` holds the Rank-2 sport (rank fixed at 2; presence of a Rank-1 profile is a TypeScript guard, not an FK) and `activity_flexibility_tag` marks a low-demand activity as a mobility/flexibility session. Both are athlete-owned record-only data, included in the encrypted physical backup, survive forward restoration and migration replay, and are cleared by Reset training data. The tag is excluded from sport workload counting.
+
+## Update 2026-11-14 — migration 078 (KineStrike plantar telemetry side-car)
+
+Final live durable tables: 128 (the 127 above, and `state_vector_kinestrike`). The migration array has 77 entries through slot `078`, so `PRAGMA user_version = 77`. The current backup contract fingerprints 217 durable table/index/trigger objects; all earlier schema contracts remain registered unchanged.
+
+`state_vector_kinestrike` stores nullable daily plantar/IMU summary fields (`ks_foot`, `ks_strike_count`, `ks_gct_mean_ms`, `ks_gct_delta_pct`, `ks_peak_load_mean`, `ks_peak_load_cv`, `ks_heel_share_mean`, `ks_medial_share_mean`, `ks_lateral_share_mean`, `ks_toe_share_mean`, `ks_cop_x_mean`, `ks_impact_peak_g_max`, `ks_cod_count`, `ks_fall_warning_count`, `ks_fall_last_state`) keyed by `date`, leaving `state_vector` and `004_state_vector_materialize.sql` byte-identical. It is descriptive athlete-owned telemetry data (never a prescription or autopilot input), included in the encrypted physical backup, survives forward restoration and migration replay, and is cleared by Reset training data.
+
+## Update 2026-11-15 — migration 079 (session slot swap cause & scope side-car)
+
+Final live durable tables: 129 (including `state_vector_kinestrike` and `session_slot_swap_cause`). The migration array has 78 entries through slot `079`, so `PRAGMA user_version = 78`. The current backup contract fingerprints 218 durable table/index/trigger objects; all earlier schema contracts remain registered unchanged.
+
+`session_slot_swap_cause` stores the athlete's reason (`cause`: `'equipment_busy' | 'preference' | 'time' | 'joint_discomfort' | 'other'`) and persistence scope (`scope`: `'today_only' | 'rest_of_block'`) alongside optional `replaced_movement_id` and `replaced_by_session_plan_slot_id` for a `session_plan_slot` swap, leaving `session_plan_slot_replacement` untouched. It is athlete-owned training record data included in the encrypted physical backup, survives forward restoration and migration replay, cascades with `session_plan_slot`, and is cleared by Reset training data.
+
+## Update 2026-11-15 — migration 080 (Phase 2 strength & meet countdown, lifting taxonomy)
+
+Final live durable tables: 134 (including the prior KineStrike and swap tables, and `sport_peaking_movement`, `planned_slot_backoff`, `session_slot_backoff`, `training_program_meet_countdown`, `training_block_meet_meta`). The migration array has 79 entries through slot `080`, so `PRAGMA user_version = 79`. The current backup contract fingerprints 223 durable table/index/trigger objects; all earlier schema contracts remain registered unchanged.
+
+`080` rebuilds `athlete_sport_profile` and `athlete_secondary_sport_profile` to allow the 24 `SportId`s (adding `olympic_weightlifting` and `strongman`) and `matches_per_week` `0..52` for lifting sports, creates and seeds `sport_peaking_movement` (reference catalog — kept across Reset training data), and adds the 4 athlete-owned STRICT side-cars (`planned_slot_backoff`, `session_slot_backoff`, `training_program_meet_countdown`, `training_block_meet_meta`), which travel in encrypted backup and cascade/clear on Reset training data.
+## Update 2026-11-16 — migration 081 (#228 + A7 advanced program control)
+
+Final live durable tables: 140 (the 134 above, plus `training_program_day_focus_ext`, `planned_session_focus_ext`, `training_program_schedule_mode`, `training_program_slot_override`, `training_program_day_routine`, and `planned_slot_athlete_override`; bringing Programs, routines, plans, provenance, and suspension state from 27 to 33). The migration array has 80 entries through slot `081`, so `PRAGMA user_version = 80`. The current backup contract fingerprints 229 durable table/index/trigger objects; all earlier schema contracts remain registered unchanged.
