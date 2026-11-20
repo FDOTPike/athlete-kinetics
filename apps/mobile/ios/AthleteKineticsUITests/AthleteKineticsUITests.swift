@@ -311,6 +311,11 @@ final class AthleteKineticsUITests: XCTestCase {
         }
         continue
       }
+      // CI evidence (run 44746241192, Xcode 26 job 136332865630, test1 line 335):
+      // after Cancel dismissed the program set-up offer, the app landed on Today
+      // (text[TODAY; No plan yet; ...], proving !showOnboarding && !showProgramSetup
+      // in App.tsx:339-340), yet shell-primary-tabs.snapshot() returned nil for 60 s.
+      // tab-today is rendered exclusively inside that same tabBar container.
       if (try? element("shell-primary-tabs").snapshot()) != nil
         || (try? element("tab-today").snapshot()) != nil {
         if !createProgram || offerHandled || Date().timeIntervalSince(tapTime) >= 8 {
