@@ -258,6 +258,7 @@ final class AthleteKineticsUITests: XCTestCase {
     let noNotes = app.buttons.matching(NSPredicate(format: "label == %@", "No, nothing to note")).firstMatch
     let noNotesSelected = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in noNotes.isSelected }, object: noNotes)
     if XCTWaiter.wait(for: [noNotesSelected], timeout: 10) != .completed {
+      log("limitations: No, nothing to note not selected after first tap; retrying (\(who))")
       bringClear(noNotes, "No, nothing to note (retry)")
       noNotes.tap()
       let retrySelected = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in noNotes.isSelected }, object: noNotes)
@@ -310,7 +311,8 @@ final class AthleteKineticsUITests: XCTestCase {
         }
         continue
       }
-      if (try? element("shell-primary-tabs").snapshot()) != nil {
+      if (try? element("shell-primary-tabs").snapshot()) != nil
+        || (try? element("tab-today").snapshot()) != nil {
         if !createProgram || offerHandled || Date().timeIntervalSince(tapTime) >= 8 {
           if createProgram && !offerHandled {
             log("program set-up offer: not shown (\(who))")
