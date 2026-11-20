@@ -674,8 +674,33 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
   const onboardingBody = suite.match(/private func completeOnboarding\([\s\S]*?\n  \}/)?.[0] ?? '';
   const completeOnboardingStepCount = (swiftSrc) => {
     const codeOnly = swiftSrc.replace(/\/\*[\s\S]*?\*\/|^\s*\/\/.*$/gm, '');
+    const fnBrace = codeOnly.indexOf('{');
+    if (fnBrace === -1) return null;
     const matches = [...codeOnly.matchAll(/\bfor\s+step\s+in\s+1\.\.\.(\d+)\s*\{/g)];
     if (matches.length !== 1) return null;
+    // Require the enclosing onboarding loop itself to sit on the function's
+    // unconditional top-level path (brace depth 0 inside completeOnboarding).
+    const beforeLoop = codeOnly.slice(fnBrace + 1, matches[0].index);
+    let prefixDepth = 0;
+    let topLevelPrefix = '';
+    for (let i = 0; i < beforeLoop.length; i += 1) {
+      const ch = beforeLoop[i];
+      if (ch === '"') {
+        const strStart = i;
+        i += 1;
+        while (i < beforeLoop.length && beforeLoop[i] !== '"') {
+          if (beforeLoop[i] === '\\' && i + 1 < beforeLoop.length) i += 2;
+          else i += 1;
+        }
+        if (prefixDepth === 0) topLevelPrefix += beforeLoop.slice(strStart, i + 1);
+        continue;
+      }
+      if (ch === '{') { prefixDepth += 1; continue; }
+      if (ch === '}') { prefixDepth -= 1; if (prefixDepth < 0) return null; continue; }
+      if (prefixDepth === 0) topLevelPrefix += ch;
+    }
+    if (prefixDepth !== 0) return null;
+    if (/#if\b|\bguard\b|\breturn\b/.test(topLevelPrefix)) return null;
     const bodyStart = matches[0].index + matches[0][0].length;
     let depth = 1;
     let bodyEnd = -1;
@@ -740,15 +765,21 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
   const staleEightScreenOnboarding = onboardingBody.replace(/\bfor\s+step\s+in\s+1\.\.\.\d+/, 'for step in 1...6');
   const noNextTapOnboarding = onboardingBody.replace(/\btap\(\s*"Next"[^\n]*\)/, 'log("skipped next")');
   const unreachableNextTapOnboarding = onboardingBody.replace(/(\btap\(\s*"Next"[^\n]*\))/, 'if false { $1 }');
+  const unreachableLoopOnboarding = onboardingBody.replace(
+    /(\bfor\s+step\s+in\s+1\.\.\.\d+\s*\{[\s\S]*?\n    \})/,
+    'if false {\n$1\n    }',
+  );
   check(
-    'falsifier: completeOnboarding with 1...6 Next taps, missing tap("Next"), or unreachable conditional tap("Next") inside the loop fails against the 9-screen default onboarding',
+    'falsifier: completeOnboarding with 1...6 Next taps, missing tap("Next"), unreachable conditional tap("Next"), or unreachable enclosing loop fails against the 9-screen default onboarding',
     expectedOnboardingSteps === 7
       && noNextTapOnboarding !== onboardingBody
       && unreachableNextTapOnboarding !== onboardingBody
+      && unreachableLoopOnboarding !== onboardingBody
       && completeOnboardingStepCount(staleEightScreenOnboarding) === 6
       && completeOnboardingStepCount(staleEightScreenOnboarding) !== expectedOnboardingSteps
       && completeOnboardingStepCount(noNextTapOnboarding) === null
-      && completeOnboardingStepCount(unreachableNextTapOnboarding) === null,
+      && completeOnboardingStepCount(unreachableNextTapOnboarding) === null
+      && completeOnboardingStepCount(unreachableLoopOnboarding) === null,
   );
   const typedSportInit = onboardingSrc.replace(
     /const \[wantsSport\b[^\]]*\]\s*=\s*useState\((?:true|false)\)/,

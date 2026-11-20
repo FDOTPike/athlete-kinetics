@@ -6605,8 +6605,11 @@ export const useStore = create<KineticsStore>()((set, get) => {
     // No load goes up. A movement kept from today's plan keeps at most its planned
     // sets and target RPE, and a raised autopilot change is not written, because
     // it would describe a raise that no longer exists.
-    const planned = rowsOf<{ movement_id: number; sets: number; target_rpe: number | null }>(d.executeSync(
-      'SELECT movement_id, sets, target_rpe FROM planned_slot WHERE planned_session_id = ?',
+    const planned = rowsOf<{ movement_id: number; sets: number; target_rpe: number | null; backoff_target_rpe: number | null }>(d.executeSync(
+      `SELECT ps.movement_id, ps.sets, ps.target_rpe, psb.target_rpe AS backoff_target_rpe
+       FROM planned_slot ps
+       LEFT JOIN planned_slot_backoff psb ON psb.planned_slot_id = ps.planned_slot_id
+       WHERE ps.planned_session_id = ?`,
       [plan.plannedSessionId],
     ));
     const slots = rebuilt.slots.map((sl) => {
@@ -6614,13 +6617,14 @@ export const useStore = create<KineticsStore>()((set, get) => {
       const before = planned.filter((p) => p.movement_id === sl.movement_id);
       if (before.length === 0) return { ...sl, autopilotDelta };
       const priorRpes = before.flatMap((p) => (p.target_rpe === null ? [] : [p.target_rpe]));
+      const priorBackOffRpes = before.flatMap((p) => (p.backoff_target_rpe === null ? [] : [p.backoff_target_rpe]));
       const clampedSets = Math.min(sl.sets, ...before.map((p) => p.sets));
       const clampedRpe = priorRpes.length === 0 ? sl.target_rpe : Math.min(sl.target_rpe, ...priorRpes);
       const clampedBackOff = sl.backOff !== undefined && clampedSets > 1
         ? {
             ...sl.backOff,
             sets: Math.min(sl.backOff.sets, clampedSets - 1),
-            targetRpe: Math.min(sl.backOff.targetRpe, clampedRpe),
+            targetRpe: Math.min(sl.backOff.targetRpe, clampedRpe, ...priorBackOffRpes),
           }
         : undefined;
       return {

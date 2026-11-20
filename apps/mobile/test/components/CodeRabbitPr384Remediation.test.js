@@ -365,13 +365,17 @@ describe('PR #384 CodeRabbit Major Remediations', () => {
     await settle();
     expect(db.executeSync('SELECT competition_date FROM training_program_meet_countdown WHERE program_id = ?', [progId]).rows).toHaveLength(0);
 
-    // Continuing after Duration edit must NOT re-enable the countdown or re-create training_program_meet_countdown
+    // Continuing after Duration edit must create the next block and NOT re-enable the countdown
+    const beforeBlockId = committedBlock.blockId;
     const oldStart = new Date(Date.UTC(y, m - 1, d - 35)).toISOString().slice(0, 10);
-    db.executeSync('UPDATE training_block SET start_date = ? WHERE block_id = ?', [oldStart, committedBlock.blockId]);
+    db.executeSync('UPDATE training_block SET start_date = ? WHERE block_id = ?', [oldStart, beforeBlockId]);
     useStore.getState().refreshBlock();
     useStore.getState().continueTrainingProgram();
     await settle();
     expect(useStore.getState().error).toBeNull();
+    const afterBlock = useStore.getState().block;
+    expect(afterBlock).not.toBeNull();
+    expect(afterBlock.blockId).not.toBe(beforeBlockId);
     expect(db.executeSync('SELECT competition_date FROM training_program_meet_countdown WHERE program_id = ?', [progId]).rows).toHaveLength(0);
     expect(useStore.getState().blockMeetMeta).toBeNull();
   });

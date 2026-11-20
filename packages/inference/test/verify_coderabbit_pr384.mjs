@@ -418,7 +418,27 @@ const fullProfile = (overrides = {}) => ({
     JSON.stringify({ fourSingles: fourSingles.workSeconds, singlePlusBackOffs: singlePlusBackOffs.workSeconds }),
   );
 
-  // Reserve routine SBD exposures BEFORE generated days: 3 generated lower days + 1 squat routine day on day 6 -> total squat exposures <= 3!
+  // Top-set + back-off slot must keep 1 + backOff.sets === sets under positive and negative set_modifier
+  const backOffBase = {
+    sets: 4,
+    reps: 1,
+    targetRpe: 8.5,
+    backOff: { sets: 3, reps: 5, targetRpe: 7.5, loadMultiplier: 0.85 },
+  };
+  const backOffBoosted = applyPrescriptionToSlot(backOffBase, { load_modifier: 1, set_modifier: 1, rpe_cap: 9.5 });
+  const backOffEased = applyPrescriptionToSlot(backOffBase, { load_modifier: 0.95, set_modifier: -1, rpe_cap: 8.0 });
+  check(
+    'derivePrescription: top-set + back-off slot prevents unmatched extra sets under set_modifier +1 and reconciles on -1',
+    backOffBoosted.sets === 4
+      && backOffBoosted.backOff?.sets === 3
+      && 1 + (backOffBoosted.backOff?.sets ?? 0) === backOffBoosted.sets
+      && backOffEased.sets === 3
+      && backOffEased.backOff?.sets === 2
+      && 1 + (backOffEased.backOff?.sets ?? 0) === backOffEased.sets,
+    JSON.stringify({ backOffBoosted, backOffEased }),
+  );
+
+  // Reserve routine SBD exposures BEFORE generated days: 3 generated lower days + 1 squat routine day on day 6
   const reservedPlan = generateBlock({
     profile: { ...DEFAULT_PROFILE, training_age: 'advanced', objective: 'strength', weekly_frequency: 4, session_duration_cap_min: 75 },
     movements: baseMovements,
@@ -441,13 +461,18 @@ const fullProfile = (overrides = {}) => ({
       },
     ],
   });
-  const week2SquatSessions = reservedPlan.sessions
-    .filter((s) => s.week_index === 2 && s.slots.some((sl) => sl.movement_id === 1))
+  const week2Sessions = reservedPlan.sessions.filter((s) => s.week_index === 2);
+  const week2Day6HasSquat = week2Sessions.some((s) => s.day_index === 6 && s.slots.some((sl) => sl.movement_id === 1));
+  const week2GeneratedSquatSessions = week2Sessions
+    .filter((s) => s.day_index !== 6 && s.slots.some((sl) => sl.movement_id === 1))
+    .length;
+  const week2SquatSessions = week2Sessions
+    .filter((s) => s.slots.some((sl) => sl.movement_id === 1))
     .length;
   check(
-    'blockGenerator: reserves assigned routine weekly SBD capacity before filling earlier generated lower days',
-    week2SquatSessions <= 3,
-    `week2SquatSessions=${week2SquatSessions}`,
+    'blockGenerator: reserves assigned routine weekly SBD capacity while retaining routine squat and generated squat days',
+    week2Day6HasSquat && week2GeneratedSquatSessions >= 1 && week2GeneratedSquatSessions <= 2 && week2SquatSessions <= 3,
+    JSON.stringify({ week2Day6HasSquat, week2GeneratedSquatSessions, week2SquatSessions }),
   );
 
   // Competition date 225 days away must NOT emit applied countdown line

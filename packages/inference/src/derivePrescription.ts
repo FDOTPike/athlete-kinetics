@@ -150,7 +150,7 @@ export function applyPrescriptionToSlot<
   const adjustedSets = authoredSets > 6
     ? Math.min(authoredSets, Math.max(1, Math.round(authoredSets + vector.set_modifier)))
     : Math.min(6, Math.max(1, Math.round(authoredSets + vector.set_modifier)));
-  const sets = slot.target?.kind === 'time' || slot.routineDecision !== undefined
+  const sets = slot.target?.kind === 'time' || slot.routineDecision !== undefined || slot.backOff !== undefined
     ? Math.min(authoredSets, adjustedSets)
     : adjustedSets;
   const targetRpe = Math.min(slot.targetRpe, vector.rpe_cap);

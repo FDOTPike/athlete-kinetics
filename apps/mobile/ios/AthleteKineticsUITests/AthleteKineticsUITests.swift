@@ -1150,6 +1150,10 @@ final class AthleteKineticsUITests: XCTestCase {
       // Time-based movements (e.g. Saturday conditioning Road Run, 1 x 20:00) omit
       // rep-in-reserve chips and expose direct numeric Effort entry instead.
       // Fail closed if this set is not time-based so missing RIR chips still fail.
+      // Fixture expectation: the default 4-day GPP Saturday conditioning session
+      // schedules 3 exercises (Road Run 1x20:00 followed by Suitcase Carry and
+      // Pallof Press), so logging Set 1 of Road Run advances to the next exercise's
+      // "Log set " control verified below.
       let secondsStepper = app.buttons.matching(NSPredicate(format: "label == %@", "Decrease Seconds")).firstMatch
       XCTAssertTrue(secondsStepper.exists, "2 clean reps left did not appear for a non-time-based set")
       let directToggle = app.buttons.matching(NSPredicate(format: "label == %@", "Enter Effort directly")).firstMatch

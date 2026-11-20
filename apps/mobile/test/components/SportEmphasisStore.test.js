@@ -486,7 +486,8 @@ describe('a competition date is context only', () => {
         ? report.applied.some((line) => line.startsWith('Competition lifts planned as main lifts:') && line.includes(lift))
         : report.omitted.some((line) => line.startsWith(`${lift} is not planned as a main lift`))).toBe(true);
     }
-    expect(report.applied.some((line) => line === `Your blocks count down to peak and taper for competition on 2099-03-01. ${COMPETITION_DATE_NOTE}`)).toBe(true);
+    // 2099-03-01 is > 32 weeks (224 days) away, so countdown peaking/taper is not applied to this block.
+    expect(report.applied.some((line) => line === `Your blocks count down to peak and taper for competition on 2099-03-01. ${COMPETITION_DATE_NOTE}`)).toBe(false);
     expect(report.omitted.some((line) => /does not change this plan/.test(line))).toBe(false);
     expect(dated.some((row) => row.phase === 'deload')).toBe(true);
 
