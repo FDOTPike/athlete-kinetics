@@ -249,7 +249,23 @@ final class AthleteKineticsUITests: XCTestCase {
         XCTFail("Next (step \(step), \(who)) did not change the onboarding screen within 30 s; it still shows: \(before ?? "<no heading>")")
       }
     }
+    // Step 8 (limitations gate): confirm "No, nothing to note" registers (selected)
+    // and "Next" becomes enabled before advancing to review (step 9). CI evidence
+    // (run 44730583899, Xcode 26 test1): an immediate Next tap landed while the
+    // screen still showed "Choose YES or NO to continue", timing out waiting for
+    // START TRAINING.
     tap("No, nothing to note")
+    let noNotes = app.buttons.matching(NSPredicate(format: "label == %@", "No, nothing to note")).firstMatch
+    let noNotesSelected = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in noNotes.isSelected }, object: noNotes)
+    if XCTWaiter.wait(for: [noNotesSelected], timeout: 10) != .completed {
+      bringClear(noNotes, "No, nothing to note (retry)")
+      noNotes.tap()
+      let retrySelected = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in noNotes.isSelected }, object: noNotes)
+      XCTAssertEqual(XCTWaiter.wait(for: [retrySelected], timeout: 10), .completed, "No, nothing to note did not become selected")
+    }
+    let nextToReview = app.buttons.matching(NSPredicate(format: "label == %@", "Next")).firstMatch
+    let nextEnabled = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in nextToReview.isEnabled }, object: nextToReview)
+    XCTAssertEqual(XCTWaiter.wait(for: [nextEnabled], timeout: 10), .completed, "Next did not become enabled after answering limitations")
     tap("Next", "Next to review (\(who))")
     let startBtn = element("START TRAINING")
     reveal(startBtn, "START TRAINING")
