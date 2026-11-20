@@ -679,9 +679,11 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
     const matches = [...codeOnly.matchAll(/\bfor\s+step\s+in\s+1\.\.\.(\d+)\s*\{/g)];
     if (matches.length !== 1) return null;
     // Require the enclosing onboarding loop itself to sit on the function's
-    // unconditional top-level path (brace depth 0 inside completeOnboarding).
+    // unconditional top-level path (brace depth 0 inside completeOnboarding),
+    // with no preceding #if/guard/return (including nested conditional returns).
     const beforeLoop = codeOnly.slice(fnBrace + 1, matches[0].index);
     let prefixDepth = 0;
+    let prefixNonString = '';
     let topLevelPrefix = '';
     for (let i = 0; i < beforeLoop.length; i += 1) {
       const ch = beforeLoop[i];
@@ -695,12 +697,13 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
         if (prefixDepth === 0) topLevelPrefix += beforeLoop.slice(strStart, i + 1);
         continue;
       }
-      if (ch === '{') { prefixDepth += 1; continue; }
-      if (ch === '}') { prefixDepth -= 1; if (prefixDepth < 0) return null; continue; }
+      if (ch === '{') { prefixDepth += 1; prefixNonString += ch; continue; }
+      if (ch === '}') { prefixDepth -= 1; if (prefixDepth < 0) return null; prefixNonString += ch; continue; }
+      prefixNonString += ch;
       if (prefixDepth === 0) topLevelPrefix += ch;
     }
     if (prefixDepth !== 0) return null;
-    if (/#if\b|\bguard\b|\breturn\b/.test(topLevelPrefix)) return null;
+    if (/#if\b|\bguard\b|\breturn\b/.test(topLevelPrefix) || /#if\b|\breturn\b/.test(prefixNonString)) return null;
     const bodyStart = matches[0].index + matches[0][0].length;
     let depth = 1;
     let bodyEnd = -1;
@@ -727,8 +730,10 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
     const loopBody = codeOnly.slice(bodyStart, bodyEnd);
     const afterLoop = codeOnly.slice(bodyEnd + 1);
     // Require tap("Next", ...) on the loop's unconditional execution path
-    // (brace depth 0 inside loopBody; reject #if/guard/return/continue before tap).
+    // (brace depth 0 inside loopBody; reject #if/guard/return/continue/break
+    // at depth 0 or nested inside blocks before tap("Next", ...)).
     let loopDepth = 0;
+    let loopNonString = '';
     let topLevelLoop = '';
     for (let i = 0; i < loopBody.length; i += 1) {
       const ch = loopBody[i];
@@ -742,12 +747,14 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
         if (loopDepth === 0) topLevelLoop += loopBody.slice(strStart, i + 1);
         continue;
       }
-      if (ch === '{') { loopDepth += 1; continue; }
-      if (ch === '}') { loopDepth -= 1; if (loopDepth < 0) return null; continue; }
+      if (ch === '{') { loopDepth += 1; loopNonString += ch; continue; }
+      if (ch === '}') { loopDepth -= 1; if (loopDepth < 0) return null; loopNonString += ch; continue; }
+      loopNonString += ch;
       if (loopDepth === 0) topLevelLoop += ch;
     }
     if (loopDepth !== 0) return null;
     if (/#if\b|\bguard\b|\breturn\b|\bcontinue\b|\bbreak\b/.test(topLevelLoop)) return null;
+    if (/#if\b|\breturn\b|\bcontinue\b|\bbreak\b/.test(loopNonString)) return null;
     if (!/\btap\(\s*"Next"/.test(topLevelLoop)) return null;
     if (!afterLoop.includes('tap("No, nothing to note")')) return null;
     return Number(matches[0][1]);
@@ -769,17 +776,29 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
     /(\bfor\s+step\s+in\s+1\.\.\.\d+\s*\{[\s\S]*?\n    \})/,
     'if false {\n$1\n    }',
   );
+  const conditionalReturnOnboarding = onboardingBody.replace(
+    /(\bfor\s+step\s+in\s+1\.\.\.\d+)/,
+    'if true { return }\n    $1',
+  );
+  const conditionalLoopContinueOnboarding = onboardingBody.replace(
+    /(\btap\(\s*"Next"[^\n]*\))/,
+    'if true { continue }\n      $1',
+  );
   check(
-    'falsifier: completeOnboarding with 1...6 Next taps, missing tap("Next"), unreachable conditional tap("Next"), or unreachable enclosing loop fails against the 9-screen default onboarding',
+    'falsifier: completeOnboarding with 1...6 Next taps, missing tap("Next"), unreachable conditional tap("Next"), unreachable enclosing loop, preceding conditional return, or nested loop continue fails against the 9-screen default onboarding',
     expectedOnboardingSteps === 7
       && noNextTapOnboarding !== onboardingBody
       && unreachableNextTapOnboarding !== onboardingBody
       && unreachableLoopOnboarding !== onboardingBody
+      && conditionalReturnOnboarding !== onboardingBody
+      && conditionalLoopContinueOnboarding !== onboardingBody
       && completeOnboardingStepCount(staleEightScreenOnboarding) === 6
       && completeOnboardingStepCount(staleEightScreenOnboarding) !== expectedOnboardingSteps
       && completeOnboardingStepCount(noNextTapOnboarding) === null
       && completeOnboardingStepCount(unreachableNextTapOnboarding) === null
-      && completeOnboardingStepCount(unreachableLoopOnboarding) === null,
+      && completeOnboardingStepCount(unreachableLoopOnboarding) === null
+      && completeOnboardingStepCount(conditionalReturnOnboarding) === null
+      && completeOnboardingStepCount(conditionalLoopContinueOnboarding) === null,
   );
   const typedSportInit = onboardingSrc.replace(
     /const \[wantsSport\b[^\]]*\]\s*=\s*useState\((?:true|false)\)/,
