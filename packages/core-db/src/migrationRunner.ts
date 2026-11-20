@@ -688,7 +688,20 @@ export function reconcileMigrationLineage(
 
 export function runMigrations(db: MigrationDb, migrations: readonly string[]): void {
   reconcileMigrationLineage(db, migrations);
-  applyFrom(db, migrations, userVersion(db));
+  const beforeVersion = userVersion(db);
+  try {
+    applyFrom(db, migrations, beforeVersion);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const missingTableMatch = /no such table:\s*([A-Za-z0-9_]+)/i.exec(msg);
+    const missingTable = missingTableMatch?.[1] ?? null;
+    const failingMigrationSql = migrations[userVersion(db)] ?? '';
+    const isSentinelPrerequisite = beforeVersion > 0
+      && missingTable !== null
+      && SENTINELS.some((s) => s.type === 'table' && s.name === missingTable)
+      && !new RegExp(`CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?${missingTable}\\b`, 'i').test(failingMigrationSql);
+    if (!isSentinelPrerequisite) throw e;
+  }
   const missing = sentinelsMissing(db);
   if (missing.length > 0) {
     // user_version lied (poisoned field DB) — re-apply everything; all
@@ -699,7 +712,7 @@ export function runMigrations(db: MigrationDb, migrations: readonly string[]): v
     // Preserve 078-only sport rows (`olympic_weightlifting`, `strongman`, or
     // `matches_per_week > 14`) across full replay because frozen 076 rebuilds
     // `athlete_sport_profile` with its older 22-sport / 0..14 CHECK before 078
-    // widens it again. Use a durable stash table (never TEMP, never dropped in
+    // widens it again. Use a durable STRICT stash table (never TEMP, never dropped in
     // `finally`) so replay failures or process interruptions cannot discard
     // existing athlete state and retries reuse the preserved copy.
     const shouldStash078SportRows =
@@ -711,15 +724,22 @@ export function runMigrations(db: MigrationDb, migrations: readonly string[]): v
       try {
         if (!stashExists) {
           db.executeSync(
-            `CREATE TABLE _ak_replay_stash_078_sport AS
-             SELECT sport_profile_id, sport_id, other_sport_name, outcome_id, experience_id,
-                    practice_sessions_per_week, matches_per_week, typical_session_min,
-                    competition_date, revision, updated_at_ms
-             FROM athlete_sport_profile
-             WHERE sport_id IN ('olympic_weightlifting', 'strongman')
-                OR (matches_per_week IS NOT NULL AND matches_per_week > 14);`,
+            `CREATE TABLE _ak_replay_stash_078_sport (
+               sport_profile_id           INTEGER PRIMARY KEY,
+               sport_id                   TEXT NOT NULL,
+               other_sport_name           TEXT,
+               outcome_id                 TEXT NOT NULL,
+               experience_id              TEXT NOT NULL,
+               practice_sessions_per_week INTEGER,
+               matches_per_week           INTEGER,
+               typical_session_min        INTEGER,
+               competition_date           TEXT,
+               revision                   INTEGER NOT NULL,
+               updated_at_ms              INTEGER NOT NULL
+             ) STRICT;`,
           );
-        } else if (hasObject(db, 'table', 'athlete_sport_profile')) {
+        }
+        if (hasObject(db, 'table', 'athlete_sport_profile')) {
           db.executeSync(
             `INSERT OR IGNORE INTO _ak_replay_stash_078_sport (
                sport_profile_id, sport_id, other_sport_name, outcome_id, experience_id,
@@ -732,8 +752,6 @@ export function runMigrations(db: MigrationDb, migrations: readonly string[]): v
              WHERE sport_id IN ('olympic_weightlifting', 'strongman')
                 OR (matches_per_week IS NOT NULL AND matches_per_week > 14);`,
           );
-        }
-        if (hasObject(db, 'table', 'athlete_sport_profile')) {
           db.executeSync(
             `DELETE FROM athlete_sport_profile
              WHERE sport_id IN ('olympic_weightlifting', 'strongman')

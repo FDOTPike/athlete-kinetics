@@ -375,9 +375,7 @@ export function sportReportLines(
     const countdownDate = options?.competitionDate !== undefined
       ? options.competitionDate
       : emphasis.sport.competitionDate;
-    const countdownApplied = options?.countdownApplied !== undefined
-      ? options.countdownApplied
-      : countdownDate !== null;
+    const countdownApplied = options?.countdownApplied === true;
     if (countdownApplied && countdownDate !== null) {
       applied.push(`Your blocks count down to peak and taper for competition on ${countdownDate}. ${COMPETITION_DATE_NOTE}`);
     } else if (emphasis.sport.competitionLifts && emphasis.sport.competitionDate === null) {

@@ -60,6 +60,12 @@ export interface TimedSlot {
   readonly sets: number;
   readonly target: TimedSlotTarget;
   readonly targetRpe: number;
+  /** Optional back-off specification when a slot combines a top set with higher-rep back-off sets. */
+  readonly backOff?: {
+    readonly sets: number;
+    readonly reps: number;
+    readonly targetRpe: number;
+  };
   /**
    * A reviewed minimum for this slot, in seconds. A planner that already had
    * an accepted time allowance for a movement passes it here, so the shared
@@ -124,8 +130,18 @@ export interface SlotTimeEstimate {
 export function estimateSlotTime(slot: TimedSlot): SlotTimeEstimate {
   const sets = Math.max(0, Math.round(slot.sets));
   if (sets === 0) return { transitionSeconds: 0, workSeconds: 0, restSeconds: 0, allowanceSeconds: 0, totalSeconds: 0 };
-  const workSeconds = sets * workSecondsPerSet(slot.target);
-  const rest = (sets - 1) * restSeconds(slot.targetRpe);
+  const backOffSets = slot.backOff !== undefined && sets > 1
+    ? Math.min(Math.max(0, Math.round(slot.backOff.sets)), sets - 1)
+    : 0;
+  const topSets = sets - backOffSets;
+  const workSeconds = backOffSets > 0 && slot.backOff !== undefined
+    ? topSets * workSecondsPerSet(slot.target)
+      + backOffSets * workSecondsPerSet({ kind: 'reps', reps: slot.backOff.reps })
+    : sets * workSecondsPerSet(slot.target);
+  const rest = backOffSets > 0 && slot.backOff !== undefined
+    ? topSets * restSeconds(slot.targetRpe)
+      + Math.max(0, backOffSets - 1) * restSeconds(slot.backOff.targetRpe)
+    : (sets - 1) * restSeconds(slot.targetRpe);
   const measured = TRANSITION_SECONDS_PER_SLOT + workSeconds + rest;
   const minimum = slot.minimumSeconds !== undefined && Number.isFinite(slot.minimumSeconds)
     ? Math.max(0, slot.minimumSeconds) : 0;

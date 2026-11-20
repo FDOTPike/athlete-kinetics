@@ -18,6 +18,7 @@ import {
   strengthAnchorRoleNames,
   weeklyProgressionSummary,
   type BlockFocus,
+  type ProgramScheduleMode,
   type SchemaType,
   type SessionTimeAlternative,
 } from '@ak/inference';
@@ -102,10 +103,16 @@ const SCHEMA_LABEL: Record<SchemaType, string> = {
 const ISO_WEEKDAY_SHORT = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 
 /**
- * #228 Q3: explicit fixed Mon–Sun ISO weekday labels (1 = Mon .. 7 = Sun).
+ * #228 Q3: explicit fixed Mon–Sun ISO weekday labels (1 = Mon .. 7 = Sun),
+ * preserving relative "Day N" labels for legacy relative-day programs.
  */
-export const programDayLabel = (dayIndex: number, _dayOneIso: string | null = null): string =>
-  ISO_WEEKDAY_SHORT[dayIndex] ?? `Day ${dayIndex}`;
+export const programDayLabel = (
+  dayIndex: number,
+  _dayOneIso: string | null = null,
+  scheduleMode: ProgramScheduleMode = 'iso_weekday',
+): string => (scheduleMode === 'relative_day_index'
+  ? `Day ${dayIndex}`
+  : (ISO_WEEKDAY_SHORT[dayIndex] ?? `Day ${dayIndex}`));
 
 interface ProgramSetupScreenProps {
   editing?: boolean;
@@ -130,12 +137,16 @@ export default function ProgramSetupScreen({
   const movementAvailabilityRevision = useStore((s) => s.movementAvailabilityRevision);
   const confirmMovementPriorExperience = useStore((s) => s.confirmMovementPriorExperience);
   const activePriorExperienceMovementIds = useStore((s) => s.activePriorExperienceMovementIds);
-  const saveProfile = useStore((s) => s.saveProfile);
   const routineTemplates = useStore((s) => s.routineTemplates ?? EMPTY_ROUTINES);
   const storeError = useStore((s) => s.error);
 
   const canCustomizeAdvanced = profile.training_age !== 'beginner';
-  const effectiveRpeCap = Math.min(profile.base_rpe_cap, profile.objective === 'rehab' ? 7.0 : 10.0);
+  const [rpeCapOverride, setRpeCapOverride] = useState<number | null>(null);
+  const draftBaseRpeCap = rpeCapOverride ?? profile.base_rpe_cap;
+  const effectiveRpeCap = Math.min(draftBaseRpeCap, profile.objective === 'rehab' ? 7.0 : 10.0);
+  const activeScheduleMode: ProgramScheduleMode = editing && program !== null
+    ? program.scheduleMode
+    : 'iso_weekday';
 
   const initialFrequency = program?.days.length ?? profile.weekly_frequency;
   // W2: every programming control now OPENS on a disclosed coach default
@@ -251,18 +262,19 @@ export default function ProgramSetupScreen({
         ? { kind: 'weeks', blockCount }
         : { kind: 'date', requestedReviewDate: reviewDate.trim() },
       schemaType,
-      scheduleMode: editing && program !== null ? program.scheduleMode : 'iso_weekday',
+      scheduleMode: activeScheduleMode,
       dayIndices,
       days,
       movementPreferences: buildMode === 'custom' ? preferences : [],
       slotOverrides: buildMode === 'custom' && canCustomizeAdvanced ? slotOverrides : [],
       routineAssignments: buildMode === 'custom' && canCustomizeAdvanced ? routineAssignments : [],
       ...(sessionCapOverride === null ? {} : { sessionDurationCapMin: sessionCapOverride }),
+      ...(rpeCapOverride === null ? {} : { baseRpeCap: rpeCapOverride }),
     };
   }, [
-    editing, program?.scheduleMode, horizonKind, schemaType, buildMode, blockCount, reviewDate, dayIndices,
+    activeScheduleMode, horizonKind, schemaType, buildMode, blockCount, reviewDate, dayIndices,
     preferences, slotOverrides, routineAssignments, canCustomizeAdvanced,
-    dayFocuses, profile.objective, sessionCapOverride,
+    dayFocuses, profile.objective, sessionCapOverride, rpeCapOverride,
   ]);
 
   const previewResult = useMemo(() => {
@@ -395,7 +407,7 @@ export default function ProgramSetupScreen({
   // #228: weekday names where Day 1 is known (a new program starts today). A
   // saved program's next block starts the day it is made, so in editing the
   // days stay numbered.
-  const dayLabel = (dayIndex: number): string => programDayLabel(dayIndex, editing ? null : today);
+  const dayLabel = (dayIndex: number): string => programDayLabel(dayIndex, editing ? null : today, activeScheduleMode);
   // R1 (Round 2, ledger 0060): the POWER explanation. Athletic power is
   // explosive-force work — the coach plans fast, speed-purpose rungs of the
   // big lifts (the curated 'speed' rows) and keeps every gate intact. The
@@ -793,7 +805,7 @@ export default function ProgramSetupScreen({
                 from it. Disclosing both is required by the ratified contract. */}
             {horizonKind === 'date' && (
               <Text style={styles.caption}>
-                {sport?.competitionDate != null && reviewDate.trim() === sport.competitionDate
+                {previewResult.preview.countdownApplied === true
                   ? 'Your blocks count down to peak and taper for competition day, synced with your goal review.'
                   : 'Blocks are whole 4-week units, so this rounds up to the next full block and can fall up to 27 days after the date you chose. It is a review checkpoint, not a competition date — your training phases are not scheduled around it.'}
               </Text>
@@ -994,14 +1006,14 @@ export default function ProgramSetupScreen({
           <View style={styles.wrap}>
             <Chip
               label="RPE 9.0 (default)"
-              selected={profile.base_rpe_cap < 9.5}
-              onPress={() => saveProfile({ base_rpe_cap: 9.0 })}
+              selected={draftBaseRpeCap < 9.5}
+              onPress={() => setRpeCapOverride(9.0)}
             />
             <Chip
               testID="program-rpe-cap-9-5"
               label="RPE 9.5"
-              selected={profile.base_rpe_cap >= 9.5}
-              onPress={() => saveProfile({ base_rpe_cap: profile.base_rpe_cap >= 9.5 ? 9.0 : 9.5 })}
+              selected={draftBaseRpeCap >= 9.5}
+              onPress={() => setRpeCapOverride(draftBaseRpeCap >= 9.5 ? 9.0 : 9.5)}
             />
           </View>
         </View>

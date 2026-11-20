@@ -146,9 +146,12 @@ export function applyPrescriptionToSlot<
   vector: Pick<AdjustmentVector, 'load_modifier' | 'set_modifier' | 'rpe_cap'> | null | undefined,
 ): T {
   if (vector === null || vector === undefined) return slot;
-  const adjustedSets = Math.min(6, Math.max(1, Math.round(slot.sets + vector.set_modifier)));
+  const authoredSets = Math.max(1, Math.round(slot.sets));
+  const adjustedSets = authoredSets > 6
+    ? Math.min(authoredSets, Math.max(1, Math.round(authoredSets + vector.set_modifier)))
+    : Math.min(6, Math.max(1, Math.round(authoredSets + vector.set_modifier)));
   const sets = slot.target?.kind === 'time' || slot.routineDecision !== undefined
-    ? Math.min(slot.sets, adjustedSets)
+    ? Math.min(authoredSets, adjustedSets)
     : adjustedSets;
   const targetRpe = Math.min(slot.targetRpe, vector.rpe_cap);
   const overrideLoadKg = slot.overrideLoadKg === undefined

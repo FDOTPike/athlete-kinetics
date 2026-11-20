@@ -736,9 +736,10 @@ function familyC() {
   });
   check('[C] every session date matches the relative calendar offset formula for the block week', () => {
     for (let b = 0; b < blocks.length; b += 1) {
-      const start = blocks[b].start_date;
+      const requestedStart = startDates[b];
+      assert.equal(blocks[b].start_date, requestedStart);
       for (const session of blocks[b].sessions) {
-        const [y, m, d] = start.split('-').map(Number);
+        const [y, m, d] = requestedStart.split('-').map(Number);
         const expected = new Date(Date.UTC(y, m - 1, d + (session.week_index - 1) * 7 + (session.day_index - 1)))
           .toISOString()
           .slice(0, 10);

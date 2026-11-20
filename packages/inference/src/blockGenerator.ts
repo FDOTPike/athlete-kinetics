@@ -462,20 +462,25 @@ const resolveScheduleDayPatterns = (
   let weekSq = 0;
   let weekBn = 0;
   let weekDl = 0;
+  // Reserve weekly SBD lift capacity for assigned routine days BEFORE choosing
+  // lifts on generated days so later routine days cannot push the week past caps.
+  if (isStrengthWeightedPlan) {
+    for (const day of schedule) {
+      if (day.routine_assignment === null || !STRENGTH_FOCI.has(day.focus)) continue;
+      const routineSbd = new Set<MovementPattern>();
+      for (const rSlot of day.routine_assignment.slots) {
+        const rm = movementById.get(rSlot.movement_id);
+        if (rm !== undefined && SBD_PATTERNS.has(rm.pattern)) {
+          routineSbd.add(rm.pattern);
+        }
+      }
+      if (routineSbd.has('squat')) weekSq += 1;
+      if (routineSbd.has('push_h')) weekBn += 1;
+      if (routineSbd.has('hinge')) weekDl += 1;
+    }
+  }
   return schedule.map((day) => {
     if (day.routine_assignment !== null) {
-      if (isStrengthWeightedPlan && STRENGTH_FOCI.has(day.focus)) {
-        const routineSbd = new Set<MovementPattern>();
-        for (const rSlot of day.routine_assignment.slots) {
-          const rm = movementById.get(rSlot.movement_id);
-          if (rm !== undefined && SBD_PATTERNS.has(rm.pattern)) {
-            routineSbd.add(rm.pattern);
-          }
-        }
-        if (routineSbd.has('squat')) weekSq += 1;
-        if (routineSbd.has('push_h')) weekBn += 1;
-        if (routineSbd.has('hinge')) weekDl += 1;
-      }
       return [];
     }
     const budget = isStrengthWeightedPlan && STRENGTH_FOCI.has(day.focus) ? Math.min(slotBudget, 4) : slotBudget;
@@ -2458,6 +2463,15 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
           sets: slot.sets,
           target: { kind: 'reps' as const, reps: slot.reps },
           targetRpe: slot.target_rpe,
+          ...(slot.backOff !== undefined
+            ? {
+                backOff: {
+                  sets: slot.backOff.sets,
+                  reps: slot.backOff.reps,
+                  targetRpe: slot.backOff.targetRpe,
+                },
+              }
+            : {}),
           minSets: athleteFixed ? slot.sets : Math.min(slot.sets, deloadSession ? 1 : 2),
           // A goal exercise or an emphasis slot is trimmed with the main
           // lifts, after the other accessories.
@@ -2563,8 +2577,17 @@ function planBlock(input: BlockInput, verifyAlternatives: boolean): BlockPlan {
       }
       omitted.push(describeGoalMovementGap(movement?.name ?? 'an exercise', goalLabel, gap));
     }
+    const blockStartMs = exactIsoUtcMs(startDate, 'Block start');
+    const daysToCompetition = competitionDateMs === null
+      ? null
+      : Math.floor((competitionDateMs - blockStartMs) / 86400000);
+    const countdownApplied = !recovery
+      && competitionDateIso !== null
+      && daysToCompetition !== null
+      && daysToCompetition >= 1
+      && daysToCompetition <= 224;
     const fixed = sportReportLines(emphasis, {
-      countdownApplied: !recovery && competitionDateIso !== null,
+      countdownApplied,
       competitionDate: competitionDateIso,
     });
     applied.push(...fixed.applied);

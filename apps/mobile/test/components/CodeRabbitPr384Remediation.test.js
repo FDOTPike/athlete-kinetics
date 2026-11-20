@@ -100,13 +100,30 @@ describe('PR #384 CodeRabbit Major Remediations', () => {
     const planSlot = useStore.getState().sessionPlan.find((s) => s.movementId === backOffRow.movement_id);
     expect(planSlot?.backOff).toBeDefined();
     useStore.getState().selectMovementSlot(planSlot.sessionPlanSlotId);
+    const activeSessionId = useStore.getState().session.sessionId;
     useStore.getState().logSet(planSlot.movementId, 1, 140, 8.0);
     for (let i = 0; i < planSlot.backOff.sets; i += 1) {
+      useStore.getState().skipRunnerRest();
       useStore.getState().logSet(planSlot.movementId, planSlot.backOff.reps, 125, 7.5);
     }
+    const loggedSets = db.executeSync(
+      'SELECT set_index, reps, load_kg FROM set_record WHERE session_id = ? AND movement_id = ? ORDER BY set_index',
+      [activeSessionId, planSlot.movementId],
+    ).rows;
+    expect(loggedSets).toHaveLength(1 + planSlot.backOff.sets);
+    expect(loggedSets[0].reps).toBe(1);
+    expect(loggedSets.slice(1).every((r) => r.reps === planSlot.backOff.reps)).toBe(true);
 
+    useStore.getState().runnerHalt('manual');
     useStore.getState().endSession();
     await settle();
+    expect(useStore.getState().error).toBeNull();
+    expect(useStore.getState().session).toBeNull();
+    const outcomeRow = db.executeSync(
+      'SELECT outcome_kind FROM session_outcome WHERE session_id = ?',
+      [activeSessionId],
+    ).rows[0];
+    expect(outcomeRow).toBeDefined();
 
     // Week 2 slot for that movement must have ZERO unearned APRE slot_override!
     const week2Slot = db.executeSync(
@@ -225,15 +242,31 @@ describe('PR #384 CodeRabbit Major Remediations', () => {
     useStore.getState().openNeutralSwap(slotA.movementId);
     const origExecute = db.executeSync.bind(db);
     const runnerBefore = useStore.getState().runner;
+    const futureRowsBefore = db.executeSync(
+      `SELECT sl.planned_slot_id, sl.movement_id
+         FROM planned_slot sl
+         JOIN planned_session ps ON ps.planned_session_id = sl.planned_session_id
+        WHERE ps.block_id = ? AND ps.session_date > ? AND sl.movement_id = ?`,
+      [block.blockId, useStore.getState().today, slotA.movementId],
+    ).rows;
+    expect(futureRowsBefore.length).toBeGreaterThan(0);
+    let faultFired = false;
     const execSpy = jest.spyOn(db, 'executeSync').mockImplementation((sql, params) => {
       if (typeof sql === 'string' && sql.includes('UPDATE planned_slot SET movement_id = ?')) {
+        faultFired = true;
         throw new Error('injected future-slot failure');
       }
       return origExecute(sql, params);
     });
     const failedBlockSwap = useStore.getState().applyNeutralSwap(slotA.movementId, optA.movement_id, 'equipment_busy', 'rest_of_block');
     execSpy.mockRestore();
+    expect(faultFired).toBe(true);
     expect(failedBlockSwap).toBe(false);
+    const futureRowAfterFail = db.executeSync(
+      'SELECT movement_id FROM planned_slot WHERE planned_slot_id = ?',
+      [futureRowsBefore[0].planned_slot_id],
+    ).rows[0];
+    expect(futureRowAfterFail.movement_id).toBe(slotA.movementId);
     const liveRowAfterFail = db.executeSync(
       'SELECT movement_id FROM session_plan_slot WHERE session_plan_slot_id = ?',
       [slotA.sessionPlanSlotId],
@@ -308,11 +341,17 @@ describe('PR #384 CodeRabbit Major Remediations', () => {
       'SELECT session_date FROM planned_session WHERE block_id = ? ORDER BY session_date',
       [committedBlock.blockId],
     ).rows;
-    expect(committedSessions.length).toBe(preview.plan.sessions.length);
+    const previewDates = [...preview.plan.sessions].map((s) => s.session_date).sort();
+    expect(committedSessions.map((s) => s.session_date)).toEqual(previewDates);
     expect(committedSessions.every((s) => s.session_date < meetDate)).toBe(true);
 
     const progId = useStore.getState().program.programId;
-    expect(db.executeSync('SELECT competition_date FROM training_program_meet_countdown WHERE program_id = ?', [progId]).rows).toHaveLength(1);
+    const sidecarRows = db.executeSync(
+      'SELECT competition_date FROM training_program_meet_countdown WHERE program_id = ?',
+      [progId],
+    ).rows;
+    expect(sidecarRows).toHaveLength(1);
+    expect(sidecarRows[0].competition_date).toBe(meetDate);
 
     // Switch the active program from Date to Duration (weeks) — sidecar must be cleared in same tx
     const updated = useStore.getState().updateProgramPreferences({
@@ -325,21 +364,34 @@ describe('PR #384 CodeRabbit Major Remediations', () => {
     expect(updated).toBe(true);
     await settle();
     expect(db.executeSync('SELECT competition_date FROM training_program_meet_countdown WHERE program_id = ?', [progId]).rows).toHaveLength(0);
+
+    // Continuing after Duration edit must NOT re-enable the countdown or re-create training_program_meet_countdown
+    const oldStart = new Date(Date.UTC(y, m - 1, d - 35)).toISOString().slice(0, 10);
+    db.executeSync('UPDATE training_block SET start_date = ? WHERE block_id = ?', [oldStart, committedBlock.blockId]);
+    useStore.getState().refreshBlock();
+    useStore.getState().continueTrainingProgram();
+    await settle();
+    expect(useStore.getState().error).toBeNull();
+    expect(db.executeSync('SELECT competition_date FROM training_program_meet_countdown WHERE program_id = ?', [progId]).rows).toHaveLength(0);
+    expect(useStore.getState().blockMeetMeta).toBeNull();
   });
 
-  test('ProgramSetupScreen:997, 254, 864 — effort cap updates preview, legacy edit preserves relative_day_index, and routine picker stays visible on preview error', async () => {
+  test('ProgramSetupScreen:997, 254, 864, 107, 998 — effort cap stays draft until confirm, relative labels stay relative, and routine picker stays visible on preview error', async () => {
     const db = mockDriverFor('athlete_kinetics.db');
     db.executeSync("UPDATE athlete_profile SET training_age = 'advanced', objective = 'strength', weekly_frequency = 2, session_duration_cap_min = 90 WHERE profile_id = 1");
     useStore.setState({ status: 'booting' });
     useStore.getState().boot();
     await settle();
 
-    // 1. Effort cap toggle recomputes preview immediately without another edit
+    // 1. Effort cap toggle recomputes preview immediately as DRAFT without calling saveProfile before confirmation
+    const savedCapBefore = useStore.getState().profile.base_rpe_cap;
     const origPreview = useStore.getState().previewTrainingProgram;
     let previewCalls = 0;
+    let lastPreviewBaseRpeCap = null;
     useStore.setState({
       previewTrainingProgram: (inp) => {
         previewCalls += 1;
+        lastPreviewBaseRpeCap = inp.baseRpeCap ?? null;
         return origPreview(inp);
       },
     });
@@ -349,10 +401,12 @@ describe('PR #384 CodeRabbit Major Remediations', () => {
     fireEvent.press(screen.getByTestId('program-rpe-cap-9-5'));
     await settle();
     expect(previewCalls).toBeGreaterThan(callsBefore);
+    expect(lastPreviewBaseRpeCap).toBe(9.5);
+    expect(useStore.getState().profile.base_rpe_cap).toBe(savedCapBefore);
     unmount();
     useStore.setState({ previewTrainingProgram: origPreview });
 
-    // 2. Editing a legacy relative_day_index program preserves scheduleMode = 'relative_day_index'
+    // 2. Editing a legacy relative_day_index program preserves scheduleMode and shows relative Day N labels
     const createdLegacy = useStore.getState().createTrainingProgram({
       horizon: { kind: 'weeks', blockCount: 2 },
       schemaType: 'LINEAR',
@@ -366,6 +420,8 @@ describe('PR #384 CodeRabbit Major Remediations', () => {
     expect(useStore.getState().program.scheduleMode).toBe('relative_day_index');
 
     const { unmount: unmountEdit } = render(<ProgramSetupScreen editing={true} />);
+    expect(screen.getAllByText('Day 1').length).toBeGreaterThan(0);
+    expect(screen.queryByText('Mon')).toBeNull();
     fireEvent.press(screen.getByText('12 wk'));
     fireEvent.press(screen.getByText('Save future preferences'));
     await settle();
@@ -373,7 +429,7 @@ describe('PR #384 CodeRabbit Major Remediations', () => {
     expect(useStore.getState().program.scheduleMode).toBe('relative_day_index');
     unmountEdit();
 
-    // 3. Routine assignment controls stay visible even when preview fails due to a removed routine day
+    // 3. Routine assignment controls stay visible even when real preview fails due to a removed routine day
     const majorMove = useStore.getState().movements.find((m) => m.pattern === 'squat');
     useStore.getState().saveRoutineTemplate({
       name: 'Temp Day',
@@ -391,6 +447,17 @@ describe('PR #384 CodeRabbit Major Remediations', () => {
     useStore.getState().refreshProgram();
     await settle();
 
+    // Verify real preview throws for the stale routine assignment
+    const staleProgram = useStore.getState().program;
+    expect(() => useStore.getState().previewTrainingProgram({
+      horizon: { kind: 'weeks', blockCount: staleProgram.plannedBlockCount },
+      schemaType: staleProgram.schemaType,
+      scheduleMode: staleProgram.scheduleMode,
+      dayIndices: staleProgram.days.map((day) => day.dayIndex),
+      days: staleProgram.days,
+      routineAssignments: staleProgram.routineAssignments,
+    })).toThrow();
+
     render(<ProgramSetupScreen editing={true} />);
     expect(screen.getByTestId('day-routine-picker-1')).toBeOnTheScreen();
     expect(screen.getAllByText('Generated day').length).toBeGreaterThan(0);
@@ -398,18 +465,24 @@ describe('PR #384 CodeRabbit Major Remediations', () => {
 
   test('useStore:3365 — continuation preview and commit include completed outgoing block 1 in longitudinal evidence', async () => {
     const db = mockDriverFor('athlete_kinetics.db');
-    db.executeSync("UPDATE athlete_profile SET training_age = 'advanced', objective = 'strength', weekly_frequency = 2, session_duration_cap_min = 90 WHERE profile_id = 1");
+    db.executeSync("UPDATE athlete_profile SET training_age = 'advanced', objective = 'strength', weekly_frequency = 4, session_duration_cap_min = 90 WHERE profile_id = 1");
     useStore.setState({ status: 'booting' });
     useStore.getState().boot();
     await settle();
 
-    const created = useStore.getState().createTrainingProgram({
+    const fourDayInput = {
       horizon: { kind: 'weeks', blockCount: 2 },
       schemaType: 'LINEAR',
       scheduleMode: 'iso_weekday',
-      dayIndices: [1, 4],
-      days: [{ dayIndex: 1, focus: 'lower' }, { dayIndex: 4, focus: 'upper' }],
-    });
+      dayIndices: [1, 2, 4, 6],
+      days: [
+        { dayIndex: 1, focus: 'lower' },
+        { dayIndex: 2, focus: 'upper' },
+        { dayIndex: 4, focus: 'lower' },
+        { dayIndex: 6, focus: 'lower' },
+      ],
+    };
+    const created = useStore.getState().createTrainingProgram(fourDayInput);
     expect(created).toBe(true);
     await settle();
 
@@ -417,22 +490,27 @@ describe('PR #384 CodeRabbit Major Remediations', () => {
     const today = useStore.getState().today;
     const [y, m, d] = today.split('-').map(Number);
     const oldStart = new Date(Date.UTC(y, m - 1, d - 35)).toISOString().slice(0, 10);
-    // Move block 1 start_date back 35 days so block 1 is completed and ready to continue (still status = 'active')
+    // Move block 1 start_date back 35 days so block 1 is completed and ready to continue (still status = 'active'),
+    // and set block 1's prescribed sets to 3 so overshooting RPE on 3 sets contracts MRV_p to 2 (< block 2's 4 sets/slot).
     db.executeSync('UPDATE training_block SET start_date = ? WHERE block_id = ?', [oldStart, block1Id]);
+    db.executeSync(
+      'UPDATE planned_slot SET sets = 3 WHERE planned_session_id IN (SELECT planned_session_id FROM planned_session WHERE block_id = ?)',
+      [block1Id],
+    );
     const squatId = db.executeSync("SELECT movement_id FROM movement WHERE pattern = 'squat' LIMIT 1").rows[0].movement_id;
-    // Log high-RPE overshoot sets across 6 distinct days inside block 1's window so MRV_p is derived from block 1!
-    for (let dayOff = 1; dayOff <= 6; dayOff += 1) {
-      const sDate = new Date(Date.UTC(y, m - 1, d - 35 + dayOff * 3)).toISOString().slice(0, 10);
+    // Log high-RPE overshoot sets across 12 recent days inside block 1's 21-day observer window so phi >= 0.30 (capacity_deficit) contracts squat MRV_p to 2!
+    for (let dayOff = 8; dayOff <= 19; dayOff += 1) {
+      const sDate = new Date(Date.UTC(y, m - 1, d - 35 + dayOff)).toISOString().slice(0, 10);
       db.executeSync('INSERT INTO session (session_date, started_at_ms) VALUES (?, ?)', [sDate, 1000 + dayOff]);
       const sid = db.executeSync('SELECT last_insert_rowid() AS id').rows[0].id;
-      for (let si = 1; si <= 4; si += 1) {
+      for (let si = 1; si <= 2; si += 1) {
         db.executeSync(
           'INSERT INTO set_record (session_id, movement_id, set_index, reps, load_kg, rpe, logged_at_ms) VALUES (?, ?, ?, 5, 100, 9.5, ?)',
           [sid, squatId, si, 1500 + dayOff * 10 + si],
         );
         const setId = db.executeSync('SELECT last_insert_rowid() AS id').rows[0].id;
         db.executeSync(
-          "INSERT INTO set_target (set_id, session_plan_slot_id, provenance_kind, target_rpe, source_planned_slot_id, created_at_ms) VALUES (?, NULL, 'planned', 7.0, NULL, ?)",
+          "INSERT INTO set_target (set_id, session_plan_slot_id, provenance_kind, target_rpe, source_planned_slot_id, created_at_ms) VALUES (?, NULL, 'planned', 6.0, NULL, ?)",
           [setId, 1500 + dayOff * 10 + si],
         );
       }
@@ -442,34 +520,45 @@ describe('PR #384 CodeRabbit Major Remediations', () => {
     await settle();
 
     // Unrelated preview (without includeCompletedBlockId) does NOT include the active unarchived block
-    const unrelatedPreview = useStore.getState().previewTrainingProgram({
-      horizon: { kind: 'weeks', blockCount: 2 },
-      schemaType: 'LINEAR',
-      scheduleMode: 'iso_weekday',
-      dayIndices: [1, 4],
-      days: [{ dayIndex: 1, focus: 'lower' }, { dayIndex: 4, focus: 'upper' }],
-    });
+    const unrelatedPreview = useStore.getState().previewTrainingProgram(fourDayInput);
     expect(unrelatedPreview.patternMrvSets).toBeUndefined();
 
     // Continuation preview DOES include completed outgoing block 1
     const contPreview = useStore.getState().previewTrainingProgram({
-      horizon: { kind: 'weeks', blockCount: 2 },
-      schemaType: 'LINEAR',
-      scheduleMode: 'iso_weekday',
-      dayIndices: [1, 4],
-      days: [{ dayIndex: 1, focus: 'lower' }, { dayIndex: 4, focus: 'upper' }],
+      ...fourDayInput,
       includeCompletedBlockId: block1Id,
     });
     expect(contPreview.patternMrvSets).toBeDefined();
     expect(contPreview.patternMrvSets.squat).toBeDefined();
 
-    // previewNextProgramBlock() and continueTrainingProgram() succeed cleanly with block 1 evidence included
+    // previewNextProgramBlock() and continueTrainingProgram() must both apply the evidence-reduced squat dose on peak Week 3
+    const squatSetsOf = (plan) => plan.sessions
+      .filter((s) => s.week_index === 3)
+      .flatMap((s) => s.slots)
+      .filter((sl) => useStore.getState().movements.find((m) => m.movement_id === sl.movement_id)?.pattern === 'squat')
+      .reduce((acc, sl) => acc + sl.sets, 0);
+    const noEvidenceSquatSets = squatSetsOf(unrelatedPreview.plan);
+    const evidenceSquatSets = squatSetsOf(contPreview.plan);
+    expect(evidenceSquatSets).toBeLessThan(noEvidenceSquatSets);
+
     const nextPlan = useStore.getState().previewNextProgramBlock();
     expect(nextPlan).not.toBeNull();
+    expect(squatSetsOf(nextPlan)).toBe(evidenceSquatSets);
+
     useStore.getState().continueTrainingProgram();
     await settle();
     expect(useStore.getState().error).toBeNull();
-    expect(useStore.getState().block.blockId).not.toBe(block1Id);
+    const nextBlockId = useStore.getState().block.blockId;
+    expect(nextBlockId).not.toBe(block1Id);
+    const persistedW3SquatSets = db.executeSync(
+      `SELECT COALESCE(SUM(sl.sets), 0) AS total_sets
+         FROM planned_session ps
+         JOIN planned_slot sl ON sl.planned_session_id = ps.planned_session_id
+         JOIN movement m ON m.movement_id = sl.movement_id
+        WHERE ps.block_id = ? AND ps.week_index = 3 AND m.pattern = 'squat'`,
+      [nextBlockId],
+    ).rows[0].total_sets;
+    expect(persistedW3SquatSets).toBe(evidenceSquatSets);
   });
 
   test('SessionScreen:1005-1006 — correcting top-set load during back-off phase re-derives back-off load field', async () => {
@@ -520,5 +609,66 @@ describe('PR #384 CodeRabbit Major Remediations', () => {
     useStore.getState().editSet(topSetId, 1, 120, 8.0);
     await settle();
     expect(screen.getByTestId('session-load-input').props.value).toBe('107.5');
+  });
+
+  test('useStore:11063 — rebuildTodayPlannedSession recognizes program-assigned routine day when assigned movement becomes unavailable', async () => {
+    const db = mockDriverFor('athlete_kinetics.db');
+    db.executeSync("UPDATE athlete_profile SET training_age = 'advanced', objective = 'strength', weekly_frequency = 2, session_duration_cap_min = 90 WHERE profile_id = 1");
+    useStore.setState({ status: 'booting' });
+    useStore.getState().boot();
+    await settle();
+
+    const barbellSquat = useStore.getState().movements.find((m) => m.pattern === 'squat' && m.required.includes('barbell'));
+    const dbBench = useStore.getState().movements.find((m) => m.pattern === 'push_h' && !m.required.includes('barbell') && m.is_compound)
+      ?? useStore.getState().movements.find((m) => m.name === 'Dumbbell Bench Press');
+    expect(barbellSquat).toBeDefined();
+    expect(dbBench).toBeDefined();
+
+    useStore.getState().saveRoutineTemplate({
+      name: 'Two Day Routine',
+      schemaType: 'LINEAR',
+      slots: [
+        { dayIndex: 1, movementId: barbellSquat.movement_id, role: 'major', sets: 3, reps: 5, targetRpe: 8 },
+        { dayIndex: 2, movementId: dbBench.movement_id, role: 'major', sets: 3, reps: 8, targetRpe: 8 },
+      ],
+    });
+    await settle();
+    const routineId = useStore.getState().routineTemplates.find((r) => r.name === 'Two Day Routine').routineTemplateId;
+
+    const created = useStore.getState().createTrainingProgram({
+      horizon: { kind: 'weeks', blockCount: 2 },
+      schemaType: 'LINEAR',
+      scheduleMode: 'relative_day_index',
+      dayIndices: [1, 3],
+      days: [{ dayIndex: 1, focus: 'lower' }, { dayIndex: 3, focus: 'upper' }],
+      routineAssignments: [
+        { dayIndex: 1, routineTemplateId: routineId, routineDayIndex: 1 },
+        { dayIndex: 3, routineTemplateId: routineId, routineDayIndex: 2 },
+      ],
+    });
+    expect(useStore.getState().error).toBeNull();
+    expect(created).toBe(true);
+    await settle();
+
+    // Remove barbell so day 1's assigned routine movement is unavailable today
+    const equipWithoutBarbell = useStore.getState().profile.equipment_inventory.filter((e) => e !== 'barbell');
+    useStore.getState().saveProfile({ equipment_inventory: equipWithoutBarbell });
+    await settle();
+
+    const rebuilt = useStore.getState().updateTodayPlannedWorkout();
+    await settle();
+    expect(useStore.getState().error).toBeNull();
+    expect(rebuilt).toBe(true);
+    const todaySlots = db.executeSync(
+      `SELECT sl.movement_id
+         FROM planned_session ps
+         JOIN planned_slot sl ON sl.planned_session_id = ps.planned_session_id
+        WHERE ps.block_id = ? AND ps.session_date = ?`,
+      [useStore.getState().block.blockId, useStore.getState().today],
+    ).rows;
+    expect(todaySlots.length).toBeGreaterThan(0);
+    expect(todaySlots.every((r) => r.movement_id !== barbellSquat.movement_id)).toBe(true);
+    // Day 3's routine assignment stays intact on the program
+    expect(useStore.getState().program.routineAssignments.some((a) => a.dayIndex === 3)).toBe(true);
   });
 });

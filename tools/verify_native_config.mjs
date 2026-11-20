@@ -522,6 +522,17 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
       && /reveal\(reps, "2 clean reps left"\)\s+bringClear\(reps, "2 clean reps left"\)\s+reps\.tap\(\)/.test(workout)
       && workout.includes('reps.isSelected') && workout.includes('XCTWaiter.wait(for: [selected], timeout: 10)')
       && !workout.includes('scrollViews.firstMatch.swipeDown'));
+  const checkTimeBasedEffortFallback = (src) =>
+    src.includes('label == %@", "Decrease Seconds"')
+      && src.includes('XCTAssertTrue(secondsStepper.exists, "2 clean reps left did not appear for a non-time-based set")')
+      && /reveal\(directToggle, "Enter Effort directly"\)\s+bringClear\(directToggle, "Enter Effort directly"\)\s+directToggle\.tap\(\)/.test(src)
+      && /reveal\(effort, "Effort 7\.0"\)\s+bringClear\(effort, "Effort 7\.0"\)\s+effort\.tap\(\)/.test(src)
+      && src.includes('effort.isSelected');
+  check('workout effort fallback is gated on time-based sets (Decrease Seconds) and requires selected direct Effort evidence',
+    checkTimeBasedEffortFallback(workout));
+  check('falsifier: dropping the Decrease Seconds guard or effort.isSelected check from test5 fails closed',
+    !checkTimeBasedEffortFallback(workout.replace('XCTAssertTrue(secondsStepper.exists, "2 clean reps left did not appear for a non-time-based set")', ''))
+      && !checkTimeBasedEffortFallback(workout.replaceAll('effort.isSelected', 'true')));
   check('a timed-out HealthKit request is accepted only when healthd logged the session timeout',
     suite.includes('HEALTH-TIMEOUT-SHOWN') && runner.includes("grep -q 'AKUI HEALTH-TIMEOUT-SHOWN'")
       && runner.includes("grep -q 'Authorization session timed out'")
@@ -690,7 +701,29 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
     if (bodyEnd === -1) return null;
     const loopBody = codeOnly.slice(bodyStart, bodyEnd);
     const afterLoop = codeOnly.slice(bodyEnd + 1);
-    if (!/\btap\(\s*"Next"/.test(loopBody)) return null;
+    // Require tap("Next", ...) on the loop's unconditional execution path
+    // (brace depth 0 inside loopBody; reject #if/guard/return/continue before tap).
+    let loopDepth = 0;
+    let topLevelLoop = '';
+    for (let i = 0; i < loopBody.length; i += 1) {
+      const ch = loopBody[i];
+      if (ch === '"') {
+        const strStart = i;
+        i += 1;
+        while (i < loopBody.length && loopBody[i] !== '"') {
+          if (loopBody[i] === '\\' && i + 1 < loopBody.length) i += 2;
+          else i += 1;
+        }
+        if (loopDepth === 0) topLevelLoop += loopBody.slice(strStart, i + 1);
+        continue;
+      }
+      if (ch === '{') { loopDepth += 1; continue; }
+      if (ch === '}') { loopDepth -= 1; if (loopDepth < 0) return null; continue; }
+      if (loopDepth === 0) topLevelLoop += ch;
+    }
+    if (loopDepth !== 0) return null;
+    if (/#if\b|\bguard\b|\breturn\b|\bcontinue\b|\bbreak\b/.test(topLevelLoop)) return null;
+    if (!/\btap\(\s*"Next"/.test(topLevelLoop)) return null;
     if (!afterLoop.includes('tap("No, nothing to note")')) return null;
     return Number(matches[0][1]);
   };
@@ -706,13 +739,16 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
   );
   const staleEightScreenOnboarding = onboardingBody.replace(/\bfor\s+step\s+in\s+1\.\.\.\d+/, 'for step in 1...6');
   const noNextTapOnboarding = onboardingBody.replace(/\btap\(\s*"Next"[^\n]*\)/, 'log("skipped next")');
+  const unreachableNextTapOnboarding = onboardingBody.replace(/(\btap\(\s*"Next"[^\n]*\))/, 'if false { $1 }');
   check(
-    'falsifier: completeOnboarding with 1...6 Next taps or missing tap("Next") inside the loop fails against the 9-screen default onboarding',
+    'falsifier: completeOnboarding with 1...6 Next taps, missing tap("Next"), or unreachable conditional tap("Next") inside the loop fails against the 9-screen default onboarding',
     expectedOnboardingSteps === 7
       && noNextTapOnboarding !== onboardingBody
+      && unreachableNextTapOnboarding !== onboardingBody
       && completeOnboardingStepCount(staleEightScreenOnboarding) === 6
       && completeOnboardingStepCount(staleEightScreenOnboarding) !== expectedOnboardingSteps
-      && completeOnboardingStepCount(noNextTapOnboarding) === null,
+      && completeOnboardingStepCount(noNextTapOnboarding) === null
+      && completeOnboardingStepCount(unreachableNextTapOnboarding) === null,
   );
   const typedSportInit = onboardingSrc.replace(
     /const \[wantsSport\b[^\]]*\]\s*=\s*useState\((?:true|false)\)/,
@@ -1317,30 +1353,21 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
     }
     const codeOnly = noStrings.join('');
     if (/#if\b|\bguard\b|\breturn\b/.test(codeOnly)) return null;
-    const stack = [];
-    let condDepth = 0;
-    let lastBoundary = 0;
+    let braceDepth = 0;
     for (let i = 0; i < n; i += 1) {
-      if (condDepth > 0) blanked[i] = true;
       const ch = noStrings[i];
       if (ch === '{') {
-        const header = codeOnly.slice(lastBoundary, i);
-        const isCond = /(?:^|[\s;}])(?:if|else|switch|while|for)\b/.test(header);
-        stack.push(isCond);
-        if (isCond) {
-          condDepth += 1;
-          blanked[i] = true;
-        }
-        lastBoundary = i + 1;
+        braceDepth += 1;
+        blanked[i] = true;
       } else if (ch === '}') {
-        if (stack.length === 0) return null;
-        if (stack.pop()) condDepth -= 1;
-        lastBoundary = i + 1;
-      } else if (ch === ';') {
-        lastBoundary = i + 1;
+        if (braceDepth === 0) return null;
+        blanked[i] = true;
+        braceDepth -= 1;
+      } else if (braceDepth > 0) {
+        blanked[i] = true;
       }
     }
-    if (stack.length !== 0) return null;
+    if (braceDepth !== 0) return null;
     return chars.map((ch, idx) => (blanked[idx] ? ' ' : ch)).join('');
   };
   const hasGlossaryAndQuestionBoxInTest1 = (src) => {
@@ -1475,15 +1502,18 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
     '',
   );
   const emptyLoopWrappedTest1 = ifFalseWrappedTest1.replace('if false {', 'for _ in [Int]() {');
+  const uncalledClosureWrappedTest1 = ifFalseWrappedTest1.replace('if false {', 'let unusedAudit = {');
   check(
-    'falsifier: plain 7-destination test1, conditional, if-false, or empty-loop QuestionBox wrappers, early return, early issues.isEmpty assertion, or log("DELOAD") without title+definition waits all fail closed',
+    'falsifier: plain 7-destination test1, conditional, if-false, empty-loop, or uncalled-closure QuestionBox wrappers, early return, early issues.isEmpty assertion, or log("DELOAD") without title+definition waits all fail closed',
     deloadLogOnlyTest1 !== test1Body
       && missingDeloadDefTest1 !== test1Body
       && emptyLoopWrappedTest1 !== ifFalseWrappedTest1
+      && uncalledClosureWrappedTest1 !== ifFalseWrappedTest1
       && !hasGlossaryAndQuestionBoxInTest1(plainSevenScreenTest1)
       && !hasGlossaryAndQuestionBoxInTest1(conditionalQuestionBoxTest1)
       && !hasGlossaryAndQuestionBoxInTest1(ifFalseWrappedTest1)
       && !hasGlossaryAndQuestionBoxInTest1(emptyLoopWrappedTest1)
+      && !hasGlossaryAndQuestionBoxInTest1(uncalledClosureWrappedTest1)
       && !hasGlossaryAndQuestionBoxInTest1(earlyReturnTest1)
       && !hasGlossaryAndQuestionBoxInTest1(earlyAssertTest1)
       && !hasGlossaryAndQuestionBoxInTest1(deloadLogOnlyTest1)

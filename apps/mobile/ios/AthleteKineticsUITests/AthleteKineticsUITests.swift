@@ -1140,11 +1140,30 @@ final class AthleteKineticsUITests: XCTestCase {
       log("load entered: 20 kg")
     }
     let reps = app.buttons.matching(NSPredicate(format: "label == %@", "2 clean reps left")).firstMatch
-    reveal(reps, "2 clean reps left")
-    bringClear(reps, "2 clean reps left")
-    reps.tap()
-    let selected = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in reps.isSelected }, object: reps)
-    XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 10), .completed, "the effort choice did not become selected")
+    if reps.waitForExistence(timeout: 5) {
+      reveal(reps, "2 clean reps left")
+      bringClear(reps, "2 clean reps left")
+      reps.tap()
+      let selected = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in reps.isSelected }, object: reps)
+      XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 10), .completed, "the effort choice did not become selected")
+    } else {
+      // Time-based movements (e.g. Saturday conditioning Road Run, 1 x 20:00) omit
+      // rep-in-reserve chips and expose direct numeric Effort entry instead.
+      // Fail closed if this set is not time-based so missing RIR chips still fail.
+      let secondsStepper = app.buttons.matching(NSPredicate(format: "label == %@", "Decrease Seconds")).firstMatch
+      XCTAssertTrue(secondsStepper.exists, "2 clean reps left did not appear for a non-time-based set")
+      let directToggle = app.buttons.matching(NSPredicate(format: "label == %@", "Enter Effort directly")).firstMatch
+      reveal(directToggle, "Enter Effort directly")
+      bringClear(directToggle, "Enter Effort directly")
+      directToggle.tap()
+      let effort = app.buttons.matching(NSPredicate(format: "label == %@", "Effort 7.0")).firstMatch
+      reveal(effort, "Effort 7.0")
+      bringClear(effort, "Effort 7.0")
+      effort.tap()
+      let selected = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in effort.isSelected }, object: effort)
+      XCTAssertEqual(XCTWaiter.wait(for: [selected], timeout: 10), .completed, "the direct effort choice did not become selected")
+      log("effort entered via direct Effort: 7.0 (time-based set)")
+    }
     let ready = element(labelBeginsWith: "Log set 1 for ")
     reveal(ready, "Log set 1")
     XCTAssertFalse(ready.label.contains("unavailable"), "the first set cannot be logged: \(ready.label)")

@@ -44,6 +44,10 @@ export function verifyR05Blocks(reports = [undefined]) {
           if (isQ2CarveOut && (training_age === 'advanced' || training_age === 'elite')) {
             // Ratified #229 Q2 carve-out: advanced/elite strength intensification (volume, 5)
             // and peak (7) blocks prescribe 1 heavy top single + back-offs on primary S/B/D.
+            const { sessions: _actualSessions, timeBudget: _actualBudget, warnings: _actualWarnings, ...actualBlockMeta } = actual;
+            const { sessions: _baseSessions, timeBudget: _baseBudget, warnings: _baseWarnings, ...baseBlockMeta } = baseline;
+            assert.deepEqual(actualBlockMeta, baseBlockMeta,
+              `R05 Q2 carve-out preserves block-level metadata: ${schemaType}/${macroBlockIndex}/${training_age}`);
             assert.equal(actual.sessions.length, baseline.sessions.length, 'R05 Q2 carve-out keeps session count');
             actual.sessions.forEach((session, i) => {
               const baseSession = baseline.sessions[i];
@@ -69,6 +73,10 @@ export function verifyR05Blocks(reports = [undefined]) {
                   if (isSbdPrimary) {
                     assert.equal(slot.reps, 1, 'R05 Q2 top single reps === 1');
                     assert.ok(slot.backOff !== undefined, 'R05 Q2 top single carries backOff');
+                    assert.ok(
+                      slot.backOff.sets >= 1 && 1 + slot.backOff.sets <= slot.sets,
+                      `R05 Q2 top single + back-offs fit within working set count: sets=${slot.sets}, backOff.sets=${slot.backOff.sets}`,
+                    );
                     assert.ok(slot.sets <= baseSlot.sets, 'R05 Q2 carve-out does not add working sets beyond baseline');
                     const { sets: _as, reps: _ar, target_rpe: _at, backOff: _ab, autopilotDelta: _ad, ...actualRest } = slot;
                     const { sets: _bs, reps: _br, target_rpe: _bt, backOff: _bb, autopilotDelta: _bd, ...baseRest } = baseSlot;

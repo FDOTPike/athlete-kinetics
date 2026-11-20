@@ -319,8 +319,13 @@ console.log('[Phase2 #229 Q1 / Q5 / question1] Countdown, Peaking Catalog & Tape
     workload: sport.resolveSportWorkload({ scheduled: [], profile: null }),
     focus: null, goals: [], goalMovements: [],
   });
-  const lines = emphasis.sportReportLines(emp);
-  check('emphasis stops saying competitionDate does not change this plan',
+  const unconfirmedLines = emphasis.sportReportLines(emp);
+  check('sportReportLines without explicit countdownApplied does not infer countdown execution from saved date',
+    !unconfirmedLines.omitted.some((line) => line.includes('does not change this plan'))
+      && !unconfirmedLines.applied.some((line) => line.includes('count down to peak and taper')),
+    JSON.stringify(unconfirmedLines));
+  const lines = emphasis.sportReportLines(emp, { countdownApplied: true });
+  check('emphasis reports competition countdown when generation confirms countdownApplied',
     !lines.omitted.some((line) => line.includes('does not change this plan'))
       && lines.applied.some((line) => line.includes('2026-10-01')),
     JSON.stringify(lines));

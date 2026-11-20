@@ -472,8 +472,17 @@ console.log('[8] sport changes selection');
     datedMeet.sessions.length > 0
       && datedMeet.sessions.every((s) => s.session_date < meetCountdownDate)
       && datedMeet.sessions.filter((s) => s.session_date >= '2026-10-26').length > 0
-      && datedMeet.sessions.filter((s) => s.session_date >= '2026-10-26').every((s) => s.phase === 'deload' && s.slots.every((sl) => sl.sets === 2 && sl.backOff === undefined))
+      && datedMeet.sessions.filter((s) => s.session_date >= '2026-10-26').every((s) =>
+        s.phase === 'deload' && s.slots.length > 0 && s.slots.every((sl) => sl.sets === 2 && sl.backOff === undefined))
       && datedMeet.emphasis.applied.some((line) => line === `Your blocks count down to peak and taper for competition on ${meetCountdownDate}. ${sp.COMPETITION_DATE_NOTE}`));
+  const undatedFootball = gen.generateBlock({
+    profile: profile({ objective: 'gpp' }),
+    movements,
+    startDate: '2026-10-05',
+    schemaType: 'LINEAR',
+    emphasis: emphasisOf({ sport: football, workload: workloadOf(football) }),
+    sportId: 'football_association',
+  });
   const datedFootball = gen.generateBlock({
     profile: profile({ objective: 'gpp' }),
     movements,
@@ -483,9 +492,19 @@ console.log('[8] sport changes selection');
     competitionDate: meetCountdownDate,
     sportId: 'football_association',
   });
+  const footballTaperSessions = datedFootball.sessions.filter((s) => s.session_date >= '2026-10-26');
+  const undatedFootballW4 = undatedFootball.sessions.filter((s) => s.session_date >= '2026-10-26');
   check('non-powerlifting BlockInput.competitionDate applies taper, clips meet day, and reports applied countdown without competition lifts',
     datedFootball.sessions.length > 0
+      && datedFootball.sessions.length < undatedFootball.sessions.length
       && datedFootball.sessions.every((s) => s.session_date < meetCountdownDate)
+      && footballTaperSessions.length > 0
+      && undatedFootballW4.length > 0
+      && footballTaperSessions.every((s) =>
+        s.phase === 'deload'
+          && s.slots.length > 0
+          && s.slots.every((sl) => sl.sets === 2 && sl.backOff === undefined))
+      && datedFootball.sessions.every((s) => s.slots.every((sl) => sl.backOff === undefined))
       && datedFootball.emphasis.applied.some((line) => line === `Your blocks count down to peak and taper for competition on ${meetCountdownDate}. ${sp.COMPETITION_DATE_NOTE}`)
       && !datedFootball.emphasis.applied.some((line) => /Competition lifts/.test(line)));
   const noRack = plan(profile({ equipment_inventory: ALL_EQUIPMENT.filter((item) => item !== 'barbell') }), { sport: lifter, workload: workloadOf(lifter) });

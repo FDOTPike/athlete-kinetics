@@ -817,6 +817,9 @@ export interface TrainingProgramInput {
    *  own offers (Android walk 2026-11-03, W1-4). The preview plans with it;
    *  creating the program saves it to the profile. Absent = the profile's. */
   sessionDurationCapMin?: number;
+  /** Draft effort cap (base_rpe_cap) chosen on the Program Setup screen;
+   *  used for preview and persisted only when the athlete confirms save/create. */
+  baseRpeCap?: number;
   /** Continuation preview only (review, PR 194): saved preferences that no
    *  longer pass the day, profile or capability gates are left out, as the
    *  continuation generator leaves them out, instead of refused. New choices
@@ -839,6 +842,8 @@ export interface TrainingProgramPreview {
   slotOverrides: TrainingProgramSlotOverride[];
   routineAssignments: TrainingProgramDayRoutineAssignment[];
   patternMrvSets?: Partial<Record<MovementPattern, number>>;
+  /** True when the resolved preview horizon actually builds a competition countdown. */
+  countdownApplied?: boolean;
   plan: BlockPlan;
 }
 
@@ -3267,6 +3272,9 @@ interface PendingProgramCreation {
   /** A session length chosen on the Build screen, saved to the profile in the
    *  same transaction as the program (null: the profile's length is kept). */
   sessionDurationCapMin: number | null;
+  /** An effort cap chosen on the Build screen, saved to the profile in the
+   *  same transaction as the program (null: the profile's cap is kept). */
+  baseRpeCap: number | null;
 }
 
 let pendingProgramCreation: PendingProgramCreation | null = null;
@@ -3285,6 +3293,8 @@ interface PendingProgramContinuation {
   objective: UserProfile['objective'];
   /** Completed outgoing block id included in continuation longitudinal evidence before archiving. */
   outgoingBlockId: number;
+  /** Program-scoped competition countdown date from training_program_meet_countdown, or null when inactive. */
+  countdownDate: string | null;
 }
 
 let pendingProgramContinuation: PendingProgramContinuation | null = null;
@@ -5863,7 +5873,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const sport = readSportProfile(d);
     const previewCompetitionDate = input.horizon.kind === 'date' && sport !== null
       ? input.horizon.requestedReviewDate
-      : (sport?.competitionDate ?? null);
+      : null;
     const routineByDayKey = readRoutineAssignmentMap(d, input.routineAssignments ?? []);
     let shape = trainingProgramShape(planningProfile, input, horizonAnchorDate, previewCompetitionDate, routineByDayKey);
     const byId = new Map(movements.map((movement) => [movement.movement_id, movement]));
@@ -5949,7 +5959,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       : nextMacroPosition(d).macroBlockIndex;
     const effectiveCompetitionDate = input.horizon.kind === 'date' && sport !== null
       ? (shape.requestedReviewDate ?? sport.competitionDate)
-      : (sport?.competitionDate ?? null);
+      : null;
     const compDays = competitionCountdownDaysAway(horizonAnchorDate, effectiveCompetitionDate);
     const totalCountdownBlocks = effectiveCompetitionDate !== null && compDays !== null
       ? resolveCompetitionCountdownHorizon(horizonAnchorDate, effectiveCompetitionDate).plannedBlockCount
@@ -5962,6 +5972,9 @@ export const useStore = create<KineticsStore>()((set, get) => {
       weekly_frequency: shape.days.length,
       ...(input.sessionDurationCapMin === undefined ? {} : {
         session_duration_cap_min: Math.round(clamp(input.sessionDurationCapMin, 15, 240)),
+      }),
+      ...(input.baseRpeCap === undefined ? {} : {
+        base_rpe_cap: clamp(input.baseRpeCap, 5.0, 10.0),
       }),
     };
     const rawPreviewEmphasis = programEmphasisFor(d, startDate);
@@ -6004,6 +6017,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       ...(longitudinalControl.patternMrvSets !== undefined
         ? { patternMrvSets: longitudinalControl.patternMrvSets }
         : {}),
+      countdownApplied: totalCountdownBlocks !== null,
       plan,
     };
   },
@@ -6025,12 +6039,16 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const chosenCapMin = input.sessionDurationCapMin === undefined ? null
       : Math.round(clamp(input.sessionDurationCapMin, 15, 240));
     const capChanges = chosenCapMin !== null && chosenCapMin !== priorCapMin;
+    const priorRpeCap = get().profile.base_rpe_cap;
+    const chosenRpeCap = input.baseRpeCap === undefined ? null
+      : clamp(input.baseRpeCap, 5.0, 10.0);
+    const rpeCapChanges = chosenRpeCap !== null && chosenRpeCap !== priorRpeCap;
     try {
       const preview = get().previewTrainingProgram(input);
       const routineByDayKey = readRoutineAssignmentMap(getDb(), input.routineAssignments ?? []);
       const creationCompDate = input.horizon.kind === 'date' && get().sport !== null
         ? (preview.requestedReviewDate ?? get().sport?.competitionDate ?? null)
-        : (get().sport?.competitionDate ?? null);
+        : null;
       const shape = trainingProgramShape(get().profile, input, preview.startDate, creationCompDate, routineByDayKey);
       pendingProgramCreation = {
         input, preview, programDays: shape.programDays,
@@ -6038,6 +6056,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
         slotOverrides: shape.slotOverrides,
         routineAssignments: shape.routineAssignments,
         sessionDurationCapMin: capChanges ? chosenCapMin : null,
+        baseRpeCap: rpeCapChanges ? chosenRpeCap : null,
       };
       set({ error: null });
       get().generateNewBlock(input.schemaType);
@@ -6078,12 +6097,15 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const pendingObjective = pendingProgramCreation?.preview.objective
       ?? pendingProgramContinuation?.objective;
     const pendingCapMin = pendingProgramCreation?.sessionDurationCapMin ?? undefined;
-    const profile = pendingFrequency === undefined && pendingObjective === undefined && pendingCapMin === undefined ? storedProfile
+    const pendingBaseRpeCap = pendingProgramCreation?.baseRpeCap ?? undefined;
+    const profile = pendingFrequency === undefined && pendingObjective === undefined
+      && pendingCapMin === undefined && pendingBaseRpeCap === undefined ? storedProfile
       : {
         ...storedProfile,
         weekly_frequency: pendingFrequency ?? storedProfile.weekly_frequency,
         objective: pendingObjective ?? storedProfile.objective,
         session_duration_cap_min: pendingCapMin ?? storedProfile.session_duration_cap_min,
+        base_rpe_cap: pendingBaseRpeCap ?? storedProfile.base_rpe_cap,
       };
     if (status !== 'ready') return;
     // Audit A2: regenerating mid-session archives the plan the live session
@@ -6103,10 +6125,12 @@ export const useStore = create<KineticsStore>()((set, get) => {
       : (pendingProgramContinuation !== null ? (get().program?.startDate ?? localToday()) : localToday());
     const meetSeqIdx = pendingProgramContinuation !== null ? pendingProgramContinuation.sequenceIndex : 1;
     const effectiveMeetDate = pendingProgramCreation !== null
-      && pendingProgramCreation.input.horizon.kind === 'date'
-      && sportForMeet !== null
-      ? (pendingProgramCreation.preview.requestedReviewDate ?? sportForMeet.competitionDate)
-      : (sportForMeet?.competitionDate ?? null);
+      ? (pendingProgramCreation.input.horizon.kind === 'date' && sportForMeet !== null
+          ? (pendingProgramCreation.preview.requestedReviewDate ?? sportForMeet.competitionDate)
+          : null)
+      : pendingProgramContinuation !== null
+        ? pendingProgramContinuation.countdownDate
+        : (sportForMeet?.competitionDate ?? null);
     const meetCompDays = competitionCountdownDaysAway(meetAnchorDate, effectiveMeetDate);
     const meetCountdown = effectiveMeetDate !== null && meetCompDays !== null
       ? (() => {
@@ -6218,6 +6242,12 @@ export const useStore = create<KineticsStore>()((set, get) => {
             [programDraft.sessionDurationCapMin, Date.now()],
           );
         }
+        if (programDraft.baseRpeCap !== null) {
+          d.executeSync(
+            'UPDATE athlete_profile SET base_rpe_cap = ?, updated_at_ms = ? WHERE profile_id = 1',
+            [programDraft.baseRpeCap, Date.now()],
+          );
+        }
         if (programId !== null && programDraft.input.horizon.kind === 'date' && sportForMeet !== null) {
           syncCanonicalCompetitionDate(d, programDraft.preview.requestedReviewDate ?? null, {
             syncSport: true,
@@ -6302,9 +6332,9 @@ export const useStore = create<KineticsStore>()((set, get) => {
       set({ error: e instanceof Error ? e.message : String(e) });
       return;
     }
-    // State follows the commit: the chosen length (if any) is the profile's now.
-    if (pendingFrequency !== undefined || pendingCapMin !== undefined) set({ profile });
-    if (pendingCapMin !== undefined && get().prescription !== null) get().computePrescription([]);
+    // State follows the commit: the chosen length / effort cap (if any) is the profile's now.
+    if (pendingFrequency !== undefined || pendingCapMin !== undefined || pendingBaseRpeCap !== undefined) set({ profile });
+    if ((pendingCapMin !== undefined || pendingBaseRpeCap !== undefined) && get().prescription !== null) get().computePrescription([]);
     if (pendingProgramCreation !== null && pendingProgramCreation.input.horizon.kind === 'date' && sportForMeet !== null) {
       get().refreshSport();
       get().refreshFocusAndGoals();
@@ -6584,10 +6614,20 @@ export const useStore = create<KineticsStore>()((set, get) => {
       const before = planned.filter((p) => p.movement_id === sl.movement_id);
       if (before.length === 0) return { ...sl, autopilotDelta };
       const priorRpes = before.flatMap((p) => (p.target_rpe === null ? [] : [p.target_rpe]));
+      const clampedSets = Math.min(sl.sets, ...before.map((p) => p.sets));
+      const clampedRpe = priorRpes.length === 0 ? sl.target_rpe : Math.min(sl.target_rpe, ...priorRpes);
+      const clampedBackOff = sl.backOff !== undefined && clampedSets > 1
+        ? {
+            ...sl.backOff,
+            sets: Math.min(sl.backOff.sets, clampedSets - 1),
+            targetRpe: Math.min(sl.backOff.targetRpe, clampedRpe),
+          }
+        : undefined;
       return {
         ...sl,
-        sets: Math.min(sl.sets, ...before.map((p) => p.sets)),
-        target_rpe: priorRpes.length === 0 ? sl.target_rpe : Math.min(sl.target_rpe, ...priorRpes),
+        sets: clampedSets,
+        target_rpe: clampedRpe,
+        ...(clampedBackOff === undefined ? { backOff: undefined } : { backOff: clampedBackOff }),
         autopilotDelta,
       };
     });
@@ -6740,6 +6780,9 @@ export const useStore = create<KineticsStore>()((set, get) => {
       const nextCapMin = input.sessionDurationCapMin === undefined
         ? get().profile.session_duration_cap_min
         : Math.round(clamp(input.sessionDurationCapMin, 15, 240));
+      const nextBaseRpeCap = input.baseRpeCap === undefined
+        ? get().profile.base_rpe_cap
+        : clamp(input.baseRpeCap, 5.0, 10.0);
       const d = getDb();
       const now = Date.now();
       const sportOnEdit = readSportProfile(d);
@@ -6790,8 +6833,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
           );
         }
         d.executeSync(
-          'UPDATE athlete_profile SET weekly_frequency = ?, session_duration_cap_min = ?, updated_at_ms = ? WHERE profile_id = 1',
-          [preview.days.length, nextCapMin, now],
+          'UPDATE athlete_profile SET weekly_frequency = ?, session_duration_cap_min = ?, base_rpe_cap = ?, updated_at_ms = ? WHERE profile_id = 1',
+          [preview.days.length, nextCapMin, nextBaseRpeCap, now],
         );
         d.executeSync('COMMIT');
       } catch (e) {
@@ -6799,9 +6842,17 @@ export const useStore = create<KineticsStore>()((set, get) => {
         throw e;
       }
       set({
-        profile: { ...get().profile, weekly_frequency: preview.days.length, session_duration_cap_min: nextCapMin },
+        profile: {
+          ...get().profile,
+          weekly_frequency: preview.days.length,
+          session_duration_cap_min: nextCapMin,
+          base_rpe_cap: nextBaseRpeCap,
+        },
         error: null,
       });
+      if (input.baseRpeCap !== undefined && get().prescription !== null) {
+        get().computePrescription([]);
+      }
       if (input.horizon.kind === 'date' && sportOnEdit !== null) {
         get().refreshSport();
         get().refreshFocusAndGoals();
@@ -6820,8 +6871,14 @@ export const useStore = create<KineticsStore>()((set, get) => {
     if (current === null || block === null || current.status !== 'active'
         || localToday() <= addDaysIso(block.startDate, 27)
         || current.currentSequenceIndex >= current.plannedBlockCount) return null;
+    const countdownRow = rowsOf<{ competition_date: string }>(getDb().executeSync(
+      'SELECT competition_date FROM training_program_meet_countdown WHERE program_id = ?',
+      [current.programId],
+    ))[0];
     const input: TrainingProgramInput = {
-      horizon: { kind: 'weeks', blockCount: current.plannedBlockCount },
+      horizon: countdownRow !== undefined
+        ? { kind: 'date', requestedReviewDate: countdownRow.competition_date }
+        : { kind: 'weeks', blockCount: current.plannedBlockCount },
       schemaType: current.schemaType,
       scheduleMode: current.scheduleMode,
       dayIndices: current.days.map((day) => day.dayIndex),
@@ -6902,6 +6959,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       scheduleMode: current.scheduleMode,
       weeklyFrequency: current.days.length,
       outgoingBlockId: block.blockId,
+      countdownDate: countdownRow?.competition_date ?? null,
     };
     try {
       set({ error: null });
@@ -8996,8 +9054,11 @@ export const useStore = create<KineticsStore>()((set, get) => {
     const preState = get();
     const ctx = buildSubstitutionContext(targetMovementId);
     if (ctx === null) return false;
-    const subCheck = computeSubstitutions(ctx.inputFor(ctx.capabilityAvailable, get().niggles));
+    const subInput = ctx.inputFor(ctx.capabilityAvailable, get().niggles);
+    const subCheck = computeSubstitutions(subInput);
     if (subCheck.haltAdvised) return false;
+    const freshNeutralOptions = computeNeutralSwapOptions(subInput);
+    if (!freshNeutralOptions.some((opt) => opt.movement_id === optionMovementId)) return false;
     const boundSlotId = preState.substitution?.targetId === targetMovementId
       && preState.substitution.targetSessionPlanSlotId !== undefined
       ? preState.substitution.targetSessionPlanSlotId
@@ -11063,6 +11124,16 @@ const plannedSessionStarted = (d: DB, plannedSessionId: number): boolean =>
 const plannedSessionIsFromRoutine = (d: DB, plannedSessionId: number): boolean =>
   rowsOf<{ planned_session_id: number }>(d.executeSync(
     'SELECT planned_session_id FROM planned_session_method WHERE planned_session_id = ?',
+    [plannedSessionId],
+  )).length > 0
+  || rowsOf<{ hit: number }>(d.executeSync(
+    `SELECT 1 AS hit
+       FROM planned_session ps
+       JOIN training_block_program tbp ON tbp.block_id = ps.block_id
+       JOIN training_program_day_routine tpdr
+         ON tpdr.program_id = tbp.program_id AND tpdr.day_index = ps.day_index
+      WHERE ps.planned_session_id = ?
+      LIMIT 1`,
     [plannedSessionId],
   )).length > 0;
 

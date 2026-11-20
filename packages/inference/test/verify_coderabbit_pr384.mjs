@@ -15,13 +15,16 @@ const { generateBlock } = require('./.build/blockGenerator.js');
 const { resolveSportWorkload, resolveMultiSportWorkload } = require('./.build/sportProfile.js');
 const { applyLongitudinalOverlayToBlockPlan } = require('./.build/longitudinalAutopilot.js');
 const { computeNeutralSwapOptions } = require('./.build/substitution.js');
+const { applyPrescriptionToSlot } = require('./.build/derivePrescription.js');
+const { estimateSlotTime } = require('./.build/sessionTimeBudget.js');
+const { buildProgramEmphasis } = require('./.build/programEmphasis.js');
 const { DEFAULT_PROFILE } = require('./.build/types.js');
 const { runMigrations } = require('../../core-db/test/.build/migrationRunner.js');
 
 const __dir = dirname(fileURLToPath(import.meta.url));
 const schemaDir = join(__dir, '..', '..', 'core-db', 'src', 'schema');
 const migrations = readdirSync(schemaDir)
-  .filter((f) => /^\d+_.*\.sql$/.test(f))
+  .filter((f) => /^\d+_.*\.sql$/.test(f) && !f.startsWith('004_'))
   .sort()
   .map((f) => readFileSync(join(schemaDir, f), 'utf8'));
 
@@ -325,32 +328,158 @@ const fullProfile = (overrides = {}) => ({
         competition_date, revision, updated_at_ms)
      VALUES (1, 'olympic_weightlifting', NULL, 'general_support', '2_to_5_years', 0, 20, NULL, '2027-06-01', 1, 1000)`,
   ).run();
-  // Trigger self-heal by dropping a sentinel table, then poison one migration so replay throws mid-flight.
+  const beforeRow = raw.prepare('SELECT * FROM athlete_sport_profile WHERE sport_profile_id = 1').get();
+  // Trigger self-heal by dropping a sentinel table, then poison the final migration with a recognizable fault.
   raw.exec('DROP TABLE planned_slot_athlete_override;');
   const poisonedMigrations = [...migrations];
-  poisonedMigrations[poisonedMigrations.length - 1] = 'INVALID SQL STATEMENT TO FORCE REPLAY FAILURE;';
-  assert.throws(() => runMigrations(db, poisonedMigrations));
+  poisonedMigrations[poisonedMigrations.length - 1] = 'SELECT nonexistent_poisoned_081_col FROM athlete_sport_profile;';
+  let caughtMsg = '';
+  try {
+    runMigrations(db, poisonedMigrations);
+  } catch (e) {
+    caughtMsg = e instanceof Error ? e.message : String(e);
+  }
+  check(
+    'migrationRunner: poisoned replay reached intended final-migration fault',
+    caughtMsg.includes('nonexistent_poisoned_081_col'),
+    caughtMsg,
+  );
 
-  const stashExistsAfterFailure = raw.prepare(
-    "SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'table' AND name = '_ak_replay_stash_078_sport'",
-  ).get().c;
-  check('migrationRunner: _ak_replay_stash_078_sport survives a failed replay', stashExistsAfterFailure === 1);
+  const stashSchema = raw.prepare(
+    "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = '_ak_replay_stash_078_sport'",
+  ).get();
+  check(
+    'migrationRunner: _ak_replay_stash_078_sport survives a failed replay as a STRICT table',
+    typeof stashSchema?.sql === 'string' && /\bSTRICT\b/i.test(stashSchema.sql) && /\bPRIMARY KEY\b/i.test(stashSchema.sql),
+    JSON.stringify(stashSchema),
+  );
 
-  // Retry with the valid migration chain: must restore the stashed olympic_weightlifting row and drop the stash!
+  // Retry with the valid migration chain: must restore the full stashed olympic_weightlifting row and drop the stash!
   runMigrations(db, migrations);
-  const restored = raw.prepare('SELECT sport_id, matches_per_week, competition_date FROM athlete_sport_profile WHERE sport_profile_id = 1').get();
+  const restored = raw.prepare('SELECT * FROM athlete_sport_profile WHERE sport_profile_id = 1').get();
   const stashAfterRecovery = raw.prepare(
     "SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'table' AND name = '_ak_replay_stash_078_sport'",
   ).get().c;
   check(
-    'migrationRunner: subsequent replay restores stashed olympic_weightlifting profile verbatim and cleans up stash',
-    restored?.sport_id === 'olympic_weightlifting'
-      && restored?.matches_per_week === 20
-      && restored?.competition_date === '2027-06-01'
-      && stashAfterRecovery === 0,
-    JSON.stringify({ restored, stashAfterRecovery }),
+    'migrationRunner: subsequent replay restores full stashed olympic_weightlifting profile verbatim and cleans up stash',
+    JSON.stringify(restored) === JSON.stringify(beforeRow) && stashAfterRecovery === 0,
+    JSON.stringify({ beforeRow, restored, stashAfterRecovery }),
   );
+
+  // Also test missing prerequisite table before slot 080 upgrade (v78 DB missing athlete_secondary_sport_profile)
+  const raw78 = new DatabaseSync(':memory:');
+  const db78 = wrap(raw78);
+  const idx080 = readdirSync(schemaDir)
+    .filter((f) => /^\d+_.*\.sql$/.test(f) && !f.startsWith('004_'))
+    .sort()
+    .findIndex((f) => f.startsWith('080_'));
+  assert.ok(idx080 > 0, '080 migration index must exist');
+  for (let i = 0; i < idx080; i += 1) {
+    raw78.exec(migrations[i]);
+    raw78.exec(`PRAGMA user_version = ${i + 1};`);
+  }
+  raw78.exec('DROP TABLE athlete_secondary_sport_profile;');
+  runMigrations(db78, migrations);
+  const hasSecondary = raw78.prepare(
+    "SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'table' AND name = 'athlete_secondary_sport_profile'",
+  ).get().c;
+  const finalVer = raw78.prepare('PRAGMA user_version').get().user_version;
+  check(
+    'migrationRunner: missing athlete_secondary_sport_profile on v78 DB routes through self-heal and completes upgrade',
+    hasSecondary === 1 && finalVer === migrations.length,
+    JSON.stringify({ hasSecondary, finalVer, expected: migrations.length }),
+  );
+  raw78.close();
   raw.close();
+}
+
+// 6. Round-2 remediations: neutral readiness 8-set preservation, back-off time pricing, routine SBD pre-reservation, >224d countdown suppression
+{
+  const slot8 = { sets: 8, targetRpe: 8.5 };
+  const neutral = applyPrescriptionToSlot(slot8, { load_modifier: 1, set_modifier: 0, rpe_cap: 10 });
+  const eased = applyPrescriptionToSlot(slot8, { load_modifier: 1, set_modifier: -1, rpe_cap: 10 });
+  const boosted = applyPrescriptionToSlot(slot8, { load_modifier: 1, set_modifier: 1, rpe_cap: 10 });
+  check(
+    'derivePrescription: explicit 8-set override preserved under neutral/positive readiness and reduced under restrictive readiness',
+    neutral.sets === 8 && eased.sets === 7 && boosted.sets === 8,
+    JSON.stringify({ neutral, eased, boosted }),
+  );
+
+  const fourSingles = estimateSlotTime({ sets: 4, target: { kind: 'reps', reps: 1 }, targetRpe: 8.5 });
+  const singlePlusBackOffs = estimateSlotTime({
+    sets: 4,
+    target: { kind: 'reps', reps: 1 },
+    targetRpe: 8.5,
+    backOff: { sets: 3, reps: 8, targetRpe: 7.5 },
+  });
+  check(
+    'sessionTimeBudget: top single + 3x8 back-offs prices higher work seconds than 4 singles',
+    singlePlusBackOffs.workSeconds > fourSingles.workSeconds,
+    JSON.stringify({ fourSingles: fourSingles.workSeconds, singlePlusBackOffs: singlePlusBackOffs.workSeconds }),
+  );
+
+  // Reserve routine SBD exposures BEFORE generated days: 3 generated lower days + 1 squat routine day on day 6 -> total squat exposures <= 3!
+  const reservedPlan = generateBlock({
+    profile: { ...DEFAULT_PROFILE, training_age: 'advanced', objective: 'strength', weekly_frequency: 4, session_duration_cap_min: 75 },
+    movements: baseMovements,
+    startDate: '2026-11-02',
+    scheduleMode: 'iso_weekday',
+    programDays: [
+      { day_index: 1, focus: 'lower', movement_preferences: [] },
+      { day_index: 2, focus: 'lower', movement_preferences: [] },
+      { day_index: 4, focus: 'lower', movement_preferences: [] },
+      {
+        day_index: 6,
+        focus: 'lower',
+        movement_preferences: [],
+        routine_assignment: {
+          routine_template_id: 9,
+          routine_day_index: 1,
+          routine_name: 'Late Squat Routine',
+          slots: [{ slot_index: 1, movement_id: 1, sets: 3, reps: 5, target_rpe: 8 }],
+        },
+      },
+    ],
+  });
+  const week2SquatSessions = reservedPlan.sessions
+    .filter((s) => s.week_index === 2 && s.slots.some((sl) => sl.movement_id === 1))
+    .length;
+  check(
+    'blockGenerator: reserves assigned routine weekly SBD capacity before filling earlier generated lower days',
+    week2SquatSessions <= 3,
+    `week2SquatSessions=${week2SquatSessions}`,
+  );
+
+  // Competition date 225 days away must NOT emit applied countdown line
+  const empFar = buildProgramEmphasis({
+    sport: {
+      sportId: 'powerlifting',
+      outcomeId: 'bigger_competition_lifts',
+      experienceId: 'over_5_years',
+      otherSportName: null,
+      practiceSessionsPerWeek: 0,
+      matchesPerWeek: 2,
+      typicalSessionMinutes: null,
+      competitionDate: '2027-06-15',
+    },
+    workload: resolveSportWorkload({ scheduled: [], profile: null }),
+    focus: null,
+    goalMovements: [],
+    roles: [],
+  });
+  const farPlan = generateBlock({
+    profile: { ...DEFAULT_PROFILE, training_age: 'advanced', objective: 'strength', weekly_frequency: 3, session_duration_cap_min: 75 },
+    movements: baseMovements,
+    startDate: '2026-11-02', // 225 days before 2027-06-15
+    emphasis: empFar,
+    competitionDate: '2027-06-15',
+    sportId: 'powerlifting',
+  });
+  check(
+    'blockGenerator: competitionDate 225 days away does not falsely emit applied countdown line',
+    !farPlan.emphasis.applied.some((line) => /count down to peak and taper/.test(line)),
+    JSON.stringify(farPlan.emphasis.applied),
+  );
 }
 
 console.log(`\nCodeRabbit PR #384 Inference/Core-DB Summary: ${passed} passed, 0 failed`);

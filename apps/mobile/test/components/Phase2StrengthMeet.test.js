@@ -154,6 +154,9 @@ describe('#229 Q4 Effort cap default 9.0 & 9.5 opt-in in Fine-tune', () => {
     const optIn = screen.getByTestId('program-rpe-cap-9-5');
     expect(optIn).toBeOnTheScreen();
     fireEvent.press(optIn);
+    // Draft until confirmation: Cancel leaves saved profile unchanged; Create program persists 9.5.
+    expect(useStore.getState().profile.base_rpe_cap).toBe(9.0);
+    fireEvent.press(screen.getByText('Create program'));
     expect(useStore.getState().profile.base_rpe_cap).toBe(9.5);
   });
 });
