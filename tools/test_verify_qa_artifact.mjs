@@ -27,6 +27,9 @@ import {
   ANDROID_DEBUG_CN,
   DEBUG_CLASS_DESCRIPTION,
   QaRejectionError,
+  SAFETY_READER_ASSET,
+  SAFETY_READER_SHA256,
+  SAFETY_READER_SIZE,
   classifySigningCertificate,
   discoverAndroidTools,
   extractSigningCertificate,
@@ -243,7 +246,8 @@ const ELF_BAD = (() => {
 
 const fixtureEntries = (overrides = {},
   { includeBundle = true, includeModel = true, includeLibs = true, includeArchivo = true,
-    archivoBytes = ARCHIVO_BYTES, elf = ELF_OK, rawManifest = null } = {}) => {
+    archivoBytes = ARCHIVO_BYTES, includeSafetyReader = false, safetyReaderBytes = null,
+    elf = ELF_OK, rawManifest = null } = {}) => {
   const manifest = { ...VALID_MANIFEST, ...overrides };
   const entries = [{
     name: 'assets/candidate_manifest.json',
@@ -251,6 +255,12 @@ const fixtureEntries = (overrides = {},
   }];
   if (includeBundle) entries.push({ name: 'assets/index.android.bundle', data: BUNDLE_BYTES });
   if (includeModel) entries.push({ name: 'assets/minilm.onnx', data: MODEL_BYTES });
+  if (includeSafetyReader) {
+    entries.push({
+      name: SAFETY_READER_ASSET,
+      data: safetyReaderBytes ?? Buffer.alloc(SAFETY_READER_SIZE, 0x5a),
+    });
+  }
   if (includeArchivo) {
     entries.push({ name: 'assets/fonts/Archivo.ttf', data: archivoBytes });
   }
@@ -378,6 +388,65 @@ async function main() {
       entries.push({ name: 'assets/minilm.onnx', data: corrupt.subarray(0, MODEL_BYTES.length - 1) });
       await expectRejected('wrong-size model rejected even when the manifest declares the short size',
         buildZip(entries));
+    }
+    // Stream 2 PR 2: bidirectional safety_reader.onnx packaging contract
+    {
+      const VALID_READER_MANIFEST = {
+        id: 'm10-r15-reader-seed3',
+        tag: 'ml-reader-m10-r15-s3',
+        assetPath: SAFETY_READER_ASSET,
+        sha256: SAFETY_READER_SHA256,
+        sizeBytes: SAFETY_READER_SIZE,
+      };
+      // 1. Undeclared safety_reader.onnx in APK without manifest.safetyReader -> REJECTED (AGENT_WORKFLOW §1.2)
+      await expectRejected(
+        'undeclared assets/safety_reader.onnx without manifest.safetyReader rejected',
+        fixtureApk({}, { includeSafetyReader: true }),
+      );
+      // 2. Declared manifest.safetyReader when assets/safety_reader.onnx missing -> REJECTED
+      await expectRejected(
+        'declared manifest.safetyReader with missing assets/safety_reader.onnx rejected',
+        fixtureApk({ safetyReader: VALID_READER_MANIFEST }, { includeSafetyReader: false }),
+      );
+      // 3. Explicit requireSafetyReader option rejects APK missing safetyReader
+      await expectRejected(
+        'requireSafetyReader: true rejects APK without safety_reader.onnx',
+        fixtureApk(),
+        { ...FIXTURE_OPTS, requireSafetyReader: true },
+      );
+      // 4. Declared manifest.safetyReader with wrong assetPath / sha256 / sizeBytes -> REJECTED
+      await expectRejected(
+        'manifest.safetyReader with wrong sha256 rejected',
+        fixtureApk(
+          { safetyReader: { ...VALID_READER_MANIFEST, sha256: '0'.repeat(64) } },
+          { includeSafetyReader: true },
+        ),
+      );
+      await expectRejected(
+        'wrong-size safety_reader.onnx rejected even when manifest.safetyReader declares the short size',
+        fixtureApk(
+          { safetyReader: { ...VALID_READER_MANIFEST, sizeBytes: SAFETY_READER_SIZE - 1 } },
+          { includeSafetyReader: true, safetyReaderBytes: Buffer.alloc(SAFETY_READER_SIZE - 1, 0x5a) },
+        ),
+      );
+      // 5. Altered safety_reader.onnx bytes rejected when requireModelHash is enabled
+      await expectRejected(
+        'corrupt safety_reader.onnx bytes rejected under hash verification',
+        fixtureApk({ safetyReader: VALID_READER_MANIFEST }, { includeSafetyReader: true }),
+        { ...FIXTURE_OPTS, requireModelHash: true },
+      );
+      // 6. Positive fixture control (fixtureMode bypasses synthetic byte hash, checks exact size + manifest pins)
+      const readerValidPath = join(scratch, 'valid-with-reader.apk');
+      writeFileSync(
+        readerValidPath,
+        fixtureApk({ safetyReader: VALID_READER_MANIFEST }, { includeSafetyReader: true }),
+      );
+      const readerOk = await runVerify(readerValidPath, { ...FIXTURE_OPTS, requireSafetyReader: true });
+      check(
+        'declared valid manifest.safetyReader + exact-size assets/safety_reader.onnx accepted in fixture mode',
+        readerOk.outcome === 'ok',
+        readerOk.result?.failures?.join('; ') ?? readerOk.outcome,
+      );
     }
     check('ELF parser: 4 KB fixture reports min alignment 0x1000',
       minElfLoadAlignment(ELF_BAD) === 0x1000);

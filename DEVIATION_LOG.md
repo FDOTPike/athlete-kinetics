@@ -766,3 +766,13 @@ they can change their goals at any time in Athlete Profile (PR 99).
    - Never invents user-facing copy or severity coefficients: reader predictions map strictly onto existing non-no-op entries in `phrase-codebase.json`.
 
 4. **Authority:** proposed per Owner's 2026-11-21 staged-PR direction; takes effect for the unwired inference library core upon Owner's merge of PR #386. Runtime ship enablement in `apps/mobile` is NOT authorized by this entry alone and requires separate Owner merge of PR 2 and PR 3 with physical-device evidence.
+
+## 2026-11-21 — Stream 2 safety reader asset delivery & packaging verifiers staged behind PR 2/3 (mobile bundle stays single-model)
+
+1. **Owner hosting decision & PR 1/3 merge record (2026-11-21):**
+   - Owner authorized merging PR #386 (`fc770dae` -> `claude/release-integration` merge `b6ceee70c7b7a9afd793968e8ca15ba17704b572`) while documenting the active global upstream TLS certificate hostname mismatch on `download.onnxruntime.ai` (`curl: (60)` / `SEC_E_WRONG_PRINCIPAL`) during macOS `pod install`.
+   - Owner selected public GitHub Release asset hosting on `FDOTPike/athlete-kinetics` for `reader_quantized.onnx`: release tag `ml-reader-m10-r15-s3` (release ID `453586297`, prerelease, target commit `b6ceee70c7b7a9afd793968e8ca15ba17704b572`), asset ID `775095775`, exact size `22,881,187` B, exact SHA-256 `a0fa76e40e10246a9caf9d1be463b72b34f03174c68b017d6673fe9f165cb5cf`.
+
+2. **Shipped runtime boundary (`AGENT_WORKFLOW.md` §1.2) preserved in PR 2/3:**
+   - PR 2/3 adds `scripts/safety-reader-integrity.mjs`, `scripts/fetch-safety-reader.mjs`, `scripts/stage-native-safety-reader.mjs`, `packages/inference/test/verify_safety_reader_integrity.mjs` (including live `onnxruntime-node` co-scheduled execution in `verify:semantic`), preflight/CI cache+fetch steps, and bidirectional APK asset verification in `tools/verify_qa_artifact.mjs`.
+   - **Mobile app bundles (`app-qa.apk`, release AAB, and `AthleteKinetics.app`) remain single-model (`minilm.onnx` only) in PR 2/3.** `tools/verify_qa_artifact.mjs` explicitly rejects any undeclared `assets/safety_reader.onnx` when `manifest.safetyReader` is absent, while requiring exact ratified metadata, byte size (`22,881,187` B), and SHA-256 (`a0fa76e4...`) once PR 3 declares and wires the safety reader with physical-device RAM evidence and Owner re-ratification of `tools/memory-audit/budget.json`.
