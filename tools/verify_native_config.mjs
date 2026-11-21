@@ -253,6 +253,32 @@ console.log('[N2] pinned embedder model staged into the iOS bundle');
   const stage = read('scripts/stage-native-embedder.mjs');
   check('the staging script verifies against KNOWN_SHA256 and never downloads',
     stage.includes("KNOWN_SHA256['onnx/model_quantized.onnx']") && !/fetch\(|https?:\/\//.test(stage));
+  const hasAlwaysOutOfDateBundleRnPhase = (pbxSrc) => {
+    const rnPhase = pbxSrc.match(/\/\* Bundle React Native code and images \*\/ = \{([\s\S]*?)\n\t\t\};/)?.[1] ?? '';
+    return /\bisa = PBXShellScriptBuildPhase;/.test(rnPhase)
+      && /\balwaysOutOfDate = 1;/.test(rnPhase)
+      && rnPhase.includes('name = "Bundle React Native code and images";')
+      && rnPhase.includes('scripts/react-native-xcode.sh');
+  };
+  check(
+    'Bundle React Native code and images build phase sets alwaysOutOfDate = 1 (silences Xcode 26/27 missing-outputs warning)',
+    hasAlwaysOutOfDateBundleRnPhase(pbx),
+  );
+  const noAlwaysOutOfDateRnPbx = pbx.replace(
+    /(\/\* Bundle React Native code and images \*\/ = \{[\s\S]*?)\n\t\t\talwaysOutOfDate = 1;/,
+    '$1',
+  );
+  const zeroAlwaysOutOfDateRnPbx = pbx.replace(
+    /(\/\* Bundle React Native code and images \*\/ = \{[\s\S]*?\n\t\t\t)alwaysOutOfDate = 1;/,
+    '$1alwaysOutOfDate = 0;',
+  );
+  check(
+    'falsifier: omitting alwaysOutOfDate = 1 or setting alwaysOutOfDate = 0 on Bundle React Native code and images fails closed',
+    noAlwaysOutOfDateRnPbx !== pbx
+      && zeroAlwaysOutOfDateRnPbx !== pbx
+      && !hasAlwaysOutOfDateBundleRnPhase(noAlwaysOutOfDateRnPbx)
+      && !hasAlwaysOutOfDateBundleRnPhase(zeroAlwaysOutOfDateRnPbx),
+  );
 }
 
 const plistXml = read('apps/mobile/ios/AthleteKinetics/Info.plist');
@@ -1049,6 +1075,67 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
   check(
     'falsifier: adding TARGETED_DEVICE_FAMILY = "1,2" to an app config fails the phone-only app check',
     universalAppConfig !== appConfigs[0] && !isPhoneOnlyAppConfig(universalAppConfig),
+  );
+  const inspectXcodeTargetSettings = (pbxSrc) => {
+    const blocks = [...pbxSrc.matchAll(/isa = XCBuildConfiguration;[\s\S]*?\n\t\t\};/g)].map((m) => m[0]);
+    const appCfgBlocks = blocks.filter(
+      (b) => b.includes('PRODUCT_BUNDLE_IDENTIFIER = com.pikemethods.training;') && !b.includes('TEST_TARGET_NAME'),
+    );
+    const uiTestCfgBlocks = blocks.filter(
+      (b) => b.includes('TEST_TARGET_NAME = AthleteKinetics;')
+        && b.includes('PRODUCT_BUNDLE_IDENTIFIER = com.pikemethods.training.uitests;'),
+    );
+    const extractTargets = (list) => list.map((b) => {
+      const m = [...b.matchAll(/\bIPHONEOS_DEPLOYMENT_TARGET\s*=\s*([^;]+);/g)].map((x) => x[1].trim());
+      return m.length === 1 ? m[0] : m.join(',');
+    });
+    const parseLdFlags = (block) => {
+      const body = block.match(/\bOTHER_LDFLAGS\s*=\s*\(([\s\S]*?)\);/)?.[1];
+      if (!body) return [];
+      return [...body.matchAll(/"([^"]+)"|([^\s,()]+)/g)].map((m) => (m[1] ?? m[2]).trim()).filter(Boolean);
+    };
+    const appTargets = extractTargets(appCfgBlocks);
+    const uiTestTargets = extractTargets(uiTestCfgBlocks);
+    const appLdFlags = appCfgBlocks.map(parseLdFlags);
+    const appDeploymentOk = appCfgBlocks.length === 2 && appTargets.every((v) => v === '15.1');
+    const uiTestDeploymentOk = uiTestCfgBlocks.length === 2 && uiTestTargets.every((v) => v === '17.0');
+    const appLdFlagsOk = appCfgBlocks.length === 2 && appLdFlags.every(
+      (flags) => flags.length === 2 && flags[0] === '$(inherited)' && flags[1] === '-ObjC' && !flags.includes('-lc++'),
+    );
+    return {
+      ok: appDeploymentOk && uiTestDeploymentOk && appLdFlagsOk,
+      appDeploymentOk,
+      uiTestDeploymentOk,
+      appLdFlagsOk,
+      detail: `app=[${appTargets.join(',')}] uiTests=[${uiTestTargets.join(',')}] ldflags=${JSON.stringify(appLdFlags)}`,
+    };
+  };
+  const xcodeSettingsState = inspectXcodeTargetSettings(pbx);
+  check(
+    'AthleteKinetics keeps IPHONEOS_DEPLOYMENT_TARGET = 15.1 and OTHER_LDFLAGS without duplicate -lc++, while AthleteKineticsUITests sets IPHONEOS_DEPLOYMENT_TARGET = 17.0',
+    xcodeSettingsState.ok,
+    xcodeSettingsState.detail,
+  );
+  const raisedAppTargetPbx = pbx.replace(
+    /(INFOPLIST_FILE = AthleteKinetics\/Info\.plist;\n\t\t\t\t)IPHONEOS_DEPLOYMENT_TARGET = 15\.1;/,
+    '$1IPHONEOS_DEPLOYMENT_TARGET = 17.0;',
+  );
+  const staleUiTestTargetPbx = pbx.replace(
+    /(GENERATE_INFOPLIST_FILE = YES;\n\t\t\t\t)IPHONEOS_DEPLOYMENT_TARGET = 17\.0;/,
+    '$1IPHONEOS_DEPLOYMENT_TARGET = 15.1;',
+  );
+  const duplicateLibcxxPbx = pbx.replace(
+    /OTHER_LDFLAGS = \(\n\t\t\t\t\t"\$\(inherited\)",\n\t\t\t\t\t"-ObjC",\n\t\t\t\t\);/,
+    'OTHER_LDFLAGS = (\n\t\t\t\t\t"$(inherited)",\n\t\t\t\t\t"-ObjC",\n\t\t\t\t\t"-lc++",\n\t\t\t\t);',
+  );
+  check(
+    'falsifier: raising AthleteKinetics deployment target from 15.1, lowering AthleteKineticsUITests below 17.0, or re-adding duplicate -lc++ to OTHER_LDFLAGS fails closed',
+    raisedAppTargetPbx !== pbx
+      && staleUiTestTargetPbx !== pbx
+      && duplicateLibcxxPbx !== pbx
+      && !inspectXcodeTargetSettings(raisedAppTargetPbx).appDeploymentOk
+      && !inspectXcodeTargetSettings(staleUiTestTargetPbx).uiTestDeploymentOk
+      && !inspectXcodeTargetSettings(duplicateLibcxxPbx).appLdFlagsOk,
   );
   const hasCompatibilityViewportRevealReach = (src) => {
     const code = stripSwiftComments(src);
