@@ -20,7 +20,8 @@ export interface OrtTensorCtor {
   new (type: 'int64', data: BigInt64Array, dims: readonly number[]): unknown;
 }
 export interface OrtOutputTensor {
-  data: Float32Array | number[];
+  type?: string;
+  data: Float32Array | Float64Array | number[] | ArrayLike<unknown>;
   dims: readonly number[];
 }
 export interface OrtSessionLike {
@@ -144,6 +145,14 @@ export function createMiniLmEmbedder(opts: MiniLmEmbedderOptions): Embedder {
 export interface SerializedOrtScheduler {
   /** Execute an ONNX session lifecycle task strictly after all prior queued tasks settle. */
   schedule<T>(task: () => Promise<T>): Promise<T>;
+  /**
+   * Permanently latch this scheduler fail-closed after an unconfirmed native
+   * session disposal failure so no subsequent session can be created while an
+   * earlier native session may still occupy memory.
+   */
+  markDisposalFailed(error: unknown): void;
+  /** True once a native disposal rejection has latched this scheduler fail-closed. */
+  isDisposalLatched(): boolean;
 }
 
 /**
@@ -151,14 +160,34 @@ export interface SerializedOrtScheduler {
  *
  * When the MiniLM embedder (triage + Question Box) and the safety reader share
  * one scheduler, a new native InferenceSession can never be created until the
- * previous session's disposal has settled in `finally`. Errors in one task
- * propagate to its caller without wedging subsequent queued tasks.
+ * previous session's disposal has settled in `finally`. Recoverable inference
+ * errors whose disposal succeeded propagate without wedging later calls; any
+ * disposal rejection permanently latches the scheduler fail-closed so peak
+ * unconfirmed native session occupancy stays bounded at one.
  */
 export function createSerializedOrtScheduler(): SerializedOrtScheduler {
   let queue: Promise<unknown> = Promise.resolve();
+  let disposalFailure: Error | null = null;
   return {
+    markDisposalFailed(error: unknown): void {
+      if (disposalFailure === null) {
+        const detail = error instanceof Error ? error.message : String(error);
+        disposalFailure = new Error(
+          `ONNX scheduler latched fail-closed after unconfirmed session disposal: ${detail}`,
+        );
+      }
+    },
+    isDisposalLatched(): boolean {
+      return disposalFailure !== null;
+    },
     schedule<T>(task: () => Promise<T>): Promise<T> {
-      const next = queue.then(task, task);
+      const runGuarded = (): Promise<T> => {
+        if (disposalFailure !== null) {
+          return Promise.reject(disposalFailure);
+        }
+        return task();
+      };
+      const next = queue.then(runGuarded, runGuarded);
       queue = next.catch(() => {});
       return next;
     },
@@ -277,6 +306,7 @@ export function createLazySingleFlightEmbedder(opts: LazyEmbedderOptions): Embed
         } catch (error) {
           disposedTotal += 1;
           disposalError = { error };
+          scheduler.markDisposalFailed(error);
           emit('disposal', 'settled', requestId, false);
         }
       }

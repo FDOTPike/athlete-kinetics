@@ -2,30 +2,36 @@
  * safetyReader.ts — Runtime-agnostic ONNX safety reader & `r15/denial-floor`
  * combiner for Stream 2 (`M10 R15 s3`).
  *
- * Provenance (independently audited by `sol` v3 `00128588...`, `findings=0`,
- * and sealed-holdout verified on `n = 555` notes, `sealed_exit=0`,
- * `meetsCriteria: true`, `sol_post_holdout_audit.txt` `d2071d04...`):
+ * Provenance (recorded in DEVIATION_LOG.md 2026-11-21; unwired library core in
+ * PR 1/3 — mobile runtime enablement stays gated on PR 2 packaging and PR 3
+ * device/memory verification):
  *   - Model: `m10-r15-reader-seed3` (`reader_quantized.onnx`)
  *   - Exact bytes: 22,881,187
  *   - Exact SHA-256: `a0fa76e40e10246a9caf9d1be463b72b34f03174c68b017d6673fe9f165cb5cf`
  *   - Gate lock SHA-256: `cffb0dfbb8608cf83b8c04bbcde3e24f198dfa5a030ab45fcb74a1b8d4b8da47`
+ *   - Pre-holdout lock audit artifact: `sol_independent_lock_audit_v3.txt` (`00128588...`, `findings=0`)
+ *   - Sealed holdout aggregate (`n = 555`, `meetsCriteria: true`): `sealed_result.json` (`de5fcec4...`)
+ *   - Independent post-holdout aggregate verification: `sol_post_holdout_audit.txt` (`d2071d04...`)
+ *   - Operator aggregate-only exit capture (`sealed_exit=0`): `sealed_run_exit_capture.txt` (`699ee09a...`)
  *   - Policy: `r15/denial-floor`
  *
  * SAFETY INVARIANTS:
  *   - Never invents user-facing copy or severity coefficients: maps predictions
  *     strictly onto existing non-no-op PhraseEntry records from phrase-codebase.json.
  *   - Preserves 100% of shipped halts and keyword halts.
- *   - Fails closed on missing, malformed, wrong-shape, or non-finite output tensors.
- *   - Shares a `SerializedOrtScheduler` with the embedder so two native ONNX
- *     sessions never coexist in mobile RAM.
+ *   - Preserves exact shipped behavior unchanged when the reader is unavailable (`null`).
+ *   - Fails closed on missing, non-floating, wrong-shape, wrong-length, or non-finite
+ *     output tensors, and enforces the locked 64-token input cap.
+ *   - Requires a shared `SerializedOrtScheduler` so two native ONNX sessions never
+ *     coexist in mobile RAM, and latches fail-closed on any disposal rejection.
  */
 import { isNoOpGuardrail, type PhraseEntry } from './codebase';
 import { isHarmlessDenial } from './denialGrammar';
 import {
-  createSerializedOrtScheduler,
   disposeOrtSession,
   type EmbedderLifecyclePhase,
   type EmbedderLifecycleSink,
+  type OrtOutputTensor,
   type OrtSessionLike,
   type OrtTensorCtor,
   type SerializedOrtScheduler,
@@ -84,26 +90,27 @@ export interface LazySafetyReaderOptions {
   createSession: () => Promise<OrtSessionLike>;
   disposeSession?: (session: OrtSessionLike) => Promise<void>;
   Tensor: OrtTensorCtor;
+  /** Token cap per query; must be an integer in [1, SAFETY_READER_MAX_TOKENS (64)]. */
   maxTokens?: number;
-  /** Shared ONNX scheduler so embedder and reader sessions never overlap. */
-  scheduler?: SerializedOrtScheduler;
+  /** Required shared ONNX scheduler so embedder and reader sessions never overlap. */
+  scheduler: SerializedOrtScheduler;
   onEvent?: EmbedderLifecycleSink;
 }
 
-function firstArgmaxIndex(values: Float32Array | readonly number[], length: number): number {
-  let bestIdx = 0;
-  let bestVal = Number(values[0]);
-  for (let i = 1; i < length; i += 1) {
-    const v = Number(values[i]);
-    if (v > bestVal) {
-      bestVal = v;
-      bestIdx = i;
-    }
+function assertLockedMaxTokens(maxTokens: number): number {
+  if (!Number.isInteger(maxTokens) || maxTokens < 1 || maxTokens > SAFETY_READER_MAX_TOKENS) {
+    throw new RangeError(
+      `safety reader maxTokens ${String(maxTokens)} must be an integer in [1, ${SAFETY_READER_MAX_TOKENS}]`,
+    );
   }
-  return bestIdx;
+  return maxTokens;
 }
 
-function assertDims(actual: readonly number[] | undefined, expected: readonly number[], name: string): void {
+function assertDims(
+  actual: readonly number[] | undefined,
+  expected: readonly number[],
+  name: string,
+): void {
   if (
     !Array.isArray(actual)
     || actual.length !== expected.length
@@ -115,9 +122,55 @@ function assertDims(actual: readonly number[] | undefined, expected: readonly nu
   }
 }
 
+function assertFloatTensorValues(
+  tensor: OrtOutputTensor,
+  name: string,
+  expectedLength: number,
+): readonly number[] {
+  if (tensor.type !== undefined && tensor.type !== 'float32' && tensor.type !== 'float64') {
+    throw new Error(
+      `safety reader output '${name}' tensor type '${tensor.type}' must be floating-point (float32/float64)`,
+    );
+  }
+  const raw = tensor.data;
+  const isFloatStorage =
+    raw instanceof Float32Array || raw instanceof Float64Array || Array.isArray(raw);
+  if (!isFloatStorage) {
+    throw new Error(
+      `safety reader output '${name}' data must be Float32Array, Float64Array, or number[]`,
+    );
+  }
+  if (raw.length !== expectedLength) {
+    throw new Error(`safety reader '${name}' length ${raw.length} != ${expectedLength}`);
+  }
+  const values: number[] = new Array<number>(expectedLength);
+  for (let i = 0; i < expectedLength; i += 1) {
+    const v: unknown = raw[i];
+    if (typeof v !== 'number' || !Number.isFinite(v)) {
+      throw new Error(`safety reader '${name}'[${i}] is non-finite or non-numeric: ${String(v)}`);
+    }
+    values[i] = v;
+  }
+  return values;
+}
+
+function firstArgmaxIndex(values: readonly number[], length: number): number {
+  let bestIdx = 0;
+  let bestVal = values[0];
+  for (let i = 1; i < length; i += 1) {
+    const v = values[i];
+    if (v > bestVal) {
+      bestVal = v;
+      bestIdx = i;
+    }
+  }
+  return bestIdx;
+}
+
 /**
  * Runs a single unpadded (`batch_size = 1`, `L <= 64`) ONNX safety-reader pass.
- * Fails closed on any missing output, unexpected shape, or non-finite logit.
+ * Fails closed on any invalid token cap, missing output, non-floating tensor,
+ * unexpected shape/length, or non-finite logit.
  */
 export async function runSafetyReaderInference(
   session: OrtSessionLike,
@@ -126,7 +179,8 @@ export async function runSafetyReaderInference(
   text: string,
   maxTokens = SAFETY_READER_MAX_TOKENS,
 ): Promise<SafetyReaderPrediction> {
-  const ids = tokenizer.encode(text, maxTokens);
+  const cappedTokens = assertLockedMaxTokens(maxTokens);
+  const ids = tokenizer.encode(text, cappedTokens);
   const n = ids.length;
   const dims = [1, n] as const;
   const feeds: Record<string, unknown> = {
@@ -145,26 +199,14 @@ export async function runSafetyReaderInference(
   }
   assertDims(caution.dims, [1], 'caution_logit');
   assertDims(routing.dims, [1, SAFETY_READER_CLASSES.length], 'routing_logits');
-  if (caution.data.length !== 1) {
-    throw new Error(`safety reader 'caution_logit' length ${caution.data.length} != 1`);
-  }
-  if (routing.data.length !== SAFETY_READER_CLASSES.length) {
-    throw new Error(
-      `safety reader 'routing_logits' length ${routing.data.length} != ${SAFETY_READER_CLASSES.length}`,
-    );
-  }
+  const cautionValues = assertFloatTensorValues(caution, 'caution_logit', 1);
+  const routingValues = assertFloatTensorValues(
+    routing,
+    'routing_logits',
+    SAFETY_READER_CLASSES.length,
+  );
 
-  const cautionLogit = Number(caution.data[0]);
-  if (!Number.isFinite(cautionLogit)) {
-    throw new Error(`safety reader 'caution_logit' is non-finite: ${cautionLogit}`);
-  }
-  for (let i = 0; i < SAFETY_READER_CLASSES.length; i += 1) {
-    const v = Number(routing.data[i]);
-    if (!Number.isFinite(v)) {
-      throw new Error(`safety reader 'routing_logits'[${i}] is non-finite: ${v}`);
-    }
-  }
-
+  const cautionLogit = cautionValues[0];
   const active = cautionLogit > 0;
   if (!active) {
     return {
@@ -175,9 +217,9 @@ export async function runSafetyReaderInference(
     };
   }
 
-  const standaloneIdx = firstArgmaxIndex(routing.data, SAFETY_READER_CLASSES.length);
+  const standaloneIdx = firstArgmaxIndex(routingValues, SAFETY_READER_CLASSES.length);
   const actionableCount = SAFETY_READER_CLASSES.length - 1; // exclude trailing 'benign'
-  const actionableIdx = firstArgmaxIndex(routing.data, actionableCount);
+  const actionableIdx = firstArgmaxIndex(routingValues, actionableCount);
   const standaloneRouteId = SAFETY_READER_CLASSES[standaloneIdx];
   const actionableRouteId = SAFETY_READER_CLASSES[actionableIdx] as Exclude<
     SafetyReaderClassId,
@@ -194,15 +236,22 @@ export async function runSafetyReaderInference(
 
 /**
  * Lazy single-flight ONNX safety reader wrapper with zero resident session
- * ownership. Uses a shared `SerializedOrtScheduler` when supplied so native
- * embedder and reader sessions never overlap in memory.
+ * ownership. Requires a shared `SerializedOrtScheduler` so native embedder and
+ * reader sessions never overlap in memory. Any native disposal rejection latches
+ * the shared scheduler fail-closed while preserving the caller's original error.
  */
 export function createLazySingleFlightSafetyReader(opts: LazySafetyReaderOptions): SafetyReader {
-  const { tokenizer: spec, createSession, Tensor } = opts;
+  if (
+    !opts.scheduler
+    || typeof opts.scheduler.schedule !== 'function'
+    || typeof opts.scheduler.markDisposalFailed !== 'function'
+  ) {
+    throw new Error('safety reader requires a shared SerializedOrtScheduler');
+  }
+  const { tokenizer: spec, createSession, Tensor, scheduler } = opts;
   const disposeSession = opts.disposeSession ?? disposeOrtSession;
-  const maxTokens = opts.maxTokens ?? SAFETY_READER_MAX_TOKENS;
+  const maxTokens = assertLockedMaxTokens(opts.maxTokens ?? SAFETY_READER_MAX_TOKENS);
   const tokenizer = new WordPieceTokenizer(spec);
-  const scheduler = opts.scheduler ?? createSerializedOrtScheduler();
   const onEvent = opts.onEvent;
 
   let requestCounter = 0;
@@ -254,6 +303,7 @@ export function createLazySingleFlightSafetyReader(opts: LazySafetyReaderOptions
         } catch (error) {
           disposedTotal += 1;
           disposalError = { error };
+          scheduler.markDisposalFailed(error);
           emit('disposal', 'settled', requestId, false);
         }
       }
@@ -283,7 +333,10 @@ export interface DenialFloorInput {
   readonly keywordEntry: PhraseEntry | null;
   /** Output entry of the shipped semantic+keyword `resolveReport(text, semantic)` path (or null). */
   readonly shippedEntry: PhraseEntry | null;
-  /** Safety reader prediction, or null when the reader is absent/unavailable (degrades to floor). */
+  /**
+   * Safety reader prediction when the reader is available (active or inactive),
+   * or `null` when the reader is unavailable/failed (preserves shipped behavior unchanged).
+   */
   readonly readerPrediction: SafetyReaderPrediction | null;
   /** Curated phrase codebase entries; reader outputs map strictly onto non-no-op entries here. */
   readonly codebaseEntries: readonly PhraseEntry[];
@@ -291,6 +344,8 @@ export interface DenialFloorInput {
 
 /**
  * Pure deterministic combiner implementing the locked `r15/denial-floor` rule:
+ *   0. If `readerPrediction === null` (reader missing/corrupt/failed), preserve
+ *      the exact shipped behavior unchanged (`normalizeActionable(shippedEntry)`).
  *   1. Normalize keyword and shipped entries (no-op guardrails -> null).
  *   2. Compute conservative `floor` = more conservative of keyword vs shipped.
  *   3. Preserve any halt (`level(floor) === 2`) unconditionally.
@@ -300,6 +355,10 @@ export interface DenialFloorInput {
  *      on tied active levels; use reader when `floor` is null.
  */
 export function combineDenialFloor(input: DenialFloorInput): PhraseEntry | null {
+  if (input.readerPrediction === null) {
+    return normalizeActionable(input.shippedEntry);
+  }
+
   const kw = normalizeActionable(input.keywordEntry);
   const shipped = normalizeActionable(input.shippedEntry);
   const floor =
@@ -311,7 +370,7 @@ export function combineDenialFloor(input: DenialFloorInput): PhraseEntry | null 
   if (isHarmlessDenial(input.text)) return null;
 
   let readerEntry: PhraseEntry | null = null;
-  if (input.readerPrediction !== null && input.readerPrediction.active && input.readerPrediction.actionableRouteId !== null) {
+  if (input.readerPrediction.active && input.readerPrediction.actionableRouteId !== null) {
     const matched = input.codebaseEntries.find(
       (e) => e.id === input.readerPrediction?.actionableRouteId,
     );

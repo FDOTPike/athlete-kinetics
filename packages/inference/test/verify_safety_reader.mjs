@@ -5,15 +5,17 @@
  *
  * Covers:
  *   1. Exact pinned provenance constants (class order, SHA-256, bytes, lock, token limit).
- *   2. Whole-sentence denial grammar (`isHarmlessDenial`) positive & adversarial cases.
- *   3. `combineDenialFloor` truth table across all 8 decision branches, no-op
- *      normalization, and graceful degradation when reader output is null.
- *   4. `runSafetyReaderInference` fail-closed guards on poisoned tensors (bad dims,
- *      NaN/Infinity, missing outputs, zero caution boundary, tie-breaking, benign exclusion).
- *   5. Shared `createSerializedOrtScheduler` cross-model concurrency invariant
+ *   2. Whole-sentence denial grammar (`isHarmlessDenial`) positive, adversarial,
+ *      and isolated length-cap (<= 200 vs > 200) + clause-cap (<= 4 vs > 4) boundary cases.
+ *   3. `combineDenialFloor` truth table across all decision branches, no-op
+ *      normalization, and unavailable-reader (`null`) fallback preserving shipped behavior.
+ *   4. `runSafetyReaderInference` fail-closed guards on locked token cap (<= 64),
+ *      floating-point tensor contract, dims/length/finiteness with exact error-pattern
+ *      assertions, zero caution boundary, tie-breaking, and benign exclusion.
+ *   5. Required shared `SerializedOrtScheduler` cross-model concurrency invariant
  *      (embedder + safety reader bombarded concurrently -> maxConcurrent === 1,
- *      disposal settles strictly before next create, error isolation, plus a
- *      self-falsifier proving unshared schedulers DO overlap to concurrency === 2).
+ *      self-falsifier proving unshared schedulers overlap to 2, recoverable inference
+ *      failure vs permanent fail-closed latch on native disposal rejection).
  */
 import { createRequire } from 'node:module';
 import { readFileSync } from 'node:fs';
@@ -81,8 +83,26 @@ check(
 );
 check('SAFETY_READER_MAX_TOKENS is 64', readerMod.SAFETY_READER_MAX_TOKENS === 64);
 
-console.log('\n=== [2] Whole-Sentence Denial Grammar (Positive & Adversarial) ===');
-for (const [text, expected] of [
+console.log('\n=== [2] Whole-Sentence Denial Grammar (Positive, Adversarial & Isolated Caps) ===');
+// Construct allowed-character, grammar-valid single-clause inputs straddling DENIAL_GRAMMAR_MAX_LENGTH (200)
+const underLenCap = `no pain${' or pain'.repeat(24)}`; // 7 + 192 = 199 chars (valid grammar, allowed chars only)
+const overLenCap = `no pain${' or pain'.repeat(25)}`;  // 7 + 200 = 207 chars (valid grammar, allowed chars only)
+check(
+  `length-cap precondition: under=${underLenCap.length} <= 200 and over=${overLenCap.length} > 200`,
+  underLenCap.length <= denialMod.DENIAL_GRAMMAR_MAX_LENGTH
+    && overLenCap.length > denialMod.DENIAL_GRAMMAR_MAX_LENGTH,
+);
+
+// Construct allowed-character, grammar-valid inputs straddling DENIAL_GRAMMAR_MAX_CLAUSES (4)
+const atClauseCap = 'no knee pain. not dizzy. pain free. soreness is gone'; // 4 valid clauses (52 chars)
+const overClauseCap = 'no knee pain. not dizzy. pain free. soreness is gone. not tired'; // 5 valid clauses (63 chars)
+check(
+  `clause-cap precondition: both well under 200 chars (${atClauseCap.length}, ${overClauseCap.length})`,
+  atClauseCap.length <= denialMod.DENIAL_GRAMMAR_MAX_LENGTH
+    && overClauseCap.length <= denialMod.DENIAL_GRAMMAR_MAX_LENGTH,
+);
+
+for (const [text, expected, label] of [
   ['no knee pain today', true],
   ['not dizzy', true],
   ['my knee does not hurt anymore', true],
@@ -92,6 +112,12 @@ for (const [text, expected] of [
   ['my left shoulder stiffness is completely gone now', true],
   ['the traffic is a pain in the neck', true],
   ['my knee isn\u2019t sore today ✅', true],
+  // Isolated length-cap boundary controls
+  [underLenCap, true, `length cap control (${underLenCap.length} chars, allowed chars, valid grammar)`],
+  [overLenCap, false, `length cap exceeded (${overLenCap.length} chars, allowed chars, valid grammar)`],
+  // Isolated clause-cap boundary controls
+  [atClauseCap, true, 'clause cap control (4 valid denial clauses)'],
+  [overClauseCap, false, 'clause cap exceeded (5 valid denial clauses)'],
   // Adversarial negative invariants — MUST return false
   ['not feeling right chest tight', false],
   ['the commute with chest pain is a pain', false],
@@ -102,12 +128,15 @@ for (const [text, expected] of [
   ['no pain today but felt dizzy', false],
   ['feeling good', false], // plain remark without denial evidence
   ['my knee pain has settled', false], // "settled" deliberately excluded
-  ['no knee pain today?'.repeat(15), false], // > 200 chars & unsupported '?'
   ['no knee pain today?', false], // '?' outside allowed character set
   ['', false],
 ]) {
   const actual = denialMod.isHarmlessDenial(text);
-  check(`denial(${JSON.stringify(text.slice(0, 48))}) === ${expected}`, actual === expected, `got ${actual}`);
+  check(
+    `denial(${label ?? JSON.stringify(text.slice(0, 48))}) === ${expected}`,
+    actual === expected,
+    `got ${actual}`,
+  );
 }
 
 console.log('\n=== [3] combineDenialFloor Truth Table (r15/denial-floor) ===');
@@ -116,17 +145,23 @@ const mild = entryById.get('pain-mild');
 const fatigue = entryById.get('fatigue-heavy');
 const positive = entryById.get('positive-strong');
 const dizzy = entryById.get('dizzy');
+const INACTIVE_READER = {
+  cautionLogit: -2.0,
+  active: false,
+  standaloneRouteId: null,
+  actionableRouteId: null,
+};
 
-// 3a. Keyword halt always preserved even if text were denied or reader silent
+// 3a. Keyword halt preserved with available inactive reader even if text matches denial grammar
 {
   const out = readerMod.combineDenialFloor({
     text: 'no dizziness today',
     keywordEntry: redFlagMod.RED_FLAG_SYSTEMIC,
     shippedEntry: null,
-    readerPrediction: null,
+    readerPrediction: INACTIVE_READER,
     codebaseEntries: codebase.entries,
   });
-  check('3a. Keyword halt preserved regardless of denial/null reader', out?.id === 'red-flag-systemic');
+  check('3a. Keyword halt preserved over denial when reader available', out?.id === 'red-flag-systemic');
 }
 // 3b. Shipped halt always preserved
 {
@@ -134,12 +169,12 @@ const dizzy = entryById.get('dizzy');
     text: 'no knee pain today',
     keywordEntry: null,
     shippedEntry: sharp,
-    readerPrediction: { cautionLogit: -2, active: false, standaloneRouteId: null, actionableRouteId: null },
+    readerPrediction: INACTIVE_READER,
     codebaseEntries: codebase.entries,
   });
   check('3b. Shipped halt preserved over denial', out?.id === 'pain-sharp');
 }
-// 3c. Harmless denial suppresses non-halt restriction floor & reader escalation
+// 3c. Harmless denial suppresses non-halt restriction floor & reader alert when reader is available
 {
   const out = readerMod.combineDenialFloor({
     text: 'no knee pain today',
@@ -148,7 +183,7 @@ const dizzy = entryById.get('dizzy');
     readerPrediction: { cautionLogit: 3.5, active: true, standaloneRouteId: 'pain-sharp', actionableRouteId: 'pain-sharp' },
     codebaseEntries: codebase.entries,
   });
-  check('3c. Harmless denial suppresses non-halt floor and reader alert', out === null);
+  check('3c. Harmless denial suppresses non-halt floor and reader alert when reader available', out === null);
 }
 // 3d. Reader escalates restriction floor (level 1) to halt (level 2)
 {
@@ -205,19 +240,37 @@ const dizzy = entryById.get('dizzy');
   });
   check('3h. Reader predicting no-op guardrail yields null', out === null);
 }
-// 3i. Graceful degradation when readerPrediction is null (reader missing/failed)
+// 3i. Unavailable reader (null) MUST preserve exact shipped result unchanged — even on denial text!
 {
-  const out = readerMod.combineDenialFloor({
+  const outNonDenial = readerMod.combineDenialFloor({
     text: 'elbow feels sore',
+    keywordEntry: redFlagMod.RED_FLAG_PAIN,
+    shippedEntry: mild,
+    readerPrediction: null,
+    codebaseEntries: codebase.entries,
+  });
+  const outDenial = readerMod.combineDenialFloor({
+    text: 'no knee pain today',
     keywordEntry: null,
     shippedEntry: mild,
     readerPrediction: null,
     codebaseEntries: codebase.entries,
   });
-  check('3i. Null reader prediction degrades cleanly to shipped floor', out?.id === 'pain-mild');
+  const outNoOp = readerMod.combineDenialFloor({
+    text: 'feeling strong today',
+    keywordEntry: null,
+    shippedEntry: positive,
+    readerPrediction: null,
+    codebaseEntries: codebase.entries,
+  });
+  check(
+    '3i. Unavailable reader (null) preserves exact shipped result unchanged (including on denial text)',
+    outNonDenial?.id === 'pain-mild' && outDenial?.id === 'pain-mild' && outNoOp === null,
+    `nonDenial=${outNonDenial?.id}, denial=${outDenial?.id}, noOp=${outNoOp}`,
+  );
 }
 
-console.log('\n=== [4] runSafetyReaderInference Contract & Poisoned-Tensor Guards ===');
+console.log('\n=== [4] runSafetyReaderInference Contract, Token Cap & Poisoned-Tensor Guards ===');
 const tokenizer = new WordPieceTokenizer(tokenizerSpec);
 
 function makeReaderSession(outputFactory, opts = {}) {
@@ -251,8 +304,8 @@ function makeReaderSession(outputFactory, opts = {}) {
   routing[6] = 3.0;
   const session = makeReaderSession(
     () => ({
-      caution_logit: { data: Float32Array.from([0.42]), dims: [1] },
-      routing_logits: { data: routing, dims: [1, 13] },
+      caution_logit: { type: 'float32', data: Float32Array.from([0.42]), dims: [1] },
+      routing_logits: { type: 'float32', data: routing, dims: [1, 13] },
     }),
     { onFeeds: (f) => { seenFeeds = f; } },
   );
@@ -278,8 +331,8 @@ function makeReaderSession(outputFactory, opts = {}) {
   const routing = new Float32Array(13).fill(-1);
   routing[8] = 5.0; // pain-sharp
   const session = makeReaderSession(() => ({
-    caution_logit: { data: Float32Array.from([0.0]), dims: [1] },
-    routing_logits: { data: routing, dims: [1, 13] },
+    caution_logit: { type: 'float32', data: Float32Array.from([0.0]), dims: [1] },
+    routing_logits: { type: 'float32', data: routing, dims: [1, 13] },
   }));
   const res = await readerMod.runSafetyReaderInference(session, FakeTensor, tokenizer, 'sharp pain');
   check(
@@ -288,32 +341,107 @@ function makeReaderSession(outputFactory, opts = {}) {
   );
 }
 
-// 4d. Poisoned tensors MUST throw (fail closed)
+// 4d. Locked 64-token cap enforced at BOTH runSafetyReaderInference and createLazySingleFlightSafetyReader
+for (const badMax of [0, -1, 65, 70, 32.5, Number.NaN]) {
+  let runErr = null;
+  try {
+    await readerMod.runSafetyReaderInference(
+      makeReaderSession(() => ({})),
+      FakeTensor,
+      tokenizer,
+      'word '.repeat(80),
+      badMax,
+    );
+  } catch (e) {
+    runErr = e;
+  }
+  let wrapErr = null;
+  try {
+    readerMod.createLazySingleFlightSafetyReader({
+      tokenizer: tokenizerSpec,
+      Tensor: FakeTensor,
+      scheduler: readerMod.createSerializedOrtScheduler(),
+      maxTokens: badMax,
+      createSession: async () => makeReaderSession(() => ({})),
+    });
+  } catch (e) {
+    wrapErr = e;
+  }
+  check(
+    `4d. Invalid maxTokens=${String(badMax)} rejected at both entry points`,
+    runErr instanceof RangeError && /maxTokens.*\[1, 64\]/.test(runErr.message)
+      && wrapErr instanceof RangeError && /maxTokens.*\[1, 64\]/.test(wrapErr.message),
+  );
+}
+
+// 4e. Poisoned tensors MUST fail for the exact stated guard reason
 const poisonedCases = [
-  ['missing caution_logit', () => ({ routing_logits: { data: new Float32Array(13), dims: [1, 13] } })],
-  ['missing routing_logits', () => ({ caution_logit: { data: Float32Array.from([1]), dims: [1] } })],
-  ['bad caution dims [1,2]', () => ({ caution_logit: { data: Float32Array.from([1, 2]), dims: [1, 2] }, routing_logits: { data: new Float32Array(13), dims: [1, 13] } })],
-  ['bad routing dims [1,12]', () => ({ caution_logit: { data: Float32Array.from([1]), dims: [1] }, routing_logits: { data: new Float32Array(12), dims: [1, 12] } })],
-  ['NaN caution_logit', () => ({ caution_logit: { data: Float32Array.from([Number.NaN]), dims: [1] }, routing_logits: { data: new Float32Array(13), dims: [1, 13] } })],
-  ['Infinity routing_logits', () => {
+  ['missing caution_logit', () => ({ routing_logits: { data: new Float32Array(13), dims: [1, 13] } }), /'caution_logit' missing from results/],
+  ['missing routing_logits', () => ({ caution_logit: { data: Float32Array.from([1]), dims: [1] } }), /'routing_logits' missing from results/],
+  ['bad caution dims [1,2]', () => ({ caution_logit: { data: Float32Array.from([1, 2]), dims: [1, 2] }, routing_logits: { data: new Float32Array(13), dims: [1, 13] } }), /'caution_logit' dims \[1,2\] != expected \[1\]/],
+  ['bad routing dims [1,12]', () => ({ caution_logit: { data: Float32Array.from([1]), dims: [1] }, routing_logits: { data: new Float32Array(12), dims: [1, 12] } }), /'routing_logits' dims \[1,12\] != expected \[1,13\]/],
+  ['correct caution dims [1] but wrong data length 2', () => ({ caution_logit: { data: Float32Array.from([1, 2]), dims: [1] }, routing_logits: { data: new Float32Array(13), dims: [1, 13] } }), /'caution_logit' length 2 != 1/],
+  ['correct routing dims [1,13] but wrong data length 12', () => ({ caution_logit: { data: Float32Array.from([1]), dims: [1] }, routing_logits: { data: new Float32Array(12), dims: [1, 13] } }), /'routing_logits' length 12 != 13/],
+  ['integer TypedArray caution_logit (Int32Array)', () => ({ caution_logit: { data: Int32Array.from([1]), dims: [1] }, routing_logits: { data: new Float32Array(13), dims: [1, 13] } }), /'caution_logit' data must be Float32Array, Float64Array, or number\[\]/],
+  ['BigInt64Array routing_logits', () => ({ caution_logit: { data: Float32Array.from([1]), dims: [1] }, routing_logits: { data: new BigInt64Array(13), dims: [1, 13] } }), /'routing_logits' data must be Float32Array, Float64Array, or number\[\]/],
+  ['non-float declared tensor type int32', () => ({ caution_logit: { type: 'int32', data: Float32Array.from([1]), dims: [1] }, routing_logits: { data: new Float32Array(13), dims: [1, 13] } }), /'caution_logit' tensor type 'int32' must be floating-point/],
+  ['non-numeric string element in caution array', () => ({ caution_logit: { data: ['1'], dims: [1] }, routing_logits: { data: new Float32Array(13), dims: [1, 13] } }), /'caution_logit'\[0\] is non-finite or non-numeric/],
+  ['NaN caution_logit', () => ({ caution_logit: { data: Float32Array.from([Number.NaN]), dims: [1] }, routing_logits: { data: new Float32Array(13), dims: [1, 13] } }), /'caution_logit'\[0\] is non-finite or non-numeric/],
+  ['-Infinity caution_logit', () => ({ caution_logit: { data: Float32Array.from([Number.NEGATIVE_INFINITY]), dims: [1] }, routing_logits: { data: new Float32Array(13), dims: [1, 13] } }), /'caution_logit'\[0\] is non-finite or non-numeric/],
+  ['NaN routing_logits[4]', () => {
+    const r = new Float32Array(13);
+    r[4] = Number.NaN;
+    return { caution_logit: { data: Float32Array.from([1]), dims: [1] }, routing_logits: { data: r, dims: [1, 13] } };
+  }, /'routing_logits'\[4\] is non-finite or non-numeric/],
+  ['-Infinity routing_logits[4]', () => {
+    const r = new Float32Array(13);
+    r[4] = Number.NEGATIVE_INFINITY;
+    return { caution_logit: { data: Float32Array.from([1]), dims: [1] }, routing_logits: { data: r, dims: [1, 13] } };
+  }, /'routing_logits'\[4\] is non-finite or non-numeric/],
+  ['+Infinity routing_logits[4]', () => {
     const r = new Float32Array(13);
     r[4] = Number.POSITIVE_INFINITY;
     return { caution_logit: { data: Float32Array.from([1]), dims: [1] }, routing_logits: { data: r, dims: [1, 13] } };
-  }],
+  }, /'routing_logits'\[4\] is non-finite or non-numeric/],
 ];
-for (const [name, factory] of poisonedCases) {
-  let threw = false;
+for (const [name, factory, pattern] of poisonedCases) {
+  let thrown = null;
   try {
     await readerMod.runSafetyReaderInference(makeReaderSession(factory), FakeTensor, tokenizer, 'test');
-  } catch {
-    threw = true;
+  } catch (e) {
+    thrown = e;
   }
-  check(`4d. Poisoned tensor rejected (${name})`, threw);
+  check(
+    `4e. Poisoned tensor rejected (${name})`,
+    thrown instanceof Error && pattern.test(thrown.message),
+    thrown ? thrown.message : 'no throw',
+  );
 }
 
-console.log('\n=== [5] Shared SerializedOrtScheduler Cross-Model Mutual Exclusion ===');
+console.log('\n=== [5] Required Shared SerializedOrtScheduler & Disposal-Failure Latch ===');
+// 5a-pre: Omitting scheduler in createLazySingleFlightSafetyReader fails closed
+{
+  let err = null;
+  try {
+    readerMod.createLazySingleFlightSafetyReader({
+      tokenizer: tokenizerSpec,
+      Tensor: FakeTensor,
+      createSession: async () => makeReaderSession(() => ({})),
+    });
+  } catch (e) {
+    err = e;
+  }
+  check(
+    '5a-pre. Omitting scheduler in createLazySingleFlightSafetyReader throws fail-closed',
+    err instanceof Error && /requires a shared SerializedOrtScheduler/.test(err.message),
+    err ? err.message : 'no throw',
+  );
+}
+
 async function exerciseCrossModelConcurrency(useSharedScheduler) {
-  const scheduler = useSharedScheduler ? readerMod.createSerializedOrtScheduler() : undefined;
+  const shared = readerMod.createSerializedOrtScheduler();
+  const embedderScheduler = useSharedScheduler ? shared : readerMod.createSerializedOrtScheduler();
+  const readerScheduler = useSharedScheduler ? shared : readerMod.createSerializedOrtScheduler();
   let activeSessions = 0;
   let maxConcurrent = 0;
   const order = [];
@@ -321,7 +449,7 @@ async function exerciseCrossModelConcurrency(useSharedScheduler) {
   const embedder = onnxMod.createLazySingleFlightEmbedder({
     tokenizer: tokenizerSpec,
     Tensor: FakeTensor,
-    scheduler,
+    scheduler: embedderScheduler,
     createSession: async () => {
       activeSessions += 1;
       maxConcurrent = Math.max(maxConcurrent, activeSessions);
@@ -349,7 +477,7 @@ async function exerciseCrossModelConcurrency(useSharedScheduler) {
   const reader = readerMod.createLazySingleFlightSafetyReader({
     tokenizer: tokenizerSpec,
     Tensor: FakeTensor,
-    scheduler,
+    scheduler: readerScheduler,
     createSession: async () => {
       activeSessions += 1;
       maxConcurrent = Math.max(maxConcurrent, activeSessions);
@@ -393,23 +521,25 @@ async function exerciseCrossModelConcurrency(useSharedScheduler) {
     `maxConcurrent=${shared.maxConcurrent}, remaining=${shared.activeSessions}, events=${shared.order.length}`,
   );
 
-  // Self-falsifier: WITHOUT a shared scheduler, concurrent embedder + reader DO overlap to 2!
+  // Self-falsifier: separate schedulers DO overlap to concurrency === 2
   const unshared = await exerciseCrossModelConcurrency(false);
   check(
-    '5b. Self-falsifier: unshared schedulers overlap to maxConcurrent === 2',
+    '5b. Self-falsifier: separate schedulers overlap to maxConcurrent === 2',
     unshared.maxConcurrent === 2 && unshared.activeSessions === 0,
     `maxConcurrent=${unshared.maxConcurrent}`,
   );
 }
 
-// 5c. Reader lifecycle: zero sessions on creation, failure in run still disposes once & queue recovers
+// 5c/5d. Recoverable inference failure (disposal succeeds) does NOT latch scheduler
 {
+  const scheduler = readerMod.createSerializedOrtScheduler();
   let created = 0;
   let disposed = 0;
   let attempt = 0;
   const reader = readerMod.createLazySingleFlightSafetyReader({
     tokenizer: tokenizerSpec,
     Tensor: FakeTensor,
+    scheduler,
     createSession: async () => {
       created += 1;
       attempt += 1;
@@ -432,17 +562,124 @@ async function exerciseCrossModelConcurrency(useSharedScheduler) {
     },
   });
   check('5c. Reader wrapper allocates zero sessions on creation', created === 0);
-  let firstThrew = false;
+  let firstErr = null;
   try {
     await reader.classify('first failing call');
-  } catch {
-    firstThrew = true;
+  } catch (e) {
+    firstErr = e;
   }
   const second = await reader.classify('second succeeding call');
   check(
-    '5d. Run failure disposes session once and does not wedge subsequent calls',
-    firstThrew && second.actionableRouteId === 'pain-sharp' && created === 2 && disposed === 2,
-    `created=${created}, disposed=${disposed}`,
+    '5d. Recoverable inference failure disposes once, stays unlatched, and lets subsequent calls succeed',
+    firstErr instanceof Error
+      && /Simulated reader inference failure/.test(firstErr.message)
+      && !scheduler.isDisposalLatched()
+      && second.actionableRouteId === 'pain-sharp'
+      && created === 2
+      && disposed === 2,
+    `created=${created}, disposed=${disposed}, latched=${scheduler.isDisposalLatched()}`,
+  );
+}
+
+// 5e. Disposal rejection on embedder permanently latches shared scheduler -> reader NEVER allocates a 2nd session
+{
+  const scheduler = readerMod.createSerializedOrtScheduler();
+  let outstandingUnconfirmed = 0;
+  let peakOutstanding = 0;
+  let readerCreates = 0;
+
+  const embedder = onnxMod.createLazySingleFlightEmbedder({
+    tokenizer: tokenizerSpec,
+    Tensor: FakeTensor,
+    scheduler,
+    createSession: async () => {
+      outstandingUnconfirmed += 1;
+      peakOutstanding = Math.max(peakOutstanding, outstandingUnconfirmed);
+      return {
+        inputNames: ['input_ids', 'attention_mask'],
+        outputNames: ['last_hidden_state'],
+        handler: {
+          async dispose() {
+            throw new Error('Native embedder disposal failed');
+          },
+        },
+        async run(feeds) {
+          const n = feeds.input_ids.dims[1];
+          return { last_hidden_state: { data: new Float32Array(n * 384).fill(0.1), dims: [1, n, 384] } };
+        },
+      };
+    },
+  });
+
+  const reader = readerMod.createLazySingleFlightSafetyReader({
+    tokenizer: tokenizerSpec,
+    Tensor: FakeTensor,
+    scheduler,
+    createSession: async () => {
+      readerCreates += 1;
+      outstandingUnconfirmed += 1;
+      peakOutstanding = Math.max(peakOutstanding, outstandingUnconfirmed);
+      return makeReaderSession(() => ({
+        caution_logit: { data: Float32Array.from([1.0]), dims: [1] },
+        routing_logits: { data: new Float32Array(13), dims: [1, 13] },
+      }));
+    },
+  });
+
+  const [embedOutcome, readerOutcome] = await Promise.allSettled([
+    embedder.embed('first call whose disposal rejects'),
+    reader.classify('queued second call must be blocked by disposal latch'),
+  ]);
+  check(
+    '5e. Embedder disposal failure propagates original error, latches shared scheduler, and blocks 2nd session creation',
+    embedOutcome.status === 'rejected'
+      && embedOutcome.reason instanceof Error
+      && /Native embedder disposal failed/.test(embedOutcome.reason.message)
+      && readerOutcome.status === 'rejected'
+      && readerOutcome.reason instanceof Error
+      && /latched fail-closed/.test(readerOutcome.reason.message)
+      && scheduler.isDisposalLatched()
+      && readerCreates === 0
+      && peakOutstanding === 1,
+    `readerCreates=${readerCreates}, peakOutstanding=${peakOutstanding}, latched=${scheduler.isDisposalLatched()}`,
+  );
+}
+
+// 5f. Dual failure (inference throws AND disposal throws): original inference error preserved AND scheduler latched
+{
+  const scheduler = readerMod.createSerializedOrtScheduler();
+  let secondCreates = 0;
+  const reader = readerMod.createLazySingleFlightSafetyReader({
+    tokenizer: tokenizerSpec,
+    Tensor: FakeTensor,
+    scheduler,
+    createSession: async () => {
+      if (scheduler.isDisposalLatched()) secondCreates += 1;
+      return makeReaderSession(() => ({}), { failRun: true, failDispose: true });
+    },
+  });
+
+  let firstErr = null;
+  try {
+    await reader.classify('both run and dispose fail');
+  } catch (e) {
+    firstErr = e;
+  }
+  let secondErr = null;
+  try {
+    await reader.classify('blocked after dual failure');
+  } catch (e) {
+    secondErr = e;
+  }
+  check(
+    '5f. Dual run+disposal failure preserves original inference error AND latches scheduler fail-closed',
+    firstErr instanceof Error
+      && /Simulated reader inference failure/.test(firstErr.message)
+      && secondErr instanceof Error
+      && /latched fail-closed/.test(secondErr.message)
+      && scheduler.isDisposalLatched()
+      && secondCreates === 0,
+    `first=${firstErr?.message}, second=${secondErr?.message}`,
   );
 }
 
