@@ -310,11 +310,23 @@ console.log('\n=== [3b] fetch-safety-reader.mjs Stream Pipeline, Asset-ID Bindin
   let server = null;
   try {
     let mode = 'oversize';
-    server = createServer((_req, res) => {
+    let redirectTargetHits = 0;
+    server = createServer((req, res) => {
       res.on('error', () => {});
+      if (req.url === '/redirect-target') {
+        redirectTargetHits += 1;
+        res.writeHead(200, { 'Content-Type': 'application/octet-stream', Connection: 'close' });
+        res.end(readFileSync(outFile));
+        return;
+      }
       if (mode === 'http500') {
         res.writeHead(500, { Connection: 'close' });
         res.end('upstream error');
+        return;
+      }
+      if (mode === 'redirect') {
+        res.writeHead(302, { Location: `http://127.0.0.1:${server.address().port}/redirect-target`, Connection: 'close' });
+        res.end();
         return;
       }
       // Stream 4 KiB above the pinned byte limit then end — pipeline must abort before writing unbounded bytes
@@ -365,15 +377,18 @@ console.log('\n=== [3b] fetch-safety-reader.mjs Stream Pipeline, Asset-ID Bindin
       oversizeStderr = String(e.stderr ?? '') + String(e.stdout ?? '');
     }
     const oversizeStages = listFiles(sandbox).filter((p) => /\.stage-/.test(p));
-    check('oversized local candidate pre-stat rejected AND oversized download stream aborts cleanly with zero stage remnants',
+    check('oversized local candidate pre-stat rejected, QA fixture attribution logged, AND oversized stream aborts cleanly with zero stage remnants',
       oversizeExit === 1
         && /existing output artifact rejected.*SIZE MISMATCH/.test(oversizeStderr)
+        && /downloading \(QA loopback fixture override\):/.test(oversizeStderr)
+        && !/asset 775095775/.test(oversizeStderr)
         && /exceeded pinned 22881187 B/.test(oversizeStderr)
         && oversizeStages.length === 0,
       `exit=${oversizeExit}, remnants=${oversizeStages.length}`);
 
     mode = 'http500';
     let http500Exit = 0;
+    let http500Output = '';
     try {
       await execFileAsync(process.execPath, [FETCH_SCRIPT], {
         env: {
@@ -386,11 +401,61 @@ console.log('\n=== [3b] fetch-safety-reader.mjs Stream Pipeline, Asset-ID Bindin
       });
     } catch (e) {
       http500Exit = e.code;
+      http500Output = String(e.stderr ?? '') + String(e.stdout ?? '');
     }
     const http500Stages = listFiles(sandbox).filter((p) => /\.stage-/.test(p));
-    check('HTTP 500 download failure exits 1 and leaves zero stage remnants',
-      http500Exit === 1 && http500Stages.length === 0,
+    check('HTTP 500 download failure fails specifically at HTTP-status check and leaves zero stage remnants',
+      http500Exit === 1
+        && /HTTP 500 fetching/.test(http500Output)
+        && http500Stages.length === 0,
       `exit=${http500Exit}, remnants=${http500Stages.length}`);
+
+    // Non-loopback QA override URL rejected before any network request
+    let nonLoopbackExit = 0;
+    let nonLoopbackOutput = '';
+    try {
+      await execFileAsync(process.execPath, [FETCH_SCRIPT], {
+        env: {
+          ...process.env,
+          AK_SAFETY_READER_CACHE: join(sandbox, 'cacheExt'),
+          AK_SAFETY_READER_OUT: join(sandbox, 'outExt'),
+          AK_SAFETY_READER_DOWNLOAD_URL: 'https://example.invalid/reader_quantized.onnx',
+        },
+        maxBuffer: 16 * 1024 * 1024,
+      });
+    } catch (e) {
+      nonLoopbackExit = e.code;
+      nonLoopbackOutput = String(e.stderr ?? '') + String(e.stdout ?? '');
+    }
+    check('non-loopback AK_SAFETY_READER_DOWNLOAD_URL rejected fail-closed',
+      nonLoopbackExit === 1 && /loopback http:\/\/ endpoint/.test(nonLoopbackOutput),
+      `exit=${nonLoopbackExit}`);
+
+    // Redirect from loopback QA override server rejected (redirect: 'error') without hitting target
+    mode = 'redirect';
+    let redirectExit = 0;
+    let redirectOutput = '';
+    try {
+      await execFileAsync(process.execPath, [FETCH_SCRIPT], {
+        env: {
+          ...process.env,
+          AK_SAFETY_READER_CACHE: join(sandbox, 'cacheRedir'),
+          AK_SAFETY_READER_OUT: join(sandbox, 'outRedir'),
+          AK_SAFETY_READER_DOWNLOAD_URL: mockUrl,
+        },
+        maxBuffer: 16 * 1024 * 1024,
+      });
+    } catch (e) {
+      redirectExit = e.code;
+      redirectOutput = String(e.stderr ?? '') + String(e.stdout ?? '');
+    }
+    const redirectStages = listFiles(sandbox).filter((p) => /\.stage-/.test(p));
+    check('redirect on QA loopback override rejected (redirect: error) with zero target hits and zero stage remnants',
+      redirectExit === 1
+        && redirectTargetHits === 0
+        && /redirect/i.test(redirectOutput)
+        && redirectStages.length === 0,
+      `exit=${redirectExit}, targetHits=${redirectTargetHits}, remnants=${redirectStages.length}`);
   } finally {
     if (server) {
       server.closeAllConnections?.();

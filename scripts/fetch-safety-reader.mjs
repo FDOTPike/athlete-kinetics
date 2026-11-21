@@ -47,7 +47,39 @@ const OUT = process.env.AK_SAFETY_READER_OUT
   : DEFAULT_SAFETY_READER_OUT_DIR;
 const CACHE_ROOT = safetyReaderCacheRoot(process.env.AK_SAFETY_READER_CACHE);
 const COMMIT_CACHE = safetyReaderCommitCachePath(CACHE_ROOT, PINNED_RELEASE_COMMIT);
-const DOWNLOAD_URL = process.env.AK_SAFETY_READER_DOWNLOAD_URL ?? PINNED_ASSET_API_URL;
+
+function resolveDownloadEndpoint(rawOverride) {
+  if (rawOverride === undefined || rawOverride === '') {
+    return { url: PINNED_ASSET_API_URL, isQaOverride: false };
+  }
+  let parsed;
+  try {
+    parsed = new URL(rawOverride);
+  } catch {
+    throw new Error(
+      `AK_SAFETY_READER_DOWNLOAD_URL must target a loopback http:// endpoint; got malformed URL ${JSON.stringify(rawOverride)}.`,
+    );
+  }
+  const isLoopbackHost =
+    parsed.hostname === '127.0.0.1'
+    || parsed.hostname === 'localhost'
+    || parsed.hostname === '[::1]';
+  if (
+    parsed.protocol !== 'http:'
+    || !isLoopbackHost
+    || parsed.username !== ''
+    || parsed.password !== ''
+  ) {
+    throw new Error(
+      `AK_SAFETY_READER_DOWNLOAD_URL must target a loopback http:// endpoint without credentials; got ${JSON.stringify(rawOverride)}.`,
+    );
+  }
+  return { url: parsed.toString(), isQaOverride: true };
+}
+
+const { url: DOWNLOAD_URL, isQaOverride: IS_QA_DOWNLOAD_OVERRIDE } = resolveDownloadEndpoint(
+  process.env.AK_SAFETY_READER_DOWNLOAD_URL,
+);
 
 mkdirSync(OUT, { recursive: true });
 mkdirSync(COMMIT_CACHE, { recursive: true });
@@ -131,13 +163,20 @@ async function downloadPinned(rel, dest) {
       Accept: 'application/octet-stream',
       'User-Agent': 'athlete-kinetics-fetch-safety-reader',
     };
-    if (ghToken && DOWNLOAD_URL === PINNED_ASSET_API_URL) {
+    if (!IS_QA_DOWNLOAD_OVERRIDE && ghToken) {
       headers.Authorization = `Bearer ${ghToken}`;
     }
-    console.log(
-      `downloading (asset ${PINNED_ASSET_ID}, ${PINNED_RELEASE_TAG} @ ${PINNED_RELEASE_COMMIT}): ${DOWNLOAD_URL}`,
-    );
-    const response = await fetch(DOWNLOAD_URL, { headers, redirect: 'follow' });
+    if (IS_QA_DOWNLOAD_OVERRIDE) {
+      console.log(`downloading (QA loopback fixture override): ${DOWNLOAD_URL}`);
+    } else {
+      console.log(
+        `downloading (asset ${PINNED_ASSET_ID}, ${PINNED_RELEASE_TAG} @ ${PINNED_RELEASE_COMMIT}): ${DOWNLOAD_URL}`,
+      );
+    }
+    const response = await fetch(DOWNLOAD_URL, {
+      headers,
+      redirect: IS_QA_DOWNLOAD_OVERRIDE ? 'error' : 'follow',
+    });
     if (!response.ok || response.body === null) {
       throw new Error(`HTTP ${response.status} fetching ${DOWNLOAD_URL}`);
     }
