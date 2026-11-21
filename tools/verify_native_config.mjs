@@ -655,6 +655,46 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
       && !checkIosBetaBuildSplit(quotedIfUiTestCi).uiTestBetaEnabled
       && !checkIosBetaBuildSplit(quotedContinueUiTestCi).uiTestBetaEnabled,
   );
+  const checkIosOrtPodCacheFallback = (ciYaml) => {
+    const clean = stripYamlComments(ciYaml);
+    const iosJob = splitJobs(clean).get('ios-simulator') ?? '';
+    const installStep = splitSteps(iosJob).find((s) => s.includes('- name: Install pods')) ?? '';
+    if (!installStep) return false;
+    const podInstallIdx = installStep.indexOf('bundle exec pod install --deployment');
+    if (podInstallIdx === -1) return false;
+    const beforePodInstall = installStep.slice(0, podInstallIdx);
+    const hasInsecureCurl = /(?:^|\s)curl\s+[^\n]*(?:\s-(?:[A-Za-z]*k[A-Za-z]*)\b|\s--insecure\b)/m.test(beforePodInstall);
+    if (hasInsecureCurl) return false;
+    return beforePodInstall.includes('https://download.onnxruntime.ai/pod-archive-onnxruntime-c-1.30.0.zip')
+      && beforePodInstall.includes('https://raw.githubusercontent.com/FDOTPike/athlete-kinetics/9a2533b9654eb5b71fda68a9e2f3f0ed67e0d87f/onnxruntime-c-1.30.0-36ca0.tar.xz')
+      && beforePodInstall.includes('56ebacedaccb3c8809279de032454beb2a80c9faa9fe5d5d8bac56ca0ba333f5')
+      && beforePodInstall.includes('e8ede7ac7f5c1ab9e5bf1e46216454cb16892e69d7c58094bfe8a30e3e1f353d')
+      && beforePodInstall.includes('916aec96269b03515955b8becd987fcc79be5242d91418f61280b3be6c1388c1')
+      && /shasum -a 256/.test(beforePodInstall)
+      && /exit 1/.test(beforePodInstall);
+  };
+  check(
+    'CI Install pods step seeds onnxruntime-c 1.30.0-36ca0 from the commit- and 3-layer-SHA256-pinned archive with strict TLS when download.onnxruntime.ai is unavailable',
+    checkIosOrtPodCacheFallback(ci),
+  );
+  const insecureCurlOrtCi = ci.replace('curl -fsSI', 'curl -fsSI -k');
+  const badTarShaOrtCi = ci.replace(
+    '56ebacedaccb3c8809279de032454beb2a80c9faa9fe5d5d8bac56ca0ba333f5',
+    '0000000000000000000000000000000000000000000000000000000000000000',
+  );
+  const badTreeShaOrtCi = ci.replace(
+    '916aec96269b03515955b8becd987fcc79be5242d91418f61280b3be6c1388c1',
+    '0000000000000000000000000000000000000000000000000000000000000000',
+  );
+  check(
+    'falsifier: curl -k/--insecure or altered archive/tree SHA-256 pins in CI Install pods fail closed',
+    insecureCurlOrtCi !== ci
+      && badTarShaOrtCi !== ci
+      && badTreeShaOrtCi !== ci
+      && !checkIosOrtPodCacheFallback(insecureCurlOrtCi)
+      && !checkIosOrtPodCacheFallback(badTarShaOrtCi)
+      && !checkIosOrtPodCacheFallback(badTreeShaOrtCi),
+  );
   const typesSrc = read('packages/inference/src/types.ts');
   const onboardingSrc = read('apps/mobile/src/screens/OnboardingScreen.tsx');
   const parseBooleanStateInit = (src, varName) => {
