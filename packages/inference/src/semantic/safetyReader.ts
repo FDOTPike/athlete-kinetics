@@ -48,6 +48,8 @@ export const SAFETY_READER_SHA256 =
 export const SAFETY_READER_BYTES = 22_881_187;
 export const SAFETY_READER_LOCK_SHA256 =
   'cffb0dfbb8608cf83b8c04bbcde3e24f198dfa5a030ab45fcb74a1b8d4b8da47';
+/** Minimum encoded sequence length (`[CLS]` + `[SEP]`). */
+export const SAFETY_READER_MIN_TOKENS = 2;
 export const SAFETY_READER_MAX_TOKENS = 64;
 
 /** Exact 13-class output order pinned to `reader_quantized.onnx` (`benign` last). */
@@ -90,7 +92,7 @@ export interface LazySafetyReaderOptions {
   createSession: () => Promise<OrtSessionLike>;
   disposeSession?: (session: OrtSessionLike) => Promise<void>;
   Tensor: OrtTensorCtor;
-  /** Token cap per query; must be an integer in [1, SAFETY_READER_MAX_TOKENS (64)]. */
+  /** Token cap per query; must be an integer in [SAFETY_READER_MIN_TOKENS (2), SAFETY_READER_MAX_TOKENS (64)]. */
   maxTokens?: number;
   /** Required shared ONNX scheduler so embedder and reader sessions never overlap. */
   scheduler: SerializedOrtScheduler;
@@ -98,9 +100,13 @@ export interface LazySafetyReaderOptions {
 }
 
 function assertLockedMaxTokens(maxTokens: number): number {
-  if (!Number.isInteger(maxTokens) || maxTokens < 1 || maxTokens > SAFETY_READER_MAX_TOKENS) {
+  if (
+    !Number.isInteger(maxTokens)
+    || maxTokens < SAFETY_READER_MIN_TOKENS
+    || maxTokens > SAFETY_READER_MAX_TOKENS
+  ) {
     throw new RangeError(
-      `safety reader maxTokens ${String(maxTokens)} must be an integer in [1, ${SAFETY_READER_MAX_TOKENS}]`,
+      `safety reader maxTokens ${String(maxTokens)} must be an integer in [${SAFETY_READER_MIN_TOKENS}, ${SAFETY_READER_MAX_TOKENS}]`,
     );
   }
   return maxTokens;
@@ -111,14 +117,17 @@ function assertDims(
   expected: readonly number[],
   name: string,
 ): void {
-  if (
-    !Array.isArray(actual)
-    || actual.length !== expected.length
-    || actual.some((d, i) => d !== expected[i])
-  ) {
+  if (!Array.isArray(actual) || actual.length !== expected.length) {
     throw new Error(
       `safety reader output '${name}' dims ${JSON.stringify(actual)} != expected ${JSON.stringify(expected)}`,
     );
+  }
+  for (let i = 0; i < expected.length; i += 1) {
+    if (!(i in actual) || typeof actual[i] !== 'number' || actual[i] !== expected[i]) {
+      throw new Error(
+        `safety reader output '${name}' dims ${JSON.stringify(actual)} != expected ${JSON.stringify(expected)}`,
+      );
+    }
   }
 }
 
@@ -182,6 +191,11 @@ export async function runSafetyReaderInference(
   const cappedTokens = assertLockedMaxTokens(maxTokens);
   const ids = tokenizer.encode(text, cappedTokens);
   const n = ids.length;
+  if (n < SAFETY_READER_MIN_TOKENS || n > cappedTokens) {
+    throw new RangeError(
+      `safety reader encoded token length ${n} outside [${SAFETY_READER_MIN_TOKENS}, ${cappedTokens}]`,
+    );
+  }
   const dims = [1, n] as const;
   const feeds: Record<string, unknown> = {
     input_ids: new Tensor('int64', BigInt64Array.from(ids, (x) => BigInt(x)), dims),
@@ -265,7 +279,12 @@ export function createLazySingleFlightSafetyReader(opts: LazySafetyReaderOptions
     ok: boolean,
   ): void => {
     if (!onEvent) return;
-    onEvent({ phase, stage, requestId, ok, createdTotal, disposedTotal, atMs: Date.now() });
+    try {
+      onEvent({ phase, stage, requestId, ok, createdTotal, disposedTotal, atMs: Date.now() });
+    } catch {
+      // Lifecycle telemetry observers must never disrupt inference, cleanup,
+      // or fail-closed scheduler state.
+    }
   };
 
   emit('wrapper', 'settled', 0, true);
@@ -296,16 +315,16 @@ export function createLazySingleFlightSafetyReader(opts: LazySafetyReaderOptions
         const s = session;
         session = null;
         emit('disposal', 'start', requestId, true);
+        let disposedOk = false;
         try {
           await disposeSession(s);
-          disposedTotal += 1;
-          emit('disposal', 'settled', requestId, true);
+          disposedOk = true;
         } catch (error) {
-          disposedTotal += 1;
           disposalError = { error };
           scheduler.markDisposalFailed(error);
-          emit('disposal', 'settled', requestId, false);
         }
+        disposedTotal += 1;
+        emit('disposal', 'settled', requestId, disposedOk);
       }
       emit('request', 'settled', requestId, requestOk && disposalError === null);
       if (disposalError !== null && requestOk) throw disposalError.error;

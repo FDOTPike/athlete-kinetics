@@ -81,6 +81,7 @@ check(
   'SAFETY_READER_LOCK_SHA256 pinned',
   readerMod.SAFETY_READER_LOCK_SHA256 === 'cffb0dfbb8608cf83b8c04bbcde3e24f198dfa5a030ab45fcb74a1b8d4b8da47',
 );
+check('SAFETY_READER_MIN_TOKENS is 2', readerMod.SAFETY_READER_MIN_TOKENS === 2);
 check('SAFETY_READER_MAX_TOKENS is 64', readerMod.SAFETY_READER_MAX_TOKENS === 64);
 
 console.log('\n=== [2] Whole-Sentence Denial Grammar (Positive, Adversarial & Isolated Caps) ===');
@@ -341,8 +342,8 @@ function makeReaderSession(outputFactory, opts = {}) {
   );
 }
 
-// 4d. Locked 64-token cap enforced at BOTH runSafetyReaderInference and createLazySingleFlightSafetyReader
-for (const badMax of [0, -1, 65, 70, 32.5, Number.NaN]) {
+// 4d. Locked [2, 64] token cap enforced at BOTH runSafetyReaderInference and createLazySingleFlightSafetyReader
+for (const badMax of [0, -1, 1, 65, 70, 32.5, Number.NaN]) {
   let runErr = null;
   try {
     await readerMod.runSafetyReaderInference(
@@ -369,8 +370,52 @@ for (const badMax of [0, -1, 65, 70, 32.5, Number.NaN]) {
   }
   check(
     `4d. Invalid maxTokens=${String(badMax)} rejected at both entry points`,
-    runErr instanceof RangeError && /maxTokens.*\[1, 64\]/.test(runErr.message)
-      && wrapErr instanceof RangeError && /maxTokens.*\[1, 64\]/.test(wrapErr.message),
+    runErr instanceof RangeError && /maxTokens.*\[2, 64\]/.test(runErr.message)
+      && wrapErr instanceof RangeError && /maxTokens.*\[2, 64\]/.test(wrapErr.message),
+    `run=${runErr?.message ?? 'no throw'}; wrap=${wrapErr?.message ?? 'no throw'}`,
+  );
+}
+
+// 4d-post. Post-encode token length guard rejects oversized or under-minimum encoded sequences before session.run
+{
+  let runCalls = 0;
+  const countingSession = makeReaderSession(
+    () => ({
+      caution_logit: { data: Float32Array.from([0]), dims: [1] },
+      routing_logits: { data: new Float32Array(13), dims: [1, 13] },
+    }),
+    { onFeeds: () => { runCalls += 1; } },
+  );
+  let overErr = null;
+  try {
+    await readerMod.runSafetyReaderInference(
+      countingSession,
+      FakeTensor,
+      { encode: () => [101, 2000, 2001, 2002, 102] },
+      'knee pain',
+      4,
+    );
+  } catch (e) {
+    overErr = e;
+  }
+  let underErr = null;
+  try {
+    await readerMod.runSafetyReaderInference(
+      countingSession,
+      FakeTensor,
+      { encode: () => [101] },
+      'knee pain',
+      4,
+    );
+  } catch (e) {
+    underErr = e;
+  }
+  check(
+    '4d-post. Post-encode length outside [2, maxTokens] rejected before session.run',
+    overErr instanceof RangeError && /encoded token length 5 outside \[2, 4\]/.test(overErr.message)
+      && underErr instanceof RangeError && /encoded token length 1 outside \[2, 4\]/.test(underErr.message)
+      && runCalls === 0,
+    `over=${overErr?.message ?? 'no throw'}; under=${underErr?.message ?? 'no throw'}; runCalls=${runCalls}`,
   );
 }
 
@@ -380,6 +425,17 @@ const poisonedCases = [
   ['missing routing_logits', () => ({ caution_logit: { data: Float32Array.from([1]), dims: [1] } }), /'routing_logits' missing from results/],
   ['bad caution dims [1,2]', () => ({ caution_logit: { data: Float32Array.from([1, 2]), dims: [1, 2] }, routing_logits: { data: new Float32Array(13), dims: [1, 13] } }), /'caution_logit' dims \[1,2\] != expected \[1\]/],
   ['bad routing dims [1,12]', () => ({ caution_logit: { data: Float32Array.from([1]), dims: [1] }, routing_logits: { data: new Float32Array(12), dims: [1, 12] } }), /'routing_logits' dims \[1,12\] != expected \[1,13\]/],
+  ['sparse caution dims (hole at index 0)', () => {
+    const d = [];
+    d.length = 1;
+    return { caution_logit: { data: Float32Array.from([1]), dims: d }, routing_logits: { data: new Float32Array(13), dims: [1, 13] } };
+  }, /'caution_logit' dims \[null\] != expected \[1\]/],
+  ['sparse routing dims (hole at index 1)', () => {
+    const d = [];
+    d.length = 2;
+    d[0] = 1;
+    return { caution_logit: { data: Float32Array.from([1]), dims: [1] }, routing_logits: { data: new Float32Array(13), dims: d } };
+  }, /'routing_logits' dims \[1,null\] != expected \[1,13\]/],
   ['correct caution dims [1] but wrong data length 2', () => ({ caution_logit: { data: Float32Array.from([1, 2]), dims: [1] }, routing_logits: { data: new Float32Array(13), dims: [1, 13] } }), /'caution_logit' length 2 != 1/],
   ['correct routing dims [1,13] but wrong data length 12', () => ({ caution_logit: { data: Float32Array.from([1]), dims: [1] }, routing_logits: { data: new Float32Array(12), dims: [1, 13] } }), /'routing_logits' length 12 != 13/],
   ['integer TypedArray caution_logit (Int32Array)', () => ({ caution_logit: { data: Int32Array.from([1]), dims: [1] }, routing_logits: { data: new Float32Array(13), dims: [1, 13] } }), /'caution_logit' data must be Float32Array, Float64Array, or number\[\]/],
@@ -680,6 +736,302 @@ async function exerciseCrossModelConcurrency(useSharedScheduler) {
       && scheduler.isDisposalLatched()
       && secondCreates === 0,
     `first=${firstErr?.message}, second=${secondErr?.message}`,
+  );
+}
+
+// 5g. Unformattable disposal rejections (Object.create(null) and Symbol) still latch scheduler and preserve exact rejection
+{
+  const nullProtoErr = Object.create(null);
+  const scheduler = readerMod.createSerializedOrtScheduler();
+  let readerCreates = 0;
+  let outstanding = 0;
+  let peakOutstanding = 0;
+  const embedder = onnxMod.createLazySingleFlightEmbedder({
+    tokenizer: tokenizerSpec,
+    Tensor: FakeTensor,
+    scheduler,
+    createSession: async () => {
+      outstanding += 1;
+      peakOutstanding = Math.max(peakOutstanding, outstanding);
+      return {
+        inputNames: ['input_ids', 'attention_mask'],
+        outputNames: ['last_hidden_state'],
+        handler: {
+          async dispose() {
+            throw nullProtoErr;
+          },
+        },
+        async run(feeds) {
+          const n = feeds.input_ids.dims[1];
+          return { last_hidden_state: { data: new Float32Array(n * 384).fill(0.1), dims: [1, n, 384] } };
+        },
+      };
+    },
+  });
+  const reader = readerMod.createLazySingleFlightSafetyReader({
+    tokenizer: tokenizerSpec,
+    Tensor: FakeTensor,
+    scheduler,
+    createSession: async () => {
+      readerCreates += 1;
+      outstanding += 1;
+      peakOutstanding = Math.max(peakOutstanding, outstanding);
+      return makeReaderSession(() => ({
+        caution_logit: { data: Float32Array.from([1.0]), dims: [1] },
+        routing_logits: { data: new Float32Array(13), dims: [1, 13] },
+      }));
+    },
+  });
+  const [embedRes, readerRes] = await Promise.allSettled([
+    embedder.embed('null-proto disposal failure'),
+    reader.classify('must stay blocked after null-proto disposal failure'),
+  ]);
+  check(
+    '5g. Null-prototype disposal rejection preserves exact rejection value, latches scheduler, and blocks 2nd session',
+    embedRes.status === 'rejected'
+      && embedRes.reason === nullProtoErr
+      && readerRes.status === 'rejected'
+      && readerRes.reason instanceof Error
+      && /latched fail-closed/.test(readerRes.reason.message)
+      && scheduler.isDisposalLatched()
+      && readerCreates === 0
+      && peakOutstanding === 1,
+    `sameObj=${embedRes.status === 'rejected' && embedRes.reason === nullProtoErr}, readerCreates=${readerCreates}, peakOutstanding=${peakOutstanding}, latched=${scheduler.isDisposalLatched()}`,
+  );
+
+  const symErr = Symbol('reader-dispose-symbol');
+  const symScheduler = readerMod.createSerializedOrtScheduler();
+  let symSecondCreates = 0;
+  const symReader = readerMod.createLazySingleFlightSafetyReader({
+    tokenizer: tokenizerSpec,
+    Tensor: FakeTensor,
+    scheduler: symScheduler,
+    createSession: async () => {
+      if (symScheduler.isDisposalLatched()) symSecondCreates += 1;
+      const base = makeReaderSession(() => ({
+        caution_logit: { data: Float32Array.from([0.0]), dims: [1] },
+        routing_logits: { data: new Float32Array(13), dims: [1, 13] },
+      }));
+      base.handler.dispose = async () => {
+        throw symErr;
+      };
+      return base;
+    },
+  });
+  const [firstSym, secondSym] = await Promise.allSettled([
+    symReader.classify('symbol disposal failure'),
+    symReader.classify('must stay blocked after symbol disposal failure'),
+  ]);
+  check(
+    '5g-sym. Symbol disposal rejection preserves exact Symbol and latches scheduler fail-closed',
+    firstSym.status === 'rejected'
+      && firstSym.reason === symErr
+      && secondSym.status === 'rejected'
+      && secondSym.reason instanceof Error
+      && /latched fail-closed/.test(secondSym.reason.message)
+      && symScheduler.isDisposalLatched()
+      && symSecondCreates === 0,
+    `sameSym=${firstSym.status === 'rejected' && firstSym.reason === symErr}, latched=${symScheduler.isDisposalLatched()}`,
+  );
+}
+
+// 5h. Throwing lifecycle observers (onEvent) must NEVER skip disposal or falsely latch a healthy scheduler
+{
+  // 5h-1: Observer throws on disposal/start AND disposal/settled for BOTH embedder and reader (healthy disposal)
+  const scheduler = readerMod.createSerializedOrtScheduler();
+  let active = 0;
+  let maxActive = 0;
+  let embedDisposed = 0;
+  let readerDisposed = 0;
+  const throwingSink = (ev) => {
+    if (ev.phase === 'disposal') {
+      throw new Error(`Observer boom on ${ev.phase}/${ev.stage}`);
+    }
+  };
+  const embedder = onnxMod.createLazySingleFlightEmbedder({
+    tokenizer: tokenizerSpec,
+    Tensor: FakeTensor,
+    scheduler,
+    onEvent: throwingSink,
+    createSession: async () => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      return {
+        inputNames: ['input_ids', 'attention_mask'],
+        outputNames: ['last_hidden_state'],
+        handler: {
+          async dispose() {
+            embedDisposed += 1;
+            active -= 1;
+          },
+        },
+        async run(feeds) {
+          const n = feeds.input_ids.dims[1];
+          return { last_hidden_state: { data: new Float32Array(n * 384).fill(0.2), dims: [1, n, 384] } };
+        },
+      };
+    },
+  });
+  const reader = readerMod.createLazySingleFlightSafetyReader({
+    tokenizer: tokenizerSpec,
+    Tensor: FakeTensor,
+    scheduler,
+    onEvent: throwingSink,
+    createSession: async () => {
+      active += 1;
+      maxActive = Math.max(maxActive, active);
+      const routing = new Float32Array(13).fill(-1);
+      routing[6] = 3.0;
+      const base = makeReaderSession(() => ({
+        caution_logit: { data: Float32Array.from([1.5]), dims: [1] },
+        routing_logits: { data: routing, dims: [1, 13] },
+      }));
+      const origDispose = base.handler.dispose;
+      base.handler.dispose = async () => {
+        await origDispose();
+        readerDisposed += 1;
+        active -= 1;
+      };
+      return base;
+    },
+  });
+  const [vec, pred] = await Promise.all([
+    embedder.embed('observer throws on disposal events'),
+    reader.classify('queued reader still runs cleanly'),
+  ]);
+  check(
+    '5h-1. Throwing disposal observers do not skip cleanup or falsely latch a healthy scheduler',
+    vec instanceof Float32Array
+      && vec.length === 384
+      && pred.actionableRouteId === 'pain-mild'
+      && embedDisposed === 1
+      && readerDisposed === 1
+      && active === 0
+      && maxActive === 1
+      && !scheduler.isDisposalLatched(),
+    `embedDisposed=${embedDisposed}, readerDisposed=${readerDisposed}, active=${active}, maxActive=${maxActive}, latched=${scheduler.isDisposalLatched()}`,
+  );
+
+  // 5h-2: Observer throws on disposal/start while actual disposal ALSO rejects -> cleanup still runs AND scheduler latches
+  const failScheduler = readerMod.createSerializedOrtScheduler();
+  let disposeAttempts = 0;
+  let queuedCreates = 0;
+  const failingReader = readerMod.createLazySingleFlightSafetyReader({
+    tokenizer: tokenizerSpec,
+    Tensor: FakeTensor,
+    scheduler: failScheduler,
+    onEvent: (ev) => {
+      if (ev.phase === 'disposal' && ev.stage === 'start') {
+        throw new Error('Observer throws before failing disposal');
+      }
+    },
+    createSession: async () => {
+      const base = makeReaderSession(() => ({
+        caution_logit: { data: Float32Array.from([0.0]), dims: [1] },
+        routing_logits: { data: new Float32Array(13), dims: [1, 13] },
+      }));
+      base.handler.dispose = async () => {
+        disposeAttempts += 1;
+        throw new Error('Underlying native disposal failure');
+      };
+      return base;
+    },
+  });
+  const queuedEmbedder = onnxMod.createLazySingleFlightEmbedder({
+    tokenizer: tokenizerSpec,
+    Tensor: FakeTensor,
+    scheduler: failScheduler,
+    createSession: async () => {
+      queuedCreates += 1;
+      throw new Error('Should never create after disposal failure');
+    },
+  });
+  const [r1, r2] = await Promise.allSettled([
+    failingReader.classify('disposal start observer throws + dispose rejects'),
+    queuedEmbedder.embed('must be latched'),
+  ]);
+  check(
+    '5h-2. Throwing disposal/start observer still executes failing disposal, preserves disposal error, and latches scheduler',
+    r1.status === 'rejected'
+      && r1.reason instanceof Error
+      && /Underlying native disposal failure/.test(r1.reason.message)
+      && r2.status === 'rejected'
+      && r2.reason instanceof Error
+      && /latched fail-closed/.test(r2.reason.message)
+      && disposeAttempts === 1
+      && queuedCreates === 0
+      && failScheduler.isDisposalLatched(),
+    `disposeAttempts=${disposeAttempts}, queuedCreates=${queuedCreates}, latched=${failScheduler.isDisposalLatched()}, r1=${r1.status === 'rejected' ? r1.reason?.message : 'ok'}`,
+  );
+
+  // 5h-3: Isolated throwing disposal/settled (ok=true) observer does NOT falsely latch or double-count
+  const settledScheduler = readerMod.createSerializedOrtScheduler();
+  const seenEvents = [];
+  const settledReader = readerMod.createLazySingleFlightSafetyReader({
+    tokenizer: tokenizerSpec,
+    Tensor: FakeTensor,
+    scheduler: settledScheduler,
+    onEvent: (ev) => {
+      seenEvents.push(ev);
+      if (ev.phase === 'disposal' && ev.stage === 'settled' && ev.ok) {
+        throw new Error('Observer throws on disposal/settled ok=true');
+      }
+    },
+    createSession: async () => makeReaderSession(() => ({
+      caution_logit: { data: Float32Array.from([0.0]), dims: [1] },
+      routing_logits: { data: new Float32Array(13), dims: [1, 13] },
+    })),
+  });
+  const s1 = await settledReader.classify('first healthy call');
+  const s2 = await settledReader.classify('second healthy call proves unlatched');
+  const lastEvent = seenEvents[seenEvents.length - 1];
+  check(
+    '5h-3. Throwing disposal/settled(ok=true) observer does not falsely latch or double-count disposedTotal',
+    s1.active === false
+      && s2.active === false
+      && !settledScheduler.isDisposalLatched()
+      && lastEvent.phase === 'request'
+      && lastEvent.stage === 'settled'
+      && lastEvent.ok === true
+      && lastEvent.disposedTotal === 2,
+    `disposedTotal=${lastEvent?.disposedTotal}, latched=${settledScheduler.isDisposalLatched()}`,
+  );
+
+  // 5g-tostring: Object with throwing toString() preserves exact object and latches fail-closed
+  const throwingToString = {
+    toString() {
+      throw new Error('toString exploded');
+    },
+  };
+  const tsScheduler = readerMod.createSerializedOrtScheduler();
+  const tsReader = readerMod.createLazySingleFlightSafetyReader({
+    tokenizer: tokenizerSpec,
+    Tensor: FakeTensor,
+    scheduler: tsScheduler,
+    createSession: async () => {
+      const base = makeReaderSession(() => ({
+        caution_logit: { data: Float32Array.from([0.0]), dims: [1] },
+        routing_logits: { data: new Float32Array(13), dims: [1, 13] },
+      }));
+      base.handler.dispose = async () => {
+        throw throwingToString;
+      };
+      return base;
+    },
+  });
+  const [tsFirst, tsSecond] = await Promise.allSettled([
+    tsReader.classify('throwing toString disposal failure'),
+    tsReader.classify('blocked after throwing toString'),
+  ]);
+  check(
+    '5g-tostring. Throwing-toString disposal rejection preserves exact object and latches scheduler',
+    tsFirst.status === 'rejected'
+      && tsFirst.reason === throwingToString
+      && tsSecond.status === 'rejected'
+      && tsSecond.reason instanceof Error
+      && /<unformattable rejection>/.test(tsSecond.reason.message)
+      && tsScheduler.isDisposalLatched(),
+    `sameObj=${tsFirst.status === 'rejected' && tsFirst.reason === throwingToString}, msg=${tsSecond.status === 'rejected' ? tsSecond.reason?.message : 'ok'}`,
   );
 }
 

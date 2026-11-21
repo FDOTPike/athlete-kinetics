@@ -170,11 +170,23 @@ export function createSerializedOrtScheduler(): SerializedOrtScheduler {
   let disposalFailure: Error | null = null;
   return {
     markDisposalFailed(error: unknown): void {
-      if (disposalFailure === null) {
+      if (disposalFailure !== null) return;
+      // Latch synchronously BEFORE touching or formatting `error` so even
+      // unformattable rejections (Object.create(null), throwing toString(),
+      // hostile Proxies) can never throw out of latch construction or leave
+      // the scheduler open to allocating a second native session.
+      const latchError = new Error(
+        'ONNX scheduler latched fail-closed after unconfirmed session disposal',
+      );
+      disposalFailure = latchError;
+      try {
         const detail = error instanceof Error ? error.message : String(error);
-        disposalFailure = new Error(
-          `ONNX scheduler latched fail-closed after unconfirmed session disposal: ${detail}`,
-        );
+        if (detail) {
+          latchError.message = `ONNX scheduler latched fail-closed after unconfirmed session disposal: ${detail}`;
+        }
+      } catch {
+        latchError.message =
+          'ONNX scheduler latched fail-closed after unconfirmed session disposal: <unformattable rejection>';
       }
     },
     isDisposalLatched(): boolean {
@@ -266,7 +278,12 @@ export function createLazySingleFlightEmbedder(opts: LazyEmbedderOptions): Embed
     ok: boolean,
   ): void => {
     if (!onEvent) return;
-    onEvent({ phase, stage, requestId, ok, createdTotal, disposedTotal, atMs: Date.now() });
+    try {
+      onEvent({ phase, stage, requestId, ok, createdTotal, disposedTotal, atMs: Date.now() });
+    } catch {
+      // Lifecycle telemetry observers must never disrupt inference, cleanup,
+      // or fail-closed scheduler state.
+    }
   };
 
   emit('wrapper', 'settled', 0, true); // wrapper exists; zero sessions created
@@ -299,16 +316,16 @@ export function createLazySingleFlightEmbedder(opts: LazyEmbedderOptions): Embed
         const s = session;
         session = null;
         emit('disposal', 'start', requestId, true);
+        let disposedOk = false;
         try {
           await disposeSession(s);
-          disposedTotal += 1;
-          emit('disposal', 'settled', requestId, true);
+          disposedOk = true;
         } catch (error) {
-          disposedTotal += 1;
           disposalError = { error };
           scheduler.markDisposalFailed(error);
-          emit('disposal', 'settled', requestId, false);
         }
+        disposedTotal += 1;
+        emit('disposal', 'settled', requestId, disposedOk);
       }
       // A failed disposal is reported on its own stage event; the request-level
       // settled event is always emitted and stays truthful about the outcome.
