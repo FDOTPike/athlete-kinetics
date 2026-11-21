@@ -661,20 +661,27 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
     const installStep = splitSteps(iosJob).find((s) => s.includes('- name: Install pods')) ?? '';
     if (!installStep) return false;
     const podInstallIdx = installStep.indexOf('bundle exec pod install --deployment');
-    if (podInstallIdx === -1) return false;
+    const lastPodInstallIdx = installStep.lastIndexOf('bundle exec pod install');
+    if (podInstallIdx === -1 || lastPodInstallIdx === -1) return false;
     const beforePodInstall = installStep.slice(0, podInstallIdx);
-    const hasInsecureCurl = /(?:^|\s)curl\s+[^\n]*(?:\s-(?:[A-Za-z]*k[A-Za-z]*)\b|\s--insecure\b)/m.test(beforePodInstall);
+    const afterPodInstall = installStep.slice(lastPodInstallIdx);
+    const hasInsecureCurl = /(?:^|\s)curl\s+[^\n]*(?:\s-(?:[A-Za-z]*k[A-Za-z]*)\b|\s--insecure\b)/m.test(installStep);
     if (hasInsecureCurl) return false;
-    return beforePodInstall.includes('https://download.onnxruntime.ai/pod-archive-onnxruntime-c-1.30.0.zip')
+    const hasFnDef = /verify_ort_cache\(\)\s*\{[\s\S]*?! -d "\$ORT_DIR"[\s\S]*?! -f "\$ORT_SPEC"[\s\S]*?e8ede7ac7f5c1ab9e5bf1e46216454cb16892e69d7c58094bfe8a30e3e1f353d[\s\S]*?916aec96269b03515955b8becd987fcc79be5242d91418f61280b3be6c1388c1[\s\S]*?exit 1[\s\S]*?\}/.test(beforePodInstall);
+    const bodyAfterFn = beforePodInstall.replace(/verify_ort_cache\(\)\s*\{[\s\S]*?\n\s*\}/, '');
+    const hasPreInstallCall = /\bverify_ort_cache\b/.test(bodyAfterFn);
+    const hasUnconditionalPostInstallCall = /^\s*verify_ort_cache\s*$/m.test(afterPodInstall);
+    return hasFnDef
+      && hasPreInstallCall
+      && hasUnconditionalPostInstallCall
+      && beforePodInstall.includes('https://download.onnxruntime.ai/pod-archive-onnxruntime-c-1.30.0.zip')
       && beforePodInstall.includes('https://raw.githubusercontent.com/FDOTPike/athlete-kinetics/9a2533b9654eb5b71fda68a9e2f3f0ed67e0d87f/onnxruntime-c-1.30.0-36ca0.tar.xz')
       && beforePodInstall.includes('56ebacedaccb3c8809279de032454beb2a80c9faa9fe5d5d8bac56ca0ba333f5')
-      && beforePodInstall.includes('e8ede7ac7f5c1ab9e5bf1e46216454cb16892e69d7c58094bfe8a30e3e1f353d')
-      && beforePodInstall.includes('916aec96269b03515955b8becd987fcc79be5242d91418f61280b3be6c1388c1')
       && /shasum -a 256/.test(beforePodInstall)
       && /exit 1/.test(beforePodInstall);
   };
   check(
-    'CI Install pods step seeds onnxruntime-c 1.30.0-36ca0 from the commit- and 3-layer-SHA256-pinned archive with strict TLS when download.onnxruntime.ai is unavailable',
+    'CI Install pods step seeds onnxruntime-c 1.30.0-36ca0 from the commit- and 3-layer-SHA256-pinned archive with strict TLS and verifies cache integrity both before and unconditionally after pod install',
     checkIosOrtPodCacheFallback(ci),
   );
   const insecureCurlOrtCi = ci.replace('curl -fsSI', 'curl -fsSI -k');
@@ -686,14 +693,17 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
     '916aec96269b03515955b8becd987fcc79be5242d91418f61280b3be6c1388c1',
     '0000000000000000000000000000000000000000000000000000000000000000',
   );
+  const noPostInstallVerifyOrtCi = ci.replace(/\n\s*verify_ort_cache\s*$/m, '\n');
   check(
-    'falsifier: curl -k/--insecure or altered archive/tree SHA-256 pins in CI Install pods fail closed',
+    'falsifier: curl -k/--insecure, altered archive/tree SHA-256 pins, or dropping post-pod-install verify_ort_cache in CI Install pods fail closed',
     insecureCurlOrtCi !== ci
       && badTarShaOrtCi !== ci
       && badTreeShaOrtCi !== ci
+      && noPostInstallVerifyOrtCi !== ci
       && !checkIosOrtPodCacheFallback(insecureCurlOrtCi)
       && !checkIosOrtPodCacheFallback(badTarShaOrtCi)
-      && !checkIosOrtPodCacheFallback(badTreeShaOrtCi),
+      && !checkIosOrtPodCacheFallback(badTreeShaOrtCi)
+      && !checkIosOrtPodCacheFallback(noPostInstallVerifyOrtCi),
   );
   const typesSrc = read('packages/inference/src/types.ts');
   const onboardingSrc = read('apps/mobile/src/screens/OnboardingScreen.tsx');
