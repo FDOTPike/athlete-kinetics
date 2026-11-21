@@ -19,7 +19,9 @@
  *       co-scheduled with real MiniLM (`model_quantized.onnx`) through one shared
  *       `SerializedOrtScheduler` (`maxConcurrent === 1`) and `combineDenialFloor`.
  */
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
+import { createServer } from 'node:http';
+import { promisify } from 'node:util';
 import {
   closeSync,
   existsSync,
@@ -275,7 +277,125 @@ console.log('\n=== [3] stage-native-safety-reader.mjs CLI Contract ===');
       badFlagExit = e.status;
     }
     check('unknown CLI flag exits 2', badFlagExit === 2, `exit=${badFlagExit}`);
+
+    // Destination replacement failure (directory at destination path) must exit 1 AND leave zero .stage- files
+    const dirDestParent = join(sandbox, 'replace-fail-dir');
+    const dirAsDest = join(dirDestParent, 'safety_reader.onnx');
+    mkdirSync(dirAsDest, { recursive: true });
+    let replaceFailExit = 0;
+    try {
+      execFileSync(process.execPath, [STAGE_SCRIPT, dirAsDest, '--required'], { stdio: 'pipe' });
+    } catch (e) {
+      replaceFailExit = e.status;
+    }
+    const leftoverStages = listFiles(dirDestParent).filter((p) => /\.stage-/.test(p));
+    check('destination replacement failure exits 1 and cleans up staged model file in finally',
+      replaceFailExit === 1 && leftoverStages.length === 0,
+      `exit=${replaceFailExit}, leftovers=${leftoverStages.length}`);
   } finally {
+    rmSync(sandbox, { recursive: true, force: true });
+  }
+}
+
+console.log('\n=== [3b] fetch-safety-reader.mjs Stream Pipeline, Asset-ID Binding & Pre-Stat Falsifiers ===');
+{
+  const FETCH_SCRIPT = join(ROOT, 'scripts', 'fetch-safety-reader.mjs');
+  const fetchSrc = readFileSync(FETCH_SCRIPT, 'utf8');
+  check('fetch-safety-reader binds downloads to PINNED_ASSET_API_URL (numeric asset ID) and has no commit override',
+    fetchSrc.includes('PINNED_ASSET_API_URL')
+      && fetchSrc.includes('application/octet-stream')
+      && !fetchSrc.includes('AK_SAFETY_READER_COMMIT'));
+
+  const sandbox = mkdtempSync(join(tmpdir(), 'ak-fetch-reader-'));
+  let server = null;
+  try {
+    let mode = 'oversize';
+    server = createServer((_req, res) => {
+      res.on('error', () => {});
+      if (mode === 'http500') {
+        res.writeHead(500, { Connection: 'close' });
+        res.end('upstream error');
+        return;
+      }
+      // Stream 4 KiB above the pinned byte limit then end — pipeline must abort before writing unbounded bytes
+      res.writeHead(200, { 'Content-Type': 'application/octet-stream', Connection: 'close' });
+      const chunk = Buffer.alloc(65536, 0xaa);
+      let written = 0;
+      const target = readerMod.SAFETY_READER_BYTES + 4096;
+      const pump = () => {
+        while (written < target && !res.destroyed) {
+          const nextLen = Math.min(chunk.length, target - written);
+          written += nextLen;
+          if (!res.write(chunk.subarray(0, nextLen))) {
+            res.once('drain', pump);
+            return;
+          }
+        }
+        if (!res.destroyed) res.end();
+      };
+      pump();
+    });
+    await new Promise((resolveListen) => server.listen(0, '127.0.0.1', resolveListen));
+    const port = server.address().port;
+    const mockUrl = `http://127.0.0.1:${port}/asset`;
+
+    const cacheDir = join(sandbox, 'cache');
+    const outDir = join(sandbox, 'out');
+    // Seed an oversized local output candidate to verify pre-stat rejection before fallback download
+    mkdirSync(outDir, { recursive: true });
+    const badLocal = join(outDir, SAFETY_READER_ARTIFACT);
+    const fd = openSync(badLocal, 'w');
+    try { ftruncateSync(fd, readerMod.SAFETY_READER_BYTES + 128); } finally { closeSync(fd); }
+
+    const execFileAsync = promisify(execFile);
+    let oversizeExit = 0;
+    let oversizeStderr = '';
+    try {
+      await execFileAsync(process.execPath, [FETCH_SCRIPT], {
+        env: {
+          ...process.env,
+          AK_SAFETY_READER_CACHE: cacheDir,
+          AK_SAFETY_READER_OUT: outDir,
+          AK_SAFETY_READER_DOWNLOAD_URL: mockUrl,
+        },
+        maxBuffer: 16 * 1024 * 1024,
+      });
+    } catch (e) {
+      oversizeExit = e.code;
+      oversizeStderr = String(e.stderr ?? '') + String(e.stdout ?? '');
+    }
+    const oversizeStages = listFiles(sandbox).filter((p) => /\.stage-/.test(p));
+    check('oversized local candidate pre-stat rejected AND oversized download stream aborts cleanly with zero stage remnants',
+      oversizeExit === 1
+        && /existing output artifact rejected.*SIZE MISMATCH/.test(oversizeStderr)
+        && /exceeded pinned 22881187 B/.test(oversizeStderr)
+        && oversizeStages.length === 0,
+      `exit=${oversizeExit}, remnants=${oversizeStages.length}`);
+
+    mode = 'http500';
+    let http500Exit = 0;
+    try {
+      await execFileAsync(process.execPath, [FETCH_SCRIPT], {
+        env: {
+          ...process.env,
+          AK_SAFETY_READER_CACHE: join(sandbox, 'cache500'),
+          AK_SAFETY_READER_OUT: join(sandbox, 'out500'),
+          AK_SAFETY_READER_DOWNLOAD_URL: mockUrl,
+        },
+        maxBuffer: 16 * 1024 * 1024,
+      });
+    } catch (e) {
+      http500Exit = e.code;
+    }
+    const http500Stages = listFiles(sandbox).filter((p) => /\.stage-/.test(p));
+    check('HTTP 500 download failure exits 1 and leaves zero stage remnants',
+      http500Exit === 1 && http500Stages.length === 0,
+      `exit=${http500Exit}, remnants=${http500Stages.length}`);
+  } finally {
+    if (server) {
+      server.closeAllConnections?.();
+      await new Promise((r) => server.close(r));
+    }
     rmSync(sandbox, { recursive: true, force: true });
   }
 }

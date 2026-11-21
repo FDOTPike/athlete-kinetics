@@ -68,6 +68,8 @@ jobs:
           path: node_modules/.cache/ak-safety-reader
           key: safety-reader-${{ hashFiles('scripts/safety-reader-integrity.mjs') }}
       - name: Fetch safety reader assets
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: npm run fetch:safety-reader
       # verify:ci is the DETERMINISTIC host suite and must exit 0. It excludes
       # the two checks CI structurally cannot make honestly:

@@ -153,6 +153,9 @@ export function readZipEntries(path) {
       const lNameLen = lfh.readUInt16LE(26);
       const lExtraLen = lfh.readUInt16LE(28);
       const dataOffset = lfhOffset + 30 + lNameLen + lExtraLen;
+      if (entries.has(name)) {
+        throw new Error(`duplicate central directory entry: ${name}`);
+      }
       entries.set(name, { name, method, compSize, uncompSize, dataOffset });
       off += 46 + nameLen + extraLen + commentLen;
     }

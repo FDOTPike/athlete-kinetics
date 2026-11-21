@@ -7,14 +7,16 @@
  * @xenova/transformers, or tokenizer code.
  *
  * Contract it enforces:
- *   npm ci                 -> dependencies installed (native loader loadable)
- *   npm run fetch:embedder -> pinned revision cache + device outputs present,
- *                             every byte matching scripts/embedder-integrity.mjs
- *   verification itself    -> local_files_only; never downloads implicitly
+ *   npm ci                      -> dependencies installed (native loader loadable)
+ *   npm run fetch:embedder      -> pinned revision cache + device outputs present,
+ *                                  every byte matching scripts/embedder-integrity.mjs
+ *   npm run fetch:safety-reader -> pinned release-asset cache + device output present,
+ *                                  matching scripts/safety-reader-integrity.mjs
+ *   verification itself         -> local_files_only; never downloads implicitly
  *
- * This gate NEVER downloads. The sole network-capable materializer is
- * scripts/fetch-embedder.mjs. An unprepared checkout is an operator error,
- * not a candidate failure.
+ * This gate NEVER downloads. The sole network-capable materializers are
+ * scripts/fetch-embedder.mjs and scripts/fetch-safety-reader.mjs. An unprepared
+ * checkout is an operator error, not a candidate failure.
  *
  * Run: node scripts/verify-preflight.mjs
  */
@@ -221,11 +223,11 @@ check('fetch-embedder downloads from the pinned host',
   fetchSrc !== null && fetchSrc.includes('huggingface.co'));
 const fetchReaderSrc = readOr(join(ROOT, 'scripts', 'fetch-safety-reader.mjs'));
 const readerIntegritySrc = readOr(join(ROOT, 'scripts', 'safety-reader-integrity.mjs'));
-check('fetch-safety-reader downloads strictly from the pinned GitHub Release asset',
+check('fetch-safety-reader downloads strictly from the pinned GitHub Release asset ID',
   fetchReaderSrc !== null
     && readerIntegritySrc !== null
-    && fetchReaderSrc.includes('PINNED_DOWNLOAD_URL')
-    && readerIntegritySrc.includes('https://github.com/${PINNED_RELEASE_REPO}/releases/download/'));
+    && fetchReaderSrc.includes('PINNED_ASSET_API_URL')
+    && readerIntegritySrc.includes('https://api.github.com/repos/${PINNED_RELEASE_REPO}/releases/assets/${PINNED_ASSET_ID}'));
 
 console.log(`\n${fail === 0 ? 'PREFLIGHT OK' : `${fail} PREFLIGHT CHECK(S) FAILED`}`);
 if (fail > 0) {

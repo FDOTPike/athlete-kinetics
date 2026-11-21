@@ -65,7 +65,7 @@ try {
   console.log(`staged ${basename(destination)} (sha256 ${sha}) -> ${destination}`);
 } catch (error) {
   console.error(`error: failed to stage verified safety reader (${error.message}).`);
-  process.exit(1);
+  process.exitCode = 1;
 } finally {
   try {
     rmSync(staged, { force: true });
