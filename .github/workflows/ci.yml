@@ -58,6 +58,19 @@ jobs:
       # Hugging Face download on a cold cache, always byte-verified).
       - name: Fetch embedder assets
         run: npm run fetch:embedder
+      # Stream 2 safety reader (`m10-r15-reader-seed3`, ~22.9 MB) exercised by
+      # verify:semantic via onnxruntime-node; keyed strictly on its pin-bearing
+      # integrity module with no restore-keys fallback. Mobile app bundles stay
+      # single-model until PR 3 lands with physical-device RAM evidence.
+      - name: Cache safety reader model
+        uses: actions/cache@v5
+        with:
+          path: node_modules/.cache/ak-safety-reader
+          key: safety-reader-${{ hashFiles('scripts/safety-reader-integrity.mjs') }}
+      - name: Fetch safety reader assets
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: npm run fetch:safety-reader
       # verify:ci is the DETERMINISTIC host suite and must exit 0. It excludes
       # the two checks CI structurally cannot make honestly:
       #   [A] the memory contract, which is a ratified budget decision, and

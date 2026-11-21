@@ -7,14 +7,16 @@
  * @xenova/transformers, or tokenizer code.
  *
  * Contract it enforces:
- *   npm ci                 -> dependencies installed (native loader loadable)
- *   npm run fetch:embedder -> pinned revision cache + device outputs present,
- *                             every byte matching scripts/embedder-integrity.mjs
- *   verification itself    -> local_files_only; never downloads implicitly
+ *   npm ci                      -> dependencies installed (native loader loadable)
+ *   npm run fetch:embedder      -> pinned revision cache + device outputs present,
+ *                                  every byte matching scripts/embedder-integrity.mjs
+ *   npm run fetch:safety-reader -> pinned release-asset cache + device output present,
+ *                                  matching scripts/safety-reader-integrity.mjs
+ *   verification itself         -> local_files_only; never downloads implicitly
  *
- * This gate NEVER downloads. The sole network-capable materializer is
- * scripts/fetch-embedder.mjs. An unprepared checkout is an operator error,
- * not a candidate failure.
+ * This gate NEVER downloads. The sole network-capable materializers are
+ * scripts/fetch-embedder.mjs and scripts/fetch-safety-reader.mjs. An unprepared
+ * checkout is an operator error, not a candidate failure.
  *
  * Run: node scripts/verify-preflight.mjs
  */
@@ -99,6 +101,14 @@ import {
   sha256File,
   transformersRevisionArtifactPath,
 } from './embedder-integrity.mjs';
+import {
+  DEFAULT_SAFETY_READER_CACHE_ROOT,
+  DEFAULT_SAFETY_READER_OUT_DIR,
+  PINNED_RELEASE_COMMIT,
+  SAFETY_READER_ARTIFACT,
+  safetyReaderCacheArtifactPath,
+  verifySafetyReaderFile,
+} from './safety-reader-integrity.mjs';
 
 const embedderFailStart = fail;
 for (const rel of REMOTE_ARTIFACTS) {
@@ -154,9 +164,46 @@ if (!existsSync(minPath)) {
   }
 }
 
+// --- [4b] pinned Stream 2 safety-reader cache & asset output ------------------
+const readerFailStart = fail;
+const readerCachePath = safetyReaderCacheArtifactPath(
+  SAFETY_READER_ARTIFACT,
+  DEFAULT_SAFETY_READER_CACHE_ROOT,
+  PINNED_RELEASE_COMMIT,
+);
+if (!existsSync(readerCachePath)) {
+  check(`safety-reader cache artifact present: ${SAFETY_READER_ARTIFACT}`, false, readerCachePath);
+} else {
+  try {
+    verifySafetyReaderFile(SAFETY_READER_ARTIFACT, readerCachePath, 'preflight cache');
+    check(`safety-reader cache artifact verified: ${SAFETY_READER_ARTIFACT}`, true, 'size + sha256 ok');
+  } catch (e) {
+    check(`safety-reader cache artifact verified: ${SAFETY_READER_ARTIFACT}`, false, String(e.message).slice(0, 120));
+  }
+}
+const readerOutPath = join(DEFAULT_SAFETY_READER_OUT_DIR, SAFETY_READER_ARTIFACT);
+if (!existsSync(readerOutPath)) {
+  check(`safety-reader output present: packages/inference/assets/safety-reader/${SAFETY_READER_ARTIFACT}`, false, readerOutPath);
+} else {
+  try {
+    verifySafetyReaderFile(SAFETY_READER_ARTIFACT, readerOutPath, 'preflight output');
+    check(`safety-reader output verified: packages/inference/assets/safety-reader/${SAFETY_READER_ARTIFACT}`, true, 'size + sha256 ok');
+  } catch (e) {
+    check(`safety-reader output verified: packages/inference/assets/safety-reader/${SAFETY_READER_ARTIFACT}`, false, String(e.message).slice(0, 120));
+  }
+}
+if (fail > readerFailStart) {
+  remediation(
+    'pinned safety-reader artifact is missing or corrupt — run "npm run fetch:safety-reader" '
+    + '(downloads from the pinned GitHub Release asset and verifies exact byte size + SHA-256).',
+  );
+}
+
 // --- [5] invoked lifecycle verifier exists -------------------------------------
 const LAZY_VERIFIER = join(ROOT, 'packages', 'inference', 'test', 'verify_lazy_lifecycle.mjs');
 check('lifecycle verifier present (verify_lazy_lifecycle.mjs)', existsSync(LAZY_VERIFIER));
+const READER_INTEGRITY_VERIFIER = join(ROOT, 'packages', 'inference', 'test', 'verify_safety_reader_integrity.mjs');
+check('safety-reader integrity verifier present (verify_safety_reader_integrity.mjs)', existsSync(READER_INTEGRITY_VERIFIER));
 
 // --- [6] verification cannot silently download ---------------------------------
 // A missing source is a FAIL line in the summary, never an uncaught stack trace.
@@ -165,15 +212,26 @@ const EMBEDDER_SRC = readOr(join(ROOT, 'packages', 'inference', 'src', 'semantic
 check('verification pipeline is constructed from local assets only',
   EMBEDDER_SRC !== null && !EMBEDDER_SRC.includes('@xenova/transformers'),
   'onnxEmbedder consumes injected sessions from packages/inference/assets/minilm');
+const READER_SRC = readOr(join(ROOT, 'packages', 'inference', 'src', 'semantic', 'safetyReader.ts'));
+check('safetyReader runtime module is pure local inference (no network/fetch imports)',
+  READER_SRC !== null && !READER_SRC.includes('@xenova/transformers') && !/\bfetch\s*\(/.test(READER_SRC),
+  'safetyReader consumes injected ONNX sessions only');
 const integritySrc = readOr(join(ROOT, 'scripts', 'embedder-integrity.mjs'));
 check('offline options enforce local_files_only', integritySrc !== null && integritySrc.includes('local_files_only: true'));
 const fetchSrc = readOr(join(ROOT, 'scripts', 'fetch-embedder.mjs'));
 check('fetch-embedder downloads from the pinned host',
   fetchSrc !== null && fetchSrc.includes('huggingface.co'));
+const fetchReaderSrc = readOr(join(ROOT, 'scripts', 'fetch-safety-reader.mjs'));
+const readerIntegritySrc = readOr(join(ROOT, 'scripts', 'safety-reader-integrity.mjs'));
+check('fetch-safety-reader downloads strictly from the pinned GitHub Release asset ID',
+  fetchReaderSrc !== null
+    && readerIntegritySrc !== null
+    && fetchReaderSrc.includes('PINNED_ASSET_API_URL')
+    && readerIntegritySrc.includes('https://api.github.com/repos/${PINNED_RELEASE_REPO}/releases/assets/${PINNED_ASSET_ID}'));
 
 console.log(`\n${fail === 0 ? 'PREFLIGHT OK' : `${fail} PREFLIGHT CHECK(S) FAILED`}`);
 if (fail > 0) {
   console.error('\nThis checkout is NOT prepared for offline verification. Required sequence:');
-  console.error('  npm ci\n  npm run fetch:embedder\n  npm run verify:ci');
+  console.error('  npm ci\n  npm run fetch:embedder\n  npm run fetch:safety-reader\n  npm run verify:ci');
   process.exit(1);
 }

@@ -73,7 +73,7 @@ session. Therefore:
   git process is live).
 
 ## 3. The verification loop (nothing ships around it)
-Clean-checkout contract: `npm ci` -> `npm run fetch:embedder` -> `npm run verify:ci`.
+Clean-checkout contract: `npm ci` -> `npm run fetch:embedder` -> `npm run fetch:safety-reader` -> `npm run verify:ci`.
 MERGE gate = `verify:ci` (must be green). RELEASE gate = `verify:release`, which
 adds the ratified memory contract [A] and measured device evidence [D]; CI cannot
 run it because no runner has an authorized device packet. `verify:all` is an alias

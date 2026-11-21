@@ -59,6 +59,15 @@ const SHA256_RE = /^[0-9a-f]{64}$/;
 export const ARCHIVO_ASSET = 'assets/fonts/Archivo.ttf';
 export const ARCHIVO_SHA256 =
   'bc878c6e9e36b848bfa2fb9174acdf812ea6df640fd167f2c95b42674729f6b5';
+// Stream 2 PR 2: bidirectional packaging contract for `assets/safety_reader.onnx`.
+// Until PR 3 enables mobile runtime shipping with physical-device RAM evidence,
+// `manifest.safetyReader` is absent and `assets/safety_reader.onnx` MUST NOT be
+// packaged (enforcing AGENT_WORKFLOW.md §1.2). Once declared (or when
+// `requireSafetyReader: true`), exact ratified size and SHA-256 are mandatory.
+export const SAFETY_READER_ASSET = 'assets/safety_reader.onnx';
+export const SAFETY_READER_SIZE = 22881187;
+export const SAFETY_READER_SHA256 =
+  'a0fa76e40e10246a9caf9d1be463b72b34f03174c68b017d6673fe9f165cb5cf';
 
 /** The Android debug keystore has shipped in TWO distinguished-name shapes:
  *    classic Studio/AGP : C=US, O=Android, CN=Android Debug
@@ -144,6 +153,9 @@ export function readZipEntries(path) {
       const lNameLen = lfh.readUInt16LE(26);
       const lExtraLen = lfh.readUInt16LE(28);
       const dataOffset = lfhOffset + 30 + lNameLen + lExtraLen;
+      if (entries.has(name)) {
+        throw new Error(`duplicate central directory entry: ${name}`);
+      }
       entries.set(name, { name, method, compSize, uncompSize, dataOffset });
       off += 46 + nameLen + extraLen + commentLen;
     }
@@ -656,6 +668,7 @@ export async function verifyQaArtifact(apkPath, options = {}) {
     skipSignature = fixtureMode,
     requireModelHash = !fixtureMode,
     requireProvenance = !fixtureMode,
+    requireSafetyReader = false,
     repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..'),
     env = process.env,
   } = options;
@@ -834,6 +847,67 @@ export async function verifyQaArtifact(apkPath, options = {}) {
       `${modelBytes.length} B${declaredSize !== undefined ? ` (declared ${declaredSize})` : ''}`);
     if (requireModelHash) {
       check('model asset sha256 matches ratified pin', actualSha === MODEL_SHA256, actualSha);
+    }
+  }
+
+  // 4a-reader. Stream 2 safety reader bidirectional packaging gate:
+  //   - Undeclared `assets/safety_reader.onnx` without `manifest.safetyReader` is
+  //     rejected (AGENT_WORKFLOW.md §1.2: only approved runtime models may ship).
+  //   - Declared `manifest.safetyReader` (or `requireSafetyReader: true`) requires
+  //     exact ratified metadata, exact byte size (22,881,187 B), and ratified SHA-256.
+  const declaredSafetyReader = manifest?.safetyReader;
+  const safetyReaderExpected =
+    Boolean(requireSafetyReader) || (declaredSafetyReader !== undefined && declaredSafetyReader !== null);
+  const safetyReaderEntry = zip.entries.get(SAFETY_READER_ASSET);
+  if (!safetyReaderExpected) {
+    if (safetyReaderEntry) {
+      check(
+        'no undeclared assets/safety_reader.onnx packaged before runtime enablement',
+        false,
+        `unexpected ${SAFETY_READER_ASSET} (${safetyReaderEntry.uncompSize} B)`,
+      );
+      throw new QaRejectionError(
+        `undeclared ${SAFETY_READER_ASSET} packaged without manifest.safetyReader`,
+      );
+    }
+  } else {
+    const metaOk =
+      declaredSafetyReader !== null
+      && typeof declaredSafetyReader === 'object'
+      && !Array.isArray(declaredSafetyReader)
+      && declaredSafetyReader.assetPath === SAFETY_READER_ASSET
+      && declaredSafetyReader.sizeBytes === SAFETY_READER_SIZE
+      && declaredSafetyReader.sha256 === SAFETY_READER_SHA256;
+    check(
+      'manifest.safetyReader metadata matches ratified pin',
+      metaOk,
+      metaOk
+        ? `${declaredSafetyReader.assetPath} (${declaredSafetyReader.sizeBytes} B)`
+        : JSON.stringify(declaredSafetyReader ?? null).slice(0, 100),
+    );
+    if (!metaOk) {
+      throw new QaRejectionError('manifest.safetyReader missing or disagrees with ratified pin');
+    }
+    if (!safetyReaderEntry) {
+      check(`${SAFETY_READER_ASSET} packaged`, false, `${SAFETY_READER_ASSET} missing`);
+      throw new QaRejectionError('declared safety reader model asset missing');
+    }
+    const readerBytes = extractEntryToBuffer(apkPath, safetyReaderEntry);
+    const readerSizeOk =
+      readerBytes.length === SAFETY_READER_SIZE
+      && declaredSafetyReader.sizeBytes === SAFETY_READER_SIZE;
+    check(
+      'safety reader asset exact ratified size',
+      readerSizeOk,
+      `${readerBytes.length} B (declared ${declaredSafetyReader.sizeBytes})`,
+    );
+    if (requireModelHash) {
+      const actualReaderSha = createHash('sha256').update(readerBytes).digest('hex');
+      check(
+        'safety reader asset sha256 matches ratified pin',
+        actualReaderSha === SAFETY_READER_SHA256,
+        actualReaderSha,
+      );
     }
   }
 
