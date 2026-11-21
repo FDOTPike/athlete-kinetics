@@ -258,7 +258,6 @@ console.log('[N2] pinned embedder model staged into the iOS bundle');
   const stage = read('scripts/stage-native-embedder.mjs');
   check('the staging script verifies against KNOWN_SHA256 and never downloads',
     stage.includes("KNOWN_SHA256['onnx/model_quantized.onnx']") && !/fetch\(|https?:\/\//.test(stage));
-
 }
 
 const plistXml = read('apps/mobile/ios/AthleteKinetics/Info.plist');
