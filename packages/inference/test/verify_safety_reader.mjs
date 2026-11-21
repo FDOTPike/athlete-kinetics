@@ -843,16 +843,18 @@ async function exerciseCrossModelConcurrency(useSharedScheduler) {
   let maxActive = 0;
   let embedDisposed = 0;
   let readerDisposed = 0;
-  const throwingSink = (ev) => {
+  const thrownStages = [];
+  const makeThrowingSink = (wrapper) => (ev) => {
     if (ev.phase === 'disposal') {
-      throw new Error(`Observer boom on ${ev.phase}/${ev.stage}`);
+      thrownStages.push(`${wrapper}:${ev.phase}/${ev.stage}:${ev.ok}`);
+      throw new Error(`Observer boom on ${wrapper}:${ev.phase}/${ev.stage}`);
     }
   };
   const embedder = onnxMod.createLazySingleFlightEmbedder({
     tokenizer: tokenizerSpec,
     Tensor: FakeTensor,
     scheduler,
-    onEvent: throwingSink,
+    onEvent: makeThrowingSink('embedder'),
     createSession: async () => {
       active += 1;
       maxActive = Math.max(maxActive, active);
@@ -876,7 +878,7 @@ async function exerciseCrossModelConcurrency(useSharedScheduler) {
     tokenizer: tokenizerSpec,
     Tensor: FakeTensor,
     scheduler,
-    onEvent: throwingSink,
+    onEvent: makeThrowingSink('reader'),
     createSession: async () => {
       active += 1;
       maxActive = Math.max(maxActive, active);
@@ -899,8 +901,14 @@ async function exerciseCrossModelConcurrency(useSharedScheduler) {
     embedder.embed('observer throws on disposal events'),
     reader.classify('queued reader still runs cleanly'),
   ]);
+  const expected5h1 = [
+    'embedder:disposal/start:true',
+    'embedder:disposal/settled:true',
+    'reader:disposal/start:true',
+    'reader:disposal/settled:true',
+  ];
   check(
-    '5h-1. Throwing disposal observers do not skip cleanup or falsely latch a healthy scheduler',
+    '5h-1. Throwing disposal observers reached all 4 throwing branches without skipping cleanup or latching',
     vec instanceof Float32Array
       && vec.length === 384
       && pred.actionableRouteId === 'pain-mild'
@@ -908,19 +916,25 @@ async function exerciseCrossModelConcurrency(useSharedScheduler) {
       && readerDisposed === 1
       && active === 0
       && maxActive === 1
-      && !scheduler.isDisposalLatched(),
-    `embedDisposed=${embedDisposed}, readerDisposed=${readerDisposed}, active=${active}, maxActive=${maxActive}, latched=${scheduler.isDisposalLatched()}`,
+      && !scheduler.isDisposalLatched()
+      && thrownStages.length === expected5h1.length
+      && expected5h1.every((entry, idx) => thrownStages[idx] === entry),
+    `stages=${JSON.stringify(thrownStages)}, active=${active}, maxActive=${maxActive}, latched=${scheduler.isDisposalLatched()}`,
   );
 
   // 5h-2: Observer throws on disposal/start while actual disposal ALSO rejects -> cleanup still runs AND scheduler latches
   const failScheduler = readerMod.createSerializedOrtScheduler();
   let disposeAttempts = 0;
   let queuedCreates = 0;
+  const failObserverStages = [];
   const failingReader = readerMod.createLazySingleFlightSafetyReader({
     tokenizer: tokenizerSpec,
     Tensor: FakeTensor,
     scheduler: failScheduler,
     onEvent: (ev) => {
+      if (ev.phase === 'disposal') {
+        failObserverStages.push(`reader:${ev.phase}/${ev.stage}:${ev.ok}`);
+      }
       if (ev.phase === 'disposal' && ev.stage === 'start') {
         throw new Error('Observer throws before failing disposal');
       }
@@ -951,7 +965,7 @@ async function exerciseCrossModelConcurrency(useSharedScheduler) {
     queuedEmbedder.embed('must be latched'),
   ]);
   check(
-    '5h-2. Throwing disposal/start observer still executes failing disposal, preserves disposal error, and latches scheduler',
+    '5h-2. Throwing disposal/start observer reached throwing branch, executed failing disposal, preserved error, and latched',
     r1.status === 'rejected'
       && r1.reason instanceof Error
       && /Underlying native disposal failure/.test(r1.reason.message)
@@ -960,13 +974,17 @@ async function exerciseCrossModelConcurrency(useSharedScheduler) {
       && /latched fail-closed/.test(r2.reason.message)
       && disposeAttempts === 1
       && queuedCreates === 0
-      && failScheduler.isDisposalLatched(),
-    `disposeAttempts=${disposeAttempts}, queuedCreates=${queuedCreates}, latched=${failScheduler.isDisposalLatched()}, r1=${r1.status === 'rejected' ? r1.reason?.message : 'ok'}`,
+      && failScheduler.isDisposalLatched()
+      && failObserverStages.length === 2
+      && failObserverStages[0] === 'reader:disposal/start:true'
+      && failObserverStages[1] === 'reader:disposal/settled:false',
+    `stages=${JSON.stringify(failObserverStages)}, disposeAttempts=${disposeAttempts}, queuedCreates=${queuedCreates}, latched=${failScheduler.isDisposalLatched()}`,
   );
 
   // 5h-3: Isolated throwing disposal/settled (ok=true) observer does NOT falsely latch or double-count
   const settledScheduler = readerMod.createSerializedOrtScheduler();
   const seenEvents = [];
+  const settledThrownStages = [];
   const settledReader = readerMod.createLazySingleFlightSafetyReader({
     tokenizer: tokenizerSpec,
     Tensor: FakeTensor,
@@ -974,6 +992,7 @@ async function exerciseCrossModelConcurrency(useSharedScheduler) {
     onEvent: (ev) => {
       seenEvents.push(ev);
       if (ev.phase === 'disposal' && ev.stage === 'settled' && ev.ok) {
+        settledThrownStages.push(`reader:${ev.phase}/${ev.stage}:${ev.ok}:disposedTotal=${ev.disposedTotal}`);
         throw new Error('Observer throws on disposal/settled ok=true');
       }
     },
@@ -986,16 +1005,120 @@ async function exerciseCrossModelConcurrency(useSharedScheduler) {
   const s2 = await settledReader.classify('second healthy call proves unlatched');
   const lastEvent = seenEvents[seenEvents.length - 1];
   check(
-    '5h-3. Throwing disposal/settled(ok=true) observer does not falsely latch or double-count disposedTotal',
+    '5h-3. Throwing disposal/settled(ok=true) observer reached throwing branch twice without latching or double-counting',
     s1.active === false
       && s2.active === false
       && !settledScheduler.isDisposalLatched()
+      && settledThrownStages.length === 2
+      && settledThrownStages[0] === 'reader:disposal/settled:true:disposedTotal=1'
+      && settledThrownStages[1] === 'reader:disposal/settled:true:disposedTotal=2'
       && lastEvent.phase === 'request'
       && lastEvent.stage === 'settled'
       && lastEvent.ok === true
       && lastEvent.disposedTotal === 2,
-    `disposedTotal=${lastEvent?.disposedTotal}, latched=${settledScheduler.isDisposalLatched()}`,
+    `thrown=${JSON.stringify(settledThrownStages)}, disposedTotal=${lastEvent?.disposedTotal}, latched=${settledScheduler.isDisposalLatched()}`,
   );
+
+  // 5h-4: Async observer returning never-settling and rejected promises must NOT block queue or emit unhandledRejection
+  const asyncScheduler = readerMod.createSerializedOrtScheduler();
+  let asyncActive = 0;
+  let asyncMaxActive = 0;
+  let asyncEmbedDisposed = 0;
+  let asyncReaderDisposed = 0;
+  const asyncStages = [];
+  const unhandled = [];
+  const onUnhandled = (reason) => {
+    unhandled.push(reason);
+  };
+  process.on('unhandledRejection', onUnhandled);
+  try {
+    const makeAsyncSink = (wrapper) => (ev) => {
+      if (ev.phase === 'disposal' && ev.stage === 'start') {
+        asyncStages.push(`${wrapper}:disposal/start:pending`);
+        return new Promise(() => {}); // never settles; must not block disposal or next queued call
+      }
+      if (ev.phase === 'disposal' && ev.stage === 'settled') {
+        asyncStages.push(`${wrapper}:disposal/settled:${ev.ok}:reject`);
+        return Promise.reject(new Error(`Async observer rejection on ${wrapper}`));
+      }
+      return undefined;
+    };
+    const asyncEmbedder = onnxMod.createLazySingleFlightEmbedder({
+      tokenizer: tokenizerSpec,
+      Tensor: FakeTensor,
+      scheduler: asyncScheduler,
+      onEvent: makeAsyncSink('embedder'),
+      createSession: async () => {
+        asyncActive += 1;
+        asyncMaxActive = Math.max(asyncMaxActive, asyncActive);
+        return {
+          inputNames: ['input_ids', 'attention_mask'],
+          outputNames: ['last_hidden_state'],
+          handler: {
+            async dispose() {
+              asyncEmbedDisposed += 1;
+              asyncActive -= 1;
+            },
+          },
+          async run(feeds) {
+            const n = feeds.input_ids.dims[1];
+            return { last_hidden_state: { data: new Float32Array(n * 384).fill(0.3), dims: [1, n, 384] } };
+          },
+        };
+      },
+    });
+    const asyncReader = readerMod.createLazySingleFlightSafetyReader({
+      tokenizer: tokenizerSpec,
+      Tensor: FakeTensor,
+      scheduler: asyncScheduler,
+      onEvent: makeAsyncSink('reader'),
+      createSession: async () => {
+        asyncActive += 1;
+        asyncMaxActive = Math.max(asyncMaxActive, asyncActive);
+        const routing = new Float32Array(13).fill(-1);
+        routing[8] = 4.0;
+        const base = makeReaderSession(() => ({
+          caution_logit: { data: Float32Array.from([1.2]), dims: [1] },
+          routing_logits: { data: routing, dims: [1, 13] },
+        }));
+        const origDispose = base.handler.dispose;
+        base.handler.dispose = async () => {
+          await origDispose();
+          asyncReaderDisposed += 1;
+          asyncActive -= 1;
+        };
+        return base;
+      },
+    });
+    const [aVec, aPred] = await Promise.all([
+      asyncEmbedder.embed('async observer on embedder'),
+      asyncReader.classify('async observer on reader'),
+    ]);
+    await new Promise((r) => setTimeout(r, 25));
+    const expectedAsync = [
+      'embedder:disposal/start:pending',
+      'embedder:disposal/settled:true:reject',
+      'reader:disposal/start:pending',
+      'reader:disposal/settled:true:reject',
+    ];
+    check(
+      '5h-4. Async observer (never-settling + rejected promises) is non-blocking and emits zero unhandledRejections',
+      aVec instanceof Float32Array
+        && aVec.length === 384
+        && aPred.actionableRouteId === 'pain-sharp'
+        && asyncEmbedDisposed === 1
+        && asyncReaderDisposed === 1
+        && asyncActive === 0
+        && asyncMaxActive === 1
+        && !asyncScheduler.isDisposalLatched()
+        && unhandled.length === 0
+        && asyncStages.length === expectedAsync.length
+        && expectedAsync.every((entry, idx) => asyncStages[idx] === entry),
+      `unhandled=${unhandled.length}, stages=${JSON.stringify(asyncStages)}, latched=${asyncScheduler.isDisposalLatched()}`,
+    );
+  } finally {
+    process.off('unhandledRejection', onUnhandled);
+  }
 
   // 5g-tostring: Object with throwing toString() preserves exact object and latches fail-closed
   const throwingToString = {

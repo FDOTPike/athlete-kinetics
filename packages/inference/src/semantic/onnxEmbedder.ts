@@ -253,6 +253,32 @@ export interface EmbedderLifecycleEvent {
 export type EmbedderLifecycleSink = (event: EmbedderLifecycleEvent) => void;
 
 /**
+ * Invoke a lifecycle observer without allowing synchronous throws OR returned
+ * rejected promises/thenables to disrupt inference, session disposal, scheduler
+ * latch state, or trigger unhandledRejection. Never awaits the observer.
+ */
+export function emitLifecycleEvent(
+  onEvent: EmbedderLifecycleSink | undefined,
+  event: EmbedderLifecycleEvent,
+): void {
+  if (!onEvent) return;
+  try {
+    const result: unknown = onEvent(event);
+    if (
+      result !== null
+      && (typeof result === 'object' || typeof result === 'function')
+      && 'then' in result
+      && typeof (result as { then?: unknown }).then === 'function'
+    ) {
+      Promise.resolve(result).catch(() => {});
+    }
+  } catch {
+    // Lifecycle telemetry observers must never disrupt inference, cleanup,
+    // or fail-closed scheduler state.
+  }
+}
+
+/**
  * Creates a lightweight Embedder wrapper that maintains ZERO resident session
  * ownership. For each embed() call, requests are serialized through a single-flight
  * queue, an isolated session is created, inference is executed, the session is
@@ -277,13 +303,15 @@ export function createLazySingleFlightEmbedder(opts: LazyEmbedderOptions): Embed
     requestId: number,
     ok: boolean,
   ): void => {
-    if (!onEvent) return;
-    try {
-      onEvent({ phase, stage, requestId, ok, createdTotal, disposedTotal, atMs: Date.now() });
-    } catch {
-      // Lifecycle telemetry observers must never disrupt inference, cleanup,
-      // or fail-closed scheduler state.
-    }
+    emitLifecycleEvent(onEvent, {
+      phase,
+      stage,
+      requestId,
+      ok,
+      createdTotal,
+      disposedTotal,
+      atMs: Date.now(),
+    });
   };
 
   emit('wrapper', 'settled', 0, true); // wrapper exists; zero sessions created

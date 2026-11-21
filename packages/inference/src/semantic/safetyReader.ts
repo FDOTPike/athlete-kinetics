@@ -29,6 +29,7 @@ import { isNoOpGuardrail, type PhraseEntry } from './codebase';
 import { isHarmlessDenial } from './denialGrammar';
 import {
   disposeOrtSession,
+  emitLifecycleEvent,
   type EmbedderLifecyclePhase,
   type EmbedderLifecycleSink,
   type OrtOutputTensor,
@@ -278,13 +279,15 @@ export function createLazySingleFlightSafetyReader(opts: LazySafetyReaderOptions
     requestId: number,
     ok: boolean,
   ): void => {
-    if (!onEvent) return;
-    try {
-      onEvent({ phase, stage, requestId, ok, createdTotal, disposedTotal, atMs: Date.now() });
-    } catch {
-      // Lifecycle telemetry observers must never disrupt inference, cleanup,
-      // or fail-closed scheduler state.
-    }
+    emitLifecycleEvent(onEvent, {
+      phase,
+      stage,
+      requestId,
+      ok,
+      createdTotal,
+      disposedTotal,
+      atMs: Date.now(),
+    });
   };
 
   emit('wrapper', 'settled', 0, true);
