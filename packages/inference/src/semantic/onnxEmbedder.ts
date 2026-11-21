@@ -141,6 +141,30 @@ export function createMiniLmEmbedder(opts: MiniLmEmbedderOptions): Embedder {
   };
 }
 
+export interface SerializedOrtScheduler {
+  /** Execute an ONNX session lifecycle task strictly after all prior queued tasks settle. */
+  schedule<T>(task: () => Promise<T>): Promise<T>;
+}
+
+/**
+ * Shared FIFO async mutex for ONNX Runtime session lifetimes.
+ *
+ * When the MiniLM embedder (triage + Question Box) and the safety reader share
+ * one scheduler, a new native InferenceSession can never be created until the
+ * previous session's disposal has settled in `finally`. Errors in one task
+ * propagate to its caller without wedging subsequent queued tasks.
+ */
+export function createSerializedOrtScheduler(): SerializedOrtScheduler {
+  let queue: Promise<unknown> = Promise.resolve();
+  return {
+    schedule<T>(task: () => Promise<T>): Promise<T> {
+      const next = queue.then(task, task);
+      queue = next.catch(() => {});
+      return next;
+    },
+  };
+}
+
 export interface LazyEmbedderOptions {
   tokenizer: TokenizerSpec;
   dim?: number;
@@ -148,6 +172,12 @@ export interface LazyEmbedderOptions {
   createSession: () => Promise<OrtSessionLike>;
   disposeSession?: (session: OrtSessionLike) => Promise<void>;
   Tensor: OrtTensorCtor;
+  /**
+   * Optional shared ONNX session scheduler (e.g., shared between the embedder
+   * and safety reader so two native sessions never coexist in memory). When
+   * omitted, the wrapper creates its own private single-flight scheduler.
+   */
+  scheduler?: SerializedOrtScheduler;
   /**
    * Optional QA-only lifecycle telemetry (WO remediation D3). When omitted the
    * wrapper behaves exactly as before — production releases carry no sink and
@@ -194,8 +224,8 @@ export function createLazySingleFlightEmbedder(opts: LazyEmbedderOptions): Embed
   const maxTokens = opts.maxTokens ?? 128;
   const tokenizer = new WordPieceTokenizer(spec);
   const onEvent = opts.onEvent;
+  const scheduler = opts.scheduler ?? createSerializedOrtScheduler();
 
-  let queue: Promise<unknown> = Promise.resolve();
   let requestCounter = 0;
   let createdTotal = 0;
   let disposedTotal = 0;
@@ -263,9 +293,7 @@ export function createLazySingleFlightEmbedder(opts: LazyEmbedderOptions): Embed
     modelId: spec.modelId,
     dim,
     embed(text: string): Promise<Float32Array> {
-      const next = queue.then(() => runSingle(text), () => runSingle(text));
-      queue = next.catch(() => {});
-      return next;
+      return scheduler.schedule(() => runSingle(text));
     },
   };
 }
