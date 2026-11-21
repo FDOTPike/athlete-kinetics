@@ -50,36 +50,42 @@ const COMMIT_CACHE = safetyReaderCommitCachePath(CACHE_ROOT, PINNED_RELEASE_COMM
 
 function resolveDownloadEndpoint(rawOverride) {
   if (rawOverride === undefined || rawOverride === '') {
-    return { url: PINNED_ASSET_API_URL, isQaOverride: false };
+    return {
+      url: PINNED_ASSET_API_URL,
+      displayTarget: PINNED_ASSET_API_URL,
+      isQaOverride: false,
+    };
   }
   let parsed;
   try {
     parsed = new URL(rawOverride);
   } catch {
     throw new Error(
-      `AK_SAFETY_READER_DOWNLOAD_URL must target a loopback http:// endpoint; got malformed URL ${JSON.stringify(rawOverride)}.`,
+      'AK_SAFETY_READER_DOWNLOAD_URL must target a credential-free loopback http:// endpoint (malformed URL).',
     );
   }
   const isLoopbackHost =
     parsed.hostname === '127.0.0.1'
     || parsed.hostname === 'localhost'
     || parsed.hostname === '[::1]';
-  if (
-    parsed.protocol !== 'http:'
-    || !isLoopbackHost
-    || parsed.username !== ''
-    || parsed.password !== ''
-  ) {
+  const hasCredentials = parsed.username !== '' || parsed.password !== '';
+  if (parsed.protocol !== 'http:' || !isLoopbackHost || hasCredentials) {
     throw new Error(
-      `AK_SAFETY_READER_DOWNLOAD_URL must target a loopback http:// endpoint without credentials; got ${JSON.stringify(rawOverride)}.`,
+      `AK_SAFETY_READER_DOWNLOAD_URL must target a credential-free loopback http:// endpoint (protocol=${parsed.protocol}, loopback=${isLoopbackHost}, credentials=${hasCredentials}).`,
     );
   }
-  return { url: parsed.toString(), isQaOverride: true };
+  return {
+    url: parsed.toString(),
+    displayTarget: parsed.origin,
+    isQaOverride: true,
+  };
 }
 
-const { url: DOWNLOAD_URL, isQaOverride: IS_QA_DOWNLOAD_OVERRIDE } = resolveDownloadEndpoint(
-  process.env.AK_SAFETY_READER_DOWNLOAD_URL,
-);
+const {
+  url: DOWNLOAD_URL,
+  displayTarget: DOWNLOAD_DISPLAY_TARGET,
+  isQaOverride: IS_QA_DOWNLOAD_OVERRIDE,
+} = resolveDownloadEndpoint(process.env.AK_SAFETY_READER_DOWNLOAD_URL);
 
 mkdirSync(OUT, { recursive: true });
 mkdirSync(COMMIT_CACHE, { recursive: true });
@@ -167,10 +173,10 @@ async function downloadPinned(rel, dest) {
       headers.Authorization = `Bearer ${ghToken}`;
     }
     if (IS_QA_DOWNLOAD_OVERRIDE) {
-      console.log(`downloading (QA loopback fixture override): ${DOWNLOAD_URL}`);
+      console.log(`downloading (QA loopback fixture override): ${DOWNLOAD_DISPLAY_TARGET}`);
     } else {
       console.log(
-        `downloading (asset ${PINNED_ASSET_ID}, ${PINNED_RELEASE_TAG} @ ${PINNED_RELEASE_COMMIT}): ${DOWNLOAD_URL}`,
+        `downloading (asset ${PINNED_ASSET_ID}, ${PINNED_RELEASE_TAG} @ ${PINNED_RELEASE_COMMIT}): ${DOWNLOAD_DISPLAY_TARGET}`,
       );
     }
     const response = await fetch(DOWNLOAD_URL, {
@@ -178,7 +184,7 @@ async function downloadPinned(rel, dest) {
       redirect: IS_QA_DOWNLOAD_OVERRIDE ? 'error' : 'follow',
     });
     if (!response.ok || response.body === null) {
-      throw new Error(`HTTP ${response.status} fetching ${DOWNLOAD_URL}`);
+      throw new Error(`HTTP ${response.status} fetching ${DOWNLOAD_DISPLAY_TARGET}`);
     }
     await streamBoundedToFile(response.body, staged, maxBytes, rel);
     const sha = installVerifiedSafetyReader(rel, staged, dest, 'download');

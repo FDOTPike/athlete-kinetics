@@ -395,7 +395,7 @@ console.log('\n=== [3b] fetch-safety-reader.mjs Stream Pipeline, Asset-ID Bindin
           ...process.env,
           AK_SAFETY_READER_CACHE: join(sandbox, 'cache500'),
           AK_SAFETY_READER_OUT: join(sandbox, 'out500'),
-          AK_SAFETY_READER_DOWNLOAD_URL: mockUrl,
+          AK_SAFETY_READER_DOWNLOAD_URL: `${mockUrl}?token=QUERY_SECRET_TOKEN#FRAG_SECRET_TOKEN`,
         },
         maxBuffer: 16 * 1024 * 1024,
       });
@@ -404,9 +404,10 @@ console.log('\n=== [3b] fetch-safety-reader.mjs Stream Pipeline, Asset-ID Bindin
       http500Output = String(e.stderr ?? '') + String(e.stdout ?? '');
     }
     const http500Stages = listFiles(sandbox).filter((p) => /\.stage-/.test(p));
-    check('HTTP 500 download failure fails specifically at HTTP-status check and leaves zero stage remnants',
+    check('HTTP 500 download failure fails at HTTP-status check, redacts query/fragment secrets, and leaves zero stage remnants',
       http500Exit === 1
         && /HTTP 500 fetching/.test(http500Output)
+        && !/QUERY_SECRET_TOKEN|FRAG_SECRET_TOKEN/.test(http500Output)
         && http500Stages.length === 0,
       `exit=${http500Exit}, remnants=${http500Stages.length}`);
 
@@ -419,7 +420,7 @@ console.log('\n=== [3b] fetch-safety-reader.mjs Stream Pipeline, Asset-ID Bindin
           ...process.env,
           AK_SAFETY_READER_CACHE: join(sandbox, 'cacheExt'),
           AK_SAFETY_READER_OUT: join(sandbox, 'outExt'),
-          AK_SAFETY_READER_DOWNLOAD_URL: 'https://example.invalid/reader_quantized.onnx',
+          AK_SAFETY_READER_DOWNLOAD_URL: 'https://example.invalid/reader_quantized.onnx?sig=EXT_SECRET',
         },
         maxBuffer: 16 * 1024 * 1024,
       });
@@ -427,9 +428,34 @@ console.log('\n=== [3b] fetch-safety-reader.mjs Stream Pipeline, Asset-ID Bindin
       nonLoopbackExit = e.code;
       nonLoopbackOutput = String(e.stderr ?? '') + String(e.stdout ?? '');
     }
-    check('non-loopback AK_SAFETY_READER_DOWNLOAD_URL rejected fail-closed',
-      nonLoopbackExit === 1 && /loopback http:\/\/ endpoint/.test(nonLoopbackOutput),
+    check('non-loopback AK_SAFETY_READER_DOWNLOAD_URL rejected fail-closed without leaking query string',
+      nonLoopbackExit === 1
+        && /loopback http:\/\/ endpoint/.test(nonLoopbackOutput)
+        && !/EXT_SECRET/.test(nonLoopbackOutput),
       `exit=${nonLoopbackExit}`);
+
+    // Credential-bearing loopback URL rejected without echoing credentials/query/fragment into stderr
+    let credExit = 0;
+    let credOutput = '';
+    try {
+      await execFileAsync(process.execPath, [FETCH_SCRIPT], {
+        env: {
+          ...process.env,
+          AK_SAFETY_READER_CACHE: join(sandbox, 'cacheCred'),
+          AK_SAFETY_READER_OUT: join(sandbox, 'outCred'),
+          AK_SAFETY_READER_DOWNLOAD_URL: 'http://admin:TOP_SECRET_PASS@127.0.0.1:9999/asset?key=CRED_QUERY#CRED_FRAG',
+        },
+        maxBuffer: 16 * 1024 * 1024,
+      });
+    } catch (e) {
+      credExit = e.code;
+      credOutput = String(e.stderr ?? '') + String(e.stdout ?? '');
+    }
+    check('credential-bearing loopback URL rejected without disclosing credentials, query, or fragment',
+      credExit === 1
+        && /loopback http:\/\/ endpoint/.test(credOutput)
+        && !/admin|TOP_SECRET_PASS|CRED_QUERY|CRED_FRAG/.test(credOutput),
+      `exit=${credExit}`);
 
     // Redirect from loopback QA override server rejected (redirect: 'error') without hitting target
     mode = 'redirect';
