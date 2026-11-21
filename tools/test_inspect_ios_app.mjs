@@ -35,6 +35,7 @@ function runInspectorCli(cliPath, args) {
   try {
     const stdout = execFileSync(process.execPath, [cliPath, ...args], {
       encoding: 'utf8',
+      stdio: 'pipe',
       timeout: 60000,
     });
     return { code: 0, stdout, stderr: '' };
@@ -285,6 +286,62 @@ async function main() {
       callHelper(poisoning2cLog) === false,
     );
 
+    // Poisoning 2d: op-sqlite .resp carries valid =1 followed by -DSQLITE_ENABLE_MATH_FUNCTIONS=0 override.
+    const opSqliteOverrideZeroRespPath = join(respDir, 'override-zero-common-args.resp');
+    writeFileSync(opSqliteOverrideZeroRespPath, `${longFlagsWithMath} '-DSQLITE_ENABLE_MATH_FUNCTIONS=0'`);
+    const poisoning2dLog = [
+      `CompileC ${join(respDir, 'sqlite3.o')} /repo/node_modules/@op-engineering/op-sqlite/cpp/sqlite3.c normal arm64 c com.apple.compilers.llvm.clang.1_0.compiler (in target 'op-sqlite' from project 'Pods')`,
+      '    cd /repo/apps/mobile/ios/Pods',
+      `    Using response file: ${opSqliteOverrideZeroRespPath}`,
+      `    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -x c @${opSqliteOverrideZeroRespPath} -c /repo/node_modules/@op-engineering/op-sqlite/cpp/sqlite3.c -o ${join(respDir, 'sqlite3.o')}`,
+      '',
+    ].join('\n');
+    check(
+      'Poisoning 2d: op-sqlite .resp has valid =1 followed by -DSQLITE_ENABLE_MATH_FUNCTIONS=0 override -> rejected',
+      callHelper(poisoning2dLog) === false,
+    );
+
+    // Poisoning 2e: op-sqlite .resp carries valid =1 followed by -USQLITE_ENABLE_MATH_FUNCTIONS undef override.
+    const opSqliteOverrideUndefRespPath = join(respDir, 'override-undef-common-args.resp');
+    writeFileSync(opSqliteOverrideUndefRespPath, `${longFlagsWithMath} '-USQLITE_ENABLE_MATH_FUNCTIONS'`);
+    const poisoning2eLog = [
+      `CompileC ${join(respDir, 'sqlite3.o')} /repo/node_modules/@op-engineering/op-sqlite/cpp/sqlite3.c normal arm64 c com.apple.compilers.llvm.clang.1_0.compiler (in target 'op-sqlite' from project 'Pods')`,
+      '    cd /repo/apps/mobile/ios/Pods',
+      `    Using response file: ${opSqliteOverrideUndefRespPath}`,
+      `    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -x c @${opSqliteOverrideUndefRespPath} -c /repo/node_modules/@op-engineering/op-sqlite/cpp/sqlite3.c -o ${join(respDir, 'sqlite3.o')}`,
+      '',
+    ].join('\n');
+    check(
+      'Poisoning 2e: op-sqlite .resp has valid =1 followed by -USQLITE_ENABLE_MATH_FUNCTIONS override -> rejected',
+      callHelper(poisoning2eLog) === false,
+    );
+
+    // Poisoning 2f: clang line references a valid @.resp file carrying =1, followed by -DSQLITE_ENABLE_MATH_FUNCTIONS=0 on the clang line.
+    const poisoning2fLog = [
+      `CompileC ${join(respDir, 'sqlite3.o')} /repo/node_modules/@op-engineering/op-sqlite/cpp/sqlite3.c normal arm64 c com.apple.compilers.llvm.clang.1_0.compiler (in target 'op-sqlite' from project 'Pods')`,
+      '    cd /repo/apps/mobile/ios/Pods',
+      `    Using response file: ${sqliteRespPath}`,
+      `    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -x c @${sqliteRespPath} -DSQLITE_ENABLE_MATH_FUNCTIONS=0 -c /repo/node_modules/@op-engineering/op-sqlite/cpp/sqlite3.c -o ${join(respDir, 'sqlite3.o')}`,
+      '',
+    ].join('\n');
+    check(
+      'Poisoning 2f: clang line references valid @.resp (=1) followed by inline -DSQLITE_ENABLE_MATH_FUNCTIONS=0 override -> rejected',
+      callHelper(poisoning2fLog) === false,
+    );
+
+    // Poisoning 2g: op-sqlite CompileC block exists for bridge.cpp with valid =1, but no sqlite3.c CompileC block exists in the log.
+    const poisoning2gLog = [
+      `CompileC ${join(respDir, 'bridge.o')} /repo/node_modules/@op-engineering/op-sqlite/cpp/bridge.cpp normal arm64 c++ com.apple.compilers.llvm.clang.1_0.compiler (in target 'op-sqlite' from project 'Pods')`,
+      '    cd /repo/apps/mobile/ios/Pods',
+      `    Using response file: ${cppRespPath}`,
+      `    /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -x c++ @${cppRespPath} -c /repo/node_modules/@op-engineering/op-sqlite/cpp/bridge.cpp -o ${join(respDir, 'bridge.o')}`,
+      '',
+    ].join('\n');
+    check(
+      'Poisoning 2g: op-sqlite CompileC blocks exist (bridge.cpp only) without any sqlite3.c CompileC block -> rejected',
+      callHelper(poisoning2gLog) === false,
+    );
+
     // Poisoning 3: Referenced op-sqlite .resp file does not exist on disk and has no logged WriteAuxiliaryFile content.
     const missingDiskRespPath = join(respDir, 'missing-from-disk-common-args.resp');
     const poisoning3Log = [
@@ -317,6 +374,13 @@ async function main() {
     // =========================================================================
     console.log('\n[3] CLI subprocess verification (including path with spaces)');
 
+    const noArgsRun = runInspectorCli(INSPECTOR, []);
+    check(
+      'CLI subprocess with no arguments exits 2 and prints usage on stderr (exercises isMainModule on every OS)',
+      noArgsRun.code === 2 && noArgsRun.stderr.includes('usage: node tools/inspect_ios_app.mjs <App.app> <xcodebuild.log> <out.json>'),
+      `exit=${noArgsRun.code}`,
+    );
+
     let hasPlutil = false;
     try {
       execFileSync('plutil', ['-help'], { stdio: 'ignore' });
@@ -330,6 +394,14 @@ async function main() {
       hasModel = readFileSync(realModelPath).length > 1_000_000 && Boolean(KNOWN_SHA256['onnx/model_quantized.onnx']);
     } catch {
       hasModel = false;
+    }
+
+    if (process.platform === 'darwin') {
+      check(
+        'macOS prerequisites (plutil and fetched minilm model) are present for bundle CLI tests (fails closed on darwin)',
+        hasPlutil && hasModel,
+        `hasPlutil=${hasPlutil} hasModel=${hasModel}`,
+      );
     }
 
     if (hasPlutil && hasModel) {

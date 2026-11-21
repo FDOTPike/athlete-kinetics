@@ -162,12 +162,10 @@ export function hasOpSqliteMathFunctions(logText) {
     if (isSqlite3C) sqlite3CompileBlocksVerified += 1;
   }
 
-  if (sqlite3CompileBlocksTotal > 0) {
-    return sqlite3CompileBlocksVerified === sqlite3CompileBlocksTotal
-      && opSqliteCompileBlocksVerified === opSqliteCompileBlocksTotal;
-  }
   if (opSqliteCompileBlocksTotal > 0) {
-    return opSqliteCompileBlocksVerified === opSqliteCompileBlocksTotal;
+    return sqlite3CompileBlocksTotal > 0
+      && sqlite3CompileBlocksVerified === sqlite3CompileBlocksTotal
+      && opSqliteCompileBlocksVerified === opSqliteCompileBlocksTotal;
   }
   return loggedRespStatus.size > 0;
 }
