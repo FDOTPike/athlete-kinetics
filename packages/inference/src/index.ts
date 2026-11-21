@@ -308,7 +308,32 @@ export {
   type OrtSessionLike,
   type OrtSessionWithHandler,
   type OrtTensorCtor,
+  createSerializedOrtScheduler,
+  type SerializedOrtScheduler,
 } from './semantic/onnxEmbedder';
+export {
+  DENIAL_GRAMMAR_MAX_CLAUSES,
+  DENIAL_GRAMMAR_MAX_LENGTH,
+  isHarmlessDenial,
+} from './semantic/denialGrammar';
+export {
+  SAFETY_READER_BYTES,
+  SAFETY_READER_CLASSES,
+  SAFETY_READER_LOCK_SHA256,
+  SAFETY_READER_MAX_TOKENS,
+  SAFETY_READER_MIN_TOKENS,
+  SAFETY_READER_MODEL_ID,
+  SAFETY_READER_POLICY_ID,
+  SAFETY_READER_SHA256,
+  combineDenialFloor,
+  createLazySingleFlightSafetyReader,
+  runSafetyReaderInference,
+  type DenialFloorInput,
+  type LazySafetyReaderOptions,
+  type SafetyReader,
+  type SafetyReaderClassId,
+  type SafetyReaderPrediction,
+} from './semantic/safetyReader';
 export {
   AMBIGUITY_MARGIN,
   CONFIDENCE_THRESHOLD,

@@ -20,7 +20,8 @@ export interface OrtTensorCtor {
   new (type: 'int64', data: BigInt64Array, dims: readonly number[]): unknown;
 }
 export interface OrtOutputTensor {
-  data: Float32Array | number[];
+  type?: string;
+  data: Float32Array | Float64Array | number[] | ArrayLike<unknown>;
   dims: readonly number[];
 }
 export interface OrtSessionLike {
@@ -141,6 +142,70 @@ export function createMiniLmEmbedder(opts: MiniLmEmbedderOptions): Embedder {
   };
 }
 
+export interface SerializedOrtScheduler {
+  /** Execute an ONNX session lifecycle task strictly after all prior queued tasks settle. */
+  schedule<T>(task: () => Promise<T>): Promise<T>;
+  /**
+   * Permanently latch this scheduler fail-closed after an unconfirmed native
+   * session disposal failure so no subsequent session can be created while an
+   * earlier native session may still occupy memory.
+   */
+  markDisposalFailed(error: unknown): void;
+  /** True once a native disposal rejection has latched this scheduler fail-closed. */
+  isDisposalLatched(): boolean;
+}
+
+/**
+ * Shared FIFO async mutex for ONNX Runtime session lifetimes.
+ *
+ * When the MiniLM embedder (triage + Question Box) and the safety reader share
+ * one scheduler, a new native InferenceSession can never be created until the
+ * previous session's disposal has settled in `finally`. Recoverable inference
+ * errors whose disposal succeeded propagate without wedging later calls; any
+ * disposal rejection permanently latches the scheduler fail-closed so peak
+ * unconfirmed native session occupancy stays bounded at one.
+ */
+export function createSerializedOrtScheduler(): SerializedOrtScheduler {
+  let queue: Promise<unknown> = Promise.resolve();
+  let disposalFailure: Error | null = null;
+  return {
+    markDisposalFailed(error: unknown): void {
+      if (disposalFailure !== null) return;
+      // Latch synchronously BEFORE touching or formatting `error` so even
+      // unformattable rejections (Object.create(null), throwing toString(),
+      // hostile Proxies) can never throw out of latch construction or leave
+      // the scheduler open to allocating a second native session.
+      const latchError = new Error(
+        'ONNX scheduler latched fail-closed after unconfirmed session disposal',
+      );
+      disposalFailure = latchError;
+      try {
+        const detail = error instanceof Error ? error.message : String(error);
+        if (detail) {
+          latchError.message = `ONNX scheduler latched fail-closed after unconfirmed session disposal: ${detail}`;
+        }
+      } catch {
+        latchError.message =
+          'ONNX scheduler latched fail-closed after unconfirmed session disposal: <unformattable rejection>';
+      }
+    },
+    isDisposalLatched(): boolean {
+      return disposalFailure !== null;
+    },
+    schedule<T>(task: () => Promise<T>): Promise<T> {
+      const runGuarded = (): Promise<T> => {
+        if (disposalFailure !== null) {
+          return Promise.reject(disposalFailure);
+        }
+        return task();
+      };
+      const next = queue.then(runGuarded, runGuarded);
+      queue = next.catch(() => {});
+      return next;
+    },
+  };
+}
+
 export interface LazyEmbedderOptions {
   tokenizer: TokenizerSpec;
   dim?: number;
@@ -148,6 +213,12 @@ export interface LazyEmbedderOptions {
   createSession: () => Promise<OrtSessionLike>;
   disposeSession?: (session: OrtSessionLike) => Promise<void>;
   Tensor: OrtTensorCtor;
+  /**
+   * Optional shared ONNX session scheduler (e.g., shared between the embedder
+   * and safety reader so two native sessions never coexist in memory). When
+   * omitted, the wrapper creates its own private single-flight scheduler.
+   */
+  scheduler?: SerializedOrtScheduler;
   /**
    * Optional QA-only lifecycle telemetry (WO remediation D3). When omitted the
    * wrapper behaves exactly as before — production releases carry no sink and
@@ -182,6 +253,32 @@ export interface EmbedderLifecycleEvent {
 export type EmbedderLifecycleSink = (event: EmbedderLifecycleEvent) => void;
 
 /**
+ * Invoke a lifecycle observer without allowing synchronous throws OR returned
+ * rejected promises/thenables to disrupt inference, session disposal, scheduler
+ * latch state, or trigger unhandledRejection. Never awaits the observer.
+ */
+export function emitLifecycleEvent(
+  onEvent: EmbedderLifecycleSink | undefined,
+  event: EmbedderLifecycleEvent,
+): void {
+  if (!onEvent) return;
+  try {
+    const result: unknown = onEvent(event);
+    if (
+      result !== null
+      && (typeof result === 'object' || typeof result === 'function')
+      && 'then' in result
+      && typeof (result as { then?: unknown }).then === 'function'
+    ) {
+      Promise.resolve(result).catch(() => {});
+    }
+  } catch {
+    // Lifecycle telemetry observers must never disrupt inference, cleanup,
+    // or fail-closed scheduler state.
+  }
+}
+
+/**
  * Creates a lightweight Embedder wrapper that maintains ZERO resident session
  * ownership. For each embed() call, requests are serialized through a single-flight
  * queue, an isolated session is created, inference is executed, the session is
@@ -194,8 +291,8 @@ export function createLazySingleFlightEmbedder(opts: LazyEmbedderOptions): Embed
   const maxTokens = opts.maxTokens ?? 128;
   const tokenizer = new WordPieceTokenizer(spec);
   const onEvent = opts.onEvent;
+  const scheduler = opts.scheduler ?? createSerializedOrtScheduler();
 
-  let queue: Promise<unknown> = Promise.resolve();
   let requestCounter = 0;
   let createdTotal = 0;
   let disposedTotal = 0;
@@ -206,8 +303,15 @@ export function createLazySingleFlightEmbedder(opts: LazyEmbedderOptions): Embed
     requestId: number,
     ok: boolean,
   ): void => {
-    if (!onEvent) return;
-    onEvent({ phase, stage, requestId, ok, createdTotal, disposedTotal, atMs: Date.now() });
+    emitLifecycleEvent(onEvent, {
+      phase,
+      stage,
+      requestId,
+      ok,
+      createdTotal,
+      disposedTotal,
+      atMs: Date.now(),
+    });
   };
 
   emit('wrapper', 'settled', 0, true); // wrapper exists; zero sessions created
@@ -240,15 +344,16 @@ export function createLazySingleFlightEmbedder(opts: LazyEmbedderOptions): Embed
         const s = session;
         session = null;
         emit('disposal', 'start', requestId, true);
+        let disposedOk = false;
         try {
           await disposeSession(s);
-          disposedTotal += 1;
-          emit('disposal', 'settled', requestId, true);
+          disposedOk = true;
         } catch (error) {
-          disposedTotal += 1;
           disposalError = { error };
-          emit('disposal', 'settled', requestId, false);
+          scheduler.markDisposalFailed(error);
         }
+        disposedTotal += 1;
+        emit('disposal', 'settled', requestId, disposedOk);
       }
       // A failed disposal is reported on its own stage event; the request-level
       // settled event is always emitted and stays truthful about the outcome.
@@ -263,9 +368,7 @@ export function createLazySingleFlightEmbedder(opts: LazyEmbedderOptions): Embed
     modelId: spec.modelId,
     dim,
     embed(text: string): Promise<Float32Array> {
-      const next = queue.then(() => runSingle(text), () => runSingle(text));
-      queue = next.catch(() => {});
-      return next;
+      return scheduler.schedule(() => runSingle(text));
     },
   };
 }
