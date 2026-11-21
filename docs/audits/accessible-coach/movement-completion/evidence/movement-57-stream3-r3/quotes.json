@@ -1,0 +1,292 @@
+{
+  "bounds": [
+    {
+      "id": 194,
+      "quote": "Step back off the platform with one leg and lower until the back knee reaches the floor.",
+      "bound": "The stepping leg is lifted off the platform and lands 33.63 behind it: across every 33 ms tick the thighs and knees never touch the platform's painted outline (distance >= thigh half-width), and once the ankle is behind the platform the shin and foot clear the outline by their painted half-widths.",
+      "test": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js:533-566"
+    },
+    {
+      "id": 194,
+      "quote": "Back tight, chest up.",
+      "bound": "The held bottom dwell and the \"Hold briefly\" captions are gone (phases [1, 0, 1, 2, 1], segments [950, 900, 950, 900]); \"back tight and chest up\" moved into the drive caption; no dwell inside the cycle exceeds 150 ms.",
+      "test": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js:519-531"
+    },
+    {
+      "id": 239,
+      "quote": "Step forward with the opposite foot and lower the back knee toward the floor with the torso upright, passing the kettlebell under the front leg to the other hand.",
+      "bound": "Forward lunge: the front ankle steps forward 29.65 (> 20) while the rear toe stays within 0.4 of where it stood (<= 0.5) at every tick; the bell's painted outline clears both thighs (min 7.586 >= 7.432) and both shins (min 10.675 >= 6.76) at every tick, and the bell passes directly under the front thigh in each lunge.",
+      "test": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js:568-617"
+    },
+    {
+      "id": 239,
+      "quote": "Pass the bell under the front thigh.",
+      "bound": "The handle is always in a hand (within 1.0 of a hold at every tick): the carrying hand brings it between the legs, both hands meet on it, it changes hands only inside bellPass [0, 0.02] at that meeting, and the taking hand swings it down under the front thigh (bell 7.4+ below the thigh axis, within 1.0 of the axis across the body); trunk stays >= 75 deg.",
+      "test": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js:568-599"
+    },
+    {
+      "id": 96,
+      "quote": "place the balls of the feet on a stable low block with the heels free.",
+      "bound": "The block runs from x = 3.8 with the ball of the foot 1.6 in from its rear edge, so the ankles stay behind the rear edge by more than the heel's painted radius at every tick (max ankle x 1.39 < 1.64), and the loaded (bar 0.40) and unloaded centres of mass stay over the block between its rear edge and the ball of the foot (3.98 to 5.17 within [3.8, 5.4]) at every tick.",
+      "test": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js:419-468"
+    },
+    {
+      "id": 96,
+      "quote": "Lower into an owned stretch, pause, then rise as high as balance allows.",
+      "bound": "At the stretch the heel joint is below the block top; footCloseUp(figure) magnifies the figure's own foot 2x in a round panel with every prim inside the circle, the heel's lowest painted point 5.07 page units below the magnified block top at the stretch and above it at the top; the source pauses are kept.",
+      "test": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js:630-663"
+    },
+    {
+      "id": 231,
+      "quote": "use the free hand to drive forward and push up to a seated position, then to one knee.",
+      "bound": "Nine keyframes [0, 1, 2, 3, 4, 3, 2, 1, 0]: lying, seated on the pelvis (trunk raised 48.6 deg >= 45, far knee 21.3 > 5), one knee with the hand down (trunk [80, -60], never past 95 deg backward), one knee upright, standing; the pelvis, back, free hand, near foot, far foot or far knee bear weight in painted contact with the floor (within 0.5) at each stage at every tick and nothing is painted below the floor.",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:610-673"
+    },
+    {
+      "id": 231,
+      "quote": "Keep the arm locked out the whole time.",
+      "bound": "The bell arm stays locked (>= 172 deg) and vertical over its shoulder at every tick (wrist exactly 24.5 above the shoulder); both knees stay >= 35 deg; neither foot is bent outside 70 to 150 deg at the ankle; no caption adds a pause.",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:438-505"
+    },
+    {
+      "id": 121,
+      "quote": "Reverse the path to the floor; if the bell slaps the forearm, the hand travelled around the bell instead of the bell rolling around the hand.",
+      "bound": "No caption or summary instructs a spiral or the hand going around the handle; the rack caption is \"Finish the hips and guide the bell close into the rack, receiving it softly with the elbow tucked.\"",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:600-608"
+    },
+    {
+      "id": 121,
+      "quote": "Receive it softly with the elbow tucked.",
+      "bound": "The rack is not held: no two consecutive keyframes share a phase (phases [0, 1, 2, 1, 0], segments [700, 800, 800, 700]); the rack elbow stays >= 30 deg.",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:600-608"
+    },
+    {
+      "id": 18,
+      "quote": "Lower the rear knee toward the floor, then drive through the front foot to stand.",
+      "bound": "The bottom hold and its \"Hold briefly\" caption are removed (phases [0, 1, 2, 1, 0], segments [650, 650, 600, 600]); no dwell inside the cycle exceeds 150 ms.",
+      "test": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js:519-531"
+    },
+    {
+      "id": 18,
+      "quote": "Drop the rear knee straight down.",
+      "bound": "The rear knee still drops straight down to the bottom pose with the whole front foot planted at every tick.",
+      "test": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js:125-165"
+    },
+    {
+      "id": 36,
+      "quote": "Put the whole foot on the box and stand up through it",
+      "bound": "The top dwell is 150 ms (segments [1100, 150, 1500, 400]) and its caption reads \"Stand tall through the hip with the whole foot on the box; the bottom foot is a passenger.\" with no hold word.",
+      "test": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js:519-531"
+    },
+    {
+      "id": 36,
+      "quote": "Drive through the top leg — the bottom foot is a passenger.",
+      "bound": "No caption adds a hold the text does not give; no dwell inside the cycle exceeds 150 ms.",
+      "test": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js:519-531"
+    },
+    {
+      "id": 136,
+      "quote": "Step forward with one leg and lower the hips straight down under control, keeping the torso upright.",
+      "bound": "The front foot is lifted and steps forward while the rear foot's toe stays within 0.5 of where it stood at every tick (lunge root moved to x 10.44, rear ankle -5.06 on the ball of the foot).",
+      "test": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js:619-628"
+    },
+    {
+      "id": 136,
+      "quote": "Push through the front heel to step back to standing.",
+      "bound": "The bottom hold and its caption are removed (phases [0, 1, 2, 1, 0, 0], segments [650, 650, 600, 600, 450]); no dwell inside the cycle exceeds 150 ms.",
+      "test": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js:519-531"
+    },
+    {
+      "id": 67,
+      "quote": "Use the bell as a counterbalance while squatting through the deepest range the standing foot can own.",
+      "bound": "The bottom dwell is 150 ms (segments [1500, 150, 1100, 400]) and its caption reads \"Root the whole standing foot at the deepest range it can own, with the free foot off the floor.\" with no hold word.",
+      "test": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js:519-531"
+    },
+    {
+      "id": 67,
+      "quote": "Root the whole standing foot.",
+      "bound": "No caption adds a hold the text does not give; the standing foot stays rooted flat with the centre of mass over it at every tick.",
+      "test": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js:366-417"
+    },
+    {
+      "id": 33,
+      "quote": "Pull the bar back to your knees using your abs, not your arms.",
+      "bound": "At the start and the finish the bar is 6.0 in front of the knees (<= 10) and clear of them (>= 0.8 + thigh half-width), with the hips sat back; nine poses solved so the plates stay on the floor (wrist height within 0.032 of 5.45) between them.",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:518-529"
+    },
+    {
+      "id": 33,
+      "quote": "Kneel behind a loaded barbell with small plates and grip it at shoulder width.",
+      "bound": "Each hand is in line with its own shoulder across the body (|wrist.z - shoulder.z| = 0 <= 1.0) at every tick; the end-of-rollout hold caption is removed (phases [0, 4, 8, 4, 0]).",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:508-542"
+    },
+    {
+      "id": 137,
+      "quote": "grip the bar with the hands about shoulder-width apart.",
+      "bound": "Each hand is in line with its own shoulder across the body (0 <= 1.0) at every tick, with the five poses re-solved so the bar stays on the floor (within 0.034 of 5.45).",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:531-542"
+    },
+    {
+      "id": 137,
+      "quote": "Pull the bar back under the shoulders to return to the start.",
+      "bound": "The extended-position hold caption is removed (phases [0, 2, 4, 2, 0], segments [700, 700, 700, 700]); no dwell inside the cycle exceeds 150 ms.",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:508-516"
+    },
+    {
+      "id": 149,
+      "quote": "Lie perpendicular across a flat bench with only the shoulders on the surface, hips low and feet flat on the floor.",
+      "bound": "The bench front edge sits under the shoulder blades (chainFlatBench(-29, -15, 18)) and the rigid trunk is lifted 1.4 (PULLOVER_BENCH_LIFT) so its painted slices rest on the bench (min gap 0.001 >= -0.05) and touch it within the shoulder quarter (<= 0.5) at every tick.",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:544-560"
+    },
+    {
+      "id": 149,
+      "quote": "Hold one dumbbell over the chest with both palms pressed against the underside and the elbows bent.",
+      "bound": "The start is over the chest: the held point is 5.13 down the trunk from the neck (> 0, <= 12, half the trunk), with the elbow bend unchanged (upperArm [36, -24], forearm [84, -24]).",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:562-575"
+    },
+    {
+      "id": 289,
+      "quote": "Lie perpendicular across a flat bench with only the shoulders on the surface, hips low and feet flat on the floor.",
+      "bound": "Same bench and lift as 149: the painted trunk rests on the bench edge (min gap 0.001) and the shoulders touch it at every tick.",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:544-560"
+    },
+    {
+      "id": 289,
+      "quote": "Hold one dumbbell over the chest at full extension with both palms pressed against the underside.",
+      "bound": "The start arm is turned toward the hips (upperArm and forearm [61, -22.5]) so the dumbbell starts 5.09 down the trunk from the neck, over the chest, with the elbows straight.",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:240-281"
+    },
+    {
+      "id": 148,
+      "quote": "Lie on a flat bench holding a barbell with a shoulder-width grip over the chest, elbows bent.",
+      "bound": "Each hand is in line with its own shoulder across the body (0 <= 1.0) at every tick; the bar starts 5.61 down the trunk from the neck (over the chest) with the elbow bend fixed at 132 deg.",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:531-575"
+    },
+    {
+      "id": 148,
+      "quote": "Keep the elbow bend fixed.",
+      "bound": "The elbow angle stays within 0.05 of its start value at every tick and the bar midpoint stays more than 5.5 from the head.",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:283-313"
+    },
+    {
+      "id": 201,
+      "quote": "Set a flat bench between two low pulleys so the pulleys line up with the chest",
+      "bound": "Both pulleys (and their frames) moved to x = -10: 6.0 down the trunk from the shoulders (> 0, <= 12).",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:577-591"
+    },
+    {
+      "id": 201,
+      "quote": "Hands meet above the chest.",
+      "bound": "The arms sweep in the chest's plane (sagittal 83 deg) so the hands meet 2.71 down the trunk from the shoulders and 22.09 above the neck (> 22), with the elbow bend fixed.",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:315-360"
+    },
+    {
+      "id": 217,
+      "quote": "Set an incline bench between two low pulleys, lie back with a handle in each hand and bring the hands together at arm's length above the face.",
+      "bound": "No caption or summary names a bench angle (\"30 to 45 degrees\" removed) or the \"upper chest\".",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:593-598"
+    },
+    {
+      "id": 217,
+      "quote": "Bring the hands back together along the same arc and pause.",
+      "bound": "The closing caption reads \"Squeeze the chest to bring the hands back together along the same arc.\" and the source pause at the top is kept.",
+      "test": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js:362-409"
+    }
+  ],
+  "fileQuotes": [
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js",
+      "line": 568,
+      "text": "test('239 Lunge Pass Through: \"Pass the bell under the front thigh\""
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js",
+      "line": 580,
+      "text": "expect(pointSegment3(bell, leg.hipJoint, leg.knee)).toBeGreaterThanOrEqual(BELL_R + THIGH_HALF);"
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js",
+      "line": 584,
+      "text": "expect(Math.min(dist3(w.kettlebell.grip, w.near.hold), dist3(w.kettlebell.grip, w.far.hold))).toBeLessThan(1.0);"
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js",
+      "line": 533,
+      "text": "test('194 Elevated Back Lunge: \"Step back off the platform with one leg\""
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js",
+      "line": 630,
+      "text": "test('96 Standing Barbell Calf Raise: \"Lower into an owned stretch, pause, then rise as high as balance allows\""
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js",
+      "line": 610,
+      "text": "test('231 Kettlebell Turkish Get-Up: \"push up to a seated position, then to one knee\""
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA14TrunkPulloverFlyeSkills.test.js",
+      "line": 518,
+      "text": "test('33 Barbell Ab Rollout: \"Pull the bar back to your knees\""
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5435,
+      "text": "wrist: [21, 24.5, 2], farWrist: [21, 24.5, 1.2], farWristArc: -2,"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5436,
+      "text": "bellSide: 1, bellPass: [0, 0.02],"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5530,
+      "text": "equipment: [{ kind: 'box', a: [3.8, 0.5], b: [10.4, 6.0] }],"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5531,
+      "text": "footCloseUp: { at: [33.6, 36.9], r: 16, scale: 2, edge: [3.8, 6.0], focus: [2.6, 9.75] },"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5929,
+      "text": "at: [-26.768, 27.511, -3.4], atArc: 1.5, trunk: [80, -60], sideCurl: -30, shrug: -2, head: [90, -60],"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5711,
+      "text": "equipment: chainFlatBench(-29, -15, 18.0),"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5795,
+      "text": "{ from: [-10, 4.5, 32], to: 'nearGrip' },"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5381,
+      "text": "ankle: [-33.63, 5.21], farAnkle: [10.0, 6.0 + CHAIN_ANKLE_HEIGHT], ankleArc: 6,"
+    },
+    {
+      "file": "tools/rendering/chain_motion_specs.mjs",
+      "line": 2620,
+      "text": "phases: [0, 4, 8, 4, 0],"
+    },
+    {
+      "file": "tools/rendering/chain_motion_specs.mjs",
+      "line": 2769,
+      "text": "'Finish the hips and guide the bell close into the rack, receiving it softly with the elbow tucked.',"
+    },
+    {
+      "file": "tools/rendering/chain_motion_specs.mjs",
+      "line": 2780,
+      "text": "phases: [0, 1, 2, 3, 4, 3, 2, 1, 0],"
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "text": "Pass the bell under the front thigh."
+    }
+  ]
+}

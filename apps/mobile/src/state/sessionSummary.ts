@@ -36,11 +36,16 @@
  * INDEPENDENT maxima with plain labels — "most reps in one set", "heaviest
  * load used", "longest recorded time". No combined "best set N reps at X kg"
  * form exists, because that reads as one set that never occurred.
+ * The one exception is the TOP SET (issue #230): it is a single logged set,
+ * named exactly as logged (load × reps at its logged effort), never composed
+ * from two sets and never an estimate.
  *
  * D4 — the no-next-session copy is the universal fallback text; D6 — summary
  * lines carry stable movement-based keys, never rendered text or indexes.
  */
 import { nextSessionAfter, type SessionRef, type TodayBlockSession } from './todayState';
+import { formatAthleteDate } from './athleteDate';
+import { regionLabel, reportSeverityLabel } from './sessionReportStop';
 
 export type ImplementClass = 'bodyweight' | 'loaded';
 
@@ -53,6 +58,8 @@ export interface SummarySetFact {
   reps: number;
   loadKg: number;
   timeS: number | null;
+  /** The effort logged with the set; null or absent when none was given. */
+  rpe?: number | null;
 }
 
 /** One movement of the ended session, with the sets actually recorded. */
@@ -64,8 +71,40 @@ export interface SummaryExercise {
    * be stated honestly — see `groupSummaryExercises`.
    */
   plannedSets: number | null;
+  /** Set when this movement's slot was swapped after logged sets (075), so the
+   *  line can say "1 of 2 sets, then swapped to <movement>". */
+  swappedToMovementName?: string | null;
   sets: SummarySetFact[];
+  /** Issue #218: a dumbbell exercise; its loads are per dumbbell, as logged. */
+  perDumbbell?: boolean;
 }
+
+/** Issue #218: whether a movement's load is entered per dumbbell. The
+ *  athlete's declared implement decides when the movement supports it;
+ *  otherwise only a movement whose sole supported implement is DB counts. The
+ *  first of several supported implements is dropdown order, never the
+ *  implement in use (OW-001). */
+export const isDumbbellLoad = (
+  movement: { readonly movement_id: number; readonly supportedPrefixes: readonly string[] } | undefined,
+  loadIntents: Readonly<Record<number, string>> | undefined,
+): boolean => {
+  if (movement === undefined) return false;
+  const prefixes = movement.supportedPrefixes ?? [];
+  const declared = loadIntents?.[movement.movement_id];
+  if (declared !== undefined && prefixes.includes(declared)) return declared === 'DB';
+  return prefixes.length === 1 && prefixes[0] === 'DB';
+};
+
+/** Marks the dumbbell exercises of a summary so their loads read per
+ *  dumbbell. Shared by the completion summary and the Progress tab. */
+export const markPerDumbbell = (
+  exercises: readonly SummaryExercise[],
+  movements: readonly { readonly movement_id: number; readonly supportedPrefixes: readonly string[] }[] | undefined,
+  loadIntents: Readonly<Record<number, string>> | undefined,
+): SummaryExercise[] => exercises.map((exercise) => (
+  isDumbbellLoad((movements ?? []).find((m) => m.movement_id === exercise.movementId), loadIntents)
+    ? { ...exercise, perDumbbell: true }
+    : exercise));
 
 /** One persisted set row as the store reads it, with its slot identity. */
 export interface SummarySetRow {
@@ -74,10 +113,15 @@ export interface SummarySetRow {
   reps: number;
   loadKg: number;
   timeS: number | null;
+  /** The effort logged with the set; null or absent when none was given. */
+  rpe?: number | null;
   /** `set_target.session_plan_slot_id`; null for a set with no planned slot. */
   sessionPlanSlotId: number | null;
   /** `session_plan_slot.planned_sets` of that slot; null when unmapped. */
   plannedSets: number | null;
+  /** The movement this slot was swapped to after logged sets, when its original count
+   *  was recorded (075); null otherwise. */
+  swappedToMovementName?: string | null;
 }
 
 /**
@@ -102,14 +146,15 @@ export interface SummarySetRow {
 export const groupSummaryExercises = (rows: readonly SummarySetRow[]): SummaryExercise[] => {
   const movementsBySlot = new Map<number, Set<number>>();
   const plannedBySlot = new Map<number, number | null>();
-  const byMovement = new Map<number, { name: string; slots: Set<number>; sets: SummarySetFact[] }>();
+  const byMovement = new Map<number, { name: string; slots: Set<number>; sets: SummarySetFact[]; swappedTo: string | null }>();
   for (const row of rows) {
     let entry = byMovement.get(row.movementId);
     if (entry === undefined) {
-      entry = { name: row.movementName, slots: new Set(), sets: [] };
+      entry = { name: row.movementName, slots: new Set(), sets: [], swappedTo: null };
       byMovement.set(row.movementId, entry);
     }
-    entry.sets.push({ reps: row.reps, loadKg: row.loadKg, timeS: row.timeS });
+    entry.sets.push({ reps: row.reps, loadKg: row.loadKg, timeS: row.timeS, rpe: row.rpe ?? null });
+    if (entry.swappedTo === null && row.swappedToMovementName != null) entry.swappedTo = row.swappedToMovementName;
     if (row.sessionPlanSlotId !== null) {
       entry.slots.add(row.sessionPlanSlotId);
       let members = movementsBySlot.get(row.sessionPlanSlotId);
@@ -132,7 +177,7 @@ export const groupSummaryExercises = (rows: readonly SummarySetRow[]): SummaryEx
         plannedSets = counts.reduce<number>((sum, c) => sum + (c as number), 0);
       }
     }
-    return { movementId, movementName: e.name, plannedSets, sets: e.sets };
+    return { movementId, movementName: e.name, plannedSets, swappedToMovementName: e.swappedTo, sets: e.sets };
   });
 };
 
@@ -216,9 +261,23 @@ export const matchPreviousFacts = (
 
 const plural = (n: number, word: string): string => `${n} ${word}${n === 1 ? '' : 's'}`;
 
+/** "3 of 4 sets", "1 of 1 set": the noun follows the planned count (Walk 2, W2-10). */
+export const setsOfPlanned = (logged: number, planned: number): string =>
+  `${logged} of ${planned} ${planned === 1 ? 'set' : 'sets'}`;
+
+/** A session focus as the athlete reads it: "Lower", "Full Body", "BJJ"
+ *  (Walk 2, W2-10: "Bjj session" on Today and in the summary). */
+export const sessionFocusName = (focus: string): string => {
+  if (focus.length === 0) return 'Session';
+  return focus.split('_').map((part) => (part.toLowerCase() === 'bjj'
+    ? 'BJJ'
+    : part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())).join(' ');
+};
+
+// Loads are logged in 0.25 kg steps (issue #233), so 22.75 kg is named as is.
 const loadCopy = (loadKg: number): string => {
-  const rounded = Math.round(loadKg * 10) / 10;
-  return `${Number.isInteger(rounded) ? rounded.toFixed(0) : rounded.toFixed(1)} kg`;
+  const rounded = Math.round(loadKg * 100) / 100;
+  return `${String(rounded)} kg`;
 };
 
 /**
@@ -239,8 +298,10 @@ const exerciseLine = (exercise: SummaryExercise): SummaryLine => {
   const logged = exercise.sets.length;
   const count = exercise.plannedSets === null
     ? plural(logged, 'set')
+    : exercise.swappedToMovementName != null
+      ? `${logged} of ${exercise.plannedSets} sets, then swapped to ${exercise.swappedToMovementName}`
     : logged === exercise.plannedSets
-      ? `${logged} of ${exercise.plannedSets} sets`
+      ? setsOfPlanned(logged, exercise.plannedSets)
       : `${plural(logged, 'set')} logged · ${exercise.plannedSets} planned`;
   const reps = exercise.sets.filter((s) => s.reps > 0);
   const timed = exercise.sets.filter((s) => s.timeS !== null && s.timeS! > 0);
@@ -250,12 +311,38 @@ const exerciseLine = (exercise: SummaryExercise): SummaryLine => {
     parts.push(`most reps in one set ${Math.max(...reps.map((s) => s.reps))}`);
   }
   if (loaded.length > 0) {
-    parts.push(`heaviest load used ${loadCopy(Math.max(...loaded.map((s) => s.loadKg)))}`);
+    parts.push(`heaviest load used ${loadCopy(Math.max(...loaded.map((s) => s.loadKg)))}${exercise.perDumbbell === true ? ' per dumbbell' : ''}`);
   }
   if (timed.length > 0) {
     parts.push(`longest recorded time ${Math.max(...timed.map((s) => s.timeS!))} s`);
   }
   return { key: `exercise-${exercise.movementId}`, text: parts.join(' · ') };
+};
+
+/** The top set of one exercise: ONE logged set, the heaviest load and, among
+ *  equal loads, the most reps (then the higher logged effort, so set order
+ *  never changes it). Only loaded sets with reps count; null when there is
+ *  none. A fact as logged, never an estimate (issue #230). */
+export const topSetOf = (exercise: SummaryExercise): { loadKg: number; reps: number; rpe: number | null } | null => {
+  let top: { loadKg: number; reps: number; rpe: number | null } | null = null;
+  for (const set of exercise.sets) {
+    if (implementClassOf(set.loadKg) !== 'loaded' || set.reps <= 0) continue;
+    const rpe = set.rpe ?? null;
+    if (top === null
+      || set.loadKg > top.loadKg
+      || (set.loadKg === top.loadKg && set.reps > top.reps)
+      || (set.loadKg === top.loadKg && set.reps === top.reps && (rpe ?? -1) > (top.rpe ?? -1))) {
+      top = { loadKg: set.loadKg, reps: set.reps, rpe };
+    }
+  }
+  return top;
+};
+
+const topSetLine = (exercise: SummaryExercise): SummaryLine | null => {
+  const top = topSetOf(exercise);
+  if (top === null) return null;
+  const effort = top.rpe === null ? '' : ` at effort ${Number.isInteger(top.rpe) ? top.rpe.toFixed(0) : top.rpe.toFixed(1)}`;
+  return { key: `top-set-${exercise.movementId}`, text: `Top set ${loadCopy(top.loadKg)} × ${top.reps}${effort}` };
 };
 
 /**
@@ -269,7 +356,7 @@ const comparisonLine = (exercise: SummaryExercise, facts: PreviousFacts): Summar
     parts.push(`most reps in one set ${facts.mostRepsInOneSet}`);
   }
   if (facts.implementClass === 'loaded' && facts.heaviestLoadKg !== null && facts.heaviestLoadKg > 0) {
-    parts.push(`heaviest load used ${loadCopy(facts.heaviestLoadKg)}`);
+    parts.push(`heaviest load used ${loadCopy(facts.heaviestLoadKg)}${exercise.perDumbbell === true ? ' per dumbbell' : ''}`);
   }
   if (parts.length === 0) return null;
   return {
@@ -278,8 +365,44 @@ const comparisonLine = (exercise: SummaryExercise, facts: PreviousFacts): Summar
   };
 };
 
+/** A planned slot the athlete skipped, with what was logged for it first. */
+export interface SkippedExercise {
+  name: string;
+  plannedSets: number;
+  loggedSets: number;
+  /** Other movements logged in this slot (a swap), in logged order. */
+  loggedAs: readonly string[];
+}
+
+/** The session timeline's wording for a skipped exercise; one source for the
+ *  completion card and the summary. */
+export const skippedExerciseText = (skipped: SkippedExercise): string => {
+  if (skipped.loggedSets <= 0) return `Skipped: ${skipped.name} · no sets logged`;
+  const loggedSuffix = skipped.loggedAs.length > 0 ? ` as ${skipped.loggedAs.join(', ')}` : '';
+  return `Skipped: ${skipped.name} · ${setsOfPlanned(skipped.loggedSets, skipped.plannedSets)} logged${loggedSuffix}`;
+};
+
+/** A "Report discomfort" report made during the session (#181). */
+export interface SessionReportFact {
+  /** The stored region key ("lower_back"). */
+  region: string;
+  /** 1-10, as saved. */
+  severity: number;
+}
+
+/** "Report: Lower back · Stop (8 of 10)". */
+export const sessionReportText = (report: SessionReportFact): string =>
+  `Report: ${regionLabel(report.region)} · ${reportSeverityLabel(report.severity)}`;
+
 export interface SessionSummaryView {
   exerciseLines: SummaryLine[];
+  /** The top set line shown under an exercise line, keyed by that exercise
+   *  line's key; absent for an exercise with no loaded set. */
+  topSetByExercise: Record<string, SummaryLine>;
+  /** One line per report made during the session, in report order (#181). */
+  reportLines: SummaryLine[];
+  /** One line per skipped exercise, in the session timeline's wording. */
+  skippedLines: SummaryLine[];
   comparisonLines: SummaryLine[];
   durationLine: string | null;
   nextLine: string | null;
@@ -292,10 +415,19 @@ export interface BuildSummaryInput {
   durationMin: number | null;
   blockSessions: readonly TodayBlockSession[];
   today: string;
+  /** The exercises the athlete skipped, in plan order. */
+  skippedExercises?: readonly SkippedExercise[];
+  /** Reports made during the session, in report order. */
+  reports?: readonly SessionReportFact[];
 }
 
 export const buildSessionSummary = (input: BuildSummaryInput): SessionSummaryView => {
   const exerciseLines = input.exercises.map(exerciseLine);
+  const topSetByExercise: Record<string, SummaryLine> = {};
+  input.exercises.forEach((exercise, index) => {
+    const line = topSetLine(exercise);
+    if (line !== null) topSetByExercise[exerciseLines[index]!.key] = line;
+  });
   const comparisonLines: SummaryLine[] = [];
   for (const exercise of input.exercises) {
     const facts = matchPreviousFacts(exercise, input.previousSets);
@@ -312,13 +444,24 @@ export const buildSessionSummary = (input: BuildSummaryInput): SessionSummaryVie
   // is exported as NO_NEXT_SESSION_TEXT (the single source of truth; the
   // screen renders it directly).
   const next: SessionRef | null = nextSessionAfter(input.blockSessions, input.today);
+  const skippedLines: SummaryLine[] = (input.skippedExercises ?? []).map((skipped, index) => ({
+    key: `skipped-${index}`,
+    text: skippedExerciseText(skipped),
+  }));
+  const reportLines: SummaryLine[] = (input.reports ?? []).map((report, index) => ({
+    key: `report-${index}`,
+    text: sessionReportText(report),
+  }));
   return {
     exerciseLines,
+    topSetByExercise,
+    reportLines,
+    skippedLines,
     comparisonLines,
     durationLine,
     nextLine: next === null
       ? null
-      : `Next: ${next.focus.charAt(0).toUpperCase()}${next.focus.slice(1).toLowerCase()} session on ${next.sessionDate} — ${plural(next.slotCount, 'movement')}.`,
+      : `Next: ${sessionFocusName(next.focus)} session on ${formatAthleteDate(next.sessionDate)} — ${plural(next.slotCount, 'movement')}.`,
   };
 };
 

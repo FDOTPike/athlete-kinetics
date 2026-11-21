@@ -51,23 +51,6 @@ export function openKineticsDb(dbName: string = DB_NAME): DB {
   return db;
 }
 
-/**
- * Call with `true` immediately before llama.rn context creation and `false`
- * after generation completes. Shrinks the page cache and pauses WAL
- * checkpointing so DB I/O cannot evict hot SLM weight pages mid-inference
- * (the audited thrash failure mode).
- */
-export function setInferenceMode(db: DB, on: boolean): void {
-  if (on) {
-    db.executeSync('PRAGMA cache_size = -4000;');      // 4 MB
-    db.executeSync('PRAGMA wal_autocheckpoint = 0;');  // defer checkpoints
-  } else {
-    db.executeSync('PRAGMA cache_size = -16000;');
-    db.executeSync('PRAGMA wal_autocheckpoint = 1000;');
-    db.executeSync('PRAGMA wal_checkpoint(PASSIVE);'); // catch up now
-  }
-}
-
 /** Run on app background/terminate: keeps the query planner statistics fresh
  *  and truncates the WAL so the next cold open is a clean single-file read. */
 export function closeKineticsDb(db: DB): void {

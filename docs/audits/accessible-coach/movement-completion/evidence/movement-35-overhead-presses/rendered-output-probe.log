@@ -1,0 +1,17 @@
+source commit: 0f96a7508bf29e5225c7dc84499559f2a5284944
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with probe-8b9082b978a09b2c98db7f4a38ad1fb64dcbea85.json
+
+movements measured: 216 (baseline 209)
+added: 4 Overhead Press; 31 Arnold Press; 41 Cable Shoulder Press; 129 Alternating Kettlebell Press; 189 Dumbbell One-Arm Shoulder Press; 228 Kettlebell Arnold Press; 230 Kettlebell Seesaw Press
+removed: none
+changed, expected: none
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  4 Overhead Press: drawn 487366745892a3a6cf54c5a160eb86aa5a3a6f7a2b5a40085f2e25785982a840 captions 12d67460f84088165db46670d1328942ee769716b1fa57cf02d7907981e668fb stage 116.64x240.00 cycle 2800 ms
+  31 Arnold Press: drawn 07dbcedc6bc49131c90c070b320c6c834cce245c7cfc818ac8081ae68c5eb2d0 captions 66deed6a8594ea7a1bf893207be5c4ffafcbafc3d0ed46504eda4fb47438e017 stage 91.43x240.00 cycle 3000 ms
+  41 Cable Shoulder Press: drawn 41ccec12ae27b31fe1623b0ea14e5448d247a34c2addd6608abde8d962103259 captions a5b895851f6a2d4bb80c90a1c04066f58158bcf37089740bd754af5e3042275b stage 73.14x240.00 cycle 2900 ms
+  129 Alternating Kettlebell Press: drawn b4f968226528585e92400116c67c12a6731e0a80391119ecd0b922bbd26a2746 captions 5399c572985ef63b7a8b21a12c775ab18d888c3e303c73b71e9ba1390d42ed73 stage 101.54x240.00 cycle 4300 ms
+  189 Dumbbell One-Arm Shoulder Press: drawn 35c61deefc9db7cc1f894b11071dc080df38d9252636c5673b09a9529da69baf captions 726520dbaa038b220537a3fed21d4735766d6639e58f3ac16df4952139811f2c stage 73.14x240.00 cycle 3650 ms
+  228 Kettlebell Arnold Press: drawn debbc4ab216d8f6b748ec061ff997f30968d6d7a7c955ebae639d154d7ded9f4 captions e58d7817b706371f89d15e4eacf4f0138875ee4bf4a9dc0a3d6359e383a4861c stage 83.08x240.00 cycle 2900 ms
+  230 Kettlebell Seesaw Press: drawn 9aba2c641f2751856bef2e9709c493f0259eb612290031b23769593f52ee3496 captions 2ec1590ad3b583b0e6bc48a49c3c52c0ae12e35468fd9eb79a3b55a9fe451679 stage 101.54x240.00 cycle 4350 ms
+exit code: 0 (probe run exit 0)

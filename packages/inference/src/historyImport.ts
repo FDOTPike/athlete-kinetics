@@ -136,7 +136,8 @@ export function parseHistoryImport(
       errors.push({ line: sourceLine, message: 'SET must appear inside a SESSION.' });
       continue;
     }
-    if (fields.length !== 7) {
+    // RPE and seconds are optional: a missing trailing field reads the same as an empty one.
+    if (fields.length < 5 || fields.length > 7) {
       errors.push({ line: sourceLine, message: 'SET requires movement, index, reps, load, optional RPE, and optional seconds.' });
       continue;
     }
@@ -150,8 +151,8 @@ export function parseHistoryImport(
     const setIndex = finite(fields[2]!);
     const reps = finite(fields[3]!);
     const loadKg = finite(fields[4]!);
-    const rpe = finite(fields[5]!);
-    const seconds = finite(fields[6]!);
+    const rpe = finite(fields[5] ?? '');
+    const seconds = finite(fields[6] ?? '');
     if (!Number.isInteger(setIndex) || !inRange(setIndex, 1, 1000) || !Number.isInteger(reps) || !inRange(reps, 0, 1000) || !inRange(loadKg, 0, 5000) || (rpe !== null && !inRange(rpe, 0, 10)) || (seconds !== null && (!Number.isInteger(seconds) || !inRange(seconds, 1, 7200)))) {
       errors.push({ line: sourceLine, message: 'SET numeric fields are outside their allowed ranges.' });
       continue;

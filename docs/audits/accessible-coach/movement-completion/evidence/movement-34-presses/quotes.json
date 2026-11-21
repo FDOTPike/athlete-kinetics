@@ -1,0 +1,204 @@
+{
+  "bounds": [
+    {
+      "id": 3,
+      "quote": "Plant the feet and pin the upper back to the bench before taking a secure competition-width grip. Unrack to straight arms, settle the bar, then lower to the same chest touch point with stacked forearms.",
+      "test": "apps/mobile/test/components/MovementPreview.movA05Presses.test.js :: 3 Competition Bench and 43 Close-Grip Bench Press plant feet, pin upper back and hips to the bench, stack forearms vertically at the lower-chest touch, and separate competition grip + pause from shoulder-width close grip + tucked elbows",
+      "bound": "feet planted on the floor at nearAnkle = [22.00, 2.16, 12.00] (0.00 drift across the cycle); painted upper back (slice 0 bottom Y = 78.90) and glutes (slice 32 bottom Y = 78.90) pinned to the flat bench top (Y = 78.90, 0.00 gap); competition-width grip at hold Z = ±14.50 (>= 13.50, 5.12 units wider per side than shoulderHalf = 9.384); starts at straight-arm lockout (elbowDeg3D = 174.02 deg >= 172 deg, hold = [-12.97, 48.41, ±14.50]) and lowers to the lower-chest touch point (hold = [-3.58, 31.80, ±14.50]) with stacked vertical forearms (forearmVertDeg3D = 0.06 deg <= 1.0 deg)"
+    },
+    {
+      "id": 3,
+      "quote": "Hold the competition pause before pressing back to lockout.",
+      "test": "apps/mobile/test/components/MovementPreview.movA05Presses.test.js :: 3 Competition Bench and 43 Close-Grip Bench Press plant feet, pin upper back and hips to the bench, stack forearms vertically at the lower-chest touch, and separate competition grip + pause from shoulder-width close grip + tucked elbows",
+      "bound": "segmentDurationsMs = [1300, 900, 950, 500] holds a 900 ms (>= 800 ms, +450 ms longer than Close-Grip Bench Press) competition pause on the lower chest at ph = 1 before pressing back to straight-arm lockout (elbowDeg3D = 174.02 deg) at ph = 0"
+    },
+    {
+      "id": 43,
+      "quote": "Lie on a bench and grip the bar at about shoulder width, not narrower. Unrack and lower the bar to your lower chest, elbows staying close to your sides. Press back up to straight arms.",
+      "test": "apps/mobile/test/components/MovementPreview.movA05Presses.test.js :: 3 Competition Bench and 43 Close-Grip Bench Press plant feet, pin upper back and hips to the bench, stack forearms vertically at the lower-chest touch, and separate competition grip + pause from shoulder-width close grip + tucked elbows",
+      "bound": "upper back (slice 0 bottom Y = 78.91) and glutes (slice 32 bottom Y = 78.90) lie flush on the bench top (Y = 78.90) with feet planted at [22.00, 2.16, ±11.30]; barbell grip at hold Z = ±9.40 matches shoulder width (|9.40 - shoulderHalf 9.384| = 0.016 <= 0.50, 5.10 units narrower per side than Competition Bench ±14.50); lowers from straight arms (elbowDeg3D = 173.38 deg) to lower chest (hold = [-2.40, 31.80, ±9.40]) with elbows tucked close to the sides (nearElbow Z = 9.41, 0.03 units outside shoulderHalf = 9.384, elbowTuckDeg = 0.11 deg)"
+    },
+    {
+      "id": 43,
+      "quote": "Elbows ride close to the ribs. Wrists stacked over the elbows. Touch low on the chest.",
+      "test": "apps/mobile/test/components/MovementPreview.movA05Presses.test.js :: 3 Competition Bench and 43 Close-Grip Bench Press plant feet, pin upper back and hips to the bench, stack forearms vertically at the lower-chest touch, and separate competition grip + pause from shoulder-width close grip + tucked elbows",
+      "bound": "at the bottom touch on the lower chest (ph = 1, hold X = -2.40 vs neck X = -13.98 and hip X = 10.00), nearWrist = [-2.40, 31.80, 9.40] is stacked vertically over nearElbow = [-2.40, 19.80, 9.41] (forearmVertDeg3D = 0.03 deg <= 1.0 deg)"
+    },
+    {
+      "id": 45,
+      "quote": "Hook your legs into the decline bench and take the bar just wider than shoulder width. Lower to the lower line of your chest — the decline shortens the stroke, so expect to touch sooner than on flat. Press back to lockout over your eyes.",
+      "test": "apps/mobile/test/components/MovementPreview.movA05Presses.test.js :: 45 Decline Bench Press and 102 Decline Dumbbell Bench Press hook legs into a head-lower decline bench with zero painted torso-to-pad gap, vertical forearms at bottom, and distinct barbell vs inward-converging dumbbell paths",
+      "bound": "torso lies on an -18.00 deg head-lower decline bench (neck = [-18.83, 17.58], hip = [4.00, 25.00], 0.00 painted gap from slice 0 and slice 32 to the decline pad top) with knees elevated over rollers at [24.22, 34.00, ±9.13] and ankles hooked at [38.48, 17.00, ±10.68]; grip at hold Z = ±11.80 is just wider than shoulderHalf = 9.384 (inside [11.0, 12.5]); vertical bar stroke is 13.44 units (from Y = 41.04 to 27.60), 3.17 units shorter than flat Competition Bench (16.61 units); lockout at ph = 0 sits over the eyes/head (hold X = -25.40 vs head X = -27.69, |dx| = 2.29 <= 2.50, elbowDeg3D = 175.36 deg)"
+    },
+    {
+      "id": 45,
+      "quote": "Touch at the natural end of the shorter stroke. Wrists stacked, bar over the forearm bones.",
+      "test": "apps/mobile/test/components/MovementPreview.movA05Presses.test.js :: 45 Decline Bench Press and 102 Decline Dumbbell Bench Press hook legs into a head-lower decline bench with zero painted torso-to-pad gap, vertical forearms at bottom, and distinct barbell vs inward-converging dumbbell paths",
+      "bound": "at the bottom touch on the lower chest (ph = 1), nearHold = [-6.72, 27.60, 11.80] sits directly above nearElbow = [-6.72, 15.60, 11.79] with vertical forearms (forearmVertDeg3D = 0.05 deg <= 1.0 deg)"
+    },
+    {
+      "id": 102,
+      "quote": "Secure the legs in a decline bench, sit with the dumbbells on the thighs, then lie back and bring the bells to the chest before pressing them into position. Lower toward the lower chest with the forearms vertical and the shoulder blades pinned into the pad.",
+      "test": "apps/mobile/test/components/MovementPreview.movA05Presses.test.js :: 45 Decline Bench Press and 102 Decline Dumbbell Bench Press hook legs into a head-lower decline bench with zero painted torso-to-pad gap, vertical forearms at bottom, and distinct barbell vs inward-converging dumbbell paths",
+      "bound": "implement === \"bells\" on the -18.00 deg decline bench (neck = [-18.83, 17.58], hip = [4.00, 25.00], 0.00 painted torso-to-pad gap at slice 0 and slice 32) with legs secured over rollers (knee = [24.22, 34.00, ±9.13], ankle = [38.48, 17.00, ±10.68]); at ph = 1, dumbbells lower to the lower chest at hold = [-7.75, 25.50, ±13.50] over nearElbow = [-7.75, 13.50, 13.49] with vertical forearms (forearmVertDeg3D = 0.03 deg <= 1.0 deg)"
+    },
+    {
+      "id": 102,
+      "quote": "Pin the shoulder blades into the pad. Stack the wrists over the elbows. Press up and slightly in.",
+      "test": "apps/mobile/test/components/MovementPreview.movA05Presses.test.js :: 45 Decline Bench Press and 102 Decline Dumbbell Bench Press hook legs into a head-lower decline bench with zero painted torso-to-pad gap, vertical forearms at bottom, and distinct barbell vs inward-converging dumbbell paths",
+      "bound": "pressing from ph = 1 to ph = 0 drives the dumbbells up (+16.41 units in Y, from 25.50 to 41.91, elbowDeg3D = 175.54 deg) and inward by 6.00 units per side (hold Z from ±13.50 to ±7.50) while shoulder blades stay pinned to the decline pad"
+    },
+    {
+      "id": 65,
+      "quote": "Set the bench between 30 and 45 degrees — lower hits more chest, higher bleeds into shoulders. Kick the dumbbells up off your knees one at a time and start from the top. Lower to a deep stretch just outside your chest with your elbows about 45 degrees from your sides, then press up and slightly back so the dumbbells finish over your face, not your belly.",
+      "test": "apps/mobile/test/components/MovementPreview.movA05Presses.test.js :: 65 Incline Dumbbell Press sets the bench between 30 and 45 degrees with zero painted backrest gap, lowers to a deep stretch outside the chest with ~45-deg elbows, and presses up and slightly back to finish over the face",
+      "bound": "incline backrest is set at 35.00 deg from horizontal (inside [30, 45] deg, neck = [-15.66, 33.37], hip = [4.00, 19.60], 0.00 painted gap between torso slices 0..32 and the backrest top edge); starts from the top at ph = 0 (elbowDeg3D = 174.92 deg) with dumbbells at [-21.50, 57.06, ±7.50] directly over the face/head (head X = -23.61, |dx| = 2.11 <= 2.50) and 25.50 units back from the belly/hips (hip X = 4.00); lowers at ph = 1 to [-8.52, 38.00, ±16.53] outside the chest (hold Z = 16.53 > shoulder Z = 9.38 + 5.0) with elbows at 45.07 deg from the sides (inside [42, 48] deg) and vertical forearms (forearmVertDeg3D = 0.04 deg)"
+    },
+    {
+      "id": 65,
+      "quote": "Feet planted, upper back tight on the bench. Earn the stretch at the bottom. Press up and slightly back, finishing over the face.",
+      "test": "apps/mobile/test/components/MovementPreview.movA05Presses.test.js :: 65 Incline Dumbbell Press sets the bench between 30 and 45 degrees with zero painted backrest gap, lowers to a deep stretch outside the chest with ~45-deg elbows, and presses up and slightly back to finish over the face",
+      "bound": "feet stay planted on the floor at [22.00, 2.16, ±11.60] throughout; pressing from ph = 1 to ph = 0 travels upward (+19.06 units in Y), backward toward the face (-12.98 units in X, from -8.52 to -21.50), and inward (-9.03 units in Z, from 16.53 to 7.50)"
+    },
+    {
+      "id": 151,
+      "quote": "Lie on the bench and band the boards securely to the chest; confirm they remain fixed before unracking. Use a spotter when available. Set the feet, arch the back, and retract the shoulder blades, then take the bar out of the rack without protracting the shoulders. Lower the bar under control until it settles on the boards. Drive the bar up with force, keeping the elbows tucked until lockout.",
+      "test": "apps/mobile/test/components/MovementPreview.movA05Presses.test.js :: 151 Board Press and 252 Pin Presses show their distinct partial-stroke stops: chest-banded boards vs rack safety pins",
+      "bound": "chestBoard = { along: 0.25, length: 10, height: 4.2 } bands the board stack + two dark straps onto the arched chest; upper back (slice 0 bottom Y = 78.90) and glutes (slice 32 bottom Y = 78.90) rest on the bench while the arched mid-back clears the bench by 0.78 units (slice 16 bottom Y = 78.12); bar lowers from lockout (ph = 0, hold = [-12.91, 48.80, ±11.80], elbowDeg3D = 173.94 deg) until its painted bottom edge (barBotY = 62.00) settles flush on the painted top of the boards (boardTopY = 62.00, 0.00 gap, elbowDeg3D = 86.47 deg, forearmVertDeg3D = 0.05 deg) for a 650 ms pause before driving back to lockout with tucked elbows (elbowTuckDeg = 11.12 deg at bottom)"
+    },
+    {
+      "id": 151,
+      "quote": "Keep the boards banded and fixed. Let the bar settle on the boards. Keep the elbows tucked to lockout.",
+      "test": "apps/mobile/test/components/MovementPreview.movA05Presses.test.js :: 151 Board Press and 252 Pin Presses show their distinct partial-stroke stops: chest-banded boards vs rack safety pins",
+      "bound": "board stack stays fixed on the chest at spine slice 8 (along = 0.25) across all frames with boardTopY = 62.00, stopping the bar at hold Y = 35.70 (+3.90 units higher than full-range Bench Press Y = 31.80) with vertical forearms (0.05 deg) and a 650 ms settle pause"
+    },
+    {
+      "id": 252,
+      "quote": "Set a bench inside a rack with the pins at the chosen height and the bar resting on them, then lie back with the bar above your usual touch point, shoulder blades pulled together and feet set. From a full pause on the pins, drive the bar up to straight arms, keeping the bar, wrists and elbows in line. Lower the bar back to the pins and let it settle before the next repetition.",
+      "test": "apps/mobile/test/components/MovementPreview.movA05Presses.test.js :: 151 Board Press and 252 Pin Presses show their distinct partial-stroke stops: chest-banded boards vs rack safety pins",
+      "bound": "horizontal rack safety pins are drawn at Y = 35.20 (top edge 36.00) inside the four-post rack; at ph = 0, the bar rests directly on the pins at hold = [-1.81, 36.80, ±12.20] (shaft bottom 36.00, 0.00 painted gap to the pin top, +5.00 units above the usual chest touch point Y = 31.80) with bar, wrists, and elbows aligned vertically (forearmVertDeg3D = 0.03 deg <= 1.0 deg); drives up to straight arms at ph = 1 (hold = [-12.98, 48.79, ±12.20], elbowDeg3D = 173.98 deg >= 172 deg) and lowers back to settle on the pins for 850 ms (>= 800 ms)"
+    },
+    {
+      "id": 252,
+      "quote": "Shoulder blades pulled together. Drive from a full pause. Settle the bar on the pins each time.",
+      "test": "apps/mobile/test/components/MovementPreview.movA05Presses.test.js :: 151 Board Press and 252 Pin Presses show their distinct partial-stroke stops: chest-banded boards vs rack safety pins",
+      "bound": "segmentDurationsMs = [900, 450, 1200, 850] drives from the pins in 900 ms, lowers under control in 1200 ms, and holds a full 850 ms settle pause on the pins at Y = 36.80 with upper back and hips pinned to the bench (t0BotY = 78.91, t32BotY = 78.90)"
+    },
+    {
+      "id": 203,
+      "quote": "Lie on the floor with your head inside a rack, the bar set on low hooks, shoulder blades pulled together, and lift the bar off with straight arms. Lower the bar toward the lower chest with the elbows tucked until the upper arms rest on the floor, and pause. Press the bar back up, keeping the bar, wrists and elbows in line.",
+      "test": "apps/mobile/test/components/MovementPreview.movA05Presses.test.js :: 203 Floor Press and 249 One-Arm Kettlebell Floor Press lie directly on the floor, rest upper arms on the floor at the bottom with vertical forearms, and distinguish racked barbell from single-arm rotating kettlebell",
+      "bound": "lies directly on the floor (t0BotY = 96.90, t32BotY = 96.90, 0.00 gap to GROUND_LINE = 96.90) with head at [-22.98, 6.83] inside the rack uprights at X = -23.50 and knees bent with feet flat at [38.00, 2.16, ±11.00]; starts at straight-arm lockout (ph = 0, hold = [-12.99, 30.74, ±12.60], elbowDeg3D = 173.20 deg), lowers with tucked elbows (15.95 deg) until the upper arms rest flat on the floor at ph = 1 (nearElbow Y = 2.112 == BODY.lw * 0.88 / 2, 0.00 painted gap to the floor) with vertical forearms (nearHold = [-2.74, 14.11, ±12.60], forearmVertDeg3D = 0.01 deg) and pauses for 800 ms (>= 750 ms)"
+    },
+    {
+      "id": 203,
+      "quote": "Shoulder blades pulled together. Pause with the arms on the floor. Wrists stacked over the elbows.",
+      "test": "apps/mobile/test/components/MovementPreview.movA05Presses.test.js :: 203 Floor Press and 249 One-Arm Kettlebell Floor Press lie directly on the floor, rest upper arms on the floor at the bottom with vertical forearms, and distinguish racked barbell from single-arm rotating kettlebell",
+      "bound": "at ph = 1, nearWrist = [-2.74, 14.11, 12.60] is stacked directly over nearElbow = [-2.74, 2.11, 12.60] (forearmVertDeg3D = 0.01 deg <= 1.0 deg) while pausing 800 ms with the upper arms resting on the floor"
+    },
+    {
+      "id": 249,
+      "quote": "Lie on the floor holding a kettlebell in one hand with that upper arm resting on the floor and the palm facing in. Press the kettlebell straight up until the arm is straight, letting the wrist turn as it rises. Lower it slowly until the upper arm rests on the floor again.",
+      "test": "apps/mobile/test/components/MovementPreview.movA05Presses.test.js :: 203 Floor Press and 249 One-Arm Kettlebell Floor Press lie directly on the floor, rest upper arms on the floor at the bottom with vertical forearms, and distinguish racked barbell from single-arm rotating kettlebell",
+      "bound": "lies on the floor (t0BotY = 96.90, t32BotY = 96.90) with implement === \"kettlebell\" in the near hand only and kettlebellTurn === true; starts at ph = 0 with the near upper arm resting on the floor (nearElbow Y = 2.112 == BODY.lw * 0.88 / 2, 0.00 painted floor gap), vertical forearm (nearHold = [-2.59, 14.11, 12.00], forearmVertDeg3D = 0.03 deg), and palm facing in (handle axis [1, 0, 0]); presses straight up to lockout over the shoulder at ph = 1 (nearHold = [-12.99, 30.95, 9.40] over nearShoulder = [-13.99, 6.52, 9.38], elbowDeg3D = 173.00 deg) while turning the wrist 90 deg to handle axis [0, 0, 1]; lowers slowly in 1450 ms (> 950 ms press + 400 ms)"
+    },
+    {
+      "id": 249,
+      "quote": "Wrist stacked over the elbow. Press straight up. Lower until the arm rests on the floor.",
+      "test": "apps/mobile/test/components/MovementPreview.movA05Presses.test.js :: 203 Floor Press and 249 One-Arm Kettlebell Floor Press lie directly on the floor, rest upper arms on the floor at the bottom with vertical forearms, and distinguish racked barbell from single-arm rotating kettlebell",
+      "bound": "at ph = 0, nearWrist = [-2.59, 14.11, 12.00] is stacked directly over nearElbow = [-2.59, 2.11, 12.00] (forearmVertDeg3D = 0.03 deg <= 1.0 deg) with the upper arm resting on the floor (Y = 2.112), and at ph = 1 the bell finishes straight overhead at elbowDeg3D = 173.00 deg"
+    },
+    {
+      "id": 83,
+      "quote": "Set two handles at chest height, face away, and take a staggered stance. Press both handles forward until your arms are long, letting them drift together at the end. Return under control — the cable pulls backward the entire rep, so the squeeze at lockout is real work here.",
+      "test": "apps/mobile/test/components/MovementPreview.movA05Presses.test.js :: 83 Cable Chest Press stands in a staggered stance facing away from chest-height pulleys, presses both handles forward until hands drift together at full reach, and returns slowly under cable tension",
+      "bound": "stands facing +X away from two chest-height pulleys at [-24.00, 61.50, ±19.50] (Y = 61.50 inside [58, 66]) in a staggered stance (planted nearAnkle = [-10.00, 2.16, 6.80], planted farAnkle = [10.00, 2.16, -6.80], 20.00 units stagger >= 18, 0.00 drift); presses both handles forward +17.25 units in X (from [8.00, 64.50, ±19.50] at ph = 0 to [25.25, 64.50, ±1.50] at ph = 1) until the arms are long (elbowDeg3D = 173.65 deg >= 165 deg) and the hands drift together by 18.00 units per side (hold Z from ±19.50 to ±1.50 <= 2.00)"
+    },
+    {
+      "id": 83,
+      "quote": "Brace into the staggered stance. Press to a full reach, hands finishing together. Ride the cables back slow.",
+      "test": "apps/mobile/test/components/MovementPreview.movA05Presses.test.js :: 83 Cable Chest Press stands in a staggered stance facing away from chest-height pulleys, presses both handles forward until hands drift together at full reach, and returns slowly under cable tension",
+      "bound": "both cables lengthen monotonically on the working press (3D length from 32.14 units at ph = 0 to 52.52 units at ph = 1) and shorten on the controlled 1450 ms return (segmentDurationsMs = [950, 450, 1450, 450], return 1450 ms > press 950 ms + 400 ms)"
+    }
+  ],
+  "fileQuotes": [
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 1515,
+      "endLine": 1516,
+      "text": "        \"instructions\": \"Plant the feet and pin the upper back to the bench before taking a secure competition-width grip. Unrack to straight arms, settle the bar, then lower to the same chest touch point with stacked forearms. Hold the competition pause before pressing back to lockout. If the hips lift or the touch point wanders, reduce the load until every rep follows one standard.\",\n        \"cues\": \"Drive the feet and pin the upper back. Touch the same lower-chest point. Hold the pause, then press.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 4243,
+      "endLine": 4244,
+      "text": "        \"instructions\": \"Lie on a bench and grip the bar at about shoulder width, not narrower. Unrack and lower the bar to your lower chest, elbows staying close to your sides. Press back up to straight arms.\",\n        \"cues\": \"Elbows ride close to the ribs. Wrists stacked over the elbows. Touch low on the chest.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 4375,
+      "endLine": 4376,
+      "text": "        \"instructions\": \"Hook your legs into the decline bench and take the bar just wider than shoulder width. Lower to the lower line of your chest — the decline shortens the stroke, so expect to touch sooner than on flat. Press back to lockout over your eyes. Have a spotter for the unrack; getting out of a decline alone is ugly.\",\n        \"cues\": \"Touch at the natural end of the shorter stroke. Wrists stacked, bar over the forearm bones. Spotter on the unrack.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 8218,
+      "endLine": 8219,
+      "text": "        \"instructions\": \"Secure the legs in a decline bench, sit with the dumbbells on the thighs, then lie back and bring the bells to the chest before pressing them into position. Lower toward the lower chest with the forearms vertical and the shoulder blades pinned into the pad. Press up and slightly inward; when the bells are too heavy to mount cleanly, the setup has already chosen a lighter working load for you.\",\n        \"cues\": \"Pin the shoulder blades into the pad. Stack the wrists over the elbows. Press up and slightly in.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 5731,
+      "endLine": 5732,
+      "text": "        \"instructions\": \"Set the bench between 30 and 45 degrees — lower hits more chest, higher bleeds into shoulders. Kick the dumbbells up off your knees one at a time and start from the top. Lower to a deep stretch just outside your chest with your elbows about 45 degrees from your sides, then press up and slightly back so the dumbbells finish over your face, not your belly.\",\n        \"cues\": \"Feet planted, upper back tight on the bench. Earn the stretch at the bottom. Press up and slightly back, finishing over the face.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 11554,
+      "endLine": 11555,
+      "text": "        \"instructions\": \"Lie on the bench and band the boards securely to the chest; confirm they remain fixed before unracking. Use a spotter when available. Set the feet, arch the back, and retract the shoulder blades, then take the bar out of the rack without protracting the shoulders. Lower the bar under control until it settles on the boards. Drive the bar up with force, keeping the elbows tucked until lockout.\",\n        \"cues\": \"Keep the boards banded and fixed. Let the bar settle on the boards. Keep the elbows tucked to lockout.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 18318,
+      "endLine": 18319,
+      "text": "        \"instructions\": \"Set a bench inside a rack with the pins at the chosen height and the bar resting on them, then lie back with the bar above your usual touch point, shoulder blades pulled together and feet set. From a full pause on the pins, drive the bar up to straight arms, keeping the bar, wrists and elbows in line. Lower the bar back to the pins and let it settle before the next repetition.\",\n        \"cues\": \"Shoulder blades pulled together. Drive from a full pause. Settle the bar on the pins each time.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 15043,
+      "endLine": 15044,
+      "text": "        \"instructions\": \"Lie on the floor with your head inside a rack, the bar set on low hooks, shoulder blades pulled together, and lift the bar off with straight arms. Lower the bar toward the lower chest with the elbows tucked until the upper arms rest on the floor, and pause. Press the bar back up, keeping the bar, wrists and elbows in line.\",\n        \"cues\": \"Shoulder blades pulled together. Pause with the arms on the floor. Wrists stacked over the elbows.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 18113,
+      "endLine": 18114,
+      "text": "        \"instructions\": \"Lie on the floor holding a kettlebell in one hand with that upper arm resting on the floor and the palm facing in. Press the kettlebell straight up until the arm is straight, letting the wrist turn as it rises. Lower it slowly until the upper arm rests on the floor again. Complete the repetitions, then change arms.\",\n        \"cues\": \"Wrist stacked over the elbow. Press straight up. Lower until the arm rests on the floor.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 6948,
+      "endLine": 6949,
+      "text": "        \"instructions\": \"Set two handles at chest height, face away, and take a staggered stance. Press both handles forward until your arms are long, letting them drift together at the end. Return under control — the cable pulls backward the entire rep, so the squeeze at lockout is real work here.\",\n        \"cues\": \"Brace into the staggered stance. Press to a full reach, hands finishing together. Ride the cables back slow.\","
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 1301,
+      "endLine": 1304,
+      "text": "  /** Boards banded to the chest for a Board Press: position along the spine from neck to hip (0..1), length along the chest, and board stack height. */\n  chestBoard?: { along: number; length: number; height: number };\n  /** Whether a held kettlebell starts with the palm facing in at phase 0 and turns 90 degrees as the arm presses to phase 1. */\n  kettlebellTurn?: boolean;"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5435,
+      "endLine": 5445,
+      "text": "    const turnT = movement.kettlebellTurn ? Math.max(0, Math.min(1, figure.ph)) : 1;\n    const hAxis: ChainVec = movement.kettlebellTurn\n      ? [Math.cos(turnT * Math.PI / 2), 0, Math.sin(turnT * Math.PI / 2)]\n      : [0, 0, 1];\n    const kbRest: ChainVec = movement.kettlebellTurn\n      ? [-1.8 * turnT, -2.2, 2.2 * (1 - turnT) + 1.4 * turnT]\n      : KETTLEBELL_REST;\n    const a = project(chainAdd(w.near.hold, hAxis, -2.6)), b = project(chainAdd(w.near.hold, hAxis, 2.6));\n    const c = project(chainAdd(w.near.hold, kbRest, 1));\n    near.push({ kind: 'circle', cx: c[0], cy: c[1], r: KETTLEBELL_RADIUS, fill: 'textHi', stroke: 'ink1', strokeWidth: 1, opacity: 1 });\n    near.push(line(a, b, 2.2, 'textHi', 1));"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 6295,
+      "endLine": 6326,
+      "text": "  if (chain && chain.movement.chestBoard) {\n    const b = chain.movement.chestBoard;\n    const bi = Math.max(0, Math.min(slices, Math.round(b.along * slices)));\n    const bt = bi / slices;\n    const here = curledSpine ? curledSpine[bi] : at(bt);\n    const before = curledSpine ? curledSpine[Math.max(0, bi - 1)] : j.nk;\n    const after = curledSpine ? curledSpine[Math.min(slices, bi + 1)] : j.hp;\n    const run = Math.hypot(after[0] - before[0], after[1] - before[1]) || 1;\n    const bAxis: CanonicalPoint = [(after[0] - before[0]) / run, (after[1] - before[1]) / run];\n    const across: CanonicalPoint = [-(after[1] - before[1]) / run, (after[0] - before[0]) / run];\n    const upNormal: CanonicalPoint = across[1] <= 0 ? across : [-across[0], -across[1]];\n    const half = !front\n      ? sw + (Math.min(hw, sw * 0.9) - sw) * bt\n      : bt <= 0.56 ? sw + (waistWidth - sw) * (bt / 0.56) : waistWidth + (hw - waistWidth) * ((bt - 0.56) / 0.44);\n    const boardCenter: CanonicalPoint = [\n      here[0] + upNormal[0] * (half + b.height / 2),\n      here[1] + upNormal[1] * (half + b.height / 2),\n    ];\n    const halfLen = b.length / 2;\n    prims.push(bone(\n      [boardCenter[0] - bAxis[0] * halfLen, boardCenter[1] - bAxis[1] * halfLen],\n      [boardCenter[0] + bAxis[0] * halfLen, boardCenter[1] + bAxis[1] * halfLen],\n      b.height, 'textMid', 1,\n    ));\n    for (const sOff of [-halfLen * 0.45, halfLen * 0.45]) {\n      const sc: CanonicalPoint = [here[0] + bAxis[0] * sOff, here[1] + bAxis[1] * sOff];\n      prims.push(bone(\n        [sc[0] - upNormal[0] * half, sc[1] - upNormal[1] * half],\n        [sc[0] + upNormal[0] * (half + b.height), sc[1] + upNormal[1] * (half + b.height)],\n        1.1, 'ink1', 0.85,\n      ));\n    }"
+    }
+  ]
+}

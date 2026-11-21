@@ -1,0 +1,23 @@
+source commit: 617e906b302a05f3db7fc2674ed8a47d7ff90f57
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with probe-f639bbbf1370267bf24f5939a3bc2212e330bbd1.json
+
+movements measured: 232 (baseline 232)
+added: none
+removed: none
+changed, expected: 98 Barbell Hack Squat; 78 Sumo Deadlift; 288 Stiff-Legged Barbell Deadlift; 23 Nordic Curl; 249 One-Arm Kettlebell Floor Press; 5 Barbell Row; 104 One-Arm Kettlebell Row; 107 Reverse Grip Bent-Over Rows; 79 T-Bar Row; 130 Alternating Kettlebell Row; 184 Drag Curl; 213 High Cable Curls; 240 Lying Cable Curl
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  98 Barbell Hack Squat: drawn 325e56bb74dff8253ee5164449760da7a0f8aa03f549855137015cb79f71ae78 captions b02aee67082836f69d640dcd1eee7586a641c687399589ff2b1e39a50b7ed06e stage 131.87x240.00 cycle 3450 ms
+  78 Sumo Deadlift: drawn 4573075970834df9548eb6cc0768bd7b907c34c3a6a2e0fdae79b1f9db8398aa captions 884f8e63d3302543821ec52687c0e388bfe41adf1dfaa7e6e9838acae34ae5f6 stage 150.00x240.00 cycle 3600 ms
+  288 Stiff-Legged Barbell Deadlift: drawn f148505f3f4958fb9e69c9136fd903bfea2f0fa95d3ec2789290c1840b4fb4ad captions 812c979ce75212fe99bd83f82be7f23b66cfa53ac9e7bb334dd5d6e6a655d8b3 stage 134.51x240.00 cycle 3600 ms
+  23 Nordic Curl: drawn 1da3354996e2654b45eb5c32e28c127cc56d41480a61ba0a3c1d405b1bd57cc9 captions ae63b81dd6820db0adeba309d166c8a5941b71ab35a5f5404d87aeb1261e7f1e stage 240.00x194.04 cycle 4900 ms
+  249 One-Arm Kettlebell Floor Press: drawn a4575b3d579d34da142bdd07165e9d32467782183dc16bd97e7ec855fbc87a31 captions f29ff657ab7ea3cb138ff8e9a853ca86ab820ab19c4ab1ed656746ea9a02eb56 stage 240.00x137.14 cycle 3100 ms
+  5 Barbell Row: drawn 67c387f0fec448f7d74d2fa5897bad5419b01cec8b00ab4034a410c06e1e8ecf captions 003d620ca8d6f8d04ab66b2b13710f559581ae42a9dd8b467a9d269e212524aa stage 122.93x240.00 cycle 3350 ms
+  104 One-Arm Kettlebell Row: drawn be5554b4db7324da4fc9a6d26c40ac0c6647c27ca61e81067ad48dab5a8f9c03 captions 63e25b9b2328c93327376218cfe0d75ae6accd1a8f3746ff4167d43f6bffb083 stage 176.47x240.00 cycle 3500 ms
+  107 Reverse Grip Bent-Over Rows: drawn e341167fb115b237762a54d4892c30161709f36aa4264a0ddad3cb5db4c63b1c captions 6367620a6c1b06c6762398811c96d33ec26424eea41f3022ea9636d1d8f73876 stage 165.16x240.00 cycle 4100 ms
+  79 T-Bar Row: drawn 56bacad321f78c8cfa33add61fb160d0a78a72a6c2d2c7d0968cb3d10972e44b captions 81d1f5aeb6bd56f4b62c8c61a367c8cba1876dc6c1bd3bc788aaed61dc734242 stage 222.13x240.00 cycle 3550 ms
+  130 Alternating Kettlebell Row: drawn 88f87a9955278c739caf904fac8f56b1f267860c29553bbc3212ac6c52b1ed75 captions cdeebd5591078246c0e0276dd1f7bf6f116c316950bbc6a2a3026fa72e5287c9 stage 184.29x240.00 cycle 4500 ms
+  184 Drag Curl: drawn 47d3b2d04f839226b9fd28552e49b57c20738a2137164b25540f4c929b6dafaf captions 79941dc8ccf1695608c9eea9ea63e397257a9b6f1d848cfd89e80aa066fc66f9 stage 151.30x240.00 cycle 3300 ms
+  213 High Cable Curls: drawn 6edb29a669fa5d73d21bcbc3be79c26d652c909bf4afeab54c1745b898478fec captions e9eaffc66d5e222a3f5742f323e19fec94ff1cf4b64eb314f729a0c9da902d6e stage 240.00x240.00 cycle 3100 ms
+  240 Lying Cable Curl: drawn 0a52c2c9efed14370d0bc7197ab014ae7e2ca5d48a38258af6bf0ccb1a7e2a02 captions 2cad7c5e5192a4b8df5d7745ce2c62e816afb25f8daf3762afa5ffb96fa56d87 stage 240.00x202.11 cycle 3100 ms
+exit code: 0 (probe run exit 0)

@@ -1,0 +1,15 @@
+source commit: f639bbbf1370267bf24f5939a3bc2212e330bbd1
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with probe-818fc33ecfc1efb7c0a0158bbbb843dbe056d6e9.json
+
+movements measured: 232 (baseline 232)
+added: none
+removed: none
+changed, expected: 8 Front Squat; 208 Front Squat (Clean Grip); 65 Incline Dumbbell Press; 249 One-Arm Kettlebell Floor Press
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  8 Front Squat: drawn c9d946b874bd07f9c22aae46c86d363297bef21633e15eaf5c96f71fd1566bf1 captions c0dd819aa41874dbbbd0054978b7a0399b00b80afaaf5062e3987ac5dd2b7514 stage 103.23x240.00 cycle 3500 ms
+  208 Front Squat (Clean Grip): drawn 59bfc8a8c7ab4024157427c480e6dc21f9e13b5ce1b51f0423b5123ff7cf48c4 captions a4e23cc18ed2a82dc5b65132727cdc95e497d373defb5680c3ce1c98fa45d2bb stage 180.00x240.00 cycle 3500 ms
+  81 Zercher Squat: drawn 8313011ec30e0f15c0fe88c2e26889d446106af256cde10013dac524637ae87e captions e3f5d3c0a88fb6f939edeb0666c3f62dbc3a882289869349f5edbfd8be526de4 stage 116.13x240.00 cycle 3500 ms
+  65 Incline Dumbbell Press: drawn f2ce0a3d1ad9af4d989438873e696841c26d11f6b9d13ff8e17aaa18de2117c9 captions 9ac6cf6e6a0aed91269f761d75d85ec8cc9e71e7735ef324d6339a7f5be6f618 stage 232.94x240.00 cycle 3100 ms
+  249 One-Arm Kettlebell Floor Press: drawn df00047484926e1e50248a94993e5410097a5263e3b2e35b32c2bf693c5e2621 captions f29ff657ab7ea3cb138ff8e9a853ca86ab820ab19c4ab1ed656746ea9a02eb56 stage 240.00x126.86 cycle 3100 ms
+exit code: 0 (probe run exit 0)

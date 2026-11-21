@@ -1,4 +1,4 @@
-export { DB_NAME, closeKineticsDb, openKineticsDb, setInferenceMode } from './pragmas';
+export { DB_NAME, closeKineticsDb, openKineticsDb } from './pragmas';
 export { migrate } from './migrations';
 export { MigrationLineageError } from './migrationRunner';
 export * from './backup';
@@ -6,11 +6,17 @@ export {
   archiveActiveTrainingBlock,
   insertTrainingProgram,
   linkTrainingBlockProgram,
+  mapBaseProgramFocus,
   updateTrainingProgramEndDate,
+  writeProgramAdvancedControl,
+  type BaseProgramFocus,
   type CreateProgramWrite,
   type ExecDb,
+  type ProgramAdvancedControlWrite,
   type ProgramDayWrite,
   type ProgramPreferenceWrite,
+  type ProgramRoutineDayWrite,
+  type ProgramSlotOverrideWrite,
 } from './programTx';
 export {
   DEMO_DAYS,

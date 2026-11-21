@@ -1,0 +1,140 @@
+{
+  "bounds": [
+    {
+      "id": 93,
+      "quote": "Set up in a push-up plank with a hand on each dumbbell, feet wider than usual.",
+      "bound": "Plank body line deg3D(ankleMid, hip, neck) = 177.36° >= 172° and knee straightness deg3D(hipJoint, knee, ankle) = 176.82° >= 172° across all ticks; foot lateral span = 31.60 >= 24.77; planted supporting arm deg3D(shoulder, elbow, wrist) = 175.43° >= 172° with floor dumbbell holds at y = 3.60 <= 4.5.",
+      "test": "apps/mobile/test/components/MovementPreview.movA09RowsRearRaises.test.js: 93 Renegade Row"
+    },
+    {
+      "id": 93,
+      "quote": "Row one dumbbell to your ribs while the rest of you stays a statue, then place it down and row the other side. The row is the easy part — the work is refusing to let the hips twist.",
+      "bound": "5-frame cycle [1, 0, 1, 2, 1] with no pause at top; symmetric rib target [12.5, 22.8, ±14.224] within 1.85 in X and 2.86 in Y of ribcage midpoint [10.65, 25.66]; yawDeg = -38, pitchDeg = 28 projects both near row (6.78 >= trunkHalf + 2.0) and far row (6.78 >= trunkHalf + 1.8, far elbow 10.60 >= trunkHalf + 4.5) clear of the torso silhouette; |roll| <= 1° and |twist| <= 1° across all ticks.",
+      "test": "apps/mobile/test/components/MovementPreview.movA09RowsRearRaises.test.js: 93 Renegade Row"
+    },
+    {
+      "id": 195,
+      "quote": "Place a low platform on the seat of a cable row station, sit on it with the feet on the foot plate and the knees slightly bent, and hold the V-handle with the arms straight and the torso upright.",
+      "bound": "Elevated platform box [-8, 12.2]..[4, 17.5] raises hip Y to 20.332 (+5.50 above seated-cable-rows at 14.832); knee angle = 145.69° in [130°, 168°]; 3D foot-plate rails [43.21, 9.56, ±CHAIN_HIP_HALF]..[44.94, 19.41, ±CHAIN_HIP_HALF] give exact sole contact (2.768 in 3D, 2.267 in 2D <= contactSum + 0.05) for both feet; single cable line to vHandleApex with two V-handle branches to hands (span 2 * V_HANDLE_HALF = 5.60) and palms facing (palmYaw = 90°); reach arm straightness = 174.52° >= 172°.",
+      "test": "apps/mobile/test/components/MovementPreview.movA09RowsRearRaises.test.js: 195 Elevated Cable Rows"
+    },
+    {
+      "id": 195,
+      "quote": "Keeping the torso still and the arms close to the body, pull the handle to the stomach. Squeeze the back, then let the handle return slowly until the arms are straight.",
+      "bound": "Pulling to the stomach (pose 1) drives the V-handle back by -14.05 units in X (21.55 -> 7.50) and down by -4.00 units in Y (35.00 -> 31.00) toward the abdomen, with elbows close to the body (elbow Z = 11.49 <= shoulderHalf + 3.5) and passing behind the trunk (elbow X = -4.27 < hip X), stationary upright torso (90°), and a 1400 ms slow return vs 1200 ms pull.",
+      "test": "apps/mobile/test/components/MovementPreview.movA09RowsRearRaises.test.js: 195 Elevated Cable Rows"
+    },
+    {
+      "id": 296,
+      "quote": "Stand tall facing a low pulley holding the straight bar against the thighs with an overhand grip slightly narrower than the shoulders.",
+      "bound": "Grip half-span = 6.80 in [5.16, 7.98] (strictly narrower than shoulder half-width 9.384); palmYaw = 180° and farPalmYaw = 180° with handCloseUp callout panel at [-32, 68] showing pronated overhand grip (palmFacingViewer = false) on the straight cable bar; at bottom (pose 0) arms are straight at 175.43° >= 172° against the thighs.",
+      "test": "apps/mobile/test/components/MovementPreview.movA09RowsRearRaises.test.js: 296 Upright Cable Row"
+    },
+    {
+      "id": 296,
+      "quote": "Keeping the bar close to the body, lift it toward the chin by raising the elbows up and out to the sides, elbows higher than the hands. Pause, then lower the bar slowly to the thighs.",
+      "bound": "At top contraction (pose 1, held for 450 ms before 1400 ms slow lower), the bar is pulled close to the body (wrist X = 5.80 <= 7.0) toward the chin (neck Y - hold Y = 1.80 <= 2.0) while elbows lead high and out at Y = 75.50 (+6.77 units above wrists at Y = 68.725; screen elbow Y = 21.40 < wrist Y = 28.18).",
+      "test": "apps/mobile/test/components/MovementPreview.movA09RowsRearRaises.test.js: 296 Upright Cable Row"
+    },
+    {
+      "id": 243,
+      "quote": "Lie chest-down on an incline bench holding a dumbbell in each hand with the arms hanging straight.",
+      "bound": "Prone incline bench at trunk = 38° (in [30°, 45°]) viewed from behind/above at yawDeg = 58° with chest supported on the pad, neutral-grip dumbbells (bellAxis aligned with the 38° trunk plane), and arms hanging straight down at 180.00° (>= 172°) below the shoulders.",
+      "test": "apps/mobile/test/components/MovementPreview.movA09RowsRearRaises.test.js: 243 Middle Back Shrug"
+    },
+    {
+      "id": 243,
+      "quote": "Pull the shoulder blades back and together without bending the elbows, and pause at the top. Lower under control; when the elbows bend to move the load, reduce the weight.",
+      "bound": "Across every sampled 33 ms tick, near and far elbow angles stay at 180.00° (>= 172°, variation 0.00° < 0.5°), while dorsal scapular retraction (retract = 6.4) lifts shoulders/dumbbells by +5.04 in Y and -3.94 in X, narrows 3D shoulder span by 4.48 units and 2D screen shoulder span by 3.80 units (>= 3.5), and pinches the shoulder blades together by 7.20 units (>= 6.0) in the upperBackCloseUp callout panel.",
+      "test": "apps/mobile/test/components/MovementPreview.movA09RowsRearRaises.test.js: 243 Middle Back Shrug"
+    },
+    {
+      "id": 188,
+      "quote": "Lie chest-down on an adjustable bench set to a shallow incline of about fifteen degrees, a dumbbell in each hand. Hold the palms facing the torso with the arms extended and the elbows slightly bent.",
+      "bound": "Prone bench set to exact 15° shallow incline (trunk = 15°, slab angle = 15°), palms facing the torso (palmYaw = 90°, farPalmYaw = 90°, palmDir[2] = ±1) with handCloseUp callout panel at [14, 72] showing neutral dumbbell grip, and fixed 12° elbow bend (elbow angle = 168.00° across all ticks).",
+      "test": "apps/mobile/test/components/MovementPreview.movA09RowsRearRaises.test.js: 188 Dumbbell Lying Rear Lateral Raise & 241 Lying Rear Delt Raise"
+    },
+    {
+      "id": 188,
+      "quote": "Raise the arms out to the side until the elbows reach shoulder height and the arms are roughly parallel to the floor. Hold the contraction for a second, then lower under control.",
+      "bound": "At peak contraction (pose 1), dumbbells sweep out in a wide lateral arc (wrist Z span = 65.53 > 50) until elbows reach shoulder height (|elbow Y - shoulder Y| = 0.00 <= 1.0, |wrist Y - shoulder Y| = 0.72 <= 2.5) and hold for an exact 1000 ms top pause before a 1700 ms controlled lower.",
+      "test": "apps/mobile/test/components/MovementPreview.movA09RowsRearRaises.test.js: 188 Dumbbell Lying Rear Lateral Raise & 241 Lying Rear Delt Raise"
+    },
+    {
+      "id": 241,
+      "quote": "Lie chest-down on a flat bench with a dumbbell in each hand. Hold the palms facing the torso with the arms extended and the elbows slightly bent.",
+      "bound": "Horizontal flat bench (trunk = 0°, slab angle = 0°) supporting the chest at Y = 30.416, palms facing the torso (palmYaw = 90°, farPalmYaw = 90°, palmDir[2] = ±1) with handCloseUp callout panel at [14, 72] showing neutral dumbbell grip, and fixed 12° elbow bend (elbow angle = 168.00° across all ticks).",
+      "test": "apps/mobile/test/components/MovementPreview.movA09RowsRearRaises.test.js: 188 Dumbbell Lying Rear Lateral Raise & 241 Lying Rear Delt Raise"
+    },
+    {
+      "id": 241,
+      "quote": "Raise the arms out to the side until the elbows reach shoulder height and the arms are roughly parallel to the floor. Hold the contraction for a second, then lower under control.",
+      "bound": "At peak contraction (pose 1), arms are parallel to the floor at shoulder height (|elbow Y - shoulder Y| = 0.00 <= 1.0, |wrist Y - shoulder Y| = 0.85 <= 2.5, wrist Z span = 65.53 > 50) and hold for an exact 1000 ms top pause before a 1700 ms controlled lower.",
+      "test": "apps/mobile/test/components/MovementPreview.movA09RowsRearRaises.test.js: 188 Dumbbell Lying Rear Lateral Raise & 241 Lying Rear Delt Raise"
+    }
+  ],
+  "fileQuotes": [
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 7620,
+      "text": "Row one dumbbell to your ribs while the rest of you stays a statue, then place it down and row the other side. The row is the easy part — the work is refusing to let the hips twist."
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 14510,
+      "text": "Place a low platform on the seat of a cable row station, sit on it with the feet on the foot plate and the knees slightly bent, and hold the V-handle with the arms straight and the torso upright."
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 21301,
+      "text": "Stand tall facing a low pulley holding the straight bar against the thighs with an overhand grip slightly narrower than the shoulders."
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 17708,
+      "text": "Pull the shoulder blades back and together without bending the elbows, and pause at the top. Lower under control; when the elbows bend to move the load, reduce the weight."
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 14039,
+      "text": "Lie chest-down on an adjustable bench set to a shallow incline of about fifteen degrees, a dumbbell in each hand. Hold the palms facing the torso with the arms extended and the elbows slightly bent."
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 17577,
+      "text": "Lie chest-down on a flat bench with a dumbbell in each hand. Hold the palms facing the torso with the arms extended and the elbows slightly bent."
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 1254,
+      "text": "to: 'nearGrip' | 'farGrip' | 'midGrip' | 'vHandleApex' | 'nearBarEnd' | 'farBarEnd' | 'nearAnkle' | 'farAnkle';"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4957,
+      "endLine": 4958,
+      "text": "implement: 'vHandle',\n    lines: [{ from: NECK_ROW_PULLEY, to: 'vHandleApex' }],"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 6050,
+      "text": "export function upperBackCloseUp(figure: ReturnType<typeof chainGeometry>) {"
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA09RowsRearRaises.test.js",
+      "line": 172,
+      "endLine": 174,
+      "text": "expect(perpFromSpine(rowNear.hold.near)).toBeGreaterThanOrEqual(trunkHalf + 2.0);\n    expect(perpFromSpine(rowFar.hold.far)).toBeGreaterThanOrEqual(trunkHalf + 1.8);\n    expect(perpFromSpine(rowFar.joints.ef)).toBeGreaterThanOrEqual(trunkHalf + 4.5);"
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA09RowsRearRaises.test.js",
+      "line": 299,
+      "text": "expect(cableLines).toHaveLength(1);"
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA09RowsRearRaises.test.js",
+      "line": 412,
+      "text": "expect(bottomBackPanel.bladeSpan - topBackPanel.bladeSpan).toBeGreaterThanOrEqual(6.0);"
+    }
+  ]
+}

@@ -1,0 +1,180 @@
+{
+  "bounds": [
+    {
+      "id": 288,
+      "quote": "Stand tall holding a barbell with an overhand grip, feet shoulder-width apart or a little narrower and the knees slightly bent.",
+      "test": "apps/mobile/test/components/MovementPreview.movA04Hinges.test.js :: 288 Stiff-Legged Barbell Deadlift starts standing, keeps the slight knee angle fixed throughout, pushes hips back over the base of support, and lowers the bar on plumb arms toward the top of the feet",
+      "bound": "at ph = 0, athlete starts standing (trunkDeg2D = 89.06 deg > 80 deg, bar hold Y = 45.17 > 38, not on the floor) with narrower stance (footSpread = 1.6) and slight knee bend (kneeDeg3D = 154.00 deg inside [148, 166])"
+    },
+    {
+      "id": 288,
+      "quote": "Keeping the knees at that angle and the back straight, push the hips back to lower the bar toward the top of the feet until you feel a stretch in the hamstrings.",
+      "test": "apps/mobile/test/components/MovementPreview.movA04Hinges.test.js :: 288 Stiff-Legged Barbell Deadlift starts standing, keeps the slight knee angle fixed throughout, pushes hips back over the base of support, and lowers the bar on plumb arms toward the top of the feet",
+      "bound": "across every 33 ms tick, kneeDeg3D remains 154.00 deg (|kneeDeg - startKneeDeg| = 0.00 < 0.05) and curled === false; at ph = 1, hip X travels back from 0.00 to -18.32 (< -12), bar lowers on plumb arms (armFromVerticalDeg2D = 3.12 deg <= 10 deg) to Y = 15.49 (< knee Y = 23.92 - 3) directly over the planted foot [ankle X = 0.00, toe X = 5.40] at X = 3.48"
+    },
+    {
+      "id": 61,
+      "quote": "Set the bar across the upper back as for a squat. Soften the knees and send the hips back until the hamstrings are loaded while the trunk stays long.",
+      "test": "apps/mobile/test/components/MovementPreview.movA04Hinges.test.js :: 61 Good Morning, 210 Good Morning off Pins, and 271 Seated Good Mornings each satisfy their setup, rack/pin contact, and hip-hinge bounds",
+      "bound": "bar sits across the upper back (hold = [2.85, 70.14] at neck = [4.84, 69.67] at ph = 0, trunkDeg2D = 88.06 deg > 80 deg) with softened knees (kneeDeg3D = 156.00 deg); at ph = 1, hips travel back 16.31 units (hip X from 4.00 to -12.31) while trunk hinges to 14.41 deg (< 25 deg) with curled === false and combined hip/bar midpoint X = -0.71 over the planted foot [4.00, 9.40]"
+    },
+    {
+      "id": 61,
+      "quote": "Drive the hips through to stand tall along the same path.",
+      "test": "apps/mobile/test/components/MovementPreview.movA04Hinges.test.js :: 61 Good Morning, 210 Good Morning off Pins, and 271 Seated Good Mornings each satisfy their setup, rack/pin contact, and hip-hinge bounds",
+      "bound": "phases [0, 1, 1, 0, 0] return along the exact same hip-hinge trajectory from hip X = -12.31, trunk = 14.41 deg at ph = 1 back to standing tall at hip X = 4.00, trunk = 88.06 deg at ph = 0 with planted feet fixed at [4.00, 2.16]"
+    },
+    {
+      "id": 210,
+      "quote": "Set the bar on the pins at about stomach height, bend over under it so it sits across the back of the shoulders, with the torso near level with the floor, the back tight and the knees slightly bent.",
+      "test": "apps/mobile/test/components/MovementPreview.movA04Hinges.test.js :: 61 Good Morning, 210 Good Morning off Pins, and 271 Seated Good Mornings each satisfy their setup, rack/pin contact, and hip-hinge bounds",
+      "bound": "horizontal rack safety pins are drawn at stomach height Y = 47.00 (inside [40, 50]); at ph = 0, the athlete starts bent under the bar on the pins (hold Y = 47.89, |hold Y - pinHeight| = 0.89 <= 2.0) with torso near level (trunkDeg2D = 8.24 deg <= 15 deg), back tight (curled === false), and knees slightly bent (kneeDeg3D = 156.00 deg)"
+    },
+    {
+      "id": 210,
+      "quote": "Drive the hips forward to stand up with the bar. Push the hips back to lower the bar slowly to the pins and let it settle before the next repetition.",
+      "test": "apps/mobile/test/components/MovementPreview.movA04Hinges.test.js :: 61 Good Morning, 210 Good Morning off Pins, and 271 Seated Good Mornings each satisfy their setup, rack/pin contact, and hip-hinge bounds",
+      "bound": "at ph = 1, hips drive forward +16.31 units (hip X from -14.31 to 2.00) to stand tall (trunkDeg2D = 88.06 deg > 80 deg, hold Y = 70.14); lowering segment duration (1900 ms) exceeds concentric ascent (1200 ms), followed by a 750 ms (>= 650 ms) settle pause on the pins"
+    },
+    {
+      "id": 271,
+      "quote": "Set a bench inside a power rack and set the pins at the depth you intend to reach. Take the bar across the back of the shoulders, squeeze the shoulder blades together, step back and sit down on the bench.",
+      "test": "apps/mobile/test/components/MovementPreview.movA04Hinges.test.js :: 61 Good Morning, 210 Good Morning off Pins, and 271 Seated Good Mornings each satisfy their setup, rack/pin contact, and hip-hinge bounds",
+      "bound": "flat bench and power rack with horizontal safety pins at Y = 32.20 are drawn; athlete stays seated on the bench throughout (hip fixed at [-6.00, 24.41], planted ankles fixed at [15.91, 2.16], drift = 0.00 < 0.01) starting upright (trunkDeg2D = 86.12 deg > 80 deg)"
+    },
+    {
+      "id": 271,
+      "quote": "Keeping the bar tight and the lower back arched, bend forward at the hips until the bar approaches the pins. Pause just above the pins and reverse the motion until the torso is upright.",
+      "test": "apps/mobile/test/components/MovementPreview.movA04Hinges.test.js :: 61 Good Morning, 210 Good Morning off Pins, and 271 Seated Good Mornings each satisfy their setup, rack/pin contact, and hip-hinge bounds",
+      "bound": "with lower back arched (curl = -8 deg to -10 deg), torso hinges forward to trunkDeg2D = 29.74 deg (< 35 deg) at ph = 1 where the bar pauses at hold Y = 37.91, 5.71 units above the pins at Y = 32.20 (inside [4.5, 6.5], leaving a 1.51-unit visual gap below the 4.2-radius plate), holds for 650 ms (>= 550 ms), and returns upright"
+    },
+    {
+      "id": 94,
+      "quote": "Hold a kettlebell in one hand and stand on the opposite leg. Hinge forward, letting the free leg travel straight back as a counterweight, until your torso and back leg are near parallel with the floor.",
+      "test": "apps/mobile/test/components/MovementPreview.movA04Hinges.test.js :: 94 Single-Leg Romanian Deadlift holds the kettlebell opposite the standing leg, hangs the bell plumb under the shoulder, keeps hips square, and extends the free leg straight back to near parallel",
+      "bound": "implement is \"kettlebell\" in the near hand (hold Z = +10.24 > 0) while standing on the opposite far leg (far ankle Z = -6.80 < 0, planted at [2.00, 2.16] with 0.00 drift); at ph = 1, free near leg extends straight back to near ankle = [-49.63, 38.83] (< hip X - 40, Y > 34) with torso at 8.41 deg (<= 15 deg) and back leg at 8.00 deg (<= 15 deg) from horizontal"
+    },
+    {
+      "id": 94,
+      "quote": "Hips stay square, back leg reaches long. Bell hangs plumb under the shoulder.",
+      "test": "apps/mobile/test/components/MovementPreview.movA04Hinges.test.js :: 94 Single-Leg Romanian Deadlift holds the kettlebell opposite the standing leg, hangs the bell plumb under the shoulder, keeps hips square, and extends the free leg straight back to near parallel",
+      "bound": "at ph = 1, pelvis roll === 0 deg (hips square), back leg knee angle = 180.00 deg, and the near arm hangs plumb under the shoulder at armFromVerticalDeg2D = 0.00 deg (<= 5 deg)"
+    },
+    {
+      "id": 35,
+      "quote": "Sit on the floor with your upper back against a bench and a padded bar over your hips. Plant your feet about hip-width, heels under your knees. Drive through your heels until your thighs and torso are level with the floor — finish flat like a tabletop, because any height past neutral comes from the lower back, not the glutes.",
+      "test": "apps/mobile/test/components/MovementPreview.movA04Hinges.test.js :: 35 Barbell Hip Thrust pivots the upper back on the bench, carries a padded bar over the hips, and finishes in a level tabletop with vertical shins and a full-beat pause",
+      "bound": "barPad === true renders the padded sleeve across the hip crease (hold = [0.61, 17.17] over hip = [0.00, 10.99] at ph = 0, and hold = [-2.94, 29.88] over hip = [0.00, 24.41] at ph = 1); upper back stays at bench height Y = 24.41 (|top.neck[1] - bottom.neck[1]| = 0.00 < 0.05); at ph = 1, neck Y = 24.41, hip Y = 24.41, and knee Y = 24.41 form a level 0.00 deg tabletop withhipLineSagittalDeg = 180.00 deg"
+    },
+    {
+      "id": 35,
+      "quote": "Tuck the pelvis and pause a full beat at the top. One straight line knee-to-shoulder, core braced in neutral. Drive through the heels, shins vertical.",
+      "test": "apps/mobile/test/components/MovementPreview.movA04Hinges.test.js :: 35 Barbell Hip Thrust pivots the upper back on the bench, carries a padded bar over the hips, and finishes in a level tabletop with vertical shins and a full-beat pause",
+      "bound": "at ph = 1, knee X = 22.25 matches planted ankle X = 22.25 (|knee X - ankle X| = 0.00 < 0.05, kneeDeg3D = 90.00 deg, shins vertical), and segmentDurationsMs[1] = 1000 ms (>= 900 ms) provides a full-beat top pause"
+    },
+    {
+      "id": 23,
+      "quote": "Kneel on a soft pad and secure the ankles beneath an anchor that cannot move. Hold one line from knees to head with the hips extended, then lower that line as slowly as possible.",
+      "test": "apps/mobile/test/components/MovementPreview.movA04Hinges.test.js :: 23 Nordic Curl, 202 Floor Glute-Ham Raise, and 244 Natural Glute Ham Raise hold one straight knee-to-shoulder line, lower more than twice as slowly as they return, and show their distinct equipment, depth, and catch mechanics",
+      "bound": "kneeling on a low floor pad (knee fixed at [32.25, 6.80], ankle locked at [10.00, 6.80] under roller [11.5, 9.6]), hipLineSagittalDeg = 180.00 deg (>= 179 deg) across every 33 ms tick, and lowering duration 2750 ms is more than 2x the 1350 ms return"
+    },
+    {
+      "id": 23,
+      "quote": "Catch with the hands and use only enough push to return; if the hips fold first, shorten the lowering range.",
+      "test": "apps/mobile/test/components/MovementPreview.movA04Hinges.test.js :: 23 Nordic Curl, 202 Floor Glute-Ham Raise, and 244 Natural Glute Ham Raise hold one straight knee-to-shoulder line, lower more than twice as slowly as they return, and show their distinct equipment, depth, and catch mechanics",
+      "bound": "at ph = 1 (trunkDeg2D = 22.00 deg, kneeDeg3D = 158.00 deg), hands catch on the floor at wrist Y = 3.43 (<= 3.5) with bent push-up elbows (elbowDeg3D = 116.00 deg) while keeping hipLineSagittalDeg = 180.00 deg"
+    },
+    {
+      "id": 202,
+      "quote": "Kneel tall in a Nordic bench with the ankles locked under the foot pads, hips and shoulders in one line. Lower yourself forward by extending at the knees, keeping the hips straight rather than folding.",
+      "test": "apps/mobile/test/components/MovementPreview.movA04Hinges.test.js :: 23 Nordic Curl, 202 Floor Glute-Ham Raise, and 244 Natural Glute Ham Raise hold one straight knee-to-shoulder line, lower more than twice as slowly as they return, and show their distinct equipment, depth, and catch mechanics",
+      "bound": "kneeling on an elevated Nordic bench (knee fixed at [32.25, 10.50] > Nordic Curl 6.80 + 3, ankle locked at [10.00, 10.50] between rollers [11.5, 13.2] and [8.2, 7.5]), hipLineSagittalDeg = 180.00 deg across every 33 ms tick as the knees extend from 90.00 deg to 165.00 deg (> Nordic Curl 158.00 deg + 5) over a 2750 ms lowering phase"
+    },
+    {
+      "id": 202,
+      "quote": "Bring the hands to the floor to catch, then push lightly off the floor to help yourself back up.",
+      "test": "apps/mobile/test/components/MovementPreview.movA04Hinges.test.js :: 23 Nordic Curl, 202 Floor Glute-Ham Raise, and 244 Natural Glute Ham Raise hold one straight knee-to-shoulder line, lower more than twice as slowly as they return, and show their distinct equipment, depth, and catch mechanics",
+      "bound": "at ph = 1 (trunkDeg2D = 15.00 deg), hands reach down from the elevated bench to catch the floor at wrist Y = 2.63 (<= 3.5) with longer arms (elbowDeg3D = 149.50 deg > Nordic Curl 116.00 deg + 20)"
+    },
+    {
+      "id": 244,
+      "quote": "Set up in a Nordic bench with the ankles locked under the foot pads and a band anchored to assist the return. Start upright with good posture, then lower yourself under control until the knees are almost straight.",
+      "test": "apps/mobile/test/components/MovementPreview.movA04Hinges.test.js :: 23 Nordic Curl, 202 Floor Glute-Ham Raise, and 244 Natural Glute Ham Raise hold one straight knee-to-shoulder line, lower more than twice as slowly as they return, and show their distinct equipment, depth, and catch mechanics",
+      "bound": "set up in the elevated Nordic bench (knee at [36.25, 10.50], ankle locked at [14.00, 10.50]) with a rear band anchored at [4, 56] to nearGrip; lowers over 2750 ms (>= 2 * 1350 ms) with hipLineSagittalDeg = 180.00 deg until the knees are almost straight at kneeDeg3D = 174.00 deg (>= 172 deg, > Floor GHR 165.00 deg + 7)"
+    },
+    {
+      "id": 244,
+      "quote": "Reverse the movement and pull yourself back to upright, letting the band assist only as much as you need.",
+      "test": "apps/mobile/test/components/MovementPreview.movA04Hinges.test.js :: 23 Nordic Curl, 202 Floor Glute-Ham Raise, and 244 Natural Glute Ham Raise hold one straight knee-to-shoulder line, lower more than twice as slowly as they return, and show their distinct equipment, depth, and catch mechanics",
+      "bound": "at ph = 1, hands hold the band at the upper chest at wrist = [82.00, 14.90] (wrist Y = 14.90 > 12, never touching the floor) as the band stretches from 32.66 units (ph = 0) to 88.24 units (ph = 1) and assists the return to upright (trunkDeg2D = 90.00 deg)"
+    }
+  ],
+  "fileQuotes": [
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 20763,
+      "endLine": 20764,
+      "text": "        \"instructions\": \"Stand tall holding a barbell with an overhand grip, feet shoulder-width apart or a little narrower and the knees slightly bent. Keeping the knees at that angle and the back straight, push the hips back to lower the bar toward the top of the feet until you feel a stretch in the hamstrings. Bring the hips forward to stand tall again.\",\n        \"cues\": \"Back straight, knees softly bent. Hips back, bar close to the legs. Stand tall with the hips.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 5466,
+      "endLine": 5467,
+      "text": "        \"instructions\": \"Set the bar across the upper back as for a squat. Soften the knees and send the hips back until the hamstrings are loaded while the trunk stays long. Drive the hips through to stand tall along the same path. If the bar rolls or the trunk softens, shorten the range or reduce the load before the next rep.\",\n        \"cues\": \"Push the hips straight back. Flat back the whole rep. Feel the hamstrings load — they bring you back up.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 15508,
+      "endLine": 15509,
+      "text": "        \"instructions\": \"Set the bar on the pins at about stomach height, bend over under it so it sits across the back of the shoulders, with the torso near level with the floor, the back tight and the knees slightly bent. Drive the hips forward to stand up with the bar. Push the hips back to lower the bar slowly to the pins and let it settle before the next repetition.\",\n        \"cues\": \"Back tight, shoulder blades pinched. Drive the hips forward. Lower slowly to the pins.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 19612,
+      "endLine": 19613,
+      "text": "        \"instructions\": \"Set a bench inside a power rack and set the pins at the depth you intend to reach. Take the bar across the back of the shoulders, squeeze the shoulder blades together, step back and sit down on the bench. Keeping the bar tight and the lower back arched, bend forward at the hips until the bar approaches the pins. Pause just above the pins and reverse the motion until the torso is upright.\",\n        \"cues\": \"Set the pins before the first rep. Move at the hips with the back arched. Pause just above the pins each rep.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 7689,
+      "endLine": 7690,
+      "text": "        \"instructions\": \"Hold a kettlebell in one hand and stand on the opposite leg. Hinge forward, letting the free leg travel straight back as a counterweight, until your torso and back leg are near parallel with the floor. Drive the hips through to stand tall. Wobbling is part of the exercise — every save is your ankle and hip learning their job.\",\n        \"cues\": \"Hips stay square, back leg reaches long. Bell hangs plumb under the shoulder. Slow beats far — shorten the hinge before you lose it.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 3693,
+      "endLine": 3694,
+      "text": "        \"instructions\": \"Sit on the floor with your upper back against a bench and a padded bar over your hips. Plant your feet about hip-width, heels under your knees. Drive through your heels until your thighs and torso are level with the floor — finish flat like a tabletop, because any height past neutral comes from the lower back, not the glutes. Lower your hips under control and repeat.\",\n        \"cues\": \"Tuck the pelvis and pause a full beat at the top. One straight line knee-to-shoulder, core braced in neutral. Drive through the heels, shins vertical.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 2892,
+      "endLine": 2893,
+      "text": "        \"instructions\": \"Kneel on a soft pad and secure the ankles beneath an anchor that cannot move. Hold one line from knees to head with the hips extended, then lower that line as slowly as possible. Catch with the hands and use only enough push to return; if the hips fold first, shorten the lowering range.\",\n        \"cues\": \"Hold the hips extended. Own the lowering phase. Use the hands for a smooth return.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 14977,
+      "endLine": 14978,
+      "text": "        \"instructions\": \"Kneel tall in a Nordic bench with the ankles locked under the foot pads, hips and shoulders in one line. Lower yourself forward by extending at the knees, keeping the hips straight rather than folding. Bring the hands to the floor to catch, then push lightly off the floor to help yourself back up.\",\n        \"cues\": \"Keep the hips in line with the shoulders. Lower as slowly as you control. Let the hands catch and assist the return.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 17773,
+      "endLine": 17774,
+      "text": "        \"instructions\": \"Set up in a Nordic bench with the ankles locked under the foot pads and a band anchored to assist the return. Start upright with good posture, then lower yourself under control until the knees are almost straight. Reverse the movement and pull yourself back to upright, letting the band assist only as much as you need.\",\n        \"cues\": \"Keep the hips in line with the shoulders. Lower as slowly as you control. Let the band assist the reversal.\","
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 1299,
+      "endLine": 1300,
+      "text": "  /** Whether a held barbell wears a thick pad around the middle of its shaft (as in a Barbell Hip Thrust). */\n  barPad?: boolean;"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5057,
+      "endLine": 5060,
+      "text": "      if (movement.barPad === true) {\n        const padHalf = Math.min(3.2, length * 0.36);\n        near.push({ ...line([mid[0] - ux * padHalf, mid[1] - uy * padHalf], [mid[0] + ux * padHalf, mid[1] + uy * padHalf], 4.2, 'textMid', 1), stroke: 'ink1', strokeWidth: 0.6 });\n      }"
+    }
+  ]
+}

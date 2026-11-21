@@ -1,0 +1,288 @@
+{
+ "bounds": [
+  {
+   "id": 249,
+   "quote": "Press the kettlebell straight up until the arm is straight, letting the wrist turn as it rises.",
+   "test": "MovementPreview.movA05Presses.test.js: 203 Floor Press and 249 One-Arm Kettlebell Floor Press ...",
+   "bound": "locked arm (shoulder to wrist) within 5 deg of vertical, hand within 1.0 and painted bell within 2.5 of directly over the shoulder; bell rises > 12; top elbow >= 172 deg"
+  },
+  {
+   "id": 249,
+   "quote": "Wrist stacked over the elbow.",
+   "test": "MovementPreview.movA05Presses.test.js: 203 Floor Press and 249 One-Arm Kettlebell Floor Press ...",
+   "bound": "bottom forearm within 1 deg of vertical; bell starts within 2.5 (floor plane) of over the elbow; headward travel beyond the elbow's offset <= 3; bell within 3 of the start-to-lockout line at every 33 ms tick"
+  },
+  {
+   "id": 249,
+   "quote": "Lie on the floor holding a kettlebell in one hand with that upper arm resting on the floor and the palm facing in.",
+   "test": "MovementPreview.movA05Presses.test.js: 203 Floor Press and 249 One-Arm Kettlebell Floor Press ...",
+   "bound": "bottom elbow centre at the upper arm's painted half width above the floor (within 0.05), never lower; upper arm 30 to 45 deg out from the trunk in the floor plane"
+  },
+  {
+   "id": 130,
+   "quote": "Stand over two kettlebells, bend the knees slightly, push the hips back and take a handle in each hand with the back flat.",
+   "test": "MovementPreview.movA08Rows.test.js: 130 Alternating Kettlebell Row ...",
+   "bound": "no spinal curl; trunk within 25 deg of level; both knees 150 to 165 deg and the body's centre of mass over the painted foot (alone and with the rowed bell at a fifth of body mass) at every 33 ms tick"
+  },
+  {
+   "id": 130,
+   "quote": "while the other hand holds its kettlebell on the floor",
+   "test": "MovementPreview.movA08Rows.test.js: 130 Alternating Kettlebell Row ...",
+   "bound": "painted bell bottom on the floor line (cy + r = 96.9, 1 dp) with a straight plumb arm (>= 172 deg, hold within 0.5 of under the shoulder) at the start, the midpoint, and through each half of the cycle; the far bell's painted centre outside the painted torso and legs at its peak"
+  },
+  {
+   "id": 5,
+   "quote": "Let the bar hang beneath the shoulders with the trunk braced and the neck long.",
+   "test": "MovementPreview.movA08Rows.test.js: 5 Barbell Row ...",
+   "bound": "hold within 0.5 of under each shoulder in straight arms (>= 172 deg); bar between ankle and toe and within 1.0 of mid-foot at the start; loaded centre of mass (bar at half body mass) over the painted foot at every 33 ms tick"
+  },
+  {
+   "id": 5,
+   "quote": "Stand holding the bar just outside the legs, then soften the knees and hinge until the torso is stable.",
+   "test": "MovementPreview.movA08Rows.test.js: 5 Barbell Row ...",
+   "bound": "trunk 15 to 60 deg; knee 140 to 165 deg"
+  },
+  {
+   "id": 107,
+   "quote": "Take an underhand grip just outside the thighs, soften the knees, and hinge until the bar hangs below them with the torso braced.",
+   "test": "MovementPreview.movA08Rows.test.js: 107 Reverse Grip Bent-Over Rows ...",
+   "bound": "caption 1 is this sentence word for word; hold within 0.5 of under each shoulder in straight arms (>= 172 deg); bar within 1.0 of mid-foot; loaded centre of mass over the painted foot at every tick"
+  },
+  {
+   "id": 107,
+   "quote": "Touch the lower ribs and own the way down.",
+   "test": "MovementPreview.movA08Rows.test.js: 107 Reverse Grip Bent-Over Rows ...",
+   "bound": "at the top the bar lies the chest half-depth plus the bar's half width (CHEST_HALF + 0.8) below the trunk line, within 0.1"
+  },
+  {
+   "id": 104,
+   "quote": "Take a staggered stance, hinge until the torso is long and stable, and let the kettlebell hang beneath one shoulder.",
+   "test": "MovementPreview.movA08Rows.test.js: 104 One-Arm Kettlebell Row ...",
+   "bound": "free hand on the far thigh's painted surface: wrist to thigh axis = THIGH_HALF + HAND_RADIUS within 0.05 at every 33 ms tick"
+  },
+  {
+   "id": 104,
+   "quote": "Row the bell toward the back pocket by driving the elbow past the ribs while the hips stay square to the floor.",
+   "test": "MovementPreview.movA08Rows.test.js: 104 One-Arm Kettlebell Row ...",
+   "bound": "twist and roll 0; top hold more than 3 closer to the hip than the Barbell Row's; elbow >= 3 behind the trunk and > 8 behind the shoulder"
+  },
+  {
+   "id": 79,
+   "quote": "Pull the plates to your chest, driving the elbows up and back",
+   "test": "MovementPreview.movA08Rows.test.js: 79 T-Bar Row ...",
+   "bound": "at the top the handle lies CHEST_HALF + 0.9 to + 1.2 below the trunk line and each plate hub at least CHEST_HALF + 1.2; elbows >= 3 behind the trunk"
+  },
+  {
+   "id": 79,
+   "quote": "take the handle with a neutral grip",
+   "test": "MovementPreview.movA08Rows.test.js: 79 T-Bar Row ...",
+   "bound": "hands at z = +-3.2 on a rigid 6.4 handle; close-up grip 'neutral' with the handle square to the forearm on screen (|cos| <= 0.02)"
+  },
+  {
+   "id": 184,
+   "quote": "Stand tall holding a barbell against the front of the thighs with a shoulder-width underhand grip.",
+   "test": "MovementPreview.movA11Curls.test.js: 184 Drag Curl ...",
+   "bound": "start wrist below the trunk's painted bottom edge (hip - 0.6 - 0.8) and at the thigh front plus the bar half width (within 0.05); close-up closed (open 0) with the palm forward (palmSide x > 0.9)"
+  },
+  {
+   "id": 184,
+   "quote": "Keep the bar touching the torso.",
+   "test": "MovementPreview.movA11Curls.test.js: 184 Drag Curl ...",
+   "bound": "at every 33 ms tick the bar's painted edge is on the thighs' or trunk's painted front, never inside (>= -0.05) and never more than 0.3 off; elbows behind the ribs' back at the top"
+  },
+  {
+   "id": 213,
+   "quote": "upper arms out to the sides at shoulder height and palms facing you",
+   "test": "MovementPreview.movA11Curls.test.js: 213 High Cable Curls ...",
+   "bound": "close-up closed with the palm up at the start (palmSide y < -0.9) and toward the head at the top (cosine > 0.5)"
+  },
+  {
+   "id": 213,
+   "quote": "Curl the hands to the ears.",
+   "test": "MovementPreview.movA11Curls.test.js: 213 High Cable Curls ...",
+   "bound": "top wrist within SHOULDER_HALF + 4 of the midline and within 3.5 of head height; elbow <= 45 deg"
+  },
+  {
+   "id": 240,
+   "quote": "holding the bar with a shoulder-width underhand grip and the arms almost straight",
+   "test": "MovementPreview.movA11Curls.test.js: 240 Lying Cable Curl ...",
+   "bound": "grip span = 2 x shoulder half width; close-up closed with the palm up (palmSide y < -0.9)"
+  },
+  {
+   "id": 240,
+   "quote": "Elbows stay close to the body.",
+   "test": "MovementPreview.movA11Curls.test.js: 240 Lying Cable Curl ...",
+   "bound": "near elbow at the shoulder's z (within 1e-6) and fixed at every tick"
+  },
+  {
+   "id": 98,
+   "quote": "stand about hip width, then squat down and take a shoulder-width grip with long arms",
+   "test": "MovementPreview.movA02OtherSquats.test.js: 98 Barbell Hack Squat ...",
+   "bound": "ankle span within a sixth of the hip-joint span; grip span within 0.5 of the shoulder span; arms 180 deg"
+  },
+  {
+   "id": 98,
+   "quote": "Keep the bar close behind the legs.",
+   "test": "MovementPreview.rigidBar.test.js: movement 98 (barbell-hack-squat) ...",
+   "bound": "bar clear of shins (>= 2.96) and thighs (>= 3.632) and within 1.5 of the nearer surface at every 33 ms tick"
+  },
+  {
+   "id": 78,
+   "quote": "Chest up before you pull.",
+   "test": "MovementPreview.movA03Deadlifts.test.js: conventional floor deadlifts ... sumo start trunk ...",
+   "bound": "start trunk drawn >= 45 deg above level (as MOV-A03-R1 set)"
+  },
+  {
+   "id": 78,
+   "quote": "Stand with a wide stance, toes pointed out, bar over mid-foot.",
+   "test": "MovementPreview.movA03Deadlifts.test.js: 78 Sumo Deadlift ... and movement 78 starts and finishes ...",
+   "bound": "bar within 2.5 of mid-foot; hips above knees on screen by > 0.5; plates on the floor line; every bone at its real length (MovementPreview.chain.test.js)"
+  },
+  {
+   "id": 288,
+   "quote": "Hips back, bar close to the legs.",
+   "test": "MovementPreview.rigidBar.test.js: movement 288 (stiff-legged-barbell-deadlift) ...",
+   "bound": "bar clear of shins (>= 2.96) and thighs (>= 3.632) and within 1.5 of the surface of the leg segment at its height at every 33 ms tick"
+  },
+  {
+   "id": 288,
+   "quote": "Keeping the knees at that angle and the back straight",
+   "test": "MovementPreview.movA04Hinges.test.js: 288 Stiff-Legged Barbell Deadlift ...",
+   "bound": "knee angle within 0.05 deg of the start at every tick; no curl; arms within 10 deg of vertical"
+  },
+  {
+   "id": 23,
+   "quote": "Catch with the hands and use only enough push to return",
+   "test": "MovementPreview.movA04Hinges.test.js: 23 Nordic Curl, 202 Floor Glute-Ham Raise ...",
+   "bound": "no caption contains 'push-up position' or 'no longer hold'"
+  },
+  {
+   "id": 23,
+   "quote": "Hold one line from knees to head with the hips extended, then lower that line as slowly as possible.",
+   "test": "MovementPreview.movA04Hinges.test.js: 23 Nordic Curl, 202 Floor Glute-Ham Raise ...",
+   "bound": "lowering segment >= 2 x the return segment (unchanged)"
+  }
+ ],
+ "fileQuotes": [
+  {
+   "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+   "line": 5174,
+   "endLine": 5174,
+   "text": "wrist: [-13.488, 6.518 + Math.sqrt(CHAIN_LONG_ARM ** 2 - 0.64 ** 2), 8.984]"
+  },
+  {
+   "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+   "line": 1746,
+   "endLine": 1746,
+   "text": "const ALT_KB_ROW_HIP: readonly [number, number] = [5, 44.32];"
+  },
+  {
+   "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+   "line": 5412,
+   "endLine": 5414,
+   "text": "    yawDeg: 50,\n    originX: 48,\n    implement: 'kettlebells',"
+  },
+  {
+   "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+   "line": 1754,
+   "endLine": 1754,
+   "text": "const BARBELL_ROW_HIP: readonly [number, number] = [-4.245, 43.363];"
+  },
+  {
+   "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+   "line": 1755,
+   "endLine": 1755,
+   "text": "const BARBELL_ROW_TRUNK = 49;"
+  },
+  {
+   "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+   "line": 5315,
+   "endLine": 5315,
+   "text": "chainOnFront(BARBELL_ROW_HIP, BARBELL_ROW_TRUNK, 12, CANONICAL_BODY_PARAMETERS.sw * 0.58 + 0.8)"
+  },
+  {
+   "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+   "line": 5274,
+   "endLine": 5274,
+   "text": "farWrist: [17.611, 31.105, -CHAIN_HIP_HALF],"
+  },
+  {
+   "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+   "line": 1991,
+   "endLine": 1991,
+   "text": "const T_BAR_ANCHOR: readonly [number, number, number] = [-36, 2.6, 0];"
+  },
+  {
+   "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+   "line": 5373,
+   "endLine": 5373,
+   "text": "closeUp: { at: [36, 74], r: 13, scale: 4.4, zoom: 1, open: 0, grip: 'neutral' },"
+  },
+  {
+   "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+   "line": 5475,
+   "endLine": 5475,
+   "text": "const topHip = -0.7;"
+  },
+  {
+   "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+   "line": 5565,
+   "endLine": 5565,
+   "text": "closeUp: { at: [0, 22, 30], r: 12, scale: 4.2, zoom: 1, open: 0, palm: 'flexion' },"
+  },
+  {
+   "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+   "line": 5585,
+   "endLine": 5585,
+   "text": "upperArm: [0, 90], forearm: [90, -57],"
+  },
+  {
+   "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+   "line": 5600,
+   "endLine": 5600,
+   "text": "closeUp: { at: [62, 60], r: 12, scale: 4.2, zoom: 1, open: 0 },"
+  },
+  {
+   "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+   "line": 4035,
+   "endLine": 4035,
+   "text": "footSpread: 0.6,"
+  },
+  {
+   "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+   "line": 4574,
+   "endLine": 4574,
+   "text": "upperArm: [-80.5, 5], forearm: [-80.5, 5],"
+  },
+  {
+   "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+   "line": 4410,
+   "endLine": 4410,
+   "text": "at: [-2.523139, 34.260767], trunk: 34.85, head: 86,"
+  },
+  {
+   "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+   "line": 4434,
+   "endLine": 4434,
+   "text": "at: [-4.2, 65.78], trunk: 90,"
+  },
+  {
+   "file": "tools/rendering/chain_motion_specs.mjs",
+   "line": 2192,
+   "endLine": 2192,
+   "text": "'Catch with the hands.',"
+  },
+  {
+   "file": "tools/rendering/chain_motion_specs.mjs",
+   "line": 2446,
+   "endLine": 2446,
+   "text": "hinge until the bar hangs below them with the torso braced.',"
+  },
+  {
+   "file": "apps/mobile/test/components/MovementPreview.fingerCurls.test.js",
+   "line": 197,
+   "endLine": 197,
+   "text": "    't-bar-row',"
+  }
+ ]
+}

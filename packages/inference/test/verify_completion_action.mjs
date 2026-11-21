@@ -154,6 +154,62 @@ check('invalid policy fails closed neutral',
     ),
     actionWith(),
   ));
+
+const ratifiedCompletionPolicy = {
+  minObservationDays: 5,
+  deficitThreshold: 0.2,
+  strongThreshold: 0.4,
+  moderateSetReduction: -1,
+  strongSetReduction: -2,
+  strongLoadFactor: 0.95,
+};
+check('ratified strongSetReduction (-2) & strongThreshold (0.4) emits dSet_p = -2',
+  eq(
+    deriveCompletionAction(
+      buildCompletionWindow(dates, rowsFor('squat', Array(5).fill(0.4))),
+      ratifiedCompletionPolicy,
+    ).corrections.squat,
+    { dLoad_p: 0.95, dSet_p: -2, dRpe_p: -0.5, prefBias_p: -1 },
+  ));
+check('ratified moderateSetReduction (-1) at 0.25 emits dSet_p = -1 and custom overrides apply',
+  eq(
+    deriveCompletionAction(
+      buildCompletionWindow(dates, rowsFor('squat', Array(5).fill(0.25))),
+      ratifiedCompletionPolicy,
+    ).corrections.squat,
+    { dLoad_p: 1, dSet_p: -1, dRpe_p: -0.5, prefBias_p: -1 },
+  ) &&
+  eq(
+    deriveCompletionAction(
+      buildCompletionWindow(dates, rowsFor('squat', Array(5).fill(0.45))),
+      {
+        minObservationDays: 5,
+        deficitThreshold: 0.2,
+        strongThreshold: 0.4,
+        moderateSetReduction: 0,
+        strongSetReduction: -2,
+        strongLoadFactor: 0.9,
+      },
+    ).corrections.squat,
+    { dLoad_p: 0.9, dSet_p: -2, dRpe_p: -0.5, prefBias_p: -1 },
+  ));
+check('invalid optional completion reduction/load fields fail closed neutral',
+  [
+    { ...ratifiedCompletionPolicy, strongSetReduction: -3 },
+    { ...ratifiedCompletionPolicy, moderateSetReduction: 1 },
+    { ...ratifiedCompletionPolicy, strongSetReduction: -1.5 },
+    { ...ratifiedCompletionPolicy, strongLoadFactor: 0 },
+    { ...ratifiedCompletionPolicy, strongLoadFactor: 1.5 },
+    { ...ratifiedCompletionPolicy, strongLoadFactor: Number.NaN },
+  ].every((badPolicy) =>
+    eq(
+      deriveCompletionAction(
+        buildCompletionWindow(dates, rowsFor('squat', Array(7).fill(0.8))),
+        badPolicy,
+      ),
+      actionWith(),
+    ),
+  ));
 check('candidate action never carries positive authority',
   MOVEMENT_PATTERNS.every((pattern) => {
     const correction = strong.corrections[pattern];

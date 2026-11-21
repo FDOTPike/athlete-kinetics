@@ -1,0 +1,17 @@
+source commit: 57946c15bebd138fbb39e8468caf5cabfb4fbce2
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with probe-30c655bacb95ad20a869bc8e94a45d29149ef66f.json
+
+movements measured: 236 (baseline 236)
+added: none
+removed: none
+changed, expected: 4 Overhead Press; 31 Arnold Press; 41 Cable Shoulder Press; 129 Alternating Kettlebell Press; 189 Dumbbell One-Arm Shoulder Press; 228 Kettlebell Arnold Press; 230 Kettlebell Seesaw Press
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  4 Overhead Press: drawn 28b18624a583949bded34d0c1f308b4f6e5d77e4f242d494887cdba28c1b76c6 captions e45b58148668695f90900ecd3636e5ae4041cd3e7385bd02e9841f5e36fe9bab stage 152.52x240.00 cycle 2600 ms
+  31 Arnold Press: drawn 27787ffd45a5d9993f522ef10c78f38a6e2af286312e30dee8c763b97479f775 captions 66deed6a8594ea7a1bf893207be5c4ffafcbafc3d0ed46504eda4fb47438e017 stage 178.29x240.00 cycle 3000 ms
+  41 Cable Shoulder Press: drawn dc28cedfdc2033dd229389ac47bcaad180a936a1e26d2a57e3c75037c4120890 captions a5b895851f6a2d4bb80c90a1c04066f58158bcf37089740bd754af5e3042275b stage 100.57x240.00 cycle 2900 ms
+  129 Alternating Kettlebell Press: drawn a6c8f5eb2e7a55994a7134b12be48b26fa93d3cec0719916eb9a63d0e2b960b3 captions 5399c572985ef63b7a8b21a12c775ab18d888c3e303c73b71e9ba1390d42ed73 stage 182.31x240.00 cycle 4300 ms
+  189 Dumbbell One-Arm Shoulder Press: drawn 081dc11e6746314251cc3dfd8fe6fda35218a81fa37bcd7f1996c23e825ed206 captions 726520dbaa038b220537a3fed21d4735766d6639e58f3ac16df4952139811f2c stage 157.71x240.00 cycle 3650 ms
+  228 Kettlebell Arnold Press: drawn 605b0aa563676df525ebb5dc21d4bbf834125b37d01d511b750ec6b7a7da5904 captions e58d7817b706371f89d15e4eacf4f0138875ee4bf4a9dc0a3d6359e383a4861c stage 156.92x240.00 cycle 2900 ms
+  230 Kettlebell Seesaw Press: drawn 73e32fd17caa8ceaf5b4a4c914980ef0308781705aab6a2df08227a9658fa75f captions 2c2fab693c6194f7468ab15b8d3961ba67d3551bea64837451c91121712fc6ed stage 108.46x240.00 cycle 3150 ms
+exit code: 0 (probe run exit 0)

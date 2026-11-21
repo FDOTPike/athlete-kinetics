@@ -615,3 +615,96 @@ describe('no fabricated preparation history', () => {
     expect(state().loadSessionPreparation(sessionId)).toBeNull();
   });
 });
+
+describe('a discomfort report that cannot open its transaction', () => {
+  test('returns false, records nothing and leaves the session running', () => {
+    const sessionId = startPlanned();
+    const real = mockDriver.executeSync.bind(mockDriver);
+    mockDriver.executeSync = (sql, params) => {
+      if (sql === 'BEGIN') throw new Error('database is locked');
+      return real(sql, params);
+    };
+    let saved;
+    try {
+      expect(() => { saved = state().reportNiggle('knee', 9); }).not.toThrow();
+    } finally {
+      mockDriver.executeSync = real;
+    }
+    expect(saved).toBe(false);
+    expect(state().error).toMatch(/database is locked/);
+    expect(count('SELECT COUNT(*) AS c FROM niggle')).toBe(0);
+    expect(state().niggles).toEqual([]);
+    expect(state().session.sessionId).toBe(sessionId);
+    expect(state().runner.phase).not.toBe('halted');
+  });
+
+  test('a saved halt-level report still reaches state when the preparation re-read fails', () => {
+    const sessionId = startPlanned();
+    const real = mockDriver.executeSync.bind(mockDriver);
+    let committed = false;
+    mockDriver.executeSync = (sql, params) => {
+      if (sql === 'COMMIT') committed = true;
+      if (committed && /FROM session_preparation\b/.test(sql)) throw new Error('disk I/O error');
+      return real(sql, params);
+    };
+    let saved;
+    try {
+      expect(() => { saved = state().reportNiggle('knee', 9); }).not.toThrow();
+    } finally {
+      mockDriver.executeSync = real;
+    }
+    // The report is committed, so it is reported as saved and the stop shows.
+    expect(saved).toBe(true);
+    expect(count('SELECT COUNT(*) AS c FROM niggle')).toBe(1);
+    expect(state().niggles).toEqual([{ region: 'knee', severity: 9 }]);
+    // #181: a Stop-level report closes the session, recorded as stopped.
+    expect(state().session).toBeNull();
+    expect(raw().prepare('SELECT outcome_kind FROM session_outcome WHERE session_id = ?').get(sessionId).outcome_kind)
+      .toBe('stopped_safely');
+    expect(prepRow(sessionId).status).toBe('stopped');
+  });
+
+  // #182: a report confirms it was saved before any sheet opens. The store
+  // records the offer and leaves opening the sheet to the screen, after the
+  // confirmation, so a sheet that cannot open cannot touch the saved report.
+  test('a saved report records the offer of alternatives without opening the sheet', () => {
+    startPlanned();
+    const openSubstitution = jest.fn();
+    const realOpen = state().openSubstitution;
+    useStore.setState({ openSubstitution });
+    let saved;
+    try {
+      expect(() => { saved = state().reportNiggle('knee', 6); }).not.toThrow();
+    } finally {
+      useStore.setState({ openSubstitution: realOpen });
+    }
+    expect(saved).toBe(true);
+    expect(count('SELECT COUNT(*) AS c FROM niggle')).toBe(1);
+    expect(state().niggles).toEqual([{ region: 'knee', severity: 6 }]);
+    expect(state().runner.substitutionOfferedForSessionPlanSlotId).not.toBeNull();
+    expect(openSubstitution).not.toHaveBeenCalled();
+    expect(state().substitution).toBeNull();
+    expect(state().error).toBeNull();
+  });
+
+  test('does not roll back a transaction it did not open', () => {
+    startPlanned();
+    // Another writer holds an open transaction with a pending write, so the
+    // report's own BEGIN fails. The pending write must survive the report.
+    raw().exec('BEGIN');
+    raw().prepare('INSERT INTO niggle (id, region, severity, reported_at_ms) VALUES (?, ?, ?, ?)')
+      .run('outer-pending', 'elbow', 2, 1);
+    let saved;
+    try {
+      expect(() => { saved = state().reportNiggle('knee', 9); }).not.toThrow();
+      expect(saved).toBe(false);
+      expect(raw().isTransaction).toBe(true);
+      expect(count("SELECT COUNT(*) AS c FROM niggle WHERE id = 'outer-pending'")).toBe(1);
+      expect(count("SELECT COUNT(*) AS c FROM niggle WHERE region = 'knee'")).toBe(0);
+    } finally {
+      if (raw().isTransaction) raw().exec('ROLLBACK');
+    }
+    expect(state().niggles).toEqual([]);
+    expect(state().runner.phase).not.toBe('halted');
+  });
+});

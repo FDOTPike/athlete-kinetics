@@ -1,0 +1,204 @@
+{
+  "bounds": [
+    {
+      "id": 1,
+      "quote": "Root the whole foot and descend until the hip crease passes the top of the knee.",
+      "test": "apps/mobile/test/components/MovementPreview.movA01Squats.test.js :: 1 Competition Squat: rooted stance, bar across upper back over mid-foot, hip crease passes top of knee",
+      "bound": "bottom.world.hip[1] < bottom.world.near.knee[1] - 1.0 (hip Y 19.50 < knee Y 21.11) and planted ankle distance <= 1e-6 across all ticks"
+    },
+    {
+      "id": 1,
+      "quote": "Drive back to standing while the bar stays over mid-foot.",
+      "test": "apps/mobile/test/components/MovementPreview.movA01Squats.test.js :: movement 1 has pending status, oblique view, family yaw, and exact bone lengths on every 33ms tick",
+      "bound": "Math.abs(bar[0] - midFootX) <= 3.5 across every 33ms tick of the 3500ms cycle, and bar sits behind the neck (bar[0] < neck[0], distance <= 3.5)"
+    },
+    {
+      "id": 123,
+      "quote": "Set the bar across the upper back and step into a stance narrower than shoulder width with the toes turned slightly out.",
+      "test": "apps/mobile/test/components/MovementPreview.movA01Squats.test.js :: 123 Narrow Stance Squats: stance narrower than shoulder width, knees travel forward over toes into a deep squat",
+      "bound": "narrowAnkleSpanZ (13.40) < shoulderSpanZ (20.98) - 6 and < compAnkleSpanZ (25.20) - 10 via footSpread = -0.5"
+    },
+    {
+      "id": 123,
+      "quote": "Send the knees forward over the toes.",
+      "test": "apps/mobile/test/components/MovementPreview.movA01Squats.test.js :: 123 Narrow Stance Squats: stance narrower than shoulder width, knees travel forward over toes into a deep squat",
+      "bound": "bottom.world.near.knee[0] (13.45) > bottom.world.near.toe[0] (3.40) + 9 and > compBottom.world.near.knee[0] (8.83) + 4, with bottom hip Y 18.20 < compBottom hip Y 19.50"
+    },
+    {
+      "id": 277,
+      "quote": "Attach bands from the ends of the bar to a secure anchor near the floor, take the bar across the back of the shoulders with the shoulder blades squeezed together and step back into a wide stance.",
+      "test": "apps/mobile/test/components/MovementPreview.movA01Squats.test.js :: 277 Squat with Bands: floor-anchored bands to barbell ends, wide stance with knees pushed out, hip crease level with top of knee",
+      "bound": "lines from [-1, 1.2, +-16.5] to nearBarEnd/farBarEnd (9 units outside hands); ankleSpanZ = 34.80 > 28; band length at top exceeds bottom by > 18 box units"
+    },
+    {
+      "id": 277,
+      "quote": "With the trunk tight, push the knees out and sit the hips back and down until the hip crease is level with the top of the knee.",
+      "test": "apps/mobile/test/components/MovementPreview.movA01Squats.test.js :: 277 Squat with Bands: floor-anchored bands to barbell ends, wide stance with knees pushed out, hip crease level with top of knee",
+      "bound": "kneeSpanBottomZ (41.36) > ankleSpanZ (34.80) + 6 via kneeOut = 28; Math.abs(bottom.world.hip[1] - bottom.world.near.knee[1]) <= 1.2 (hip Y 24.40 vs knee Y 23.86)"
+    },
+    {
+      "id": 299,
+      "quote": "Take the bar from the rack across the upper back and step back into a stance wider than the shoulders with the toes turned slightly out.",
+      "test": "apps/mobile/test/components/MovementPreview.movA01Squats.test.js :: 299 Wide Stance Barbell Squat: stance wider than the shoulders, knees pushed out, thighs just below level with floor",
+      "bound": "wideAnkleSpanZ (34.40) > shoulderSpanZ (20.98) + 9 and > compAnkleSpanZ (25.20) + 5 via footSpread = 10.0"
+    },
+    {
+      "id": 299,
+      "quote": "Keeping the chest up and the back straight, bend the knees and lower until the thighs are just below level with the floor.",
+      "test": "apps/mobile/test/components/MovementPreview.movA01Squats.test.js :: 299 Wide Stance Barbell Squat: stance wider than the shoulders, knees pushed out, thighs just below level with floor",
+      "bound": "bottom.world.hip[1] (22.40) < bottom.world.near.knee[1] (23.02) and bottom.world.near.knee[1] - bottom.world.hip[1] <= 1.5"
+    },
+    {
+      "id": 8,
+      "quote": "Set the bar across the front of the shoulders with a secure grip and the elbows pointing forward.",
+      "test": "apps/mobile/test/components/MovementPreview.movA01Squats.test.js :: 8 Front Squat: bar across front of shoulders, secure grip with elbows pointing forward, upright torso into full squat",
+      "bound": "bar[0] > neck[0] + 1.0 and Math.hypot(bar[0] - neck[0], bar[1] - neck[1]) <= 2.5 on every phase; elbow[0] - shoulder[0] > 11.0; angles.hand is undefined (direct grip)"
+    },
+    {
+      "id": 8,
+      "quote": "Stay tall through the drive.",
+      "test": "apps/mobile/test/components/MovementPreview.movA01Squats.test.js :: 8 Front Squat: bar across front of shoulders, secure grip with elbows pointing forward, upright torso into full squat",
+      "bound": "bottom.angles.trunk[0] (68 deg) > compBottom.angles.trunk[0] (52 deg) + 15, and bottom.world.hip[1] (18.80) < bottom.world.near.knee[1] - 1.0"
+    },
+    {
+      "id": 208,
+      "quote": "Set the bar in a rack just below shoulder height, rest it on the front of the shoulders with the fingertips under the bar and the elbows high, then step back with the feet shoulder-width apart.",
+      "test": "apps/mobile/test/components/MovementPreview.movA01Squats.test.js :: 208 Front Squat (Clean Grip): rack set just below shoulder height, fingertips under bar, elbows lifted higher than standard front squat",
+      "bound": "rack J-hook height 67.2 < standing shoulder height 70.08 (within 4.0 units); angles.hand defined with grip Z > shoulder Z + 3.5; elbow Y - shoulder Y exceeds Front Squat (id 8) by > 1.2 units"
+    },
+    {
+      "id": 208,
+      "quote": "Keeping the elbows and chest up, bend the knees and sit straight down between the legs as deep as you can control.",
+      "test": "apps/mobile/test/components/MovementPreview.movA01Squats.test.js :: 208 Front Squat (Clean Grip): rack set just below shoulder height, fingertips under bar, elbows lifted higher than standard front squat",
+      "bound": "bottom.angles.trunk[0] = 72 deg (upright chest), bar stays within 2.5 units of neck anteriorly across all phases, and bottom.world.hip[1] (18.20) < bottom.world.near.knee[1] - 2.0"
+    },
+    {
+      "id": 38,
+      "quote": "Set a box behind you at or just below parallel height and set up as for a back squat. Sit back onto the box under control, pausing briefly without relaxing.",
+      "test": "apps/mobile/test/components/MovementPreview.movA01Squats.test.js :: 38 Box Squat: box at parallel height behind lifter, hips sit far back onto box with near-vertical shins and a seated pause",
+      "bound": "box top at y = 20.2 contacts underside of thighs at bottom pause (|(bottom.world.hip[1] - thighRadius) - 20.2| <= 0.5); frames[1] and frames[2] hold ph = 1 for segmentDurationsMs[1] = 550ms >= 500ms"
+    },
+    {
+      "id": 38,
+      "quote": "Sit back, shins near vertical.",
+      "test": "apps/mobile/test/components/MovementPreview.movA01Squats.test.js :: 38 Box Squat: box at parallel height behind lifter, hips sit far back onto box with near-vertical shins and a seated pause",
+      "bound": "bottom.world.hip[0] (-16.80) < compBottom.world.hip[0] (-12.50) - 4.0, and Math.abs(shinAngleFromFloorDeg(bottom) - 90) <= 7.0 (84.28 deg)"
+    },
+    {
+      "id": 256,
+      "quote": "Inside a rack, hang bands from the top and loop them around the bar, set a box behind you, take the bar across the back of the shoulders and step back.",
+      "test": "apps/mobile/test/components/MovementPreview.movA01Squats.test.js :: 256 Reverse Band Box Squat: bands hang from top of power rack to barbell ends, lengthen on descent to help at bottom, wide stance onto box",
+      "bound": "overhead rack anchors at [-4, 86, +-16.5] (above standing head Y = 78.47) attached to nearBarEnd/farBarEnd; band length at bottom exceeds top by > 18 box units"
+    },
+    {
+      "id": 256,
+      "quote": "With the trunk tight, push the knees out and sit the hips back until you are seated on the box, and pause.",
+      "test": "apps/mobile/test/components/MovementPreview.movA01Squats.test.js :: 256 Reverse Band Box Squat: bands hang from top of power rack to barbell ends, lengthen on descent to help at bottom, wide stance onto box",
+      "bound": "ankleSpanZ (33.60) > 26, Math.abs(shinAngleFromFloorDeg(bottom) - 90) <= 7.0 (84.08 deg), and |(bottom.world.hip[1] - thighRadius) - 20.2| <= 0.5 during the 550ms box pause"
+    },
+    {
+      "id": 275,
+      "quote": "Anchor bands near the floor and loop them over the ends of the bar, set a box behind you, take the bar across the upper back with the shoulder blades pulled together and step back.",
+      "test": "apps/mobile/test/components/MovementPreview.movA01Squats.test.js :: 275 Speed Box Squat: floor-anchored bands to bar ends, controlled descent to box, brief pause, concentric visibly faster than descent",
+      "bound": "floor anchors at [-4, 1.2, +-16.5] attached to nearBarEnd/farBarEnd; band length at standing top exceeds box bottom by > 18 box units"
+    },
+    {
+      "id": 275,
+      "quote": "Sit the hips back under control until you are seated on the box, and pause briefly. Drive up off the box as fast as you can while staying tight.",
+      "test": "apps/mobile/test/components/MovementPreview.movA01Squats.test.js :: 275 Speed Box Squat: floor-anchored bands to bar ends, controlled descent to box, brief pause, concentric visibly faster than descent",
+      "bound": "segmentDurationsMs = [1350, 350, 650, 450]: boxPauseMs (350) >= 300 with frames[1..2].joints.ph === 1, and concentricMs * 2 (1300) < descentMs (1350)"
+    }
+  ],
+  "fileQuotes": [
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 1380,
+      "endLine": 1381,
+      "text": "\"instructions\": \"Set the bar securely, brace, and walk it out with the fewest controlled steps needed. Root the whole foot and descend until the hip crease passes the top of the knee. Drive back to standing while the bar stays over mid-foot. If the stance or depth changes between reps, reduce the load until the competition shape is repeatable.\""
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 9642,
+      "endLine": 9643,
+      "text": "\"instructions\": \"Set the bar across the upper back and step into a stance narrower than shoulder width with the toes turned slightly out. Brace and let the knees travel forward as the hips sit down, keeping pressure across the whole foot to the deepest position you own. Push the floor away to stand; if the heels lift or the knees lose their line, the stance is narrower than your available range.\""
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 20016,
+      "endLine": 20017,
+      "text": "\"instructions\": \"Attach bands from the ends of the bar to a secure anchor near the floor, take the bar across the back of the shoulders with the shoulder blades squeezed together and step back into a wide stance. With the trunk tight, push the knees out and sit the hips back and down until the hip crease is level with the top of the knee. Drive through the feet, keeping the knees out, to stand tall against the band tension.\""
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 21501,
+      "endLine": 21502,
+      "text": "\"instructions\": \"Take the bar from the rack across the upper back and step back into a stance wider than the shoulders with the toes turned slightly out. Keeping the chest up and the back straight, bend the knees and lower until the thighs are just below level with the floor. Drive through the feet to stand back up.\""
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 1856,
+      "endLine": 1857,
+      "text": "\"instructions\": \"Set the bar across the front of the shoulders with a secure grip and the elbows pointing forward. Stand around shoulder width, root the whole foot, and keep the elbows high before descending. Squat between the hips, then drive back to standing with the bar over mid-foot. If the elbows drop and the bar rolls forward, reduce the load until the upper back can hold the rack.\""
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 15372,
+      "endLine": 15373,
+      "text": "\"instructions\": \"Set the bar in a rack just below shoulder height, rest it on the front of the shoulders with the fingertips under the bar and the elbows high, then step back with the feet shoulder-width apart. Keeping the elbows and chest up, bend the knees and sit straight down between the legs as deep as you can control. Drive through the middle of the feet to stand back up.\""
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 3897,
+      "endLine": 3898,
+      "text": "\"instructions\": \"Set a box behind you at or just below parallel height and set up as for a back squat. Sit back onto the box under control, pausing briefly without relaxing. Drive back up to standing without rocking forward.\""
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 18594,
+      "endLine": 18595,
+      "text": "\"instructions\": \"Inside a rack, hang bands from the top and loop them around the bar, set a box behind you, take the bar across the back of the shoulders and step back. With the trunk tight, push the knees out and sit the hips back until you are seated on the box, and pause. Drive through the feet with the knees out to stand up off the box.\""
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 19883,
+      "endLine": 19884,
+      "text": "\"instructions\": \"Anchor bands near the floor and loop them over the ends of the bar, set a box behind you, take the bar across the upper back with the shoulder blades pulled together and step back. Sit the hips back under control until you are seated on the box, and pause briefly. Drive up off the box as fast as you can while staying tight.\""
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 1223,
+      "endLine": 1226,
+      "text": "  /** Lateral offset of each planted ankle from hip width, in world Z units. */\n  footSpread?: number;\n  /** Lateral out-angle (degrees) added to the solved knee pole so knees track outward. */\n  kneeOut?: number;"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 1245,
+      "endLine": 1245,
+      "text": "  to: 'nearGrip' | 'farGrip' | 'midGrip' | 'nearBarEnd' | 'farBarEnd' | 'nearAnkle' | 'farAnkle';"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 1284,
+      "endLine": 1287,
+      "text": "  /** Lateral offset of each planted ankle from hip width, in world Z units. */\n  footSpread?: number;\n  /** Lateral out-angle (degrees) added to the solved knee pole so knees track outward. */\n  kneeOut?: number;"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4046,
+      "endLine": 4057,
+      "text": "  const baseKneePole = chainPair(movement.kneePole ?? 45);\n  const legPole: ChainDir = kneeOut === 0 ? (movement.kneePole ?? 45) : [baseKneePole[0], baseKneePole[1] + kneeOut];"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4107,
+      "endLine": 4114,
+      "text": "  const barEnd: { near: CanonicalPoint; far: CanonicalPoint } = {\n    near: [nearHoldProj[0] + barUx * barOver, nearHoldProj[1] + barUy * barOver],\n    far: [farHoldProj[0] - barUx * barOver, farHoldProj[1] - barUy * barOver],\n  };"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4206,
+      "endLine": 4206,
+      "text": "        : cable.to === 'nearBarEnd' ? figure.barEnd.near : cable.to === 'farBarEnd' ? figure.barEnd.far"
+    }
+  ]
+}

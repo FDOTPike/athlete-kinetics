@@ -1,0 +1,174 @@
+{
+  "bounds": [
+    {
+      "id": 140,
+      "quote": "Place a flat bench behind you, take the bar from the rack across the upper back and stand with the feet shoulder-width apart and toes turned slightly out. Bend the knees and sit the hips back, chest up, until you lightly touch the bench.",
+      "test": "apps/mobile/test/components/MovementPreview.movA02OtherSquats.test.js :: 140 Barbell Squat To A Bench: bar on upper back, bench behind, hips lightly touch bench and stand without resting",
+      "bound": "slab top at y = 20.6 contacts underside of hips/thighs at ph = 1 (|(bottom.world.hip[1] - thighRadius) - 20.6| <= 0.5), bar rests behind neck (bar[0] < neck[0] and distance <= 3.5), and ankleSpanZ = 23.60 > shoulderSpanZ (20.98)"
+    },
+    {
+      "id": 140,
+      "quote": "Drive through the feet to stand back up without resting on the bench.",
+      "test": "apps/mobile/test/components/MovementPreview.movA02OtherSquats.test.js :: 140 Barbell Squat To A Bench: bar on upper back, bench behind, hips lightly touch bench and stand without resting",
+      "bound": "exactly one keyframe at ph = 1 (frames.filter(f => f.joints.ph === 1).length === 1), reversing immediately to ph = 0.5 without a seated pause segment"
+    },
+    {
+      "id": 192,
+      "quote": "Stand in front of a flat bench with a dumbbell in each hand at your sides, feet shoulder-width apart and toes turned slightly out. Bend the knees and sit the hips back, chest up, until you lightly touch the bench.",
+      "test": "apps/mobile/test/components/MovementPreview.movA02OtherSquats.test.js :: 192 Dumbbell Squat To A Bench: dumbbells held at the sides with arms long, hips lightly touch bench without resting",
+      "bound": "implement === 'bells' with wrist Y < hip Y + 2 and wrist Z > hipJoint Z + 2.5 at all phases; slab top at y = 20.6 contacts underside of hips/thighs at ph = 1 (|(bottom.world.hip[1] - thighRadius) - 20.6| <= 0.5)"
+    },
+    {
+      "id": 192,
+      "quote": "Push through the feet to stand back up without resting on the bench.",
+      "test": "apps/mobile/test/components/MovementPreview.movA02OtherSquats.test.js :: 192 Dumbbell Squat To A Bench: dumbbells held at the sides with arms long, hips lightly touch bench without resting",
+      "bound": "exactly one keyframe at ph = 1 (frames.filter(f => f.joints.ph === 1).length === 1), reversing immediately to ph = 0.5 without resting on the bench"
+    },
+    {
+      "id": 81,
+      "quote": "Cradle the bar in the crooks of the elbows, clasp the hands, and stand from the rack.",
+      "test": "apps/mobile/test/components/MovementPreview.movA02OtherSquats.test.js :: 81 Zercher Squat: bar cradled in elbow crooks, hands clasped at chest, elbows ride inside knees at bottom",
+      "bound": "barAt === 'elbows' places nearHold and farHold at world.near.elbowCrook and world.far.elbowCrook (distance < 1e-6), while clasped wrists sit above the elbows (wrist[1] > elbow[1] + 8) and narrower than the elbows"
+    },
+    {
+      "id": 81,
+      "quote": "Elbows ride inside the knees at the bottom.",
+      "test": "apps/mobile/test/components/MovementPreview.movA02OtherSquats.test.js :: 81 Zercher Squat: bar cradled in elbow crooks, hands clasped at chest, elbows ride inside knees at bottom",
+      "bound": "at ph = 1, elbowSpanBottomZ (16.29) < kneeSpanBottomZ (33.59) - 10, and bottom.world.hip[1] (18.80) < bottom.world.near.knee[1] - 1.0"
+    },
+    {
+      "id": 98,
+      "quote": "Set a bar on the floor behind your calves, stand about hip width, then squat down and take a shoulder-width grip with long arms. Brace the trunk and drive the floor away, letting the bar skim up behind the legs as the hips and knees straighten together.",
+      "test": "apps/mobile/test/components/MovementPreview.movA02OtherSquats.test.js :: 98 Barbell Hack Squat: starts from the floor with bar behind the calves and skims up behind the legs to standing",
+      "bound": "frames[0].joints.ph === 0 starts at bottom with bar Y (14.61) <= 16.5 behind the ankles (bar[0] < ankle[0] - 1.5), and at ph = 1 the bar rises > 20 units (to Y = 39.27) behind the hips (bar[0] < hip[0] - 1.5)"
+    },
+    {
+      "id": 98,
+      "quote": "Keep the bar close behind the legs.",
+      "test": "apps/mobile/test/components/MovementPreview.movA02OtherSquats.test.js :: 98 Barbell Hack Squat: starts from the floor with bar behind the calves and skims up behind the legs to standing",
+      "bound": "across all phases ph in [0, 0.25, 0.5, 0.75, 1], bar[0] < knee[0] - 3.0 and arm reach |shoulder - wrist| > 24.0 (straight arms 12.5 + 12.0 = 24.5); barAt === 'behind' paints the far bar half and plate in groups.behind behind the legs"
+    },
+    {
+      "id": 120,
+      "quote": "Straddle the bar with the feet angled comfortably, then squat down and take one hand in front of the body and one behind at equal distances.",
+      "test": "apps/mobile/test/components/MovementPreview.movA02OtherSquats.test.js :: 120 Jefferson Squats: straddling the bar with one hand in front and one behind, bar travels straight up between the legs",
+      "bound": "near ankle sits in front/near ([-5, 2.42, +15.5]) and far ankle sits behind/far ([+5, 2.42, -15.5]); near grip is in front of hip (+5.4) and far grip is at equal distance behind hip (-5.4), centring bar at X = 0, Z = 0"
+    },
+    {
+      "id": 120,
+      "quote": "Keep the bar travelling straight between the legs.",
+      "test": "apps/mobile/test/components/MovementPreview.movA02OtherSquats.test.js :: 120 Jefferson Squats: straddling the bar with one hand in front and one behind, bar travels straight up between the legs",
+      "bound": "across every phase ph in [0, 0.25, 0.5, 0.75, 1], Math.abs(bar[0]) < 1.5 and Math.abs(bar[2]) < 1.5 while bar[1] rises from 21.60 at the floor start (ph = 0) to 42.60 at standing (ph = 1)"
+    },
+    {
+      "id": 235,
+      "quote": "Kneel tall in a rack with the bar on the back and the hips, knees and shoulders stacked. Sit the hips back toward the heels only as far as the trunk stays braced.",
+      "test": "apps/mobile/test/components/MovementPreview.movA02OtherSquats.test.js :: 235 Kneeling Squat: knees and shins stay on the floor while hips sit back toward the heels and drive to tall kneeling",
+      "bound": "knees (y <= 3.5) and ankles (y = 2.5) stay on the floor across all phases; at ph = 0, |hip[0] - knee[0]| <= 2.5 and |neck[0] - hip[0]| <= 2.5; at ph = 1, hips sit back > 14 units toward the ankles (|hip - ankle| < 9)"
+    },
+    {
+      "id": 235,
+      "quote": "Drive the hips forward to return to tall kneeling; when the ribs flare, shorten the range.",
+      "test": "apps/mobile/test/components/MovementPreview.movA02OtherSquats.test.js :: 235 Kneeling Squat: knees and shins stay on the floor while hips sit back toward the heels and drive to tall kneeling",
+      "bound": "hip X drives forward from -17.0 at bottom (ph = 1) back to -1.5 at tall kneeling (ph = 0) with hips, knees (-2.25), and shoulders (-0.43) stacked vertically"
+    },
+    {
+      "id": 105,
+      "quote": "Clean and press one kettlebell overhead, lock the elbow, and use the free arm forward as a counterbalance. Root the whole foot and sit between the hips while keeping the bell stacked over the shoulder and the eyes forward.",
+      "test": "apps/mobile/test/components/MovementPreview.movA02OtherSquats.test.js :: 105 One-Arm Overhead Kettlebell Squat: one kettlebell locked overhead stacked over shoulder, free arm forward, pause at bottom",
+      "bound": "implement === 'kettlebell' (1 bell circle); near wrist stays locked overhead above head (wrist[1] > head[1] + 10) and stacked over near shoulder (|wrist[0] - shoulder[0]| <= 3.5) across all phases, while far counterbalance wrist reaches forward (far.wrist[0] > far.shoulder[0] + 15)"
+    },
+    {
+      "id": 105,
+      "quote": "Pause at the deepest owned position, then drive to standing; the rep ends where the bell drifts or the ribs flare, not where the hips wish to go.",
+      "test": "apps/mobile/test/components/MovementPreview.movA02OtherSquats.test.js :: 105 One-Arm Overhead Kettlebell Squat: one kettlebell locked overhead stacked over shoulder, free arm forward, pause at bottom",
+      "bound": "frames[1].joints.ph === 1 and frames[2].joints.ph === 1 hold the bottom squat position (bottom.world.hip[1] = 19.20 < knee[1] - 1.0) for segmentDurationsMs[1] = 450ms >= 400ms"
+    },
+    {
+      "id": 48,
+      "quote": "Clean two kettlebells into the rack position, resting on your forearms at your chest. Squat down as deep as you can control, keeping your elbows in and chest up.",
+      "test": "apps/mobile/test/components/MovementPreview.movA02OtherSquats.test.js :: 48 Double Kettlebell Front Squat: two kettlebells racked on forearms at chest, elbows in, knees pushed out",
+      "bound": "implement === 'kettlebells' draws 2 bell circles at chest height (neck[1] - 10 < hold[1] < neck[1] + 2), with elbows tucked in (elbowSpanZ = 15.83 < shoulderSpanZ = 20.98) and deep squat depth (bottom.world.hip[1] = 18.80 < knee[1] - 1.0)"
+    },
+    {
+      "id": 48,
+      "quote": "Full foot planted, knees out.",
+      "test": "apps/mobile/test/components/MovementPreview.movA02OtherSquats.test.js :: 48 Double Kettlebell Front Squat: two kettlebells racked on forearms at chest, elbows in, knees pushed out",
+      "bound": "planted feet stay fixed on the floor across all ticks and kneeSpanBottomZ (34.48) > ankleSpanZ (23.60) + 8 via kneeOut = 28"
+    }
+  ],
+  "fileQuotes": [
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 10798,
+      "endLine": 10799,
+      "text": "\"instructions\": \"Place a flat bench behind you, take the bar from the rack across the upper back and stand with the feet shoulder-width apart and toes turned slightly out. Bend the knees and sit the hips back, chest up, until you lightly touch the bench. Drive through the feet to stand back up without resting on the bench.\",\n        \"cues\": \"Sit the hips back to the bench. Touch lightly, stay tight. Chest up, knees in line with the toes.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 14306,
+      "endLine": 14307,
+      "text": "\"instructions\": \"Stand in front of a flat bench with a dumbbell in each hand at your sides, feet shoulder-width apart and toes turned slightly out. Bend the knees and sit the hips back, chest up, until you lightly touch the bench. Push through the feet to stand back up without resting on the bench.\",\n        \"cues\": \"Sit back to the bench. Touch lightly, stay tight. Chest up, eyes forward.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 6811,
+      "endLine": 6812,
+      "text": "\"instructions\": \"Cradle the bar in the crooks of the elbows, clasp the hands, and stand from the rack. Squat between the knees while the torso stays as tall as the front load allows. Drive up without letting the bar roll down the forearms. Use a wrap or pad as needed; if arm pressure becomes painful or changes the position, end the set and adjust.\",\n        \"cues\": \"Elbows ride inside the knees at the bottom. Brace tall like a front squat. Wrap the bar, then give it full effort.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 7952,
+      "endLine": 7953,
+      "text": "\"instructions\": \"Set a bar on the floor behind your calves, stand about hip width, then squat down and take a shoulder-width grip with long arms. Brace the trunk and drive the floor away, letting the bar skim up behind the legs as the hips and knees straighten together. Lower along the same close path; when the grip or torso position breaks before the legs tire, that is the load limit for the day.\",\n        \"cues\": \"Set the chest proud and the arms long. Push the floor away. Keep the bar close behind the legs.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 9435,
+      "endLine": 9436,
+      "text": "\"instructions\": \"Straddle the bar with the feet angled comfortably, then squat down and take one hand in front of the body and one behind at equal distances. Brace a tall torso and push both feet through the floor to stand with the bar travelling between the legs. Lower along the same centred path and switch orientation between sets; if the bar twists away from the midline, reset the grip and stance before adding load.\",\n        \"cues\": \"Centre the torso over the bar. Push both feet through the floor. Keep the bar travelling straight between the legs.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 17179,
+      "endLine": 17180,
+      "text": "\"instructions\": \"Kneel tall in a rack with the bar on the back and the hips, knees and shoulders stacked. Sit the hips back toward the heels only as far as the trunk stays braced. Drive the hips forward to return to tall kneeling; when the ribs flare, shorten the range.\",\n        \"cues\": \"Set the ribs down before you sit back. Move at the hips, not the low back. Finish tall through the glutes.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 8420,
+      "endLine": 8421,
+      "text": "\"instructions\": \"Clean and press one kettlebell overhead, lock the elbow, and use the free arm forward as a counterbalance. Root the whole foot and sit between the hips while keeping the bell stacked over the shoulder and the eyes forward. Pause at the deepest owned position, then drive to standing; the rep ends where the bell drifts or the ribs flare, not where the hips wish to go.\",\n        \"cues\": \"Punch the bell toward the ceiling. Sit between the hips on a rooted foot. Drive up under the bell.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 4581,
+      "endLine": 4582,
+      "text": "\"instructions\": \"Clean two kettlebells into the rack position, resting on your forearms at your chest. Squat down as deep as you can control, keeping your elbows in and chest up. Drive back up to standing without letting the bells pull you forward.\",\n        \"cues\": \"Elbows in, bells resting on the forearms. Stay tall — chest proud against the load. Full foot planted, knees out.\","
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 1294,
+      "endLine": 1296,
+      "text": "  implement?: 'none' | 'bells' | 'bell' | 'hammer' | 'bar' | 'ez' | 'cableBar' | 'handle' | 'handles' | 'rope' | 'longBar' | 'kettlebell' | 'kettlebells';\n  /** Where a held bar rests on the figure: across the hands by default, cradled in the elbow crooks ('elbows'), or held in the hands with its far half behind the legs ('behind'). */\n  barAt?: 'hands' | 'elbows' | 'behind';"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4293,
+      "endLine": 4305,
+      "text": "  const crookOf = (arm: { root: ChainVec; mid: ChainVec; end: ChainVec }): ChainVec => {\n    const u1 = chainNormal([arm.root[0] - arm.mid[0], arm.root[1] - arm.mid[1], arm.root[2] - arm.mid[2]]);\n    const u2 = chainNormal([arm.end[0] - arm.mid[0], arm.end[1] - arm.mid[1], arm.end[2] - arm.mid[2]]);\n    return chainAdd(arm.mid, chainNormal([u1[0] + u2[0], u1[1] + u2[1], u1[2] + u2[2]]), 2.2);\n  };\n  const nearCrook = crookOf(nearArm), farCrook = crookOf(farArm);\n  // What a bent hand holds sits on the palm's side of the knuckles; a Zercher bar rests in the elbow crooks.\n  const holdOf = (grip: ChainVec, side: number): ChainVec => {\n    if (hand === undefined || movement.palm === undefined) return grip;\n    return chainAdd(grip, chainUnit([hand[0] + (movement.palm === 'up' ? 90 : -90), hand[1]], side), CHAIN_PALM);\n  };\n  const nearHold = movement.barAt === 'elbows' ? nearCrook : holdOf(nearGrip, 1);\n  const farHold = movement.barAt === 'elbows' ? farCrook : holdOf(farGrip, -1);"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4496,
+      "endLine": 4514,
+      "text": "    const barFar = movement.barAt === 'elbows' ? w.far.elbowCrook : w.far.hold;\n    const barNear = movement.barAt === 'elbows' ? w.near.elbowCrook : w.near.hold;\n    const p = project(barFar), q = project(barNear);\n    const length = Math.hypot(q[0] - p[0], q[1] - p[1]);\n    if (length < 3) {\n      // One bar through both hands, seen end-on at the near hand.\n      if (kind === 'bar') near.push(...layoutEndOnBarbell(q));\n      else if (kind === 'ez') near.push(...layoutEndOnEzBar(q));\n      else near.push({ kind: 'circle', cx: q[0], cy: q[1], r: 2.4, fill: 'textHi', stroke: 'ink1', strokeWidth: 1, opacity: 1 });\n    } else {\n      // Seen along its length. From the front the whole bar is in front of\n      // the body; turned, its far half passes behind.\n      const ux = (q[0] - p[0]) / length, uy = (q[1] - p[1]) / length;\n      const over = kind === 'cableBar' ? 3.5 : 9;\n      const mid: CanonicalPoint = [(p[0] + q[0]) / 2, (p[1] + q[1]) / 2];\n      const farEnd: CanonicalPoint = [p[0] - ux * over, p[1] - uy * over];\n      const nearEnd: CanonicalPoint = [q[0] + ux * over, q[1] + uy * over];\n      const whole = figure.view === 'front';\n      const farGroup = whole ? near : movement.barAt === 'behind' ? groups.behind : far;"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4542,
+      "endLine": 4548,
+      "text": "    if (kind === 'kettlebells') {\n      const fa = figure.projectFar(chainAdd(w.far.hold, [0, 0, 1], -2.6));\n      const fb = figure.projectFar(chainAdd(w.far.hold, [0, 0, 1], 2.6));\n      const fc = figure.projectFar(chainAdd(w.far.hold, [KETTLEBELL_REST[0], KETTLEBELL_REST[1], -KETTLEBELL_REST[2]], 1));\n      far.push({ kind: 'circle', cx: fc[0], cy: fc[1], r: KETTLEBELL_RADIUS, fill: farColor, stroke: 'ink1', strokeWidth: 1, opacity: farOpacity });\n      far.push(line(fa, fb, 2.2, farColor, farOpacity));\n    }"
+    }
+  ]
+}

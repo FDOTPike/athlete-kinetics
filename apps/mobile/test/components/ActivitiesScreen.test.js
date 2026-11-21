@@ -1,5 +1,5 @@
 import React from 'react';
-import { BackHandler } from 'react-native';
+import { Alert, BackHandler } from 'react-native';
 import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import ActivitiesScreen from '../../src/screens/ActivitiesScreen';
 import { NavigationProvider } from '../../src/navigation/navigation';
@@ -203,6 +203,89 @@ describe('WO-05 factual activities screen', () => {
     }
   });
 
+  test('#148 an untouched entry closes without a question, and Back then goes to the host', () => {
+    const onClose = jest.fn();
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const hardwareBack = captureHardwareBack();
+    try {
+      render(<NavigationProvider initialTab="athlete"><ActivitiesScreen onClose={onClose} /></NavigationProvider>);
+      fireEvent.press(screen.getByRole('button', { name: 'Add an existing or one-off activity' }));
+
+      expect(hardwareBack.press()).toBe(true);
+      expect(screen.queryByTestId('activity-entry-form')).toBeNull();
+      // Nothing was typed: this screen does not take the Back, so the host closes it as before.
+      expect(hardwareBack.press()).toBe(false);
+      expect(alert).not.toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
+    } finally {
+      hardwareBack.restore();
+      alert.mockRestore();
+    }
+  });
+
+  test('#148 an edited entry asks before Activities closes, and Discard closes it', () => {
+    const onClose = jest.fn();
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const hardwareBack = captureHardwareBack();
+    try {
+      render(<NavigationProvider initialTab="athlete"><ActivitiesScreen onClose={onClose} /></NavigationProvider>);
+      fireEvent.press(screen.getByRole('button', { name: 'Add an existing or one-off activity' }));
+      fireEvent.changeText(screen.getByLabelText('Activity name shown in the app'), 'Rock climbing');
+
+      expect(hardwareBack.press()).toBe(true);
+      expect(alert).not.toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
+
+      expect(hardwareBack.press()).toBe(true);
+      expect(alert).toHaveBeenCalledTimes(1);
+      expect(alert.mock.calls[0][0]).toBe('Discard this activity?');
+      expect(onClose).not.toHaveBeenCalled();
+
+      alert.mock.calls[0][2].find((button) => button.text === 'Discard').onPress();
+      expect(onClose).toHaveBeenCalledTimes(1);
+    } finally {
+      hardwareBack.restore();
+      alert.mockRestore();
+    }
+  });
+
+  test('#148 an untouched EDIT SCHEDULE leaves quietly, and an edited one asks first', () => {
+    mockState.activityLedger = {
+      ...emptyLedger,
+      definitions: [{
+        activityId: 'activity-1', kindId: 'walking', displayName: 'Walk', demand: 'low',
+        facilities: [], equipment: [],
+      }],
+      series: [{
+        seriesId: 'series-1', activityId: 'activity-1', displayName: 'Walk', revision: 1,
+        localWeekday: 5, localStartMinute: null, timezoneId: 'Australia/Sydney', timing: 'flexible',
+        expectedDurationMin: 30, expectedEffort: null, effectiveStartDate: '2026-09-01', effectiveEndDate: null,
+      }],
+      scheduledKnownMinutesPerWeek: 30,
+    };
+    const onClose = jest.fn();
+    const alert = jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    const hardwareBack = captureHardwareBack();
+    try {
+      render(<NavigationProvider initialTab="athlete"><ActivitiesScreen onClose={onClose} /></NavigationProvider>);
+      fireEvent.press(screen.getByRole('button', { name: 'Edit weekly schedule for Walk' }));
+      expect(hardwareBack.press()).toBe(true);
+      expect(alert).not.toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
+
+      fireEvent.press(screen.getByRole('button', { name: 'Edit weekly schedule for Walk' }));
+      fireEvent.changeText(screen.getByLabelText('Whole activity duration in minutes'), '45');
+      expect(hardwareBack.press()).toBe(true);
+      expect(hardwareBack.press()).toBe(true);
+      expect(alert).toHaveBeenCalledTimes(1);
+      expect(alert.mock.calls[0][0]).toBe('Discard this activity?');
+      expect(onClose).not.toHaveBeenCalled();
+    } finally {
+      hardwareBack.restore();
+      alert.mockRestore();
+    }
+  });
+
   test('R2 hardware Back closes an open completion view before the entry form and keeps its typed minutes for that entry', () => {
     mockState.activityLedger = { ...emptyLedger, occurrences: [{
         occurrenceId: 'occurrence-plan', activityId: 'activity-1', displayName: 'Walk',
@@ -302,5 +385,77 @@ describe('WO-05 factual activities screen', () => {
     fireEvent.changeText(nameField(), 'Hobby horsing');
     fireEvent.press(screen.getByRole('button', { name: 'Activity type: Rugby' }));
     expect(nameField().props.value).toBe('Hobby horsing');
+  });
+
+  // Issue #147: a validation message must not stay next to a corrected value.
+  // The store's own message is used; the validation itself is unchanged.
+  const rejectEffortAboveTen = (input) => {
+    if (input.expectedEffort !== null && input.expectedEffort > 10) {
+      throw new Error('Effort must be between 1 and 10.');
+    }
+    return 'series-1';
+  };
+
+  test('#147: correcting the effort clears the effort error before Save is pressed', () => {
+    mockState.saveWeeklyActivity = jest.fn(rejectEffortAboveTen);
+    render(<ActivitiesScreen onClose={jest.fn()} />);
+    fireEvent.press(screen.getByRole('button', { name: 'Add an existing or one-off activity' }));
+    fireEvent.changeText(screen.getByLabelText('Whole activity effort from 1 to 10'), '11');
+    fireEvent.press(screen.getByRole('button', { name: 'Save activity facts' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Effort must be between 1 and 10.');
+
+    fireEvent.changeText(screen.getByLabelText('Whole activity effort from 1 to 10'), '6');
+    expect(screen.queryByText('Effort must be between 1 and 10.')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(mockState.saveWeeklyActivity).toHaveBeenCalledTimes(1);
+
+    // Save still validates: 6 is accepted, 11 again is refused again.
+    fireEvent.press(screen.getByRole('button', { name: 'Save activity facts' }));
+    expect(mockState.saveWeeklyActivity).toHaveBeenLastCalledWith(expect.objectContaining({ expectedEffort: 6 }));
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  test('#147: editing the duration or the start time also clears a shown form error', () => {
+    mockState.saveWeeklyActivity = jest.fn(rejectEffortAboveTen);
+    render(<ActivitiesScreen onClose={jest.fn()} />);
+    fireEvent.press(screen.getByRole('button', { name: 'Add an existing or one-off activity' }));
+
+    fireEvent.changeText(screen.getByLabelText('Whole activity duration in minutes'), 'abc');
+    fireEvent.press(screen.getByRole('button', { name: 'Save activity facts' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Use a number or leave the field blank.');
+    fireEvent.changeText(screen.getByLabelText('Whole activity duration in minutes'), '45');
+    expect(screen.queryByRole('alert')).toBeNull();
+
+    fireEvent.changeText(screen.getByLabelText('Start time in 24-hour HH:MM'), '25:00');
+    fireEvent.press(screen.getByRole('button', { name: 'Save activity facts' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Enter a real time between 00:00 and 23:59.');
+    fireEvent.changeText(screen.getByLabelText('Start time in 24-hour HH:MM'), '17:00');
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(mockState.saveWeeklyActivity).not.toHaveBeenCalled();
+  });
+
+  test('#147: correcting the effort in the completion form clears its error before Save', () => {
+    mockState.activityLedger = {
+      ...emptyLedger,
+      occurrences: [{
+        occurrenceId: 'occurrence-1', activityId: 'activity-1', displayName: 'Walk',
+        localDate: '2026-09-13', localStartMinute: null, timezoneId: 'Australia/Sydney',
+        state: 'planned', timing: 'flexible', modalityId: 'unknown', purposeId: 'recreation',
+        expectedDurationMin: 30, expectedEffort: null, actualDurationMin: null, actualEffort: null,
+      }],
+    };
+    mockState.completeActivityOccurrence = jest.fn((input) => {
+      if (input.actualEffort !== null && input.actualEffort > 10) throw new Error('Effort must be between 1 and 10.');
+    });
+    render(<ActivitiesScreen onClose={jest.fn()} />);
+    fireEvent.press(screen.getByRole('button', { name: 'Log actual completion for Walk' }));
+    fireEvent.changeText(screen.getByLabelText('Actual whole activity effort from 1 to 10'), '11');
+    fireEvent.press(screen.getByRole('button', { name: 'SAVE ACTUAL ACTIVITY' }));
+    expect(screen.getAllByText('Effort must be between 1 and 10.').length).toBeGreaterThan(0);
+
+    fireEvent.changeText(screen.getByLabelText('Actual whole activity effort from 1 to 10'), '6');
+    expect(screen.queryAllByText('Effort must be between 1 and 10.')).toHaveLength(0);
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(mockState.completeActivityOccurrence).toHaveBeenCalledTimes(1);
   });
 });

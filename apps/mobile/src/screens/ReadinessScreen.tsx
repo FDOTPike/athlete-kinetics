@@ -9,7 +9,14 @@ import React, { useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { StateVectorRow } from '@ak/inference';
 import { useStore } from '../state/useStore';
+import { IS_BETA_BUILD } from '../config/features';
+import { deriveTodayState } from '../state/todayState';
+import TrainingSupportNotice from '../components/TrainingSupportNotice';
 import { theme } from '../theme/theme';
+import { sessionFocusName } from '../state/sessionSummary';
+import { HALT_NEXT_TEXT, HALT_TODAY_TEXT } from '../state/haltCopy';
+import { operativeReportLine } from '../state/operativeReportLine';
+import { SafetyReportView } from '../components/SafetyReportView';
 import {
   PrimaryButton,
   SecondaryButton,
@@ -54,7 +61,7 @@ const STATE_META: Record<AthleteState, ReadinessMeta> = {
   },
 };
 
-const HALT_META: ReadinessMeta = {
+export const HALT_META: ReadinessMeta = {
   label: 'Training paused',
   title: 'Resolve today\'s safety report',
   recommendation: 'Training is paused for today. Review the report before doing more work.',
@@ -67,8 +74,7 @@ const format = (value: number | null, digits: number, suffix = ''): string =>
 const formatSigned = (value: number | null, digits: number): string =>
   value === null ? 'Not available' : `${value >= 0 ? '+' : ''}${value.toFixed(digits)}`;
 
-const formatFocus = (focus: string): string =>
-  focus ? focus.charAt(0).toUpperCase() + focus.slice(1).toLowerCase() : '';
+const formatFocus = (focus: string): string => (focus ? sessionFocusName(focus) : '');
 
 export const readinessCoverage = (vector: StateVectorRow): string => {
   const available = [vector.hrv_z !== null, vector.sleep_efficiency_pct !== null]
@@ -76,6 +82,14 @@ export const readinessCoverage = (vector: StateVectorRow): string => {
   if (available === 0) return 'No current inputs';
   return `${available} of 2 inputs`;
 };
+
+// #170: with no scored HRV or sleep input the score is the neutral default of 50
+// (004_state_vector_materialize.sql). Say so instead of crediting "your signals".
+// "Scored" because a first HRV reading has no baseline yet, so hrv_z stays null.
+export const NEUTRAL_DEFAULT_EXPLANATION = 'No scored signals yet. Using a neutral default of 50.';
+
+const hasNoReadinessInputs = (vector: StateVectorRow): boolean =>
+  vector.hrv_z === null && vector.sleep_efficiency_pct === null;
 export interface ReadinessScreenProps {
   /** Supplied by the shell so the focused action can open a live session. */
   onOpenSession?: () => void;
@@ -87,7 +101,61 @@ function CenteredState({ children }: { children: React.ReactNode }): React.JSX.E
   return <View style={styles.center}>{children}</View>;
 }
 
-export default function ReadinessScreen({
+/**
+ * A support hold replaces the screen, but a same-day halt must stay visible
+ * above it: both can be active at once, and the halt is the stronger message.
+ * Reuses the existing halt copy only.
+ */
+export function HeldScreenWithHalt({ lastTriage, header, children }: {
+  lastTriage: ReturnType<typeof useStore.getState>['lastTriage'];
+  /** Shown above everything else, halt card included (Today's Coach-mode athlete name, #177). */
+  header?: React.ReactNode;
+  children: React.ReactNode;
+}): React.JSX.Element {
+  if (lastTriage === null || lastTriage.kind !== 'matched' || !lastTriage.directive.halt) {
+    // No scroll container here, so the header gets the notice's own side padding.
+    return <>{header !== undefined && <View style={{ paddingHorizontal: theme.space[4], paddingTop: theme.space[4] }}>{header}</View>}{children}</>;
+  }
+  return (
+    <ScrollView style={styles.screen} contentContainerStyle={styles.contentContainer}>
+      {header}
+      <View style={[styles.card, styles.cardActiveSpine]} testID="held-screen-halt-card">
+        <View style={styles.statusBadge}>
+          <Text style={styles.statusBadgeText}>{HALT_META.label.toUpperCase()}</Text>
+        </View>
+        <Text style={styles.title}>{HALT_META.title}</Text>
+        <Text style={styles.body}>{HALT_META.recommendation}</Text>
+        {/* Halt-only wording (#178): never the entry's adjustment cue. */}
+        <Text style={styles.haltCue}>{HALT_NEXT_TEXT}</Text>
+      </View>
+      {children}
+    </ScrollView>
+  );
+}
+
+export default function ReadinessScreen(props: ReadinessScreenProps): React.JSX.Element {
+  const state = useStore((s) => s);
+  if (state.status === 'booting' || state.status === 'error') {
+    return <AvailableReadinessScreen {...props} />;
+  }
+  const movementIds = state.todayPlan?.slots.map((slot) => slot.movementId);
+  const decision = typeof state.getTrainingSupportDecision === 'function'
+    ? state.getTrainingSupportDecision(movementIds)
+    : { status: 'support_unavailable' as const };
+  // Same explanation as Today and Plan when only narrow-scope holds lock the whole prescription.
+  const narrowScopeOnly = decision.status === 'held' && typeof state.isBroadHoldFromNarrowScopes === 'function'
+    ? state.isBroadHoldFromNarrowScopes(movementIds, decision)
+    : false;
+  if (decision.status !== 'available') return <HeldScreenWithHalt lastTriage={state.lastTriage}>
+    <TrainingSupportNotice
+      unavailable={decision.status === 'support_unavailable'}
+      narrowScopeOnly={narrowScopeOnly}
+      onOpenSession={state.session !== null ? props.onOpenSession : undefined} />
+  </HeldScreenWithHalt>;
+  return <AvailableReadinessScreen {...props} />;
+}
+
+function AvailableReadinessScreen({
   onOpenSession,
   onOpenCoach,
 }: ReadinessScreenProps): React.JSX.Element {
@@ -98,7 +166,11 @@ export default function ReadinessScreen({
   const trend = useStore((s) => s.trend);
   const session = useStore((s) => s.session);
   const todayPlan = useStore((s) => s.todayPlan);
+  const blockSessions = useStore((s) => s.blockSessions);
+  const block = useStore((s) => s.block);
+  const hasArchivedBlock = useStore((s) => s.hasArchivedBlock);
   const lastTriage = useStore((s) => s.lastTriage);
+  const prescription = useStore((s) => s.prescription);
   const uiPreferences = useStore((s) => s.uiPreferences);
   const boot = useStore((s) => s.boot);
   const refreshVector = useStore((s) => s.refreshVector);
@@ -112,6 +184,7 @@ export default function ReadinessScreen({
   // say so instead of leaving the button looking dead.
   const [demoBlocked, setDemoBlocked] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [reportViewOpen, setReportViewOpen] = useState(false);
 
   const attemptDemoLoad = React.useCallback(() => {
     const result = loadDemoAthlete();
@@ -149,81 +222,129 @@ export default function ReadinessScreen({
     );
   }
 
+  const halted = lastTriage !== null && lastTriage.kind === 'matched' && lastTriage.directive.halt;
+  const hasLiveSession = session !== null;
+  const primaryHandler = hasLiveSession ? onOpenSession : onOpenCoach;
+
   if (vector === null) {
     return (
       <ScrollView style={styles.screen} contentContainerStyle={styles.contentContainer} testID="readiness-screen">
         <View style={styles.header}>
           <Text style={styles.wordmark}>pikeMethods</Text>
         </View>
+        {halted && (
+          <View style={[styles.card, styles.cardActiveSpine]}>
+            <View style={styles.statusBadge}>
+              <Text style={styles.statusBadgeText}>{HALT_META.label.toUpperCase()}</Text>
+            </View>
+            <Text style={styles.title}>{HALT_META.title}</Text>
+            <Text style={styles.body}>{HALT_META.recommendation}</Text>
+            {/* No "planned today" while halted (#178): no session may start. */}
+            <Text style={styles.caption}>{HALT_NEXT_TEXT}</Text>
+            {/* #185: the saved reports, read-only, wherever READY is opened from. */}
+            <PrimaryButton label="Review safety report" onPress={() => setReportViewOpen(true)} />
+          </View>
+        )}
+        {halted && reportViewOpen && <SafetyReportView onClose={() => setReportViewOpen(false)} />}
         <View style={styles.card}>
           <Text style={styles.wordmark}>READY</Text>
           <Text style={styles.title}>No readiness yet</Text>
           <Text style={styles.body}>
             Log a session and sync any available telemetry to build today's recommendation.
           </Text>
-          <PrimaryButton
-            label="Load demo athlete"
-            onPress={attemptDemoLoad}
-            accessibilityLabel="Load the 180 day demo athlete"
-          />
-          {demoBlocked && (
-            <Text style={styles.caption} accessibilityLiveRegion="polite">
-              Demo not loaded because training history already exists. Use “Reset and load demo” if you want to replace it.
-            </Text>
+          {!IS_BETA_BUILD && (
+            <>
+              <PrimaryButton
+                label="Load demo athlete"
+                onPress={attemptDemoLoad}
+                accessibilityLabel="Load the 180 day demo athlete"
+              />
+              {demoBlocked && (
+                <Text style={styles.caption} accessibilityLiveRegion="polite">
+                  Demo not loaded because training history already exists. Use “Reset and load demo” if you want to replace it.
+                </Text>
+              )}
+            </>
           )}
           <SecondaryButton label="Refresh" onPress={refreshVector} />
-          <View style={{ marginTop: theme.space[3] }}>
-            <Disclosure label="Reset and load demo">
-              {!confirmReset ? (
-                <View style={{ gap: theme.space[3] }}>
-                  <Text style={styles.caption}>
-                    This removes training history, telemetry, blocks, and today's reports. Your
-                    profile and saved profile slots remain.
-                  </Text>
-                  <SecondaryButton
-                    label="Continue to reset"
-                    onPress={() => setConfirmReset(true)}
-                    accessibilityLabel="Continue to reset training data and load demo"
-                  />
-                </View>
-              ) : (
-                <View style={{ gap: theme.space[3] }}>
-                  <Text style={styles.body}>This cannot be undone. Reset the training data and load the demo athlete?</Text>
-                  <PrimaryButton
-                    label="Reset training data and load demo"
-                    onPress={() => {
-                      resetTrainingData();
-                      attemptDemoLoad();
-                      setConfirmReset(false);
-                    }}
-                    accessibilityLabel="Confirm reset training data and load demo athlete"
-                  />
-                  <SecondaryButton label="Keep my data" onPress={() => setConfirmReset(false)} />
-                </View>
-              )}
-            </Disclosure>
-          </View>
+          {!IS_BETA_BUILD && (
+            <View style={{ marginTop: theme.space[3] }}>
+              <Disclosure label="Reset and load demo">
+                {!confirmReset ? (
+                  <View style={{ gap: theme.space[3] }}>
+                    <Text style={styles.caption}>
+                      This removes training history, telemetry, blocks, and today's reports. Your
+                      profile and saved profile slots remain.
+                    </Text>
+                    <SecondaryButton
+                      label="Continue to reset"
+                      onPress={() => setConfirmReset(true)}
+                      accessibilityLabel="Continue to reset training data and load demo"
+                    />
+                  </View>
+                ) : (
+                  <View style={{ gap: theme.space[3] }}>
+                    <Text style={styles.body}>This cannot be undone. Reset the training data and load the demo athlete?</Text>
+                    <PrimaryButton
+                      label="Reset training data and load demo"
+                      onPress={() => {
+                        resetTrainingData();
+                        attemptDemoLoad();
+                        setConfirmReset(false);
+                      }}
+                      accessibilityLabel="Confirm reset training data and load demo athlete"
+                    />
+                    <SecondaryButton label="Keep my data" onPress={() => setConfirmReset(false)} />
+                  </View>
+                )}
+              </Disclosure>
+            </View>
+          )}
         </View>
       </ScrollView>
     );
   }
 
-  const halted = lastTriage !== null && lastTriage.kind === 'matched' && lastTriage.directive.halt;
   const athleteState = classifyReadiness(vector);
-  const meta = halted ? HALT_META : STATE_META[athleteState];
-  const hasLiveSession = session !== null;
+  // #186: a report shaping today is named with the change it applied, and
+  // READY no longer says the signals support the planned work.
+  const todaysReport = !halted && prescription != null && prescription.forDate === today
+    ? prescription.report ?? null : null;
+  const stateMeta = STATE_META[athleteState];
+  const meta = halted
+    ? HALT_META
+    : todaysReport !== null && athleteState === 'OPTIMAL'
+      ? { ...stateMeta, explanation: 'Your recovery signals are good, but a report you saved today changed the plan.' }
+      : stateMeta;
+  const explanation = !halted && hasNoReadinessInputs(vector) ? NEUTRAL_DEFAULT_EXPLANATION : meta.explanation;
   const isRestDay = todayPlan === null && !halted && !hasLiveSession;
+  // #200: the same derivation Today uses. A planned session already finalized
+  // as complete is reported as recorded, not as still planned.
+  const todaySessionDone = todayPlan !== null && deriveTodayState({
+    today,
+    hasActiveSession: hasLiveSession,
+    halted,
+    todayPlan: {
+      plannedSessionId: todayPlan.plannedSessionId,
+      focus: todayPlan.focus,
+      slotCount: todayPlan.slots.length,
+    },
+    blockSessions: blockSessions ?? [],
+    hasActiveBlock: block != null,
+    hasArchivedBlock: hasArchivedBlock ?? false,
+  }).kind === 'completed_today';
 
   const primaryLabel = halted
     ? 'Review safety report'
     : hasLiveSession
       ? 'Open active session'
-      : todayPlan !== null
-        ? "Review today's plan"
-        : athleteState === 'OVERREACHED'
-          ? 'Review recovery plan'
-          : 'Review your plan';
-  const primaryHandler = hasLiveSession ? onOpenSession : onOpenCoach;
+      : todaySessionDone
+        ? 'Review your plan'
+        : todayPlan !== null
+          ? "Review today's plan"
+          : athleteState === 'OVERREACHED'
+            ? 'Review recovery plan'
+            : 'Review your plan';
 
   // Quiet readiness metrics rows
   const renderRawMetricsList = () => {
@@ -239,7 +360,10 @@ export default function ReadinessScreen({
             Recent recorded external load compared with the preceding four-week average. Bodyweight, conditioning, grappling, and unlogged training may be incomplete. Shown as history only: it does not affect the readiness estimate or today&apos;s plan, and there is no target range.
           </Text>
         </ListRow>
-        <ListRow label="HRV deviation" detail={formatSigned(vector.hrv_z, 1)} />
+        <ListRow
+          label="HRV deviation"
+          detail={vector.hrv_z === null ? 'Not available' : `${formatSigned(vector.hrv_z, 1)} SD from your baseline`}
+        />
         <ListRow label="Sleep efficiency" detail={format(vector.sleep_efficiency_pct, 1, '%')} />
         <ListRow label="Acute load" detail={format(vector.acute_load_kg, 0, ' kg')} />
         <ListRow label="Chronic load" detail={format(vector.chronic_load_kg, 0, ' kg')} />
@@ -323,13 +447,14 @@ export default function ReadinessScreen({
 
         {renderReturnCheckinCard()}
 
-        {/* Display-type Rest day statement */}
-        <Text style={styles.displayMain}>Rest day.</Text>
-        <Text style={styles.displaySub}>That's the work.</Text>
+        {/* Rest day only when a block exists and today is unplanned. With no
+            block, say what Today says (issue #156). */}
+        <Text style={styles.displayMain}>{block != null ? 'Rest day.' : 'No plan yet.'}</Text>
+        <Text style={styles.displaySub}>{block != null ? "That's the work." : 'Build a plan and today gets a workout with it.'}</Text>
 
         <View style={styles.section}>
           <Disclosure label="Why this recommendation" hint="The short explanation first">
-            <Text style={styles.body}>{meta.explanation}</Text>
+            <Text style={styles.body}>{explanation}</Text>
             <View style={{ marginTop: theme.space[4] }}>
               <SecondaryButton label="Refresh readiness" onPress={refreshVector} />
             </View>
@@ -371,10 +496,22 @@ export default function ReadinessScreen({
           <Text style={styles.statusBadgeText}>{meta.label.toUpperCase()}</Text>
         </View>
         <Text style={styles.title}>{meta.title}</Text>
-        <Text style={styles.body}>{meta.recommendation}</Text>
-        {hasLiveSession && <Text style={styles.caption}>Your active workout is ready to resume.</Text>}
-        {!hasLiveSession && todayPlan !== null && (
-          <Text style={styles.caption}>{formatFocus(todayPlan.focus)} session planned today.</Text>
+        {/* #253: once today's session is recorded, this line no longer tells the athlete to follow the plan. */}
+        <Text style={styles.body}>
+          {todaySessionDone ? "Today's session is done. Rest and recover." : meta.recommendation}
+        </Text>
+        {todaysReport !== null && (
+          <Text style={styles.caption} testID="readiness-report-line">{operativeReportLine(todaysReport)}</Text>
+        )}
+        {/* While halted, READY names no planned or resumable session (#178). */}
+        {halted && <Text style={styles.caption}>{HALT_NEXT_TEXT}</Text>}
+        {!halted && hasLiveSession && <Text style={styles.caption}>Your active workout is ready to resume.</Text>}
+        {!halted && !hasLiveSession && todayPlan !== null && (
+          <Text style={styles.caption}>
+            {todaySessionDone
+              ? `Today's ${formatFocus(todayPlan.focus)} session is recorded.`
+              : `${formatFocus(todayPlan.focus)} session planned today.`}
+          </Text>
         )}
         {!hasLiveSession && todayPlan === null && !halted && (
           <Text style={styles.caption}>
@@ -383,19 +520,23 @@ export default function ReadinessScreen({
               : 'There is no planned session for today.'}
           </Text>
         )}
-        {primaryHandler !== undefined ? (
+        {halted ? (
+          // #185: the saved reports, read-only, not the paused workout.
+          <PrimaryButton label={primaryLabel} onPress={() => setReportViewOpen(true)} />
+        ) : primaryHandler !== undefined ? (
           <PrimaryButton label={primaryLabel} onPress={primaryHandler} />
         ) : (
           <Text style={styles.navigationHint}>Open the relevant tab below to continue.</Text>
         )}
       </View>
+      {halted && reportViewOpen && <SafetyReportView onClose={() => setReportViewOpen(false)} />}
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>DETAILS</Text>
         <Disclosure label="Why this recommendation" hint="The short explanation first">
-          <Text style={styles.body}>{meta.explanation}</Text>
+          <Text style={styles.body}>{explanation}</Text>
           {halted && lastTriage !== null && lastTriage.kind === 'matched' && (
-            <Text style={styles.haltCue}>{lastTriage.directive.vector.coaching_cue}</Text>
+            <Text style={styles.haltCue}>{HALT_TODAY_TEXT}</Text>
           )}
           <View style={{ marginTop: theme.space[3] }}>
             {uiPreferences.readinessDetail === 'full' ? (

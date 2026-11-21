@@ -227,24 +227,16 @@ describe('Finding A: Canonical Frame-Fit Enclosure and Stage Integrity', () => {
     unmount();
   });
 
-  test('Coverage of all renderable canonical and derived entries across the full cycle', async () => {
-    const renderableEntries = previewManifest.entries.filter(
-      (e) => (Array.isArray(e.frames) && e.frames.length > 0 && Array.isArray(e.viewBox)) || Boolean(e.derivesFrom),
-    );
+  const renderableEntries = previewManifest.entries.filter(
+    (e) => (Array.isArray(e.frames) && e.frames.length > 0 && Array.isArray(e.viewBox)) || Boolean(e.derivesFrom),
+  );
+  const renderableTable = renderableEntries.map((entry) => [entry.movementId, entry.name, entry]);
+  const testedIds = new Set();
+  let derivedCount = 0;
 
-    // Nothing may drop out of coverage silently. Every manifest entry is either
-    // guarded here, marked unsuitable, or one of the legacy-rig prototypes that
-    // carry frames without a canonical view box and are not drawn on this stage.
-    const unsuitable = previewManifest.entries.filter((e) => e.status === 'intentionally_unsuitable');
-    const legacyRig = previewManifest.entries.filter(
-      (e) => e.status !== 'intentionally_unsuitable' && !e.derivesFrom
-        && Array.isArray(e.frames) && e.frames.length > 0 && !Array.isArray(e.viewBox),
-    );
-    expect(legacyRig.map((e) => e.movementId).sort((a, b) => a - b)).toEqual([16, 28, 88]);
-    expect(renderableEntries.length + unsuitable.length + legacyRig.length).toBe(previewManifest.entries.length);
-
-    let derivedCount = 0;
-    for (const entry of renderableEntries) {
+  test.each(renderableTable)(
+    'Coverage of renderable entry %i (%s) across the full cycle',
+    async (_id, _name, entry) => {
       const base = entry.derivesFrom
         ? previewManifest.entries.find((b) => b.movementId === entry.derivesFrom)
         : undefined;
@@ -274,11 +266,29 @@ describe('Finding A: Canonical Frame-Fit Enclosure and Stage Integrity', () => {
       }
 
       unmount();
-      jest.restoreAllMocks();
-    }
+      testedIds.add(entry.movementId);
+    },
+  );
 
+  test('Coverage count check: every renderable and derived entry has its own full-cycle test', () => {
+    // Nothing may drop out of coverage silently. Every manifest entry is either
+    // guarded here, marked unsuitable, or one of the legacy-rig prototypes that
+    // carry frames without a canonical view box and are not drawn on this stage.
+    const unsuitable = previewManifest.entries.filter((e) => e.status === 'intentionally_unsuitable');
+    const legacyRig = previewManifest.entries.filter(
+      (e) => e.status !== 'intentionally_unsuitable' && !e.derivesFrom
+        && Array.isArray(e.frames) && e.frames.length > 0 && !Array.isArray(e.viewBox),
+    );
+    expect(legacyRig.map((e) => e.movementId).sort((a, b) => a - b)).toEqual([16, 28, 88]);
+    expect(renderableEntries.length + unsuitable.length + legacyRig.length).toBe(previewManifest.entries.length);
+    expect(renderableTable).toHaveLength(renderableEntries.length);
+    expect(testedIds.size).toBe(renderableEntries.length);
+    expect([...testedIds].sort((a, b) => a - b)).toEqual(
+      renderableEntries.map((e) => e.movementId).sort((a, b) => a - b),
+    );
     expect(derivedCount).toBeGreaterThanOrEqual(1);
-  }, 300000);
+    expect(derivedCount).toBe(renderableEntries.filter((e) => Boolean(e.derivesFrom)).length);
+  });
 
   test('Parent layout presentation: compact mode (SessionScreen) and card mode (LibraryScreenV2)', async () => {
     // Standard Card mode (Library)

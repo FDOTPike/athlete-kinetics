@@ -1,0 +1,17 @@
+source commit: a981b09f4fbeebdf2a1ffd3ca11dcae08dcf4f2c
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with probe-3c7c2a6220ac485bda06625ff13035ecd553b1a4.json
+
+movements measured: 200 (baseline 193)
+added: 2 Deadlift; 46 Deficit Deadlift; 176 Deadlift with Bands; 257 Reverse Band Deadlift; 78 Sumo Deadlift; 258 Reverse Band Sumo Deadlift; 290 Sumo Deadlift with Bands
+removed: none
+changed, expected: none
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  2 Deadlift: drawn 6b78b96bb33a24dca3cf77068af46d0e6cc98209e53d70b6f0493c5ea99df74c captions 9d2a8752cf3602407cc76f21e0c7cd02e48d635bf79aec58b6a1daeb4606d673 stage 127.83x240.00 cycle 3600 ms
+  46 Deficit Deadlift: drawn e2d285f89353ae750dcb160a02adbbbc681b03e49d5f7ecacd68c692845a2eef captions cf8a13848ca5d53cecab555f8d4670af6ac3dcccb729976c1798e4da668483cf stage 123.79x240.00 cycle 3650 ms
+  176 Deadlift with Bands: drawn b2084cf481e7cbe25ab9c3a2c04018a33c32f37cd5564ddbd2e4acec6bac1d00 captions 901139ddb7e017051d3fce3d58e6e39d7d32c65c6cb3c8f06f386358ec31e930 stage 127.83x240.00 cycle 3600 ms
+  257 Reverse Band Deadlift: drawn 61f03fcfc06ae0f066a1cd2404b5a3307ddf07e10dc712693b10b80469b9076c captions a863622970652b21647d1ed867aa7e9883aba88aabb5ac02f60cfd8d50e4e2a9 stage 132.77x240.00 cycle 3600 ms
+  78 Sumo Deadlift: drawn 77548a7a73abdfab86f2d1e108a3bf1421b52e99cd85604e62577c0b2c6047de captions 884f8e63d3302543821ec52687c0e388bfe41adf1dfaa7e6e9838acae34ae5f6 stage 141.82x240.00 cycle 3600 ms
+  258 Reverse Band Sumo Deadlift: drawn eec32e0c784d27d9ee7ad74baef6578a00ed8c0a98c9100a3c1d4d1b12893675 captions 3f0bdd5f6e2d988c80db718750ab3d945179dad1df3f38409aeddb48d8dc0bf4 stage 148.09x240.00 cycle 3600 ms
+  290 Sumo Deadlift with Bands: drawn 829abe438466587b2a951b32aeeefdfa61f545de9d49b78739b2983dcae80b90 captions 6807e113b8542f9f17df932f0ab094a8f4a2ee30be51a93da61e9bdf300e35ed stage 141.82x240.00 cycle 3600 ms
+exit code: 0 (probe run exit 0)

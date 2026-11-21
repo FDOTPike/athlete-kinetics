@@ -69,3 +69,6 @@ apps/mobile/android/app/src/main/assets/index.android.bundle
 # candidate-manifest generator respects --exclude-standard, so ignoring it
 # keeps the sealed fingerprint free of build products.
 apps/mobile/android/app/src/main/assets/fonts/Archivo.ttf
+
+# Encrypted pikeMethods backups (owner data). Never commit.
+*.pmbak

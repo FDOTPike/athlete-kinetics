@@ -116,3 +116,4 @@ for (const spec of CHAIN_SPECS) {
 }
 
 fs.writeFileSync(file, `${JSON.stringify(manifest)}\n`);
+

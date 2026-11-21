@@ -117,3 +117,18 @@ Choose one:
 
 Recommendation: **1**. It matches the ratified A6 decision to defer the
 threshold to real data and avoids another synthetic calibration.
+
+## 8. Owner ruling - 2026-10-13
+
+**Option 1.** Action authority stays dormant until real completion history
+accumulates; the sweep is then repeated against observed distributions.
+
+The three options above were put to the owner with the recommendation of
+option 1 ("Wait for real history"), and he answered "yes to all six, go with
+your recommendations" to that and five other decisions the same day.
+
+Nothing follows from this ruling but the wait: no threshold, no provisional
+policy, no recency family, and no caller for `deriveCompletionAction`. The same
+day he ruled that the app should start keeping two facts a later sweep will
+need and that were being lost: which planned slots were skipped, and the load a
+set's entry was seeded with (migration 071). Those are records only.

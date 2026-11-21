@@ -20,7 +20,7 @@
  */
 import React from 'react';
 import { fireEvent, render, screen, within } from '@testing-library/react-native';
-import ProgramSetupScreen from '../../src/screens/ProgramSetupScreen';
+import ProgramSetupScreen, { offersGrapplingDays } from '../../src/screens/ProgramSetupScreen';
 import { RECOMMENDED_BLOCK_COUNT, recommendedProgramDefaults } from '../../src/state/programDefaults';
 
 let mockState;
@@ -247,6 +247,38 @@ test('editing opens the controls, because fine-tuning IS the task there', () => 
   expect(screen.queryByTestId('program-recommendation-card')).toBeNull();
 });
 
+describe('the footer says what a save changes (#172)', () => {
+  const activeProgram = {
+    programId: 1, objective: 'strength', startDate: '2026-06-01',
+    horizonKind: 'weeks', requestedReviewDate: null, plannedEndDate: '2026-09-01',
+    plannedBlockCount: 2, startingMacroBlockIndex: 1, schemaType: 'LINEAR',
+    status: 'active', currentSequenceIndex: 1,
+    days: [{ dayIndex: 1, focus: 'full' }], movementPreferences: [],
+  };
+
+  test('editing with an active block: the block stays, but a change of training days updates the weekly-day limit', () => {
+    mockState = stateFor('advanced');
+    mockState.program = activeProgram;
+    mockState.block = { blockId: 1, startDate: '2026-07-01', objective: 'strength', createdAtMs: 1 };
+    render(<ProgramSetupScreen editing />);
+    expect(screen.getByText('Your current block stays as it is. These choices apply to future blocks, except a change of training days also updates the weekly-day limit used for current targets.')).toBeOnTheScreen();
+  });
+
+  test('editing with no active block: the choices apply to future blocks', () => {
+    mockState = stateFor('advanced');
+    mockState.program = activeProgram;
+    mockState.block = null;
+    render(<ProgramSetupScreen editing />);
+    expect(screen.getByText('These choices apply to future blocks.')).toBeOnTheScreen();
+  });
+
+  test('first setup: the start date and the confirmation of future blocks', () => {
+    mockState = stateFor('intermediate');
+    render(<ProgramSetupScreen />);
+    expect(screen.getByText('Program starts 2026-08-03. Future blocks require confirmation.')).toBeOnTheScreen();
+  });
+});
+
 // ---------------------------------------------------------------------------
 // The surviving R8 §2.3 rule
 // ---------------------------------------------------------------------------
@@ -317,7 +349,9 @@ test('editing a day row changes the focus passed to block generation / program c
   openAdvanced();
 
   // Day 1 default for strength 2-day is 'lower'. Change it to 'conditioning'.
-  const conditioningChips = screen.getAllByText('conditioning');
+  expect(screen.getAllByText('Lower').length).toBeGreaterThan(0);
+  const conditioningChips = screen.getAllByText('Conditioning');
+  expect(screen.queryAllByText('conditioning')).toHaveLength(0);
   fireEvent.press(conditioningChips[0]);
 
   fireEvent.press(screen.getByText('Create program'));
@@ -367,6 +401,121 @@ test('custom week-one rows use the middle dot between day number and focus', () 
   fireEvent.press(screen.getByText('Customize'));
 
   // The literal separator is U+00B7 MIDDLE DOT, never '?'.
-  expect(screen.getAllByText(/Day \d+ · /).length).toBeGreaterThan(0);
-  expect(screen.queryByText(/Day \d+ \? /)).toBeNull();
+  expect(screen.getAllByText(/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) · /).length).toBeGreaterThan(0);
+  expect(screen.queryByText(/^(Mon|Tue|Wed|Thu|Fri|Sat|Sun) \? /)).toBeNull();
+});
+
+// ---------------------------------------------------------------------------
+// #210 — expert sections collapsed for everyone; no "bjj" chip without a
+// grappling goal or sport
+// ---------------------------------------------------------------------------
+
+test.each(['beginner', 'intermediate', 'advanced', 'elite'])(
+  '#210 Fine-tune starts collapsed for a %s athlete',
+  (trainingAge) => {
+    mockState = stateFor(trainingAge);
+    render(<ProgramSetupScreen />);
+    expect(screen.getByLabelText('Fine-tune your program (optional)').props.accessibilityState)
+      .toMatchObject({ expanded: false });
+    expect(screen.queryByText('2. Review horizon')).toBeNull();
+    expect(screen.queryByText('4. Training method')).toBeNull();
+  },
+);
+
+test('#210 no "bjj" day chip for a strength athlete with no sport', () => {
+  mockState = stateFor('intermediate');
+  mockState.sport = null;
+  render(<ProgramSetupScreen />);
+  openAdvanced();
+  expect(screen.getAllByText('Lower').length).toBeGreaterThan(0);
+  expect(screen.queryAllByText('BJJ')).toHaveLength(0);
+  expect(screen.queryAllByText('bjj')).toHaveLength(0);
+});
+
+test('#210 the "bjj" day chip shows for the strength + grappling goal', () => {
+  mockState = stateFor('intermediate');
+  mockState.profile.objective = 'hybrid';
+  mockState.sport = null;
+  render(<ProgramSetupScreen />);
+  openAdvanced();
+  expect(screen.queryAllByText('BJJ').length).toBeGreaterThan(0);
+  expect(screen.queryAllByText('bjj')).toHaveLength(0);
+});
+
+test('#210 the "bjj" day chip shows for a grappling sport named under Other', () => {
+  mockState = stateFor('intermediate');
+  mockState.sport = { sportId: 'other', otherSportName: 'Brazilian Jiu-Jitsu' };
+  render(<ProgramSetupScreen />);
+  openAdvanced();
+  expect(screen.queryAllByText('BJJ').length).toBeGreaterThan(0);
+  expect(screen.queryAllByText('bjj')).toHaveLength(0);
+});
+
+test('#210 a day already set to bjj keeps its chip so the choice stays visible', () => {
+  mockState = stateFor('advanced');
+  mockState.sport = null;
+  mockState.program = {
+    programId: 1, objective: 'strength', startDate: '2026-06-01',
+    horizonKind: 'weeks', requestedReviewDate: null, plannedEndDate: '2026-09-01',
+    plannedBlockCount: 2, startingMacroBlockIndex: 1, schemaType: 'LINEAR',
+    status: 'active', currentSequenceIndex: 1,
+    days: [{ dayIndex: 1, focus: 'bjj' }], movementPreferences: [],
+  };
+  render(<ProgramSetupScreen editing />);
+  expect(screen.queryAllByText('BJJ')).toHaveLength(1);
+  expect(screen.queryAllByText('bjj')).toHaveLength(0);
+});
+
+// ---------------------------------------------------------------------------
+// #351 & #357 — taxonomy grappling + MMA sports offer BJJ chip; Training days
+// chips use display names from sessionFocusName while storing lowercase focus.
+// ---------------------------------------------------------------------------
+
+test.each(['grappling_bjj', 'grappling_wrestling', 'grappling_judo', 'combat_mma'])(
+  '#351 offersGrapplingDays and Training days chips offer BJJ for %s under strength objective',
+  (sportId) => {
+    expect(offersGrapplingDays('strength', { sportId, otherSportName: null })).toBe(true);
+    expect(offersGrapplingDays('gpp', { sportId, otherSportName: null })).toBe(true);
+    mockState = stateFor('intermediate');
+    mockState.profile.objective = 'strength';
+    mockState.sport = { sportId, otherSportName: null };
+    render(<ProgramSetupScreen />);
+    openAdvanced();
+    const bjjChips = screen.getAllByRole('button', { name: 'BJJ' });
+    expect(bjjChips.length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: 'bjj' })).toBeNull();
+    fireEvent.press(bjjChips[0]);
+    fireEvent.press(screen.getByText('Create program'));
+    expect(mockState.createTrainingProgram.mock.calls[0][0].days[0]).toMatchObject({
+      dayIndex: 1,
+      focus: 'bjj',
+    });
+  },
+);
+
+test.each(['powerlifting', 'basketball'])(
+  '#351 offersGrapplingDays does not offer BJJ chip for non-grappling sport %s',
+  (sportId) => {
+    expect(offersGrapplingDays('strength', { sportId, otherSportName: null })).toBe(false);
+    mockState = stateFor('intermediate');
+    mockState.profile.objective = 'strength';
+    mockState.sport = { sportId, otherSportName: null };
+    render(<ProgramSetupScreen />);
+    openAdvanced();
+    expect(screen.queryByRole('button', { name: 'BJJ' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'bjj' })).toBeNull();
+  },
+);
+
+test('#357 Training days chips render sessionFocusName labels with zero raw lowercase tokens', () => {
+  mockState = stateFor('intermediate');
+  mockState.profile.objective = 'hybrid';
+  render(<ProgramSetupScreen />);
+  openAdvanced();
+  for (const label of ['Lower', 'Upper', 'Full', 'Conditioning', 'BJJ']) {
+    expect(screen.getAllByRole('button', { name: label }).length).toBeGreaterThan(0);
+  }
+  for (const rawFocus of ['lower', 'upper', 'full', 'conditioning', 'bjj']) {
+    expect(screen.queryByRole('button', { name: rawFocus })).toBeNull();
+  }
 });

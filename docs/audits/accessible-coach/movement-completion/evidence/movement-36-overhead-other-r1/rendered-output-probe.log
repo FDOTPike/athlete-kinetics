@@ -1,0 +1,15 @@
+source commit: c7b5556f4767ff789c7ed572a863989ec1be0115
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with probe-225cd4c2b7541914b898ef18c4eef3f803c83dc9.json
+
+movements measured: 224 (baseline 224)
+added: none
+removed: none
+changed, expected: 229 Kettlebell Seated Press; 112 Bent Press; 58 Eccentric Wall Handstand Push-Up; 63 Handstand Push-Up; 69 Pike Push-Up
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  229 Kettlebell Seated Press: drawn bb72ec29872af6af471d448d70b779be37fd2279c50b885a26949c2ff2a4c38a captions ac8f1471d34901d48c8db2f0a229b7a843337015c9fc6b9c77d91ba49293dd62 stage 240.00x169.76 cycle 3600 ms
+  112 Bent Press: drawn 1a5b6b87040022d82cdda42c70112890fec22d788be0757b17a842abec2a6d9b captions 3dd5e7dace27bad0b5e5958bd2e073a807253a729acde53cb429ff1d1ef3b071 stage 90.87x240.00 cycle 4450 ms
+  58 Eccentric Wall Handstand Push-Up: drawn 69df34a7d7129275067df8524f920b13007b85799cc55e47c60f2fdf41355478 captions b5d601c70fcf853383e0e8635af1b52edb969ba78fee8341f81dab3cf4f0b881 stage 200.77x240.00 cycle 7700 ms
+  63 Handstand Push-Up: drawn 309b02b26b53264f3163b2c8227d7dca2ae91081909f114fe53aa458e5df9b3d captions 32eb7eae0d0d3d3c5367dfc4eaa74b55ded3313414746da2cfba94f5287611e5 stage 69.23x240.00 cycle 3450 ms
+  69 Pike Push-Up: drawn 5d6bec56b191eb8e5be0df23dd93d876c97c8c666145a759b7ea2c290cc06bf2 captions cd0903c1c3ed4b341a6805b2142d49569b2a8107437605e173c6c61b4737b123 stage 240.00x204.59 cycle 3200 ms
+exit code: 0 (probe run exit 0)

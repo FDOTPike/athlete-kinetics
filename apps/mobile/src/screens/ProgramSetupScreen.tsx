@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
   accessContextForBlockFocus,
+  movementFitsFocusDay,
   ANCHOR_MOVEMENT_NAMES,
   NO_EMPHASIS_EXPLANATION,
   objectiveStyleLabel,
@@ -12,29 +13,106 @@ import {
   splitExplainer,
   SPLIT_EXPLAINER_FOOTER,
   BLOCK_FOCUS_LIST,
+  SPORT_INFO,
   strengthAnchorCapacity,
   strengthAnchorRoleNames,
   weeklyProgressionSummary,
   type BlockFocus,
+  type ProgramScheduleMode,
   type SchemaType,
+  type SessionTimeAlternative,
 } from '@ak/inference';
 import { Chip, Disclosure, PrimaryButton, SecondaryButton } from '../components/ui';
 import { theme } from '../theme/theme';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { EmphasisReportCard } from '../components/EmphasisReportCard';
-import { recommendedProgramDefaults } from '../state/programDefaults';
+import { sessionFocusName } from '../state/sessionSummary';
+import { programChoiceDisclosure, recommendedProgramDefaults } from '../state/programDefaults';
+import { anchorDisplayName, priorExperienceWouldClear } from '../state/priorExperience';
+import { blockWeekTotals, describeBlockWeek } from '../state/blockWeekChanges';
 import {
+  REASON_TEXT_MAP,
   useStore,
+  type RoutineTemplate,
   type TrainingProgramDay,
+  type TrainingProgramDayRoutineAssignment,
   type TrainingProgramInput,
   type TrainingProgramMovementPreference,
+  type TrainingProgramSlotOverride,
 } from '../state/useStore';
+
+const EMPTY_ROUTINES: readonly RoutineTemplate[] = [];
+
+const FOCUS_SPLIT_WORD: Record<BlockFocus, string> = {
+  lower: 'lower-body',
+  upper: 'upper-body',
+  full: 'full-body',
+  push: 'push',
+  pull: 'pull',
+  legs: 'legs',
+  accessories: 'accessory',
+  conditioning: 'conditioning',
+  bjj: 'BJJ',
+};
+
+/** Walk W3-9b: the split description kept the objective's default wording
+ *  ("alternated with conditioning") after the athlete set every day to full.
+ *  When the chosen day types differ from the defaults, describe the choice. */
+export const chosenSplitText = (objective: string, focuses: readonly BlockFocus[]): string => {
+  const defaults = programFocuses(objective as Parameters<typeof programFocuses>[0], focuses.length);
+  if (focuses.every((focus, i) => focus === defaults[i])) return splitExplainer(objective, focuses.length);
+  const counts = new Map<BlockFocus, number>();
+  for (const focus of focuses) counts.set(focus, (counts.get(focus) ?? 0) + 1);
+  const parts = [...counts].map(([focus, n]) => `${n} ${FOCUS_SPLIT_WORD[focus]} ${n === 1 ? 'session' : 'sessions'}`);
+  const list = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`;
+  return `${list} a week, as you chose.`;
+};
+
+/** Walk W3-8: the build page printed the resolver's raw reason codes
+ *  ("capability"). Use the same plain words the Library uses. */
+export const anchorReasonText = (reasons: readonly string[]): string => {
+  const text = reasons
+    .map((reason) => REASON_TEXT_MAP[reason as keyof typeof REASON_TEXT_MAP] ?? reason)
+    .join('; ');
+  return text.length > 0 ? `${text.charAt(0).toUpperCase()}${text.slice(1)}.` : '';
+};
+
+/** #210: the sport list has no grappling sport, so a grappling sport can only
+ *  be one the athlete named under "Other". These words only decide whether a
+ *  day-type chip is offered; they change nothing the generator does. */
+const GRAPPLING_SPORT_NAME = /\b(bjj|jiu[\s-]?jitsu|ju[\s-]?jitsu|jujitsu|judo|wrestl\w*|grappl\w*|sambo)\b/i;
+
+/** #210 / #351: the "bjj" day type is offered with the Strength + Grappling goal,
+ *  any grappling-family sport, MMA (`combat_mma`), or a matching custom sport name.
+ *  A day already set to bjj keeps the chip (see below), so an existing choice is never hidden. */
+export const offersGrapplingDays = (
+  objective: string,
+  sport: { sportId: string; otherSportName: string | null } | null | undefined,
+): boolean => objective === 'hybrid'
+  || (sport != null && (
+    SPORT_INFO[sport.sportId as keyof typeof SPORT_INFO]?.family === 'grappling'
+    || sport.sportId === 'combat_mma'
+    || (sport.sportId === 'other' && sport.otherSportName != null
+      && GRAPPLING_SPORT_NAME.test(sport.otherSportName))
+  ));
 
 const SCHEMA_LABEL: Record<SchemaType, string> = {
   LINEAR: 'Linear', WAVE: 'Undulating', STEP: 'Step loading', APRE: 'Autoregulated',
 };
 
-const DAY_NAME = ['Today', 'Tomorrow', 'Day 3', 'Day 4', 'Day 5', 'Day 6', 'Day 7'];
+const ISO_WEEKDAY_SHORT = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
+
+/**
+ * #228 Q3: explicit fixed Mon–Sun ISO weekday labels (1 = Mon .. 7 = Sun),
+ * preserving relative "Day N" labels for legacy relative-day programs.
+ */
+export const programDayLabel = (
+  dayIndex: number,
+  _dayOneIso: string | null = null,
+  scheduleMode: ProgramScheduleMode = 'iso_weekday',
+): string => (scheduleMode === 'relative_day_index'
+  ? `Day ${dayIndex}`
+  : (ISO_WEEKDAY_SHORT[dayIndex] ?? `Day ${dayIndex}`));
 
 interface ProgramSetupScreenProps {
   editing?: boolean;
@@ -48,6 +126,8 @@ export default function ProgramSetupScreen({
   const profile = useStore((s) => s.profile);
   const today = useStore((s) => s.today);
   const program = useStore((s) => s.program);
+  const sport = useStore((s) => s.sport);
+  const block = useStore((s) => s.block);
   const movements = useStore((s) => s.movements);
   const niggles = useStore((s) => s.niggles);
   const previewTrainingProgram = useStore((s) => s.previewTrainingProgram);
@@ -57,7 +137,16 @@ export default function ProgramSetupScreen({
   const movementAvailabilityRevision = useStore((s) => s.movementAvailabilityRevision);
   const confirmMovementPriorExperience = useStore((s) => s.confirmMovementPriorExperience);
   const activePriorExperienceMovementIds = useStore((s) => s.activePriorExperienceMovementIds);
+  const routineTemplates = useStore((s) => s.routineTemplates ?? EMPTY_ROUTINES);
   const storeError = useStore((s) => s.error);
+
+  const canCustomizeAdvanced = profile.training_age !== 'beginner';
+  const [rpeCapOverride, setRpeCapOverride] = useState<number | null>(null);
+  const draftBaseRpeCap = rpeCapOverride ?? profile.base_rpe_cap;
+  const effectiveRpeCap = Math.min(draftBaseRpeCap, profile.objective === 'rehab' ? 7.0 : 10.0);
+  const activeScheduleMode: ProgramScheduleMode = editing && program !== null
+    ? program.scheduleMode
+    : 'iso_weekday';
 
   const initialFrequency = program?.days.length ?? profile.weekly_frequency;
   // W2: every programming control now OPENS on a disclosed coach default
@@ -66,15 +155,34 @@ export default function ProgramSetupScreen({
   // over the recommendation when editing.
   const recommended = useMemo(() => recommendedProgramDefaults(profile), [profile]);
   const [buildMode, setBuildMode] = useState<'coach' | 'custom'>(
-    editing && (program?.movementPreferences.length ?? 0) > 0 ? 'custom' : recommended.buildMode,
+    editing && (
+      (program?.movementPreferences.length ?? 0) > 0
+      || (program?.slotOverrides?.length ?? 0) > 0
+      || (program?.routineAssignments?.length ?? 0) > 0
+    )
+      ? 'custom'
+      : recommended.buildMode,
   );
+  const countdownCompDate = useMemo(() => {
+    const cd = sport?.competitionDate;
+    if (cd == null || cd.trim() === '') return null;
+    const tMs = Date.parse(`${today}T00:00:00Z`);
+    const cMs = Date.parse(`${cd}T00:00:00Z`);
+    if (!Number.isFinite(tMs) || !Number.isFinite(cMs)) return null;
+    const days = Math.floor((cMs - tMs) / 86400000);
+    return days >= 1 && days <= 224 ? cd : null;
+  }, [sport?.competitionDate, today]);
   const [horizonKind, setHorizonKind] = useState<'weeks' | 'date'>(
-    editing ? (program?.horizonKind ?? recommended.horizonKind) : recommended.horizonKind,
+    editing
+      ? (program?.horizonKind ?? recommended.horizonKind)
+      : (countdownCompDate !== null ? 'date' : recommended.horizonKind),
   );
   const [blockCount, setBlockCount] = useState<number>(
     editing ? (program?.plannedBlockCount ?? recommended.blockCount) : recommended.blockCount,
   );
-  const [reviewDate, setReviewDate] = useState(program?.requestedReviewDate ?? '');
+  const [reviewDate, setReviewDate] = useState(
+    program?.requestedReviewDate ?? countdownCompDate ?? '',
+  );
   const [schemaType, setSchemaType] = useState<SchemaType>(
     editing ? (program?.schemaType ?? recommended.schemaType) : recommended.schemaType,
   );
@@ -102,7 +210,42 @@ export default function ProgramSetupScreen({
   const [preferences, setPreferences] = useState<TrainingProgramMovementPreference[]>(() =>
     program?.movementPreferences ?? [],
   );
+  const [slotOverrides, setSlotOverrides] = useState<TrainingProgramSlotOverride[]>(() =>
+    program?.slotOverrides ?? [],
+  );
+  const [routineAssignments, setRoutineAssignments] = useState<TrainingProgramDayRoutineAssignment[]>(() =>
+    program?.routineAssignments ?? [],
+  );
   const [localError, setLocalError] = useState<string | null>(null);
+  // Android walk 2026-11-03 (W1-4): a session length the athlete picked from
+  // the plan's own offers. It is a draft until Create program saves it; Cancel
+  // leaves the profile as it was. null = the profile's length.
+  const [sessionCapOverride, setSessionCapOverride] = useState<number | null>(null);
+  const planningProfile = useMemo(
+    () => (sessionCapOverride === null ? profile : { ...profile, session_duration_cap_min: sessionCapOverride }),
+    [profile, sessionCapOverride],
+  );
+
+  const routineDayOptions = useMemo(() => {
+    const options: {
+      key: string;
+      routineTemplateId: number;
+      routineDayIndex: number;
+      label: string;
+    }[] = [];
+    for (const template of routineTemplates) {
+      const days = [...new Set(template.slots.map((s) => s.dayIndex))].sort((a, b) => a - b);
+      for (const routineDayIndex of days) {
+        options.push({
+          key: `${template.routineTemplateId}:${routineDayIndex}`,
+          routineTemplateId: template.routineTemplateId,
+          routineDayIndex,
+          label: `${template.name} · Day ${routineDayIndex}`,
+        });
+      }
+    }
+    return options;
+  }, [routineTemplates]);
 
   const input = useMemo<TrainingProgramInput | null>(() => {
     // Only ONE way to be incomplete survives: choosing the Date horizon and not
@@ -119,11 +262,20 @@ export default function ProgramSetupScreen({
         ? { kind: 'weeks', blockCount }
         : { kind: 'date', requestedReviewDate: reviewDate.trim() },
       schemaType,
+      scheduleMode: activeScheduleMode,
       dayIndices,
       days,
       movementPreferences: buildMode === 'custom' ? preferences : [],
+      slotOverrides: buildMode === 'custom' && canCustomizeAdvanced ? slotOverrides : [],
+      routineAssignments: buildMode === 'custom' && canCustomizeAdvanced ? routineAssignments : [],
+      ...(sessionCapOverride === null ? {} : { sessionDurationCapMin: sessionCapOverride }),
+      ...(rpeCapOverride === null ? {} : { baseRpeCap: rpeCapOverride }),
     };
-  }, [horizonKind, schemaType, buildMode, blockCount, reviewDate, dayIndices, preferences, dayFocuses, profile.objective]);
+  }, [
+    activeScheduleMode, horizonKind, schemaType, buildMode, blockCount, reviewDate, dayIndices,
+    preferences, slotOverrides, routineAssignments, canCustomizeAdvanced,
+    dayFocuses, profile.objective, sessionCapOverride, rpeCapOverride,
+  ]);
 
   const previewResult = useMemo(() => {
     if (input === null) return { preview: null, error: null };
@@ -132,7 +284,9 @@ export default function ProgramSetupScreen({
     } catch (error) {
       return { preview: null, error: error instanceof Error ? error.message : String(error) };
     }
-  }, [input, previewTrainingProgram]);
+    // previewTrainingProgram reads the prior-experience list and profile.base_rpe_cap
+    // from the store at call time, so changes to either must redraw the preview (#211, #229).
+  }, [input, previewTrainingProgram, movementAvailabilityRevision, activePriorExperienceMovementIds, profile.base_rpe_cap]);
 
   const availableIdsByContext = useMemo(() => ({
     weight_room: new Set(getVerdicts('weight_room')
@@ -149,6 +303,8 @@ export default function ProgramSetupScreen({
       : [...dayIndices, day].sort((a, b) => a - b);
     setDayIndices(nextDays);
     setPreferences((current) => current.filter((preference) => preference.dayIndex !== day));
+    setSlotOverrides((current) => current.filter((ov) => ov.dayIndex !== day));
+    setRoutineAssignments((current) => current.filter((ra) => ra.dayIndex !== day));
     setDayFocuses((current) => {
       const updated = { ...current };
       const defaultFocuses = programFocuses(profile.objective, nextDays.length);
@@ -162,10 +318,16 @@ export default function ProgramSetupScreen({
   };
 
   const setDayFocus = (dayIndex: number, focus: BlockFocus): void => {
+    const currentFocus = dayFocuses[dayIndex]
+      ?? programFocuses(profile.objective, dayIndices.length)[dayIndices.indexOf(dayIndex)]
+      ?? 'full';
+    if (currentFocus === focus) return;
     setDayFocuses((current) => ({
       ...current,
       [dayIndex]: focus,
     }));
+    setPreferences((current) => current.filter((preference) => preference.dayIndex !== dayIndex));
+    setSlotOverrides((current) => current.filter((ov) => ov.dayIndex !== dayIndex));
   };
 
   const chooseMovement = (dayIndex: number, slotIndex: number, pattern: TrainingProgramMovementPreference['pattern'], movementId: number): void => {
@@ -173,6 +335,42 @@ export default function ProgramSetupScreen({
       ...current.filter((item) => !(item.dayIndex === dayIndex && item.slotIndex === slotIndex)),
       { dayIndex, slotIndex, pattern, movementId },
     ]);
+  };
+
+  const updateSlotOverride = (
+    dayIndex: number,
+    slotIndex: number,
+    patch: { sets?: number; reps?: number; targetRpe?: number },
+  ): void => {
+    if (!canCustomizeAdvanced) return;
+    setSlotOverrides((current) => {
+      const existing = current.find((item) => item.dayIndex === dayIndex && item.slotIndex === slotIndex);
+      const merged: TrainingProgramSlotOverride = {
+        dayIndex,
+        slotIndex,
+        ...(existing ?? {}),
+        ...patch,
+      };
+      return [
+        ...current.filter((item) => !(item.dayIndex === dayIndex && item.slotIndex === slotIndex)),
+        merged,
+      ];
+    });
+  };
+
+  const assignRoutineDay = (
+    dayIndex: number,
+    assignment: TrainingProgramDayRoutineAssignment | null,
+  ): void => {
+    if (!canCustomizeAdvanced) return;
+    setRoutineAssignments((current) => {
+      const filtered = current.filter((item) => item.dayIndex !== dayIndex);
+      return assignment === null ? filtered : [...filtered, assignment];
+    });
+    if (assignment !== null) {
+      setPreferences((current) => current.filter((item) => item.dayIndex !== dayIndex));
+      setSlotOverrides((current) => current.filter((item) => item.dayIndex !== dayIndex));
+    }
   };
 
   const confirm = (): void => {
@@ -192,12 +390,24 @@ export default function ProgramSetupScreen({
   // each one is defensive about a plan that is missing an optional array.
   // A throw here is a blank screen at exactly the worst moment.
   const weekOne = previewResult.preview?.plan?.sessions?.filter((session) => session.week_index === 1) ?? [];
+  const weekTwo = previewResult.preview?.plan?.sessions?.filter((session) => session.week_index === 2) ?? [];
+  const customizeSessions = useMemo(() => {
+    const merged = [...weekOne];
+    for (const s of weekTwo) {
+      if (!weekOne.some((w1) => w1.day_index === s.day_index)) merged.push(s);
+    }
+    return merged;
+  }, [weekOne, weekTwo]);
 
   // --- W3 disclosures: honest style, capacity, anchor coverage -------------
   // The athlete-facing style is the goal's honest meaning (WO §2.2), shown
   // beside the raw persisted objective so the label can never silently
   // misrepresent the split actually scheduled.
   const styleLabel = objectiveStyleLabel(profile.objective);
+  // #228: weekday names where Day 1 is known (a new program starts today). A
+  // saved program's next block starts the day it is made, so in editing the
+  // days stay numbered.
+  const dayLabel = (dayIndex: number): string => programDayLabel(dayIndex, editing ? null : today, activeScheduleMode);
   // R1 (Round 2, ledger 0060): the POWER explanation. Athletic power is
   // explosive-force work — the coach plans fast, speed-purpose rungs of the
   // big lifts (the curated 'speed' rows) and keeps every gate intact. The
@@ -212,17 +422,17 @@ export default function ProgramSetupScreen({
   // duration-shaped week can carry; fewer than 3 cannot carry the big
   // three (an all-lower week can never bench).
   const anchorCapacity = useMemo(() => strengthAnchorCapacity(
-    profile, programFocuses, defaultProgramDayIndices,
+    planningProfile, programFocuses, defaultProgramDayIndices,
     dayIndices.map((dayIndex) => ({ dayIndex, focus: dayFocuses[dayIndex] ?? 'full' })),
-  ), [profile.objective, profile.weekly_frequency, profile.session_duration_cap_min, dayIndices, dayFocuses]);
+  ), [planningProfile, dayIndices, dayFocuses]);
   const strengthCapacityShort = profile.objective === 'strength' && anchorCapacity < 3;
   // Round 5: the warning speaks in ROLES, not slot counts — the pure export
   // names the distinct squat/push/hinge roles the drafted week covers, and
   // the copy names the missing role with the focus change that remedies it.
   const anchorRoleNames = useMemo(() => strengthAnchorRoleNames(
-    profile, programFocuses,
+    planningProfile, programFocuses,
     dayIndices.map((dayIndex) => ({ dayIndex, focus: dayFocuses[dayIndex] ?? 'full' })),
-  ), [profile.objective, profile.weekly_frequency, profile.session_duration_cap_min, dayIndices, dayFocuses]);
+  ), [planningProfile, dayIndices, dayFocuses]);
   const missingAnchorRoles = useMemo(() => {
     const ALL_ROLES = ['squat', 'horizontal push (bench)', 'hinge (deadlift)'];
     return ALL_ROLES.filter((role) => !anchorRoleNames.includes(role));
@@ -241,39 +451,37 @@ export default function ProgramSetupScreen({
       focus: (dayFocuses[dayIndex] ?? 'full') as BlockFocus,
     }));
     const fixes: string[] = [];
-    const DAY_NAME_FIX = ['Today', 'Tomorrow', 'Day 3', 'Day 4', 'Day 5', 'Day 6', 'Day 7'];
     for (const day of draft) {
       for (const candidate of BLOCK_FOCUS_LIST) {
         if (candidate === day.focus) continue;
         const simulated = strengthAnchorCapacity(
-          profile, programFocuses, defaultProgramDayIndices,
+          planningProfile, programFocuses, defaultProgramDayIndices,
           draft.map((d) => (d.dayIndex === day.dayIndex ? { ...d, focus: candidate } : d)),
         );
         if (simulated === 3) {
-          fixes.push(`set ${DAY_NAME_FIX[day.dayIndex - 1]}'s focus to ${candidate}`);
+          fixes.push(`set ${dayLabel(day.dayIndex)}'s focus to ${sessionFocusName(candidate)}`);
         }
       }
     }
     return fixes;
-  }, [missingAnchorRoles, dayIndices, dayFocuses, profile.objective, profile.weekly_frequency, profile.session_duration_cap_min]);
+  }, [missingAnchorRoles, dayIndices, dayFocuses, planningProfile, today, editing]);
   const durationConstrained = useMemo(() => {
     // Duration is the constraint when a longer session would let a drafted
     // day's menu reach a role the budget currently trims away.
     if (missingAnchorRoles.length === 0) return false;
-    const longer = { ...profile, session_duration_cap_min: Math.min(240, profile.session_duration_cap_min + 15) };
+    const longer = { ...planningProfile, session_duration_cap_min: Math.min(240, planningProfile.session_duration_cap_min + 15) };
     const draft = dayIndices.map((dayIndex) => ({
       dayIndex,
       focus: (dayFocuses[dayIndex] ?? 'full') as BlockFocus,
     }));
     return strengthAnchorCapacity(longer, programFocuses, defaultProgramDayIndices, draft)
       > anchorCapacity;
-  }, [missingAnchorRoles, profile, dayIndices, dayFocuses, anchorCapacity]);
-  // Anchor coverage for strength: which of the big three are gated-available
-  // this week, which are blocked (with reasons), and whether a local
-  // prior-experience declaration would clear an ordinary capability gap
-  // (shared verdict: capability is the ONLY blocker and confirmationWouldClear).
+  }, [missingAnchorRoles, planningProfile, dayIndices, dayFocuses, anchorCapacity]);
+  // Anchor coverage, for every goal (#217): which of the big three are
+  // gated-available this week, which are blocked (with reasons), and whether a
+  // local prior-experience declaration would clear an ordinary capability gap
+  // (the shared test the Library's chip uses: priorExperienceWouldClear).
   const anchorCoverage = useMemo(() => {
-    if (profile.objective !== 'strength') return [];
     return ANCHOR_MOVEMENT_NAMES.map((name) => {
       const movement = movements.find((m) => m.name === name);
       if (movement === undefined) {
@@ -281,11 +489,7 @@ export default function ProgramSetupScreen({
       }
       const verdict = getVerdicts('weight_room').find((v) => v.movementId === movement.movement_id);
       const reasons = verdict?.reasons ?? [];
-      const confirmWouldClear = (verdict?.state === 'teaching_only'
-        && verdict.confirmationWouldClear
-        && !verdict.separateAttestationRequired
-        && verdict.reasons.length === 1
-        && verdict.reasons[0] === 'capability');
+      const confirmWouldClear = priorExperienceWouldClear(verdict);
       const confirmed = activePriorExperienceMovementIds.includes(movement.movement_id);
       return {
         name,
@@ -296,7 +500,15 @@ export default function ProgramSetupScreen({
         confirmed,
       };
     });
-  }, [profile.objective, profile, movements, getVerdicts, movementAvailabilityRevision, activePriorExperienceMovementIds, niggles]);
+  }, [profile, movements, getVerdicts, movementAvailabilityRevision, activePriorExperienceMovementIds, niggles]);
+  // #204: the section is shown only when there is something to declare.
+  const showAnchorDeclarations = anchorCoverage.some((anchor) => anchor.confirmWouldClear);
+  // #204/#217: the title names what the program is. A strength plan with no
+  // competition lift available is not yet a big-lift plan.
+  const programTitle = profile.objective === 'strength'
+    && !anchorCoverage.some((anchor) => anchor.state === 'available')
+    ? 'Strength foundations'
+    : styleLabel;
 
   // Ranking decisions from the generated preview: anchor substitutions and
   // reasoned bodyweight fallbacks surface verbatim in the preview card.
@@ -310,12 +522,38 @@ export default function ProgramSetupScreen({
       capMin: budget.capMin,
       preparationMin: Math.min(...budget.sessions.map((session) => session.preparationMin)),
       longestMin: Math.max(...budget.sessions.map((session) => session.estimatedMin)),
+      // Issue #209: the lifting part of the longest session (sets, rest and
+      // changeovers, without preparation).
+      liftingMin: Math.max(...budget.sessions.map((session) => session.estimatedMin - session.preparationMin)),
       trimmed: budget.sessions.some((session) => session.trimmedSlotIndexes.length > 0),
       conflicts: budget.conflicts,
+      alternatives: budget.alternatives ?? [],
     };
   }, [previewResult.preview]);
+  // W1-4: each verified offer is a choice that redraws the plan. A fewer-days
+  // offer was verified on the default schedule for that number of days, so it
+  // takes that schedule; movement choices tied to the old days are dropped.
+  const chooseAlternative = (alternative: SessionTimeAlternative): void => {
+    setSessionCapOverride(alternative.capMin === profile.session_duration_cap_min ? null : alternative.capMin);
+    if (alternative.kind === 'fewer_longer_sessions') {
+      const days = [...defaultProgramDayIndices(alternative.weeklyFrequency)];
+      const focuses = programFocuses(profile.objective, days.length);
+      const nextFocuses: Record<number, BlockFocus> = {};
+      days.forEach((day, index) => { nextFocuses[day] = focuses[index] ?? 'full'; });
+      setDayIndices(days);
+      setDayFocuses(nextFocuses);
+      setPreferences([]);
+      setSlotOverrides([]);
+      setRoutineAssignments([]);
+    }
+  };
+  const alternativeLabel = (alternative: SessionTimeAlternative): string =>
+    alternative.kind === 'extend_session'
+      ? `Use ${alternative.capMin}-minute sessions`
+      : `Train ${alternative.weeklyFrequency} day${alternative.weeklyFrequency === 1 ? '' : 's'} a week at ${alternative.capMin} minutes`;
   const rankingNotes = previewResult.preview?.plan?.warnings?.filter((w) =>
-    w.includes('unavailable for') || w.includes('no loaded')) ?? [];
+    w.includes('unavailable for') || w.includes('no loaded')
+    || w.includes('the main lift the day before or after')) ?? [];
 
   // R3 (Round 2, ledger 0060): the weekly progression summary rendered in the
   // ACTUAL preview. The pure classifier explains the week-1 -> 2 and
@@ -326,14 +564,26 @@ export default function ProgramSetupScreen({
     const bodyweightNames = new Set((movements ?? [])
       .filter((m) => (m.supportedPrefixes ?? []).length === 1 && m.supportedPrefixes[0] === 'Bodyweight')
       .map((m) => m.movement_id));
-    return weeklyProgressionSummary(
+    // Walk W3-9b: the same line came back once per training day.
+    return [...new Set(weeklyProgressionSummary(
       previewResult.preview.plan,
       (movementId) => {
         const m = (movements ?? []).find((item) => item.movement_id === movementId);
         return m ? { name: m.name, bodyweight: bodyweightNames.has(m.movement_id) } : undefined;
       },
-    );
+    ))];
   }, [previewResult.preview, movements]);
+  // #169: the block's own week-to-week change, read from the generated plan
+  // (working sets and target effort per week), named by phase.
+  const weekChanges = useMemo(() => {
+    const plan = previewResult.preview?.plan;
+    if (plan == null) return [];
+    const totals = blockWeekTotals(plan.sessions.flatMap((session) => session.slots.map((slot) => ({
+      week: session.week_index, phase: session.phase ?? '', sets: slot.sets, targetRpe: slot.target_rpe,
+    }))));
+    return totals.map((row) => describeBlockWeek(totals, row.week, true))
+      .filter((line): line is string => line !== null);
+  }, [previewResult.preview]);
 
   // R8 §2.3 said a rule must never be enforced invisibly. That contract is kept
   // in full — what changed is how many rules there are left to enforce. Four of
@@ -342,6 +592,7 @@ export default function ProgramSetupScreen({
   // method") are gone because the decisions they policed now arrive with
   // disclosed defaults, not because the explanation was dropped. The one rule
   // that can still block is still explained, in the same live region.
+  const coachNotes = previewResult.preview?.plan?.coachNotes ?? [];
   const missingRequirement = useMemo<string | null>(() => {
     if (horizonKind === 'date' && reviewDate.trim() === '') return 'Enter a review date.';
     return null;
@@ -351,9 +602,11 @@ export default function ProgramSetupScreen({
     <View style={styles.root}>
     <KeyboardAwareScrollView style={styles.scroll} contentContainerStyle={styles.content}>
       <Text style={styles.eyebrow}>{editing ? 'MANAGE PROGRAM' : 'BUILD YOUR PROGRAM'}</Text>
-      <Text style={styles.title}>{styleLabel}</Text>
+      <Text style={styles.title}>{programTitle}</Text>
+      {/* Walk 1 (W1-15): the title already names the goal in the athlete's
+          words; the internal code ("hypertrophy", "gpp") is not shown. */}
       <Text style={styles.body}>
-        Goal: {profile.objective.replace('_', ' ')} — {styleLabel}. Four-week blocks stay intact. You choose when to review the goal.
+        Four-week blocks stay intact. You choose when to review the goal.
       </Text>
 
       {/* W2: the recommendation, stated before anything is asked. Every value
@@ -361,8 +614,17 @@ export default function ProgramSetupScreen({
           applied quietly. */}
       {!editing && (
         <View style={styles.card} testID="program-recommendation-card">
-          <Text style={styles.sectionTitle}>What the coach has picked for you</Text>
-          <Text style={styles.notice}>{recommended.disclosure}</Text>
+          <Text style={styles.sectionTitle} testID="program-recommendation-heading">
+            {buildMode === recommended.buildMode
+              && schemaType === recommended.schemaType
+              && horizonKind === recommended.horizonKind
+              && blockCount === recommended.blockCount
+              ? 'What the coach has picked for you'
+              : 'Your program choices'}
+          </Text>
+          <Text style={styles.notice} testID="program-choice-disclosure">
+            {programChoiceDisclosure({ buildMode, schemaType, horizonKind, blockCount, reviewDate })}
+          </Text>
           <Text style={styles.caption}>
             Your {dayIndices.length}-day week comes from the training days you already gave during
             setup. Nothing here is permanent — you can change all of it later in Athlete / Profile.
@@ -379,7 +641,7 @@ export default function ProgramSetupScreen({
           {weekOne.map((session) => (
             <View key={session.day_index} style={styles.session}>
               <Text style={styles.sessionTitle}>
-                {DAY_NAME[session.day_index - 1] ?? `Day ${session.day_index}`} · {session.focus}
+                {dayLabel(session.day_index)} · {sessionFocusName(session.focus)}
               </Text>
               {session.slots.map((slot) => {
                 const movement = movements.find((item) => item.movement_id === slot.movement_id);
@@ -390,6 +652,15 @@ export default function ProgramSetupScreen({
                 );
               })}
             </View>
+          ))}
+        </View>
+      )}
+
+      {coachNotes.length > 0 && (
+        <View style={styles.card} testID="program-coach-notes">
+          <Text style={styles.sectionTitle}>Coach notes</Text>
+          {coachNotes.map((note) => (
+            <Text key={note} style={styles.caption}>{note}</Text>
           ))}
         </View>
       )}
@@ -442,27 +713,34 @@ export default function ProgramSetupScreen({
         </View>
       )}
 
-      {anchorCoverage.length > 0 && (
+      {showAnchorDeclarations && (
         <View style={styles.card} testID="anchor-coverage-card">
-          <Text style={styles.sectionTitle}>Big-lift availability</Text>
+          <Text style={styles.sectionTitle}>Squat, bench press and deadlift</Text>
           {anchorCoverage.map((anchor) => (
             <View key={anchor.name} style={styles.anchorRow}>
               <Text style={styles.anchorName}>
-                {anchor.name}: {anchor.state === 'available' ? 'ready' : anchor.state === 'missing_from_library' ? 'not in your library' : 'blocked'}
+                {anchor.state === 'available'
+                  ? `${anchorDisplayName(anchor.name)}: can be in your plan.`
+                  : anchor.state === 'missing_from_library'
+                    ? `${anchorDisplayName(anchor.name)}: not in your library.`
+                    : anchor.confirmWouldClear
+                      ? `${anchorDisplayName(anchor.name)}: not in your plan yet. Tap below if you have trained it before.`
+                      : `${anchorDisplayName(anchor.name)}: not in your plan yet.`}
               </Text>
-              {anchor.state === 'blocked' && anchor.reasons.length > 0 && (
-                <Text style={styles.caption}>{anchor.reasons.join(', ')}</Text>
+              {anchor.state === 'blocked' && !anchor.confirmWouldClear && anchor.reasons.length > 0 && (
+                <Text style={styles.caption}>{anchorReasonText(anchor.reasons)}</Text>
               )}
               {anchor.confirmWouldClear && (
                 <>
                   <Text style={styles.caption}>
-                    You can declare you have trained this lift before — a local statement about your own
-                    history, not a coaching assessment.
+                    This is your own statement about your training history, not a coaching assessment.
                   </Text>
                   <Chip
-                    label={`I have trained ${anchor.name} before`}
+                    wrap
+                    label={`I have trained ${anchorDisplayName(anchor.name)} before`}
                     selected={false}
                     onPress={() => confirmMovementPriorExperience(anchor.movementId, 'weight_room')}
+                    accessibilityLabel={`I have trained ${anchorDisplayName(anchor.name)} before`}
                     testID={`anchor-confirm-${anchor.movementId}`}
                   />
                 </>
@@ -488,7 +766,11 @@ export default function ProgramSetupScreen({
           <Chip label="Coach build" selected={buildMode === 'coach'} onPress={() => setBuildMode('coach')} />
           <Chip label="Customize" selected={buildMode === 'custom'} onPress={() => setBuildMode('custom')} />
         </View>
-        <Text style={styles.caption}>Customize changes movements only. Sets, reps and RPE stay coach-controlled.</Text>
+        <Text style={styles.caption}>
+          {canCustomizeAdvanced
+            ? 'Choose exercises, sets, reps and target RPE for each slot, or assign a saved routine to a day.'
+            : 'Customize changes movements only. Sets, reps and RPE stay coach-controlled.'}
+        </Text>
       </View>
 
       <View style={styles.card}>
@@ -523,9 +805,9 @@ export default function ProgramSetupScreen({
                 from it. Disclosing both is required by the ratified contract. */}
             {horizonKind === 'date' && (
               <Text style={styles.caption}>
-                Blocks are whole 4-week units, so this rounds up to the next full block and can fall
-                up to 27 days after the date you chose. It is a review checkpoint, not a competition
-                date — your training phases are not scheduled around it.
+                {previewResult.preview.countdownApplied === true
+                  ? 'Your blocks count down to peak and taper for competition day, synced with your goal review.'
+                  : 'Blocks are whole 4-week units, so this rounds up to the next full block and can fall up to 27 days after the date you chose. It is a review checkpoint, not a competition date — your training phases are not scheduled around it.'}
               </Text>
             )}
           </>
@@ -534,17 +816,23 @@ export default function ProgramSetupScreen({
 
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>3. Training days</Text>
-        <Text style={styles.caption}>Day 1 is today. These days repeat every week.</Text>
+        <Text style={styles.caption} testID="program-days-caption">
+          Choose the days of the week you train. Your schedule repeats every week.
+        </Text>
         <View style={styles.wrap}>
           {[1, 2, 3, 4, 5, 6, 7].map((day) => (
-            <Chip key={day} label={DAY_NAME[day - 1]} selected={dayIndices.includes(day)} onPress={() => toggleDay(day)} />
+            <Chip key={day} label={dayLabel(day)} selected={dayIndices.includes(day)} onPress={() => toggleDay(day)} />
           ))}
         </View>
 
         {/* Split explainer */}
         <View style={styles.explainerBox}>
           <Text style={styles.explainerText}>
-            {splitExplainer(profile.objective, dayIndices.length)}
+            {chosenSplitText(
+              profile.objective,
+              dayIndices.map((dayIndex, i) =>
+                dayFocuses[dayIndex] ?? programFocuses(profile.objective, dayIndices.length)[i] ?? 'full'),
+            )}
           </Text>
           <Text style={styles.explainerFooter}>{SPLIT_EXPLAINER_FOOTER}</Text>
         </View>
@@ -555,12 +843,13 @@ export default function ProgramSetupScreen({
             const currentFocus = dayFocuses[dayIndex] ?? programFocuses(profile.objective, dayIndices.length)[dayIndices.indexOf(dayIndex)] ?? 'full';
             return (
               <View key={dayIndex} style={styles.dayRow}>
-                <Text style={styles.dayRowTitle}>{DAY_NAME[dayIndex - 1]}</Text>
+                <Text style={styles.dayRowTitle}>{dayLabel(dayIndex)}</Text>
                 <View style={styles.focusChipRow}>
-                  {BLOCK_FOCUS_LIST.map((focus) => (
+                  {BLOCK_FOCUS_LIST.filter((focus) => focus !== 'bjj' || currentFocus === 'bjj'
+                    || offersGrapplingDays(profile.objective, sport)).map((focus) => (
                     <Chip
                       key={focus}
-                      label={focus}
+                      label={sessionFocusName(focus)}
                       selected={currentFocus === focus}
                       onPress={() => setDayFocus(dayIndex, focus)}
                     />
@@ -584,34 +873,149 @@ export default function ProgramSetupScreen({
         </View>
       </View>
 
-      {buildMode === 'custom' && weekOne.length > 0 && (
+      {buildMode === 'custom' && (customizeSessions.length > 0 || (canCustomizeAdvanced && dayIndices.length > 0)) && (
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>5. Customize generated week</Text>
-          {weekOne.map((session) => (
-            <View key={session.day_index} style={styles.session}>
-              <Text style={styles.sessionTitle}>Day {session.day_index} · {session.focus}</Text>
-              {session.slots.map((slot) => {
-                const movement = movements.find((item) => item.movement_id === slot.movement_id);
-                if (movement === undefined) return null;
-                const selectedId = preferences.find((item) =>
-                  item.dayIndex === session.day_index && item.slotIndex === slot.slot_index)?.movementId ?? slot.movement_id;
-                const accessContext = accessContextForBlockFocus(session.focus as BlockFocus);
-                const choices = movements.filter((item) => item.pattern === movement.pattern
-                  && availableIdsByContext[accessContext].has(item.movement_id));
-                return (
-                  <View key={slot.slot_index} style={styles.slot}>
-                    <Text style={styles.slotTitle}>{movement.pattern.replace('_', ' ')}</Text>
+          {(customizeSessions.length > 0
+            ? customizeSessions
+            : dayIndices.map((dayIndex, i) => ({
+                day_index: dayIndex,
+                focus: (dayFocuses[dayIndex] ?? programFocuses(profile.objective, dayIndices.length)[i] ?? 'full') as BlockFocus,
+                slots: [] as typeof customizeSessions[number]['slots'],
+              }))
+          ).map((session) => {
+            const assignedRoutine = canCustomizeAdvanced
+              ? routineAssignments.find((item) => item.dayIndex === session.day_index)
+              : undefined;
+            return (
+              <View key={session.day_index} style={styles.session}>
+                <Text style={styles.sessionTitle}>
+                  {dayLabel(session.day_index)} · {sessionFocusName(session.focus)}
+                </Text>
+                {canCustomizeAdvanced && (
+                  <View style={styles.routinePicker} testID={`day-routine-picker-${session.day_index}`}>
+                    <Text style={styles.slotTitle}>Day source</Text>
                     <View style={styles.wrap}>
-                      {choices.map((choice) => (
-                        <Chip key={choice.movement_id} label={choice.name} selected={selectedId === choice.movement_id}
-                          onPress={() => chooseMovement(session.day_index, slot.slot_index, movement.pattern as TrainingProgramMovementPreference['pattern'], choice.movement_id)} />
+                      <Chip
+                        wrap
+                        label="Generated day"
+                        selected={assignedRoutine === undefined}
+                        onPress={() => assignRoutineDay(session.day_index, null)}
+                      />
+                      {routineDayOptions.map((opt) => (
+                        <Chip
+                          key={opt.key}
+                          wrap
+                          label={opt.label}
+                          selected={assignedRoutine?.routineTemplateId === opt.routineTemplateId
+                            && assignedRoutine?.routineDayIndex === opt.routineDayIndex}
+                          onPress={() => assignRoutineDay(session.day_index, {
+                            dayIndex: session.day_index,
+                            routineTemplateId: opt.routineTemplateId,
+                            routineDayIndex: opt.routineDayIndex,
+                          })}
+                        />
                       ))}
                     </View>
                   </View>
-                );
-              })}
-            </View>
-          ))}
+                )}
+                {assignedRoutine !== undefined ? (
+                  <View style={styles.doseGroup}>
+                    <Text style={styles.caption}>
+                      Using saved routine for Weeks 1–3 (deload scaled automatically in Week 4).
+                    </Text>
+                    {session.slots.map((slot) => {
+                      const movement = movements.find((item) => item.movement_id === slot.movement_id);
+                      return (
+                        <Text key={slot.slot_index} style={styles.caption}>
+                          {movement?.name ?? `Movement ${slot.movement_id}`} — {slot.sets}×{slot.reps} @ RPE {slot.target_rpe}
+                        </Text>
+                      );
+                    })}
+                  </View>
+                ) : (
+                  session.slots.map((slot) => {
+                    const movement = movements.find((item) => item.movement_id === slot.movement_id);
+                    if (movement === undefined) return null;
+                    const selectedId = preferences.find((item) =>
+                      item.dayIndex === session.day_index && item.slotIndex === slot.slot_index)?.movementId ?? slot.movement_id;
+                    const accessContext = accessContextForBlockFocus(session.focus as BlockFocus);
+                    // Only choices the generator will place on this day (a sparring
+                    // round belongs on a BJJ day only).
+                    const choices = movements.filter((item) => item.pattern === movement.pattern
+                      && availableIdsByContext[accessContext].has(item.movement_id)
+                      && movementFitsFocusDay(item, session.focus as BlockFocus));
+                    const ov = slotOverrides.find(
+                      (item) => item.dayIndex === session.day_index && item.slotIndex === slot.slot_index,
+                    );
+                    const setsVal = ov?.sets ?? slot.sets;
+                    const repsVal = ov?.reps ?? slot.reps;
+                    const rpeVal = ov?.targetRpe ?? slot.target_rpe;
+                    return (
+                      <View key={slot.slot_index} style={styles.slot}>
+                        <CustomizeSlot
+                          testID={`customize-slot-${session.day_index}-${slot.slot_index}`}
+                          pattern={movement.pattern}
+                          choices={choices}
+                          selectedId={selectedId}
+                          onChoose={(movementId) => chooseMovement(session.day_index, slot.slot_index, movement.pattern as TrainingProgramMovementPreference['pattern'], movementId)}
+                        />
+                        {canCustomizeAdvanced && (
+                          <View style={styles.doseGroup}>
+                            <DoseStepper
+                              testID={`slot-sets-${session.day_index}-${slot.slot_index}`}
+                              label="Sets"
+                              value={setsVal}
+                              min={1}
+                              max={10}
+                              step={1}
+                              onChange={(next) => updateSlotOverride(session.day_index, slot.slot_index, { sets: next })}
+                            />
+                            <DoseStepper
+                              testID={`slot-reps-${session.day_index}-${slot.slot_index}`}
+                              label="Reps"
+                              value={repsVal}
+                              min={1}
+                              max={30}
+                              step={1}
+                              onChange={(next) => updateSlotOverride(session.day_index, slot.slot_index, { reps: next })}
+                            />
+                            <DoseStepper
+                              testID={`slot-rpe-${session.day_index}-${slot.slot_index}`}
+                              label="Target RPE"
+                              value={rpeVal}
+                              min={5.0}
+                              max={effectiveRpeCap}
+                              step={0.5}
+                              onChange={(next) => updateSlotOverride(session.day_index, slot.slot_index, { targetRpe: next })}
+                            />
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })
+                )}
+              </View>
+            );
+          })}
+        </View>
+      )}
+      {(profile.training_age === 'advanced' || profile.training_age === 'elite') && (
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Effort cap</Text>
+          <View style={styles.wrap}>
+            <Chip
+              label="RPE 9.0 (default)"
+              selected={draftBaseRpeCap < 9.5}
+              onPress={() => setRpeCapOverride(9.0)}
+            />
+            <Chip
+              testID="program-rpe-cap-9-5"
+              label="RPE 9.5"
+              selected={draftBaseRpeCap >= 9.5}
+              onPress={() => setRpeCapOverride(draftBaseRpeCap >= 9.5 ? 9.0 : 9.5)}
+            />
+          </View>
         </View>
       )}
       </Disclosure>
@@ -622,6 +1026,11 @@ export default function ProgramSetupScreen({
       {progressionSummary.length > 0 && (
         <View style={styles.card} testID="weekly-progression-summary">
           <Text style={styles.sectionTitle}>How the weeks progress</Text>
+          <View testID="program-week-changes">
+            {weekChanges.map((line) => (
+              <Text key={line} style={styles.caption}>{line}</Text>
+            ))}
+          </View>
           {progressionSummary.map((line, index) => (
             <Text key={`${index}:${line}`} style={styles.caption}>{line}</Text>
           ))}
@@ -634,6 +1043,11 @@ export default function ProgramSetupScreen({
           <Text style={styles.caption} testID="session-time-summary">
             {`Each session counts preparation (${sessionTime.preparationMin} min), your sets, rest and changeovers inside your ${sessionTime.capMin}-minute limit. The longest session is about ${Math.ceil(sessionTime.longestMin)} minutes.`}
           </Text>
+          {profile.training_age === 'beginner' && (
+            <Text style={styles.caption} testID="session-time-beginner">
+              {`Beginner sessions are kept short on purpose: about ${Math.max(1, Math.ceil(sessionTime.liftingMin))} minutes of lifting, plus ${sessionTime.preparationMin} minutes of preparation.`}
+            </Text>
+          )}
           {sessionTime.trimmed && (
             <Text style={styles.caption} testID="session-time-trimmed">
               Some sets were reduced so sessions fit your limit. Preparation was not shortened below its minimum.
@@ -642,6 +1056,35 @@ export default function ProgramSetupScreen({
           {sessionTime.conflicts.map((conflict) => (
             <Text key={conflict} style={styles.error} testID="session-time-conflict">{conflict}</Text>
           ))}
+          {sessionTime.conflicts.length > 0 && sessionTime.alternatives.length > 0 && (
+            <View style={styles.alternatives} testID="session-time-alternatives">
+              <Text style={styles.caption}>
+                {editing
+                  ? 'Choose one to redraw the plan. Nothing is saved until you save preferences.'
+                  : 'Choose one to redraw the plan. Nothing is saved until you create it.'}
+              </Text>
+              {sessionTime.alternatives.map((alternative) => (
+                <SecondaryButton
+                  key={`${alternative.kind}:${alternative.capMin}`}
+                  label={alternativeLabel(alternative)}
+                  onPress={() => chooseAlternative(alternative)}
+                />
+              ))}
+            </View>
+          )}
+          {sessionCapOverride !== null && (
+            <View style={styles.alternatives} testID="session-time-draft">
+              <Text style={styles.caption}>
+                {editing
+                  ? `This plan uses ${sessionCapOverride}-minute sessions. Your profile says ${profile.session_duration_cap_min}. Save future preferences saves ${sessionCapOverride} minutes as your session length.`
+                  : `This plan uses ${sessionCapOverride}-minute sessions. Your profile says ${profile.session_duration_cap_min}. Create program saves ${sessionCapOverride} minutes as your session length.`}
+              </Text>
+              <SecondaryButton
+                label={`Back to ${profile.session_duration_cap_min} minutes`}
+                onPress={() => setSessionCapOverride(null)}
+              />
+            </View>
+          )}
         </View>
       )}
       {/* Work order 3: what focus, goals, sport and sport workload change in
@@ -661,7 +1104,13 @@ export default function ProgramSetupScreen({
           ))}
         </View>
       )}
-      <Text style={styles.caption}>Program starts {today}. Future blocks require confirmation.</Text>
+      <Text style={styles.caption}>
+        {editing
+          ? (block != null
+            ? 'Your current block stays as it is. These choices apply to future blocks, except a change of training days also updates the weekly-day limit used for current targets.'
+            : 'These choices apply to future blocks.')
+          : `Program starts ${today}. Future blocks require confirmation.`}
+      </Text>
     </KeyboardAwareScrollView>
     {/* The actions stay on screen below the plan: reaching them never takes
         scrolling past the whole generated week (issue #38). The blocking
@@ -681,6 +1130,108 @@ export default function ProgramSetupScreen({
   );
 }
 
+// Android issue #216: slots were headed by the raw pattern code ("PUSH H") and
+// listed every allowed movement, 20 or more chips each. A slot now has a plain
+// title, starts with its current choice and a few alternatives, and "Show all"
+// opens the rest. Which movements are allowed is unchanged.
+const SLOT_TITLE: Record<string, string> = {
+  squat: 'Squat',
+  hinge: 'Hip hinge',
+  lunge: 'Lunge',
+  push_h: 'Horizontal push (bench, push-up)',
+  pull_h: 'Horizontal pull (rows)',
+  push_v: 'Vertical push (overhead)',
+  pull_v: 'Vertical pull (pull-up, pulldown)',
+  carry: 'Carry',
+  rotation: 'Core and trunk',
+  isolation: 'Isolation (single joint)',
+  locomotion: 'Locomotion',
+};
+
+export const slotTitle = (pattern: string): string =>
+  SLOT_TITLE[pattern] ?? pattern.replace(/_/g, ' ');
+
+/** Alternatives shown after the current choice before "Show all". */
+export const COLLAPSED_ALTERNATIVES = 4;
+
+interface CustomizeSlotProps {
+  testID: string;
+  pattern: string;
+  choices: readonly { movement_id: number; name: string }[];
+  selectedId: number;
+  onChoose: (movementId: number) => void;
+}
+
+function CustomizeSlot({ testID, pattern, choices, selectedId, onChoose }: CustomizeSlotProps): React.JSX.Element {
+  const [showAll, setShowAll] = useState(false);
+  const current = choices.filter((choice) => choice.movement_id === selectedId);
+  const others = choices.filter((choice) => choice.movement_id !== selectedId);
+  const collapsible = others.length > COLLAPSED_ALTERNATIVES;
+  const shown = [...current, ...(showAll || !collapsible ? others : others.slice(0, COLLAPSED_ALTERNATIVES))];
+  return (
+    <View testID={testID} style={styles.slot}>
+      <Text style={styles.slotTitle}>{slotTitle(pattern)}</Text>
+      <View style={styles.wrap}>
+        {shown.map((choice) => (
+          <Chip key={choice.movement_id} wrap label={choice.name} selected={selectedId === choice.movement_id}
+            onPress={() => onChoose(choice.movement_id)} />
+        ))}
+      </View>
+      {collapsible && (
+        <Pressable accessibilityRole="button" onPress={() => setShowAll((open) => !open)}
+          testID={`${testID}-show-all`} style={styles.showAll}>
+          <Text style={styles.showAllText}>{showAll ? 'Show fewer' : `Show all (${choices.length})`}</Text>
+        </Pressable>
+      )}
+    </View>
+  );
+}
+
+interface DoseStepperProps {
+  testID: string;
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (next: number) => void;
+}
+
+function DoseStepper({ testID, label, value, min, max, step, onChange }: DoseStepperProps): React.JSX.Element {
+  const canDecrease = value > min;
+  const canIncrease = value < max;
+  const adjust = (delta: number): void => {
+    const next = Math.max(min, Math.min(max, Math.round((value + delta) * 10) / 10));
+    onChange(next);
+  };
+  return (
+    <View testID={testID} style={styles.doseRow}>
+      <Text style={styles.doseLabel}>{label}</Text>
+      <View style={styles.stepperRow}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Decrease ${label}`}
+          disabled={!canDecrease}
+          onPress={() => adjust(-step)}
+          style={[styles.stepperButton, !canDecrease && styles.stepperButtonDisabled]}
+        >
+          <Text style={styles.stepperBtnText}>-</Text>
+        </Pressable>
+        <Text style={styles.stepperValue}>{String(value)}</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`Increase ${label}`}
+          disabled={!canIncrease}
+          onPress={() => adjust(step)}
+          style={[styles.stepperButton, !canIncrease && styles.stepperButtonDisabled]}
+        >
+          <Text style={styles.stepperBtnText}>+</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: theme.color.ink0 },
   scroll: { flex: 1 },
@@ -692,6 +1243,7 @@ const styles = StyleSheet.create({
   eyebrow: { color: theme.color.textLow, fontSize: 11, fontWeight: '800', letterSpacing: 2 },
   title: { color: theme.color.textHi, fontSize: 30, fontWeight: '800', textTransform: 'capitalize' },
   body: { color: theme.color.textMid, fontSize: 15, lineHeight: 22 },
+  alternatives: { gap: theme.space[2] },
   card: { backgroundColor: theme.color.ink1, borderWidth: 1, borderColor: theme.color.line, padding: theme.space[4], gap: theme.space[3] },
   sectionTitle: { color: theme.color.textHi, fontSize: 17, fontWeight: '800' },
   row: { flexDirection: 'row', gap: 8 },
@@ -754,4 +1306,23 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
   },
+  showAll: { minHeight: 56, justifyContent: 'center', alignSelf: 'flex-start' },
+  showAllText: { color: theme.color.textHi, fontSize: 13, fontWeight: '700', textDecorationLine: 'underline' },
+  routinePicker: { gap: 6 },
+  doseGroup: { gap: 6, paddingTop: 4 },
+  doseRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  doseLabel: { color: theme.color.textMid, fontSize: 13, fontWeight: '600' },
+  stepperRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  stepperButton: {
+    minWidth: theme.touch.min,
+    minHeight: theme.touch.min,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: theme.color.line,
+    borderRadius: theme.radius.chip,
+  },
+  stepperButtonDisabled: { opacity: 0.4 },
+  stepperBtnText: { color: theme.color.textHi, fontSize: 18, fontWeight: '700' },
+  stepperValue: { color: theme.color.textHi, fontSize: 15, fontWeight: '700', minWidth: 32, textAlign: 'center' },
 });

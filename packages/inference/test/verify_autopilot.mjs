@@ -348,6 +348,96 @@ console.log('[6] bounded authority / anti-windup');
   check('R1 release resets when the persisted macro index rolls 8→1',
     deriveControlAction(allHeadroom, NEUTRAL_PROFILE, GPP, 1).blockAddedRpe === 0.5);
 
+  // Decision of 2026-10-13: a block generated while a suspension is open gets
+  // no positive RPE grant, at any position, because it consumes no position and
+  // the per-position ceiling would not count it.
+  const withheld = Array.from(
+    { length: 8 },
+    (_, i) => deriveControlAction(allHeadroom, NEUTRAL_PROFILE, GPP, i + 1, false),
+  );
+  check('suspension: no RPE grant is released at any macro position',
+    eq(withheld.map((a) => a.blockAddedRpe), [0, 0, 0, 0, 0, 0, 0, 0]) &&
+    withheld.every((a) => MOVEMENT_PATTERNS.every((p) => a.corrections[p].dRpe_p <= 0)));
+  check('suspension: any number of blocks at one frozen position adds nothing to the cycle (the gap this closes: six grants at position 3 summed to 3.0)',
+    Array.from({ length: 6 }, () => deriveControlAction(allHeadroom, NEUTRAL_PROFILE, GPP, 3, false))
+      .reduce((sum, a) => sum + a.blockAddedRpe, 0) === 0 &&
+    Array.from({ length: 6 }, () => deriveControlAction(allHeadroom, NEUTRAL_PROFILE, GPP, 3))
+      .reduce((sum, a) => sum + a.blockAddedRpe, 0) === 3.0);
+  check('suspension: only the RPE raise is withheld — set and load corrections are identical with and without it',
+    withheld.every((a, i) => MOVEMENT_PATTERNS.every((p) =>
+      a.corrections[p].dSet_p === macroActions[i].corrections[p].dSet_p &&
+      a.corrections[p].dLoad_p === macroActions[i].corrections[p].dLoad_p)) &&
+    withheld.every((a, i) => a.blockAddedSets === macroActions[i].blockAddedSets));
+  check('suspension: cuts are untouched — a deficit report gives the same action with and without it, at every position',
+    Array.from({ length: 8 }, (_, i) => i + 1).every((index) =>
+      eq(deriveControlAction(allDeficit, NEUTRAL_PROFILE, GPP, index, false), deriveControlAction(allDeficit, NEUTRAL_PROFILE, GPP, index))));
+  check('the permission defaults to granted: omitted or explicitly true, the action is the same at every position',
+    Array.from({ length: 8 }, (_, i) => i + 1).every((index) =>
+      eq(deriveControlAction(allHeadroom, NEUTRAL_PROFILE, GPP, index, true), macroActions[index - 1])));
+
+  // Suspension and resume over whole macro-cycles. A cycle is walked position by
+  // position, 1 to 8, one ordinary block each. Up to two episodes are opened on
+  // the way: an episode opened before position p generates k blocks at the
+  // frozen position p (S6(b): they consume none), then the athlete resumes and
+  // position p gets its ordinary block. Every placement and length is tried:
+  // first episode at any position with 0 to 6 blocks, second at the same or any
+  // later position with 0 to 4. Under the rule the episode blocks are generated
+  // with the raise withheld; "before" is the same walk with it granted.
+  {
+    const walk = (report, episodes, withheldInEpisodes) => {
+      let total = 0;
+      let blocks = 0;
+      for (let position = 1; position <= 8; position++) {
+        for (const episode of episodes) {
+          if (episode.position !== position) continue;
+          for (let i = 0; i < episode.blocks; i++) {
+            total += deriveControlAction(report, NEUTRAL_PROFILE, GPP, position, !withheldInEpisodes).blockAddedRpe;
+            blocks += 1;
+          }
+        }
+        total += deriveControlAction(report, NEUTRAL_PROFILE, GPP, position).blockAddedRpe;
+        blocks += 1;
+      }
+      return { total, blocks };
+    };
+    let schedules = 0;
+    let overBefore = 0;
+    let worstBefore = 0;
+    let overWithRule = 0;
+    let notExactWithRule = 0;
+    let formulaHolds = true;
+    let longest = 0;
+    for (let p = 1; p <= 8; p++) for (let k = 0; k <= 6; k++) for (let q = p; q <= 8; q++) for (let k2 = 0; k2 <= 4; k2++) {
+      const episodes = [{ position: p, blocks: k }, { position: q, blocks: k2 }];
+      const before = walk(allHeadroom, episodes, false);
+      const ruled = walk(allHeadroom, episodes, true);
+      schedules += 1;
+      longest = Math.max(longest, ruled.blocks);
+      if (before.total > CONTROL_AUTHORITY.MAX_MACROCYCLE_RPE_RAISE) overBefore += 1;
+      worstBefore = Math.max(worstBefore, before.total);
+      if (ruled.total > CONTROL_AUTHORITY.MAX_MACROCYCLE_RPE_RAISE) overWithRule += 1;
+      if (ruled.total !== CONTROL_AUTHORITY.MAX_MACROCYCLE_RPE_RAISE) notExactWithRule += 1;
+      // What the gap was, exactly: one half point for every episode block at a granting position.
+      const extra = CONTROL_AUTHORITY.RPE_STEP * ((p <= 5 ? k : 0) + (q <= 5 ? k2 : 0));
+      if (before.total !== CONTROL_AUTHORITY.MAX_MACROCYCLE_RPE_RAISE + extra) formulaHolds = false;
+    }
+    check('suspension sweep: every placement and length of up to two episodes in a cycle was walked',
+      schedules === 1260 && longest === 18, `${schedules} schedules, longest ${longest} blocks`);
+    check('suspension sweep: with the raise withheld in episode blocks, no cycle exceeds the 2.5 ceiling, and a cycle of full headroom is granted exactly 2.5',
+      overWithRule === 0 && notExactWithRule === 0, `over=${overWithRule} notExact=${notExactWithRule}`);
+    check('suspension sweep: the gap this closes is real and is exactly one half point per episode block at a granting position',
+      formulaHolds && overBefore > 0 && worstBefore === CONTROL_AUTHORITY.MAX_MACROCYCLE_RPE_RAISE + CONTROL_AUTHORITY.RPE_STEP * 10,
+      `${overBefore} of ${schedules} schedules exceeded it before; worst ${worstBefore}`);
+    // Cuts are not rationed and not touched: a cycle of full deficit is cut identically with and without the rule.
+    let cutsDiffer = 0;
+    for (let p = 1; p <= 8; p++) for (let k = 0; k <= 6; k++) {
+      for (let i = 0; i < k; i++) {
+        if (!eq(deriveControlAction(allDeficit, NEUTRAL_PROFILE, GPP, p, false), deriveControlAction(allDeficit, NEUTRAL_PROFILE, GPP, p, true))) cutsDiffer += 1;
+      }
+    }
+    check('suspension sweep: across every episode block of every schedule, a deficit is cut identically with and without the rule', cutsDiffer === 0);
+  }
+
   const failClosedIndexActions = [
     deriveControlAction(allHeadroom, NEUTRAL_PROFILE, GPP),
     deriveControlAction(allHeadroom, NEUTRAL_PROFILE, GPP, undefined),

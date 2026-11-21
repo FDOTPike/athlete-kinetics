@@ -10,6 +10,13 @@ on:
 permissions:
   contents: read
 
+# A new push to a pull request supersedes its older run: the older run is
+# cancelled instead of holding a macOS runner for an hour and a half on a
+# commit nobody will merge. Pushes to master are never cancelled.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   # All pinned actions below are Node24-native majors, and runners default to
   # Node24 since 2026-06-16. This flag is now redundant belt-and-suspenders:
@@ -171,14 +178,30 @@ jobs:
   # the App Store, or touch TestFlight — those need the owner's Apple team,
   # registered bundle id and signing credentials (none are configured here).
   ios-simulator:
-    name: iOS unsigned simulator build + native smoke
-    runs-on: macos-26
+    name: iOS unsigned simulator build + native smoke${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
     needs: verify
     timeout-minutes: 150
+    strategy:
+      # Each Xcode reports its own result; one failing does not cancel the other.
+      fail-fast: false
+      matrix:
+        include:
+          # Xcode/iOS SDK 26+ is the current App Store upload requirement. The
+          # job selects the newest installed Xcode of this major and records it.
+          - runner: macos-26
+            xcode: '26'
+            label: ''
+            artifact: athlete-kinetics-ios-simulator-unsigned
+          # Xcode 27.0, the version a tester's Mac runs (issue #38), on
+          # GitHub's Xcode 27 image. The same steps, fail closed: pods that
+          # build on Xcode 26 have stopped the Xcode 27 build before.
+          - runner: xcode-27
+            xcode: '27.0'
+            label: ' (Xcode 27)'
+            artifact: athlete-kinetics-ios-simulator-unsigned-xcode27
     env:
-      # Xcode/iOS SDK 26+ is the current App Store upload requirement. The job
-      # selects the newest installed Xcode of this major and records it.
-      XCODE_MAJOR: '26'
+      XCODE_MAJOR: ${{ matrix.xcode }}
       BUNDLE_ID: com.pikemethods.training
     steps:
       - uses: actions/checkout@v6
@@ -283,6 +306,8 @@ jobs:
       # no Apple team, certificate or profile is used or available here.
       - name: Build the UI tests (simulator, ad-hoc signed to run locally)
         working-directory: apps/mobile/ios
+        env:
+          AK_BETA_BUILD: 'on'
         run: |
           set -o pipefail
           xcodebuild -workspace AthleteKinetics.xcworkspace -scheme AthleteKinetics \
@@ -290,7 +315,7 @@ jobs:
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath build COMPILER_INDEX_STORE_ENABLE=NO \
             CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY=- DEVELOPMENT_TEAM= PROVISIONING_PROFILE_SPECIFIER= \
-            build-for-testing 2>&1 | tee ../../../ios-evidence/xcodebuild-uitests.log
+            AK_BETA_BUILD=on build-for-testing 2>&1 | tee ../../../ios-evidence/xcodebuild-uitests.log
           APP=build/Build/Products/Release-iphonesimulator/AthleteKinetics.app
           # Simulator builds carry their entitlements (what the simulator
           # enforces) in the __TEXT,__entitlements section, not the signature.
@@ -334,6 +359,6 @@ jobs:
       - uses: actions/upload-artifact@v6
         if: always()
         with:
-          name: athlete-kinetics-ios-simulator-unsigned
+          name: ${{ matrix.artifact }}
           path: ios-evidence/
           if-no-files-found: error

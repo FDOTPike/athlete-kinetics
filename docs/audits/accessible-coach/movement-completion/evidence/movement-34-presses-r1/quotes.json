@@ -1,0 +1,65 @@
+{
+  "bounds": [],
+  "fileQuotes": [
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4149,
+      "endLine": 4151,
+      "text": "        at: [-1.8, 70.62], trunk: 90, head: 90, shrug: 0, thigh: -90, shin: -90,\n        ankle: [-2.0, CHAIN_ANKLE_HEIGHT], kneeOut: 4,\n        upperArm: [-85, -1.4], forearm: [-85, -1.4],"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4184,
+      "endLine": 4186,
+      "text": "        at: [-2.5, 70.62 + 3.3], trunk: 90, head: 90, shrug: 0, thigh: -90, shin: -90,\n        ankle: [-2.7, CHAIN_ANKLE_HEIGHT + 3.3], foot: 0, kneeOut: 4,\n        upperArm: [-85, -1.4], forearm: [-85, -1.4],"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4219,
+      "endLine": 4221,
+      "text": "        at: [-1.8, 70.62], trunk: 90, head: 90, shrug: 0, thigh: -90, shin: -90,\n        ankle: [-2.0, CHAIN_ANKLE_HEIGHT], kneeOut: 4,\n        upperArm: [-85, -1.4], forearm: [-85, -1.4],"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4261,
+      "endLine": 4263,
+      "text": "        at: [-1.8, 70.62], trunk: 90, head: 90, shrug: 0, thigh: -90, shin: -90,\n        ankle: [-2.0, CHAIN_ANKLE_HEIGHT], kneeOut: 4,\n        upperArm: [-85, -1.4], forearm: [-85, -1.4],"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4925,
+      "endLine": 4948,
+      "text": "  'one-arm-kettlebell-floor-press': {\n    root: 'hip',\n    view: 'oblique',\n    yawDeg: 16,\n    originX: 48,\n    implement: 'kettlebell',\n    kettlebellTurn: true,\n    footSpread: 4.2,\n    kneePole: 90,\n    elbowPole: [-75.964, 30.19],\n    poses: [\n      {\n        at: [10, 5.915], trunk: 176.56, curl: -4, head: 178,\n        thigh: 42, shin: -52, ankle: [38, CHAIN_ANKLE_HEIGHT],\n        upperArm: 0, forearm: 90,\n        wrist: [-9.488, 14.113, 20.182], farWrist: [-9.488, 14.113, -20.182],\n      },\n      {\n        at: [10, 5.915], trunk: 176.56, curl: -4, head: 178,\n        thigh: 42, shin: -52, ankle: [38, CHAIN_ANKLE_HEIGHT],\n        upperArm: 90, forearm: 90,\n        wrist: [-12.19, 30.94, 9.384], farWrist: [-9.488, 14.113, -20.182],\n      },\n    ],"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4954,
+      "endLine": 4958,
+      "text": "  'cable-chest-press': {\n    root: 'hip',\n    view: 'oblique',\n    yawDeg: 30,\n    pitchDeg: 15,"
+    },
+    {
+      "file": "tools/rendering/chain_motion_specs.mjs",
+      "line": 2276,
+      "endLine": 2276,
+      "text": "      'Hook your legs into the decline bench, take the bar just wider than shoulder width, and have a spotter for the unrack to lockout over your eyes.',"
+    },
+    {
+      "file": "tools/rendering/chain_motion_specs.mjs",
+      "line": 2293,
+      "endLine": 2293,
+      "text": "      'Secure the legs in a decline bench, sit with the dumbbells on the thighs, then lie back and bring the bells to the chest before pressing them into position.',"
+    },
+    {
+      "file": "tools/rendering/chain_motion_specs.mjs",
+      "line": 2310,
+      "endLine": 2310,
+      "text": "      'Set the bench between 30 and 45 degrees, kick the dumbbells up off your knees one at a time, and start from the top.',"
+    },
+    {
+      "file": "tools/rendering/chain_motion_specs.mjs",
+      "line": 2342,
+      "endLine": 2346,
+      "text": "    segments: [900, 200, 1200, 850],\n    captions: [\n      'Set a bench inside a rack with the pins at the chosen height above your usual touch point and the bar resting on them, shoulder blades pulled together and feet set.',\n      'From a full pause on the pins, drive the bar up to straight arms, keeping the bar, wrists and elbows in line.',\n      'Reach straight arms at the top with the bar, wrists and elbows in line.',"
+    }
+  ]
+}

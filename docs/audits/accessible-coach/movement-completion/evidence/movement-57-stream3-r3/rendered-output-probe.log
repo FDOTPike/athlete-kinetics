@@ -1,0 +1,26 @@
+source commit: 5f639fafce0a806a3a24e4c78ad2d9e145a96996
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with probe-75c793807058421ee45e2e07c15cbb190b13a546.json
+
+movements measured: 243 (baseline 243)
+added: none
+removed: none
+changed, expected: 18 Bulgarian Split Squat; 36 Barbell Step-Up; 136 Barbell Lunge; 194 Elevated Back Lunge; 239 Lunge Pass Through; 67 Kettlebell Pistol Squat; 96 Standing Barbell Calf Raise; 33 Barbell Ab Rollout; 137 Barbell Rollout from Bench; 149 Bent-Arm Dumbbell Pullover; 289 Straight-Arm Dumbbell Pullover; 148 Bent-Arm Barbell Pullover; 201 Flat Bench Cable Flyes; 217 Incline Cable Flye; 121 Kettlebell Dead Clean; 231 Kettlebell Turkish Get-Up (Lunge style)
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  18 Bulgarian Split Squat: drawn b11d76e99078e541c18a23786beb9643e765d1f265da15ed6ff5117d8e24e5a8 captions 2ae181c5c5699fa787c8de99c1e63abb627232d98fbbd9522212fd304cddd97f stage 166.15x240.00 cycle 2500 ms
+  36 Barbell Step-Up: drawn 131740687ee02bb32fdde255740a220b916c5a96f50fc82996134fffcd6b5a03 captions 423e5269b1966c4e324ab092434d87ec8b620948cdb67b30bca8d8e7bd32ae54 stage 94.29x240.00 cycle 3150 ms
+  136 Barbell Lunge: drawn fa30b1b0990af489a297da566af9b9697d1ad97fd8ffd33bc5d22417859dbd87 captions c4be47df0dedb25b96180ac607a256d29e229600c0e0a25baf8e6b241da0cc45 stage 165.16x240.00 cycle 2950 ms
+  194 Elevated Back Lunge: drawn 3629c577b66262eb49b9641160c2d67b6569f192f3098c82c53cc1bc14354936 captions 6a43df1e80c44703853ed2d28bbd2d6aecba14e835e954f10d063d3dd75181c7 stage 172.12x240.00 cycle 3700 ms
+  239 Lunge Pass Through: drawn d5c34bb720344ccb255340932966ceb364db76247626c8f1d62d5e004bfb6259 captions f8d4418287f0ac50cb791d2b3da44b734dc993248ed07df5ea81084eaaf24a21 stage 148.70x240.00 cycle 4000 ms
+  67 Kettlebell Pistol Squat: drawn 33f863550e6c6bfd7d94221a71c8c5e11ad9b98a97e1b6e66dcc91367ddfa9b1 captions 1a6ac9da41eff1168c862301ec8d4ac5f4750b8c6e557cdab11df25714c4258a stage 164.35x240.00 cycle 3150 ms
+  96 Standing Barbell Calf Raise: drawn 887d8828f8bd2f5ff4da197fbe9f1afbb0f59f4caa06c023eb55ff93c9cee462 captions d31b25100050f998cd5f8b426e3ad49ff54d95ec8f38e708c2ff2ca39da1ea6f stage 155.29x240.00 cycle 2900 ms
+  33 Barbell Ab Rollout: drawn f25c25fbc25a40c8a38559b3bc74dbf8926cfe6b05d01a6bd9e0e13e520102cb captions 333fd68ec8a1df142641b2dc0212dc7eb849500c322a9d90a9e92d1c5334018a stage 240.00x93.82 cycle 2800 ms
+  137 Barbell Rollout from Bench: drawn d888409eb48014e7458447d2d7ecd42824d96e971096c9d312896fb7c02bb347 captions a8e3897a80eb2e608980b8f404aa3857ce020fe595044ea7009bb614be08b397 stage 240.00x102.55 cycle 2800 ms
+  149 Bent-Arm Dumbbell Pullover: drawn e409fa87c8a5d14978d5a46571a3cd01d202f206c80d6852e34142bd75b15944 captions 59f09b26a8150c18467a8780fae4ef409ae714c3a745898bb615822112837e7b stage 240.00x175.38 cycle 3000 ms
+  289 Straight-Arm Dumbbell Pullover: drawn ed53e25e614cc2e17c3d485a4c8af6e7d5a195ac4348167103b8ca9d8dbcf247 captions 4d10640ac61018f0446f2218538a74caf8f8d4dae57751094defe1f3817d737b stage 240.00x174.81 cycle 3000 ms
+  148 Bent-Arm Barbell Pullover: drawn b1385f9d289338cb667be015bb0244905738e2cb9a39b88121af19fa74950056 captions 350a7344c60c8b775d75bfcba344578db748019422d4759694ba57337db6d7be stage 240.00x159.10 cycle 3000 ms
+  201 Flat Bench Cable Flyes: drawn 33761dd5eaa69293457b20aa3aa28d89bc4c52782de4baf681c8899d1737c7a3 captions d924bd37d84321c01191cce7259198581f59296cd8a611dd09ff4f352c1686c6 stage 240.00x190.68 cycle 3300 ms
+  217 Incline Cable Flye: drawn 6df7d2bc7372b5aa2a4d51d081611361c8caca4b9290d29169545ea657b4f16d captions 731a709421780950445bbf4201cd6b1703a999663d3f95867befbf4732440b30 stage 233.33x240.00 cycle 3300 ms
+  121 Kettlebell Dead Clean: drawn 73fa8d7fdf751510440e0e513e34a44d7ddfbbefcda6d43b4c7a9fda40516213 captions e190b66a0c0893b5ad1602dc6e353114cf6db791b25f11c88d312ea94ab7c521 stage 117.39x240.00 cycle 3000 ms
+  231 Kettlebell Turkish Get-Up (Lunge style): drawn e3cadd5438c3b0621d5957c818a8f498ac694d62dbf00f9272abb2a1482ac97d captions 7f66ece2afb9c9a75e25f14f45c8822c7c747b5904ca77515d4e666ddcf44512 stage 205.38x240.00 cycle 8000 ms
+exit code: 0 (probe run exit 0)

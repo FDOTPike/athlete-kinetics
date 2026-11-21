@@ -17,6 +17,7 @@
  *   - onboarding saves sport and goal exercise with everything else, or not
  *     at all.
  */
+import { COMPETITION_DATE_NOTE } from '@ak/inference';
 import { useStore } from '../../src/state/useStore';
 import { authorizeAthleteDataBoot, resetDataMaintenanceLockForTests } from '../../src/state/dataMaintenanceLock';
 import { makeNodeSqliteDriver } from '../helpers/nodeSqliteOpDriver';
@@ -75,25 +76,29 @@ const schedule = (id, { weekday = 2, kind = 'soccer', demand = 'high', minutes =
     VALUES (?, ?, 1, 'weekly', ?, NULL, 'Australia/Sydney', 'unresolved', '2020-01-01', ?, 'flexible', ?, NULL, NULL, NULL, 1, 1)`)
     .run(`series-${id}`, `act-${id}`, weekday, ended, minutes);
 };
-const weekOne = (file = A) => all(`SELECT ps.day_index AS day, sl.slot_index AS slot, m.name AS name, sl.sets AS sets
+const weekAt = (weekIndex, file = A) => all(`SELECT ps.day_index AS day, sl.slot_index AS slot, m.name AS name, sl.sets AS sets
   FROM planned_slot sl JOIN planned_session ps USING(planned_session_id) JOIN movement m USING(movement_id)
-  JOIN training_block b USING(block_id) WHERE b.status = 'active' AND ps.week_index = 1 ORDER BY ps.day_index, sl.slot_index`, file);
+  JOIN training_block b USING(block_id) WHERE b.status = 'active' AND ps.week_index = ${weekIndex} ORDER BY ps.day_index, sl.slot_index`, file);
+const weekOne = (file = A) => weekAt(1, file);
+const weekTwo = (file = A) => weekAt(2, file);
 const primaryMuscles = (name) => all(`SELECT r.muscle_group_id AS muscle FROM movement_muscle_role r JOIN movement m USING(movement_id)
   WHERE m.name = '${name.replaceAll("'", "''")}' AND r.role = 'primary'`).map((row) => row.muscle);
 /** The standard plan for the same profile: a second athlete with nothing set.
  *  The real store gates every movement on capability, so plans are compared
  *  with this control rather than with names from the pure verifier. */
-const controlWeekOne = async (profile = PROFILE) => {
+const controlWeekAt = async (weekIndex, profile = PROFILE) => {
   state().switchAthlete('athlete-b');
   await settle();
   state().saveProfile(profile);
   createProgram();
   expect(count('block_emphasis', B)).toBe(0);
-  const rows = weekOne(B);
+  const rows = weekAt(weekIndex, B);
   state().switchAthlete('default');
   await settle();
   return rows;
 };
+const controlWeekOne = (profile = PROFILE) => controlWeekAt(1, profile);
+const controlWeekTwo = (profile = PROFILE) => controlWeekAt(2, profile);
 const planBytes = () => JSON.stringify([
   all('SELECT * FROM planned_slot ORDER BY 1'), all('SELECT * FROM planned_session ORDER BY 1'),
   all('SELECT * FROM training_block ORDER BY 1'), all('SELECT * FROM block_emphasis ORDER BY 1'),
@@ -222,11 +227,11 @@ describe('a new block is planned with the focus, goal, sport and workload', () =
   });
 
   test('focus changes selection and weekly allocation, and the explanation is frozen with the block', async () => {
-    const control = await controlWeekOne();
+    const control = await controlWeekTwo();
     expect(state().saveFocus(BEACH)).toBe(true);
     const blockId = createProgram();
-    const focused = weekOne();
-    // Same shape as the standard plan: nothing added, lower days untouched.
+    const focused = weekTwo();
+    // Full scheduled week (Week 2, after #53 Intro Week 1): same shape as standard plan, lower days untouched.
     expect(focused.map((row) => [row.day, row.slot, row.sets])).toEqual(control.map((row) => [row.day, row.slot, row.sets]));
     expect(focused.filter((row) => [1, 4].includes(row.day))).toEqual(control.filter((row) => [1, 4].includes(row.day)));
     // The main press on both upper days now trains the upper chest directly, and still the chest.
@@ -250,7 +255,7 @@ describe('a new block is planned with the focus, goal, sport and workload', () =
     expect(report.applied).toContain(`${press} is planned instead of ${control.find((entry) => entry.day === 2 && entry.slot === 1).name}: it trains upper chest directly (your focus).`);
     expect(report.applied.some((line) => line.startsWith(`${armWork} takes the place of ${standardLast} on one upper day a week, for `)
       && line.endsWith(`(your focus). ${standardLast} is still trained on another day.`))).toBe(true);
-    expect(report.omitted.join(' ')).toMatch(/No room for extra (biceps|triceps) work in your 60-minute sessions/);
+    expect(report.omitted.join(' ')).toMatch(/No room for extra (biceps|triceps) work in this plan: what is already planned is a main lift/);
     expect(state().blockEmphasis).toMatchObject({ blockId, report });
     // The frozen inputs describe the emphasis; the 794-row library mapping is not copied into every block.
     const inputs = JSON.parse(row[0].inputs_json);
@@ -343,6 +348,17 @@ describe('a new block is planned with the focus, goal, sport and workload', () =
     expect(state().goalMovements).toEqual({ [goalId]: idOf('Front Squat') });
   });
 
+  test('#146: one weekly activity is counted in the NEW block, and the block says it does not change the gym plan', () => {
+    state().saveProfile({ objective: 'gpp' });
+    schedule('bb', { weekday: 4, minutes: 60, name: 'Basketball' });
+    state().refreshSport();
+    createProgram();
+    expect(state().sportWorkload).toMatchObject({ source: 'schedule', sessionsPerWeek: 1, tier: 'light' });
+    const report = state().blockEmphasis.report;
+    expect(report.omitted.join(' ')).toMatch(/Sport workload: 1 weekly session in your Activities schedule \(Basketball\)\. That does not change the gym plan\./);
+    expect(report.applied.join(' ')).not.toMatch(/Basketball/);
+  });
+
   test('a full sport week in the schedule takes one set off accessories in a NEW block and says why', async () => {
     // Control: the same athlete profile in a second database, with no schedule.
     state().saveProfile({ objective: 'gpp' });
@@ -350,7 +366,7 @@ describe('a new block is planned with the focus, goal, sport and workload', () =
     createProgram();
     const withSchedule = weekOne();
     expect(state().blockEmphasis.report.applied.join(' '))
-      .toMatch(/Sport workload: 3 weekly sessions in your Activities schedule \(Club training\)\. To leave room for it, each accessory exercise has one fewer set\./);
+      .toMatch(/Sport workload: 3 weekly sessions in your Activities schedule \(Club training\)\. To leave room for it, most accessory exercises have one fewer set \(down to at least one set; goal-linked, locomotion, non-strength-day, and deload sets are kept\)\./);
 
     state().switchAthlete('athlete-b');
     await settle();
@@ -470,7 +486,9 @@ describe('a competition date is context only', () => {
         ? report.applied.some((line) => line.startsWith('Competition lifts planned as main lifts:') && line.includes(lift))
         : report.omitted.some((line) => line.startsWith(`${lift} is not planned as a main lift`))).toBe(true);
     }
-    expect(report.omitted.join(' ')).toMatch(/Your competition on 2099-03-01 does not change this plan/);
+    // 2099-03-01 is > 32 weeks (224 days) away, so countdown peaking/taper is not applied to this block.
+    expect(report.applied.some((line) => line === `Your blocks count down to peak and taper for competition on 2099-03-01. ${COMPETITION_DATE_NOTE}`)).toBe(false);
+    expect(report.omitted.some((line) => /does not change this plan/.test(line))).toBe(false);
     expect(dated.some((row) => row.phase === 'deload')).toBe(true);
 
     state().switchAthlete('athlete-b');
@@ -480,6 +498,8 @@ describe('a competition date is context only', () => {
     createProgram();
     const undated = all(`SELECT ps.week_index, ps.day_index, ps.phase, sl.slot_index, sl.movement_id, sl.sets, sl.reps, sl.target_rpe
       FROM planned_slot sl JOIN planned_session ps USING(planned_session_id) ORDER BY 1, 2, 4`, B);
+    // 2099-03-01 is > 32 weeks away, so only the countdown window triggers phase shaping while
+    // competition-lift emphasis matches either way.
     expect(undated).toEqual(dated);
   });
 });

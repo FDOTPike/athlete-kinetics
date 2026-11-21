@@ -20,3 +20,37 @@ export const autopilotReasonCopy = (
     default: return null;
   }
 };
+
+/** One stored autopilot change on a planned slot of the active block. */
+export interface AppliedAdjustmentRow {
+  readonly movementId: number;
+  readonly movementName: string;
+  readonly reason: string;
+}
+
+export interface AppliedAdjustmentLine {
+  readonly key: string;
+  readonly text: string;
+}
+
+/**
+ * The Plan tab's "Changed in this block" lines. The rows are per planned slot,
+ * so one movement repeats across sessions; it is listed once per movement and
+ * reason, first occurrence kept. A reason with no plain wording is left out,
+ * never shown as the stored token.
+ */
+export const appliedAdjustmentLines = (
+  rows: readonly AppliedAdjustmentRow[],
+): AppliedAdjustmentLine[] => {
+  const seen = new Set<string>();
+  const lines: AppliedAdjustmentLine[] = [];
+  for (const row of rows) {
+    const copy = autopilotReasonCopy(row.reason);
+    if (copy === null) continue;
+    const key = `${row.movementId}:${row.reason}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    lines.push({ key, text: `${row.movementName}: ${copy}` });
+  }
+  return lines;
+};

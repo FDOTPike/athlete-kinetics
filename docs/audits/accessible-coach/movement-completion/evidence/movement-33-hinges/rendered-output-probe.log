@@ -1,0 +1,19 @@
+source commit: edbd5418b4fcf83944f36a3499dbd3bf00c441d2
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with probe-a981b09f4fbeebdf2a1ffd3ca11dcae08dcf4f2c.json
+
+movements measured: 209 (baseline 200)
+added: 288 Stiff-Legged Barbell Deadlift; 61 Good Morning; 210 Good Morning off Pins; 271 Seated Good Mornings; 94 Single-Leg Romanian Deadlift; 35 Barbell Hip Thrust; 23 Nordic Curl; 202 Floor Glute-Ham Raise; 244 Natural Glute Ham Raise
+removed: none
+changed, expected: none
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  288 Stiff-Legged Barbell Deadlift: drawn a29f51ffaafff74082e15d9ae1b7459c16ff6dc0ff0eef14937a69a0da4ba8c1 captions 812c979ce75212fe99bd83f82be7f23b66cfa53ac9e7bb334dd5d6e6a655d8b3 stage 134.51x240.00 cycle 3600 ms
+  61 Good Morning: drawn c5b17f2c4e65721407d97770e263045bd5e1dca1bc49cbb78bc0e6dbab7d26c9 captions 98f8768a8915f53329dd5e3289a55f6892678fd6cda8f26caee7883c2eb0b6c3 stage 135.65x240.00 cycle 3600 ms
+  210 Good Morning off Pins: drawn 4be3ca8ab2230c5a282e1ad974d0447b27dee40226b3082803331fc4b8098447 captions 4fc4d3e225f0ca3955f3eaddefa650cec88a093e2b14a4dd050d680c79f2358e stage 133.04x240.00 cycle 4200 ms
+  271 Seated Good Mornings: drawn 3e33a2b1b6c6f636f9a65fd927a1f896376351cd3bea2e40e5d4ec70cc7d0d4c captions 35dfb1c6f220aabf7a6ae39f8ee9962cfae907adef022580052659fcc74b8488 stage 165.71x240.00 cycle 3800 ms
+  94 Single-Leg Romanian Deadlift: drawn 4e511f3a277b58c73af66428c8380bf2797f6d52dfe2abb907ec0352df1f6bfb captions 6ace8cfa898cd71e1fb923c4ffa5b2e095bb092e5f9d1048295f30b955308bc5 stage 234.78x240.00 cycle 3700 ms
+  35 Barbell Hip Thrust: drawn cb775a81c2b06c995567d0135548bc3140e5ddcb48abd84fb7e9216d1ac6a375 captions b3ec5f7abda750dffeda79902baa159141cc01f3d8df3d4eb27fb8f898dbe521 stage 240.00x150.40 cycle 4050 ms
+  23 Nordic Curl: drawn 22ae2002defc2013373375888540305ffae156c7a1f641c4148aa52cd6303d4d captions 5a8d5b20e06ffb22e9b9645b785916d75eac3b4329cd29e0cf2bc93c193ff074 stage 240.00x196.13 cycle 4900 ms
+  202 Floor Glute-Ham Raise: drawn a999066ad7310c32d009eae3d945da14b7f56e1d2fe985db5a01da1476f3d27b captions a76d39f709100197297f6c4a9a65ee819df3e67aab9505de96f325e2498c963d stage 240.00x199.58 cycle 4900 ms
+  244 Natural Glute Ham Raise: drawn 5487e5ad0d62e22f865d544d14c06f680774e3ffb5e76c71e8d5046decb6bdc9 captions c2e248201017109a2ba24357c993de400f747172ecc685a5959ec3c3f28805a1 stage 240.00x186.41 cycle 4900 ms
+exit code: 0 (probe run exit 0)

@@ -19,6 +19,7 @@ let mockFailIncomingMove = false;
 let mockFailRollbackCopy = false;
 let mockDropRecoveryMove = false;
 let mockFileOps = [];
+let mockIncomingCheckEvaluations = 0;
 const mockKeepLocalCopy = jest.fn(async () => {
   const localPath = `${mockCacheDir}/selected-local.pmbak`;
   require('node:fs').copyFileSync(mockSelectedBackupPath, localPath);
@@ -104,6 +105,10 @@ const mockRestartStore = jest.fn();
 function mockOpenDatabase(options) {
   const path = `${options.location ?? mockLibraryDir}/${options.name}`;
   const raw = new DatabaseSync(path);
+  raw.function('restore_probe', () => {
+    if (path.includes('.ak-incoming-')) mockIncomingCheckEvaluations += 1;
+    return 1;
+  });
   return {
     executeSync(sql) {
       const statement = sql.trim();
@@ -146,6 +151,7 @@ import {
   BACKUP_SCHEMA_TABLE_COUNT,
   BACKUP_SCHEMA_USER_VERSION,
   bytesToBase64,
+  openBackup,
   sealBackup,
 } from '@ak/core-db';
 import { serializeRegistry } from '../../src/state/athleteRegistryCore';
@@ -161,7 +167,7 @@ function makeDatabase(path, applicationId) {
   }
   db.exec(`PRAGMA user_version=${BACKUP_SCHEMA_USER_VERSION}; PRAGMA application_id=${applicationId};`);
   assert.equal(db.prepare('PRAGMA quick_check').get().quick_check, 'ok');
-  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").get().count,
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM sqlite_master WHERE type='table' AND name NOT GLOB 'sqlite_*'").get().count,
     BACKUP_SCHEMA_TABLE_COUNT);
   db.close();
   return new Uint8Array(readFileSync(path));
@@ -198,6 +204,7 @@ beforeEach(async () => {
   mockFailRollbackCopy = false;
   mockDropRecoveryMove = false;
   mockFileOps = [];
+  mockIncomingCheckEvaluations = 0;
   mockKeepLocalCopy.mockClear();
   mockSaveDocuments.mockClear();
   mockRoot = mkdtempSync(join(tmpdir(), 'ak-backup-store-'));
@@ -320,6 +327,53 @@ test('real backup store restores exact databases and semantic registry regardles
   expect(journalCleanupIndex).toBeGreaterThan(Math.max(...markerCleanupIndices));
 });
 
+test('an imported CHECK expression is rejected before quick_check can evaluate it', async () => {
+  const opened = await openBackup(readFileSync(mockSelectedBackupPath, 'utf8'), 'restore-password', mockCryptoProvider);
+  expect(opened.ok).toBe(true);
+  const path = join(mockRoot, 'hostile.db');
+  writeFileSync(path, Buffer.from(opened.archive.databases[0].databaseBase64, 'base64'));
+  const db = new DatabaseSync(path);
+  db.function('restore_probe', () => 1);
+  const table = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT GLOB 'sqlite_*'").all()
+    .find(({ name }) => db.prepare(`SELECT COUNT(*) AS count FROM "${name.replaceAll('"', '""')}"`).get().count === 1);
+  expect(table).toBeDefined();
+  db.exec(`ALTER TABLE "${table.name.replaceAll('"', '""')}" ADD COLUMN unsafe_probe INTEGER DEFAULT 1 CHECK(restore_probe())`);
+  db.close();
+  opened.archive.databases[0] = snapshot('default', 'athlete_kinetics.db', new Uint8Array(readFileSync(path)));
+  writeFileSync(mockSelectedBackupPath, await sealBackup(opened.archive, 'restore-password', mockCryptoProvider));
+  mockSelectedSize = statSync(mockSelectedBackupPath).size;
+
+  await useBackupStore.getState().chooseRestore('restore-password');
+  expect(useBackupStore.getState().status).toBe('preview');
+  await useBackupStore.getState().confirmRestore('restore-password');
+  expect(useBackupStore.getState().status).toBe('error');
+  expect(useBackupStore.getState().message).toMatch(/does not match the verified app schema/);
+  expect(mockIncomingCheckEvaluations).toBe(0);
+  expect(mockHashFile(join(mockLibraryDir, 'athlete_kinetics.db'))).toBe(currentHashes.default);
+});
+
+test('a sqliteX_payload trigger in an authenticated backup is rejected before installation', async () => {
+  const opened = await openBackup(readFileSync(mockSelectedBackupPath, 'utf8'), 'restore-password', mockCryptoProvider);
+  expect(opened.ok).toBe(true);
+  const path = join(mockRoot, 'trigger.db');
+  writeFileSync(path, Buffer.from(opened.archive.databases[0].databaseBase64, 'base64'));
+  const db = new DatabaseSync(path);
+  const { name } = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name NOT GLOB 'sqlite_*' LIMIT 1").get();
+  db.exec(`CREATE TRIGGER sqliteX_payload BEFORE INSERT ON "${name.replaceAll('"', '""')}" BEGIN SELECT RAISE(IGNORE); END`);
+  db.close();
+  opened.archive.databases[0] = snapshot('default', 'athlete_kinetics.db', new Uint8Array(readFileSync(path)));
+  writeFileSync(mockSelectedBackupPath, await sealBackup(opened.archive, 'restore-password', mockCryptoProvider));
+  mockSelectedSize = statSync(mockSelectedBackupPath).size;
+
+  await useBackupStore.getState().chooseRestore('restore-password');
+  expect(useBackupStore.getState().status).toBe('preview');
+  await useBackupStore.getState().confirmRestore('restore-password');
+  expect(useBackupStore.getState().status).toBe('error');
+  expect(useBackupStore.getState().message).toMatch(/does not match the verified app schema/);
+  expect(mockHashFile(join(mockLibraryDir, 'athlete_kinetics.db'))).toBe(currentHashes.default);
+  expect(readFileSync(join(mockDocumentDir, 'coach_athletes.json'), 'utf8')).toBe(serializeRegistry(currentRegistry));
+});
+
 test('resolved native recovery move without a destination fails closed before replacement', async () => {
   await useBackupStore.getState().chooseRestore('restore-password');
   expect(useBackupStore.getState().status).toBe('preview');
@@ -365,6 +419,35 @@ test('backup removes and confirms plaintext snapshots before opening the OS save
   expect(useBackupStore.getState().status).toBe('success');
   expect(mockSaveDocuments).toHaveBeenCalledTimes(1);
   expect(readdirSync(mockCacheDir).filter((name) => /^ak-backup-|^ak-portable-/.test(name))).toEqual([]);
+});
+
+// Review (PR 118): the file the OS save sheet receives is named by
+// backupFileNameFor, whose local-date rule BackupFileName.test.js proves in a
+// Sydney-zone process. A distinctive return value shows the save path uses that
+// namer for the file it hands over, so a revert to an inline UTC date fails here.
+test('the file handed to the OS save sheet is named by the local-date namer', async () => {
+  const namer = jest.spyOn(require('../../src/state/backupFileName'), 'backupFileNameFor')
+    .mockReturnValue('pikeMethods-2031-07-09.pmbak');
+  try {
+    const before = Date.now();
+    await useBackupStore.getState().createBackup('restore-password');
+    const after = Date.now();
+    expect(useBackupStore.getState().status).toBe('success');
+    expect(namer).toHaveBeenCalledTimes(1);
+    // Review (PR 118): the namer is given the time of this backup, not any
+    // Date (an epoch or a stale stamp would also be a Date).
+    const namedAt = namer.mock.calls[0][0];
+    expect(namedAt).toBeInstanceOf(Date);
+    expect(namedAt.getTime()).toBeGreaterThanOrEqual(before);
+    expect(namedAt.getTime()).toBeLessThanOrEqual(after);
+    expect(mockSaveDocuments).toHaveBeenCalledTimes(1);
+    const saveCall = mockSaveDocuments.mock.calls[0][0];
+    // iOS names the saved file after the source file; Android uses fileName.
+    expect(saveCall.sourceUris[0]).toMatch(/\/pikeMethods-2031-07-09\.pmbak$/);
+    expect(saveCall.fileName).toBe('pikeMethods-2031-07-09.pmbak');
+  } finally {
+    namer.mockRestore();
+  }
 });
 
 test('previous recovery is absent or wrong-password fail-closed without exposing a path', async () => {

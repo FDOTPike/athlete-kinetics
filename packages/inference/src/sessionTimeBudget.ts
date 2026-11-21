@@ -60,6 +60,12 @@ export interface TimedSlot {
   readonly sets: number;
   readonly target: TimedSlotTarget;
   readonly targetRpe: number;
+  /** Optional back-off specification when a slot combines a top set with higher-rep back-off sets. */
+  readonly backOff?: {
+    readonly sets: number;
+    readonly reps: number;
+    readonly targetRpe: number;
+  };
   /**
    * A reviewed minimum for this slot, in seconds. A planner that already had
    * an accepted time allowance for a movement passes it here, so the shared
@@ -124,8 +130,18 @@ export interface SlotTimeEstimate {
 export function estimateSlotTime(slot: TimedSlot): SlotTimeEstimate {
   const sets = Math.max(0, Math.round(slot.sets));
   if (sets === 0) return { transitionSeconds: 0, workSeconds: 0, restSeconds: 0, allowanceSeconds: 0, totalSeconds: 0 };
-  const workSeconds = sets * workSecondsPerSet(slot.target);
-  const rest = (sets - 1) * restSeconds(slot.targetRpe);
+  const backOffSets = slot.backOff !== undefined && sets > 1
+    ? Math.min(Math.max(0, Math.round(slot.backOff.sets)), sets - 1)
+    : 0;
+  const topSets = sets - backOffSets;
+  const workSeconds = backOffSets > 0 && slot.backOff !== undefined
+    ? topSets * workSecondsPerSet(slot.target)
+      + backOffSets * workSecondsPerSet({ kind: 'reps', reps: slot.backOff.reps })
+    : sets * workSecondsPerSet(slot.target);
+  const rest = backOffSets > 0 && slot.backOff !== undefined
+    ? topSets * restSeconds(slot.targetRpe)
+      + Math.max(0, backOffSets - 1) * restSeconds(slot.backOff.targetRpe)
+    : (sets - 1) * restSeconds(slot.targetRpe);
   const measured = TRANSITION_SECONDS_PER_SLOT + workSeconds + rest;
   const minimum = slot.minimumSeconds !== undefined && Number.isFinite(slot.minimumSeconds)
     ? Math.max(0, slot.minimumSeconds) : 0;
@@ -323,7 +339,10 @@ export function feasibleSessionAlternatives(input: {
 export const describeSessionAlternative = (alternative: SessionTimeAlternative): string =>
   alternative.kind === 'extend_session'
     ? `Lengthen sessions to ${alternative.capMin} minutes.`
-    : `Train ${alternative.weeklyFrequency} day${alternative.weeklyFrequency === 1 ? '' : 's'} a week at ${alternative.capMin} minutes — the same weekly time in fewer, longer sessions.`;
+    // Android walk 2026-11-03 (W1-5): the day count is rounded down, so the
+    // weekly total can fall below today's (7 x 15 = 105 -> 1 x 60). The line
+    // states the weekly minutes it offers instead of promising the same time.
+    : `Train ${alternative.weeklyFrequency} day${alternative.weeklyFrequency === 1 ? '' : 's'} a week at ${alternative.capMin} minutes — ${alternative.weeklyFrequency * alternative.capMin} minutes a week in fewer, longer sessions.`;
 
 /** One honest sentence for a session that does not fit its cap. */
 export function describeSessionTimeConflict(input: {

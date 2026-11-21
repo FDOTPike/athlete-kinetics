@@ -9,6 +9,8 @@
  * re-export shim and carries no implementation.
  */
 import React from 'react';
+import { StyleSheet } from 'react-native';
+import { theme } from '../../src/theme/theme';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import { EQUIPMENT_PRESETS, SPECIALIST_EQUIPMENT_ITEMS, STANDARD_EQUIPMENT_ITEMS } from '@ak/inference';
 import LibraryScreenV2 from '../../src/screens/LibraryScreenV2';
@@ -101,6 +103,12 @@ describe('049 full-body scope in the movement library', () => {
     };
   });
 
+  test('the movement search input meets the minimum touch height', () => {
+    render(<LibraryScreenV2 />);
+    const style = StyleSheet.flatten(screen.getByLabelText('Search movements').props.style);
+    expect(style.minHeight).toBeGreaterThanOrEqual(theme.touch.min);
+  });
+
   test('both Turkish Get-Ups carry a full-body badge in the list, and nothing else does', () => {
     render(<LibraryScreenV2 />);
     expect(screen.getByLabelText('Kettlebell Turkish Get-Up is a full body movement')).toBeOnTheScreen();
@@ -112,6 +120,7 @@ describe('049 full-body scope in the movement library', () => {
   test('the scope filter is independent of pattern and type, and narrows to the scoped rows', () => {
     render(<LibraryScreenV2 />);
     expect(screen.getByText('4 of 4 movements')).toBeOnTheScreen();
+    fireEvent.press(screen.getByLabelText('Filters'));
     fireEvent.press(screen.getByLabelText('Filter scope by Full body'));
     expect(screen.getByText('2 of 4 movements')).toBeOnTheScreen();
     expect(screen.getByText('Kettlebell Turkish Get-Up')).toBeOnTheScreen();
@@ -121,13 +130,29 @@ describe('049 full-body scope in the movement library', () => {
 
   test('the scope filter composes conjunctively with an equipment facet', () => {
     render(<LibraryScreenV2 />);
+    fireEvent.press(screen.getByLabelText('Filters'));
     fireEvent.press(screen.getByLabelText('Filter scope by Full body'));
     fireEvent.press(screen.getByLabelText('Filter equipment by Boards'));
     expect(screen.getByText('No matching movements')).toBeOnTheScreen();
   });
 
+  // Issue 160: the "All" chips speak their visible words before the action.
+  test('the All chips in the filter rows start their names with the visible words', () => {
+    render(<LibraryScreenV2 />);
+    fireEvent.press(screen.getByLabelText('Filters'));
+    for (const name of [
+      'All patterns, clear pattern filter',
+      'All equipment, clear equipment filter',
+      'All tiers, clear tier filter',
+      'All types, clear movement type filter',
+    ]) {
+      expect(screen.getByLabelText(name)).toBeOnTheScreen();
+    }
+  });
+
   test('clearing filters restores the full corpus', () => {
     render(<LibraryScreenV2 />);
+    fireEvent.press(screen.getByLabelText('Filters'));
     fireEvent.press(screen.getByLabelText('Filter scope by Full body'));
     fireEvent.press(screen.getAllByLabelText('Clear search and filters')[0]);
     expect(screen.getByText('4 of 4 movements')).toBeOnTheScreen();

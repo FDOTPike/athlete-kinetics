@@ -83,6 +83,109 @@ export const SUPPORTED_BACKUP_SCHEMA_CONTRACTS: readonly BackupSchemaContract[] 
     objectCount: 204,
     fingerprint: '33f76480826a0b81b0cd57ceb74294a441c1ffac71884dda95f90dd24fde5861',
   },
+  // Through 070_session_feel — adds session_feel, how a finished session went
+  // and why (one table, no index or trigger).
+  {
+    userVersion: 69,
+    migrationSlot: 70,
+    tableCount: 119,
+    objectCount: 205,
+    fingerprint: '3d718e2b66f0f09e4e34cfd791b971a20ffb7fbf5b023161e2bdb00c1e1ca802',
+  },
+  // Through 071_beta_recording — adds session_skipped_slot and set_load_shown,
+  // two record-only side tables (two tables, no index or trigger).
+  {
+    userVersion: 70,
+    migrationSlot: 71,
+    tableCount: 121,
+    objectCount: 207,
+    fingerprint: '19a684a3b413a3ae15ae3f919851a803e27a36a02d1e77d52f000672d35f4d53',
+  },
+  // Through 072_question_log: local questions and the one card or fixed message shown.
+  {
+    userVersion: 71,
+    migrationSlot: 72,
+    tableCount: 122,
+    objectCount: 208,
+    fingerprint: '15aaa4b3bc4d575a2a9b28f4b29da543ce598a843455a43b73dbfbc161e3aa37',
+  },
+  // Through 073_session_slot_replaced_by: adds session_plan_slot_replacement side-car table.
+  {
+    userVersion: 72,
+    migrationSlot: 73,
+    tableCount: 123,
+    objectCount: 209,
+    fingerprint: 'ddb63af34a12943836b43c5392ac22ceb5f1a720e92d14280e35483ec531164c',
+  },
+  // Through 074_session_feel_reasons: session_feel rebuilt with a looser CHECK,
+  // and the session_feel_extra_reason side-car table.
+  {
+    userVersion: 73,
+    migrationSlot: 74,
+    tableCount: 124,
+    objectCount: 210,
+    fingerprint: 'bddf9047a966fd3bdb50db09d99754130cc506f69c4625e171c4cf3ec0402ee0',
+  },
+  // Through 075_session_plan_slot_planned_count: adds the
+  // session_plan_slot_planned_count side-car table.
+  {
+    userVersion: 74,
+    migrationSlot: 75,
+    tableCount: 125,
+    objectCount: 211,
+    fingerprint: 'ba1fe3146a91547dc3804f1ad765cc32d7f2cc5e389841fceac3a376045456d4',
+  },
+  // Through 076_sport_taxonomy_expansion: athlete_sport_profile rebuilt with the
+  // 22 proposed SportIds. Same table and object counts, new schema fingerprint.
+  {
+    userVersion: 75,
+    migrationSlot: 76,
+    tableCount: 125,
+    objectCount: 211,
+    fingerprint: '00aca47da3d6e7be422b674e70d8ba000f4f685527b362f09089cda08f932be8',
+  },
+  // Through 077_multisport_and_flexibility: two side-car tables and six guards.
+  {
+    userVersion: 76,
+    migrationSlot: 77,
+    tableCount: 127,
+    objectCount: 216,
+    fingerprint: '88daea365fb6f4d9d6414c1ab2c267af5aa0aa0149c7b5b3a69a3b0b804be294',
+  },
+  // Through 078_kinestrike_telemetry: adds the state_vector_kinestrike side-car table.
+  {
+    userVersion: 77,
+    migrationSlot: 78,
+    tableCount: 128,
+    objectCount: 217,
+    fingerprint: 'eab1ec16b39fb6cf884344340a726775960bfc0af5c0828c4d68ac76691c89b2',
+  },
+  // Through 079_session_slot_swap_cause: adds the session_slot_swap_cause side-car table.
+  {
+    userVersion: 78,
+    migrationSlot: 79,
+    tableCount: 129,
+    objectCount: 218,
+    fingerprint: 'c3debf653091b89f0d4f7703ea39a1543b83baa1a7f810c77848ef20aea143cc',
+  },
+  // Through 080_sport_peaking_and_lifting_taxonomy: widens primary & secondary
+  // sport tables to 24 sports and 0..52 matches_per_week for lifting sports, and
+  // adds sport_peaking_movement plus 4 Phase 2 side-car tables.
+  {
+    userVersion: 79,
+    migrationSlot: 80,
+    tableCount: 134,
+    objectCount: 223,
+    fingerprint: 'a098fc6fe8d1d0ab3851d3ce06aaf007c09ab3e3d348f6b0dd1bd8bc04ccaf2d',
+  },
+  // Through 081_advanced_program_control: six side-car tables for Phase 2 (#228 + A7).
+  {
+    userVersion: 80,
+    migrationSlot: 81,
+    tableCount: 140,
+    objectCount: 229,
+    fingerprint: '18e8e595edc07baf10fd1c4ae85de155830f99859b2936d990dbaf78bdeae892',
+  },
 ];
 
 export const CURRENT_BACKUP_SCHEMA_CONTRACT: BackupSchemaContract =

@@ -1,0 +1,51 @@
+source commit: 06669dd79f9fd6e6b5b2cb1da481bf3a6fd02f1c
+command: node --expose-gc tools/rendering/verify_preview_storage.mjs
+
+{
+  "runtime": "v24.11.1",
+  "scope": "Host storage and retained JSON-clone regression only; no native peak memory/frame-timing/4GBphone acceptance",
+  "records": 206,
+  "families": 75,
+  "rawBytes": 599484,
+  "gzipBytes": 99230,
+  "largestFamily": {
+    "file": "squat__standing.json",
+    "rawBytes": 53185
+  },
+  "singleFamily": {
+    "samples": [
+      126544,
+      129912,
+      130072,
+      130072,
+      130304
+    ],
+    "medianBytes": 130072
+  },
+  "allFamilies": {
+    "samples": [
+      1495832,
+      1495032,
+      1494904,
+      1494904,
+      1494904
+    ],
+    "medianBytes": 1494904
+  },
+  "budgets": {
+    "rawBytes": 1048576,
+    "gzipBytes": 196608,
+    "familyBytes": 65536,
+    "singleFamilyMaxBytes": 262144,
+    "allFamiliesMaxBytes": 2097152
+  },
+  "checks": {
+    "aggregateRaw": true,
+    "aggregateGzip": true,
+    "everyFamily": true,
+    "singleFamilyClone": true,
+    "allFamiliesClone": true
+  },
+  "pass": true
+}
+exit code: 0

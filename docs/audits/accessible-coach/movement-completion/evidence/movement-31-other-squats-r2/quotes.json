@@ -1,0 +1,78 @@
+{
+  "bounds": [
+    {
+      "id": 140,
+      "quote": "Place a flat bench behind you, take the bar from the rack across the upper back and stand with the feet shoulder-width apart and toes turned slightly out. Bend the knees and sit the hips back, chest up, until you lightly touch the bench.",
+      "test": "apps/mobile/test/components/MovementPreview.movA02OtherSquats.test.js :: 140 Barbell Squat To A Bench: bar on upper back, bench behind, hips lightly touch bench and stand without resting",
+      "bound": "painted bench top y = 76.7 (world y = 20.2); at ph = 1, painted hip underside y = 76.532 (gap = 0.168 in [0, 0.5]), painted thigh underside at bench edge y = 76.5673 (gap = 0.1327 in [0, 0.5]), painted thigh lowest underside y = 76.6522 (gap = 0.0478 in [0, 0.5]), zero penetration"
+    },
+    {
+      "id": 140,
+      "quote": "Drive through the feet to stand back up without resting on the bench.",
+      "test": "apps/mobile/test/components/MovementPreview.movA02OtherSquats.test.js :: 140 Barbell Squat To A Bench: bar on upper back, bench behind, hips lightly touch bench and stand without resting",
+      "bound": "exactly one keyframe at ph = 1 (frames.filter(f => f.joints.ph === 1).length === 1), reversing immediately to ph = 0.5 without a seated pause segment"
+    },
+    {
+      "id": 192,
+      "quote": "Stand in front of a flat bench with a dumbbell in each hand at your sides, feet shoulder-width apart and toes turned slightly out. Bend the knees and sit the hips back, chest up, until you lightly touch the bench.",
+      "test": "apps/mobile/test/components/MovementPreview.movA02OtherSquats.test.js :: 192 Dumbbell Squat To A Bench: dumbbells held at the sides with arms long, hips lightly touch bench without resting",
+      "bound": "painted bench top y = 76.7 (world y = 20.2); at ph = 1, painted hip underside y = 76.532 (gap = 0.168 in [0, 0.5]), painted thigh underside at bench edge y = 76.5673 (gap = 0.1327 in [0, 0.5]), painted thigh lowest underside y = 76.6522 (gap = 0.0478 in [0, 0.5]), zero penetration"
+    },
+    {
+      "id": 192,
+      "quote": "Push through the feet to stand back up without resting on the bench.",
+      "test": "apps/mobile/test/components/MovementPreview.movA02OtherSquats.test.js :: 192 Dumbbell Squat To A Bench: dumbbells held at the sides with arms long, hips lightly touch bench without resting",
+      "bound": "exactly one keyframe at ph = 1 (frames.filter(f => f.joints.ph === 1).length === 1), reversing immediately to ph = 0.5 without resting on the bench"
+    },
+    {
+      "id": 98,
+      "quote": "Set a bar on the floor behind your calves, stand about hip width, then squat down and take a shoulder-width grip with long arms. Brace the trunk and drive the floor away, letting the bar skim up behind the legs as the hips and knees straighten together.",
+      "test": "apps/mobile/test/components/MovementPreview.movA02OtherSquats.test.js :: 98 Barbell Hack Squat: starts from the floor with bar behind the calves and skims up behind the legs to standing",
+      "bound": "at ph = 0, barAt === 'behind' splits the near half at the near hold (q = [51.6044, 87.4]): mid-to-q ([56.4672, 87.4] -> [51.6044, 87.4]) is painted in groups.behind at index 1 before nearShinIdx = 45, and q-to-nearEnd ([51.6044, 87.4] -> [42.6044, 87.4]) is painted in near at index 52 outside the hands; 0 bar primitives between the hands are painted after the near shin"
+    },
+    {
+      "id": 98,
+      "quote": "Keep the bar close behind the legs.",
+      "test": "apps/mobile/test/components/MovementPreview.movA02OtherSquats.test.js :: 98 Barbell Hack Squat: starts from the floor with bar behind the calves and skims up behind the legs to standing",
+      "bound": "across floor, mid, and top phases, bar[0] < near.ankle[0] - 1.0 and bar[0] < near.knee[0] - 2.0 with straight arms (elbowAngleDeg = 180 deg, shoulder-to-wrist = 24.5)"
+    }
+  ],
+  "fileQuotes": [
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 10798,
+      "endLine": 10799,
+      "text": "\"instructions\": \"Place a flat bench behind you, take the bar from the rack across the upper back and stand with the feet shoulder-width apart and toes turned slightly out. Bend the knees and sit the hips back, chest up, until you lightly touch the bench. Drive through the feet to stand back up without resting on the bench.\",\n        \"cues\": \"Sit the hips back to the bench. Touch lightly, stay tight. Chest up, knees in line with the toes.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 14306,
+      "endLine": 14307,
+      "text": "\"instructions\": \"Stand in front of a flat bench with a dumbbell in each hand at your sides, feet shoulder-width apart and toes turned slightly out. Bend the knees and sit the hips back, chest up, until you lightly touch the bench. Push through the feet to stand back up without resting on the bench.\",\n        \"cues\": \"Sit back to the bench. Touch lightly, stay tight. Chest up, eyes forward.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 7952,
+      "endLine": 7953,
+      "text": "\"instructions\": \"Set a bar on the floor behind your calves, stand about hip width, then squat down and take a shoulder-width grip with long arms. Brace the trunk and drive the floor away, letting the bar skim up behind the legs as the hips and knees straighten together. Lower along the same close path; when the grip or torso position breaks before the legs tire, that is the load limit for the day.\",\n        \"cues\": \"Set the chest proud and the arms long. Push the floor away. Keep the bar close behind the legs.\","
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5055,
+      "endLine": 5061,
+      "text": "      farGroup.push(line(mid, farEnd, 1.6, farTone, farAlpha));\n      if (movement.barAt === 'behind') {\n        groups.behind.push(line(mid, q, 1.6, 'textHi', 1));\n        near.push(line(q, nearEnd, 1.6, 'textHi', 1));\n      } else {\n        near.push(line(mid, nearEnd, 1.6, 'textHi', 1));\n      }"
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA02OtherSquats.test.js",
+      "line": 244,
+      "endLine": 249,
+      "text": "      expect(hipGap).toBeGreaterThanOrEqual(0);\n      expect(hipGap).toBeLessThanOrEqual(0.5);\n      expect(thighGap).toBeGreaterThanOrEqual(0);\n      expect(thighGap).toBeLessThanOrEqual(0.5);\n      expect(thighEdgeGap).toBeGreaterThanOrEqual(0);\n      expect(thighEdgeGap).toBeLessThanOrEqual(0.5);"
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA02OtherSquats.test.js",
+      "line": 362,
+      "endLine": 369,
+      "text": "    const barBetweenHandsAfterNearShin = floorPrims.slice(nearShinIdx + 1).filter(\n      (p) =>\n        p.kind === 'bone' &&\n        Math.abs(p.w - 1.6) < 1e-6 &&\n        Math.min(p.x1, p.x2) < maxHandX - 1e-6 &&\n        Math.max(p.x1, p.x2) > minHandX + 1e-6,\n    );\n    expect(barBetweenHandsAfterNearShin).toHaveLength(0);"
+    }
+  ]
+}

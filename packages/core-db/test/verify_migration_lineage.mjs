@@ -206,7 +206,7 @@ function preserved(before, db) {
   }
   return problems;
 }
-const schemaObjects = (db) => db.raw.prepare("SELECT type,name,tbl_name,coalesce(sql,'') AS sql FROM sqlite_master WHERE type IN ('table','index','trigger') AND name NOT LIKE 'sqlite_%' ORDER BY type,name").all()
+const schemaObjects = (db) => db.raw.prepare("SELECT type,name,tbl_name,coalesce(sql,'') AS sql FROM sqlite_master WHERE type IN ('table','index','trigger') AND name NOT GLOB 'sqlite_*' ORDER BY type,name").all()
   .map((o) => [o.type, o.name, o.tbl_name, o.sql, o.type === 'table'
     ? db.raw.prepare(`PRAGMA table_info("${o.name.replaceAll('"', '""')}")`).all()
       .map((c) => [c.cid, c.name, c.type, c.notnull, c.dflt_value, c.pk]) : []]);

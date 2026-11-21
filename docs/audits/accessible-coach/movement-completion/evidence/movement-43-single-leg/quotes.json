@@ -1,0 +1,149 @@
+{
+  "bounds": [
+    {
+      "id": 18,
+      "quote": "Rest the top of the rear foot on the bench and settle the hips square over the stance.",
+      "bound": "farAnkle = [-18.5, 13.0] with farFoot = 180 rests the top of the rear foot on chainFlatBench(-34, -16, 12.0), while the front foot stays planted at ankle = [13.5, 2.16] with foot = 0 and standing front knee 174.1 deg.",
+      "test": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js:125"
+    },
+    {
+      "id": 18,
+      "quote": "Drop the rear knee straight down.",
+      "bound": "Rear knee drops from y = 22.32 at ph = 0 to y = 3.29 at ph = 2 (vertical drop 19.03 units) with horizontal drift 0.16 units (< 0.5), and front foot sole contact stays on the floor across every tick.",
+      "test": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js:143"
+    },
+    {
+      "id": 36,
+      "quote": "Set the bar as for a squat and stand close to a box that puts your thigh near parallel when your foot is up.",
+      "bound": "At ph = 0 on box y = 20.0, the lead thigh is at -10.0 deg from horizontal (<= 12 deg), with a rigid barbell across the upper back (3D wrist span 33.12 constant across every tick).",
+      "test": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js:170"
+    },
+    {
+      "id": 36,
+      "quote": "Put the whole foot on the box and stand up through it — the floor leg hangs, it does not jump.",
+      "bound": "Lead foot stays planted flat on the box at y = 22.16 across every tick, top standing knee reaches 175.0 deg (>= 172 deg), trailing foot hangs behind the box at y = 21.63, and 3D CoM with the 0.40 bodyweight bar stays over [0, 5.4] ([1.88, 3.69]).",
+      "test": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js:195"
+    },
+    {
+      "id": 36,
+      "quote": "Lower on a controlled count until the floor toe touches, and go again without rocking.",
+      "bound": "Lowering segment duration is 1500 ms vs 1100 ms drive up, and at ph = 0 the trailing toe touches the floor at y = 2.16 while the trailing ankle stays elevated at y = 4.83.",
+      "test": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js:178"
+    },
+    {
+      "id": 56,
+      "quote": "Hold a dumbbell in each hand and stand close to a box that puts your thigh near parallel when your foot is up.",
+      "bound": "At ph = 0 on box y = 20.0, the lead thigh is at -10.0 deg from horizontal (<= 12 deg) while dumbbells hang quiet at the sides (upperArm = [-90, 8], forearm = [-90, 6]).",
+      "test": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js:170"
+    },
+    {
+      "id": 56,
+      "quote": "Dumbbells hang quiet at your sides.",
+      "bound": "World-space upperArm[0] = -90 deg and forearm[0] = -90 deg on every tick while 3D CoM with 0.25 bodyweight dumbbells stays over the standing foot [0, 5.4] ([1.10, 3.31]).",
+      "test": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js:227"
+    },
+    {
+      "id": 136,
+      "quote": "Step forward with one leg and lower the hips straight down under control, keeping the torso upright.",
+      "bound": "Lead ankle steps forward 22.50 units from x = -6.0 (ph = 0, both knees 174.1 deg) to x = 16.5 (ph = 1), then hips drop straight down from [0.0, 41.20] to [0.0, 24.80] (dx = 0.00, dy = 16.40) with trunk = 89 deg across every tick.",
+      "test": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js:236"
+    },
+    {
+      "id": 136,
+      "quote": "Complete the repetitions on one leg, then change legs.",
+      "bound": "The post-set instruction to change legs appears only in the final frame caption (p7) and in none of p1..p6.",
+      "test": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js:264"
+    },
+    {
+      "id": 194,
+      "quote": "Step back off the platform with one leg and lower until the back knee reaches the floor.",
+      "bound": "From standing on the y = 6.0 platform (both ankles at y = 8.16, both knees 174.1 deg), the rear ankle steps back to x = -18.5 and lowers until the rear knee reaches y = 2.841 (painted bottom 96.891 at FLOOR = 96.9).",
+      "test": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js:270"
+    },
+    {
+      "id": 194,
+      "quote": "Drive through the front leg to return to the platform, then repeat with the other leg.",
+      "bound": "After driving back to standing on the platform at ph = 1, the movement alternates legs to ph = 2 where the far leg steps back to x = -18.5 and its knee reaches y = 2.841 (painted bottom 96.891 at FLOOR = 96.9).",
+      "test": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js:295"
+    },
+    {
+      "id": 239,
+      "quote": "Step forward with the opposite foot and lower the back knee toward the floor with the torso upright, passing the kettlebell under the front leg to the other hand.",
+      "bound": "From standing with the kettlebell in the near hand (bellSide = +1, knees 174.1 deg), the opposite (far) foot steps forward to x = 11.5 and the kettlebell passes under the front thigh (bell y = 10.61 < thigh midpoint y = 16.72 - 3.0) from bellSide = +0.45 to -0.85.",
+      "test": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js:312"
+    },
+    {
+      "id": 239,
+      "quote": "Push through the front heel to return to standing, then step forward with the other foot and pass the kettlebell back.",
+      "bound": "Returns to standing at ph = 3 with the bell in the far hand (bellSide = -1, knees 174.1 deg), then steps the near foot forward to x = 11.5 (ph = 4 -> 5) and passes the bell under the front thigh back to the near hand (bellSide = -0.45 -> +0.85).",
+      "test": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js:342"
+    },
+    {
+      "id": 67,
+      "quote": "Hold a light kettlebell at the chest and stand on one leg with the other leg reaching forward.",
+      "bound": "Standing leg is rooted at [0, 2.16] with top knee 175.0 deg (>= 172 deg), free leg reaches forward straight at 176.0 deg across every tick with painted sole <= 91.8 < FLOOR - 5.0, and the kettlebell is held at the chest.",
+      "test": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js:366"
+    },
+    {
+      "id": 67,
+      "quote": "Use the bell as a counterbalance while squatting through the deepest range the standing foot can own.",
+      "bound": "At the bottom (standing knee 51.0 deg < 60 deg), the kettlebell reaches forward by +14.12 units so 3D CoM with the 0.20 bodyweight bell stays strictly over the standing foot [0, 5.4] ([3.48, 5.26], unloaded [0.15, 2.96]) across every tick.",
+      "test": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js:379"
+    },
+    {
+      "id": 96,
+      "quote": "Set the bar across the upper back and place the balls of the feet on a stable low block with the heels free.",
+      "bound": "Rooted at toe = [5.4, 7.968] on the y = 6.0 block with a rigid barbell across the upper back (3D wrist span 33.12) and straight knees (179.0 deg >= 172 deg) across every tick.",
+      "test": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js:419"
+    },
+    {
+      "id": 96,
+      "quote": "Deep stretch, full pause at the bottom.",
+      "bound": "At ph = 1 (foot = +28 deg), the ankle drops to y = 5.62 below the block top (y = 6.0) and the heel bottom drops to y = 3.65 (2.35 units below the block top), held for a 500 ms pause (p2 -> p3).",
+      "test": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js:436"
+    },
+    {
+      "id": 96,
+      "quote": "Preserve the bottom stretch and top pause as load increases; if either disappears, reduce the weight before the next set.",
+      "bound": "At ph = 2 (foot = -42 deg), the ankle rises to y = 11.77 (+5.77 units above the block top) and holds a 450 ms top pause (p4 -> p5) with 3D CoM + bar over the forefoot.",
+      "test": "apps/mobile/test/components/MovementPreview.movA13SingleLeg.test.js:440"
+    }
+  ],
+  "fileQuotes": [
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5167,
+      "text": "'bulgarian-split-squat': {"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5199,
+      "text": "'barbell-step-up': {"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5265,
+      "text": "'barbell-lunge': {"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5305,
+      "text": "'elevated-back-lunge': {"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5345,
+      "text": "'lunge-pass-through': {"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5412,
+      "text": "'kettlebell-pistol-squat': {"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5449,
+      "text": "'standing-barbell-calf-raise': {"
+    }
+  ]
+}

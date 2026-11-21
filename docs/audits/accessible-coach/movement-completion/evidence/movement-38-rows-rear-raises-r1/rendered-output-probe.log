@@ -1,0 +1,16 @@
+source commit: c9d0f25faf35617b4189e385a839819751249205
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with probe-7022cb94bd4c3df0d366393633179835fc164b86.json
+
+movements measured: 231 (baseline 231)
+added: none
+removed: none
+changed, expected: 93 Renegade Row; 195 Elevated Cable Rows; 296 Upright Cable Row; 243 Middle Back Shrug; 188 Dumbbell Lying Rear Lateral Raise; 241 Lying Rear Delt Raise
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  93 Renegade Row: drawn 08e20e8d1103def8ead02f12a788b2027d14cd939194dc568c758a719c40ff96 captions 9a871b2c3fb03c17aacc3297fad67b44838d7434c3e2b4ea0878298f6c92183f stage 240.00x198.52 cycle 4400 ms
+  195 Elevated Cable Rows: drawn 2f5ad74d9e1e478c381514f02559c044af19acd7ada51b085cdca4dd7795c51f captions a986d690654b37b3e37ae549667637f5c19cfb296a4be9a90dcfb305fd78f3d9 stage 230.00x240.00 cycle 3550 ms
+  296 Upright Cable Row: drawn 8654fba630bc6315845bab55a3496be185498a81c87d6b8b35ab20fa9e8e5022 captions 7cd3a3a550c7ef5baae19a677908df94e97cd0eec57ae87331e9d6399f44ba4d stage 165.16x240.00 cycle 3550 ms
+  243 Middle Back Shrug: drawn 0bf6c405e743e083e008f746738f412e06173c4673756022c666bb700a0697c2 captions e2535c029a4ca73e152bbc6af879de5b79c5ce8c2255934a22f38c323f356afc stage 177.50x240.00 cycle 3350 ms
+  188 Dumbbell Lying Rear Lateral Raise: drawn 2d90abe2f201db17a74b5a249290a6f5e44d9c27c7539fb02d7d73f1ce8c9e1f captions 873e10532d0df32e764f4b4e09e0fb1e7ed50daff558d6283d8fd15e1bd768a0 stage 206.09x240.00 cycle 4400 ms
+  241 Lying Rear Delt Raise: drawn 18bf230dd20bf208b5fc480bcc17139b363ba84bd59aaa0145b4ce9174b6f3c7 captions c4cbf50169bcbe2af29adb428dae7c85df465fdae84b8b481b42875b59dd1562 stage 206.09x240.00 cycle 4400 ms
+exit code: 0 (probe run exit 0)

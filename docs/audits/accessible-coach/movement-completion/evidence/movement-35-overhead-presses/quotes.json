@@ -1,0 +1,180 @@
+{
+  "bounds": [
+    {
+      "id": 4,
+      "quote": "Set the bar across the front shoulders with a full grip and the forearms close to vertical. Stand with balanced feet and brace before the bar leaves the shoulders.",
+      "bound": "Full grip (hand angle undefined, handCloseUp null), bar across the front shoulders (start.world.near.hold[0] in (neck[0] + 0.5, neck[0] + 2.0], |hold[1] - neck[1]| <= 1.5), and forearms within 10 deg of vertical (offVertical3D <= 10)",
+      "test": "apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:126-134"
+    },
+    {
+      "id": 4,
+      "quote": "Press close past the face, move the head through to a tall lockout, and lower along the same path. If the torso leans into an incline press, reduce the load until the finish stays stacked.",
+      "bound": "Head starts back (head[0] < neck[0] - 0.8) and moves through at lockout (|top.world.head[0] - top.world.neck[0]| < 0.1), straight elbows at lockout (deg3D >= 176), bar stacked over mid-foot (|hold[0] - midFootX| <= 0.5), and upright trunk without lean-back (|neck[0] - hip[0]| < 0.05)",
+      "test": "apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:137-146"
+    },
+    {
+      "id": 31,
+      "quote": "Sit or stand holding dumbbells at shoulder height with palms facing you. Press up while rotating your palms to face forward at the top. Reverse the rotation on the way back down to the start.",
+      "bound": "Dumbbells start at shoulder height (|hold[1] - shoulder[1]| <= 2.0) with palms facing the athlete (palmYaw = 180, palmDir[0] = -1), pass through 90 deg at mid-press (handleAxis[0] = 1), rotate to face forward at lockout (palmYaw = 0, palmDir[0] = 1, deg3D >= 176), and flip painted knuckle-wrap order relative to the handle shaft",
+      "test": "apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:162-189"
+    },
+    {
+      "id": 31,
+      "quote": "Stay tall and braced the whole press — the lean-back arch is the classic cheat, and it quietly turns this into a sloppy incline press.",
+      "bound": "Elbows start tucked tight in front of the shoulders (elbow[0] > shoulder[0] + 5.0) and trunk stays upright and uncurled across every 33 ms tick (trunkDegFromHorizontal2D >= 87, |neck[0] - hip[0]| <= 0.5, curled === false)",
+      "test": "apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:66-68,163-164"
+    },
+    {
+      "id": 41,
+      "quote": "Set a low pulley and bring the handle to shoulder height, standing tall. Press to lockout overhead against the cable's pull, which drags forward and down the entire rep — that constant tension is the point, there is no rest at the top.",
+      "bound": "Low pulley at y <= 12 (at [20, 5, 11.5]), handle starts at shoulder height and presses to straight-arm lockout (deg3D >= 176), with pulley forward of and below the hand at every 33 ms tick (pulley[0] - hold[0] > 10, pulley[1] - hold[1] < -55) and cable length monotonically increasing during the press",
+      "test": "apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:202-230"
+    },
+    {
+      "id": 41,
+      "quote": "Lower under control back to the shoulder. Usually run one arm at a time; the free hand tells you when you are leaning.",
+      "bound": "Single-arm handle press with the free far hand stationary at the hip across every 33 ms tick (dist(g.world.far.wrist, start.world.far.wrist) < 1e-6) and upright trunk without lateral or backward lean",
+      "test": "apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:66-68,201,223"
+    },
+    {
+      "id": 129,
+      "quote": "Clean two kettlebells to the shoulders and stand tall with the palms facing in. Press one kettlebell straight overhead until the arm is straight, turning the palm to face forward as it rises, while the other stays at the shoulder. Lower it under control back to the shoulder, then press the other side.",
+      "bound": "Two kettlebells start at the shoulders with palms facing in (palmYaw = 90, farPalmYaw = 90); near press reaches straight-arm lockout (deg3D >= 176) with palm forward (palmYaw = 0) while far bell stays at the shoulder, returns to the rack, and then far press reaches straight-arm lockout (deg3D >= 176) with palm forward (farPalmYaw = 0) while near bell stays at the shoulder",
+      "test": "apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:247-269"
+    },
+    {
+      "id": 129,
+      "quote": "Stand tall and squeeze the glutes. One bell moves, the other waits at the shoulder. Finish with the arm straight beside the ear.",
+      "bound": "Across every 33 ms tick of the first half of the cycle the far kettlebell stays stationary at the shoulder rack (dist < 1e-6), and across every 33 ms tick of the second half the near kettlebell stays stationary at the shoulder rack (dist < 1e-6)",
+      "test": "apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:271-281"
+    },
+    {
+      "id": 189,
+      "quote": "Sit on a bench with back support or stand tall, and bring one dumbbell to shoulder height with the palm facing forward and the other hand at your side or on a fixed support. Press the dumbbell straight up until the arm is straight. Pause, then lower it slowly to shoulder height.",
+      "bound": "Single dumbbell starts at shoulder height with the palm facing forward throughout the entire press (palmYaw = 0 at start and top, palmDir[0] = 1), presses straight up to a straight-arm lockout (deg3D >= 176, |top.hold[0] - start.hold[0]| <= 0.5), pauses at lockout (segmentDurationsMs[1] >= 550), and lowers slowly (segmentDurationsMs[2] >= segmentDurationsMs[0] * 1.45)",
+      "test": "apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:324-335"
+    },
+    {
+      "id": 189,
+      "quote": "Ribs down, trunk tall. Press straight up. Lower slowly to the shoulder.",
+      "bound": "Trunk remains tall and uncurled across every 33 ms tick (trunkDegFromHorizontal2D >= 87, |neck[0] - hip[0]| <= 0.5, curled === false) and free far hand stays stationary at the side (dist < 1e-6)",
+      "test": "apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:66-68,355-362"
+    },
+    {
+      "id": 228,
+      "quote": "Clean a kettlebell to the shoulder and stand tall with the palm facing in. Press the kettlebell up and overhead, turning the wrist so the palm faces forward at the top. Lower it to the shoulder, turning the palm back to face in.",
+      "bound": "Single kettlebell starts at the shoulder with the palm facing in (palmYaw = 90, palmDir[2] = -1, handleAxis[0] = 1) and presses to a straight-arm lockout overhead (deg3D >= 176) while turning the wrist so the palm faces forward (palmYaw = 0, palmDir[0] = 1, handleAxis[2] = 1)",
+      "test": "apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:343-352"
+    },
+    {
+      "id": 228,
+      "quote": "Stand tall, eyes forward. Turn the palm as you press. Finish with the arm straight.",
+      "bound": "Tall upright trunk and head facing forward across every 33 ms tick, with the free far hand quiet at the side (dist < 1e-6) and straight-arm overhead finish (deg3D >= 176)",
+      "test": "apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:66-68,349-362"
+    },
+    {
+      "id": 230,
+      "quote": "Clean two kettlebells to the shoulders and stand tall. Press one kettlebell overhead until the arm is straight. As you lower it to the shoulder, press the other kettlebell up, and keep alternating for the same number of repetitions on each side.",
+      "bound": "Two kettlebells start at the shoulders, first press reaches straight-arm lockout (deg3D >= 176), and during the seesaw segment (ph: 1 -> 2) the first bell strictly lowers on every 33 ms tick while the second bell strictly rises at the same time to straight-arm lockout (deg3D >= 176)",
+      "test": "apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:292-309"
+    },
+    {
+      "id": 230,
+      "quote": "Stand tall and squeeze the glutes. One up as one comes down. Finish each press with a straight arm.",
+      "bound": "At the seesaw midpoint (ph = 1.5), both kettlebells are simultaneously in mid-air above the shoulders by more than 10 units and pass each other at the same height (|near.hold[1] - far.hold[1]| < 0.05)",
+      "test": "apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js:296-299"
+    }
+  ],
+  "fileQuotes": [
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 1232,
+      "endLine": 1233,
+      "text": "  palmYaw?: number;\n  farPalmYaw?: number;"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4648,
+      "endLine": 4671,
+      "text": "  'overhead-press': {\n    root: 'hip',\n    view: 'oblique',\n    yawDeg: 34,\n    originX: 48,\n    implement: 'bar',\n    farArmOver: true,\n    nearArmOverHead: true,\n    kneePole: 0,\n    footSpread: 2,\n    kneeOut: 8,\n    poses: [\n      {\n        at: [2.7, 46.5], trunk: 90, head: 98,\n        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],\n        upperArm: [98, 162], forearm: [90, 0],\n      },\n      {\n        at: [2.7, 46.5], trunk: 90, head: 90,\n        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],\n        upperArm: [90, 6], forearm: [90, 6],\n      },\n    ],\n  },"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4676,
+      "endLine": 4701,
+      "text": "  'arnold-press': {\n    root: 'hip',\n    view: 'oblique',\n    yawDeg: 32,\n    originX: 48,\n    implement: 'bells',\n    farArmOver: true,\n    nearArmOverHead: true,\n    kneePole: 0,\n    footSpread: 2,\n    kneeOut: 8,\n    poses: [\n      {\n        at: [3.0, 46.5], trunk: 90, head: 90,\n        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],\n        upperArm: [115, 165], forearm: [108, -10],\n        palmYaw: 180, farPalmYaw: 180,\n      },\n      {\n        at: [3.0, 46.5], trunk: 90, head: 90,\n        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],\n        upperArm: [88, 4], forearm: [88, 4],\n        palmYaw: 0, farPalmYaw: 0,\n      },\n    ],\n  },"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4706,
+      "endLine": 4736,
+      "text": "  'cable-shoulder-press': {\n    root: 'hip',\n    view: 'oblique',\n    yawDeg: 36,\n    originX: 44,\n    implement: 'handle',\n    farArmOver: true,\n    nearArmOverHead: true,\n    kneePole: 0,\n    footSpread: 2,\n    kneeOut: 8,\n    lines: [{ from: [20, 5, 11.5], to: 'nearGrip' }],\n    equipment: [\n      { kind: 'frame', a: [20, 0.5, 11.5], b: [20, 18, 11.5] },\n      { kind: 'pulley', at: [20, 5, 11.5] },\n    ],"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4742,
+      "endLine": 4776,
+      "text": "  'alternating-kettlebell-press': {\n    root: 'hip',\n    view: 'oblique',\n    yawDeg: 34,\n    originX: 48,\n    implement: 'kettlebells',\n    farArmOver: true,\n    nearArmOverHead: true,\n    kneePole: 0,\n    footSpread: 2,\n    kneeOut: 8,\n    poses: [\n      {\n        at: [2.7, 46.5], trunk: 90, head: 90,\n        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],\n        upperArm: [90, 4], forearm: [90, 4],\n        farUpperArm: [106, 162], farForearm: [98, -6],\n        palmYaw: 0, farPalmYaw: 90,\n      },"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4781,
+      "endLine": 4808,
+      "text": "  'dumbbell-one-arm-shoulder-press': {\n    root: 'hip',\n    view: 'oblique',\n    yawDeg: 32,\n    originX: 48,\n    implement: 'bell',\n    farArmOver: true,\n    nearArmOverHead: true,\n    kneePole: 0,\n    footSpread: 2,\n    kneeOut: 8,\n    poses: [\n      {\n        at: [2.7, 46.5], trunk: 90, head: 90,\n        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],\n        upperArm: [90, 158], forearm: [90, 0],\n        farUpperArm: [-90, 8], farForearm: [-82, -12],\n        palmYaw: 0, farPalmYaw: 0,\n      },"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4813,
+      "endLine": 4840,
+      "text": "  'kettlebell-arnold-press': {\n    root: 'hip',\n    view: 'oblique',\n    yawDeg: 34,\n    originX: 48,\n    implement: 'kettlebell',\n    farArmOver: true,\n    nearArmOverHead: true,\n    kneePole: 0,\n    footSpread: 2,\n    kneeOut: 8,\n    poses: [\n      {\n        at: [2.7, 46.5], trunk: 90, head: 90,\n        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],\n        upperArm: [106, 162], forearm: [98, -6],\n        farUpperArm: [-90, 8], farForearm: [-82, -12],\n        palmYaw: 90, farPalmYaw: 90,\n      },"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4844,
+      "endLine": 4878,
+      "text": "  'kettlebell-seesaw-press': {\n    root: 'hip',\n    view: 'oblique',\n    yawDeg: 34,\n    originX: 48,\n    implement: 'kettlebells',\n    farArmOver: true,\n    nearArmOverHead: true,\n    kneePole: 0,\n    footSpread: 2,\n    kneeOut: 8,\n    poses: [\n      {\n        at: [2.7, 46.5], trunk: 90, head: 90,\n        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],\n        upperArm: [106, 162], forearm: [98, -6],\n        farUpperArm: [106, 162], farForearm: [98, -6],\n        palmYaw: 90, farPalmYaw: 90,\n      },"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4957,
+      "endLine": 4969,
+      "text": "  const hasPalmYaw = a.palmYaw !== undefined || b.palmYaw !== undefined || a.farPalmYaw !== undefined || b.farPalmYaw !== undefined;\n  const palmYaw = hasPalmYaw ? num(a.palmYaw, b.palmYaw) : undefined;\n  const farPalmYaw = hasPalmYaw ? num(a.farPalmYaw ?? a.palmYaw, b.farPalmYaw ?? b.palmYaw) : undefined;\n  const palmVectors = (deg: number | undefined, side: number): { palmDir?: ChainVec; handleAxis?: ChainVec } => {\n    if (deg === undefined) return {};\n    const r = chainRad(deg);\n    return {\n      palmDir: [Math.cos(r), 0, -side * Math.sin(r)],\n      handleAxis: [Math.sin(r), 0, side * Math.cos(r)],\n    };\n  };\n  const nearPalm = palmVectors(palmYaw, 1);\n  const farPalm = palmVectors(farPalmYaw, -1);"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5384,
+      "endLine": 5387,
+      "text": "      const axis: ChainVec = handleAxis ?? [0, 0, 1];\n      const rest: ChainVec = palmDir !== undefined && handleAxis !== undefined\n        ? [KETTLEBELL_REST[0] * palmDir[0] + KETTLEBELL_REST[2] * handleAxis[0], KETTLEBELL_REST[1], KETTLEBELL_REST[0] * palmDir[2] + KETTLEBELL_REST[2] * handleAxis[2]]\n        : [KETTLEBELL_REST[0], KETTLEBELL_REST[1], side * KETTLEBELL_REST[2]];"
+    },
+    {
+      "file": "tools/rendering/chain_motion_specs.mjs",
+      "line": 2233,
+      "endLine": 2238,
+      "text": "  {\n    id: 4,\n    slug: 'overhead-press',\n    view: 'side',\n    equipment: 'barbell',\n    phases: [0, 0.5, 1, 0.5, 0],"
+    },
+    {
+      "file": "tools/rendering/wo09_split_preview_manifest.mjs",
+      "line": 98,
+      "endLine": 104,
+      "text": "  4: 'vertical-press@standing',\n  31: 'vertical-press@standing',\n  41: 'vertical-press@standing',\n  129: 'vertical-press@standing',\n  189: 'vertical-press@standing',\n  228: 'vertical-press@standing',\n  230: 'vertical-press@standing',"
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.approval.test.js",
+      "line": 101,
+      "endLine": 102,
+      "text": "// MOV-A06 (standing overhead presses): 4, 31, 41, 129, 189, 228, 230.\nconst CANONICAL_AUTHORED = [14, 9, 15, 10, 11, 12, 21, 54, 17, 19, 39, 62, 55, 74, 103, 169, 294, 298, 300, 97, 113, 287, 86, 100, 128, 133, 141, 168, 185, 196, 227, 246, 22, 30, 117, 238, 273, 142, 144, 146, 147, 32, 115, 197, 198, 224, 127, 274, 280, 284, 76, 118, 267, 270, 34, 106, 114, 126, 167, 172, 199, 260, 278, 134, 212, 216, 218, 24, 159, 25, 251, 111, 191, 26, 42, 44, 57, 59, 266, 60, 254, 255, 174, 175, 263, 116, 157, 193, 282, 283, 53, 82, 138, 163, 125, 161, 225, 226, 40, 132, 214, 73, 173, 245, 90, 222, 223, 92, 158, 253, 29, 75, 51, 286, 110, 143, 122, 234, 135, 187, 80, 262, 292, 264, 49, 178, 220, 84, 52, 66, 152, 50, 236, 87, 206, 272, 219, 221, 207, 155, 179, 180, 156, 237, 276, 171, 268, 269, 164, 95, 124, 72, 99, 150, 183, 285, 232, 181, 160, 248, 89, 37, 182, 27, 295, 297, 139, 162, 261, 131, 200, 247, 154, 279, 1, 123, 277, 299, 8, 208, 38, 256, 275, 140, 192, 81, 98, 120, 235, 105, 48, 2, 46, 176, 257, 78, 258, 290, 288, 61, 210, 271, 94, 35, 23, 202, 244, 4, 31, 41, 129, 189, 228, 230];"
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.layout.test.js",
+      "line": 52,
+      "endLine": 53,
+      "text": "  // MOV-A06 adds 7 standing overhead presses (4, 31, 41, 129, 189, 228, 230), making 214.\n  expect(CANONICAL.length).toBe(214);"
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA06OverheadPresses.test.js",
+      "line": 48,
+      "endLine": 56,
+      "text": "describe('MOV-A06 standing overhead presses: universal physics, painted floor contact, mid-foot balance, upright trunk, and depth order', () => {\n  test.each(IDS)('movement %i is authored as pending with >= 5 frames, planted painted floor contact, upright braced trunk, load over mid-foot, and back-to-front depth order at every 33 ms tick', (id) => {\n    const e = entryFor(id);\n    expect(e.status).toBe('pending');\n    expect(e.frames.length).toBeGreaterThanOrEqual(5);\n    const slug = slugOf(e);\n    const start = rig.chainGeometry(slug, e.frames[0].joints.ph, BODY);\n    const midFootX = (start.world.near.ankle[0] + start.world.near.toe[0]) / 2;\n    const poses = e.frames.map((f) => f.joints);"
+    }
+  ]
+}

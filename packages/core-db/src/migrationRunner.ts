@@ -305,7 +305,9 @@ export const SENTINELS: readonly MigrationSentinel[] = [
   // athlete_sport_profile would silently turn a sport athlete's next block
   // into the standard plan, and losing block_emphasis (or its immutability
   // guard) would lose or let someone rewrite the explanation of a frozen plan.
-  { type: 'table', name: 'athlete_sport_profile' },                           // 067
+  { type: 'table', name: 'athlete_sport_profile' },
+  { type: 'table', name: 'athlete_secondary_sport_profile' },   // 077
+  { type: 'table', name: 'activity_flexibility_tag' },          // 077                           // 067
   { type: 'table', name: 'athlete_goal_movement' },                           // 067
   { type: 'table', name: 'block_emphasis' },                                  // 067
   { type: 'trigger', name: 'trg_block_emphasis_immutable_bu' },               // 067
@@ -323,6 +325,36 @@ export const SENTINELS: readonly MigrationSentinel[] = [
   // 069 resting heart rate independent of HRV. Losing the table would make
   // every later sync fail its write and drop the athlete's resting HR.
   { type: 'table', name: 'resting_hr_daily' },                                // 069
+  // 070 how a finished session went and why. Losing the table would make the
+  // completion screen's save fail and drop every answer already recorded.
+  { type: 'table', name: 'session_feel' },                                    // 070
+  // 071 which planned slots were skipped, and what the load entry was seeded
+  // with. Losing either table would make session finalization or set logging
+  // fail its write and drop every record already kept.
+  { type: 'table', name: 'question_log' }, // 072
+  { type: 'table', name: 'session_skipped_slot' },                            // 071
+  { type: 'table', name: 'set_load_shown' },                                  // 071
+  { type: 'table', name: 'session_plan_slot_replacement' },                   // 073
+  { type: 'table', name: 'session_feel_extra_reason' },                       // 074
+  { type: 'table', name: 'session_plan_slot_planned_count' },                 // 075
+  { type: 'table', name: 'state_vector_kinestrike' },                         // 078
+  { type: 'table', name: 'session_slot_swap_cause' },                         // 079
+  { type: 'table', name: 'sport_peaking_movement' },                          // 080
+  {
+    type: 'row',
+    name: 'sport_peaking_movement basketball seed',                           // 080
+    presenceSql: `SELECT 1 AS ok WHERE (SELECT COUNT(*) FROM sport_peaking_movement WHERE sport_id = 'basketball') = 3`,
+  },
+  { type: 'table', name: 'planned_slot_backoff' },                            // 080
+  { type: 'table', name: 'session_slot_backoff' },                            // 080
+  { type: 'table', name: 'training_program_meet_countdown' },                 // 080
+  { type: 'table', name: 'training_block_meet_meta' },                        // 080
+  { type: 'table', name: 'training_program_day_focus_ext' },                  // 081
+  { type: 'table', name: 'planned_session_focus_ext' },                       // 081
+  { type: 'table', name: 'training_program_schedule_mode' },                  // 081
+  { type: 'table', name: 'training_program_slot_override' },                  // 081
+  { type: 'table', name: 'training_program_day_routine' },                    // 081
+  { type: 'table', name: 'planned_slot_athlete_override' },                   // 081
 ];
 
 /** Durable tables deliberately absent from SENTINELS, each with the reason it
@@ -378,6 +410,10 @@ const REPLAY_BLOCKING_TRIGGERS: readonly string[] = [
   // Drop them only during a full self-heal replay; 064 recreates them before
   // sentinel validation returns control to the app.
   'trg_activity_completion_completed_bi',        // 064 -> activity_occurrence
+  // 077: every trigger names a table created after the rename point.
+  'trg_activity_flexibility_tag_low_demand_bi',   // 077 -> activity_definition
+  'trg_activity_flexibility_tag_low_demand_bu',   // 077 -> activity_definition
+  'trg_activity_definition_flexibility_low_demand_bu', // 077 -> activity_flexibility_tag
   'trg_activity_completion_completed_bu',        // 064 -> activity_occurrence
   // This trigger lives on activity_occurrence and names the later-in-064
   // activity_completion table, so it has the same replay constraint.
@@ -408,11 +444,102 @@ function userVersion(db: MigrationDb): number {
   return Number(db.executeSync('PRAGMA user_version;').rows[0]?.user_version ?? 0);
 }
 
+// Statement-boundary scanner: the token classes and transition table of
+// SQLite's own sqlite3_complete(). A statement ends at a ';' outside strings,
+// comments and quoted names; a CREATE [TEMP] TRIGGER ends only at the ';' that
+// follows its closing END. State 1 is "at a statement boundary".
+const TOKEN_SEMI = 0;
+const TOKEN_SPACE = 1;
+const TOKEN_OTHER = 2;
+const STATEMENT_KEYWORDS: ReadonlyMap<string, number> = new Map([
+  ['explain', 3], ['create', 4], ['temp', 5], ['temporary', 5], ['trigger', 6], ['end', 7],
+]);
+const STATEMENT_TRANSITIONS: readonly (readonly number[])[] = [
+  /* 0 before any input */ [1, 0, 2, 3, 4, 2, 2, 2],
+  /* 1 at a boundary    */ [1, 1, 2, 3, 4, 2, 2, 2],
+  /* 2 in a statement   */ [1, 2, 2, 2, 2, 2, 2, 2],
+  /* 3 after EXPLAIN    */ [1, 3, 3, 2, 4, 2, 2, 2],
+  /* 4 after CREATE     */ [1, 4, 2, 2, 2, 4, 5, 2],
+  /* 5 in a trigger     */ [6, 5, 5, 5, 5, 5, 5, 5],
+  /* 6 trigger, at ';'  */ [6, 6, 5, 5, 5, 5, 5, 7],
+  /* 7 trigger, at END  */ [1, 7, 5, 5, 5, 5, 5, 5],
+];
+const NAME_CHARACTER = /[A-Za-z0-9_$\u0080-￿]/;
+
+/** The statements of a SQL script, in order, each with its own text. Pieces
+ *  that hold only whitespace, comments or a bare ';' are dropped. */
+export function splitSqlStatements(sql: string): string[] {
+  const statements: string[] = [];
+  const length = sql.length;
+  let state = 0;
+  let start = 0;
+  let hasContent = false;
+  let i = 0;
+  while (i < length) {
+    const c = sql.charAt(i);
+    let token = TOKEN_OTHER;
+    if (c === ';') {
+      token = TOKEN_SEMI;
+      i += 1;
+    } else if (c === ' ' || c === '\t' || c === '\n' || c === '\r' || c === '\f') {
+      token = TOKEN_SPACE;
+      i += 1;
+    } else if (c === '/' && sql.charAt(i + 1) === '*') {
+      const close = sql.indexOf('*/', i + 2);
+      token = TOKEN_SPACE;
+      i = close < 0 ? length : close + 2;
+    } else if (c === '-' && sql.charAt(i + 1) === '-') {
+      const lineEnd = sql.indexOf('\n', i);
+      token = TOKEN_SPACE;
+      i = lineEnd < 0 ? length : lineEnd;
+    } else if (c === "'" || c === '"' || c === '`' || c === '[') {
+      // A doubled quote inside a string reads as one string ending and the
+      // next beginning: the same token class either way.
+      const close = sql.indexOf(c === '[' ? ']' : c, i + 1);
+      i = close < 0 ? length : close + 1;
+    } else if (NAME_CHARACTER.test(c)) {
+      let end = i + 1;
+      while (end < length && NAME_CHARACTER.test(sql.charAt(end))) end += 1;
+      token = STATEMENT_KEYWORDS.get(sql.slice(i, end).toLowerCase()) ?? TOKEN_OTHER;
+      i = end;
+    } else {
+      i += 1;
+    }
+    if (token !== TOKEN_SEMI && token !== TOKEN_SPACE) hasContent = true;
+    state = STATEMENT_TRANSITIONS[state]?.[token] ?? state;
+    if (token === TOKEN_SEMI && state === 1) {
+      if (hasContent) statements.push(sql.slice(start, i));
+      start = i;
+      hasContent = false;
+    }
+  }
+  if (hasContent) statements.push(sql.slice(start));
+  return statements;
+}
+
+/**
+ * Runs a multi-statement script one statement per call.
+ *
+ * CI evidence (run 37877632952, iOS test3): the app died with EXC_BAD_ACCESS
+ * inside op-sqlite's executeSync while a new athlete's database was being
+ * built. For one call, op-sqlite 16.2.0 collects the column names of EVERY
+ * statement in the script but keeps each result row at its own statement's
+ * width, then reads every row at the combined width (create_js_rows). A script
+ * with more than one row-returning statement is therefore read past the end of
+ * its rows: usually a harmless garbage value the runner ignores, sometimes a
+ * crash. 032's three row-count assertions are such a script. One statement per
+ * call keeps the two widths equal. (executeRawSync is not an alternative: it
+ * steps only the first statement of a script.)
+ */
+function executeScript(db: MigrationDb, sql: string): void {
+  for (const statement of splitSqlStatements(sql)) db.executeSync(statement);
+}
+
 function applyFrom(db: MigrationDb, migrations: readonly string[], start: number): void {
   for (let v = start; v < migrations.length; v++) {
     db.executeSync('BEGIN');
     try {
-      db.executeSync(migrations[v]);
+      executeScript(db, migrations[v]);
       db.executeSync(`PRAGMA user_version = ${v + 1};`);
       db.executeSync('COMMIT');
     } catch (e) {
@@ -447,7 +574,7 @@ function applyFailClosedRepairs(db: MigrationDb, missing: readonly string[]): vo
 
   db.executeSync('BEGIN');
   try {
-    for (const repairSql of repairs) db.executeSync(repairSql);
+    for (const repairSql of repairs) executeScript(db, repairSql);
     db.executeSync('COMMIT');
   } catch (error) {
     try {
@@ -561,7 +688,20 @@ export function reconcileMigrationLineage(
 
 export function runMigrations(db: MigrationDb, migrations: readonly string[]): void {
   reconcileMigrationLineage(db, migrations);
-  applyFrom(db, migrations, userVersion(db));
+  const beforeVersion = userVersion(db);
+  try {
+    applyFrom(db, migrations, beforeVersion);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    const missingTableMatch = /no such table:\s*([A-Za-z0-9_]+)/i.exec(msg);
+    const missingTable = missingTableMatch?.[1] ?? null;
+    const failingMigrationSql = migrations[userVersion(db)] ?? '';
+    const isSentinelPrerequisite = beforeVersion > 0
+      && missingTable !== null
+      && SENTINELS.some((s) => s.type === 'table' && s.name === missingTable)
+      && !new RegExp(`CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?${missingTable}\\b`, 'i').test(failingMigrationSql);
+    if (!isSentinelPrerequisite) throw e;
+  }
   const missing = sentinelsMissing(db);
   if (missing.length > 0) {
     // user_version lied (poisoned field DB) — re-apply everything; all
@@ -569,11 +709,99 @@ export function runMigrations(db: MigrationDb, migrations: readonly string[]): v
     // first persisted in its conservative state so replay can never widen it.
     applyFailClosedRepairs(db, missing);
     dropReplayBlockingTriggers(db);
+    // Preserve 078-only sport rows (`olympic_weightlifting`, `strongman`, or
+    // `matches_per_week > 14`) across full replay because frozen 076 rebuilds
+    // `athlete_sport_profile` with its older 22-sport / 0..14 CHECK before 078
+    // widens it again. Use a durable STRICT stash table (never TEMP, never dropped in
+    // `finally`) so replay failures or process interruptions cannot discard
+    // existing athlete state and retries reuse the preserved copy.
+    const shouldStash078SportRows =
+      (hasObject(db, 'table', 'athlete_sport_profile') || hasObject(db, 'table', '_ak_replay_stash_078_sport'))
+      && migrations.some((m) => /athlete_sport_profile_078/.test(m));
+    if (shouldStash078SportRows) {
+      const stashExists = hasObject(db, 'table', '_ak_replay_stash_078_sport');
+      db.executeSync('BEGIN');
+      try {
+        if (!stashExists) {
+          db.executeSync(
+            `CREATE TABLE _ak_replay_stash_078_sport (
+               sport_profile_id           INTEGER PRIMARY KEY,
+               sport_id                   TEXT NOT NULL,
+               other_sport_name           TEXT,
+               outcome_id                 TEXT NOT NULL,
+               experience_id              TEXT NOT NULL,
+               practice_sessions_per_week INTEGER,
+               matches_per_week           INTEGER,
+               typical_session_min        INTEGER,
+               competition_date           TEXT,
+               revision                   INTEGER NOT NULL,
+               updated_at_ms              INTEGER NOT NULL
+             ) STRICT;`,
+          );
+        }
+        if (hasObject(db, 'table', 'athlete_sport_profile')) {
+          db.executeSync(
+            `INSERT OR IGNORE INTO _ak_replay_stash_078_sport (
+               sport_profile_id, sport_id, other_sport_name, outcome_id, experience_id,
+               practice_sessions_per_week, matches_per_week, typical_session_min,
+               competition_date, revision, updated_at_ms)
+             SELECT sport_profile_id, sport_id, other_sport_name, outcome_id, experience_id,
+                    practice_sessions_per_week, matches_per_week, typical_session_min,
+                    competition_date, revision, updated_at_ms
+             FROM athlete_sport_profile
+             WHERE sport_id IN ('olympic_weightlifting', 'strongman')
+                OR (matches_per_week IS NOT NULL AND matches_per_week > 14);`,
+          );
+          db.executeSync(
+            `DELETE FROM athlete_sport_profile
+             WHERE sport_id IN ('olympic_weightlifting', 'strongman')
+                OR (matches_per_week IS NOT NULL AND matches_per_week > 14);`,
+          );
+        }
+        db.executeSync('COMMIT');
+      } catch (e) {
+        db.executeSync('ROLLBACK');
+        throw e;
+      }
+    }
     db.executeSync('PRAGMA user_version = 0;');
     applyFrom(db, migrations, 0);
     const still = sentinelsMissing(db);
     if (still.length > 0) {
       throw new Error(`schema incomplete after full re-apply: missing ${still.join(', ')}`);
+    }
+  }
+  // If an earlier replay stashed 078-only sport rows and was interrupted or
+  // resumed via normal applyFrom, restore and verify them before dropping the stash.
+  if (hasObject(db, 'table', '_ak_replay_stash_078_sport') && hasObject(db, 'table', 'athlete_sport_profile')) {
+    db.executeSync('BEGIN');
+    try {
+      db.executeSync(
+        `INSERT OR IGNORE INTO athlete_sport_profile (
+           sport_profile_id, sport_id, other_sport_name, outcome_id, experience_id,
+           practice_sessions_per_week, matches_per_week, typical_session_min,
+           competition_date, revision, updated_at_ms)
+         SELECT sport_profile_id, sport_id, other_sport_name, outcome_id, experience_id,
+                practice_sessions_per_week, matches_per_week, typical_session_min,
+                competition_date, revision, updated_at_ms
+         FROM _ak_replay_stash_078_sport;`,
+      );
+      const missingRestored = db.executeSync(
+        `SELECT COUNT(*) AS n
+           FROM _ak_replay_stash_078_sport s
+          WHERE NOT EXISTS (
+            SELECT 1 FROM athlete_sport_profile p
+             WHERE p.sport_profile_id = s.sport_profile_id
+          );`,
+      ).rows?.[0]?.n;
+      if (Number(missingRestored ?? 0) !== 0) {
+        throw new Error(`failed to restore ${String(missingRestored)} stashed 078 sport profile row(s)`);
+      }
+      db.executeSync('DROP TABLE _ak_replay_stash_078_sport;');
+      db.executeSync('COMMIT');
+    } catch (e) {
+      db.executeSync('ROLLBACK');
+      throw e;
     }
   }
 }

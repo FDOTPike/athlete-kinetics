@@ -1,0 +1,396 @@
+{
+  "bounds": [
+    {
+      "id": 233,
+      "quote": "kneel facing away from the machine and rest the head and the backs of the upper arms on the bench",
+      "bound": "At every 33 ms tick the painted underside of the head ring (head centre y less r + strokeWidth / 2) is at or above the pad top and within 0.5 of it, with the head centre over the pad",
+      "test": "apps/mobile/test/components/MovementPreview.movA12TricepsPush.test.js:330-333"
+    },
+    {
+      "id": 233,
+      "quote": "holding the straight bar with a narrow overhand grip and the elbows bent",
+      "bound": "At every 33 ms tick a hand close-up (palm yaw 0, palm toward the viewer) draws the light palm before a bar more than 6 across, and four fingers after it that wrap over the bar",
+      "test": "apps/mobile/test/components/MovementPreview.movA12TricepsPush.test.js:378-407"
+    },
+    {
+      "id": 233,
+      "quote": "Keeping the upper arms on the bench and close to the head, straighten the elbows until the arms are level with the floor.",
+      "bound": "The bar clears the head by at least head radius + bar radius in 3D and on screen, and the cable from the pulley to the bar clears the head by more than head radius + 0.7, at every tick",
+      "test": "apps/mobile/test/components/MovementPreview.movA12TricepsPush.test.js:128-129, apps/mobile/test/components/MovementPreview.movA12TricepsPush.test.js:361"
+    },
+    {
+      "id": 47,
+      "quote": "Support yourself on parallel bars with arms straight.",
+      "bound": "At every 33 ms tick the centre of mass of head, trunk, arms and legs (Winter fractions) is within 2.0 of the hands fore and aft",
+      "test": "apps/mobile/test/components/MovementPreview.movA12TricepsPush.test.js:506"
+    },
+    {
+      "id": 47,
+      "quote": "Lean slightly forward for more chest, stay upright for more triceps.",
+      "bound": "The forward lean at the bottom is balanced by the hips and legs swinging back, under the same 2.0 centre-of-mass bound at every tick",
+      "test": "apps/mobile/test/components/MovementPreview.movA12TricepsPush.test.js:506"
+    },
+    {
+      "id": 188,
+      "quote": "Hold the palms facing the torso with the arms extended and the elbows slightly bent.",
+      "bound": "The close-up draws the handle along its projected direction: drawn half-length equals 5.4 * |projected handle x| (under 2, nearly end on), horizontal, with both plates drawn face on (wider than 5.5)",
+      "test": "apps/mobile/test/components/MovementPreview.movA09RowsRearRaises.test.js:498-503"
+    },
+    {
+      "id": 188,
+      "quote": "Raise the arms out to the side until the elbows reach shoulder height and the arms are roughly parallel to the floor.",
+      "bound": "The drawn-handle bound holds at the bottom and at the top keyframe of the raise",
+      "test": "apps/mobile/test/components/MovementPreview.movA09RowsRearRaises.test.js:498-503"
+    },
+    {
+      "id": 241,
+      "quote": "Hold the palms facing the torso with the arms extended and the elbows slightly bent.",
+      "bound": "Same drawn-handle bound as 188, at the bottom and the top keyframe",
+      "test": "apps/mobile/test/components/MovementPreview.movA09RowsRearRaises.test.js:498-503"
+    },
+    {
+      "id": 241,
+      "quote": "Lie chest-down on a flat bench with a dumbbell in each hand.",
+      "bound": "Same drawn-handle bound as 188 on the flat-bench variant",
+      "test": "apps/mobile/test/components/MovementPreview.movA09RowsRearRaises.test.js:498-503"
+    },
+    {
+      "id": 205,
+      "quote": "keep pressure through the whole foot",
+      "bound": "At every 33 ms tick the bar and the centre of mass of body and bar (a quarter body mass in each hand) are within 2.0 of the mid-foot fore and aft",
+      "test": "apps/mobile/test/components/MovementPreview.movA15HeldText.test.js:448-449"
+    },
+    {
+      "id": 205,
+      "quote": "Keep pressure through the whole foot. Drive the floor away to stand.",
+      "bound": "The same mid-foot bound holds at the light touch on the bench (bottom keyframe) and through the stand",
+      "test": "apps/mobile/test/components/MovementPreview.movA15HeldText.test.js:448-449"
+    },
+    {
+      "id": 242,
+      "quote": "holding an EZ bar or a straight bar with a medium overhand grip",
+      "bound": "At every 33 ms tick the hand close-up shows palm yaw 0 toward the viewer: light palm behind a bar more than 6 across with four fingers wrapped over it",
+      "test": "apps/mobile/test/components/MovementPreview.movA12TricepsPush.test.js:378-407"
+    },
+    {
+      "id": 242,
+      "quote": "Keeping the upper arms and elbows still, bend the elbows to lower the bar until it is just above the forehead.",
+      "bound": "The grip close-up holds in the hanging hand at the bottom as well as the upright hand at the top",
+      "test": "apps/mobile/test/components/MovementPreview.movA12TricepsPush.test.js:378-407"
+    },
+    {
+      "id": 215,
+      "quote": "holding a barbell overhead with an overhand grip slightly narrower than the shoulders",
+      "bound": "At every 33 ms tick the hand close-up shows palm yaw 0 toward the viewer: light palm behind a bar more than 6 across with four fingers wrapped over it",
+      "test": "apps/mobile/test/components/MovementPreview.movA12TricepsPush.test.js:378-407"
+    },
+    {
+      "id": 215,
+      "quote": "Keeping the upper arms still and close to the head, bend the elbows to lower the bar behind the head.",
+      "bound": "The grip close-up holds while the bar is lowered behind the head (hand turned down)",
+      "test": "apps/mobile/test/components/MovementPreview.movA12TricepsPush.test.js:378-407"
+    },
+    {
+      "id": 250,
+      "quote": "Soften the knees, send the hips back until the posterior chain loads",
+      "bound": "At the hike the knee is a soft hinge, 148 to 162 degrees, not a squat",
+      "test": "apps/mobile/test/components/MovementPreview.movA15HeldText.test.js:518-519"
+    },
+    {
+      "id": 250,
+      "quote": "Send the hips back into the load.",
+      "bound": "At the hike the close-up stays on the working hand: palm yaw 180, back of the hand toward the viewer, handle drawn across with the bell under it",
+      "test": "apps/mobile/test/components/MovementPreview.movA15HeldText.test.js:495-508"
+    },
+    {
+      "id": 166,
+      "quote": "push up fast enough for the hands to leave the floor",
+      "bound": "In the flight keyframe both wrists are more than 7.5 above their start height",
+      "test": "apps/mobile/test/components/MovementPreview.movA12TricepsPush.test.js:587"
+    },
+    {
+      "id": 166,
+      "quote": "repeat, working around the circle until you are back where you started",
+      "bound": "The body turn never runs backward from the start to the reset, the loop has exactly one flight, and no caption says travel back, hop back, go back or the way it came",
+      "test": "apps/mobile/test/components/MovementPreview.movA12TricepsPush.test.js:600-608"
+    },
+    {
+      "id": 195,
+      "quote": "sit on it with the feet on the foot plate and the knees slightly bent",
+      "bound": "Both knees between 158 and 172 degrees",
+      "test": "apps/mobile/test/components/MovementPreview.movA09RowsRearRaises.test.js:218-221"
+    },
+    {
+      "id": 195,
+      "quote": "Torso stays upright and still.",
+      "bound": "Only the feet moved forward to straighten the knees; the trunk and its bounds are unchanged",
+      "test": "apps/mobile/test/components/MovementPreview.movA09RowsRearRaises.test.js:218-221"
+    },
+    {
+      "id": 296,
+      "quote": "lift it toward the chin by raising the elbows up and out to the sides, elbows higher than the hands",
+      "bound": "At the top each hand is within 2.5 below the chin and not above it, with the elbow open to at least 35 degrees",
+      "test": "apps/mobile/test/components/MovementPreview.movA09RowsRearRaises.test.js:356-358"
+    },
+    {
+      "id": 296,
+      "quote": "Elbows lead and stay above the hands.",
+      "bound": "The top hand-to-chin and elbow-opening bounds hold with the existing elbows-above-hands bounds",
+      "test": "apps/mobile/test/components/MovementPreview.movA09RowsRearRaises.test.js:356-358"
+    },
+    {
+      "id": 145,
+      "quote": "Set the torso before the pull.",
+      "bound": "Fixed knee bend 148 to 162 degrees at every tick (about 20 to 30 degrees of bend) under the still torso",
+      "test": "apps/mobile/test/components/MovementPreview.movA15HeldText.test.js:179-180"
+    },
+    {
+      "id": 145,
+      "quote": "Lead with the elbows.",
+      "bound": "The knee bound holds at every tick of the pull",
+      "test": "apps/mobile/test/components/MovementPreview.movA15HeldText.test.js:179-180"
+    },
+    {
+      "id": 153,
+      "quote": "Keep pressure through the whole foot.",
+      "bound": "Ankles 0.95 to 1.25 times the shoulder span apart",
+      "test": "apps/mobile/test/components/MovementPreview.movA15HeldText.test.js:260-261"
+    },
+    {
+      "id": 153,
+      "quote": "Brace before the descent.",
+      "bound": "The narrowed stance keeps the standing legs straight and the seated box bounds",
+      "test": "apps/mobile/test/components/MovementPreview.movA15HeldText.test.js:260-261"
+    }
+  ],
+  "fileQuotes": [
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA12TricepsPush.test.js",
+      "line": 330,
+      "endLine": 331,
+      "text": "      expect(headUnderside).toBeGreaterThanOrEqual(benchTop);\n      expect(headUnderside).toBeLessThanOrEqual(benchTop + 0.5);"
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA12TricepsPush.test.js",
+      "line": 361,
+      "endLine": 361,
+      "text": "      expect(segDist2D(pulley.at, midHold, [g.world.head[0], g.world.head[1]])).toBeGreaterThan(BODY.hr + 0.7);"
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA12TricepsPush.test.js",
+      "line": 403,
+      "endLine": 403,
+      "text": "      expect(palm.i).toBeLessThan(bar.i);"
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA12TricepsPush.test.js",
+      "line": 406,
+      "endLine": 406,
+      "text": "      expect(wrapped).toHaveLength(4);"
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA12TricepsPush.test.js",
+      "line": 506,
+      "endLine": 506,
+      "text": "      expect(Math.abs(systemComX(g.world, 0) - g.world.near.wrist[0])).toBeLessThanOrEqual(2.0);"
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA12TricepsPush.test.js",
+      "line": 587,
+      "endLine": 587,
+      "text": "    expect(flight.world.near.wrist[1]).toBeGreaterThan(start.world.near.wrist[1] + 7.5);"
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA12TricepsPush.test.js",
+      "line": 607,
+      "endLine": 608,
+      "text": "    expect(flights).toBe(1);\n    for (const frame of e.frames) expect(frame.caption).not.toMatch(/travel back|hop back|go back|way it came/i);"
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA09RowsRearRaises.test.js",
+      "line": 218,
+      "endLine": 221,
+      "text": "    expect(nearKneeDeg).toBeGreaterThanOrEqual(158);\n    expect(nearKneeDeg).toBeLessThanOrEqual(172);\n    expect(farKneeDeg).toBeGreaterThanOrEqual(158);\n    expect(farKneeDeg).toBeLessThanOrEqual(172);"
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA09RowsRearRaises.test.js",
+      "line": 356,
+      "endLine": 358,
+      "text": "      expect(s.hold[1]).toBeGreaterThanOrEqual(chinY - 2.5);\n      expect(s.hold[1]).toBeLessThanOrEqual(chinY);\n      expect(deg3D(s.shoulder, s.elbow, s.wrist)).toBeGreaterThanOrEqual(35);"
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA09RowsRearRaises.test.js",
+      "line": 498,
+      "endLine": 499,
+      "text": "        expect(half).toBeCloseTo(5.4 * Math.abs(panel.handleScreenDir[0]), 6);\n        expect(half).toBeLessThan(2.0);"
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA09RowsRearRaises.test.js",
+      "line": 503,
+      "endLine": 503,
+      "text": "        for (const plate of plates) expect(plate.w).toBeGreaterThan(5.5);"
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA15HeldText.test.js",
+      "line": 179,
+      "endLine": 180,
+      "text": "      expect(kneeDeg).toBeGreaterThanOrEqual(148);\n      expect(kneeDeg).toBeLessThanOrEqual(162);"
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA15HeldText.test.js",
+      "line": 260,
+      "endLine": 261,
+      "text": "    expect(stance).toBeGreaterThanOrEqual(0.95 * shoulderSpan);\n    expect(stance).toBeLessThanOrEqual(1.25 * shoulderSpan);"
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA15HeldText.test.js",
+      "line": 448,
+      "endLine": 449,
+      "text": "      expect(Math.abs(w.near.hold[0] - midFootX)).toBeLessThanOrEqual(2.0);\n      expect(Math.abs(systemComX(w, 0.25) - midFootX)).toBeLessThanOrEqual(2.0);"
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA15HeldText.test.js",
+      "line": 495,
+      "endLine": 496,
+      "text": "    expect(panel.palmYaw).toBe(180);\n    expect(panel.palmFacingViewer).toBe(false);"
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA15HeldText.test.js",
+      "line": 518,
+      "endLine": 519,
+      "text": "    expect(hikeKneeDeg).toBeGreaterThanOrEqual(148);\n    expect(hikeKneeDeg).toBeLessThanOrEqual(162);"
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.fingerCurls.test.js",
+      "line": 202,
+      "endLine": 205,
+      "text": "    'lying-triceps-press',\n    'incline-barbell-triceps-extension',\n    'kneeling-cable-triceps-extension',\n    'one-arm-kettlebell-swings',"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 4986,
+      "endLine": 4986,
+      "text": "        thigh: 0, shin: 0, ankle: [43.5, 13], foot: 80,"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5031,
+      "endLine": 5031,
+      "text": "        wrist: [6.9, CHAIN_STANDING_SHOULDER + 2.0, 6.8],"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5234,
+      "endLine": 5234,
+      "text": "      { kind: 'pulley', at: [8, 86] },"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5241,
+      "endLine": 5241,
+      "text": "        trunk: 4, head: 38, upperArm: [0, -7], forearm: [104, -7], hand: [104, -7], palmYaw: 0, farPalmYaw: 0,"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5245,
+      "endLine": 5245,
+      "text": "        trunk: 4, head: 38, upperArm: [0, -7], forearm: [0, -7], hand: [0, -7], palmYaw: 0, farPalmYaw: 0,"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5294,
+      "endLine": 5294,
+      "text": "        at: [-0.256, 50.695], trunk: 87, head: 88,"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5301,
+      "endLine": 5301,
+      "text": "        at: [1.581, 39.111], trunk: 71, head: 80,"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5395,
+      "endLine": 5395,
+      "text": "        poseAt(23.0, 0, 0, 11.4),"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5399,
+      "endLine": 5399,
+      "text": "        poseAt(14.5, 0, 0, 2.35),"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5426,
+      "endLine": 5426,
+      "text": "        at: [0, 44.5], trunk: 24, head: 30,"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5456,
+      "endLine": 5456,
+      "text": "    footSpread: 3.6,"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5474,
+      "endLine": 5474,
+      "text": "        at: [1.8, 46.43], trunk: 86, head: 90, thigh: -90, shin: -90,"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5555,
+      "endLine": 5555,
+      "text": "      ...chainFlatBench(-30, -5, 20.2),"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5568,
+      "endLine": 5568,
+      "text": "        at: [-6.8, 23.032], trunk: 71, head: 90, thigh: -90, shin: -90,"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5589,
+      "endLine": 5589,
+      "text": "    closeUp: { at: [-30, 66], r: 12.5, scale: 4.2, zoom: 1, hand: 'near' },"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5592,
+      "endLine": 5592,
+      "text": "        at: [-8.5, 44.7], trunk: 30, head: 36, thigh: -90, shin: -90,"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 6197,
+      "endLine": 6197,
+      "text": "        if ((kind === 'bar' || kind === 'ez' || kind === 'cableBar') && facing) {"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 6243,
+      "endLine": 6243,
+      "text": "          const hHalf = Math.max(0.9, Math.abs(hDx) * 5.4);"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 6477,
+      "endLine": 6477,
+      "text": "  const useFar = closeUp.hand !== 'near'"
+    },
+    {
+      "file": "tools/rendering/chain_motion_specs.mjs",
+      "line": 2591,
+      "endLine": 2591,
+      "text": "    phases: [0, 1, 2, 3, 4, 5, 6],"
+    },
+    {
+      "file": "tools/rendering/chain_motion_specs.mjs",
+      "line": 2599,
+      "endLine": 2599,
+      "text": "      'Repeat the hop a step further round each time, working around the circle until you are back where you started.',"
+    }
+  ]
+}

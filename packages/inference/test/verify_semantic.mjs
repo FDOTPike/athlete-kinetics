@@ -64,6 +64,29 @@ check('loadCodebase rejects misaligned vectors', (() => {
   try { cbMod.loadCodebase(codebase, vecFile.vectors.slice(1)); return false; } catch { return true; }
 })());
 
+// Clause-scoped denial and positive safety controls, independent of the embedder.
+for (const [text, pain, systemic] of [
+  ['no knee pain', false, false], ['zero lower back pain', false, false],
+  ['free of shoulder pain', false, false], ['no knee pain, chest is fine, shoulder tight', false, false],
+  ['no knee pain, but sharp pain in left hip', true, false], ['knee pain is zero', false, false],
+  ['shoulder pain resolved', false, false], ['was dizzy yesterday but fine now', false, false],
+  ['sharp pain in left knee', true, false], ['chest tightness on bench', false, true],
+  ['no chest tightness on bench', false, false], ['sharp pain in chest during bench press, feeling dizzy', true, true],
+  ['not dizzy but dizzy now', false, true], ['was dizzy yesterday but fine now, dizzy again', false, true],
+  ['no pain and dizzy', false, true], ['knee pain and dizzy resolved', true, false],
+  ['sharp knee pain is zero', false, false],
+  ['sharp, knee', true, false],
+  ['no relief from dizziness', false, true],
+  ['dizzy not gone', false, true],
+  ['was dizzy yesterday but not fine now', false, true],
+  ['was dizzy yesterday but my knee is fine now', false, true],
+  ['not suffering from dizziness', false, false],
+  ['not dizzy or nauseous', false, false],
+]) {
+  const result = redFlag.scanRedFlags(text);
+  check(`red flag clause: ${text}`, result.pain === pain && result.systemic === systemic);
+}
+
 // --- 3. live routing with the production embedding model ------------------------
 console.log('[3] live routing (embedding real queries with MiniLM)');
 const { pipeline } = await import('@xenova/transformers');
@@ -201,6 +224,90 @@ check('systemic language ends in a halt (curated or override)',
 r5 = await resolveLive('feeling amazing, weights are flying up');
 check('clean positive report untouched by the override layer',
   !r5.overrideApplied && r5.entry?.id === 'positive-strong');
+
+
+// 5d. systemic language beside a confident curated match that does not halt
+// (decision of 2026-10-13, DEVIATION_LOG.md).
+//
+// First with fixed inputs, so the rule is pinned whatever the embedder does:
+// the resolver is handed a match directly.
+{
+  const entryById = (id) => loaded.entries.find((e) => e.id === id);
+  const matched = (id, confident = true) => ({ entry: entryById(id), similarity: 0.9, confident });
+  const routine = loaded.entries.filter((e) => ['pain', 'illness', 'fatigue'].includes(e.category) && e.guardrail.halt === false);
+  const halting = loaded.entries.filter((e) => ['pain', 'illness', 'fatigue'].includes(e.category) && e.guardrail.halt === true);
+  const outside = loaded.entries.filter((e) => !['pain', 'illness', 'fatigue'].includes(e.category));
+  check('fixture: the codebase has curated entries that restrict, curated entries that halt, and entries outside the curated categories',
+    routine.length >= 3 && halting.length >= 2 && outside.length >= 2, `${routine.length}/${halting.length}/${outside.length}`);
+  check('fixed inputs: systemic language beside EVERY confident curated entry that does not halt is a systemic halt',
+    routine.every((e) => {
+      const r = redFlag.resolveReport('i feel dizzy', matched(e.id));
+      return r.entry.id === 'red-flag-systemic' && r.entry.guardrail.halt === true && r.overrideApplied && r.confident;
+    }));
+  check('fixed inputs: beside every confident curated entry that already halts, that entry is kept as it is',
+    halting.every((e) => {
+      const r = redFlag.resolveReport('i feel dizzy', matched(e.id));
+      return r.entry.id === e.id && !r.overrideApplied;
+    }));
+  check('fixed inputs: a pain word beside every confident curated entry, halting or not, still yields to it',
+    [...routine, ...halting].every((e) => {
+      const r = redFlag.resolveReport('my knee hurts', matched(e.id));
+      return r.entry.id === e.id && !r.overrideApplied;
+    }));
+  check('fixed inputs: outside the curated categories, and below the gate, the override is what it always was',
+    outside.every((e) => redFlag.resolveReport('i feel dizzy', matched(e.id)).entry.id === 'red-flag-systemic'
+      && redFlag.resolveReport('my knee hurts', matched(e.id)).entry.id === redFlag.RED_FLAG_PAIN.id)
+    && routine.every((e) => redFlag.resolveReport('i feel dizzy', matched(e.id, false)).entry.id === 'red-flag-systemic'));
+  check('fixed inputs: with no flag in the text, a confident match is returned untouched',
+    [...routine, ...halting, ...outside].every((e) => {
+      const r = redFlag.resolveReport('all moving well today', matched(e.id));
+      return r.entry.id === e.id && !r.overrideApplied;
+    }));
+}
+// Then through the live embedder. Before this change each of the three reports
+// below left with a soreness or fatigue adjustment and no halt.
+for (const text of [
+  'hamstrings are tight and sore and i feel faint between sets',
+  'really tired today and a bit lightheaded on the warm up',
+  'quads ache from squats and i feel nauseous',
+]) {
+  // The precondition, asserted so that the check below cannot pass for another reason (a match that
+  // drifts below the gate, or into a category outside the curated set, was always overridden).
+  const alone = triageMod.triage(await embedOne(text), loaded);
+  check(`  precondition: the match alone is confident, curated and does not halt: "${text}"`,
+    alone.confident === true && alone.entry !== null && ['pain', 'illness', 'fatigue'].includes(alone.entry.category)
+      && alone.entry.guardrail.halt === false, `${alone.entry?.id} ${alone.similarity.toFixed(3)}`);
+  r5 = await resolveLive(text);
+  check(`systemic language beside a routine match halts: "${text}"`,
+    r5.confident && r5.overrideApplied && r5.entry?.id === 'red-flag-systemic' && r5.entry.guardrail.halt === true,
+    `${r5.entry?.id} override=${r5.overrideApplied}`);
+  // The keyword layer alone gives the same answer, so the report halts whether or not the embedder is available.
+  const keywordOnly = redFlag.resolveReport(text, null);
+  check(`  ... and identically with the embedder unavailable`, keywordOnly.entry?.id === 'red-flag-systemic');
+}
+// What the change does NOT touch.
+r5 = await resolveLive('legs are sore from yesterday and i got dizzy standing up');
+check('a curated match that already halts keeps its own entry and wording',
+  r5.entry?.id === 'dizzy' && r5.entry.guardrail.halt === true && !r5.overrideApplied, r5.entry?.id);
+r5 = await resolveLive('quads still hurt from the last squat day');
+check('a pain word beside a confident routine match is still not raised to the pain floor (only systemic language outranks a match)',
+  !r5.overrideApplied && r5.entry?.guardrail.halt === false, `${r5.entry?.id} override=${r5.overrideApplied}`);
+r5 = await resolveLive('quads are sore from squats, not dizzy');
+check('a denial the one-word negation check catches is read as it was',
+  redFlag.scanRedFlags('quads are sore from squats, not dizzy').systemic === false && !r5.overrideApplied,
+  `${r5.entry?.id} override=${r5.overrideApplied}`);
+// The three-token window now recognizes the previously pinned denial.
+{
+  const alone = triageMod.triage(await embedOne('back muscles are sore but i am not feeling dizzy'), loaded);
+  check('precondition: the match alone is confident, curated and does not halt',
+    alone.confident === true && alone.entry !== null && ['pain', 'illness', 'fatigue'].includes(alone.entry.category)
+      && alone.entry.guardrail.halt === false, `${alone.entry?.id} ${alone.similarity.toFixed(3)}`);
+}
+r5 = await resolveLive('back muscles are sore but i am not feeling dizzy');
+check('a denial two words back is recognized',
+  redFlag.scanRedFlags('back muscles are sore but i am not feeling dizzy').systemic === false
+    && !r5.overrideApplied,
+  `${r5.entry?.id} override=${r5.overrideApplied}`);
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}  (routing ${routedOk}/${CASES.length})`);
 process.exit(fail ? 1 : 0);

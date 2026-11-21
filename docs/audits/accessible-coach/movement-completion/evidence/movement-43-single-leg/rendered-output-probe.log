@@ -1,0 +1,18 @@
+source commit: 019668f6c9bf55dfb9fe272870cbf732adf5a16f
+command: rendered-output probe (real MovementPreview, neutral figure, every 33 ms tick) compared with probe-c7b5556f4767ff789c7ed572a863989ec1be0115.json
+
+movements measured: 232 (baseline 224)
+added: 18 Bulgarian Split Squat; 36 Barbell Step-Up; 56 Dumbbell Step-Up; 136 Barbell Lunge; 194 Elevated Back Lunge; 239 Lunge Pass Through; 67 Kettlebell Pistol Squat; 96 Standing Barbell Calf Raise
+removed: none
+changed, expected: none
+changed, NOT expected: none
+movements with overflow above 1e-6 dp: none
+  18 Bulgarian Split Squat: drawn 8db9f80adefd9b9fe7b27a8e2bf9c831a01d89195e23b9d452f9e8ec28273fc1 captions 541b056d5db8bdf10f557904d7974ae5fb5942f07607c0173936f2754a75ac48 stage 166.15x240.00 cycle 2900 ms
+  36 Barbell Step-Up: drawn f57cf5e192c9e44a6fad58270fdb44726dbb81b732f253dc32201803bfdc3163 captions 5c473502563a768b4b760bccd9c3ab31d425da6d7a8ac70da85d3a464e4f58f9 stage 94.29x240.00 cycle 3400 ms
+  56 Dumbbell Step-Up: drawn fedaeafa6acc34cb88ff418592872e4cfcfb7ac6fe37a1fb2fa3bea5339770f6 captions e9a26a979dd90530e8507b891dff3f007b0d70a2122ca8ca46caf12339d29acb stage 85.71x240.00 cycle 3400 ms
+  136 Barbell Lunge: drawn 45df09f0934aed84815587a2a6787f2c69cb7885391aa3412f8c2e0787fe2c6f captions d65bdba42d3208272f0d2015aa0b8eaae4eeb1fc95fae5f8492909612c29491e stage 139.35x240.00 cycle 3350 ms
+  194 Elevated Back Lunge: drawn e95d4a16fcfb0dcd20d285c6a2342e571eed3a899630991ca73d5ac424ec27d8 captions eb43d40bb2b7dd9aea1ea9f8d856a9a64977a3646d22c8ea0a17a4ed784515b1 stage 135.76x240.00 cycle 4400 ms
+  239 Lunge Pass Through: drawn b09fc499785c5362a1ea735a33c635f525b2ee3acb6a45e5c87a79018138bd0a captions f8d4418287f0ac50cb791d2b3da44b734dc993248ed07df5ea81084eaaf24a21 stage 133.04x240.00 cycle 4000 ms
+  67 Kettlebell Pistol Squat: drawn eb27ed0b2bb0a82b3fff354aac0f1c000d550f839812acfb8ab365f836f13853 captions 965a6cfe2b659f2aa6bdde305132e38ebeb3f212cb8d9054006d51bd8447d900 stage 164.35x240.00 cycle 3400 ms
+  96 Standing Barbell Calf Raise: drawn 96039019a291a3580da29ce49a9405ebff41f54391412fa1fde6b1d234cdf443 captions d31b25100050f998cd5f8b426e3ad49ff54d95ec8f38e708c2ff2ca39da1ea6f stage 89.41x240.00 cycle 2900 ms
+exit code: 0 (probe run exit 0)

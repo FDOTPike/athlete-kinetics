@@ -89,6 +89,7 @@ Selection remains uncapped while dose remains non-increasing and bounded. Suppor
 | **Autopilot: Strong Threshold** | `0.4` | `kinematicAutopilot.ts:STRONG_THRESHOLD` | Frozen strong-signal threshold |
 | **Layoff: Gap Trigger Threshold** | `21 days` | `returnFromLayoff.ts:LAYOFF_GAP_DAYS` | Frozen check-in trigger; NOT a dose value |
 | **Lift Anchor Coefficients** | `1.0` | `011_lift_anchor.sql` / `movement_family` | Frozen anchor values (Squat, Bench, DL, OHP) |
+| **e1RM: Minimum Qualifying RPE Floor** | `6.0` | `e1rm.ts:estimateOneRepMax` / `E1RM_RPE_FLOOR_2026-10-15.md` | Effort floor (`rpe < 6` yields `null`); pinned by behaviour in `verify_policy.mjs` [10] |
 
 **Return-to-training dose modifiers: NONE.** Ratification §5 forbids any executor from
 inventing a return-to-training dose modifier, and §4 forbids the check-in from changing

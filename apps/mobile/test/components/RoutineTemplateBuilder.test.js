@@ -182,8 +182,8 @@ describe('RoutineTemplateBuilder', () => {
       fireEvent.press(infoButton);
       expect(screen.getByRole('header', { name: tooltipTerm })).toBeOnTheScreen();
       expect(screen.getByTestId('info-tip-dialog').props.accessibilityViewIsModal).toBe(true);
-      fireEvent.press(screen.getByLabelText('Dismiss explanation'));
-      expect(screen.queryByLabelText('Dismiss explanation')).toBeNull();
+      fireEvent.press(screen.getByLabelText('Close, dismiss explanation'));
+      expect(screen.queryByLabelText('Close, dismiss explanation')).toBeNull();
     }
   });
 

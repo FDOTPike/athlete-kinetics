@@ -15,8 +15,12 @@
  *     targetPct(reps, rpe) = 1 / (1 + (reps + max(0, 10 - rpe)) / 30)
  *
  * It is used forward — known 1RM -> target load. This module reads the SAME
- * function backwards. There is no second formula, no new coefficient, and no
- * threshold. Calibration Policy v1 section 5 is therefore not engaged.
+ * function backwards, with no second formula. The qualifying effort floor is
+ * RPE 6 (`rpe < 6` yields `null`; 6.0 qualifies, 5.5 and lower do not), the
+ * owner's rule (Francis, 2026-10-15):
+ * "anything below rpe 6 shouldnt even qualify"
+ * Recorded in `docs/decisions/E1RM_RPE_FLOOR_2026-10-15.md` and in
+ * `docs/decisions/CALIBRATION_POLICY_V1.md` section 5.
  *
  * WHAT THIS IS NOT
  * Not a plateau detector. It carries no minimal-detectable-change value, no
@@ -26,9 +30,9 @@
  * and nothing here may feed `one_rep_max`, which stays the single athlete-entered
  * source of truth for forward load targeting.
  *
- * Machine-checked in verify:blocks, including a negative invariant on the export
- * surface — this file exports exactly two functions and no constant, so a
- * threshold cannot be smuggled in later without turning the gate red.
+ * Machine-checked in verify:blocks and verify:policy, including a negative
+ * invariant on the export surface — this file exports exactly two functions and
+ * no constant.
  */
 import { targetPct } from './blockGenerator';
 
@@ -60,6 +64,9 @@ export interface E1rmPoint {
  * Returns `null` — never a fallback, never a default — when:
  *   - `rpe` is null. A set logged without effort carries no intensity anchor,
  *     and assuming one would fabricate the very signal being measured.
+ *   - `rpe < 6`. By the owner's rule (`docs/decisions/E1RM_RPE_FLOOR_2026-10-15.md`,
+ *     `docs/decisions/CALIBRATION_POLICY_V1.md` section 5), a set reported
+ *     strictly below RPE 6 does not qualify for an estimated 1RM.
  *   - `reps < 1`, `loadKg <= 0`, or any input is non-finite.
  *   - `rpe` falls outside the 0..10 CHECK domain of `set_record.rpe`.
  *
@@ -75,7 +82,7 @@ export function estimateOneRepMax(
   if (rpe === null) return null;
   if (!Number.isFinite(loadKg) || !Number.isFinite(reps) || !Number.isFinite(rpe)) return null;
   if (loadKg <= 0 || reps < 1) return null;
-  if (rpe < 0 || rpe > 10) return null;
+  if (rpe < 6 || rpe > 10) return null;
   const pct = targetPct(reps, rpe);
   if (!Number.isFinite(pct) || pct <= 0) return null;
   return loadKg / pct;
@@ -83,9 +90,9 @@ export function estimateOneRepMax(
 
 /**
  * Collapses logged sets into one point per session — the highest estimate that
- * session produced. Sets yielding `null` contribute nothing; a session in which
- * every set was logged without an RPE produces no point at all rather than a
- * zero or a gap-filled value.
+ * session produced. Sets yielding `null` (including unrated sets and sets below
+ * RPE 6) contribute nothing; a session in which every set yields `null`
+ * produces no point at all rather than a zero or a gap-filled value.
  *
  * Deterministic: ties resolve to the lowest `set_id`, and the result is ordered
  * by `session_date` then `session_id`. Pure — the input array is not mutated.

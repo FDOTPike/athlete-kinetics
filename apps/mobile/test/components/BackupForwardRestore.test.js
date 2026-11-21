@@ -237,7 +237,7 @@ function makeDatabase(path, contract, label) {
 }
 
 const open = (path) => new DatabaseSync(path);
-const schemaObjects = (db) => db.prepare("SELECT type,name,tbl_name,coalesce(sql,'') AS sql FROM sqlite_master WHERE type IN ('table','index','trigger') AND name NOT LIKE 'sqlite_%' ORDER BY type,name").all()
+const schemaObjects = (db) => db.prepare("SELECT type,name,tbl_name,coalesce(sql,'') AS sql FROM sqlite_master WHERE type IN ('table','index','trigger') AND name NOT GLOB 'sqlite_*' ORDER BY type,name").all()
   .map((object) => [object.type, object.name, object.tbl_name, object.sql, object.type === 'table'
     ? db.prepare(`PRAGMA table_info("${object.name.replaceAll('"', '""')}")`).all()
       .map((column) => [column.cid, column.name, column.type, column.notnull, column.dflt_value, column.pk]) : []]);
@@ -299,6 +299,7 @@ const telemetryRows = (path) => {
     return JSON.stringify({
       hrv: db.prepare('SELECT * FROM hrv_daily ORDER BY date').all(),
       restingHr: hasTable(db, 'resting_hr_daily') ? db.prepare('SELECT * FROM resting_hr_daily ORDER BY date').all() : [],
+      kinestrike: hasTable(db, 'state_vector_kinestrike') ? db.prepare('SELECT * FROM state_vector_kinestrike ORDER BY date').all() : [],
     });
   } finally { db.close(); }
 };
@@ -495,6 +496,7 @@ function expectForwardRestored(legacy) {
     // an empty resting_hr_daily and copies or invents nothing into it.
     expect(telemetryRows(path)).toBe(legacy.telemetry[key]);
     expect(JSON.parse(telemetryRows(path)).restingHr).toEqual([]);
+    expect(JSON.parse(telemetryRows(path)).kinestrike).toEqual([]);
     // The forward migration brought the library text up to date: all 115 v2
     // corrections applied, only the deliberately held template rows remain.
     expect(coachingText(path)).toEqual({ v2Corrections: 115, templateRows: 29 });
@@ -702,7 +704,65 @@ describe('every registered pre-upgrade schema restores, not only the first', () 
     const v68 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 68);
     expect(v68.fingerprint).not.toBe(v67.fingerprint);
     expect([v68.migrationSlot, v68.tableCount]).toEqual([69, v67.tableCount + 1]);
-    expect(PRE_UPGRADE.length).toBeGreaterThanOrEqual(5);
+    // 070 adds a table too (session_feel), so v69 has a fingerprint of its own.
+    const v69 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 69);
+    expect(v69.fingerprint).not.toBe(v68.fingerprint);
+    expect([v69.migrationSlot, v69.tableCount]).toEqual([70, v68.tableCount + 1]);
+    // 071 adds two tables (session_skipped_slot, set_load_shown), giving v70 its own fingerprint.
+    const v70 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 70);
+    expect(v70).not.toBe(CURRENT);
+    const v71 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 71);
+    expect(v71).not.toBe(CURRENT);
+    expect(v71.fingerprint).not.toBe(v70.fingerprint);
+    expect([v71.migrationSlot, v71.tableCount]).toEqual([72, v70.tableCount + 1]);
+    const v72 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 72);
+    expect(v72).not.toBe(CURRENT);
+    expect(v72.fingerprint).not.toBe(v71.fingerprint);
+    expect([v72.migrationSlot, v72.tableCount]).toEqual([73, v71.tableCount + 1]);
+    // 074 (issue #220): session_feel rebuilt, one side-car table added.
+    const v73 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 73);
+    expect(v73).not.toBe(CURRENT);
+    expect(v73.fingerprint).not.toBe(v72.fingerprint);
+    expect([v73.migrationSlot, v73.tableCount]).toEqual([74, v72.tableCount + 1]);
+    // 075 (issue #144): one side-car table added for the planned set count.
+    const v74 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 74);
+    expect(v74).not.toBe(CURRENT);
+    expect(v74.fingerprint).not.toBe(v73.fingerprint);
+    expect([v74.migrationSlot, v74.tableCount]).toEqual([75, v73.tableCount + 1]);
+    // 076 (WO-02 v12): athlete_sport_profile rebuilt with the 22 sport ids.
+    // A rebuild keeps the table count and changes only the schema fingerprint.
+    const v75 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 75);
+    expect(v75).not.toBe(CURRENT);
+    expect(v75.fingerprint).not.toBe(v74.fingerprint);
+    expect([v75.migrationSlot, v75.tableCount]).toEqual([76, v74.tableCount]);
+    // 077 adds two side-car tables.
+    const v76 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 76);
+    expect(v76).not.toBe(CURRENT);
+    expect(v76.fingerprint).not.toBe(v75.fingerprint);
+    expect([v76.migrationSlot, v76.tableCount]).toEqual([77, v75.tableCount + 2]);
+    // 078 (WO-KS-BRIDGE-02): one side-car table added for KineStrike telemetry.
+    const v77 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 77);
+    expect(v77).not.toBe(CURRENT);
+    expect(v77.fingerprint).not.toBe(v76.fingerprint);
+    expect([v77.migrationSlot, v77.tableCount]).toEqual([78, v76.tableCount + 1]);
+    // 079 adds a swap-cause side-car.
+    const v78 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 78);
+    expect(v78).not.toBe(CURRENT);
+    expect(v78.fingerprint).not.toBe(v77.fingerprint);
+    expect([v78.migrationSlot, v78.tableCount]).toEqual([79, v77.tableCount + 1]);
+    // 080 adds a reference catalog and four strength/meet side-cars.
+    const v79 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 79);
+    expect(v79).not.toBe(CURRENT);
+    expect(v79.fingerprint).not.toBe(v78.fingerprint);
+    expect([v79.migrationSlot, v79.tableCount]).toEqual([80, v78.tableCount + 5]);
+    // 081 (#228) adds six additive program-control side-car tables.
+    const v80 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 80);
+    expect(v80).toBe(CURRENT);
+    expect(v80.fingerprint).not.toBe(v79.fingerprint);
+    expect([v80.migrationSlot, v80.tableCount]).toEqual([81, v79.tableCount + 6]);
+    expect(v70.fingerprint).not.toBe(v69.fingerprint);
+    expect([v70.migrationSlot, v70.tableCount]).toEqual([71, v69.tableCount + 2]);
+    expect(PRE_UPGRADE.length).toBeGreaterThanOrEqual(7);
   });
 
   test.each(PRE_UPGRADE.map((contract) => [contract.userVersion, contract]))(
@@ -783,21 +843,79 @@ describe('every registered pre-upgrade schema restores, not only the first', () 
   );
 });
 
-test('round trip at the current schema: focus, goals, every revision and measurement, the sport answer, goal exercise, block explanation and resting heart rate survive backup and restore', async () => {
+test('round trip at the current schema: focus, goals, every revision and measurement, the sport answer, goal exercise, block explanation, resting heart rate, session feel, skipped slots and shown loads survive backup and restore', async () => {
   const livePath = join(mockLibraryDir, 'athlete_kinetics.db');
   const db = open(livePath);
   seedFocusAndGoals(db);
   seedSportAndEmphasis(db);
   seedLegacyHrv(db);
-  // Resting HR with no HRV beside it, from each service (069).
+  // Resting HR with no HRV beside it, from each service (069), plus KineStrike telemetry (078).
   db.exec(`INSERT INTO resting_hr_daily (date, bpm, source, synced_at_ms) VALUES
-    ('2026-09-03', 54.5, 'apple_health', 8000), ('2026-09-04', 49, 'health_connect', 8100)`);
+    ('2026-09-03', 54.5, 'apple_health', 8000), ('2026-09-04', 49, 'health_connect', 8100);
+    INSERT INTO state_vector_kinestrike
+      (date, ks_foot, ks_strike_count, ks_gct_mean_ms, ks_gct_delta_pct, ks_cop_x_mean, ks_fall_last_state)
+      VALUES ('2026-09-05', 'L', 28, 242.5, 7.6, 0.48, 'IDLE')`);
+  // 070 and 071: how a finished session went, a slot that was skipped in it, and
+  // what two of its sets were seeded with (a load, and a blank field with an advisory).
+  db.exec(`INSERT INTO session (session_id, micro_cycle_id, session_date, started_at_ms) VALUES (7100, NULL, '2026-09-05', 9000);
+    INSERT INTO session_feel (session_id, feel, reason_tired, recorded_at_ms) VALUES (7100, 'harder', 1, 9500);
+    INSERT INTO session_plan_slot (session_plan_slot_id, session_id, slot_index, movement_id, planned_sets, provenance_kind)
+      VALUES (7101, 7100, 0, 1, 3, 'free_form'), (7102, 7100, 1, 2, 3, 'free_form');
+    INSERT INTO set_record (set_id, session_id, movement_id, set_index, reps, load_kg, rpe, logged_at_ms)
+      VALUES (7101, 7100, 1, 1, 8, 40, 7, 9100), (7102, 7100, 1, 2, 8, 42.5, NULL, 9200);
+    INSERT INTO session_skipped_slot (session_plan_slot_id) VALUES (7102);
+    INSERT INTO set_load_shown (set_id, load_source, shown_load_kg, advisory_kg, advisory_kind)
+      VALUES (7101, 'history', 40, NULL, NULL), (7102, 'manual', NULL, 45, 'onerm');
+    INSERT INTO question_log (asked_at, question_text, outcome_kind, glossary_term_id) VALUES (9501, 'private-question', 'card', 'RPE');`);
   db.close();
+  const sessionRecords = (file) => {
+    const reader = open(file);
+    try {
+      return JSON.stringify({
+        feel: reader.prepare('SELECT * FROM session_feel ORDER BY session_id').all(),
+        skipped: reader.prepare('SELECT * FROM session_skipped_slot ORDER BY session_plan_slot_id').all(),
+        shown: reader.prepare('SELECT * FROM set_load_shown ORDER BY set_id').all(),
+        questions: reader.prepare('SELECT * FROM question_log ORDER BY id').all(),
+      });
+    } finally { reader.close(); }
+  };
+  const recordsBefore = sessionRecords(livePath);
+  // Seed a neutral swap cause row (078) on one of the session's plan slots so
+  // current-schema backup round-trip and CASCADE delete are covered end to end.
+  const causeDb = open(livePath);
+  let seededSlotId;
+  try {
+    seededSlotId = Number(causeDb.prepare('SELECT session_plan_slot_id FROM session_plan_slot WHERE session_id = 7100 ORDER BY session_plan_slot_id LIMIT 1').get().session_plan_slot_id);
+    causeDb.prepare(
+      'INSERT INTO session_slot_swap_cause (session_plan_slot_id, cause, scope, replaced_movement_id, recorded_at_ms) VALUES (?, ?, ?, ?, ?)',
+    ).run(seededSlotId, 'equipment_busy', 'rest_of_block', 1, 9600);
+  } finally { causeDb.close(); }
+  const swapCauseRows = (path) => {
+    const reader = open(path);
+    try {
+      return hasTable(reader, 'session_slot_swap_cause')
+        ? reader.prepare('SELECT session_plan_slot_id, cause, scope, replaced_movement_id, recorded_at_ms FROM session_slot_swap_cause ORDER BY session_plan_slot_id').all()
+        : [];
+    } finally { reader.close(); }
+  };
+  const swapCauseBefore = swapCauseRows(livePath);
+  expect(swapCauseBefore).toEqual([
+    { session_plan_slot_id: seededSlotId, cause: 'equipment_busy', scope: 'rest_of_block', replaced_movement_id: 1, recorded_at_ms: 9600 },
+  ]);
+  expect(JSON.parse(recordsBefore)).toMatchObject({
+    feel: [{ session_id: 7100, feel: 'harder' }],
+    questions: [{ id: 1, asked_at: 9501, question_text: 'private-question', outcome_kind: 'card', glossary_term_id: 'RPE' }],
+    skipped: [{ session_plan_slot_id: 7102 }],
+    shown: [{ set_id: 7101, load_source: 'history', shown_load_kg: 40 }, { set_id: 7102, load_source: 'manual', shown_load_kg: null, advisory_kg: 45, advisory_kind: 'onerm' }],
+  });
   const before = {
     athlete: athleteData(livePath), focusGoals: focusGoalRows(livePath), seeds: seedCounts(livePath), sport: sportRows(livePath),
     telemetry: telemetryRows(livePath),
   };
   expect(JSON.parse(before.telemetry).restingHr).toHaveLength(2);
+  expect(JSON.parse(before.telemetry).kinestrike).toEqual([
+    expect.objectContaining({ date: '2026-09-05', ks_foot: 'L', ks_strike_count: 28, ks_gct_delta_pct: 7.6 }),
+  ]);
   expect(JSON.parse(before.sport)).toMatchObject({ sport: [{ sport_id: 'other', revision: 3 }], links: [{ movement_id: 1 }] });
   expect(JSON.parse(before.sport).emphasis).toHaveLength(1);
   expect(JSON.parse(before.focusGoals)).toMatchObject({ focus: [{ bundle_id: 'lower_body', revision: 2 }] });
@@ -810,15 +928,20 @@ test('round trip at the current schema: focus, goals, every revision and measure
   expect(readFileSync(mockSavedBackupPath, 'utf8')).not.toContain('private-reason');
   expect(readFileSync(mockSavedBackupPath, 'utf8')).not.toContain('private-sport');
   expect(readFileSync(mockSavedBackupPath, 'utf8')).not.toContain('private-report');
+  expect(readFileSync(mockSavedBackupPath, 'utf8')).not.toContain('private-question');
 
   // Lose the data, then restore. Deleting the goal is the one supported way
   // to remove its revisions and measurements (they cascade with it).
   const wipe = open(livePath);
   wipe.exec('PRAGMA foreign_keys = ON; DELETE FROM athlete_goal; DELETE FROM athlete_focus;'
     + ' DELETE FROM athlete_sport_profile; DELETE FROM training_block;'
-    + ' DELETE FROM hrv_daily; DELETE FROM resting_hr_daily;');
+    + ' DELETE FROM hrv_daily; DELETE FROM resting_hr_daily; DELETE FROM state_vector_kinestrike;'
+    + ' DELETE FROM session WHERE session_id = 7100; DELETE FROM question_log;');
   wipe.close();
-  expect(JSON.parse(telemetryRows(livePath))).toEqual({ hrv: [], restingHr: [] });
+  // The session's records went with it.
+  expect(JSON.parse(sessionRecords(livePath))).toEqual({ feel: [], skipped: [], shown: [], questions: [] });
+  expect(swapCauseRows(livePath)).toEqual([]);
+  expect(JSON.parse(telemetryRows(livePath))).toEqual({ hrv: [], restingHr: [], kinestrike: [] });
   expect(focusGoalRows(livePath)).toBe(NO_FOCUS_OR_GOALS);
   // The goal link and the block explanation went with their parents.
   expect(sportRows(livePath)).toBe(NO_SPORT_OR_EMPHASIS);
@@ -833,6 +956,8 @@ test('round trip at the current schema: focus, goals, every revision and measure
   expect(focusGoalRows(livePath)).toBe(before.focusGoals);
   expect(sportRows(livePath)).toBe(before.sport);
   expect(telemetryRows(livePath)).toBe(before.telemetry);
+  expect(sessionRecords(livePath)).toBe(recordsBefore);
+  expect(swapCauseRows(livePath)).toEqual(swapCauseBefore);
   expect(athleteData(livePath)).toBe(before.athlete);
   expect(seedCounts(livePath)).toEqual(before.seeds);
   // The restored file is the real current schema again, guards included.

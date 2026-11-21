@@ -45,8 +45,22 @@ test('every canonical movement, both bodies, every keyframe: no duplicate primit
   // Finger Curls, drawn with a close-up of the hand, came next, and One-Arm
   // Dumbbell Row, once a variant of Single-Arm Dumbbell Row, now has its own frames.
   // Cable Incline Pushdown and Standing Cable Chest Press, the last two beginner
-  // movements without a drawing, make 174.
-  expect(CANONICAL.length).toBe(174);
+  // movements without a drawing, make 174. MOV-A01 adds 9 squats, making 183.
+  // MOV-A02 adds 8 other squats (140, 192, 81, 98, 120, 235, 105, 48), making 191.
+  // MOV-A03 adds 7 floor and sumo deadlifts (2, 46, 176, 257, 78, 258, 290), making 198.
+  // MOV-A04 adds 9 hinges and posterior-chain movements (288, 61, 210, 271, 94, 35, 23, 202, 244), making 207.
+  // MOV-A05 adds 10 horizontal, incline, decline, floor, board, pin, and cable presses (3, 43, 45, 102, 65, 151, 252, 203, 249, 83), making 217.
+  // MOV-A08 adds 6 bent-over rows (5, 104, 107, 293, 79, 130), making 223.
+  // MOV-A11 adds 7 curls (184, 281, 109, 190, 213, 240, 259), making 230.
+  // MOV-A06 adds 7 standing overhead presses (4, 31, 41, 129, 189, 228, 230), making 237.
+  // MOV-A09 adds 7 rows and rear raises (93, 195, 296, 243, 188, 241, 265), making 244.
+  // MOV-A12 adds 8 triceps extensions, dips and push-ups (91, 242, 215, 233, 177, 47, 170, 166), making 252.
+  // MOV-A15 adds 5 movements on a source hold (145, 153, 165, 205, 250), making 257.
+  // MOV-A07 adds 7 other overhead work movements (229, 85, 112, 101, 58, 63, 69), making 264.
+  // MOV-A10 adds 8 vertical pull and hanging movements (6, 13, 71, 108, 209, 77, 211, 64), making 272.
+  // MOV-A13 adds 8 single-leg and calf raise movements (18, 36, 56, 136, 194, 239, 67, 96), making 280.
+  // MOV-A14 adds 11 trunk, pullover, flye, and kettlebell skill movements (33, 137, 119, 204, 149, 289, 148, 201, 217, 121, 231), making 291.
+  expect(CANONICAL.length).toBe(291);
   for (const entry of CANONICAL) {
     for (const bodyName of ['neutral']) {
       for (const frame of entry.frames) {

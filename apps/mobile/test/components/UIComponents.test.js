@@ -217,6 +217,29 @@ test('Stepper: renders label and value, fires decrement and increment', () => {
   fireEvent.press(screen.getByLabelText('Increase Reps'));
   expect(inc).toHaveBeenCalledTimes(1);
 });
+
+// Android walk 2026-11-03 (issue 138): the visual "3 · " numbering and the
+// uppercase visible label were read out by screen readers.
+test('Stepper: spoken names drop the visual numbering and read in sentence case', () => {
+  render(
+    <Stepper label="3 · TRAINING DAYS PER WEEK" value="3" onDecrement={() => {}} onIncrement={() => {}} />
+  );
+  expect(screen.getByLabelText('Decrease training days per week')).toBeOnTheScreen();
+  expect(screen.getByLabelText('Increase training days per week')).toBeOnTheScreen();
+  expect(screen.getByLabelText('training days per week 3')).toBeOnTheScreen();
+  expect(screen.queryByLabelText(/·/)).toBeNull();
+  // Mixed-case labels keep their wording, so existing names such as "Effort" hold.
+  render(<Stepper label="Effort" value="7" onDecrement={() => {}} onIncrement={() => {}} />);
+  expect(screen.getByLabelText('Decrease Effort')).toBeOnTheScreen();
+});
+// Initialisms and units stay upper case in the spoken name: "rpe" must not read as a word.
+test('Stepper: initialisms and units keep their capitals in the spoken name', () => {
+  render(
+    <Stepper label="2 · RPE CEILING FOR BJJ, 1RM, HRV, MMA AND (MIN)" value="8" onDecrement={() => {}} onIncrement={() => {}} />
+  );
+  expect(screen.getByLabelText('Decrease RPE ceiling for BJJ, 1RM, HRV, MMA and (MIN)')).toBeOnTheScreen();
+  expect(screen.getByLabelText('RPE ceiling for BJJ, 1RM, HRV, MMA and (MIN) 8')).toBeOnTheScreen();
+});
 test('Stepper: optional hold repeats after 300ms and stops on release', () => {
   jest.useFakeTimers();
   const inc = jest.fn();

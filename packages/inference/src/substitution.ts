@@ -128,8 +128,11 @@ export interface NiggleInput {
 /** A movement scheduled later in the 28-day block, eligible to pull forward. */
 export interface FutureSlot {
   plannedSlotId: number;
-  /** Absolute day index within the block. */
+  /** Absolute day index within the block (0 = the block's first day). */
   dayIndex: number;
+  /** The origin session's date (YYYY-MM-DD), when known. Shown to the athlete
+   *  instead of the 0-based day index. */
+  sessionDate?: string;
   movement: SubstitutionMovement;
   /** Planned working sets at the origin slot (the volume that will move). */
   sets: number;
@@ -169,6 +172,8 @@ export interface DaySwapOption {
   name: string;
   preference: MovementPreference;
   fromDayIndex: number;
+  /** The origin session's date, copied from the slot when known. */
+  sessionDate?: string;
   plannedSlotId: number;
   /** Volume moved forward AND deducted from the origin (conservation). */
   setsConserved: number;
@@ -195,6 +200,39 @@ export interface SubstitutionResult {
    *  (EXPERIENCE_SEVERITY[age].haltMin): too severe to train around — the UI
    *  should advise ending the session rather than substituting. */
   haltAdvised: boolean;
+}
+
+export type SwapCause = 'joint_discomfort' | 'equipment_busy' | 'preference' | 'time' | 'other';
+export type NeutralSwapCause = 'equipment_busy' | 'preference' | 'time';
+export type SwapScope = 'today_only' | 'rest_of_block';
+
+export const NEUTRAL_SWAP_CAUSES: readonly NeutralSwapCause[] = [
+  'equipment_busy',
+  'preference',
+  'time',
+] as const;
+
+export const NON_PATHOLOGICAL_SWAP_CAUSES: ReadonlySet<SwapCause> = new Set<SwapCause>(
+  NEUTRAL_SWAP_CAUSES,
+);
+
+export const NEUTRAL_SWAP_SUBTITLE = 'Same movement pattern · Uses your available equipment' as const;
+
+export interface NeutralSwapOption {
+  readonly movement_id: number;
+  readonly name: string;
+  readonly pattern: MovementPattern;
+  readonly difficulty: DifficultyRating;
+  readonly preference: MovementPreference;
+  readonly tierDelta: number;
+  readonly absTierDelta: number;
+  readonly subtitle: typeof NEUTRAL_SWAP_SUBTITLE;
+}
+
+export interface SwapHistoryRecord {
+  readonly movement_id: number;
+  readonly cause: SwapCause;
+  readonly overlaps_affected_joint?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -236,12 +274,12 @@ const byTriage = (a: SubstitutionMovement, b: SubstitutionMovement): number =>
   b.preference - a.preference ||
   DIFFICULTY_RANK[a.difficulty] - DIFFICULTY_RANK[b.difficulty] ||
   a.movement_id - b.movement_id;
+const byNeutralSwap = (a: NeutralSwapOption, b: NeutralSwapOption): number =>
+  a.absTierDelta - b.absTierDelta ||
+  b.preference - a.preference ||
+  a.movement_id - b.movement_id;
 
-// ---------------------------------------------------------------------------
-// Engine
-// ---------------------------------------------------------------------------
-export function computeSubstitutions(input: SubstitutionInput): SubstitutionResult {
-  const ratio = clampInt(input.maxAccessoryRatio ?? DEFAULT_ACCESSORY_RATIO, 1, DEFAULT_ACCESSORY_RATIO);
+function createSubstitutionPredicates(input: SubstitutionInput) {
   const inventory = new Set(input.inventory);
   const niggles = input.niggles ?? [];
   // Experience-weighted thresholds (DOMS-vs-structural): a beginner tolerates
@@ -250,7 +288,6 @@ export function computeSubstitutions(input: SubstitutionInput): SubstitutionResu
   const injured = injuredJoints(niggles, triageMin);
   const guarded = injured.size > 0;
   const haltAdvised = niggles.some((n) => n.severity >= haltMin);
-  const targetCategory = PATTERN_TO_CATEGORY[input.target.pattern];
   const targetRank = DIFFICULTY_RANK[input.target.difficulty];
   const blocked = new Set<number>();
 
@@ -274,6 +311,94 @@ export function computeSubstitutions(input: SubstitutionInput): SubstitutionResu
     return false;
   };
 
+  return {
+    niggles,
+    triageMin,
+    haltMin,
+    guarded,
+    haltAdvised,
+    targetRank,
+    blocked,
+    available,
+    tierBars,
+    guardrailBars,
+  };
+}
+
+export function isNonPathologicalSwapCause(cause: SwapCause): boolean {
+  return NON_PATHOLOGICAL_SWAP_CAUSES.has(cause);
+}
+
+/** Mechanism 1 (kTrigger) swap evaluation: non-pathological causes
+ *  ('equipment_busy' | 'preference' | 'time') never trigger Avoid (-1) promotions. */
+export function deriveAvoidPromotionsFromSwaps(
+  swaps: readonly SwapHistoryRecord[],
+  kTrigger: number,
+): Readonly<Record<number, typeof MOVEMENT_PREFERENCE.AVOID>> {
+  if (!Number.isInteger(kTrigger) || kTrigger < 1) {
+    throw new RangeError(`kTrigger must be a positive integer; received ${kTrigger}`);
+  }
+  const counts = new Map<number, number>();
+  for (const swap of swaps) {
+    if (isNonPathologicalSwapCause(swap.cause)) continue;
+    if (swap.overlaps_affected_joint !== true) continue;
+    counts.set(swap.movement_id, (counts.get(swap.movement_id) ?? 0) + 1);
+  }
+  const avoids: Record<number, typeof MOVEMENT_PREFERENCE.AVOID> = {};
+  for (const [movementId, count] of counts) {
+    if (count >= kTrigger) avoids[movementId] = MOVEMENT_PREFERENCE.AVOID;
+  }
+  return avoids;
+}
+
+/** Issue #208 neutral parity swap ranking: same-pattern available movements
+ *  ranked at matched difficulty first (|tierDelta| === 0, then 1) with neutral copy.
+ *  A halt-level niggle ends the session; neutral replacements are never offered while haltAdvised is true. */
+export function computeNeutralSwapOptions(input: SubstitutionInput): NeutralSwapOption[] {
+  const { haltAdvised, targetRank, available, tierBars, guardrailBars } = createSubstitutionPredicates(input);
+  if (haltAdvised) return [];
+  const options: NeutralSwapOption[] = [];
+  for (const m of input.library) {
+    if (m.movement_id === input.target.movement_id) continue;
+    if (m.pattern !== input.target.pattern) continue;
+    if (isAvoided(m) || !available(m)) continue;
+    if (tierBars(m)) continue;
+    if (guardrailBars(m)) continue;
+    const tierDelta = DIFFICULTY_RANK[m.difficulty] - targetRank;
+    options.push({
+      movement_id: m.movement_id,
+      name: m.name,
+      pattern: m.pattern,
+      difficulty: m.difficulty,
+      preference: m.preference,
+      tierDelta,
+      absTierDelta: Math.abs(tierDelta),
+      subtitle: NEUTRAL_SWAP_SUBTITLE,
+    });
+  }
+  options.sort(byNeutralSwap);
+  return options;
+}
+
+// ---------------------------------------------------------------------------
+// Engine
+// ---------------------------------------------------------------------------
+export function computeSubstitutions(input: SubstitutionInput): SubstitutionResult {
+  const ratio = clampInt(input.maxAccessoryRatio ?? DEFAULT_ACCESSORY_RATIO, 1, DEFAULT_ACCESSORY_RATIO);
+  const {
+    niggles,
+    triageMin,
+    haltMin,
+    guarded,
+    haltAdvised,
+    targetRank,
+    blocked,
+    available,
+    tierBars,
+    guardrailBars,
+  } = createSubstitutionPredicates(input);
+  const targetCategory = PATTERN_TO_CATEGORY[input.target.pattern];
+
   // --- LAYER 1: biomechanical regression (green) ---------------------------
   // Same precise pattern, difficulty NOT above the target ("reduce difficulty
   // OR modify torque at matched difficulty"), available, not Avoided.
@@ -293,7 +418,7 @@ export function computeSubstitutions(input: SubstitutionInput): SubstitutionResu
       preference: m.preference,
       rationale:
         `${m.name} (${m.difficulty}) substitutes ${input.target.name}` +
-        (easier ? ' with reduced mechanical demand' : ' at matched difficulty, altered torque') +
+        (easier ? ' with reduced mechanical demand' : ' at matched difficulty') +
         (guarded ? '; Passes the app’s current reported-joint checks' : ''),
     });
   }
@@ -316,10 +441,13 @@ export function computeSubstitutions(input: SubstitutionInput): SubstitutionResu
       name: m.name,
       preference: m.preference,
       fromDayIndex: slot.dayIndex,
+      ...(slot.sessionDate !== undefined ? { sessionDate: slot.sessionDate } : {}),
       plannedSlotId: slot.plannedSlotId,
       setsConserved: slot.sets,
       rationale:
-        `Pull ${m.name} forward from day ${slot.dayIndex}; ${slot.sets} set(s) ` +
+        // The athlete never sees 0-based day indices: name the session by its
+        // date, or count block days from 1 as the plan does.
+        `Pull ${m.name} forward from ${slot.sessionDate !== undefined ? `the ${slot.sessionDate} session` : `block day ${slot.dayIndex + 1}`}; ${slot.sets} set(s) ` +
         'deducted from that slot to conserve block volume.',
     });
   }

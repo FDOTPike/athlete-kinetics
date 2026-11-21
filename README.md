@@ -11,14 +11,15 @@ prescribes today's load/sets/RPE adjustment — entirely on your phone.
 
 - **No cloud, no account, no subscription.** Every byte stays in a local SQLite
   file. There is no server to pay for and nothing to leak.
-- **No required downloads, no LLM.** The prescription engine is a deterministic
+- **No required downloads.** The prescription engine is a deterministic
   policy table (`packages/inference/src/policyReference.ts`) that runs in
   microseconds on any device. Subjective reports ("knee feels 3/10 sore") are
   handled by a **Vector-Heuristic pipeline**: a ~23 MB sentence-embedding model
   routes free text to a curated Phrase Codebase by cosine similarity, and pure
   TypeScript guardrails apply hardcoded, human-reviewed consequences. Peak RAM
-  for the entire intelligence layer is ~100 MB transient — the former 1 GB+
-  generative SLM (and its Jetsam risk) is gone.
+  for the entire intelligence layer is ~100 MB transient. No generative model
+  ships today: the former 1 GB+ generative SLM (and its Jetsam risk) was
+  removed. See [Language models in this app](#language-models-in-this-app).
 - **Accessible interaction.** Dark, high-contrast, 56–88 pt touch targets,
   keyboard-free logging (built for chalked/sweaty hands), accessibility roles
   and labels on every control, no animations.
@@ -98,9 +99,14 @@ Every layer ships with a runnable verifier; all must pass before a change lands.
 | `npm run verify:release`| RELEASE gate — verify:ci + memory contract [A]/[D] + real QA APK   |
 | `npm run bench:cosine` | the Path A (JS cosine) vs sqlite-vec decision data                  |
 
-## Why there is no LLM in this app
+## Language models in this app
 
-There was one. A live-fire evaluation ran real Qwen 0.5B/1.5B GGUF weights
+**What ships today.** One small model: a ~23 MB sentence-embedding model. It
+turns the athlete's typed note into numbers so the app can find the closest
+phrase in its codebase. It does not generate text and it makes no decision.
+
+**What was removed, and why.** There was a generative model. A live-fire
+evaluation ran real Qwen 0.5B/1.5B GGUF weights
 through a GBNF-constrained prompt against the seeded athlete's history: the
 grammar held 100% (malformed output was unsamplable), but **both models
 emitted constant prescriptions regardless of input** — including "hold the
@@ -113,3 +119,17 @@ contribution, so it was removed. The replacement Vector-Heuristic pipeline
 keeps the only thing embeddings are actually good at — meaning-matching free
 text — and leaves every consequence to deterministic, reviewable TypeScript.
 The coaching cue is mechanical-rationale only; the app gives no medical advice.
+
+**What is being evaluated (owner ruling, 2026-10-09).** The owner ruled that
+a small model may be part of the decision process, and confirmed the
+conditions given here. The lesson of the
+removed model was that a small model cannot be the decision-maker. It did not
+show that a small model cannot help. The embedding router matches wording
+without understanding it: it cannot tell "no pain today" from "pain today",
+a past problem from a current one, or the athlete from someone the athlete is
+talking about. A hybrid design is now under study, in which a small on-device
+model reads the note and reports facts about it, and deterministic TypeScript
+still decides every consequence. Any such model must run fully offline and
+inside the app's memory ceiling, and nothing ships until it has been measured
+against the current router on sealed test phrases and the owner has signed
+off on that measured evidence.

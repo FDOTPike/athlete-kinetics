@@ -1,0 +1,200 @@
+{
+  "bounds": [
+    {
+      "id": 6,
+      "quote": "Secure the external load so it hangs centrally and test that it stays clear of the floor and body. Take a controlled full hang with a firm grip and a quiet trunk.",
+      "bound": "Start in a controlled full hang from the overhead bar at y = 105 with 3D elbow angle >= 175 deg (measured 175.64 deg), both hands locked on the bar at [0, 105, +-13.5], and waistLoad hanging centrally at [hip.x, hip.y - 16.5, 0] clear of the floor (y - r > 35) and painted thighs (> 1.0 unit 2D clearance) on every 33 ms tick.",
+      "test": "apps/mobile/test/components/MovementPreview.movA10Pulls.test.js:154-212"
+    },
+    {
+      "id": 6,
+      "quote": "Drive the elbows toward the ribs. Keep the added load quiet. Own the full return to long arms.",
+      "bound": "At the top pose, 3D elbow y < shoulder y - 9, upper chest (neck.y) > 101.5 (measured 102.58), chin clears the bar (head.y - hr > 105), combined athlete+load CoM x stays within +-0.8 of the bar (measured [0.00, 0.09]) across every 33 ms tick, and the eccentric return duration is >= 1.3x the concentric pull (1500 ms vs 1100 ms).",
+      "test": "apps/mobile/test/components/MovementPreview.movA10Pulls.test.js:129-212"
+    },
+    {
+      "id": 13,
+      "quote": "Take an underhand grip around shoulder width and begin from a controlled full hang. Drive the elbows down to bring the upper chest toward the bar without reaching with the chin.",
+      "bound": "Underhand grip around shoulder width (|grip.z - shoulder.z| <= 1.0, wrist.x = +3.76 > bar x + 3.0), full hang at start (3D elbow angle 175.47 deg >= 175 deg), upper chest at top neck.y = 102.68 > 101.5 with chin clearing the bar and head-to-neck angle within 3 deg of trunk angle.",
+      "test": "apps/mobile/test/components/MovementPreview.movA10Pulls.test.js:214-264"
+    },
+    {
+      "id": 13,
+      "quote": "Drive the elbows toward the ribs. Bring the upper chest to the bar. Own the full return to long arms.",
+      "bound": "At the top pose, near elbow drives down in front toward the ribs (elbow.x > 0, elbow.y < shoulder.y - 9), CoM x stays within [-0.08, 0.29] under the bar across every 33 ms tick, and the eccentric return returns to full hang over 1500 ms vs 1100 ms concentric.",
+      "test": "apps/mobile/test/components/MovementPreview.movA10Pulls.test.js:129-152,214-264"
+    },
+    {
+      "id": 71,
+      "quote": "Take an overhand grip just outside your shoulders and start from a dead hang. Pull your chest towards the bar, driving the elbows down and back, until your chin clears without reaching for it.",
+      "bound": "Overhand grip outside the shoulders (grip.z = 14.5 >= shoulder.z + 4.5 and >= chin-up grip.z + 4.5; wrist.x = -3.76 < bar x - 3.0), dead hang at start (3D elbow angle 175.65 deg >= 175 deg), upper chest at top neck.y = 102.69 > 101.5, chin clearing the bar without reaching (head-to-neck within 3 deg of trunk), and elbows driven down, wider, and back (elbow.x < -3, elbow.z >= chin-up elbow.z + 3.5).",
+      "test": "apps/mobile/test/components/MovementPreview.movA10Pulls.test.js:214-264"
+    },
+    {
+      "id": 71,
+      "quote": "Begin every rep from a controlled full hang. Drive the elbows down and back. Keep the body quiet from hang to bar.",
+      "bound": "Both hands stay locked on the bar at [0, 105, +-14.5], CoM x stays within [0.01, 0.12] directly under the bar across every 33 ms tick, and the cycle begins and ends in a 450 ms dead-hang pause.",
+      "test": "apps/mobile/test/components/MovementPreview.movA10Pulls.test.js:129-152,214-264"
+    },
+    {
+      "id": 108,
+      "quote": "Lock the thighs under the pad, take the neutral V-bar, and lean back only enough to keep the chest tall beneath the cable. Pull the elbows down and back until the handle reaches the upper chest, then pause without turning the rep into a row.",
+      "bound": "Seated on the lat-pulldown bench slab with the thigh roller pad locked directly over the upper thighs (pad y - thigh top in [2.5, 3.5]), neutral close V-bar implement (hold.z = +-3), small tall-chest lean back (trunk angle 100 deg in [95, 105] deg), handle reaching the upper chest at the bottom (along in [2/3 * TRUNK, TRUNK], front <= 8.5) with a 450 ms pause.",
+      "test": "apps/mobile/test/components/MovementPreview.movA10Pulls.test.js:266-326"
+    },
+    {
+      "id": 108,
+      "quote": "Show the chest to the handle. Drive the elbows down and back. Reach fully at the top.",
+      "bound": "Full overhead reach at start (3D elbow angle 176.24 deg >= 174 deg), elbows driven down and back at bottom (elbow.y < shoulder.y - 8, onTrunk front <= 3), and working cable length from high pulley [9, 98, 0] to midGrip grows monotonically by > 20 units across every 33 ms tick of the pull.",
+      "test": "apps/mobile/test/components/MovementPreview.movA10Pulls.test.js:266-326"
+    },
+    {
+      "id": 209,
+      "quote": "Sit on a high bench or stand between two high pulleys and take the opposite handle in each hand so the arms are crossed overhead with the palms facing forward. With the chest up, pull the handles down in an arc, turning the hands so the palms face each other at the bottom.",
+      "bound": "Seated on a high bench between two high pulleys at [4, 98, -36] and [4, 98, +36] with opposite cable lines ([4, 98, -36] -> nearGrip and [4, 98, +36] -> farGrip), arms crossed overhead at start (near wrist z = -2.12 < -1.5, far wrist z = +2.12 > +1.5, wrist.y > head top, 3D elbow angle 180 deg >= 175 deg), sweeping wide at mid-rep (near wrist z > shoulder.z + 10).",
+      "test": "apps/mobile/test/components/MovementPreview.movA10Pulls.test.js:328-382"
+    },
+    {
+      "id": 209,
+      "quote": "Chest up. Pull the elbows down and in. Return slowly to a full stretch.",
+      "bound": "At the bottom of the arc, elbows pull down and in toward the sides (elbow.y < shoulder.y - 8, elbow.z < mid wrist.z - 5), both opposite cables lengthen monotonically by > 30 units across every 33 ms tick of the working pull, and the slow return takes 1750 ms (>= 1.4x the 1200 ms pull).",
+      "test": "apps/mobile/test/components/MovementPreview.movA10Pulls.test.js:328-382"
+    },
+    {
+      "id": 77,
+      "quote": "Stand facing a high cable with a straight bar or rope, arms extended in front of you at shoulder height. Keeping a slight elbow bend, pull the attachment down in an arc until your hands reach your thighs.",
+      "bound": "Standing facing the high pulley at [34, 98, 0] with arms extended in front at shoulder height at start (|wrist.y - shoulder.y| <= 2, wrist.x > shoulder.x + 20) and arcing down until the hands reach the thighs at the bottom (wrist.y <= hip.y, 2D wrist-to-hip distance <= 9, elbow 3D travel > 15 units).",
+      "test": "apps/mobile/test/components/MovementPreview.movA10Pulls.test.js:384-435"
+    },
+    {
+      "id": 77,
+      "quote": "Keep the arms long with one soft elbow angle. Lead the arc with the elbows and let the hands stay quiet. Hold a small, braced hinge.",
+      "bound": "Trunk holds a stationary small braced hinge at 78 deg (in [74, 84] deg, hip drift < 0.01) across every 33 ms tick, 3D elbow angle stays locked at 168.00 deg (variation < 0.05 deg across every 33 ms tick), and the cable from high pulley to midGrip lengthens monotonically by > 25 units on the pull.",
+      "test": "apps/mobile/test/components/MovementPreview.movA10Pulls.test.js:384-435"
+    },
+    {
+      "id": 211,
+      "quote": "Hang from a bar with an underhand grip slightly wider than the shoulders and bend the knees so the shins are level with the floor. Pull yourself up while drawing the knees up, finishing with the knees at chest height and the nose level with the bar.",
+      "bound": "Underhand grip slightly wider than the shoulders (wrist.x = +3.76 > bar x + 3.0, grip.z = 11.5 > shoulder.z + 1.5), full hang at start (3D elbow angle 175.03 deg >= 174 deg) with knees bent 90 deg and shins level with the floor (|ankle.y - knee.y| = 0.00 < 0.5), finishing with knees at chest height (knee.y = 87.48 in (hip.y + 10, neck.y)) and nose level with the bar (|head.y - 105| = 0.95 <= 1.5).",
+      "test": "apps/mobile/test/components/MovementPreview.movA10Pulls.test.js:437-473"
+    },
+    {
+      "id": 211,
+      "quote": "Pull and crunch together. Knees to the chest. Lower slowly to a full hang.",
+      "bound": "Across both working segments (0 -> 1 and 1 -> 2), both hip height (pull) and knee-minus-hip height (lower-spine crunch to curl = 26 deg) increase simultaneously by > 7 and > 10 units per segment, CoM x stays within [-0.71, -0.01] under the bar on every 33 ms tick, and the slow lower takes 1650 ms vs 1200 ms concentric.",
+      "test": "apps/mobile/test/components/MovementPreview.movA10Pulls.test.js:129-152,437-473"
+    },
+    {
+      "id": 64,
+      "quote": "Hang from a pull-up bar with an overhand grip, arms and legs straight. Raise your legs until they are at least parallel to the floor, higher if you can keep control. Lower slowly back to a dead hang.",
+      "bound": "Overhand grip on the bar (wrist.x = -3.76 < bar x - 3.0), arms and legs straight on every 33 ms tick (3D elbow angle in [171.56, 176.75] deg >= 171 deg, 3D knee angle = 180.00 deg >= 178 deg), raising straight legs above parallel at the top (ankle.y = 69.35 > hip.y + 10 = 65.60).",
+      "test": "apps/mobile/test/components/MovementPreview.movA10Pulls.test.js:475-512"
+    },
+    {
+      "id": 64,
+      "quote": "Curl the pelvis up towards the ribs. Dead-still hang between reps. Slow on the way down.",
+      "bound": "Lower-spine pelvic curl reaches curl = 28 deg >= 24 deg with spine: 'lower' and trunkAt: 'neck', CoM x stays within [-0.40, 0.14] directly under the bar across every 33 ms tick, slow eccentric lower takes 2100 ms (>= 1.3x the 1500 ms raise), and the rep finishes with a 450 ms dead-still hang.",
+      "test": "apps/mobile/test/components/MovementPreview.movA10Pulls.test.js:129-152,475-512"
+    }
+  ],
+  "fileQuotes": [
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 1722,
+      "text": "\"instructions\": \"Secure the external load so it hangs centrally and test that it stays clear of the floor and body. Take a controlled full hang with a firm grip and a quiet trunk. Drive the elbows down to bring the chest toward the bar, then lower to long arms; if range shortens or the load swings, use less weight.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 1723,
+      "text": "\"cues\": \"Drive the elbows toward the ribs. Keep the added load quiet. Own the full return to long arms.\""
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 2204,
+      "text": "\"instructions\": \"Take an underhand grip around shoulder width and begin from a controlled full hang. Drive the elbows down to bring the upper chest toward the bar without reaching with the chin. Lower to long arms; if the bottom range disappears, finish the set or use assistance.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 2205,
+      "text": "\"cues\": \"Drive the elbows toward the ribs. Bring the upper chest to the bar. Own the full return to long arms.\""
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 6149,
+      "text": "\"instructions\": \"Take an overhand grip just outside your shoulders and start from a dead hang. Pull your chest towards the bar, driving the elbows down and back, until your chin clears without reaching for it. Lower under full control back to the dead hang — cutting the bottom quietly steals the range that builds the back.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 6150,
+      "text": "\"cues\": \"Begin every rep from a controlled full hang. Drive the elbows down and back. Keep the body quiet from hang to bar.\""
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 8623,
+      "text": "\"instructions\": \"Lock the thighs under the pad, take the neutral V-bar, and lean back only enough to keep the chest tall beneath the cable. Pull the elbows down and back until the handle reaches the upper chest, then pause without turning the rep into a row. Return to a full overhead reach without letting the stack settle; if the biceps burn first, soften the hands and lead harder with the elbows.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 8624,
+      "text": "\"cues\": \"Show the chest to the handle. Drive the elbows down and back. Reach fully at the top.\""
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 15440,
+      "text": "\"instructions\": \"Sit on a high bench or stand between two high pulleys and take the opposite handle in each hand so the arms are crossed overhead with the palms facing forward. With the chest up, pull the handles down in an arc, turning the hands so the palms face each other at the bottom. Return slowly along the same arc until the arms are crossed overhead again.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 15441,
+      "text": "\"cues\": \"Chest up. Pull the elbows down and in. Return slowly to a full stretch.\""
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 6545,
+      "text": "\"instructions\": \"Stand facing a high cable with a straight bar or rope, arms extended in front of you at shoulder height. Keeping a slight elbow bend, pull the attachment down in an arc until your hands reach your thighs. Return under control to shoulder height.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 6546,
+      "text": "\"cues\": \"Keep the arms long with one soft elbow angle. Lead the arc with the elbows and let the hands stay quiet. Hold a small, braced hinge.\""
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 15576,
+      "text": "\"instructions\": \"Hang from a bar with an underhand grip slightly wider than the shoulders and bend the knees so the shins are level with the floor. Pull yourself up while drawing the knees up, finishing with the knees at chest height and the nose level with the bar. Lower slowly to a full hang with the knees bent as at the start.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 15577,
+      "text": "\"cues\": \"Pull and crunch together. Knees to the chest. Lower slowly to a full hang.\""
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 5666,
+      "text": "\"instructions\": \"Hang from a pull-up bar with an overhand grip, arms and legs straight. Raise your legs until they are at least parallel to the floor, higher if you can keep control. Lower slowly back to a dead hang. Bend your knees to make it easier.\","
+    },
+    {
+      "file": "docs/audits/accessible-coach/movement-completion/ALL_300_MOTION_MAP.json",
+      "line": 5667,
+      "text": "\"cues\": \"Curl the pelvis up towards the ribs. Dead-still hang between reps. Slow on the way down.\""
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5468,
+      "endLine": 5470,
+      "text": "    } else if (shape.kind === 'bar') {\n      groups[shape.layer ?? 'mid'].push(line(project(chainWorld(shape.a)), project(chainWorld(shape.b)), 2.2, 'textMid', 1));"
+    },
+    {
+      "file": "apps/mobile/src/components/movementPreview/canonicalFigure.ts",
+      "line": 5608,
+      "endLine": 5629,
+      "text": "  } else if (kind === 'vBar') {\n    const mid: CanonicalPoint = [(figure.hold.near[0] + figure.hold.far[0]) / 2, (figure.hold.near[1] + figure.hold.far[1]) / 2];\n    const apex: CanonicalPoint = [mid[0], mid[1] - 3.2];\n    far.push(line(apex, figure.hold.far, 1.8, farColor, farOpacity));\n    far.push({ kind: 'circle', cx: figure.hold.far[0], cy: figure.hold.far[1], r: 2.2, fill: farColor, opacity: farOpacity });\n    near.push(line(apex, figure.hold.near, 1.8, 'textHi', 1));\n    near.push(line(mid, apex, 1.6, 'textMid', 1));\n    near.push({ kind: 'circle', cx: figure.hold.near[0], cy: figure.hold.near[1], r: 2.2, fill: 'textHi', opacity: 1 });\n  } else if (kind === 'handle' || kind === 'handles' || kind === 'rope') {\n    const r = kind === 'rope' ? 2.2 : 2.6;\n    if (kind !== 'handle') far.push({ kind: 'circle', cx: figure.grip.far[0], cy: figure.grip.far[1], r, fill: farColor, opacity: farOpacity });\n    near.push({ kind: 'circle', cx: figure.grip.near[0], cy: figure.grip.near[1], r, fill: 'textHi', opacity: 1 });\n  }\n  if (w.waistLoad !== undefined && movement.waistLoad !== undefined) {\n    const loadPt = project(w.waistLoad);\n    const r = movement.waistLoad.r ?? 3.2;\n    const beltHalf = body.hw * 0.52;\n    near.push(line([j.hp[0] - beltHalf, j.hp[1]], [j.hp[0] + beltHalf, j.hp[1]], 1.8, 'textMid', 1));\n    groups.mid.push(line(j.hp, loadPt, 1.4, 'textMid', 1));\n    groups.mid.push({ kind: 'circle', cx: loadPt[0], cy: loadPt[1], r, fill: 'textMid', stroke: 'ink1', strokeWidth: 1, opacity: 1 });\n    groups.mid.push({ kind: 'circle', cx: loadPt[0], cy: loadPt[1], r: 1.2, fill: 'ink1', opacity: 1 });\n  }"
+    },
+    {
+      "file": "apps/mobile/test/components/MovementPreview.movA10Pulls.test.js",
+      "line": 146,
+      "endLine": 151,
+      "text": "      // Centre of mass stays directly under the bar at every tick\n      const com = centreOfMass3D(w, id === 6 ? 0.25 : 0);\n      expect(Math.abs(com[0] - BAR_X)).toBeLessThanOrEqual(0.8);\n      expect(Math.abs(com[2])).toBeLessThan(1e-6);\n      expect(com[1]).toBeLessThan(BAR_Y - 15);"
+    }
+  ]
+}

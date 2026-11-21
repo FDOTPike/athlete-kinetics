@@ -1188,6 +1188,8 @@ export interface ChainPose {
   twist?: number;
   /** How far the shoulders are lifted toward the ears, along the spine (a shrug). */
   shrug?: number;
+  /** How far the shoulder blades are pulled back and together perpendicular to the spine (a prone/incline retraction shrug). */
+  retract?: number;
   /**
    * How far the whole body is rolled about its own length, in degrees: hips
    * and shoulders together. Positive brings the near side toward the front of
@@ -1220,6 +1222,44 @@ export interface ChainPose {
   /** An ankle position the legs are solved to, in place of the leg directions (feet planted). */
   ankle?: ChainPoint;
   farAnkle?: ChainPoint;
+  /**
+   * How far the solved ankle's path rises above the straight line on the way
+   * from this pose to the next, at half-way (a foot lifted to step, not slid).
+   */
+  ankleArc?: number;
+  farAnkleArc?: number;
+  /** How far the root's path rises above the straight line on the way to the next pose, at half-way (hips lifted into a bridge). */
+  atArc?: number;
+  /** How far the trunk swings past its straight blend on the way to the next pose, at half-way, in degrees (shoulders lowered toward a hand while the hips bridge). */
+  trunkArc?: number;
+  /** Lateral offset of each planted ankle from hip width, in world Z units. */
+  footSpread?: number;
+  /** Lateral out-angle (degrees) added to the solved knee pole so knees track outward. */
+  kneeOut?: number;
+  /** Vertical downward reach (protraction) of the working near shoulder at the bottom of a one-arm row. */
+  nearReach?: number;
+  /**
+   * Horizontal rotation of the palm about the vertical axis, in degrees:
+   * 0 faces forward (+X), 90 faces in toward the midline (-side * Z),
+   * and 180 faces back toward the athlete (-X).
+   */
+  palmYaw?: number;
+  farPalmYaw?: number;
+  /** Which hand holds a single kettlebell (+1 near, 0 centred between both hands, -1 far). */
+  bellSide?: number;
+  /**
+   * The stretch of the way to the next pose, as fractions, over which the bell
+   * changes to the next pose's hand: before it the bell stays in this pose's
+   * hand, after it in the next. A hand-to-hand pass while the hands are together.
+   */
+  bellPass?: readonly [number, number];
+  /**
+   * How far the solved hand's path bows from the straight line on the way to
+   * the next pose, at half-way: upward by a number (negative dips it), or by a
+   * [forward, up, across] offset (a hand carried around a leg rather than through it).
+   */
+  wristArc?: number | ChainVec;
+  farWristArc?: number | ChainVec;
 }
 
 /** Where a piece of equipment is painted: behind the figure, between the far limbs and the trunk, or in front of everything. */
@@ -1232,13 +1272,14 @@ export type ChainShape =
   | { kind: 'pulley'; at: ChainPoint; layer?: ChainLayer }
   | { kind: 'ball'; at: ChainPoint; r: number; layer?: ChainLayer }
   | { kind: 'roller'; at: ChainPoint; layer?: ChainLayer }
-  | { kind: 'box'; a: ChainPoint; b: ChainPoint; layer?: ChainLayer };
+  | { kind: 'box'; a: ChainPoint; b: ChainPoint; layer?: ChainLayer }
+  | { kind: 'bar'; a: ChainPoint; b: ChainPoint; layer?: ChainLayer };
 
-/** A cable or band from a fixed point, or from under a foot, to a hand or an ankle. */
+/** A cable or band from a fixed point, or from under a foot, to a hand, bar end, or ankle. */
 export interface ChainLine {
   from: ChainPoint | 'nearFoot' | 'farFoot';
-  /** 'midGrip' is half-way between the two hands: the middle of a bar they both hold. */
-  to: 'nearGrip' | 'farGrip' | 'midGrip' | 'nearAnkle' | 'farAnkle';
+  /** 'midGrip' is half-way between the two hands; 'vHandleApex' is the cable collar at the apex of a rigid V-handle; 'nearBarEnd' and 'farBarEnd' are the outer ends of a held bar. */
+  to: 'nearGrip' | 'farGrip' | 'midGrip' | 'vHandleApex' | 'nearBarEnd' | 'farBarEnd' | 'nearAnkle' | 'farAnkle';
   /** 'far' paints the line behind the trunk and the near limbs (a cable that runs between the legs). */
   depth?: 'far';
 }
@@ -1258,6 +1299,8 @@ export interface ChainMovement {
    * so a stride does not pulse.
    */
   cycle?: boolean;
+  /** Whether phase 0..1 maps evenly across all poses (0..poses.length - 1). */
+  unitPhase?: boolean;
   /** Side view by default. 'oblique' turns the figure by `yawDeg`; 'front' faces it. */
   view?: 'side' | 'oblique' | 'front';
   yawDeg?: number;
@@ -1277,18 +1320,49 @@ export interface ChainMovement {
   /** The way a solved elbow or knee points. */
   elbowPole?: ChainDir;
   kneePole?: ChainDir;
+  /** Lateral offset of each planted ankle from hip width, in world Z units. */
+  footSpread?: number;
+  /** Lateral out-angle (degrees) added to the solved knee pole so knees track outward. */
+  kneeOut?: number;
   /**
    * 'flat': level and on the floor. 'free': along the pose's foot direction.
    * 'front': standing, seen from the front, drawn the way every front view draws a foot.
    */
   feet?: 'flat' | 'free' | 'front' | 'none';
   /** What the hands hold. */
-  implement?: 'none' | 'bells' | 'bell' | 'hammer' | 'bar' | 'ez' | 'cableBar' | 'handle' | 'handles' | 'rope' | 'longBar' | 'kettlebell';
+  implement?: 'none' | 'bells' | 'bell' | 'hammer' | 'bar' | 'ez' | 'cableBar' | 'vHandle' | 'vBar' | 'handle' | 'handles' | 'rope' | 'longBar' | 'kettlebell' | 'kettlebells';
+  /** Whether a held kettlebell hangs straight below its handle (as in a goblet hold or under-leg pass) rather than resting on the back of the wrist. */
+  kettlebellHang?: boolean;
+  /** Where a held bar rests on the figure: across the hands by default, cradled in the elbow crooks ('elbows'), held in the hands with its far half behind the legs ('behind'), or held in front of both legs ('front'). */
+  barAt?: 'hands' | 'elbows' | 'behind' | 'front';
+  /** Half-length of a held barbell's plate segment (4.2 by default; larger for floor-starting barbell lifts). */
+  plateRadius?: number;
+  /** Whether a held barbell wears a thick pad around the middle of its shaft (as in a Barbell Hip Thrust). */
+  barPad?: boolean;
+  /** Boards banded to the chest for a Board Press: position along the spine from neck to hip (0..1), length along the chest, and board stack height. */
+  chestBoard?: { along: number; length: number; height: number };
+  /** Whether a held kettlebell starts with the palm facing in at phase 0 and turns 90 degrees as the arm presses to phase 1. */
+  kettlebellTurn?: boolean;
+  /** Whether a held kettlebell (or pair of kettlebells) hangs directly beneath the handle as in a row. */
+  kettlebellBelow?: boolean;
+  /**
+   * For a held barbell seen end on: the fill of its plate (the default end-on
+   * barbell is a white disc). A grey plate with a light sleeve end keeps the bar
+   * distinct from the head ring when it passes in front of the face.
+   */
+  endOnPlateTone?: ColorRole;
   /** For 'longBar': the point on the floor the bar's far end is braced at, and the bar's whole length from there. */
   barAnchor?: ChainPoint;
   barLength?: number;
+  /** For 'longBar': both hands hold a double handle hooked under the shaft just behind the plates, rather than the shaft itself. */
+  doubleHandle?: boolean;
   /** Which way the palm of a bent hand faces: what it holds sits on that side of the knuckles. */
   palm?: 'up' | 'down';
+  /**
+   * Whether the keyframe's `tw` value drives forearm rotation in degrees
+   * (+90 palms-up, 0 neutral hammer, -90 palms-down) instead of shoulder twist.
+   */
+  forearmTurn?: boolean;
   /**
    * A palms-up dumbbell curl whose wrist keeps turning at the top: over the
    * upper half of the lift each bell tilts so its inner, little-finger end
@@ -1320,9 +1394,35 @@ export interface ChainMovement {
    * body: from pose 0 to pose 1 the panel grows out of the hand, and from
    * pose 1 to pose 2 the fingers open and the bar rolls from the palm to the
    * fingertips. `at` is the panel's centre, `r` its radius and `scale` how
-   * many times larger than the figure the hand is drawn.
+   * many times larger than the figure the hand is drawn. Optional `zoom` and
+   * `open` fix the panel expansion and finger opening across all phases when a
+   * movement holds a constant finger grip (such as a clean-grip front rack).
+   * `hand: 'near'` keeps the panel on the near hand even when the far hand is
+   * higher (a one-arm lift whose free hand holds nothing).
    */
-  closeUp?: { at: ChainPoint; r: number; scale: number };
+  closeUp?: {
+    at: ChainPoint;
+    r: number;
+    scale: number;
+    zoom?: number;
+    open?: number;
+    grip?: 'neutral';
+    palm?: 'flexion' | 'underhand' | 'overhand' | 'neutral' | 'turn';
+    hand?: 'near';
+  };
+  /**
+   * A magnified side view of the near foot on the edge it stands on, in a
+   * round panel, for a movement whose range is in the ankle (a heel dropping
+   * below a block and rising above it). `at` is the panel's centre, `r` its
+   * radius and `scale` how many times larger than the figure it is drawn;
+   * `edge` is the block's rear top corner and `focus` the point of the scene
+   * placed at the panel's centre.
+   */
+  footCloseUp?: { at: ChainPoint; r: number; scale: number; edge: ChainPoint; focus: ChainPoint };
+  /** Weight stack column for a cable pulldown station (`x` position, resting stack top `baseTop`, minimum lifted clearance `minClearance`, and travel `stroke`). */
+  weightStack?: { x: number; baseTop: number; minClearance: number; stroke: number };
+  /** External load hanging centrally from a belt at the waist/hips (`drop` units below hip, disc radius `r`). */
+  waistLoad?: { drop: number; r?: number };
 }
 
 const CHAIN_TRUNK = 24;
@@ -1335,6 +1435,9 @@ const CHAIN_PALM = 1.8;
 const CHAIN_FOOT = 5.4;
 /** The floor the soles rest on. */
 const CHAIN_FLOOR = 96.9;
+/** Half-length of a floor-starting barbell plate segment (with its 1.2 cap, outer radius is 9.5). */
+export const CHAIN_FLOOR_PLATE = 8.3;
+export const CHAIN_FLOOR_BAR_HEIGHT = CHAIN_FLOOR_PLATE + 1.2;
 const CHAIN_SPINE_STEPS = 32;
 /** The height of an ankle whose flat foot is on the floor, and of the hip of a figure standing straight on it. */
 export const CHAIN_ANKLE_HEIGHT = CANONICAL_BODY_PARAMETERS.lw * 0.9 / 2;
@@ -1503,6 +1606,12 @@ const CONCENTRATION_BODY = {
  * painted below the floor.
  */
 export const CHAIN_LYING_HEIGHT = CHAIN_BACK_HALF + 0.6;
+/**
+ * How far a cross-bench pullover's neck sits above a back laid flat on the
+ * bench: the trunk slopes down to the hips, so it rests on the bench's front
+ * edge, under the shoulder blades, rather than flat along its top.
+ */
+const PULLOVER_BENCH_LIFT = 1.4;
 /** Arms lying on the floor beside the body, pointing at the feet, palms down. */
 const ARMS_BESIDE = { upperArm: -8, forearm: -12 } as const;
 /** The low pulley beyond the feet for the Cable Reverse Crunch. */
@@ -1646,17 +1755,21 @@ export const SEATED_CABLE_RAISE_PULLEYS: readonly [ChainPoint, ChainPoint] = [[2
 /** The Reverse Flyes: the incline the chest lies on, and where the hips are. */
 export const REVERSE_FLYE_INCLINE = 45;
 const REVERSE_FLYE_HIP: readonly [number, number] = [38, 40];
-/** That bench: a pad along the front of the trunk, on a post. */
-function reverseFlyeBench(): ChainShape[] {
-  const along = chainUnit([REVERSE_FLYE_INCLINE, 0], 1);
-  const front = chainUnit([REVERSE_FLYE_INCLINE - 90, 0], 1);
-  const foot = chainAdd([REVERSE_FLYE_HIP[0], REVERSE_FLYE_HIP[1], 0], front, CHAIN_BACK_HALF + 2);
+/** A prone incline bench: a pad along the front of the trunk at `inclineDeg`, on a post and base frame. */
+function proneInclineBench(hip: readonly [number, number], inclineDeg: number): ChainShape[] {
+  const along = chainUnit([inclineDeg, 0], 1);
+  const front = chainUnit([inclineDeg - 90, 0], 1);
+  const foot = chainAdd([hip[0], hip[1], 0], front, CHAIN_BACK_HALF + 2);
   const low = chainAdd(foot, along, -2), high = chainAdd(foot, along, 21), prop = chainAdd(foot, along, 10);
   return [
     { kind: 'post', at: [prop[0], prop[1]] },
     { kind: 'frame', a: [prop[0] - 12, 1.2], b: [prop[0] + 12, 1.2] },
     { kind: 'slab', a: [low[0], low[1]], b: [high[0], high[1]] },
   ];
+}
+/** That bench: a pad along the front of the trunk, on a post. */
+function reverseFlyeBench(): ChainShape[] {
+  return proneInclineBench(REVERSE_FLYE_HIP, REVERSE_FLYE_INCLINE);
 }
 /** The Back Flyes With Bands: where the band is looped round the rack upright, at shoulder height in front. */
 export const BACK_FLYE_ANCHOR: readonly [number, number] = [46, CHAIN_STANDING_HIP + CHAIN_TRUNK];
@@ -1708,6 +1821,17 @@ function chainOnFront(hip: readonly [number, number], trunkDeg: number, along: n
   return [hip[0] + Math.cos(a) * along + Math.sin(a) * off, hip[1] + Math.sin(a) * along - Math.cos(a) * off];
 }
 const chainNeckOf = (hip: readonly [number, number], trunkDeg: number): readonly [number, number] => chainOnFront(hip, trunkDeg, CHAIN_TRUNK, 0);
+/** Alternating Kettlebell Row (MOV-S1-R3): hips 9 behind the ankles over 158-degree knees; the trunk tilts down so plumb straight arms reach floor bells. */
+const ALT_KB_ROW_HIP: readonly [number, number] = [5, 44.32];
+const ALT_KB_ROW_TRUNK = -22.721;
+/**
+ * Barbell rows (MOV-S1-R3): hips 15.7 behind the bar over 150-degree knees and
+ * a 49-degree trunk, so the bar hangs plumb under the shoulders 0.8 ahead of
+ * mid-foot and, rowed to the lower ribs, keeps the loaded centre of mass over
+ * the foot.
+ */
+const BARBELL_ROW_HIP: readonly [number, number] = [-4.245, 43.363];
+const BARBELL_ROW_TRUNK = 49;
 /** How far from its shoulder the hand of a straight arm is: a hair short of the two segments, so the elbow can still be solved. */
 const CHAIN_LONG_ARM = SAGITTAL_UPPER_ARM + SAGITTAL_FOREARM - 0.03;
 
@@ -1942,6 +2066,17 @@ export const INCLINE_PRESS_PULLEYS: readonly [ChainPoint, ChainPoint] = [[-14, 4
 /** Half the width of the shoulders and of the hips, as the 3D model places them. */
 const CHAIN_SHOULDER_HALF = CANONICAL_BODY_PARAMETERS.sw * 0.92;
 const CHAIN_HIP_HALF = CANONICAL_BODY_PARAMETERS.hw * 0.8;
+/** T-Bar Row (MOV-S1-R3): the pivot on the floor, and the handle's top on the circle through its plumb bottom. */
+const T_BAR_ANCHOR: readonly [number, number, number] = [-36, 2.6, 0];
+const T_BAR_BOTTOM: readonly [number, number] = [
+  chainOnFront([-2, 42.5], 45, 24, 0)[0],
+  chainOnFront([-2, 42.5], 45, 24, 0)[1] - Math.sqrt(CHAIN_LONG_ARM ** 2 - (3.2 - CHAIN_SHOULDER_HALF) ** 2),
+];
+const T_BAR_REACH = Math.hypot(T_BAR_BOTTOM[0] - T_BAR_ANCHOR[0], T_BAR_BOTTOM[1] - T_BAR_ANCHOR[1]);
+const T_BAR_TOP: readonly [number, number] = [
+  T_BAR_ANCHOR[0] + T_BAR_REACH * Math.cos((42.3 * Math.PI) / 180),
+  T_BAR_ANCHOR[1] + T_BAR_REACH * Math.sin((42.3 * Math.PI) / 180),
+];
 /** The height of a hand resting on a surface: half a hand's thickness above it. */
 const CHAIN_HAND_REST = CANONICAL_BODY_PARAMETERS.lw * 0.44 + 0.1;
 /** Oblique Crunches: how far the shoulders turn toward the far knee, and the far hand's place out on the floor. */
@@ -3584,6 +3719,4227 @@ export const CHAIN_MOVEMENTS: Record<string, ChainMovement> = {
       { at: STANDING_PRESS_HIP, trunk: 90, thigh: -90, shin: -90, ankle: [-10, CHAIN_ANKLE_HEIGHT], farAnkle: [10, CHAIN_ANKLE_HEIGHT], upperArm: 0, forearm: 0, ...cablePressHands(true) },
     ],
   },
+  // Barbell Squat (id 1): back-rack squat in a rack, feet shoulder-width or
+  // slightly wider, descending until the hip crease passes the top of the knee.
+  'competition-squat': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 32,
+    originX: 50,
+    implement: 'bar',
+    armsFollowTrunk: true,
+    footSpread: 5.4,
+    equipment: [
+      { kind: 'frame', a: [-15, 0.5, 16], b: [-15, 78, 16] },
+      { kind: 'frame', a: [-15, 0.5, -16], b: [-15, 78, -16] },
+      { kind: 'frame', a: [-15, 68, 16], b: [-11.5, 68, 16] },
+      { kind: 'frame', a: [-15, 68, -16], b: [-11.5, 68, -16] },
+    ],
+    poses: [
+      {
+        at: [-0.2, 46.20], trunk: 86, thigh: -90, shin: -90,
+        ankle: [-2, CHAIN_ANKLE_HEIGHT], kneeOut: 8,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+      {
+        at: [-12.5, 19.5], trunk: 52, thigh: -90, shin: -90,
+        ankle: [-2, CHAIN_ANKLE_HEIGHT], kneeOut: 18,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+    ],
+  },
+  // Narrow Stance Squats (id 123): feet narrower than shoulder width, knees
+  // tracking forward over the toes into a deep squat.
+  'narrow-stance-squats': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 32,
+    originX: 50,
+    implement: 'bar',
+    armsFollowTrunk: true,
+    footSpread: -0.5,
+    equipment: [
+      { kind: 'frame', a: [-15, 0.5, 16], b: [-15, 78, 16] },
+      { kind: 'frame', a: [-15, 0.5, -16], b: [-15, 78, -16] },
+      { kind: 'frame', a: [-15, 68, 16], b: [-11.5, 68, 16] },
+      { kind: 'frame', a: [-15, 68, -16], b: [-11.5, 68, -16] },
+    ],
+    poses: [
+      {
+        at: [-0.2, 46.45], trunk: 86, thigh: -90, shin: -90,
+        ankle: [-2, CHAIN_ANKLE_HEIGHT], foot: [0, 15.5], kneeOut: 4,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+      {
+        at: [-9.5, 18.2], trunk: 62, thigh: -90, shin: -90,
+        ankle: [-2, CHAIN_ANKLE_HEIGHT], foot: [0, 15.5], kneeOut: 6,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+    ],
+  },
+  // Squat with Bands (id 277): wide stance in a rack with bands anchored low
+  // on the rack/floor and attached to the barbell ends, knees pushed out,
+  // descending until the hip crease is level with the top of the knee.
+  'squat-with-bands': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 32,
+    originX: 50,
+    implement: 'bar',
+    armsFollowTrunk: true,
+    footSpread: 10.2,
+    lines: [
+      { from: [-1, 1.2, 16.5], to: 'nearBarEnd' },
+      { from: [-1, 1.2, -16.5], to: 'farBarEnd', depth: 'far' },
+    ],
+    equipment: [
+      { kind: 'frame', a: [-15, 0.5, 16], b: [-15, 78, 16] },
+      { kind: 'frame', a: [-15, 0.5, -16], b: [-15, 78, -16] },
+      { kind: 'frame', a: [-15, 0.8, 16], b: [6, 0.8, 16] },
+      { kind: 'frame', a: [-15, 0.8, -16], b: [6, 0.8, -16] },
+    ],
+    poses: [
+      {
+        at: [-0.2, 45.25], trunk: 86, thigh: -90, shin: -90,
+        ankle: [-2, CHAIN_ANKLE_HEIGHT], kneeOut: 12,
+        upperArm: [-104, 20], forearm: [86, 10],
+      },
+      {
+        at: [-14.6, 24.4], trunk: 52, thigh: -90, shin: -90,
+        ankle: [-2, CHAIN_ANKLE_HEIGHT], kneeOut: 28,
+        upperArm: [-104, 20], forearm: [86, 10],
+      },
+    ],
+  },
+  // Wide Stance Barbell Squat (id 299): feet wider than the shoulders, knees
+  // tracking over the toes, descending until the thighs are just below level.
+  'wide-stance-barbell-squat': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 32,
+    originX: 50,
+    implement: 'bar',
+    armsFollowTrunk: true,
+    footSpread: 10.0,
+    equipment: [
+      { kind: 'frame', a: [-15, 0.5, 16], b: [-15, 78, 16] },
+      { kind: 'frame', a: [-15, 0.5, -16], b: [-15, 78, -16] },
+      { kind: 'frame', a: [-15, 68, 16], b: [-11.5, 68, 16] },
+      { kind: 'frame', a: [-15, 68, -16], b: [-11.5, 68, -16] },
+    ],
+    poses: [
+      {
+        at: [-0.2, 45.30], trunk: 86, thigh: -90, shin: -90,
+        ankle: [-2, CHAIN_ANKLE_HEIGHT], foot: [0, 28], kneeOut: 14,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+      {
+        at: [-14.2, 22.4], trunk: 52, thigh: -90, shin: -90,
+        ankle: [-2, CHAIN_ANKLE_HEIGHT], foot: [0, 28], kneeOut: 26,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+    ],
+  },
+  // Front Squat (id 8): bar resting across the front of the shoulders with a
+  // secure grip slightly wider than shoulder-width and elbows pointing forward,
+  // upright torso into a full squat.
+  // MOV-A05-R2: the bar rests on the painted shoulders in front of the neck
+  // (the same place relative to the trunk in both poses), the upper arms stay
+  // level and pointing forward, and the hands sit far enough out along the bar
+  // that each elbow opens to 34 degrees instead of folding the forearm into
+  // the upper arm.
+  'front-squat': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 10,
+    originX: 54,
+    implement: 'bar',
+    armsFollowTrunk: true,
+    footSpread: 4.6,
+    equipment: [
+      { kind: 'frame', a: [14, 0.5, 16], b: [14, 78, 16] },
+      { kind: 'frame', a: [14, 0.5, -16], b: [14, 78, -16] },
+      { kind: 'frame', a: [14, 68.5, 16], b: [10.5, 68.5, 16] },
+      { kind: 'frame', a: [14, 68.5, -16], b: [10.5, 68.5, -16] },
+    ],
+    poses: [
+      {
+        at: [0.0, 46.10], trunk: 89, thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 10,
+        upperArm: [1, -0.82], forearm: [173.076, 33.82],
+      },
+      {
+        at: [-10.4, 18.8], trunk: 68, thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 14,
+        upperArm: [22, -3.58], forearm: [199.942, 37.351],
+      },
+    ],
+  },
+  // Front Squat (Clean Grip) (id 208): rack set just below shoulder height,
+  // hands just outside the shoulders with fingertips under the bar (shown in
+  // closeUp) and elbows high with chest up.
+  // MOV-A05-R2: the bar rests on the painted shoulders in front of the neck,
+  // the elbows sit 6 degrees above level, and each elbow opens to at least
+  // 32 degrees.
+  'front-squat-clean-grip': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 10,
+    originX: 54,
+    implement: 'bar',
+    armsFollowTrunk: true,
+    footSpread: 4.8,
+    closeUp: { at: [-33, 73], r: 15, scale: 5, zoom: 1, open: 1 },
+    equipment: [
+      { kind: 'frame', a: [14, 0.5, 16], b: [14, 78, 16] },
+      { kind: 'frame', a: [14, 0.5, -16], b: [14, 78, -16] },
+      { kind: 'frame', a: [14, 63.0, 16], b: [10.2, 63.0, 16] },
+      { kind: 'frame', a: [14, 63.0, -16], b: [10.2, 63.0, -16] },
+    ],
+    poses: [
+      {
+        at: [0.0, 46.08], trunk: 90, thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 10,
+        upperArm: [6.038, -6.446], forearm: [-157.156, 34.997], hand: [100, -4],
+      },
+      {
+        at: [-9.6, 18.2], trunk: 72, thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 16,
+        upperArm: [24.03, -5.709], forearm: [-133.853, 34.07], hand: [100, -4],
+      },
+    ],
+  },
+  // Box Squat (id 38): sitting hips back onto a box at knee height behind the
+  // lifter with shins near-vertical, pausing seated on the box before standing.
+  'box-squat': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 30,
+    originX: 50,
+    implement: 'bar',
+    armsFollowTrunk: true,
+    footSpread: 9.2,
+    equipment: [
+      { kind: 'box', a: [-24, 20.2], b: [-12, 0.6] },
+      { kind: 'frame', a: [15, 0.5, 16], b: [15, 78, 16] },
+      { kind: 'frame', a: [15, 0.5, -16], b: [15, 78, -16] },
+    ],
+    poses: [
+      {
+        at: [1.8, 45.60], trunk: 86, thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 10,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+      {
+        at: [-16.8, 23.2], trunk: 44, thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 28,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+    ],
+  },
+  // Reverse Band Box Squat (id 256): wide stance in a power rack with bands
+  // hanging from the top of the rack to the barbell ends, sitting back onto a box.
+  'reverse-band-box-squat': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 30,
+    originX: 50,
+    implement: 'bar',
+    armsFollowTrunk: true,
+    footSpread: 9.6,
+    lines: [
+      { from: [-4, 86, 16.5], to: 'nearBarEnd' },
+      { from: [-4, 86, -16.5], to: 'farBarEnd', depth: 'far' },
+    ],
+    equipment: [
+      { kind: 'box', a: [-24, 20.2], b: [-12, 0.6] },
+      { kind: 'frame', a: [-16, 0.5, 16.5], b: [-16, 86, 16.5] },
+      { kind: 'frame', a: [12, 0.5, 16.5], b: [12, 86, 16.5] },
+      { kind: 'frame', a: [-16, 86, 16.5], b: [12, 86, 16.5] },
+      { kind: 'frame', a: [-16, 0.5, -16.5], b: [-16, 86, -16.5] },
+      { kind: 'frame', a: [12, 0.5, -16.5], b: [12, 86, -16.5] },
+      { kind: 'frame', a: [-16, 86, -16.5], b: [12, 86, -16.5] },
+    ],
+    poses: [
+      {
+        at: [1.8, 45.50], trunk: 86, thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 12,
+        upperArm: [-104, 20], forearm: [86, 10],
+      },
+      {
+        at: [-16.8, 23.2], trunk: 44, thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 30,
+        upperArm: [-104, 20], forearm: [86, 10],
+      },
+    ],
+  },
+  // Speed Box Squat (id 275): box squat with floor-anchored bands on the bar
+  // ends, controlled descent to the box and an explosive concentric ascent.
+  'speed-box-squat': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 30,
+    originX: 50,
+    implement: 'bar',
+    armsFollowTrunk: true,
+    footSpread: 9.2,
+    lines: [
+      { from: [-4, 1.2, 16.5], to: 'nearBarEnd' },
+      { from: [-4, 1.2, -16.5], to: 'farBarEnd', depth: 'far' },
+    ],
+    equipment: [
+      { kind: 'box', a: [-24, 20.2], b: [-12, 0.6] },
+      { kind: 'frame', a: [14, 0.5, 16.5], b: [14, 78, 16.5] },
+      { kind: 'frame', a: [14, 0.5, -16.5], b: [14, 78, -16.5] },
+      { kind: 'frame', a: [-14, 0.8, 16.5], b: [14, 0.8, 16.5] },
+      { kind: 'frame', a: [-14, 0.8, -16.5], b: [14, 0.8, -16.5] },
+    ],
+    poses: [
+      {
+        at: [1.8, 45.60], trunk: 86, thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 10,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+      {
+        at: [-16.8, 23.2], trunk: 44, thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 28,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+    ],
+  },
+  // Barbell Squat To A Bench (id 140): flat bench behind the lifter, barbell
+  // across the upper back, sitting the hips back until lightly touching the
+  // bench and driving back up without resting on it.
+  'barbell-squat-to-a-bench': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 10,
+    originX: 54,
+    implement: 'bar',
+    armsFollowTrunk: true,
+    footSpread: 4.8,
+    equipment: [
+      ...chainFlatBench(-34, -10, 20.2),
+      { kind: 'frame', a: [14, 0.5, 16], b: [14, 78, 16] },
+      { kind: 'frame', a: [14, 0.5, -16], b: [14, 78, -16] },
+      { kind: 'frame', a: [14, 68, 16], b: [10.5, 68, 16] },
+      { kind: 'frame', a: [14, 68, -16], b: [10.5, 68, -16] },
+    ],
+    poses: [
+      {
+        at: [0.2, 45.75], trunk: 86, thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT], foot: [0, 22], kneeOut: 10,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+      {
+        at: [-14.2, 23.2], trunk: 50, thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT], foot: [0, 22], kneeOut: 14.8,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+    ],
+  },
+  // Dumbbell Squat To A Bench (id 192): flat bench behind the lifter, a
+  // dumbbell in each hand at the sides, sitting the hips back until lightly
+  // touching the bench and pushing back up without resting on it.
+  'dumbbell-squat-to-a-bench': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 10,
+    originX: 54,
+    implement: 'bells',
+    bellAxis: [1, 0, 0],
+    footSpread: 4.8,
+    equipment: [
+      ...chainFlatBench(-34, -10, 20.2),
+    ],
+    poses: [
+      {
+        at: [0.2, 45.75], trunk: 88, thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT], foot: [0, 22], kneeOut: 10,
+        upperArm: [-92, 10], forearm: [-90, 8],
+      },
+      {
+        at: [-14.2, 23.2], trunk: 45, thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT], foot: [0, 22], kneeOut: 22,
+        upperArm: [-96, 8], forearm: [-96, 6],
+      },
+    ],
+  },
+  // Zercher Squat (id 81): bar cradled in the crooks of the elbows with the
+  // hands clasped in front, squatting between the knees with a tall torso and
+  // the elbows riding inside the knees at the bottom.
+  'zercher-squat': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 52,
+    implement: 'bar',
+    barAt: 'elbows',
+    farArmOver: true,
+    footSpread: 5.8,
+    equipment: [
+      { kind: 'frame', a: [14, 0.5, 16], b: [14, 78, 16] },
+      { kind: 'frame', a: [14, 0.5, -16], b: [14, 78, -16] },
+      { kind: 'frame', a: [14, 55, 16], b: [10.5, 55, 16] },
+      { kind: 'frame', a: [14, 55, -16], b: [10.5, 55, -16] },
+    ],
+    poses: [
+      {
+        at: [-3.0, 45.95], trunk: 88, thigh: -90, shin: -90,
+        ankle: [-3.0, CHAIN_ANKLE_HEIGHT], kneeOut: 14,
+        upperArm: [-64, 4], forearm: [98, -44],
+      },
+      {
+        at: [-13.2, 19.6], trunk: 68, thigh: -90, shin: -90,
+        ankle: [-3.0, CHAIN_ANKLE_HEIGHT], kneeOut: 28,
+        upperArm: [-58, 4], forearm: [102, -44],
+      },
+    ],
+  },
+  // Barbell Hack Squat (id 98): bar set on the floor behind the calves, hip-
+  // width stance, squatting down to take a shoulder-width grip with long arms
+  // and driving the floor away as the bar skims up behind the legs.
+  // MOV-S1-R3: "about hip width" puts the ankles 15 apart under hip joints
+  // 13.6 apart, and the shoulder-width grip hangs the arms straight down from
+  // the shoulders (no outward turn), so the hands are as far apart as they are.
+  'barbell-hack-squat': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 26,
+    originX: 50,
+    unitPhase: true,
+    implement: 'bar',
+    barAt: 'behind',
+    plateRadius: CHAIN_FLOOR_PLATE,
+    footSpread: 0.6,
+    poses: [
+      {
+        at: [-10.2828, 21.276082], trunk: 40.5, shrug: -4.5, thigh: -90, shin: -90,
+        ankle: [10, CHAIN_ANKLE_HEIGHT], kneeOut: 12,
+        upperArm: [-86, 0], forearm: [-86, 0],
+      },
+      {
+        at: [-8.0097, 28.6678], trunk: 40, shrug: -5, thigh: -90, shin: -90,
+        ankle: [10, CHAIN_ANKLE_HEIGHT], kneeOut: 11.5,
+        upperArm: [-86, 0], forearm: [-86, 0],
+      },
+      {
+        at: [-8.4912, 33.2697], trunk: 41, shrug: -5.5, thigh: -90, shin: -90,
+        ankle: [10, CHAIN_ANKLE_HEIGHT], kneeOut: 11,
+        upperArm: [-86, 0], forearm: [-86, 0],
+      },
+      {
+        at: [5.1122, 33.9869], trunk: 72.5, shrug: -5, thigh: -90, shin: -90,
+        ankle: [10, CHAIN_ANKLE_HEIGHT], kneeOut: 10,
+        upperArm: [-105, 0], forearm: [-105, 0],
+      },
+      {
+        at: [7.9554, 38.7678], trunk: 83, shrug: -2.5, thigh: -90, shin: -90,
+        ankle: [10, CHAIN_ANKLE_HEIGHT], kneeOut: 9,
+        upperArm: [-105, 0], forearm: [-105, 0],
+      },
+      {
+        at: [8.5, 45.70], trunk: 88, shrug: 0, thigh: -90, shin: -90,
+        ankle: [10, CHAIN_ANKLE_HEIGHT], kneeOut: 8,
+        upperArm: [-102, 0], forearm: [-102, 0],
+      },
+    ],
+  },
+  // Jefferson Squats (id 120): straddling the bar with feet angled comfortably,
+  // one hand in front of the body and one behind at equal distances, pushing
+  // both feet through the floor with a tall centred torso as the bar travels
+  // straight between the legs.
+  'jefferson-squats': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 50,
+    feet: 'free',
+    implement: 'bar',
+    plateRadius: CHAIN_FLOOR_PLATE,
+    kneePole: [90, 36],
+    poses: [
+      {
+        at: [
+          0,
+          CHAIN_FLOOR_BAR_HEIGHT - (CHAIN_TRUNK - 1.6) - (SAGITTAL_UPPER_ARM + SAGITTAL_FOREARM) * Math.sin(chainRad(-83.5)) * Math.cos(chainRad(-10)),
+        ],
+        trunk: 90, twist: 58, shrug: -1.6, thigh: -90, shin: -90,
+        ankle: [-7.0, CHAIN_ANKLE_HEIGHT, 18.0], farAnkle: [7.0, CHAIN_ANKLE_HEIGHT, -18.0],
+        foot: [0, -8], farFoot: [0, 20], kneeOut: 18,
+        upperArm: [-83.5, -10], forearm: [-83.5, -10],
+        farUpperArm: [-96.5, -10], farForearm: [-96.5, -10],
+      },
+      {
+        at: [0, 44.2], trunk: 90, twist: 58, shrug: -1.6, thigh: -90, shin: -90,
+        ankle: [-7.0, CHAIN_ANKLE_HEIGHT, 18.0], farAnkle: [7.0, CHAIN_ANKLE_HEIGHT, -18.0],
+        foot: [0, -8], farFoot: [0, 20], kneeOut: 14,
+        upperArm: [-83.5, -10], forearm: [-83.5, -10],
+        farUpperArm: [-96.5, -10], farForearm: [-96.5, -10],
+      },
+    ],
+  },
+  // Kneeling Squat (id 235): kneeling tall in a rack with the bar on the back
+  // and hips, knees and shoulders stacked, sitting the hips back toward the
+  // heels with a braced trunk and driving the hips forward to tall kneeling.
+  'kneeling-squat': {
+    root: 'ankle',
+    view: 'oblique',
+    yawDeg: 10,
+    originX: 52,
+    feet: 'free',
+    implement: 'bar',
+    armsFollowTrunk: true,
+    footSpread: 4.0,
+    equipment: [
+      { kind: 'frame', a: [16, 0.5, 16], b: [16, 62, 16] },
+      { kind: 'frame', a: [16, 0.5, -16], b: [16, 62, -16] },
+      { kind: 'frame', a: [16, 46, 16], b: [12.5, 46, 16] },
+      { kind: 'frame', a: [16, 46, -16], b: [12.5, 46, -16] },
+    ],
+    poses: [
+      {
+        at: [-14.0, CHAIN_KNEELING_KNEE], trunk: 90,
+        thigh: -90, shin: 180, foot: 180,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+      {
+        at: [-14.0, CHAIN_KNEELING_KNEE], trunk: 60,
+        thigh: -38, shin: 180, foot: 180,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+    ],
+  },
+  // One-Arm Overhead Kettlebell Squat (id 105): one kettlebell locked out
+  // overhead stacked over the shoulder and the free arm forward as a
+  // counterbalance, squatting between the hips on a rooted foot.
+  'one-arm-overhead-kettlebell-squat': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 50,
+    implement: 'kettlebell',
+    nearArmOverHead: true,
+    farArmOver: true,
+    footSpread: 5.2,
+    poses: [
+      {
+        at: [0.0, 45.95], trunk: 80, twist: -34, thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 12,
+        upperArm: [92, 8], forearm: [90, 6],
+        farUpperArm: [6, 12], farForearm: [10, 6],
+      },
+      {
+        at: [-10.8, 20.2], trunk: 64, twist: -22, thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 24,
+        upperArm: [92, 8], forearm: [90, 6],
+        farUpperArm: [6, 12], farForearm: [10, 6],
+      },
+    ],
+  },
+  // Double Kettlebell Front Squat (id 48): two kettlebells in the front rack
+  // resting on the forearms at the chest with the elbows tucked in, squatting
+  // deep with the chest up and knees out.
+  'double-kettlebell-front-squat': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 50,
+    implement: 'kettlebells',
+    armsFollowTrunk: true,
+    farArmOver: true,
+    footSpread: 5.4,
+    poses: [
+      {
+        at: [0.0, 45.95], trunk: 89, thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 12,
+        upperArm: [-70, 14], forearm: [66, -12],
+      },
+      {
+        at: [-10.6, 19.6], trunk: 68, thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 24,
+        upperArm: [-70, 14], forearm: [66, -12],
+      },
+    ],
+  },
+  // Deadlift (id 2): bar over mid-foot, shins brought to the bar, flat braced
+  // trunk, pushing the floor away to stand tall with the bar close to the legs.
+  'deadlift': {
+    root: 'neck',
+    view: 'oblique',
+    yawDeg: 24,
+    originX: 50,
+    unitPhase: true,
+    footSpread: -1.2,
+    kneePole: 10,
+    implement: 'bar',
+    barAt: 'front',
+    plateRadius: CHAIN_FLOOR_PLATE,
+    farArmOver: true,
+    poses: [
+      {
+        at: [0.0, 33.991754], trunk: 17.2, head: 84, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT], kneeOut: 0,
+        upperArm: [-90.5, -1.4], forearm: [-90.5, -1.4],
+      },
+      {
+        at: [0.55, 33.991754], trunk: 21.6, head: 86, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT], kneeOut: 0,
+        upperArm: [-90.5, -1.4], forearm: [-90.5, -1.4],
+      },
+      {
+        at: [-2.20, 42.3799], trunk: 22, head: 87, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT], kneeOut: 1,
+        upperArm: [-84.5, -1.4], forearm: [-84.5, -1.4],
+      },
+      {
+        at: [-0.8548, 49.9778], trunk: 29, head: 88, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT], kneeOut: 2,
+        upperArm: [-88, -1.4], forearm: [-88, -1.4],
+      },
+      {
+        at: [-0.6275, 60.489], trunk: 74, head: 89, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT], kneeOut: 3,
+        upperArm: [-89, -1.4], forearm: [-89, -1.4],
+      },
+      {
+        at: [-4.4, 70.62], trunk: 90, head: 90, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT], kneeOut: 4,
+        upperArm: [-80.84, -1.4], forearm: [-80.84, -1.4],
+      },
+    ],
+  },
+  // Deficit Deadlift (id 46): standing on a low platform (1-3 inches) with the
+  // bar over mid-foot, forcing more knee and hip bend at the start with a flat
+  // back and pulling through the longer range to lockout.
+  'deficit-deadlift': {
+    root: 'neck',
+    view: 'oblique',
+    yawDeg: 24,
+    originX: 50,
+    unitPhase: true,
+    feet: 'free',
+    footSpread: -1.2,
+    kneePole: 10,
+    implement: 'bar',
+    barAt: 'front',
+    plateRadius: CHAIN_FLOOR_PLATE,
+    farArmOver: true,
+    equipment: [
+      { kind: 'box', a: [-11.5, 3.5], b: [7.5, 0.5] },
+    ],
+    poses: [
+      {
+        at: [0.05, 33.751232], trunk: 12.6, head: 84, shrug: 1.0, thigh: -90, shin: -90,
+        ankle: [-5.0, CHAIN_ANKLE_HEIGHT + 3.3], foot: 0, kneeOut: 2,
+        upperArm: [-92.5, -1.4], forearm: [-92.5, -1.4],
+      },
+      {
+        at: [0.2137, 33.991754], trunk: 17.2, head: 86, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-5.0, CHAIN_ANKLE_HEIGHT + 3.3], foot: 0, kneeOut: 2,
+        upperArm: [-90.5, -1.4], forearm: [-90.5, -1.4],
+      },
+      {
+        at: [0.2137, 43.4918], trunk: 18, head: 87, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-5.0, CHAIN_ANKLE_HEIGHT + 3.3], foot: 0, kneeOut: 2.5,
+        upperArm: [-90.5, -1.4], forearm: [-90.5, -1.4],
+      },
+      {
+        at: [0.1137, 53.2918], trunk: 27, head: 88, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-5.0, CHAIN_ANKLE_HEIGHT + 3.3], foot: 0, kneeOut: 3,
+        upperArm: [-90.5, -1.4], forearm: [-90.5, -1.4],
+      },
+      {
+        at: [-0.2863, 63.4918], trunk: 70, head: 89, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-5.0, CHAIN_ANKLE_HEIGHT + 3.3], foot: 0, kneeOut: 3.5,
+        upperArm: [-90.5, -1.4], forearm: [-90.5, -1.4],
+      },
+      {
+        at: [-4.8, 70.62 + 3.3], trunk: 90, head: 90, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-5.0, CHAIN_ANKLE_HEIGHT + 3.3], foot: 0, kneeOut: 4,
+        upperArm: [-80.84, -1.4], forearm: [-80.84, -1.4],
+      },
+    ],
+  },
+  // Deadlift with Bands (id 176): bands looped over the bar ends and anchored
+  // under the feet, gripping just outside the legs and standing tall against
+  // the band tension.
+  'deadlift-with-bands': {
+    root: 'neck',
+    view: 'oblique',
+    yawDeg: 24,
+    originX: 50,
+    unitPhase: true,
+    footSpread: -1.2,
+    kneePole: 10,
+    implement: 'bar',
+    barAt: 'front',
+    plateRadius: CHAIN_FLOOR_PLATE,
+    farArmOver: true,
+    lines: [
+      { from: 'nearFoot', to: 'nearBarEnd' },
+      { from: 'farFoot', to: 'farBarEnd', depth: 'far' },
+    ],
+    poses: [
+      {
+        at: [0.2137, 33.991754], trunk: 19.5, head: 86, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT], kneeOut: 0,
+        upperArm: [-90.5, -1.4], forearm: [-90.5, -1.4],
+      },
+      {
+        at: [-2.3475, 42.3799], trunk: 22, head: 87, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT], kneeOut: 1,
+        upperArm: [-84.5, -1.4], forearm: [-84.5, -1.4],
+      },
+      {
+        at: [-0.4275, 49.989], trunk: 28, head: 88, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT], kneeOut: 2,
+        upperArm: [-89, -1.4], forearm: [-89, -1.4],
+      },
+      {
+        at: [-0.6275, 60.489], trunk: 74, head: 89, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT], kneeOut: 3,
+        upperArm: [-89, -1.4], forearm: [-89, -1.4],
+      },
+      {
+        at: [-4.4, 70.62], trunk: 90, head: 90, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT], kneeOut: 4,
+        upperArm: [-80.84, -1.4], forearm: [-80.84, -1.4],
+      },
+    ],
+  },
+  // Reverse Band Deadlift (id 257): inside a rack with bands hung from the top
+  // and looped around the bar ends, hip-width stance and shoulder-width grip.
+  'reverse-band-deadlift': {
+    root: 'neck',
+    view: 'oblique',
+    yawDeg: 24,
+    originX: 50,
+    unitPhase: true,
+    footSpread: -1.2,
+    kneePole: 10,
+    implement: 'bar',
+    barAt: 'front',
+    plateRadius: CHAIN_FLOOR_PLATE,
+    farArmOver: true,
+    lines: [
+      { from: [0, 86, 17.5], to: 'nearBarEnd' },
+      { from: [0, 86, -17.5], to: 'farBarEnd', depth: 'far' },
+    ],
+    equipment: [
+      { kind: 'frame', a: [-16, 0.5, 17.5], b: [-16, 86, 17.5] },
+      { kind: 'frame', a: [12, 0.5, 17.5], b: [12, 86, 17.5] },
+      { kind: 'frame', a: [-16, 86, 17.5], b: [12, 86, 17.5] },
+      { kind: 'frame', a: [-16, 0.5, -17.5], b: [-16, 86, -17.5] },
+      { kind: 'frame', a: [12, 0.5, -17.5], b: [12, 86, -17.5] },
+      { kind: 'frame', a: [-16, 86, -17.5], b: [12, 86, -17.5] },
+    ],
+    poses: [
+      {
+        at: [0.2137, 33.991754], trunk: 19.5, head: 86, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT], kneeOut: 0,
+        upperArm: [-90.5, -1.4], forearm: [-90.5, -1.4],
+      },
+      {
+        at: [-2.3475, 42.3799], trunk: 22, head: 87, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT], kneeOut: 1,
+        upperArm: [-84.5, -1.4], forearm: [-84.5, -1.4],
+      },
+      {
+        at: [-0.4275, 49.989], trunk: 28, head: 88, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT], kneeOut: 2,
+        upperArm: [-89, -1.4], forearm: [-89, -1.4],
+      },
+      {
+        at: [-0.6275, 60.489], trunk: 74, head: 89, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT], kneeOut: 3,
+        upperArm: [-89, -1.4], forearm: [-89, -1.4],
+      },
+      {
+        at: [-4.4, 70.62], trunk: 90, head: 90, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT], kneeOut: 4,
+        upperArm: [-80.84, -1.4], forearm: [-80.84, -1.4],
+      },
+    ],
+  },
+  // Sumo Deadlift (id 78): wide stance with toes pointed out, bar over mid-foot,
+  // straight arms gripping inside the knees, chest up and driving the floor apart.
+  // MOV-S1-R3: the chest is up at the start ("Chest up before you pull"): the
+  // trunk is drawn 45.1 degrees above level (34.85 in the body's own plane,
+  // turned 46 degrees to the viewer), the neck set so the shoulders and bar
+  // stay where they were. The stance is 2 units wider each side and the
+  // knees pushed further out, so the hips stay above the knees and the shins
+  // clear of the bar; through the knees the arms hang a little further back
+  // so the bar still rises close to the legs. Standing tall over the wider
+  // stance, the hips finish 0.96 lower, where the legs reach the floor.
+  'sumo-deadlift': {
+    root: 'neck',
+    view: 'oblique',
+    yawDeg: 46,
+    originX: 50,
+    unitPhase: true,
+    feet: 'free',
+    kneePole: -5,
+    implement: 'bar',
+    barAt: 'front',
+    plateRadius: CHAIN_FLOOR_PLATE,
+    farArmOver: true,
+    poses: [
+      {
+        at: [-2.523139, 34.260767], trunk: 34.85, head: 86, shrug: -2.0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT, 27.0], farAnkle: [-4.6, CHAIN_ANKLE_HEIGHT, -27.0],
+        foot: [0, 38], kneeOut: 20,
+        upperArm: [-80, -11.8], forearm: [-80, -11.8],
+      },
+      {
+        at: [-2.743255, 40.98899], trunk: 35.5, head: 87, shrug: -1.5, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT, 27.0], farAnkle: [-4.6, CHAIN_ANKLE_HEIGHT, -27.0],
+        foot: [0, 38], kneeOut: 19,
+        upperArm: [-80, -11.8], forearm: [-80, -11.8],
+      },
+      {
+        at: [-2.5765, 47.7336], trunk: 38, head: 88, shrug: -1.0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT, 27.0], farAnkle: [-4.6, CHAIN_ANKLE_HEIGHT, -27.0],
+        foot: [0, 38], kneeOut: 16,
+        upperArm: [-83, -11.8], forearm: [-83, -11.8],
+      },
+      {
+        at: [-3.4531, 57.2986], trunk: 82, head: 89, shrug: -0.5, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT, 27.0], farAnkle: [-4.6, CHAIN_ANKLE_HEIGHT, -27.0],
+        foot: [0, 38], kneeOut: 15,
+        upperArm: [-84, -11.8], forearm: [-84, -11.8],
+      },
+      {
+        at: [-4.2, 65.78], trunk: 90, head: 90, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT, 27.0], farAnkle: [-4.6, CHAIN_ANKLE_HEIGHT, -27.0],
+        foot: [0, 38], kneeOut: 14,
+        upperArm: [-81.2, -11.8], forearm: [-81.2, -11.8],
+      },
+    ],
+  },
+  // Reverse Band Sumo Deadlift (id 258): wide sumo stance and inside-knee grip
+  // inside a rack with bands hung from the top and looped around the bar ends.
+  'reverse-band-sumo-deadlift': {
+    root: 'neck',
+    view: 'oblique',
+    yawDeg: 46,
+    originX: 50,
+    unitPhase: true,
+    feet: 'free',
+    kneePole: -5,
+    implement: 'bar',
+    barAt: 'front',
+    plateRadius: CHAIN_FLOOR_PLATE,
+    farArmOver: true,
+    lines: [
+      { from: [0, 86, 22.0], to: 'nearBarEnd' },
+      { from: [0, 86, -22.0], to: 'farBarEnd', depth: 'far' },
+    ],
+    equipment: [
+      { kind: 'frame', a: [-16, 0.5, 22.0], b: [-16, 86, 22.0] },
+      { kind: 'frame', a: [10, 0.5, 22.0], b: [10, 86, 22.0] },
+      { kind: 'frame', a: [-16, 86, 22.0], b: [10, 86, 22.0] },
+      { kind: 'frame', a: [-16, 0.5, -22.0], b: [-16, 86, -22.0] },
+      { kind: 'frame', a: [10, 0.5, -22.0], b: [10, 86, -22.0] },
+      { kind: 'frame', a: [-16, 86, -22.0], b: [10, 86, -22.0] },
+    ],
+    poses: [
+      {
+        at: [-2.4871, 34.207185], trunk: 33, head: 86, shrug: -2.0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT, 25.0], farAnkle: [-4.6, CHAIN_ANKLE_HEIGHT, -25.0],
+        foot: [0, 38], kneeOut: 18,
+        upperArm: [-80, -11.8], forearm: [-80, -11.8],
+      },
+      {
+        at: [-2.7357, 40.9783], trunk: 35, head: 87, shrug: -1.5, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT, 25.0], farAnkle: [-4.6, CHAIN_ANKLE_HEIGHT, -25.0],
+        foot: [0, 38], kneeOut: 17,
+        upperArm: [-80, -11.8], forearm: [-80, -11.8],
+      },
+      {
+        at: [-2.5765, 47.7336], trunk: 38, head: 88, shrug: -1.0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT, 25.0], farAnkle: [-4.6, CHAIN_ANKLE_HEIGHT, -25.0],
+        foot: [0, 38], kneeOut: 16,
+        upperArm: [-80, -11.8], forearm: [-80, -11.8],
+      },
+      {
+        at: [-3.4531, 57.2986], trunk: 82, head: 89, shrug: -0.5, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT, 25.0], farAnkle: [-4.6, CHAIN_ANKLE_HEIGHT, -25.0],
+        foot: [0, 38], kneeOut: 15,
+        upperArm: [-83, -11.8], forearm: [-83, -11.8],
+      },
+      {
+        at: [-4.2, 66.74], trunk: 90, head: 90, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT, 25.0], farAnkle: [-4.6, CHAIN_ANKLE_HEIGHT, -25.0],
+        foot: [0, 38], kneeOut: 14,
+        upperArm: [-81.2, -11.8], forearm: [-81.2, -11.8],
+      },
+    ],
+  },
+  // Sumo Deadlift with Bands (id 290): short bands looped over the bar ends and
+  // stood on with wide sumo feet, gripping inside the legs on straight arms.
+  'sumo-deadlift-with-bands': {
+    root: 'neck',
+    view: 'oblique',
+    yawDeg: 46,
+    originX: 50,
+    unitPhase: true,
+    feet: 'free',
+    kneePole: -5,
+    implement: 'bar',
+    barAt: 'front',
+    plateRadius: CHAIN_FLOOR_PLATE,
+    farArmOver: true,
+    lines: [
+      { from: 'nearFoot', to: 'nearBarEnd' },
+      { from: 'farFoot', to: 'farBarEnd', depth: 'far' },
+    ],
+    poses: [
+      {
+        at: [-2.4871, 34.207185], trunk: 33, head: 86, shrug: -2.0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT, 25.0], farAnkle: [-4.6, CHAIN_ANKLE_HEIGHT, -25.0],
+        foot: [0, 38], kneeOut: 18,
+        upperArm: [-80, -11.8], forearm: [-80, -11.8],
+      },
+      {
+        at: [-2.7357, 40.9783], trunk: 35, head: 87, shrug: -1.5, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT, 25.0], farAnkle: [-4.6, CHAIN_ANKLE_HEIGHT, -25.0],
+        foot: [0, 38], kneeOut: 17,
+        upperArm: [-80, -11.8], forearm: [-80, -11.8],
+      },
+      {
+        at: [-2.5765, 47.7336], trunk: 38, head: 88, shrug: -1.0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT, 25.0], farAnkle: [-4.6, CHAIN_ANKLE_HEIGHT, -25.0],
+        foot: [0, 38], kneeOut: 16,
+        upperArm: [-80, -11.8], forearm: [-80, -11.8],
+      },
+      {
+        at: [-3.4531, 57.2986], trunk: 82, head: 89, shrug: -0.5, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT, 25.0], farAnkle: [-4.6, CHAIN_ANKLE_HEIGHT, -25.0],
+        foot: [0, 38], kneeOut: 15,
+        upperArm: [-83, -11.8], forearm: [-83, -11.8],
+      },
+      {
+        at: [-4.2, 66.74], trunk: 90, head: 90, shrug: 0, thigh: -90, shin: -90,
+        ankle: [-4.6, CHAIN_ANKLE_HEIGHT, 25.0], farAnkle: [-4.6, CHAIN_ANKLE_HEIGHT, -25.0],
+        foot: [0, 38], kneeOut: 14,
+        upperArm: [-81.2, -11.8], forearm: [-81.2, -11.8],
+      },
+    ],
+  },
+  // Stiff-Legged Barbell Deadlift: starts standing holding a barbell with an
+  // overhand grip, feet shoulder-width or narrower and knees slightly bent.
+  // Keeping that exact knee angle and a straight back, the hips push back so
+  // the bar lowers on plumb arms toward the top of the feet.
+  // MOV-S1-R3: "bar close to the legs". The hips go back early, the legs
+  // leaning back at the fixed 154-degree knee as the trunk folds, and the
+  // arms hang within 9 degrees of plumb, so the bar runs down the thighs and
+  // onto the shins within 0.7 units of their surface at each keyframe (1.1 at
+  // most between them) instead of swinging out ahead of the legs.
+  'stiff-legged-barbell-deadlift': {
+    root: 'ankle',
+    view: 'oblique',
+    yawDeg: 20,
+    originX: 50,
+    footSpread: 1.6,
+    implement: 'bar',
+    barAt: 'front',
+    farArmOver: true,
+    unitPhase: true,
+    poses: [
+      {
+        at: [0, CHAIN_ANKLE_HEIGHT], trunk: 89, head: 90, shrug: 0,
+        thigh: -77, shin: -103,
+        upperArm: [-80.5, 5], forearm: [-80.5, 5],
+      },
+      {
+        at: [0, CHAIN_ANKLE_HEIGHT], trunk: 77.38, head: 80.75, shrug: -0.19,
+        thigh: -76.5, shin: -102.5,
+        upperArm: [-91.1, 5], forearm: [-91.1, 5],
+      },
+      {
+        at: [0, CHAIN_ANKLE_HEIGHT], trunk: 65.75, head: 71.5, shrug: -0.38,
+        thigh: -60.9, shin: -86.9,
+        upperArm: [-97.7, 5], forearm: [-97.7, 5],
+      },
+      {
+        at: [0, CHAIN_ANKLE_HEIGHT], trunk: 54.12, head: 62.25, shrug: -0.56,
+        thigh: -47.3, shin: -73.3,
+        upperArm: [-97.1, 5], forearm: [-97.1, 5],
+      },
+      {
+        at: [0, CHAIN_ANKLE_HEIGHT], trunk: 42.5, head: 53, shrug: -0.75,
+        thigh: -46.4, shin: -72.4,
+        upperArm: [-97.2, 5], forearm: [-97.2, 5],
+      },
+      {
+        at: [0, CHAIN_ANKLE_HEIGHT], trunk: 30.88, head: 43.75, shrug: -0.94,
+        thigh: -46.1, shin: -72.1,
+        upperArm: [-94.1, 5], forearm: [-94.1, 5],
+      },
+      {
+        at: [0, CHAIN_ANKLE_HEIGHT], trunk: 19.25, head: 34.5, shrug: -1.12,
+        thigh: -45.7, shin: -71.7,
+        upperArm: [-94.5, 5], forearm: [-94.5, 5],
+      },
+      {
+        at: [0, CHAIN_ANKLE_HEIGHT], trunk: 7.62, head: 25.25, shrug: -1.31,
+        thigh: -45.5, shin: -71.5,
+        upperArm: [-92.8, 5], forearm: [-92.8, 5],
+      },
+      {
+        at: [0, CHAIN_ANKLE_HEIGHT], trunk: -4, head: 16, shrug: -1.5,
+        thigh: -45, shin: -71,
+        upperArm: [-88.4, 5], forearm: [-88.4, 5],
+      },
+    ],
+  },
+  // Good Morning: barbell set across the upper back as for a squat after
+  // stepping forward from the rack. Knees soften and the hips travel back while
+  // the trunk stays long and straight, then hips drive forward to stand tall.
+  'good-morning': {
+    root: 'ankle',
+    view: 'oblique',
+    yawDeg: 14,
+    originX: 52,
+    footSpread: 3.5,
+    implement: 'bar',
+    armsFollowTrunk: true,
+    equipment: [
+      { kind: 'frame', a: [-16, 0.5, 16], b: [-16, 78, 16] },
+      { kind: 'frame', a: [-16, 0.5, -16], b: [-16, 78, -16] },
+      { kind: 'frame', a: [-16, 68, 16], b: [-12.5, 68, 16] },
+      { kind: 'frame', a: [-16, 68, -16], b: [-12.5, 68, -16] },
+    ],
+    poses: [
+      {
+        at: [4, CHAIN_ANKLE_HEIGHT], trunk: 88, head: 90,
+        thigh: -82, shin: -104,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+      {
+        at: [4, CHAIN_ANKLE_HEIGHT], trunk: 14, head: 28,
+        thigh: -58, shin: -91,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+    ],
+  },
+  // Good Morning off Pins: the bar starts on stomach-height safety pins inside
+  // the rack. The athlete bends under it with torso near level and knees
+  // slightly bent, drives the hips forward to stand tall, then lowers slowly
+  // back to the pins to let the bar settle.
+  'good-morning-off-pins': {
+    root: 'ankle',
+    view: 'oblique',
+    yawDeg: 14,
+    originX: 50,
+    footSpread: 3.5,
+    implement: 'bar',
+    armsFollowTrunk: true,
+    equipment: [
+      { kind: 'frame', a: [-16, 0.5, 16], b: [-16, 78, 16] },
+      { kind: 'frame', a: [-16, 0.5, -16], b: [-16, 78, -16] },
+      { kind: 'frame', a: [18, 0.5, 16], b: [18, 78, 16] },
+      { kind: 'frame', a: [18, 0.5, -16], b: [18, 78, -16] },
+      { kind: 'frame', a: [-16, 47.0, 16], b: [18, 47.0, 16] },
+      { kind: 'frame', a: [-16, 47.0, -16], b: [18, 47.0, -16] },
+    ],
+    poses: [
+      {
+        at: [2, CHAIN_ANKLE_HEIGHT], trunk: 8, head: 22,
+        thigh: -56, shin: -80,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+      {
+        at: [2, CHAIN_ANKLE_HEIGHT], trunk: 88, head: 90,
+        thigh: -78, shin: -102,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+    ],
+  },
+  // Seated Good Mornings: seated on a bench inside a power rack with safety
+  // pins set below the bottom depth. Keeping the lower back arched and shoulder
+  // blades pinched, the athlete hinges forward at the hips, pauses just above
+  // the pins, and reverses to sit upright.
+  'seated-good-mornings': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 14,
+    originX: 48,
+    footSpread: 4.5,
+    implement: 'bar',
+    armsFollowTrunk: true,
+    equipment: [
+      ...chainFlatBench(-16, 6, CHAIN_SEATED_HIP - CHAIN_THIGH_HALF),
+      { kind: 'frame', a: [-18, 0.5, 16], b: [-18, 76, 16] },
+      { kind: 'frame', a: [-18, 0.5, -16], b: [-18, 76, -16] },
+      { kind: 'frame', a: [24, 0.5, 16], b: [24, 76, 16] },
+      { kind: 'frame', a: [24, 0.5, -16], b: [24, 76, -16] },
+      { kind: 'frame', a: [-18, 32.2, 16], b: [24, 32.2, 16] },
+      { kind: 'frame', a: [-18, 32.2, -16], b: [24, 32.2, -16] },
+    ],
+    poses: [
+      {
+        at: [-6, CHAIN_SEATED_HIP], trunk: 90, curl: -8, head: 90,
+        thigh: [0, 10], shin: -90,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+      {
+        at: [-6, CHAIN_SEATED_HIP], trunk: 24, curl: -10, head: 36,
+        thigh: [0, 10], shin: -90,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+    ],
+  },
+  // Single-Leg Romanian Deadlift: kettlebell held in the near hand while
+  // standing on the opposite (far) leg. Hinging forward with square hips, the
+  // free near leg reaches straight back as a counterweight until torso and back
+  // leg are near parallel with the floor and the bell hangs plumb under the shoulder.
+  'single-leg-romanian-deadlift': {
+    root: 'farAnkle',
+    view: 'oblique',
+    yawDeg: 18,
+    originX: 54,
+    feet: 'free',
+    implement: 'kettlebell',
+    farArmOver: true,
+    poses: [
+      {
+        at: [2, CHAIN_ANKLE_HEIGHT], trunk: 88, head: 90, roll: 0,
+        thigh: -82, shin: -112, foot: 0,
+        farThigh: -80, farShin: -100, farFoot: 0,
+        upperArm: [-88, 2], forearm: [-88, 2],
+        farUpperArm: [-92, 6], farForearm: [-86, 6],
+      },
+      {
+        at: [2, CHAIN_ANKLE_HEIGHT], trunk: 8, head: 24, roll: 0,
+        thigh: -172, shin: -172, foot: -82,
+        farThigh: -68, farShin: -92, farFoot: 0,
+        upperArm: [-90, 0], forearm: [-90, 0],
+        farUpperArm: [-135, 10], farForearm: [-125, 10],
+      },
+    ],
+  },
+  // Barbell Hip Thrust: upper back braced against a bench, padded barbell over
+  // the hips. Driving through the heels lifts the hips until thighs and torso
+  // form a level tabletop with vertical shins and a full-beat pause at the top.
+  'barbell-hip-thrust': {
+    root: 'neck',
+    view: 'oblique',
+    yawDeg: -12,
+    originX: 50,
+    kneePole: 90,
+    implement: 'bar',
+    barPad: true,
+    plateRadius: CHAIN_FLOOR_PLATE,
+    armsFollowTrunk: true,
+    farArmOver: true,
+    equipment: [
+      ...chainFlatBench(-36, -20, 20.6),
+    ],
+    poses: [
+      {
+        at: [-19.9, CHAIN_SEATED_HIP], trunk: 146, head: 125,
+        thigh: 0, shin: -90, ankle: [22.25, CHAIN_ANKLE_HEIGHT],
+        upperArm: [-96, 18], forearm: [-54, 18],
+      },
+      {
+        at: [-24.0, CHAIN_SEATED_HIP], trunk: 180, head: 155,
+        thigh: 0, shin: -90, ankle: [22.25, CHAIN_ANKLE_HEIGHT],
+        upperArm: [-96, 18], forearm: [-54, 18],
+      },
+    ],
+  },
+  // Nordic Curl: kneeling on a low floor pad with ankles secured beneath an
+  // immovable floor anchor. One straight line from knees to head lowers slowly
+  // until the hands catch the floor in a push-up position and help the hamstrings return.
+  'nordic-curl': {
+    root: 'ankle',
+    feet: 'free',
+    cycle: true,
+    elbowPole: 135,
+    equipment: [
+      { kind: 'box', a: [27, 0.6], b: [38, 4.2] },
+      { kind: 'post', at: [11.5, 9.6] },
+      { kind: 'roller', at: [11.5, 9.6] },
+    ],
+    poses: [
+      {
+        at: [10, 6.8], trunk: 90, head: 90,
+        thigh: -90, shin: 180, foot: -56,
+        upperArm: -68, forearm: -22,
+      },
+      {
+        at: [10, 6.8], trunk: 17, head: 23,
+        thigh: -163, shin: 180, foot: -56,
+        upperArm: -133.0272, forearm: -49.0423,
+        wrist: [75.8158, 2.122],
+      },
+      {
+        at: [10, 6.8], trunk: 23, head: 29,
+        thigh: -157, shin: 180, foot: -56,
+        upperArm: -108.6968, forearm: -65.3786,
+        wrist: [75.8158, 2.122],
+      },
+    ],
+  },
+  // Floor Glute-Ham Raise: kneeling tall in an elevated Nordic bench with ankles
+  // locked under the foot pads. Lowering forward in one knee-to-shoulder line
+  // extends deeper at the knees until the hands catch on the floor and lightly assist.
+  'floor-glute-ham-raise': {
+    root: 'ankle',
+    feet: 'free',
+    cycle: true,
+    elbowPole: 135,
+    equipment: [
+      { kind: 'box', a: [8, 0.6], b: [38, 5.2] },
+      { kind: 'slab', a: [24, 7.6], b: [38, 7.6] },
+      { kind: 'frame', a: [10, 5.2], b: [10, 14.0] },
+      { kind: 'roller', at: [11.5, 13.2] },
+      { kind: 'roller', at: [8.2, 7.5] },
+    ],
+    poses: [
+      {
+        at: [10, 10.5], trunk: 90, head: 90,
+        thigh: -90, shin: 180, foot: -90,
+        upperArm: -68, forearm: -21,
+      },
+      {
+        at: [10, 10.5], trunk: 11, head: 17,
+        thigh: -169, shin: 180, foot: -90,
+        upperArm: -135.0253, forearm: -44.2133,
+        wrist: [77.4085, 2.122],
+      },
+      {
+        at: [10, 10.5], trunk: 18, head: 24,
+        thigh: -162, shin: 180, foot: -90,
+        upperArm: -108.6679, forearm: -64.4628,
+        wrist: [77.4085, 2.122],
+      },
+    ],
+  },
+  // Natural Glute Ham Raise: set up in a Nordic bench with a band anchored
+  // behind to assist the return. The athlete lowers in one straight line until
+  // the knees are almost straight while holding the band above the floor, then curls back up.
+  'natural-glute-ham-raise': {
+    root: 'ankle',
+    feet: 'free',
+    armsFollowTrunk: true,
+    lines: [{ from: [4, 56], to: 'nearGrip' }],
+    equipment: [
+      { kind: 'frame', a: [4, 0.5], b: [4, 62] },
+      { kind: 'pulley', at: [4, 56] },
+      { kind: 'box', a: [12, 0.6], b: [42, 5.2] },
+      { kind: 'slab', a: [28, 7.6], b: [42, 7.6] },
+      { kind: 'frame', a: [14, 5.2], b: [14, 14.0] },
+      { kind: 'roller', at: [15.5, 13.2] },
+      { kind: 'roller', at: [12.2, 7.5] },
+    ],
+    poses: [
+      {
+        at: [14, 10.5], trunk: 90, head: 90,
+        thigh: -90, shin: 180, foot: -90,
+        upperArm: -60, forearm: 65,
+      },
+      {
+        at: [14, 10.5], trunk: 6, head: 14,
+        thigh: -174, shin: 180, foot: -90,
+        upperArm: -60, forearm: 65,
+      },
+    ],
+  },
+  // Family 34 (MOV-A05): horizontal, incline, decline, floor, board, pin, and cable presses.
+  // 3 Competition Bench:
+  // "Plant the feet and pin the upper back to the bench before taking a secure competition-width
+  // grip. Unrack to straight arms, settle the bar, then lower to the same chest touch point with
+  // stacked forearms. Hold the competition pause before pressing back to lockout."
+  'competition-bench': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 48,
+    implement: 'bar',
+    footSpread: 5.2,
+    elbowPole: [-24.4, 24.2],
+    equipment: chainFlatBench(-18, 13, 18.0),
+    poses: [
+      {
+        at: [10, 23.89], trunk: 174.53, curl: -8, head: 178,
+        thigh: 0, shin: -90, ankle: [22, CHAIN_ANKLE_HEIGHT],
+        upperArm: 90, forearm: 90,
+        wrist: [-12.97, 48.41, 14.5], farWrist: [-12.97, 48.41, -14.5],
+      },
+      {
+        at: [10, 23.89], trunk: 174.53, curl: -8, head: 178,
+        thigh: 0, shin: -90, ankle: [22, CHAIN_ANKLE_HEIGHT],
+        upperArm: 0, forearm: 90,
+        wrist: [-3.58, 31.8, 14.5], farWrist: [-3.58, 31.8, -14.5],
+      },
+    ],
+  },
+  // 43 Close-Grip Bench Press:
+  // "Lie on a bench and grip the bar at about shoulder width, not narrower. Unrack and lower the
+  // bar to your lower chest, elbows staying close to your sides. Press back up to straight arms."
+  'close-grip-bench-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 48,
+    implement: 'bar',
+    footSpread: 4.5,
+    elbowPole: [-22.1, 0.1],
+    equipment: chainFlatBench(-18, 13, 18.0),
+    poses: [
+      {
+        at: [10, 23.90], trunk: 175.55, curl: -6, head: 178,
+        thigh: 0, shin: -90, ankle: [22, CHAIN_ANKLE_HEIGHT],
+        upperArm: 90, forearm: 90,
+        wrist: [-12.48, 48.92, 9.4], farWrist: [-12.48, 48.92, -9.4],
+      },
+      {
+        at: [10, 23.90], trunk: 175.55, curl: -6, head: 178,
+        thigh: 0, shin: -90, ankle: [22, CHAIN_ANKLE_HEIGHT],
+        upperArm: 0, forearm: 90,
+        wrist: [-2.4, 31.8, 9.4], farWrist: [-2.4, 31.8, -9.4],
+      },
+    ],
+  },
+  // 45 Decline Bench Press:
+  // "Hook your legs into the decline bench and take the bar just wider than shoulder width. Lower
+  // to the lower line of your chest — the decline shortens the stroke, so expect to touch sooner
+  // than on flat. Press back to lockout over your eyes."
+  'decline-bench-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 48,
+    implement: 'bar',
+    feet: 'free',
+    elbowPole: [-9.3, 11.1],
+    equipment: [
+      { kind: 'slab', a: [-20.72, 7.82], b: [9.24, 18.38] },
+      { kind: 'post', at: [-16, 7.5] },
+      { kind: 'post', at: [7, 16.5] },
+      { kind: 'post', at: [24.2, 31.0] },
+      { kind: 'frame', a: [9.24, 18.38], b: [24.2, 31.0] },
+      { kind: 'frame', a: [24.2, 31.0], b: [40.5, 19.0] },
+      { kind: 'roller', at: [24.2, 31.0] },
+      { kind: 'roller', at: [40.5, 19.0] },
+    ],
+    poses: [
+      {
+        at: [4, 25.0], trunk: 198, head: 190,
+        thigh: [24, 6], shin: [-50, 4], foot: 30,
+        upperArm: 90, forearm: 90,
+        wrist: [-25.4, 41.04, 11.8], farWrist: [-25.4, 41.04, -11.8],
+      },
+      {
+        at: [4, 25.0], trunk: 198, head: 190,
+        thigh: [24, 6], shin: [-50, 4], foot: 30,
+        upperArm: 0, forearm: 90,
+        wrist: [-6.72, 27.6, 11.8], farWrist: [-6.72, 27.6, -11.8],
+      },
+    ],
+  },
+  // 102 Decline Dumbbell Bench Press:
+  // "Secure the legs in a decline bench, sit with the dumbbells on the thighs, then lie back and
+  // bring the bells to the chest before pressing them into position. Lower toward the lower chest
+  // with the forearms vertical and the shoulder blades pinned into the pad. Press up and slightly
+  // inward"
+  'decline-dumbbell-bench-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 48,
+    implement: 'bells',
+    feet: 'free',
+    elbowPole: [-20.2, 19.2],
+    equipment: [
+      { kind: 'slab', a: [-20.72, 7.82], b: [9.24, 18.38] },
+      { kind: 'post', at: [-16, 7.5] },
+      { kind: 'post', at: [7, 16.5] },
+      { kind: 'post', at: [24.2, 31.0] },
+      { kind: 'frame', a: [9.24, 18.38], b: [24.2, 31.0] },
+      { kind: 'frame', a: [24.2, 31.0], b: [40.5, 19.0] },
+      { kind: 'roller', at: [24.2, 31.0] },
+      { kind: 'roller', at: [40.5, 19.0] },
+    ],
+    poses: [
+      {
+        at: [4, 25.0], trunk: 198, head: 190,
+        thigh: [24, 6], shin: [-50, 4], foot: 30,
+        upperArm: 90, forearm: 90,
+        wrist: [-20.83, 41.91, 7.5], farWrist: [-20.83, 41.91, -7.5],
+      },
+      {
+        at: [4, 25.0], trunk: 198, head: 190,
+        thigh: [24, 6], shin: [-50, 4], foot: 30,
+        upperArm: 0, forearm: 90,
+        wrist: [-7.75, 25.5, 13.5], farWrist: [-7.75, 25.5, -13.5],
+      },
+    ],
+  },
+  // 65 Incline Dumbbell Press:
+  // "Set the bench between 30 and 45 degrees — lower hits more chest, higher bleeds into
+  // shoulders. Kick the dumbbells up off your knees one at a time and start from the top. Lower to
+  // a deep stretch just outside your chest with your elbows about 45 degrees from your sides, then
+  // press up and slightly back so the dumbbells finish over your face, not your belly."
+  'incline-dumbbell-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 48,
+    implement: 'bells',
+    footSpread: 4.8,
+    elbowPole: [-45.9, 34.9],
+    equipment: [
+      { kind: 'slab', a: [-27.01, 30.3], b: [0.32, 12.19] },
+      { kind: 'slab', a: [-1, 15.54], b: [14, 15.54] },
+      { kind: 'post', at: [-18, 22] },
+      { kind: 'post', at: [10, 13.5] },
+    ],
+    poses: [
+      {
+        at: [4, 19.6], trunk: 145, head: 152,
+        thigh: 0, shin: -90, ankle: [22, CHAIN_ANKLE_HEIGHT],
+        upperArm: 90, forearm: 90,
+        wrist: [-21.5, 57.06, 7.5], farWrist: [-21.5, 57.06, -7.5],
+      },
+      {
+        at: [4, 19.6], trunk: 145, head: 152,
+        thigh: 0, shin: -90, ankle: [22, CHAIN_ANKLE_HEIGHT],
+        upperArm: 0, forearm: 90,
+        wrist: [-8.52, 38.0, 16.53], farWrist: [-8.52, 38.0, -16.53],
+      },
+    ],
+  },
+  // 151 Board Press:
+  // "Lie on the bench and band the boards securely to the chest; confirm they remain fixed before
+  // unracking... Set the feet, arch the back, and retract the shoulder blades, then take the bar
+  // out of the rack without protracting the shoulders. Lower the bar under control until it settles
+  // on the boards. Drive the bar up with force, keeping the elbows tucked until lockout."
+  'board-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 48,
+    implement: 'bar',
+    footSpread: 5.2,
+    elbowPole: [-3.6, 11.1],
+    chestBoard: { along: 0.25, length: 10.0, height: 4.2 },
+    equipment: chainFlatBench(-18, 13, 18.0),
+    poses: [
+      {
+        at: [10, 23.84], trunk: 170.48, curl: -16, head: 176,
+        thigh: 0, shin: -90, ankle: [21, CHAIN_ANKLE_HEIGHT],
+        upperArm: 90, forearm: 90,
+        wrist: [-12.91, 48.8, 11.8], farWrist: [-12.91, 48.8, -11.8],
+      },
+      {
+        at: [10, 23.84], trunk: 170.48, curl: -16, head: 176,
+        thigh: 0, shin: -90, ankle: [21, CHAIN_ANKLE_HEIGHT],
+        upperArm: 0, forearm: 90,
+        wrist: [-1.67, 35.7, 11.8], farWrist: [-1.67, 35.7, -11.8],
+      },
+    ],
+  },
+  // 252 Pin Presses:
+  // "Set a bench inside a rack with the pins at the chosen height and the bar resting on them, then
+  // lie back with the bar above your usual touch point, shoulder blades pulled together and feet
+  // set. From a full pause on the pins, drive the bar up to straight arms, keeping the bar, wrists
+  // and elbows in line. Lower the bar back to the pins and let it settle before the next
+  // repetition."
+  'pin-presses': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 48,
+    implement: 'bar',
+    footSpread: 4.8,
+    elbowPole: [1.4, 13.0],
+    equipment: [
+      ...chainFlatBench(-18, 13, 18.0),
+      { kind: 'frame', a: [-17, 0.5, -15.5], b: [-17, 74, -15.5], layer: 'behind' },
+      { kind: 'frame', a: [12, 0.5, -15.5], b: [12, 74, -15.5], layer: 'behind' },
+      { kind: 'frame', a: [-17, 35.2, -15.5], b: [12, 35.2, -15.5], layer: 'behind' },
+      { kind: 'frame', a: [-9.0, 0.5, 9.5], b: [-9.0, 35.2, 9.5], layer: 'front' },
+      { kind: 'frame', a: [5.0, 0.5, 9.5], b: [5.0, 35.2, 9.5], layer: 'front' },
+      { kind: 'frame', a: [-9.0, 35.2, 9.5], b: [5.0, 35.2, 9.5], layer: 'front' },
+    ],
+    poses: [
+      {
+        at: [10, 23.90], trunk: 175.55, curl: -6, head: 178,
+        thigh: 0, shin: -90, ankle: [22, CHAIN_ANKLE_HEIGHT],
+        upperArm: 0, forearm: 90,
+        wrist: [-1.81, 36.8, 12.2], farWrist: [-1.81, 36.8, -12.2],
+      },
+      {
+        at: [10, 23.90], trunk: 175.55, curl: -6, head: 178,
+        thigh: 0, shin: -90, ankle: [22, CHAIN_ANKLE_HEIGHT],
+        upperArm: 90, forearm: 90,
+        wrist: [-12.98, 48.79, 12.2], farWrist: [-12.98, 48.79, -12.2],
+      },
+    ],
+  },
+  // 203 Floor Press:
+  // "Lie on the floor with your head inside a rack, the bar set on low hooks, shoulder blades
+  // pulled together, and lift the bar off with straight arms. Lower the bar toward the lower chest
+  // with the elbows tucked until the upper arms rest on the floor, and pause. Press the bar back
+  // up, keeping the bar, wrists and elbows in line."
+  'floor-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 48,
+    implement: 'bar',
+    footSpread: 4.2,
+    kneePole: 90,
+    elbowPole: [-21.4, 14.9],
+    equipment: [
+      { kind: 'frame', a: [-23.5, 0.5, -15.5], b: [-23.5, 48, -15.5], layer: 'behind' },
+      { kind: 'frame', a: [-23.5, 29.5, -15.5], b: [-19.5, 29.5, -15.5], layer: 'behind' },
+      { kind: 'frame', a: [-23.5, 0.5, 15.5], b: [-23.5, 48, 15.5], layer: 'front' },
+      { kind: 'frame', a: [-23.5, 29.5, 15.5], b: [-19.5, 29.5, 15.5], layer: 'front' },
+    ],
+    poses: [
+      {
+        at: [10, 5.913], trunk: 176.56, curl: -4, head: 178,
+        thigh: 42, shin: -52, ankle: [38, CHAIN_ANKLE_HEIGHT],
+        upperArm: 90, forearm: 90,
+        wrist: [-12.99, 30.74, 12.6], farWrist: [-12.99, 30.74, -12.6],
+      },
+      {
+        at: [10, 5.913], trunk: 176.56, curl: -4, head: 178,
+        thigh: 42, shin: -52, ankle: [38, CHAIN_ANKLE_HEIGHT],
+        upperArm: 0, forearm: 90,
+        wrist: [-2.74, 14.112, 12.6], farWrist: [-2.74, 14.112, -12.6],
+      },
+    ],
+  },
+  // 249 One-Arm Kettlebell Floor Press:
+  // "Lie on the floor holding a kettlebell in one hand with that upper arm resting on the floor
+  // and the palm facing in. Press the kettlebell straight up until the arm is straight, letting
+  // the wrist turn as it rises. Lower it slowly until the upper arm rests on the floor again."
+  // MOV-S1-R3: the upper arm rests on the floor 45 degrees out from the trunk,
+  // the wrist stacked over the elbow. A floor press locks out with the arm
+  // vertical and the bell stacked over the shoulder, so the bell travels in
+  // from over the elbow to over the shoulder (the elbow's offset); the hand
+  // finishes 0.64 units from plumb, set against the turned bell so the bell's
+  // centre lands 1.6 units from over the shoulder and only 1.3 units further
+  // headward than the elbow's offset. Turned 45 degrees the other way so that
+  // any drift along or across the trunk would show on screen. The free arm
+  // lies on the floor.
+  'one-arm-kettlebell-floor-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: -45,
+    originX: 48,
+    implement: 'kettlebell',
+    kettlebellTurn: true,
+    footSpread: 4.2,
+    kneePole: 90,
+    elbowPole: [-28.03, 41.432],
+    poses: [
+      {
+        at: [10, 5.915], trunk: 176.56, curl: -4, head: 178,
+        thigh: 42, shin: -52, ankle: [38, CHAIN_ANKLE_HEIGHT],
+        upperArm: 0, forearm: 90,
+        wrist: [-5.716, 14.112, 17.656], farWrist: [5.560, 2.116, -21.760],
+      },
+      {
+        at: [10, 5.915], trunk: 176.56, curl: -4, head: 178,
+        thigh: 42, shin: -52, ankle: [38, CHAIN_ANKLE_HEIGHT],
+        upperArm: 90, forearm: 90,
+        wrist: [-13.488, 6.518 + Math.sqrt(CHAIN_LONG_ARM ** 2 - 0.64 ** 2), 8.984], farWrist: [5.560, 2.116, -21.760],
+      },
+    ],
+  },
+  // 83 Cable Chest Press:
+  // "Set two handles at chest height, face away, and take a staggered stance. Press both handles
+  // forward until your arms are long, letting them drift together at the end. Return under control
+  // — the cable pulls backward the entire rep, so the squeeze at lockout is real work here."
+  'cable-chest-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 30,
+    pitchDeg: 15,
+    originX: 50,
+    implement: 'handles',
+    elbowPole: [-90, 70],
+    equipment: [
+      { kind: 'frame', a: [-26, 0.5, 24], b: [-26, 78, 24] },
+      { kind: 'frame', a: [-26, 0.5, -24], b: [-26, 78, -24] },
+      { kind: 'pulley', at: STANDING_PRESS_PULLEYS[0] },
+      { kind: 'pulley', at: STANDING_PRESS_PULLEYS[1] },
+    ],
+    lines: [
+      { from: STANDING_PRESS_PULLEYS[0], to: 'nearGrip' },
+      { from: STANDING_PRESS_PULLEYS[1], to: 'farGrip', depth: 'far' },
+    ],
+    poses: [
+      {
+        at: STANDING_PRESS_HIP, trunk: 84, head: 86,
+        thigh: -90, shin: -90, ankle: [-10, CHAIN_ANKLE_HEIGHT], farAnkle: [10, CHAIN_ANKLE_HEIGHT],
+        upperArm: 0, forearm: 0,
+        wrist: [8.0, 64.5, 19.5], farWrist: [8.0, 64.5, -19.5],
+      },
+      {
+        at: STANDING_PRESS_HIP, trunk: 84, head: 86,
+        thigh: -90, shin: -90, ankle: [-10, CHAIN_ANKLE_HEIGHT], farAnkle: [10, CHAIN_ANKLE_HEIGHT],
+        upperArm: 0, forearm: 0,
+        wrist: [25.25, 64.5, 1.5], farWrist: [25.25, 64.5, -1.5],
+      },
+    ],
+  },
+  // 5 Barbell Row:
+  // "Stand holding the bar just outside the legs, then soften the knees and hinge until the torso
+  // is stable. Let the bar hang beneath the shoulders with the trunk braced and the neck long.
+  // Drive the elbows back to row toward the lower ribs, then lower to long arms without changing
+  // the torso angle. If the torso rises on each pull, reduce the load before the hips turn the
+  // row into a heave."
+  // MOV-S1-R3: a loaded row keeps the bar over the mid-foot. The hips sit
+  // back over softly bent knees and the trunk is set at 49 degrees, so the
+  // bar hangs plumb under the shoulders over the foot and the elbows drive
+  // it to the lower ribs (12 up the trunk) without the loaded centre of mass
+  // leaving the foot.
+  'barbell-row': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 46,
+    implement: 'bar',
+    kneePole: 0,
+    elbowPole: [135, 25],
+    poses: [
+      {
+        at: BARBELL_ROW_HIP, trunk: BARBELL_ROW_TRUNK, head: BARBELL_ROW_TRUNK + 8,
+        thigh: -90, shin: -90, ankle: [8, CHAIN_ANKLE_HEIGHT],
+        upperArm: -90, forearm: -90,
+        wrist: [chainNeckOf(BARBELL_ROW_HIP, BARBELL_ROW_TRUNK)[0], chainNeckOf(BARBELL_ROW_HIP, BARBELL_ROW_TRUNK)[1] - Math.sqrt(CHAIN_LONG_ARM ** 2 - (11.2 - CHAIN_SHOULDER_HALF) ** 2), 11.2],
+        farWrist: [chainNeckOf(BARBELL_ROW_HIP, BARBELL_ROW_TRUNK)[0], chainNeckOf(BARBELL_ROW_HIP, BARBELL_ROW_TRUNK)[1] - Math.sqrt(CHAIN_LONG_ARM ** 2 - (11.2 - CHAIN_SHOULDER_HALF) ** 2), -11.2],
+      },
+      {
+        at: BARBELL_ROW_HIP, trunk: BARBELL_ROW_TRUNK, head: BARBELL_ROW_TRUNK + 8,
+        thigh: -90, shin: -90, ankle: [8, CHAIN_ANKLE_HEIGHT],
+        upperArm: -90, forearm: -90,
+        wrist: [chainOnFront(BARBELL_ROW_HIP, BARBELL_ROW_TRUNK, 12, 7.2)[0], chainOnFront(BARBELL_ROW_HIP, BARBELL_ROW_TRUNK, 12, 7.2)[1], 11.2],
+        farWrist: [chainOnFront(BARBELL_ROW_HIP, BARBELL_ROW_TRUNK, 12, 7.2)[0], chainOnFront(BARBELL_ROW_HIP, BARBELL_ROW_TRUNK, 12, 7.2)[1], -11.2],
+      },
+    ],
+  },
+  // 104 One-Arm Kettlebell Row:
+  // "Take a staggered stance, hinge until the torso is long and stable, and let the kettlebell
+  // hang beneath one shoulder. Row the bell toward the back pocket by driving the elbow past the
+  // ribs while the hips stay square to the floor. Lower until the shoulder blade reaches
+  // naturally; if the torso opens to finish the pull, the bell is heavier than the row you intended."
+  // MOV-S1-R3: the free hand rests on the front thigh, four fifths of the way
+  // to the knee, its palm on the thigh's surface (5.04 from its line: the
+  // thigh's half-width and the hand's) instead of inside it.
+  'one-arm-kettlebell-row': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 46,
+    implement: 'kettlebell',
+    kettlebellBelow: true,
+    kneePole: 0,
+    elbowPole: [150, 12],
+    poses: [
+      {
+        at: [1.5, 40.2], trunk: 24, head: 32, nearReach: 1.8,
+        thigh: -90, shin: -90, ankle: [-5, CHAIN_ANKLE_HEIGHT], farAnkle: [18, CHAIN_ANKLE_HEIGHT],
+        upperArm: -90, forearm: -90,
+        wrist: [chainNeckOf([1.5, 40.2], 24)[0], chainNeckOf([1.5, 40.2], 24)[1] - 1.8 - CHAIN_LONG_ARM, CHAIN_SHOULDER_HALF],
+        farWrist: [17.611, 31.105, -CHAIN_HIP_HALF],
+      },
+      {
+        at: [1.5, 40.2], trunk: 24, head: 32, nearReach: 0,
+        thigh: -90, shin: -90, ankle: [-5, CHAIN_ANKLE_HEIGHT], farAnkle: [18, CHAIN_ANKLE_HEIGHT],
+        upperArm: -90, forearm: -90,
+        wrist: [chainOnFront([1.5, 40.2], 24, 5.5, 6.2)[0], chainOnFront([1.5, 40.2], 24, 5.5, 6.2)[1], CHAIN_SHOULDER_HALF],
+        farWrist: [17.611, 31.105, -CHAIN_HIP_HALF],
+      },
+    ],
+  },
+  // 107 Reverse Grip Bent-Over Rows:
+  // "Take an underhand grip just outside the thighs, soften the knees, and hinge until the bar
+  // hangs below them with the torso braced. Pull the elbows back and row the bar toward the lower
+  // ribs, holding the top long enough to feel the shoulder blades finish. Lower to long arms
+  // without changing the hinge; if the torso rises on every pull, the bar is borrowing range from
+  // the hips."
+  // MOV-S1-R3: the barbell row's balanced hinge. The bar hangs straight below
+  // the shoulders over the mid-foot, and at the top it touches the lower ribs
+  // at the chest's painted surface.
+  'reverse-grip-bent-over-rows': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 46,
+    implement: 'bar',
+    kneePole: 0,
+    elbowPole: [165, 8],
+    closeUp: { at: [38, 72], r: 14, scale: 4.8, zoom: 1, open: 0 },
+    poses: [
+      {
+        at: BARBELL_ROW_HIP, trunk: BARBELL_ROW_TRUNK, head: BARBELL_ROW_TRUNK + 8,
+        thigh: -90, shin: -90, ankle: [8, CHAIN_ANKLE_HEIGHT],
+        upperArm: -90, forearm: -90,
+        wrist: [chainNeckOf(BARBELL_ROW_HIP, BARBELL_ROW_TRUNK)[0], chainNeckOf(BARBELL_ROW_HIP, BARBELL_ROW_TRUNK)[1] - Math.sqrt(CHAIN_LONG_ARM ** 2 - (9.4 - CHAIN_SHOULDER_HALF) ** 2), 9.4],
+        farWrist: [chainNeckOf(BARBELL_ROW_HIP, BARBELL_ROW_TRUNK)[0], chainNeckOf(BARBELL_ROW_HIP, BARBELL_ROW_TRUNK)[1] - Math.sqrt(CHAIN_LONG_ARM ** 2 - (9.4 - CHAIN_SHOULDER_HALF) ** 2), -9.4],
+      },
+      {
+        at: BARBELL_ROW_HIP, trunk: BARBELL_ROW_TRUNK, head: BARBELL_ROW_TRUNK + 8,
+        thigh: -90, shin: -90, ankle: [8, CHAIN_ANKLE_HEIGHT],
+        upperArm: -90, forearm: -90,
+        wrist: [chainOnFront(BARBELL_ROW_HIP, BARBELL_ROW_TRUNK, 12, CANONICAL_BODY_PARAMETERS.sw * 0.58 + 0.8)[0], chainOnFront(BARBELL_ROW_HIP, BARBELL_ROW_TRUNK, 12, CANONICAL_BODY_PARAMETERS.sw * 0.58 + 0.8)[1], 9.4],
+        farWrist: [chainOnFront(BARBELL_ROW_HIP, BARBELL_ROW_TRUNK, 12, CANONICAL_BODY_PARAMETERS.sw * 0.58 + 0.8)[0], chainOnFront(BARBELL_ROW_HIP, BARBELL_ROW_TRUNK, 12, CANONICAL_BODY_PARAMETERS.sw * 0.58 + 0.8)[1], -9.4],
+      },
+    ],
+  },
+  // 293 Two-Arm Kettlebell Row:
+  // "Stand over two kettlebells, bend the knees slightly, push the hips back and take a handle in
+  // each hand with the back straight. Pull both kettlebells toward the stomach, drawing the
+  // shoulder blades together. Lower them under control until the arms are straight."
+  'two-arm-kettlebell-row': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 46,
+    implement: 'kettlebells',
+    kettlebellBelow: true,
+    kneePole: 0,
+    elbowPole: [145, 16],
+    poses: [
+      {
+        at: [-2, 40.2], trunk: 22, head: 30,
+        thigh: -90, shin: -90, ankle: [15.5, CHAIN_ANKLE_HEIGHT],
+        upperArm: -90, forearm: -90,
+        wrist: [chainNeckOf([-2, 40.2], 22)[0], chainNeckOf([-2, 40.2], 22)[1] - Math.sqrt(CHAIN_LONG_ARM ** 2 - (8.6 - CHAIN_SHOULDER_HALF) ** 2), 8.6],
+        farWrist: [chainNeckOf([-2, 40.2], 22)[0], chainNeckOf([-2, 40.2], 22)[1] - Math.sqrt(CHAIN_LONG_ARM ** 2 - (8.6 - CHAIN_SHOULDER_HALF) ** 2), -8.6],
+      },
+      {
+        at: [-2, 40.2], trunk: 22, head: 30,
+        thigh: -90, shin: -90, ankle: [15.5, CHAIN_ANKLE_HEIGHT],
+        upperArm: -90, forearm: -90,
+        wrist: [chainOnFront([-2, 40.2], 22, 8.5, 6.8)[0], chainOnFront([-2, 40.2], 22, 8.5, 6.8)[1], 8.6],
+        farWrist: [chainOnFront([-2, 40.2], 22, 8.5, 6.8)[0], chainOnFront([-2, 40.2], 22, 8.5, 6.8)[1], -8.6],
+      },
+    ],
+  },
+  // 79 T-Bar Row:
+  // "Straddle the bar, hinge to about 45 degrees, and take the handle with a neutral grip. Pull
+  // the plates to your chest, driving the elbows up and back, and let the bar stretch your lats at
+  // the bottom of every rep. Hold your hinge angle — every degree you stand up as the set gets
+  // hard is range you stole from your back."
+  // MOV-S1-R3: the pivot sits 36 units behind the hips, so the bar is a
+  // little flatter than the 45-degree trunk at the top (42.3 degrees). The
+  // handle then stops 7.0 units below the trunk's line, just outside the
+  // chest's painted surface (5.9), and the plates further out stop outside it
+  // too. The elbows drive straight back (no flare in the pole) to finish 3.9
+  // units behind the trunk. A close-up of the near hand shows the neutral
+  // grip: the handle runs across the fist instead of being seen end on.
+  't-bar-row': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 48,
+    implement: 'longBar',
+    barAnchor: T_BAR_ANCHOR,
+    barLength: 64.5,
+    footSpread: 5.2,
+    kneePole: 0,
+    elbowPole: [135, 0],
+    closeUp: { at: [36, 74], r: 13, scale: 4.4, zoom: 1, open: 0, grip: 'neutral' },
+    equipment: [
+      { kind: 'frame', a: [T_BAR_ANCHOR[0] - 3, 0.8, 0], b: [T_BAR_ANCHOR[0] + 4, 0.8, 0] },
+      { kind: 'frame', a: [T_BAR_ANCHOR[0], 0.8, 0], b: T_BAR_ANCHOR },
+      { kind: 'roller', at: T_BAR_ANCHOR, layer: 'behind' },
+    ],
+    poses: [
+      {
+        at: [-2, 42.5], trunk: 45, head: 52,
+        thigh: -90, shin: -90, ankle: [8, CHAIN_ANKLE_HEIGHT],
+        upperArm: -90, forearm: -90,
+        wrist: [chainNeckOf([-2, 42.5], 45)[0], chainNeckOf([-2, 42.5], 45)[1] - Math.sqrt(CHAIN_LONG_ARM ** 2 - (3.2 - CHAIN_SHOULDER_HALF) ** 2), 3.2],
+        farWrist: [chainNeckOf([-2, 42.5], 45)[0], chainNeckOf([-2, 42.5], 45)[1] - Math.sqrt(CHAIN_LONG_ARM ** 2 - (3.2 - CHAIN_SHOULDER_HALF) ** 2), -3.2],
+      },
+      {
+        at: [-2, 42.5], trunk: 45, head: 52,
+        thigh: -90, shin: -90, ankle: [8, CHAIN_ANKLE_HEIGHT],
+        upperArm: -90, forearm: -90,
+        wrist: [...T_BAR_TOP, 3.2],
+        farWrist: [...T_BAR_TOP, -3.2],
+      },
+    ],
+  },
+  // 130 Alternating Kettlebell Row:
+  // "Stand over two kettlebells, bend the knees slightly, push the hips back and take a handle in
+  // each hand with the back flat. Pull one kettlebell toward the lower ribs, drawing that shoulder
+  // blade back, while the other hand holds its kettlebell on the floor. Lower it under control to
+  // the floor, then row the other side."
+  // MOV-S1-R3: a hinge that can stand. The knees are softly bent (158
+  // degrees), the hips sit 9 units behind the ankles, and the flat trunk
+  // tilts 22.7 degrees below level so that straight, plumb arms reach the
+  // handles of bells resting on the floor (handle 10.6 up). The body's centre
+  // of mass then stays over the foot at every tick. The bells sit ahead of
+  // the toes, under the shoulders. The rowed bell comes up beside the hip,
+  // outside the thigh, toward the lower ribs. Turned 50 degrees so the far
+  // side's row is not hidden behind the trunk and the near leg.
+  'alternating-kettlebell-row': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 50,
+    originX: 48,
+    implement: 'kettlebells',
+    kettlebellBelow: true,
+    kneePole: 0,
+    elbowPole: [145, 16],
+    poses: [
+      {
+        at: ALT_KB_ROW_HIP, trunk: ALT_KB_ROW_TRUNK, head: ALT_KB_ROW_TRUNK + 12,
+        thigh: -90, shin: -90, ankle: [14, CHAIN_ANKLE_HEIGHT],
+        upperArm: -90, forearm: -90,
+        wrist: [...chainOnFront(ALT_KB_ROW_HIP, ALT_KB_ROW_TRUNK, 14, 6.5), 15],
+        farWrist: [chainNeckOf(ALT_KB_ROW_HIP, ALT_KB_ROW_TRUNK)[0], 10.6, -8.4],
+      },
+      {
+        at: ALT_KB_ROW_HIP, trunk: ALT_KB_ROW_TRUNK, head: ALT_KB_ROW_TRUNK + 12,
+        thigh: -90, shin: -90, ankle: [14, CHAIN_ANKLE_HEIGHT],
+        upperArm: -90, forearm: -90,
+        wrist: [chainNeckOf(ALT_KB_ROW_HIP, ALT_KB_ROW_TRUNK)[0], 10.6, 8.4],
+        farWrist: [chainNeckOf(ALT_KB_ROW_HIP, ALT_KB_ROW_TRUNK)[0], 10.6, -8.4],
+      },
+      {
+        at: ALT_KB_ROW_HIP, trunk: ALT_KB_ROW_TRUNK, head: ALT_KB_ROW_TRUNK + 12,
+        thigh: -90, shin: -90, ankle: [14, CHAIN_ANKLE_HEIGHT],
+        upperArm: -90, forearm: -90,
+        wrist: [chainNeckOf(ALT_KB_ROW_HIP, ALT_KB_ROW_TRUNK)[0], 10.6, 8.4],
+        farWrist: [...chainOnFront(ALT_KB_ROW_HIP, ALT_KB_ROW_TRUNK, 14, 6.5), -15],
+      },
+    ],
+  },
+  // Drag Curl (184): standing tall with a barbell against the front of the
+  // thighs in a shoulder-width underhand grip; the bar is dragged straight up
+  // the front of the torso while the elbows travel back behind the ribs.
+  // MOV-S1-R3: the bar starts in contact with the front of the thighs below
+  // the hip crease, crosses the crease, and runs up the trunk's front,
+  // touching the painted body all the way. A close-up of the near hand shows
+  // the underhand grip.
+  'drag-curl': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 35,
+    originX: 50,
+    unitPhase: true,
+    implement: 'bar',
+    palm: 'up',
+    elbowPole: 180,
+    closeUp: { at: [-22, 62], r: 12, scale: 4.2, zoom: 1, open: 0 },
+    poses: (() => {
+      // The bar's painted edge on the painted body: the thighs' front below
+      // the hip, then the trunk's front, which tapers from the hips' depth at
+      // the hip to the chest's at the shoulders.
+      const barHalf = 0.8;
+      const thighFront = (CANONICAL_BODY_PARAMETERS.lw * 1.18) / 2;
+      const hipFront = CANONICAL_BODY_PARAMETERS.hw * 0.58;
+      const trunkFront = (along: number): number => hipFront + (CHAIN_BACK_HALF - hipFront) * (along / CHAIN_TRUNK);
+      const crease = 1.4;
+      // Hanging straight from shoulders drawn 1.5 down, the hands reach just
+      // below the hip crease with the bar on the thighs.
+      const startX = thighFront + barHalf + 0.02;
+      const startY = CHAIN_STANDING_SHOULDER - 1.5 - Math.sqrt(24.448 ** 2 - startX ** 2);
+      // A forearm reaches only 12 behind the bar, so for the elbows to pass
+      // behind the ribs with the bar on the chest the hips ease 0.7 back at
+      // the top, the feet staying planted.
+      const topHip = -0.7;
+      // A straight leg leaning that far drops the hip by what it loses in height.
+      const legDrop = (hipX: number): number => CHAIN_THIGH + CHAIN_SHIN - Math.sqrt((CHAIN_THIGH + CHAIN_SHIN) ** 2 - hipX ** 2);
+      const pose = (shrug: number, hipX: number, x: number, y: number): ChainPose => ({
+        at: [hipX, CHAIN_STANDING_HIP - legDrop(hipX)], trunk: 90, thigh: -90, shin: -90, shrug,
+        ankle: [0, CHAIN_ANKLE_HEIGHT],
+        upperArm: -90, forearm: -90,
+        wrist: [hipX + x, y, CHAIN_SHOULDER_HALF],
+        farWrist: [hipX + x, y, -CHAIN_SHOULDER_HALF],
+      });
+      return [
+        pose(-1.5, 0, startX, startY),
+        pose(-1.2, 0, trunkFront(crease) + barHalf + 0.1, CHAIN_STANDING_HIP + crease),
+        pose(0, topHip, trunkFront(CHAIN_TRUNK - 10.6) + barHalf + 0.1, CHAIN_STANDING_SHOULDER - 10.6),
+      ];
+    })(),
+  },
+  // Standing Dumbbell Reverse Curl (281): standing tall with a dumbbell in each
+  // hand, palms facing down throughout; upper arms stay still while the
+  // forearms curl the dumbbells to shoulder height.
+  'standing-dumbbell-reverse-curl': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 40,
+    originX: 48,
+    implement: 'bells',
+    palm: 'down',
+    poses: [
+      { at: [0, CHAIN_STANDING_HIP], trunk: 90, thigh: -90, shin: -90, upperArm: [-90, 4], forearm: [-90, 2] },
+      { at: [0, CHAIN_STANDING_HIP], trunk: 90, thigh: -90, shin: -90, upperArm: [-90, 4], forearm: [58, 2] },
+    ],
+  },
+  // Zottman Curl (109): standing with dumbbells at the sides, curling up with
+  // the palms turning up, rotating at the top to palms-down with the elbows
+  // closed, lowering slowly through the overhand grip, and turning back to
+  // neutral only at the bottom.
+  'zottman-curl': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 40,
+    originX: 48,
+    implement: 'bells',
+    forearmTurn: true,
+    poses: [
+      { at: [0, CHAIN_STANDING_HIP], trunk: 90, thigh: -90, shin: -90, upperArm: [-90, 4], forearm: [-90, 2] },
+      { at: [0, CHAIN_STANDING_HIP], trunk: 90, thigh: -90, shin: -90, upperArm: [-90, 4], forearm: [60, 2] },
+    ],
+  },
+  // Dumbbell Prone Incline Curl (190): lying face down on an incline bench with
+  // the shoulders near the top and the arms hanging straight down, palms facing
+  // forward; upper arms stay hanging still while the elbows bend fully.
+  'dumbbell-prone-incline-curl': {
+    root: 'hip',
+    implement: 'bells',
+    palm: 'up',
+    supinatedPeak: true,
+    equipment: (() => {
+      const hip: readonly [number, number] = [38, 42];
+      const deg = 38;
+      const along = chainUnit([deg, 0], 1);
+      const front = chainUnit([deg - 90, 0], 1);
+      const foot = chainAdd([hip[0], hip[1], 0], front, CHAIN_BACK_HALF + 2);
+      const low = chainAdd(foot, along, -2);
+      const high = chainAdd(foot, along, 16);
+      const prop = chainAdd(foot, along, 8);
+      return [
+        { kind: 'post' as const, at: [prop[0], prop[1]] as const },
+        { kind: 'frame' as const, a: [prop[0] - 12, 1.2] as const, b: [prop[0] + 12, 1.2] as const },
+        { kind: 'slab' as const, a: [low[0], low[1]] as const, b: [high[0], high[1]] as const },
+      ];
+    })(),
+    poses: [
+      { at: [38, 42], trunk: 38, head: 42, thigh: -130, shin: -130, ankle: [20, CHAIN_ANKLE_HEIGHT], upperArm: -90, forearm: -90 },
+      { at: [38, 42], trunk: 38, head: 42, thigh: -130, shin: -130, ankle: [20, CHAIN_ANKLE_HEIGHT], upperArm: -90, forearm: 55 },
+    ],
+  },
+  // High Cable Curls (213): standing between two high pulleys holding a handle
+  // in each hand, upper arms out to the sides level with the floor and palms
+  // facing in; the hands curl in toward the ears while the upper arms stay still.
+  // MOV-S1-R3: a close-up of the near hand shows "palms facing you": palm up
+  // as the arm reaches out to the pulley, and facing the head at the top. The
+  // shoulders are lifted 3 units, as they are with the arms raised to
+  // shoulder height, so the curled hand finishes level with the head, by
+  // the ear.
+  'high-cable-curls': {
+    root: 'hip',
+    view: 'front',
+    feet: 'front',
+    implement: 'handles',
+    palm: 'up',
+    closeUp: { at: [0, 22, 30], r: 12, scale: 4.2, zoom: 1, open: 0, palm: 'flexion' },
+    lines: [
+      { from: [0, 88, 44], to: 'nearGrip' },
+      { from: [0, 88, -44], to: 'farGrip' },
+    ],
+    equipment: [
+      { kind: 'frame', a: [0, 0.5, 44], b: [0, 92, 44] },
+      { kind: 'frame', a: [0, 0.5, -44], b: [0, 92, -44] },
+      { kind: 'pulley', at: [0, 88, 44] },
+      { kind: 'pulley', at: [0, 88, -44] },
+    ],
+    poses: [
+      {
+        at: [0, FRONT_STANCE_HIP], trunk: 90, shrug: 3,
+        thigh: [-90, FRONT_STANCE_OUT], shin: [-90, FRONT_STANCE_OUT],
+        upperArm: [0, 90], forearm: [90, 84],
+      },
+      {
+        at: [0, FRONT_STANCE_HIP], trunk: 90, shrug: 3,
+        thigh: [-90, FRONT_STANCE_OUT], shin: [-90, FRONT_STANCE_OUT],
+        upperArm: [0, 90], forearm: [90, -57],
+      },
+    ],
+  },
+  // Lying Cable Curl (240): lying on the back facing a low pulley with the feet
+  // braced against the base of the machine and the legs straight, holding the
+  // bar with a shoulder-width underhand grip; upper arms stay still beside the
+  // body while the bar curls toward the chest.
+  // MOV-S1-R3: a close-up of the near hand shows the underhand grip: palm up
+  // as the arms reach toward the pulley.
+  'lying-cable-curl': {
+    root: 'hip',
+    feet: 'free',
+    implement: 'cableBar',
+    palm: 'up',
+    closeUp: { at: [62, 60], r: 12, scale: 4.2, zoom: 1, open: 0 },
+    lines: [{ from: [92, 9], to: 'nearGrip' }],
+    equipment: [
+      { kind: 'frame', a: [92, 0.5], b: [92, 24] },
+      { kind: 'slab', a: [91, 2.5], b: [91, 9] },
+      { kind: 'pulley', at: [92, 9] },
+    ],
+    poses: [
+      { at: [46, CHAIN_LYING_HEIGHT], trunk: 180, thigh: -4, shin: -4, foot: 86, upperArm: 8, forearm: 5 },
+      { at: [46, CHAIN_LYING_HEIGHT], trunk: 180, thigh: -4, shin: -4, foot: 86, upperArm: 8, forearm: 145 },
+    ],
+  },
+  // Reverse Barbell Preacher Curls (259): seated behind a preacher bench pad
+  // holding an EZ bar with a shoulder-width palms-down grip, upper arms resting
+  // on the pad; the bar curls up to shoulder height and lowers slowly.
+  'reverse-barbell-preacher-curls': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 36,
+    implement: 'ez',
+    palm: 'down',
+    equipment: (() => {
+      const a = chainRad(PREACHER_UPPER_ARM);
+      const yaw = chainRad(28);
+      const under = CANONICAL_BODY_PARAMETERS.lw * 0.88 / 2 + 2;
+      const tLen = Math.hypot(Math.cos(a) * Math.cos(yaw), -Math.sin(a));
+      const dx = (Math.sin(a) / (tLen * Math.cos(yaw))) * under;
+      const dy = (-Math.cos(a) * Math.cos(yaw) / tLen) * under;
+      const padAt = (along: number): readonly [number, number, number] => [
+        PREACHER_SHOULDER[0] + Math.cos(a) * along + dx,
+        PREACHER_SHOULDER[1] + Math.sin(a) * along + dy,
+        CHAIN_SHOULDER_HALF,
+      ];
+      return [
+        { kind: 'post' as const, at: padAt(8) },
+        { kind: 'slab' as const, a: padAt(3), b: padAt(14.5), layer: 'front' as const },
+        ...chainFlatBench(PREACHER_HIP[0] - 10, PREACHER_HIP[0] + 10, CHAIN_SEATED_HIP - CHAIN_THIGH_HALF),
+      ];
+    })(),
+    poses: [
+      { at: PREACHER_HIP, trunk: PREACHER_TRUNK, thigh: 0, shin: -90, upperArm: PREACHER_UPPER_ARM, forearm: PREACHER_UPPER_ARM + 5 },
+      { at: PREACHER_HIP, trunk: PREACHER_TRUNK, thigh: 0, shin: -90, upperArm: PREACHER_UPPER_ARM, forearm: 58 },
+    ],
+  },
+  // Overhead Press: standing with balanced feet and a braced upright trunk, the
+  // bar set across the front shoulders with a full grip and the forearms close
+  // to vertical. The bar presses close past the face as the head moves through
+  // to a tall, stacked lockout overhead, then lowers along the same path.
+  // Seen nearly side on, so the bar is end on: its path rises close in front of
+  // the face rather than being drawn across the head. The grip, a little wider
+  // than the shoulders, opens the rack elbows; the hips sit a little behind
+  // mid-foot, and ease back a little more as the bar passes the face, so the
+  // bar in front stays over the foot until the lockout stacks.
+  'overhead-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 3,
+    originX: 58,
+    implement: 'bar',
+    endOnPlateTone: 'textMid',
+    farArmOver: true,
+    nearArmOverHead: true,
+    elbowPole: [-88, 10],
+    kneePole: 0,
+    footSpread: 2,
+    kneeOut: 8,
+    closeUp: { at: [-38, 65], r: 13.0, scale: 4.4, zoom: 1, open: 0 },
+    poses: [
+      {
+        at: [0.7, 46.5], trunk: 90, head: 122,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
+        upperArm: -90, forearm: 90,
+        wrist: [4.65, 71.8, 15.2], farWrist: [4.65, 71.8, -15.2],
+      },
+      {
+        at: [-1.0, 46.5], trunk: 90, head: 128,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
+        upperArm: 90, forearm: 90,
+        wrist: [4.6, 86.2, 15.2], farWrist: [4.6, 86.2, -15.2],
+      },
+      {
+        at: [2.7, 46.5], trunk: 90, head: 90,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
+        upperArm: 90, forearm: 90,
+        wrist: [2.7, 94.26, 15.2], farWrist: [2.7, 94.26, -15.2],
+      },
+    ],
+  },
+  // Arnold Press: standing tall and braced holding dumbbells at shoulder height
+  // with elbows tight in front and palms facing the athlete. Presses overhead
+  // while smoothly rotating the palms 180 degrees to face forward at lockout,
+  // then reverses the rotation on the way back down.
+  'arnold-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 32,
+    originX: 58,
+    implement: 'bells',
+    farArmOver: true,
+    nearArmOverHead: true,
+    kneePole: 0,
+    footSpread: 2,
+    kneeOut: 8,
+    closeUp: { at: [-44, 65], r: 13.0, scale: 4.4, zoom: 1 },
+    poses: [
+      {
+        at: [3.0, 46.5], trunk: 90, head: 90,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [117, 184], forearm: [80, 0],
+        palmYaw: 180, farPalmYaw: 180,
+      },
+      {
+        at: [3.0, 46.5], trunk: 90, head: 90,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [88, 4], forearm: [88, 4],
+        palmYaw: 0, farPalmYaw: 0,
+      },
+    ],
+  },
+  // Cable Shoulder Press: standing tall beside a low pulley set in front,
+  // bringing the single handle to shoulder height with the free hand at the
+  // hip. Presses to a tall stacked lockout overhead against the cable's forward
+  // and downward pull, then lowers under control back to the shoulder.
+  'cable-shoulder-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 24,
+    originX: 38,
+    implement: 'handle',
+    farArmOver: true,
+    nearArmOverHead: true,
+    kneePole: 0,
+    footSpread: 2,
+    kneeOut: 8,
+    lines: [{ from: [30, 6, 6.0], to: 'nearGrip' }],
+    equipment: [
+      { kind: 'frame', a: [30, 0.5, 6.0], b: [30, 18, 6.0] },
+      { kind: 'pulley', at: [30, 6, 6.0] },
+    ],
+    poses: [
+      {
+        at: [2.7, 46.5], trunk: 90, head: 90,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [96, 148], forearm: [90, 8],
+        farUpperArm: [-90, 8], farForearm: [-82, -12],
+      },
+      {
+        at: [2.7, 46.5], trunk: 90, head: 90,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [90, 4], forearm: [90, 4],
+        farUpperArm: [-90, 8], farForearm: [-82, -12],
+      },
+    ],
+  },
+  // Alternating Kettlebell Press: two kettlebells cleaned to the shoulders,
+  // standing tall with the palms facing in. One kettlebell presses straight
+  // overhead until the arm is straight, turning the palm to face forward as it
+  // rises, while the other waits at the shoulder; lowers to the shoulder, then
+  // the other side presses.
+  'alternating-kettlebell-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 34,
+    originX: 58,
+    implement: 'kettlebells',
+    farArmOver: true,
+    nearArmOverHead: true,
+    kneePole: 0,
+    footSpread: 2,
+    kneeOut: 8,
+    closeUp: { at: [-44, 65], r: 13.0, scale: 4.4, zoom: 1 },
+    poses: [
+      {
+        at: [2.7, 46.5], trunk: 90, head: 90,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [90, 4], forearm: [90, 4],
+        farUpperArm: [113, 162], farForearm: [86, 6],
+        palmYaw: 0, farPalmYaw: 90,
+      },
+      {
+        at: [2.7, 46.5], trunk: 90, head: 90,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [113, 162], forearm: [86, 6],
+        farUpperArm: [113, 162], farForearm: [86, 6],
+        palmYaw: 90, farPalmYaw: 90,
+      },
+      {
+        at: [2.7, 46.5], trunk: 90, head: 90,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [113, 162], forearm: [86, 6],
+        farUpperArm: [90, 4], farForearm: [90, 4],
+        palmYaw: 90, farPalmYaw: 0,
+      },
+    ],
+  },
+  // Dumbbell One-Arm Shoulder Press: standing tall with one dumbbell at
+  // shoulder height with the palm facing forward and the other hand at the
+  // side. Presses the dumbbell straight up until the arm is straight, pauses
+  // at lockout, and lowers slowly to shoulder height.
+  'dumbbell-one-arm-shoulder-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 32,
+    originX: 58,
+    implement: 'bell',
+    farArmOver: true,
+    nearArmOverHead: true,
+    kneePole: 0,
+    footSpread: 2,
+    kneeOut: 8,
+    closeUp: { at: [-44, 65], r: 13.0, scale: 4.4, zoom: 1 },
+    poses: [
+      {
+        at: [2.7, 46.5], trunk: 90, head: 90,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [90, 147], forearm: [90, 8],
+        farUpperArm: [-90, 8], farForearm: [-82, -12],
+        palmYaw: 0, farPalmYaw: 0,
+      },
+      {
+        at: [2.7, 46.5], trunk: 90, head: 90,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [90, 4], forearm: [90, 4],
+        farUpperArm: [-90, 8], farForearm: [-82, -12],
+        palmYaw: 0, farPalmYaw: 0,
+      },
+    ],
+  },
+  // Kettlebell Arnold Press: standing tall with a kettlebell cleaned to the
+  // shoulder and the palm facing in. Presses the kettlebell up and overhead,
+  // turning the wrist so the palm faces forward at the top, then lowers to the
+  // shoulder while turning the palm back to face in.
+  'kettlebell-arnold-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 34,
+    originX: 58,
+    implement: 'kettlebell',
+    farArmOver: true,
+    nearArmOverHead: true,
+    kneePole: 0,
+    footSpread: 2,
+    kneeOut: 8,
+    closeUp: { at: [-44, 65], r: 13.0, scale: 4.4, zoom: 1 },
+    poses: [
+      {
+        at: [2.7, 46.5], trunk: 90, head: 90,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [113, 162], forearm: [86, 6],
+        farUpperArm: [-90, 8], farForearm: [-82, -12],
+        palmYaw: 90, farPalmYaw: 90,
+      },
+      {
+        at: [2.7, 46.5], trunk: 90, head: 90,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [90, 4], forearm: [90, 4],
+        farUpperArm: [-90, 8], farForearm: [-82, -12],
+        palmYaw: 0, farPalmYaw: 90,
+      },
+    ],
+  },
+  // Kettlebell Seesaw Press: two kettlebells cleaned to the shoulders, standing
+  // tall. One kettlebell presses overhead until the arm is straight; as it
+  // lowers to the shoulder, the other kettlebell presses up at the same time.
+  'kettlebell-seesaw-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 34,
+    originX: 48,
+    cycle: true,
+    implement: 'kettlebells',
+    farArmOver: true,
+    nearArmOverHead: true,
+    kneePole: 0,
+    footSpread: 2,
+    kneeOut: 8,
+    poses: [
+      {
+        at: [2.7, 46.5], trunk: 90, head: 90,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [113, 162], forearm: [86, 6],
+        farUpperArm: [113, 162], farForearm: [86, 6],
+        palmYaw: 90, farPalmYaw: 90,
+      },
+      {
+        at: [2.7, 46.5], trunk: 90, head: 90,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [90, 4], forearm: [90, 4],
+        farUpperArm: [113, 162], farForearm: [86, 6],
+        palmYaw: 0, farPalmYaw: 90,
+      },
+      {
+        at: [2.7, 46.5], trunk: 90, head: 90,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [113, 162], forearm: [86, 6],
+        farUpperArm: [90, 4], farForearm: [90, 4],
+        palmYaw: 90, farPalmYaw: 0,
+      },
+    ],
+  },
+  // Renegade Row: prone push-up plank on two floor dumbbells with a wide
+  // foot stance for stability; rows one dumbbell to the side of the waist
+  // while keeping the hips square, returns it to the floor, then rows the
+  // other side.
+  'renegade-row': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: -38,
+    pitchDeg: 28,
+    originX: 52,
+    feet: 'free',
+    implement: 'bells',
+    bellAxis: [1, 0, 0],
+    elbowPole: [125, 25],
+    kneePole: -90,
+    poses: [
+      {
+        at: [-2.0, 19.09], trunk: 22, head: 22, roll: 0, twist: 0,
+        thigh: -158, shin: -158,
+        ankle: [-43.1, 4.65, 15.8], farAnkle: [-43.1, 4.65, -15.8],
+        foot: -28, farFoot: -28,
+        upperArm: -90, forearm: -90,
+        wrist: [12.5, 22.8, CHAIN_SHOULDER_HALF + 4.84],
+        farWrist: [20.252, 3.60, -CHAIN_SHOULDER_HALF],
+      },
+      {
+        at: [-2.0, 19.09], trunk: 22, head: 22, roll: 0, twist: 0,
+        thigh: -158, shin: -158,
+        ankle: [-43.1, 4.65, 15.8], farAnkle: [-43.1, 4.65, -15.8],
+        foot: -28, farFoot: -28,
+        upperArm: -90, forearm: -90,
+        wrist: [20.252, 3.60, CHAIN_SHOULDER_HALF],
+        farWrist: [20.252, 3.60, -CHAIN_SHOULDER_HALF],
+      },
+      {
+        at: [-2.0, 19.09], trunk: 22, head: 22, roll: 0, twist: 0,
+        thigh: -158, shin: -158,
+        ankle: [-43.1, 4.65, 15.8], farAnkle: [-43.1, 4.65, -15.8],
+        foot: -28, farFoot: -28,
+        upperArm: -90, forearm: -90,
+        wrist: [20.252, 3.60, CHAIN_SHOULDER_HALF],
+        farWrist: [12.5, 22.8, -CHAIN_SHOULDER_HALF - 4.84],
+      },
+    ],
+  },
+  // Elevated Cable Rows: seated on an elevated platform/box atop the row
+  // bench with the knees slightly bent on the foot platform, pulling the V-handle from
+  // extended arms to the abdomen while keeping the torso stationary.
+  'elevated-cable-rows': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 35,
+    pitchDeg: 12,
+    originX: 24,
+    feet: 'free',
+    kneePole: 90,
+    elbowPole: [-170, 18],
+    implement: 'vHandle',
+    lines: [{ from: NECK_ROW_PULLEY, to: 'vHandleApex' }],
+    equipment: [
+      { kind: 'frame', a: [NECK_ROW_PULLEY[0], 0.5], b: [NECK_ROW_PULLEY[0], 22] },
+      { kind: 'pulley', at: NECK_ROW_PULLEY },
+      { kind: 'frame', a: [45.71, 9.56, CHAIN_HIP_HALF], b: [47.44, 19.41, CHAIN_HIP_HALF] },
+      { kind: 'frame', a: [45.71, 9.56, -CHAIN_HIP_HALF], b: [47.44, 19.41, -CHAIN_HIP_HALF] },
+      { kind: 'frame', a: [45.71, 9.56, CHAIN_HIP_HALF], b: [45.71, 9.56, -CHAIN_HIP_HALF] },
+      { kind: 'frame', a: [47.44, 19.41, CHAIN_HIP_HALF], b: [47.44, 19.41, -CHAIN_HIP_HALF] },
+      { kind: 'box', a: [-8, 12.2], b: [4, 17.5] },
+      ...chainFlatBench(-13, 6, NECK_ROW_SEAT_TOP),
+    ],
+    poses: [
+      {
+        at: [0, 17.5 + CHAIN_THIGH_HALF], trunk: 90,
+        thigh: 0, shin: 0, ankle: [43.5, 13], foot: 80,
+        upperArm: 0, forearm: 0,
+        wrist: [21.55, 35.0, V_HANDLE_HALF], farWrist: [21.55, 35.0, -V_HANDLE_HALF],
+        palmYaw: 90, farPalmYaw: 90,
+      },
+      {
+        at: [0, 17.5 + CHAIN_THIGH_HALF], trunk: 90,
+        thigh: 0, shin: 0, ankle: [43.5, 13], foot: 80,
+        upperArm: 0, forearm: 0,
+        wrist: [7.5, 31.0, V_HANDLE_HALF], farWrist: [7.5, 31.0, -V_HANDLE_HALF],
+        palmYaw: 90, farPalmYaw: 90,
+      },
+    ],
+  },
+  // Upright Cable Row: standing facing a low pulley with a narrow-grip
+  // straight bar resting against the thighs on straight arms, pulling the
+  // bar vertically toward the chin with the elbows leading high out to the
+  // sides above the hands; at the top the hands are just under the chin with
+  // the elbows high and open.
+  'upright-cable-row': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 45,
+    originX: 44,
+    implement: 'cableBar',
+    barAt: 'front',
+    farArmOver: true,
+    elbowPole: [90, 54],
+    closeUp: { at: [-32, 68], r: 12.5, scale: 4.2, zoom: 1 },
+    lines: [{ from: [18, 5], to: 'midGrip' }],
+    equipment: [
+      { kind: 'frame', a: [18, 0.5], b: [18, 20] },
+      { kind: 'pulley', at: [18, 5] },
+    ],
+    poses: [
+      {
+        at: [0, CHAIN_STANDING_HIP], trunk: 90, thigh: -90, shin: -90,
+        upperArm: -90, forearm: -90,
+        wrist: [5.2, CHAIN_STANDING_SHOULDER - 23.78, 6.8],
+        farWrist: [5.2, CHAIN_STANDING_SHOULDER - 23.78, -6.8],
+        palmYaw: 180, farPalmYaw: 180,
+      },
+      {
+        at: [0, CHAIN_STANDING_SHOULDER - CHAIN_TRUNK], trunk: 90, thigh: -90, shin: -90,
+        upperArm: -90, forearm: -90,
+        wrist: [6.9, CHAIN_STANDING_SHOULDER + 2.0, 6.8],
+        farWrist: [6.9, CHAIN_STANDING_SHOULDER + 2.0, -6.8],
+        palmYaw: 180, farPalmYaw: 180,
+      },
+    ],
+  },
+  // Middle Back Shrug: lying chest-down on a prone incline bench with
+  // dumbbells hanging straight down on straight arms, palms facing each
+  // other, retracting the shoulder blades together without bending the elbows.
+  'middle-back-shrug': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 58,
+    originX: 28,
+    implement: 'bells',
+    bellAxis: [Math.cos(chainRad(38)), Math.sin(chainRad(38)), 0],
+    kneePole: 0,
+    equipment: proneInclineBench([38, 38], 38),
+    poses: [
+      {
+        at: [38, 38], trunk: 38, thigh: -110, shin: -110, ankle: [18, CHAIN_ANKLE_HEIGHT],
+        upperArm: [-90, 4], forearm: [-90, 4], retract: 0,
+      },
+      {
+        at: [38, 38], trunk: 38, thigh: -110, shin: -110, ankle: [18, CHAIN_ANKLE_HEIGHT],
+        upperArm: [-90, 4], forearm: [-90, 4], retract: 6.4,
+      },
+    ],
+  },
+  // Dumbbell Lying Rear Lateral Raise: lying chest-down on a bench set to a
+  // shallow 15-degree incline with palms facing each other and a slight
+  // fixed elbow bend, raising the dumbbells out to the sides to shoulder
+  // height and holding for one second at the top.
+  'dumbbell-lying-rear-lateral-raise': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 40,
+    originX: 16,
+    implement: 'bells',
+    bellAxis: [Math.cos(chainRad(15)), Math.sin(chainRad(15)), 0],
+    kneePole: 0,
+    closeUp: { at: [14, 72], r: 12.5, scale: 4.2, zoom: 1 },
+    equipment: proneInclineBench([34, 28], 15),
+    poses: [
+      {
+        at: [34, 28], trunk: 15, thigh: -110, shin: -110, ankle: [10, CHAIN_ANKLE_HEIGHT],
+        upperArm: [-88, 8], forearm: [-88, -4],
+        palmYaw: 90, farPalmYaw: 90,
+      },
+      {
+        at: [34, 28], trunk: 15, thigh: -110, shin: -110, ankle: [10, CHAIN_ANKLE_HEIGHT],
+        upperArm: [-88, 90], forearm: [-88, 78],
+        palmYaw: 90, farPalmYaw: 90,
+      },
+    ],
+  },
+  // Lying Rear Delt Raise: lying chest-down on a flat bench with palms
+  // facing each other and a slight fixed elbow bend, raising the dumbbells
+  // out to the sides to shoulder height and holding for one second at the top.
+  'lying-rear-delt-raise': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 40,
+    originX: 16,
+    implement: 'bells',
+    bellAxis: [1, 0, 0],
+    kneePole: 0,
+    closeUp: { at: [14, 72], r: 12.5, scale: 4.2, zoom: 1 },
+    equipment: chainFlatBench(30, 62, 24.5),
+    poses: [
+      {
+        at: [34, 24.5 + CHAIN_BACK_HALF], trunk: 0, thigh: -110, shin: -110, ankle: [10, CHAIN_ANKLE_HEIGHT],
+        upperArm: [-88, 8], forearm: [-88, -4],
+        palmYaw: 90, farPalmYaw: 90,
+      },
+      {
+        at: [34, 24.5 + CHAIN_BACK_HALF], trunk: 0, thigh: -110, shin: -110, ankle: [10, CHAIN_ANKLE_HEIGHT],
+        upperArm: [-88, 90], forearm: [-88, 78],
+        palmYaw: 90, farPalmYaw: 90,
+      },
+    ],
+  },
+  // Seated Bent-Over Rear Delt Raise: seated on the end of a flat bench
+  // with feet together, torso bent forward over the thighs, and dumbbells
+  // tucked behind the calves with palms facing each other; raises the arms
+  // out to the sides in a wide arc until parallel to the floor.
+  'seated-bent-over-rear-delt-raise': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 48,
+    originX: 38,
+    implement: 'bells',
+    kneePole: 90,
+    equipment: chainFlatBench(-28, 5, CHAIN_SEATED_HIP - CHAIN_THIGH_HALF),
+    poses: [
+      {
+        at: [0, CHAIN_SEATED_HIP], trunk: 26, head: 20, thigh: 0, shin: -90,
+        ankle: [21.8, CHAIN_ANKLE_HEIGHT, 2.0], farAnkle: [21.8, CHAIN_ANKLE_HEIGHT, -2.0],
+        upperArm: [-108, -6], forearm: [-108, -18],
+        palmYaw: 90, farPalmYaw: 90,
+      },
+      {
+        at: [0, CHAIN_SEATED_HIP], trunk: 26, head: 20, thigh: 0, shin: -90,
+        ankle: [21.8, CHAIN_ANKLE_HEIGHT, 2.0], farAnkle: [21.8, CHAIN_ANKLE_HEIGHT, -2.0],
+        upperArm: [-108, 90], forearm: [-108, 78],
+        palmYaw: 90, farPalmYaw: 90,
+      },
+    ],
+  },
+  // Lying Dumbbell Triceps Extension: supine on a flat bench with dumbbells
+  // pressed over the chest and palms facing each other; upper arms stay frozen
+  // and angled slightly back over the head while the elbows bend to lower the
+  // dumbbells beside the ears and press back to long arms.
+  'lying-dumbbell-triceps-extension': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 22,
+    originX: 16,
+    implement: 'hammer',
+    farArmOver: true,
+    nearArmOverHead: true,
+    equipment: chainFlatBench(20, 66, CABLE_LYING_BENCH_TOP),
+    poses: [
+      {
+        at: [62, CABLE_LYING_BENCH_TOP + CHAIN_BACK_HALF], trunk: 180, thigh: 0, shin: -90,
+        ankle: [84, CHAIN_ANKLE_HEIGHT], upperArm: [104, 0], forearm: [104, 0],
+      },
+      {
+        at: [62, CABLE_LYING_BENCH_TOP + CHAIN_BACK_HALF], trunk: 180, thigh: 0, shin: -90,
+        ankle: [84, CHAIN_ANKLE_HEIGHT], upperArm: [104, 0], forearm: [236, 0],
+      },
+    ],
+  },
+  // Lying Triceps Press: supine on a flat bench holding an EZ bar with a
+  // medium overhand grip, arms straight above the chest and elbows tucked in;
+  // upper arms and elbows stay still while the bar lowers until just above the
+  // forehead and returns above the chest.
+  'lying-triceps-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 22,
+    originX: 16,
+    implement: 'ez',
+    farArmOver: true,
+    nearArmOverHead: true,
+    equipment: chainFlatBench(20, 66, CABLE_LYING_BENCH_TOP),
+    closeUp: { at: [80, 62], r: 12.5, scale: 4.2, zoom: 1 },
+    poses: [
+      {
+        at: [62, CABLE_LYING_BENCH_TOP + CHAIN_BACK_HALF], trunk: 180, thigh: 0, shin: -90,
+        ankle: [84, CHAIN_ANKLE_HEIGHT], upperArm: [90, 0], forearm: [90, 0], palmYaw: 0, farPalmYaw: 0,
+      },
+      {
+        at: [62, CABLE_LYING_BENCH_TOP + CHAIN_BACK_HALF], trunk: 180, thigh: 0, shin: -90,
+        ankle: [84, CHAIN_ANKLE_HEIGHT], upperArm: [90, 0], forearm: [195, 0], palmYaw: 0, farPalmYaw: 0,
+      },
+    ],
+  },
+  // Incline Barbell Triceps Extension: reclined on an incline bench holding a
+  // barbell overhead with an overhand grip slightly narrower than the
+  // shoulders, arms straight and in line with the torso; upper arms stay still
+  // and close to the head while the elbows bend to lower the bar behind the
+  // head, then straighten overhead and pause.
+  'incline-barbell-triceps-extension': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 18,
+    originX: 16,
+    implement: 'bar',
+    farArmOver: true,
+    nearArmOverHead: true,
+    equipment: chainInclineBench([52, CHAIN_SEATED_HIP], 128),
+    closeUp: { at: [82, 70], r: 12.5, scale: 4.2, zoom: 1 },
+    poses: [
+      {
+        at: [52, CHAIN_SEATED_HIP], trunk: 128, head: 112, thigh: 0, shin: -90,
+        upperArm: [128, -4.5], forearm: [128, -4.5], palmYaw: 0, farPalmYaw: 0,
+      },
+      {
+        at: [52, CHAIN_SEATED_HIP], trunk: 128, head: 112, thigh: 0, shin: -90,
+        upperArm: [128, -4.5], forearm: [222, -4.5], palmYaw: 0, farPalmYaw: 0,
+      },
+    ],
+  },
+  // Kneeling Cable Triceps Extension: kneeling facing away from a high pulley
+  // with the head and the backs of the upper arms resting on a bench placed
+  // sideways in front of the machine, holding the straight bar with a narrow
+  // overhand grip; straightens the elbows until the arms are level with the
+  // floor, pauses, and lets the elbows bend slowly back to the start. The head
+  // rests on the pad beside the upper arms, the bar sits in the hands beyond the
+  // wrists, and the pulley is high enough for the cable to pass over the head.
+  'kneeling-cable-triceps-extension': {
+    root: 'ankle',
+    view: 'oblique',
+    yawDeg: 18,
+    originX: 8,
+    feet: 'free',
+    implement: 'cableBar',
+    farArmOver: true,
+    nearArmOverHead: true,
+    lines: [{ from: [8, 86], to: 'midGrip' }],
+    equipment: [
+      { kind: 'frame', a: [8, 0.5], b: [8, 92] },
+      { kind: 'pulley', at: [8, 86] },
+      ...chainFlatBench(60, 79, 24.5),
+    ],
+    closeUp: { at: [36, 72], r: 12.5, scale: 4.2, zoom: 1 },
+    poses: [
+      {
+        at: [14, CHAIN_KNEELING_KNEE], thigh: -98, shin: 180, foot: 180,
+        trunk: 4, head: 38, upperArm: [0, -7], forearm: [104, -7], hand: [104, -7], palmYaw: 0, farPalmYaw: 0,
+      },
+      {
+        at: [14, CHAIN_KNEELING_KNEE], thigh: -98, shin: 180, foot: 180,
+        trunk: 4, head: 38, upperArm: [0, -7], forearm: [0, -7], hand: [0, -7], palmYaw: 0, farPalmYaw: 0,
+      },
+    ],
+  },
+  // Decline Close-Grip Bench To Skull Crusher: legs secured on a decline
+  // bench, holding a barbell over the chest with a grip slightly narrower than
+  // shoulder width; lowers the bar to the lower chest with the elbows in and
+  // presses back up, then keeps the upper arms still and bends the elbows to
+  // lower the bar toward the forehead and straightens them again.
+  'decline-close-grip-bench-to-skull-crusher': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 18,
+    originX: 16,
+    feet: 'free',
+    implement: 'bar',
+    farArmOver: true,
+    nearArmOverHead: true,
+    equipment: chainDeclineBench(DECLINE_EXTENSION_HIP, DECLINE_EXTENSION_DEG, DECLINE_EXTENSION_ANKLE),
+    poses: [
+      { ...DECLINE_EXTENSION_BODY, upperArm: [-15, -4.5], forearm: [115, -4.5] },
+      { ...DECLINE_EXTENSION_BODY, upperArm: [105, -4.5], forearm: [105, -4.5] },
+      { ...DECLINE_EXTENSION_BODY, upperArm: [105, -4.5], forearm: [222, -4.5] },
+    ],
+  },
+  // Dip: supported on parallel bars with straight arms and shoulders packed
+  // down; bends the elbows and lowers the body until the upper arms are about
+  // parallel to the floor, then presses back up to straight arms. Only the hands
+  // hold the body up, so as the trunk leans slightly forward at the bottom (the
+  // forearms tilt with the elbows a little behind the wrists) the hips and the
+  // bent legs swing back to keep the centre of mass over the hands.
+  'dip': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 50,
+    feet: 'free',
+    farArmOver: true,
+    elbowPole: 180,
+    equipment: [
+      { kind: 'post', at: [-10, 44, -CHAIN_SHOULDER_HALF] },
+      { kind: 'post', at: [10, 44, -CHAIN_SHOULDER_HALF] },
+      { kind: 'slab', a: [-14, 46, -CHAIN_SHOULDER_HALF], b: [14, 46, -CHAIN_SHOULDER_HALF], layer: 'behind' },
+      { kind: 'post', at: [-10, 44, CHAIN_SHOULDER_HALF] },
+      { kind: 'post', at: [10, 44, CHAIN_SHOULDER_HALF] },
+      { kind: 'slab', a: [-14, 46, CHAIN_SHOULDER_HALF], b: [14, 46, CHAIN_SHOULDER_HALF], layer: 'front' },
+    ],
+    poses: [
+      {
+        at: [-0.256, 50.695], trunk: 87, head: 88,
+        thigh: -92, shin: -136, foot: -128,
+        upperArm: -90, forearm: -90,
+        wrist: [0, 48 + CHAIN_HAND_REST, CHAIN_SHOULDER_HALF],
+        farWrist: [0, 48 + CHAIN_HAND_REST, -CHAIN_SHOULDER_HALF],
+      },
+      {
+        at: [1.581, 39.111], trunk: 71, head: 80,
+        thigh: -119, shin: -160, foot: -152,
+        upperArm: 180, forearm: -90,
+        wrist: [0, 48 + CHAIN_HAND_REST, CHAIN_SHOULDER_HALF],
+        farWrist: [0, 48 + CHAIN_HAND_REST, -CHAIN_SHOULDER_HALF],
+      },
+    ],
+  },
+  // Close-Grip Push-Up off of a Dumbbell: a dumbbell stood vertically on its
+  // end on the floor with both hands placed together on top of it, body rigid
+  // in a push-up position on the toes; bends the elbows close to the ribs to
+  // lower the chest toward the hands and presses back up to straight arms.
+  'close-grip-push-up-off-of-a-dumbbell': {
+    root: 'ankle',
+    view: 'oblique',
+    yawDeg: 24,
+    originX: 8,
+    feet: 'free',
+    farArmOver: true,
+    elbowPole: [180, 6],
+    footSpread: 2,
+    equipment: [
+      { kind: 'slab', a: [72.5, 2.0], b: [79.5, 2.0] },
+      { kind: 'box', a: [74.8, 2.0], b: [77.2, 7.6] },
+      { kind: 'slab', a: [72.5, 7.6], b: [79.5, 7.6] },
+    ],
+    poses: [
+      {
+        at: [14, SIDE_PLANK_ANKLE[1]], trunk: 24.16, head: 28.16,
+        thigh: 204.16, shin: 204.16, foot: -70,
+        upperArm: -90, forearm: -90,
+        wrist: [76.0, 9.6 + CHAIN_HAND_REST, 1.8],
+        farWrist: [76.0, 9.6 + CHAIN_HAND_REST, -1.8],
+      },
+      {
+        at: [14, SIDE_PLANK_ANKLE[1]], trunk: 10.0, head: 14.0,
+        thigh: 190.0, shin: 190.0, foot: -70,
+        upperArm: -90, forearm: -90,
+        wrist: [76.0, 9.6 + CHAIN_HAND_REST, 1.8],
+        farWrist: [76.0, 9.6 + CHAIN_HAND_REST, -1.8],
+      },
+    ],
+  },
+  // Clock Push-Up: starts in a push-up position with hands about shoulder-width
+  // apart and the body in one straight line; lowers the chest toward the floor,
+  // pushes up fast enough for both hands to leave the floor and land a short
+  // step to one side turning the body slightly, lands with soft bent elbows,
+  // and resets the straight arms and straight body line. The one hop goes one
+  // way round; the loop then returns to the start as a reset on the floor.
+  'clock-push-up': (() => {
+    const poseAt = (pitchDeg: number, trunkO: number, handO: number, handY: number): ChainPose => {
+      const p = chainRad(pitchDeg), o = chainRad(trunkO), ho = chainRad(handO);
+      const pTop = chainRad(16.65);
+      const legLen = CHAIN_THIGH + CHAIN_SHIN;
+      const hipX = 14 + legLen * Math.cos(p) * Math.cos(o);
+      const hipY = SIDE_PLANK_ANKLE[1] + 0.35 + legLen * Math.sin(p) * Math.cos(o);
+      const hipZ = legLen * Math.sin(o);
+      const topAxis = chainUnit([16.65, handO], 1);
+      const topLine = chainAcross(topAxis);
+      const topFwd = chainCross(topAxis, topLine);
+      const twTop = -Math.atan(Math.tan(pTop) * Math.sin(ho));
+      const shAxX = topLine[0] * Math.cos(twTop) + topFwd[0] * Math.sin(twTop);
+      const shAxZ = topLine[2] * Math.cos(twTop) + topFwd[2] * Math.sin(twTop);
+      const handX = 14 + SIDE_PLANK_BODY * Math.cos(pTop) * Math.cos(ho);
+      const handZ = SIDE_PLANK_BODY * Math.sin(ho);
+      const twist = -Math.atan(Math.tan(p) * Math.sin(o)) * 180 / Math.PI;
+      return {
+        at: [hipX, hipY, hipZ],
+        trunk: [pitchDeg, trunkO],
+        head: [pitchDeg + 4, trunkO],
+        twist,
+        thigh: [pitchDeg + 180, -trunkO],
+        shin: [pitchDeg + 180, -trunkO],
+        farThigh: [pitchDeg + 180, trunkO],
+        farShin: [pitchDeg + 180, trunkO],
+        foot: -70,
+        upperArm: -90,
+        forearm: -90,
+        wrist: [handX + shAxX * CHAIN_SHOULDER_HALF, handY, handZ + shAxZ * CHAIN_SHOULDER_HALF],
+        farWrist: [handX - shAxX * CHAIN_SHOULDER_HALF, handY, handZ - shAxZ * CHAIN_SHOULDER_HALF],
+      };
+    };
+    return {
+      root: 'hip',
+      view: 'oblique',
+      yawDeg: 32,
+      originX: 12,
+      feet: 'free',
+      cycle: true,
+      farArmOver: true,
+      elbowPole: [180, 18],
+      poses: [
+        poseAt(16.65, -8, -8, 2.35),
+        poseAt(7.0, -8, -8, 2.35),
+        poseAt(23.0, 0, 0, 11.4),
+        poseAt(14.5, 8, 8, 2.35),
+        poseAt(16.65, 8, 8, 2.35),
+        // The loop's return to the start, on the floor with the elbows a little soft.
+        poseAt(14.5, 0, 0, 2.35),
+      ],
+    };
+  })(),
+  // Bent Over Two-Arm Long Bar Row (id 145): barbell anchored on the floor in
+  // a corner/landmine pivot behind and between the feet, straddling the bar
+  // with feet shoulder-width apart and knees slightly bent, torso hinged near
+  // parallel to the floor with a flat back, pulling a double handle hooked
+  // under the bar behind the plates to the lower chest with elbows tucked in.
+  'bent-over-two-arm-long-bar-row': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 48,
+    implement: 'longBar',
+    barAnchor: [-20, 1.5],
+    barLength: 55.5,
+    doubleHandle: true,
+    farArmOver: true,
+    kneePole: 0,
+    elbowPole: [145, 16],
+    footSpread: 2.6,
+    equipment: [
+      { kind: 'frame', a: [-22.4, 0.5, 0], b: [-22.4, 10, 0] },
+      { kind: 'frame', a: [-22.4, 0.5, 0], b: [-17.0, 0.5, 0] },
+    ],
+    poses: [
+      {
+        at: [0, 44.5], trunk: 24, head: 30,
+        thigh: -90, shin: -90, ankle: [9, CHAIN_ANKLE_HEIGHT],
+        upperArm: -90, forearm: -90,
+        wrist: [21.60, 30.80, V_HANDLE_HALF],
+        farWrist: [21.60, 30.80, -V_HANDLE_HALF],
+        palmYaw: 90, farPalmYaw: 90,
+      },
+      {
+        at: [0, 44.5], trunk: 24, head: 30,
+        thigh: -90, shin: -90, ankle: [9, CHAIN_ANKLE_HEIGHT],
+        upperArm: -90, forearm: -90,
+        wrist: [13.47, 40.63, V_HANDLE_HALF],
+        farWrist: [13.47, 40.63, -V_HANDLE_HALF],
+        palmYaw: 90, farPalmYaw: 90,
+      },
+    ],
+  },
+  // Box Squat with Bands (id 153): parallel-height box behind the athlete
+  // inside a power rack with downward bands looped from each barbell sleeve to
+  // floor anchors on the rack base; from a shoulder-width to slightly wider
+  // stance, sits hips back and knees out onto the box
+  // with vertical shins, pauses seated on the box without bouncing, and drives
+  // upward through the heels against the bands.
+  'box-squat-with-bands': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 30,
+    originX: 50,
+    implement: 'bar',
+    armsFollowTrunk: true,
+    footSpread: 3.6,
+    lines: [
+      { from: [-4, 1.2, 16.5], to: 'nearBarEnd' },
+      { from: [-4, 1.2, -16.5], to: 'farBarEnd', depth: 'far' },
+    ],
+    equipment: [
+      { kind: 'box', a: [-24, 20.2], b: [-12, 0.6] },
+      { kind: 'frame', a: [-16, 0.5, 16.5], b: [-16, 86, 16.5] },
+      { kind: 'frame', a: [14, 0.5, 16.5], b: [14, 86, 16.5] },
+      { kind: 'frame', a: [-16, 86, 16.5], b: [14, 86, 16.5] },
+      { kind: 'frame', a: [-16, 0.8, 16.5], b: [14, 0.8, 16.5] },
+      { kind: 'frame', a: [-16, 0.5, -16.5], b: [-16, 86, -16.5] },
+      { kind: 'frame', a: [14, 0.5, -16.5], b: [14, 86, -16.5] },
+      { kind: 'frame', a: [-16, 86, -16.5], b: [14, 86, -16.5] },
+      { kind: 'frame', a: [-16, 0.8, -16.5], b: [14, 0.8, -16.5] },
+    ],
+    poses: [
+      {
+        at: [1.8, 46.43], trunk: 86, head: 90, thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 10,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+      {
+        at: [-16.8, 23.032], trunk: 46, head: 90, thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 28,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+    ],
+  },
+  // Calf Raise On A Dumbbell (id 165): non-rolling dumbbell with flat-bottomed
+  // hexagonal heads on the floor in front of a sturdy support that cannot move,
+  // held with both hands for balance; stands with the ball of one foot on the
+  // dumbbell handle and the other foot lifted clear of the floor, keeps the
+  // dumbbell still and the working knee straight to lower the heel into a
+  // stretch, and rises into full calf extension for a one-second hold.
+  'calf-raise-on-a-dumbbell': {
+    root: 'toe',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 46,
+    feet: 'free',
+    farArmOver: true,
+    elbowPole: [-150, 18],
+    equipment: [
+      { kind: 'frame', a: [14, 0.5, -12], b: [14, 76, -12] },
+      { kind: 'frame', a: [14, 0.5, 12], b: [14, 76, 12] },
+      { kind: 'slab', a: [14, 60, -12], b: [14, 60, 12] },
+      { kind: 'box', a: [-1.8, 0.5, 0.6], b: [1.8, 6.1, 0.6] },
+      { kind: 'frame', a: [-1.8, 0.5, 0.6], b: [1.8, 0.5, 0.6] },
+      { kind: 'frame', a: [1.8, 0.5, 0.6], b: [3.2, 3.3, 0.6] },
+      { kind: 'frame', a: [3.2, 3.3, 0.6], b: [1.8, 6.1, 0.6] },
+      { kind: 'frame', a: [1.8, 6.1, 0.6], b: [-1.8, 6.1, 0.6] },
+      { kind: 'frame', a: [-1.8, 6.1, 0.6], b: [-3.2, 3.3, 0.6] },
+      { kind: 'frame', a: [-3.2, 3.3, 0.6], b: [-1.8, 0.5, 0.6] },
+      { kind: 'slab', a: [0, 2.6, 1.2], b: [0, 2.6, 12.4] },
+      { kind: 'box', a: [-1.8, 0.5, 13.0], b: [1.8, 6.1, 13.0] },
+      { kind: 'frame', a: [-1.8, 0.5, 13.0], b: [1.8, 0.5, 13.0] },
+      { kind: 'frame', a: [1.8, 0.5, 13.0], b: [3.2, 3.3, 13.0] },
+      { kind: 'frame', a: [3.2, 3.3, 13.0], b: [1.8, 6.1, 13.0] },
+      { kind: 'frame', a: [1.8, 6.1, 13.0], b: [-1.8, 6.1, 13.0] },
+      { kind: 'frame', a: [-1.8, 6.1, 13.0], b: [-3.2, 3.3, 13.0] },
+      { kind: 'frame', a: [-3.2, 3.3, 13.0], b: [-1.8, 0.5, 13.0] },
+    ],
+    poses: [
+      {
+        at: [0, 6.568], trunk: 90, head: 90,
+        thigh: -90, shin: -90, foot: 24,
+        farThigh: -90, farShin: -135, farFoot: -15,
+        upperArm: -45, forearm: 15,
+        wrist: [14, 62 + CHAIN_HAND_REST, 6.5],
+        farWrist: [14, 62 + CHAIN_HAND_REST, -6.5],
+      },
+      {
+        at: [0, 6.568], trunk: 90, head: 90,
+        thigh: -90, shin: -90, foot: -44,
+        farThigh: -90, farShin: -135, farFoot: -15,
+        upperArm: -45, forearm: 15,
+        wrist: [14, 62 + CHAIN_HAND_REST, 6.5],
+        farWrist: [14, 62 + CHAIN_HAND_REST, -6.5],
+      },
+    ],
+  },
+  // Front Barbell Squat To A Bench (id 205): flat bench behind the athlete
+  // inside a squat rack, barbell resting across the top of the front shoulders
+  // with arms crossed to grasp the bar and upper arms slightly above parallel
+  // to the floor; lowers slowly with a straight upright back and knees in line
+  // with the toes until the glutes touch the bench, then drives right back up
+  // through the heels without sitting back and relaxing on the bench: the
+  // knees travel forward over the toes so the bar and the centre of mass stay
+  // over the mid-foot at the light touch.
+  'front-barbell-squat-to-a-bench': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 54,
+    implement: 'bar',
+    armsFollowTrunk: true,
+    footSpread: 4.8,
+    equipment: [
+      ...chainFlatBench(-30, -5, 20.2),
+      { kind: 'frame', a: [14, 0.5, 16], b: [14, 78, 16] },
+      { kind: 'frame', a: [14, 0.5, -16], b: [14, 78, -16] },
+      { kind: 'frame', a: [14, 66, 16], b: [10.5, 66, 16] },
+      { kind: 'frame', a: [14, 66, -16], b: [10.5, 66, -16] },
+    ],
+    poses: [
+      {
+        at: [0.0, 46.32], trunk: 89, head: 90, thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 10,
+        upperArm: [9, -28], forearm: [-168, -42],
+      },
+      {
+        at: [-6.8, 23.032], trunk: 71, head: 90, thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 16,
+        upperArm: [27, -28], forearm: [-150, -42],
+      },
+    ],
+  },
+  // One-Arm Kettlebell Swings (id 250): feet slightly wider than the hips,
+  // kettlebell held in one hand with an overhand grip on a long straight arm;
+  // hikes the bell back between the upper thighs in a flat-backed hip hinge
+  // with soft knees (not a squat) and the free arm swinging back beside the
+  // hip, the close-up staying on the working hand, snaps the hips and knees
+  // forward to stand tall as the bell floats to shoulder height, and stays
+  // tall until the bell drops back to the thighs to hinge into the next rep.
+  'one-arm-kettlebell-swings': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 46,
+    implement: 'kettlebell',
+    farArmOver: true,
+    footSpread: 3.6,
+    closeUp: { at: [-30, 66], r: 12.5, scale: 4.2, zoom: 1, hand: 'near' },
+    poses: [
+      {
+        at: [-8.5, 44.7], trunk: 30, head: 36, thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 12,
+        upperArm: [-135, -12], forearm: [-135, -12],
+        farUpperArm: [-158, 8], farForearm: [-150, 8],
+        palmYaw: 180, farPalmYaw: 90,
+      },
+      {
+        at: [-1.2, 45.2], trunk: 78, head: 84, thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 10,
+        upperArm: [-52, -10], forearm: [-52, -10],
+        farUpperArm: [-88, 12], farForearm: [-62, 10],
+        palmYaw: 180, farPalmYaw: 90,
+      },
+      {
+        at: [0.0, 46.50], trunk: 90, head: 90, thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 8,
+        upperArm: [2, -8], forearm: [2, -8],
+        farUpperArm: [-48, 16], farForearm: [-16, 10],
+        palmYaw: 180, farPalmYaw: 90,
+      },
+    ],
+  },
+  // Kettlebell Seated Press (id 229): seated directly on the floor with legs
+  // spread comfortably wide and settled; one kettlebell cleaned to the shoulder
+  // resting on the forearm, pressed up and out to a locked elbow overhead, and
+  // lowered back to the rack position under control.
+  'kettlebell-seated-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 72,
+    originX: 44,
+    feet: 'free',
+    implement: 'kettlebell',
+    nearArmOverHead: true,
+    farArmOver: true,
+    poses: [
+      {
+        at: [-4, CHAIN_THIGH_HALF + 0.05], trunk: 90, head: 90,
+        thigh: [0, 35], shin: [-1.84, 35], foot: [80, 28],
+        upperArm: [80, 138], forearm: [68, -10],
+        farUpperArm: [-28, 32], farForearm: [-8, 20],
+      },
+      {
+        at: [-4, CHAIN_THIGH_HALF + 0.05], trunk: 90, head: 90,
+        thigh: [0, 35], shin: [-1.84, 35], foot: [80, 28],
+        upperArm: [90, 24], forearm: [90, 24],
+        farUpperArm: [-28, 32], farForearm: [-8, 20],
+      },
+    ],
+  },
+  // Double Kettlebell Push Press (id 85): two kettlebells in the rack; a
+  // shallow, fast knee dip with a vertical torso, then a hard leg drive that
+  // carries both bells to locked arms overhead before lowering back to the rack.
+  'double-kettlebell-push-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 50,
+    footSpread: 2.5,
+    implement: 'kettlebells',
+    nearArmOverHead: true,
+    farArmOver: true,
+    poses: [
+      {
+        at: [-1.4, 41.6], trunk: 90, head: 90,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 10,
+        upperArm: [80, 136], forearm: [80, -10],
+      },
+      {
+        at: [0, CHAIN_STANDING_HIP - 0.075], trunk: 90, head: 90,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 4,
+        upperArm: [80, 136], forearm: [80, -10],
+      },
+      {
+        at: [0, CHAIN_STANDING_HIP - 0.075], trunk: 90, head: 90,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 4,
+        upperArm: [90, 12], forearm: [90, 12],
+      },
+    ],
+  },
+  // Bent Press (id 112): one kettlebell at the shoulder, feet wider than the
+  // hips and turned slightly away from the loaded side; hips shift away and the
+  // torso wedges under the bell while the arm straightens with eyes on the
+  // handle and the bell stacked over its base, then stand tall under the locked arm.
+  'bent-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 32,
+    originX: 52,
+    cycle: true,
+    feet: 'free',
+    elbowPole: [-90, 35],
+    implement: 'kettlebell',
+    nearArmOverHead: true,
+    farArmOver: true,
+    poses: [
+      {
+        at: [-0.4, 46.3], trunk: 89, head: [90, 0],
+        thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT, 12.0], farAnkle: [-0.8, CHAIN_ANKLE_HEIGHT, -12.0],
+        foot: [0, -18], kneeOut: 6,
+        upperArm: -60, forearm: 80,
+        wrist: [2.64, 76.6, CHAIN_SHOULDER_HALF], farWrist: [1.6, 49.8, -CHAIN_SHOULDER_HALF],
+      },
+      {
+        at: [-15.2, 37.5], trunk: 42, head: [90, 20],
+        thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT, 12.0], farAnkle: [-0.8, CHAIN_ANKLE_HEIGHT, -12.0],
+        foot: [0, -18], kneeOut: 10,
+        upperArm: 90, forearm: 90,
+        wrist: [2.64, 78.045, CHAIN_SHOULDER_HALF], farWrist: [-4.0, 34.0, -CHAIN_SHOULDER_HALF],
+      },
+      {
+        at: [-0.4, 46.3], trunk: 89, head: [90, 0],
+        thigh: -90, shin: -90,
+        ankle: [0, CHAIN_ANKLE_HEIGHT, 12.0], farAnkle: [-0.8, CHAIN_ANKLE_HEIGHT, -12.0],
+        foot: [0, -18], kneeOut: 6,
+        upperArm: 90, forearm: 90,
+        wrist: [2.64, 94.65, CHAIN_SHOULDER_HALF], farWrist: [1.6, 49.8, -CHAIN_SHOULDER_HALF],
+      },
+    ],
+  },
+  // Cuban Press (id 101): standing with light dumbbells; raise the elbows wide
+  // to shoulder height with forearms hanging below them, hold the upper arms
+  // fixed while rotating the forearms up until wrists stack over the elbows,
+  // press to a tall overhead finish, and reverse every stage under control.
+  'cuban-press': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 38,
+    originX: 50,
+    footSpread: 2.0,
+    implement: 'bells',
+    nearArmOverHead: true,
+    farArmOver: true,
+    poses: [
+      {
+        at: [0, CHAIN_STANDING_HIP - 0.08], trunk: 90, head: 90,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [-85, 14], forearm: [-85, 14],
+      },
+      {
+        at: [0, CHAIN_STANDING_HIP - 0.08], trunk: 90, head: 90,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [0, 90], forearm: [-90, 0],
+      },
+      {
+        at: [0, CHAIN_STANDING_HIP - 0.08], trunk: 90, head: 90,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [0, 90], forearm: [90, 0],
+      },
+      {
+        at: [0, CHAIN_STANDING_HIP - 0.08], trunk: 90, head: 90,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [90, 12], forearm: [90, 12],
+      },
+    ],
+  },
+  // Eccentric Wall Handstand Push-Up (id 58): kick up to the wall with hands
+  // just outside shoulder width and a padded target beneath the head; brace in
+  // one vertical line and lower for up to five seconds until the head meets the
+  // pad softly, then exit through the rehearsed clear side, reset on the floor, and kick back up.
+  'eccentric-wall-handstand-push-up': {
+    root: 'neck',
+    view: 'oblique',
+    yawDeg: 20,
+    originX: 46,
+    cycle: true,
+    feet: 'free',
+    elbowPole: [-140, 35],
+    equipment: [
+      { kind: 'slab', a: [-7.02, 2.0], b: [-7.02, 95.0], layer: 'behind' },
+      { kind: 'slab', a: [-3.5, 2.0], b: [7.5, 2.0], layer: 'behind' },
+    ],
+    poses: [
+      {
+        at: [0, 26.59], trunk: -90, head: -90,
+        thigh: 90, shin: 90, foot: 0,
+        upperArm: -90, forearm: -90,
+        wrist: [1.0, CHAIN_HAND_REST, 11.2], farWrist: [1.0, CHAIN_HAND_REST, -11.2],
+      },
+      {
+        at: [0, 19.3], trunk: -90, head: -90,
+        thigh: 90, shin: 90, foot: 0,
+        upperArm: -90, forearm: -90,
+        wrist: [1.0, CHAIN_HAND_REST, 11.2], farWrist: [1.0, CHAIN_HAND_REST, -11.2],
+      },
+      {
+        at: [0, 19.3], trunk: -114, head: -100,
+        thigh: 18, shin: 0, foot: 0,
+        upperArm: -90, forearm: -90,
+        wrist: [1.0, CHAIN_HAND_REST, 11.2], farWrist: [1.0, CHAIN_HAND_REST, -11.2],
+      },
+      {
+        at: [0, 19.3], trunk: -138, head: -115,
+        thigh: -48.07, shin: -48.07, foot: 0,
+        upperArm: -90, forearm: -90,
+        wrist: [1.0, CHAIN_HAND_REST, 11.2], farWrist: [1.0, CHAIN_HAND_REST, -11.2],
+      },
+      {
+        at: [0, 26.59], trunk: -158.5, head: -125,
+        thigh: -48.07, shin: -48.07, foot: 0,
+        upperArm: -90, forearm: -90,
+        wrist: [1.0, CHAIN_HAND_REST, 11.2], farWrist: [1.0, CHAIN_HAND_REST, -11.2],
+      },
+      {
+        at: [0, 26.59], trunk: -118, head: -102,
+        thigh: 18, shin: 18, foot: 0,
+        upperArm: -90, forearm: -90,
+        wrist: [1.0, CHAIN_HAND_REST, 11.2], farWrist: [1.0, CHAIN_HAND_REST, -11.2],
+      },
+    ],
+  },
+  // Handstand Push-Up (id 63): kick up to the wall with hands just outside
+  // shoulder width and a padded target beneath the head; brace in one vertical
+  // line, lower until the head meets the pad softly, and press back to straight arms.
+  'handstand-push-up': {
+    root: 'neck',
+    view: 'oblique',
+    yawDeg: 20,
+    originX: 50,
+    feet: 'free',
+    elbowPole: [-140, 35],
+    equipment: [
+      { kind: 'slab', a: [-7.02, 2.0], b: [-7.02, 95.0], layer: 'behind' },
+      { kind: 'slab', a: [-3.5, 2.0], b: [7.5, 2.0], layer: 'behind' },
+    ],
+    poses: [
+      {
+        at: [0, 26.59], trunk: -90, head: -90,
+        thigh: 90, shin: 90, foot: 0,
+        upperArm: -90, forearm: -90,
+        wrist: [1.0, CHAIN_HAND_REST, 11.2], farWrist: [1.0, CHAIN_HAND_REST, -11.2],
+      },
+      {
+        at: [0, 19.3], trunk: -90, head: -90,
+        thigh: 90, shin: 90, foot: 0,
+        upperArm: -90, forearm: -90,
+        wrist: [1.0, CHAIN_HAND_REST, 11.2], farWrist: [1.0, CHAIN_HAND_REST, -11.2],
+      },
+    ],
+  },
+  // Pike Push-Up (id 69): feet walked in and hips lifted high in an inverted V;
+  // elbows bend and track at about 45 degrees to lower the top of the head
+  // toward a spot just ahead of the hands, then press back to long arms without
+  // the hips drifting forward.
+  'pike-push-up': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 22,
+    originX: 50,
+    feet: 'free',
+    elbowPole: [-135, 45],
+    kneePole: -45,
+    poses: [
+      {
+        at: [-0.5, 40.8], trunk: -39.2, head: -39.2,
+        thigh: -115, shin: -115, foot: 0,
+        ankle: [-21.8, CHAIN_ANKLE_HEIGHT, 6.8], farAnkle: [-21.8, CHAIN_ANKLE_HEIGHT, -6.8],
+        upperArm: -80, forearm: -80,
+        wrist: [11.0, CHAIN_HAND_REST, 9.6], farWrist: [11.0, CHAIN_HAND_REST, -9.6],
+      },
+      {
+        at: [-0.5, 38.6], trunk: -62, head: -62,
+        thigh: -115, shin: -115, foot: 0,
+        ankle: [-21.8, CHAIN_ANKLE_HEIGHT, 6.8], farAnkle: [-21.8, CHAIN_ANKLE_HEIGHT, -6.8],
+        upperArm: -80, forearm: -80,
+        wrist: [11.0, CHAIN_HAND_REST, 9.6], farWrist: [11.0, CHAIN_HAND_REST, -9.6],
+      },
+    ],
+  },
+  // Weighted Pull-up (6): overhand grip outside the shoulders with an external
+  // weight plate suspended centrally from a dip belt at the waist, clear of the
+  // floor and body and kept quiet throughout.
+  'weighted-pull-up': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 42,
+    originX: 48,
+    feet: 'free',
+    elbowPole: [-95, 34],
+    waistLoad: { drop: 15, r: 3.0 },
+    equipment: [
+      { kind: 'frame', a: [0, 0.5, -24], b: [0, 106, -24] },
+      { kind: 'frame', a: [0, 0.5, 24], b: [0, 106, 24] },
+      { kind: 'bar', a: [0, 105, -24], b: [0, 105, 24] },
+    ],
+    poses: [
+      {
+        at: [0.68, 55.74], trunk: 93, head: 91,
+        thigh: [-91, 25], shin: [-93, 12], foot: 0,
+        upperArm: 90, forearm: 90, hand: [20, 0],
+        wrist: [-3.76, 103.63, 13.5], farWrist: [-3.76, 103.63, -13.5],
+      },
+      {
+        at: [1.65, 78.35], trunk: 90.5, head: 90,
+        thigh: [-99, 25], shin: [-103, 12], foot: 0,
+        upperArm: 90, forearm: 90, hand: [20, 0],
+        wrist: [-3.76, 103.63, 13.5], farWrist: [-3.76, 103.63, -13.5],
+      },
+    ],
+  },
+  // Chin-up (13): underhand grip around shoulder width from a full hang,
+  // driving the elbows down toward the ribs to bring the upper chest to the bar
+  // without reaching with the chin.
+  'chin-up': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 32,
+    originX: 48,
+    feet: 'free',
+    elbowPole: [-65, 10],
+    closeUp: { at: [-30, 88], r: 12, scale: 4.0, zoom: 1, open: 0, palm: 'underhand' },
+    equipment: [
+      { kind: 'frame', a: [0, 0.5, -24], b: [0, 106, -24] },
+      { kind: 'frame', a: [0, 0.5, 24], b: [0, 106, 24] },
+      { kind: 'bar', a: [0, 105, -24], b: [0, 105, 24] },
+    ],
+    poses: [
+      {
+        at: [0.46, 55.61], trunk: 93, head: 91,
+        thigh: -91, shin: -93, foot: 0,
+        upperArm: 90, forearm: 90, hand: [160, 0],
+        wrist: [3.76, 103.63, 9.5], farWrist: [3.76, 103.63, -9.5],
+      },
+      {
+        at: [1.36, 79.2], trunk: 102, head: 100,
+        thigh: -85, shin: -92, foot: 0,
+        upperArm: 90, forearm: 90, hand: [160, 0],
+        wrist: [3.76, 103.63, 9.5], farWrist: [3.76, 103.63, -9.5],
+      },
+    ],
+  },
+  // Pull-Up (71): overhand grip just outside the shoulders from a dead hang,
+  // driving the elbows down and back until the chin clears the bar without reaching.
+  'pull-up': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 32,
+    originX: 48,
+    feet: 'free',
+    elbowPole: [-129, 44],
+    closeUp: { at: [-30, 88], r: 12, scale: 4.0, zoom: 1, open: 0, palm: 'overhand' },
+    equipment: [
+      { kind: 'frame', a: [0, 0.5, -24], b: [0, 106, -24] },
+      { kind: 'frame', a: [0, 0.5, 24], b: [0, 106, 24] },
+      { kind: 'bar', a: [0, 105, -24], b: [0, 105, 24] },
+    ],
+    poses: [
+      {
+        at: [0.87, 55.96], trunk: 93, head: 91,
+        thigh: -91, shin: -93, foot: 0,
+        upperArm: 90, forearm: 90, hand: [20, 0],
+        wrist: [-3.76, 103.63, 14.5], farWrist: [-3.76, 103.63, -14.5],
+      },
+      {
+        at: [1.55, 78.32], trunk: 94, head: 93,
+        thigh: -92, shin: -96, foot: 0,
+        upperArm: 90, forearm: 90, hand: [20, 0],
+        wrist: [-3.76, 103.63, 14.5], farWrist: [-3.76, 103.63, -14.5],
+      },
+    ],
+  },
+  // V-Bar Pulldown (108): seated with thighs locked under the pad, neutral
+  // V-bar, small lean back with chest tall, pulling the handle to the upper chest.
+  'v-bar-pulldown': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 38,
+    originX: 40,
+    implement: 'vBar',
+    elbowPole: [-125, 12],
+    closeUp: { at: [-26, 68], r: 12, scale: 4.0, zoom: 1, open: 0, palm: 'neutral' },
+    weightStack: { x: 30, baseTop: 10.5, minClearance: 4.5, stroke: 24 },
+    lines: [{ from: PULLDOWN.pulley, to: 'midGrip' }],
+    equipment: [
+      { kind: 'frame', a: [PULLDOWN.pulley[0], 0.5], b: PULLDOWN.pulley },
+      { kind: 'pulley', at: PULLDOWN.pulley },
+      { kind: 'post', at: [16, CHAIN_SEATED_HIP + CHAIN_THIGH_HALF + 4] },
+      { kind: 'roller', at: [14, CHAIN_SEATED_HIP + CHAIN_THIGH_HALF + 2.8] },
+      ...chainFlatBench(-12, 8, CHAIN_SEATED_HIP - CHAIN_THIGH_HALF),
+    ],
+    poses: [
+      {
+        at: PULLDOWN_HIP, trunk: PULLDOWN.back, head: 98, thigh: 0, shin: -90,
+        upperArm: 80, forearm: 80,
+        wrist: [0.5, 71.22, 3], farWrist: [0.5, 71.22, -3],
+      },
+      {
+        at: PULLDOWN_HIP, trunk: PULLDOWN.back, head: 98, thigh: 0, shin: -90,
+        upperArm: 80, forearm: 80,
+        wrist: [PULLDOWN_CHEST[0], PULLDOWN_CHEST[1], 3], farWrist: [PULLDOWN_CHEST[0], PULLDOWN_CHEST[1], -3],
+      },
+    ],
+  },
+  // Full Range-Of-Motion Lat Pulldown (209): seated on a bench between two high
+  // pulleys, taking the opposite handle in each hand so the arms cross overhead,
+  // then pulling down in a wide arc with elbows driven down and in.
+  'full-range-of-motion-lat-pulldown': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 68,
+    originX: 50,
+    implement: 'handles',
+    farArmOver: true,
+    closeUp: { at: [-34, 68], r: 12, scale: 4.0, zoom: 1, open: 0, palm: 'turn' },
+    lines: [
+      { from: [0, 92, -38], to: 'nearGrip', depth: 'far' },
+      { from: [0, 92, 38], to: 'farGrip' },
+    ],
+    equipment: [
+      { kind: 'frame', a: [0, 0.5, -38], b: [0, 92, -38] },
+      { kind: 'frame', a: [0, 0.5, 38], b: [0, 92, 38] },
+      { kind: 'pulley', at: [0, 92, -38] },
+      { kind: 'pulley', at: [0, 92, 38] },
+      ...chainFlatBench(-10, 8, CHAIN_SEATED_HIP - CHAIN_THIGH_HALF),
+    ],
+    poses: [
+      {
+        at: [0, CHAIN_SEATED_HIP], trunk: 94, head: 94, thigh: [0, 10], shin: -90,
+        upperArm: [86, -28], forearm: [86, -28],
+        farUpperArm: [80, -28], farForearm: [80, -28],
+        hand: [0, 0],
+      },
+      {
+        at: [0, CHAIN_SEATED_HIP], trunk: 94, head: 94, thigh: [0, 10], shin: -90,
+        upperArm: [86, 152], forearm: [86, 62],
+        farUpperArm: [80, 152], farForearm: [80, 62],
+        hand: [0, -90],
+      },
+    ],
+  },
+  // Straight-Arm Pulldown (77): standing facing a high cable with a small
+  // braced hinge, arms extended at shoulder height with one fixed soft elbow
+  // bend, sweeping the bar down in an arc until the hands reach the thighs.
+  'straight-arm-pulldown': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 42,
+    implement: 'cableBar',
+    lines: [{ from: [38, 92], to: 'midGrip' }],
+    equipment: [
+      { kind: 'frame', a: [38, 0.5], b: [38, 92] },
+      { kind: 'pulley', at: [38, 92] },
+    ],
+    poses: [
+      {
+        at: [
+          -CHAIN_THIGH * Math.cos(chainRad(-84)) - CHAIN_SHIN * Math.cos(chainRad(-96)),
+          CHAIN_ANKLE_HEIGHT - CHAIN_THIGH * Math.sin(chainRad(-84)) - CHAIN_SHIN * Math.sin(chainRad(-96)),
+        ],
+        trunk: 78, head: 84, thigh: -84, shin: -96,
+        upperArm: [-5, -6], forearm: [7, -6],
+      },
+      {
+        at: [
+          -CHAIN_THIGH * Math.cos(chainRad(-84)) - CHAIN_SHIN * Math.cos(chainRad(-96)),
+          CHAIN_ANKLE_HEIGHT - CHAIN_THIGH * Math.sin(chainRad(-84)) - CHAIN_SHIN * Math.sin(chainRad(-96)),
+        ],
+        trunk: 78, head: 84, thigh: -84, shin: -96,
+        upperArm: [-95, -6], forearm: [-83, -6],
+      },
+    ],
+  },
+  // Gorilla Chin/Crunch (211): hanging with an underhand grip slightly wider
+  // than the shoulders and knees bent so the shins are level with the floor;
+  // pulling up while drawing the knees up until the knees are at chest height
+  // and the nose is level with the bar.
+  'gorilla-chin-crunch': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 32,
+    originX: 48,
+    feet: 'free',
+    spine: 'lower',
+    trunkAt: 'neck',
+    elbowPole: [-65, 16],
+    closeUp: { at: [-30, 88], r: 12, scale: 4.0, zoom: 1, open: 0, palm: 'underhand' },
+    equipment: [
+      { kind: 'frame', a: [0, 0.5, -24], b: [0, 106, -24] },
+      { kind: 'frame', a: [0, 0.5, 24], b: [0, 106, 24] },
+      { kind: 'bar', a: [0, 105, -24], b: [0, 105, 24] },
+    ],
+    poses: [
+      {
+        at: [1.73, 55.5], trunk: 93, curl: 0, head: 91,
+        thigh: -90, shin: -180, foot: -90,
+        upperArm: 90, forearm: 90, hand: [160, 0],
+        wrist: [3.76, 103.63, 11.5], farWrist: [3.76, 103.63, -11.5],
+      },
+      {
+        at: [-2.15, 65.0], trunk: 96.5, curl: 13, head: 93.5,
+        thigh: -28, shin: -133, foot: -43,
+        upperArm: 90, forearm: 90, hand: [160, 0],
+        wrist: [3.76, 103.63, 11.5], farWrist: [3.76, 103.63, -11.5],
+      },
+      {
+        at: [-1.15, 74.4], trunk: 100, curl: 26, head: 96,
+        thigh: 34, shin: -86, foot: 4,
+        upperArm: 90, forearm: 90, hand: [160, 0],
+        wrist: [3.76, 103.63, 11.5], farWrist: [3.76, 103.63, -11.5],
+      },
+    ],
+  },
+  // Hanging Leg Raise (64): overhand hang with arms and legs straight, curling
+  // the pelvis up toward the ribs to raise the straight legs above parallel.
+  'hanging-leg-raise': {
+    root: 'neck',
+    view: 'oblique',
+    yawDeg: 30,
+    originX: 46,
+    feet: 'free',
+    spine: 'lower',
+    trunkAt: 'neck',
+    elbowPole: [-90, 35],
+    closeUp: { at: [-30, 88], r: 12, scale: 4.0, zoom: 1, open: 0, palm: 'overhand' },
+    equipment: [
+      { kind: 'frame', a: [0, 0.5, -24], b: [0, 106, -24] },
+      { kind: 'frame', a: [0, 0.5, 24], b: [0, 106, 24] },
+      { kind: 'bar', a: [0, 105, -24], b: [0, 105, 24] },
+    ],
+    poses: [
+      {
+        at: [-0.06, 79.45], trunk: 91, curl: 0, head: 90,
+        thigh: -90, shin: -90, foot: 0,
+        upperArm: 90, forearm: 90, hand: [20, 0],
+        wrist: [-3.76, 103.63, 10.5], farWrist: [-3.76, 103.63, -10.5],
+      },
+      {
+        at: [-3.20, 79.18], trunk: 86, curl: 9, head: 90,
+        thigh: -54, shin: -54, foot: 36,
+        upperArm: 90, forearm: 90, hand: [20, 0],
+        wrist: [-3.76, 103.63, 10.5], farWrist: [-3.76, 103.63, -10.5],
+      },
+      {
+        at: [-4.86, 79.19], trunk: 81, curl: 18, head: 90,
+        thigh: -18, shin: -18, foot: 72,
+        upperArm: 90, forearm: 90, hand: [20, 0],
+        wrist: [-3.76, 103.63, 10.5], farWrist: [-3.76, 103.63, -10.5],
+      },
+      {
+        at: [-4.18, 79.17], trunk: 76, curl: 28, head: 90,
+        thigh: 18, shin: 18, foot: 108,
+        upperArm: 90, forearm: 90, hand: [20, 0],
+        wrist: [-3.76, 103.63, 10.5], farWrist: [-3.76, 103.63, -10.5],
+      },
+    ],
+  },
+  // MOV-A13: single-leg and calf raises (18, 36, 56, 136, 194, 239, 67, 96).
+  // 18 Bulgarian Split Squat: rear foot elevated on a bench behind, front foot
+  // forward so the front shin is vertical at the bottom; lower straight down
+  // until the back knee nearly touches the floor, then drive through the front
+  // heel to stand.
+  'bulgarian-split-squat': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 18,
+    originX: 50,
+    feet: 'free',
+    kneePole: 0,
+    equipment: chainFlatBench(-34, -16, 12.0),
+    poses: [
+      {
+        at: [0.0, 44.50], trunk: 88, head: 90, thigh: -90, shin: -90,
+        ankle: [13.5, CHAIN_ANKLE_HEIGHT], farAnkle: [-18.5, 13.0],
+        foot: 0, farFoot: 180,
+        upperArm: [-80, 10], forearm: [65, -16],
+      },
+      {
+        at: [-1.88, 35.00], trunk: 86, head: 90, thigh: -90, shin: -90,
+        ankle: [13.5, CHAIN_ANKLE_HEIGHT], farAnkle: [-18.5, 13.0],
+        foot: 0, farFoot: 180,
+        upperArm: [-80, 10], forearm: [65, -16],
+      },
+      {
+        at: [0.18, 25.50], trunk: 84, head: 90, thigh: -90, shin: -90,
+        ankle: [13.5, CHAIN_ANKLE_HEIGHT], farAnkle: [-18.5, 13.0],
+        foot: 0, farFoot: 180,
+        upperArm: [-80, 10], forearm: [65, -16],
+      },
+    ],
+  },
+  // 36 Barbell Step-Up: bar across upper back, one whole foot on the box, drive
+  // through the lead heel to stand on the box without pushing off the trailing
+  // foot, and step down under control.
+  'barbell-step-up': {
+    root: 'ankle',
+    view: 'oblique',
+    yawDeg: 18,
+    originX: 50,
+    feet: 'free',
+    implement: 'bar',
+    armsFollowTrunk: true,
+    equipment: [{ kind: 'box', a: [-2, 0.5], b: [14, 20.0] }],
+    poses: [
+      {
+        at: [0, 20.0 + CHAIN_ANKLE_HEIGHT], trunk: 60, head: 84,
+        thigh: -10, shin: -136, foot: 0,
+        farThigh: -78, farShin: -138, farFoot: -29.61,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+      {
+        at: [0, 20.0 + CHAIN_ANKLE_HEIGHT], trunk: 72, head: 88,
+        thigh: -48, shin: -124, foot: 0,
+        farThigh: -92, farShin: -126, farFoot: -28,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+      {
+        at: [0, 20.0 + CHAIN_ANKLE_HEIGHT], trunk: 86, head: 90,
+        thigh: -88, shin: -93, foot: 0,
+        farThigh: -100, farShin: -112, farFoot: -24,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+    ],
+  },
+  // 56 Dumbbell Step-Up: dumbbells at sides, whole lead foot on the box, drive
+  // through the lead heel to stand tall on the box, and lower back down slowly.
+  'dumbbell-step-up': {
+    root: 'ankle',
+    view: 'oblique',
+    yawDeg: 18,
+    originX: 50,
+    feet: 'free',
+    implement: 'bells',
+    bellAxis: [1, 0, 0],
+    equipment: [{ kind: 'box', a: [-2, 0.5], b: [14, 20.0] }],
+    poses: [
+      {
+        at: [0, 20.0 + CHAIN_ANKLE_HEIGHT], trunk: 60, head: 84,
+        thigh: -10, shin: -136, foot: 0,
+        farThigh: -78, farShin: -138, farFoot: -29.61,
+        upperArm: [-90, 8], forearm: [-90, 6],
+      },
+      {
+        at: [0, 20.0 + CHAIN_ANKLE_HEIGHT], trunk: 72, head: 88,
+        thigh: -48, shin: -124, foot: 0,
+        farThigh: -92, farShin: -126, farFoot: -28,
+        upperArm: [-90, 8], forearm: [-90, 6],
+      },
+      {
+        at: [0, 20.0 + CHAIN_ANKLE_HEIGHT], trunk: 86, head: 90,
+        thigh: -88, shin: -93, foot: 0,
+        farThigh: -100, farShin: -112, farFoot: -24,
+        upperArm: [-90, 8], forearm: [-90, 6],
+      },
+    ],
+  },
+  // 136 Barbell Lunge: unrack the bar across the upper traps and step clear of
+  // the rack, step forward with the lead leg, lower the hips straight down
+  // until both knees bend to about 90 degrees and the back knee hovers above
+  // the floor, then drive through the front heel to return to standing.
+  'barbell-lunge': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 18,
+    originX: 48,
+    feet: 'free',
+    kneePole: 0,
+    implement: 'bar',
+    armsFollowTrunk: true,
+    equipment: [
+      { kind: 'frame', a: [-22, 0.5, 11], b: [-22, 76, 11] },
+      { kind: 'frame', a: [-22, 0.5, -11], b: [-22, 76, -11] },
+      { kind: 'bar', a: [-22, 66, 11], b: [-19, 66, 11] },
+      { kind: 'bar', a: [-22, 66, -11], b: [-19, 66, -11] },
+    ],
+    poses: [
+      {
+        // The front foot is lifted on its way forward; the rear foot's ball stays where it stood.
+        at: [-6.2, 46.60], trunk: 89, head: 90, thigh: -90, shin: -90,
+        ankle: [-6.0, CHAIN_ANKLE_HEIGHT], farAnkle: [-6.0, CHAIN_ANKLE_HEIGHT], ankleArc: 5,
+        foot: 0, farFoot: 0,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+      {
+        at: [10.44, 41.20], trunk: 89, head: 90, thigh: -90, shin: -90,
+        ankle: [26.94, CHAIN_ANKLE_HEIGHT], farAnkle: [-5.06, 5.21],
+        foot: 0, farFoot: -34.4,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+      {
+        at: [10.44, 24.80], trunk: 89, head: 90, thigh: -90, shin: -90,
+        ankle: [26.94, CHAIN_ANKLE_HEIGHT], farAnkle: [-5.06, 5.21],
+        foot: 0, farFoot: -34.4,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+    ],
+  },
+  // 194 Elevated Back Lunge: stand on a low platform inside the rack with the
+  // barbell across the upper back, step one foot back off the platform onto the
+  // floor and lower until the rear knee touches the ground, then drive through
+  // the front foot on the platform to return to standing and alternate legs.
+  'elevated-back-lunge': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 18,
+    originX: 52,
+    feet: 'free',
+    kneePole: 0,
+    implement: 'bar',
+    armsFollowTrunk: true,
+    // The platform starts just behind the heels; the stepping foot is lifted
+    // off its edge and the back knee lands well behind it.
+    equipment: [
+      { kind: 'box', a: [6, 0.5], b: [22, 6.0] },
+      { kind: 'frame', a: [24, 0.5, 11], b: [24, 82, 11] },
+      { kind: 'frame', a: [24, 0.5, -11], b: [24, 82, -11] },
+    ],
+    poses: [
+      {
+        at: [-6.0, 24.40], trunk: 86, head: 90, thigh: -90, shin: -90,
+        ankle: [-33.63, 5.21], farAnkle: [10.0, 6.0 + CHAIN_ANKLE_HEIGHT], ankleArc: 6,
+        foot: -34.4, farFoot: 0,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+      {
+        at: [9.8, 52.60], trunk: 89, head: 90, thigh: -90, shin: -90,
+        ankle: [10.0, 6.0 + CHAIN_ANKLE_HEIGHT], farAnkle: [10.0, 6.0 + CHAIN_ANKLE_HEIGHT], farAnkleArc: 6,
+        foot: 0, farFoot: 0,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+      {
+        at: [-6.0, 24.40], trunk: 86, head: 90, thigh: -90, shin: -90,
+        ankle: [10.0, 6.0 + CHAIN_ANKLE_HEIGHT], farAnkle: [-33.63, 5.21],
+        foot: 0, farFoot: -34.4,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+    ],
+  },
+  // 239 Lunge Pass Through: stand holding a kettlebell in one hand, step
+  // forward with the opposite foot and lower the back knee toward the floor,
+  // pass the kettlebell under the front thigh to the other hand, and push
+  // through the front heel to return to standing before repeating on the
+  // other side. The bell is always in a hand: the carrying hand brings it
+  // between the legs, the other hand meets it there and takes it, then swings
+  // it down under the front thigh and out, clear of both legs at every tick.
+  'lunge-pass-through': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 22,
+    originX: 48,
+    cycle: true,
+    feet: 'free',
+    kneePole: 0,
+    implement: 'kettlebell',
+    kettlebellHang: true,
+    farArmOver: true,
+    // A forward lunge: the front foot is lifted and stepped forward, and the
+    // rear foot's ball stays where it stood while its heel rises.
+    poses: [
+      {
+        // Standing, the bell in the near hand beside the near thigh; it is carried forward and in around that thigh.
+        at: [-4.2, 46.60], trunk: 89, head: 90, thigh: -90, shin: -90,
+        ankle: [-4.0, CHAIN_ANKLE_HEIGHT], farAnkle: [-4.0, CHAIN_ANKLE_HEIGHT], farAnkleArc: 5,
+        foot: 0, farFoot: 0,
+        upperArm: [-90, 0], forearm: [-90, 0],
+        wrist: [-3.6, 46.8, 14.4], farWrist: [-3.6, 46.8, -14.4], wristArc: [5, 0, 5],
+        bellSide: 1,
+      },
+      {
+        // Bottom of the first lunge: both hands meet on the handle between the legs, and the far hand takes it.
+        at: [11.65, 23.60], trunk: 76, head: 88, thigh: -90, shin: -90, twist: -25, shrug: -3,
+        ankle: [-2.35, 6.20], farAnkle: [25.65, CHAIN_ANKLE_HEIGHT],
+        foot: -46, farFoot: 0,
+        upperArm: [-90, 0], forearm: [-90, 0],
+        wrist: [21, 24.5, 2], farWrist: [21, 24.5, 1.2], farWristArc: -2,
+        bellSide: 1, bellPass: [0, 0.02],
+      },
+      {
+        // The far hand has swung the bell down under the front thigh, leaning toward that leg to reach it.
+        at: [11.65, 23.60], trunk: 76, head: 88, thigh: -90, shin: -90, sideCurl: -25, shrug: -3,
+        ankle: [-2.35, 6.20], farAnkle: [25.65, CHAIN_ANKLE_HEIGHT], farAnkleArc: 5,
+        foot: -46, farFoot: 0,
+        upperArm: [-90, 0], forearm: [-90, 0],
+        wrist: [17.5, 25.5, 11], farWrist: [19, 20.3, -7.3], farWristArc: [0, 0, -6],
+        bellSide: -1,
+      },
+      {
+        // Standing, the bell in the far hand; it is carried forward and in around the far thigh.
+        at: [-4.2, 46.60], trunk: 89, head: 90, thigh: -90, shin: -90,
+        ankle: [-4.0, CHAIN_ANKLE_HEIGHT], farAnkle: [-4.0, CHAIN_ANKLE_HEIGHT], ankleArc: 5,
+        foot: 0, farFoot: 0,
+        upperArm: [-90, 0], forearm: [-90, 0],
+        wrist: [-3.6, 46.8, 14.4], farWrist: [-3.6, 46.8, -14.4], farWristArc: [5, 0, -5],
+        bellSide: -1,
+      },
+      {
+        // Bottom of the second lunge: the hands meet between the legs and the near hand takes the bell.
+        at: [11.65, 23.60], trunk: 76, head: 88, thigh: -90, shin: -90, twist: 25, shrug: -3,
+        ankle: [25.65, CHAIN_ANKLE_HEIGHT], farAnkle: [-2.35, 6.20],
+        foot: 0, farFoot: -46,
+        upperArm: [-90, 0], forearm: [-90, 0],
+        wrist: [21, 24.5, -1.2], farWrist: [21, 24.5, -2], wristArc: -2,
+        bellSide: -1, bellPass: [0, 0.02],
+      },
+      {
+        // The near hand has swung the bell down under the front thigh and carries it out to stand.
+        at: [11.65, 23.60], trunk: 76, head: 88, thigh: -90, shin: -90, sideCurl: 25, shrug: -3,
+        ankle: [25.65, CHAIN_ANKLE_HEIGHT], farAnkle: [-2.35, 6.20], ankleArc: 5,
+        foot: 0, farFoot: -46,
+        upperArm: [-90, 0], forearm: [-90, 0],
+        wrist: [19, 20.3, 7.3], farWrist: [17.5, 25.5, -11], wristArc: [0, 0, 6],
+        bellSide: 1,
+      },
+    ],
+  },
+  // 67 Kettlebell Pistol Squat: hold a kettlebell by the horns at the chest,
+  // extend the free leg straight out in front, sit all the way down on the
+  // standing leg while pressing the bell slightly forward as a counterbalance
+  // and keeping the standing heel flat, then drive through the whole standing
+  // foot to return to the top.
+  'kettlebell-pistol-squat': {
+    root: 'ankle',
+    view: 'oblique',
+    yawDeg: 18,
+    originX: 48,
+    feet: 'free',
+    implement: 'kettlebell',
+    kettlebellHang: true,
+    farArmOver: true,
+    poses: [
+      {
+        at: [0, CHAIN_ANKLE_HEIGHT], trunk: 88, head: 90,
+        thigh: -88, shin: -93, foot: 0,
+        farThigh: -56, farShin: -60, farFoot: 26,
+        upperArm: [-70, -12], forearm: [64, -16],
+        bellSide: 0,
+      },
+      {
+        at: [0, CHAIN_ANKLE_HEIGHT], trunk: 64, head: 84,
+        thigh: -38, shin: -117, foot: 0,
+        farThigh: -18, farShin: -22, farFoot: 60,
+        upperArm: [-44, -11], forearm: [50, -16],
+        bellSide: 0,
+      },
+      {
+        at: [0, CHAIN_ANKLE_HEIGHT], trunk: 54, head: 78,
+        thigh: 10, shin: -119, foot: 0,
+        farThigh: 8, farShin: 4, farFoot: 80,
+        upperArm: [-20, -10], forearm: [40, -16],
+        bellSide: 0,
+      },
+    ],
+  },
+  // 96 Standing Barbell Calf Raise: barbell across upper back, balls of the
+  // feet on a raised block with the heels hanging off the back edge, lower the
+  // heels below the block into a deep calf stretch, then press through the
+  // balls of the feet to rise as high as possible with the knees straight.
+  'standing-barbell-calf-raise': {
+    root: 'toe',
+    view: 'oblique',
+    yawDeg: 18,
+    originX: 48,
+    feet: 'free',
+    implement: 'bar',
+    armsFollowTrunk: true,
+    // Only the ball of the foot is on the block, 1.6 in from its rear edge, so
+    // the heels are free at every tick. The body leans just far enough from
+    // the ankles that the centre of mass, with the bar and without it, stays
+    // over that strip of the foot; the dip and the rise are shown magnified.
+    equipment: [{ kind: 'box', a: [3.8, 0.5], b: [10.4, 6.0] }],
+    footCloseUp: { at: [33.6, 36.9], r: 16, scale: 2, edge: [3.8, 6.0], focus: [2.6, 9.75] },
+    poses: [
+      {
+        at: [5.4, 6.0 + CHAIN_FOREFOOT_HEIGHT], trunk: 88, head: 90,
+        thigh: -96.11, shin: -97.11, foot: 0,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+      {
+        at: [5.4, 6.0 + CHAIN_FOREFOOT_HEIGHT], trunk: 88, head: 90,
+        thigh: -95.85, shin: -96.85, foot: 28,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+      {
+        at: [5.4, 6.0 + CHAIN_FOREFOOT_HEIGHT], trunk: 88, head: 90,
+        thigh: -94.76, shin: -95.76, foot: -42,
+        upperArm: [-102, 22], forearm: [88, 12],
+      },
+    ],
+  },
+  // 33 Barbell Ab Rollout: kneel behind a loaded barbell with small plates and
+  // a shoulder-width grip, brace hard with the pelvis tucked, roll the bar
+  // forward as far as possible without the hips sagging, and pull back to the knees.
+  'barbell-ab-rollout': {
+    root: 'ankle',
+    view: 'oblique',
+    yawDeg: 14,
+    originX: 48,
+    feet: 'free',
+    implement: 'bar',
+    // From the bar just in front of the knees with the hips sat back, out to
+    // full reach: each pose puts the straight-armed, shoulder-width grip on the
+    // floor, close enough together that the plates never leave it in between.
+    poses: [
+      {
+        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 23.94, curl: 16, head: 2,
+        thigh: -62, shin: 180, foot: 180,
+        upperArm: [-105.52, 0], forearm: [-105.52, 0],
+      },
+      {
+        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 21.48, curl: 15.5, head: 2,
+        thigh: -72.28, shin: 180, foot: 180,
+        upperArm: [-97.91, 0], forearm: [-97.91, 0],
+      },
+      {
+        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 19.72, curl: 15, head: 2,
+        thigh: -82.19, shin: 180, foot: 180,
+        upperArm: [-90.4, 0], forearm: [-90.4, 0],
+      },
+      {
+        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 18.56, curl: 14.5, head: 2,
+        thigh: -92, shin: 180, foot: 180,
+        upperArm: [-83.08, 0], forearm: [-83.08, 0],
+      },
+      {
+        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 17.96, curl: 14, head: 2,
+        thigh: -101.91, shin: 180, foot: 180,
+        upperArm: [-75.45, 0], forearm: [-75.45, 0],
+      },
+      {
+        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 16.43, curl: 13.5, head: 2,
+        thigh: -110, shin: 180, foot: 180,
+        upperArm: [-65.69, 0], forearm: [-65.69, 0],
+      },
+      {
+        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 15.41, curl: 13, head: 1,
+        thigh: -120, shin: 180, foot: 180,
+        upperArm: [-56.24, 0], forearm: [-56.24, 0],
+      },
+      {
+        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 14.14, curl: 12.5, head: 1,
+        thigh: -131, shin: 180, foot: 180,
+        upperArm: [-45.49, 0], forearm: [-45.49, 0],
+      },
+      {
+        at: [-40.25, CHAIN_KNEELING_KNEE], trunk: 12.35, curl: 12, head: 0,
+        thigh: -144, shin: 180, foot: 180,
+        upperArm: [-32.38, 0], forearm: [-32.38, 0],
+      },
+    ],
+  },
+  // 137 Barbell Rollout from Bench: kneel on a bench with a loaded barbell on
+  // the floor at the end of it, keep the arms straight while the hips extend
+  // and the bar rolls forward until the arms reach overhead, then pull the bar
+  // back under the shoulders.
+  'barbell-rollout-from-bench': {
+    root: 'ankle',
+    view: 'oblique',
+    yawDeg: 14,
+    originX: 52,
+    feet: 'free',
+    implement: 'bar',
+    equipment: chainFlatBench(-46, -18, 9.0),
+    poses: [
+      {
+        at: [-44.25, 9.0 + CHAIN_KNEELING_KNEE], trunk: -0.63, curl: 14, head: -14,
+        thigh: -108, shin: 180, foot: 180,
+        upperArm: [-84.22, 0], forearm: [-84.22, 0],
+      },
+      {
+        at: [-44.25, 9.0 + CHAIN_KNEELING_KNEE], trunk: 0.95, curl: 13, head: -10,
+        thigh: -119, shin: 180, foot: 180,
+        upperArm: [-73.88, 0], forearm: [-73.88, 0],
+      },
+      {
+        at: [-44.25, 9.0 + CHAIN_KNEELING_KNEE], trunk: 1.93, curl: 12, head: -6,
+        thigh: -130, shin: 180, foot: 180,
+        upperArm: [-62.51, 0], forearm: [-62.51, 0],
+      },
+      {
+        at: [-44.25, 9.0 + CHAIN_KNEELING_KNEE], trunk: 2.07, curl: 11, head: -4,
+        thigh: -140.44, shin: 180, foot: 180,
+        upperArm: [-51.34, 0], forearm: [-51.34, 0],
+      },
+      {
+        at: [-44.25, 9.0 + CHAIN_KNEELING_KNEE], trunk: 1.81, curl: 10, head: -6,
+        thigh: -152, shin: 180, foot: 180,
+        upperArm: [-39.25, 0], forearm: [-39.25, 0],
+      },
+    ],
+  },
+  // 119 Decline Crunch: secure the legs on a decline bench, fingertips resting
+  // lightly beside the temples, press the lower back into the pad and curl the
+  // shoulder blades up to bring the ribs toward the pelvis without sitting tall.
+  'decline-crunch': {
+    root: 'hip',
+    spine: 'upper',
+    feet: 'free',
+    armsFollowTrunk: true,
+    nearArmOverHead: true,
+    equipment: chainDeclineBench(DECLINE_EXTENSION_HIP, DECLINE_EXTENSION_DEG, DECLINE_EXTENSION_ANKLE),
+    poses: [
+      { ...DECLINE_EXTENSION_BODY, curl: 0, ...HANDS_BY_EARS },
+      { ...DECLINE_EXTENSION_BODY, curl: 58, ...HANDS_BY_EARS },
+    ],
+  },
+  // 204 Frog Sit-Ups: lie on the back with the soles of the feet together and
+  // the knees dropped out to the sides, arms crossed over the chest, lower back
+  // flattened to the floor, curling the head and shoulders up a short way.
+  'frog-sit-ups': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 38,
+    originX: 48,
+    spine: 'upper',
+    feet: 'free',
+    kneePole: [52, 64],
+    armsFollowTrunk: true,
+    poses: [
+      {
+        at: [-10, CHAIN_LYING_HEIGHT], trunk: 180, curl: 0,
+        thigh: 0, shin: 0,
+        ankle: [16.0, CHAIN_ANKLE_HEIGHT, 1.6], farAnkle: [16.0, CHAIN_ANKLE_HEIGHT, -1.6],
+        foot: [0, -16], farFoot: [0, -16],
+        upperArm: [-68, -14], forearm: [32, -42],
+      },
+      {
+        at: [-10, CHAIN_LYING_HEIGHT], trunk: 180, curl: 40,
+        thigh: 0, shin: 0,
+        ankle: [16.0, CHAIN_ANKLE_HEIGHT, 1.6], farAnkle: [16.0, CHAIN_ANKLE_HEIGHT, -1.6],
+        foot: [0, -16], farFoot: [0, -16],
+        upperArm: [-68, -14], forearm: [32, -42],
+      },
+    ],
+  },
+  // 149 Bent-Arm Dumbbell Pullover: lie perpendicular across a flat bench with
+  // only the shoulders on the surface, hips low and feet flat on the floor;
+  // hold one dumbbell over the chest with both palms against the underside and
+  // the elbows bent at a fixed angle, lowering in an arc behind the head.
+  'bent-arm-dumbbell-pullover': {
+    root: 'neck',
+    view: 'oblique',
+    yawDeg: 18,
+    originX: 54,
+    kneePole: 90,
+    implement: 'bell',
+    bellAxis: [1, 0, 0],
+    nearArmOverHead: true,
+    farArmOver: true,
+    // The bench's front edge sits under the shoulder blades, and the rigid
+    // trunk rests on that edge, sloping down to the low hips.
+    equipment: chainFlatBench(-29, -15, 18.0),
+    poses: [
+      {
+        at: [-17.0, 18.0 + CHAIN_BACK_HALF + PULLOVER_BENCH_LIFT], trunk: 164, head: 180,
+        thigh: 0, shin: -90, ankle: [23.0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [36, -24], forearm: [84, -24],
+      },
+      {
+        at: [-17.0, 18.0 + CHAIN_BACK_HALF + PULLOVER_BENCH_LIFT], trunk: 164, head: 180,
+        thigh: 0, shin: -90, ankle: [23.0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [134, -24], forearm: [182, -24],
+      },
+    ],
+  },
+  // 289 Straight-Arm Dumbbell Pullover: the same perpendicular setup across a
+  // flat bench with only the shoulders on the surface, hips low and feet flat,
+  // holding one dumbbell at full elbow extension through a wider arc behind the head.
+  'straight-arm-dumbbell-pullover': {
+    root: 'neck',
+    view: 'oblique',
+    yawDeg: 18,
+    originX: 54,
+    kneePole: 90,
+    implement: 'bell',
+    bellAxis: [1, 0, 0],
+    nearArmOverHead: true,
+    farArmOver: true,
+    // The bench's front edge sits under the shoulder blades, and the rigid
+    // trunk rests on that edge, sloping down to the low hips.
+    equipment: chainFlatBench(-29, -15, 18.0),
+    poses: [
+      {
+        at: [-17.0, 18.0 + CHAIN_BACK_HALF + PULLOVER_BENCH_LIFT], trunk: 164, head: 180,
+        thigh: 0, shin: -90, ankle: [23.0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [61, -22.5], forearm: [61, -22.5],
+      },
+      {
+        at: [-17.0, 18.0 + CHAIN_BACK_HALF + PULLOVER_BENCH_LIFT], trunk: 164, head: 180,
+        thigh: 0, shin: -90, ankle: [23.0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [168, -22.5], forearm: [168, -22.5],
+      },
+    ],
+  },
+  // 148 Bent-Arm Barbell Pullover: lie along a flat bench holding a barbell
+  // with a shoulder-width grip over the chest and a fixed bend in the elbows,
+  // lowering in an arc behind the head and pulling back to pause over the chest.
+  'bent-arm-barbell-pullover': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 18,
+    originX: 54,
+    kneePole: 90,
+    implement: 'bar',
+    nearArmOverHead: true,
+    farArmOver: true,
+    equipment: chainFlatBench(-20, 12, 18.0),
+    poses: [
+      {
+        at: [8.0, 18.0 + CHAIN_BACK_HALF], trunk: 180, head: 180,
+        thigh: 0, shin: -90, ankle: [25.0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [52, 0], forearm: [100, 0],
+      },
+      {
+        at: [8.0, 18.0 + CHAIN_BACK_HALF], trunk: 180, head: 180,
+        thigh: 0, shin: -90, ankle: [25.0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [148, 0], forearm: [196, 0],
+      },
+    ],
+  },
+  // 201 Flat Bench Cable Flyes: lie on a flat bench centered between two low
+  // pulleys holding a D-handle in each hand, begin with the arms wide in a soft
+  // elbow bend and sweep the hands together in a wide arc above the chest.
+  'flat-bench-cable-flyes': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 42,
+    originX: 52,
+    kneePole: 90,
+    implement: 'handles',
+    nearArmOverHead: true,
+    farArmOver: true,
+    // The pulleys line up with the chest, and the arms sweep in the chest's
+    // plane, so the hands meet above it rather than above the shoulders.
+    lines: [
+      { from: [-10, 4.5, 32], to: 'nearGrip' },
+      { from: [-10, 4.5, -32], to: 'farGrip', depth: 'far' },
+    ],
+    equipment: [
+      ...chainFlatBench(-20, 12, 18.0),
+      { kind: 'frame', a: [-10, 0.5, 32], b: [-10, 14, 32] },
+      { kind: 'frame', a: [-10, 0.5, -32], b: [-10, 14, -32] },
+      { kind: 'pulley', at: [-10, 4.5, 32] },
+      { kind: 'pulley', at: [-10, 4.5, -32] },
+    ],
+    poses: [
+      {
+        at: [8.0, 18.0 + CHAIN_BACK_HALF], trunk: 180, head: 180,
+        thigh: 0, shin: -90, ankle: [25.0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [83, 94], forearm: [83, 70],
+      },
+      {
+        at: [8.0, 18.0 + CHAIN_BACK_HALF], trunk: 180, head: 180,
+        thigh: 0, shin: -90, ankle: [25.0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [83, -10], forearm: [83, -34],
+      },
+    ],
+  },
+  // 217 Incline Cable Flye: lie on an incline bench (35 degrees) centered
+  // between two low pulleys holding a D-handle in each hand, begin with the
+  // hands together above the face, open the arms wide in a broad arc with a
+  // fixed slight bend in the elbows, and sweep the hands back together.
+  'incline-cable-flye': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 42,
+    originX: 52,
+    kneePole: 90,
+    implement: 'handles',
+    nearArmOverHead: true,
+    farArmOver: true,
+    lines: [
+      { from: [-13.66, 4.5, 32], to: 'nearGrip' },
+      { from: [-13.66, 4.5, -32], to: 'farGrip', depth: 'far' },
+    ],
+    equipment: [
+      ...chainInclineBench([6.0, CHAIN_SEATED_HIP], 145),
+      { kind: 'frame', a: [-13.66, 0.5, 32], b: [-13.66, 14, 32] },
+      { kind: 'frame', a: [-13.66, 0.5, -32], b: [-13.66, 14, -32] },
+      { kind: 'pulley', at: [-13.66, 4.5, 32] },
+      { kind: 'pulley', at: [-13.66, 4.5, -32] },
+    ],
+    poses: [
+      {
+        at: [6.0, CHAIN_SEATED_HIP], trunk: 145, head: 145,
+        thigh: 0, shin: -90, ankle: [22.0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [90, -10], forearm: [90, -34],
+      },
+      {
+        at: [6.0, CHAIN_SEATED_HIP], trunk: 145, head: 145,
+        thigh: 0, shin: -90, ankle: [22.0, CHAIN_ANKLE_HEIGHT],
+        upperArm: [90, 94], forearm: [90, 70],
+      },
+    ],
+  },
+  // 121 Kettlebell Dead Clean: stand over a kettlebell set between the ankles
+  // with hips back and a long spine, drive the floor away to pull the bell from
+  // a dead stop close up the body, receiving it softly in the rack with the
+  // elbow tucked, then set it back on the floor between the feet.
+  'kettlebell-dead-clean': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 28,
+    originX: 50,
+    footSpread: 3.0,
+    implement: 'kettlebell',
+    farArmOver: true,
+    poses: [
+      {
+        at: [-18.5, 19.7], trunk: 28, head: 44,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 12,
+        upperArm: [-91.2, -22], forearm: [-91.2, -22],
+        farUpperArm: [-120, 14], farForearm: [-100, 10],
+      },
+      {
+        at: [-8.5, 36.5], trunk: 68, head: 78,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 8,
+        upperArm: [-146, -14], forearm: [-8, -22],
+        farUpperArm: [-98, 12], farForearm: [-88, 8],
+      },
+      {
+        at: [-0.4, 46.50], trunk: 89, head: 90,
+        thigh: -90, shin: -90, ankle: [0, CHAIN_ANKLE_HEIGHT], kneeOut: 2,
+        upperArm: [-84, -10], forearm: [82, -22],
+        farUpperArm: [-88, 10], farForearm: [-84, 6],
+      },
+    ],
+  },
+  // 231 Kettlebell Turkish Get-Up (Lunge style): lie on the back with one
+  // kettlebell locked out overhead and the same-side knee bent, push up on the
+  // free hand to a seated position, bridge the hips and sweep the straight leg
+  // back under them to one knee, lift the trunk upright, stand, and reverse.
+  // The bell arm stays vertical over its shoulder throughout. Whatever bears
+  // weight is on the floor at every tick: the near foot never moves, and the
+  // free hand stays planted from lying until the trunk lifts off it.
+  'kettlebell-turkish-get-up-lunge-style': {
+    root: 'hip',
+    view: 'oblique',
+    yawDeg: 24,
+    originX: 48,
+    feet: 'free',
+    implement: 'kettlebell',
+    nearArmOverHead: true,
+    farArmOver: true,
+    // The free elbow bends out to the side; each knee bends forward of its leg's line.
+    elbowPole: [0, 90],
+    kneePole: 0,
+    poses: [
+      {
+        // Lying: back and pelvis on the floor, the far leg long on it, the free hand out at the side.
+        at: [-11, 6.30, 0], atArc: 0.5, trunk: 179, head: 155,
+        thigh: 0, shin: 0, ankle: [5, CHAIN_ANKLE_HEIGHT, 6.8], foot: 0,
+        farThigh: 0, farShin: 0, farAnkle: [32.4, 2.4, -6.8], farFoot: 70,
+        upperArm: [90, 0], forearm: [90, 0],
+        farUpperArm: 0, farForearm: 0, farWrist: [-24, 2.25, -23],
+      },
+      {
+        // Seated on the pelvis, side-bent onto the free hand with that shoulder packed down,
+        // the far knee bent with its foot down. On to the knee: the hips bridge and the trunk
+        // hinges forward over the hand while the far foot slides back on its toes.
+        at: [-11, 3.24, 0], atArc: 4.5, trunk: 120, trunkArc: -60, sideCurl: -60, shrug: -4, head: 112,
+        thigh: 0, shin: 0, ankle: [5, CHAIN_ANKLE_HEIGHT, 6.8], foot: 0,
+        farThigh: 0, farShin: 0, farAnkle: [16, 3.1, -6.8], farAnkleArc: 2.08, farFoot: -10,
+        upperArm: [90, 0], forearm: [90, 0],
+        farUpperArm: 0, farForearm: 0, farWrist: [-24, 2.25, -23],
+      },
+      {
+        // One knee down with the hand still on the floor: the trunk, hinged slightly forward,
+        // tips sideways over the hand (hips and all) so the straight arm reaches the floor.
+        at: [-26.768, 27.511, -3.4], atArc: 1.5, trunk: [80, -60], sideCurl: -30, shrug: -2, head: [90, -60],
+        thigh: 0, shin: 0, ankle: [5, CHAIN_ANKLE_HEIGHT, 6.8], foot: 0,
+        farThigh: 0, farShin: 0, farAnkle: [-37.888, 6.84, -6.8], farFoot: -120,
+        upperArm: [90, 0], forearm: [90, 0],
+        farUpperArm: 0, farForearm: 0, farWrist: [-24, 2.25, -23],
+      },
+      {
+        // One knee down, upright; the hips pivot over the planted knee, then rise first as the far foot steps through.
+        at: [-17.939, 25.007, 0], atArc: 4, trunk: 89, head: 106,
+        thigh: 0, shin: 0, ankle: [5, CHAIN_ANKLE_HEIGHT, 6.8], foot: 0,
+        farThigh: 0, farShin: 0, farAnkle: [-37.888, 6.84, -6.8], farAnkleArc: 3, farFoot: -120,
+        upperArm: [90, 0], forearm: [90, 0],
+        farUpperArm: 0, farForearm: 0, farWrist: [-16.339, 34, -12],
+      },
+      {
+        // Standing tall.
+        at: [5, 46.6, 0], trunk: 89, head: 106,
+        thigh: 0, shin: 0, ankle: [5, CHAIN_ANKLE_HEIGHT, 6.8], foot: 0,
+        farThigh: 0, farShin: 0, farAnkle: [5, CHAIN_ANKLE_HEIGHT, -6.8], farFoot: 0,
+        upperArm: [90, 0], forearm: [90, 0],
+        farUpperArm: 0, farForearm: 0, farWrist: [6.4, 47.5, -11],
+      },
+    ],
+  },
   // chain movements are added above this line
 };
 
@@ -3600,7 +7956,8 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters, tu
   const front = view === 'front';
   const count = movement.poses.length;
   const last = count - 1;
-  let t = Math.max(0, Math.min(last, ph));
+  const rawPh = movement.unitPhase === true ? ph * last : ph;
+  let t = Math.max(0, Math.min(last, rawPh));
   let index = Math.min(Math.max(0, last - 1), Math.floor(t));
   let u = last === 0 ? 0 : t - index;
   let next = Math.min(last, index + 1);
@@ -3624,6 +7981,11 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters, tu
     (x === undefined || y === undefined ? undefined : dir(x, y));
   const point = (x: ChainPoint | undefined, y: ChainPoint | undefined, name: string): ChainPoint | undefined => {
     if (x === undefined && y === undefined) return undefined;
+    if (name === 'wrist' || name === 'farWrist') {
+      if (u === 0) return x;
+      if (u === 1) return y;
+      if (x === undefined || y === undefined) return undefined;
+    }
     if (x === undefined || y === undefined || (x[2] === undefined) !== (y[2] === undefined)) {
       throw new Error(`canonicalFigure: '${slug}' gives '${name}' on some poses only`);
     }
@@ -3631,13 +7993,23 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters, tu
     return x[2] === undefined || y[2] === undefined ? flat : [flat[0], flat[1], x[2] + (y[2] - x[2]) * u];
   };
 
-  const at = point(a.at, b.at, 'at') as ChainPoint;
+  const lifted = (p: ChainPoint | undefined, arc: number | ChainVec | undefined): ChainPoint | undefined => {
+    if (p === undefined || arc === undefined || arc === 0) return p;
+    const k = 4 * u * (1 - u);
+    if (typeof arc === 'number') return p[2] === undefined ? [p[0], p[1] + arc * k] : [p[0], p[1] + arc * k, p[2]];
+    return [p[0] + arc[0] * k, p[1] + arc[1] * k, (p[2] ?? 0) + arc[2] * k];
+  };
+  const at = lifted(point(a.at, b.at, 'at'), a.atArc) as ChainPoint;
   const curl = num(a.curl, b.curl);
   const sideCurl = num(a.sideCurl, b.sideCurl);
   const roll = num(a.roll, b.roll);
   const shrug = num(a.shrug, b.shrug);
-  const twist = num(a.twist, b.twist) + roll + turn * (movement.turnWithPhase === true ? Math.max(0, Math.min(1, ph)) : 1);
-  const given = dir(a.trunk, b.trunk);
+  const nearReach = num(a.nearReach, b.nearReach);
+  const retract = num(a.retract, b.retract);
+  const forearmRotation = movement.forearmTurn === true ? turn : movement.palm === 'up' ? 90 : movement.palm === 'down' ? -90 : 0;
+  const twist = num(a.twist, b.twist) + roll + (movement.forearmTurn === true ? 0 : turn * (movement.turnWithPhase === true ? Math.max(0, Math.min(1, ph)) : 1));
+  const blended = dir(a.trunk, b.trunk);
+  const given: readonly [number, number] = a.trunkArc === undefined ? blended : [blended[0] + a.trunkArc * 4 * u * (1 - u), blended[1]];
   const thigh = dir(a.thigh, b.thigh);
   const shin = dir(a.shin, b.shin);
   // Arms that follow the trunk turn by however far the top of the spine has left upright.
@@ -3652,10 +8024,35 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters, tu
   const hand = optDir(a.hand, b.hand);
   const foot = optDir(a.foot, b.foot);
   const farFoot = optDir(a.farFoot ?? a.foot, b.farFoot ?? b.foot);
-  const wristTarget = point(a.wrist, b.wrist, 'wrist');
-  const farWristTarget = point(a.farWrist ?? a.wrist, b.farWrist ?? b.wrist, 'farWrist');
-  const ankleTarget = point(a.ankle, b.ankle, 'ankle');
-  const farAnkleTarget = point(a.farAnkle ?? a.ankle, b.farAnkle ?? b.ankle, 'farAnkle');
+  const wristTarget = lifted(point(a.wrist, b.wrist, 'wrist'), a.wristArc);
+  const farWristTarget = lifted(point(a.farWrist ?? a.wrist, b.farWrist ?? b.wrist, 'farWrist'), a.farWristArc);
+  const ankleTarget = lifted(point(a.ankle, b.ankle, 'ankle'), a.ankleArc);
+  const farAnkleTarget = lifted(point(a.farAnkle ?? a.ankle, b.farAnkle ?? b.ankle, 'farAnkle'), a.farAnkleArc);
+  const footSpread = a.footSpread !== undefined || b.footSpread !== undefined
+    ? num(a.footSpread ?? movement.footSpread, b.footSpread ?? movement.footSpread)
+    : (movement.footSpread ?? 0);
+  const kneeOut = a.kneeOut !== undefined || b.kneeOut !== undefined
+    ? num(a.kneeOut ?? movement.kneeOut, b.kneeOut ?? movement.kneeOut)
+    : (movement.kneeOut ?? 0);
+  const hasPalmYaw = a.palmYaw !== undefined || b.palmYaw !== undefined || a.farPalmYaw !== undefined || b.farPalmYaw !== undefined;
+  const palmYaw = hasPalmYaw ? num(a.palmYaw, b.palmYaw) : undefined;
+  const farPalmYaw = hasPalmYaw ? num(a.farPalmYaw ?? a.palmYaw, b.farPalmYaw ?? b.palmYaw) : undefined;
+  const palmVectors = (deg: number | undefined, side: number): { palmDir?: ChainVec; handleAxis?: ChainVec } => {
+    if (deg === undefined) return {};
+    const r = chainRad(deg);
+    return {
+      palmDir: [Math.cos(r), 0, -side * Math.sin(r)],
+      handleAxis: [Math.sin(r), 0, side * Math.cos(r)],
+    };
+  };
+  const nearPalm = palmVectors(palmYaw, 1);
+  const farPalm = palmVectors(farPalmYaw, -1);
+  // A bell passed from hand to hand changes hands only inside `bellPass`, while the hands are together.
+  const passU = a.bellPass === undefined ? u
+    : Math.max(0, Math.min(1, (u - a.bellPass[0]) / Math.max(1e-9, a.bellPass[1] - a.bellPass[0])));
+  const bellSide = a.bellSide !== undefined || b.bellSide !== undefined
+    ? (a.bellSide ?? 1) + ((b.bellSide ?? 1) - (a.bellSide ?? 1)) * passU
+    : 1;
 
   // The spine, hip to neck, as a run of short steps. A curl turns each step a
   // little further toward the front of the body, so the trunk bends through
@@ -3746,28 +8143,63 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters, tu
     const mid = chainAdd(root, chainUnit(first, side), firstLength);
     return { root, mid, end: chainAdd(mid, chainUnit(second, side), secondLength) };
   };
-  // A shrug lifts both shoulders along the spine; the neck and head stay where they are.
-  const girdleCentre = shrug === 0 ? neck : chainAdd(neck, neckTangent, shrug);
-  const nearArm = limb(chainAdd(girdleCentre, shoulderAxis, shoulderHalf), 1, upperArm, forearm, upperLength, foreLength,
+  // A shrug lifts both shoulders along the spine; dorsal retraction draws them
+  // toward the back of the chest (`-forward`) and pinches them toward the spine.
+  const girdleBase = shrug === 0 ? neck : chainAdd(neck, neckTangent, shrug);
+  const girdleCentre = retract === 0 ? girdleBase : chainAdd(girdleBase, forward, -retract);
+  const effectiveShoulderHalf = Math.max(2, shoulderHalf - retract * 0.35);
+  const nearShoulderBase = chainAdd(girdleCentre, shoulderAxis, effectiveShoulderHalf);
+  const nearShoulderRoot = nearReach === 0 ? nearShoulderBase : chainAdd(nearShoulderBase, [0, -1, 0], nearReach);
+  const nearArm = limb(nearShoulderRoot, 1, upperArm, forearm, upperLength, foreLength,
     wristTarget, movement.elbowPole ?? -135);
-  const farArm = limb(chainAdd(girdleCentre, shoulderAxis, -shoulderHalf), -1, farUpperArm, farForearm, upperLength, foreLength,
+  const farArm = limb(chainAdd(girdleCentre, shoulderAxis, -effectiveShoulderHalf), -1, farUpperArm, farForearm, upperLength, foreLength,
     farWristTarget, movement.elbowPole ?? -135);
+  const baseKneePole = chainPair(movement.kneePole ?? 45);
+  const legPole: ChainDir = kneeOut === 0 ? (movement.kneePole ?? 45) : [baseKneePole[0], baseKneePole[1] + kneeOut];
+  const nearAnkleWithSpread: ChainPoint | undefined = ankleTarget === undefined || footSpread === 0 || ankleTarget[2] !== undefined
+    ? ankleTarget
+    : [ankleTarget[0], ankleTarget[1], hipHalf + footSpread];
+  const farAnkleWithSpread: ChainPoint | undefined = farAnkleTarget === undefined || footSpread === 0 || farAnkleTarget[2] !== undefined
+    ? farAnkleTarget
+    : [farAnkleTarget[0], farAnkleTarget[1], -hipHalf - footSpread];
   const nearLeg = limb(chainAdd(hip, hipAxis, hipHalf), 1, thigh, shin, CHAIN_THIGH, CHAIN_SHIN,
-    ankleTarget, movement.kneePole ?? 45);
+    nearAnkleWithSpread, legPole);
   const farLeg = limb(chainAdd(hip, hipAxis, -hipHalf), -1, farThigh, farShin, CHAIN_THIGH, CHAIN_SHIN,
-    farAnkleTarget, movement.kneePole ?? 45);
+    farAnkleWithSpread, legPole);
   const nearGrip = hand === undefined ? nearArm.end : chainAdd(nearArm.end, chainUnit(hand, 1), CHAIN_HAND);
   const farGrip = hand === undefined ? farArm.end : chainAdd(farArm.end, chainUnit(hand, -1), CHAIN_HAND);
-  // What a bent hand holds sits on the palm's side of the knuckles.
-  const holdOf = (grip: ChainVec, side: number): ChainVec => {
-    if (hand === undefined || movement.palm === undefined) return grip;
-    return chainAdd(grip, chainUnit([hand[0] + (movement.palm === 'up' ? 90 : -90), hand[1]], side), CHAIN_PALM);
+  // Where a bar rests when cradled in the crook of the elbow: inside the bend between upper arm and forearm.
+  const crookOf = (arm: { root: ChainVec; mid: ChainVec; end: ChainVec }): ChainVec => {
+    const u1 = chainNormal([arm.root[0] - arm.mid[0], arm.root[1] - arm.mid[1], arm.root[2] - arm.mid[2]]);
+    const u2 = chainNormal([arm.end[0] - arm.mid[0], arm.end[1] - arm.mid[1], arm.end[2] - arm.mid[2]]);
+    return chainAdd(arm.mid, chainNormal([u1[0] + u2[0], u1[1] + u2[1], u1[2] + u2[2]]), 2.2);
   };
-  const nearHold = holdOf(nearGrip, 1), farHold = holdOf(farGrip, -1);
+  const nearCrook = crookOf(nearArm), farCrook = crookOf(farArm);
+  // What a bent hand holds sits on the palm's side of the knuckles; a Zercher bar rests in the elbow crooks.
+  const holdOf = (grip: ChainVec, side: number): ChainVec => {
+    if (hand !== undefined && movement.palm !== undefined) {
+      return chainAdd(grip, chainUnit([hand[0] + (movement.palm === 'up' ? 90 : -90), hand[1]], side), CHAIN_PALM);
+    }
+    if (hand === undefined && (movement.implement === 'bells' || movement.implement === 'bell') && (movement.forearmTurn === true || movement.palm !== undefined)) {
+      return [grip[0], grip[1] + (forearmRotation / 90) * 1.4, grip[2]];
+    }
+    return grip;
+  };
+  const nearHold = movement.barAt === 'elbows' ? nearCrook : holdOf(nearGrip, 1);
+  const farHold = movement.barAt === 'elbows' ? farCrook : holdOf(farGrip, -1);
+  const bellU = (1 - bellSide) / 2;
+  const bellGrip: ChainVec = [
+    nearHold[0] + (farHold[0] - nearHold[0]) * bellU,
+    nearHold[1] + (farHold[1] - nearHold[1]) * bellU,
+    nearHold[2] + (farHold[2] - nearHold[2]) * bellU,
+  ];
+  const bellBody: ChainVec = movement.kettlebellHang === true
+    ? [bellGrip[0], bellGrip[1] - 4.6, bellGrip[2]]
+    : chainAdd(bellGrip, [KETTLEBELL_REST[0], KETTLEBELL_REST[1], KETTLEBELL_REST[2] * bellSide], 1);
   const feet = movement.feet ?? 'flat';
   const toeOf = (ankle: ChainVec, side: number, free: readonly [number, number] | undefined): ChainVec | null => {
+    if (free !== undefined && (feet === 'flat' || feet === 'free')) return chainAdd(ankle, chainUnit(free, side), CHAIN_FOOT);
     if (feet === 'flat') return [ankle[0] + CHAIN_FOOT, ankle[1], ankle[2]];
-    if (feet === 'free' && free !== undefined) return chainAdd(ankle, chainUnit(free, side), CHAIN_FOOT);
     return null;
   };
   const nearToe = toeOf(nearLeg.end, 1, foot);
@@ -3804,25 +8236,73 @@ export function chainGeometry(slug: string, ph: number, body: BodyParameters, tu
     el: project(nearArm.mid), wr: project(nearArm.end), ef: projectFar(farArm.mid), wf: projectFar(farArm.end),
     kn: project(nearLeg.mid), an: project(nearLeg.end), kf: projectFar(farLeg.mid), af: projectFar(farLeg.end),
   };
+  const nearHoldProj = project(nearHold), farHoldProj = project(farHold);
+  const crossedBar = movement.implement === 'bar' && nearHold[2] < farHold[2];
+  const barNearProj = crossedBar ? farHoldProj : nearHoldProj;
+  const barFarProj = crossedBar ? nearHoldProj : farHoldProj;
+  const holdSpan = Math.hypot(barNearProj[0] - barFarProj[0], barNearProj[1] - barFarProj[1]);
+  const barOver = movement.implement === 'cableBar' ? 3.5 : 9;
+  const barUx = holdSpan >= 3 ? (barNearProj[0] - barFarProj[0]) / holdSpan : 0;
+  const barUy = holdSpan >= 3 ? (barNearProj[1] - barFarProj[1]) / holdSpan : 0;
+  const barEnd: { near: CanonicalPoint; far: CanonicalPoint } = {
+    near: [barNearProj[0] + barUx * barOver, barNearProj[1] + barUy * barOver],
+    far: [barFarProj[0] - barUx * barOver, barFarProj[1] - barUy * barOver],
+  };
+  const vHandleApex = project([
+    (nearHold[0] + farHold[0]) / 2 + 3.8,
+    (nearHold[1] + farHold[1]) / 2 - 1.4,
+    (nearHold[2] + farHold[2]) / 2,
+  ]);
   return {
-    movement, view, joints, project, projectFar, ph,
+    movement, view, joints, project, projectFar, nearness, ph,
     /** The trunk's drawn centreline, neck first. Straight unless the spine is curled. */
     spine, curled: Math.abs(curl) > 1e-9 || Math.abs(sideCurl) > 1e-9,
     /** Whether the shoulders are drawn as a girdle out from the neck (any view that shows their width). */
     girdle: view === 'oblique' || (view === 'side' && Math.abs(twist) > 1e-9),
     world: {
       hip, neck, head, spine: spineWorld,
-      near: { shoulder: nearArm.root, elbow: nearArm.mid, wrist: nearArm.end, grip: nearGrip, hold: nearHold, hipJoint: nearLeg.root, knee: nearLeg.mid, ankle: nearLeg.end, toe: nearToe },
-      far: { shoulder: farArm.root, elbow: farArm.mid, wrist: farArm.end, grip: farGrip, hold: farHold, hipJoint: farLeg.root, knee: farLeg.mid, ankle: farLeg.end, toe: farToe },
+      ...(movement.waistLoad !== undefined
+        ? { waistLoad: [hip[0], hip[1] - movement.waistLoad.drop, 0] as ChainVec }
+        : {}),
+      ...(movement.weightStack !== undefined
+        ? (() => {
+            const ws = movement.weightStack;
+            const liftedBottom = ws.baseTop + ws.minClearance + ws.stroke * Math.max(0, Math.min(1, ph));
+            return {
+              weightStack: {
+                x: ws.x,
+                baseTop: ws.baseTop,
+                liftedBottom,
+                liftedTop: liftedBottom + 8,
+                clearance: liftedBottom - ws.baseTop,
+              },
+            };
+          })()
+        : {}),
+      ...(movement.implement === 'kettlebell'
+        ? { kettlebell: { grip: bellGrip, body: bellBody, side: bellSide } }
+        : {}),
+      near: { shoulder: nearArm.root, elbow: nearArm.mid, elbowCrook: nearCrook, wrist: nearArm.end, grip: nearGrip, hold: nearHold, ...nearPalm, hipJoint: nearLeg.root, knee: nearLeg.mid, ankle: nearLeg.end, toe: nearToe },
+      far: { shoulder: farArm.root, elbow: farArm.mid, elbowCrook: farCrook, wrist: farArm.end, grip: farGrip, hold: farHold, ...farPalm, hipJoint: farLeg.root, knee: farLeg.mid, ankle: farLeg.end, toe: farToe },
     },
     grip: { near: project(nearGrip), far: projectFar(farGrip) },
     /** Where the held weight sits: the grip, moved to the palm's side when the hand is bent. */
-    hold: { near: project(nearHold), far: projectFar(farHold) },
+    hold: { near: nearHoldProj, far: projectFar(farHold) },
+    barEnd,
+    vHandleApex,
     toe: { near: nearToe ? project(nearToe) : null, far: farToe ? projectFar(farToe) : null },
     footWidth: feet === 'flat' ? body.lw * 0.9 : body.lw * 0.82,
+    forearmRotation,
     /** How far each held bell is tilted, inner end up, in degrees: none below half-way, all of it at the top. */
-    peakTilt: movement.supinatedPeak === true ? BELL_TILT_DEG * Math.max(0, Math.min(1, (ph - 0.5) * 2)) : 0,
-    angles: { trunk: given, curl, sideCurl, twist, roll, shrug, thigh, shin, upperArm, forearm, farThigh, farShin, farUpperArm, farForearm, hand, foot },
+    peakTilt: movement.supinatedPeak === true
+      ? BELL_TILT_DEG * Math.max(0, Math.min(1, (ph - 0.5) * 2))
+      : movement.forearmTurn === true && forearmRotation > 0
+        ? BELL_TILT_DEG * Math.max(0, Math.min(1, (ph - 0.5) * 2)) * (forearmRotation / 90)
+        : 0,
+    angles: {
+      trunk: given, curl, sideCurl, twist, roll, shrug, retract, thigh, shin, upperArm, forearm, farThigh, farShin, farUpperArm, farForearm, hand, foot, footSpread, kneeOut, bellSide,
+      ...(hasPalmYaw ? { palmYaw, farPalmYaw } : {}),
+    },
   };
 }
 
@@ -3839,6 +8319,22 @@ export function trunkCentreline(pose: CanonicalPose, opts: FigureOptions): Canon
   }
   const joints = resolveFigureJoints(pose, opts);
   return [joints.nk, joints.hp];
+}
+
+/**
+ * Where the near hand's kettlebell is painted, in world units: the round bell
+ * resting on the back of the wrist, or hanging under the handle in a row.
+ * With `kettlebellTurn` the bell goes round with the wrist as the arm rises.
+ */
+export function chainKettlebellCentre(figure: ReturnType<typeof chainGeometry>): readonly [number, number, number] {
+  const movement = figure.movement;
+  const turnT = movement.kettlebellTurn ? Math.max(0, Math.min(1, figure.ph)) : 1;
+  const kbRest: ChainVec = movement.kettlebellBelow
+    ? [0, -6.0, 0]
+    : movement.kettlebellTurn
+      ? [-1.8 * turnT, -2.2, 2.2 * (1 - turnT) + 1.4 * turnT]
+      : KETTLEBELL_REST;
+  return chainAdd(figure.world.near.hold, kbRest, 1);
 }
 
 /** A chain movement's equipment, lines and held implement, grouped by where they are painted. */
@@ -3878,6 +8374,8 @@ function layoutChainExtras(
         kind: 'rect', x: Math.min(p[0], q[0]), y: Math.min(p[1], q[1]), w: Math.abs(q[0] - p[0]), h: Math.abs(q[1] - p[1]),
         rx: 1, fill: 'line', stroke: 'textLow', strokeWidth: 1.2, opacity: 1,
       });
+    } else if (shape.kind === 'bar') {
+      groups[shape.layer ?? 'mid'].push(line(project(chainWorld(shape.a)), project(chainWorld(shape.b)), 2.2, 'textMid', 1));
     } else {
       const p = project(chainWorld(shape.at));
       groups[shape.layer ?? 'front'].push({ kind: 'circle', cx: p[0], cy: p[1], r: 2.6, fill: 'textMid', opacity: 1 });
@@ -3885,16 +8383,23 @@ function layoutChainExtras(
   }
 
   for (const cable of movement.lines ?? []) {
-    // Under the middle of the foot: ahead of the ankle from the side, at the ankle from the front.
+    // Under the middle of the foot: ahead of the ankle from the side, at the ankle from the front,
+    // or at the midpoint of the drawn foot in a turned view.
     const underFoot = figure.view === 'front' ? 0 : CHAIN_FOOT / 2;
+    const nearFootX = figure.view === 'oblique' && figure.toe.near !== null
+      ? (j.an[0] + figure.toe.near[0]) / 2 : j.an[0] + underFoot;
+    const farFootX = figure.view === 'oblique' && figure.toe.far !== null
+      ? (j.af[0] + figure.toe.far[0]) / 2 : j.af[0] + underFoot;
     // A band trapped under a foot starts on the floor: its own half-width above it.
     const trapped = CHAIN_FLOOR - 0.7;
-    const start: CanonicalPoint = cable.from === 'nearFoot' ? [j.an[0] + underFoot, trapped]
-      : cable.from === 'farFoot' ? [j.af[0] + underFoot, trapped]
+    const start: CanonicalPoint = cable.from === 'nearFoot' ? [nearFootX, trapped]
+      : cable.from === 'farFoot' ? [farFootX, trapped]
         : project(chainWorld(cable.from));
     const end: CanonicalPoint = cable.to === 'nearGrip' ? figure.hold.near : cable.to === 'farGrip' ? figure.hold.far
       : cable.to === 'midGrip' ? [(figure.hold.near[0] + figure.hold.far[0]) / 2, (figure.hold.near[1] + figure.hold.far[1]) / 2]
-        : cable.to === 'nearAnkle' ? j.an : j.af;
+        : cable.to === 'vHandleApex' ? figure.vHandleApex
+          : cable.to === 'nearBarEnd' ? figure.barEnd.near : cable.to === 'farBarEnd' ? figure.barEnd.far
+            : cable.to === 'nearAnkle' ? j.an : j.af;
     (cable.depth === 'far' ? far : lines).push(line(start, end, 1.4, 'textMid', 1));
   }
 
@@ -3909,7 +8414,38 @@ function layoutChainExtras(
   near.push(handDot(figure.grip.near, 'textHi', 1));
 
   const kind = movement.implement ?? 'none';
-  const bell = (grip: ChainVec, to: (q: ChainVec) => CanonicalPoint, color: ColorRole, opacity: number, out: FigurePrim[]): void => {
+  const bell = (
+    grip: ChainVec, to: (q: ChainVec) => CanonicalPoint, color: ColorRole, opacity: number, out: FigurePrim[],
+    palmDir?: ChainVec, handleAxis?: ChainVec,
+  ): void => {
+    if (palmDir !== undefined && handleAxis !== undefined && movement.bellAxis === undefined) {
+      const endA = chainAdd(grip, handleAxis, -4.2), endB = chainAdd(grip, handleAxis, 4.2);
+      const farEnd3 = figure.nearness(endA) <= figure.nearness(endB) ? endA : endB;
+      const nearEnd3 = figure.nearness(endA) <= figure.nearness(endB) ? endB : endA;
+      const a = to(farEnd3), b = to(nearEnd3);
+      const drawn = Math.hypot(b[0] - a[0], b[1] - a[1]);
+      const nx = drawn >= 0.4 ? -(b[1] - a[1]) / drawn * 2.2 : 0;
+      const ny = drawn >= 0.4 ? (b[0] - a[0]) / drawn * 2.2 : 2.2;
+      const farPlate: FigurePrim = { ...line([a[0] - nx, a[1] - ny], [a[0] + nx, a[1] + ny], 2.6, color, opacity), stroke: 'ink1', strokeWidth: 0.6 };
+      const nearPlate: FigurePrim = { ...line([b[0] - nx, b[1] - ny], [b[0] + nx, b[1] + ny], 2.6, color, opacity), stroke: 'ink1', strokeWidth: 0.6 };
+      const shaft: FigurePrim = line(a, b, 1.8, color, opacity);
+      const kCenter = chainAdd(grip, palmDir, -0.5);
+      let k1 = to(chainAdd(kCenter, handleAxis, -1.7)), k2 = to(chainAdd(kCenter, handleAxis, 1.7));
+      if (Math.hypot(k2[0] - k1[0], k2[1] - k1[1]) < 1.4) {
+        const kc = to(kCenter);
+        k1 = [kc[0] - 0.8, kc[1]];
+        k2 = [kc[0] + 0.8, kc[1]];
+      }
+      const knuckle: FigurePrim = { ...line(k1, k2, 2.2, color, opacity), stroke: 'ink1', strokeWidth: 0.7 };
+      out.push(farPlate);
+      if (figure.nearness(palmDir) < 0) {
+        out.push(shaft, knuckle);
+      } else {
+        out.push(knuckle, shaft);
+      }
+      out.push(nearPlate);
+      return;
+    }
     const axis = movement.bellAxis ?? [0, 0, 1];
     const p = to(chainAdd(grip, axis, -4.2)), q = to(chainAdd(grip, axis, 4.2));
     const length = Math.hypot(q[0] - p[0], q[1] - p[1]);
@@ -3937,19 +8473,47 @@ function layoutChainExtras(
   };
   const w = figure.world;
   if (kind === 'bells' || kind === 'bell') {
-    if (kind === 'bells') bell(w.far.hold, figure.projectFar, farColor, farOpacity, far);
-    bell(w.near.hold, project, 'textHi', 1, near);
+    if (movement.forearmTurn === true && Math.abs(figure.forearmRotation) < 25) {
+      if (kind === 'bells') far.push(...layoutHammerDumbbell(figure.grip.far, j.ef, false));
+      near.push(...layoutHammerDumbbell(figure.grip.near, j.el));
+    } else {
+      if (kind === 'bells') bell(w.far.hold, figure.projectFar, farColor, farOpacity, far, w.far.palmDir, w.far.handleAxis);
+      bell(w.near.hold, project, 'textHi', 1, near, w.near.palmDir, w.near.handleAxis);
+      if (figure.angles.hand === undefined && (movement.palm !== undefined || movement.forearmTurn === true)) {
+        if (figure.forearmRotation <= -25) {
+          if (kind === 'bells') far.push(line([j.wf[0] - 2.1, j.wf[1] - 0.9], [j.wf[0] + 2.1, j.wf[1] - 0.9], 2.0, 'ink1', farOpacity));
+          near.push(line([j.wr[0] - 2.1, j.wr[1] - 0.9], [j.wr[0] + 2.1, j.wr[1] - 0.9], 2.0, 'ink1', 1));
+        } else if (figure.forearmRotation >= 25) {
+          if (kind === 'bells') far.push(line([j.wf[0] - 2.0, j.wf[1] + 1.2], [j.wf[0] + 2.0, j.wf[1] + 1.2], 2.2, farColor, farOpacity));
+          near.push(line([j.wr[0] - 2.0, j.wr[1] + 1.2], [j.wr[0] + 2.0, j.wr[1] + 1.2], 2.2, 'textHi', 1));
+        }
+      }
+    }
   } else if (kind === 'hammer') {
     far.push(...layoutHammerDumbbell(figure.grip.far, j.ef, false));
     near.push(...layoutHammerDumbbell(figure.grip.near, j.el));
   } else if (kind === 'bar' || kind === 'ez' || kind === 'cableBar') {
-    const p = project(w.far.hold), q = project(w.near.hold);
+    const crossedBar = kind === 'bar' && w.near.hold[2] < w.far.hold[2];
+    const barFar = movement.barAt === 'elbows' ? w.far.elbowCrook : (crossedBar ? w.near.hold : w.far.hold);
+    const barNear = movement.barAt === 'elbows' ? w.near.elbowCrook : (crossedBar ? w.far.hold : w.near.hold);
+    const p = project(barFar), q = project(barNear);
     const length = Math.hypot(q[0] - p[0], q[1] - p[1]);
     if (length < 3) {
       // One bar through both hands, seen end-on at the near hand.
-      if (kind === 'bar') near.push(...layoutEndOnBarbell(figure.hold.near));
-      else if (kind === 'ez') near.push(...layoutEndOnEzBar(figure.hold.near));
-      else near.push({ kind: 'circle', cx: figure.hold.near[0], cy: figure.hold.near[1], r: 2.4, fill: 'textHi', stroke: 'ink1', strokeWidth: 1, opacity: 1 });
+      if (kind === 'bar' && movement.endOnPlateTone !== undefined) {
+        // The plate face, then the sleeve's end (5 cm across) at the bar's axis.
+        near.push(
+          { kind: 'circle', cx: q[0], cy: q[1], r: 6.6, fill: movement.endOnPlateTone, stroke: 'ink1', strokeWidth: 1.0, opacity: 1 },
+          { kind: 'circle', cx: q[0], cy: q[1], r: 1.2, fill: 'textHi', stroke: 'ink1', strokeWidth: 0.6, opacity: 1 },
+        );
+      } else if (kind === 'bar') near.push(...layoutEndOnBarbell(q));
+      else if (kind === 'ez') near.push(...layoutEndOnEzBar(q));
+      else near.push({ kind: 'circle', cx: q[0], cy: q[1], r: 2.4, fill: 'textHi', stroke: 'ink1', strokeWidth: 1, opacity: 1 });
+      if (figure.angles.hand === undefined && movement.palm === 'up') {
+        near.push(line([q[0] - 2.0, q[1] + 1.5], [q[0] + 2.0, q[1] + 1.5], 2.2, 'textHi', 1));
+      } else if (figure.angles.hand === undefined && movement.palm === 'down') {
+        near.push(line([q[0] - 2.1, q[1] - 1.1], [q[0] + 2.1, q[1] - 1.1], 2.0, 'ink1', 1));
+      }
     } else {
       // Seen along its length. From the front the whole bar is in front of
       // the body; turned, its far half passes behind.
@@ -3959,57 +8523,497 @@ function layoutChainExtras(
       const farEnd: CanonicalPoint = [p[0] - ux * over, p[1] - uy * over];
       const nearEnd: CanonicalPoint = [q[0] + ux * over, q[1] + uy * over];
       const whole = figure.view === 'front';
-      const farGroup = whole ? near : far;
+      const farGroup = whole || movement.barAt === 'front' ? near : movement.barAt === 'behind' ? groups.behind : far;
       const farTone: ColorRole = whole ? 'textHi' : farColor;
       const farAlpha = whole ? 1 : farOpacity;
       farGroup.push(line(mid, farEnd, 1.6, farTone, farAlpha));
-      near.push(line(mid, nearEnd, 1.6, 'textHi', 1));
+      if (movement.barAt === 'behind') {
+        groups.behind.push(line(mid, q, 1.6, 'textHi', 1));
+        near.push(line(q, nearEnd, 1.6, 'textHi', 1));
+      } else {
+        near.push(line(mid, nearEnd, 1.6, 'textHi', 1));
+      }
+      if (kind === 'ez') {
+        farGroup.push(line([mid[0] - ux * 2.6, mid[1] - uy * 2.6 + 1.3], [mid[0], mid[1] - 1.3], 1.8, farTone, farAlpha));
+        near.push(line([mid[0], mid[1] - 1.3], [mid[0] + ux * 2.6, mid[1] + uy * 2.6 + 1.3], 1.8, 'textHi', 1));
+      }
+      if (figure.angles.hand === undefined && movement.palm === 'up') {
+        farGroup.push(line([p[0] - 2.0, p[1] + 1.5], [p[0] + 2.0, p[1] + 1.5], 2.2, farTone, farAlpha));
+        near.push(line([q[0] - 2.0, q[1] + 1.5], [q[0] + 2.0, q[1] + 1.5], 2.2, 'textHi', 1));
+      } else if (figure.angles.hand === undefined && movement.palm === 'down') {
+        farGroup.push(line([p[0] - 2.1, p[1] - 1.1], [p[0] + 2.1, p[1] - 1.1], 2.0, 'ink1', farAlpha));
+        near.push(line([q[0] - 2.1, q[1] - 1.1], [q[0] + 2.1, q[1] - 1.1], 2.0, 'ink1', 1));
+      }
+      if (movement.barPad === true) {
+        const padHalf = Math.min(3.2, length * 0.36);
+        near.push({ ...line([mid[0] - ux * padHalf, mid[1] - uy * padHalf], [mid[0] + ux * padHalf, mid[1] + uy * padHalf], 4.2, 'textMid', 1), stroke: 'ink1', strokeWidth: 0.6 });
+      }
       if (kind !== 'cableBar') {
+        const pr = movement.plateRadius ?? 4.2;
         const plate = (c: CanonicalPoint, color: ColorRole, opacity: number): FigurePrim =>
-          ({ ...line([c[0] + uy * 4.2, c[1] - ux * 4.2], [c[0] - uy * 4.2, c[1] + ux * 4.2], 2.4, color, opacity), stroke: 'ink1', strokeWidth: 0.6 });
+          ({ ...line([c[0] + uy * pr, c[1] - ux * pr], [c[0] - uy * pr, c[1] + ux * pr], 2.4, color, opacity), stroke: 'ink1', strokeWidth: 0.6 });
         farGroup.push(plate([farEnd[0] + ux * 2, farEnd[1] + uy * 2], farTone, farAlpha));
         near.push(plate([nearEnd[0] - ux * 2, nearEnd[1] - uy * 2], 'textHi', 1));
       }
     }
   } else if (kind === 'longBar' && movement.barAnchor !== undefined) {
-    // One end braced on the floor, the near hand on the shaft just behind the plates at the other.
-    const from = project(chainWorld(movement.barAnchor)), grip = figure.hold.near;
+    // One end braced on the floor, the near hand on the shaft just behind the plates at the other,
+    // both hands on a double handle hooked under the shaft there, or, in an oblique straddled
+    // T-bar row, both hands on a neutral handle centred on the shaft.
+    // The straddled T-bar row's two hands also share one point in the side plane, so the double handle is named, not inferred.
+    const twoArmHandle = movement.doubleHandle === true;
+    const from = project(chainWorld(movement.barAnchor));
+    const grip: CanonicalPoint = twoArmHandle
+      ? project([w.near.hold[0] + 1.4, w.near.hold[1] + 2.0, 0])
+      : figure.view === 'oblique'
+        ? [(figure.hold.near[0] + figure.hold.far[0]) / 2, (figure.hold.near[1] + figure.hold.far[1]) / 2]
+        : figure.hold.near;
     const reach = Math.hypot(grip[0] - from[0], grip[1] - from[1]) || 1;
     const ux = (grip[0] - from[0]) / reach, uy = (grip[1] - from[1]) / reach;
     const length = movement.barLength ?? reach + 8;
     const end: CanonicalPoint = [from[0] + ux * length, from[1] + uy * length];
-    near.push(line(from, end, 1.6, 'textHi', 1));
+    if (twoArmHandle) {
+      groups.mid.push(line(from, grip, 1.6, 'textHi', 1));
+      far.push(line(grip, figure.hold.far, 1.8, farColor, farOpacity));
+      near.push(line(grip, figure.hold.near, 1.8, 'textHi', 1));
+      near.push(line(grip, end, 1.6, 'textHi', 1));
+    } else if (figure.view === 'oblique') {
+      groups.mid.push(line(from, grip, 1.6, 'textHi', 1));
+      near.push(line(grip, end, 1.6, 'textHi', 1));
+      near.push(line(figure.hold.far, figure.hold.near, 1.8, 'textMid', 1));
+    } else {
+      near.push(line(from, end, 1.6, 'textHi', 1));
+    }
     for (const back of [2, 4.6]) {
       const c: CanonicalPoint = [end[0] - ux * back, end[1] - uy * back];
       near.push({ ...line([c[0] + uy * 6, c[1] - ux * 6], [c[0] - uy * 6, c[1] + ux * 6], 2.4, 'textHi', 1), stroke: 'ink1', strokeWidth: 0.6 });
     }
-  } else if (kind === 'kettlebell') {
-    // One kettlebell in the near hand: the handle across the palm, and the
-    // round bell resting on the back of the wrist, below and behind the grip.
-    const a = project(chainAdd(w.near.hold, [0, 0, 1], -2.6)), b = project(chainAdd(w.near.hold, [0, 0, 1], 2.6));
-    const c = project(chainAdd(w.near.hold, KETTLEBELL_REST, 1));
-    near.push({ kind: 'circle', cx: c[0], cy: c[1], r: KETTLEBELL_RADIUS, fill: 'textHi', stroke: 'ink1', strokeWidth: 1, opacity: 1 });
-    near.push(line(a, b, 2.2, 'textHi', 1));
+  } else if (kind === 'kettlebell' || kind === 'kettlebells') {
+    if (kind === 'kettlebell' && movement.kettlebellHang === true && w.kettlebell !== undefined) {
+      const isFar = w.kettlebell.side < 0;
+      const tone: ColorRole = isFar ? farColor : 'textHi';
+      const alpha = isFar ? farOpacity : 1;
+      const targetGroup = isFar ? far : near;
+      const ha = project(chainAdd(w.kettlebell.grip, [0, 0, 1], -2.6));
+      const hb = project(chainAdd(w.kettlebell.grip, [0, 0, 1], 2.6));
+      const bc = project(w.kettlebell.body);
+      targetGroup.push({ kind: 'circle', cx: bc[0], cy: bc[1], r: KETTLEBELL_RADIUS, fill: tone, stroke: 'ink1', strokeWidth: 1, opacity: alpha });
+      targetGroup.push(line(ha, hb, 2.2, tone, alpha));
+    } else {
+      // One kettlebell in the near hand (or one in each hand for 'kettlebells'):
+      // the handle across the palm, and the round bell resting on the back of
+      // the wrist (or hanging straight down beneath the handle in a row). A hand
+      // given a palm direction turns the handle and the bell's rest with it.
+      const kb = (
+        hold: ChainVec, side: number, to: (q: ChainVec) => CanonicalPoint,
+        color: ColorRole, opacity: number, out: FigurePrim[],
+        palmDir?: ChainVec, handleAxis?: ChainVec,
+      ): void => {
+        const axis: ChainVec = handleAxis ?? [0, 0, 1];
+        const rest: ChainVec = palmDir !== undefined && handleAxis !== undefined
+          ? [KETTLEBELL_REST[0] * palmDir[0] + KETTLEBELL_REST[2] * handleAxis[0], KETTLEBELL_REST[1], KETTLEBELL_REST[0] * palmDir[2] + KETTLEBELL_REST[2] * handleAxis[2]]
+          : [KETTLEBELL_REST[0], KETTLEBELL_REST[1], side * KETTLEBELL_REST[2]];
+        const a = to(chainAdd(hold, axis, -2.6)), b = to(chainAdd(hold, axis, 2.6));
+        const c = to(chainAdd(hold, rest, 1));
+        out.push({ kind: 'circle', cx: c[0], cy: c[1], r: KETTLEBELL_RADIUS, fill: color, stroke: 'ink1', strokeWidth: 1, opacity });
+        out.push(line(a, b, 2.2, color, opacity));
+      };
+      if (kind === 'kettlebells') {
+        if (w.far.palmDir !== undefined) {
+          kb(w.far.hold, -1, figure.projectFar, farColor, farOpacity, far, w.far.palmDir, w.far.handleAxis);
+        } else {
+          const fa = figure.projectFar(chainAdd(w.far.hold, [0, 0, 1], -2.6));
+          const fb = figure.projectFar(chainAdd(w.far.hold, [0, 0, 1], 2.6));
+          const farRest: ChainVec = movement.kettlebellBelow
+            ? [0, -6.0, 0]
+            : [KETTLEBELL_REST[0], KETTLEBELL_REST[1], -KETTLEBELL_REST[2]];
+          const fc = figure.projectFar(chainAdd(w.far.hold, farRest, 1));
+          far.push({ kind: 'circle', cx: fc[0], cy: fc[1], r: KETTLEBELL_RADIUS, fill: farColor, stroke: 'ink1', strokeWidth: 1, opacity: farOpacity });
+          far.push(line(fa, fb, 2.2, farColor, farOpacity));
+        }
+      }
+      if (w.near.palmDir !== undefined) {
+        kb(w.near.hold, 1, project, 'textHi', 1, near, w.near.palmDir, w.near.handleAxis);
+      } else {
+        const turnT = movement.kettlebellTurn ? Math.max(0, Math.min(1, figure.ph)) : 1;
+        const hAxis: ChainVec = movement.kettlebellTurn
+          ? [Math.cos(turnT * Math.PI / 2), 0, Math.sin(turnT * Math.PI / 2)]
+          : [0, 0, 1];
+        const a = project(chainAdd(w.near.hold, hAxis, -2.6)), b = project(chainAdd(w.near.hold, hAxis, 2.6));
+        const c = project(chainKettlebellCentre(figure));
+        near.push({ kind: 'circle', cx: c[0], cy: c[1], r: KETTLEBELL_RADIUS, fill: 'textHi', stroke: 'ink1', strokeWidth: 1, opacity: 1 });
+        near.push(line(a, b, 2.2, 'textHi', 1));
+      }
+    }
+  } else if (kind === 'vHandle') {
+    // Rigid short V-handle: two steel branches meeting at the cable apex and vertical grip bars in the hands.
+    far.push(line(figure.vHandleApex, figure.hold.far, 2.0, 'textHi', farOpacity));
+    far.push({
+      ...line([figure.hold.far[0], figure.hold.far[1] - 2.2], [figure.hold.far[0], figure.hold.far[1] + 2.2], 2.4, farColor, farOpacity),
+      stroke: 'ink1', strokeWidth: 0.6,
+    });
+    near.push(line(figure.vHandleApex, figure.hold.near, 2.0, 'textHi', 1));
+    near.push({
+      ...line([figure.hold.near[0], figure.hold.near[1] - 2.2], [figure.hold.near[0], figure.hold.near[1] + 2.2], 2.4, 'textHi', 1),
+      stroke: 'ink1', strokeWidth: 0.6,
+    });
+    near.push({ kind: 'circle', cx: figure.vHandleApex[0], cy: figure.vHandleApex[1], r: 1.5, fill: 'textMid', stroke: 'ink1', strokeWidth: 0.6, opacity: 1 });
+  } else if (kind === 'vBar') {
+    const mid: CanonicalPoint = [(figure.hold.near[0] + figure.hold.far[0]) / 2, (figure.hold.near[1] + figure.hold.far[1]) / 2];
+    const apex: CanonicalPoint = [mid[0], mid[1] - 3.2];
+    far.push(line(apex, figure.hold.far, 1.8, farColor, farOpacity));
+    far.push({ kind: 'circle', cx: figure.hold.far[0], cy: figure.hold.far[1], r: 2.2, fill: farColor, opacity: farOpacity });
+    near.push(line(apex, figure.hold.near, 1.8, 'textHi', 1));
+    near.push(line(mid, apex, 1.6, 'textMid', 1));
+    near.push({ kind: 'circle', cx: figure.hold.near[0], cy: figure.hold.near[1], r: 2.2, fill: 'textHi', opacity: 1 });
   } else if (kind === 'handle' || kind === 'handles' || kind === 'rope') {
     const r = kind === 'rope' ? 2.2 : 2.6;
     if (kind !== 'handle') far.push({ kind: 'circle', cx: figure.grip.far[0], cy: figure.grip.far[1], r, fill: farColor, opacity: farOpacity });
     near.push({ kind: 'circle', cx: figure.grip.near[0], cy: figure.grip.near[1], r, fill: 'textHi', opacity: 1 });
+    if (movement.palm === 'up') {
+      if (kind !== 'handle') far.push(line([figure.grip.far[0] - 1.8, figure.grip.far[1] + 1.4], [figure.grip.far[0] + 1.8, figure.grip.far[1] + 1.4], 2.2, farColor, farOpacity));
+      near.push(line([figure.grip.near[0] - 1.8, figure.grip.near[1] + 1.4], [figure.grip.near[0] + 1.8, figure.grip.near[1] + 1.4], 2.2, 'textHi', 1));
+    }
+  }
+  if (w.waistLoad !== undefined && movement.waistLoad !== undefined) {
+    const loadPt = project(w.waistLoad);
+    const r = movement.waistLoad.r ?? 3.2;
+    const beltHalf = body.hw * 0.52;
+    near.push(line([j.hp[0] - beltHalf, j.hp[1]], [j.hp[0] + beltHalf, j.hp[1]], 1.8, 'textMid', 1));
+    groups.mid.push(line(j.hp, loadPt, 1.4, 'textMid', 1));
+    groups.mid.push({ kind: 'circle', cx: loadPt[0], cy: loadPt[1], r, fill: 'textMid', stroke: 'ink1', strokeWidth: 1, opacity: 1 });
+    groups.mid.push({ kind: 'circle', cx: loadPt[0], cy: loadPt[1], r: 1.2, fill: 'ink1', opacity: 1 });
+  }
+  if (w.weightStack !== undefined) {
+    const ws = w.weightStack;
+    const topP = project([ws.x, 92, 0]);
+    const botP = project([ws.x, 1.5, 0]);
+    const baseTopP = project([ws.x, ws.baseTop, 0]);
+    const liftBotP = project([ws.x, ws.liftedBottom, 0]);
+    const liftTopP = project([ws.x, ws.liftedTop, 0]);
+    const pulleyEq = (movement.equipment ?? []).find((s) => s.kind === 'pulley');
+    if (pulleyEq !== undefined && 'at' in pulleyEq) {
+      const pulleyP = project(chainWorld(pulleyEq.at));
+      groups.behind.push(line(pulleyP, topP, 1.6, 'textLow', 0.75));
+    }
+    groups.behind.push(line([topP[0] - 1.8, topP[1]], [botP[0] - 1.8, botP[1]], 1.2, 'textLow', 0.75));
+    groups.behind.push(line([topP[0] + 1.8, topP[1]], [botP[0] + 1.8, botP[1]], 1.2, 'textLow', 0.75));
+    groups.behind.push(line(topP, liftTopP, 1.4, 'textMid', 1));
+    groups.mid.push({
+      kind: 'rect',
+      x: topP[0] - 3.8,
+      y: baseTopP[1],
+      w: 7.6,
+      h: Math.max(2, botP[1] - baseTopP[1]),
+      rx: 0.8,
+      fill: 'textLow',
+      stroke: 'ink1',
+      strokeWidth: 0.8,
+      opacity: 0.9,
+    });
+    groups.mid.push({
+      kind: 'rect',
+      x: topP[0] - 3.8,
+      y: liftTopP[1],
+      w: 7.6,
+      h: Math.max(2, liftBotP[1] - liftTopP[1]),
+      rx: 0.8,
+      fill: 'textHi',
+      stroke: 'ink1',
+      strokeWidth: 0.8,
+      opacity: 1,
+    });
   }
   const panel = handCloseUp(figure);
   if (panel !== null) {
-    // Back to front: the line from the real hand, the panel that hides whatever
-    // is behind it, the wrist and palm, the fingers, and the bar they hold.
-    groups.front.push(line(figure.grip.near, panel.centre, 0.8, 'textLow', 0.75));
-    groups.front.push({ kind: 'circle', cx: panel.centre[0], cy: panel.centre[1], r: panel.r, fill: 'ink1', stroke: 'textLow', strokeWidth: 1.2, opacity: 1 });
-    groups.front.push(line(panel.stub, panel.wrist, CLOSE_UP_HAND.wristHalf * 2 * panel.scale, 'textHi', 1));
-    groups.front.push(line(panel.wrist, panel.knuckle, CLOSE_UP_HAND.palmHalf * 2 * panel.scale, 'textHi', 1));
-    groups.front.push(line(panel.thumb[0], panel.thumb[1], CLOSE_UP_HAND.fingerHalf * 2 * panel.scale, 'textHi', 1));
-    for (let i = 0; i < 3; i++) {
-      groups.front.push(line(panel.finger[i], panel.finger[i + 1], CLOSE_UP_HAND.fingerHalf * 2 * panel.scale, 'textHi', 1));
+    if (panel.palmYaw !== undefined && panel.palmScreenDir !== undefined && panel.handleScreenDir !== undefined) {
+      const cx = panel.centre[0], cy = panel.centre[1];
+      const pDx = panel.palmScreenDir[0], hDx = panel.handleScreenDir[0];
+      const facing = panel.palmFacingViewer === true;
+      const thumbSide = -hDx;
+      const fSpread = Math.max(0.45, Math.abs(hDx));
+      const hanging = j.wr[1] > j.el[1];
+      if (hanging) {
+        const wristBase = line([cx, cy - 7.5], [cx, cy - 3.0], 3.4, 'textHi', 1);
+        const dorsal = line([cx, cy - 3.0], [cx, cy + 1.6], 5.2, 'textHi', 1);
+        const innerPalm = line([cx + pDx * 0.9, cy - 2.4], [cx + pDx * 0.9, cy + 1.2], 3.6, 'textMid', 1);
+        groups.front.push(line(panel.hand ?? figure.grip.near, panel.centre, 0.8, 'textLow', 0.75));
+        groups.front.push({ kind: 'circle', cx, cy, r: panel.r, fill: 'ink1', stroke: 'textLow', strokeWidth: 1.2, opacity: 1 });
+        if ((kind === 'bar' || kind === 'ez' || kind === 'cableBar') && facing) {
+          // A bar in a hand turned down, palm toward the viewer: the light palm
+          // behind the bar, drawn along its projected direction, and the four
+          // fingers wrapped over it, as in the upright hand turned over.
+          const bHalf = Math.max(2.0, Math.abs(hDx) * 8.5);
+          const barLine: FigurePrim = line([cx - bHalf, cy + 1.8], [cx + bHalf, cy + 1.8], 2.2, 'textMid', 1);
+          const palm: FigurePrim = { ...line([cx, cy - 3.0], [cx, cy + 0.4], 7.0, 'textHi', 1), stroke: 'ink1', strokeWidth: 0.6 };
+          const wrapped: FigurePrim[] = [-2.55, -0.85, 0.85, 2.55].map((off) => ({
+            ...line([cx + off * fSpread, cy + 4.1], [cx + off * fSpread, cy - 0.1], 1.7, 'textHi', 1),
+            stroke: 'ink1', strokeWidth: 0.5,
+          }));
+          const downThumb: FigurePrim = {
+            ...line([cx + thumbSide * 2.2, cy - 1.4], [cx + thumbSide * 3.8 + pDx * 1.4, cy + 1.2], 2.0, 'textHi', 1),
+            stroke: 'ink1', strokeWidth: 0.6,
+          };
+          groups.front.push(wristBase, palm, barLine, ...wrapped, downThumb);
+        } else if (kind === 'cableBar') {
+          const barShaft: FigurePrim = { ...line([cx - 7.6, cy + 1.8], [cx + 7.6, cy + 1.8], 2.2, 'textMid', 1), stroke: 'ink1', strokeWidth: 0.6 };
+          const cableStub: FigurePrim = line([cx, cy + 1.8], [cx, cy + 9.2], 1.4, 'textMid', 1);
+          const overhandFingers: FigurePrim[] = [-2.1, -0.7, 0.7, 2.1].map((off) => ({
+            ...line([cx + off, cy + 0.2], [cx + off, cy + 3.4], 1.6, 'textHi', 1),
+            stroke: 'ink1', strokeWidth: 0.5,
+          }));
+          const overhandThumb: FigurePrim = {
+            ...line([cx - 2.6, cy + 0.6], [cx - 3.8, cy + 2.8], 1.8, 'textHi', 1),
+            stroke: 'ink1', strokeWidth: 0.6,
+          };
+          groups.front.push(cableStub, barShaft, innerPalm, wristBase, dorsal, overhandThumb, ...overhandFingers);
+        } else if (kind === 'kettlebell' || kind === 'kettlebells') {
+          // A kettlebell hanging from an overhand hand: the handle across the
+          // panel along its projected direction, the bell under it, and the back
+          // of the hand (or the palm) with the fingers wrapped over the handle.
+          const hHalf = Math.max(2.0, Math.abs(hDx) * 5.4);
+          const handle: FigurePrim = { ...line([cx - hHalf, cy + 1.8], [cx + hHalf, cy + 1.8], 2.2, 'textHi', 1), stroke: 'ink1', strokeWidth: 0.6 };
+          const globe: FigurePrim = { kind: 'circle', cx, cy: cy + 8.6, r: 5.2, fill: 'textMid', stroke: 'ink1', strokeWidth: 1.0, opacity: 1 };
+          const hand: FigurePrim = { ...line([cx, cy - 3.0], [cx, cy + 0.6], 7.0, facing ? 'textHi' : 'textMid', 1), stroke: 'ink1', strokeWidth: 0.6 };
+          const wrist: FigurePrim = { ...wristBase, color: facing ? 'textHi' : 'textMid' };
+          const overFingers: FigurePrim[] = [-2.55, -0.85, 0.85, 2.55].map((off) => ({
+            ...line([cx + off * fSpread, cy + 0.2], [cx + off * fSpread, cy + 3.4], 1.6, 'textHi', 1),
+            stroke: 'ink1', strokeWidth: 0.5,
+          }));
+          groups.front.push(globe, handle, wrist, hand, ...overFingers);
+        } else {
+          // The dumbbell's handle runs along its real projected direction, so a
+          // palm facing the torso (handle head to foot) is seen nearly end on and
+          // its plates show their faces; a palm facing back shows the handle across.
+          const hHalf = Math.max(0.9, Math.abs(hDx) * 5.4);
+          const dirSign = hDx >= 0 ? 1 : -1;
+          const farPlateX = cx - dirSign * hHalf, nearPlateX = cx + dirSign * hHalf;
+          const faceHalf = 3.4 * Math.sqrt(Math.max(0, 1 - hDx * hDx)) + 0.8 * Math.abs(hDx);
+          const plateAt = (x: number): FigurePrim => ({
+            kind: 'rect', x: x - faceHalf, y: cy - 1.6, w: 2 * faceHalf, h: 6.8, rx: Math.min(faceHalf, 3.4),
+            fill: 'textHi', stroke: 'ink1', strokeWidth: 0.8, opacity: 1,
+          });
+          const farPlate = plateAt(farPlateX), nearPlate = plateAt(nearPlateX);
+          const shaft: FigurePrim = line([cx - hHalf, cy + 1.8], [cx + hHalf, cy + 1.8], 2.2, 'textMid', 1);
+          const thumb: FigurePrim = {
+            ...line([cx + dirSign * 2.0, cy - 1.0], [cx + dirSign * 3.2, cy + 1.6], 2.0, 'textHi', 1),
+            stroke: 'ink1', strokeWidth: 0.6,
+          };
+          const fingers: FigurePrim[] = [-1.5, 0, 1.5].map((off) => ({
+            ...line([cx + off, cy + 0.4], [cx + off, cy + 3.4], 1.6, 'textHi', 1),
+            stroke: 'ink1', strokeWidth: 0.5,
+          }));
+          groups.front.push(farPlate, shaft, wristBase, dorsal, innerPalm, thumb, ...fingers, nearPlate);
+        }
+      } else {
+        const wristBase = line([cx, cy + 7.5], [cx, cy + 3.0], 3.4, 'textHi', 1);
+        const dorsal = line([cx, cy + 3.0], [cx, cy - 1.8], 5.2, 'textHi', 1);
+        const innerPalm = line([cx + pDx * 0.9, cy + 2.4], [cx + pDx * 0.9, cy - 1.2], 3.6, 'textMid', 1);
+        const thumb: FigurePrim = {
+          ...line([cx + thumbSide * 2.2, cy + 1.4], [cx + thumbSide * 3.8 + pDx * 1.4, cy - 1.2], 2.0, 'textHi', 1),
+          stroke: 'ink1', strokeWidth: 0.6,
+        };
+        const fingers: FigurePrim[] = [-1.6, 0, 1.6].map((off) => ({
+          ...line([cx + off * fSpread + pDx * 0.8, cy - 0.6], [cx + off * fSpread + pDx * 0.8, cy - 3.2], 1.7, 'textHi', 1),
+          stroke: 'ink1', strokeWidth: 0.5,
+        }));
+        groups.front.push(line(panel.hand ?? figure.grip.near, panel.centre, 0.8, 'textLow', 0.75));
+        groups.front.push({ kind: 'circle', cx, cy, r: panel.r, fill: 'ink1', stroke: 'textLow', strokeWidth: 1.2, opacity: 1 });
+        if (kind === 'kettlebell' || kind === 'kettlebells') {
+          const hHalf = Math.max(2.0, Math.abs(hDx) * 5.4);
+          const handleBar: FigurePrim = { ...line([cx - hHalf, cy - 2.6], [cx + hHalf, cy - 2.6], 2.2, 'textHi', 1), stroke: 'ink1', strokeWidth: 0.6 };
+          const postL: FigurePrim = line([cx - hHalf, cy - 2.6], [cx - hHalf * 0.7 - pDx * 2.2, cy + 0.8], 1.6, 'textMid', 1);
+          const postR: FigurePrim = line([cx + hHalf, cy - 2.6], [cx + hHalf * 0.7 - pDx * 2.2, cy + 0.8], 1.6, 'textMid', 1);
+          const globe: FigurePrim = { kind: 'circle', cx: cx - pDx * 3.8, cy: cy + 2.4, r: 5.2, fill: 'textMid', stroke: 'ink1', strokeWidth: 1.0, opacity: 1 };
+          if (facing) {
+            groups.front.push(globe, postL, postR, wristBase, dorsal, innerPalm, handleBar, ...fingers, thumb);
+          } else {
+            groups.front.push(innerPalm, wristBase, dorsal, postL, postR, handleBar, ...fingers, thumb, globe);
+          }
+        } else if (kind === 'bar' || kind === 'ez' || kind === 'cableBar') {
+          // A bar in an upright hand, drawn along its projected direction, with
+          // the palm and the back of the hand told apart as for a dumbbell: a
+          // light palm behind the bar with four fingers wrapped over it, or a
+          // darker back of the hand over the bar with the knuckles above it.
+          const bHalf = Math.max(2.0, Math.abs(hDx) * 8.5);
+          const barLine: FigurePrim = line([cx - bHalf, cy - 1.8], [cx + bHalf, cy - 1.8], 2.2, 'textMid', 1);
+          const barFingers = [-2.55, -0.85, 0.85, 2.55];
+          if (facing) {
+            const palm: FigurePrim = { ...line([cx, cy + 3.0], [cx, cy - 0.4], 7.0, 'textHi', 1), stroke: 'ink1', strokeWidth: 0.6 };
+            const wrapped: FigurePrim[] = barFingers.map((off) => ({
+              ...line([cx + off * fSpread, cy - 4.1], [cx + off * fSpread, cy + 0.1], 1.7, 'textHi', 1),
+              stroke: 'ink1', strokeWidth: 0.5,
+            }));
+            groups.front.push(wristBase, palm, barLine, ...wrapped, thumb);
+          } else {
+            const back: FigurePrim = { ...line([cx, cy + 3.0], [cx, cy - 2.4], 7.0, 'textMid', 1), stroke: 'ink1', strokeWidth: 0.6 };
+            const knuckles: FigurePrim[] = barFingers.map((off) => ({
+              kind: 'circle', cx: cx + off * fSpread, cy: cy - 3.9, r: 1.05, fill: 'textHi', stroke: 'ink1', strokeWidth: 0.45, opacity: 1,
+            }));
+            groups.front.push(barLine, { ...wristBase, color: 'textMid' }, back, thumb, ...knuckles);
+          }
+        } else {
+          const hHalf = Math.max(1.8, Math.abs(hDx) * 6.8);
+          const dirSign = hDx >= 0 ? 1 : -1;
+          const farPlateX = cx - dirSign * hHalf, nearPlateX = cx + dirSign * hHalf;
+          const farPlate: FigurePrim = { ...line([farPlateX, cy - 5.2], [farPlateX, cy + 2.0], 3.2, 'textHi', 1), stroke: 'ink1', strokeWidth: 0.8 };
+          const nearPlate: FigurePrim = { ...line([nearPlateX, cy - 5.2], [nearPlateX, cy + 2.0], 3.2, 'textHi', 1), stroke: 'ink1', strokeWidth: 0.8 };
+          const shaft: FigurePrim = line([cx - hHalf, cy - 1.8], [cx + hHalf, cy - 1.8], 2.2, 'textMid', 1);
+          // The palm and the back of the hand are drawn differently so they read
+          // apart at card size. Palm side: a light palm behind the handle and four
+          // fingers wrapped over it toward the viewer. Back side: a darker back of
+          // the hand over the middle of the handle, hiding it, with the four
+          // knuckles riding above it.
+          const fingerOffsets = [-2.55, -0.85, 0.85, 2.55];
+          if (facing) {
+            const palm: FigurePrim = { ...line([cx, cy + 3.0], [cx, cy - 0.4], 7.0, 'textHi', 1), stroke: 'ink1', strokeWidth: 0.6 };
+            const wrapped: FigurePrim[] = fingerOffsets.map((off) => ({
+              ...line([cx + off * fSpread, cy - 4.1], [cx + off * fSpread, cy + 0.1], 1.7, 'textHi', 1),
+              stroke: 'ink1', strokeWidth: 0.5,
+            }));
+            groups.front.push(wristBase, palm, farPlate, shaft, ...wrapped, thumb, nearPlate);
+          } else {
+            const back: FigurePrim = { ...line([cx, cy + 3.0], [cx, cy - 2.4], 7.0, 'textMid', 1), stroke: 'ink1', strokeWidth: 0.6 };
+            const knuckles: FigurePrim[] = fingerOffsets.map((off) => ({
+              kind: 'circle', cx: cx + off * fSpread, cy: cy - 3.9, r: 1.05, fill: 'textHi', stroke: 'ink1', strokeWidth: 0.45, opacity: 1,
+            }));
+            const backWrist: FigurePrim = { ...wristBase, color: 'textMid' };
+            groups.front.push(farPlate, shaft, backWrist, back, thumb, ...knuckles, nearPlate);
+          }
+        }
+      }
+    } else {
+      // Back to front: the line from the real hand, the panel that hides whatever
+      // is behind it, and either the two-hand neutral V-bar view, the turning
+      // D-handle palm view, or the profile hand with wrist, palm, fingers, and bar.
+      groups.front.push(line(figure.grip.near, panel.centre, 0.8, 'textLow', 0.75));
+      groups.front.push({ kind: 'circle', cx: panel.centre[0], cy: panel.centre[1], r: panel.r, fill: 'ink1', stroke: 'textLow', strokeWidth: 1.2, opacity: 1 });
+      const [cx, cy] = panel.centre;
+      if (panel.palmsFacingEachOther) {
+        // Neutral V-bar close-up: V-bar branches angled down from the central swivel,
+        // gripped from the outside by both hands with their inner palms facing each other.
+        groups.front.push(line([cx, cy - 8.2], [cx, cy - 5.2], 1.4, 'textMid', 1));
+        groups.front.push(line([cx, cy - 5.2], [cx - 3.6, cy + 4.2], 1.8, 'textMid', 1));
+        groups.front.push(line([cx, cy - 5.2], [cx + 3.6, cy + 4.2], 1.8, 'textMid', 1));
+        // Left hand: outer dorsal back, inner palm pad facing right, and fingers wrapped inward
+        groups.front.push(line([panel.leftDorsalX, cy - 1.4], [panel.leftDorsalX, cy + 3.8], 2.0, 'textHi', 1));
+        groups.front.push(line([panel.leftPalmX, cy - 1.2], [panel.leftPalmX, cy + 3.6], 1.6, 'textMid', 1));
+        groups.front.push(line([panel.leftDorsalX + 0.4, cy - 1.8], [cx - 2.2, cy - 2.4], 1.4, 'textHi', 1));
+        for (const dy of [-0.4, 1.2, 2.8]) {
+          groups.front.push(line([panel.leftPalmX, cy + dy], [cx - 1.9, cy + dy], 1.3, 'textHi', 1));
+        }
+        // Right hand: outer dorsal back, inner palm pad facing left, and fingers wrapped inward
+        groups.front.push(line([panel.rightDorsalX, cy - 1.4], [panel.rightDorsalX, cy + 3.8], 2.0, 'textHi', 1));
+        groups.front.push(line([panel.rightPalmX, cy - 1.2], [panel.rightPalmX, cy + 3.6], 1.6, 'textMid', 1));
+        groups.front.push(line([panel.rightDorsalX - 0.4, cy - 1.8], [cx + 2.2, cy - 2.4], 1.4, 'textHi', 1));
+        for (const dy of [-0.4, 1.2, 2.8]) {
+          groups.front.push(line([panel.rightPalmX, cy + dy], [cx + 1.9, cy + dy], 1.3, 'textHi', 1));
+        }
+      } else if (panel.grip === 'neutral') {
+        // The handle first, then the back of the hand and the closed fist over
+        // its middle, so its two ends stand out either side of the fist.
+        groups.front.push({ ...line(panel.handle[0], panel.handle[1], CLOSE_UP_HAND.bar * 2 * panel.scale, 'textMid', 1), stroke: 'ink1', strokeWidth: 0.8 });
+        groups.front.push(line(panel.stub, panel.wrist, CLOSE_UP_HAND.wristHalf * 2 * panel.scale, 'textHi', 1));
+        groups.front.push(line(panel.wrist, panel.bar, CLOSE_UP_HAND.palmHalf * 2 * panel.scale, 'textHi', 1));
+        groups.front.push({ kind: 'circle', cx: panel.bar[0], cy: panel.bar[1], r: (CLOSE_UP_HAND.bar + CLOSE_UP_HAND.fingerHalf * 2) * panel.scale, fill: 'textHi', stroke: 'ink1', strokeWidth: 0.8, opacity: 1 });
+      } else if (panel.grip === 'turn') {
+        // Turning D-handle close-up: at palmYaw = 0 (u = 0) the broad inner palm faces
+        // forward at the viewer with the D-handle across it; at palmYaw = 90 (u = 1)
+        // the hand has turned 90 degrees so the dorsal back is on the outside (right)
+        // and the palm and curled fingers face inward (left) toward the opposite palm.
+        const u = Math.max(0, Math.min(1, panel.palmYaw / 90));
+        const halfW = 4.0 * (1 - 0.75 * u);
+        const wristX = cx + 1.4 * u;
+        groups.front.push(line([cx, cy - 8.4], [cx, cy - 4.8], 1.4, 'textMid', 1));
+        groups.front.push(line([cx, cy - 4.8], [cx - halfW, cy - 1.2], 1.3, 'textLow', 0.9));
+        groups.front.push(line([cx, cy - 4.8], [cx + halfW, cy - 1.2], 1.3, 'textLow', 0.9));
+        groups.front.push(line([cx - halfW - 0.6, cy - 1.2], [cx + halfW + 0.6, cy - 1.2], 2.0, 'textMid', 1));
+        // Wrist and outer dorsal edge
+        groups.front.push(line([wristX, cy + 7.2], [wristX, cy + 4.0], 3.2 - 0.8 * u, 'textHi', 1));
+        groups.front.push(line([cx + 2.6 * u, cy + 4.0], [cx + 2.6 * u, cy - 0.6], 4.6 - 2.2 * u, 'textHi', 1));
+        // Inner palm pad (broad front pad at u = 0, shifting to the inner/left edge at u = 1)
+        groups.front.push(line([cx - 1.4 * u, cy + 3.6], [cx - 1.4 * u, cy - 0.4], 3.8 - 2.0 * u, 'textMid', 1));
+        // Thumb and fingers curling over the handle bar
+        groups.front.push(line([cx - 2.8 * (1 - 0.5 * u), cy + 2.2], [cx - 3.2 * (1 - 0.4 * u), cy - 0.8], 1.5, 'textHi', 1));
+        for (const k of [-1.5, -0.5, 0.5, 1.5]) {
+          const fx0 = cx + k * 1.4 * (1 - u) + 1.0 * u;
+          const fx1 = cx + k * 1.4 * (1 - u) - 2.0 * u;
+          const fy0 = cy - 0.6 + k * 0.9 * u;
+          const fy1 = cy - 2.4 + k * 0.9 * u;
+          groups.front.push(line([fx0, fy0], [fx1, fy1], 1.3, 'textHi', 1));
+        }
+      } else {
+        groups.front.push(line(panel.stub, panel.wrist, CLOSE_UP_HAND.wristHalf * 2 * panel.scale, 'textHi', 1));
+        groups.front.push(line(panel.wrist, panel.knuckle, CLOSE_UP_HAND.palmHalf * 2 * panel.scale, 'textHi', 1));
+        if (panel.grip === 'underhand' || panel.grip === 'overhand') {
+          const palmShift = panel.grip === 'underhand' ? -0.9 : 0.9;
+          groups.front.push(line([panel.wrist[0] + palmShift, panel.wrist[1]], [panel.knuckle[0] + palmShift, panel.knuckle[1]], 1.4, 'textMid', 1));
+        }
+        groups.front.push(line(panel.thumb[0], panel.thumb[1], CLOSE_UP_HAND.fingerHalf * 2 * panel.scale, 'textHi', 1));
+        for (let i = 0; i < 3; i++) {
+          groups.front.push(line(panel.finger[i], panel.finger[i + 1], CLOSE_UP_HAND.fingerHalf * 2 * panel.scale, 'textHi', 1));
+        }
+        groups.front.push({ kind: 'circle', cx: panel.bar[0], cy: panel.bar[1], r: CLOSE_UP_HAND.bar * panel.scale, fill: 'textMid', stroke: 'ink1', strokeWidth: 0.8, opacity: 1 });
+      }
     }
-    groups.front.push({ kind: 'circle', cx: panel.bar[0], cy: panel.bar[1], r: CLOSE_UP_HAND.bar * panel.scale, fill: 'textMid', stroke: 'ink1', strokeWidth: 0.8, opacity: 1 });
+  }
+  const backPanel = upperBackCloseUp(figure);
+  if (backPanel !== null) {
+    const cx = backPanel.centre[0], cy = backPanel.centre[1];
+    groups.front.push(line(j.nk, backPanel.centre, 0.8, 'textLow', 0.75));
+    groups.front.push({ kind: 'circle', cx, cy, r: backPanel.r, fill: 'ink1', stroke: 'textLow', strokeWidth: 1.2, opacity: 1 });
+    // Thoracic spine midline and rear torso contour inside the upper-back callout
+    groups.front.push(line([cx, cy - 8.5], [cx, cy + 8.5], 1.4, 'textLow', 0.85));
+    groups.front.push(line([cx - 9.0, cy - 3.6], [cx + 9.0, cy - 3.6], 2.0, 'textMid', 0.75));
+    // Left and right shoulder blades (scapulae) pinching medially toward the spine
+    groups.front.push({
+      ...line(backPanel.leftBlade[0], backPanel.leftBlade[1], 2.8, 'textHi', 1),
+      stroke: 'ink1', strokeWidth: 0.6,
+    });
+    groups.front.push({
+      ...line(backPanel.rightBlade[0], backPanel.rightBlade[1], 2.8, 'textHi', 1),
+      stroke: 'ink1', strokeWidth: 0.6,
+    });
+    groups.front.push(line([cx - 8.8, cy - 3.4], backPanel.leftBlade[0], 2.0, 'textHi', 0.9));
+    groups.front.push(line([cx + 8.8, cy - 3.4], backPanel.rightBlade[0], 2.0, 'textHi', 0.9));
+  }
+  const foot = footCloseUp(figure);
+  if (foot !== null) {
+    // The line from the real heel, then the panel over whatever is behind it.
+    groups.front.push(line(figure.joints.an, foot.centre, 0.8, 'textLow', 0.75));
+    groups.front.push(...foot.prims);
   }
   return { ...groups, far, lines, near };
+}
+
+/**
+ * Magnified rear-view callout of the upper back and shoulder blades (scapulae)
+ * for the Middle Back Shrug, showing the two shoulder blades drawing together
+ * toward the spine as `retract` increases.
+ */
+export function upperBackCloseUp(figure: ReturnType<typeof chainGeometry>) {
+  if (figure.movement !== CHAIN_MOVEMENTS['middle-back-shrug']) return null;
+  const centre: CanonicalPoint = [22, 22];
+  const r = 13.5;
+  const t = Math.max(0, Math.min(1, figure.angles.retract / 6.4));
+  const halfSpan = 6.4 - 3.6 * t;
+  const lift = 1.6 * t;
+  const leftBlade: readonly [CanonicalPoint, CanonicalPoint] = [
+    [centre[0] - halfSpan, centre[1] - 4.2 - lift],
+    [centre[0] - halfSpan * 0.78, centre[1] + 4.4 - lift],
+  ];
+  const rightBlade: readonly [CanonicalPoint, CanonicalPoint] = [
+    [centre[0] + halfSpan, centre[1] - 4.2 - lift],
+    [centre[0] + halfSpan * 0.78, centre[1] + 4.4 - lift],
+  ];
+  return {
+    centre,
+    r,
+    bladeSpan: halfSpan * 2,
+    retract: figure.angles.retract,
+    leftBlade,
+    rightBlade,
+  };
 }
 
 /**
@@ -4035,6 +9039,8 @@ export const CLOSE_UP_HAND = {
   palm: 2.5, palmHalf: CLOSE_UP_PALM_HALF, wristHalf: 0.5, stub: 0.2,
   finger: [CLOSE_UP_FIRST_BONE, CLOSE_UP_MIDDLE_BONE, 0.6], fingerHalf: CLOSE_UP_FINGER_HALF, bar: CLOSE_UP_BAR,
   closed: [40, 40 + CLOSE_UP_WRAP, 40 + 2 * CLOSE_UP_WRAP], open: [-30, -5, 50],
+  /** Half the length of a neutral handle shown across the fist. */
+  handle: 1.7,
 } as const;
 /** Where the knuckle sits in the panel, so that the whole hand is centred in it. */
 const CLOSE_UP_KNUCKLE: readonly [number, number] = [0.25, -0.3];
@@ -4079,26 +9085,89 @@ function closeUpBar(open: number): [number, number] {
 export function handCloseUp(figure: ReturnType<typeof chainGeometry>) {
   const closeUp = figure.movement.closeUp;
   if (closeUp === undefined) return null;
-  const zoom = Math.max(0, Math.min(1, figure.ph));
-  const open = Math.max(0, Math.min(1, figure.ph - 1));
+  const zoom = closeUp.zoom ?? Math.max(0, Math.min(1, figure.ph));
+  const open = closeUp.open ?? Math.max(0, Math.min(1, figure.ph - 1));
   if (zoom < 1e-6) return null;
-  const hand = figure.grip.near;
+  const useFar = closeUp.hand !== 'near'
+    && figure.world.far.palmDir !== undefined
+    && figure.world.far.handleAxis !== undefined
+    && figure.world.far.hold[1] > figure.world.near.hold[1] + 1;
+  const hand = useFar ? figure.grip.far : figure.grip.near;
   const target = figure.project(chainWorld(closeUp.at));
   const centre: CanonicalPoint = [hand[0] + (target[0] - hand[0]) * zoom, hand[1] + (target[1] - hand[1]) * zoom];
   const scale = closeUp.scale * zoom;
-  // The hand is drawn the way the figure's own forearm points, with the palm on the side a palms-up grip puts it.
+  // The hand is drawn the way the figure's own forearm points, or vertical to
+  // an overhead bar when `closeUp.palm` names an explicit grip orientation.
   const j = figure.joints;
-  const length = Math.hypot(j.wr[0] - j.el[0], j.wr[1] - j.el[1]) || 1;
-  const along: CanonicalPoint = [(j.wr[0] - j.el[0]) / length, (j.wr[1] - j.el[1]) / length];
-  const palmSide: CanonicalPoint = [along[1], -along[0]];
+  const el = useFar ? j.ef : j.el;
+  const wr = useFar ? j.wf : j.wr;
+  const shoulder = useFar ? j.fArm : j.nArm;
+  const length = Math.hypot(wr[0] - el[0], wr[1] - el[1]) || 1;
+  const forearmAlong: CanonicalPoint = [(wr[0] - el[0]) / length, (wr[1] - el[1]) / length];
+  // A named grip orientation (anything but 'flexion') stands the hand vertical to an overhead bar.
+  const namedGrip = closeUp.palm !== undefined && closeUp.palm !== 'flexion' ? closeUp.palm : undefined;
+  const along: CanonicalPoint = namedGrip !== undefined ? [0, -1] : forearmAlong;
+  // With `palm: 'flexion'` a bent arm's palm faces the inside of the bend,
+  // the side its own upper arm is on, as a palms-up curl turns it toward the
+  // shoulder and head.
+  const toShoulder: CanonicalPoint = [shoulder[0] - el[0], shoulder[1] - el[1]];
+  const bendSide = along[0] * toShoulder[1] - along[1] * toShoulder[0];
+  const palmSide: CanonicalPoint = namedGrip === 'underhand' ? [-1, 0]
+    : namedGrip === 'overhand' ? [1, 0]
+      : closeUp.palm === 'flexion' && Math.abs(bendSide) > 1
+        ? (bendSide > 0 ? [-along[1], along[0]] : [along[1], -along[0]])
+        : along[0] < 0 ? [-along[1], along[0]] : [along[1], -along[0]];
   const place = (q: readonly [number, number]): CanonicalPoint => [
     centre[0] + (along[0] * (q[0] + CLOSE_UP_KNUCKLE[0]) + palmSide[0] * (q[1] + CLOSE_UP_KNUCKLE[1])) * scale,
     centre[1] + (along[1] * (q[0] + CLOSE_UP_KNUCKLE[0]) + palmSide[1] * (q[1] + CLOSE_UP_KNUCKLE[1])) * scale,
   ];
   const finger = closeUpFinger(open);
   const bar = closeUpBar(open);
+  // A neutral grip is seen from the back of the hand: the handle runs across
+  // the fist, square to the forearm, and stands out on both sides of it.
+  const grip = closeUp.grip ?? 'bar';
+  const handle = [place([bar[0], bar[1] - CLOSE_UP_HAND.handle]), place([bar[0], bar[1] + CLOSE_UP_HAND.handle])] as const;
+  // The turn of a 'turn' grip comes from the hand's angle; a pose's own palm yaw, when it names one, replaces it below.
+  const handYaw = figure.angles.hand !== undefined ? -figure.angles.hand[1] : 0;
+  const palmYaw = useFar ? figure.angles.farPalmYaw : figure.angles.palmYaw;
+  const palmExtra: {
+    palmYaw?: number;
+    palmDir?: ChainVec;
+    handleAxis?: ChainVec;
+    palmFacingViewer?: boolean;
+    palmScreenDir?: CanonicalPoint;
+    handleScreenDir?: CanonicalPoint;
+    hand?: CanonicalPoint;
+  } = palmYaw !== undefined ? (() => {
+    const r = chainRad(palmYaw);
+    const camYaw = chainRad(72);
+    const palmDir: ChainVec = [Math.cos(r), 0, -Math.sin(r)];
+    const handleAxis: ChainVec = [Math.sin(r), 0, Math.cos(r)];
+    const palmZ = palmDir[0] * Math.sin(camYaw) + palmDir[2] * Math.cos(camYaw);
+    const palmScreenDir: CanonicalPoint = [palmDir[0] * Math.cos(camYaw) - palmDir[2] * Math.sin(camYaw), 0];
+    const handleScreenDir: CanonicalPoint = [handleAxis[0] * Math.cos(camYaw) - handleAxis[2] * Math.sin(camYaw), 0];
+    return {
+      palmYaw,
+      palmDir,
+      handleAxis,
+      palmFacingViewer: palmZ > 0,
+      palmScreenDir,
+      handleScreenDir,
+      hand,
+    };
+  })() : {};
   return {
     zoom, open, centre, r: closeUp.r * zoom, scale,
+    // A neutral handle grip, else the named grip orientation, else a bar across the fingers.
+    grip: closeUp.grip ?? namedGrip ?? ('bar' as const),
+    handle, palmSide,
+    palmsFacingEachOther: closeUp.palm === 'neutral',
+    leftDorsalX: centre[0] - 5.4,
+    leftPalmX: centre[0] - 3.8,
+    rightPalmX: centre[0] + 3.8,
+    rightDorsalX: centre[0] + 5.4,
+    palmYaw: handYaw,
+    palmFacingViewer: handYaw < 45,
     /** The hand model before it is placed: the finger's points and the bar, from the knuckle. */
     model: { finger, bar },
     stub: place([-CLOSE_UP_HAND.palm - CLOSE_UP_HAND.stub, 0]),
@@ -4107,7 +9176,58 @@ export function handCloseUp(figure: ReturnType<typeof chainGeometry>) {
     thumb: [place([-CLOSE_UP_HAND.palm + 0.7, 0.25]), place([-CLOSE_UP_HAND.palm + 1.5, 0.7])] as const,
     finger: finger.map(place),
     bar: place(bar),
+    ...palmExtra,
   };
+}
+
+/**
+ * The close-up of the near foot on the block's edge at this moment, or null
+ * when the movement has none. The scene is the figure's own foot, seen side
+ * on: each world point is placed relative to the block's rear top corner and
+ * magnified, so the heel's drop below the block top and its rise above it read
+ * at a glance. Everything drawn stays inside the panel's circle.
+ */
+export function footCloseUp(figure: ReturnType<typeof chainGeometry>) {
+  const closeUp = figure.movement.footCloseUp;
+  if (closeUp === undefined) return null;
+  const { r, scale, edge, focus } = closeUp;
+  const centre = figure.project(chainWorld(closeUp.at));
+  const corner: CanonicalPoint = [centre[0] + (edge[0] - focus[0]) * scale, centre[1] - (edge[1] - focus[1]) * scale];
+  const place = (q: readonly number[]): CanonicalPoint => [corner[0] + (q[0] - edge[0]) * scale, corner[1] - (q[1] - edge[1]) * scale];
+  const w = figure.world.near;
+  const heel = place(w.ankle);
+  const ball = place(w.toe ?? w.ankle);
+  const shinHalf = CANONICAL_BODY_PARAMETERS.lw * 0.9 / 2 * scale;
+  const footHalf = figure.footWidth / 2 * scale;
+  const fromCentre = (p: CanonicalPoint): number => Math.hypot(p[0] - centre[0], p[1] - centre[1]);
+  // The shin runs up from the heel toward the knee, as far as the panel shows it.
+  const up = [w.knee[0] - w.ankle[0], w.knee[1] - w.ankle[1]];
+  const upLength = Math.hypot(up[0], up[1]) || 1;
+  const dir: CanonicalPoint = [up[0] / upLength, -up[1] / upLength];
+  const room = r - shinHalf;
+  const off: CanonicalPoint = [heel[0] - centre[0], heel[1] - centre[1]];
+  const b = off[0] * dir[0] + off[1] * dir[1];
+  const reach = Math.max(0, -b + Math.sqrt(Math.max(0, b * b - (off[0] * off[0] + off[1] * off[1] - room * room))));
+  const shinEnd: CanonicalPoint = [heel[0] + dir[0] * reach, heel[1] + dir[1] * reach];
+  // The block: its top and rear face meet at the corner, cut off by the panel.
+  // The block fills as much of the panel below and ahead of its corner as fits.
+  const fits = (x: number, y: number): boolean => fromCentre([x, y]) <= r;
+  let blockW = 10, blockH = 3.5;
+  while (blockW > 0 && !(fits(corner[0] + blockW, corner[1]) && fits(corner[0] + blockW, corner[1] + blockH))) blockW -= 0.25;
+  while (blockH > 0 && !fits(corner[0], corner[1] + blockH)) blockH -= 0.25;
+  if (fromCentre(heel) + shinHalf > r + 1e-9) return null;
+  // A thin line carries the block's top back across the panel, over the foot,
+  // so the heel reads plainly below it at the stretch and above it at the top.
+  const levelHalf = 0.3;
+  const levelReach = Math.sqrt(Math.max(0, (r - levelHalf) ** 2 - (corner[1] - centre[1]) ** 2));
+  const prims: FigurePrim[] = [
+    { kind: 'circle', cx: centre[0], cy: centre[1], r, fill: 'ink1', stroke: 'textLow', strokeWidth: 1.2, opacity: 1 },
+    { kind: 'rect', x: corner[0], y: corner[1], w: blockW, h: blockH, rx: 0, fill: 'line', stroke: 'textLow', strokeWidth: 1.2, opacity: 1 },
+    { kind: 'bone', x1: heel[0], y1: heel[1], x2: shinEnd[0], y2: shinEnd[1], w: shinHalf * 2, color: 'textHi', opacity: 1 },
+    { kind: 'bone', x1: heel[0], y1: heel[1], x2: ball[0], y2: ball[1], w: footHalf * 2, color: 'textHi', opacity: 1 },
+    { kind: 'bone', x1: centre[0] - levelReach, y1: corner[1], x2: corner[0], y2: corner[1], w: levelHalf * 2, color: 'textLow', opacity: 1 },
+  ];
+  return { centre, r, scale, corner, heel, ball, heelR: shinHalf, prims };
 }
 
 /** Small hip arc with fixed soft knee; an actual cuff, not a hand cable. */
@@ -4839,6 +9959,39 @@ export function layoutCanonicalFigure(pose: CanonicalPose, opts: FigureOptions):
       thickness, 'textLow', 1,
     ));
   }
+  if (chain && chain.movement.chestBoard) {
+    const b = chain.movement.chestBoard;
+    const bi = Math.max(0, Math.min(slices, Math.round(b.along * slices)));
+    const bt = bi / slices;
+    const here = curledSpine ? curledSpine[bi] : at(bt);
+    const before = curledSpine ? curledSpine[Math.max(0, bi - 1)] : j.nk;
+    const after = curledSpine ? curledSpine[Math.min(slices, bi + 1)] : j.hp;
+    const run = Math.hypot(after[0] - before[0], after[1] - before[1]) || 1;
+    const bAxis: CanonicalPoint = [(after[0] - before[0]) / run, (after[1] - before[1]) / run];
+    const across: CanonicalPoint = [-(after[1] - before[1]) / run, (after[0] - before[0]) / run];
+    const upNormal: CanonicalPoint = across[1] <= 0 ? across : [-across[0], -across[1]];
+    const half = !front
+      ? sw + (Math.min(hw, sw * 0.9) - sw) * bt
+      : bt <= 0.56 ? sw + (waistWidth - sw) * (bt / 0.56) : waistWidth + (hw - waistWidth) * ((bt - 0.56) / 0.44);
+    const boardCenter: CanonicalPoint = [
+      here[0] + upNormal[0] * (half + b.height / 2),
+      here[1] + upNormal[1] * (half + b.height / 2),
+    ];
+    const halfLen = b.length / 2;
+    prims.push(bone(
+      [boardCenter[0] - bAxis[0] * halfLen, boardCenter[1] - bAxis[1] * halfLen],
+      [boardCenter[0] + bAxis[0] * halfLen, boardCenter[1] + bAxis[1] * halfLen],
+      b.height, 'textMid', 1,
+    ));
+    for (const sOff of [-halfLen * 0.45, halfLen * 0.45]) {
+      const sc: CanonicalPoint = [here[0] + bAxis[0] * sOff, here[1] + bAxis[1] * sOff];
+      prims.push(bone(
+        [sc[0] - upNormal[0] * half, sc[1] - upNormal[1] * half],
+        [sc[0] + upNormal[0] * (half + b.height), sc[1] + upNormal[1] * (half + b.height)],
+        1.1, 'ink1', 0.85,
+      ));
+    }
+  }
 
   // B1-113: the near cable passes behind the near leg, never over it.
   if (cableDraw) prims.push(...cableDraw.nearCable);
@@ -5231,6 +10384,53 @@ export const EQUIPMENT_BY_SLUG: Record<string, string> = {
   // Family 38: the incline shoulder raises.
   'barbell-incline-shoulder-raise': 'barbell',
   'dumbbell-incline-shoulder-raise': 'dumbbells',
+  // Family 34 (MOV-A05): the horizontal, incline, decline, floor, board, pin, and cable presses.
+  'competition-bench': 'barbell',
+  'close-grip-bench-press': 'barbell',
+  'decline-bench-press': 'barbell',
+  'decline-dumbbell-bench-press': 'dumbbells',
+  'incline-dumbbell-press': 'dumbbells',
+  'board-press': 'barbell',
+  'pin-presses': 'barbell',
+  'floor-press': 'barbell',
+  'one-arm-kettlebell-floor-press': 'kettlebell',
+  'cable-chest-press': 'cable_machine',
+  // Family 37 (MOV-A08): the bent-over barbell, T-bar, and kettlebell rows.
+  'one-arm-kettlebell-row': 'kettlebell',
+  'reverse-grip-bent-over-rows': 'barbell',
+  'two-arm-kettlebell-row': 'kettlebell',
+  't-bar-row': 'barbell',
+  'alternating-kettlebell-row': 'kettlebell',
+  // MOV-A10: vertical pulls and hanging.
+  'weighted-pull-up': 'none',
+  'chin-up': 'none',
+  'pull-up': 'none',
+  'v-bar-pulldown': 'cable_machine',
+  'full-range-of-motion-lat-pulldown': 'cable_machine',
+  'straight-arm-pulldown': 'cable_machine',
+  'gorilla-chin-crunch': 'pullup_bar',
+  'hanging-leg-raise': 'pullup_bar',
+  // MOV-A13: single-leg and calf raises.
+  'bulgarian-split-squat': 'bench',
+  'barbell-step-up': 'barbell',
+  'dumbbell-step-up': 'dumbbells',
+  'barbell-lunge': 'barbell',
+  'elevated-back-lunge': 'barbell',
+  'lunge-pass-through': 'kettlebell',
+  'kettlebell-pistol-squat': 'kettlebell',
+  'standing-barbell-calf-raise': 'barbell',
+  // MOV-A14: trunk, pullovers, flyes, and kettlebell skills.
+  'barbell-ab-rollout': 'barbell',
+  'barbell-rollout-from-bench': 'barbell',
+  'decline-crunch': 'bench',
+  'frog-sit-ups': 'none',
+  'bent-arm-dumbbell-pullover': 'dumbbells',
+  'straight-arm-dumbbell-pullover': 'dumbbells',
+  'bent-arm-barbell-pullover': 'barbell',
+  'flat-bench-cable-flyes': 'cable_machine',
+  'incline-cable-flye': 'cable_machine',
+  'kettlebell-dead-clean': 'kettlebell',
+  'kettlebell-turkish-get-up-lunge-style': 'kettlebell',
 };
 
 /**
