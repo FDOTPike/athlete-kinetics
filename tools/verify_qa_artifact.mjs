@@ -661,6 +661,8 @@ export function validateFingerprint(fp) {
  * in this call, so a rejected artifact cannot poison a later verification in the
  * same process.
  */
+export const defaultRequireSafetyReader = (fixtureMode = false) => !fixtureMode;
+
 export async function verifyQaArtifact(apkPath, options = {}) {
   const {
     fixtureMode = false,
@@ -668,7 +670,7 @@ export async function verifyQaArtifact(apkPath, options = {}) {
     skipSignature = fixtureMode,
     requireModelHash = !fixtureMode,
     requireProvenance = !fixtureMode,
-    requireSafetyReader = false,
+    requireSafetyReader = defaultRequireSafetyReader(fixtureMode),
     repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..'),
     env = process.env,
   } = options;

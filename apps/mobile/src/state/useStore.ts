@@ -133,7 +133,7 @@ import {
   MOVEMENT_PREFIXES,
   RED_FLAG_PAIN,
   RED_FLAG_SYSTEMIC,
-  resolveReport,
+  resolveReportWithSafetyReader,
   resolveMovementAvailability,
   triage,
   type CapabilityEdge,
@@ -155,6 +155,8 @@ import {
   type RoutineStressPurpose,
   type DifficultyRating,
   type Embedder,
+  type SafetyReader,
+  type SafetyReaderPrediction,
   type ReturnAction,
   type BlockPlan,
   type BlockFocus,
@@ -1141,6 +1143,7 @@ interface KineticsStore {
   /** Synchronous read of a planned session's slots (grid detail view). */
   loadSessionSlots: (plannedSessionId: number) => TodaySlot[];
   setEmbedder: (e: Embedder | null) => void;
+  setSafetyReader: (r: SafetyReader | null) => void;
   askQuestion: (text: string) => Promise<QuestionResult | null>;
   saveProfile: (patch: Partial<UserProfile>) => void;
   /** Re-read UI preferences for the active profile slot. */
@@ -1659,6 +1662,7 @@ const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.m
 // Semantic triage singletons (native-adjacent, non-serializable: module level)
 // ---------------------------------------------------------------------------
 let embedder: Embedder | null = null;
+let safetyReader: SafetyReader | null = null;
 let questionIndex: QuestionIndex | null = null;
 /** Health Connect bridge; null = device cannot serve biometrics (by design,
  *  nothing else in the app changes — subjective-triage-only routing). */
@@ -10332,6 +10336,10 @@ export const useStore = create<KineticsStore>()((set, get) => {
     set({ triageReady: e !== null });
   },
 
+  setSafetyReader: (r) => {
+    safetyReader = r;
+  },
+
   askQuestion: async (text) => {
     if (get().status !== 'ready' || text.trim().length === 0 || text.length > 300) return null;
     const releaseLease = tryAcquireDataMutationLease();
@@ -10413,6 +10421,16 @@ export const useStore = create<KineticsStore>()((set, get) => {
           set({ triageReady: false });
         }
       }
+      let readerPrediction: SafetyReaderPrediction | null = null;
+      if (safetyReader !== null) {
+        try {
+          readerPrediction = await safetyReader.classify(raw);
+        } catch {
+          // Safety reader unavailable or failed: preserve exact shipped
+          // semantic + keyword behavior (`readerPrediction = null`).
+          readerPrediction = null;
+        }
+      }
       // Defence in depth behind the lease: never resolve "the current
       // database" for a report started in another athlete context. Nothing is
       // written, and the athlete is told so rather than the report vanishing.
@@ -10421,7 +10439,12 @@ export const useStore = create<KineticsStore>()((set, get) => {
         set({ error: 'Your report was not saved because the athlete changed while it was being checked. Please report it again.' });
         return false;
       }
-      const resolved = resolveReport(raw, semantic);
+      const resolved = resolveReportWithSafetyReader(
+        raw,
+        semantic,
+        readerPrediction,
+        getCodebase().entries,
+      );
       const d = getDb();
       if (!resolved.confident || resolved.entry === null) {
         // No curated match, no red-flag language: log for codebase curation,

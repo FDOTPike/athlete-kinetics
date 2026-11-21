@@ -24,10 +24,17 @@
  * no athlete data is read or written.
  */
 import { Platform } from 'react-native';
-import { loadCodebase, packVectors, triage, type PhraseCodebase } from '@ak/inference';
+import {
+  loadCodebase,
+  packVectors,
+  resolveReportWithSafetyReader,
+  triage,
+  type PhraseCodebase,
+} from '@ak/inference';
 import { routeQuestion, type QuestionIndex } from '../../../../packages/inference/src/semantic/questionRouter';
 import { BACKUP_SCHEMA_USER_VERSION, closeKineticsDb, migrate, openKineticsDb } from '@ak/core-db';
 import { tryCreateDeviceEmbedder } from '../inference/deviceEmbedder';
+import { tryCreateDeviceSafetyReader } from '../inference/deviceSafetyReader';
 import { useStore } from '../state/useStore';
 import { mobileBackupCrypto } from '../state/backupCrypto';
 import { startupDeviceBackupExclusion } from '../state/deviceBackupPolicy';
@@ -148,6 +155,46 @@ export async function runNativeSmoke(): Promise<void> {
       throw new Error(`routed outcome=${routed.outcome} shown=${JSON.stringify(routed.shown)}`);
     }
     return `dims=384 rows=1111 norm=${norm.toFixed(6)} routed=${routed.outcome} shown=${routed.shown.join(',')}`;
+  });
+
+  await step(checks, 'safety reader inference + denial floor', async () => {
+    const reader = await tryCreateDeviceSafetyReader();
+    if (reader === null) {
+      throw new Error('safety reader unavailable (model missing from bundle or ORT failed to load)');
+    }
+    const codebase = loadCodebase(
+      phraseCodebaseJson as unknown as PhraseCodebase,
+      phraseVectorsJson.vectors,
+    );
+    const pred = await reader.classify('vision went spotty after the last set');
+    if (!Number.isFinite(pred.cautionLogit) || !pred.active || pred.actionableRouteId !== 'dizzy') {
+      throw new Error(
+        `unexpected dizzy prediction: active=${pred.active} caution=${pred.cautionLogit} route=${pred.actionableRouteId}`,
+      );
+    }
+    const resolvedHalt = resolveReportWithSafetyReader(
+      'vision went spotty after the last set',
+      null,
+      pred,
+      codebase.entries,
+    );
+    if (!resolvedHalt.confident || resolvedHalt.entry?.id !== 'dizzy' || !resolvedHalt.entry.guardrail.halt) {
+      throw new Error(`expected dizzy halt, got ${resolvedHalt.entry?.id ?? 'null'}`);
+    }
+    const denialPred = await reader.classify('no pain today');
+    if (!Number.isFinite(denialPred.cautionLogit)) {
+      throw new Error(`non-finite denial cautionLogit=${denialPred.cautionLogit}`);
+    }
+    const resolvedDenial = resolveReportWithSafetyReader(
+      'no pain today',
+      null,
+      denialPred,
+      codebase.entries,
+    );
+    if (resolvedDenial.entry !== null) {
+      throw new Error(`expected harmless denial suppression, got ${resolvedDenial.entry.id}`);
+    }
+    return `caution=${pred.cautionLogit.toFixed(4)} route=${pred.actionableRouteId} denialCaution=${denialPred.cautionLogit.toFixed(4)}`;
   });
 
   // The exact production entropy path of encrypted backups (no global polyfill

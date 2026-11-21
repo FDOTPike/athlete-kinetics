@@ -38,6 +38,7 @@
  */
 
 export const LIFECYCLE_TAG = '[embedder-lifecycle]';
+export const SAFETY_READER_LIFECYCLE_TAG = '[safety-reader-lifecycle]';
 
 /** requestId reserved by the wrapper's own creation event. Never a real
  *  inference — see createLazySingleFlightEmbedder's `emit('wrapper',...,0,...)`. */
@@ -141,11 +142,11 @@ export function parseLogcatProcess(line) {
 // --- marker parsing ---------------------------------------------------------
 
 const PHASE_RE = new RegExp(
-  String.raw`\[embedder-lifecycle\]\s+(wrapper|request|session|inference|disposal):(start|settled)`
+  String.raw`\[(embedder|safety-reader)-lifecycle\]\s+(wrapper|request|session|inference|disposal):(start|settled)`
   + String.raw`\s+req=(\d+)\s+ok=(\d+)\s+created=(\d+)\s+disposed=(\d+)`,
 );
 const COMPLETION_RE = new RegExp(
-  String.raw`\[embedder-lifecycle\]\s+request=(\d+)\s+ok=(\d+)\s+totalMs=(-?\d+(?:\.\d+)?)`,
+  String.raw`\[(embedder|safety-reader)-lifecycle\]\s+request=(\d+)\s+ok=(\d+)\s+totalMs=(-?\d+(?:\.\d+)?)`,
 );
 
 /**
@@ -164,7 +165,7 @@ export function parseLifecycleMarkers(logText, opts = {}) {
   const lines = String(logText ?? '').split(/\r?\n/);
 
   lines.forEach((raw, i) => {
-    if (!raw.includes(LIFECYCLE_TAG)) return;
+    if (!raw.includes(LIFECYCLE_TAG) && !raw.includes(SAFETY_READER_LIFECYCLE_TAG)) return;
     const lineNo = i + 1;
     const ts = parseLogcatTimestamp(raw, opts);
 
@@ -174,25 +175,27 @@ export function parseLifecycleMarkers(logText, opts = {}) {
 
     if (phase) {
       marker = {
+        component: phase[1],
         kind: 'phase',
-        phase: phase[1],
-        stage: phase[2],
-        requestId: Number(phase[3]),
-        ok: Number(phase[4]) === 1,
-        created: Number(phase[5]),
-        disposed: Number(phase[6]),
+        phase: phase[2],
+        stage: phase[3],
+        requestId: Number(phase[4]),
+        ok: Number(phase[5]) === 1,
+        created: Number(phase[6]),
+        disposed: Number(phase[7]),
         totalMs: null,
       };
     } else if (completion) {
       marker = {
+        component: completion[1],
         kind: 'completion',
         phase: 'request',
         stage: 'completion',
-        requestId: Number(completion[1]),
-        ok: Number(completion[2]) === 1,
+        requestId: Number(completion[2]),
+        ok: Number(completion[3]) === 1,
         created: null,
         disposed: null,
-        totalMs: Number(completion[3]),
+        totalMs: Number(completion[4]),
       };
     } else {
       malformed.push({ lineNo, raw, reason: 'lifecycle tag present but marker grammar unrecognised' });
@@ -205,12 +208,13 @@ export function parseLifecycleMarkers(logText, opts = {}) {
     else undated.push({ ...record, reason: ts.reason });
   });
 
-  // Stamp a wrapper epoch per process. Every `wrapper:settled` marker announces
-  // a FRESH wrapper whose request counter restarts at 1, so markers before and
-  // after it must never be pooled even within one process.
+  // Stamp a wrapper epoch per (process, component). Every `wrapper:settled`
+  // marker announces a FRESH wrapper for that component whose request counter
+  // restarts at 1, without colliding across co-scheduled embedder + safety-reader
+  // wrappers inside the same process.
   const epochByPid = new Map();
   for (const m of markers) {
-    const key = String(m.pid);
+    const key = `${m.pid}|${m.component ?? 'embedder'}`;
     if (m.phase === 'wrapper') epochByPid.set(key, (epochByPid.get(key) ?? 0) + 1);
     m.wrapperEpoch = epochByPid.get(key) ?? 0;
   }
@@ -232,20 +236,46 @@ export function summarizeDisposalIntegrity(markers) {
   const failures = markers
     .filter((m) => m.phase === 'disposal' && m.stage === 'settled' && m.ok === false)
     .map((m) => ({
+      component: m.component ?? 'embedder',
       pid: m.pid, wrapperEpoch: m.wrapperEpoch, requestId: m.requestId,
       tsMs: m.tsMs, created: m.created, disposed: m.disposed, raw: m.raw,
     }));
-  const settled = markers.filter((m) => m.phase === 'disposal' && m.stage === 'settled');
-  const sessions = markers.filter((m) => m.phase === 'session' && m.stage === 'settled');
-  const finalCreated = sessions.length ? Math.max(...sessions.map((m) => m.created)) : 0;
-  const finalDisposed = settled.length ? Math.max(...settled.map((m) => m.disposed)) : 0;
+  const groups = new Map();
+  const byComponent = new Map();
+  for (const m of markers) {
+    const comp = m.component ?? 'embedder';
+    const k = `${comp}|${m.pid}|${m.wrapperEpoch ?? 0}`;
+    if (!groups.has(k)) groups.set(k, { maxCreated: 0, maxDisposed: 0 });
+    if (!byComponent.has(comp)) byComponent.set(comp, { maxCreated: 0, maxDisposed: 0 });
+    const g = groups.get(k);
+    const c = byComponent.get(comp);
+    if (m.phase === 'session' && m.stage === 'settled' && Number.isFinite(m.created)) {
+      g.maxCreated = Math.max(g.maxCreated, m.created);
+      c.maxCreated = Math.max(c.maxCreated, m.created);
+    }
+    if (m.phase === 'disposal' && m.stage === 'settled' && Number.isFinite(m.disposed)) {
+      g.maxDisposed = Math.max(g.maxDisposed, m.disposed);
+      c.maxDisposed = Math.max(c.maxDisposed, m.disposed);
+    }
+  }
+  let finalCreated = 0;
+  let finalDisposed = 0;
+  for (const c of byComponent.values()) {
+    finalCreated += c.maxCreated;
+    finalDisposed += c.maxDisposed;
+  }
+  let everyGroupBalanced = true;
+  for (const g of groups.values()) {
+    if (g.maxCreated !== g.maxDisposed) everyGroupBalanced = false;
+  }
+  const countersBalanced = everyGroupBalanced && finalCreated === finalDisposed;
   return {
     disposalFailureCount: failures.length,
     failures,
     finalCreated,
     finalDisposed,
-    countersBalanced: finalCreated === finalDisposed,
-    clean: failures.length === 0 && finalCreated === finalDisposed,
+    countersBalanced,
+    clean: failures.length === 0 && countersBalanced,
     note: 'disposedTotal increments even on a THROWN disposal, so countersBalanced '
       + 'alone does not prove absence of a leak; disposalFailureCount is decisive.',
   };
@@ -398,10 +428,10 @@ export function bindTargetSamples({ samples, markers, segments, packageName }) {
 }
 
 export function correlateRequests({ markers, segments }) {
-  // Identity is (process, wrapper instance, request id) — NOT request id alone.
+  // Identity is (component, process, wrapper instance, request id) — NOT request id alone.
   const byRequest = new Map();
   for (const m of markers) {
-    const key = `${m.pid}|${m.wrapperEpoch ?? 0}|${m.requestId}`;
+    const key = `${m.component ?? 'embedder'}|${m.pid}|${m.wrapperEpoch ?? 0}|${m.requestId}`;
     if (!byRequest.has(key)) byRequest.set(key, []);
     byRequest.get(key).push(m);
   }
@@ -423,7 +453,7 @@ export function correlateRequests({ markers, segments }) {
   const epochLedger = new Map();
   for (const m of markers) {
     if (!Number.isFinite(m.pid)) continue;
-    const k = `${m.pid}|${m.wrapperEpoch ?? 0}`;
+    const k = `${m.component ?? 'embedder'}|${m.pid}|${m.wrapperEpoch ?? 0}`;
     if (!epochLedger.has(k)) epochLedger.set(k, { sessionSettled: 0, maxCreated: 0 });
     const e = epochLedger.get(k);
     if (m.phase === 'session' && m.stage === 'settled') e.sessionSettled += 1;
@@ -431,14 +461,16 @@ export function correlateRequests({ markers, segments }) {
   }
 
   const keys = [...byRequest.keys()].sort((a, b) => {
-    const [ap, ae, ar] = a.split('|').map(Number);
-    const [bp, be, br] = b.split('|').map(Number);
-    return ap - bp || ae - be || ar - br;
+    const [ac, apStr, aeStr, arStr] = a.split('|');
+    const [bc, bpStr, beStr, brStr] = b.split('|');
+    const [ap, ae, ar] = [Number(apStr), Number(aeStr), Number(arStr)];
+    const [bp, be, br] = [Number(bpStr), Number(beStr), Number(brStr)];
+    return ap - bp || ac.localeCompare(bc) || ae - be || ar - br;
   });
 
   for (const key of keys) {
     const group = byRequest.get(key);
-    const [pidStr, epochStr] = key.split('|');
+    const [component, pidStr, epochStr] = key.split('|');
     const pid = Number(pidStr);
     const wrapperEpoch = Number(epochStr);
     const processSegments = segments.filter((s) => s.pid === undefined || s.pid === pid);
@@ -586,7 +618,7 @@ export function correlateRequests({ markers, segments }) {
     // Epoch-level ledger (Hermes R4-2). Catches the stitch whose halves agree
     // on their snapshots, because the capture never witnessed enough session
     // creations to justify the counter value those markers carry.
-    const ledger = epochLedger.get(`${pid}|${wrapperEpoch}`);
+    const ledger = epochLedger.get(`${component}|${pid}|${wrapperEpoch}`);
     if (ledger && ledger.maxCreated > ledger.sessionSettled) {
       reasons.push(
         `the created counter reaches ${ledger.maxCreated} in this wrapper instance but only `
@@ -621,16 +653,17 @@ export function correlateRequests({ markers, segments }) {
 
     // Defensive: every marker in a group must share the process identity the
     // key was built from.
-    if (group.some((m) => m.pid !== pid || (m.wrapperEpoch ?? 0) !== wrapperEpoch)) {
+    if (group.some((m) => (m.component ?? 'embedder') !== component || m.pid !== pid || (m.wrapperEpoch ?? 0) !== wrapperEpoch)) {
       reasons.push('markers in this group disagree about process/wrapper identity');
     }
 
     if (reasons.length > 0) {
-      rejected.push({ requestId, pid, wrapperEpoch, reasons, markerCount: group.length });
+      rejected.push({ component, requestId, pid, wrapperEpoch, reasons, markerCount: group.length });
       continue;
     }
 
     qualified.push({
+      component,
       requestId,
       pid,
       wrapperEpoch,
