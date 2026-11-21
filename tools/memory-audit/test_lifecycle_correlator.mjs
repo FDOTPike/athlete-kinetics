@@ -970,5 +970,76 @@ console.log('\n[14] HERMES r4 R4-2 — the epoch session ledger');
   check('SEC11: mismatched raw package identity fails closed', refused);
 }
 
+console.log('\n[15] Stream 2 PR 3 — co-scheduled [embedder-lifecycle] + [safety-reader-lifecycle]');
+{
+  const readerPhaseMsg = (p, s, req, ok, created, disposed) =>
+    `[safety-reader-lifecycle] ${p}:${s} req=${req} ok=${ok} created=${created} disposed=${disposed}`;
+  const readerCompletionMsg = (req, ok, totalMs) =>
+    `[safety-reader-lifecycle] request=${req} ok=${ok} totalMs=${totalMs}`;
+
+  const t = BASE;
+  const dualLines = [
+    pidLine(t + 100, 777, phaseMsg('wrapper', 'settled', 0, 1, 0, 0)),
+    pidLine(t + 120, 777, readerPhaseMsg('wrapper', 'settled', 0, 1, 0, 0)),
+    // Request 1 on embedder (t+1000..t+1160)
+    pidLine(t + 1000, 777, phaseMsg('session', 'start', 1, 1, 0, 0)),
+    pidLine(t + 1050, 777, phaseMsg('session', 'settled', 1, 1, 1, 0)),
+    pidLine(t + 1050, 777, phaseMsg('inference', 'start', 1, 1, 1, 0)),
+    pidLine(t + 1120, 777, phaseMsg('inference', 'settled', 1, 1, 1, 0)),
+    pidLine(t + 1120, 777, phaseMsg('disposal', 'start', 1, 1, 1, 0)),
+    pidLine(t + 1160, 777, phaseMsg('disposal', 'settled', 1, 1, 1, 1)),
+    pidLine(t + 1160, 777, completionMsg(1, 1, 160)),
+    // Co-scheduled Request 1 on safety-reader AFTER embedder disposed (t+1170..t+1310)
+    pidLine(t + 1170, 777, readerPhaseMsg('session', 'start', 1, 1, 0, 0)),
+    pidLine(t + 1210, 777, readerPhaseMsg('session', 'settled', 1, 1, 1, 0)),
+    pidLine(t + 1210, 777, readerPhaseMsg('inference', 'start', 1, 1, 1, 0)),
+    pidLine(t + 1270, 777, readerPhaseMsg('inference', 'settled', 1, 1, 1, 0)),
+    pidLine(t + 1270, 777, readerPhaseMsg('disposal', 'start', 1, 1, 1, 0)),
+    pidLine(t + 1310, 777, readerPhaseMsg('disposal', 'settled', 1, 1, 1, 1)),
+    pidLine(t + 1310, 777, readerCompletionMsg(1, 1, 140)),
+  ];
+  const dualRes = correlate(dualLines, DENSE, { anchor: false });
+  check(
+    'DUAL-1: co-scheduled embedder + safety-reader req=1 both qualify without epoch or requestId collision',
+    dualRes.qualified.length === 2
+      && dualRes.qualified.some((q) => q.component === 'embedder' && q.requestId === 1)
+      && dualRes.qualified.some((q) => q.component === 'safety-reader' && q.requestId === 1)
+      && dualRes.disposalIntegrity.clean === true
+      && dualRes.disposalIntegrity.finalCreated === 2
+      && dualRes.disposalIntegrity.finalDisposed === 2,
+    `qualified=${dualRes.qualified.length}, created=${dualRes.disposalIntegrity.finalCreated}, disposed=${dualRes.disposalIntegrity.finalDisposed}`,
+  );
+
+  // Negative falsifier: safety-reader disposal ok=0 fails session-wide disposalIntegrity even when embedder is clean
+  const leakedReaderLines = dualLines.map((line) =>
+    line.includes('[safety-reader-lifecycle] disposal:settled')
+      ? pidLine(t + 1310, 777, readerPhaseMsg('disposal', 'settled', 1, 0, 1, 1))
+      : line,
+  );
+  const leakedReaderRes = correlate(leakedReaderLines, DENSE, { anchor: false });
+  check(
+    'DUAL-2: safety-reader disposal:settled ok=0 fails disposalIntegrity closed even when embedder is clean',
+    leakedReaderRes.qualified.length === 1
+      && leakedReaderRes.qualified[0].component === 'embedder'
+      && leakedReaderRes.disposalIntegrity.disposalFailureCount === 1
+      && leakedReaderRes.disposalIntegrity.clean === false,
+    `failures=${leakedReaderRes.disposalIntegrity.disposalFailureCount}, clean=${leakedReaderRes.disposalIntegrity.clean}`,
+  );
+
+  // Negative falsifier: safety-reader missing disposal (unbalanced 1 != 0) fails countersBalanced even when embedder is 1/1
+  const unbalancedReaderLines = dualLines.filter(
+    (line) => !line.includes('[safety-reader-lifecycle] disposal:') && !line.includes('[safety-reader-lifecycle] request=1'),
+  );
+  const unbalancedRes = correlate(unbalancedReaderLines, DENSE, { anchor: false });
+  check(
+    'DUAL-3: unbalanced safety-reader session (created=1, disposed=0) fails countersBalanced even when embedder is 1/1',
+    unbalancedRes.disposalIntegrity.finalCreated === 2
+      && unbalancedRes.disposalIntegrity.finalDisposed === 1
+      && unbalancedRes.disposalIntegrity.countersBalanced === false
+      && unbalancedRes.disposalIntegrity.clean === false,
+    `created=${unbalancedRes.disposalIntegrity.finalCreated}, disposed=${unbalancedRes.disposalIntegrity.finalDisposed}`,
+  );
+}
+
 console.log(`\n${fail === 0 ? 'ALL LIFECYCLE CORRELATOR FIXTURES PASSED' : `${fail} LIFECYCLE CORRELATOR FIXTURE(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

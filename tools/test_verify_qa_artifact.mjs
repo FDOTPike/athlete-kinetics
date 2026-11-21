@@ -535,6 +535,22 @@ async function main() {
         readerOk.outcome === 'ok',
         readerOk.result?.failures?.join('; ') ?? readerOk.outcome,
       );
+
+      // 8. Stream 2 PR 3: real-candidate mode (fixtureMode: false) requires safety_reader.onnx by default
+      //    without introducing any skipAapt bypass knob into verifyQaArtifact.
+      {
+        const qaMod = await import('./verify_qa_artifact.mjs');
+        const verifierSrc = readFileSync(VERIFIER, 'utf8');
+        check(
+          'real-candidate mode defaults requireSafetyReader to true via defaultRequireSafetyReader(fixtureMode)',
+          typeof qaMod.defaultRequireSafetyReader === 'function'
+            && qaMod.defaultRequireSafetyReader() === true
+            && qaMod.defaultRequireSafetyReader(false) === true
+            && qaMod.defaultRequireSafetyReader(true) === false
+            && verifierSrc.includes('requireSafetyReader = defaultRequireSafetyReader(fixtureMode)'),
+          typeof qaMod.defaultRequireSafetyReader,
+        );
+      }
     }
     check('ELF parser: 4 KB fixture reports min alignment 0x1000',
       minElfLoadAlignment(ELF_BAD) === 0x1000);

@@ -377,6 +377,48 @@ def qaCandidateManifestTask = tasks.register("generateQaCandidateManifest") {
                 "QA candidate manifest: staged model sha256 ${stagedModelSha} != ratified pin ${modelSha}; refusing to build")
         }
 
+        // Stream 2 safety-reader supply-chain pin — parsed from scripts/safety-reader-integrity.mjs.
+        def readerIntegrityFile = new File(repoRoot, 'scripts/safety-reader-integrity.mjs')
+        def readerIntegritySrc = readerIntegrityFile.text
+        def readerIdMatcher = readerIntegritySrc =~ /SAFETY_READER_MODEL_ID\s*=\s*'([^']+)'/
+        def readerPolicyMatcher = readerIntegritySrc =~ /SAFETY_READER_POLICY_ID\s*=\s*'([^']+)'/
+        def readerTagMatcher = readerIntegritySrc =~ /PINNED_RELEASE_TAG\s*=\s*'([^']+)'/
+        def readerCommitMatcher = readerIntegritySrc =~ /PINNED_RELEASE_COMMIT\s*=\s*'([0-9a-f]{40})'/
+        def readerAssetIdMatcher = readerIntegritySrc =~ /PINNED_ASSET_ID\s*=\s*(\d+)/
+        def readerBytesMatcher = readerIntegritySrc =~ /'reader_quantized\.onnx':\s*(\d+)/
+        def readerShaMatcher = readerIntegritySrc =~ /'reader_quantized\.onnx':\s*\n\s*'([0-9a-f]{64})'/
+        if (!readerIdMatcher.find() || !readerPolicyMatcher.find() || !readerTagMatcher.find()
+                || !readerCommitMatcher.find() || !readerAssetIdMatcher.find()
+                || !readerBytesMatcher.find() || !readerShaMatcher.find()) {
+            throw new GradleException("QA candidate manifest: cannot parse safety-reader pins from safety-reader-integrity.mjs")
+        }
+        def readerModelId = readerIdMatcher.group(1)
+        def readerPolicyId = readerPolicyMatcher.group(1)
+        def readerReleaseTag = readerTagMatcher.group(1)
+        def readerReleaseCommit = readerCommitMatcher.group(1)
+        def readerAssetId = Long.parseLong(readerAssetIdMatcher.group(1))
+        def readerBytes = Long.parseLong(readerBytesMatcher.group(1))
+        def readerSha = readerShaMatcher.group(1)
+
+        def materializedReader = new File(repoRoot, 'packages/inference/assets/safety-reader/reader_quantized.onnx')
+        if (!materializedReader.isFile()) {
+            throw new GradleException(
+                "QA candidate manifest: ${materializedReader} missing - run 'npm run fetch:safety-reader' before building the QA artifact")
+        }
+        if (materializedReader.length() != readerBytes || sha256OfFile(materializedReader) != readerSha) {
+            throw new GradleException(
+                "QA candidate manifest: materialized safety reader failed size/sha256 check against ${readerSha}; refusing to build")
+        }
+        def stagedAndroidReader = file('src/main/assets/safety_reader.onnx')
+        if (!stagedAndroidReader.isFile()) {
+            throw new GradleException(
+                "QA candidate manifest: ${stagedAndroidReader} missing - stage via 'node scripts/stage-native-safety-reader.mjs apps/mobile/android/app/src/main/assets/safety_reader.onnx --required'")
+        }
+        if (stagedAndroidReader.length() != readerBytes || sha256OfFile(stagedAndroidReader) != readerSha) {
+            throw new GradleException(
+                "QA candidate manifest: staged Android safety_reader.onnx failed size/sha256 check against ${readerSha}; refusing to build")
+        }
+
         def rnPkg = new groovy.json.JsonSlurper()
             .parse(new File(repoRoot, 'node_modules/react-native/package.json'))
         def ortRnPkg = new groovy.json.JsonSlurper()
@@ -400,6 +442,16 @@ def qaCandidateManifestTask = tasks.register("generateQaCandidateManifest") {
                 assetPath    : 'assets/minilm.onnx',
                 sha256       : modelSha,
                 sizeBytes    : 22972370,
+            ],
+            safetyReader        : [
+                id           : readerModelId,
+                policyId     : readerPolicyId,
+                releaseTag   : readerReleaseTag,
+                releaseCommit: readerReleaseCommit,
+                assetId      : readerAssetId,
+                assetPath    : 'assets/safety_reader.onnx',
+                sha256       : readerSha,
+                sizeBytes    : readerBytes,
             ],
             packageId           : 'com.pikemethods.training.qa',
             versionCode         : android.defaultConfig.versionCode,

@@ -37,7 +37,8 @@ import {
   type OrtTensorCtor,
   type SerializedOrtScheduler,
 } from './onnxEmbedder';
-import { moreConservative } from './triage';
+import { resolveReport, type ResolvedReport } from './redFlag';
+import { moreConservative, type TriageResult } from './triage';
 import { WordPieceTokenizer, type TokenizerSpec } from './wordpiece';
 
 export { createSerializedOrtScheduler, type SerializedOrtScheduler } from './onnxEmbedder';
@@ -400,4 +401,61 @@ export function combineDenialFloor(input: DenialFloorInput): PhraseEntry | null 
   }
 
   return actionLevel(readerEntry) > actionLevel(floor) ? readerEntry : (floor ?? readerEntry);
+}
+
+/**
+ * End-to-end subjective-report resolver combining deterministic keyword scan,
+ * semantic cosine triage, and the optional m10-r15-reader-seed3 safety reader
+ * under r15/denial-floor:
+ *   - When readerPrediction === null (reader absent or failed), returns
+ *     resolveReport(text, semantic) unchanged.
+ *   - When combineDenialFloor selects an actionable guardrail, returns that
+ *     curated/red-flag entry as confident (overrideApplied when changed).
+ *   - When combineDenialFloor returns null, preserves an uncontested
+ *     no-op acknowledgment (positive-strong) unless isHarmlessDenial(text)
+ *     suppressed the report, and otherwise returns { entry: null, confident: false }.
+ */
+export function resolveReportWithSafetyReader(
+  text: string,
+  semantic: TriageResult | null,
+  readerPrediction: SafetyReaderPrediction | null,
+  codebaseEntries: readonly PhraseEntry[],
+): ResolvedReport {
+  const shipped = resolveReport(text, semantic);
+  if (readerPrediction === null) {
+    return shipped;
+  }
+  const keywordOnly = resolveReport(text, null);
+  const actionable = combineDenialFloor({
+    text,
+    keywordEntry: keywordOnly.entry,
+    shippedEntry: shipped.entry,
+    readerPrediction,
+    codebaseEntries,
+  });
+  if (actionable !== null) {
+    if (shipped.confident && shipped.entry === actionable) {
+      return shipped;
+    }
+    return {
+      entry: actionable,
+      similarity: shipped.similarity,
+      confident: true,
+      overrideApplied: true,
+    };
+  }
+  if (
+    shipped.confident
+    && shipped.entry !== null
+    && isNoOpGuardrail(shipped.entry.guardrail)
+    && !isHarmlessDenial(text)
+  ) {
+    return shipped;
+  }
+  return {
+    entry: null,
+    similarity: shipped.similarity,
+    confident: false,
+    overrideApplied: shipped.confident && shipped.entry !== null,
+  };
 }
