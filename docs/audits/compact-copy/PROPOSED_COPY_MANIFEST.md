@@ -9,7 +9,6 @@ Baseline `fb539d06`. Existing copy retained verbatim when it moves into a disclo
 | `apps/mobile/src/screens/TodayScreen.tsx:401` | Your session is saved exactly where you left it. | Your session is saved. | None in TodayScreen.test.js. SessionScreen.test.js pins the same after text in the workout flow. |
 | `apps/mobile/src/screens/ProgressScreen.tsx:124` | What your sessions and measurements say — read straight from your log. | From your training log. | None found. |
 | `apps/mobile/src/screens/ProfileScreen.tsx:708` | These choices stay with this profile slot. Session mode changes start with your next session. | Settings apply to this profile. Session mode changes start next workout. | None in ProfileCopyW4.test.js. |
-| `apps/mobile/src/components/BackupTransferPanel.tsx:96` | An encrypted backup includes each athlete's profile, plans, routines, workouts, activities, health-support records, preferences, and identifiers on this phone. | An encrypted backup includes all athletes’ profiles, plans, routines, workouts, activities, health-support records, preferences, and identifiers. | None found. Backup warnings and capacity copy stay visible verbatim. |
 | `apps/mobile/src/components/SportFields.tsx:191` | ${SPORT_INFO[sportId].label.toUpperCase()} — ${SPORT_INFO[sportId].distinction ?? ''} | Sport label in its own control and distinction in its own description. Strip a repeated leading sport name followed by a colon. | SportScreens.test.js pins the Field hockey and Ice hockey accessibility distinctions. |
 | `apps/mobile/src/screens/LibraryScreenV2.tsx:405` | Showing the movements available to you. Availability, pattern, equipment and more. | Showing the movements available to you. | No exact-string pin found. |
 | `apps/mobile/src/screens/LibraryScreenV2.tsx:406` | Availability, pattern, equipment and more. | Removed. The Filters label and controls name the options. | No exact-string pin found. |
@@ -50,6 +49,8 @@ The chevron keeps each distinction available. The Judo distinction remains visib
 
 ### Disclosure and visibility inventory
 
+The line-by-line companion C:/codex-sol-compact-evidence/copy-inventory-classified.md lists muted JSX text and protected notices across these files. It records exact baseline locations and whether the work changed their presentation.
+
 | Surface | Collapsed with a chevron | Glossary | Always visible when the surrounding feature is shown |
 | --- | --- | --- | --- |
 | Onboarding | Goal, experience and equipment option descriptions | Existing option InfoTips | Required answers, review facts, errors and limits |
@@ -67,6 +68,15 @@ The chevron keeps each distinction available. The Judo distinction remains visib
 | Focus goals | When a focus change takes effect | — | Saved focus and targets, observations, errors and discard confirmation |
 | Preparation | — | Preparation | Exercise instructions, suitability, reductions, restrictions, stop and skip controls |
 | Subjective report | Optional report prompt explanation | — | Report prompt, semantic availability and safety notices, results and errors |
-| Backup and transfer | What an encrypted backup includes | — | Password, storage, capacity, restore scope and error warnings |
+| Backup and transfer | What an encrypted backup includes, with exact wording pinned by `BackupTransferPanel.test.js` | — | Password, storage, capacity, restore scope and error warnings |
 
 Other muted labels, metadata, generated facts, empty states and action guidance continue to render where they already appeared. A text color alone does not make that copy optional.
+
+### Pixel layout copy
+
+| Source | Before | Provisional after | Pinned assertion |
+| --- | --- | --- | --- |
+| `apps/mobile/src/screens/BlockScreen.tsx:671` | No persistent instruction beside the week rows. | Swipe across a week to see all seven days. | `FocusScreens.test.js` checks the text at a narrow measured width and its absence when the rail fits. |
+| `apps/mobile/src/screens/OnboardingScreen.tsx:1128` | Finish the sport questions to continue, or choose "Skip this" to plan general gym training. | Prepend the first applicable validator message. Examples exercised are `Choose your sport.`, `Choose what you want from your training for this sport.`, and `Choose how long you have played.` The original skip guidance follows it. | `SportScreens.test.js` asserts the existing guidance and the exact required-answer messages. |
+
+The existing `START TRAINING` label moves into the Review footer. Today uses the existing locale-aware date formatter.
