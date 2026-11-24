@@ -20,12 +20,13 @@ test('explains encrypted all-athlete backup, off-phone storage, and replace-only
   };
   render(<BackupTransferPanel />);
   // #173: "every athlete" became the stated limit (see BackupCapacity.test.js).
-  expect(screen.getByText(/includes each athlete's profile, plans, routines, workouts, activities, health-support records/)).toBeOnTheScreen();
   expect(screen.getByText(/Backups cover up to about five athletes in this version/)).toBeOnTheScreen();
   expect(screen.getByText(/copy kept only on this phone will not protect you/)).toBeOnTheScreen();
   expect(screen.getByText(/Replace only: this removes all current athlete data/)).toBeOnTheScreen();
   expect(screen.getByText(/creates and verifies an encrypted recovery backup/)).toBeOnTheScreen();
   expect(screen.getByText('Athletes: Athlete 1, Alex')).toBeOnTheScreen();
+  fireEvent.press(screen.getByLabelText('Show details for BACK UP & TRANSFER DATA'));
+  expect(screen.getByText(/includes each athlete's profile, plans, routines, workouts, activities, health-support records/)).toBeOnTheScreen();
 });
 
 // #235: there is no CSV export, so the panel must not point to one.

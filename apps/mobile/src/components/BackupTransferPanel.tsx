@@ -93,7 +93,7 @@ export default function BackupTransferPanel({ athleteCount }: BackupTransferPane
     <View style={styles.section} testID="backup-transfer-section">
       <CompactDescription label="BACK UP &amp; TRANSFER DATA" heading={<Text style={styles.heading}>BACK UP &amp; TRANSFER DATA</Text>}>
         <Text style={styles.body}>
-          An encrypted backup includes all athletes’ profiles, plans, routines, workouts, activities, health-support records, preferences, and identifiers.
+          An encrypted backup includes each athlete&apos;s profile, plans, routines, workouts, activities, health-support records, preferences, and identifiers on this phone.
         </Text>
       </CompactDescription>
       <Text style={styles.body} testID="backup-limit">{backupLimitText(sizeEstimate)}</Text>

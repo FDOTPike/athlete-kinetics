@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 import BlockScreen from '../../src/screens/BlockScreen';
 
 let mockState;
@@ -109,12 +109,13 @@ describe('Changed in this block panel', () => {
     expect(screen.getByText('FIXED UNTIL 2026-08-28')).toBeOnTheScreen();
     expect(screen.getByTestId('block-adjustments-panel')).toBeOnTheScreen();
     expect(screen.getByText('Changed in this block')).toBeOnTheScreen();
-    expect(screen.getByText('These adjustments were applied when this block was built.')).toBeOnTheScreen();
     expect(screen.getByText(`Overhead Barbell Press: ${SAFETY}`)).toBeOnTheScreen();
     expect(screen.getByText(`Barbell Deadlift: ${RAISED}`)).toBeOnTheScreen();
     expect(screen.queryByText(/held_safety/)).toBeNull();
     expect(screen.queryByText('What changes next block')).toBeNull();
     expect(screen.queryByText(/next one is built/)).toBeNull();
+    fireEvent.press(screen.getByLabelText('Show details for Changed in this block'));
+    expect(screen.getByText('These adjustments were applied when this block was built.')).toBeOnTheScreen();
   });
 
   test('lists a movement once although it has a row for every planned slot', () => {

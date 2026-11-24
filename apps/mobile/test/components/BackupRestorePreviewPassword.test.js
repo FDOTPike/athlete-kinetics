@@ -97,6 +97,7 @@ jest.mock('../../src/state/backupCrypto', () => ({
   },
 }));
 jest.mock('../../src/state/useStore', () => ({
+  useStore: (selector) => selector({ uiPreferences: { descriptionMode: 'compact' } }),
   closeStoreDatabaseForRestore: (...args) => mockCloseStore(...args),
   restartStoreAfterRestore: (...args) => mockRestartStore(...args),
 }));

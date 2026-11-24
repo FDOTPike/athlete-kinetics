@@ -5,7 +5,7 @@
  * the programme pause cards do not say "you can still train".
  */
 import React from 'react';
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 import ReadinessScreen from '../../src/screens/ReadinessScreen';
 import BlockScreen from '../../src/screens/BlockScreen';
 import TodayScreen from '../../src/screens/TodayScreen';
@@ -146,6 +146,7 @@ test('PLAN pause card does not say "you can still train" while a halt is active'
 test('PLAN pause card keeps "you can still train" when there is no halt', () => {
   mockState = baseState({ lastTriage: null });
   render(<BlockScreen />);
+  fireEvent.press(screen.getByLabelText('Show details for Pause'));
   expect(screen.getByText(/still train while paused/)).toBeOnTheScreen();
 });
 
