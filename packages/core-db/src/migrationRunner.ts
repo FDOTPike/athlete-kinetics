@@ -355,6 +355,7 @@ export const SENTINELS: readonly MigrationSentinel[] = [
   { type: 'table', name: 'training_program_slot_override' },                  // 081
   { type: 'table', name: 'training_program_day_routine' },                    // 081
   { type: 'table', name: 'planned_slot_athlete_override' },                   // 081
+  { type: 'table', name: 'profile_ui_description_preference' },             // 082
 ];
 
 /** Durable tables deliberately absent from SENTINELS, each with the reason it

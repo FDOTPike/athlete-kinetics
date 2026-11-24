@@ -22,7 +22,7 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useStore, type RecentSessionOutcome } from '../state/useStore';
 import { theme } from '../theme/theme';
 import { formatAthleteDate } from '../state/athleteDate';
-import { ListRow } from '../components/ui';
+import { CompactDescription, ListRow } from '../components/ui';
 import { measuredDayDetail } from './measuredDayDetail';
 import { buildSessionSummary, markPerDumbbell, sessionFocusName } from '../state/sessionSummary';
 
@@ -119,10 +119,11 @@ export default function ProgressScreen(): React.JSX.Element {
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} testID="progress-screen">
-      <Text style={styles.heading}>PROGRESS</Text>
-      <Text style={styles.caption}>
-        What your sessions and measurements say — read straight from your log.
-      </Text>
+      <CompactDescription label="Progress" heading={<Text style={styles.heading}>PROGRESS</Text>}>
+        <Text style={styles.caption}>
+          From your training log.
+        </Text>
+      </CompactDescription>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>RECENT SESSIONS</Text>

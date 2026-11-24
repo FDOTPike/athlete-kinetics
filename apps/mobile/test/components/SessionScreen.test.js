@@ -113,7 +113,7 @@ const state = (overrides = {}) => {
     openSubstitution: jest.fn(), openNeutralSwap: jest.fn(), closeSubstitution: jest.fn(), applyNeutralSwap: jest.fn(), applyRegression: jest.fn(), applyDaySwap: jest.fn(),
     reportNiggle: jest.fn(() => true), logSet: jest.fn(), editSet: jest.fn(), endSession: jest.fn(),
     runner: runner(), sessionMode: 'guided',
-    uiPreferences: { sessionModeOverride: null, readinessDetail: 'summary', restTimerEnabled: true, textScale: 'system' },
+    uiPreferences: { sessionModeOverride: null, readinessDetail: 'summary', restTimerEnabled: true, textScale: 'system', descriptionMode: 'expanded' },
     bandLadder: [], advanceRunnerRest: jest.fn(), skipRunnerRest: jest.fn(), setRunnerRestOverride: jest.fn(), runnerThumbsDown: jest.fn(), runnerHalt: jest.fn(),
     loadSessionOutcome: jest.fn(() => null),
     dismissOutcome: jest.fn(function() {
@@ -3364,6 +3364,18 @@ test('without an edit, coming back shows the seeded load', () => {
   first.unmount();
   render(<SessionScreen />);
   expect(screen.getByTestId('session-load-input').props.value).toBe(seeded);
+});
+
+test('Compact hides effort help without hiding stop guidance', () => {
+  mockState = state();
+  mockState.uiPreferences.descriptionMode = 'compact';
+  render(<SessionScreen />);
+  expect(screen.queryByTestId('rpe-cue')).toBeNull();
+  expect(screen.getByTestId('effort-stop-guidance')).toHaveTextContent(
+    'Pain, dizziness, or losing control of the movement: stop the set. Pain is not effort — never trade form for the number.',
+  );
+  fireEvent.press(screen.getByLabelText('Show details for Effort guide'));
+  expect(screen.getByTestId('rpe-cue')).toHaveTextContent('Effort is optional evidence — leave it untouched to skip.');
 });
 
 describe('large text at font scale 2.0 (issue 158)', () => {

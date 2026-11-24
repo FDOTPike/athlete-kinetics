@@ -79,6 +79,7 @@ describe('#228 Phase 2 Advanced Athlete Control', () => {
       fireEvent.press(screen.getByLabelText('Fine-tune your program (optional)'));
 
       // Exact ratified Q3 caption
+      fireEvent.press(screen.getByLabelText('Show details for 3. Training days'));
       expect(screen.getByText('Choose the days of the week you train. Your schedule repeats every week.')).toBeOnTheScreen();
 
       // Fixed Mon..Sun chips (all 7 present, no relative 'Day 1, ...' label)
@@ -150,6 +151,7 @@ describe('#228 Phase 2 Advanced Athlete Control', () => {
     await settle();
     render(<ProgramSetupScreen />);
     fireEvent.press(screen.getByLabelText('Fine-tune your program (optional)'));
+    fireEvent.press(screen.getByLabelText('Show details for 1. Who chooses movements?'));
     expect(screen.getByText('Customize changes movements only. Sets, reps and RPE stay coach-controlled.')).toBeOnTheScreen();
     fireEvent.press(screen.getByText('Customize'));
     expect(screen.queryByTestId('slot-sets-1-1')).toBeNull();
@@ -173,6 +175,7 @@ describe('#228 Phase 2 Advanced Athlete Control', () => {
     fireEvent.press(screen.getByLabelText('Fine-tune your program (optional)'));
 
     // Exact ratified intermediate+ Customize caption
+    fireEvent.press(screen.getByLabelText('Show details for 1. Who chooses movements?'));
     expect(screen.getByText('Choose exercises, sets, reps and target RPE for each slot, or assign a saved routine to a day.')).toBeOnTheScreen();
 
     // Block 1 Introductory Week 1 note & Week 1 lighter working sets (-1 floored at 2)

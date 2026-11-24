@@ -584,6 +584,7 @@ export interface UiPreferences {
   readinessDetail: ReadinessDetail;
   restTimerEnabled: boolean;
   textScale: TextScale;
+  descriptionMode: 'compact' | 'expanded';
 }
 
 /** A personal, ordinal band ladder. Labels belong to the athlete; no colour is
@@ -2502,10 +2503,11 @@ const defaultUiPreferences = (profile: UserProfile): UiPreferences => ({
   readinessDetail: profile.training_age === 'beginner' ? 'summary' : 'full',
   restTimerEnabled: true,
   textScale: 'system',
+  descriptionMode: 'compact',
 });
 
 const uiPreferencesFromRow = (
-  row: { session_mode_override: string | null; readiness_detail: string | null; rest_timer_enabled: number | null; text_scale: string | null } | undefined,
+  row: { session_mode_override: string | null; readiness_detail: string | null; rest_timer_enabled: number | null; text_scale: string | null; description_mode: string | null } | undefined,
   profile: UserProfile,
 ): UiPreferences => {
   const fallback = defaultUiPreferences(profile);
@@ -2520,6 +2522,7 @@ const uiPreferencesFromRow = (
     textScale: row?.text_scale === 'large' || row?.text_scale === 'extra_large' || row?.text_scale === 'system'
       ? row.text_scale
       : 'system',
+    descriptionMode: row?.description_mode === 'expanded' ? 'expanded' : fallback.descriptionMode,
   };
 };
 /** Resolve the mode once at session creation. The nullable override intentionally
@@ -4751,10 +4754,12 @@ export const useStore = create<KineticsStore>()((set, get) => {
       readiness_detail: string | null;
       rest_timer_enabled: number | null;
       text_scale: string | null;
+      description_mode: string | null;
     }>(d.executeSync(
-      `SELECT p.session_mode_override, p.readiness_detail, p.rest_timer_enabled, p.text_scale
+      `SELECT p.session_mode_override, p.readiness_detail, p.rest_timer_enabled, p.text_scale, m.description_mode
        FROM profile_slot s
        LEFT JOIN profile_ui_preference p ON p.profile_slot_id = s.slot_id
+       LEFT JOIN profile_ui_description_preference m ON m.profile_slot_id = s.slot_id
        WHERE s.is_active = 1
        LIMIT 1`,
     ))[0];
@@ -4769,25 +4774,44 @@ export const useStore = create<KineticsStore>()((set, get) => {
     if (slot === undefined) return;
     const current = get().uiPreferences;
     const next: UiPreferences = { ...current, ...patch };
-    d.executeSync(
-      `INSERT INTO profile_ui_preference
-         (profile_slot_id, session_mode_override, readiness_detail, rest_timer_enabled, text_scale, updated_at_ms)
-       VALUES (?, ?, ?, ?, ?, ?)
-       ON CONFLICT(profile_slot_id) DO UPDATE SET
-         session_mode_override = excluded.session_mode_override,
-         readiness_detail = excluded.readiness_detail,
-         rest_timer_enabled = excluded.rest_timer_enabled,
-         text_scale = excluded.text_scale,
-         updated_at_ms = excluded.updated_at_ms`,
-      [
-        slot.slot_id,
-        next.sessionModeOverride,
-        next.readinessDetail,
-        next.restTimerEnabled ? 1 : 0,
-        next.textScale,
-        Date.now(),
-      ],
-    );
+    const now = Date.now();
+    d.executeSync('BEGIN');
+    try {
+      d.executeSync(
+        `INSERT INTO profile_ui_preference
+           (profile_slot_id, session_mode_override, readiness_detail, rest_timer_enabled, text_scale, updated_at_ms)
+         VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(profile_slot_id) DO UPDATE SET
+           session_mode_override = excluded.session_mode_override,
+           readiness_detail = excluded.readiness_detail,
+           rest_timer_enabled = excluded.rest_timer_enabled,
+           text_scale = excluded.text_scale,
+           updated_at_ms = excluded.updated_at_ms`,
+        [
+          slot.slot_id,
+          next.sessionModeOverride,
+          next.readinessDetail,
+          next.restTimerEnabled ? 1 : 0,
+          next.textScale,
+          now,
+        ],
+      );
+      if (patch.descriptionMode !== undefined) {
+        d.executeSync(
+          `INSERT INTO profile_ui_description_preference
+             (profile_slot_id, description_mode, updated_at_ms)
+           VALUES (?, ?, ?)
+           ON CONFLICT(profile_slot_id) DO UPDATE SET
+             description_mode = excluded.description_mode,
+             updated_at_ms = excluded.updated_at_ms`,
+          [slot.slot_id, next.descriptionMode, now],
+        );
+      }
+      d.executeSync('COMMIT');
+    } catch (error) {
+      d.executeSync('ROLLBACK');
+      throw error;
+    }
     set({ uiPreferences: next });
   },
 

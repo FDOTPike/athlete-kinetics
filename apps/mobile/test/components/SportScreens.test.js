@@ -105,6 +105,21 @@ const walkToReview = () => {
   expect(screen.getByLabelText('START TRAINING')).toBeTruthy();
 };
 
+test('description preferences are saved per profile slot and reloaded from SQLite', () => {
+  const activeSlot = raw().prepare('SELECT slot_id FROM profile_slot WHERE is_active = 1').get().slot_id;
+  const otherSlot = raw().prepare('SELECT slot_id FROM profile_slot WHERE is_active = 0 ORDER BY slot_id LIMIT 1').get().slot_id;
+
+  expect(state().uiPreferences.descriptionMode).toBe('compact');
+  act(() => state().saveUiPreferences({ descriptionMode: 'expanded' }));
+  expect(raw().prepare('SELECT description_mode FROM profile_ui_description_preference WHERE profile_slot_id = ?').get(activeSlot))
+    .toMatchObject({ description_mode: 'expanded' });
+
+  act(() => state().switchProfile(otherSlot));
+  expect(state().uiPreferences.descriptionMode).toBe('compact');
+  act(() => state().switchProfile(activeSlot));
+  expect(state().uiPreferences.descriptionMode).toBe('expanded');
+});
+
 describe('the sport screen in the interview', () => {
   test('is offered on the focus slide and is not part of the interview unless asked for', () => {
     render(<OnboardingScreen />);
@@ -174,6 +189,7 @@ describe('the sport screen in the interview', () => {
     expect(screen.getByTestId('sport-emphasis-summary').props.children)
       .toBe('Extra leg-strength work for quads, glutes and calves, which jumping relies on.');
     expect(textsOf('sport-emphasis-limit').join(' ')).toMatch(/no jump or plyometric drills yet.*does not include jump training itself/);
+    pressLabel('Show details for Research basis');
     expect(screen.getByTestId('sport-emphasis-basis').props.children).toMatch(/Suchomel.*Markovic/);
     // An outcome with no reviewed basis says so and adds nothing.
     press('sport-family-striking');

@@ -4,7 +4,7 @@ import { theme } from '../theme/theme';
 import { useBackupStore } from '../state/backupStore';
 import { formatAthleteDateTime } from '../state/athleteDate';
 import { backupLimitText, measureBackupSize, type BackupSizeEstimate } from '../state/backupCapacity';
-import { QuietAction } from './ui';
+import { CompactDescription, QuietAction } from './ui';
 
 const dateLabel = (value: string | null): string => value === null
   ? 'No confirmed backup saved yet.'
@@ -91,10 +91,11 @@ export default function BackupTransferPanel({ athleteCount }: BackupTransferPane
 
   return (
     <View style={styles.section} testID="backup-transfer-section">
-      <Text style={styles.heading}>BACK UP &amp; TRANSFER DATA</Text>
-      <Text style={styles.body}>
-        An encrypted backup includes each athlete&apos;s profile, plans, routines, workouts, activities, health-support records, preferences, and identifiers on this phone.
-      </Text>
+      <CompactDescription label="BACK UP &amp; TRANSFER DATA" heading={<Text style={styles.heading}>BACK UP &amp; TRANSFER DATA</Text>}>
+        <Text style={styles.body}>
+          An encrypted backup includes all athletes’ profiles, plans, routines, workouts, activities, health-support records, preferences, and identifiers.
+        </Text>
+      </CompactDescription>
       <Text style={styles.body} testID="backup-limit">{backupLimitText(sizeEstimate)}</Text>
       <Text style={styles.body}>
         New phone: create a backup, save it somewhere you can reach from the new phone, install pikeMethods there, then choose Restore backup.

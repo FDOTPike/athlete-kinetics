@@ -43,7 +43,7 @@ import {
 } from '../state/backupCapacity';
 import { useSubViewBack } from '../navigation/navigation';
 import { formatAthleteDate } from '../state/athleteDate';
-import { Chip, Stepper, QuietAction, Disclosure, ListRow, PrimaryButton, SecondaryButton } from '../components/ui';
+import { CompactDescription, Chip, Stepper, QuietAction, Disclosure, ListRow, PrimaryButton, SecondaryButton } from '../components/ui';
 import { measuredDayDetail } from './measuredDayDetail';
 import InfoTip from '../components/InfoTip';
 import { OneRmRow, oneRmClampNote } from '../components/OneRmRow';
@@ -703,10 +703,11 @@ export default function ProfileScreen(): React.JSX.Element {
       </Disclosure>
 
       <View style={styles.mgmtSection}>
-        <Text style={styles.mgmtHeading}>SESSION &amp; DISPLAY</Text>
-        <Text style={styles.fieldHint}>
-          These choices stay with this profile slot. Session mode changes start with your next session.
-        </Text>
+        <CompactDescription label="SESSION &amp; DISPLAY" heading={<Text style={styles.mgmtHeading}>SESSION &amp; DISPLAY</Text>}>
+          <Text style={styles.fieldHint}>
+            Settings apply to this profile. Session mode changes start next workout.
+          </Text>
+        </CompactDescription>
         <Text style={styles.fieldLabel}>SESSION MODE</Text>
         <View style={styles.chipWrap}>
           {([
@@ -742,6 +743,19 @@ export default function ProfileScreen(): React.JSX.Element {
           onPress={() => saveUiPreferences({ restTimerEnabled: !uiPreferences.restTimerEnabled })}
           accessibilityLabel={`Rest timer ${uiPreferences.restTimerEnabled ? 'on' : 'off'}`}
         />
+        <Text style={[styles.fieldLabel, styles.preferenceLabel]}>DESCRIPTIONS</Text>
+        <View style={styles.chipWrap}>
+          <Chip
+            label="COMPACT"
+            selected={uiPreferences.descriptionMode !== 'expanded'}
+            onPress={() => saveUiPreferences({ descriptionMode: 'compact' })}
+          />
+          <Chip
+            label="SHOW ALL"
+            selected={uiPreferences.descriptionMode === 'expanded'}
+            onPress={() => saveUiPreferences({ descriptionMode: 'expanded' })}
+          />
+        </View>
         <Text style={[styles.fieldLabel, styles.preferenceLabel]}>APP TEXT SIZE</Text>
         <View style={styles.chipWrap}>
           {(['system', 'large', 'extra_large'] as const).map((value) => (
@@ -857,10 +871,11 @@ export default function ProfileScreen(): React.JSX.Element {
       )}
 
       <View style={styles.mgmtSection}>
-        <Text style={styles.mgmtHeading}>BAND LADDER</Text>
-        <Text style={styles.fieldHint}>
-          Name bands in the order they feel harder. The app records the level, never invents kilograms.
-        </Text>
+        <CompactDescription label="BAND LADDER" heading={<Text style={styles.mgmtHeading}>BAND LADDER</Text>}>
+          <Text style={styles.fieldHint}>
+            Name bands in the order they feel harder. The app records the level, never invents kilograms.
+          </Text>
+        </CompactDescription>
         {bandLadder.map((band) => (
           <View key={band.level} style={styles.bandRow}>
             <Text style={styles.bandLevel}>LEVEL {band.level}</Text>
@@ -909,12 +924,11 @@ export default function ProfileScreen(): React.JSX.Element {
         )}
       </View>
       <View style={styles.field}>
-        <View style={styles.fieldLabelRow}>
-          <Text style={styles.fieldLabel}>EQUIPMENT INVENTORY</Text>
-        </View>
-        <Text style={styles.fieldHint}>
-          Workouts only ever prescribe movements your equipment can support.
-        </Text>
+        <CompactDescription label="EQUIPMENT INVENTORY" heading={<Text style={styles.fieldLabel}>EQUIPMENT INVENTORY</Text>}>
+          <Text style={styles.fieldHint}>
+            Workouts only ever prescribe movements your equipment can support.
+          </Text>
+        </CompactDescription>
         <View style={styles.chipWrap}>
           {(Object.keys(EQUIPMENT_PRESETS) as (keyof typeof EQUIPMENT_PRESETS)[]).map((preset) => (
             <Chip

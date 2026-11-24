@@ -691,6 +691,7 @@ describe('screen laws: D5, D6, D8, D9', () => {
       resolveSlotLoadCalls: [],
     });
     render(<SessionScreen />);
+    fireEvent.press(screen.getByLabelText('Show details for Effort guide'));
     // With no rating, the cue line carries the plain wording (ux-8 removed
     // the second line that repeated it).
     expect(screen.getByText('Effort is optional evidence — leave it untouched to skip.')).toBeOnTheScreen();

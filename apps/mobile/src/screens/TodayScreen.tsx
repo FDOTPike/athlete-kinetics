@@ -56,7 +56,7 @@ import { classifyReadiness, HALT_META, HeldScreenWithHalt } from './ReadinessScr
 import { autopilotReasonCopy } from '../state/autopilotCopy';
 import { formatAthleteDate } from '../state/athleteDate';
 import { coachModeAthleteName } from '../state/coachModeAthlete';
-import { PrimaryButton, QuietAction, Disclosure, ListRow } from '../components/ui';
+import { CompactDescription, PrimaryButton, QuietAction, Disclosure, ListRow } from '../components/ui';
 import { sessionFocusName } from '../state/sessionSummary';
 import { HALT_NEXT_TEXT } from '../state/haltCopy';
 import { operativeReportLine } from '../state/operativeReportLine';
@@ -396,10 +396,11 @@ function AvailableTodayScreen({
         return (
           <View style={[styles.card, styles.cardActive]} testID="today-card-active">
             <Text style={styles.eyebrow}>TODAY</Text>
-            <Text style={styles.title}>Workout in progress</Text>
-            <Text style={styles.body}>
-              Your session is saved exactly where you left it.
-            </Text>
+            <CompactDescription label="Workout in progress" heading={<Text style={styles.title}>Workout in progress</Text>}>
+              <Text style={styles.body}>
+                Your session is saved.
+              </Text>
+            </CompactDescription>
             <PrimaryButton
               label="Resume workout"
               onPress={() => onOpenSession?.()}

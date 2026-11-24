@@ -17,12 +17,15 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
+import { useStore } from '../../state/useStore';
 import { theme } from '../../theme/theme';
 import { motionDuration } from './motionDuration';
 
 export interface DisclosureProps {
   label: string;
   hint?: string;
+  compact?: boolean;
+  heading?: React.ReactNode;
   defaultOpen?: boolean;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -35,6 +38,8 @@ export interface DisclosureProps {
 export function Disclosure({
   label,
   hint,
+  compact = false,
+  heading,
   defaultOpen = false,
   open,
   onOpenChange,
@@ -46,7 +51,7 @@ export function Disclosure({
   const [uncontrolledOpen, setUncontrolledOpen] = useState(defaultOpen);
   const expanded = open ?? uncontrolledOpen;
 
-  const rotation = useRef(new Animated.Value(defaultOpen ? 1 : 0)).current;
+  const rotation = useRef(new Animated.Value(expanded ? 1 : 0)).current;
 
   const toggle = (): void => {
     const next = !expanded;
@@ -63,6 +68,36 @@ export function Disclosure({
     inputRange: [0, 1],
     outputRange: ['0deg', '180deg'],
   });
+
+  const chevron = (
+    <Animated.Text
+      style={[styles.chevron, { transform: [{ rotate: chevronRotation }] }]}
+    >
+      ⌄
+    </Animated.Text>
+  );
+
+  if (compact) {
+    return (
+      <View style={style} testID={testID}>
+        <View style={styles.compactRow}>
+          <View style={styles.compactHeading}>
+            {heading ?? <Text style={styles.triggerLabel}>{label}</Text>}
+          </View>
+          <Pressable
+            onPress={toggle}
+            accessibilityRole="button"
+            accessibilityLabel={accessibilityLabel ?? `${expanded ? 'Hide' : 'Show'} details for ${label}`}
+            accessibilityState={{ expanded }}
+            style={styles.compactTrigger}
+          >
+            {chevron}
+          </Pressable>
+        </View>
+        {expanded && children}
+      </View>
+    );
+  }
 
   return (
     <View style={[styles.container, style]} testID={testID}>
@@ -82,11 +117,7 @@ export function Disclosure({
             <Text style={styles.triggerHint}>{hint}</Text>
           )}
         </View>
-        <Animated.Text
-          style={[styles.chevron, { transform: [{ rotate: chevronRotation }] }]}
-        >
-          ⌄
-        </Animated.Text>
+        {chevron}
       </Pressable>
       {expanded && (
         <View style={styles.body}>
@@ -97,7 +128,26 @@ export function Disclosure({
   );
 }
 
+type CompactDescriptionProps = Pick<DisclosureProps, 'label' | 'heading' | 'children' | 'style' | 'testID'>;
+
+export function CompactDescription(props: CompactDescriptionProps): React.JSX.Element {
+  const expanded = useStore((state) => state.uiPreferences?.descriptionMode === 'expanded');
+  return <Disclosure key={String(expanded)} {...props} compact defaultOpen={expanded} />;
+}
+
 const styles = StyleSheet.create({
+  compactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: theme.space[2],
+  },
+  compactHeading: { flex: 1, minWidth: 0 },
+  compactTrigger: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: theme.touch.min,
+    minHeight: theme.touch.min,
+  },
   container: {
     borderWidth: 1,
     borderColor: theme.color.line,
@@ -106,6 +156,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   trigger: {
+    minWidth: theme.touch.min,
     minHeight: theme.touch.min,
     flexDirection: 'row',
     alignItems: 'center',

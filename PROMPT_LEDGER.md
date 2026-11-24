@@ -13368,3 +13368,9 @@ The appendix held the code around the read, every match for `0286` and "record o
 - **Verification Scope (`EVIDENCE CAPTURED`):**
   - Fail-first (`pr228_fail_first.txt`, `pr228_fail_first_db_and_jest.txt`, `pr228_fail_first_migrations.txt`, `pr228_fail_first_split_word.txt`), guard-break/restore (`pr228_guard_break.txt`, `pr228_guard_restored.txt`), and post-edit `npm run typecheck` + `npm run verify:ci` (`pr228_verify_ci.txt`, `pr228_verify_ci_final.txt`) captured outside git working tree.
   - Note: Entry `0304` leaves `0303` available for sibling concurrent branch `#208` / PR `#366`, and migration slot `078` will be reconciled if PR `#366` merges to base prior to `#228`.
+
+## Entry 0305 — 2026-11-23 · Compact descriptions and Pixel 9 Pro fixes
+
+**Input:** Owner handoff for the four-stage isolated run from `fb539d06`. Checkpoint A decisions are provisional and subject to Antigravity and Owner review. The Pixel reported a locked screen at baseline.
+
+**Output:** See the compact-copy judgment ledger and executor handoff for changes, gate output and hardware evidence status.

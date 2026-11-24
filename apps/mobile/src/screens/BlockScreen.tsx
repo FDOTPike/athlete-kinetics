@@ -51,6 +51,7 @@ import { reportEffectText, reportEntryName } from '../state/reportCopy';
 import { SafetyReportView } from '../components/SafetyReportView';
 import { isSessionReportStop, SESSION_REPORT_STOP_SENTENCE } from '../state/sessionReportStop';
 import {
+  CompactDescription,
   PrimaryButton,
   SecondaryButton,
   QuietAction,
@@ -909,12 +910,20 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
          so the pause buttons are not offered. An open pause still shows. */
       <View style={styles.card}>
         <Text style={styles.eyebrow}>PAUSE</Text>
-        <Text style={styles.cardTitle}>Injured, ill, or life got in the way?</Text>
-        <Text style={styles.bodyText}>
-          {halted
-            ? HALT_PAUSE_CARD_TEXT
-            : 'Pausing holds your place in the program so a gap does not cost you a block. You can still train while paused.'}
-        </Text>
+        {halted ? (
+          <>
+            <Text style={styles.cardTitle}>Injured, ill, or life got in the way?</Text>
+            <Text style={styles.bodyText}>{HALT_PAUSE_CARD_TEXT}</Text>
+          </>
+        ) : (
+          <CompactDescription label="Pause" heading={
+            <Text style={styles.cardTitle}>Injured, ill, or life got in the way?</Text>
+          }>
+            <Text style={styles.bodyText}>
+              Pausing holds your place in the program so a gap does not cost you a block. You can still train while paused.
+            </Text>
+          </CompactDescription>
+        )}
         {/* #188: every pause asks first; the pause itself is unchanged. */}
         {confirmPauseReason === null ? SUSPENSION_REASONS.map((reason) => (
           <PrimaryButton
@@ -1358,10 +1367,11 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
       {block !== null && appliedLines.length > 0 && (
         <View style={styles.section}>
           <View style={styles.blockAdjustmentsPanel} testID="block-adjustments-panel">
-            <Text style={styles.blockAdjustmentsHeading}>Changed in this block</Text>
-            <Text style={styles.blockAdjustmentsIntro}>
-              These adjustments were applied when this block was built.
-            </Text>
+            <CompactDescription label="Changed in this block" heading={<Text style={styles.blockAdjustmentsHeading}>Changed in this block</Text>}>
+              <Text style={styles.blockAdjustmentsIntro}>
+                These adjustments were applied when this block was built.
+              </Text>
+            </CompactDescription>
             <View style={styles.adjustmentsList}>
               {appliedLines.map((line) => (
                 <View key={line.key} style={styles.adjustmentRow}>

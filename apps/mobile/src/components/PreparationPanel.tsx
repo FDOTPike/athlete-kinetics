@@ -11,6 +11,7 @@
  * Every action passes the revision this render was drawn from, so a second
  * tap on the same button cannot record twice.
  */
+import InfoTip from './InfoTip';
 import React, { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import {
@@ -111,7 +112,10 @@ export function PreparationPanel({
 
   return (
     <View style={styles.card} testID="preparation-panel" accessibilityLabel="Preparation">
-      <Text style={styles.eyebrow}>PREPARATION</Text>
+      <View style={styles.preparationHeader}>
+        <Text style={styles.eyebrow}>PREPARATION</Text>
+        <InfoTip term="PREPARATION" />
+      </View>
       <Text style={styles.title} accessibilityRole="header">Prepare for this session</Text>
       <Text style={styles.meta} testID="preparation-estimate">
         {`About ${estimate} minute${estimate === 1 ? '' : 's'} · ${protocol.variant === 'standard' ? 'full protocol' : 'short protocol'}`}
@@ -265,6 +269,7 @@ export function PreparationPanel({
 }
 
 const styles = StyleSheet.create({
+  preparationHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   card: {
     padding: theme.space[4],
     borderWidth: 1,

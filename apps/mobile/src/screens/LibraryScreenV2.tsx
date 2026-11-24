@@ -9,7 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Chip, Disclosure, PrimaryButton, SecondaryButton } from '../components/ui';
+import { CompactDescription, Chip, Disclosure, PrimaryButton, SecondaryButton } from '../components/ui';
 import { MovementPreview } from '../components/movementPreview/MovementPreview';
 import { useSubViewBack } from '../navigation/navigation';
 import {
@@ -401,15 +401,18 @@ export default function LibraryScreenV2({ initialMovementId }: LibraryScreenProp
       </View>
       <Disclosure
         label="Filters"
-        hint={availabilityView === 'available'
-          ? 'Showing the movements available to you. Availability, pattern, equipment and more.'
-          : 'Availability, pattern, equipment and more.'}
         open={filtersOpen}
         onOpenChange={setFiltersOpen}
         testID="library-filters"
       >
       <View style={styles.filterBody}>
-      <Text style={styles.filterLabel}>Availability</Text>
+      {availabilityView === 'available' ? (
+        <CompactDescription label="Availability" heading={<Text style={styles.filterLabel}>Availability</Text>}>
+          <Text style={styles.countText}>Showing the movements available to you.</Text>
+        </CompactDescription>
+      ) : (
+        <Text style={styles.filterLabel}>Availability</Text>
+      )}
       <View style={styles.toggleRow}>
         <Chip
           label="Available"

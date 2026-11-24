@@ -24,7 +24,7 @@ export type { ChipProps } from './Chip';
 export { ListRow } from './ListRow';
 export type { ListRowProps } from './ListRow';
 
-export { Disclosure } from './Disclosure';
+export { CompactDescription, Disclosure } from './Disclosure';
 export type { DisclosureProps } from './Disclosure';
 
 export { Sheet } from './Sheet';

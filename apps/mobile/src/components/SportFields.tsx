@@ -45,7 +45,7 @@ import {
   type SportProfileDraft,
 } from '@ak/inference';
 import { theme } from '../theme/theme';
-import { Chip, Stepper } from './ui';
+import { CompactDescription, Chip, Stepper } from './ui';
 
 export const SPORT_QUESTION = 'Do you play or compete in a sport?';
 
@@ -183,18 +183,36 @@ export function SportEditor({ fields, onChange, today, showAllErrors = false }: 
         <>
           <Text style={styles.label}>{`WHICH KIND OF ${SPORT_FAMILY_LABEL[fields.family!].toUpperCase()}?`}</Text>
           <View style={styles.group}>
-            {members.map((sportId) => (
-              <Chip
-                wrap
-                key={sportId}
-                testID={`sport-${sportId}`}
-                label={`${SPORT_INFO[sportId].label.toUpperCase()} — ${SPORT_INFO[sportId].distinction ?? ''}`}
-                selected={fields.sportId === sportId}
-                onPress={() => chooseSport(sportId)}
-                accessibilityLabel={`${SPORT_INFO[sportId].label}. ${SPORT_INFO[sportId].distinction ?? ''}`}
-                style={styles.chip}
-              />
-            ))}
+            {members.map((sportId) => {
+              const { label, distinction } = SPORT_INFO[sportId];
+              const prefix = `${label}: `;
+              const detail = distinction?.startsWith(prefix) ? distinction.slice(prefix.length) : distinction;
+              const option = (
+                <Chip
+                  wrap
+                  testID={`sport-${sportId}`}
+                  label={label.toUpperCase()}
+                  selected={fields.sportId === sportId}
+                  onPress={() => chooseSport(sportId)}
+                  accessibilityLabel={detail === null ? label : `${label}. ${detail}`}
+                  style={styles.chip}
+                />
+              );
+              // Judo's distinction includes an injury mechanism.
+              if (detail === null || sportId === 'grappling_judo') {
+                return (
+                  <View key={sportId}>
+                    {option}
+                    {detail !== null && <Text style={styles.dim}>{detail}</Text>}
+                  </View>
+                );
+              }
+              return (
+                <CompactDescription key={sportId} label={label} heading={option}>
+                  <Text style={styles.dim}>{detail}</Text>
+                </CompactDescription>
+              );
+            })}
           </View>
         </>
       )}
@@ -249,9 +267,11 @@ export function SportEditor({ fields, onChange, today, showAllErrors = false }: 
             <Text key={limit} style={styles.dim} testID="sport-emphasis-limit">{limit}</Text>
           ))}
           {emphasis.basis.length > 0 && (
-            <Text style={styles.dim} testID="sport-emphasis-basis">
-              {`Based on: ${emphasis.basis.map((basis) => basis.citation).join(' ')}`}
-            </Text>
+            <CompactDescription label="Research basis">
+              <Text style={styles.dim} testID="sport-emphasis-basis">
+                {`Based on: ${emphasis.basis.map((basis) => basis.citation).join(' ')}`}
+              </Text>
+            </CompactDescription>
           )}
         </View>
       )}
@@ -283,10 +303,11 @@ export function SportEditor({ fields, onChange, today, showAllErrors = false }: 
             </Text>
           ) : (
             <>
-              <Text style={styles.label}>A NORMAL WEEK OF YOUR SPORT</Text>
-              <Text style={styles.dim}>
-                A full sport week leaves less room for gym work, so a new plan takes it into account. If you are not sure, leave it: nothing is assumed.
-              </Text>
+              <CompactDescription label="A NORMAL WEEK OF YOUR SPORT" heading={<Text style={styles.label}>A NORMAL WEEK OF YOUR SPORT</Text>}>
+                <Text style={styles.dim}>
+                  A full sport week leaves less room for gym work, so a new plan takes it into account. If you are not sure, leave it: nothing is assumed.
+                </Text>
+              </CompactDescription>
               <Stepper
                 label="PRACTICE SESSIONS A WEEK"
                 value={count(fields.practiceSessionsPerWeek)}

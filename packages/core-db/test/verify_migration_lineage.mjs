@@ -94,6 +94,9 @@ console.log('[L1] frozen SQL bytes, ordinals and registry parity');
   check('unified chain is append-only after the integration point (058 at ordinal 57, 068 at ordinal 67)',
     UNIFIED_FILES[56] === '058_suspension_episode.sql' && UNIFIED_FILES[66] === '068_movement_content_correction_v2.sql'
       && UNIFIED_FILES.slice(67).every((file) => Number(file.slice(0, 3)) > 68));
+  check('082 appends the description side-car after 081 without renumbering either lineage',
+    UNIFIED_FILES[79] === '081_advanced_program_control.sql'
+      && UNIFIED_FILES[80] === '082_profile_ui_description_mode.sql');
   const gateSource = readFileSync(join(CORE, 'test', 'verify_migrations.mjs'), 'utf8');
   const gateFiles = [...gateSource.match(/const FILES = \[([\s\S]*?)\];/)[1].matchAll(/'([^']+\.sql)'/g)].map((m) => m[1]);
   check('verify_migrations.mjs FILES is exactly the production registry (closes the hand-copied-list gap)',

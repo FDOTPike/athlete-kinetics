@@ -406,6 +406,11 @@
         "ordinal": 80,
         "file": "081_advanced_program_control.sql",
         "sha256": "7afab8b7a051d7636d1fbfc214954d84ab1278813efbdfa11d1f2764f75f3bf0"
+      },
+      {
+        "ordinal": 81,
+        "file": "082_profile_ui_description_mode.sql",
+        "sha256": "0fed979b156b22657fb2e4a7c5b137dcebff92c58bccfab23a68c7be99d8f8ca"
       }
     ]
   },

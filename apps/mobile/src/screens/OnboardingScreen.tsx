@@ -59,7 +59,7 @@ import InfoTip from '../components/InfoTip';
 import { useStore } from '../state/useStore';
 import { anchorDisplayName } from '../state/priorExperience';
 import { useSubViewBack } from '../navigation/navigation';
-import { Chip, Stepper, QuietAction, PrimaryButton } from '../components/ui';
+import { CompactDescription, Chip, Stepper, QuietAction, PrimaryButton } from '../components/ui';
 import { OneRmRow, oneRmKeptKg, parseOneRmText } from '../components/OneRmRow';
 import {
   BALANCED_FOCUS_DRAFT,
@@ -196,25 +196,29 @@ function ChoiceRow({
   accessibilityLabel,
 }: ChoiceRowProps): React.JSX.Element {
   return (
-    <View style={styles.choiceRow}>
-      <Pressable
-        onPress={onSelect}
-        accessibilityRole="button"
-        accessibilityLabel={accessibilityLabel ?? `${label}. ${description}`}
-        accessibilityState={{ selected }}
-        style={({ pressed }) => [
-          styles.choiceSelect,
-          selected && styles.choiceSelected,
-          pressed && !selected && styles.choicePressed,
-        ]}
-      >
-        <Text style={[styles.choiceLabel, selected && styles.choiceLabelSelected]}>{label}</Text>
-        <Text style={[styles.choiceDescription, selected && styles.choiceDescriptionSelected]}>
-          {description}
-        </Text>
-      </Pressable>
-      {infoTerm !== undefined && <InfoTip term={infoTerm} />}
-    </View>
+    <CompactDescription
+      label={label}
+      heading={(
+        <View style={styles.choiceRow}>
+          <Pressable
+            onPress={onSelect}
+            accessibilityRole="button"
+            accessibilityLabel={accessibilityLabel ?? label}
+            accessibilityState={{ selected }}
+            style={({ pressed }) => [
+              styles.choiceSelect,
+              selected && styles.choiceSelected,
+              pressed && !selected && styles.choicePressed,
+            ]}
+          >
+            <Text style={[styles.choiceLabel, selected && styles.choiceLabelSelected]}>{label}</Text>
+          </Pressable>
+          {infoTerm !== undefined && <InfoTip term={infoTerm} />}
+        </View>
+      )}
+    >
+      <Text style={styles.choiceDescription}>{description}</Text>
+    </CompactDescription>
   );
 }
 
@@ -1200,7 +1204,6 @@ const styles = StyleSheet.create({
   choiceLabel: { ...theme.font.label, color: theme.color.textHi, flexShrink: 1 },
   choiceLabelSelected: { color: theme.color.ink0 },
   choiceDescription: { ...theme.font.body, color: theme.color.textMid, marginTop: theme.space[1], flexShrink: 1 },
-  choiceDescriptionSelected: { color: theme.color.ink0 },
   stepperBlock: { marginBottom: theme.space[4] },
   notesInput: {
     backgroundColor: theme.color.ink1, borderWidth: 1, borderColor: theme.color.line, borderRadius: theme.radius.control,

@@ -5,6 +5,7 @@
  * recommendation stays visible; the underlying vector and history are only
  * available through inline disclosure.
  */
+import InfoTip from '../components/InfoTip';
 import React, { useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { StateVectorRow } from '@ak/inference';
@@ -360,10 +361,14 @@ function AvailableReadinessScreen({
             Recent recorded external load compared with the preceding four-week average. Bodyweight, conditioning, grappling, and unlogged training may be incomplete. Shown as history only: it does not affect the readiness estimate or today&apos;s plan, and there is no target range.
           </Text>
         </ListRow>
-        <ListRow
-          label="HRV deviation"
-          detail={vector.hrv_z === null ? 'Not available' : `${formatSigned(vector.hrv_z, 1)} SD from your baseline`}
-        />
+        <View style={styles.hrvRow}>
+          <ListRow
+            style={styles.hrvValue}
+            label="HRV deviation"
+            detail={vector.hrv_z === null ? 'Not available' : `${formatSigned(vector.hrv_z, 1)} SD from your baseline`}
+          />
+          <InfoTip term="HRV" />
+        </View>
         <ListRow label="Sleep efficiency" detail={format(vector.sleep_efficiency_pct, 1, '%')} />
         <ListRow label="Acute load" detail={format(vector.acute_load_kg, 0, ' kg')} />
         <ListRow label="Chronic load" detail={format(vector.chronic_load_kg, 0, ' kg')} />
@@ -561,6 +566,8 @@ function AvailableReadinessScreen({
 }
 
 const styles = StyleSheet.create({
+  hrvRow: { flexDirection: 'row', alignItems: 'center' },
+  hrvValue: { flex: 1 },
   screen: {
     flex: 1,
     backgroundColor: theme.color.ink0,

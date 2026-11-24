@@ -258,3 +258,7 @@ Final live durable tables: 134 (including the prior KineStrike and swap tables, 
 ## Update 2026-11-16 — migration 081 (#228 + A7 advanced program control)
 
 Final live durable tables: 140 (the 134 above, plus `training_program_day_focus_ext`, `planned_session_focus_ext`, `training_program_schedule_mode`, `training_program_slot_override`, `training_program_day_routine`, and `planned_slot_athlete_override`; bringing Programs, routines, plans, provenance, and suspension state from 27 to 33). The migration array has 80 entries through slot `081`, so `PRAGMA user_version = 80`. The current backup contract fingerprints 229 durable table/index/trigger objects; all earlier schema contracts remain registered unchanged.
+
+### Migration 082 description preference
+
+Final live durable tables: 141. The per-profile `profile_ui_description_preference` table is carried by the encrypted whole-database snapshot. Migration slot `082` is entry 81 and the v81 backup schema fingerprints 230 objects.

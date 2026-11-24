@@ -186,6 +186,14 @@ export const SUPPORTED_BACKUP_SCHEMA_CONTRACTS: readonly BackupSchemaContract[] 
     objectCount: 229,
     fingerprint: '18e8e595edc07baf10fd1c4ae85de155830f99859b2936d990dbaf78bdeae892',
   },
+  // Through 082: per-profile description display preference.
+  {
+    userVersion: 81,
+    migrationSlot: 82,
+    tableCount: 141,
+    objectCount: 230,
+    fingerprint: '640dfb34240651e171b5c6fa7a81b33b041fc94c0cfc640c5c36fa7dd4aad314',
+  },
 ];
 
 export const CURRENT_BACKUP_SCHEMA_CONTRACT: BackupSchemaContract =

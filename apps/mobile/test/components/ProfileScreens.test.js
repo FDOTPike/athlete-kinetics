@@ -637,10 +637,11 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
   test('WO-02 uses supportive weight-loss and week-ceiling copy exactly', () => {
     render(<OnboardingScreen />);
     pressNext();
-    expect(screen.getByLabelText(/WEIGHT-LOSS SUPPORT/)).toBeOnTheScreen();
+    expect(screen.getByLabelText(/^WEIGHT-LOSS SUPPORT\./)).toBeOnTheScreen();
     const goal = screen.getByRole('button', { name: /WEIGHT-LOSS SUPPORT\. Stay active/ });
     expect(StyleSheet.flatten(goal.props.style)).toMatchObject({ minHeight: 56, flex: 1 });
     expect(screen.getByText('WEIGHT-LOSS SUPPORT').props.numberOfLines).toBeUndefined();
+    fireEvent.press(screen.getByLabelText('Show details for WEIGHT-LOSS SUPPORT'));
     expect(screen.getByText('Stay active and keep your muscle').props.numberOfLines).toBeUndefined();
     expect(screen.queryByText(/fat[- ]loss/i)).toBeNull();
     pressNext();
@@ -658,6 +659,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     expect(selection).not.toBe(info);
     expect(selection.props.accessibilityState.selected).toBe(false);
     expect(StyleSheet.flatten(selection.props.style)).toMatchObject({ minHeight: 56, flex: 1 });
+    fireEvent.press(screen.getByLabelText('Show details for NEW TO THIS'));
     expect(screen.getByText('Under a year of consistent training, or returning after a long break').props.numberOfLines).toBeUndefined();
 
     fireEvent.press(info);
@@ -683,6 +685,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     expect(screen.getByRole('button', { name: 'What does BARBELL mean?' })).not.toBe(barbell);
     expect(boards.props.accessibilityState.selected).toBe(false);
     expect(screen.getAllByLabelText(/^What does .* mean\?$/)).toHaveLength(14);
+    fireEvent.press(screen.getByLabelText('Show details for BARBELL'));
     expect(screen.getByText('A straight bar loaded with weight plates.').props.numberOfLines).toBeUndefined();
   });
 
@@ -732,7 +735,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     render(<OnboardingScreen />);
     fireEvent.changeText(screen.getByLabelText('Your name'), 'Ari');
     pressNext();
-    fireEvent.press(screen.getByLabelText(/WEIGHT-LOSS SUPPORT/));
+    fireEvent.press(screen.getByLabelText(/^WEIGHT-LOSS SUPPORT\./));
     pressNext();
     fireEvent.press(screen.getByLabelText(/EXPERIENCED\./));
     pressNext();
@@ -753,7 +756,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     expect(screen.getByText('HOW LONG HAVE YOU BEEN TRAINING?')).toBeOnTheScreen();
     expect(screen.getByRole('button', { name: /EXPERIENCED\. 3\+ years/ }).props.accessibilityState.selected).toBe(true);
     pressBack();
-    expect(screen.getByRole('button', { name: /WEIGHT-LOSS SUPPORT/ }).props.accessibilityState.selected).toBe(true);
+    expect(screen.getByRole('button', { name: /^WEIGHT-LOSS SUPPORT\./ }).props.accessibilityState.selected).toBe(true);
   });
 
   test.each([
@@ -1170,14 +1173,14 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     mockState.completeOnboarding = jest.fn();
     render(<OnboardingScreen />);
     pressNext(); // welcome -> goal
-    fireEvent.press(screen.getByLabelText(/ALL-ROUND FITNESS/));
+    fireEvent.press(screen.getByLabelText(/^ALL-ROUND FITNESS\./));
     pressNext(); // goal -> experience
     fireEvent.press(screen.getByRole('button', { name: /SOME MILEAGE\. 1–3 years/ }));
     expect(mockState.completeOnboarding).not.toHaveBeenCalled();
     // Android/back navigation walks the DRAFT back a step, keeping answers.
     pressBack();
     expect(screen.getByText('WHAT ARE WE TRAINING FOR?')).toBeOnTheScreen();
-    expect(screen.getByLabelText(/ALL-ROUND FITNESS/).props.accessibilityState.selected).toBe(true);
+    expect(screen.getByLabelText(/^ALL-ROUND FITNESS\./).props.accessibilityState.selected).toBe(true);
     expect(mockState.completeOnboarding).not.toHaveBeenCalled();
   });
 

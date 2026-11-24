@@ -13,6 +13,7 @@ import InfoTip from '../components/InfoTip';
 import { isEasedBelow } from '../state/loadCopyFacts';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import {
+  CompactDescription,
   PrimaryButton,
   SecondaryButton,
   ListRow,
@@ -2251,17 +2252,19 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                             )}
                           </View>
 
-                          <Text style={styles.effortCue} testID="rpe-cue">
-                            {safeRpe !== null
-                              ? (effortCue(safeRpe) ?? 'Effort is optional evidence — leave it untouched to skip.')
-                              : 'Effort is optional evidence — leave it untouched to skip.'}
-                          </Text>
+                          <CompactDescription label="Effort guide">
+                            <Text style={styles.effortCue} testID="rpe-cue">
+                              {safeRpe !== null
+                                ? (effortCue(safeRpe) ?? 'Effort is optional evidence — leave it untouched to skip.')
+                                : 'Effort is optional evidence — leave it untouched to skip.'}
+                            </Text>
+                            <Text style={styles.effortCue}>{EFFORT_BREATHING_NOTE}</Text>
+                          </CompactDescription>
                           {ceilingNote !== null && (
                             <Text style={styles.effortCue} testID="effort-above-ceiling-note" accessibilityLiveRegion="polite">
                               {ceilingNote}
                             </Text>
                           )}
-                          <Text style={styles.effortCue}>{EFFORT_BREATHING_NOTE}</Text>
                           <Text style={styles.effortStop} testID="effort-stop-guidance">{EFFORT_STOP_GUIDANCE}</Text>
                           {/* With no rating, the cue above already says effort is
                               optional; a second line said it again (ux-8). */}
