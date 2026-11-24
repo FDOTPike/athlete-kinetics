@@ -220,6 +220,9 @@ function slotTarget(
   }`;
 }
 
+const TRAJECTORY_DAYS = 7;
+const TRAJECTORY_RAIL_MIN_WIDTH = TRAJECTORY_DAYS * theme.touch.min + (TRAJECTORY_DAYS - 1) * theme.space[1];
+
 const AUTOPILOT_BUDGET_NOTE = 'Held steady — effort only rises early in a cycle.';
 
 function autopilotExplanation(slot: TodaySlot): string | null {
@@ -367,6 +370,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [attributionSlotId, setAttributionSlotId] = useState<number | null>(null);
   const [macroBudgetOpen, setMacroBudgetOpen] = useState(false);
+  const [trajectoryOverflows, setTrajectoryOverflows] = useState(false);
   const [manageOpen, setManageOpen] = useState(block === null);
   const scrollRef = useRef<ScrollView>(null);
   const trajectorySectionY = useRef(0);
@@ -663,6 +667,9 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           </View>
         )}
       </View>
+      {block !== null && trajectoryOverflows && (
+        <Text style={styles.captionText}>Swipe across a week to see all seven days.</Text>
+      )}
       {meetHeader !== null && (
         <Text style={styles.captionText} testID="plan-meet-countdown-header">{meetHeader}</Text>
       )}
@@ -722,6 +729,10 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                     <ScrollView
                       horizontal
                       showsHorizontalScrollIndicator
+                      persistentScrollbar
+                      onLayout={row.week === 1
+                        ? (event) => setTrajectoryOverflows(event.nativeEvent.layout.width < TRAJECTORY_RAIL_MIN_WIDTH)
+                        : undefined}
                       style={styles.dayScroll}
                       contentOffset={{
                         x: Math.max(0, row.cells.findIndex((_, dayIndex) => addDaysIso(block.startDate, (row.week - 1) * 7 + dayIndex) === today)) * (theme.touch.min + theme.space[1]),
@@ -2009,6 +2020,7 @@ const styles = StyleSheet.create({
   },
   dayRail: {
     flexGrow: 1,
+    minWidth: TRAJECTORY_RAIL_MIN_WIDTH,
     flexDirection: 'row',
     gap: theme.space[1],
   },

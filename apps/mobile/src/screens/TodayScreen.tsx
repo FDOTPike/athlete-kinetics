@@ -765,7 +765,7 @@ function AvailableTodayScreen({
         )
       )}
 
-      <Text style={styles.date}>{today}</Text>
+      <Text style={styles.date}>{formatAthleteDate(today)}</Text>
     </ScrollView>
   );
 }

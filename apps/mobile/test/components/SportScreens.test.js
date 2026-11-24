@@ -18,7 +18,7 @@
  *   - the profile panel edits and removes the sport without touching a plan.
  */
 import React from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import { useStore } from '../../src/state/useStore';
 import { authorizeAthleteDataBoot, resetDataMaintenanceLockForTests } from '../../src/state/dataMaintenanceLock';
 import OnboardingScreen from '../../src/screens/OnboardingScreen';
@@ -121,6 +121,26 @@ test('description preferences are saved per profile slot and reloaded from SQLit
 });
 
 describe('the sport screen in the interview', () => {
+  test('the sticky sport gate names the next required answer', () => {
+    openSportSlide();
+    const missing = () => screen.getByTestId('onboarding-sport-gate-missing');
+    expect(missing()).toHaveTextContent('Choose your sport.');
+    press('sport-family-court');
+    press('sport-basketball');
+    expect(missing()).toHaveTextContent('Choose what you want from your training for this sport.');
+    press('sport-outcome-jump_higher');
+    expect(missing()).toHaveTextContent('Choose how long you have played.');
+  });
+
+  test('Review exposes Start Training in the sticky footer beside Back', () => {
+    openSportSlide();
+    press('onboarding-skip-sport');
+    walkToReview();
+    const footer = within(screen.getByTestId('onboarding-footer-container'));
+    expect(footer.getByLabelText('Back')).toBeOnTheScreen();
+    expect(footer.getByLabelText('START TRAINING')).toBeOnTheScreen();
+  });
+
   test('is offered on the focus slide and is not part of the interview unless asked for', () => {
     render(<OnboardingScreen />);
     next();

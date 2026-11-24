@@ -48,13 +48,14 @@ jest.mock('@ak/inference', () => {
 const resolveLoadSelectionSpy = jest.fn((input) => actualResolveLoadSelection(input));
 // Issue 158: a test can set the font scale. Undefined keeps the real hook's value.
 let mockFontScale;
+let mockWindowWidth;
 jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => {
   const actual = jest.requireActual('react-native/Libraries/Utilities/useWindowDimensions').default;
   return {
     __esModule: true,
     default: () => {
       const dims = actual();
-      return mockFontScale === undefined ? dims : { ...dims, fontScale: mockFontScale };
+      return { ...dims, fontScale: mockFontScale ?? dims.fontScale, width: mockWindowWidth ?? dims.width };
     },
   };
 });
@@ -3381,6 +3382,22 @@ test('Compact hides effort help without hiding stop guidance', () => {
 describe('large text at font scale 2.0 (issue 158)', () => {
   afterEach(() => {
     mockFontScale = undefined;
+    mockWindowWidth = undefined;
+  });
+
+  test.each([360, 412])('at %i dp the two workout actions have separate full-width rows', (width) => {
+    mockFontScale = 1;
+    mockWindowWidth = width;
+    mockState = state();
+    render(<SessionScreen />);
+    expect(StyleSheet.flatten(screen.getByTestId('workout-quick-row').props.style).flexDirection).toBe('column');
+    for (const label of [/^Swap exercise: .+$/, 'Report discomfort']) {
+      const action = screen.getByLabelText(label);
+      expect(StyleSheet.flatten(action.props.style)).toMatchObject({
+        alignSelf: 'stretch',
+        minHeight: theme.touch.min,
+      });
+    }
   });
 
   test('at font scale 2.0 the two workout buttons stack, and each fills the row', () => {
@@ -3392,8 +3409,9 @@ describe('large text at font scale 2.0 (issue 158)', () => {
     expect(StyleSheet.flatten(screen.getByLabelText(/^Swap exercise: .+$/).props.style)).toMatchObject({ alignSelf: 'stretch' });
   });
 
-  test('at the default font scale the two workout buttons stay side by side', () => {
+  test('at the default font scale the two workout buttons stay side by side on a wide display', () => {
     mockFontScale = 1;
+    mockWindowWidth = 600;
     mockState = state();
     render(<SessionScreen />);
     expect(StyleSheet.flatten(screen.getByTestId('workout-quick-row').props.style)).toMatchObject({ flexDirection: 'row' });

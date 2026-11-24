@@ -338,6 +338,12 @@ describe('adjustments read as English and never overstate', () => {
 // Screen behaviour and ACTION IDENTITY
 // ---------------------------------------------------------------------------
 
+test('Today shows the same athlete-facing calendar format as other dates', () => {
+  render(<TodayScreen />);
+  expect(screen.getByText(formatAthleteDate(TODAY))).toBeOnTheScreen();
+  expect(screen.queryByText(TODAY)).toBeNull();
+});
+
 describe('Today starts the workout directly — no Coach detour', () => {
   test('a planned day offers ONE primary action that calls the production start path', () => {
     // Sol R4 F5: the mock now does what the real store does on success —

@@ -20,7 +20,7 @@
  *    cold-start root.
  */
 import React from 'react';
-import { Keyboard, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
+import { Dimensions, Keyboard, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
 import { render, screen, fireEvent, act, within } from '@testing-library/react-native';
 import { NavigationProvider, useNavigation } from '../../src/navigation/navigation';
 import AppShellTestHarness from '../../src/AppShellTestHarness';
@@ -385,11 +385,23 @@ describe('Readiness, Session, Library and Profile remain reachable', () => {
     expect(screen.getByTestId('readiness-screen')).toBeOnTheScreen();
   });
 
+  test('an edge-to-edge Android shell clears the bottom gesture bar', () => {
+    jest.replaceProperty(Platform, 'OS', 'android');
+    jest.spyOn(Platform, 'Version', 'get').mockReturnValue(37);
+    jest.spyOn(Dimensions, 'get').mockReturnValue({ width: 360, height: 800, scale: 3, fontScale: 1 });
+    render(<AppShellTestHarness />);
+    expect(StyleSheet.flatten(screen.getByTestId('shell-root').props.style).paddingBottom).toBeGreaterThan(0);
+  });
+
   test('Session is reachable during an active workout, marked as in progress', () => {
     mockState = state({ session: { sessionId: 7, date: '2026-07-15', startedAtMs: 1, sets: [] } });
     render(<AppShellTestHarness />);
     expect(screen.getByLabelText('Open the workout — workout in progress')).toBeOnTheScreen();
     expect(screen.getByTestId('header-session-live-dot', { includeHiddenElements: true })).toBeOnTheScreen();
+    expect(StyleSheet.flatten(screen.getByTestId('header-session').props.style)).toMatchObject({
+      flexDirection: 'row',
+      alignItems: 'center',
+    });
     expect(screen.getByText('WORKOUT')).toBeOnTheScreen();
     fireEvent.press(screen.getByTestId('header-session'));
     expect(screen.getByTestId('session-screen-shown')).toBeOnTheScreen();

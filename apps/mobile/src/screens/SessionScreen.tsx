@@ -525,9 +525,10 @@ export const clearUnloggedLoadDraftsForTests = (): void => { unloggedLoadDrafts.
 export const unloggedLoadDraftCountForTests = (): number => unloggedLoadDrafts.size;
 
 export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionScreenProps = {}): React.JSX.Element {
-  // Large text (issue 158): the two workout buttons stack so their words do not break.
-  const { fontScale } = useWindowDimensions();
-  const stackQuickRow = fontScale >= 1.3;
+  const { fontScale, width } = useWindowDimensions();
+  // The timeline rail and card padding leave too little space for two labels
+  // at phone widths, even at the default font scale.
+  const stackQuickRow = width <= 412 || fontScale >= 1.3;
   const state = useStore((s) => s);
   const nav = typeof useNavigation === 'function' ? useNavigation() : undefined;
   const [emptyStartPromptOpen, setEmptyStartPromptOpen] = useState(false);
@@ -2360,7 +2361,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                             }}
                             accessibilityLabel={`Swap exercise: ${movement?.name ?? 'this movement'}`}
                             fullWidth={stackQuickRow}
-                            style={{ flex: 1, minHeight: theme.touch.min }}
+                            style={stackQuickRow ? undefined : styles.quickAction}
                           />
                           <SecondaryButton
                             label="Report discomfort"
@@ -2370,7 +2371,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                             }}
                             accessibilityLabel="Report discomfort"
                             fullWidth={stackQuickRow}
-                            style={{ flex: 1, minHeight: theme.touch.min }}
+                            style={stackQuickRow ? undefined : styles.quickAction}
                           />
                         </View>
 
@@ -3061,6 +3062,7 @@ const styles = StyleSheet.create({
   quickRowStacked: {
     flexDirection: 'column',
   },
+  quickAction: { flex: 1 },
   safety: {
     marginTop: theme.space[3],
     padding: theme.space[3],

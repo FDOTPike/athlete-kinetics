@@ -1083,22 +1083,11 @@ export default function OnboardingScreen(): React.JSX.Element {
               Change any of this later in Profile. Next, check your first week,
               then start on Today.
             </Text>
-            <PrimaryButton
-              label="START TRAINING"
-              onPress={finish}
-              accessibilityLabel="START TRAINING"
-              style={styles.startBtn}
-            />
-            {saveAttempted && typeof storeError === 'string' && storeError.length > 0 && (
-              <Text style={styles.p} accessibilityRole="alert" testID="onboarding-save-error">
-                {`Not saved. ${storeError}`}
-              </Text>
-            )}
           </View>
         )}
       </KeyboardAwareScrollView>
 
-      {/* Footer: BACK / NEXT. On the limitations screen NEXT stays disabled
+      {/* Footer: BACK / NEXT or START TRAINING. On the limitations screen NEXT stays disabled
           until an explicit yes/no answer exists (R5, Round 2); the caption
           says why, so the rule is never invisible. BACK still walks the
           draft — an unanswered limitations screen only blocks going FORWARD. */}
@@ -1118,17 +1107,28 @@ export default function OnboardingScreen(): React.JSX.Element {
             disabled={stepIdx === 0}
             accessibilityLabel="Back"
           />
-          {!isLast && (
-            <PrimaryButton
-              label="NEXT"
-              onPress={goNext}
-              disabled={limitsGateOpen || targetGateOpen || sportGateOpen}
-              accessibilityLabel="Next"
-            />
-          )}
+          <PrimaryButton
+            label={isLast ? 'START TRAINING' : 'NEXT'}
+            onPress={isLast ? finish : goNext}
+            disabled={!isLast && (limitsGateOpen || targetGateOpen || sportGateOpen)}
+            accessibilityLabel={isLast ? 'START TRAINING' : 'Next'}
+            style={styles.footerAction}
+          />
         </View>
-        {sportGateOpen && (
+        {isLast && saveAttempted && typeof storeError === 'string' && storeError.length > 0 && (
           <View style={styles.limitsGateNotice}>
+            <Text style={styles.p} accessibilityRole="alert" testID="onboarding-save-error">
+              {`Not saved. ${storeError}`}
+            </Text>
+          </View>
+        )}
+        {sportGateOpen && !sportValidation.ok && (
+          <View style={styles.limitsGateNotice}>
+            {sportValidation.errors[0] !== undefined && (
+              <Text style={styles.p} testID="onboarding-sport-gate-missing" accessibilityLiveRegion="polite">
+                {sportValidation.errors[0].message}
+              </Text>
+            )}
             <Text style={styles.pDim} accessibilityLiveRegion="polite">
               Finish the sport questions to continue, or choose "Skip this" to plan general gym training.
             </Text>
@@ -1227,11 +1227,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   reviewEditText: { ...theme.font.label, color: theme.color.textHi },
-  startBtn: {
-    marginTop: theme.space[2],
-  },
+  footerAction: { flexShrink: 1 },
   footer: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: theme.space[3],
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: theme.space[2], padding: theme.space[3],
     paddingBottom: Platform.OS === 'ios' ? theme.space[4] : theme.space[3],
     borderTopWidth: 1, borderTopColor: theme.color.line,
   },
