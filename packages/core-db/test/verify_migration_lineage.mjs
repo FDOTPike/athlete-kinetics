@@ -407,7 +407,23 @@ console.log('[L7] backup schema contract recognises exactly the known lineage va
   check('the equivalence applies only to the suspension_episode TABLE object',
     !contract.matchesBackupSchemaContract(masterObjects.map((o) => (o[1] === 'suspension_episode'
       ? ['index', o[1], o[2], o[3], o[4]] : o)), current, cryptoProvider));
-  check('equivalence registry holds exactly one reviewed entry', contract.KNOWN_LINEAGE_SQL_EQUIVALENTS.length === 1);
+  // The provisional Windows Metro run installed the same new 082 statement
+  // with CRLF. Build both real databases so this also catches DDL drift.
+  for (const [label, ending] of [['Git LF', '\n'], ['provisional Windows CRLF', '\r\n']]) {
+    const installed = openDb();
+    runner.runMigrations(installed, [...UNIFIED.slice(0, -1), UNIFIED.at(-1).replace(/\r?\n/g, ending)]);
+    const objects = schemaObjects(installed);
+    check(`082 ${label} schema matches the current backup contract`,
+      contract.matchesBackupSchemaContract(objects, current, cryptoProvider));
+    const drifted = objects.map((object) => object[1] === 'profile_ui_description_preference'
+      ? [object[0], object[1], object[2], object[3].replace("'expanded'", "'other'"), object[4]]
+      : object);
+    check(`082 ${label} schema with a changed CHECK is rejected`,
+      !contract.matchesBackupSchemaContract(drifted, current, cryptoProvider));
+  }
+  check('equivalence registry is limited to the exact 058 and 082 table texts',
+    JSON.stringify(contract.KNOWN_LINEAGE_SQL_EQUIVALENTS.map((entry) => entry.name))
+      === JSON.stringify(['suspension_episode', 'profile_ui_description_preference']));
 }
 
 for (const raw of openConnections) {

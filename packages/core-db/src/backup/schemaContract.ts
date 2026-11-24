@@ -192,7 +192,7 @@ export const SUPPORTED_BACKUP_SCHEMA_CONTRACTS: readonly BackupSchemaContract[] 
     migrationSlot: 82,
     tableCount: 141,
     objectCount: 230,
-    fingerprint: '640dfb34240651e171b5c6fa7a81b33b041fc94c0cfc640c5c36fa7dd4aad314',
+    fingerprint: 'feae0da792ded0c3b07b073d502023487d3b8ac25890c9006917f87de9ac3bba',
   },
 ];
 
@@ -244,13 +244,13 @@ export function backupSchemaContractFor(userVersion: number, migrationSlot: numb
  * for `suspension_episode`, and its exact fingerprint differs from a fresh
  * install's even though columns, CHECKs, indexes and triggers are identical.
  *
- * This table maps that ONE exact stored text to the canonical (feature) text
- * before fingerprinting. It is an exact string match — not comment stripping,
+ * The registry maps each exact stored text to its canonical text before
+ * fingerprinting. It is an exact string match — not comment stripping,
  * not whitespace folding, not a relaxed comparison — so any other text,
  * including a one-byte change to either variant, still fails the contract.
  * Columns are compared unchanged. Adding an entry here requires the same
- * review as adding a migration: verify:backup pins both texts against the
- * real chains (fixtures under packages/core-db/test/fixtures/lineage/).
+ * review as adding a migration. The migration-lineage and backup gates
+ * exercise both texts against SQLite.
  */
 export const MASTER_058_SUSPENSION_EPISODE_SQL = 'CREATE TABLE suspension_episode (\n'
   + '  episode_id         INTEGER PRIMARY KEY,\n'
@@ -274,6 +274,13 @@ export const FEATURE_058_SUSPENSION_EPISODE_SQL = 'CREATE TABLE suspension_episo
   + '  frozen_macro_index INTEGER NOT NULL CHECK (frozen_macro_index BETWEEN 1 AND 8)\n'
   + ') STRICT';
 
+// The provisional Windows Metro bundle installed these exact bytes with CRLF.
+const DESCRIPTION_PREFERENCE_SQL = `CREATE TABLE profile_ui_description_preference (
+  profile_slot_id INTEGER PRIMARY KEY REFERENCES profile_slot(slot_id) ON DELETE CASCADE,
+  description_mode TEXT NOT NULL CHECK (description_mode IN ('compact', 'expanded')),
+  updated_at_ms INTEGER NOT NULL DEFAULT 0
+) STRICT`;
+
 export const KNOWN_LINEAGE_SQL_EQUIVALENTS: readonly {
   readonly type: 'table';
   readonly name: string;
@@ -287,6 +294,13 @@ export const KNOWN_LINEAGE_SQL_EQUIVALENTS: readonly {
     lineage: 'master 1da218d migration 058',
     variantSql: MASTER_058_SUSPENSION_EPISODE_SQL,
     canonicalSql: FEATURE_058_SUSPENSION_EPISODE_SQL,
+  },
+  {
+    type: 'table',
+    name: 'profile_ui_description_preference',
+    lineage: 'provisional Windows Metro migration 082',
+    variantSql: DESCRIPTION_PREFERENCE_SQL.replace(/\n/g, '\r\n'),
+    canonicalSql: DESCRIPTION_PREFERENCE_SQL,
   },
 ];
 
