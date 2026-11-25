@@ -1,6 +1,6 @@
 # Compact descriptions and Pixel executor handoff
 
-24 November 2026
+24–25 November 2026
 
 PROVISIONAL — FOR ANTIGRAVITY & OWNER REVIEW
 
@@ -16,6 +16,7 @@ PROVISIONAL — FOR ANTIGRAVITY & OWNER REVIEW
 | `1fd7247b5f4902f5b0c6c140880c5e94e407a538` | Backup compatibility for the Git SQL and the exact provisional CRLF SQL |
 | `d5d24e98da0d974cf1a37679741031e4064f7c51` and `bbc2ffd1dbbc908d2a94e42424969f90f074a49a` | Pipeline checks for the appended migration |
 | `ec742514e7be08f0185b2b8cd148c74016f63578` | Pinned backup wording and disclosure test coverage |
+| `e30fafb261dced191b8c5e8bd88c82aa5b5754af` | Locale-aware off-plan workout date in Today’s caption and accessibility label |
 
 ## Hardware evidence
 
@@ -43,6 +44,8 @@ EVIDENCE CAPTURED — Pixel 9 Pro, Android 17, physical serial `192.168.0.49:438
 
 EVIDENCE CAPTURED — Coach Mode scratch athlete `New Athlete` received the test workout, set and display setting. `after/francis-reactivated.json` records `Athlete Francis, active` with `SELECTED`. `after/francis-relocked.json` identifies Francis as the active profile and the advanced-tools control is absent. The final app layout is Today. `pixel-qa-package.txt` records the installed `com.pikemethods.training.qa` package. `metro-handback.txt` records `PORT_8081_LISTENERS=0`.
 
+EVIDENCE CAPTURED — The 25 November rerun captured the complete Stage 3 walkthrough on the Android 17 Pixel, including both ends of the Plan strip and the Review footer before and after scrolling. On Today, the footer reads `Wed, Nov 25, 2026` and the off-plan caption and accessibility label contain `Tue, Nov 24, 2026`. The rerun closed the scratch workout, restored Francis to Today, relocked advanced tools and released Metro port 8081. [Rerun evidence and device handback](C:/codex-sol-compact-evidence/stage3-restart-2026-11-25/STAGE_3_RERUN.md)
+
 ## §10 report
 
 1. **What I did**
@@ -52,6 +55,8 @@ EVIDENCE CAPTURED — Coach Mode scratch athlete `New Athlete` received the test
    EVIDENCE CAPTURED — `npm run typecheck` reports `EXIT=0` in `typecheck-final.log`. `npm run verify:pipeline` reports `pipeline verification: 55 checks passed` and `EXIT=0` in `pipeline-final.log`. The focused compact-description run reports `177 passed, 177 total` in `stage2-focused-final.log`. The final backup-portability filter reports `5 passed` and `EXIT=0` in `backup-portability-focused.log`. Red-first outputs include `compact-red.log`, `migration-red.log`, `backup-red.log`, `pixel-red.log`, `pixel-review-red.log` and `line-endings-red.log`. The last proves the LF schema initially failed the backup fingerprint check. After the full suite identified disclosure fixtures that still expected visible copy, the four affected suites reran with `34 passed, 34 total` and `EXIT=0` in `remaining-pins-final.log`. The Git diff check and hex audit are recorded separately.
 
    EVIDENCE CAPTURED — `npm run verify:ci` at `ec742514e7be08f0185b2b8cd148c74016f63578` ran `npm run verify:components` and exited with `EXIT=0` in `verify-ci-release-review.log`. Its final lines read `Test Suites: 256 passed, 256 total` and `Tests: 6884 passed, 6884 total`. `git-diff-check.txt` records `EXIT=0` and `final-hex-audit.txt` records `ADDED_HEX_LITERALS=0`.
+
+   EVIDENCE CAPTURED — On the application tree committed as `e30fafb261dced191b8c5e8bd88c82aa5b5754af`, both off-plan caption assertions failed on the raw dates before the fix. With the fix, `npm run typecheck`, nine focused component suites with 391 tests, and `git diff --check` exited 0. The full `npm run verify:ci` ran `npm run verify:components` and exited 0 with 256 suites and 6,884 tests. [Before-fix test log](C:/codex-sol-compact-evidence/stage3-restart-2026-11-25/caption-red.log) · [Full verification log](C:/codex-sol-compact-evidence/stage3-restart-2026-11-25/verify-ci.log)
 
 3. **What I could not verify**
    NOT VERIFIED — phone locked during the original hardware baseline before a set and rest timer, Session Feel, and the post-session summary could be captured. The scratch-athlete after-walk covered those flows.
