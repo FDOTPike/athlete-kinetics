@@ -46,6 +46,8 @@ EVIDENCE CAPTURED — Coach Mode scratch athlete `New Athlete` received the test
 
 EVIDENCE CAPTURED — The 25 November rerun captured the complete Stage 3 walkthrough on the Android 17 Pixel, including both ends of the Plan strip and the Review footer before and after scrolling. On Today, the footer reads `Wed, Nov 25, 2026` and the off-plan caption and accessibility label contain `Tue, Nov 24, 2026`. The rerun closed the scratch workout, restored Francis to Today, relocked advanced tools and released Metro port 8081. [Rerun evidence and device handback](C:/codex-sol-compact-evidence/stage3-restart-2026-11-25/STAGE_3_RERUN.md)
 
+EVIDENCE CAPTURED — A disposable Android 15 emulator supplied reconstructed before-state captures from `fb539d06` and a matched Box Squat comparison against verified application commit `e30fafb2`. The updated labels fit on one line, the live dot aligns with WORKOUT within 1 px, and all three tab bounds end 85 px above the bottom of the display. Both versions show the rest timer, stopped-session summary and Session Feel after the same scratch set. The packet also includes before-state Onboarding, Sport (BJJ), Program Setup, Today and Plan. [Android 15 evidence index](C:/codex-sol-compact-evidence/emulator-comparison-2026-11-25/ANDROID15_COMPARISON.md)
+
 ## §10 report
 
 1. **What I did**
@@ -59,9 +61,9 @@ EVIDENCE CAPTURED — The 25 November rerun captured the complete Stage 3 walkth
    EVIDENCE CAPTURED — On the application tree committed as `e30fafb261dced191b8c5e8bd88c82aa5b5754af`, both off-plan caption assertions failed on the raw dates before the fix. With the fix, `npm run typecheck`, nine focused component suites with 391 tests, and `git diff --check` exited 0. The full `npm run verify:ci` ran `npm run verify:components` and exited 0 with 256 suites and 6,884 tests. [Before-fix test log](C:/codex-sol-compact-evidence/stage3-restart-2026-11-25/caption-red.log) · [Full verification log](C:/codex-sol-compact-evidence/stage3-restart-2026-11-25/verify-ci.log)
 
 3. **What I could not verify**
-   NOT VERIFIED — phone locked during the original hardware baseline before a set and rest timer, Session Feel, and the post-session summary could be captured. The scratch-athlete after-walk covered those flows.
+   NOT VERIFIED — the Pixel locked during the original physical baseline before a logged set, rest timer, Session Feel and post-session summary could be captured. The reconstructed Android 15 emulator baseline covers those flows on the original source commit, and the physical after-walk covers them on the updated build.
    NOT VERIFIED — Library animation is gated on completed technique review in the bundled manifest. The Library detail layout is captured.
-   NOT VERIFIED — additional hardware combinations for Android 15 and 16, other viewport/font sizes, and disclosure states outside the hardware packet. The component gates exercise the added layout and touch-target contracts.
+   NOT VERIFIED — physical Android 15 and 16, Android 16 emulation, other viewport/font sizes, and disclosure states outside the evidence packets. Android 15 gesture clearance is captured on the emulator. The component gates exercise the added layout and touch-target contracts.
    NOT VERIFIED — encrypted restore on the physical phone would replace live athlete data. Encrypted restore evidence comes from the local SQLite suites.
 
 4. **Judgment calls**
