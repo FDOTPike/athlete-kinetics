@@ -48,6 +48,8 @@ EVIDENCE CAPTURED — The 25 November rerun captured the complete Stage 3 walkth
 
 EVIDENCE CAPTURED — A disposable Android 15 emulator supplied reconstructed before-state captures from `fb539d06` and a matched Box Squat comparison against verified application commit `e30fafb2`. The updated labels fit on one line, the live dot aligns with WORKOUT within 1 px, and all three tab bounds end 85 px above the bottom of the display. Both versions show the rest timer, stopped-session summary and Session Feel after the same scratch set. The packet also includes before-state Onboarding, Sport (BJJ), Program Setup, Today and Plan. [Android 15 evidence index](C:/codex-sol-compact-evidence/emulator-comparison-2026-11-25/ANDROID15_COMPARISON.md)
 
+EVIDENCE CAPTURED — The restarted physical Pixel walkthrough now pairs the original Box Squat layout with the updated Box Squat layout at the same display settings. On the updated build, both action labels fit, the live dot is inline, and the tabs clear the gesture bar. The same run captured the swap picker, rest timer, stopped-session summary, Session Feel and both display modes. The scratch athlete’s initial Compact setting was restored, Francis was reactivated, advanced tools were relocked and port 8081 was released. [Physical restart evidence](C:/codex-sol-compact-evidence/pixel-workorder-restart-2026-11-25/PIXEL_RESTART.md)
+
 ## §10 report
 
 1. **What I did**
