@@ -10,12 +10,29 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import ProgressScreen from '../../src/screens/ProgressScreen';
+import { makeNodeSqliteDriver } from '../helpers/nodeSqliteOpDriver';
 
 let mockState;
+let mockStoreOverride = null;
+let mockDriver = null;
+
+jest.mock('@op-engineering/op-sqlite', () => ({ open: () => mockDriver }));
+jest.mock('../../src/state/athleteRegistry', () => {
+  const core = jest.requireActual('../../src/state/athleteRegistryCore');
+  return {
+    loadRegistry: async () => ({
+      version: 1,
+      activeId: core.DEFAULT_ATHLETE_ID,
+      advancedToolsUnlocked: false,
+      athletes: [{ id: core.DEFAULT_ATHLETE_ID, name: 'Athlete 1', dbName: core.LEGACY_DB_NAME, createdAtMs: 0 }],
+    }),
+    saveRegistry: async () => undefined,
+  };
+});
 
 jest.mock('../../src/state/useStore', () => ({
   palette: { bg: '#000', surface: '#15151A', line: '#26262E', text: '#F4F4F6', dim: '#86868F', green: '#2EE6A8', amber: '#FFB454', red: '#FF5D5D' },
-  useStore: (selector) => selector(mockState),
+  useStore: (selector) => (mockStoreOverride !== null ? mockStoreOverride(selector) : selector(mockState)),
 }));
 
 // Deterministic locale so the year assertion is stable.
@@ -534,3 +551,125 @@ test('WO03-SOL-R3: catching up on a missed Week 1 workout during Week 2 does not
   const readIds = [...new Set(factsSpy.mock.calls.map(([id]) => id))];
   expect(readIds).toEqual([20]);
 });
+
+test('WO03-SOL-R5: real store keeps a Week 1 catch-up closed on the first day of Week 2 out of Week 2 via persisted session_origin', async () => {
+  const Clock = global.Date;
+  let now = new Clock('2026-11-08T23:30:00').getTime();
+  global.Date = class extends Clock {
+    constructor(...args) { super(...(args.length ? args : [now])); }
+    static now() { return ++now; }
+  };
+  try {
+    mockDriver = makeNodeSqliteDriver();
+    const { useStore: realUseStore } = jest.requireActual('../../src/state/useStore');
+    const { authorizeAthleteDataBoot, resetDataMaintenanceLockForTests } = require('../../src/state/dataMaintenanceLock');
+    const { offPlanStartTarget } = require('../../src/state/offPlanStart');
+    mockStoreOverride = realUseStore;
+
+    resetDataMaintenanceLockForTests();
+    authorizeAthleteDataBoot();
+    const realState = () => realUseStore.getState();
+    const raw = () => mockDriver.raw;
+    const idOf = (name) => Number(raw().prepare('SELECT movement_id FROM movement WHERE name = ?').get(name).movement_id);
+
+    realUseStore.setState({
+      status: 'booting', error: null, session: null, runner: null, sessionMode: null, sessionPlan: [],
+      preparation: null, activeSessionPlanSlotId: null, activeMovementId: null, lastTriage: null,
+      prescription: null, niggles: [], todayPlan: null, block: null, program: null, lastEndedSessionId: null,
+    });
+    realState().boot();
+    for (let i = 0; i < 500 && realState().status !== 'ready'; i += 1) {
+      await new Promise((resolve) => { setImmediate(resolve); });
+    }
+    expect(realState().status).toBe('ready');
+    realState().saveProfile({
+      training_age: 'intermediate',
+      equipment_inventory: ['barbell', 'squat_rack', 'dumbbells', 'bench'],
+    });
+    raw().exec("INSERT INTO session (session_id, micro_cycle_id, session_date, started_at_ms, duration_min) VALUES (9000, NULL, '2026-01-04', 1000, 40)");
+
+    const movementId = idOf('Incline Dumbbell Press');
+    raw().prepare(
+      "INSERT INTO training_block (block_id, start_date, objective, created_at_ms, status) VALUES (1, ?, 'hypertrophy', ?, 'active')",
+    ).run('2026-11-02', new Clock('2026-11-02T07:00:00').getTime());
+    for (const [id, week, day, date] of [[101, 1, 5, '2026-11-06'], [102, 2, 1, '2026-11-09'], [103, 2, 3, '2026-11-11']]) {
+      raw().prepare(
+        "INSERT INTO planned_session (planned_session_id, block_id, week_index, day_index, focus, phase, session_date) VALUES (?, 1, ?, ?, 'upper', 'accumulation', ?)",
+      ).run(id, week, day, date);
+      raw().prepare(
+        'INSERT INTO planned_slot (planned_slot_id, planned_session_id, slot_index, movement_id, sets, reps, target_rpe) VALUES (?, ?, 1, ?, 3, 8, 8)',
+      ).run(id * 10, id, movementId);
+    }
+
+    realState().rolloverDay();
+    realState().refreshBlock();
+    const target = offPlanStartTarget(realState().blockSessions, realState().today);
+    expect(target.session.plannedSessionId).toBe(101);
+    realState().startSession(false, target.session.plannedSessionId);
+    expect(realState().error).toBeNull();
+    const catchUpId = realState().session.sessionId;
+
+    const logSets = (count) => {
+      const slot = realState().sessionPlan[0];
+      realState().finishPreparation('already_warm', realState().preparation.revision);
+      for (let index = 0; index < count; index += 1) {
+        realState().logSet(slot.movementId, 8, 20, 8, undefined, undefined, undefined, undefined, slot.sessionPlanSlotId);
+        expect(realState().error).toBeNull();
+        realState().skipRunnerRest();
+      }
+    };
+    logSets(3);
+
+    now = new Clock('2026-11-09T00:05:00').getTime();
+    realUseStore.setState({
+      session: null, runner: null, sessionMode: null, sessionPlan: [],
+      preparation: null, activeSessionPlanSlotId: null, activeMovementId: null,
+    });
+    realState().rolloverDay();
+    expect(realState().finishEarlierSession(catchUpId)).toBe(true);
+    expect(realState().todayPlan.plannedSessionId).toBe(102);
+
+    now = new Clock('2026-11-09T09:00:00').getTime();
+    realState().startSession();
+    expect(realState().error).toBeNull();
+    const scheduledId = realState().session.sessionId;
+    logSets(1);
+    realState().runnerHalt('manual');
+    realState().endSession();
+    expect(realState().error).toBeNull();
+    expect(realState().session).toBeNull();
+
+    const origins = raw().prepare(
+      'SELECT session_id, source_planned_session_id FROM session_origin WHERE session_id IN (?, ?) ORDER BY session_id',
+    ).all(catchUpId, scheduledId);
+    expect(origins).toEqual([
+      { session_id: catchUpId, source_planned_session_id: 101 },
+      { session_id: scheduledId, source_planned_session_id: 102 },
+    ]);
+
+    const facts = jest.fn(realState().loadSessionSummaryFacts);
+    realUseStore.setState({
+      loadSessionSummaryFacts: facts,
+      focus: { bundleId: 'beach_muscles', muscles: ['chest'], customised: false, movementControl: false },
+    });
+    const view = render(<ProgressScreen />);
+    try {
+      const observed = {
+        rendered: screen.getByTestId('progress-focus-muscle-chest').props.children,
+        readIds: facts.mock.calls.map(([id]) => id),
+      };
+      expect(observed).toEqual({
+        rendered: 'Chest · 1 of 6 planned sets completed this week',
+        readIds: [scheduledId],
+      });
+    } finally {
+      view.unmount();
+      realUseStore.setState({ loadSessionSummaryFacts: facts.getMockImplementation() });
+      resetDataMaintenanceLockForTests();
+    }
+  } finally {
+    mockStoreOverride = null;
+    mockDriver = null;
+    global.Date = Clock;
+  }
+}, 60_000);

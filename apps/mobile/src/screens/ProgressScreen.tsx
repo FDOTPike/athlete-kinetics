@@ -19,6 +19,7 @@
  */
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import type { DB } from '@op-engineering/op-sqlite';
 import {
   MUSCLE_GROUP_INFO,
   describeFocus,
@@ -27,6 +28,7 @@ import {
   type MuscleGroupId,
 } from '@ak/inference';
 import { useStore, type RecentSessionOutcome } from '../state/useStore';
+import { athleteDataBootAllowed } from '../state/dataMaintenanceLock';
 import { theme } from '../theme/theme';
 import { formatAthleteDate } from '../state/athleteDate';
 import { CompactDescription, ListRow } from '../components/ui';
@@ -84,6 +86,55 @@ const localIsoDate = (ms: number): string | null => {
   return `${y}-${mo}-${da}`;
 };
 
+function rowsOf<T>(res: unknown): T[] {
+  if (Array.isArray(res)) return res as T[];
+  const r = (res as { rows?: unknown } | null | undefined)?.rows;
+  if (Array.isArray(r)) return r as T[];
+  const arr = (r as { _array?: unknown } | null | undefined)?._array;
+  return Array.isArray(arr) ? (arr as T[]) : [];
+}
+
+/** Read persisted `session_origin` links (`session_id -> source_planned_session_id`)
+ *  when booted against SQLite so earlier catch-up workouts finalized on a later day
+ *  attribute to their true planned session rather than their finalization date. */
+const readPersistedPlannedSessionOrigins = (dbName: string | null): ReadonlyMap<number, number> => {
+  const map = new Map<number, number>();
+  if (dbName === null || !athleteDataBootAllowed()) return map;
+  let readerDb: DB | null = null;
+  try {
+    const { open } = require('@op-engineering/op-sqlite') as typeof import('@op-engineering/op-sqlite');
+    readerDb = open({ name: dbName });
+    const rows = rowsOf<{ session_id: number; source_planned_session_id: number }>(
+      readerDb.executeSync(
+        "SELECT session_id, source_planned_session_id FROM session_origin WHERE origin_kind = 'planned' AND source_planned_session_id IS NOT NULL",
+      ),
+    );
+    for (let idx = 0; idx < rows.length; idx += 1) {
+      const row = rows[idx];
+      const sessionId = Number(row.session_id);
+      const planId = Number(row.source_planned_session_id);
+      if (Number.isFinite(sessionId) && Number.isFinite(planId)) {
+        map.set(sessionId, planId);
+      }
+    }
+  } catch {
+    // Mocked unit-test stores without an op-sqlite driver fall back to outcome replay.
+  } finally {
+    if (
+      readerDb !== null
+      && typeof (globalThis as { __OPSQLiteProxy?: unknown }).__OPSQLiteProxy !== 'undefined'
+      && typeof readerDb.close === 'function'
+    ) {
+      try {
+        readerDb.close();
+      } catch {
+        // Ignore secondary reader close errors.
+      }
+    }
+  }
+  return map;
+};
+
 /** The logged facts of one past session: no plan context, no completion
  *  actions, only what was recorded. */
 function PastSessionSummary({ sessionId, load }: {
@@ -138,6 +189,12 @@ export default function ProgressScreen(): React.JSX.Element {
   const today = useStore((s) => s.today) ?? '';
   const movements = useStore((s) => s.movements) ?? [];
   const loadSessionSlots = useStore((s) => s.loadSessionSlots);
+  const storeStatus = useStore((s) => s.status) ?? null;
+  const athletes = useStore((s) => s.athletes) ?? [];
+  const activeAthleteId = useStore((s) => s.activeAthleteId) ?? null;
+  const activeDbName = storeStatus === 'ready' && activeAthleteId !== null
+    ? athletes.find((entry) => entry.id === activeAthleteId)?.dbName ?? null
+    : null;
 
   const [allOutcomes, setAllOutcomes] = useState<RecentSessionOutcome[]>([]);
   const recentOutcomes = allOutcomes.slice(0, 20);
@@ -202,35 +259,52 @@ export default function ProgressScreen(): React.JSX.Element {
             ? -1
             : 1,
       );
-      const totalFinalizedInBlock = finalizedBlockSessions.length;
-      const activeBlockOutcomesChronological = allOutcomes
-        .filter(
-          (row) =>
-            row.sessionId != null
-            && (row.originKind == null || row.originKind === 'planned')
-            && (block === null || !(block.createdAtMs > 0) || row.finalizedAtMs >= block.createdAtMs),
-        )
-        .sort((a, b) => (b.sessionId ?? 0) - (a.sessionId ?? 0) || b.finalizedAtMs - a.finalizedAtMs)
-        .slice(0, totalFinalizedInBlock)
-        .reverse();
-      // Attribute each finalized planned outcome to its source planned_session (#228):
-      // 1) explicit sourcePlannedSessionId when present;
-      // 2) exact on-date planned session (`bs.sessionDate === rowDate`);
-      // 3) off-plan start rule (`offPlanStartTarget`): earliest unfinished session before
-      //    `rowDate` (missed-session catch-up), else earliest unfinished session after `rowDate`.
-      const unclaimed = [...finalizedBlockSessions];
+      const allBlockPlanIds = new Set(blockSessions.map((bs) => bs.plannedSessionId));
+      const finalizedPlanById = new Map(finalizedBlockSessions.map((bs) => [bs.plannedSessionId, bs]));
+      const plannedCandidatesNewestFirst = allOutcomes
+        .filter((row) => row.sessionId != null && (row.originKind == null || row.originKind === 'planned'))
+        .sort((a, b) => (b.sessionId ?? 0) - (a.sessionId ?? 0) || b.finalizedAtMs - a.finalizedAtMs);
+      const persistedOrigins = plannedCandidatesNewestFirst.some(
+        (row) => (row as { sourcePlannedSessionId?: number | null }).sourcePlannedSessionId == null,
+      )
+        ? readPersistedPlannedSessionOrigins(activeDbName)
+        : new Map<number, number>();
+
+      const claimedPlanIds = new Set<number>();
       const activeWeekOutcomes: RecentSessionOutcome[] = [];
-      for (const row of activeBlockOutcomesChronological) {
-        const explicitPlanId = (row as { sourcePlannedSessionId?: number | null }).sourcePlannedSessionId;
-        let matchedPlan: (typeof finalizedBlockSessions)[number] | undefined;
-        if (explicitPlanId != null) {
-          const explicitIdx = unclaimed.findIndex((bs) => bs.plannedSessionId === explicitPlanId);
-          if (explicitIdx !== -1) {
-            [matchedPlan] = unclaimed.splice(explicitIdx, 1);
-          } else {
-            matchedPlan = finalizedBlockSessions.find((bs) => bs.plannedSessionId === explicitPlanId);
+      const unresolvedBlockCandidatesNewestFirst: RecentSessionOutcome[] = [];
+      for (const row of plannedCandidatesNewestFirst) {
+        const explicitPlanId = (row as { sourcePlannedSessionId?: number | null }).sourcePlannedSessionId
+          ?? persistedOrigins.get(row.sessionId)
+          ?? null;
+        if (explicitPlanId !== null) {
+          // Session explicitly linked to an archived/other block's planned_session: skip.
+          if (!allBlockPlanIds.has(explicitPlanId)) continue;
+          claimedPlanIds.add(explicitPlanId);
+          const matchedPlan = finalizedPlanById.get(explicitPlanId);
+          if (matchedPlan !== undefined && matchedPlan.weekIndex === activeWeekIndex) {
+            if (block === null) {
+              const rowDate = localIsoDate(row.finalizedAtMs);
+              if (rowDate === null || rowDate < weekStart || rowDate > weekEnd) continue;
+            }
+            activeWeekOutcomes.push(row);
           }
-        } else if (unclaimed.length > 0) {
+          continue;
+        }
+        if (block === null || !(block.createdAtMs > 0) || row.finalizedAtMs >= block.createdAtMs) {
+          unresolvedBlockCandidatesNewestFirst.push(row);
+        }
+      }
+
+      // Fallback (#228) for mocked unit-test stores without persisted `session_origin` rows:
+      // attribute remaining finalized planned outcomes chronologically to unclaimed sessions.
+      const unclaimed = finalizedBlockSessions.filter((bs) => !claimedPlanIds.has(bs.plannedSessionId));
+      const unresolvedChronological = unresolvedBlockCandidatesNewestFirst
+        .slice(0, unclaimed.length)
+        .reverse();
+      for (const row of unresolvedChronological) {
+        let matchedPlan: (typeof finalizedBlockSessions)[number] | undefined;
+        if (unclaimed.length > 0) {
           const rowDate = localIsoDate(row.finalizedAtMs);
           const focusPool = row.focus == null
             ? unclaimed
