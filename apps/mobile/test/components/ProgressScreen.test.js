@@ -673,3 +673,133 @@ test('WO03-SOL-R5: real store keeps a Week 1 catch-up closed on the first day of
     global.Date = Clock;
   }
 }, 60_000);
+
+test('WO03-SOL-R6: rerendering, tapping Recent Sessions rows, and remounting Progress do not allocate additional native op-sqlite readers', async () => {
+  const Clock = global.Date;
+  let now = new Clock('2026-11-08T23:30:00').getTime();
+  global.Date = class extends Clock {
+    constructor(...args) { super(...(args.length ? args : [now])); }
+    static now() { return ++now; }
+  };
+  const origProxy = global.__OPSQLiteProxy;
+  const mockOp = require('@op-engineering/op-sqlite');
+  const origOpen = mockOp.open;
+  try {
+    mockDriver = makeNodeSqliteDriver();
+    const { useStore: realUseStore } = jest.requireActual('../../src/state/useStore');
+    const { authorizeAthleteDataBoot, resetDataMaintenanceLockForTests } = require('../../src/state/dataMaintenanceLock');
+    const { offPlanStartTarget } = require('../../src/state/offPlanStart');
+    mockStoreOverride = realUseStore;
+
+    resetDataMaintenanceLockForTests();
+    authorizeAthleteDataBoot();
+    const realState = () => realUseStore.getState();
+    const raw = () => mockDriver.raw;
+    const idOf = (name) => Number(raw().prepare('SELECT movement_id FROM movement WHERE name = ?').get(name).movement_id);
+
+    realUseStore.setState({
+      status: 'booting', error: null, session: null, runner: null, sessionMode: null, sessionPlan: [],
+      preparation: null, activeSessionPlanSlotId: null, activeMovementId: null, lastTriage: null,
+      prescription: null, niggles: [], todayPlan: null, block: null, program: null, lastEndedSessionId: null,
+    });
+    realState().boot();
+    for (let i = 0; i < 500 && realState().status !== 'ready'; i += 1) {
+      await new Promise((resolve) => { setImmediate(resolve); });
+    }
+    expect(realState().status).toBe('ready');
+    realState().saveProfile({
+      training_age: 'intermediate',
+      equipment_inventory: ['barbell', 'squat_rack', 'dumbbells', 'bench'],
+    });
+    raw().exec("INSERT INTO session (session_id, micro_cycle_id, session_date, started_at_ms, duration_min) VALUES (9000, NULL, '2026-01-04', 1000, 40)");
+
+    const movementId = idOf('Incline Dumbbell Press');
+    raw().prepare(
+      "INSERT INTO training_block (block_id, start_date, objective, created_at_ms, status) VALUES (1, ?, 'hypertrophy', ?, 'active')",
+    ).run('2026-11-02', new Clock('2026-11-02T07:00:00').getTime());
+    for (const [id, week, day, date] of [[101, 1, 5, '2026-11-06'], [102, 2, 1, '2026-11-09'], [103, 2, 3, '2026-11-11']]) {
+      raw().prepare(
+        "INSERT INTO planned_session (planned_session_id, block_id, week_index, day_index, focus, phase, session_date) VALUES (?, 1, ?, ?, 'upper', 'accumulation', ?)",
+      ).run(id, week, day, date);
+      raw().prepare(
+        'INSERT INTO planned_slot (planned_slot_id, planned_session_id, slot_index, movement_id, sets, reps, target_rpe) VALUES (?, ?, 1, ?, 3, 8, 8)',
+      ).run(id * 10, id, movementId);
+    }
+
+    realState().rolloverDay();
+    realState().refreshBlock();
+    const target = offPlanStartTarget(realState().blockSessions, realState().today);
+    realState().startSession(false, target.session.plannedSessionId);
+    const catchUpId = realState().session.sessionId;
+
+    const logSets = (count) => {
+      const slot = realState().sessionPlan[0];
+      realState().finishPreparation('already_warm', realState().preparation.revision);
+      for (let index = 0; index < count; index += 1) {
+        realState().logSet(slot.movementId, 8, 20, 8, undefined, undefined, undefined, undefined, slot.sessionPlanSlotId);
+        realState().skipRunnerRest();
+      }
+    };
+    logSets(3);
+
+    now = new Clock('2026-11-09T00:05:00').getTime();
+    realUseStore.setState({
+      session: null, runner: null, sessionMode: null, sessionPlan: [],
+      preparation: null, activeSessionPlanSlotId: null, activeMovementId: null,
+    });
+    realState().rolloverDay();
+    expect(realState().finishEarlierSession(catchUpId)).toBe(true);
+
+    now = new Clock('2026-11-09T09:00:00').getTime();
+    realState().startSession();
+    const scheduledId = realState().session.sessionId;
+    logSets(1);
+    realState().runnerHalt('manual');
+    realState().endSession();
+
+    const nativeReads = [];
+    const readerClose = jest.fn();
+    global.__OPSQLiteProxy = {};
+    mockOp.open = ({ name }) => {
+      nativeReads.push(name);
+      return { executeSync: (...args) => mockDriver.executeSync(...args), close: readerClose };
+    };
+
+    realUseStore.setState({
+      focus: { bundleId: 'beach_muscles', muscles: ['chest'], customised: false, movementControl: false },
+    });
+    const view = render(<ProgressScreen />);
+    try {
+      expect(screen.getByTestId('progress-focus-muscle-chest')).toHaveTextContent(
+        'Chest · 1 of 6 planned sets completed this week',
+      );
+      const openAfterMount = nativeReads.length;
+      for (let r = 0; r < 12; r += 1) {
+        view.rerender(<ProgressScreen />);
+      }
+      for (let n = 0; n < 12; n += 1) {
+        fireEvent.press(screen.getByTestId(`progress-session-${scheduledId}`));
+        expect(Boolean(screen.queryByTestId(`progress-session-${scheduledId}-summary`))).toBe(n % 2 === 0);
+      }
+      view.unmount();
+      const remounted = render(<ProgressScreen />);
+      try {
+        expect(screen.getByTestId('progress-focus-muscle-chest')).toHaveTextContent(
+          'Chest · 1 of 6 planned sets completed this week',
+        );
+      } finally {
+        remounted.unmount();
+      }
+      const additionalNativeOpens = nativeReads.length - openAfterMount;
+      expect(additionalNativeOpens).toBe(0);
+    } finally {
+      resetDataMaintenanceLockForTests();
+    }
+  } finally {
+    mockOp.open = origOpen;
+    global.__OPSQLiteProxy = origProxy;
+    mockStoreOverride = null;
+    mockDriver = null;
+    global.Date = Clock;
+  }
+}, 60_000);

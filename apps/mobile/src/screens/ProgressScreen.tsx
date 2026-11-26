@@ -17,7 +17,7 @@
  * Profile/settings (the editable athlete surface) stays reachable from the
  * shell header and renders the full ProfileScreen unchanged.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { DB } from '@op-engineering/op-sqlite';
 import {
@@ -94,12 +94,20 @@ function rowsOf<T>(res: unknown): T[] {
   return Array.isArray(arr) ? (arr as T[]) : [];
 }
 
+type OriginCacheEntry = {
+  readonly key: string;
+  readonly origins: ReadonlyMap<number, number>;
+};
+
+const EMPTY_ORIGINS: ReadonlyMap<number, number> = new Map<number, number>();
+const bootScopedOriginCache = new WeakMap<object, OriginCacheEntry>();
+
 /** Read persisted `session_origin` links (`session_id -> source_planned_session_id`)
  *  when booted against SQLite so earlier catch-up workouts finalized on a later day
  *  attribute to their true planned session rather than their finalization date. */
 const readPersistedPlannedSessionOrigins = (dbName: string | null): ReadonlyMap<number, number> => {
+  if (dbName === null || !athleteDataBootAllowed()) return EMPTY_ORIGINS;
   const map = new Map<number, number>();
-  if (dbName === null || !athleteDataBootAllowed()) return map;
   let readerDb: DB | null = null;
   try {
     const { open } = require('@op-engineering/op-sqlite') as typeof import('@op-engineering/op-sqlite');
@@ -187,7 +195,8 @@ export default function ProgressScreen(): React.JSX.Element {
   const block = useStore((s) => s.block) ?? null;
   const blockSessions = useStore((s) => s.blockSessions) ?? [];
   const today = useStore((s) => s.today) ?? '';
-  const movements = useStore((s) => s.movements) ?? [];
+  const rawMovements = useStore((s) => s.movements);
+  const movements = rawMovements ?? [];
   const loadSessionSlots = useStore((s) => s.loadSessionSlots);
   const storeStatus = useStore((s) => s.status) ?? null;
   const athletes = useStore((s) => s.athletes) ?? [];
@@ -195,6 +204,7 @@ export default function ProgressScreen(): React.JSX.Element {
   const activeDbName = storeStatus === 'ready' && activeAthleteId !== null
     ? athletes.find((entry) => entry.id === activeAthleteId)?.dbName ?? null
     : null;
+  const localOriginCacheRef = useRef<OriginCacheEntry | null>(null);
 
   const [allOutcomes, setAllOutcomes] = useState<RecentSessionOutcome[]>([]);
   const recentOutcomes = allOutcomes.slice(0, 20);
@@ -264,11 +274,28 @@ export default function ProgressScreen(): React.JSX.Element {
       const plannedCandidatesNewestFirst = allOutcomes
         .filter((row) => row.sessionId != null && (row.originKind == null || row.originKind === 'planned'))
         .sort((a, b) => (b.sessionId ?? 0) - (a.sessionId ?? 0) || b.finalizedAtMs - a.finalizedAtMs);
-      const persistedOrigins = plannedCandidatesNewestFirst.some(
+      const needsPersistedOrigins = activeDbName !== null && plannedCandidatesNewestFirst.some(
         (row) => (row as { sourcePlannedSessionId?: number | null }).sourcePlannedSessionId == null,
-      )
-        ? readPersistedPlannedSessionOrigins(activeDbName)
-        : new Map<number, number>();
+      );
+      let persistedOrigins: ReadonlyMap<number, number> = EMPTY_ORIGINS;
+      if (needsPersistedOrigins && athleteDataBootAllowed()) {
+        const outcomeSig = plannedCandidatesNewestFirst
+          .map((row) => `${row.sessionId}:${row.outcomeKind}:${row.finalizedAtMs}:${row.loggedSetCount ?? ''}`)
+          .join(',');
+        const cacheKey = `${activeAthleteId ?? ''}|${activeDbName}|${outcomeSig}`;
+        const scopeObj: object | null = (Array.isArray(rawMovements) && rawMovements.length > 0 ? rawMovements : null) ?? block;
+        const cached = scopeObj !== null ? bootScopedOriginCache.get(scopeObj) : localOriginCacheRef.current;
+        if (cached !== undefined && cached !== null && cached.key === cacheKey) {
+          persistedOrigins = cached.origins;
+        } else {
+          persistedOrigins = readPersistedPlannedSessionOrigins(activeDbName);
+          const nextEntry: OriginCacheEntry = { key: cacheKey, origins: persistedOrigins };
+          if (scopeObj !== null) {
+            bootScopedOriginCache.set(scopeObj, nextEntry);
+          }
+          localOriginCacheRef.current = nextEntry;
+        }
+      }
 
       const claimedPlanIds = new Set<number>();
       const activeWeekOutcomes: RecentSessionOutcome[] = [];
