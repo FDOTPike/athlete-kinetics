@@ -79,22 +79,35 @@ console.log('\n[2] Negative invariants & poisoning falsifiers');
     oobRes.errors[0] ?? '',
   );
 
-  // Off-by-one drifted anchor line fails closed and names the specific mutated ProfileScreen citation
+  // Off-by-one drifted anchor line fails closed and names the exact mutated ProfileScreen citation coordinate
+  let mutatedProfileCoord = '';
   const driftRes = verifyBetaFilingCitations({
     repoRoot,
     readFile: (rel) => {
       const real = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
-      return rel === 'docs/release/beta/DISCLAIMER.md'
-        ? real.replace(/ProfileScreen\.tsx:(\d+)-(\d+)/, (_m, n1, n2) => `ProfileScreen.tsx:${Number(n1) - 10}-${Number(n2) - 10}`)
-        : real;
+      if (rel !== 'docs/release/beta/DISCLAIMER.md') return real;
+      return real.replace(/ProfileScreen\.tsx:(\d+)-(\d+)/, (_m, n1, n2) => {
+        const s = Number(n1) - 10;
+        const e = Number(n2) - 10;
+        mutatedProfileCoord = `apps/mobile/src/screens/ProfileScreen.tsx:${s}-${e}`;
+        return `ProfileScreen.tsx:${s}-${e}`;
+      });
     },
   });
+  const matchesExactProfileCitation = (err, coord) => {
+    const startNum = coord.split(':')[1]?.split('-')[0];
+    return (
+      typeof err === 'string'
+      && Boolean(coord)
+      && err.startsWith(`docs/release/beta/DISCLAIMER.md (\`${coord}\`): line ${startNum} does not contain expected anchor`)
+    );
+  };
   check(
-    'WO04-SOL-07: drifted ProfileScreen line number fails closed and names the exact ProfileScreen citation',
+    'WO04-SOL-07: drifted ProfileScreen line number fails closed and names the exact mutated ProfileScreen coordinate',
     !driftRes.ok
       && driftRes.errors.length === 1
-      && driftRes.errors[0].includes('ProfileScreen.tsx:')
-      && driftRes.errors[0].includes('does not contain expected anchor'),
+      && matchesExactProfileCitation(driftRes.errors[0], mutatedProfileCoord)
+      && !matchesExactProfileCitation(driftRes.errors[0], 'apps/mobile/src/screens/ProfileScreen.tsx:506-507'),
     driftRes.errors[0] ?? '',
   );
 
@@ -227,6 +240,110 @@ console.log('\n[2] Negative invariants & poisoning falsifiers');
     'WO04-SOL-03: fenced citations, double-backtick literals, and malformed `:999x` references fail closed',
     !fencedRes.ok && !doubleBacktickRes.ok && !malformedRefRes.ok,
     [fencedRes.ok, doubleBacktickRes.ok, malformedRefRes.ok].join(','),
+  );
+
+  // WO04-SOL-03-R3: CommonMark 4-backtick fence containing ``` line, tilde fence containing `~~~ info`,
+  // HTML comments (`<!-- ... -->`), and backslash-escaped opening backtick (`\`...`) must NEVER count as live citations
+  const fourBacktickFenceRes = verifyBetaFilingCitations({
+    repoRoot,
+    readFile: (rel) => {
+      const real = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+      return rel === 'docs/release/beta/DISCLAIMER.md'
+        ? real.replace(/(`apps\/mobile\/src\/screens\/ProfileScreen\.tsx:\d+(?:-\d+)?`)/, '````\n```\n$1\n````')
+        : real;
+    },
+  });
+  const tildeFenceWithTrailingTextRes = verifyBetaFilingCitations({
+    repoRoot,
+    readFile: (rel) => {
+      const real = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+      return rel === 'docs/release/beta/DISCLAIMER.md'
+        ? real.replace(/(`apps\/mobile\/src\/screens\/ProfileScreen\.tsx:\d+(?:-\d+)?`)/, '~~~\n~~~ not-a-closing-fence\n$1\n~~~')
+        : real;
+    },
+  });
+  const htmlCommentRes = verifyBetaFilingCitations({
+    repoRoot,
+    readFile: (rel) => {
+      const real = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+      return rel === 'docs/release/beta/DISCLAIMER.md'
+        ? real.replace(/(`apps\/mobile\/src\/screens\/ProfileScreen\.tsx:\d+(?:-\d+)?`)/, '<!-- hidden\n$1\n-->')
+        : real;
+    },
+  });
+  const escapedBacktickRes = verifyBetaFilingCitations({
+    repoRoot,
+    readFile: (rel) => {
+      const real = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+      return rel === 'docs/release/beta/DISCLAIMER.md'
+        ? real.replace(/`apps\/mobile\/src\/screens\/ProfileScreen\.tsx:(\d+(?:-\d+)?)`/, '\\`apps/mobile/src/screens/ProfileScreen.tsx:$1`')
+        : real;
+    },
+  });
+  check(
+    'WO04-SOL-03-R3: 4-backtick fence with inner 3-backticks, tilde fence with info line, HTML comment, and escaped backtick all fail closed',
+    !fourBacktickFenceRes.ok
+      && !tildeFenceWithTrailingTextRes.ok
+      && !htmlCommentRes.ok
+      && !escapedBacktickRes.ok,
+    [
+      fourBacktickFenceRes.ok,
+      tildeFenceWithTrailingTextRes.ok,
+      htmlCommentRes.ok,
+      escapedBacktickRes.ok,
+    ].join(','),
+  );
+
+  // WO04-SOL-02-R3: commenting out implementation in XML, TS, or SQL fails closed even when line numbers stay intact
+  const xmlCommentedManifestRes = verifyBetaFilingCitations({
+    repoRoot,
+    readFile: (rel) => {
+      const real = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+      if (rel !== 'apps/mobile/android/app/src/main/AndroidManifest.xml') return real;
+      return real.replace(
+        /<uses-permission\s+android:name="android\.permission\.INTERNET"\s+tools:node="remove"\s*\/>/,
+        (m) => `<!-- ${m} -->`,
+      );
+    },
+  });
+  const tsCommentedSealRes = verifyBetaFilingCitations({
+    repoRoot,
+    readFile: (rel) => {
+      const real = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+      if (rel !== 'apps/mobile/src/state/backupStore.ts') return real;
+      return real.replace(
+        'sealBackup(archive, password, mobileBackupCrypto)',
+        '/* sealBackup(archive, password, mobileBackupCrypto) */ null',
+      );
+    },
+  });
+  const sqlCommentedTableRes = verifyBetaFilingCitations({
+    repoRoot,
+    readFile: (rel) => {
+      const real = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+      if (rel !== 'packages/core-db/src/schema/066_focus_and_goals.sql') return real;
+      return real.replace('CREATE TABLE IF NOT EXISTS athlete_goal (', '-- CREATE TABLE IF NOT EXISTS athlete_goal (');
+    },
+  });
+  check(
+    'WO04-SOL-02-R3: commenting out cited XML permission removal, TS backup sealing, or SQL table definition fails closed',
+    !xmlCommentedManifestRes.ok && !tsCommentedSealRes.ok && !sqlCommentedTableRes.ok,
+    [xmlCommentedManifestRes.ok, tsCommentedSealRes.ok, sqlCommentedTableRes.ok].join(','),
+  );
+
+  // WO04-SOL-04..06-R3: filing spans cover export invocation, restore authentication + preview, sleep_daily storage, and readiness exclusion
+  const dataSafetyDoc = fs.readFileSync(path.join(repoRoot, 'docs/release/beta/GOOGLE_DATA_SAFETY_ANSWERS.md'), 'utf8');
+  const privacyDoc = fs.readFileSync(path.join(repoRoot, 'docs/release/beta/PRIVACY_POLICY_DRAFT.md'), 'utf8');
+  const hcDoc = fs.readFileSync(path.join(repoRoot, 'docs/release/beta/HEALTH_CONNECT_PERMISSIONS.md'), 'utf8');
+  check(
+    'WO04-SOL-04..06-R3: Data Safety, Privacy Policy, and Health Connect spans cover full export, restore auth/preview, sleep_daily, and RHR readiness exclusion',
+    dataSafetyDoc.includes('`apps/mobile/src/state/backupStore.ts:605-1066`')
+      && dataSafetyDoc.includes('`apps/mobile/src/state/useStore.ts:7670-7696`')
+      && privacyDoc.includes('`apps/mobile/src/state/backupStore.ts:1087-1207`')
+      && privacyDoc.includes('`apps/mobile/src/state/useStore.ts:7670-7696`')
+      && privacyDoc.includes('`apps/mobile/src/state/biometricsCopy.ts:13-15`')
+      && hcDoc.includes('`apps/mobile/src/state/biometricsCopy.ts:13-15`'),
+    'missing widened evidence span',
   );
 }
 

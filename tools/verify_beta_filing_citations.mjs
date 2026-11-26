@@ -73,6 +73,7 @@ export const EXPECTED_ANCHORS = Object.freeze({
   'docs/release/beta/HEALTH_APPS_DECLARATION.md|4': {
     path: 'apps/mobile/src/screens/SessionScreen.tsx',
     isRange: true,
+    startAnchorIsComment: true,
     startAnchor: "// restrictions stay enforced per slot below and inside the store's mutation",
     rangeAnchors: ["if (state.getTrainingSupportDecision([currentMovement.movement_id]).status !== 'available') return;"],
     endAnchor: 'if (!currentSlotExecutable) return;',
@@ -95,8 +96,13 @@ export const EXPECTED_ANCHORS = Object.freeze({
     path: 'apps/mobile/src/state/backupStore.ts',
     isRange: true,
     startAnchor: 'async function createEncryptedBytes(',
-    rangeAnchors: ['sealBackup(archive, password, mobileBackupCrypto)', 'saveDocuments('],
-    endAnchor: '}',
+    rangeAnchors: [
+      'sealBackup(archive, password, mobileBackupCrypto)',
+      'saveDocuments(',
+      'createBackup: async (password) => {',
+      "await fs().writeFile(encryptedPath, created.text, 'utf8');",
+    ],
+    endAnchor: 'const saved = await pickerSave(encryptedPath, fileName);',
   },
   'docs/release/beta/GOOGLE_DATA_SAFETY_ANSWERS.md|2': {
     path: 'apps/mobile/src/state/backupStore.ts',
@@ -108,6 +114,7 @@ export const EXPECTED_ANCHORS = Object.freeze({
   'docs/release/beta/GOOGLE_DATA_SAFETY_ANSWERS.md|3': {
     path: 'apps/mobile/src/state/useStore.ts',
     isRange: true,
+    startAnchorIsComment: true,
     startAnchor: '/** Coach Mode: remove a non-active, non-default athlete from the registry',
     endAnchor: 'deleteAthlete: (id: string) => Promise<boolean>;',
   },
@@ -124,12 +131,19 @@ export const EXPECTED_ANCHORS = Object.freeze({
   'docs/release/beta/GOOGLE_DATA_SAFETY_ANSWERS.md|5': {
     path: 'apps/mobile/src/state/athleteRegistry.ts',
     isRange: false,
+    startAnchorIsComment: true,
     startAnchor: '* The registry is a tiny JSON file in the app document directory.',
   },
   'docs/release/beta/GOOGLE_DATA_SAFETY_ANSWERS.md|6': {
     path: 'apps/mobile/src/state/useStore.ts',
-    isRange: false,
+    isRange: true,
     startAnchor: 'INSERT INTO hrv_daily (date, rmssd_ms, resting_hr, source)',
+    rangeAnchors: [
+      'INSERT INTO resting_hr_daily (date, bpm, source, synced_at_ms)',
+      'INSERT INTO sleep_daily (date, in_bed_min, asleep_min, deep_min, rem_min, light_min)',
+      '[r.date, r.inBedMin, r.asleepMin ?? 0, r.deepMin, r.remMin, r.lightMin],',
+    ],
+    endAnchor: ');',
   },
   'docs/release/beta/GOOGLE_DATA_SAFETY_ANSWERS.md|7': {
     path: 'packages/core-db/src/schema/005_subjective_report.sql',
@@ -191,8 +205,13 @@ export const EXPECTED_ANCHORS = Object.freeze({
   },
   'docs/release/beta/HEALTH_CONNECT_PERMISSIONS.md|8': {
     path: 'apps/mobile/src/state/biometricsCopy.ts',
-    isRange: false,
+    isRange: true,
+    startAnchorIsComment: true,
+    endAnchorIsComment: true,
+    rangeAnchorsAreComments: true,
     startAnchor: '* On both platforms HRV (where read) and sleep feed readiness; resting heart',
+    rangeAnchors: ['rate is kept with the measured days and does not feed readiness, so no copy'],
+    endAnchor: '* says it does.',
   },
   'docs/release/beta/HEALTH_CONNECT_PERMISSIONS.md|9': {
     path: 'apps/mobile/src/state/useStore.ts',
@@ -214,18 +233,21 @@ export const EXPECTED_ANCHORS = Object.freeze({
   'docs/release/beta/PRIVACY_POLICY_DRAFT.md|0': {
     path: 'apps/mobile/android/app/src/main/AndroidManifest.xml',
     isRange: true,
+    startAnchorIsComment: true,
     startAnchor: 'offline posture: the production app has no in-process network',
-    rangeAnchors: ['android:name="android.permission.INTERNET"'],
+    rangeAnchors: ['<uses-permission', 'android:name="android.permission.INTERNET"'],
     endAnchor: 'tools:node="remove" />',
   },
   'docs/release/beta/PRIVACY_POLICY_DRAFT.md|1': {
     path: 'apps/mobile/src/state/useStore.ts',
     isRange: false,
+    startAnchorIsComment: true,
     startAnchor: '/** Coach Mode (Phase 15): registered athletes',
   },
   'docs/release/beta/PRIVACY_POLICY_DRAFT.md|2': {
     path: 'apps/mobile/src/state/athleteRegistry.ts',
     isRange: false,
+    startAnchorIsComment: true,
     startAnchor: '* The registry is a tiny JSON file in the app document directory.',
   },
   'docs/release/beta/PRIVACY_POLICY_DRAFT.md|3': {
@@ -269,13 +291,24 @@ export const EXPECTED_ANCHORS = Object.freeze({
   },
   'docs/release/beta/PRIVACY_POLICY_DRAFT.md|10': {
     path: 'apps/mobile/src/state/useStore.ts',
-    isRange: false,
+    isRange: true,
     startAnchor: 'INSERT INTO hrv_daily (date, rmssd_ms, resting_hr, source)',
+    rangeAnchors: [
+      'INSERT INTO resting_hr_daily (date, bpm, source, synced_at_ms)',
+      'INSERT INTO sleep_daily (date, in_bed_min, asleep_min, deep_min, rem_min, light_min)',
+      '[r.date, r.inBedMin, r.asleepMin ?? 0, r.deepMin, r.remMin, r.lightMin],',
+    ],
+    endAnchor: ');',
   },
   'docs/release/beta/PRIVACY_POLICY_DRAFT.md|11': {
     path: 'apps/mobile/src/state/biometricsCopy.ts',
-    isRange: false,
+    isRange: true,
+    startAnchorIsComment: true,
+    endAnchorIsComment: true,
+    rangeAnchorsAreComments: true,
     startAnchor: '* On both platforms HRV (where read) and sleep feed readiness; resting heart',
+    rangeAnchors: ['rate is kept with the measured days and does not feed readiness, so no copy'],
+    endAnchor: '* says it does.',
   },
   'docs/release/beta/PRIVACY_POLICY_DRAFT.md|12': {
     path: 'apps/mobile/src/state/biometricsCopy.ts',
@@ -301,8 +334,14 @@ export const EXPECTED_ANCHORS = Object.freeze({
   'docs/release/beta/PRIVACY_POLICY_DRAFT.md|15': {
     path: 'apps/mobile/src/state/backupStore.ts',
     isRange: true,
-    startAnchor: 'confirmRestore: async (_password) => {',
-    rangeAnchors: ['const opened = await openBackup(text, restorePassword, mobileBackupCrypto);'],
+    startAnchor: 'chooseRestore: async (password) => {',
+    rangeAnchors: [
+      "const opened = await openBackup(asText(await fs().readFile(localPath, 'utf8')), password, mobileBackupCrypto);",
+      "set({ status: 'preview', message: 'Review this backup before replacing data.', preview: restorePreview(pending) });",
+      'confirmRestore: async (_password) => {',
+      'await publishRecoveryBackup(',
+      'const opened = await openBackup(text, restorePassword, mobileBackupCrypto);',
+    ],
     endAnchor: 'await replaceAllData(pending.archive);',
   },
   'docs/release/beta/PRIVACY_POLICY_DRAFT.md|16': {
@@ -313,6 +352,7 @@ export const EXPECTED_ANCHORS = Object.freeze({
   'docs/release/beta/PRIVACY_POLICY_DRAFT.md|17': {
     path: 'apps/mobile/src/state/useStore.ts',
     isRange: false,
+    startAnchorIsComment: true,
     startAnchor: '/** Coach Mode: remove a non-active, non-default athlete from the registry',
   },
   'docs/release/beta/PRIVACY_POLICY_DRAFT.md|18': {
@@ -333,6 +373,7 @@ export const EXPECTED_ANCHORS = Object.freeze({
   'docs/release/beta/PRIVACY_POLICY_DRAFT.md|21': {
     path: 'apps/mobile/src/state/deviceBackupPolicy.ts',
     isRange: false,
+    startAnchorIsComment: true,
     startAnchor: '* (idempotent) so a container restored by the OS is re-protected.',
   },
 
@@ -340,16 +381,19 @@ export const EXPECTED_ANCHORS = Object.freeze({
   'docs/release/beta/STORE_LISTING_DRAFT.md|0': {
     path: 'apps/mobile/src/screens/OnboardingScreen.tsx',
     isRange: false,
+    startAnchorIsComment: true,
     startAnchor: '/**',
   },
   'docs/release/beta/STORE_LISTING_DRAFT.md|1': {
     path: 'apps/mobile/src/screens/SessionScreen.tsx',
     isRange: false,
+    startAnchorIsComment: true,
     startAnchor: '/** Phase 17 utility-first active-session surface. */',
   },
   'docs/release/beta/STORE_LISTING_DRAFT.md|2': {
     path: 'apps/mobile/src/screens/ProgressScreen.tsx',
     isRange: false,
+    startAnchorIsComment: true,
     startAnchor: '/**',
   },
   'docs/release/beta/STORE_LISTING_DRAFT.md|3': {
@@ -360,6 +404,7 @@ export const EXPECTED_ANCHORS = Object.freeze({
   'docs/release/beta/STORE_LISTING_DRAFT.md|4': {
     path: 'apps/mobile/src/state/useStore.ts',
     isRange: false,
+    startAnchorIsComment: true,
     startAnchor: '/** Coach Mode (Phase 15): registered athletes',
   },
   'docs/release/beta/STORE_LISTING_DRAFT.md|5': {
@@ -387,39 +432,76 @@ function isRepoContainedRelativePath(repoRoot, relPath) {
   return Boolean(rel) && !rel.startsWith('..') && !path.isAbsolute(rel);
 }
 
+const ASCII_PUNCT_RE = /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/;
+
 /**
- * Strip fenced code blocks and extract single-backtick inline code spans using
- * CommonMark backtick-run matching so multi-backtick literals (`` `...` ``) and
- * fenced blocks are never miscounted as live citations.
+ * Strip CommonMark fenced/indented code blocks, HTML comments, and backslash-escaped
+ * backticks, then extract single-backtick inline code spans using CommonMark
+ * backtick-run matching so hidden or escaped literals never count as live citations.
  */
 function extractLiveCitations(doc, text, errors) {
   const lines = text.split(/\r?\n/);
   const unfencedLines = [];
   let inFence = false;
-  let fenceMarker = '';
+  let fenceChar = '';
+  let fenceLen = 0;
+  let prevBlank = true;
+
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i];
-    const fenceMatch = /^(\s*)(`{3,}|~{3,})/.exec(line);
-    if (fenceMatch) {
-      const marker = fenceMatch[2];
-      if (!inFence) {
-        inFence = true;
-        fenceMarker = marker[0];
-        continue;
-      }
-      if (marker[0] === fenceMarker && marker.length >= 3) {
+    if (inFence) {
+      const closeMatch = /^ {0,3}(`{3,}|~{3,})[ \t]*$/.exec(line);
+      if (closeMatch && closeMatch[1][0] === fenceChar && closeMatch[1].length >= fenceLen) {
         inFence = false;
-        fenceMarker = '';
+        fenceChar = '';
+        fenceLen = 0;
+        prevBlank = false;
+      }
+      continue;
+    }
+
+    const openMatch = /^ {0,3}(`{3,}|~{3,})([^\r\n]*)$/.exec(line);
+    if (openMatch) {
+      const marker = openMatch[1];
+      const info = openMatch[2];
+      // CommonMark §4.5: backtick fences cannot contain backticks in their info string
+      if (marker[0] !== '`' || !info.includes('`')) {
+        inFence = true;
+        fenceChar = marker[0];
+        fenceLen = marker.length;
         continue;
       }
     }
-    if (!inFence) unfencedLines.push(line);
+
+    // CommonMark §4.4: 4-space / tab indented code blocks after a blank line
+    if (prevBlank && /^(?: {4}|\t)/.test(line) && line.trim().length > 0) {
+      // Consume contiguous indented / blank lines of the indented code block
+      while (i + 1 < lines.length && (/^(?: {4}|\t)/.test(lines[i + 1]) || lines[i + 1].trim().length === 0)) {
+        i += 1;
+      }
+      prevBlank = true;
+      continue;
+    }
+
+    prevBlank = line.trim().length === 0;
+    unfencedLines.push(line);
   }
 
   const unfenced = unfencedLines.join('\n');
   const citations = [];
   let i = 0;
   while (i < unfenced.length) {
+    // CommonMark §2.4: backslash before ASCII punctuation escapes it outside code spans
+    if (unfenced[i] === '\\' && i + 1 < unfenced.length && ASCII_PUNCT_RE.test(unfenced[i + 1])) {
+      i += 2;
+      continue;
+    }
+    // CommonMark §6.6: HTML comments outside code spans
+    if (unfenced.startsWith('<!--', i)) {
+      const endComment = unfenced.indexOf('-->', i + 4);
+      i = endComment === -1 ? unfenced.length : endComment + 3;
+      continue;
+    }
     if (unfenced[i] !== '`') {
       i += 1;
       continue;
@@ -473,6 +555,67 @@ function splitPhysicalLines(rawText) {
   return withoutTrailingEol.split(/\r?\n/);
 }
 
+/**
+ * Replace commented-out characters with spaces while preserving exact line breaks
+ * so commented-out XML directives, TS/TSX statements, or SQL declarations cannot
+ * masquerade as active implementation.
+ */
+function stripCommentsPreservingLines(relPath, rawText) {
+  const maskKeepNewlines = (chunk) => chunk.replace(/[^\r\n]/g, ' ');
+  if (relPath.endsWith('.xml')) {
+    return rawText.replace(/<!--[\s\S]*?(?:-->|$)/g, maskKeepNewlines);
+  }
+  if (relPath.endsWith('.sql')) {
+    let out = '';
+    let idx = 0;
+    while (idx < rawText.length) {
+      const ch = rawText[idx];
+      if (ch === "'" || ch === '"') {
+        const quote = ch;
+        out += ch;
+        idx += 1;
+        while (idx < rawText.length) {
+          if (rawText[idx] === quote && rawText[idx + 1] === quote) {
+            out += quote + quote;
+            idx += 2;
+            continue;
+          }
+          out += rawText[idx];
+          if (rawText[idx] === quote) {
+            idx += 1;
+            break;
+          }
+          idx += 1;
+        }
+        continue;
+      }
+      if (rawText.startsWith('/*', idx)) {
+        const end = rawText.indexOf('*/', idx + 2);
+        const slice = end === -1 ? rawText.slice(idx) : rawText.slice(idx, end + 2);
+        out += maskKeepNewlines(slice);
+        idx = end === -1 ? rawText.length : end + 2;
+        continue;
+      }
+      if (rawText.startsWith('--', idx)) {
+        const nl = rawText.indexOf('\n', idx + 2);
+        const slice = nl === -1 ? rawText.slice(idx) : rawText.slice(idx, nl);
+        out += maskKeepNewlines(slice);
+        idx = nl === -1 ? rawText.length : nl;
+        continue;
+      }
+      out += ch;
+      idx += 1;
+    }
+    return out;
+  }
+  if (relPath.endsWith('.ts') || relPath.endsWith('.tsx') || relPath.endsWith('.mjs') || relPath.endsWith('.js')) {
+    return rawText
+      .replace(/\/\*[\s\S]*?(?:\*\/|$)/g, maskKeepNewlines)
+      .replace(/(?<!:)\/\/[^\r\n]*/g, maskKeepNewlines);
+  }
+  return rawText;
+}
+
 export function verifyBetaFilingCitations({
   repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'),
   readFile = (relPath) => fs.readFileSync(path.join(repoRoot, relPath), 'utf8'),
@@ -480,11 +623,17 @@ export function verifyBetaFilingCitations({
 } = {}) {
   const errors = [];
   const sourceCache = new Map();
-  const getLines = (relPath) => {
+  const activeSourceCache = new Map();
+  const getSourceBundle = (relPath) => {
     if (!sourceCache.has(relPath)) {
-      sourceCache.set(relPath, splitPhysicalLines(readFile(relPath)));
+      const raw = readFile(relPath);
+      sourceCache.set(relPath, splitPhysicalLines(raw));
+      activeSourceCache.set(relPath, splitPhysicalLines(stripCommentsPreservingLines(relPath, raw)));
     }
-    return sourceCache.get(relPath);
+    return {
+      lines: sourceCache.get(relPath),
+      activeLines: activeSourceCache.get(relPath),
+    };
   };
 
   let totalCitations = 0;
@@ -525,7 +674,7 @@ export function verifyBetaFilingCitations({
         errors.push(`${doc} (${c.raw}): target file does not exist: ${c.targetPath}`);
         return;
       }
-      const lines = getLines(c.targetPath);
+      const { lines, activeLines } = getSourceBundle(c.targetPath);
       if (c.start < 1 || c.end < c.start || c.end > lines.length) {
         errors.push(`${doc} (${c.raw}): line range ${c.start}-${c.end} out of bounds (1..${lines.length})`);
         return;
@@ -537,20 +686,21 @@ export function verifyBetaFilingCitations({
         return;
       }
 
-      const startLine = lines[c.start - 1];
+      const startPool = spec.startAnchorIsComment ? lines : activeLines;
+      const startLine = startPool[c.start - 1];
       if (!startLine.includes(spec.startAnchor)) {
         const movedTo = lines
           .map((line, i) => (line.includes(spec.startAnchor) ? i + 1 : -1))
           .filter((n) => n > 0);
         const hint = movedTo.length > 0 ? ` (anchor now at line ${movedTo.join(',')})` : ' (anchor not found in file)';
         errors.push(
-          `${doc} (${c.raw}): line ${c.start} does not contain expected anchor "${spec.startAnchor}"${hint}; got "${startLine.trim().slice(0, 80)}"`,
+          `${doc} (${c.raw}): line ${c.start} does not contain expected anchor "${spec.startAnchor}"${hint}; got "${lines[c.start - 1].trim().slice(0, 80)}"`,
         );
         return;
       }
 
       if (spec.prevAnchor) {
-        const prevLine = c.start >= 2 ? lines[c.start - 2] : '';
+        const prevLine = c.start >= 2 ? activeLines[c.start - 2] : '';
         if (!prevLine.includes(spec.prevAnchor)) {
           errors.push(
             `${doc} (${c.raw}): preceding line ${c.start - 1} does not contain disambiguating context "${spec.prevAnchor}"`,
@@ -560,19 +710,23 @@ export function verifyBetaFilingCitations({
       }
 
       const expectedEndAnchor = spec.endAnchor ?? spec.startAnchor;
-      const endLine = lines[c.end - 1];
+      const endPool = (spec.endAnchor !== undefined ? spec.endAnchorIsComment : spec.startAnchorIsComment)
+        ? lines
+        : activeLines;
+      const endLine = endPool[c.end - 1];
       if (!endLine.includes(expectedEndAnchor)) {
         errors.push(
-          `${doc} (${c.raw}): end line ${c.end} does not contain expected end anchor "${expectedEndAnchor}"; got "${endLine.trim().slice(0, 80)}"`,
+          `${doc} (${c.raw}): end line ${c.end} does not contain expected end anchor "${expectedEndAnchor}"; got "${lines[c.end - 1].trim().slice(0, 80)}"`,
         );
         return;
       }
 
       if (Array.isArray(spec.rangeAnchors) && spec.rangeAnchors.length > 0) {
-        const sliceJoined = lines.slice(c.start - 1, c.end).join('\n');
+        const rangePool = spec.rangeAnchorsAreComments ? lines : activeLines;
+        const sliceJoined = rangePool.slice(c.start - 1, c.end).join('\n');
         for (const req of spec.rangeAnchors) {
           if (!sliceJoined.includes(req)) {
-            errors.push(`${doc} (${c.raw}): range ${c.start}-${c.end} is missing required evidence "${req}"`);
+            errors.push(`${doc} (${c.raw}): range ${c.start}-${c.end} is missing required active evidence "${req}"`);
           }
         }
       }
