@@ -906,4 +906,186 @@ describe('Stream 2 PR 3 — mobile safety reader + shared scheduler + useStore w
     });
     blockView.unmount();
   });
+
+  test('WO02-SOL-02 Round-4: retrying a keyword safety halt after a transient store failure succeeds on both SubjectiveReportPanel and BlockScreen while an earlier ordinary report remains pending', async () => {
+    // 1. Direct double-tap vs post-failure retry check on SubjectiveReportPanel while triaging=true
+    const deferredApply = deferred();
+    const onApplySpy = jest.fn(() => deferredApply.promise);
+    const isolatedPanel = render(
+      React.createElement(SubjectiveReportPanel, {
+        hasVector: true,
+        lastTriage: null,
+        triaging: true,
+        triageReady: true,
+        onApply: onApplySpy,
+        onClose: () => {},
+      }),
+    );
+    fireEvent.changeText(screen.getByLabelText('Describe how your body feels today'), 'feeling dizzy and faint');
+    fireEvent.press(screen.getByLabelText('Severity 7 of 10'));
+    await act(async () => {
+      const btn = screen.getByTestId('completion-report-apply');
+      // Synchronous double-tap while in-flight must only invoke onApply once
+      fireEvent.press(btn);
+      fireEvent.press(btn);
+    });
+    expect(onApplySpy).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId('completion-report-apply').props.accessibilityState?.disabled).toBe(true);
+
+    // Settle the attempt as not stored (false) while triaging remains true -> retry MUST immediately re-enable!
+    await act(async () => {
+      deferredApply.resolve(false);
+      await settle();
+    });
+    expect(screen.getByTestId('completion-report-not-sent')).toBeTruthy();
+    expect(screen.getByTestId('completion-report-apply').props.accessibilityState?.disabled).not.toBe(true);
+    isolatedPanel.unmount();
+
+    // 2. Full store-backed replay on SubjectiveReportPanel: hung ordinary report + SQLite write failure + UI retry
+    const holdReaderA = deferred();
+    getStoreState().setEmbedder({ embed: async () => new Float32Array(384) });
+    getStoreState().setSafetyReader({
+      modelId: 'm10-r15-reader-seed3',
+      policyId: 'r15/denial-floor',
+      classify: () => holdReaderA.promise,
+    });
+
+    function LivePanelHarness() {
+      const triaging = useStore((s) => s.triaging);
+      const lastTriage = useStore((s) => s.lastTriage);
+      const triageReady = useStore((s) => s.triageReady);
+      const reportSubjective = useStore((s) => s.reportSubjective);
+      return React.createElement(SubjectiveReportPanel, {
+        hasVector: true,
+        lastTriage,
+        triaging,
+        triageReady,
+        onApply: reportSubjective,
+        onClose: () => {},
+      });
+    }
+
+    const beforeA = rows(A, 'SELECT * FROM subjective_report').length;
+    const panelView = render(React.createElement(LivePanelHarness));
+
+    fireEvent.changeText(screen.getByLabelText('Describe how your body feels today'), 'knee sore');
+    fireEvent.press(screen.getByLabelText('Severity 4 of 10'));
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('completion-report-apply'));
+    });
+    await settle();
+    expect(getStoreState().triaging).toBe(true);
+
+    // Arm a 1-shot SQLite write failure on INSERT INTO subjective_report
+    const driverA = mockDrivers.get(A);
+    const origExecA = driverA.executeSync.bind(driverA);
+    let failInsertOnceA = true;
+    const execSpyA = jest.spyOn(driverA, 'executeSync').mockImplementation((sql, params) => {
+      if (failInsertOnceA && String(sql).includes('INSERT INTO subjective_report')) {
+        failInsertOnceA = false;
+        throw new Error('simulated transient SQLite write error');
+      }
+      return origExecA(sql, params);
+    });
+
+    try {
+      fireEvent.changeText(screen.getByLabelText('Describe how your body feels today'), 'feeling dizzy and faint');
+      fireEvent.press(screen.getByLabelText('Severity 7 of 10'));
+      await act(async () => {
+        fireEvent.press(screen.getByTestId('completion-report-apply'));
+      });
+      await settle();
+
+      expect(screen.getByTestId('completion-report-not-sent')).toBeTruthy();
+      expect(rows(A, 'SELECT * FROM subjective_report').slice(beforeA)).toEqual([]);
+      expect(getStoreState().triaging).toBe(true);
+
+      // Identical retry MUST be enabled immediately while 'knee sore' is still pending!
+      const retryPanelBtn = screen.getByTestId('completion-report-apply');
+      expect(retryPanelBtn.props.accessibilityState?.disabled).not.toBe(true);
+      expect(retryPanelBtn.props.accessibilityLabel).toBe('Apply report');
+
+      await act(async () => {
+        fireEvent.press(retryPanelBtn);
+      });
+      await settle();
+
+      expect(rows(A, 'SELECT matched_entry_id, halt FROM subjective_report').slice(beforeA)).toEqual([
+        { matched_entry_id: 'red-flag-systemic', halt: 1 },
+      ]);
+      expect(getStoreState().lastTriage?.directive?.halt).toBe(true);
+    } finally {
+      execSpyA.mockRestore();
+      await act(async () => {
+        holdReaderA.resolve({ cautionLogit: -5.0, active: false, standaloneRouteId: null, actionableRouteId: null });
+        await settle();
+      });
+      panelView.unmount();
+    }
+
+    // 3. Full store-backed replay on BlockScreen: hung ordinary report + SQLite write failure + UI retry
+    mockDrivers.get(A).raw.prepare('DELETE FROM subjective_report').run();
+    getStoreState().computePrescription([]);
+    expect(getStoreState().lastTriage).toBeNull();
+
+    const holdReaderB = deferred();
+    getStoreState().setSafetyReader({
+      modelId: 'm10-r15-reader-seed3',
+      policyId: 'r15/denial-floor',
+      classify: () => holdReaderB.promise,
+    });
+
+    const blockView = render(React.createElement(BlockScreen));
+    fireEvent.press(screen.getByText('Something feels off'));
+    fireEvent.changeText(screen.getByLabelText('Describe how your body feels today'), 'knee sore');
+    fireEvent.press(screen.getByLabelText('Severity 4 of 10'));
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Apply report'));
+    });
+    await settle();
+    expect(getStoreState().triaging).toBe(true);
+
+    let failInsertOnceB = true;
+    const execSpyB = jest.spyOn(driverA, 'executeSync').mockImplementation((sql, params) => {
+      if (failInsertOnceB && String(sql).includes('INSERT INTO subjective_report')) {
+        failInsertOnceB = false;
+        throw new Error('simulated transient SQLite write error');
+      }
+      return origExecA(sql, params);
+    });
+
+    try {
+      fireEvent.changeText(screen.getByLabelText('Describe how your body feels today'), 'feeling dizzy and faint');
+      fireEvent.press(screen.getByLabelText('Severity 8 of 10'));
+      await act(async () => {
+        fireEvent.press(screen.getByLabelText('Apply report'));
+      });
+      await settle();
+
+      expect(screen.getByTestId('plan-report-not-sent')).toBeTruthy();
+      expect(rows(A, 'SELECT * FROM subjective_report')).toEqual([]);
+      expect(getStoreState().triaging).toBe(true);
+
+      // Identical retry on BlockScreen MUST be enabled as 'Apply report', never stuck as 'Checking report'!
+      const retryBlockBtn = screen.getByLabelText('Apply report');
+      expect(retryBlockBtn.props.accessibilityState?.disabled).not.toBe(true);
+
+      await act(async () => {
+        fireEvent.press(retryBlockBtn);
+      });
+      await settle();
+
+      expect(rows(A, 'SELECT matched_entry_id, halt FROM subjective_report')).toEqual([
+        { matched_entry_id: 'red-flag-systemic', halt: 1 },
+      ]);
+      expect(getStoreState().lastTriage?.directive?.halt).toBe(true);
+    } finally {
+      execSpyB.mockRestore();
+      await act(async () => {
+        holdReaderB.resolve({ cautionLogit: -5.0, active: false, standaloneRouteId: null, actionableRouteId: null });
+        await settle();
+      });
+      blockView.unmount();
+    }
+  });
 });

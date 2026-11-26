@@ -15,7 +15,7 @@
  */
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
@@ -1013,23 +1013,37 @@ for (const [label, tamper, needle] of [
 console.log('\n[15] WO02-SOL-03 — sealed packets bind candidate_manifest.json & ratified safety-reader SHA-256');
 
 const REPO_ROOT = join(import.meta.dirname, '..', '..');
-function buildLiveCandidateManifest(overrides = {}) {
-  const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: REPO_ROOT, encoding: 'utf8' }).trim();
-  const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: REPO_ROOT, encoding: 'utf8' }).trim();
+const EMPTY_DIFF_SHA256 = createHash('sha256').update(Buffer.alloc(0)).digest('hex');
+function buildLiveCandidateManifest(overrides = {}, repoRoot = REPO_ROOT) {
+  const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoRoot, encoding: 'utf8' }).trim();
+  const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: repoRoot, encoding: 'utf8' }).trim();
   const diffBuf = execFileSync('git', ['diff', '--full-index', '--binary', 'HEAD'], {
-    cwd: REPO_ROOT, maxBuffer: 256 * 1024 * 1024,
+    cwd: repoRoot, maxBuffer: 256 * 1024 * 1024,
   });
   const fp = createHash('sha256').update(diffBuf).digest('hex');
+  const ownerArtifacts = new Set(['TASK.md', 'audit_task_b.mjs']);
+  const stagedNew = execFileSync('git', ['diff', '--cached', '--name-only', '--diff-filter=A', '-z'], {
+    cwd: repoRoot, encoding: 'utf8',
+  }).split('\0').filter((p) => p.length > 0 && !ownerArtifacts.has(p));
+  const untracked = execFileSync('git', ['ls-files', '--others', '--exclude-standard', '-z'], {
+    cwd: repoRoot, encoding: 'utf8',
+  }).split('\0').filter((p) => p.length > 0 && !ownerArtifacts.has(p) && !stagedNew.includes(p)).sort();
+  const newFiles = [...stagedNew, ...untracked].map((rel) => ({
+    path: rel.replace(/\\/g, '/'),
+    sha256: sha256OfFile(join(repoRoot, rel)),
+  }));
   return {
     schema: 'ak.candidate-manifest/1',
     label: 'NON_PRODUCTION_QA_DEBUG_SIGNED',
     head,
     branch,
+    sourceDirty: fp !== EMPTY_DIFF_SHA256,
     trackedDiffFingerprint: {
       method: 'sha256(git diff --full-index --binary HEAD)',
       value: fp,
     },
-    newFiles: [],
+    newFiles,
+    qaLifecycleTelemetry: true,
     safetyReader: {
       id: 'm10-r15-reader-seed3',
       policyId: 'r15/denial-floor',
@@ -1161,6 +1175,100 @@ for (const [label, badManifest] of [
     v.ok === false && v.problems.some((p) => p.includes('HEAD mismatch')),
     v.problems.join('; ').slice(0, 160));
   rmSync(pkt.dir, { recursive: true, force: true });
+}
+
+{
+  // Round-4 counterexamples (SOL-03-R4): candidate_manifest.json completeness:
+  //   1. Wrong trackedDiffFingerprint.method (even when value matches live diff)
+  //   2. Wrong schema or label
+  //   3. Wrong sourceDirty boolean
+  //   4. Surplus tracked path listed in newFiles
+  //   5. Omitted current untracked source file in repoRoot
+  //   6. Omitted current staged-new source file in repoRoot
+  //   7. Positive control in temp git repo when both staged-new + untracked files are accurately pinned
+  for (const [label, mutOverrides, needle] of [
+    ['wrong trackedDiffFingerprint.method', {
+      trackedDiffFingerprint: {
+        method: 'sha256(git diff HEAD)',
+        value: VALID_CANDIDATE_MANIFEST.trackedDiffFingerprint.value,
+      },
+    }, /method/i],
+    ['wrong candidate_manifest schema', { schema: 'ak.candidate-manifest/999' }, /schema/i],
+    ['wrong candidate_manifest label', { label: 'PRODUCTION_RELEASE' }, /label/i],
+    ['contradictory sourceDirty flag', { sourceDirty: !VALID_CANDIDATE_MANIFEST.sourceDirty }, /sourceDirty/i],
+    ['surplus tracked path in newFiles', {
+      newFiles: [
+        ...VALID_CANDIDATE_MANIFEST.newFiles,
+        { path: 'package.json', sha256: sha256OfFile(join(REPO_ROOT, 'package.json')) },
+      ],
+    }, /surplus|newFiles/i],
+  ]) {
+    const pkt = makePacket();
+    const { sessionPath } = sealFullManifestDir(pkt, buildLiveCandidateManifest(mutOverrides));
+    const v = verifyEvidencePacket({ sessionPath });
+    check(`SOL-03-R4: REJECTS ${label}`,
+      v.ok === false && v.problems.some((p) => needle.test(p)),
+      v.problems.join('; ').slice(0, 160));
+    rmSync(pkt.dir, { recursive: true, force: true });
+  }
+
+  // Isolated scratch git repository for untracked & staged-new file omission / parity checks
+  const tempRepo = mkdtempSync(join(tmpdir(), 'ak-cand-prov-'));
+  try {
+    const gitTmp = (args) => execFileSync('git', args, { cwd: tempRepo, encoding: 'utf8' });
+    gitTmp(['init', '-q']);
+    mkdirSync(join(tempRepo, 'src'), { recursive: true });
+    writeFileSync(join(tempRepo, 'src', 'tracked.mjs'), 'export const x = 1;\n');
+    gitTmp(['add', 'src/tracked.mjs']);
+    gitTmp([
+      '-c', 'user.name=Fixture',
+      '-c', 'user.email=fixture@example.invalid',
+      '-c', 'commit.gpgsign=false',
+      'commit', '-qm', 'init',
+    ]);
+
+    // Case A: current untracked source file in repoRoot omitted from candidate_manifest.json newFiles
+    writeFileSync(join(tempRepo, 'src', 'untracked_helper.mjs'), 'export const y = 2;\n');
+    {
+      const pkt = makePacket();
+      const { sessionPath } = sealFullManifestDir(pkt, buildLiveCandidateManifest({ newFiles: [] }, tempRepo));
+      const v = verifyEvidencePacket({ sessionPath, repoRoot: tempRepo });
+      check('SOL-03-R4: REJECTS packet omitting a current untracked source file in repoRoot',
+        v.ok === false && v.problems.some((p) => p.includes('src/untracked_helper.mjs')),
+        v.problems.join('; ').slice(0, 160));
+      rmSync(pkt.dir, { recursive: true, force: true });
+    }
+
+    // Case B: current staged-new source file in repoRoot omitted from candidate_manifest.json newFiles
+    writeFileSync(join(tempRepo, 'src', 'staged_new.mjs'), 'export const z = 3;\n');
+    gitTmp(['add', 'src/staged_new.mjs']);
+    {
+      const pkt = makePacket();
+      const onlyUntracked = [{
+        path: 'src/untracked_helper.mjs',
+        sha256: sha256OfFile(join(tempRepo, 'src', 'untracked_helper.mjs')),
+      }];
+      const { sessionPath } = sealFullManifestDir(pkt, buildLiveCandidateManifest({ newFiles: onlyUntracked }, tempRepo));
+      const v = verifyEvidencePacket({ sessionPath, repoRoot: tempRepo });
+      check('SOL-03-R4: REJECTS packet omitting a staged-new source file in repoRoot',
+        v.ok === false && v.problems.some((p) => p.includes('src/staged_new.mjs')),
+        v.problems.join('; ').slice(0, 160));
+      rmSync(pkt.dir, { recursive: true, force: true });
+    }
+
+    // Case C: Positive control — when BOTH staged-new and untracked files are accurately pinned in newFiles
+    {
+      const pkt = makePacket();
+      const { sessionPath } = sealFullManifestDir(pkt, buildLiveCandidateManifest({}, tempRepo));
+      const v = verifyEvidencePacket({ sessionPath, repoRoot: tempRepo });
+      check('SOL-03-R4: ACCEPTS packet when staged-new and untracked source files match worktree exactly',
+        v.ok === true && v.status === 'BOUND' && v.problems.length === 0,
+        v.problems.join('; ').slice(0, 160));
+      rmSync(pkt.dir, { recursive: true, force: true });
+    }
+  } finally {
+    rmSync(tempRepo, { recursive: true, force: true });
+  }
 }
 
 console.log(`\n${fail === 0 ? 'ALL MEMORY GATE FIXTURES PASSED' : `${fail} MEMORY GATE FIXTURE(S) FAILED`}`);

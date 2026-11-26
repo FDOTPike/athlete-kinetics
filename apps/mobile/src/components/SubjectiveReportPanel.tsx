@@ -63,48 +63,62 @@ export function SubjectiveReportPanel({
   // answer arrives sends nothing unless the new draft carries deterministic
   // systemic red-flag language, which must never wait behind a hung check.
   const inFlightCount = useRef(0);
-  const lastInFlightKey = useRef<string | null>(null);
+  const inFlightKeyCounts = useRef<Map<string, number>>(new Map());
   const submitEpoch = useRef(0);
   const [pending, setPending] = useState(false);
+  const [activeKeys, setActiveKeys] = useState<string[]>([]);
 
   const trimmedText = reportText.trim();
   const keywordHaltReady = trimmedText.length > 0 && scanRedFlags(trimmedText).systemic;
   const submitKey = reportSeverity !== null ? `${trimmedText}\n${reportSeverity}` : null;
-  const blockedWhileBusy =
-    (triaging || pending) && (!keywordHaltReady || submitKey === lastInFlightKey.current);
+  const keyInFlight =
+    submitKey !== null
+    && (activeKeys.includes(submitKey) || (inFlightKeyCounts.current.get(submitKey) ?? 0) > 0);
+  const blockedWhileBusy = (triaging || pending) && (!keywordHaltReady || keyInFlight);
 
   const apply = (): void => {
-    if (trimmedText.length === 0 || reportSeverity === null) return;
+    if (trimmedText.length === 0 || reportSeverity === null || submitKey === null) return;
     const busyNow = triaging || pending || inFlightCount.current > 0;
-    if (busyNow && (!keywordHaltReady || submitKey === lastInFlightKey.current)) return;
+    const thisKeyBusy = (inFlightKeyCounts.current.get(submitKey) ?? 0) > 0;
+    if (busyNow && (!keywordHaltReady || thisKeyBusy)) return;
     const myEpoch = ++submitEpoch.current;
     inFlightCount.current += 1;
-    lastInFlightKey.current = submitKey;
+    inFlightKeyCounts.current.set(submitKey, (inFlightKeyCounts.current.get(submitKey) ?? 0) + 1);
+    setActiveKeys([...inFlightKeyCounts.current.keys()]);
     setPending(true);
     setNotSent(false);
     // A new report starts without the previous report's result on screen.
     setApplied(false);
+    let didSettle = false;
     const settled = (): void => {
+      if (didSettle) return;
+      didSettle = true;
       inFlightCount.current = Math.max(0, inFlightCount.current - 1);
-      if (inFlightCount.current === 0) {
-        lastInFlightKey.current = null;
-        setPending(false);
-      }
+      const nextForKey = (inFlightKeyCounts.current.get(submitKey) ?? 1) - 1;
+      if (nextForKey <= 0) inFlightKeyCounts.current.delete(submitKey);
+      else inFlightKeyCounts.current.set(submitKey, nextForKey);
+      setActiveKeys([...inFlightKeyCounts.current.keys()]);
+      if (inFlightCount.current === 0) setPending(false);
     };
     // The text is cleared only once the store has stored the report. Anything else
     // keeps it on screen and says so, so nothing typed is lost.
-    onApply(reportText, reportSeverity).then((stored) => {
+    try {
+      onApply(reportText, reportSeverity).then((stored) => {
+        settled();
+        if (submitEpoch.current !== myEpoch) return;
+        if (!stored) { setNotSent(true); return; }
+        setReportText('');
+        setReportSeverity(null);
+        setApplied(true);
+      }, () => {
+        settled();
+        if (submitEpoch.current !== myEpoch) return;
+        setNotSent(true);
+      });
+    } catch {
       settled();
-      if (submitEpoch.current !== myEpoch) return;
-      if (!stored) { setNotSent(true); return; }
-      setReportText('');
-      setReportSeverity(null);
-      setApplied(true);
-    }, () => {
-      settled();
-      if (submitEpoch.current !== myEpoch) return;
-      setNotSent(true);
-    });
+      if (submitEpoch.current === myEpoch) setNotSent(true);
+    }
   };
 
   const haltCard = halted && lastTriage !== null && lastTriage.kind === 'matched' ? (

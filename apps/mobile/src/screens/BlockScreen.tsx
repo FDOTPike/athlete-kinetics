@@ -363,9 +363,10 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
   const [reportText, setReportText] = useState('');
   const [reportSeverity, setReportSeverity] = useState<number | null>(null);
   const [reportNotSent, setReportNotSent] = useState(false);
+  const [reportActiveKeys, setReportActiveKeys] = useState<string[]>([]);
   const reportSubmitEpoch = useRef(0);
   const reportInFlightCount = useRef(0);
-  const reportLastInFlightKey = useRef<string | null>(null);
+  const reportInFlightKeyCounts = useRef<Map<string, number>>(new Map());
   const [schema, setSchema] = useState<SchemaType>('LINEAR');
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [attributionSlotId, setAttributionSlotId] = useState<number | null>(null);
@@ -1825,42 +1826,62 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                 const trimmedReport = reportText.trim();
                 const keywordHaltReady = trimmedReport.length > 0 && scanRedFlags(trimmedReport).systemic;
                 const submitKey = reportSeverity !== null ? `${trimmedReport}\n${reportSeverity}` : null;
+                const keyInFlight =
+                  submitKey !== null
+                  && (reportActiveKeys.includes(submitKey)
+                    || (reportInFlightKeyCounts.current.get(submitKey) ?? 0) > 0);
                 const reportBusy =
-                  triaging && (!keywordHaltReady || submitKey === reportLastInFlightKey.current);
+                  (triaging || reportActiveKeys.length > 0) && (!keywordHaltReady || keyInFlight);
                 return (
                   <PrimaryButton
                     label={reportBusy ? 'Checking report' : 'Apply report'}
                     disabled={trimmedReport.length === 0 || reportSeverity === null || reportBusy}
                     onPress={() => {
-                      if (trimmedReport.length === 0 || reportSeverity === null) return;
-                      const busyNow = triaging || reportInFlightCount.current > 0;
-                      if (busyNow && (!keywordHaltReady || submitKey === reportLastInFlightKey.current)) return;
+                      if (trimmedReport.length === 0 || reportSeverity === null || submitKey === null) return;
+                      const busyNow = triaging || reportActiveKeys.length > 0 || reportInFlightCount.current > 0;
+                      const thisKeyBusy = (reportInFlightKeyCounts.current.get(submitKey) ?? 0) > 0;
+                      if (busyNow && (!keywordHaltReady || thisKeyBusy)) return;
                       const myEpoch = ++reportSubmitEpoch.current;
                       reportInFlightCount.current += 1;
-                      reportLastInFlightKey.current = submitKey;
+                      reportInFlightKeyCounts.current.set(
+                        submitKey,
+                        (reportInFlightKeyCounts.current.get(submitKey) ?? 0) + 1,
+                      );
+                      setReportActiveKeys([...reportInFlightKeyCounts.current.keys()]);
+                      let didSettle = false;
                       const settled = (): void => {
+                        if (didSettle) return;
+                        didSettle = true;
                         reportInFlightCount.current = Math.max(0, reportInFlightCount.current - 1);
-                        if (reportInFlightCount.current === 0) reportLastInFlightKey.current = null;
+                        const nextForKey = (reportInFlightKeyCounts.current.get(submitKey) ?? 1) - 1;
+                        if (nextForKey <= 0) reportInFlightKeyCounts.current.delete(submitKey);
+                        else reportInFlightKeyCounts.current.set(submitKey, nextForKey);
+                        setReportActiveKeys([...reportInFlightKeyCounts.current.keys()]);
                       };
                       setReportNotSent(false);
                       // The text and severity clear only once the store has stored the report.
                       // Anything else keeps them on screen and says so, so nothing typed is lost.
-                      void reportSubjective(reportText, reportSeverity).then((stored) => {
-                        settled();
-                        if (reportSubmitEpoch.current !== myEpoch) return;
-                        if (!stored) { setReportNotSent(true); return; }
-                        setReportText('');
-                        setReportSeverity(null);
-                        // Bring the reply (above the form) into view (#207).
-                        scrollRef.current?.scrollTo({
-                          y: Math.max(0, disclosuresSectionY.current + reportDisclosureOffsetY.current - theme.space[4]),
-                          animated: true,
+                      try {
+                        void reportSubjective(reportText, reportSeverity).then((stored) => {
+                          settled();
+                          if (reportSubmitEpoch.current !== myEpoch) return;
+                          if (!stored) { setReportNotSent(true); return; }
+                          setReportText('');
+                          setReportSeverity(null);
+                          // Bring the reply (above the form) into view (#207).
+                          scrollRef.current?.scrollTo({
+                            y: Math.max(0, disclosuresSectionY.current + reportDisclosureOffsetY.current - theme.space[4]),
+                            animated: true,
+                          });
+                        }, () => {
+                          settled();
+                          if (reportSubmitEpoch.current !== myEpoch) return;
+                          setReportNotSent(true);
                         });
-                      }, () => {
+                      } catch {
                         settled();
-                        if (reportSubmitEpoch.current !== myEpoch) return;
-                        setReportNotSent(true);
-                      });
+                        if (reportSubmitEpoch.current === myEpoch) setReportNotSent(true);
+                      }
                     }}
                     accessibilityLabel={reportBusy ? 'Checking report' : 'Apply report'}
                   />

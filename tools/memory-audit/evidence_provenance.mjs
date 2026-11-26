@@ -36,13 +36,14 @@
  *     corpus. Manifest binding (below) is the answer to that: the packet must
  *     be a member of an evidence manifest whose detached seal verifies.
  */
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { basename, dirname, join, relative, sep } from 'node:path';
 
 import { parseMeminfoDump, privateDirtyBytes } from './meminfo_parser.mjs';
 import { checkCandidateManifestSafetyReader } from './memory_gate.mjs';
-import { verifyProvenance } from '../verify_qa_artifact.mjs';
+import { validateFingerprint, verifyProvenance } from '../verify_qa_artifact.mjs';
 import {
   bindTargetSamples,
   computeCadence,
@@ -60,6 +61,83 @@ export const LOGCAT_FILENAME = 'logcat-epoch.txt';
 
 /** The candidate APK manifest bound to a sealed device-evidence packet. */
 export const CANDIDATE_MANIFEST_FILENAME = 'candidate_manifest.json';
+
+const CANDIDATE_MANIFEST_SCHEMA = 'ak.candidate-manifest/1';
+const CANDIDATE_MANIFEST_LABEL = 'NON_PRODUCTION_QA_DEBUG_SIGNED';
+const EMPTY_DIFF_SHA256 = createHash('sha256').update(Buffer.alloc(0)).digest('hex');
+const OWNER_CANDIDATE_EXCLUSIONS = new Set(['TASK.md', 'audit_task_b.mjs']);
+
+function verifyCandidateManifestComplete(parsedCandidate, { repoRoot, gitBin = 'git' } = {}) {
+  const problems = [];
+  if (parsedCandidate?.schema !== CANDIDATE_MANIFEST_SCHEMA) {
+    problems.push(`candidate_manifest.json schema mismatch: expected "${CANDIDATE_MANIFEST_SCHEMA}", `
+      + `got ${JSON.stringify(parsedCandidate?.schema)}`);
+  }
+  if (parsedCandidate?.label !== CANDIDATE_MANIFEST_LABEL) {
+    problems.push(`candidate_manifest.json label mismatch: expected "${CANDIDATE_MANIFEST_LABEL}", `
+      + `got ${JSON.stringify(parsedCandidate?.label)}`);
+  }
+  if (typeof parsedCandidate?.branch !== 'string' || parsedCandidate.branch.length === 0
+      || !/^[0-9a-f]{40}$/.test(parsedCandidate?.head ?? '')) {
+    problems.push('candidate_manifest.json head/branch identity incomplete or malformed');
+  }
+  if (parsedCandidate?.qaLifecycleTelemetry !== true) {
+    problems.push('candidate_manifest.json qaLifecycleTelemetry must be true');
+  }
+  const fpCheck = validateFingerprint(parsedCandidate?.trackedDiffFingerprint);
+  if (!fpCheck.ok) {
+    for (const p of fpCheck.problems) {
+      problems.push(`candidate_manifest.json trackedDiffFingerprint: ${p}`);
+    }
+  }
+  const candProv = verifyProvenance(parsedCandidate, { repoRoot, gitBin });
+  if (!candProv.ok) {
+    problems.push(...candProv.problems);
+  }
+  if (typeof parsedCandidate?.sourceDirty !== 'boolean') {
+    problems.push('candidate_manifest.json sourceDirty must be a boolean');
+  } else if (candProv.observed?.fingerprint) {
+    const expectedDirty = candProv.observed.fingerprint !== EMPTY_DIFF_SHA256;
+    if (parsedCandidate.sourceDirty !== expectedDirty) {
+      problems.push(`candidate_manifest.json sourceDirty=${parsedCandidate.sourceDirty} disagrees with `
+        + `live worktree tracked diff (expected ${expectedDirty})`);
+    }
+  }
+  // Exact newFiles set parity against apps/mobile/android/app/build.gradle:406-429:
+  // neither surplus tracked paths nor omitted current untracked/staged-new files may slip by.
+  try {
+    const stagedOut = execFileSync(gitBin, ['diff', '--cached', '--name-only', '--diff-filter=A', '-z'], {
+      cwd: repoRoot, encoding: 'utf8', timeout: 300000, maxBuffer: 64 * 1024 * 1024,
+    });
+    const untrackedOut = execFileSync(gitBin, ['ls-files', '--others', '--exclude-standard', '-z'], {
+      cwd: repoRoot, encoding: 'utf8', timeout: 300000, maxBuffer: 64 * 1024 * 1024,
+    });
+    const normalizeRel = (p) => p.replace(/\\/g, '/');
+    const expectedPaths = new Set(
+      [...stagedOut.split('\0'), ...untrackedOut.split('\0')]
+        .map((p) => normalizeRel(p))
+        .filter((p) => p.length > 0 && !OWNER_CANDIDATE_EXCLUSIONS.has(p)),
+    );
+    const declaredPaths = new Set(
+      (Array.isArray(parsedCandidate?.newFiles) ? parsedCandidate.newFiles : [])
+        .map((f) => (typeof f?.path === 'string' ? f.path : null))
+        .filter((p) => p !== null),
+    );
+    const surplus = [...declaredPaths].filter((p) => !expectedPaths.has(p));
+    if (surplus.length > 0) {
+      problems.push('surplus path(s) in candidate_manifest.json newFiles (not untracked or staged-new '
+        + `in worktree): ${surplus.slice(0, 5).join(', ')}`);
+    }
+    const omitted = [...expectedPaths].filter((p) => !declaredPaths.has(p));
+    if (omitted.length > 0) {
+      problems.push('untracked or staged-new worktree file(s) omitted from candidate_manifest.json '
+        + `newFiles: ${omitted.slice(0, 5).join(', ')}`);
+    }
+  } catch (e) {
+    problems.push(`could not enumerate worktree new/untracked files: ${String(e.message).slice(0, 120)}`);
+  }
+  return problems;
+}
 
 export const sha256OfFile = (p) => createHash('sha256').update(readFileSync(p)).digest('hex');
 export const sha256OfString = (s) => createHash('sha256').update(s, 'utf-8').digest('hex');
@@ -410,10 +488,7 @@ export function verifyEvidencePacket({
         problems.push('summary.candidateManifest does not match sealed candidate_manifest.json');
       }
       if (verifyCandidateProvenance) {
-        const candProv = verifyProvenance(parsedCandidate, { repoRoot });
-        if (!candProv.ok) {
-          problems.push(...candProv.problems);
-        }
+        problems.push(...verifyCandidateManifestComplete(parsedCandidate, { repoRoot }));
       }
     } catch (e) {
       problems.push(`${CANDIDATE_MANIFEST_FILENAME} is not parseable JSON: ${e.message}`);
