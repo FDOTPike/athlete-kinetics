@@ -139,13 +139,14 @@ export default function ProgressScreen(): React.JSX.Element {
   const movements = useStore((s) => s.movements) ?? [];
   const loadSessionSlots = useStore((s) => s.loadSessionSlots);
 
-  const [recentOutcomes, setRecentOutcomes] = useState<RecentSessionOutcome[]>([]);
+  const [allOutcomes, setAllOutcomes] = useState<RecentSessionOutcome[]>([]);
+  const recentOutcomes = allOutcomes.slice(0, 20);
   // Walk 2 (W2-9): a recent session opens in place to its own summary.
   const [openSessionId, setOpenSessionId] = useState<number | null>(null);
   const [recentMeasures, setRecentMeasures] = useState<ReturnType<typeof loadMeasuredHistory>>([]);
 
   useEffect(() => {
-    setRecentOutcomes(loadRecentOutcomes(20));
+    setAllOutcomes(loadRecentOutcomes(Number.MAX_SAFE_INTEGER) ?? []);
     setRecentMeasures(loadMeasuredHistory(14));
     // Re-read when a session ends: the ended session's outcome becomes a fact.
   }, [session, loadRecentOutcomes, loadMeasuredHistory]);
@@ -158,6 +159,8 @@ export default function ProgressScreen(): React.JSX.Element {
   for (const muscle of focusMuscles) {
     weeklyMuscleCounts.set(muscle, { plannedSets: 0, completedSets: 0 });
   }
+  const isFinalizedPlanSession = (bs: (typeof blockSessions)[number]): boolean =>
+    bs.completionStatus === 'complete' || bs.completionStatus === 'halted';
   const activeWeekSessions = blockSessions.filter((s) => s.weekIndex === activeWeekIndex);
   if (focusMuscles.length > 0 && typeof loadSessionSlots === 'function') {
     for (const bs of activeWeekSessions) {
@@ -185,11 +188,36 @@ export default function ProgressScreen(): React.JSX.Element {
       const plusSix = addDaysIso(sortedDates[0], 6);
       weekEnd = sortedDates[sortedDates.length - 1] > plusSix ? sortedDates[sortedDates.length - 1] : plusSix;
     }
-    if (weekStart !== null && weekEnd !== null && typeof loadSessionSummaryFacts === 'function') {
-      for (const row of recentOutcomes) {
-        if (row.sessionId == null || (row.originKind != null && row.originKind !== 'planned')) continue;
-        const rowDate = localIsoDate(row.finalizedAtMs);
-        if (rowDate === null || rowDate < weekStart || rowDate > weekEnd) continue;
+    const finalizedInActiveWeek = activeWeekSessions.filter(isFinalizedPlanSession);
+    if (
+      finalizedInActiveWeek.length > 0
+      && weekStart !== null
+      && weekEnd !== null
+      && typeof loadSessionSummaryFacts === 'function'
+    ) {
+      const totalFinalizedInBlock = blockSessions.filter(isFinalizedPlanSession).length;
+      const finalizedBeforeActiveWeek = blockSessions.filter(
+        (s) => s.weekIndex < activeWeekIndex && isFinalizedPlanSession(s),
+      ).length;
+      const activeBlockOutcomesChronological = allOutcomes
+        .filter(
+          (row) =>
+            row.sessionId != null
+            && (row.originKind == null || row.originKind === 'planned')
+            && (block === null || !(block.createdAtMs > 0) || row.finalizedAtMs >= block.createdAtMs),
+        )
+        .sort((a, b) => (b.sessionId ?? 0) - (a.sessionId ?? 0) || b.finalizedAtMs - a.finalizedAtMs)
+        .slice(0, totalFinalizedInBlock)
+        .reverse();
+      const activeWeekOutcomes = activeBlockOutcomesChronological.slice(
+        finalizedBeforeActiveWeek,
+        finalizedBeforeActiveWeek + finalizedInActiveWeek.length,
+      );
+      for (const row of activeWeekOutcomes) {
+        if (block === null) {
+          const rowDate = localIsoDate(row.finalizedAtMs);
+          if (rowDate === null || rowDate < weekStart || rowDate > weekEnd) continue;
+        }
         try {
           const facts = loadSessionSummaryFacts(row.sessionId);
           for (const ex of facts?.exercises ?? []) {
