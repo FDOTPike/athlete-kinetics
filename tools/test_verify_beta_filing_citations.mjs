@@ -453,6 +453,135 @@ console.log('\n[2] Negative invariants & poisoning falsifiers');
     !multilineDivisionCommentRes.ok,
     multilineDivisionCommentRes.errors[0] ?? 'accepted multiline division followed by // comment',
   );
+
+  // WO04-SOL-R6a: CommonMark multiline ref-def titles, escaped ref labels, deep nested parens in link dest,
+  // unmatched `](...)` non-links, cross-block backticks, and lazy blockquote continuations match CommonMark
+  const refMultilineTitleRes = replaceProfileRefInDisclaimer((m) => `[notice]: /url "title starts\n${m}\ntitle ends"`);
+  const refEscapeLabelRes = replaceProfileRefInDisclaimer((m) => `[no\\]tice]: /url "${m}"`);
+  const deepNestedDestRes = replaceProfileRefInDisclaimer((m) => `[notice](/a(b(c)) "${m}")`);
+  const unmatchedCloserControlRes = replaceProfileRefInDisclaimer((m) => `](/url "${m}")`);
+  const precedingParaTickControlRes = replaceProfileRefInDisclaimer((m) => `\`\n\n${m}`);
+  const pseudoSpanAcrossParasRes = replaceProfileRefInDisclaimer((m) => `\`\n\n${m.slice(1, -1)}\n\n\``);
+  const atxUnmatchedTickControlRes = replaceProfileRefInDisclaimer((m) => `# \`\n${m}`);
+  const lazyBlockquoteControlRes = replaceProfileRefInDisclaimer((m) => `> Paragraph\n    ${m}`);
+  check(
+    'WO04-SOL-R6a: CommonMark multiline/escaped ref-defs, deep nested link parens, unmatched closers, block-scoped backticks, and lazy continuations match CommonMark',
+    !refMultilineTitleRes.ok
+      && !refEscapeLabelRes.ok
+      && !deepNestedDestRes.ok
+      && unmatchedCloserControlRes.ok
+      && precedingParaTickControlRes.ok
+      && !pseudoSpanAcrossParasRes.ok
+      && atxUnmatchedTickControlRes.ok
+      && lazyBlockquoteControlRes.ok,
+    [
+      refMultilineTitleRes.ok,
+      refEscapeLabelRes.ok,
+      deepNestedDestRes.ok,
+      unmatchedCloserControlRes.ok,
+      precedingParaTickControlRes.ok,
+      pseudoSpanAcrossParasRes.ok,
+      atxUnmatchedTickControlRes.ok,
+      lazyBlockquoteControlRes.ok,
+    ].join(','),
+  );
+
+  // WO04-SOL-R6b: TypeScript UTF-16 non-BMP emoji comments + inert template-literal statements,
+  // XML CDATA / processing-instruction wrapping, and SQLite string-wrapping + bracket-quoted identifiers
+  const emojiBeforeLivePickerRes = verifyBetaFilingCitations({
+    repoRoot,
+    readFile: (rel) => {
+      const real = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+      if (rel !== 'apps/mobile/src/state/backupStore.ts') return real;
+      return real.replace(
+        'const saved = await pickerSave(encryptedPath, fileName);',
+        '/*\u{1F600}*/const saved = await pickerSave(encryptedPath, fileName);',
+      );
+    },
+  });
+  const pickerInTemplateTextRes = verifyBetaFilingCitations({
+    repoRoot,
+    readFile: (rel) => {
+      const real = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+      if (rel !== 'apps/mobile/src/state/backupStore.ts') return real;
+      const writeAnchor = "await fs().writeFile(encryptedPath, created.text, 'utf8');";
+      const pickerAnchor = 'const saved = await pickerSave(encryptedPath, fileName);';
+      const re = new RegExp(
+        writeAnchor.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        + '(\\r?\\n[ \\t]+)'
+        + pickerAnchor.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+      );
+      return real.replace(re, (_m, eolAndIndent) => `${writeAnchor} const saved = true;${eolAndIndent}\`${pickerAnchor}\`;`);
+    },
+  });
+  const xmlCdataManifestRes = verifyBetaFilingCitations({
+    repoRoot,
+    readFile: (rel) => {
+      const real = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+      if (rel !== 'apps/mobile/android/app/src/main/AndroidManifest.xml') return real;
+      return real.replace(
+        /<uses-permission\s+android:name="android\.permission\.INTERNET"\s+tools:node="remove"\s*\/>/,
+        (m) => `<![CDATA[${m}]]>`,
+      );
+    },
+  });
+  const xmlPiManifestRes = verifyBetaFilingCitations({
+    repoRoot,
+    readFile: (rel) => {
+      const real = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+      if (rel !== 'apps/mobile/android/app/src/main/AndroidManifest.xml') return real;
+      return real.replace(
+        /<uses-permission\s+android:name="android\.permission\.INTERNET"\s+tools:node="remove"\s*\/>/,
+        (m) => `<?unused ${m}?>`,
+      );
+    },
+  });
+  const mutateSubjectiveSql = (transformLines) => verifyBetaFilingCitations({
+    repoRoot,
+    readFile: (rel) => {
+      const real = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+      if (rel !== 'packages/core-db/src/schema/005_subjective_report.sql') return real;
+      const eol = real.includes('\r\n') ? '\r\n' : '\n';
+      const lines = real.replace(/\r?\n$/, '').split(/\r?\n/);
+      transformLines(lines);
+      return `${lines.join(eol)}${eol}`;
+    },
+  });
+  const sqlAnchorInStringRes = mutateSubjectiveSql((ls) => {
+    const idx = ls.findIndex((l) => l.startsWith('CREATE INDEX'));
+    ls[6] = "SELECT '";
+    ls[8] = "';";
+    for (let k = 9; k < idx; k += 1) ls[k] = `-- ${ls[k]}`;
+    ls[idx] = `-- ${ls[idx]}`;
+  });
+  const sqlBracketMasksRealCommentRes = mutateSubjectiveSql((ls) => {
+    const idx = ls.findIndex((l) => l.startsWith('CREATE INDEX'));
+    ls[6] = "SELECT 1 AS ['];";
+    for (let k = 7; k < idx; k += 1) ls[k] = `-- ${ls[k]}`;
+    ls[idx] = `-- ${ls[idx]}`;
+  });
+  const sqlBracketFakesCommentControlRes = mutateSubjectiveSql((ls) => {
+    ls[7] = `SELECT 1 AS [a--b]; ${ls[7]}`;
+  });
+  check(
+    'WO04-SOL-R6b: UTF-16 emoji comments, inert TS template text, XML CDATA/PI wrapping, and SQLite string/bracket-identifier rules all match real language parsers',
+    emojiBeforeLivePickerRes.ok
+      && !pickerInTemplateTextRes.ok
+      && !xmlCdataManifestRes.ok
+      && !xmlPiManifestRes.ok
+      && !sqlAnchorInStringRes.ok
+      && !sqlBracketMasksRealCommentRes.ok
+      && sqlBracketFakesCommentControlRes.ok,
+    [
+      emojiBeforeLivePickerRes.ok,
+      pickerInTemplateTextRes.ok,
+      xmlCdataManifestRes.ok,
+      xmlPiManifestRes.ok,
+      sqlAnchorInStringRes.ok,
+      sqlBracketMasksRealCommentRes.ok,
+      sqlBracketFakesCommentControlRes.ok,
+    ].join(','),
+  );
 }
 
 console.log(`\n${failed === 0 ? 'ALL BETA FILING CITATION TESTS PASSED' : `${failed} TEST(S) FAILED`}`);

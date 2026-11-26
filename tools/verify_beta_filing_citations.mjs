@@ -19,6 +19,7 @@
 import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 
 const requireFromHere = createRequire(import.meta.url);
@@ -31,6 +32,17 @@ function loadTypeScriptCompiler() {
     cachedTs = null;
   }
   return cachedTs;
+}
+
+let cachedXmlDom = undefined;
+function loadXmlDomParser() {
+  if (cachedXmlDom !== undefined) return cachedXmlDom;
+  try {
+    cachedXmlDom = requireFromHere('@xmldom/xmldom').DOMParser;
+  } catch {
+    cachedXmlDom = null;
+  }
+  return cachedXmlDom;
 }
 
 export const REQUIRED_FILING_DOCS = Object.freeze([
@@ -53,6 +65,7 @@ export const EXPECTED_ANCHORS = Object.freeze({
   'docs/release/beta/DISCLAIMER.md|1': {
     path: 'apps/mobile/src/screens/ProfileScreen.tsx',
     isRange: true,
+    anchorInStringLiteral: true,
     prevAnchor: '<Text style={styles.safetyText}>',
     startAnchor: 'pikeMethods provides training guidance, not medical advice. It is not a medical device.',
     endAnchor: 'Stop if something feels unsafe and seek qualified professional advice when needed.',
@@ -68,11 +81,13 @@ export const EXPECTED_ANCHORS = Object.freeze({
   'docs/release/beta/HEALTH_APPS_DECLARATION.md|1': {
     path: 'apps/mobile/src/state/biometricsCopy.ts',
     isRange: false,
+    anchorInStringLiteral: true,
     startAnchor: 'Connected. Overnight HRV and sleep feed your readiness score',
   },
   'docs/release/beta/HEALTH_APPS_DECLARATION.md|2': {
     path: 'apps/mobile/src/screens/ProfileScreen.tsx',
     isRange: false,
+    anchorInStringLiteral: true,
     prevAnchor: '<Text style={styles.safetyText}>',
     startAnchor: 'pikeMethods provides training guidance, not medical advice. It is not a medical device.',
   },
@@ -94,6 +109,7 @@ export const EXPECTED_ANCHORS = Object.freeze({
   'docs/release/beta/HEALTH_APPS_DECLARATION.md|5': {
     path: 'apps/mobile/src/screens/ProfileScreen.tsx',
     isRange: false,
+    anchorInStringLiteral: true,
     prevAnchor: 'pikeMethods provides training guidance, not medical advice. It is not a medical device.',
     startAnchor: 'Stop if something feels unsafe and seek qualified professional advice when needed.',
   },
@@ -134,6 +150,7 @@ export const EXPECTED_ANCHORS = Object.freeze({
   'docs/release/beta/GOOGLE_DATA_SAFETY_ANSWERS.md|4': {
     path: 'apps/mobile/src/state/useStore.ts',
     isRange: true,
+    endAnchorInStringLiteral: true,
     startAnchor: 'deleteAthlete: async (id) => {',
     rangeAnchors: [
       "set({ error: 'The active and default athletes cannot be deleted.' });",
@@ -150,6 +167,7 @@ export const EXPECTED_ANCHORS = Object.freeze({
   'docs/release/beta/GOOGLE_DATA_SAFETY_ANSWERS.md|6': {
     path: 'apps/mobile/src/state/useStore.ts',
     isRange: true,
+    anchorInStringLiteral: true,
     startAnchor: 'INSERT INTO hrv_daily (date, rmssd_ms, resting_hr, source)',
     rangeAnchors: [
       'INSERT INTO resting_hr_daily (date, bpm, source, synced_at_ms)',
@@ -209,11 +227,13 @@ export const EXPECTED_ANCHORS = Object.freeze({
   'docs/release/beta/HEALTH_CONNECT_PERMISSIONS.md|6': {
     path: 'apps/mobile/src/state/biometricsCopy.ts',
     isRange: false,
+    anchorInStringLiteral: true,
     startAnchor: 'Connected. Overnight HRV and sleep feed your readiness score',
   },
   'docs/release/beta/HEALTH_CONNECT_PERMISSIONS.md|7': {
     path: 'apps/mobile/src/state/biometricsCopy.ts',
     isRange: false,
+    anchorInStringLiteral: true,
     startAnchor: 'Connected. Overnight HRV and sleep feed your readiness score',
   },
   'docs/release/beta/HEALTH_CONNECT_PERMISSIONS.md|8': {
@@ -229,6 +249,7 @@ export const EXPECTED_ANCHORS = Object.freeze({
   'docs/release/beta/HEALTH_CONNECT_PERMISSIONS.md|9': {
     path: 'apps/mobile/src/state/useStore.ts',
     isRange: true,
+    anchorInStringLiteral: true,
     startAnchor: 'UNION SELECT date FROM hrv_daily UNION SELECT date FROM sleep_daily',
     rangeAnchors: [
       'UNION SELECT date FROM resting_hr_daily',
@@ -240,6 +261,7 @@ export const EXPECTED_ANCHORS = Object.freeze({
   'docs/release/beta/HEALTH_CONNECT_PERMISSIONS.md|10': {
     path: 'apps/mobile/src/state/useStore.ts',
     isRange: false,
+    anchorInStringLiteral: true,
     startAnchor: 'INSERT INTO resting_hr_daily (date, bpm, source, synced_at_ms)',
   },
 
@@ -305,6 +327,7 @@ export const EXPECTED_ANCHORS = Object.freeze({
   'docs/release/beta/PRIVACY_POLICY_DRAFT.md|10': {
     path: 'apps/mobile/src/state/useStore.ts',
     isRange: true,
+    anchorInStringLiteral: true,
     startAnchor: 'INSERT INTO hrv_daily (date, rmssd_ms, resting_hr, source)',
     rangeAnchors: [
       'INSERT INTO resting_hr_daily (date, bpm, source, synced_at_ms)',
@@ -326,6 +349,7 @@ export const EXPECTED_ANCHORS = Object.freeze({
   'docs/release/beta/PRIVACY_POLICY_DRAFT.md|12': {
     path: 'apps/mobile/src/state/biometricsCopy.ts',
     isRange: false,
+    anchorInStringLiteral: true,
     startAnchor: 'Connected. Overnight HRV and sleep feed your readiness score',
   },
   'docs/release/beta/PRIVACY_POLICY_DRAFT.md|13': {
@@ -376,6 +400,7 @@ export const EXPECTED_ANCHORS = Object.freeze({
   'docs/release/beta/PRIVACY_POLICY_DRAFT.md|19': {
     path: 'apps/mobile/src/state/useStore.ts',
     isRange: false,
+    anchorInStringLiteral: true,
     startAnchor: 'Athlete removed from the list, but their database file could not be deleted',
   },
   'docs/release/beta/PRIVACY_POLICY_DRAFT.md|20': {
@@ -412,6 +437,7 @@ export const EXPECTED_ANCHORS = Object.freeze({
   'docs/release/beta/STORE_LISTING_DRAFT.md|3': {
     path: 'apps/mobile/src/state/biometricsCopy.ts',
     isRange: false,
+    anchorInStringLiteral: true,
     startAnchor: 'Connected. Overnight HRV and sleep feed your readiness score',
   },
   'docs/release/beta/STORE_LISTING_DRAFT.md|4': {
@@ -584,226 +610,303 @@ function matchHtmlBlockOpen(trimmedAfterIndent, inParagraph) {
   return null;
 }
 
-/**
- * Strip CommonMark block containers (blockquotes, list items, fenced/indented code blocks,
- * HTML blocks Types 1-7, Setext & ATX headings, link reference definitions), inline HTML
- * tags/comments/autolinks, link destination/title tails, and backslash-escaped backticks,
- * then extract single-backtick inline code spans using CommonMark backtick-run matching.
- */
-function extractLiveCitations(doc, text, errors) {
-  const lines = text.split(/\r?\n/);
-  const unfencedLines = [];
-  const containers = [];
-  let inFence = false;
-  let fenceChar = '';
-  let fenceLen = 0;
-  let htmlBlock = null; // { mode: 'closeRe' | 'blankLine', closeRe: RegExp | null }
-  let inParagraph = false;
+function canInterruptParagraph(rest) {
+  const spaces = leadingSpaceCount(rest);
+  if (spaces > 3) return false;
+  const trimmed = rest.slice(spaces);
+  if (trimmed.length === 0) return true;
+  if (trimmed[0] === '>') return true;
+  if (/^#{1,6}(?:[ ]|$)/.test(trimmed)) return true;
+  if (/^(?:[-_*][ ]*){3,}$/.test(trimmed)) return true;
+  const openFence = /^(`{3,}|~{3,})([^\r\n]*)$/.exec(trimmed);
+  if (openFence && (openFence[1][0] !== '`' || !openFence[2].includes('`'))) return true;
+  if (matchHtmlBlockOpen(trimmed, true) !== null) return true;
+  const listMatch = /^([-+*]|\d{1,9}[.)])([ ]+)(.*)$/.exec(trimmed);
+  if (listMatch && listMatch[3].trim().length > 0) {
+    if (!/^\d/.test(listMatch[1]) || Number.parseInt(listMatch[1], 10) === 1) return true;
+  }
+  return false;
+}
 
-  for (let i = 0; i < lines.length; i += 1) {
-    const expanded = expandTabsToSpaces(lines[i]);
-    const matched = matchOpenContainers(expanded, containers);
-    let stripped = matched.rest;
-
-    if (!matched.matchedAll) {
-      if (inFence) {
-        inFence = false;
-        fenceChar = '';
-        fenceLen = 0;
-      }
-      if (htmlBlock !== null) {
-        htmlBlock = null;
-      }
-      if (!inParagraph) {
-        containers.length = matched.matchedCount;
-      }
-    }
-
-    if (htmlBlock !== null) {
-      const indentCols = leadingSpaceCount(stripped);
-      const isBlank = indentCols === stripped.length;
-      if (htmlBlock.mode === 'blankLine') {
-        if (isBlank) {
-          htmlBlock = null;
-          unfencedLines.push('');
-        }
-      } else if (htmlBlock.closeRe.test(stripped)) {
-        htmlBlock = null;
-      }
-      inParagraph = false;
-      continue;
-    }
-
-    if (inFence) {
-      const indentCols = leadingSpaceCount(stripped);
-      const trimmedAfterIndent = stripped.slice(indentCols);
-      if (indentCols <= 3) {
-        const closeMatch = /^(`{3,}|~{3,})[ ]*$/.exec(trimmedAfterIndent);
-        if (closeMatch && closeMatch[1][0] === fenceChar && closeMatch[1].length >= fenceLen) {
-          inFence = false;
-          fenceChar = '';
-          fenceLen = 0;
-        }
-      }
-      inParagraph = false;
-      continue;
-    }
-
-    // CommonMark §4.3: Setext heading underline (`===` or `---`) when continuing a non-lazy paragraph
-    const preOpenIndent = leadingSpaceCount(stripped);
-    const preOpenTrimmed = stripped.slice(preOpenIndent);
-    if (inParagraph && matched.matchedAll && preOpenIndent <= 3 && /^(?:=+|-+)[ ]*$/.test(preOpenTrimmed)) {
-      inParagraph = false;
-      continue;
-    }
-
-    if (!matched.matchedAll) {
-      // Check whether unmatched line starts a container/block interruption rather than lazy paragraph continuation
-      containers.length = matched.matchedCount;
-    }
-
-    const opened = openNewContainers(stripped, containers, inParagraph && matched.matchedAll);
-    stripped = opened.rest;
-    if (!opened.inParagraph) {
-      inParagraph = false;
-    }
-
-    const indentCols = leadingSpaceCount(stripped);
-    const trimmedAfterIndent = stripped.slice(indentCols);
-    const isBlank = trimmedAfterIndent.length === 0;
-
-    if (isBlank) {
-      inParagraph = false;
-      unfencedLines.push('');
-      continue;
-    }
-
-    // CommonMark §4.4: 4+ virtual columns of indentation when NOT interrupting a paragraph
-    if (!inParagraph && indentCols >= 4) {
-      inParagraph = false;
-      continue;
-    }
-
-    if (indentCols <= 3) {
-      // CommonMark §4.5: fenced code block opening
-      const openMatch = /^(`{3,}|~{3,})([^\r\n]*)$/.exec(trimmedAfterIndent);
-      if (openMatch) {
-        const marker = openMatch[1];
-        const info = openMatch[2];
-        if (marker[0] !== '`' || !info.includes('`')) {
-          inFence = true;
-          fenceChar = marker[0];
-          fenceLen = marker.length;
-          inParagraph = false;
-          continue;
-        }
-      }
-
-      // CommonMark §4.6: HTML blocks Types 1-7
-      const htmlOpen = matchHtmlBlockOpen(trimmedAfterIndent, inParagraph);
-      if (htmlOpen !== null) {
-        if (!htmlOpen.closesImmediately) {
-          htmlBlock = { mode: htmlOpen.mode, closeRe: htmlOpen.closeRe };
-        }
-        inParagraph = false;
+function scanBalancedDestination(str, startIdx) {
+  let idx = startIdx;
+  if (idx >= str.length) return -1;
+  if (str[idx] === '<') {
+    idx += 1;
+    while (idx < str.length) {
+      const ch = str[idx];
+      if (ch === '\r' || ch === '\n' || ch === '<') return -1;
+      if (ch === '\\' && idx + 1 < str.length) {
+        idx += 2;
         continue;
       }
-
-      // CommonMark §4.7 single-line & multi-line link reference definitions `[id]: dest "title"`
-      if (!inParagraph) {
-        const linkRefHead = /^\[[^\]\r\n]+\]:[ ]*(.*)$/.exec(trimmedAfterIndent);
-        if (linkRefHead) {
-          const destAndTitleRe = /^(?:<[^<>\r\n]*>|\S+)(?:([ ]+)(?:"(?:\\"|[^"\r\n])*"|'(?:\\'|[^'\r\n])*'|\((?:\\\)|[^)\r\n])*\)))?[ ]*$/;
-          const titleOnlyRe = /^[ ]*(?:"(?:\\"|[^"\r\n])*"|'(?:\\'|[^'\r\n])*'|\((?:\\\)|[^)\r\n])*\))[ ]*$/;
-          const tail = linkRefHead[1];
-          if (tail.length > 0) {
-            const dtMatch = destAndTitleRe.exec(tail);
-            if (dtMatch) {
-              // Optional title on next line when current line had destination only
-              if (!dtMatch[1] && i + 1 < lines.length) {
-                const nextMatch = matchOpenContainers(expandTabsToSpaces(lines[i + 1]), containers);
-                if (nextMatch.matchedAll && titleOnlyRe.test(nextMatch.rest)) {
-                  i += 1;
-                }
-              }
-              inParagraph = false;
-              continue;
-            }
-          } else if (i + 1 < lines.length) {
-            // Destination (and optional title) on next line
-            const nextMatch = matchOpenContainers(expandTabsToSpaces(lines[i + 1]), containers);
-            const nextTrimmed = nextMatch.rest.trimStart();
-            const dtMatch = nextMatch.matchedAll ? destAndTitleRe.exec(nextTrimmed) : null;
-            if (dtMatch) {
-              i += 1;
-              if (!dtMatch[1] && i + 1 < lines.length) {
-                const titleLineMatch = matchOpenContainers(expandTabsToSpaces(lines[i + 1]), containers);
-                if (titleLineMatch.matchedAll && titleOnlyRe.test(titleLineMatch.rest)) {
-                  i += 1;
-                }
-              }
-              inParagraph = false;
-              continue;
-            }
-          }
-        }
-      }
-
-      // CommonMark §4.1 & §4.2: ATX headings and thematic breaks terminate/do not start paragraphs
-      if (/^#{1,6}(?:[ ]|$)/.test(trimmedAfterIndent) || /^(?:[-_*][ ]*){3,}$/.test(trimmedAfterIndent)) {
-        inParagraph = false;
-        unfencedLines.push(stripped);
-        continue;
-      }
+      if (ch === '>') return idx + 1;
+      idx += 1;
     }
+    return -1;
+  }
+  let parenDepth = 0;
+  let consumed = 0;
+  while (idx < str.length) {
+    const ch = str[idx];
+    const code = str.charCodeAt(idx);
+    if (code <= 0x20 || code === 0x7f) break;
+    if (ch === '\\' && idx + 1 < str.length && ASCII_PUNCT_RE.test(str[idx + 1])) {
+      idx += 2;
+      consumed += 2;
+      continue;
+    }
+    if (ch === '(') {
+      parenDepth += 1;
+      idx += 1;
+      consumed += 1;
+      continue;
+    }
+    if (ch === ')') {
+      if (parenDepth === 0) break;
+      parenDepth -= 1;
+      idx += 1;
+      consumed += 1;
+      continue;
+    }
+    idx += 1;
+    consumed += 1;
+  }
+  return consumed > 0 && parenDepth === 0 ? idx : -1;
+}
 
-    inParagraph = true;
-    unfencedLines.push(stripped);
+function scanLinkTitle(str, startIdx) {
+  if (startIdx >= str.length) return -1;
+  const opener = str[startIdx];
+  if (opener !== '"' && opener !== "'" && opener !== '(') return -1;
+  const closer = opener === '(' ? ')' : opener;
+  let idx = startIdx + 1;
+  while (idx < str.length) {
+    const ch = str[idx];
+    if (ch === '\\' && idx + 1 < str.length) {
+      idx += 2;
+      continue;
+    }
+    if (opener === '(' && ch === '(') return -1;
+    if (ch === closer) {
+      const inner = str.slice(startIdx + 1, idx);
+      if (/\n[ \t]*\n/.test(inner)) return -1;
+      return idx + 1;
+    }
+    idx += 1;
+  }
+  return -1;
+}
+
+function peelOneLinkRefDef(text) {
+  let idx = 0;
+  let spaces = 0;
+  while (idx < text.length && text[idx] === ' ' && spaces < 4) {
+    idx += 1;
+    spaces += 1;
+  }
+  if (spaces > 3 || text[idx] !== '[') return null;
+  idx += 1;
+  const labelStart = idx;
+  let labelChars = 0;
+  let foundClose = false;
+  while (idx < text.length && labelChars <= 999) {
+    const ch = text[idx];
+    if (ch === '\\' && idx + 1 < text.length) {
+      idx += 2;
+      labelChars += 2;
+      continue;
+    }
+    if (ch === '[') return null;
+    if (ch === ']') {
+      foundClose = true;
+      break;
+    }
+    idx += 1;
+    labelChars += 1;
+  }
+  if (!foundClose || labelChars === 0 || labelChars > 999) return null;
+  const rawLabel = text.slice(labelStart, idx);
+  if (!/\S/.test(rawLabel) || text[idx + 1] !== ':') return null;
+  idx += 2;
+
+  while (idx < text.length && (text[idx] === ' ' || text[idx] === '\t')) idx += 1;
+  if (idx < text.length && text[idx] === '\n') {
+    idx += 1;
+    while (idx < text.length && (text[idx] === ' ' || text[idx] === '\t')) idx += 1;
+  }
+  if (idx >= text.length) return null;
+
+  const afterDest = scanBalancedDestination(text, idx);
+  if (afterDest === -1) return null;
+
+  const destEndMatch = /^[ \t]*(?:\n|$)/.exec(text.slice(afterDest));
+  let wsIdx = afterDest;
+  let sawWs = false;
+  let sawNewlineBeforeTitle = false;
+  while (wsIdx < text.length && (text[wsIdx] === ' ' || text[wsIdx] === '\t')) {
+    wsIdx += 1;
+    sawWs = true;
+  }
+  if (wsIdx < text.length && text[wsIdx] === '\n') {
+    wsIdx += 1;
+    sawWs = true;
+    sawNewlineBeforeTitle = true;
+    while (wsIdx < text.length && (text[wsIdx] === ' ' || text[wsIdx] === '\t')) wsIdx += 1;
   }
 
-  const unfenced = unfencedLines.join('\n');
-  const citations = [];
-  let i = 0;
-  const HTML_RAW_TOKEN_RE = /^(?:<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<![A-Z][\s\S]*?>|<!\[CDATA\[[\s\S]*?\]\]>|<\/[A-Za-z][A-Za-z0-9-]*\s*>|<[A-Za-z][A-Za-z0-9-]*(?:\s+[A-Za-z_:][A-Za-z0-9_.:-]*(?:\s*=\s*(?:[^\s"'=<>`]+|'[^']*'|"[^"]*"))?)*\s*\/?>|<[A-Za-z][A-Za-z0-9+.-]{1,31}:[^\s<>]*>)/;
-  const LINK_TAIL_RE = /^\]\(\s*(?:<[^<>\r\n]*>|(?:[^\s()\\]|\\.|\((?:[^\s()\\]|\\.)*\))+)(?:\s+(?:"(?:\\"|[^"])*"|'(?:\\'|[^'])*'|\((?:\\\)|[^)])*\)))?\s*\)/;
+  if (sawWs && wsIdx < text.length && (text[wsIdx] === '"' || text[wsIdx] === "'" || text[wsIdx] === '(')) {
+    const afterTitle = scanLinkTitle(text, wsIdx);
+    if (afterTitle !== -1) {
+      const titleLineEnd = /^[ \t]*(?:\n|$)/.exec(text.slice(afterTitle));
+      if (titleLineEnd) {
+        return text.slice(afterTitle + titleLineEnd[0].length);
+      }
+    }
+    if (sawNewlineBeforeTitle && destEndMatch) {
+      return text.slice(afterDest + destEndMatch[0].length);
+    }
+    return null;
+  }
 
-  while (i < unfenced.length) {
-    // CommonMark §2.4: backslash before ASCII punctuation escapes it outside code spans
-    if (unfenced[i] === '\\' && i + 1 < unfenced.length && ASCII_PUNCT_RE.test(unfenced[i + 1])) {
+  if (destEndMatch) {
+    return text.slice(afterDest + destEndMatch[0].length);
+  }
+  return null;
+}
+
+function peelLeadingLinkRefDefs(paragraphText) {
+  let rest = paragraphText;
+  while (rest.length > 0) {
+    const next = peelOneLinkRefDef(rest);
+    if (next === null) break;
+    rest = next;
+  }
+  return rest;
+}
+
+function skipOptionalInlineWsNoBlankLine(str, startIdx) {
+  let idx = startIdx;
+  let sawAny = false;
+  let newlines = 0;
+  while (idx < str.length) {
+    const ch = str[idx];
+    if (ch === ' ' || ch === '\t') {
+      idx += 1;
+      sawAny = true;
+    } else if (ch === '\n') {
+      newlines += 1;
+      if (newlines > 1) return null;
+      idx += 1;
+      sawAny = true;
+    } else if (ch === '\r') {
+      idx += 1;
+    } else {
+      break;
+    }
+  }
+  return { idx, sawAny };
+}
+
+function tryConsumeInlineLinkTail(block, openParenIdx) {
+  if (block[openParenIdx] !== '(') return -1;
+  const ws1 = skipOptionalInlineWsNoBlankLine(block, openParenIdx + 1);
+  if (ws1 === null) return -1;
+  let idx = ws1.idx;
+  if (idx >= block.length) return -1;
+  if (block[idx] === ')') return idx + 1;
+
+  let hasDest = false;
+  if (block[idx] !== '"' && block[idx] !== "'") {
+    const afterDest = scanBalancedDestination(block, idx);
+    if (afterDest !== -1) {
+      idx = afterDest;
+      hasDest = true;
+    }
+  }
+
+  const ws2 = skipOptionalInlineWsNoBlankLine(block, idx);
+  if (ws2 === null) return -1;
+  idx = ws2.idx;
+  if (idx >= block.length) return -1;
+  if (block[idx] === ')') return idx + 1;
+
+  if (hasDest && !ws2.sawAny) return -1;
+  if (block[idx] === '"' || block[idx] === "'" || block[idx] === '(') {
+    const afterTitle = scanLinkTitle(block, idx);
+    if (afterTitle === -1) return -1;
+    const ws3 = skipOptionalInlineWsNoBlankLine(block, afterTitle);
+    if (ws3 === null) return -1;
+    if (ws3.idx < block.length && block[ws3.idx] === ')') {
+      return ws3.idx + 1;
+    }
+  }
+  return -1;
+}
+
+const HTML_RAW_TOKEN_RE = /^(?:<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<![A-Z][\s\S]*?>|<!\[CDATA\[[\s\S]*?\]\]>|<\/[A-Za-z][A-Za-z0-9-]*\s*>|<[A-Za-z][A-Za-z0-9-]*(?:\s+[A-Za-z_:][A-Za-z0-9_.:-]*(?:\s*=\s*(?:[^\s"'=<>`]+|'[^']*'|"[^"]*"))?)*\s*\/?>|<[A-Za-z][A-Za-z0-9+.-]{1,31}:[^\s<>]*>|<[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*>)/;
+
+function extractInlineCitationsFromBlock(doc, block, citations, errors) {
+  const openBrackets = [];
+  let i = 0;
+  while (i < block.length) {
+    if (block[i] === '\\' && i + 1 < block.length && ASCII_PUNCT_RE.test(block[i + 1])) {
       i += 2;
       continue;
     }
-    // CommonMark §6.5 & §6.6: raw HTML tags (with quoted attributes), HTML comments, and autolinks
-    if (unfenced[i] === '<') {
-      const htmlMatch = HTML_RAW_TOKEN_RE.exec(unfenced.slice(i));
+    if (block[i] === '!' && block[i + 1] === '[') {
+      openBrackets.push({ isImage: true });
+      i += 2;
+      continue;
+    }
+    if (block[i] === '[') {
+      openBrackets.push({ isImage: false });
+      i += 1;
+      continue;
+    }
+    if (block[i] === ']') {
+      if (openBrackets.length === 0) {
+        i += 1;
+        continue;
+      }
+      const opener = openBrackets.pop();
+      if (block[i + 1] === '(') {
+        const afterLink = tryConsumeInlineLinkTail(block, i + 1);
+        if (afterLink !== -1) {
+          if (!opener.isImage) {
+            for (let k = openBrackets.length - 1; k >= 0; k -= 1) {
+              if (!openBrackets[k].isImage) openBrackets.splice(k, 1);
+            }
+          }
+          i = afterLink;
+          continue;
+        }
+      }
+      i += 1;
+      continue;
+    }
+    if (block[i] === '<') {
+      const htmlMatch = HTML_RAW_TOKEN_RE.exec(block.slice(i));
       if (htmlMatch) {
         i += htmlMatch[0].length;
         continue;
       }
     }
-    // CommonMark §6.3: link destination & title after `]` (`](url "title")`) are not inline-parsed for code spans
-    if (unfenced[i] === ']' && unfenced[i + 1] === '(') {
-      const linkTail = LINK_TAIL_RE.exec(unfenced.slice(i));
-      if (linkTail) {
-        i += linkTail[0].length;
-        continue;
-      }
-    }
-    if (unfenced[i] !== '`') {
+    if (block[i] !== '`') {
       i += 1;
       continue;
     }
     let runLen = 0;
-    while (i + runLen < unfenced.length && unfenced[i + runLen] === '`') runLen += 1;
+    while (i + runLen < block.length && block[i + runLen] === '`') runLen += 1;
     let j = i + runLen;
     let closePos = -1;
-    while (j < unfenced.length) {
-      if (unfenced[j] !== '`') {
+    while (j < block.length) {
+      if (block[j] !== '`') {
         j += 1;
         continue;
       }
       let closeLen = 0;
-      while (j + closeLen < unfenced.length && unfenced[j + closeLen] === '`') closeLen += 1;
+      while (j + closeLen < block.length && block[j + closeLen] === '`') closeLen += 1;
       if (closeLen === runLen) {
         closePos = j;
         break;
@@ -814,7 +917,7 @@ function extractLiveCitations(doc, text, errors) {
       i += runLen;
       continue;
     }
-    const content = unfenced.slice(i + runLen, closePos);
+    const content = block.slice(i + runLen, closePos);
     if (runLen === 1) {
       const trimmed = content.trim();
       if (/^(?:apps|packages|tools)\//.test(trimmed)) {
@@ -833,6 +936,172 @@ function extractLiveCitations(doc, text, errors) {
       }
     }
     i = closePos + runLen;
+  }
+}
+
+/**
+ * Strip CommonMark block containers (blockquotes, list items, fenced/indented code blocks,
+ * HTML blocks Types 1-7, Setext & ATX headings, link reference definitions), then scan
+ * each paragraph/heading inline block independently for live single-backtick citations.
+ */
+function extractLiveCitations(doc, text, errors) {
+  const lines = text.split(/\r?\n/);
+  const inlineBlocks = [];
+  const containers = [];
+  let currentParagraph = [];
+  let inFence = false;
+  let fenceChar = '';
+  let fenceLen = 0;
+  let htmlBlock = null;
+
+  const flushParagraph = () => {
+    if (currentParagraph.length === 0) return;
+    const body = peelLeadingLinkRefDefs(currentParagraph.join('\n'));
+    if (body.trim().length > 0) {
+      inlineBlocks.push(body);
+    }
+    currentParagraph = [];
+  };
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const expanded = expandTabsToSpaces(lines[i]);
+    const matched = matchOpenContainers(expanded, containers);
+    let stripped = matched.rest;
+
+    if (!matched.matchedAll) {
+      if (inFence) {
+        inFence = false;
+        fenceChar = '';
+        fenceLen = 0;
+      }
+      if (htmlBlock !== null) {
+        htmlBlock = null;
+      }
+    }
+
+    if (htmlBlock !== null) {
+      const indentCols = leadingSpaceCount(stripped);
+      const isBlank = indentCols === stripped.length;
+      if (htmlBlock.mode === 'blankLine') {
+        if (isBlank) htmlBlock = null;
+      } else if (htmlBlock.closeRe.test(stripped)) {
+        htmlBlock = null;
+      }
+      flushParagraph();
+      continue;
+    }
+
+    if (inFence) {
+      const indentCols = leadingSpaceCount(stripped);
+      const trimmedAfterIndent = stripped.slice(indentCols);
+      if (indentCols <= 3) {
+        const closeMatch = /^(`{3,}|~{3,})[ ]*$/.exec(trimmedAfterIndent);
+        if (closeMatch && closeMatch[1][0] === fenceChar && closeMatch[1].length >= fenceLen) {
+          inFence = false;
+          fenceChar = '';
+          fenceLen = 0;
+        }
+      }
+      flushParagraph();
+      continue;
+    }
+
+    // CommonMark §5.1 lazy continuation: if in a paragraph and open containers were not all matched,
+    // check whether the unmatched remainder interrupts the paragraph; if not, append lazily!
+    if (currentParagraph.length > 0 && !matched.matchedAll) {
+      if (!canInterruptParagraph(stripped)) {
+        currentParagraph.push(stripped.trimStart());
+        continue;
+      }
+      flushParagraph();
+      containers.length = matched.matchedCount;
+    } else if (!matched.matchedAll) {
+      containers.length = matched.matchedCount;
+    }
+
+    // CommonMark §4.3: Setext heading underline (`===` or `---`) when continuing a non-lazy paragraph
+    const preOpenIndent = leadingSpaceCount(stripped);
+    const preOpenTrimmed = stripped.slice(preOpenIndent);
+    if (currentParagraph.length > 0 && matched.matchedAll && preOpenIndent <= 3 && /^(?:=+|-+)[ ]*$/.test(preOpenTrimmed)) {
+      const remainingHeadingText = peelLeadingLinkRefDefs(currentParagraph.join('\n'));
+      currentParagraph = [];
+      if (remainingHeadingText.trim().length > 0) {
+        inlineBlocks.push(remainingHeadingText);
+        continue;
+      }
+    }
+
+    const hadParagraphBeforeOpen = currentParagraph.length > 0;
+    const opened = openNewContainers(stripped, containers, hadParagraphBeforeOpen);
+    stripped = opened.rest;
+    if (hadParagraphBeforeOpen && !opened.inParagraph) {
+      flushParagraph();
+    }
+
+    const indentCols = leadingSpaceCount(stripped);
+    const trimmedAfterIndent = stripped.slice(indentCols);
+    const isBlank = trimmedAfterIndent.length === 0;
+
+    if (isBlank) {
+      flushParagraph();
+      continue;
+    }
+
+    // CommonMark §4.4: 4+ virtual columns of indentation when NOT interrupting a paragraph
+    if (currentParagraph.length === 0 && indentCols >= 4) {
+      continue;
+    }
+
+    if (indentCols <= 3) {
+      // CommonMark §4.5: fenced code block opening
+      const openMatch = /^(`{3,}|~{3,})([^\r\n]*)$/.exec(trimmedAfterIndent);
+      if (openMatch) {
+        const marker = openMatch[1];
+        const info = openMatch[2];
+        if (marker[0] !== '`' || !info.includes('`')) {
+          flushParagraph();
+          inFence = true;
+          fenceChar = marker[0];
+          fenceLen = marker.length;
+          continue;
+        }
+      }
+
+      // CommonMark §4.6: HTML blocks Types 1-7
+      const htmlOpen = matchHtmlBlockOpen(trimmedAfterIndent, currentParagraph.length > 0);
+      if (htmlOpen !== null) {
+        flushParagraph();
+        if (!htmlOpen.closesImmediately) {
+          htmlBlock = { mode: htmlOpen.mode, closeRe: htmlOpen.closeRe };
+        }
+        continue;
+      }
+
+      // CommonMark §4.1 thematic break
+      if (/^(?:[-_*][ ]*){3,}$/.test(trimmedAfterIndent)) {
+        flushParagraph();
+        continue;
+      }
+
+      // CommonMark §4.2 ATX heading (isolated inline block)
+      const atxMatch = /^(#{1,6})(?:[ ]+(.*?))?[ ]*$/.exec(trimmedAfterIndent);
+      if (atxMatch && (trimmedAfterIndent.length === atxMatch[1].length || trimmedAfterIndent[atxMatch[1].length] === ' ')) {
+        flushParagraph();
+        const rawHeading = (atxMatch[2] ?? '').replace(/(?:^|[ ]+)#+[ ]*$/, '');
+        if (rawHeading.length > 0) {
+          inlineBlocks.push(rawHeading);
+        }
+        continue;
+      }
+    }
+
+    currentParagraph.push(trimmedAfterIndent);
+  }
+  flushParagraph();
+
+  const citations = [];
+  for (const block of inlineBlocks) {
+    extractInlineCitationsFromBlock(doc, block, citations, errors);
   }
   return citations;
 }
@@ -906,7 +1175,7 @@ function findClosingRegexLiteral(rawText, openIdx) {
   return -1;
 }
 
-function stripJsTsCommentsWithTypeScript(ts, relPath, rawText) {
+function buildJsTsActiveViewsWithTypeScript(ts, relPath, rawText) {
   const scriptKind = relPath.endsWith('.tsx')
     ? ts.ScriptKind.TSX
     : relPath.endsWith('.jsx')
@@ -915,37 +1184,84 @@ function stripJsTsCommentsWithTypeScript(ts, relPath, rawText) {
         ? ts.ScriptKind.TS
         : ts.ScriptKind.JS;
   const sf = ts.createSourceFile(relPath, rawText, ts.ScriptTarget.Latest, true, scriptKind);
-  const chars = Array.from(rawText);
-  const maskRange = (pos, end) => {
-    for (let p = pos; p < end; p += 1) {
-      if (chars[p] !== '\r' && chars[p] !== '\n') chars[p] = ' ';
+  const parseErrors = (sf.parseDiagnostics ?? []).map((d) => ts.flattenDiagnosticMessageText(d.messageText, ' '));
+  // Use exact UTF-16 code units (`split('')`, NOT `Array.from`) so astral code points (e.g. emoji) match TS AST offsets 1:1
+  const activeChars = rawText.split('');
+  const strictCodeChars = rawText.split('');
+  const maskIn = (arr, pos, end) => {
+    const clampedEnd = Math.min(arr.length, end);
+    for (let p = Math.max(0, pos); p < clampedEnd; p += 1) {
+      if (arr[p] !== '\r' && arr[p] !== '\n') arr[p] = ' ';
     }
   };
   const visit = (node) => {
+    // Mask dead standalone string/template literal ExpressionStatements (other than directives like 'use strict')
+    if (ts.isExpressionStatement(node)) {
+      const expr = node.expression;
+      if (
+        ts.isStringLiteral(expr)
+        || ts.isNoSubstitutionTemplateLiteral(expr)
+        || ts.isTemplateExpression(expr)
+      ) {
+        const txt = expr.getText(sf).trim();
+        if (txt !== "'use strict'" && txt !== '"use strict"') {
+          maskIn(activeChars, expr.getStart(sf), expr.getEnd());
+        }
+      }
+    }
     const children = node.getChildren(sf);
     if (children.length === 0) {
       if (node.kind !== ts.SyntaxKind.JsxText) {
         const leading = ts.getLeadingCommentRanges(rawText, node.pos) ?? [];
-        for (const r of leading) maskRange(r.pos, r.end);
+        for (const r of leading) {
+          maskIn(activeChars, r.pos, r.end);
+          maskIn(strictCodeChars, r.pos, r.end);
+        }
         const trailing = ts.getTrailingCommentRanges(rawText, node.end) ?? [];
-        for (const r of trailing) maskRange(r.pos, r.end);
+        for (const r of trailing) {
+          maskIn(activeChars, r.pos, r.end);
+          maskIn(strictCodeChars, r.pos, r.end);
+        }
+      }
+      if (
+        node.kind === ts.SyntaxKind.StringLiteral
+        || node.kind === ts.SyntaxKind.NoSubstitutionTemplateLiteral
+      ) {
+        const s = node.getStart(sf);
+        const e = node.getEnd();
+        if (e - s >= 2) maskIn(strictCodeChars, s + 1, e - 1);
+      } else if (node.kind === ts.SyntaxKind.TemplateHead) {
+        const s = node.getStart(sf);
+        const e = node.getEnd();
+        if (e - s >= 3) maskIn(strictCodeChars, s + 1, e - 2);
+      } else if (node.kind === ts.SyntaxKind.TemplateMiddle) {
+        const s = node.getStart(sf);
+        const e = node.getEnd();
+        if (e - s >= 3) maskIn(strictCodeChars, s + 1, e - 2);
+      } else if (node.kind === ts.SyntaxKind.TemplateTail) {
+        const s = node.getStart(sf);
+        const e = node.getEnd();
+        if (e - s >= 2) maskIn(strictCodeChars, s + 1, e - 1);
       }
       return;
     }
     for (const child of children) visit(child);
   };
   visit(sf);
-  return chars.join('');
+  return {
+    activeText: activeChars.join(''),
+    strictCodeText: strictCodeChars.join(''),
+    parseErrors,
+  };
 }
 
 function stripJsTsCommentsPreservingLines(relPath, rawText, maskKeepNewlines) {
   const ts = loadTypeScriptCompiler();
   if (ts !== null) {
-    return stripJsTsCommentsWithTypeScript(ts, relPath, rawText);
+    return buildJsTsActiveViewsWithTypeScript(ts, relPath, rawText);
   }
   let out = '';
   let idx = 0;
-  // Stack entries: -1 = inside template literal text; >= 0 = brace depth inside `${...}`
   const templateStack = [];
 
   while (idx < rawText.length) {
@@ -973,7 +1289,6 @@ function stripJsTsCommentsPreservingLines(relPath, rawText, maskKeepNewlines) {
       continue;
     }
 
-    // Outside template text (normal code or `${...}` expression)
     if (rawText.startsWith('/*', idx)) {
       const end = rawText.indexOf('*/', idx + 2);
       const slice = end === -1 ? rawText.slice(idx) : rawText.slice(idx, end + 2);
@@ -1022,7 +1337,6 @@ function stripJsTsCommentsPreservingLines(relPath, rawText, maskKeepNewlines) {
     }
     if (rawText[idx] === "'" || rawText[idx] === '"') {
       const quote = rawText[idx];
-      // Do not treat JSX prose apostrophes (`Today's`, `athlete's`) as JS string openers
       const isJsxProseApostrophe = quote === "'" && idx > 0 && /[A-Za-z0-9]/.test(rawText[idx - 1]);
       const closeIdx = isJsxProseApostrophe ? -1 : findClosingSingleLineQuote(rawText, idx, quote);
       if (closeIdx !== -1) {
@@ -1034,66 +1348,235 @@ function stripJsTsCommentsPreservingLines(relPath, rawText, maskKeepNewlines) {
     out += rawText[idx];
     idx += 1;
   }
+  return { activeText: out, strictCodeText: out, parseErrors: [] };
+}
+
+function stripSqlCommentsAndLiteralsPreservingLines(rawText, maskKeepNewlines) {
+  let out = '';
+  let idx = 0;
+  while (idx < rawText.length) {
+    const ch = rawText[idx];
+    // SQLite single-quoted string literal ('...'), double-quoted identifier ("..."), or backtick identifier (`...`)
+    if (ch === "'" || ch === '"' || ch === '`') {
+      const quote = ch;
+      out += quote;
+      idx += 1;
+      while (idx < rawText.length) {
+        if (rawText[idx] === quote && rawText[idx + 1] === quote) {
+          out += '  ';
+          idx += 2;
+          continue;
+        }
+        if (rawText[idx] === quote) {
+          out += quote;
+          idx += 1;
+          break;
+        }
+        out += rawText[idx] === '\r' || rawText[idx] === '\n' ? rawText[idx] : ' ';
+        idx += 1;
+      }
+      continue;
+    }
+    // SQLite bracket-quoted identifier ([...])
+    if (ch === '[') {
+      out += '[';
+      idx += 1;
+      while (idx < rawText.length) {
+        if (rawText[idx] === ']') {
+          out += ']';
+          idx += 1;
+          break;
+        }
+        out += rawText[idx] === '\r' || rawText[idx] === '\n' ? rawText[idx] : ' ';
+        idx += 1;
+      }
+      continue;
+    }
+    if (rawText.startsWith('/*', idx)) {
+      const end = rawText.indexOf('*/', idx + 2);
+      const slice = end === -1 ? rawText.slice(idx) : rawText.slice(idx, end + 2);
+      out += maskKeepNewlines(slice);
+      idx = end === -1 ? rawText.length : end + 2;
+      continue;
+    }
+    if (rawText.startsWith('--', idx)) {
+      const nl = rawText.indexOf('\n', idx + 2);
+      const slice = nl === -1 ? rawText.slice(idx) : rawText.slice(idx, nl);
+      out += maskKeepNewlines(slice);
+      idx = nl === -1 ? rawText.length : nl;
+      continue;
+    }
+    out += ch;
+    idx += 1;
+  }
   return out;
 }
 
+function inspectXmlDom(rawText) {
+  const DOMParser = loadXmlDomParser();
+  if (DOMParser === null) return { parseErrors: [], doc: null };
+  const parseErrors = [];
+  let doc = null;
+  try {
+    doc = new DOMParser({
+      errorHandler: {
+        warning: () => {},
+        error: (msg) => parseErrors.push(String(msg)),
+        fatalError: (msg) => parseErrors.push(String(msg)),
+      },
+    }).parseFromString(rawText, 'text/xml');
+  } catch (err) {
+    parseErrors.push(String(err));
+  }
+  return { parseErrors, doc };
+}
+
+function inspectSqliteTables(repoRoot, relPath, rawText, readFile) {
+  const db = new DatabaseSync(':memory:');
+  try {
+    db.exec('PRAGMA foreign_keys = OFF;');
+    try {
+      db.prepare('SELECT ln(2.0), sqrt(2.0)').get();
+    } catch {
+      db.function('ln', { deterministic: true }, (x) => (x !== null && x > 0 ? Math.log(x) : null));
+      db.function('sqrt', { deterministic: true }, (x) => (x !== null && x >= 0 ? Math.sqrt(x) : null));
+    }
+    const schemaDir = 'packages/core-db/src/schema';
+    const absSchemaDir = path.join(repoRoot, schemaDir);
+    if (relPath.startsWith(`${schemaDir}/`) && fs.existsSync(absSchemaDir)) {
+      const targetBase = path.posix.basename(relPath);
+      const priorFiles = fs
+        .readdirSync(absSchemaDir)
+        .filter((f) => /^0\d\d_.*\.sql$/.test(f) && !f.startsWith('004_') && f < targetBase)
+        .sort();
+      for (const prior of priorFiles) {
+        db.exec(readFile(`${schemaDir}/${prior}`));
+      }
+    }
+    db.exec(rawText);
+    const rows = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all();
+    return { sqlError: null, tables: new Set(rows.map((r) => String(r.name))) };
+  } catch (err) {
+    return { sqlError: String(err), tables: new Set() };
+  } finally {
+    db.close();
+  }
+}
+
+function verifyXmlElementSemantics(xmlInfo, spec, c) {
+  if (xmlInfo.parseErrors.length > 0) {
+    return `malformed XML: ${xmlInfo.parseErrors[0]}`;
+  }
+  if (!xmlInfo.doc || !xmlInfo.doc.documentElement) return null;
+  const root = xmlInfo.doc.documentElement;
+  const allAnchors = [spec.startAnchor, ...(spec.rangeAnchors ?? []), ...(spec.endAnchor ? [spec.endAnchor] : [])].join('\n');
+  const permMatch = /android:name="([^"]+)"/.exec(allAnchors);
+  if (permMatch) {
+    const targetPerm = permMatch[1];
+    const requiresRemove = allAnchors.includes('tools:node="remove"');
+    const nodes = root.getElementsByTagName('uses-permission');
+    let found = false;
+    for (let i = 0; i < nodes.length; i += 1) {
+      const el = nodes.item(i);
+      if (!el || el.parentNode !== root) continue;
+      if (el.getAttribute('android:name') !== targetPerm) continue;
+      if (requiresRemove && el.getAttribute('tools:node') !== 'remove') continue;
+      if (typeof el.lineNumber === 'number' && (el.lineNumber < c.start || el.lineNumber > c.end)) continue;
+      found = true;
+      break;
+    }
+    if (!found) {
+      return `missing active XML <uses-permission android:name="${targetPerm}"${requiresRemove ? ' tools:node="remove"' : ''}> element in lines ${c.start}-${c.end}`;
+    }
+  }
+  if (allAnchors.includes('android:allowBackup="false"')) {
+    const apps = root.getElementsByTagName('application');
+    let found = false;
+    for (let i = 0; i < apps.length; i += 1) {
+      const el = apps.item(i);
+      if (el && el.parentNode === root && el.getAttribute('android:allowBackup') === 'false') {
+        found = true;
+        break;
+      }
+    }
+    if (!found) {
+      return 'missing active XML <application android:allowBackup="false"> attribute';
+    }
+  }
+  return null;
+}
+
+function verifySqlTableSemantics(sqlInfo, spec) {
+  if (sqlInfo.sqlError !== null) {
+    return `SQLite schema execution failed: ${sqlInfo.sqlError}`;
+  }
+  const anchors = [spec.startAnchor, ...(spec.rangeAnchors ?? [])];
+  for (const anchor of anchors) {
+    const m = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([A-Za-z_][A-Za-z0-9_]*)\b/i.exec(anchor);
+    if (m && !sqlInfo.tables.has(m[1])) {
+      return `SQLite execution did not create expected table "${m[1]}"`;
+    }
+  }
+  return null;
+}
+
 /**
- * Replace commented-out characters with spaces while preserving exact line breaks
- * so commented-out XML directives, TS/TSX statements, or SQL declarations cannot
- * masquerade as active implementation.
+ * Build line-aligned source views so commented-out or inert string/CDATA/PI text
+ * in XML, TS/TSX, or SQL cannot masquerade as active implementation.
  */
-function stripCommentsPreservingLines(relPath, rawText) {
+function buildSourceBundle(repoRoot, relPath, rawText, readFile) {
   const maskKeepNewlines = (chunk) => chunk.replace(/[^\r\n]/g, ' ');
+  const lines = splitPhysicalLines(rawText);
   if (relPath.endsWith('.xml')) {
-    return rawText.replace(/<!--[\s\S]*?(?:-->|$)/g, maskKeepNewlines);
+    const stripped = rawText
+      .replace(/<!--[\s\S]*?(?:-->|$)/g, maskKeepNewlines)
+      .replace(/<!\[CDATA\[[\s\S]*?(?:\]\]>|$)/g, maskKeepNewlines)
+      .replace(/<\?[\s\S]*?(?:\?>|$)/g, maskKeepNewlines);
+    const activeLines = splitPhysicalLines(stripped);
+    return {
+      lines,
+      activeLines,
+      strictCodeLines: activeLines,
+      parseErrors: [],
+      xmlInfo: inspectXmlDom(rawText),
+      sqlInfo: null,
+    };
   }
   if (relPath.endsWith('.sql')) {
-    let out = '';
-    let idx = 0;
-    while (idx < rawText.length) {
-      const ch = rawText[idx];
-      if (ch === "'" || ch === '"') {
-        const quote = ch;
-        out += ch;
-        idx += 1;
-        while (idx < rawText.length) {
-          if (rawText[idx] === quote && rawText[idx + 1] === quote) {
-            out += quote + quote;
-            idx += 2;
-            continue;
-          }
-          out += rawText[idx];
-          if (rawText[idx] === quote) {
-            idx += 1;
-            break;
-          }
-          idx += 1;
-        }
-        continue;
-      }
-      if (rawText.startsWith('/*', idx)) {
-        const end = rawText.indexOf('*/', idx + 2);
-        const slice = end === -1 ? rawText.slice(idx) : rawText.slice(idx, end + 2);
-        out += maskKeepNewlines(slice);
-        idx = end === -1 ? rawText.length : end + 2;
-        continue;
-      }
-      if (rawText.startsWith('--', idx)) {
-        const nl = rawText.indexOf('\n', idx + 2);
-        const slice = nl === -1 ? rawText.slice(idx) : rawText.slice(idx, nl);
-        out += maskKeepNewlines(slice);
-        idx = nl === -1 ? rawText.length : nl;
-        continue;
-      }
-      out += ch;
-      idx += 1;
-    }
-    return out;
+    const stripped = stripSqlCommentsAndLiteralsPreservingLines(rawText, maskKeepNewlines);
+    const activeLines = splitPhysicalLines(stripped);
+    return {
+      lines,
+      activeLines,
+      strictCodeLines: activeLines,
+      parseErrors: [],
+      xmlInfo: null,
+      sqlInfo: inspectSqliteTables(repoRoot, relPath, rawText, readFile),
+    };
   }
   if (relPath.endsWith('.ts') || relPath.endsWith('.tsx') || relPath.endsWith('.mjs') || relPath.endsWith('.js')) {
-    return stripJsTsCommentsPreservingLines(relPath, rawText, maskKeepNewlines);
+    const { activeText, strictCodeText, parseErrors } = stripJsTsCommentsPreservingLines(relPath, rawText, maskKeepNewlines);
+    return {
+      lines,
+      activeLines: splitPhysicalLines(activeText),
+      strictCodeLines: splitPhysicalLines(strictCodeText),
+      parseErrors,
+      xmlInfo: null,
+      sqlInfo: null,
+    };
   }
-  return rawText;
+  return {
+    lines,
+    activeLines: lines,
+    strictCodeLines: lines,
+    parseErrors: [],
+    xmlInfo: null,
+    sqlInfo: null,
+  };
+}
+
+function anchorHasQuoteChars(anchor) {
+  return anchor.includes("'") || anchor.includes('"') || anchor.includes('`');
 }
 
 export function verifyBetaFilingCitations({
@@ -1102,18 +1585,13 @@ export function verifyBetaFilingCitations({
   exists = (relPath) => fs.existsSync(path.join(repoRoot, relPath)),
 } = {}) {
   const errors = [];
-  const sourceCache = new Map();
-  const activeSourceCache = new Map();
+  const bundleCache = new Map();
   const getSourceBundle = (relPath) => {
-    if (!sourceCache.has(relPath)) {
+    if (!bundleCache.has(relPath)) {
       const raw = readFile(relPath);
-      sourceCache.set(relPath, splitPhysicalLines(raw));
-      activeSourceCache.set(relPath, splitPhysicalLines(stripCommentsPreservingLines(relPath, raw)));
+      bundleCache.set(relPath, buildSourceBundle(repoRoot, relPath, raw, readFile));
     }
-    return {
-      lines: sourceCache.get(relPath),
-      activeLines: activeSourceCache.get(relPath),
-    };
+    return bundleCache.get(relPath);
   };
 
   let totalCitations = 0;
@@ -1154,7 +1632,12 @@ export function verifyBetaFilingCitations({
         errors.push(`${doc} (${c.raw}): target file does not exist: ${c.targetPath}`);
         return;
       }
-      const { lines, activeLines } = getSourceBundle(c.targetPath);
+      const bundle = getSourceBundle(c.targetPath);
+      const { lines, activeLines, strictCodeLines, parseErrors, xmlInfo, sqlInfo } = bundle;
+      if (parseErrors.length > 0) {
+        errors.push(`${doc} (${c.raw}): syntax error in ${c.targetPath}: ${parseErrors[0]}`);
+        return;
+      }
       if (c.start < 1 || c.end < c.start || c.end > lines.length) {
         errors.push(`${doc} (${c.raw}): line range ${c.start}-${c.end} out of bounds (1..${lines.length})`);
         return;
@@ -1166,7 +1649,13 @@ export function verifyBetaFilingCitations({
         return;
       }
 
-      const startPool = spec.startAnchorIsComment ? lines : activeLines;
+      const pickPoolForAnchor = (anchor, isComment, allowStringLiteral) => {
+        if (isComment) return lines;
+        if (allowStringLiteral || anchorHasQuoteChars(anchor)) return activeLines;
+        return strictCodeLines;
+      };
+
+      const startPool = pickPoolForAnchor(spec.startAnchor, spec.startAnchorIsComment, spec.anchorInStringLiteral);
       const startLine = startPool[c.start - 1];
       if (!startLine.includes(spec.startAnchor)) {
         const movedTo = lines
@@ -1180,7 +1669,8 @@ export function verifyBetaFilingCitations({
       }
 
       if (spec.prevAnchor) {
-        const prevLine = c.start >= 2 ? activeLines[c.start - 2] : '';
+        const prevPool = pickPoolForAnchor(spec.prevAnchor, false, false);
+        const prevLine = c.start >= 2 ? prevPool[c.start - 2] : '';
         if (!prevLine.includes(spec.prevAnchor)) {
           errors.push(
             `${doc} (${c.raw}): preceding line ${c.start - 1} does not contain disambiguating context "${spec.prevAnchor}"`,
@@ -1190,9 +1680,11 @@ export function verifyBetaFilingCitations({
       }
 
       const expectedEndAnchor = spec.endAnchor ?? spec.startAnchor;
-      const endPool = (spec.endAnchor !== undefined ? spec.endAnchorIsComment : spec.startAnchorIsComment)
-        ? lines
-        : activeLines;
+      const endIsComment = spec.endAnchor !== undefined ? spec.endAnchorIsComment : spec.startAnchorIsComment;
+      const endAllowString = spec.endAnchor !== undefined
+        ? Boolean(spec.endAnchorInStringLiteral || spec.anchorInStringLiteral)
+        : Boolean(spec.anchorInStringLiteral);
+      const endPool = pickPoolForAnchor(expectedEndAnchor, endIsComment, endAllowString);
       const endLine = endPool[c.end - 1];
       if (!endLine.includes(expectedEndAnchor)) {
         errors.push(
@@ -1202,12 +1694,26 @@ export function verifyBetaFilingCitations({
       }
 
       if (Array.isArray(spec.rangeAnchors) && spec.rangeAnchors.length > 0) {
-        const rangePool = spec.rangeAnchorsAreComments ? lines : activeLines;
-        const sliceJoined = rangePool.slice(c.start - 1, c.end).join('\n');
         for (const req of spec.rangeAnchors) {
+          const reqPool = pickPoolForAnchor(req, spec.rangeAnchorsAreComments, spec.anchorInStringLiteral);
+          const sliceJoined = reqPool.slice(c.start - 1, c.end).join('\n');
           if (!sliceJoined.includes(req)) {
             errors.push(`${doc} (${c.raw}): range ${c.start}-${c.end} is missing required active evidence "${req}"`);
           }
+        }
+      }
+
+      if (xmlInfo !== null && !spec.startAnchorIsComment) {
+        const xmlErr = verifyXmlElementSemantics(xmlInfo, spec, c);
+        if (xmlErr !== null) {
+          errors.push(`${doc} (${c.raw}): ${xmlErr}`);
+        }
+      }
+
+      if (sqlInfo !== null) {
+        const sqlErr = verifySqlTableSemantics(sqlInfo, spec);
+        if (sqlErr !== null) {
+          errors.push(`${doc} (${c.raw}): ${sqlErr}`);
         }
       }
     });
