@@ -37,6 +37,54 @@ const movement = {
   implement: 'barbell',
 };
 
+const libraryState = (movements) => ({
+  movements,
+  profile: {
+    objective: 'strength',
+    training_age: 'intermediate',
+    weekly_frequency: 3,
+    session_duration_cap_min: 60,
+    base_rpe_cap: 8.5,
+    equipment_inventory: ['barbell', 'squat_rack'],
+  },
+  niggles: [],
+  today: '2026-07-15',
+  activePriorExperienceMovementIds: [],
+  movementAvailabilityRevision: 0,
+  resolveGoalRung: jest.fn(() => null),
+  getMovementAvailabilityVerdicts: jest.fn(() => movements.map((m) => ({
+    movementId: m.movement_id,
+    state: 'available',
+    reasons: [],
+    missingPrerequisites: [],
+    priorExperienceConfirmed: false,
+    confirmationWouldClear: false,
+    separateAttestationRequired: false,
+  }))),
+  confirmMovementPriorExperience: jest.fn(() => true),
+  revokeMovementPriorExperience: jest.fn(() => true),
+  loadIntents: {},
+  saveMovementLoadIntent: jest.fn(() => true),
+  error: null,
+});
+
+test('detail shows the base name only when it differs from the movement name', () => {
+  const boxSquat = { ...movement, movement_id: 2, name: 'Box Squat', baseName: 'Box Squat' };
+  mockState = libraryState([boxSquat]);
+  render(<LibraryScreenV2 />);
+  fireEvent.press(screen.getByRole('button', { name: /Box Squat/i }));
+  expect(screen.getByLabelText('Back to movement list')).toBeOnTheScreen();
+  expect(screen.getAllByText('Box Squat')).toHaveLength(1);
+});
+
+test('a prefixed variant keeps its distinct base-name subtitle in the detail view', () => {
+  mockState = libraryState([movement]);
+  render(<LibraryScreenV2 />);
+  fireEvent.press(screen.getByRole('button', { name: /Barbell Back Squat/i }));
+  expect(screen.getByLabelText('Back to movement list')).toBeOnTheScreen();
+  expect(screen.getByText('Back Squat')).toBeOnTheScreen();
+});
+
 test('plan-5: LibraryScreenV2 movement detail metadata badges are not exposed as interactive unselected buttons', () => {
   mockState = {
     movements: [movement],

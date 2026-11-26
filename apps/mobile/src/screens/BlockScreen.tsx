@@ -45,6 +45,7 @@ import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { appliedAdjustmentLines, autopilotReasonCopy } from '../state/autopilotCopy';
 import { EMPTY_ACTIVITY_LEDGER } from '../state/activityStore';
 import { sessionFocusName } from '../state/sessionSummary';
+import { formatAthleteDate } from '../state/athleteDate';
 import { HALT_NEXT_TEXT, HALT_PAUSE_CARD_TEXT, HALT_TODAY_TEXT } from '../state/haltCopy';
 import { operativeReportLine } from '../state/operativeReportLine';
 import { reportEffectText, reportEntryName } from '../state/reportCopy';
@@ -662,8 +663,8 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
       <View style={styles.trajectoryHeaderRow}>
         <Text style={styles.sectionTitle}>Four-week trajectory</Text>
         {block != null && blockEndDate != null && (
-          <View style={styles.fixedBadge} accessibilityRole="text" accessibilityLabel={`Fixed until ${blockEndDate}`}>
-            <Text style={styles.fixedBadgeText}>FIXED UNTIL {blockEndDate}</Text>
+          <View style={styles.fixedBadge} accessibilityRole="text" accessibilityLabel={`Fixed until ${formatAthleteDate(blockEndDate)}`}>
+            <Text style={styles.fixedBadgeText}>FIXED UNTIL {formatAthleteDate(blockEndDate)}</Text>
           </View>
         )}
       </View>

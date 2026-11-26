@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createRequire } from 'node:module';
 import { Worker } from 'node:worker_threads';
+import { execFileSync } from 'node:child_process';
 
 const require = createRequire(import.meta.url);
 const backup = require('../.build/backup/index.js');
@@ -124,6 +125,44 @@ function schemaObjectsOf(db) {
   assert.equal(backup.isCurrentBackupSchema(drifted, cryptoProvider), false,
     'a migrated database missing one guard must fail the current contract');
   legacy.close();
+}
+
+{
+  // Line endings are not schema. The production runner (compiled here, so
+  // this gate never depends on another gate's build output) must store the
+  // canonical LF statements even when every migration reaches it with CRLF
+  // bytes (a Windows checkout or dev bundle), so the current fingerprint
+  // matches byte-for-byte without any lineage equivalence entry.
+  const runnerBuild = join(import.meta.dirname, '..', '.build', 'backup-runner');
+  execFileSync(process.execPath, [require.resolve('typescript/bin/tsc'), '--strict', '--target', 'es2020', '--module', 'commonjs',
+    '--lib', 'es2020', '--outDir', runnerBuild, join(import.meta.dirname, '..', '..', 'src', 'migrationRunner.ts')], { stdio: 'inherit' });
+  const runner = require(join(runnerBuild, 'migrationRunner.js'));
+  const runnerDb = (raw) => ({
+    executeSync(sql) {
+      if (/^\s*(SELECT|PRAGMA\s+user_version\s*;?\s*$)/i.test(sql)) return { rows: raw.prepare(sql).all() };
+      raw.exec(sql);
+      return { rows: [] };
+    },
+  });
+  const chainLf = schemaFiles.map((name) => readFileSync(join(schemaDirectory, name), 'utf8'));
+  assert.equal(chainLf.some((sql) => sql.includes('\r')), false, 'checked-in migrations are LF');
+  const installs = {};
+  for (const [label, ending] of [['LF', '\n'], ['CRLF', '\r\n']]) {
+    const raw = new DatabaseSync(':memory:');
+    raw.exec('PRAGMA foreign_keys = ON;');
+    runner.runMigrations(runnerDb(raw), chainLf.map((sql) => sql.replace(/\r?\n/g, ending)));
+    const objects = schemaObjectsOf(raw);
+    const carriageReturns = objects.filter((object) => object[3].includes('\r')).map((object) => object[1]);
+    assert.deepEqual(carriageReturns, [], `a ${label} migration chain must store no carriage return in sqlite_master`);
+    assert.equal(backup.isCurrentBackupSchema(objects, cryptoProvider), true,
+      `a ${label} migration chain run by the production runner must match the current contract exactly`);
+    installs[label] = JSON.stringify(objects);
+    raw.close();
+  }
+  assert.equal(installs.CRLF, installs.LF, 'CRLF and LF chains must produce byte-identical schema objects');
+  assert.deepEqual(backup.KNOWN_LINEAGE_SQL_EQUIVALENTS.map((entry) => [entry.name, entry.lineage]),
+    [['suspension_episode', 'master 1da218d migration 058']],
+    'only the shipped 058 two-lineage table may carry a lineage equivalence');
 }
 
 function makeDatabase(file, label) {

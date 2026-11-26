@@ -81,3 +81,13 @@ Other muted labels, metadata, generated facts, empty states and action guidance 
 | `apps/mobile/src/state/offPlanStart.ts:63` | `This starts ${offPlanSessionName(target.session)} (${target.session.sessionDate}), the earliest one you have not finished.` and `This starts ${offPlanSessionName(target.session)} (${target.session.sessionDate}), your next planned session.` | `This starts ${offPlanSessionName(target.session)} (${formatAthleteDate(target.session.sessionDate)}), the earliest one you have not finished.` and `This starts ${offPlanSessionName(target.session)} (${formatAthleteDate(target.session.sessionDate)}), your next planned session.` | `TodayScreen.test.js:825` and `:843` pin the full caption and accessibility label for both branches. |
 
 The existing `START TRAINING` label moves into the Review footer. Today uses the existing locale-aware date formatter.
+
+### Post-audit closeout (26 November 2026)
+
+No new prose. Each row reuses an existing string or the existing date formatter.
+
+| Source | Before | Provisional after | Pinned assertion |
+| --- | --- | --- | --- |
+| `apps/mobile/src/screens/BlockScreen.tsx:665-666` | `FIXED UNTIL ${blockEndDate}` and accessibility label `Fixed until ${blockEndDate}` (raw ISO date) | `FIXED UNTIL ${formatAthleteDate(blockEndDate)}` and `Fixed until ${formatAthleteDate(blockEndDate)}` | `BlockAdjustmentsPanel.test.js` checks the formatted text, the accessibility label and that `2026-08-28` is absent. |
+| `apps/mobile/src/screens/SessionScreen.tsx` rest view | Rest explanation always visible under the rest stepper | Same wording, verbatim, inside a `CompactDescription` headed by the existing `Rest between sets: m:ss` line. The toggle uses the existing `Show/Hide details for <label>` pattern with label `Rest between sets`. | `SessionScreen.test.js` checks that Compact hides the explanation, the rest value and both stepper buttons stay visible, the toggle is at least 56 × 56 dp and pressing it shows the exact wording. The existing Show All test still checks the exact wording. |
+| `apps/mobile/src/screens/LibraryScreenV2.tsx:267` | Base name always shown under the movement name (`Box Squat` above `Box Squat`) | Base name shown only when it is non-empty and differs from the movement name | `LibraryScreenDetailTags.test.js` checks that `Box Squat` appears once and that `Back Squat` still appears under `Barbell Back Squat`. |

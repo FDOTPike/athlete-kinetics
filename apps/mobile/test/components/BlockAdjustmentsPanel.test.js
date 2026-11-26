@@ -1,6 +1,7 @@
 import React from 'react';
 import { fireEvent, render, screen } from '@testing-library/react-native';
 import BlockScreen from '../../src/screens/BlockScreen';
+import { formatAthleteDate } from '../../src/state/athleteDate';
 
 let mockState;
 
@@ -106,7 +107,10 @@ describe('Changed in this block panel', () => {
     ]);
     render(<BlockScreen onSessionStarted={jest.fn()} />);
 
-    expect(screen.getByText('FIXED UNTIL 2026-08-28')).toBeOnTheScreen();
+    // The fixed-until badge reads as a date, not a raw ISO string.
+    expect(screen.getByText(`FIXED UNTIL ${formatAthleteDate('2026-08-28')}`)).toBeOnTheScreen();
+    expect(screen.getByLabelText(`Fixed until ${formatAthleteDate('2026-08-28')}`)).toBeOnTheScreen();
+    expect(screen.queryByText(/2026-08-28/)).toBeNull();
     expect(screen.getByTestId('block-adjustments-panel')).toBeOnTheScreen();
     expect(screen.getByText('Changed in this block')).toBeOnTheScreen();
     expect(screen.getByText(`Overhead Barbell Press: ${SAFETY}`)).toBeOnTheScreen();

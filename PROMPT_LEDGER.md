@@ -13374,3 +13374,11 @@ The appendix held the code around the read, every match for `0286` and "record o
 **Input:** Owner handoff for the four-stage isolated run from `fb539d06`. Checkpoint A decisions are provisional and subject to Antigravity and Owner review. The Pixel reported a locked screen at baseline.
 
 **Output:** See the compact-copy judgment ledger and executor handoff for changes, gate output and hardware evidence status.
+
+## Entry 0306 — 2026-11-26 · Compact descriptions post-audit closeout (Opus 5.5)
+
+**Executor:** Claude Opus 5.5 (`C:\codex-sol-compact`, `feat/sol-compact-ui-and-pixel-fixes`, starting HEAD `1f54c76201764a4c84d6b7fd17a0f7bab39d096c`). Local commits only; push reserved for Antigravity.
+
+**Input:** Antigravity audit `SOL_FINAL_WORKORDER_AUDIT_1F54C762.md` closeout items 1–5: remove the dev-session CRLF `082` backup lineage entry and normalize SQL line endings before execution; format the `PLAN` `FIXED UNTIL` date; suppress the duplicate Library detail subtitle; collapse the rest-stepper helper paragraph behind `CompactDescription`; stop the in-flight `Disclosure` rotation on unmount.
+
+**Output:** See `docs/audits/compact-copy/EXECUTOR_HANDOFF.md` and `JUDGMENT_LEDGER.md` for changes, gate output and evidence paths.

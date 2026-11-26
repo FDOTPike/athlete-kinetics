@@ -1000,3 +1000,15 @@ test('round trip at the current schema: focus, goals, every revision and measure
   } finally { restored.close(); }
   expect(artifacts()).toEqual([]);
 });
+
+// A Windows checkout or bundle can carry CRLF bytes. The jest .sql loader must
+// hand the migration runner the same LF text a Git LF checkout does, and only
+// the shipped 058 two-lineage table may carry a backup lineage equivalence.
+test('the .sql loader normalizes CRLF and the backup lineage registry holds only 058', () => {
+  const transformer = require('../sqlRawTransformer');
+  const loaded = { exports: undefined };
+  new Function('module', transformer.process('CREATE TABLE t (\r\n  a INTEGER\r\n) STRICT;\r\n').code)(loaded);
+  expect(loaded.exports).toBe('CREATE TABLE t (\n  a INTEGER\n) STRICT;\n');
+  const { KNOWN_LINEAGE_SQL_EQUIVALENTS } = require('../../../../packages/core-db/src/backup/schemaContract');
+  expect(KNOWN_LINEAGE_SQL_EQUIVALENTS.map((entry) => entry.name)).toEqual(['suspension_episode']);
+});

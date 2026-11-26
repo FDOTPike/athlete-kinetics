@@ -1975,9 +1975,29 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                           onComplete={completeRest}
                           style={{ alignSelf: 'stretch' }}
                         />
-                        <Text style={styles.nextUp} testID="session-rest-between">
-                          {`Rest between sets: ${minutesSeconds(rest.seconds)}`}
-                        </Text>
+                        {runnerResting ? (
+                          // The target follows the last set's effort (restSecondsFor);
+                          // say so, or the number reads as a setting that changed by
+                          // itself (Android walk 2026-11-03, ux-8). Compact folds the
+                          // explanation; the rest value and stepper stay visible.
+                          <CompactDescription
+                            label="Rest between sets"
+                            heading={(
+                              <Text style={styles.nextUp} testID="session-rest-between">
+                                {`Rest between sets: ${minutesSeconds(rest.seconds)}`}
+                              </Text>
+                            )}
+                            style={{ alignSelf: 'stretch' }}
+                          >
+                            <Text style={styles.nextUp}>
+                              Rest uses your effort rating, or the planned effort if you leave it blank. Harder sets get longer rests; a bodyweight set gets 60 to 90 seconds. Your changes apply for this session.
+                            </Text>
+                          </CompactDescription>
+                        ) : (
+                          <Text style={styles.nextUp} testID="session-rest-between">
+                            {`Rest between sets: ${minutesSeconds(rest.seconds)}`}
+                          </Text>
+                        )}
                         {runnerResting && (
                           <>
                             <Stepper
@@ -1989,12 +2009,6 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                               repeatOnHold={true}
                               style={styles.sessionStepper}
                             />
-                            {/* The target follows the last set's effort (restSecondsFor);
-                                say so, or the number reads as a setting that changed by
-                                itself (Android walk 2026-11-03, ux-8). */}
-                            <Text style={styles.nextUp}>
-                              Rest uses your effort rating, or the planned effort if you leave it blank. Harder sets get longer rests; a bodyweight set gets 60 to 90 seconds. Your changes apply for this session.
-                            </Text>
                           </>
                         )}
                         <PrimaryButton

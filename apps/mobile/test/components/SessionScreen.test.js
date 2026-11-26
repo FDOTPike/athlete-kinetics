@@ -3367,6 +3367,36 @@ test('without an edit, coming back shows the seeded load', () => {
   expect(screen.getByTestId('session-load-input').props.value).toBe(seeded);
 });
 
+test('Compact folds the rest explanation while the rest controls stay visible', () => {
+  mockState = state({
+    runner: runner({
+      phase: 'resting',
+      setIndex: 1,
+      restSecondsTarget: 90,
+      restStartedAtMs: Date.now(),
+      restRpe: 8,
+      restSecondsOverride: 90,
+      slotSetCounts: [1, 0],
+      loggedSets: 1,
+    }),
+  });
+  mockState.uiPreferences.descriptionMode = 'compact';
+  render(<SessionScreen />);
+  const explanation = 'Rest uses your effort rating, or the planned effort if you leave it blank. Harder sets get longer rests; a bodyweight set gets 60 to 90 seconds. Your changes apply for this session.';
+  expect(screen.queryByText(explanation)).toBeNull();
+  expect(screen.getByTestId('session-rest-between')).toHaveTextContent('Rest between sets: 1:30');
+  expect(screen.getByLabelText('Change rest (min:sec) 1:30')).toBeOnTheScreen();
+  expect(screen.getByLabelText('Increase Change rest (min:sec)')).toBeOnTheScreen();
+  expect(screen.getByLabelText('Decrease Change rest (min:sec)')).toBeOnTheScreen();
+  const toggle = screen.getByLabelText('Show details for Rest between sets');
+  expect(StyleSheet.flatten(toggle.props.style)).toEqual(expect.objectContaining({
+    minWidth: theme.touch.min,
+    minHeight: theme.touch.min,
+  }));
+  fireEvent.press(toggle);
+  expect(screen.getByText(explanation)).toBeOnTheScreen();
+});
+
 test('Compact hides effort help without hiding stop guidance', () => {
   mockState = state();
   mockState.uiPreferences.descriptionMode = 'compact';

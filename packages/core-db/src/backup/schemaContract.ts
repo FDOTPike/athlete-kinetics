@@ -274,13 +274,6 @@ export const FEATURE_058_SUSPENSION_EPISODE_SQL = 'CREATE TABLE suspension_episo
   + '  frozen_macro_index INTEGER NOT NULL CHECK (frozen_macro_index BETWEEN 1 AND 8)\n'
   + ') STRICT';
 
-// The provisional Windows Metro bundle installed these exact bytes with CRLF.
-const DESCRIPTION_PREFERENCE_SQL = `CREATE TABLE profile_ui_description_preference (
-  profile_slot_id INTEGER PRIMARY KEY REFERENCES profile_slot(slot_id) ON DELETE CASCADE,
-  description_mode TEXT NOT NULL CHECK (description_mode IN ('compact', 'expanded')),
-  updated_at_ms INTEGER NOT NULL DEFAULT 0
-) STRICT`;
-
 export const KNOWN_LINEAGE_SQL_EQUIVALENTS: readonly {
   readonly type: 'table';
   readonly name: string;
@@ -294,13 +287,6 @@ export const KNOWN_LINEAGE_SQL_EQUIVALENTS: readonly {
     lineage: 'master 1da218d migration 058',
     variantSql: MASTER_058_SUSPENSION_EPISODE_SQL,
     canonicalSql: FEATURE_058_SUSPENSION_EPISODE_SQL,
-  },
-  {
-    type: 'table',
-    name: 'profile_ui_description_preference',
-    lineage: 'provisional Windows Metro migration 082',
-    variantSql: DESCRIPTION_PREFERENCE_SQL.replace(/\n/g, '\r\n'),
-    canonicalSql: DESCRIPTION_PREFERENCE_SQL,
   },
 ];
 

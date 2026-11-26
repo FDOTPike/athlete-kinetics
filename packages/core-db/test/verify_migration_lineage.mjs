@@ -407,12 +407,22 @@ console.log('[L7] backup schema contract recognises exactly the known lineage va
   check('the equivalence applies only to the suspension_episode TABLE object',
     !contract.matchesBackupSchemaContract(masterObjects.map((o) => (o[1] === 'suspension_episode'
       ? ['index', o[1], o[2], o[3], o[4]] : o)), current, cryptoProvider));
-  // The provisional Windows Metro run installed the same new 082 statement
-  // with CRLF. Build both real databases so this also catches DDL drift.
-  for (const [label, ending] of [['Git LF', '\n'], ['provisional Windows CRLF', '\r\n']]) {
+  // A Windows checkout or dev bundle can hand the runner 082 with CRLF line
+  // endings. The runner normalizes line endings before execution, so both
+  // byte forms must store the canonical LF statement: no lineage entry is
+  // registered for this, and DDL drift is still caught.
+  const lfDescriptionSql = (() => {
+    const installed = openDb();
+    runner.runMigrations(installed, UNIFIED);
+    return installed.raw.prepare("SELECT sql FROM sqlite_master WHERE name = 'profile_ui_description_preference'").get().sql;
+  })();
+  for (const [label, ending] of [['Git LF', '\n'], ['Windows CRLF', '\r\n']]) {
     const installed = openDb();
     runner.runMigrations(installed, [...UNIFIED.slice(0, -1), UNIFIED.at(-1).replace(/\r?\n/g, ending)]);
     const objects = schemaObjects(installed);
+    const storedSql = installed.raw.prepare("SELECT sql FROM sqlite_master WHERE name = 'profile_ui_description_preference'").get().sql;
+    check(`082 ${label} bytes are stored as the canonical LF statement (no carriage return)`,
+      !storedSql.includes('\r') && storedSql === lfDescriptionSql);
     check(`082 ${label} schema matches the current backup contract`,
       contract.matchesBackupSchemaContract(objects, current, cryptoProvider));
     const drifted = objects.map((object) => object[1] === 'profile_ui_description_preference'
@@ -421,9 +431,12 @@ console.log('[L7] backup schema contract recognises exactly the known lineage va
     check(`082 ${label} schema with a changed CHECK is rejected`,
       !contract.matchesBackupSchemaContract(drifted, current, cryptoProvider));
   }
-  check('equivalence registry is limited to the exact 058 and 082 table texts',
+  check('equivalence registry is limited to the one shipped two-lineage table (058 suspension_episode)',
     JSON.stringify(contract.KNOWN_LINEAGE_SQL_EQUIVALENTS.map((entry) => entry.name))
-      === JSON.stringify(['suspension_episode', 'profile_ui_description_preference']));
+      === JSON.stringify(['suspension_episode']));
+  check('a CRLF 082 table text is NOT canonicalized by the backup contract (normalization lives in the runner)',
+    !contract.matchesBackupSchemaContract(schemaObjects(masterUpgraded).map((object) => object[1] === 'profile_ui_description_preference'
+      ? [object[0], object[1], object[2], object[3].replace(/\n/g, '\r\n'), object[4]] : object), current, cryptoProvider));
 }
 
 for (const raw of openConnections) {

@@ -264,7 +264,9 @@ export default function LibraryScreenV2({ initialMovementId }: LibraryScreenProp
           <View style={styles.detailCard}>
             <View style={styles.detailTitleRow}>
               <Text style={styles.detailName}>{selectedMovement.name}</Text>
-              <Text style={styles.detailBase}>{selectedMovement.baseName}</Text>
+              {selectedMovement.baseName.trim() !== '' && selectedMovement.baseName !== selectedMovement.name && (
+                <Text style={styles.detailBase}>{selectedMovement.baseName}</Text>
+              )}
             </View>
             {availability?.state !== 'available' && (
               <View style={styles.teachingOnlyBanner}>

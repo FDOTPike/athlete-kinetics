@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
 import { EMPTY_SPORT_FIELDS, SportEditor } from '../../src/components/SportFields';
 import { theme } from '../../src/theme/theme';
@@ -18,7 +18,17 @@ const fields = {
 const editor = (onChange) => <SportEditor fields={fields} onChange={onChange} today="2026-11-23" />;
 const descriptionButton = () => screen.getByRole('button', { name: /details for research basis/i });
 
-beforeEach(() => { mockDescriptionMode = 'compact'; });
+// The chevron rotation is a 160 ms Animated.timing driven by jest's frame
+// timers. Fake timers, drained inside act() after each test, let it finish
+// within React's test boundary instead of firing later outside act.
+beforeEach(() => {
+  mockDescriptionMode = 'compact';
+  jest.useFakeTimers();
+});
+afterEach(() => {
+  act(() => { jest.runAllTimers(); });
+  jest.useRealTimers();
+});
 
 test('compact mode hides citations while the plan and evidence limits stay visible', () => {
   render(editor(jest.fn()));
