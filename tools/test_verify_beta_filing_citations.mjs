@@ -345,6 +345,59 @@ console.log('\n[2] Negative invariants & poisoning falsifiers');
       && hcDoc.includes('`apps/mobile/src/state/biometricsCopy.ts:13-15`'),
     'missing widened evidence span',
   );
+
+  // WO04-SOL-03-R4: blockquote fence, space+tab indented block, post-heading indented block,
+  // HTML attribute backticks, link-title backticks, and <pre> HTML blocks must NEVER count as live citations
+  const replaceProfileRefInDisclaimer = (fn) => verifyBetaFilingCitations({
+    repoRoot,
+    readFile: (rel) => {
+      const real = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+      return rel === 'docs/release/beta/DISCLAIMER.md'
+        ? real.replace(/(`apps\/mobile\/src\/screens\/ProfileScreen\.tsx:\d+(?:-\d+)?`)/, fn)
+        : real;
+    },
+  });
+  const blockquoteFenceRes = replaceProfileRefInDisclaimer((m) => `\n> \`\`\`\n> ${m}\n> \`\`\`\n`);
+  const spaceTabIndentRes = replaceProfileRefInDisclaimer((m) => `\n\n \t${m}\n`);
+  const postHeadingIndentRes = replaceProfileRefInDisclaimer((m) => `\n## Extra Heading\n    ${m}\n`);
+  const htmlTitleAttrRes = replaceProfileRefInDisclaimer((m) => `<span title="${m}">notice</span>`);
+  const linkTitleBacktickRes = replaceProfileRefInDisclaimer((m) => `[notice](https://example.com "${m}")`);
+  const preBlockRes = replaceProfileRefInDisclaimer((m) => `\n<pre>\n${m}\n</pre>\n`);
+  check(
+    'WO04-SOL-03-R4: blockquote fence, space+tab indent, post-heading indent, HTML title attr, link title, and <pre> block all fail closed',
+    !blockquoteFenceRes.ok
+      && !spaceTabIndentRes.ok
+      && !postHeadingIndentRes.ok
+      && !htmlTitleAttrRes.ok
+      && !linkTitleBacktickRes.ok
+      && !preBlockRes.ok,
+    [
+      blockquoteFenceRes.ok,
+      spaceTabIndentRes.ok,
+      postHeadingIndentRes.ok,
+      htmlTitleAttrRes.ok,
+      linkTitleBacktickRes.ok,
+      preBlockRes.ok,
+    ].join(','),
+  );
+
+  // WO04-SOL-02-R4: `disabled:// const saved = await pickerSave(...)` after a colon still masks the line comment and fails closed
+  const colonLineCommentRes = verifyBetaFilingCitations({
+    repoRoot,
+    readFile: (rel) => {
+      const real = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+      if (rel !== 'apps/mobile/src/state/backupStore.ts') return real;
+      return real.replace(
+        'const saved = await pickerSave(encryptedPath, fileName);',
+        'disabled:// const saved = await pickerSave(encryptedPath, fileName);',
+      );
+    },
+  });
+  check(
+    'WO04-SOL-02-R4: line comment immediately following a label/ternary colon (`disabled:// ...`) fails closed',
+    !colonLineCommentRes.ok,
+    colonLineCommentRes.errors[0] ?? 'accepted colon-prefixed // comment',
+  );
 }
 
 console.log(`\n${failed === 0 ? 'ALL BETA FILING CITATION TESTS PASSED' : `${failed} TEST(S) FAILED`}`);

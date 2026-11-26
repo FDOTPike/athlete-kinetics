@@ -434,10 +434,44 @@ function isRepoContainedRelativePath(repoRoot, relPath) {
 
 const ASCII_PUNCT_RE = /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/;
 
+function leadingIndentColumns(str) {
+  let cols = 0;
+  let idx = 0;
+  while (idx < str.length) {
+    if (str[idx] === ' ') {
+      cols += 1;
+      idx += 1;
+    } else if (str[idx] === '\t') {
+      cols += 4 - (cols % 4);
+      idx += 1;
+    } else {
+      break;
+    }
+  }
+  return { cols, indexAfterWhitespace: idx };
+}
+
+function stripBlockquoteContainers(rawLine) {
+  let rest = rawLine;
+  while (true) {
+    const { cols, indexAfterWhitespace } = leadingIndentColumns(rest);
+    if (cols <= 3 && rest[indexAfterWhitespace] === '>') {
+      let nextIdx = indexAfterWhitespace + 1;
+      if (rest[nextIdx] === ' ') nextIdx += 1;
+      else if (rest[nextIdx] === '\t') nextIdx += 1;
+      rest = rest.slice(nextIdx);
+    } else {
+      break;
+    }
+  }
+  return rest;
+}
+
 /**
- * Strip CommonMark fenced/indented code blocks, HTML comments, and backslash-escaped
- * backticks, then extract single-backtick inline code spans using CommonMark
- * backtick-run matching so hidden or escaped literals never count as live citations.
+ * Strip CommonMark block containers (blockquotes, fenced/indented code blocks,
+ * raw HTML blocks, link reference definitions), inline HTML tags/comments/autolinks,
+ * link destination/title tails, and backslash-escaped backticks, then extract
+ * single-backtick inline code spans using CommonMark backtick-run matching.
  */
 function extractLiveCitations(doc, text, errors) {
   const lines = text.split(/\r?\n/);
@@ -445,62 +479,132 @@ function extractLiveCitations(doc, text, errors) {
   let inFence = false;
   let fenceChar = '';
   let fenceLen = 0;
-  let prevBlank = true;
+  let inRawHtmlBlock = false;
+  let rawHtmlCloseRe = null;
+  let inParagraph = false;
 
   for (let i = 0; i < lines.length; i += 1) {
-    const line = lines[i];
-    if (inFence) {
-      const closeMatch = /^ {0,3}(`{3,}|~{3,})[ \t]*$/.exec(line);
-      if (closeMatch && closeMatch[1][0] === fenceChar && closeMatch[1].length >= fenceLen) {
-        inFence = false;
-        fenceChar = '';
-        fenceLen = 0;
-        prevBlank = false;
+    const stripped = stripBlockquoteContainers(lines[i]);
+    const { cols: indentCols, indexAfterWhitespace } = leadingIndentColumns(stripped);
+    const trimmedAfterIndent = stripped.slice(indexAfterWhitespace);
+    const isBlank = trimmedAfterIndent.length === 0;
+
+    if (inRawHtmlBlock) {
+      if (rawHtmlCloseRe.test(stripped)) {
+        inRawHtmlBlock = false;
+        rawHtmlCloseRe = null;
       }
+      inParagraph = false;
       continue;
     }
 
-    const openMatch = /^ {0,3}(`{3,}|~{3,})([^\r\n]*)$/.exec(line);
-    if (openMatch) {
-      const marker = openMatch[1];
-      const info = openMatch[2];
-      // CommonMark §4.5: backtick fences cannot contain backticks in their info string
-      if (marker[0] !== '`' || !info.includes('`')) {
-        inFence = true;
-        fenceChar = marker[0];
-        fenceLen = marker.length;
+    if (inFence) {
+      if (indentCols <= 3) {
+        const closeMatch = /^(`{3,}|~{3,})[ \t]*$/.exec(trimmedAfterIndent);
+        if (closeMatch && closeMatch[1][0] === fenceChar && closeMatch[1].length >= fenceLen) {
+          inFence = false;
+          fenceChar = '';
+          fenceLen = 0;
+        }
+      }
+      inParagraph = false;
+      continue;
+    }
+
+    if (isBlank) {
+      inParagraph = false;
+      unfencedLines.push('');
+      continue;
+    }
+
+    // CommonMark §4.4: 4+ virtual columns of indentation when NOT interrupting a paragraph
+    if (!inParagraph && indentCols >= 4) {
+      while (i + 1 < lines.length) {
+        const nextStripped = stripBlockquoteContainers(lines[i + 1]);
+        const nextIndent = leadingIndentColumns(nextStripped);
+        const nextBlank = nextStripped.slice(nextIndent.indexAfterWhitespace).length === 0;
+        if (nextIndent.cols >= 4 || nextBlank) {
+          i += 1;
+        } else {
+          break;
+        }
+      }
+      inParagraph = false;
+      continue;
+    }
+
+    if (indentCols <= 3) {
+      // CommonMark §4.5: fenced code block opening
+      const openMatch = /^(`{3,}|~{3,})([^\r\n]*)$/.exec(trimmedAfterIndent);
+      if (openMatch) {
+        const marker = openMatch[1];
+        const info = openMatch[2];
+        if (marker[0] !== '`' || !info.includes('`')) {
+          inFence = true;
+          fenceChar = marker[0];
+          fenceLen = marker.length;
+          inParagraph = false;
+          continue;
+        }
+      }
+
+      // CommonMark §4.6 Type 1 raw HTML blocks (<pre>, <script>, <style>, <textarea>)
+      const rawBlockOpen = /^<(pre|script|style|textarea)(?=[\s>]|$)/i.exec(trimmedAfterIndent);
+      if (rawBlockOpen) {
+        const closeRe = new RegExp(`</${rawBlockOpen[1]}\\s*>`, 'i');
+        if (!closeRe.test(stripped)) {
+          inRawHtmlBlock = true;
+          rawHtmlCloseRe = closeRe;
+        }
+        inParagraph = false;
+        continue;
+      }
+
+      // CommonMark §4.7 single-line link reference definitions `[id]: dest "title"`
+      if (!inParagraph && /^\[[^\]\r\n]+\]:[ \t]*\S+(?:[ \t]+(?:"[^"\r\n]*"|'[^'\r\n]*'|\([^)\r\n]*\)))?[ \t]*$/.test(trimmedAfterIndent)) {
+        inParagraph = false;
+        continue;
+      }
+
+      // CommonMark §4.1 & §4.2: ATX headings and thematic breaks terminate/do not start paragraphs
+      if (/^#{1,6}(?:[ \t]|$)/.test(trimmedAfterIndent) || /^(?:[-_*][ \t]*){3,}$/.test(trimmedAfterIndent)) {
+        inParagraph = false;
+        unfencedLines.push(stripped);
         continue;
       }
     }
 
-    // CommonMark §4.4: 4-space / tab indented code blocks after a blank line
-    if (prevBlank && /^(?: {4}|\t)/.test(line) && line.trim().length > 0) {
-      // Consume contiguous indented / blank lines of the indented code block
-      while (i + 1 < lines.length && (/^(?: {4}|\t)/.test(lines[i + 1]) || lines[i + 1].trim().length === 0)) {
-        i += 1;
-      }
-      prevBlank = true;
-      continue;
-    }
-
-    prevBlank = line.trim().length === 0;
-    unfencedLines.push(line);
+    inParagraph = true;
+    unfencedLines.push(stripped);
   }
 
   const unfenced = unfencedLines.join('\n');
   const citations = [];
   let i = 0;
+  const HTML_RAW_TOKEN_RE = /^(?:<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<![A-Z][\s\S]*?>|<!\[CDATA\[[\s\S]*?\]\]>|<\/[A-Za-z][A-Za-z0-9-]*\s*>|<[A-Za-z][A-Za-z0-9-]*(?:\s+[A-Za-z_:][A-Za-z0-9_.:-]*(?:\s*=\s*(?:[^\s"'=<>`]+|'[^']*'|"[^"]*"))?)*\s*\/?>|<[A-Za-z][A-Za-z0-9+.-]{1,31}:[^\s<>]*>)/;
+  const LINK_TAIL_RE = /^\]\(\s*(?:<[^<>\r\n]*>|[^\s()]+)(?:\s+(?:"(?:\\"|[^"])*"|'(?:\\'|[^'])*'|\((?:\\\)|[^)])*\)))?\s*\)/;
+
   while (i < unfenced.length) {
     // CommonMark §2.4: backslash before ASCII punctuation escapes it outside code spans
     if (unfenced[i] === '\\' && i + 1 < unfenced.length && ASCII_PUNCT_RE.test(unfenced[i + 1])) {
       i += 2;
       continue;
     }
-    // CommonMark §6.6: HTML comments outside code spans
-    if (unfenced.startsWith('<!--', i)) {
-      const endComment = unfenced.indexOf('-->', i + 4);
-      i = endComment === -1 ? unfenced.length : endComment + 3;
-      continue;
+    // CommonMark §6.5 & §6.6: raw HTML tags (with quoted attributes), HTML comments, and autolinks
+    if (unfenced[i] === '<') {
+      const htmlMatch = HTML_RAW_TOKEN_RE.exec(unfenced.slice(i));
+      if (htmlMatch) {
+        i += htmlMatch[0].length;
+        continue;
+      }
+    }
+    // CommonMark §6.3: link destination & title after `]` (`](url "title")`) are not inline-parsed for code spans
+    if (unfenced[i] === ']' && unfenced[i + 1] === '(') {
+      const linkTail = LINK_TAIL_RE.exec(unfenced.slice(i));
+      if (linkTail) {
+        i += linkTail[0].length;
+        continue;
+      }
     }
     if (unfenced[i] !== '`') {
       i += 1;
@@ -553,6 +657,163 @@ function extractLiveCitations(doc, text, errors) {
 function splitPhysicalLines(rawText) {
   const withoutTrailingEol = rawText.replace(/\r?\n$/, '');
   return withoutTrailingEol.split(/\r?\n/);
+}
+
+function findClosingSingleLineQuote(rawText, openIdx, quote) {
+  let i = openIdx + 1;
+  while (i < rawText.length) {
+    const ch = rawText[i];
+    if (ch === '\r' || ch === '\n') return -1;
+    if (ch === '\\') {
+      i += 2;
+      continue;
+    }
+    if (ch === quote) return i;
+    i += 1;
+  }
+  return -1;
+}
+
+const REGEX_PRECEDING_CHAR_RE = /[=(,[!:&|?{;~^%*+\-<>]/;
+
+function canStartRegexLiteral(rawText, slashIdx) {
+  if (slashIdx > 0 && rawText[slashIdx - 1] === '<') return false; // JSX `</Tag>`
+  let k = slashIdx - 1;
+  while (k >= 0 && (rawText[k] === ' ' || rawText[k] === '\t')) k -= 1;
+  if (k < 0 || rawText[k] === '\n' || rawText[k] === '\r') return true;
+  if (REGEX_PRECEDING_CHAR_RE.test(rawText[k])) return true;
+  const identMatch = /(?:^|[^A-Za-z0-9_$])(return|case|throw|typeof|void|delete|in|of|instanceof|new|yield|await)$/.exec(
+    rawText.slice(Math.max(0, k - 14), k + 1),
+  );
+  return Boolean(identMatch);
+}
+
+function findClosingRegexLiteral(rawText, openIdx) {
+  let i = openIdx + 1;
+  if (i >= rawText.length || rawText[i] === '/' || rawText[i] === '*' || rawText[i] === '\r' || rawText[i] === '\n') {
+    return -1;
+  }
+  let inCharClass = false;
+  while (i < rawText.length) {
+    const ch = rawText[i];
+    if (ch === '\r' || ch === '\n') return -1;
+    if (ch === '\\') {
+      i += 2;
+      continue;
+    }
+    if (ch === '[') {
+      inCharClass = true;
+      i += 1;
+      continue;
+    }
+    if (ch === ']' && inCharClass) {
+      inCharClass = false;
+      i += 1;
+      continue;
+    }
+    if (ch === '/' && !inCharClass) {
+      let end = i + 1;
+      while (end < rawText.length && /[dgimsuvy]/.test(rawText[end])) end += 1;
+      return end - 1;
+    }
+    i += 1;
+  }
+  return -1;
+}
+
+function stripJsTsCommentsPreservingLines(rawText, maskKeepNewlines) {
+  let out = '';
+  let idx = 0;
+  // Stack entries: -1 = inside template literal text; >= 0 = brace depth inside `${...}`
+  const templateStack = [];
+
+  while (idx < rawText.length) {
+    const inTemplateText = templateStack.length > 0 && templateStack[templateStack.length - 1] === -1;
+    if (inTemplateText) {
+      if (rawText[idx] === '\\' && idx + 1 < rawText.length) {
+        out += rawText[idx] + rawText[idx + 1];
+        idx += 2;
+        continue;
+      }
+      if (rawText[idx] === '`') {
+        templateStack.pop();
+        out += '`';
+        idx += 1;
+        continue;
+      }
+      if (rawText[idx] === '$' && rawText[idx + 1] === '{') {
+        templateStack[templateStack.length - 1] = 0;
+        out += '${';
+        idx += 2;
+        continue;
+      }
+      out += rawText[idx];
+      idx += 1;
+      continue;
+    }
+
+    // Outside template text (normal code or `${...}` expression)
+    if (rawText.startsWith('/*', idx)) {
+      const end = rawText.indexOf('*/', idx + 2);
+      const slice = end === -1 ? rawText.slice(idx) : rawText.slice(idx, end + 2);
+      out += maskKeepNewlines(slice);
+      idx = end === -1 ? rawText.length : end + 2;
+      continue;
+    }
+    if (rawText.startsWith('//', idx)) {
+      const nl = rawText.indexOf('\n', idx + 2);
+      const slice = nl === -1 ? rawText.slice(idx) : rawText.slice(idx, nl);
+      out += maskKeepNewlines(slice);
+      idx = nl === -1 ? rawText.length : nl;
+      continue;
+    }
+    if (rawText[idx] === '`') {
+      templateStack.push(-1);
+      out += '`';
+      idx += 1;
+      continue;
+    }
+    if (templateStack.length > 0) {
+      if (rawText[idx] === '{') {
+        templateStack[templateStack.length - 1] += 1;
+        out += '{';
+        idx += 1;
+        continue;
+      }
+      if (rawText[idx] === '}') {
+        if (templateStack[templateStack.length - 1] === 0) {
+          templateStack[templateStack.length - 1] = -1;
+        } else {
+          templateStack[templateStack.length - 1] -= 1;
+        }
+        out += '}';
+        idx += 1;
+        continue;
+      }
+    }
+    if (rawText[idx] === '/' && canStartRegexLiteral(rawText, idx)) {
+      const closeRegexIdx = findClosingRegexLiteral(rawText, idx);
+      if (closeRegexIdx !== -1) {
+        out += rawText.slice(idx, closeRegexIdx + 1);
+        idx = closeRegexIdx + 1;
+        continue;
+      }
+    }
+    if (rawText[idx] === "'" || rawText[idx] === '"') {
+      const quote = rawText[idx];
+      // Do not treat JSX prose apostrophes (`Today's`, `athlete's`) as JS string openers
+      const isJsxProseApostrophe = quote === "'" && idx > 0 && /[A-Za-z0-9]/.test(rawText[idx - 1]);
+      const closeIdx = isJsxProseApostrophe ? -1 : findClosingSingleLineQuote(rawText, idx, quote);
+      if (closeIdx !== -1) {
+        out += rawText.slice(idx, closeIdx + 1);
+        idx = closeIdx + 1;
+        continue;
+      }
+    }
+    out += rawText[idx];
+    idx += 1;
+  }
+  return out;
 }
 
 /**
@@ -609,9 +870,7 @@ function stripCommentsPreservingLines(relPath, rawText) {
     return out;
   }
   if (relPath.endsWith('.ts') || relPath.endsWith('.tsx') || relPath.endsWith('.mjs') || relPath.endsWith('.js')) {
-    return rawText
-      .replace(/\/\*[\s\S]*?(?:\*\/|$)/g, maskKeepNewlines)
-      .replace(/(?<!:)\/\/[^\r\n]*/g, maskKeepNewlines);
+    return stripJsTsCommentsPreservingLines(rawText, maskKeepNewlines);
   }
   return rawText;
 }
