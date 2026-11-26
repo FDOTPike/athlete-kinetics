@@ -1,19 +1,20 @@
 /**
- * verify_beta_filing_citations.mjs — Worktree citation & semantic-anchor verifier
- * for the six Play Store / regulatory beta filing drafts under `docs/release/beta/`.
+ * verify_beta_filing_citations.mjs — Worktree citation, path-identity, & range-anchor
+ * verifier for the six Play Store / regulatory beta filing drafts under `docs/release/beta/`.
  *
  * Unlike `docs/release/beta/plan/*.md` (which are intentionally pinned to historical
  * commits `26f6557a` and `47857623` in `tools/device-validation/verify_plan.py`),
- * the six top-level filing drafts carry unprefixed `file:line` evidence references
- * intended to point at the current release-integration checkout.
+ * the six top-level filing drafts carry unprefixed `file:line` / `file:start-end`
+ * evidence references intended to point at the current release-integration checkout.
  *
  * Enforces fail-closed invariants:
  *   1. Every required filing document exists, is non-empty, and cites >= 1 source location.
- *   2. Total citation count across the six documents equals EXPECTED_CITATION_COUNT (57).
- *   3. Every cited path resolves inside the repository and `1 <= start <= end <= lineCount`.
- *   4. Every `(doc, path, start)` coordinate matches its expected semantic anchor substring
- *      on that exact source line, so a silent line shift after a merge fails closed and
- *      reports the moved line number.
+ *   2. Fenced blocks and multi-backtick literals are never counted as live citations, and
+ *      malformed `apps/|packages/|tools/` code spans fail closed.
+ *   3. Every cited path is repository-contained (`..` / absolute paths rejected before I/O),
+ *      matches the expected source path for that citation slot, and `1 <= start <= end <= physicalLineCount`.
+ *   4. Every citation matches its expected `startAnchor`, `endAnchor`, `prevAnchor` (when
+ *      disambiguating duplicate lines), and all `rangeAnchors` inside `start..end`.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -30,74 +31,447 @@ export const REQUIRED_FILING_DOCS = Object.freeze([
 
 export const EXPECTED_CITATION_COUNT = 57;
 
-/** Keyed by `${doc}|${occurrenceIndexInDoc}` -> expected substring on cited `start` line. */
 export const EXPECTED_ANCHORS = Object.freeze({
-  'docs/release/beta/DISCLAIMER.md|0': '<Text style={styles.haltTitle}>Stop training for today.</Text>',
-  'docs/release/beta/DISCLAIMER.md|1': 'pikeMethods provides training guidance, not medical advice. It is not a medical device.',
+  'docs/release/beta/DISCLAIMER.md|0': {
+    path: 'apps/mobile/src/screens/SessionScreen.tsx',
+    isRange: false,
+    startAnchor: '<Text style={styles.haltTitle}>Stop training for today.</Text>',
+  },
+  'docs/release/beta/DISCLAIMER.md|1': {
+    path: 'apps/mobile/src/screens/ProfileScreen.tsx',
+    isRange: true,
+    prevAnchor: '<Text style={styles.safetyText}>',
+    startAnchor: 'pikeMethods provides training guidance, not medical advice. It is not a medical device.',
+    endAnchor: 'Stop if something feels unsafe and seek qualified professional advice when needed.',
+  },
 
-  'docs/release/beta/HEALTH_APPS_DECLARATION.md|0': 'CREATE TABLE IF NOT EXISTS session (',
-  'docs/release/beta/HEALTH_APPS_DECLARATION.md|1': 'Connected. Overnight HRV and sleep feed your readiness score',
-  'docs/release/beta/HEALTH_APPS_DECLARATION.md|2': 'pikeMethods provides training guidance, not medical advice. It is not a medical device.',
-  'docs/release/beta/HEALTH_APPS_DECLARATION.md|3': '<Text style={styles.haltTitle}>Stop training for today.</Text>',
-  'docs/release/beta/HEALTH_APPS_DECLARATION.md|4': "// restrictions stay enforced per slot below and inside the store's mutation",
-  'docs/release/beta/HEALTH_APPS_DECLARATION.md|5': 'Stop if something feels unsafe and seek qualified professional advice when needed.',
+  'docs/release/beta/HEALTH_APPS_DECLARATION.md|0': {
+    path: 'packages/core-db/src/schema/001_mechanical_input.sql',
+    isRange: true,
+    startAnchor: 'CREATE TABLE IF NOT EXISTS session (',
+    rangeAnchors: ['CREATE TABLE IF NOT EXISTS set_record ('],
+    endAnchor: 'rpe              REAL CHECK (rpe IS NULL OR rpe BETWEEN 0 AND 10),',
+  },
+  'docs/release/beta/HEALTH_APPS_DECLARATION.md|1': {
+    path: 'apps/mobile/src/state/biometricsCopy.ts',
+    isRange: false,
+    startAnchor: 'Connected. Overnight HRV and sleep feed your readiness score',
+  },
+  'docs/release/beta/HEALTH_APPS_DECLARATION.md|2': {
+    path: 'apps/mobile/src/screens/ProfileScreen.tsx',
+    isRange: false,
+    prevAnchor: '<Text style={styles.safetyText}>',
+    startAnchor: 'pikeMethods provides training guidance, not medical advice. It is not a medical device.',
+  },
+  'docs/release/beta/HEALTH_APPS_DECLARATION.md|3': {
+    path: 'apps/mobile/src/screens/SessionScreen.tsx',
+    isRange: true,
+    startAnchor: "const triageHalted = lastTriage?.kind === 'matched' && lastTriage.directive.halt;",
+    rangeAnchors: ["const halted = runnerPhase === 'halted' || (!runnerComplete && triageHalted);"],
+    endAnchor: '<Text style={styles.haltTitle}>Stop training for today.</Text>',
+  },
+  'docs/release/beta/HEALTH_APPS_DECLARATION.md|4': {
+    path: 'apps/mobile/src/screens/SessionScreen.tsx',
+    isRange: true,
+    startAnchor: "// restrictions stay enforced per slot below and inside the store's mutation",
+    rangeAnchors: ["if (state.getTrainingSupportDecision([currentMovement.movement_id]).status !== 'available') return;"],
+    endAnchor: 'if (!currentSlotExecutable) return;',
+  },
+  'docs/release/beta/HEALTH_APPS_DECLARATION.md|5': {
+    path: 'apps/mobile/src/screens/ProfileScreen.tsx',
+    isRange: false,
+    prevAnchor: 'pikeMethods provides training guidance, not medical advice. It is not a medical device.',
+    startAnchor: 'Stop if something feels unsafe and seek qualified professional advice when needed.',
+  },
 
-  'docs/release/beta/GOOGLE_DATA_SAFETY_ANSWERS.md|0': '<uses-permission',
-  'docs/release/beta/GOOGLE_DATA_SAFETY_ANSWERS.md|1': 'createBackup: async (password) => {',
-  'docs/release/beta/GOOGLE_DATA_SAFETY_ANSWERS.md|2': 'encryptedPath = `${exportDirectory}/${fileName}`;',
-  'docs/release/beta/GOOGLE_DATA_SAFETY_ANSWERS.md|3': '/** Coach Mode: remove a non-active, non-default athlete from the registry',
-  'docs/release/beta/GOOGLE_DATA_SAFETY_ANSWERS.md|4': 'Athlete removed from the list, but their database file could not be deleted',
-  'docs/release/beta/GOOGLE_DATA_SAFETY_ANSWERS.md|5': '* The registry is a tiny JSON file in the app document directory.',
-  'docs/release/beta/GOOGLE_DATA_SAFETY_ANSWERS.md|6': 'INSERT INTO hrv_daily (date, rmssd_ms, resting_hr, source)',
-  'docs/release/beta/GOOGLE_DATA_SAFETY_ANSWERS.md|7': 'CREATE TABLE IF NOT EXISTS subjective_report (',
-  'docs/release/beta/GOOGLE_DATA_SAFETY_ANSWERS.md|8': 'CREATE TABLE IF NOT EXISTS athlete_profile (',
-  'docs/release/beta/GOOGLE_DATA_SAFETY_ANSWERS.md|9': "set({ status: 'working', message: 'Creating an encrypted snapshot",
+  'docs/release/beta/GOOGLE_DATA_SAFETY_ANSWERS.md|0': {
+    path: 'apps/mobile/android/app/src/main/AndroidManifest.xml',
+    isRange: true,
+    startAnchor: '<uses-permission',
+    rangeAnchors: ['android:name="android.permission.INTERNET"'],
+    endAnchor: 'tools:node="remove" />',
+  },
+  'docs/release/beta/GOOGLE_DATA_SAFETY_ANSWERS.md|1': {
+    path: 'apps/mobile/src/state/backupStore.ts',
+    isRange: true,
+    startAnchor: 'async function createEncryptedBytes(',
+    rangeAnchors: ['sealBackup(archive, password, mobileBackupCrypto)', 'saveDocuments('],
+    endAnchor: '}',
+  },
+  'docs/release/beta/GOOGLE_DATA_SAFETY_ANSWERS.md|2': {
+    path: 'apps/mobile/src/state/backupStore.ts',
+    isRange: true,
+    startAnchor: 'const created = await createEncryptedBytes(password, get().lastSuccessfulBackupAt);',
+    rangeAnchors: ["await fs().writeFile(encryptedPath, created.text, 'utf8');"],
+    endAnchor: 'const saved = await pickerSave(encryptedPath, fileName);',
+  },
+  'docs/release/beta/GOOGLE_DATA_SAFETY_ANSWERS.md|3': {
+    path: 'apps/mobile/src/state/useStore.ts',
+    isRange: true,
+    startAnchor: '/** Coach Mode: remove a non-active, non-default athlete from the registry',
+    endAnchor: 'deleteAthlete: (id: string) => Promise<boolean>;',
+  },
+  'docs/release/beta/GOOGLE_DATA_SAFETY_ANSWERS.md|4': {
+    path: 'apps/mobile/src/state/useStore.ts',
+    isRange: true,
+    startAnchor: 'deleteAthlete: async (id) => {',
+    rangeAnchors: [
+      "set({ error: 'The active and default athletes cannot be deleted.' });",
+      'open({ name: removed.dbName }).delete();',
+    ],
+    endAnchor: 'Athlete removed from the list, but their database file could not be deleted',
+  },
+  'docs/release/beta/GOOGLE_DATA_SAFETY_ANSWERS.md|5': {
+    path: 'apps/mobile/src/state/athleteRegistry.ts',
+    isRange: false,
+    startAnchor: '* The registry is a tiny JSON file in the app document directory.',
+  },
+  'docs/release/beta/GOOGLE_DATA_SAFETY_ANSWERS.md|6': {
+    path: 'apps/mobile/src/state/useStore.ts',
+    isRange: false,
+    startAnchor: 'INSERT INTO hrv_daily (date, rmssd_ms, resting_hr, source)',
+  },
+  'docs/release/beta/GOOGLE_DATA_SAFETY_ANSWERS.md|7': {
+    path: 'packages/core-db/src/schema/005_subjective_report.sql',
+    isRange: false,
+    startAnchor: 'CREATE TABLE IF NOT EXISTS subjective_report (',
+  },
+  'docs/release/beta/GOOGLE_DATA_SAFETY_ANSWERS.md|8': {
+    path: 'packages/core-db/src/schema/007_program_engine.sql',
+    isRange: false,
+    startAnchor: 'CREATE TABLE IF NOT EXISTS athlete_profile (',
+  },
+  'docs/release/beta/GOOGLE_DATA_SAFETY_ANSWERS.md|9': {
+    path: 'apps/mobile/src/state/backupStore.ts',
+    isRange: true,
+    startAnchor: 'async function createEncryptedBytes(',
+    rangeAnchors: ['sealBackup(archive, password, mobileBackupCrypto)'],
+    endAnchor: '}',
+  },
 
-  'docs/release/beta/HEALTH_CONNECT_PERMISSIONS.md|0': '<uses-permission android:name="android.permission.health.READ_SLEEP" />',
-  'docs/release/beta/HEALTH_CONNECT_PERMISSIONS.md|1': "read('SleepSession'),",
-  'docs/release/beta/HEALTH_CONNECT_PERMISSIONS.md|2': '<uses-permission android:name="android.permission.health.READ_HEART_RATE_VARIABILITY" />',
-  'docs/release/beta/HEALTH_CONNECT_PERMISSIONS.md|3': "read('HeartRateVariabilityRmssd'),",
-  'docs/release/beta/HEALTH_CONNECT_PERMISSIONS.md|4': '<uses-permission android:name="android.permission.health.READ_RESTING_HEART_RATE" />',
-  'docs/release/beta/HEALTH_CONNECT_PERMISSIONS.md|5': "read('RestingHeartRate'),",
-  'docs/release/beta/HEALTH_CONNECT_PERMISSIONS.md|6': 'Connected. Overnight HRV and sleep feed your readiness score',
-  'docs/release/beta/HEALTH_CONNECT_PERMISSIONS.md|7': 'Connected. Overnight HRV and sleep feed your readiness score',
-  'docs/release/beta/HEALTH_CONNECT_PERMISSIONS.md|8': '* On both platforms HRV (where read) and sleep feed readiness; resting heart',
-  'docs/release/beta/HEALTH_CONNECT_PERMISSIONS.md|9': 'UNION SELECT date FROM hrv_daily UNION SELECT date FROM sleep_daily',
-  'docs/release/beta/HEALTH_CONNECT_PERMISSIONS.md|10': 'INSERT INTO resting_hr_daily (date, bpm, source, synced_at_ms)',
+  'docs/release/beta/HEALTH_CONNECT_PERMISSIONS.md|0': {
+    path: 'apps/mobile/android/app/src/main/AndroidManifest.xml',
+    isRange: false,
+    startAnchor: '<uses-permission android:name="android.permission.health.READ_SLEEP" />',
+  },
+  'docs/release/beta/HEALTH_CONNECT_PERMISSIONS.md|1': {
+    path: 'packages/biometrics/src/healthConnect.ts',
+    isRange: false,
+    startAnchor: "read('SleepSession'),",
+  },
+  'docs/release/beta/HEALTH_CONNECT_PERMISSIONS.md|2': {
+    path: 'apps/mobile/android/app/src/main/AndroidManifest.xml',
+    isRange: false,
+    startAnchor: '<uses-permission android:name="android.permission.health.READ_HEART_RATE_VARIABILITY" />',
+  },
+  'docs/release/beta/HEALTH_CONNECT_PERMISSIONS.md|3': {
+    path: 'packages/biometrics/src/healthConnect.ts',
+    isRange: false,
+    startAnchor: "read('HeartRateVariabilityRmssd'),",
+  },
+  'docs/release/beta/HEALTH_CONNECT_PERMISSIONS.md|4': {
+    path: 'apps/mobile/android/app/src/main/AndroidManifest.xml',
+    isRange: false,
+    startAnchor: '<uses-permission android:name="android.permission.health.READ_RESTING_HEART_RATE" />',
+  },
+  'docs/release/beta/HEALTH_CONNECT_PERMISSIONS.md|5': {
+    path: 'packages/biometrics/src/healthConnect.ts',
+    isRange: false,
+    startAnchor: "read('RestingHeartRate'),",
+  },
+  'docs/release/beta/HEALTH_CONNECT_PERMISSIONS.md|6': {
+    path: 'apps/mobile/src/state/biometricsCopy.ts',
+    isRange: false,
+    startAnchor: 'Connected. Overnight HRV and sleep feed your readiness score',
+  },
+  'docs/release/beta/HEALTH_CONNECT_PERMISSIONS.md|7': {
+    path: 'apps/mobile/src/state/biometricsCopy.ts',
+    isRange: false,
+    startAnchor: 'Connected. Overnight HRV and sleep feed your readiness score',
+  },
+  'docs/release/beta/HEALTH_CONNECT_PERMISSIONS.md|8': {
+    path: 'apps/mobile/src/state/biometricsCopy.ts',
+    isRange: false,
+    startAnchor: '* On both platforms HRV (where read) and sleep feed readiness; resting heart',
+  },
+  'docs/release/beta/HEALTH_CONNECT_PERMISSIONS.md|9': {
+    path: 'apps/mobile/src/state/useStore.ts',
+    isRange: true,
+    startAnchor: 'UNION SELECT date FROM hrv_daily UNION SELECT date FROM sleep_daily',
+    rangeAnchors: [
+      'UNION SELECT date FROM resting_hr_daily',
+      'COALESCE(rhr.bpm, h.resting_hr) AS resting_hr',
+      'LEFT JOIN resting_hr_daily rhr USING (date)',
+    ],
+    endAnchor: 'restingHr: row.resting_hr, sleepMinutes: row.asleep_min,',
+  },
+  'docs/release/beta/HEALTH_CONNECT_PERMISSIONS.md|10': {
+    path: 'apps/mobile/src/state/useStore.ts',
+    isRange: false,
+    startAnchor: 'INSERT INTO resting_hr_daily (date, bpm, source, synced_at_ms)',
+  },
 
-  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|0': 'offline posture: the production app has no in-process network',
-  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|1': '/** Coach Mode (Phase 15): registered athletes',
-  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|2': '* The registry is a tiny JSON file in the app document directory.',
-  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|3': 'CREATE TABLE IF NOT EXISTS athlete_profile (',
-  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|4': 'CREATE TABLE IF NOT EXISTS athlete_focus (',
-  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|5': 'CREATE TABLE IF NOT EXISTS session (',
-  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|6': 'CREATE TABLE IF NOT EXISTS subjective_report (',
-  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|7': 'CREATE TABLE IF NOT EXISTS health_support_profile (',
-  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|8': 'const [hrv, rhr, sleep] = await Promise.all([',
-  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|9': 'const [sleep, restingHr] = await Promise.all([',
-  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|10': 'INSERT INTO hrv_daily (date, rmssd_ms, resting_hr, source)',
-  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|11': '* On both platforms HRV (where read) and sleep feed readiness; resting heart',
-  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|12': 'Connected. Overnight HRV and sleep feed your readiness score',
-  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|13': "scope: 'all-athletes',",
-  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|14': 'createBackup: async (password) => {',
-  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|15': 'confirmRestore: async (_password) => {',
-  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|16': "set({ status: 'success', message: 'Restore complete. All athlete data was replaced from the backup.'",
-  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|17': '/** Coach Mode: remove a non-active, non-default athlete from the registry',
-  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|18': 'deleteAthlete: async (id) => {',
-  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|19': 'Athlete removed from the list, but their database file could not be deleted',
-  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|20': 'android:allowBackup="false"',
-  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|21': '* (idempotent) so a container restored by the OS is re-protected.',
+  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|0': {
+    path: 'apps/mobile/android/app/src/main/AndroidManifest.xml',
+    isRange: true,
+    startAnchor: 'offline posture: the production app has no in-process network',
+    rangeAnchors: ['android:name="android.permission.INTERNET"'],
+    endAnchor: 'tools:node="remove" />',
+  },
+  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|1': {
+    path: 'apps/mobile/src/state/useStore.ts',
+    isRange: false,
+    startAnchor: '/** Coach Mode (Phase 15): registered athletes',
+  },
+  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|2': {
+    path: 'apps/mobile/src/state/athleteRegistry.ts',
+    isRange: false,
+    startAnchor: '* The registry is a tiny JSON file in the app document directory.',
+  },
+  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|3': {
+    path: 'packages/core-db/src/schema/007_program_engine.sql',
+    isRange: false,
+    startAnchor: 'CREATE TABLE IF NOT EXISTS athlete_profile (',
+  },
+  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|4': {
+    path: 'packages/core-db/src/schema/066_focus_and_goals.sql',
+    isRange: true,
+    startAnchor: 'CREATE TABLE IF NOT EXISTS athlete_focus (',
+    rangeAnchors: ['CREATE TABLE IF NOT EXISTS athlete_goal ('],
+    endAnchor: ') STRICT;',
+  },
+  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|5': {
+    path: 'packages/core-db/src/schema/001_mechanical_input.sql',
+    isRange: true,
+    startAnchor: 'CREATE TABLE IF NOT EXISTS session (',
+    rangeAnchors: ['CREATE TABLE IF NOT EXISTS set_record ('],
+    endAnchor: 'rpe              REAL CHECK (rpe IS NULL OR rpe BETWEEN 0 AND 10),',
+  },
+  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|6': {
+    path: 'packages/core-db/src/schema/005_subjective_report.sql',
+    isRange: false,
+    startAnchor: 'CREATE TABLE IF NOT EXISTS subjective_report (',
+  },
+  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|7': {
+    path: 'packages/core-db/src/schema/064_accessible_coach_support.sql',
+    isRange: false,
+    startAnchor: 'CREATE TABLE IF NOT EXISTS health_support_profile (',
+  },
+  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|8': {
+    path: 'packages/biometrics/src/healthConnect.ts',
+    isRange: false,
+    startAnchor: 'const [hrv, rhr, sleep] = await Promise.all([',
+  },
+  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|9': {
+    path: 'packages/biometrics/src/appleHealth.ts',
+    isRange: false,
+    startAnchor: 'const [sleep, restingHr] = await Promise.all([',
+  },
+  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|10': {
+    path: 'apps/mobile/src/state/useStore.ts',
+    isRange: false,
+    startAnchor: 'INSERT INTO hrv_daily (date, rmssd_ms, resting_hr, source)',
+  },
+  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|11': {
+    path: 'apps/mobile/src/state/biometricsCopy.ts',
+    isRange: false,
+    startAnchor: '* On both platforms HRV (where read) and sleep feed readiness; resting heart',
+  },
+  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|12': {
+    path: 'apps/mobile/src/state/biometricsCopy.ts',
+    isRange: false,
+    startAnchor: 'Connected. Overnight HRV and sleep feed your readiness score',
+  },
+  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|13': {
+    path: 'apps/mobile/src/state/backupStore.ts',
+    isRange: false,
+    startAnchor: "scope: 'all-athletes',",
+  },
+  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|14': {
+    path: 'apps/mobile/src/state/backupStore.ts',
+    isRange: true,
+    startAnchor: 'async function createEncryptedBytes(',
+    rangeAnchors: [
+      'sealBackup(archive, password, mobileBackupCrypto)',
+      'createBackup: async (password) => {',
+      "await fs().writeFile(encryptedPath, created.text, 'utf8');",
+    ],
+    endAnchor: 'const saved = await pickerSave(encryptedPath, fileName);',
+  },
+  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|15': {
+    path: 'apps/mobile/src/state/backupStore.ts',
+    isRange: true,
+    startAnchor: 'confirmRestore: async (_password) => {',
+    rangeAnchors: ['const opened = await openBackup(text, restorePassword, mobileBackupCrypto);'],
+    endAnchor: 'await replaceAllData(pending.archive);',
+  },
+  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|16': {
+    path: 'apps/mobile/src/state/backupStore.ts',
+    isRange: false,
+    startAnchor: "set({ status: 'success', message: 'Restore complete. All athlete data was replaced from the backup.'",
+  },
+  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|17': {
+    path: 'apps/mobile/src/state/useStore.ts',
+    isRange: false,
+    startAnchor: '/** Coach Mode: remove a non-active, non-default athlete from the registry',
+  },
+  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|18': {
+    path: 'apps/mobile/src/state/useStore.ts',
+    isRange: false,
+    startAnchor: 'deleteAthlete: async (id) => {',
+  },
+  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|19': {
+    path: 'apps/mobile/src/state/useStore.ts',
+    isRange: false,
+    startAnchor: 'Athlete removed from the list, but their database file could not be deleted',
+  },
+  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|20': {
+    path: 'apps/mobile/android/app/src/main/AndroidManifest.xml',
+    isRange: false,
+    startAnchor: 'android:allowBackup="false"',
+  },
+  'docs/release/beta/PRIVACY_POLICY_DRAFT.md|21': {
+    path: 'apps/mobile/src/state/deviceBackupPolicy.ts',
+    isRange: false,
+    startAnchor: '* (idempotent) so a container restored by the OS is re-protected.',
+  },
 
   // Intentional `:1` file-presence anchors documented in RECORDS_2026-11-06.md:21
-  'docs/release/beta/STORE_LISTING_DRAFT.md|0': '/**',
-  'docs/release/beta/STORE_LISTING_DRAFT.md|1': '/** Phase 17 utility-first active-session surface. */',
-  'docs/release/beta/STORE_LISTING_DRAFT.md|2': '/**',
-  'docs/release/beta/STORE_LISTING_DRAFT.md|3': 'Connected. Overnight HRV and sleep feed your readiness score',
-  'docs/release/beta/STORE_LISTING_DRAFT.md|4': '/** Coach Mode (Phase 15): registered athletes',
-  'docs/release/beta/STORE_LISTING_DRAFT.md|5': 'createBackup: async (password) => {',
+  'docs/release/beta/STORE_LISTING_DRAFT.md|0': {
+    path: 'apps/mobile/src/screens/OnboardingScreen.tsx',
+    isRange: false,
+    startAnchor: '/**',
+  },
+  'docs/release/beta/STORE_LISTING_DRAFT.md|1': {
+    path: 'apps/mobile/src/screens/SessionScreen.tsx',
+    isRange: false,
+    startAnchor: '/** Phase 17 utility-first active-session surface. */',
+  },
+  'docs/release/beta/STORE_LISTING_DRAFT.md|2': {
+    path: 'apps/mobile/src/screens/ProgressScreen.tsx',
+    isRange: false,
+    startAnchor: '/**',
+  },
+  'docs/release/beta/STORE_LISTING_DRAFT.md|3': {
+    path: 'apps/mobile/src/state/biometricsCopy.ts',
+    isRange: false,
+    startAnchor: 'Connected. Overnight HRV and sleep feed your readiness score',
+  },
+  'docs/release/beta/STORE_LISTING_DRAFT.md|4': {
+    path: 'apps/mobile/src/state/useStore.ts',
+    isRange: false,
+    startAnchor: '/** Coach Mode (Phase 15): registered athletes',
+  },
+  'docs/release/beta/STORE_LISTING_DRAFT.md|5': {
+    path: 'apps/mobile/src/state/backupStore.ts',
+    isRange: true,
+    startAnchor: 'async function createEncryptedBytes(',
+    rangeAnchors: [
+      'sealBackup(archive, password, mobileBackupCrypto)',
+      'createBackup: async (password) => {',
+      "await fs().writeFile(encryptedPath, created.text, 'utf8');",
+    ],
+    endAnchor: 'const saved = await pickerSave(encryptedPath, fileName);',
+  },
 });
 
-const CITATION_RE = /`((?:apps|packages|tools)\/[\w/.-]+):(\d+)(?:-(\d+))?`/g;
+const STRICT_CITATION_TOKEN_RE = /^((?:apps|packages|tools)\/[A-Za-z0-9_./-]+):(\d+)(?:-(\d+))?$/;
+
+function isRepoContainedRelativePath(repoRoot, relPath) {
+  if (!relPath || path.isAbsolute(relPath) || relPath.includes('\\')) return false;
+  const segments = relPath.split('/');
+  if (segments.some((seg) => seg === '' || seg === '.' || seg === '..')) return false;
+  const resolvedRoot = path.resolve(repoRoot);
+  const resolvedTarget = path.resolve(resolvedRoot, relPath);
+  const rel = path.relative(resolvedRoot, resolvedTarget);
+  return Boolean(rel) && !rel.startsWith('..') && !path.isAbsolute(rel);
+}
+
+/**
+ * Strip fenced code blocks and extract single-backtick inline code spans using
+ * CommonMark backtick-run matching so multi-backtick literals (`` `...` ``) and
+ * fenced blocks are never miscounted as live citations.
+ */
+function extractLiveCitations(doc, text, errors) {
+  const lines = text.split(/\r?\n/);
+  const unfencedLines = [];
+  let inFence = false;
+  let fenceMarker = '';
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    const fenceMatch = /^(\s*)(`{3,}|~{3,})/.exec(line);
+    if (fenceMatch) {
+      const marker = fenceMatch[2];
+      if (!inFence) {
+        inFence = true;
+        fenceMarker = marker[0];
+        continue;
+      }
+      if (marker[0] === fenceMarker && marker.length >= 3) {
+        inFence = false;
+        fenceMarker = '';
+        continue;
+      }
+    }
+    if (!inFence) unfencedLines.push(line);
+  }
+
+  const unfenced = unfencedLines.join('\n');
+  const citations = [];
+  let i = 0;
+  while (i < unfenced.length) {
+    if (unfenced[i] !== '`') {
+      i += 1;
+      continue;
+    }
+    let runLen = 0;
+    while (i + runLen < unfenced.length && unfenced[i + runLen] === '`') runLen += 1;
+    let j = i + runLen;
+    let closePos = -1;
+    while (j < unfenced.length) {
+      if (unfenced[j] !== '`') {
+        j += 1;
+        continue;
+      }
+      let closeLen = 0;
+      while (j + closeLen < unfenced.length && unfenced[j + closeLen] === '`') closeLen += 1;
+      if (closeLen === runLen) {
+        closePos = j;
+        break;
+      }
+      j += closeLen;
+    }
+    if (closePos === -1) {
+      i += runLen;
+      continue;
+    }
+    const content = unfenced.slice(i + runLen, closePos);
+    if (runLen === 1) {
+      const trimmed = content.trim();
+      if (/^(?:apps|packages|tools)\//.test(trimmed)) {
+        const m = STRICT_CITATION_TOKEN_RE.exec(trimmed);
+        if (!m) {
+          errors.push(`${doc} (\`${trimmed}\`): malformed source citation token`);
+        } else {
+          citations.push({
+            raw: `\`${trimmed}\``,
+            targetPath: m[1],
+            start: Number.parseInt(m[2], 10),
+            end: m[3] === undefined ? Number.parseInt(m[2], 10) : Number.parseInt(m[3], 10),
+            hasExplicitRange: m[3] !== undefined,
+          });
+        }
+      }
+    }
+    i = closePos + runLen;
+  }
+  return citations;
+}
+
+function splitPhysicalLines(rawText) {
+  const withoutTrailingEol = rawText.replace(/\r?\n$/, '');
+  return withoutTrailingEol.split(/\r?\n/);
+}
 
 export function verifyBetaFilingCitations({
   repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'),
@@ -108,7 +482,7 @@ export function verifyBetaFilingCitations({
   const sourceCache = new Map();
   const getLines = (relPath) => {
     if (!sourceCache.has(relPath)) {
-      sourceCache.set(relPath, readFile(relPath).split(/\r?\n/));
+      sourceCache.set(relPath, splitPhysicalLines(readFile(relPath)));
     }
     return sourceCache.get(relPath);
   };
@@ -116,7 +490,7 @@ export function verifyBetaFilingCitations({
   let totalCitations = 0;
 
   for (const doc of REQUIRED_FILING_DOCS) {
-    if (!exists(doc)) {
+    if (!isRepoContainedRelativePath(repoRoot, doc) || !exists(doc)) {
       errors.push(`${doc}: required filing document is missing`);
       continue;
     }
@@ -125,48 +499,90 @@ export function verifyBetaFilingCitations({
       errors.push(`${doc}: filing document is empty`);
       continue;
     }
-    const matches = [...text.matchAll(CITATION_RE)];
-    if (matches.length === 0) {
+    const citations = extractLiveCitations(doc, text, errors);
+    if (citations.length === 0) {
       errors.push(`${doc}: filing document cites zero source locations`);
       continue;
     }
 
-    matches.forEach((m, idx) => {
+    citations.forEach((c, idx) => {
       totalCitations += 1;
-      const [, targetPath, startStr, endStr] = m;
-      const start = Number.parseInt(startStr, 10);
-      const end = endStr === undefined ? start : Number.parseInt(endStr, 10);
       const key = `${doc}|${idx}`;
-      const expectedAnchor = EXPECTED_ANCHORS[key];
+      const spec = EXPECTED_ANCHORS[key];
+      if (!spec) {
+        errors.push(`${doc} [#${idx}] (${c.raw}): unmapped citation slot ${key}`);
+        return;
+      }
+      if (!isRepoContainedRelativePath(repoRoot, c.targetPath)) {
+        errors.push(`${doc} (${c.raw}): path escapes repository containment: ${c.targetPath}`);
+        return;
+      }
+      if (c.targetPath !== spec.path) {
+        errors.push(`${doc} (${c.raw}): expected path "${spec.path}", got "${c.targetPath}"`);
+        return;
+      }
+      if (!exists(c.targetPath)) {
+        errors.push(`${doc} (${c.raw}): target file does not exist: ${c.targetPath}`);
+        return;
+      }
+      const lines = getLines(c.targetPath);
+      if (c.start < 1 || c.end < c.start || c.end > lines.length) {
+        errors.push(`${doc} (${c.raw}): line range ${c.start}-${c.end} out of bounds (1..${lines.length})`);
+        return;
+      }
+      if (Boolean(spec.isRange) !== (c.end > c.start)) {
+        errors.push(
+          `${doc} (${c.raw}): expected ${spec.isRange ? 'multi-line range' : 'single-line anchor'} for ${spec.path}`,
+        );
+        return;
+      }
 
-      if (expectedAnchor === undefined) {
-        errors.push(`${doc} [#${idx}] (${m[0]}): unmapped citation slot ${key}`);
-        return;
-      }
-      if (!exists(targetPath)) {
-        errors.push(`${doc} (${m[0]}): target file does not exist: ${targetPath}`);
-        return;
-      }
-      const lines = getLines(targetPath);
-      if (start < 1 || end < start || end > lines.length) {
-        errors.push(`${doc} (${m[0]}): line range ${start}-${end} out of bounds (1..${lines.length})`);
-        return;
-      }
-      const actualLine = lines[start - 1];
-      if (!actualLine.includes(expectedAnchor)) {
+      const startLine = lines[c.start - 1];
+      if (!startLine.includes(spec.startAnchor)) {
         const movedTo = lines
-          .map((line, i) => (line.includes(expectedAnchor) ? i + 1 : -1))
+          .map((line, i) => (line.includes(spec.startAnchor) ? i + 1 : -1))
           .filter((n) => n > 0);
         const hint = movedTo.length > 0 ? ` (anchor now at line ${movedTo.join(',')})` : ' (anchor not found in file)';
         errors.push(
-          `${doc} (${m[0]}): line ${start} does not contain expected anchor "${expectedAnchor}"${hint}; got "${actualLine.trim().slice(0, 80)}"`,
+          `${doc} (${c.raw}): line ${c.start} does not contain expected anchor "${spec.startAnchor}"${hint}; got "${startLine.trim().slice(0, 80)}"`,
         );
+        return;
+      }
+
+      if (spec.prevAnchor) {
+        const prevLine = c.start >= 2 ? lines[c.start - 2] : '';
+        if (!prevLine.includes(spec.prevAnchor)) {
+          errors.push(
+            `${doc} (${c.raw}): preceding line ${c.start - 1} does not contain disambiguating context "${spec.prevAnchor}"`,
+          );
+          return;
+        }
+      }
+
+      const expectedEndAnchor = spec.endAnchor ?? spec.startAnchor;
+      const endLine = lines[c.end - 1];
+      if (!endLine.includes(expectedEndAnchor)) {
+        errors.push(
+          `${doc} (${c.raw}): end line ${c.end} does not contain expected end anchor "${expectedEndAnchor}"; got "${endLine.trim().slice(0, 80)}"`,
+        );
+        return;
+      }
+
+      if (Array.isArray(spec.rangeAnchors) && spec.rangeAnchors.length > 0) {
+        const sliceJoined = lines.slice(c.start - 1, c.end).join('\n');
+        for (const req of spec.rangeAnchors) {
+          if (!sliceJoined.includes(req)) {
+            errors.push(`${doc} (${c.raw}): range ${c.start}-${c.end} is missing required evidence "${req}"`);
+          }
+        }
       }
     });
   }
 
-  if (errors.length === 0 && totalCitations !== EXPECTED_CITATION_COUNT) {
-    errors.push(`expected ${EXPECTED_CITATION_COUNT} total citations across ${REQUIRED_FILING_DOCS.length} docs, found ${totalCitations}`);
+  if (totalCitations !== EXPECTED_CITATION_COUNT) {
+    errors.push(
+      `expected ${EXPECTED_CITATION_COUNT} total citations across ${REQUIRED_FILING_DOCS.length} docs, found ${totalCitations}`,
+    );
   }
 
   return {

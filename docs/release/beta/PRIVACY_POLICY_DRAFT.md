@@ -25,10 +25,10 @@ In Coach Mode a coach can keep and switch between several athletes' separate fil
 | --- | --- |
 | Release network permission removed; debug differs | `apps/mobile/android/app/src/main/AndroidManifest.xml:4-14` |
 | Separate athlete files and local registry | `apps/mobile/src/state/useStore.ts:1038`; `apps/mobile/src/state/athleteRegistry.ts:4` |
-| Profile, goals, sessions and sets | `packages/core-db/src/schema/007_program_engine.sql:67`; `packages/core-db/src/schema/066_focus_and_goals.sql:162`; `packages/core-db/src/schema/001_mechanical_input.sql:61` |
+| Profile, goals, sessions and sets | `packages/core-db/src/schema/007_program_engine.sql:67`; `packages/core-db/src/schema/066_focus_and_goals.sql:162-196`; `packages/core-db/src/schema/001_mechanical_input.sql:61-80` |
 | Symptoms, activity, notes and support information | `packages/core-db/src/schema/005_subjective_report.sql:8`; `packages/core-db/src/schema/064_accessible_coach_support.sql:197` |
 | Health reads and daily storage | `packages/biometrics/src/healthConnect.ts:124`; `packages/biometrics/src/appleHealth.ts:334`; `apps/mobile/src/state/useStore.ts:7670` |
 | Readiness and resting heart rate | `apps/mobile/src/state/biometricsCopy.ts:13`; `apps/mobile/src/state/biometricsCopy.ts:63` |
-| Backup includes all athletes, encrypted export and restore | `apps/mobile/src/state/backupStore.ts:591`; `apps/mobile/src/state/backupStore.ts:1041`; `apps/mobile/src/state/backupStore.ts:1162`; `apps/mobile/src/state/backupStore.ts:1209` |
+| Backup includes all athletes, encrypted export and restore | `apps/mobile/src/state/backupStore.ts:591`; `apps/mobile/src/state/backupStore.ts:605-1066`; `apps/mobile/src/state/backupStore.ts:1162-1207`; `apps/mobile/src/state/backupStore.ts:1209` |
 | Delete limits and failure | `apps/mobile/src/state/useStore.ts:1238`; `apps/mobile/src/state/useStore.ts:5394`; `apps/mobile/src/state/useStore.ts:5421` |
 | Android automatic backup disabled; iOS exclusion can fail | `apps/mobile/android/app/src/main/AndroidManifest.xml:24`; `apps/mobile/src/state/deviceBackupPolicy.ts:16` |

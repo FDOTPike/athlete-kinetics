@@ -79,20 +79,154 @@ console.log('\n[2] Negative invariants & poisoning falsifiers');
     oobRes.errors[0] ?? '',
   );
 
-  // Off-by-one drifted anchor line fails closed and names the moved line
+  // Off-by-one drifted anchor line fails closed and names the specific mutated ProfileScreen citation
   const driftRes = verifyBetaFilingCitations({
     repoRoot,
     readFile: (rel) => {
       const real = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
       return rel === 'docs/release/beta/DISCLAIMER.md'
-        ? real.replace(/ProfileScreen\.tsx:(\d+)/, (_m, n) => `ProfileScreen.tsx:${Number(n) - 10}`)
+        ? real.replace(/ProfileScreen\.tsx:(\d+)-(\d+)/, (_m, n1, n2) => `ProfileScreen.tsx:${Number(n1) - 10}-${Number(n2) - 10}`)
         : real;
     },
   });
   check(
-    'drifted line number fails closed and names the current anchor line',
-    !driftRes.ok && driftRes.errors.some((e) => e.includes('does not contain expected anchor') && e.includes('anchor now at line')),
+    'WO04-SOL-07: drifted ProfileScreen line number fails closed and names the exact ProfileScreen citation',
+    !driftRes.ok
+      && driftRes.errors.length === 1
+      && driftRes.errors[0].includes('ProfileScreen.tsx:')
+      && driftRes.errors[0].includes('does not contain expected anchor'),
     driftRes.errors[0] ?? '',
+  );
+
+  // WO04-SOL-01a: substituting ProgressScreen.tsx:1 with a duplicate OnboardingScreen.tsx:1 fails closed
+  const wrongPathRes = verifyBetaFilingCitations({
+    repoRoot,
+    readFile: (rel) => {
+      const real = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+      return rel === 'docs/release/beta/STORE_LISTING_DRAFT.md'
+        ? real.replace('apps/mobile/src/screens/ProgressScreen.tsx:1', 'apps/mobile/src/screens/OnboardingScreen.tsx:1')
+        : real;
+    },
+  });
+  check(
+    'WO04-SOL-01a: substituting ProgressScreen.tsx:1 with OnboardingScreen.tsx:1 fails closed',
+    !wrongPathRes.ok && wrongPathRes.errors.some((e) => e.includes('expected path')),
+    wrongPathRes.errors[0] ?? 'accepted wrong path',
+  );
+
+  // WO04-SOL-01b: substituting ProfileScreen visible text (517) with accessibilityLabel line (511) fails closed via prevAnchor
+  const wrongDuplicateLineRes = verifyBetaFilingCitations({
+    repoRoot,
+    readFile: (rel) => {
+      const real = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+      return rel === 'docs/release/beta/HEALTH_APPS_DECLARATION.md'
+        ? real.replace('ProfileScreen.tsx:517', 'ProfileScreen.tsx:511')
+        : real;
+    },
+  });
+  check(
+    'WO04-SOL-01b: substituting ProfileScreen visible notice (517) with accessibilityLabel line (511) fails closed via prevAnchor',
+    !wrongDuplicateLineRes.ok && wrongDuplicateLineRes.errors.some((e) => e.includes('disambiguating context')),
+    wrongDuplicateLineRes.errors[0] ?? 'accepted duplicate substring on wrong line',
+  );
+
+  // WO04-SOL-01c: repository-escaping relative path is rejected before calling exists/readFile
+  let touchedOutsideRepo = false;
+  const escapeRes = verifyBetaFilingCitations({
+    repoRoot,
+    exists: (rel) => {
+      if (rel.includes('..')) touchedOutsideRepo = true;
+      return fs.existsSync(path.join(repoRoot, rel));
+    },
+    readFile: (rel) => {
+      if (rel.includes('..')) touchedOutsideRepo = true;
+      const real = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+      return rel === 'docs/release/beta/DISCLAIMER.md'
+        ? real.replace(/`apps\/mobile\/src\/screens\/SessionScreen\.tsx:\d+(?:-\d+)?`/, '`apps/../../../outside.ts:1`')
+        : real;
+    },
+  });
+  check(
+    'WO04-SOL-01c: repository-escaping path is rejected before touching filesystem callbacks',
+    !escapeRes.ok && !touchedOutsideRepo,
+    escapeRes.errors[0] ?? 'escaped repo containment',
+  );
+
+  // WO04-SOL-02a: truncating AndroidManifest.xml:4-14 to :4-4 or mutating tools:node="remove" at line 14 fails closed
+  const truncatedRangeRes = verifyBetaFilingCitations({
+    repoRoot,
+    readFile: (rel) => {
+      const real = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+      return rel === 'docs/release/beta/PRIVACY_POLICY_DRAFT.md'
+        ? real.replace('AndroidManifest.xml:4-14', 'AndroidManifest.xml:4-4')
+        : real;
+    },
+  });
+  const mutatedRangeBodyRes = verifyBetaFilingCitations({
+    repoRoot,
+    readFile: (rel) => {
+      const real = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+      return rel === 'apps/mobile/android/app/src/main/AndroidManifest.xml'
+        ? real.replace('tools:node="remove"', 'tools:node="merge"')
+        : real;
+    },
+  });
+  check(
+    'WO04-SOL-02: truncating range 4-14 to 4-4 or mutating tools:node="remove" inside the range fails closed',
+    !truncatedRangeRes.ok && !mutatedRangeBodyRes.ok,
+    truncatedRangeRes.errors[0] ?? mutatedRangeBodyRes.errors[0] ?? 'accepted truncated/mutated range',
+  );
+
+  // WO04-SOL-02b: trailing newline does not inflate physical line count by 1
+  const manifestRaw = fs.readFileSync(path.join(repoRoot, 'apps/mobile/android/app/src/main/AndroidManifest.xml'), 'utf8');
+  const physicalManifestLines = manifestRaw.replace(/\r?\n$/, '').split(/\r?\n/).length;
+  const trailingNewlineOobRes = verifyBetaFilingCitations({
+    repoRoot,
+    readFile: (rel) => {
+      const real = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+      return rel === 'docs/release/beta/PRIVACY_POLICY_DRAFT.md'
+        ? real.replace('AndroidManifest.xml:24', `AndroidManifest.xml:24-${physicalManifestLines + 1}`)
+        : real;
+    },
+  });
+  check(
+    'WO04-SOL-02b: range ending on trailing-newline phantom line fails closed as out of bounds',
+    !trailingNewlineOobRes.ok && trailingNewlineOobRes.errors.some((e) => e.includes('out of bounds')),
+    trailingNewlineOobRes.errors[0] ?? 'accepted phantom trailing line',
+  );
+
+  // WO04-SOL-03: fenced code blocks, double-backtick literals, and malformed `:999x` source refs fail closed
+  const fencedRes = verifyBetaFilingCitations({
+    repoRoot,
+    readFile: (rel) => {
+      const real = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+      return rel === 'docs/release/beta/DISCLAIMER.md'
+        ? real.replace(/(`apps\/mobile\/src\/screens\/SessionScreen\.tsx:\d+(?:-\d+)?`)/, '```\n$1\n```')
+        : real;
+    },
+  });
+  const doubleBacktickRes = verifyBetaFilingCitations({
+    repoRoot,
+    readFile: (rel) => {
+      const real = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+      return rel === 'docs/release/beta/DISCLAIMER.md'
+        ? real.replace(/`apps\/mobile\/src\/screens\/SessionScreen\.tsx:(\d+(?:-\d+)?)`/, '`` `apps/mobile/src/screens/SessionScreen.tsx:$1` ``')
+        : real;
+    },
+  });
+  const malformedRefRes = verifyBetaFilingCitations({
+    repoRoot,
+    readFile: (rel) => {
+      const real = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+      return rel === 'docs/release/beta/DISCLAIMER.md'
+        ? `${real}\n\`apps/mobile/src/screens/ProfileScreen.tsx:999x\`\n`
+        : real;
+    },
+  });
+  check(
+    'WO04-SOL-03: fenced citations, double-backtick literals, and malformed `:999x` references fail closed',
+    !fencedRes.ok && !doubleBacktickRes.ok && !malformedRefRes.ok,
+    [fencedRes.ok, doubleBacktickRes.ok, malformedRefRes.ok].join(','),
   );
 }
 
