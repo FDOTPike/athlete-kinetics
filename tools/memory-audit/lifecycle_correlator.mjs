@@ -315,10 +315,11 @@ export function detectSessionOverlaps(markers) {
   for (const g of groups.values()) {
     const find = (phase, stage) => g.markers.find((m) => m.phase === phase && m.stage === stage);
     const sessionStart = find('session', 'start');
-    const sessionSettled = find('session', 'settled');
-    if (!sessionStart && !sessionSettled) continue;
-    const opener = sessionStart ?? sessionSettled;
     const disposalSettled = find('disposal', 'settled');
+    // Without session:start we do not know how early the native session opened,
+    // so fail closed (-Infinity) rather than shrinking the interval to a later
+    // phase marker and masking a real overlap (WO02-SOL-01).
+    const hasOpener = sessionStart !== undefined;
     const closed = disposalSettled !== undefined && disposalSettled.ok === true;
     const interval = {
       key: g.key,
@@ -326,8 +327,8 @@ export function detectSessionOverlaps(markers) {
       pid: g.pid,
       wrapperEpoch: g.wrapperEpoch,
       requestId: g.requestId,
-      startTsMs: opener.tsMs,
-      startLineNo: opener.lineNo,
+      startTsMs: hasOpener ? sessionStart.tsMs : -Infinity,
+      startLineNo: hasOpener ? sessionStart.lineNo : -Infinity,
       endTsMs: closed ? disposalSettled.tsMs : Infinity,
       endLineNo: closed ? disposalSettled.lineNo : Infinity,
     };
@@ -338,7 +339,8 @@ export function detectSessionOverlaps(markers) {
   const overlappingKeys = new Set();
   const identity = (iv) => ({
     component: iv.component, pid: iv.pid, wrapperEpoch: iv.wrapperEpoch, requestId: iv.requestId,
-    startTsMs: iv.startTsMs, endTsMs: Number.isFinite(iv.endTsMs) ? iv.endTsMs : null,
+    startTsMs: Number.isFinite(iv.startTsMs) ? iv.startTsMs : null,
+    endTsMs: Number.isFinite(iv.endTsMs) ? iv.endTsMs : null,
   });
   for (const intervals of intervalsByPid.values()) {
     intervals.sort((a, b) => a.startTsMs - b.startTsMs || a.startLineNo - b.startLineNo);
@@ -508,11 +510,22 @@ export function bindTargetSamples({ samples, markers, segments, packageName }) {
   // A target-PID marker outside its own process window is evidence of a broken
   // timeline, so it fails closed instead of being silently filtered out.
   const targetMarkers = [];
+  const seenMarkerPids = new Set();
+  let lastMarkerPid = null;
+  let lastRunIdx = -1;
   for (const m of markers) {
     const i = runs.findIndex((run) => run.pid === m.pid);
     if (i === -1) continue;
-    if (m.tsMs < (runs[i - 1]?.starts.at(-1) ?? -Infinity) || m.tsMs > (runs[i + 1]?.starts[0] ?? Infinity)) {
+    if (m.tsMs <= (runs[i - 1]?.starts.at(-1) ?? -Infinity) || m.tsMs >= (runs[i + 1]?.starts[0] ?? Infinity)) {
       throw new Error('Cold-restart PID continuity violation: target PID lifecycle marker falls outside its process sampling window');
+    }
+    if (m.pid !== lastMarkerPid) {
+      if (seenMarkerPids.has(m.pid) || i < lastRunIdx) {
+        throw new Error('Cold-restart PID continuity violation: process ID reappeared after a PID transition');
+      }
+      seenMarkerPids.add(m.pid);
+      lastMarkerPid = m.pid;
+      lastRunIdx = i;
     }
     targetMarkers.push({ ...m });
   }
@@ -555,8 +568,12 @@ export function correlateRequests({ markers, segments }) {
   for (const m of markers) {
     if (!Number.isFinite(m.pid)) continue;
     const k = `${m.component ?? 'embedder'}|${m.pid}|${m.wrapperEpoch ?? 0}`;
-    if (!epochLedger.has(k)) epochLedger.set(k, { sessionSettled: 0, maxCreated: 0 });
+    if (!epochLedger.has(k)) epochLedger.set(k, { sessionSettled: 0, maxCreated: 0, wrapperTsMs: null, wrapperLineNo: null });
     const e = epochLedger.get(k);
+    if (m.phase === 'wrapper' && e.wrapperTsMs === null) {
+      e.wrapperTsMs = m.tsMs;
+      e.wrapperLineNo = m.lineNo;
+    }
     if (m.phase === 'session' && m.stage === 'settled') e.sessionSettled += 1;
     if (Number.isFinite(m.created)) e.maxCreated = Math.max(e.maxCreated, m.created);
   }
@@ -729,16 +746,32 @@ export function correlateRequests({ markers, segments }) {
       );
     }
 
+    if (ledger && Number.isFinite(ledger.wrapperTsMs)) {
+      const preWrapper = group.find(
+        (m) => m.tsMs < ledger.wrapperTsMs
+          || (m.tsMs === ledger.wrapperTsMs && m.lineNo < ledger.wrapperLineNo),
+      );
+      if (preWrapper) {
+        reasons.push(
+          `marker ${preWrapper.phase ?? 'request'}:${preWrapper.stage ?? 'settled'} `
+          + 'precedes its wrapper:settled anchor in time',
+        );
+      }
+    }
+
     const ordered = [
       ...REQUIRED_PHASE_MARKERS.map(([p, s]) => index.get(keyOf(p, s))),
       completion,
     ];
     if (ordered.every(Boolean)) {
       for (let i = 1; i < ordered.length; i += 1) {
-        if (ordered[i].tsMs < ordered[i - 1].tsMs) {
+        if (
+          ordered[i].tsMs < ordered[i - 1].tsMs
+          || (ordered[i].tsMs === ordered[i - 1].tsMs && ordered[i].lineNo < ordered[i - 1].lineNo)
+        ) {
           reasons.push(
-            `markers out of order: ${ordered[i - 1].phase}:${ordered[i - 1].stage} `
-            + `after ${ordered[i].phase}:${ordered[i].stage}`,
+            `markers out of order: ${ordered[i - 1].phase ?? 'request'}:${ordered[i - 1].stage ?? 'settled'} `
+            + `after ${ordered[i].phase ?? 'request'}:${ordered[i].stage ?? 'settled'}`,
           );
           break;
         }

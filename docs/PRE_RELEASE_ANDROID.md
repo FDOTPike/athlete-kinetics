@@ -105,6 +105,7 @@ npm.cmd run fetch:safety-reader
 npm.cmd run verify:ci           # MERGE gate: must exit 0
 node scripts/stage-native-embedder.mjs apps/mobile/android/app/src/main/assets/minilm.onnx --required
 node scripts/stage-native-safety-reader.mjs apps/mobile/android/app/src/main/assets/safety_reader.onnx --required
+Push-Location apps\mobile\android; .\gradlew.bat assembleQa --no-daemon; Pop-Location
 npm.cmd run verify:release      # RELEASE gate: adds [A], [D] and the real QA APK
 ```
 

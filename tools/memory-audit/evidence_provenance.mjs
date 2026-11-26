@@ -41,6 +41,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { basename, dirname, join, relative, sep } from 'node:path';
 
 import { parseMeminfoDump, privateDirtyBytes } from './meminfo_parser.mjs';
+import { checkCandidateManifestSafetyReader } from './memory_gate.mjs';
 import {
   bindTargetSamples,
   computeCadence,
@@ -55,6 +56,9 @@ export const EVIDENCE_BINDING_SCHEMA = 'ak.evidence-binding/1';
 
 /** The raw logcat capture a packet is derived from. */
 export const LOGCAT_FILENAME = 'logcat-epoch.txt';
+
+/** The candidate APK manifest bound to a sealed device-evidence packet. */
+export const CANDIDATE_MANIFEST_FILENAME = 'candidate_manifest.json';
 
 export const sha256OfFile = (p) => createHash('sha256').update(readFileSync(p)).digest('hex');
 export const sha256OfString = (s) => createHash('sha256').update(s, 'utf-8').digest('hex');
@@ -71,6 +75,14 @@ export function evidenceInputs({ evidenceDir, session }) {
   const inputs = [];
   const logcat = join(evidenceDir, LOGCAT_FILENAME);
   if (existsSync(logcat)) inputs.push({ name: LOGCAT_FILENAME, kind: 'logcat', path: logcat });
+  const candidateManifest = join(evidenceDir, CANDIDATE_MANIFEST_FILENAME);
+  const claimsCandidate = Boolean(
+    (session && Object.hasOwn(session, 'candidateManifest'))
+    || (session?.summary && Object.hasOwn(session.summary, 'candidateManifest')),
+  );
+  if (existsSync(candidateManifest) || claimsCandidate) {
+    inputs.push({ name: CANDIDATE_MANIFEST_FILENAME, kind: 'candidate-manifest', path: candidateManifest });
+  }
   for (const s of session?.samples ?? []) {
     const name = basename(String(s?.rawFile ?? ''));
     if (!name) continue;
@@ -382,11 +394,26 @@ export function verifyEvidencePacket({
     }
   }
 
-  // --- 5. MANDATORY: membership of a SEALED evidence manifest -------------
-  // Steps 1-4 prove a packet is INTERNALLY CONSISTENT. They cannot prove it was
-  // ever produced by a device, because a consistent corpus can simply be
-  // authored. Only the seal — which an auditor verifies out of band via the
-  // detached hash — distinguishes the two. This step is therefore required.
+  // --- 5. MANDATORY: candidate_manifest.json + SEALED evidence manifest ----
+  // Steps 1-4 prove a packet is INTERNALLY CONSISTENT. They cannot prove which
+  // candidate APK produced it or that it was not authored after the fact.
+  const candidateManifestPath = join(evidenceDir, CANDIDATE_MANIFEST_FILENAME);
+  if (existsSync(candidateManifestPath)) {
+    try {
+      const parsedCandidate = JSON.parse(readFileSync(candidateManifestPath, 'utf-8'));
+      problems.push(...checkCandidateManifestSafetyReader(parsedCandidate));
+      if (summary.candidateManifest !== undefined
+          && JSON.stringify(summary.candidateManifest) !== JSON.stringify(parsedCandidate)) {
+        problems.push('summary.candidateManifest does not match sealed candidate_manifest.json');
+      }
+    } catch (e) {
+      problems.push(`${CANDIDATE_MANIFEST_FILENAME} is not parseable JSON: ${e.message}`);
+    }
+  } else if (requireManifest) {
+    problems.push(`no ${CANDIDATE_MANIFEST_FILENAME} in the packet directory — sealed device evidence `
+      + 'must bind the exercised QA candidate manifest and its ratified safetyReader hash');
+  }
+
   const resolved = resolveManifestPath({ evidenceDir, explicit: manifestPath });
   let manifestChecked = false;
   if (resolved.path) {

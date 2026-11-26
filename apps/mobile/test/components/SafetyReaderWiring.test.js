@@ -119,6 +119,21 @@ jest.mock(
         unlink: async (p) => {
           mockOrtHarness.files.delete(p);
         },
+        hash: async (p, alg) => {
+          await mockDelay(2);
+          if (!mockOrtHarness.files.has(p)) throw new Error(`ENOENT ${p}`);
+          const val = mockOrtHarness.files.get(p);
+          if (alg === 'sha256') {
+            if (val === 'reader-bytes') {
+              return 'a0fa76e40e10246a9caf9d1be463b72b34f03174c68b017d6673fe9f165cb5cf';
+            }
+            if (val === 'minilm-bytes') {
+              return 'afdb6f1a0e45b715d0bb9b11772f032c399babd23bfc31fed1c170afc848bdb1';
+            }
+          }
+          const crypto = require('node:crypto');
+          return crypto.createHash(alg).update(String(val)).digest('hex');
+        },
       },
     },
   }),
@@ -635,6 +650,151 @@ describe('Stream 2 PR 3 — mobile safety reader + shared scheduler + useStore w
       expect(docsModelCopies).toEqual([]);
       expect(mockOrtHarness.files.get('/bundle/minilm.onnx')).toBe('minilm-bytes');
       expect(mockOrtHarness.files.get('/bundle/safety_reader.onnx')).toBe('reader-bytes');
+    } finally {
+      Platform.OS = origOS;
+      global.__DEV__ = origDev;
+      spyLog.mockRestore();
+    }
+  });
+
+  test('WO02-SOL-02: a hung non-halting report and hung embedder cannot block or overwrite a subsequent keyword safety halt', async () => {
+    const holdReader = deferred();
+    const neverEmbed = jest.fn(() => new Promise(() => {}));
+    let firstCall = true;
+    getStoreState().setEmbedder({
+      embed: (...args) => {
+        if (firstCall) {
+          firstCall = false;
+          return Promise.resolve(new Float32Array(384));
+        }
+        return neverEmbed(...args);
+      },
+    });
+    const classifySpy = jest.fn(() => holdReader.promise);
+    getStoreState().setSafetyReader({
+      modelId: 'm10-r15-reader-seed3',
+      policyId: 'r15/denial-floor',
+      classify: classifySpy,
+    });
+
+    const before = rows(A, 'SELECT * FROM subjective_report').length;
+    const pendingFirst = getStoreState().reportSubjective('knee is a little tender today', 4);
+    await settle();
+
+    // First report is hung inside safetyReader.classify; triaging is true and lease count is 1.
+    expect(getStoreState().triaging).toBe(true);
+    expect(activeDataMutationLeaseCount()).toBe(1);
+    expect(classifySpy).toHaveBeenCalledTimes(1);
+
+    // Athlete now reports a deterministic red-flag halt while first report + ORT queue are hung.
+    const haltOutcome = await Promise.race([
+      getStoreState().reportSubjective('feeling dizzy and faint', 7).then((saved) => ({ saved })),
+      new Promise((done) => setTimeout(() => done({ saved: 'timed-out' }), 300)),
+    ]);
+    expect(haltOutcome).toEqual({ saved: true });
+    expect(neverEmbed).not.toHaveBeenCalled();
+    expect(classifySpy).toHaveBeenCalledTimes(1);
+    expect(getStoreState().lastTriage?.directive?.halt).toBe(true);
+    expect(rows(A, 'SELECT matched_entry_id, halt FROM subjective_report').slice(before)).toEqual([
+      { matched_entry_id: 'red-flag-systemic', halt: 1 },
+    ]);
+
+    // Now let the earlier non-halting report finish: it must NOT clobber the halt directive!
+    holdReader.resolve({
+      cautionLogit: -5.0,
+      active: false,
+      standaloneRouteId: null,
+      actionableRouteId: null,
+    });
+    expect(await pendingFirst).toBe(true);
+    expect(getStoreState().lastTriage?.directive?.halt).toBe(true);
+    expect(getStoreState().triaging).toBe(false);
+    expect(activeDataMutationLeaseCount()).toBe(0);
+  });
+
+  test('WO02-SOL-06: switchProfile is refused while safetyReader.classify holds a mutation lease', async () => {
+    const rawDb = mockDrivers.get(A).raw;
+    const existingSlots = rawDb.prepare('SELECT slot_id, is_active, profile_json FROM profile_slot ORDER BY slot_id').all();
+    expect(existingSlots.length).toBeGreaterThanOrEqual(1);
+    const activeSlot = existingSlots.find((s) => s.is_active === 1) ?? existingSlots[0];
+    let secondSlotId = existingSlots.find((s) => s.slot_id !== activeSlot.slot_id)?.slot_id;
+    if (secondSlotId === undefined) {
+      secondSlotId = activeSlot.slot_id + 1;
+      rawDb
+        .prepare('INSERT INTO profile_slot (slot_id, name, is_active, profile_json, updated_at_ms) VALUES (?, ?, 0, ?, ?)')
+        .run(secondSlotId, 'Secondary Slot', activeSlot.profile_json, Date.now());
+      getStoreState().refreshProfileSlots();
+    }
+
+    const holdReader = deferred();
+    getStoreState().setEmbedder({ embed: async () => new Float32Array(384) });
+    getStoreState().setSafetyReader({
+      modelId: 'm10-r15-reader-seed3',
+      policyId: 'r15/denial-floor',
+      classify: () => holdReader.promise,
+    });
+
+    const before = rows(A, 'SELECT * FROM subjective_report').length;
+    const pending = getStoreState().reportSubjective('vision went spotty after the set', 8);
+    await settle();
+    expect(activeDataMutationLeaseCount()).toBe(1);
+
+    // Attempt profile-slot switch within the same athlete while classify is awaiting -> MUST refuse!
+    getStoreState().switchProfile(secondSlotId);
+    expect(getStoreState().error).toMatch(/still being saved/i);
+    const activeAfterAttempt = rawDb.prepare('SELECT slot_id FROM profile_slot WHERE is_active = 1').get();
+    expect(activeAfterAttempt.slot_id).toBe(activeSlot.slot_id);
+
+    holdReader.resolve({
+      cautionLogit: 6.1,
+      active: true,
+      standaloneRouteId: 'dizzy',
+      actionableRouteId: 'dizzy',
+    });
+    expect(await pending).toBe(true);
+    expect(activeDataMutationLeaseCount()).toBe(0);
+    expect(rows(A, 'SELECT matched_entry_id, halt FROM subjective_report').slice(before)).toEqual([
+      { matched_entry_id: 'dizzy', halt: 1 },
+    ]);
+  });
+
+  test('WO02-SOL-09: Android deviceSafetyReader verifies SHA-256 of pre-existing DocumentDir cache and staged copy before opening ORT', async () => {
+    const origOS = Platform.OS;
+    const origDev = global.__DEV__;
+    const spyLog = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    Platform.OS = 'android';
+    global.__DEV__ = false;
+    try {
+      // Case A: pre-existing corrupt/zero-byte file at the exact pin-named DocumentDir path is replaced from verified APK asset
+      resetOrtHarness([
+        ['asset:safety_reader.onnx', 'reader-bytes'],
+        ['asset:candidate_manifest.json', QA_MANIFEST],
+        ['/docs/safety-reader-a0fa76e40e10246a.onnx', ''],
+      ]);
+      resetQaTelemetryCacheForTests();
+      createFreshDeviceOrtSchedulerForTests();
+
+      const rdrRecovered = await tryCreateDeviceSafetyReader();
+      expect(rdrRecovered).not.toBeNull();
+      const pred = await rdrRecovered.classify('vision went spotty');
+      expect(pred.actionableRouteId).toBe('dizzy');
+      expect(mockOrtHarness.files.get('/docs/safety-reader-a0fa76e40e10246a.onnx')).toBe('reader-bytes');
+      expect(mockOrtHarness.createdModelPaths).toEqual(['/docs/safety-reader-a0fa76e40e10246a.onnx']);
+
+      // Case B: tampered asset whose SHA-256 does not match ratified pin is NEVER handed to InferenceSession.create
+      resetOrtHarness([
+        ['asset:safety_reader.onnx', 'tampered-wrong-model-bytes'],
+        ['asset:candidate_manifest.json', QA_MANIFEST],
+      ]);
+      resetQaTelemetryCacheForTests();
+      createFreshDeviceOrtSchedulerForTests();
+
+      const rdrTampered = await tryCreateDeviceSafetyReader();
+      expect(rdrTampered).not.toBeNull();
+      await expect(rdrTampered.classify('vision went spotty')).rejects.toThrow(/integrity|sha-?256|mismatch/i);
+      expect(mockOrtHarness.createdModelPaths).toEqual([]);
+      expect(mockOrtHarness.files.has('/docs/safety-reader-a0fa76e40e10246a.onnx')).toBe(false);
     } finally {
       Platform.OS = origOS;
       global.__DEV__ = origDev;

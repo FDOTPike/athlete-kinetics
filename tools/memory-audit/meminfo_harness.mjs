@@ -45,8 +45,12 @@ import {
   parseLifecycleMarkers,
   summarizeMemory,
 } from './lifecycle_correlator.mjs';
-import { computeEvidenceBinding, LOGCAT_FILENAME } from './evidence_provenance.mjs';
-import { PREFERRED_TARGET_BYTES, RATIFIED_CEILING_BYTES } from './memory_gate.mjs';
+import { CANDIDATE_MANIFEST_FILENAME, computeEvidenceBinding, LOGCAT_FILENAME } from './evidence_provenance.mjs';
+import {
+  checkCandidateManifestSafetyReader,
+  PREFERRED_TARGET_BYTES,
+  RATIFIED_CEILING_BYTES,
+} from './memory_gate.mjs';
 
 // The QA variant's real application id (android/app/build.gradle:
 // applicationId com.pikemethods.training + applicationIdSuffix ".qa").
@@ -470,6 +474,15 @@ function cmdFinish() {
   // this, a hand-written summary satisfied gate [D] — and because the ratified
   // review band makes [A] depend on [D], one fabricated file turned the whole
   // memory gate green with no device data at all.
+  const candidateManifestPath = join(evidenceRoot(), CANDIDATE_MANIFEST_FILENAME);
+  if (existsSync(candidateManifestPath)) {
+    const parsedCandidate = JSON.parse(readFileSync(candidateManifestPath, 'utf-8'));
+    const candidateProblems = checkCandidateManifestSafetyReader(parsedCandidate);
+    if (candidateProblems.length > 0) {
+      throw new Error(`Invalid ${CANDIDATE_MANIFEST_FILENAME}: ${candidateProblems.join('; ')}`);
+    }
+    summary.candidateManifest = parsedCandidate;
+  }
   summary.evidenceBinding = computeEvidenceBinding({ evidenceDir: evidenceRoot(), session });
   console.log(`[harness] evidence binding: ${summary.evidenceBinding.fileCount} raw input(s), `
     + `digest ${summary.evidenceBinding.bindingDigest}`);

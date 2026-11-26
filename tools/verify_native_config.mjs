@@ -1705,12 +1705,20 @@ console.log('[N12] Stream 2 safety reader staging, shared scheduler & native smo
   const inspectIosReaderPath = join(ROOT, 'tools/inspect_ios_safety_reader.mjs');
   const deviceReader = existsSync(deviceReaderPath) ? readFileSync(deviceReaderPath, 'utf8') : '';
   const deviceSched = existsSync(deviceSchedPath) ? readFileSync(deviceSchedPath, 'utf8') : '';
-  const readerPrefix = deviceReader.match(/READER_PIN_PREFIX = '([0-9a-f]+)'/)?.[1];
+  const extractReaderPrefix = (src) => stripJsComments(src).match(/READER_PIN_PREFIX\s*=\s*'([0-9a-f]+)'/)?.[1];
+  const readerPrefix = extractReaderPrefix(deviceReader);
+  const validReaderPrefix = (p) =>
+    p !== undefined
+    && p.length >= 16
+    && READER_KNOWN_SHA256[SAFETY_READER_ARTIFACT].startsWith(p);
   check('deviceSafetyReader pin prefix matches the ratified safety-reader SHA-256',
-    readerPrefix !== undefined
-      && readerPrefix.length >= 16
-      && READER_KNOWN_SHA256[SAFETY_READER_ARTIFACT].startsWith(readerPrefix),
+    validReaderPrefix(readerPrefix),
     readerPrefix ?? 'missing');
+  check('falsifier: a commented-out old READER_PIN_PREFIX cannot mask a wrong active pin prefix (WO02-SOL-08)',
+    !validReaderPrefix(extractReaderPrefix(
+      `// const READER_PIN_PREFIX = '${readerPrefix ?? 'a0fa76e40e10246a'}';\n`
+      + deviceReader.replace(/READER_PIN_PREFIX = '[0-9a-f]+'/, "READER_PIN_PREFIX = '0000000000000000'"),
+    )));
   check('iOS opens the bundled safety_reader.onnx in place (no Documents copy)',
     /Platform\.OS === 'ios'[\s\S]{0,220}MainBundleDir/.test(deviceReader));
   const hasSharedOrtScheduler = (embSrc, rdrSrc, schedSrc) => {

@@ -119,3 +119,29 @@ test('cold restart requires two distinct valid PIDs, in order, with no recurrenc
   assert.ok(verifyColdRestartPidContinuity({ ...ok, samples: run([900, 900]) }).length >= 1);
   assert.ok(verifyColdRestartPidContinuity({ ...ok, samples: run([901]) }).length >= 1);
 });
+
+test('harnessPacketErrors validates candidate_manifest.json safetyReader pin when supplied', () => {
+  const sound = () => ({ summary: { lifecycle: {
+    componentRequestCounts: { embedder: 1, 'safety-reader': 1 },
+    sessionOverlapCount: 0,
+    disposalIntegrity: { clean: true, countersBalanced: true, sessionOverlapCount: 0 },
+  } } });
+  const validCandidate = {
+    safetyReader: {
+      id: 'm10-r15-reader-seed3',
+      policyId: 'r15/denial-floor',
+      releaseTag: 'ml-reader-m10-r15-s3',
+      releaseCommit: 'b6ceee70c7b7a9afd793968e8ca15ba17704b572',
+      assetId: 775095775,
+      assetPath: 'assets/safety_reader.onnx',
+      sha256: 'a0fa76e40e10246a9caf9d1be463b72b34f03174c68b017d6673fe9f165cb5cf',
+      sizeBytes: 22881187,
+    },
+  };
+  assert.deepEqual(harnessPacketErrors(sound(), validCandidate), []);
+  assert.ok(harnessPacketErrors(sound(), null).some((e) => /candidate_manifest/i.test(e)));
+  assert.ok(harnessPacketErrors(sound(), { safetyReaderPresent: true }).some((e) => /safetyReader|safety-reader/i.test(e)));
+  assert.ok(harnessPacketErrors(sound(), {
+    safetyReader: { ...validCandidate.safetyReader, sha256: '0'.repeat(64) },
+  }).some((e) => /safetyReader|safety-reader/i.test(e)));
+});

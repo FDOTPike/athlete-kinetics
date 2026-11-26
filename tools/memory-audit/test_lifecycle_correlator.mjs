@@ -1268,6 +1268,71 @@ console.log('\n[16] WO-02 Item 3 — serial non-overlap, cold-restart PID contin
         && sum.peakClaimBlockers.some((b) => b.startsWith('embedder request 1 (pid 777)')),
       sum.peakClaimBlockers.join('; ').slice(0, 160));
   }
+
+  console.log('\n[17] GPT 6.2 Sol adversarial provenance falsifiers (WO02-SOL-01, 05, 07)');
+  {
+    // WO02-SOL-01: reader disposes at +160 ms; embedder req 1 started at +140 ms
+    // and settled at +170 ms, but its session:start line was lost from logcat,
+    // followed by a clean embedder req 2. Dropping session:start must NOT shrink
+    // req 1's interval to +170 ms and hide the cross-model overlap.
+    const emb1WithoutStart = life('embedder', 900, 1, 0, [t + 140, t + 170, t + 170, t + 190, t + 190, t + 210]).slice(1);
+    const lostStart = correlate([
+      ...wrappers(900, t + 50),
+      ...life('safety-reader', 900, 1, 0, [t + 100, t + 120, t + 120, t + 145, t + 145, t + 160]),
+      ...emb1WithoutStart,
+      ...life('embedder', 900, 2, 1, [t + 500, t + 530, t + 530, t + 560, t + 560, t + 590]),
+    ], DENSE, { anchor: false });
+    check('SOL-R3-1 (WO02-SOL-01): missing session:start fails closed on overlap and cannot pass clean with a later request',
+      lostStart.disposalIntegrity.sessionOverlapCount >= 1
+        && lostStart.disposalIntegrity.clean === false
+        && !lostStart.qualified.some((q) => q.component === 'safety-reader' && q.requestId === 1),
+      `overlaps=${lostStart.disposalIntegrity.sessionOverlapCount} clean=${lostStart.disposalIntegrity.clean} qualified=${lostStart.qualified.length}`);
+
+    // WO02-SOL-05a: interleaved PID recurrence (900 -> 901 -> 900) inside the inter-sample gap.
+    let gapRecurErr = null;
+    try {
+      bind(coldRestart, [
+        pidLine(BASE + 880, 900, phaseMsg('wrapper', 'settled', 0, 1, 0, 0)),
+        pidLine(BASE + 920, 901, phaseMsg('wrapper', 'settled', 0, 1, 0, 0)),
+        pidLine(BASE + 950, 900, phaseMsg('session', 'start', 1, 1, 0, 0)),
+      ]);
+    } catch (e) { gapRecurErr = e; }
+    check('SOL-R3-2a (WO02-SOL-05): marker PID recurrence 900 -> 901 -> 900 inside inter-sample gap is rejected',
+      gapRecurErr !== null && gapRecurErr.message.includes('Cold-restart PID continuity violation'),
+      gapRecurErr?.message ?? 'no error');
+
+    // WO02-SOL-05b: old-PID marker at exact first sample timestamp of the new PID (BASE + 1000).
+    let boundaryErr = null;
+    try {
+      bind(coldRestart, [
+        pidLine(BASE + 50, 900, phaseMsg('wrapper', 'settled', 0, 1, 0, 0)),
+        pidLine(BASE + 1000, 900, phaseMsg('session', 'start', 1, 1, 0, 0)),
+      ]);
+    } catch (e) { boundaryErr = e; }
+    check('SOL-R3-2b (WO02-SOL-05): old-PID marker at exact start timestamp of next PID sampling window is rejected',
+      boundaryErr !== null && boundaryErr.message.includes('Cold-restart PID continuity violation'),
+      boundaryErr?.message ?? 'no error');
+
+    // WO02-SOL-07a: all 7 lines of a request at the same millisecond in REVERSED log order.
+    const sameMsReversed = [
+      pidLine(t + 100, 777, phaseMsg('wrapper', 'settled', 0, 1, 0, 0)),
+      ...life('embedder', 777, 1, 0, [t + 1000, t + 1000, t + 1000, t + 1000, t + 1000, t + 1000]).reverse(),
+    ];
+    const revRes = correlate(sameMsReversed, DENSE, { anchor: false });
+    check('SOL-R3-3 (WO02-SOL-07): same-millisecond markers in reversed log line order are rejected',
+      revRes.qualified.length === 0
+        && revRes.lifecycleRejected.some((r) => r.reasons.some((x) => x.includes('out of order'))),
+      `qualified=${revRes.qualified.length}`);
+
+    // WO02-SOL-07b: wrapper:settled logged earlier in file with a LATER timestamp (+400 ms) than request (+100 ms).
+    const invertedAnchor = correlate([
+      pidLine(t + 400, 777, phaseMsg('wrapper', 'settled', 0, 1, 0, 0)),
+      ...life('embedder', 777, 1, 0, [t + 100, t + 120, t + 120, t + 140, t + 140, t + 160]),
+    ], DENSE, { anchor: false });
+    check('SOL-R3-4 (WO02-SOL-07): request markers with timestamps earlier than their wrapper:settled anchor are rejected',
+      invertedAnchor.qualified.length === 0,
+      `qualified=${invertedAnchor.qualified.length}`);
+  }
 }
 
 console.log(`\n${fail === 0 ? 'ALL LIFECYCLE CORRELATOR FIXTURES PASSED' : `${fail} LIFECYCLE CORRELATOR FIXTURE(S) FAILED`}`);

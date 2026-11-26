@@ -6,7 +6,12 @@ import { tmpdir } from 'node:os';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createInterface } from 'node:readline/promises';
-import { RATIFIED_CEILING_BYTES, PREFERRED_TARGET_BYTES } from '../memory-audit/memory_gate.mjs';
+import {
+  RATIFIED_CEILING_BYTES,
+  PREFERRED_TARGET_BYTES,
+  checkCandidateManifestSafetyReader,
+} from '../memory-audit/memory_gate.mjs';
+import { extractEntryToBuffer, readZipEntries } from '../verify_qa_artifact.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const harness = join(root, 'tools/memory-audit/meminfo_harness.mjs');
@@ -81,11 +86,21 @@ Dry run supplies no physical-device or release-gate evidence.`);
   if (adb(['shell', 'getprop', 'ro.kernel.qemu']).trim() === '1') throw new Error('Use a physical phone, not an emulator.');
   const badging = run(options.aapt, ['dump', 'badging', apk]);
   if (badging.match(/^package: name='([^']+)'/m)?.[1] !== pkg) throw new Error(`Refusing APK: expected ${pkg}.`);
+  const { entries: apkEntries } = readZipEntries(apk);
+  const manifestEntry = apkEntries.get('assets/candidate_manifest.json');
+  if (!manifestEntry) throw new Error('Refusing APK: missing assets/candidate_manifest.json.');
+  const candidateManifestRaw = extractEntryToBuffer(apk, manifestEntry);
+  const candidateManifest = JSON.parse(candidateManifestRaw.toString('utf8'));
+  const candidateManifestProblems = checkCandidateManifestSafetyReader(candidateManifest);
+  if (candidateManifestProblems.length > 0) {
+    throw new Error(`Refusing APK: ${candidateManifestProblems.join('; ')}`);
+  }
   const out = join(outRoot, `device-validation-${new Date().toISOString().replace(/[:.]/g, '-')}`);
   mkdirSync(out, { recursive: true });
   console.log(`Results: ${out}`);
   const save = (name, data) => writeFileSync(join(out, name), typeof data === 'string' || Buffer.isBuffer(data) ? data : JSON.stringify(data, null, 2));
   const report = { startedAt: new Date().toISOString(), serial, apkSha256: createHash('sha256').update(readFileSync(apk)).digest('hex'), observations: [], errors: [] };
+  save('candidate_manifest.json', candidateManifestRaw);
   save('apk-badging.txt', badging);
   save('device.txt', adb(['shell', 'getprop']));
   env.AK_MEM_EVIDENCE_DIR = out;
@@ -191,7 +206,7 @@ Dry run supplies no physical-device or release-gate evidence.`);
     report.memoryBand = memoryBand(maximum);
     report.harnessSummaryAvailable = Boolean(packet.summary);
     // A missing summary, or disposal integrity that is not confirmed clean, fails closed.
-    report.errors.push(...harnessPacketErrors(packet));
+    report.errors.push(...harnessPacketErrors(packet, candidateManifest));
     report.status = report.errors.length || maximum === null ? 'NOT VERIFIED' : 'EVIDENCE CAPTURED - OWNER REVIEW REQUIRED';
     save('results.json', report);
     const summary = `${report.status}\nMaximum sampled Private Dirty: ${maximum ?? 'NOT MEASURED'} B\n${report.memoryBand}; ceiling ${RATIFIED_CEILING_BYTES} B (512 MiB), preferred ${PREFERRED_TARGET_BYTES} B.\nSampling is not proof of the transient peak. This packet is not a sealed release-gate packet.\n${report.errors.join('\n')}\n`;
@@ -201,7 +216,7 @@ Dry run supplies no physical-device or release-gate evidence.`);
 }
 // Fail closed: a summary counts only when the harness confirms clean disposal
 // (tools/memory-audit/lifecycle_correlator.mjs:248). Missing or non-boolean is not clean.
-export function harnessPacketErrors(packet) {
+export function harnessPacketErrors(packet, candidateManifest = undefined) {
   if (!packet?.summary) return ['No correlated harness summary; evidence incomplete.'];
   const clean = packet.summary.lifecycle?.disposalIntegrity?.clean;
   if (clean === false) return ['Disposal failure observed.'];
@@ -217,6 +232,10 @@ export function harnessPacketErrors(packet) {
   if (lifecycle.sessionOverlapCount !== 0) errors.push('Lifecycle summary does not confirm zero session overlap; evidence incomplete.');
   if (!(counts?.embedder >= 1)) errors.push('No correlated embedder request in the harness summary; evidence incomplete.');
   if (!(counts?.['safety-reader'] >= 1)) errors.push('No correlated safety-reader request in the harness summary; evidence incomplete.');
+  if (arguments.length >= 2 || Object.hasOwn(packet.summary, 'candidateManifest')) {
+    const manifestToCheck = arguments.length >= 2 ? candidateManifest : packet.summary.candidateManifest;
+    errors.push(...checkCandidateManifestSafetyReader(manifestToCheck));
+  }
   return errors;
 }
 // Cold restart (force-stop + relaunch) must produce a NEW process: two valid,

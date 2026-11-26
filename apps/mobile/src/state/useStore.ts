@@ -1477,6 +1477,8 @@ let bootInFlight = false;
  * of, an athlete context it did not start in.
  */
 let athleteContextRevision = 0;
+let activeTriagingCount = 0;
+let subjectiveReportEpoch = 0;
 /** Shown when a normal athlete-data action cannot take its mutation lease. */
 const DATA_LOCKED_MESSAGE = 'Athlete data is temporarily locked for backup or restore.';
 /** Exclusive (registry-changing) actions are also refused while ordinary
@@ -4976,43 +4978,53 @@ export const useStore = create<KineticsStore>()((set, get) => {
       d.executeSync('SELECT profile_json FROM profile_slot WHERE slot_id = ?', [slotId]),
     )[0];
     if (target === undefined) return;
-    // Validated + clamped here, so the athlete_profile UPDATE below can never
-    // throw on a malformed slot (the whole switch stays atomic).
-    const loaded = profileFromJsonString(target.profile_json);
-    // ONE transaction: snapshot the live profile back into the active slot, move
-    // the active flag to the target, LOAD the target into athlete_profile, and
-    // wipe block state. Either all of it commits or none does — is_active and
-    // athlete_profile can never disagree.
-    d.executeSync('BEGIN');
-    try {
-      d.executeSync(
-        'UPDATE profile_slot SET profile_json = ?, updated_at_ms = ? WHERE is_active = 1',
-        [profileToJsonString(get().profile), Date.now()],
-      );
-      d.executeSync('UPDATE profile_slot SET is_active = CASE WHEN slot_id = ? THEN 1 ELSE 0 END', [slotId]);
-      persistProfileFields(d, loaded);
-      runBlockWipe(d, localToday());
-      d.executeSync("UPDATE training_program SET status = 'archived', updated_at_ms = ? WHERE status IN ('active','review_due')", [Date.now()]);
-      d.executeSync('COMMIT');
-    } catch (e) {
-      d.executeSync('ROLLBACK');
-      set({ error: e instanceof Error ? e.message : String(e) });
+    const releaseLease = tryAcquireDataMutationLease(true);
+    if (releaseLease === null) {
+      set({ error: mutationRefusalMessage() });
       return;
     }
-    set({
-      profile: loaded,
-      block: null, blockMeta: null, blockMeetMeta: null, blockSessions: [], todayPlan: null, program: null,
-      niggles: [], lastTriage: null,
-    });
-    get().refreshProfileSlots();
-    get().refreshUiPreferences();
-    get().refreshLoadPreference();
-    get().refreshBandLadder();
-    get().refreshNiggles();
-    get().refreshBlock();
-    get().refreshProgram();
-    get().refreshVector();
-    get().computePrescription([]);
+    athleteContextRevision += 1;
+    try {
+      // Validated + clamped here, so the athlete_profile UPDATE below can never
+      // throw on a malformed slot (the whole switch stays atomic).
+      const loaded = profileFromJsonString(target.profile_json);
+      // ONE transaction: snapshot the live profile back into the active slot, move
+      // the active flag to the target, LOAD the target into athlete_profile, and
+      // wipe block state. Either all of it commits or none does — is_active and
+      // athlete_profile can never disagree.
+      d.executeSync('BEGIN');
+      try {
+        d.executeSync(
+          'UPDATE profile_slot SET profile_json = ?, updated_at_ms = ? WHERE is_active = 1',
+          [profileToJsonString(get().profile), Date.now()],
+        );
+        d.executeSync('UPDATE profile_slot SET is_active = CASE WHEN slot_id = ? THEN 1 ELSE 0 END', [slotId]);
+        persistProfileFields(d, loaded);
+        runBlockWipe(d, localToday());
+        d.executeSync("UPDATE training_program SET status = 'archived', updated_at_ms = ? WHERE status IN ('active','review_due')", [Date.now()]);
+        d.executeSync('COMMIT');
+      } catch (e) {
+        d.executeSync('ROLLBACK');
+        set({ error: e instanceof Error ? e.message : String(e) });
+        return;
+      }
+      set({
+        profile: loaded,
+        block: null, blockMeta: null, blockMeetMeta: null, blockSessions: [], todayPlan: null, program: null,
+        niggles: [], lastTriage: null,
+      });
+      get().refreshProfileSlots();
+      get().refreshUiPreferences();
+      get().refreshLoadPreference();
+      get().refreshBandLadder();
+      get().refreshNiggles();
+      get().refreshBlock();
+      get().refreshProgram();
+      get().refreshVector();
+      get().computePrescription([]);
+    } finally {
+      releaseLease();
+    }
   },
 
   wipeActiveBlockState: () => {
@@ -10376,11 +10388,19 @@ export const useStore = create<KineticsStore>()((set, get) => {
     // A report typed after midnight must land on the NEW day — persisting it
     // under a stale date would make the resulting halt vanish on restart.
     get().rolloverDay();
-    const { vector, triaging } = get();
+    const { vector, triaging: wasTriaging } = get();
     const today = localToday();
     const raw = text.trim();
-    if (get().status !== 'ready' || vector === null || triaging) return false;
     if (raw.length === 0 || raw.length > 500) return false;
+    // Evaluate deterministic keyword red flags BEFORE consulting `triaging`: a
+    // hung non-halting report already in flight (`wasTriaging`) must never
+    // block or delay a subsequent keyword safety halt on the shared ORT queue.
+    const keywordBaseline = resolveReport(raw, null);
+    const keywordHalts =
+      keywordBaseline.confident
+      && keywordBaseline.entry !== null
+      && keywordBaseline.entry.guardrail.halt;
+    if (get().status !== 'ready' || vector === null || (wasTriaging && !keywordHalts)) return false;
     // The report belongs to the athlete whose database is open NOW. The lease
     // keeps that database bound through the inference await (switch, create
     // and restore are refused until it settles), so a delayed safety report
@@ -10392,6 +10412,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
     }
     const athleteId = get().activeAthleteId;
     const contextRevision = athleteContextRevision;
+    const myReportEpoch = ++subjectiveReportEpoch;
     // The UI forces a 1-10 severity before processing; clamp at the boundary.
     const safeSeverity = Math.round(clamp(severity, 1, 10));
     // Once the report is written it is stored. A refresh that fails after that
@@ -10406,12 +10427,15 @@ export const useStore = create<KineticsStore>()((set, get) => {
         lastTriage: ownHalt !== null ? { kind: 'matched', directive: ownHalt } : earlierHalt,
       });
     };
+    activeTriagingCount += 1;
     set({ triaging: true });
     try {
       // Semantic routing is OPTIONAL; the keyword safety layer inside
-      // resolveReport works with `null` (embedder absent or failed).
+      // resolveReport works with `null` (embedder absent or failed). When an
+      // earlier report is already in flight (`wasTriaging`) and this report is
+      // a deterministic keyword halt, bypass the shared ORT queue entirely.
       let semantic: TriageResult | null = null;
-      if (embedder !== null) {
+      if (!(wasTriaging && keywordHalts) && embedder !== null) {
         try {
           semantic = triage(await embedder.embed(raw), getCodebase());
           set({ triageReady: true });
@@ -10425,7 +10449,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       // A keyword or semantic halt is already final: the safety reader can only
       // add caution, so it is never consulted (and can never delay the halt or
       // hold the lease) when the shipped resolution halts.
-      const baseline = resolveReport(raw, semantic);
+      const baseline = wasTriaging && keywordHalts ? keywordBaseline : resolveReport(raw, semantic);
       const baselineHalts =
         baseline.confident && baseline.entry !== null && baseline.entry.guardrail.halt;
       let readerPrediction: SafetyReaderPrediction | null = null;
@@ -10464,7 +10488,10 @@ export const useStore = create<KineticsStore>()((set, get) => {
         try {
           get().computePrescription([]);
           const triageAfter = get().lastTriage;
-          if (triageAfter === null || triageAfter.kind !== 'matched' || !triageAfter.directive.halt) {
+          if (
+            subjectiveReportEpoch === myReportEpoch
+            && (triageAfter === null || triageAfter.kind !== 'matched' || !triageAfter.directive.halt)
+          ) {
             set({ lastTriage: { kind: 'rejected' } });
           }
         } catch (error) {
@@ -10542,7 +10569,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
         // positive sentiment OR a complaint the severity gate de-escalated to
         // benign (DOMS) — unless a restrictive report from earlier today still
         // governs, in which case computePrescription kept that honest directive.
-        if (get().lastTriage === null) {
+        if (subjectiveReportEpoch === myReportEpoch && get().lastTriage === null) {
           set({ lastTriage: { kind: 'positive', cue: resolved.entry.cue, entryId: resolved.entry.id } });
         }
       } catch (error) {
@@ -10550,7 +10577,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
       }
       return true;
     } finally {
-      set({ triaging: false });
+      activeTriagingCount = Math.max(0, activeTriagingCount - 1);
+      set({ triaging: activeTriagingCount > 0 });
       releaseLease();
     }
   },

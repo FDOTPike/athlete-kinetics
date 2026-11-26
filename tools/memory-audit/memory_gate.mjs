@@ -84,6 +84,74 @@ export const RATIFIED_FLOORS = Object.freeze({
   embedderTransientBytes: 104_857_600,
 });
 
+export const SAFETY_READER_ASSET = 'assets/safety_reader.onnx';
+export const SAFETY_READER_SIZE = 22881187;
+export const SAFETY_READER_SHA256 =
+  'a0fa76e40e10246a9caf9d1be463b72b34f03174c68b017d6673fe9f165cb5cf';
+export const SAFETY_READER_MANIFEST_PIN = Object.freeze({
+  id: 'm10-r15-reader-seed3',
+  policyId: 'r15/denial-floor',
+  releaseTag: 'ml-reader-m10-r15-s3',
+  releaseCommit: 'b6ceee70c7b7a9afd793968e8ca15ba17704b572',
+  assetId: 775095775,
+  assetPath: SAFETY_READER_ASSET,
+  sha256: SAFETY_READER_SHA256,
+  sizeBytes: SAFETY_READER_SIZE,
+});
+
+/**
+ * Validate that a candidate_manifest.json object pins the ratified safety-reader
+ * model (supporting both the 8-field APK `safetyReader` object and flattened
+ * `safetyReaderPresent` + `safetyReaderModelSha256` representations).
+ */
+export function checkCandidateManifestSafetyReader(candidateManifest) {
+  if (candidateManifest === null || typeof candidateManifest !== 'object' || Array.isArray(candidateManifest)) {
+    return ['candidate_manifest.json is missing or not an object'];
+  }
+  const problems = [];
+  if (Object.hasOwn(candidateManifest, 'safetyReader')) {
+    const sr = candidateManifest.safetyReader;
+    if (sr === null || typeof sr !== 'object' || Array.isArray(sr)) {
+      problems.push('candidate_manifest.json safetyReader is not an object');
+    } else {
+      const expectedKeys = Object.keys(SAFETY_READER_MANIFEST_PIN);
+      for (const key of Object.keys(sr)) {
+        if (!expectedKeys.includes(key)) {
+          problems.push(`candidate_manifest.json safetyReader has unexpected key ${key}`);
+        }
+      }
+      for (const key of expectedKeys) {
+        if (!Object.hasOwn(sr, key)) {
+          problems.push(`candidate_manifest.json safetyReader missing ${key}`);
+        } else if (sr[key] !== SAFETY_READER_MANIFEST_PIN[key]) {
+          problems.push(`candidate_manifest.json safetyReader.${key}=${JSON.stringify(sr[key])} `
+            + `does not match ratified ${JSON.stringify(SAFETY_READER_MANIFEST_PIN[key])}`);
+        }
+      }
+    }
+    if (Object.hasOwn(candidateManifest, 'safetyReaderPresent') && candidateManifest.safetyReaderPresent !== true) {
+      problems.push('candidate_manifest.json safetyReaderPresent must be true');
+    }
+    if (Object.hasOwn(candidateManifest, 'safetyReaderModelSha256')
+        && candidateManifest.safetyReaderModelSha256 !== SAFETY_READER_SHA256) {
+      problems.push('candidate_manifest.json safetyReaderModelSha256 does not match ratified safetyReader SHA-256');
+    }
+    return problems;
+  }
+  if (candidateManifest.safetyReaderPresent === true) {
+    if (candidateManifest.safetyReaderModelSha256 !== SAFETY_READER_SHA256) {
+      problems.push('candidate_manifest.json declares safetyReaderPresent:true without ratified safetyReaderModelSha256');
+    }
+    if (Object.hasOwn(candidateManifest, 'safetyReaderModelSizeBytes')
+        && candidateManifest.safetyReaderModelSizeBytes !== SAFETY_READER_SIZE) {
+      problems.push('candidate_manifest.json safetyReaderModelSizeBytes does not match ratified safetyReader size');
+    }
+    return problems;
+  }
+  problems.push('candidate_manifest.json omits ratified safetyReader metadata');
+  return problems;
+}
+
 /**
  * Envelope arithmetic. Pure: no filesystem, no environment.
  * @param {{runtimeDirtyBytes:{hermesAndUi:number,sqliteLayer:number}, embedderTransientBytes:number}} budget
@@ -429,6 +497,13 @@ export function checkMeasuredEvidence(session, ceiling = RATIFIED_CEILING_BYTES)
   if (!s?.evidenceBinding || s.evidenceBinding.schema !== 'ak.evidence-binding/1') {
     problems.push('packet carries no evidenceBinding: it asserts results without naming the '
       + 'raw logcat and meminfo dumps they were derived from (see [G])');
+  }
+
+  const candidateManifest = (s && Object.hasOwn(s, 'candidateManifest'))
+    ? s.candidateManifest
+    : (Object.hasOwn(session, 'candidateManifest') ? session.candidateManifest : undefined);
+  if (candidateManifest !== undefined) {
+    problems.push(...checkCandidateManifestSafetyReader(candidateManifest));
   }
 
   const peakClaimable = s?.memory?.peakClaimable === true;

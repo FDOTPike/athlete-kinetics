@@ -19,6 +19,7 @@ import { tmpdir } from 'node:os';
 import {
   computeEvidenceBinding,
   resolveManifestPath,
+  sha256OfFile,
   verifyEvidencePacket,
 } from './evidence_provenance.mjs';
 import {
@@ -1002,6 +1003,126 @@ for (const [label, tamper, needle] of [
   const v = provenanceOf(sealPacket(pkt));
   check('ITEM3 [G]: cold-restart PID recurrence 4242 -> 5555 -> 4242 is REJECTED',
     v.ok === false && v.problems.some((p) => p.includes('Cold-restart PID continuity violation')),
+    v.problems.join('; ').slice(0, 160));
+  rmSync(pkt.dir, { recursive: true, force: true });
+}
+
+// =============================================================================
+console.log('\n[15] WO02-SOL-03 — sealed packets bind candidate_manifest.json & ratified safety-reader SHA-256');
+
+const VALID_CANDIDATE_MANIFEST = Object.freeze({
+  schema: 'ak.candidate-manifest/1',
+  label: 'NON_PRODUCTION_QA_DEBUG_SIGNED',
+  safetyReader: {
+    id: 'm10-r15-reader-seed3',
+    policyId: 'r15/denial-floor',
+    releaseTag: 'ml-reader-m10-r15-s3',
+    releaseCommit: 'b6ceee70c7b7a9afd793968e8ca15ba17704b572',
+    assetId: 775095775,
+    assetPath: 'assets/safety_reader.onnx',
+    sha256: 'a0fa76e40e10246a9caf9d1be463b72b34f03174c68b017d6673fe9f165cb5cf',
+    sizeBytes: 22881187,
+  },
+});
+
+function sealFullManifestDir(pkt, candidateManifestObj = undefined) {
+  if (candidateManifestObj !== undefined) {
+    writeFileSync(join(pkt.dir, 'candidate_manifest.json'), JSON.stringify(candidateManifestObj, null, 2));
+  }
+  pkt.binding = computeEvidenceBinding({ evidenceDir: pkt.dir, session: pkt.session });
+  const sessionPath = sealPacket(pkt);
+  const manifestEntries = [
+    { path: 'session.json', sha256: sha256OfFile(sessionPath) },
+    { path: 'logcat-epoch.txt', sha256: sha256OfFile(join(pkt.dir, 'logcat-epoch.txt')) },
+    ...pkt.session.samples.map((s) => {
+      const name = s.rawFile.split(/[\\/]/).pop();
+      return { path: name, sha256: sha256OfFile(s.rawFile) };
+    }),
+  ];
+  if (candidateManifestObj !== undefined) {
+    manifestEntries.push({
+      path: 'candidate_manifest.json',
+      sha256: sha256OfFile(join(pkt.dir, 'candidate_manifest.json')),
+    });
+  }
+  const manifestPath = join(pkt.dir, 'EVIDENCE_MANIFEST.json');
+  writeFileSync(manifestPath, JSON.stringify({ files: manifestEntries }, null, 2));
+  writeFileSync(`${manifestPath}.sha256`, `${sha256OfFile(manifestPath)}  EVIDENCE_MANIFEST.json\n`);
+  return { sessionPath, manifestPath };
+}
+
+{
+  // Positive control: sealed packet with valid candidate_manifest.json passes [D] and [G].
+  const pkt = makePacket();
+  const { sessionPath } = sealFullManifestDir(pkt, VALID_CANDIDATE_MANIFEST);
+  const v = verifyEvidencePacket({ sessionPath });
+  const sessionDoc = JSON.parse(readFileSync(sessionPath, 'utf-8'));
+  sessionDoc.summary.candidateManifest = VALID_CANDIDATE_MANIFEST;
+  const g = evaluateMemoryGate({
+    budget: REVIEWED_BUDGET, vectors: VECTORS, session: sessionDoc, evidenceProvenance: v,
+  });
+  check('SOL-03: sealed packet with valid candidate_manifest.json + ratified safetyReader hash is BOUND and GREEN',
+    v.ok === true && v.manifestChecked === true && g.ok === true,
+    v.problems.join('; ').slice(0, 160));
+  rmSync(pkt.dir, { recursive: true, force: true });
+}
+
+{
+  // Counterexample 1: sealed packet omitting candidate_manifest.json altogether is REJECTED by [G].
+  const pkt = makePacket();
+  const { sessionPath } = sealFullManifestDir(pkt, undefined);
+  const v = verifyEvidencePacket({ sessionPath });
+  check('SOL-03: sealed packet without candidate_manifest.json is REJECTED by [G]',
+    v.ok === false && v.problems.some((p) => p.includes('candidate_manifest.json')),
+    v.problems.join('; ').slice(0, 160));
+  rmSync(pkt.dir, { recursive: true, force: true });
+}
+
+for (const [label, badManifest] of [
+  ['safetyReaderPresent:true with missing safetyReaderModelSha256', {
+    schema: 'ak.candidate-manifest/1',
+    safetyReaderPresent: true,
+  }],
+  ['safetyReaderPresent:true with wrong safetyReaderModelSha256', {
+    schema: 'ak.candidate-manifest/1',
+    safetyReaderPresent: true,
+    safetyReaderModelSha256: '0'.repeat(64),
+  }],
+  ['APK safetyReader object with wrong sha256', {
+    ...VALID_CANDIDATE_MANIFEST,
+    safetyReader: { ...VALID_CANDIDATE_MANIFEST.safetyReader, sha256: 'b'.repeat(64) },
+  }],
+  ['candidate_manifest.json omitting safetyReader completely', {
+    schema: 'ak.candidate-manifest/1',
+    label: 'NON_PRODUCTION_QA_DEBUG_SIGNED',
+  }],
+]) {
+  const pkt = makePacket();
+  const { sessionPath } = sealFullManifestDir(pkt, badManifest);
+  const v = verifyEvidencePacket({ sessionPath });
+  const s = soundSession({ candidateManifest: badManifest });
+  const d = checkMeasuredEvidence(s);
+  check(`SOL-03 [G]: REJECTS ${label}`,
+    v.ok === false && v.problems.some((p) => /safetyReader|safety-reader/i.test(p)),
+    v.problems.join('; ').slice(0, 160));
+  check(`SOL-03 [D]: REJECTS ${label}`,
+    d.ok === false && /safetyReader|safety-reader/i.test(String(d.reason)),
+    String(d.reason ?? '').slice(0, 160));
+  rmSync(pkt.dir, { recursive: true, force: true });
+}
+
+{
+  // Counterexample 2: post-seal tampering with candidate_manifest.json breaks [G] binding & manifest check.
+  const pkt = makePacket();
+  const { sessionPath } = sealFullManifestDir(pkt, VALID_CANDIDATE_MANIFEST);
+  writeFileSync(
+    join(pkt.dir, 'candidate_manifest.json'),
+    JSON.stringify({ ...VALID_CANDIDATE_MANIFEST, tampered: true }, null, 2),
+  );
+  const v = verifyEvidencePacket({ sessionPath });
+  check('SOL-03: mutating candidate_manifest.json after sealing breaks [G] binding and manifest membership',
+    v.ok === false
+      && v.problems.some((p) => p.includes('bindingDigest') || p.includes('candidate_manifest.json')),
     v.problems.join('; ').slice(0, 160));
   rmSync(pkt.dir, { recursive: true, force: true });
 }

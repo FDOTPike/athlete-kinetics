@@ -33,6 +33,8 @@ import {
 } from './deviceOrtScheduler';
 
 const READER_MODEL_ASSET = 'safety_reader.onnx';
+const READER_SHA256 =
+  'a0fa76e40e10246a9caf9d1be463b72b34f03174c68b017d6673fe9f165cb5cf';
 /** First 16 hex of the ratified safety-reader SHA-256
  *  (scripts/safety-reader-integrity.mjs, KNOWN_SHA256['reader_quantized.onnx']);
  *  verify:native-config pins the two together. */
@@ -48,6 +50,16 @@ export async function tryCreateDeviceSafetyReader(): Promise<SafetyReader | null
 
     const dest = `${ReactNativeBlobUtil.fs.dirs.DocumentDir}/safety-reader-${READER_PIN_PREFIX}.onnx`;
 
+    const hasVerifiedWorkingCopy = async (path: string): Promise<boolean> => {
+      try {
+        if (!(await ReactNativeBlobUtil.fs.exists(path))) return false;
+        const digest = await ReactNativeBlobUtil.fs.hash(path, 'sha256');
+        return typeof digest === 'string' && digest.toLowerCase() === READER_SHA256;
+      } catch {
+        return false;
+      }
+    };
+
     const ensureModelCopied = async (): Promise<string> => {
       if (Platform.OS === 'ios') {
         const bundled = `${ReactNativeBlobUtil.fs.dirs.MainBundleDir}/${READER_MODEL_ASSET}`;
@@ -56,7 +68,7 @@ export async function tryCreateDeviceSafetyReader(): Promise<SafetyReader | null
         }
         return bundled;
       }
-      if (!(await ReactNativeBlobUtil.fs.exists(dest))) {
+      if (!(await hasVerifiedWorkingCopy(dest))) {
         const dir = ReactNativeBlobUtil.fs.dirs.DocumentDir;
         for (const name of await ReactNativeBlobUtil.fs.ls(dir)) {
           if (
@@ -71,6 +83,11 @@ export async function tryCreateDeviceSafetyReader(): Promise<SafetyReader | null
           ReactNativeBlobUtil.fs.asset(READER_MODEL_ASSET),
           partial,
         );
+        const partialDigest = (await ReactNativeBlobUtil.fs.hash(partial, 'sha256')).toLowerCase();
+        if (partialDigest !== READER_SHA256) {
+          await ReactNativeBlobUtil.fs.unlink(partial);
+          throw new Error('safety reader model SHA-256 integrity mismatch');
+        }
         if ((await ReactNativeBlobUtil.fs.mv(partial, dest)) === false) {
           throw new Error('safety reader model copy could not be finalized');
         }
