@@ -477,3 +477,60 @@ test('WO03-SOL-R2b: twenty-five newer extra sessions do not hide a finalized pla
   // Recent sessions display remains bounded to the 20 most recent rows
   expect(screen.queryByTestId('progress-session-50')).toBeNull();
 });
+
+test('WO03-SOL-R3: catching up on a missed Week 1 workout during Week 2 does not credit Week 2 counter or read Week 1 summary facts', () => {
+  const weekTwoMs = new SpyDate('2026-11-09T09:00:00').getTime();
+  const catchUpMs = new SpyDate('2026-11-10T09:00:00').getTime();
+  const factsSpy = jest.fn((sessionId) => ({
+    durationMin: 30,
+    previousSets: [],
+    skippedExercises: [],
+    exercises: [{
+      movementId: 10,
+      movementName: 'Incline Dumbbell Press',
+      plannedSets: 3,
+      sets: Array.from({ length: sessionId === 20 ? 1 : 3 }, () => ({ reps: 8, loadKg: 20, timeS: null })),
+    }],
+  }));
+  mockState = state({
+    today: '2026-11-10',
+    block: {
+      blockId: 2,
+      startDate: '2026-11-02',
+      objective: 'hypertrophy',
+      createdAtMs: new SpyDate('2026-11-02T08:00:00').getTime(),
+    },
+    focus: { bundleId: 'beach_muscles', muscles: ['upper_chest'], customised: false, movementControl: false },
+    blockSessions: [
+      { plannedSessionId: 101, weekIndex: 1, dayIndex: 1, focus: 'upper', phase: 'accumulation', sessionDate: '2026-11-06', slotCount: 1, completionStatus: 'complete' },
+      { plannedSessionId: 102, weekIndex: 2, dayIndex: 1, focus: 'upper', phase: 'accumulation', sessionDate: '2026-11-09', slotCount: 1, completionStatus: 'complete' },
+      { plannedSessionId: 103, weekIndex: 2, dayIndex: 2, focus: 'upper', phase: 'accumulation', sessionDate: '2026-11-11', slotCount: 1, completionStatus: null },
+    ],
+    loadRecentOutcomes: jest.fn((limit = 20) => [
+      { sessionId: 21, outcomeKind: 'adapted_session', finalizedAtMs: catchUpMs, focus: 'upper', originKind: 'planned', exerciseCount: 1, loggedSetCount: 3 },
+      { sessionId: 20, outcomeKind: 'adapted_session', finalizedAtMs: weekTwoMs, focus: 'upper', originKind: 'planned', exerciseCount: 1, loggedSetCount: 1 },
+    ].slice(0, limit)),
+    loadSessionSummaryFacts: factsSpy,
+    loadSessionSlots: jest.fn((plannedSessionId) => [{
+      slotIndex: 0,
+      plannedSlotId: plannedSessionId * 10,
+      movementId: 10,
+      movementName: 'Incline Dumbbell Press',
+      sets: 3,
+      reps: 8,
+      target: { kind: 'reps', reps: 8 },
+      targetRpe: 8,
+      overrideLoadKg: null,
+      overrideReason: null,
+    }]),
+    movements: [{ movement_id: 10, name: 'Incline Dumbbell Press', targetMuscles: ['upper_chest'] }],
+    goals: [],
+  });
+
+  render(<ProgressScreen />);
+  expect(screen.getByTestId('progress-focus-muscle-upper_chest')).toHaveTextContent(
+    'Upper chest · 1 of 6 planned sets completed this week',
+  );
+  const readIds = [...new Set(factsSpy.mock.calls.map(([id]) => id))];
+  expect(readIds).toEqual([20]);
+});

@@ -195,10 +195,14 @@ export default function ProgressScreen(): React.JSX.Element {
       && weekEnd !== null
       && typeof loadSessionSummaryFacts === 'function'
     ) {
-      const totalFinalizedInBlock = blockSessions.filter(isFinalizedPlanSession).length;
-      const finalizedBeforeActiveWeek = blockSessions.filter(
-        (s) => s.weekIndex < activeWeekIndex && isFinalizedPlanSession(s),
-      ).length;
+      const finalizedBlockSessions = [...blockSessions.filter(isFinalizedPlanSession)].sort((a, b) =>
+        a.sessionDate === b.sessionDate
+          ? a.plannedSessionId - b.plannedSessionId
+          : a.sessionDate < b.sessionDate
+            ? -1
+            : 1,
+      );
+      const totalFinalizedInBlock = finalizedBlockSessions.length;
       const activeBlockOutcomesChronological = allOutcomes
         .filter(
           (row) =>
@@ -209,15 +213,50 @@ export default function ProgressScreen(): React.JSX.Element {
         .sort((a, b) => (b.sessionId ?? 0) - (a.sessionId ?? 0) || b.finalizedAtMs - a.finalizedAtMs)
         .slice(0, totalFinalizedInBlock)
         .reverse();
-      const activeWeekOutcomes = activeBlockOutcomesChronological.slice(
-        finalizedBeforeActiveWeek,
-        finalizedBeforeActiveWeek + finalizedInActiveWeek.length,
-      );
-      for (const row of activeWeekOutcomes) {
-        if (block === null) {
+      // Attribute each finalized planned outcome to its source planned_session (#228):
+      // 1) explicit sourcePlannedSessionId when present;
+      // 2) exact on-date planned session (`bs.sessionDate === rowDate`);
+      // 3) off-plan start rule (`offPlanStartTarget`): earliest unfinished session before
+      //    `rowDate` (missed-session catch-up), else earliest unfinished session after `rowDate`.
+      const unclaimed = [...finalizedBlockSessions];
+      const activeWeekOutcomes: RecentSessionOutcome[] = [];
+      for (const row of activeBlockOutcomesChronological) {
+        const explicitPlanId = (row as { sourcePlannedSessionId?: number | null }).sourcePlannedSessionId;
+        let matchedPlan: (typeof finalizedBlockSessions)[number] | undefined;
+        if (explicitPlanId != null) {
+          const explicitIdx = unclaimed.findIndex((bs) => bs.plannedSessionId === explicitPlanId);
+          if (explicitIdx !== -1) {
+            [matchedPlan] = unclaimed.splice(explicitIdx, 1);
+          } else {
+            matchedPlan = finalizedBlockSessions.find((bs) => bs.plannedSessionId === explicitPlanId);
+          }
+        } else if (unclaimed.length > 0) {
           const rowDate = localIsoDate(row.finalizedAtMs);
-          if (rowDate === null || rowDate < weekStart || rowDate > weekEnd) continue;
+          const focusPool = row.focus == null
+            ? unclaimed
+            : unclaimed.filter((bs) => bs.focus === row.focus);
+          const candidates = focusPool.length > 0 ? focusPool : unclaimed;
+          if (rowDate !== null) {
+            matchedPlan = candidates.find((bs) => bs.sessionDate === rowDate)
+              ?? candidates.find((bs) => bs.sessionDate < rowDate)
+              ?? candidates.find((bs) => bs.sessionDate > rowDate);
+          } else {
+            matchedPlan = candidates[0];
+          }
+          if (matchedPlan !== undefined) {
+            const removeIdx = unclaimed.indexOf(matchedPlan);
+            if (removeIdx !== -1) unclaimed.splice(removeIdx, 1);
+          }
         }
+        if (matchedPlan !== undefined && matchedPlan.weekIndex === activeWeekIndex) {
+          if (block === null) {
+            const rowDate = localIsoDate(row.finalizedAtMs);
+            if (rowDate === null || rowDate < weekStart || rowDate > weekEnd) continue;
+          }
+          activeWeekOutcomes.push(row);
+        }
+      }
+      for (const row of activeWeekOutcomes) {
         try {
           const facts = loadSessionSummaryFacts(row.sessionId);
           for (const ex of facts?.exercises ?? []) {
