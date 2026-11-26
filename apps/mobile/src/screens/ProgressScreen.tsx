@@ -99,16 +99,37 @@ type OriginCacheEntry = {
   readonly origins: ReadonlyMap<number, number>;
 };
 
+type OriginReadResult = {
+  readonly ok: boolean;
+  readonly origins: ReadonlyMap<number, number>;
+};
+
 const EMPTY_ORIGINS: ReadonlyMap<number, number> = new Map<number, number>();
 const bootScopedOriginCache = new WeakMap<object, OriginCacheEntry>();
+let nextObjectIdentityId = 1;
+const objectIdentityIds = new WeakMap<object, number>();
+
+const getObjectIdentityTag = (value: unknown): string => {
+  if (typeof value !== 'object' || value === null) return String(value);
+  let id = objectIdentityIds.get(value);
+  if (id === undefined) {
+    id = nextObjectIdentityId;
+    nextObjectIdentityId += 1;
+    objectIdentityIds.set(value, id);
+  }
+  return `obj:${id}`;
+};
 
 /** Read persisted `session_origin` links (`session_id -> source_planned_session_id`)
  *  when booted against SQLite so earlier catch-up workouts finalized on a later day
  *  attribute to their true planned session rather than their finalization date. */
-const readPersistedPlannedSessionOrigins = (dbName: string | null): ReadonlyMap<number, number> => {
-  if (dbName === null || !athleteDataBootAllowed()) return EMPTY_ORIGINS;
+const readPersistedPlannedSessionOrigins = (dbName: string | null): OriginReadResult => {
+  if (dbName === null || !athleteDataBootAllowed()) {
+    return { ok: false, origins: EMPTY_ORIGINS };
+  }
   const map = new Map<number, number>();
   let readerDb: DB | null = null;
+  let ok = false;
   try {
     const { open } = require('@op-engineering/op-sqlite') as typeof import('@op-engineering/op-sqlite');
     readerDb = open({ name: dbName });
@@ -125,8 +146,9 @@ const readPersistedPlannedSessionOrigins = (dbName: string | null): ReadonlyMap<
         map.set(sessionId, planId);
       }
     }
+    ok = true;
   } catch {
-    // Mocked unit-test stores without an op-sqlite driver fall back to outcome replay.
+    // Transient reader errors or mocked unit-test stores fall back to outcome replay without caching failure.
   } finally {
     if (
       readerDb !== null
@@ -140,7 +162,7 @@ const readPersistedPlannedSessionOrigins = (dbName: string | null): ReadonlyMap<
       }
     }
   }
-  return map;
+  return { ok, origins: ok ? map : EMPTY_ORIGINS };
 };
 
 /** The logged facts of one past session: no plan context, no completion
@@ -190,10 +212,13 @@ export default function ProgressScreen(): React.JSX.Element {
   const loadMeasuredHistory = useStore((s) => s.loadMeasuredHistory);
   const loadSessionSummaryFacts = useStore((s) => s.loadSessionSummaryFacts);
   const session = useStore((s) => s.session);
+  const rawEarlierOpenSessions = useStore((s) => s.earlierOpenSessions);
   const focus = useStore((s) => s.focus) ?? null;
   const goals = useStore((s) => s.goals) ?? [];
-  const block = useStore((s) => s.block) ?? null;
-  const blockSessions = useStore((s) => s.blockSessions) ?? [];
+  const rawBlock = useStore((s) => s.block);
+  const block = rawBlock ?? null;
+  const rawBlockSessions = useStore((s) => s.blockSessions);
+  const blockSessions = rawBlockSessions ?? [];
   const today = useStore((s) => s.today) ?? '';
   const rawMovements = useStore((s) => s.movements);
   const movements = rawMovements ?? [];
@@ -215,8 +240,18 @@ export default function ProgressScreen(): React.JSX.Element {
   useEffect(() => {
     setAllOutcomes(loadRecentOutcomes(Number.MAX_SAFE_INTEGER) ?? []);
     setRecentMeasures(loadMeasuredHistory(14));
-    // Re-read when a session ends: the ended session's outcome becomes a fact.
-  }, [session, loadRecentOutcomes, loadMeasuredHistory]);
+    // Re-read when a session ends, an earlier open workout resolves, or athlete/block state reloads.
+  }, [
+    session,
+    rawEarlierOpenSessions,
+    rawBlock,
+    rawBlockSessions,
+    activeAthleteId,
+    storeStatus,
+    rawMovements,
+    loadRecentOutcomes,
+    loadMeasuredHistory,
+  ]);
 
   const activeWeekIndex = blockSessions.find((s) => s.sessionDate >= today)?.weekIndex
     ?? blockSessions[blockSessions.length - 1]?.weekIndex
@@ -282,18 +317,25 @@ export default function ProgressScreen(): React.JSX.Element {
         const outcomeSig = plannedCandidatesNewestFirst
           .map((row) => `${row.sessionId}:${row.outcomeKind}:${row.finalizedAtMs}:${row.loggedSetCount ?? ''}`)
           .join(',');
-        const cacheKey = `${activeAthleteId ?? ''}|${activeDbName}|${outcomeSig}`;
-        const scopeObj: object | null = (Array.isArray(rawMovements) && rawMovements.length > 0 ? rawMovements : null) ?? block;
+        const sliceIdentitySig = `${getObjectIdentityTag(rawMovements)}|${getObjectIdentityTag(rawBlock)}|${getObjectIdentityTag(rawBlockSessions)}`;
+        const cacheKey = `${activeAthleteId ?? ''}|${activeDbName}|${sliceIdentitySig}|${outcomeSig}`;
+        const scopeObj: object | null =
+          (Array.isArray(rawMovements) && rawMovements.length > 0 ? rawMovements : null)
+          ?? rawBlock
+          ?? (Array.isArray(rawBlockSessions) && rawBlockSessions.length > 0 ? rawBlockSessions : null);
         const cached = scopeObj !== null ? bootScopedOriginCache.get(scopeObj) : localOriginCacheRef.current;
         if (cached !== undefined && cached !== null && cached.key === cacheKey) {
           persistedOrigins = cached.origins;
         } else {
-          persistedOrigins = readPersistedPlannedSessionOrigins(activeDbName);
-          const nextEntry: OriginCacheEntry = { key: cacheKey, origins: persistedOrigins };
-          if (scopeObj !== null) {
-            bootScopedOriginCache.set(scopeObj, nextEntry);
+          const readResult = readPersistedPlannedSessionOrigins(activeDbName);
+          persistedOrigins = readResult.origins;
+          if (readResult.ok) {
+            const nextEntry: OriginCacheEntry = { key: cacheKey, origins: persistedOrigins };
+            if (scopeObj !== null) {
+              bootScopedOriginCache.set(scopeObj, nextEntry);
+            }
+            localOriginCacheRef.current = nextEntry;
           }
-          localOriginCacheRef.current = nextEntry;
         }
       }
 
