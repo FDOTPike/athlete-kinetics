@@ -153,8 +153,12 @@ describe('Demo athlete entry points and copy gated by IS_BETA_BUILD (#133)', () 
     mockState.onboarded = true;
 
     const readyView = render(<ReadinessScreen />);
+    const { PrimaryButton, SecondaryButton } = require('../../src/components/ui');
     expect(screen.getByText('Refresh')).toBeOnTheScreen();
     expect(screen.getByLabelText('Load the 180 day demo athlete')).toBeOnTheScreen();
+    expect(readyView.UNSAFE_getAllByType(PrimaryButton).map((b) => b.props.label)).toContain('Refresh');
+    expect(readyView.UNSAFE_getAllByType(PrimaryButton).map((b) => b.props.label)).not.toContain('Load demo athlete');
+    expect(readyView.UNSAFE_getAllByType(SecondaryButton).map((b) => b.props.label)).toContain('Load demo athlete');
 
     const treeJson = JSON.stringify(readyView.toJSON());
     const refreshIdx = treeJson.indexOf('"Refresh"');

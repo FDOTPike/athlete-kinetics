@@ -943,3 +943,38 @@ test('planned card tags movements selected for a goal, focus, or sport outcome (
   expect(screen.getByTestId('today-slot-provenance-12')).toHaveTextContent('Your Football (soccer) outcome');
   expect(screen.queryByTestId('today-slot-provenance-13')).toBeNull();
 });
+
+test('WO03-SOL-02 & WO03-SOL-05: frozen blockEmphasis never leaks later live goal/focus edits onto an active block, and undefined blockSessions does not throw', () => {
+  mockState = baseState({
+    blockSessions: undefined,
+    todayPlan: {
+      plannedSessionId: 1,
+      focus: 'lower',
+      phase: 'accumulation',
+      slots: [slot({ plannedSlotId: 10, movementId: 14, movementName: 'Seated Row' })],
+    },
+    movements: [{ movement_id: 14, name: 'Seated Row', targetMuscles: ['upper_back'] }],
+    focus: { bundleId: null, muscles: ['upper_back'], customised: true, movementControl: false },
+    goals: [{
+      goalId: 'g-later',
+      status: 'active',
+      revision: 1,
+      goal: { specificOutcome: 'New profile goal', metricId: 'load_kg', unit: 'kg', measurementMethod: 'row', baselineKnown: false, baselineValue: null, targetValue: 60, reason: 'test', requestedDeadline: null },
+      observations: [],
+    }],
+    goalMovements: { 'g-later': 14 },
+    blockEmphasis: {
+      blockId: 1,
+      inputs: {
+        focus: { muscles: [], movementControl: false, description: 'Balanced whole body (no extra emphasis)' },
+        sport: null,
+        workload: null,
+        goalMovements: [],
+      },
+      report: { version: 1, applied: [], omitted: [] },
+    },
+  });
+
+  render(<TodayScreen />);
+  expect(screen.queryByTestId('today-slot-provenance-10')).toBeNull();
+});

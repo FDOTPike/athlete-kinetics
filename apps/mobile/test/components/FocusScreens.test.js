@@ -1173,3 +1173,19 @@ test('PLAN renders plan-emphasis-disclosure with NO_EMPHASIS_EXPLANATION emptyTe
   fireEvent.press(screen.getByRole('button', { name: 'WHY THIS PLAN LOOKS THE WAY IT DOES' }));
   expect(screen.getByTestId('plan-emphasis-empty')).toHaveTextContent(NO_EMPHASIS_EXPLANATION);
 });
+
+test('WO03-SOL-03 & WO03-SOL-04: PLAN pre-readiness Manage block (program === null) opens current block controls rather than NewBlockChooser, and partial activityLedger {} never throws', () => {
+  mockState = baseState({
+    vector: null,
+    program: null,
+    activityLedger: {},
+  });
+  render(<BlockScreen />);
+
+  expect(screen.getByLabelText('Manage current block')).toBeOnTheScreen();
+  fireEvent.press(screen.getByLabelText('Manage current block'));
+
+  expect(screen.getByTestId('manage-block-section')).toBeOnTheScreen();
+  expect(screen.getByText('Choose a loading structure')).toBeOnTheScreen();
+  expect(screen.getByLabelText('Generate next block')).toBeOnTheScreen();
+});

@@ -122,7 +122,7 @@ function AvailableTodayScreen({
   const today = useStore((s) => s.today);
   const session = useStore((s) => s.session);
   const todayPlan = useStore((s) => s.todayPlan);
-  const blockSessions = useStore((s) => s.blockSessions);
+  const blockSessions = useStore((s) => s.blockSessions) ?? [];
   const block = useStore((s) => s.block) ?? null;
   const suspension = useStore((s) => s.suspension);
   const hasArchivedBlock = useStore((s) => s.hasArchivedBlock);
@@ -429,26 +429,29 @@ function AvailableTodayScreen({
           recordedDurationsForFocus(state.focus),
           profile.session_duration_cap_min,
         );
-        const todayWeekIndex = blockSessions?.find((s) => s.plannedSessionId === todayPlan?.plannedSessionId)?.weekIndex
-          ?? blockSessions?.find((s) => s.sessionDate >= today)?.weekIndex
+        const todayWeekIndex = blockSessions.find((s) => s.plannedSessionId === todayPlan?.plannedSessionId)?.weekIndex
+          ?? blockSessions.find((s) => s.sessionDate >= today)?.weekIndex
           ?? 1;
-        const focusSummary = blockEmphasis?.inputs?.focus?.description
-          ?? (focus !== null ? describeFocus(focus) : describeFocus(BALANCED_FOCUS));
-        const sportSummary = blockEmphasis?.inputs?.sport?.name
-          ?? (sport !== null ? sportDisplayName(sport) : null);
+        const hasFrozenEmphasis = blockEmphasis?.inputs != null;
+        const focusSummary = hasFrozenEmphasis
+          ? (blockEmphasis!.inputs.focus?.description ?? describeFocus(BALANCED_FOCUS))
+          : (focus !== null ? describeFocus(focus) : describeFocus(BALANCED_FOCUS));
+        const sportSummary = hasFrozenEmphasis
+          ? (blockEmphasis!.inputs.sport?.name ?? null)
+          : (sport !== null ? sportDisplayName(sport) : null);
         const identityLine = block !== null || program !== null
           ? `${program !== null ? `Block ${program.currentSequenceIndex} of ${program.plannedBlockCount} · ` : ''}Week ${todayWeekIndex} of 4 · ${focusSummary}${sportSummary !== null ? ` · ${sportSummary}` : ''}`
           : null;
         const focusMuscles = new Set<MuscleGroupId>(
-          blockEmphasis?.inputs?.focus?.muscles ?? focus?.muscles ?? [],
+          hasFrozenEmphasis ? (blockEmphasis!.inputs.focus?.muscles ?? []) : (focus?.muscles ?? []),
         );
         const sportMuscles = new Set<MuscleGroupId>(
-          blockEmphasis?.inputs?.sport?.muscles ?? [],
+          hasFrozenEmphasis ? (blockEmphasis!.inputs.sport?.muscles ?? []) : [],
         );
         const slotProvenanceLabel = (slot: { movementId: number; movementName: string }): string | null => {
-          const goalLabel = blockEmphasis?.inputs?.goalMovements?.find((g) => g.movementId === slot.movementId)?.goalLabel
-            ?? goals.find((g) => goalMovements[g.goalId] === slot.movementId)?.goal.specificOutcome
-            ?? null;
+          const goalLabel = hasFrozenEmphasis
+            ? (blockEmphasis!.inputs.goalMovements?.find((g) => g.movementId === slot.movementId)?.goalLabel ?? null)
+            : (goals.find((g) => goalMovements[g.goalId] === slot.movementId)?.goal.specificOutcome ?? null);
           if (goalLabel !== null && goalLabel !== undefined) {
             return `Goal: ${goalLabel}`;
           }
@@ -465,7 +468,9 @@ function AvailableTodayScreen({
           const matchedSport = appliedLines.some((line) => line.startsWith(`${slot.movementName} `) && /outcome\)\.$/.test(line))
             || resolvedMuscles.some((m) => sportMuscles.has(m));
           if (matchedSport) {
-            const sportName = blockEmphasis?.inputs?.sport?.name ?? (sport !== null ? sportDisplayName(sport) : 'sport');
+            const sportName = hasFrozenEmphasis
+              ? (blockEmphasis!.inputs.sport?.name ?? 'sport')
+              : (sport !== null ? sportDisplayName(sport) : 'sport');
             return `Your ${sportName} outcome`;
           }
           return null;

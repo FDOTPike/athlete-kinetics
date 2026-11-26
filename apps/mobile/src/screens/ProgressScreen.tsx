@@ -65,6 +65,25 @@ const sessionDescriptor = (row: {
 // Two sessions on one day were identical rows; the time tells them apart.
 const formatFinalizedTime = (ms: number): string => (ms <= 0 ? '' : ` · ${new Date(ms).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`);
 
+const addDaysIso = (iso: string, delta: number): string => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+  if (m === null) return iso;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + delta));
+  const y = d.getUTCFullYear();
+  const mo = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const da = String(d.getUTCDate()).padStart(2, '0');
+  return `${y}-${mo}-${da}`;
+};
+
+const localIsoDate = (ms: number): string | null => {
+  if (!Number.isFinite(ms) || ms <= 0) return null;
+  const d = new Date(ms);
+  const y = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  const da = String(d.getDate()).padStart(2, '0');
+  return `${y}-${mo}-${da}`;
+};
+
 /** The logged facts of one past session: no plan context, no completion
  *  actions, only what was recorded. */
 function PastSessionSummary({ sessionId, load }: {
@@ -114,6 +133,7 @@ export default function ProgressScreen(): React.JSX.Element {
   const session = useStore((s) => s.session);
   const focus = useStore((s) => s.focus) ?? null;
   const goals = useStore((s) => s.goals) ?? [];
+  const block = useStore((s) => s.block) ?? null;
   const blockSessions = useStore((s) => s.blockSessions) ?? [];
   const today = useStore((s) => s.today) ?? '';
   const movements = useStore((s) => s.movements) ?? [];
@@ -138,11 +158,10 @@ export default function ProgressScreen(): React.JSX.Element {
   for (const muscle of focusMuscles) {
     weeklyMuscleCounts.set(muscle, { plannedSets: 0, completedSets: 0 });
   }
+  const activeWeekSessions = blockSessions.filter((s) => s.weekIndex === activeWeekIndex);
   if (focusMuscles.length > 0 && typeof loadSessionSlots === 'function') {
-    for (const bs of blockSessions) {
-      if (bs.weekIndex !== activeWeekIndex) continue;
+    for (const bs of activeWeekSessions) {
       const slots = loadSessionSlots(bs.plannedSessionId) ?? [];
-      const isComplete = bs.completionStatus === 'complete';
       for (const sl of slots) {
         const rawMuscles = movements.find((m) => m.movement_id === sl.movementId)?.targetMuscles ?? [];
         const matched = new Set<MuscleGroupId>();
@@ -151,9 +170,44 @@ export default function ProgressScreen(): React.JSX.Element {
           if (resolved !== null && weeklyMuscleCounts.has(resolved)) matched.add(resolved);
         }
         for (const muscle of matched) {
-          const entry = weeklyMuscleCounts.get(muscle)!;
-          entry.plannedSets += sl.sets;
-          if (isComplete) entry.completedSets += sl.sets;
+          weeklyMuscleCounts.get(muscle)!.plannedSets += sl.sets;
+        }
+      }
+    }
+    let weekStart: string | null = null;
+    let weekEnd: string | null = null;
+    if (block !== null) {
+      weekStart = addDaysIso(block.startDate, (activeWeekIndex - 1) * 7);
+      weekEnd = addDaysIso(block.startDate, activeWeekIndex * 7 - 1);
+    } else if (activeWeekSessions.length > 0) {
+      const sortedDates = activeWeekSessions.map((s) => s.sessionDate).sort();
+      weekStart = sortedDates[0];
+      const plusSix = addDaysIso(sortedDates[0], 6);
+      weekEnd = sortedDates[sortedDates.length - 1] > plusSix ? sortedDates[sortedDates.length - 1] : plusSix;
+    }
+    if (weekStart !== null && weekEnd !== null && typeof loadSessionSummaryFacts === 'function') {
+      for (const row of recentOutcomes) {
+        if (row.sessionId == null || (row.originKind != null && row.originKind !== 'planned')) continue;
+        const rowDate = localIsoDate(row.finalizedAtMs);
+        if (rowDate === null || rowDate < weekStart || rowDate > weekEnd) continue;
+        try {
+          const facts = loadSessionSummaryFacts(row.sessionId);
+          for (const ex of facts?.exercises ?? []) {
+            const completedForSlot = ex.plannedSets !== null ? Math.min(ex.sets.length, ex.plannedSets) : 0;
+            if (completedForSlot <= 0) continue;
+            const rawMuscles = movements.find((m) => m.movement_id === ex.movementId)?.targetMuscles ?? [];
+            const matched = new Set<MuscleGroupId>();
+            for (const raw of rawMuscles) {
+              const resolved = resolveMuscleGroupAlias(raw);
+              if (resolved !== null && weeklyMuscleCounts.has(resolved)) matched.add(resolved);
+            }
+            for (const muscle of matched) {
+              const entry = weeklyMuscleCounts.get(muscle)!;
+              entry.completedSets = Math.min(entry.plannedSets, entry.completedSets + completedForSlot);
+            }
+          }
+        } catch {
+          // Unreadable session facts fail closed (0 completed sets credited).
         }
       }
     }

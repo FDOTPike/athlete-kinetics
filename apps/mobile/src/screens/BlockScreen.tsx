@@ -987,7 +987,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
   );
 
   const renderExistingActivitiesDisclosure = (): React.JSX.Element | null => (
-    activityLedger.series.some((row) => row.effectiveEndDate === null) ? (
+    Array.isArray(activityLedger?.series) && activityLedger.series.some((row) => row.effectiveEndDate === null) ? (
       <Disclosure
         label="YOUR OTHER WEEKLY ACTIVITIES"
         hint="Recorded commitments shown beside this plan"
@@ -1029,12 +1029,109 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
     ) : null
   );
 
+  const openManageBlock = (): void => {
+    setManageOpen(true);
+    scrollRef.current?.scrollTo({
+      y: Math.max(0, trajectorySectionY.current + manageSectionOffsetY.current - theme.space[4]),
+      animated: true,
+    });
+  };
+
+  const renderManageBlockSection = (): React.JSX.Element => (
+    <View
+      testID="manage-block-section"
+      onLayout={(event) => { manageSectionOffsetY.current = event.nativeEvent.layout.y; }}
+    >
+      <Disclosure
+        label="Manage block"
+        hint={block === null ? 'Start your first block' : 'Block settings and regeneration'}
+        open={manageOpen}
+        onOpenChange={setManageOpen}
+      >
+        <View style={styles.disclosureContent}>
+          {block !== null ? (
+            <Text style={styles.captionText}>
+              {block.objective.replace(/_/g, ' ')} block, started {block.startDate}
+              {blockMeta !== null
+                ? ` - ${blockMeta.schemaType}`
+                : ''}
+            </Text>
+          ) : (
+            <Text style={styles.captionText}>
+              Coach will build from your objective, equipment, and weekly frequency.
+            </Text>
+          )}
+          {blockMeta?.peakShifted === true && (
+            <Text style={styles.peakShiftText}>
+              Coach inserted a deload week before the peak because fatigue was high.
+            </Text>
+          )}
+          {/* #171: with no block, "Start a new block" opens the chooser and
+              never reads a loading structure, so the chips are not shown. */}
+          {block !== null && (
+            <>
+              <Text style={styles.schemaLabel}>Choose a loading structure</Text>
+              <View style={styles.schemaRow}>
+                {SELECTABLE_SCHEMA_TYPES.map((type) => {
+                  const selected = type === schema;
+                  return (
+                    <Pressable
+                      key={type}
+                      onPress={() => setSchema(type)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      accessibilityLabel={`${SCHEMA_LABEL[type]} loading structure`}
+                      style={[styles.schemaChip, selected && styles.schemaChipSelected]}
+                    >
+                      <Text style={[styles.schemaChipText, selected && styles.schemaChipTextSelected]}>
+                        {SCHEMA_LABEL[type]}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </>
+          )}
+
+          {!confirmRegenerate ? (
+            <PrimaryButton
+              label={block === null ? 'Start a new block' : 'Generate next block'}
+              onPress={() => {
+                if (block === null) {
+                  setShowChooser(true);
+                } else {
+                  setConfirmRegenerate(true);
+                }
+              }}
+              accessibilityLabel={block === null ? 'Start a new block' : 'Generate next block'}
+            />
+          ) : (
+            <View style={styles.confirmation}>
+              <Text style={styles.bodyText}>This archives the current block and starts the next one today.</Text>
+              <PrimaryButton
+                label="Generate next block now"
+                onPress={() => {
+                  setDetail(null);
+                  generateNewBlock(schema);
+                  setConfirmRegenerate(false);
+                  setManageOpen(false);
+                }}
+                accessibilityLabel="Generate next block now"
+              />
+              <SecondaryButton label="Keep current block" onPress={() => setConfirmRegenerate(false)} accessibilityLabel="Keep current block" />
+            </View>
+          )}
+        </View>
+      </Disclosure>
+    </View>
+  );
+
   if (vector === null) {
     return (
       // The no-vector gate is an early return INSIDE the real screen, so the
       // route identity (coach-screen) is still asserted by tests even when
       // readiness data has not arrived yet.
-      <ScrollView style={styles.screen} contentContainerStyle={styles.gateContent} testID="coach-screen">
+      <ScrollView ref={scrollRef} style={styles.screen} contentContainerStyle={styles.gateContent} testID="coach-screen">
         {halted && lastTriage !== null && lastTriage.kind === 'matched' && (
           <View style={[styles.card, styles.haltCard]}>
             <Text style={styles.eyebrow}>SAFETY</Text>
@@ -1127,23 +1224,16 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           {block !== null && (
             <SecondaryButton
               label={program == null ? 'Manage block' : 'Manage program'}
-              onPress={program == null ? () => setShowChooser(true) : () => setEditingProgram(true)}
+              onPress={program == null ? openManageBlock : () => setEditingProgram(true)}
               accessibilityLabel={program == null ? 'Manage current block' : 'Manage future program preferences'}
             />
           )}
         </View>
+        {block !== null && program === null && renderManageBlockSection()}
         {renderPauseCard()}
       </ScrollView>
     );
   }
-
-  const openManageBlock = (): void => {
-    setManageOpen(true);
-    scrollRef.current?.scrollTo({
-      y: Math.max(0, trajectorySectionY.current + manageSectionOffsetY.current - theme.space[4]),
-      animated: true,
-    });
-  };
 
   /** Open "Something feels off" and bring it into view (#188, injury pause). */
   const openReportForm = (): void => {
@@ -1608,92 +1698,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
         </Disclosure>
 
         {program == null && (
-        <View
-          testID="manage-block-section"
-          onLayout={(event) => { manageSectionOffsetY.current = event.nativeEvent.layout.y; }}
-        >
-        <Disclosure
-          label="Manage block"
-          hint={block === null ? 'Start your first block' : 'Block settings and regeneration'}
-          open={manageOpen}
-          onOpenChange={setManageOpen}
-        >
-          <View style={styles.disclosureContent}>
-            {block !== null ? (
-              <Text style={styles.captionText}>
-                {block.objective.replace(/_/g, ' ')} block, started {block.startDate}
-                {blockMeta !== null
-                  ? ` - ${blockMeta.schemaType}`
-                  : ''}
-              </Text>
-            ) : (
-              <Text style={styles.captionText}>
-                Coach will build from your objective, equipment, and weekly frequency.
-              </Text>
-            )}
-            {blockMeta?.peakShifted === true && (
-              <Text style={styles.peakShiftText}>
-                Coach inserted a deload week before the peak because fatigue was high.
-              </Text>
-            )}
-            {/* #171: with no block, "Start a new block" opens the chooser and
-                never reads a loading structure, so the chips are not shown. */}
-            {block !== null && (
-            <>
-            <Text style={styles.schemaLabel}>Choose a loading structure</Text>
-            <View style={styles.schemaRow}>
-              {SELECTABLE_SCHEMA_TYPES.map((type) => {
-                const selected = type === schema;
-                return (
-                  <Pressable
-                    key={type}
-                    onPress={() => setSchema(type)}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected }}
-                    accessibilityLabel={`${SCHEMA_LABEL[type]} loading structure`}
-                    style={[styles.schemaChip, selected && styles.schemaChipSelected]}
-                  >
-                    <Text style={[styles.schemaChipText, selected && styles.schemaChipTextSelected]}>
-                      {SCHEMA_LABEL[type]}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            </>
-            )}
-
-            {!confirmRegenerate ? (
-              <PrimaryButton
-                label={block === null ? 'Start a new block' : 'Generate next block'}
-                onPress={() => {
-                  if (block === null) {
-                    setShowChooser(true);
-                  } else {
-                    setConfirmRegenerate(true);
-                  }
-                }}
-                accessibilityLabel={block === null ? 'Start a new block' : 'Generate next block'}
-              />
-            ) : (
-              <View style={styles.confirmation}>
-                <Text style={styles.bodyText}>This archives the current block and starts the next one today.</Text>
-                <PrimaryButton
-                  label="Generate next block now"
-                  onPress={() => {
-                    setDetail(null);
-                    generateNewBlock(schema);
-                    setConfirmRegenerate(false);
-                    setManageOpen(false);
-                  }}
-                  accessibilityLabel="Generate next block now"
-                />
-                <SecondaryButton label="Keep current block" onPress={() => setConfirmRegenerate(false)} accessibilityLabel="Keep current block" />
-              </View>
-            )}
-          </View>
-        </Disclosure>
-        </View>
+          renderManageBlockSection()
         )}
 
         {/* Deliberately OUTSIDE the `program == null` gate above. "Manage block"

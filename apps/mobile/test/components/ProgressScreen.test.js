@@ -204,6 +204,30 @@ test('renders TRAINING FOCUS weekly muscle completion and GOALS on the primary P
       slotCount: 1,
       completionStatus: 'complete',
     }],
+    loadRecentOutcomes: jest.fn(() => [{
+      sessionId: 20,
+      outcomeKind: 'followed_plan',
+      finalizedAtMs: new SpyDate('2026-11-04T10:30:00').getTime(),
+      focus: 'upper',
+      originKind: 'planned',
+      exerciseCount: 1,
+      loggedSetCount: 3,
+    }]),
+    loadSessionSummaryFacts: jest.fn(() => ({
+      durationMin: 28,
+      exercises: [{
+        movementId: 10,
+        movementName: 'Incline Dumbbell Press',
+        plannedSets: 3,
+        sets: [
+          { reps: 8, loadKg: 20, timeS: null },
+          { reps: 8, loadKg: 20, timeS: null },
+          { reps: 8, loadKg: 20, timeS: null },
+        ],
+      }],
+      previousSets: [],
+      skippedExercises: [],
+    })),
     loadSessionSlots: jest.fn(() => [{
       slotIndex: 0,
       plannedSlotId: 1,
@@ -248,4 +272,55 @@ test('renders TRAINING FOCUS weekly muscle completion and GOALS on the primary P
   expect(screen.getByTestId('progress-goal-g1')).toBeOnTheScreen();
   expect(screen.getByText(/Goblet squat 40 kg for 10/)).toBeOnTheScreen();
   expect(screen.getByText(/About 50% of the way/)).toBeOnTheScreen();
+});
+
+test('WO03-SOL-01: finalized planned session whose focus exercise was skipped reports 0 of 3 planned sets completed', () => {
+  mockState = state({
+    today: '2026-11-04',
+    focus: { bundleId: 'beach_muscles', muscles: ['upper_chest'], customised: false, movementControl: false },
+    blockSessions: [{
+      plannedSessionId: 1,
+      weekIndex: 1,
+      dayIndex: 1,
+      focus: 'upper',
+      phase: 'accumulation',
+      sessionDate: '2026-11-04',
+      slotCount: 1,
+      completionStatus: 'complete',
+    }],
+    loadRecentOutcomes: jest.fn(() => [{
+      sessionId: 21,
+      outcomeKind: 'adapted_session',
+      finalizedAtMs: new SpyDate('2026-11-04T10:30:00').getTime(),
+      focus: 'upper',
+      originKind: 'planned',
+      exerciseCount: 0,
+      loggedSetCount: 0,
+    }]),
+    loadSessionSummaryFacts: jest.fn(() => ({
+      durationMin: 6,
+      exercises: [],
+      previousSets: [],
+      skippedExercises: [{ name: 'Incline Dumbbell Press', plannedSets: 3, loggedSets: 0, loggedAs: [] }],
+    })),
+    loadSessionSlots: jest.fn(() => [{
+      slotIndex: 0,
+      plannedSlotId: 1,
+      movementId: 10,
+      movementName: 'Incline Dumbbell Press',
+      sets: 3,
+      reps: 8,
+      target: { kind: 'reps', reps: 8 },
+      targetRpe: 8,
+      overrideLoadKg: null,
+      overrideReason: null,
+    }]),
+    movements: [{ movement_id: 10, name: 'Incline Dumbbell Press', targetMuscles: ['upper_chest'] }],
+    goals: [],
+  });
+
+  render(<ProgressScreen />);
+  expect(screen.getByTestId('progress-focus-muscle-upper_chest')).toHaveTextContent(
+    'Upper chest · 0 of 3 planned sets completed this week',
+  );
 });
