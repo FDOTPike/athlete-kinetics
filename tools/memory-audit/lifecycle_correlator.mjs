@@ -269,16 +269,93 @@ export function summarizeDisposalIntegrity(markers) {
     if (g.maxCreated !== g.maxDisposed) everyGroupBalanced = false;
   }
   const countersBalanced = everyGroupBalanced && finalCreated === finalDisposed;
+  const { sessionOverlaps } = detectSessionOverlaps(markers);
+  const sessionOverlapCount = sessionOverlaps.length;
   return {
     disposalFailureCount: failures.length,
     failures,
     finalCreated,
     finalDisposed,
     countersBalanced,
-    clean: failures.length === 0 && countersBalanced,
+    sessionOverlapCount,
+    sessionOverlaps,
+    clean: failures.length === 0 && countersBalanced && sessionOverlapCount === 0,
     note: 'disposedTotal increments even on a THROWN disposal, so countersBalanced '
       + 'alone does not prove absence of a leak; disposalFailureCount is decisive.',
   };
+}
+
+/**
+ * Cross-component serial non-overlap. Within one process, every live native
+ * session (embedder OR safety-reader) must be disposed before the next one
+ * starts. A session's live interval runs from session:start (or
+ * session:settled when the start line is absent) to a disposal:settled with
+ * ok=1; without a successful disposal the interval never closes.
+ *
+ * Ordering is by (tsMs, lineNo): a disposal settling on an earlier log line at
+ * timestamp T followed by a session starting on a later line at the same T is
+ * a sequential handoff, not an overlap. Every interval is compared against
+ * ALL earlier intervals in the same pid, so one long session containing two
+ * shorter, mutually sequential ones yields two overlaps.
+ *
+ * @returns {{ sessionOverlaps: object[], overlappingKeys: Set<string> }}
+ */
+export function detectSessionOverlaps(markers) {
+  const groups = new Map();
+  for (const m of markers) {
+    if (m.kind !== 'phase' || !Number.isFinite(m.pid) || m.requestId === WRAPPER_REQUEST_ID) continue;
+    const component = m.component ?? 'embedder';
+    const key = `${component}|${m.pid}|${m.wrapperEpoch ?? 0}|${m.requestId}`;
+    if (!groups.has(key)) {
+      groups.set(key, { key, component, pid: m.pid, wrapperEpoch: m.wrapperEpoch ?? 0, requestId: m.requestId, markers: [] });
+    }
+    groups.get(key).markers.push(m);
+  }
+  const intervalsByPid = new Map();
+  for (const g of groups.values()) {
+    const find = (phase, stage) => g.markers.find((m) => m.phase === phase && m.stage === stage);
+    const sessionStart = find('session', 'start');
+    const sessionSettled = find('session', 'settled');
+    if (!sessionStart && !sessionSettled) continue;
+    const opener = sessionStart ?? sessionSettled;
+    const disposalSettled = find('disposal', 'settled');
+    const closed = disposalSettled !== undefined && disposalSettled.ok === true;
+    const interval = {
+      key: g.key,
+      component: g.component,
+      pid: g.pid,
+      wrapperEpoch: g.wrapperEpoch,
+      requestId: g.requestId,
+      startTsMs: opener.tsMs,
+      startLineNo: opener.lineNo,
+      endTsMs: closed ? disposalSettled.tsMs : Infinity,
+      endLineNo: closed ? disposalSettled.lineNo : Infinity,
+    };
+    if (!intervalsByPid.has(g.pid)) intervalsByPid.set(g.pid, []);
+    intervalsByPid.get(g.pid).push(interval);
+  }
+  const sessionOverlaps = [];
+  const overlappingKeys = new Set();
+  const identity = (iv) => ({
+    component: iv.component, pid: iv.pid, wrapperEpoch: iv.wrapperEpoch, requestId: iv.requestId,
+    startTsMs: iv.startTsMs, endTsMs: Number.isFinite(iv.endTsMs) ? iv.endTsMs : null,
+  });
+  for (const intervals of intervalsByPid.values()) {
+    intervals.sort((a, b) => a.startTsMs - b.startTsMs || a.startLineNo - b.startLineNo);
+    for (let j = 1; j < intervals.length; j += 1) {
+      const b = intervals[j];
+      for (let i = 0; i < j; i += 1) {
+        const a = intervals[i];
+        const overlaps = b.startTsMs < a.endTsMs
+          || (b.startTsMs === a.endTsMs && b.startLineNo < a.endLineNo);
+        if (!overlaps) continue;
+        sessionOverlaps.push({ earlier: identity(a), later: identity(b) });
+        overlappingKeys.add(a.key);
+        overlappingKeys.add(b.key);
+      }
+    }
+  }
+  return { sessionOverlaps, overlappingKeys };
 }
 
 // --- sampling cadence and continuity ---------------------------------------
@@ -396,6 +473,7 @@ const keyOf = (phase, stage) => `${phase}:${stage}`;
  */
 export function bindTargetSamples({ samples, markers, segments, packageName }) {
   const runs = [];
+  const seenPids = new Set();
   for (const sample of samples) {
     if (!packageName || sample.appName !== packageName || !Number.isInteger(sample.processId)
         || sample.processId <= 0) throw new Error('Raw memory sample does not identify the target package and PID');
@@ -405,6 +483,12 @@ export function bindTargetSamples({ samples, markers, segments, packageName }) {
     }
     let run = runs.at(-1);
     if (!run || run.pid !== sample.processId) {
+      // A cold restart moves to a NEW pid. A pid that comes back after a
+      // transition cannot be told apart from a stale or interleaved capture.
+      if (seenPids.has(sample.processId)) {
+        throw new Error('Cold-restart PID continuity violation: process ID reappeared after a PID transition');
+      }
+      seenPids.add(sample.processId);
       run = { pid: sample.processId, starts: [] };
       runs.push(run);
     }
@@ -421,9 +505,25 @@ export function bindTargetSamples({ samples, markers, segments, packageName }) {
     }
   }
   // Keep wrapper anchors before the first probe, including after a cold restart.
-  const targetMarkers = markers.filter((m) => runs.some((run, i) => m.pid === run.pid
-    && m.tsMs >= (runs[i - 1]?.starts.at(-1) ?? -Infinity)
-    && m.tsMs <= (runs[i + 1]?.starts[0] ?? Infinity)));
+  // A target-PID marker outside its own process window is evidence of a broken
+  // timeline, so it fails closed instead of being silently filtered out.
+  const targetMarkers = [];
+  for (const m of markers) {
+    const i = runs.findIndex((run) => run.pid === m.pid);
+    if (i === -1) continue;
+    if (m.tsMs < (runs[i - 1]?.starts.at(-1) ?? -Infinity) || m.tsMs > (runs[i + 1]?.starts[0] ?? Infinity)) {
+      throw new Error('Cold-restart PID continuity violation: target PID lifecycle marker falls outside its process sampling window');
+    }
+    targetMarkers.push({ ...m });
+  }
+  // Re-stamp wrapper epochs on the bound set only, so filtered foreign-PID
+  // markers (or any epoch carried in by the caller) can never shift epoch state.
+  const epochByKey = new Map();
+  for (const m of targetMarkers) {
+    const key = `${m.pid}|${m.component ?? 'embedder'}`;
+    if (m.phase === 'wrapper') epochByKey.set(key, (epochByKey.get(key) ?? 0) + 1);
+    m.wrapperEpoch = epochByKey.get(key) ?? 0;
+  }
   return { markers: targetMarkers, segments: boundSegments };
 }
 
@@ -438,6 +538,7 @@ export function correlateRequests({ markers, segments }) {
 
   const qualified = [];
   const rejected = [];
+  const { overlappingKeys } = detectSessionOverlaps(markers);
 
   // --- per-(pid, epoch) session ledger -------------------------------------
   // Hermes R4-2: a stitch whose two halves carry IDENTICAL created snapshots is
@@ -657,6 +758,13 @@ export function correlateRequests({ markers, segments }) {
       reasons.push('markers in this group disagree about process/wrapper identity');
     }
 
+    // Serial non-overlap: two live native sessions in one process at once
+    // (any component) means neither request's memory can be attributed to it.
+    if (overlappingKeys.has(key)) {
+      reasons.push('session interval overlaps another live session in the same process '
+        + '(see disposalIntegrity.sessionOverlaps)');
+    }
+
     if (reasons.length > 0) {
       rejected.push({ component, requestId, pid, wrapperEpoch, reasons, markerCount: group.length });
       continue;
@@ -680,7 +788,15 @@ export function correlateRequests({ markers, segments }) {
     });
   }
 
-  return { qualified, rejected, disposalIntegrity: summarizeDisposalIntegrity(markers) };
+  return {
+    qualified,
+    rejected,
+    componentRequestCounts: {
+      embedder: qualified.filter((q) => q.component === 'embedder').length,
+      'safety-reader': qualified.filter((q) => q.component === 'safety-reader').length,
+    },
+    disposalIntegrity: summarizeDisposalIntegrity(markers),
+  };
 }
 
 // --- memory summarisation ---------------------------------------------------
@@ -726,6 +842,9 @@ export function summarizeMemory({ samples, segments, qualified, cadence, peakCla
     }
     return {
       windowMaxGapMs,
+      component: q.component,
+      pid: q.pid,
+      wrapperEpoch: q.wrapperEpoch,
       requestId: q.requestId,
       segmentIndex: q.segmentIndex,
       startMs: q.startMs,
@@ -748,6 +867,7 @@ export function summarizeMemory({ samples, segments, qualified, cadence, peakCla
     const max = inSeg.length ? Math.max(...inSeg.map((s) => s.privateDirtyBytes)) : null;
     return {
       segmentIndex: seg.index,
+      pid: seg.pid ?? null,
       startMs: seg.startMs,
       endMs: seg.endMs,
       spanMs: seg.spanMs,
@@ -778,10 +898,11 @@ export function summarizeMemory({ samples, segments, qualified, cadence, peakCla
   if (Number.isFinite(p95Interval) && p95Interval > peakClaimIntervalMs) peakClaimBlockers.push(`p95 interval ${p95Interval} ms > ${peakClaimIntervalMs} ms`);
   if (perRequest.length === 0) peakClaimBlockers.push('no correlated request to observe');
   for (const r of perRequest) {
+    const label = `${r.component ?? 'embedder'} request ${r.requestId} (pid ${r.pid ?? 'unknown'})`;
     if (r.samplesInsideRequest < MIN_SAMPLES_IN_REQUEST_WINDOW) {
-      peakClaimBlockers.push(`request ${r.requestId} had ${r.samplesInsideRequest} sample(s) inside its window`);
+      peakClaimBlockers.push(`${label} had ${r.samplesInsideRequest} sample(s) inside its window`);
     } else if (r.windowMaxGapMs > peakClaimIntervalMs) {
-      peakClaimBlockers.push(`request ${r.requestId} has a ${r.windowMaxGapMs} ms observation hole`);
+      peakClaimBlockers.push(`${label} has a ${r.windowMaxGapMs} ms observation hole`);
     }
   }
 

@@ -90,11 +90,18 @@ const soundSession = (over = {}) => ({
     evidenceBinding: FIXTURE_BINDING,
     lifecycle: {
       correlatedRequestCount: 11,
-      disposalProof: [{ requestId: 1, createdSessionWasDisposed: true }],
+      // Both production models must be proven ([embedder-lifecycle] +
+      // [safety-reader-lifecycle]), serially, in one process.
+      componentRequestCounts: { embedder: 6, 'safety-reader': 5 },
+      sessionOverlapCount: 0,
+      disposalProof: [
+        { component: 'embedder', requestId: 1, createdSessionWasDisposed: true },
+        { component: 'safety-reader', requestId: 1, createdSessionWasDisposed: true },
+      ],
       // Session-wide, independent of which requests qualified (Sol finding 1).
       disposalIntegrity: {
         disposalFailureCount: 0, failures: [], finalCreated: 11, finalDisposed: 11,
-        countersBalanced: true, clean: true,
+        countersBalanced: true, sessionOverlapCount: 0, sessionOverlaps: [], clean: true,
       },
     },
     sampling: { achievedMedianIntervalMs: 871 },
@@ -508,7 +515,7 @@ console.log('\n[10] HERMES B-1 — a summary is a CLAIM about evidence, not evid
  * computed from those exact bytes. Everything [G] verifies is present, so the
  * fixtures below can tamper with one thing at a time.
  */
-function makePacket() {
+function makePacket({ embedder = true, reader = 'sequential', danglingEmbedder = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'ak-g-fixture-'));
   const t0 = Date.UTC(2026, 7, 24, 3, 0, 0, 0);
   const PID = 4242;
@@ -531,16 +538,43 @@ function makePacket() {
 
   const stamp = (ms) => `${Math.floor(ms / 1000)}.${String(ms % 1000).padStart(3, '0')}`;
   const l = (ms, body) => `${stamp(ms)}  ${PID} ${PID + 1} I ReactNativeJS: [embedder-lifecycle] ${body}`;
-  const logcat = [
-    l(t0 + 500, 'wrapper:settled req=0 ok=1 created=0 disposed=0'),
-    l(t0 + 1000, 'session:start req=1 ok=1 created=0 disposed=0'),
-    l(t0 + 1100, 'session:settled req=1 ok=1 created=1 disposed=0'),
-    l(t0 + 1100, 'inference:start req=1 ok=1 created=1 disposed=0'),
-    l(t0 + 1200, 'inference:settled req=1 ok=1 created=1 disposed=0'),
-    l(t0 + 1200, 'disposal:start req=1 ok=1 created=1 disposed=0'),
-    l(t0 + 1300, 'disposal:settled req=1 ok=1 created=1 disposed=1'),
-    l(t0 + 1300, 'request=1 ok=1 totalMs=300'),
-  ].join('\n');
+  const r = (ms, body) => `${stamp(ms)}  ${PID} ${PID + 1} I ReactNativeJS: [safety-reader-lifecycle] ${body}`;
+  const lines = [l(t0 + 500, 'wrapper:settled req=0 ok=1 created=0 disposed=0')];
+  if (reader !== 'none') lines.push(r(t0 + 510, 'wrapper:settled req=0 ok=1 created=0 disposed=0'));
+  if (embedder) {
+    lines.push(
+      l(t0 + 1000, 'session:start req=1 ok=1 created=0 disposed=0'),
+      l(t0 + 1100, 'session:settled req=1 ok=1 created=1 disposed=0'),
+      l(t0 + 1100, 'inference:start req=1 ok=1 created=1 disposed=0'),
+      l(t0 + 1200, 'inference:settled req=1 ok=1 created=1 disposed=0'),
+      l(t0 + 1200, 'disposal:start req=1 ok=1 created=1 disposed=0'),
+      l(t0 + 1300, 'disposal:settled req=1 ok=1 created=1 disposed=1'),
+      l(t0 + 1300, 'request=1 ok=1 totalMs=300'),
+    );
+  }
+  if (reader !== 'none') {
+    // 'sequential' starts after the embedder disposal settled; 'overlap' starts
+    // while the embedder session is still live in the same process.
+    const s0 = t0 + (reader === 'overlap' ? 1250 : 1400);
+    lines.push(
+      r(s0, 'session:start req=1 ok=1 created=0 disposed=0'),
+      r(s0 + 100, 'session:settled req=1 ok=1 created=1 disposed=0'),
+      r(s0 + 100, 'inference:start req=1 ok=1 created=1 disposed=0'),
+      r(s0 + 200, 'inference:settled req=1 ok=1 created=1 disposed=0'),
+      r(s0 + 200, 'disposal:start req=1 ok=1 created=1 disposed=0'),
+      r(s0 + 300, 'disposal:settled req=1 ok=1 created=1 disposed=1'),
+      r(s0 + 300, 'request=1 ok=1 totalMs=300'),
+    );
+  }
+  if (danglingEmbedder) {
+    // A second embedder session that is created and never disposed: counters
+    // cannot balance, yet it overlaps nothing (no later session in the PID).
+    lines.push(
+      l(t0 + 1900, 'session:start req=2 ok=1 created=1 disposed=1'),
+      l(t0 + 1950, 'session:settled req=2 ok=1 created=2 disposed=1'),
+    );
+  }
+  const logcat = lines.join('\n');
   writeFileSync(join(dir, 'logcat-epoch.txt'), logcat);
 
   // Dense, evenly spaced samples that fully bracket the lifecycle.
@@ -583,9 +617,21 @@ function sealPacket({ dir, session, binding }) {
     },
     lifecycle: {
       correlatedRequestCount: cadence.correlated,
-      disposalProof: [{ requestId: 1, createdSessionWasDisposed: true }],
+      componentRequestCounts: { embedder: 1, 'safety-reader': 1 },
+      sessionOverlapCount: 0,
+      sampledProcessIds: [...new Set(session.samples.map((s) => Number(/pid (\d+)/.exec(readFileSync(s.rawFile, 'utf-8'))[1])))],
+      correlatedRequests: [
+        { component: 'embedder', requestId: 1, pid: 4242, wrapperEpoch: 1, totalMs: 300 },
+        { component: 'safety-reader', requestId: 1, pid: 4242, wrapperEpoch: 1, totalMs: 300 },
+      ],
+      processIds: [4242],
+      disposalProof: [
+        { component: 'embedder', pid: 4242, wrapperEpoch: 1, requestId: 1, createdSessionWasDisposed: true },
+        { component: 'safety-reader', pid: 4242, wrapperEpoch: 1, requestId: 1, createdSessionWasDisposed: true },
+      ],
       disposalIntegrity: {
-        disposalFailureCount: 0, finalCreated: 1, finalDisposed: 1, clean: true,
+        disposalFailureCount: 0, finalCreated: 2, finalDisposed: 2,
+        countersBalanced: true, sessionOverlapCount: 0, clean: true,
       },
     },
     memory: {
@@ -604,7 +650,7 @@ function computeCadenceLocal(sampleStarts) {
   // Deliberately uses verifyEvidencePacket's own machinery indirectly: build a
   // throwaway packet, read back what the verifier re-derives, and use that as
   // the truth the sealed summary must state.
-  return { median: 200, gap: 2000, correlated: 1, peakClaimable: false };
+  return { median: 200, gap: 2000, correlated: 2, peakClaimable: false };
 }
 
 {
@@ -831,10 +877,132 @@ console.log('\n[13] HERMES r4 R4-3 — a deleted tier is a deleted check');
   pkt.binding = computeEvidenceBinding({ evidenceDir: pkt.dir, session: pkt.session });
   const path = sealPacket(pkt);
   const packet = JSON.parse(readFileSync(path, 'utf8'));
-  packet.summary.lifecycle.correlatedRequestCount = 2;
+  packet.summary.lifecycle.correlatedRequestCount = 4;
+  packet.summary.lifecycle.componentRequestCounts = { embedder: 2, 'safety-reader': 2 };
   writeFileSync(path, JSON.stringify(packet));
   const v = verifyEvidencePacket({ sessionPath: path, requireManifest: false });
   check('SEC11: provenance accepts a genuine cold-start PID change', v.ok, v.problems.join('; '));
+  rmSync(pkt.dir, { recursive: true, force: true });
+}
+
+// =============================================================================
+console.log('\n[14] WO-02 Item 3 — dual-model, serial non-overlap, balanced disposal, PID continuity');
+
+const gateWith = (session) => evaluateMemoryGate({
+  budget: REVIEWED_BUDGET, vectors: VECTORS, session, evidenceProvenance: BOUND_STUB,
+});
+{
+  const g = gateWith(soundSession());
+  check('ITEM3: positive control — dual-model sound packet keeps [D] and the reviewed gate GREEN',
+    g.ok === true && g.checks.find((c) => c.id === 'D').ok === true,
+    g.checks.filter((c) => !c.ok).map((c) => `${c.id}:${c.reason}`).join(' | ').slice(0, 160));
+}
+for (const [label, mutate, needle] of [
+  ['an overlap recorded in disposalIntegrity.sessionOverlapCount',
+    (s) => { s.summary.lifecycle.disposalIntegrity.sessionOverlapCount = 1; }, 'overlap'],
+  ['an overlap recorded in lifecycle.sessionOverlapCount',
+    (s) => { s.summary.lifecycle.sessionOverlapCount = 1; }, 'overlap'],
+  ['a missing lifecycle.sessionOverlapCount',
+    (s) => { delete s.summary.lifecycle.sessionOverlapCount; }, 'overlap'],
+  ['unbalanced disposal counters with zero disposal failures (DUAL-3 shape)',
+    (s) => { Object.assign(s.summary.lifecycle.disposalIntegrity, { countersBalanced: false, clean: false, finalDisposed: 10 }); },
+    'countersBalanced'],
+  ['disposalIntegrity.clean !== true with everything else sound',
+    (s) => { s.summary.lifecycle.disposalIntegrity.clean = false; }, 'clean'],
+  ['a single-model packet missing safety-reader',
+    (s) => { s.summary.lifecycle.componentRequestCounts = { embedder: 11, 'safety-reader': 0 }; }, 'safety-reader'],
+  ['a single-model packet missing embedder',
+    (s) => { s.summary.lifecycle.componentRequestCounts = { embedder: 0, 'safety-reader': 11 }; }, 'embedder'],
+  ['a packet with no componentRequestCounts at all',
+    (s) => { delete s.summary.lifecycle.componentRequestCounts; }, 'componentRequestCounts'],
+]) {
+  const s = soundSession();
+  mutate(s);
+  const d = checkMeasuredEvidence(s);
+  check(`ITEM3 [D]: REJECTS ${label}`, d.ok === false && String(d.reason).includes(needle), d.reason ?? '');
+  check(`ITEM3 gate: ${label} turns the reviewed gate RED`, gateWith(s).ok === false);
+}
+
+// [G]: the same properties must be RE-DERIVED from the raw bytes, not believed.
+const provenanceOf = (path) => verifyEvidencePacket({ sessionPath: path, requireManifest: false });
+const gOf = (v) => checkEvidenceProvenance({ ...v, manifestChecked: true });
+{
+  const pkt = makePacket();
+  const v = provenanceOf(sealPacket(pkt));
+  check('ITEM3 [G]: positive control — sequential dual-model packet is BOUND',
+    v.ok === true && gOf(v).ok === true, v.problems.join('; ').slice(0, 160));
+  rmSync(pkt.dir, { recursive: true, force: true });
+}
+for (const [label, opts, honest, needle] of [
+  ['concurrent embedder + safety-reader sessions in one PID', { reader: 'overlap' }, (L) => {
+    Object.assign(L, { correlatedRequestCount: 0, componentRequestCounts: { embedder: 0, 'safety-reader': 0 },
+      sessionOverlapCount: 1, correlatedRequests: [], processIds: [] });
+    Object.assign(L.disposalIntegrity, { sessionOverlapCount: 1, clean: false });
+  }, 'sessionOverlapCount'],
+  ['a single-model packet (no safety-reader lifecycle)', { reader: 'none' }, (L) => {
+    Object.assign(L, { correlatedRequestCount: 1, componentRequestCounts: { embedder: 1, 'safety-reader': 0 },
+      correlatedRequests: L.correlatedRequests.slice(0, 1) });
+    Object.assign(L.disposalIntegrity, { finalCreated: 1, finalDisposed: 1 });
+  }, 'safety-reader'],
+  ['a single-model packet (no embedder lifecycle)', { embedder: false }, (L) => {
+    Object.assign(L, { correlatedRequestCount: 1, componentRequestCounts: { embedder: 0, 'safety-reader': 1 },
+      correlatedRequests: L.correlatedRequests.slice(1) });
+    Object.assign(L.disposalIntegrity, { finalCreated: 1, finalDisposed: 1 });
+  }, 'embedder'],
+  ['unbalanced disposal (a created session never disposed, no disposal failure)', { danglingEmbedder: true }, (L) => {
+    Object.assign(L.disposalIntegrity, { finalCreated: 3, finalDisposed: 2, countersBalanced: false, clean: false });
+  }, 'countersBalanced'],
+]) {
+  const pkt = makePacket(opts);
+  const path = sealPacket(pkt);
+  const doc = JSON.parse(readFileSync(path, 'utf-8'));
+  honest(doc.summary.lifecycle);
+  writeFileSync(path, JSON.stringify(doc, null, 2));
+  const v = provenanceOf(path);
+  check(`ITEM3 [G]: REJECTS ${label} even when the packet states it honestly`,
+    v.ok === false && v.problems.some((p) => p.includes(needle)) && gOf(v).ok === false,
+    v.problems.join('; ').slice(0, 160));
+  rmSync(pkt.dir, { recursive: true, force: true });
+}
+for (const [label, tamper, needle] of [
+  ['an inflated embedder count', (L) => { L.componentRequestCounts.embedder += 1; }, 'componentRequestCounts.embedder'],
+  ['an inflated safety-reader count', (L) => { L.componentRequestCounts['safety-reader'] += 1; }, 'componentRequestCounts.safety-reader'],
+  ['a missing componentRequestCounts', (L) => { delete L.componentRequestCounts; }, 'componentRequestCounts'],
+  ['a lifecycle.sessionOverlapCount the log contradicts', (L) => { L.sessionOverlapCount = 1; }, 'sessionOverlapCount'],
+  ['a disposalIntegrity.sessionOverlapCount the log contradicts', (L) => { L.disposalIntegrity.sessionOverlapCount = 1; }, 'sessionOverlapCount'],
+  ['a countersBalanced the log contradicts', (L) => { L.disposalIntegrity.countersBalanced = false; }, 'countersBalanced'],
+  ['a clean flag the log contradicts', (L) => { L.disposalIntegrity.clean = false; }, 'disposalIntegrity.clean'],
+  ['a sampledProcessIds list the raw dumps contradict', (L) => { L.sampledProcessIds = [4242, 1]; }, 'sampledProcessIds'],
+  ['a correlated request attributed to an unsampled PID', (L) => { L.correlatedRequests[0].pid = 1; }, 'sampledProcessIds'],
+]) {
+  const pkt = makePacket();
+  const path = sealPacket(pkt);
+  const doc = JSON.parse(readFileSync(path, 'utf-8'));
+  tamper(doc.summary.lifecycle);
+  writeFileSync(path, JSON.stringify(doc, null, 2));
+  const v = provenanceOf(path);
+  check(`ITEM3 [G]: re-derivation catches ${label}`,
+    v.ok === false && v.problems.some((p) => p.includes(needle)), v.problems.join('; ').slice(0, 160));
+  rmSync(pkt.dir, { recursive: true, force: true });
+}
+{
+  // Cold-restart PID recurrence (4242 -> 5555 -> 4242) is refused by provenance.
+  const pkt = makePacket();
+  const original = [...pkt.session.samples];
+  for (const [offset, pid] of [[3000, 5555], [6000, 4242]]) {
+    for (const sample of original) {
+      const seq = pkt.session.samples.length + 1;
+      const rawFile = join(pkt.dir, `sample-${seq}-recur.txt`);
+      writeFileSync(rawFile, readFileSync(sample.rawFile, 'utf8').replace('pid 4242', `pid ${pid}`));
+      pkt.session.samples.push({ ...sample, seq, rawFile, captureStartMs: sample.captureStartMs + offset,
+        atUtc: new Date(sample.captureStartMs + offset).toISOString() });
+    }
+  }
+  pkt.binding = computeEvidenceBinding({ evidenceDir: pkt.dir, session: pkt.session });
+  const v = provenanceOf(sealPacket(pkt));
+  check('ITEM3 [G]: cold-restart PID recurrence 4242 -> 5555 -> 4242 is REJECTED',
+    v.ok === false && v.problems.some((p) => p.includes('Cold-restart PID continuity violation')),
+    v.problems.join('; ').slice(0, 160));
   rmSync(pkt.dir, { recursive: true, force: true });
 }
 

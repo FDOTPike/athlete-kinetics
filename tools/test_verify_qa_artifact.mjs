@@ -391,13 +391,103 @@ async function main() {
     }
     // Stream 2 PR 2: bidirectional safety_reader.onnx packaging contract
     {
+      // All 8 manifest.safetyReader fields, written as literals independent of
+      // the verifier's constants so a drift on either side is caught.
       const VALID_READER_MANIFEST = {
         id: 'm10-r15-reader-seed3',
-        tag: 'ml-reader-m10-r15-s3',
-        assetPath: SAFETY_READER_ASSET,
-        sha256: SAFETY_READER_SHA256,
-        sizeBytes: SAFETY_READER_SIZE,
+        policyId: 'r15/denial-floor',
+        releaseTag: 'ml-reader-m10-r15-s3',
+        releaseCommit: 'b6ceee70c7b7a9afd793968e8ca15ba17704b572',
+        assetId: 775095775,
+        assetPath: 'assets/safety_reader.onnx',
+        sha256: 'a0fa76e40e10246a9caf9d1be463b72b34f03174c68b017d6673fe9f165cb5cf',
+        sizeBytes: 22881187,
       };
+      check(
+        'verifier SAFETY_READER_ASSET / SIZE / SHA256 agree with the literal 8-field fixture',
+        SAFETY_READER_ASSET === VALID_READER_MANIFEST.assetPath
+          && SAFETY_READER_SIZE === VALID_READER_MANIFEST.sizeBytes
+          && SAFETY_READER_SHA256 === VALID_READER_MANIFEST.sha256,
+        `${SAFETY_READER_ASSET} ${SAFETY_READER_SIZE} ${SAFETY_READER_SHA256}`,
+      );
+      {
+        // Drift guard: the verifier's self-contained 8-field pin must equal the
+        // single source of truth in scripts/safety-reader-integrity.mjs.
+        const integrity = await import('../scripts/safety-reader-integrity.mjs');
+        const { SAFETY_READER_MANIFEST_PIN } = await import('./verify_qa_artifact.mjs');
+        const fromSource = {
+          id: integrity.SAFETY_READER_MODEL_ID,
+          policyId: integrity.SAFETY_READER_POLICY_ID,
+          releaseTag: integrity.PINNED_RELEASE_TAG,
+          releaseCommit: integrity.PINNED_RELEASE_COMMIT,
+          assetId: integrity.PINNED_ASSET_ID,
+          assetPath: 'assets/safety_reader.onnx',
+          sha256: integrity.KNOWN_SHA256[integrity.SAFETY_READER_ARTIFACT],
+          sizeBytes: integrity.KNOWN_BYTES[integrity.SAFETY_READER_ARTIFACT],
+        };
+        check(
+          'verifier SAFETY_READER_MANIFEST_PIN equals scripts/safety-reader-integrity.mjs (exact 8 keys, strict values)',
+          SAFETY_READER_MANIFEST_PIN !== undefined
+            && JSON.stringify(Object.keys(SAFETY_READER_MANIFEST_PIN))
+              === JSON.stringify(Object.keys(fromSource))
+            && Object.keys(fromSource).every((k) => SAFETY_READER_MANIFEST_PIN[k] === fromSource[k])
+            && Object.keys(fromSource).every((k) => VALID_READER_MANIFEST[k] === fromSource[k]),
+          JSON.stringify(SAFETY_READER_MANIFEST_PIN ?? null).slice(0, 120),
+        );
+      }
+      // 0. Each of the 8 pinned fields tampered individually, a missing field,
+      //    and an unexpected 9th field -> REJECTED (exact 8-key set).
+      const READER_FIELD_TAMPERS = {
+        id: 'm10-r15-reader-seed4',
+        policyId: 'r15/denial-floor-x',
+        releaseTag: 'ml-reader-m10-r15-s4',
+        releaseCommit: 'c'.repeat(40),
+        assetId: 775095776,
+        assetPath: 'assets/safety_reader_x.onnx',
+        sha256: 'f'.repeat(64),
+        sizeBytes: 22881188,
+      };
+      check(
+        'reader tamper table covers exactly the 8 pinned fields',
+        JSON.stringify(Object.keys(READER_FIELD_TAMPERS).sort())
+          === JSON.stringify(Object.keys(VALID_READER_MANIFEST).sort())
+          && Object.keys(VALID_READER_MANIFEST).length === 8,
+        Object.keys(READER_FIELD_TAMPERS).join(','),
+      );
+      for (const [field, bad] of Object.entries(READER_FIELD_TAMPERS)) {
+        await expectRejected(
+          `manifest.safetyReader with tampered ${field} rejected`,
+          fixtureApk(
+            { safetyReader: { ...VALID_READER_MANIFEST, [field]: bad } },
+            { includeSafetyReader: true },
+          ),
+          { ...FIXTURE_OPTS, requireSafetyReader: true },
+        );
+      }
+      for (const field of Object.keys(VALID_READER_MANIFEST)) {
+        const { [field]: _omitted, ...missing } = VALID_READER_MANIFEST;
+        await expectRejected(
+          `manifest.safetyReader missing ${field} rejected`,
+          fixtureApk({ safetyReader: missing }, { includeSafetyReader: true }),
+          { ...FIXTURE_OPTS, requireSafetyReader: true },
+        );
+      }
+      await expectRejected(
+        'manifest.safetyReader with unexpected 9th field rejected',
+        fixtureApk(
+          { safetyReader: { ...VALID_READER_MANIFEST, tag: 'ml-reader-m10-r15-s3' } },
+          { includeSafetyReader: true },
+        ),
+        { ...FIXTURE_OPTS, requireSafetyReader: true },
+      );
+      await expectRejected(
+        'manifest.safetyReader with stringified assetId rejected (type-exact)',
+        fixtureApk(
+          { safetyReader: { ...VALID_READER_MANIFEST, assetId: '775095775' } },
+          { includeSafetyReader: true },
+        ),
+        { ...FIXTURE_OPTS, requireSafetyReader: true },
+      );
       // 1. Undeclared safety_reader.onnx in APK without manifest.safetyReader -> REJECTED (AGENT_WORKFLOW §1.2)
       await expectRejected(
         'undeclared assets/safety_reader.onnx without manifest.safetyReader rejected',

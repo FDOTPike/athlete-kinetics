@@ -6,7 +6,14 @@
  *   - Android DocumentDir working-copy isolation vs iOS MainBundleDir in-place loading;
  *   - End-to-end useStore.reportSubjective wiring (subtle safety halt, harmless denial
  *     suppression, uncontested positive-strong preservation, fail-safe fallback on reader
- *     error, and async athlete-ownership lease retention while safetyReader.classify awaits).
+ *     error, async athlete-ownership lease retention while safetyReader.classify awaits,
+ *     classify short-circuit when the keyword/semantic baseline already halts, and
+ *     codebase-read failure isolation when only the safety reader is present).
+ *
+ * Native modules are mocked ONCE at module scope (no jest.resetModules): the
+ * device wrappers require react-native-blob-util / onnxruntime-react-native
+ * lazily inside their async factories and read Platform.OS at call time, so
+ * every test mutates the SAME Platform object those wrappers imported.
  */
 import { Platform } from 'react-native';
 import { useStore, closeStoreDatabaseForRestore } from '../../src/state/useStore';
@@ -41,12 +48,146 @@ jest.mock('../../src/state/athleteRegistry', () => ({
   },
 }));
 
+// One-shot codebase read failure: when armed, the NEXT read of
+// `getCodebase().entries` inside useStore throws. Everything else delegates to
+// the real loaded codebase.
+const mockCodebaseFault = { armed: false };
+jest.mock('@ak/inference', () => {
+  const actual = jest.requireActual('@ak/inference');
+  return {
+    ...actual,
+    loadCodebase: (...args) => {
+      const real = actual.loadCodebase(...args);
+      return new Proxy(real, {
+        get(target, prop, receiver) {
+          if (prop === 'entries' && mockCodebaseFault.armed) {
+            mockCodebaseFault.armed = false;
+            throw new Error('simulated codebase read failure');
+          }
+          return Reflect.get(target, prop, receiver);
+        },
+      });
+    },
+  };
+});
+
+// Per-test mutable native harness backing the module-scope native mocks.
+const mockOrtHarness = {
+  files: new Map(),
+  createdModelPaths: [],
+  activeNativeSessions: 0,
+  maxConcurrentSessions: 0,
+  failNextDispose: false,
+};
+const resetOrtHarness = (entries) => {
+  mockOrtHarness.files = new Map(entries);
+  mockOrtHarness.createdModelPaths = [];
+  mockOrtHarness.activeNativeSessions = 0;
+  mockOrtHarness.maxConcurrentSessions = 0;
+  mockOrtHarness.failNextDispose = false;
+};
+const mockDelay = (ms) => new Promise((done) => setTimeout(done, ms));
+
+jest.mock(
+  'react-native-blob-util',
+  () => ({
+    default: {
+      fs: {
+        dirs: { DocumentDir: '/docs', MainBundleDir: '/bundle' },
+        asset: (name) => `asset:${name}`,
+        exists: async (p) => mockOrtHarness.files.has(p),
+        ls: async (dir) =>
+          [...mockOrtHarness.files.keys()]
+            .filter((k) => k.startsWith(`${dir}/`))
+            .map((k) => k.slice(dir.length + 1)),
+        cp: async (src, dst) => {
+          await mockDelay(5);
+          if (!mockOrtHarness.files.has(src)) throw new Error(`missing ${src}`);
+          mockOrtHarness.files.set(dst, mockOrtHarness.files.get(src));
+        },
+        mv: async (src, dst) => {
+          if (!mockOrtHarness.files.has(src)) return false;
+          mockOrtHarness.files.set(dst, mockOrtHarness.files.get(src));
+          mockOrtHarness.files.delete(src);
+          return true;
+        },
+        readFile: async (p) => {
+          await mockDelay(5);
+          if (!mockOrtHarness.files.has(p)) throw new Error(`ENOENT ${p}`);
+          return mockOrtHarness.files.get(p);
+        },
+        unlink: async (p) => {
+          mockOrtHarness.files.delete(p);
+        },
+      },
+    },
+  }),
+);
+
+jest.mock(
+  'onnxruntime-react-native',
+  () => {
+    class MockTensor {
+      constructor(type, data, dims) {
+        this.type = type;
+        this.data = data;
+        this.dims = dims;
+      }
+    }
+    return {
+      Tensor: MockTensor,
+      InferenceSession: {
+        create: async (modelPath) => {
+          if (!mockOrtHarness.files.has(modelPath)) throw new Error(`ENOENT ${modelPath}`);
+          mockOrtHarness.createdModelPaths.push(modelPath);
+          mockOrtHarness.activeNativeSessions += 1;
+          mockOrtHarness.maxConcurrentSessions = Math.max(
+            mockOrtHarness.maxConcurrentSessions,
+            mockOrtHarness.activeNativeSessions,
+          );
+          const isReader = modelPath.includes('safety-reader') || modelPath.includes('safety_reader');
+          return {
+            inputNames: ['input_ids', 'attention_mask'],
+            outputNames: isReader ? ['caution_logit', 'routing_logits'] : ['last_hidden_state'],
+            async run(feeds) {
+              await mockDelay(15);
+              const n = feeds.input_ids.dims[1];
+              if (isReader) {
+                const routing = new Float32Array(13).fill(-1);
+                routing[0] = 3.5; // dizzy
+                return {
+                  caution_logit: { data: Float32Array.from([4.2]), dims: [1], type: 'float32' },
+                  routing_logits: { data: routing, dims: [1, 13], type: 'float32' },
+                };
+              }
+              return {
+                last_hidden_state: { data: new Float32Array(n * 384).fill(0.1), dims: [1, n, 384] },
+              };
+            },
+            handler: {
+              async dispose() {
+                await mockDelay(5);
+                mockOrtHarness.activeNativeSessions -= 1;
+                if (mockOrtHarness.failNextDispose) {
+                  mockOrtHarness.failNextDispose = false;
+                  throw new Error('simulated native release failure');
+                }
+              },
+            },
+          };
+        },
+      },
+    };
+  },
+  { virtual: true },
+);
+
 const A = 'athlete_kinetics.db';
 const B = 'athlete_b.db';
-const state = () => useStore.getState();
+const getStoreState = () => useStore.getState();
 const rows = (file, sql, ...params) => mockDrivers.get(file).raw.prepare(sql).all(...params);
 const settle = async () => {
-  for (let n = 0; n < 8; n += 1) await new Promise((r) => setImmediate(r));
+  for (let n = 0; n < 8; n += 1) await new Promise((done) => setImmediate(done));
 };
 const deferred = () => {
   let resolve;
@@ -57,9 +198,25 @@ const deferred = () => {
   });
   return { promise, resolve, reject };
 };
+const codebaseVectorFor = (entryId) => {
+  const codebaseJson = require('../../../../packages/inference/assets/phrase-codebase.json');
+  const vectorsAsset = require('../../../../packages/inference/assets/phrase-codebase.vectors.json');
+  let offset = 0;
+  for (const entry of codebaseJson.entries) {
+    if (entry.id === entryId) return Float32Array.from(vectorsAsset.vectors[offset]);
+    offset += 1 + entry.aliases.length;
+  }
+  throw new Error(`no codebase entry ${entryId}`);
+};
+const QA_MANIFEST = JSON.stringify({
+  schema: 'ak.candidate-manifest/1',
+  label: 'NON_PRODUCTION_QA_DEBUG_SIGNED',
+  qaLifecycleTelemetry: true,
+});
 
 beforeEach(async () => {
-  await state().connectBiometrics(null);
+  mockCodebaseFault.armed = false;
+  await getStoreState().connectBiometrics(null);
   resetDataMaintenanceLockForTests();
   authorizeAthleteDataBoot();
   closeStoreDatabaseForRestore();
@@ -83,20 +240,20 @@ beforeEach(async () => {
     biometricsStatus: 'off',
     lastTriage: null,
   });
-  state().setEmbedder(null);
-  state().setSafetyReader(null);
-  state().boot();
+  getStoreState().setEmbedder(null);
+  getStoreState().setSafetyReader(null);
+  getStoreState().boot();
   await settle();
-  expect(state().status).toBe('ready');
-  expect(state().loadDemoAthlete()).toBe('loaded');
+  expect(getStoreState().status).toBe('ready');
+  expect(getStoreState().loadDemoAthlete()).toBe('loaded');
   expect(activeDataMutationLeaseCount()).toBe(0);
 });
 
 describe('Stream 2 PR 3 — mobile safety reader + shared scheduler + useStore wiring', () => {
   test('reportSubjective escalates subtle neurological symptoms missed by MiniLM & keywords to dizzy halt', async () => {
     // Low-magnitude non-matching vector -> semantic triage rejects
-    state().setEmbedder({ embed: async () => new Float32Array(384) });
-    state().setSafetyReader({
+    getStoreState().setEmbedder({ embed: async () => new Float32Array(384) });
+    getStoreState().setSafetyReader({
       modelId: 'm10-r15-reader-seed3',
       policyId: 'r15/denial-floor',
       classify: async () => ({
@@ -108,20 +265,20 @@ describe('Stream 2 PR 3 — mobile safety reader + shared scheduler + useStore w
     });
 
     expect(
-      state().createTrainingProgram({
+      getStoreState().createTrainingProgram({
         horizon: { kind: 'weeks', blockCount: 1 },
         schemaType: 'LINEAR',
         dayIndices: [1, 3, 5],
       }),
     ).toBe(true);
-    const nextPlanned = state().blockSessions.find((s) => !s.completed);
+    const nextPlanned = getStoreState().blockSessions.find((s) => !s.completed);
     expect(nextPlanned).toBeDefined();
-    state().startSession(false, nextPlanned.plannedSessionId);
-    expect(state().session).not.toBeNull();
-    expect(state().runner?.phase).toBe('working');
+    getStoreState().startSession(false, nextPlanned.plannedSessionId);
+    expect(getStoreState().session).not.toBeNull();
+    expect(getStoreState().runner?.phase).toBe('working');
 
     const before = rows(A, 'SELECT * FROM subjective_report').length;
-    const saved = await state().reportSubjective('vision went dim for a second after standing', 8);
+    const saved = await getStoreState().reportSubjective('vision went dim for a second after standing', 8);
     expect(saved).toBe(true);
 
     const inserted = rows(
@@ -137,18 +294,18 @@ describe('Stream 2 PR 3 — mobile safety reader + shared scheduler + useStore w
         rpe_cap: 0,
       },
     ]);
-    expect(state().lastTriage?.kind).toBe('matched');
-    expect(state().lastTriage?.directive?.halt).toBe(true);
-    expect(state().runner?.phase).toBe('halted');
-    expect(state().runner?.haltReason).toBe('safety');
+    expect(getStoreState().lastTriage?.kind).toBe('matched');
+    expect(getStoreState().lastTriage?.directive?.halt).toBe(true);
+    expect(getStoreState().runner?.phase).toBe('halted');
+    expect(getStoreState().runner?.haltReason).toBe('safety');
   });
 
   test('reportSubjective suppresses harmless denial misfires from MiniLM without modifying prescription', async () => {
     // Force MiniLM to return exact canonical vector for pain-mild
     const vectorsAsset = require('../../../../packages/inference/assets/phrase-codebase.vectors.json');
     const painMildVec = Float32Array.from(vectorsAsset.vectors[0]);
-    state().setEmbedder({ embed: async () => painMildVec });
-    state().setSafetyReader({
+    getStoreState().setEmbedder({ embed: async () => painMildVec });
+    getStoreState().setSafetyReader({
       modelId: 'm10-r15-reader-seed3',
       policyId: 'r15/denial-floor',
       classify: async () => ({
@@ -159,9 +316,9 @@ describe('Stream 2 PR 3 — mobile safety reader + shared scheduler + useStore w
       }),
     });
 
-    const baselinePrescription = state().prescription?.vector;
+    const baselinePrescription = getStoreState().prescription?.vector;
     const before = rows(A, 'SELECT * FROM subjective_report').length;
-    const saved = await state().reportSubjective('no pain today', 2);
+    const saved = await getStoreState().reportSubjective('no pain today', 2);
     expect(saved).toBe(true);
 
     const inserted = rows(
@@ -176,22 +333,15 @@ describe('Stream 2 PR 3 — mobile safety reader + shared scheduler + useStore w
         load_modifier: null,
       },
     ]);
-    expect(state().lastTriage).toEqual({ kind: 'rejected' });
-    expect(state().prescription?.vector).toEqual(baselinePrescription);
+    expect(getStoreState().lastTriage).toEqual({ kind: 'rejected' });
+    expect(getStoreState().prescription?.vector).toEqual(baselinePrescription);
   });
 
   test('reportSubjective preserves positive-strong acknowledgment when reader sees no caution, and degrades fail-safe when reader throws', async () => {
-    const codebaseJson = require('../../../../packages/inference/assets/phrase-codebase.json');
     const vectorsAsset = require('../../../../packages/inference/assets/phrase-codebase.vectors.json');
-    // Find vector index for positive-strong primary text
-    let offset = 0;
-    for (const entry of codebaseJson.entries) {
-      if (entry.id === 'positive-strong') break;
-      offset += 1 + entry.aliases.length;
-    }
-    const positiveVec = Float32Array.from(vectorsAsset.vectors[offset]);
-    state().setEmbedder({ embed: async () => positiveVec });
-    state().setSafetyReader({
+    const positiveVec = codebaseVectorFor('positive-strong');
+    getStoreState().setEmbedder({ embed: async () => positiveVec });
+    getStoreState().setSafetyReader({
       modelId: 'm10-r15-reader-seed3',
       policyId: 'r15/denial-floor',
       classify: async () => ({
@@ -202,44 +352,44 @@ describe('Stream 2 PR 3 — mobile safety reader + shared scheduler + useStore w
       }),
     });
 
-    const okPos = await state().reportSubjective('feeling strong and fresh today, weights are moving fast', 1);
+    const okPos = await getStoreState().reportSubjective('feeling strong and fresh today, weights are moving fast', 1);
     expect(okPos).toBe(true);
-    expect(state().lastTriage?.kind).toBe('positive');
-    expect(state().lastTriage?.entryId).toBe('positive-strong');
+    expect(getStoreState().lastTriage?.kind).toBe('positive');
+    expect(getStoreState().lastTriage?.entryId).toBe('positive-strong');
 
     // Now simulate safetyReader throwing -> must degrade cleanly to shipped pain-mild match
     const painMildVec = Float32Array.from(vectorsAsset.vectors[0]);
-    state().setEmbedder({ embed: async () => painMildVec });
-    state().setSafetyReader({
+    getStoreState().setEmbedder({ embed: async () => painMildVec });
+    getStoreState().setSafetyReader({
       modelId: 'm10-r15-reader-seed3',
       policyId: 'r15/denial-floor',
       classify: async () => {
         throw new Error('simulated native reader failure');
       },
     });
-    const okFallback = await state().reportSubjective('knee is a little tender today', 6);
+    const okFallback = await getStoreState().reportSubjective('knee is a little tender today', 6);
     expect(okFallback).toBe(true);
-    expect(state().lastTriage?.kind).toBe('matched');
-    expect(state().error).toBeNull();
+    expect(getStoreState().lastTriage?.kind).toBe('matched');
+    expect(getStoreState().error).toBeNull();
   });
 
   test('async athlete-ownership lease stays held while safetyReader.classify is pending', async () => {
     const holdReader = deferred();
-    state().setEmbedder({ embed: async () => new Float32Array(384) });
-    state().setSafetyReader({
+    getStoreState().setEmbedder({ embed: async () => new Float32Array(384) });
+    getStoreState().setSafetyReader({
       modelId: 'm10-r15-reader-seed3',
       policyId: 'r15/denial-floor',
       classify: () => holdReader.promise,
     });
 
     const before = rows(A, 'SELECT * FROM subjective_report').length;
-    const pending = state().reportSubjective('vision went spotty after the set', 9);
+    const pending = getStoreState().reportSubjective('vision went spotty after the set', 9);
     await settle();
 
     // Embedder already settled, safetyReader is still awaiting -> lease MUST still be held!
     expect(activeDataMutationLeaseCount()).toBe(1);
-    state().switchAthlete('athlete-b');
-    expect(state().activeAthleteId).toBe('default');
+    getStoreState().switchAthlete('athlete-b');
+    expect(getStoreState().activeAthleteId).toBe('default');
     expect(() => acquireDataMaintenanceLock('test-restore')).toThrow(/still being saved/i);
 
     holdReader.resolve({
@@ -257,6 +407,131 @@ describe('Stream 2 PR 3 — mobile safety reader + shared scheduler + useStore w
     ]);
   });
 
+  test('keyword halt with no embedder never calls safetyReader.classify', async () => {
+    const classifySpy = jest.fn(async () => ({
+      cautionLogit: -5.1,
+      active: false,
+      standaloneRouteId: null,
+      actionableRouteId: null,
+    }));
+    getStoreState().setSafetyReader({
+      modelId: 'm10-r15-reader-seed3',
+      policyId: 'r15/denial-floor',
+      classify: classifySpy,
+    });
+
+    const before = rows(A, 'SELECT * FROM subjective_report').length;
+    const saved = await getStoreState().reportSubjective('feeling dizzy and faint', 7);
+    expect(saved).toBe(true);
+    expect(classifySpy).not.toHaveBeenCalled();
+    expect(rows(A, 'SELECT matched_entry_id, halt FROM subjective_report').slice(before)).toEqual([
+      { matched_entry_id: 'red-flag-systemic', halt: 1 },
+    ]);
+    expect(getStoreState().lastTriage?.directive?.halt).toBe(true);
+    expect(activeDataMutationLeaseCount()).toBe(0);
+  });
+
+  test('semantic halt never calls safetyReader.classify', async () => {
+    const dizzyVec = codebaseVectorFor('dizzy');
+    getStoreState().setEmbedder({ embed: async () => dizzyVec });
+    const classifySpy = jest.fn(async () => ({
+      cautionLogit: -5.1,
+      active: false,
+      standaloneRouteId: null,
+      actionableRouteId: null,
+    }));
+    getStoreState().setSafetyReader({
+      modelId: 'm10-r15-reader-seed3',
+      policyId: 'r15/denial-floor',
+      classify: classifySpy,
+    });
+
+    const before = rows(A, 'SELECT * FROM subjective_report').length;
+    const saved = await getStoreState().reportSubjective('vision went dim for a second after standing', 7);
+    expect(saved).toBe(true);
+    expect(classifySpy).not.toHaveBeenCalled();
+    expect(rows(A, 'SELECT matched_entry_id, halt FROM subjective_report').slice(before)).toEqual([
+      { matched_entry_id: 'dizzy', halt: 1 },
+    ]);
+    expect(activeDataMutationLeaseCount()).toBe(0);
+  });
+
+  test('a never-resolving safetyReader.classify cannot delay a keyword halt or hold the lease', async () => {
+    const never = new Promise(() => {});
+    const classifySpy = jest.fn(() => never);
+    getStoreState().setSafetyReader({
+      modelId: 'm10-r15-reader-seed3',
+      policyId: 'r15/denial-floor',
+      classify: classifySpy,
+    });
+
+    const before = rows(A, 'SELECT * FROM subjective_report').length;
+    const pending = getStoreState().reportSubjective('feeling dizzy and faint', 7);
+    const outcome = await Promise.race([
+      pending.then((saved) => ({ saved })),
+      new Promise((done) => setTimeout(() => done({ saved: 'still pending' }), 1000)),
+    ]);
+    expect(outcome).toEqual({ saved: true });
+    expect(classifySpy).not.toHaveBeenCalled();
+    expect(activeDataMutationLeaseCount()).toBe(0);
+    expect(rows(A, 'SELECT matched_entry_id, halt FROM subjective_report').slice(before)).toEqual([
+      { matched_entry_id: 'red-flag-systemic', halt: 1 },
+    ]);
+  });
+
+  test('codebase read failure with no embedder degrades to the keyword baseline without losing the report or the lease', async () => {
+    const classifySpy = jest.fn(async () => ({
+      cautionLogit: 6.1,
+      active: true,
+      standaloneRouteId: 'dizzy',
+      actionableRouteId: 'dizzy',
+    }));
+    getStoreState().setSafetyReader({
+      modelId: 'm10-r15-reader-seed3',
+      policyId: 'r15/denial-floor',
+      classify: classifySpy,
+    });
+
+    const before = rows(A, 'SELECT * FROM subjective_report').length;
+    mockCodebaseFault.armed = true;
+    let saved;
+    let thrown = null;
+    try {
+      saved = await getStoreState().reportSubjective('knee is a little tender today', 4);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).toBeNull();
+    expect(saved).toBe(true);
+    // The armed fault was consumed by the codebase read, not left pending.
+    expect(mockCodebaseFault.armed).toBe(false);
+    // Baseline is resolveReport(raw, null): no keyword, no semantic -> logged, unmatched.
+    expect(
+      rows(A, 'SELECT raw_text, matched_entry_id, halt FROM subjective_report').slice(before),
+    ).toEqual([{ raw_text: 'knee is a little tender today', matched_entry_id: null, halt: 0 }]);
+    expect(activeDataMutationLeaseCount()).toBe(0);
+    expect(getStoreState().triaging).toBe(false);
+  });
+
+  test('safetyReader.classify throwing with no embedder degrades to the keyword baseline', async () => {
+    getStoreState().setSafetyReader({
+      modelId: 'm10-r15-reader-seed3',
+      policyId: 'r15/denial-floor',
+      classify: async () => {
+        throw new Error('simulated native reader failure');
+      },
+    });
+
+    const before = rows(A, 'SELECT * FROM subjective_report').length;
+    const saved = await getStoreState().reportSubjective('knee is a little tender today', 4);
+    expect(saved).toBe(true);
+    expect(
+      rows(A, 'SELECT raw_text, matched_entry_id, halt FROM subjective_report').slice(before),
+    ).toEqual([{ raw_text: 'knee is a little tender today', matched_entry_id: null, halt: 0 }]);
+    expect(activeDataMutationLeaseCount()).toBe(0);
+    expect(getStoreState().error).toBeNull();
+  });
+
   test('deviceEmbedder and deviceSafetyReader share one SerializedOrtScheduler, isolate Android working copies, and avoid QA manifest race', async () => {
     const origOS = Platform.OS;
     const origDev = global.__DEV__;
@@ -265,129 +540,22 @@ describe('Stream 2 PR 3 — mobile safety reader + shared scheduler + useStore w
       logs.push(args.join(' '));
     });
 
-    let activeNativeSessions = 0;
-    let maxConcurrentSessions = 0;
-    let failNextDispose = false;
-    const files = new Map([
+    resetOrtHarness([
       ['asset:minilm.onnx', 'minilm-bytes'],
       ['asset:safety_reader.onnx', 'reader-bytes'],
-      [
-        'asset:candidate_manifest.json',
-        JSON.stringify({
-          schema: 'ak.candidate-manifest/1',
-          label: 'NON_PRODUCTION_QA_DEBUG_SIGNED',
-          qaLifecycleTelemetry: true,
-        }),
-      ],
+      ['asset:candidate_manifest.json', QA_MANIFEST],
       ['/docs/minilm-0000000000000000.onnx', 'stale-minilm'],
       ['/docs/safety-reader-1111111111111111.onnx', 'stale-reader'],
     ]);
 
-    jest.resetModules();
     Platform.OS = 'android';
     global.__DEV__ = false;
-
-    jest.doMock(
-      'react-native-blob-util',
-      () => ({
-        default: {
-          fs: {
-            dirs: { DocumentDir: '/docs', MainBundleDir: '/bundle' },
-            asset: (name) => `asset:${name}`,
-            exists: async (p) => files.has(p),
-            ls: async (dir) =>
-              [...files.keys()]
-                .filter((k) => k.startsWith(`${dir}/`))
-                .map((k) => k.slice(dir.length + 1)),
-            cp: async (src, dst) => {
-              await new Promise((r) => setTimeout(r, 5));
-              if (!files.has(src)) throw new Error(`missing ${src}`);
-              files.set(dst, files.get(src));
-            },
-            mv: async (src, dst) => {
-              if (!files.has(src)) return false;
-              files.set(dst, files.get(src));
-              files.delete(src);
-              return true;
-            },
-            readFile: async (p) => {
-              await new Promise((r) => setTimeout(r, 5));
-              if (!files.has(p)) throw new Error(`ENOENT ${p}`);
-              return files.get(p);
-            },
-            unlink: async (p) => {
-              files.delete(p);
-            },
-          },
-        },
-      }),
-      { virtual: true },
-    );
-
-    class MockTensor {
-      constructor(type, data, dims) {
-        this.type = type;
-        this.data = data;
-        this.dims = dims;
-      }
-    }
-
-    jest.doMock(
-      'onnxruntime-react-native',
-      () => ({
-        Tensor: MockTensor,
-        InferenceSession: {
-          create: async (modelPath) => {
-            activeNativeSessions += 1;
-            maxConcurrentSessions = Math.max(maxConcurrentSessions, activeNativeSessions);
-            const isReader = modelPath.includes('safety-reader') || modelPath.includes('safety_reader');
-            return {
-              inputNames: ['input_ids', 'attention_mask'],
-              outputNames: isReader ? ['caution_logit', 'routing_logits'] : ['last_hidden_state'],
-              async run(feeds) {
-                await new Promise((r) => setTimeout(r, 15));
-                const n = feeds.input_ids.dims[1];
-                if (isReader) {
-                  const routing = new Float32Array(13).fill(-1);
-                  routing[0] = 3.5; // dizzy
-                  return {
-                    caution_logit: { data: Float32Array.from([4.2]), dims: [1], type: 'float32' },
-                    routing_logits: { data: routing, dims: [1, 13], type: 'float32' },
-                  };
-                }
-                return {
-                  last_hidden_state: { data: new Float32Array(n * 384).fill(0.1), dims: [1, n, 384] },
-                };
-              },
-              handler: {
-                async dispose() {
-                  await new Promise((r) => setTimeout(r, 5));
-                  activeNativeSessions -= 1;
-                  if (failNextDispose) {
-                    failNextDispose = false;
-                    throw new Error('simulated native release failure');
-                  }
-                },
-              },
-            };
-          },
-        },
-      }),
-      { virtual: true },
-    );
-
     try {
-      const freshEmbMod = require('../../src/inference/deviceEmbedder');
-      const freshRdrMod = require('../../src/inference/deviceSafetyReader');
-      const freshSchedMod = require('../../src/inference/deviceOrtScheduler');
-      freshSchedMod.resetQaTelemetryCacheForTests();
-      freshSchedMod.createFreshDeviceOrtSchedulerForTests();
+      resetQaTelemetryCacheForTests();
+      createFreshDeviceOrtSchedulerForTests();
 
       // Concurrent startup creation (mirrors App.tsx) -> must NOT race on .qa_manifest scratch file
-      const [emb, rdr] = await Promise.all([
-        freshEmbMod.tryCreateDeviceEmbedder(),
-        freshRdrMod.tryCreateDeviceSafetyReader(),
-      ]);
+      const [emb, rdr] = await Promise.all([tryCreateDeviceEmbedder(), tryCreateDeviceSafetyReader()]);
       expect(emb).not.toBeNull();
       expect(rdr).not.toBeNull();
 
@@ -398,29 +566,79 @@ describe('Stream 2 PR 3 — mobile safety reader + shared scheduler + useStore w
       ]);
       expect(vec.length).toBe(384);
       expect(pred.actionableRouteId).toBe('dizzy');
-      expect(maxConcurrentSessions).toBe(1);
-      expect(activeNativeSessions).toBe(0);
+      expect(mockOrtHarness.maxConcurrentSessions).toBe(1);
+      expect(mockOrtHarness.activeNativeSessions).toBe(0);
+
+      // Android sessions open the DocumentDir working copies, never the bundle.
+      expect([...mockOrtHarness.createdModelPaths].sort()).toEqual([
+        '/docs/minilm-afdb6f1a0e45b715.onnx',
+        '/docs/safety-reader-a0fa76e40e10246a.onnx',
+      ]);
 
       // Verify stale working copies were cleaned up WITHOUT deleting the other model's active copy
-      expect(files.has('/docs/minilm-afdb6f1a0e45b715.onnx')).toBe(true);
-      expect(files.has('/docs/safety-reader-a0fa76e40e10246a.onnx')).toBe(true);
-      expect(files.has('/docs/minilm-0000000000000000.onnx')).toBe(false);
-      expect(files.has('/docs/safety-reader-1111111111111111.onnx')).toBe(false);
+      expect(mockOrtHarness.files.has('/docs/minilm-afdb6f1a0e45b715.onnx')).toBe(true);
+      expect(mockOrtHarness.files.has('/docs/safety-reader-a0fa76e40e10246a.onnx')).toBe(true);
+      expect(mockOrtHarness.files.has('/docs/minilm-0000000000000000.onnx')).toBe(false);
+      expect(mockOrtHarness.files.has('/docs/safety-reader-1111111111111111.onnx')).toBe(false);
 
       // Verify BOTH lifecycle tags emitted without scratch-file race loss
       expect(logs.some((l) => l.includes('[embedder-lifecycle] request=1 ok=1'))).toBe(true);
       expect(logs.some((l) => l.includes('[safety-reader-lifecycle] request=1 ok=1'))).toBe(true);
 
       // Verify cross-wrapper fail-closed disposal latch: if safetyReader release() throws, embedder is ALSO blocked!
-      failNextDispose = true;
+      mockOrtHarness.failNextDispose = true;
       await expect(rdr.classify('trigger release failure')).rejects.toThrow(/simulated native release failure/);
       await expect(emb.embed('must be blocked by shared latch')).rejects.toThrow(/latched fail-closed/);
     } finally {
       Platform.OS = origOS;
       global.__DEV__ = origDev;
       spyLog.mockRestore();
-      jest.dontMock('react-native-blob-util');
-      jest.dontMock('onnxruntime-react-native');
+    }
+  });
+
+  test('iOS loads both bundled models in place without writing working copies to DocumentDir', async () => {
+    const origOS = Platform.OS;
+    const origDev = global.__DEV__;
+    const spyLog = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    resetOrtHarness([
+      ['/bundle/minilm.onnx', 'minilm-bytes'],
+      ['/bundle/safety_reader.onnx', 'reader-bytes'],
+      ['asset:candidate_manifest.json', QA_MANIFEST],
+    ]);
+
+    Platform.OS = 'ios';
+    global.__DEV__ = false;
+    try {
+      resetQaTelemetryCacheForTests();
+      createFreshDeviceOrtSchedulerForTests();
+
+      const [emb, rdr] = await Promise.all([tryCreateDeviceEmbedder(), tryCreateDeviceSafetyReader()]);
+      expect(emb).not.toBeNull();
+      expect(rdr).not.toBeNull();
+
+      const [vec, pred] = await Promise.all([
+        emb.embed('what is a deload week'),
+        rdr.classify('vision went spotty'),
+      ]);
+      expect(vec.length).toBe(384);
+      expect(pred.actionableRouteId).toBe('dizzy');
+      expect(mockOrtHarness.maxConcurrentSessions).toBe(1);
+
+      expect([...mockOrtHarness.createdModelPaths].sort()).toEqual([
+        '/bundle/minilm.onnx',
+        '/bundle/safety_reader.onnx',
+      ]);
+      const docsModelCopies = [...mockOrtHarness.files.keys()].filter(
+        (k) => k.startsWith('/docs/') && k.endsWith('.onnx'),
+      );
+      expect(docsModelCopies).toEqual([]);
+      expect(mockOrtHarness.files.get('/bundle/minilm.onnx')).toBe('minilm-bytes');
+      expect(mockOrtHarness.files.get('/bundle/safety_reader.onnx')).toBe('reader-bytes');
+    } finally {
+      Platform.OS = origOS;
+      global.__DEV__ = origDev;
+      spyLog.mockRestore();
     }
   });
 });

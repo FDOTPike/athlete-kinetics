@@ -133,6 +133,7 @@ import {
   MOVEMENT_PREFIXES,
   RED_FLAG_PAIN,
   RED_FLAG_SYSTEMIC,
+  resolveReport,
   resolveReportWithSafetyReader,
   resolveMovementAvailability,
   triage,
@@ -10421,13 +10422,21 @@ export const useStore = create<KineticsStore>()((set, get) => {
           set({ triageReady: false });
         }
       }
+      // A keyword or semantic halt is already final: the safety reader can only
+      // add caution, so it is never consulted (and can never delay the halt or
+      // hold the lease) when the shipped resolution halts.
+      const baseline = resolveReport(raw, semantic);
+      const baselineHalts =
+        baseline.confident && baseline.entry !== null && baseline.entry.guardrail.halt;
       let readerPrediction: SafetyReaderPrediction | null = null;
-      if (safetyReader !== null) {
+      let codebaseEntries: readonly PhraseEntry[] = [];
+      if (!baselineHalts && safetyReader !== null) {
         try {
+          codebaseEntries = getCodebase().entries;
           readerPrediction = await safetyReader.classify(raw);
         } catch {
-          // Safety reader unavailable or failed: preserve exact shipped
-          // semantic + keyword behavior (`readerPrediction = null`).
+          // Safety reader (or the codebase it combines with) unavailable or
+          // failed: preserve exact shipped semantic + keyword behavior.
           readerPrediction = null;
         }
       }
@@ -10439,12 +10448,10 @@ export const useStore = create<KineticsStore>()((set, get) => {
         set({ error: 'Your report was not saved because the athlete changed while it was being checked. Please report it again.' });
         return false;
       }
-      const resolved = resolveReportWithSafetyReader(
-        raw,
-        semantic,
-        readerPrediction,
-        getCodebase().entries,
-      );
+      const resolved =
+        baselineHalts || readerPrediction === null
+          ? baseline
+          : resolveReportWithSafetyReader(raw, semantic, readerPrediction, codebaseEntries);
       const d = getDb();
       if (!resolved.confident || resolved.entry === null) {
         // No curated match, no red-flag language: log for codebase curation,

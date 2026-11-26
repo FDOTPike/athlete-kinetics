@@ -5,7 +5,7 @@
  *   node tools/inspect_ios_safety_reader.mjs <path/to/AthleteKinetics.app> <out.json>
  */
 import { createHash } from 'node:crypto';
-import { existsSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -30,23 +30,34 @@ export function inspectIosSafetyReader(appPath, outPath = null) {
   let present = false;
   let actualBytes = null;
   let actualSha = null;
+  let absentDetail = 'missing';
 
-  if (existsSync(target)) {
-    const st = statSync(target);
-    if (st.isFile()) {
+  // lstat (never stat): a symlinked .app bundle or a symlinked
+  // safety_reader.onnx fails closed instead of following the link.
+  let appSt = null;
+  try { appSt = lstatSync(appPath); } catch { appSt = null; }
+  if (appSt !== null && appSt.isSymbolicLink()) {
+    absentDetail = 'symlink rejected (app bundle)';
+  } else if (existsSync(target)) {
+    const st = lstatSync(target);
+    if (st.isSymbolicLink()) {
+      absentDetail = 'symlink rejected';
+    } else if (st.isFile()) {
       present = true;
       actualBytes = st.size;
+    } else {
+      absentDetail = 'not a regular file';
     }
   }
   record(
     'safety_reader.onnx present as regular file in app bundle',
     present,
-    present ? `${actualBytes} B` : 'missing',
+    present ? `${actualBytes} B` : absentDetail,
   );
   record(
     'safety_reader.onnx exact ratified byte length',
     present && actualBytes === expectedBytes,
-    present ? `${actualBytes} B (expected ${expectedBytes} B)` : 'missing',
+    present ? `${actualBytes} B (expected ${expectedBytes} B)` : absentDetail,
   );
   if (present && actualBytes === expectedBytes) {
     actualSha = createHash('sha256').update(readFileSync(target)).digest('hex');

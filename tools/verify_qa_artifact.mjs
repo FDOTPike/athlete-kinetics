@@ -64,10 +64,46 @@ export const ARCHIVO_SHA256 =
 // `manifest.safetyReader` is absent and `assets/safety_reader.onnx` MUST NOT be
 // packaged (enforcing AGENT_WORKFLOW.md §1.2). Once declared (or when
 // `requireSafetyReader: true`), exact ratified size and SHA-256 are mandatory.
+// This module stays self-contained (the CLI is exercised as a standalone copy
+// from a spaced scratch path by test_verify_qa_artifact.mjs), so the pins below
+// mirror scripts/safety-reader-integrity.mjs; test_verify_qa_artifact.mjs
+// asserts every value equals that source of truth so drift fails the gate.
 export const SAFETY_READER_ASSET = 'assets/safety_reader.onnx';
 export const SAFETY_READER_SIZE = 22881187;
 export const SAFETY_READER_SHA256 =
   'a0fa76e40e10246a9caf9d1be463b72b34f03174c68b017d6673fe9f165cb5cf';
+/** Exact 8-field `manifest.safetyReader` contract. Key set is exact: a missing
+ *  or extra key rejects the artifact; values compare with strict equality. */
+export const SAFETY_READER_MANIFEST_PIN = Object.freeze({
+  id: 'm10-r15-reader-seed3',
+  policyId: 'r15/denial-floor',
+  releaseTag: 'ml-reader-m10-r15-s3',
+  releaseCommit: 'b6ceee70c7b7a9afd793968e8ca15ba17704b572',
+  assetId: 775095775,
+  assetPath: SAFETY_READER_ASSET,
+  sha256: SAFETY_READER_SHA256,
+  sizeBytes: SAFETY_READER_SIZE,
+});
+
+/** Returns the list of problems (empty when exact) for a declared
+ *  `manifest.safetyReader` against SAFETY_READER_MANIFEST_PIN. */
+export function safetyReaderManifestProblems(declared) {
+  if (declared === null || typeof declared !== 'object' || Array.isArray(declared)) {
+    return ['manifest.safetyReader is not an object'];
+  }
+  const problems = [];
+  const expectedKeys = Object.keys(SAFETY_READER_MANIFEST_PIN);
+  for (const key of Object.keys(declared)) {
+    if (!expectedKeys.includes(key)) problems.push(`unexpected key ${key}`);
+  }
+  for (const key of expectedKeys) {
+    if (!Object.hasOwn(declared, key)) problems.push(`missing key ${key}`);
+    else if (declared[key] !== SAFETY_READER_MANIFEST_PIN[key]) {
+      problems.push(`${key}=${JSON.stringify(declared[key])}`);
+    }
+  }
+  return problems;
+}
 
 /** The Android debug keystore has shipped in TWO distinguished-name shapes:
  *    classic Studio/AGP : C=US, O=Android, CN=Android Debug
@@ -873,19 +909,14 @@ export async function verifyQaArtifact(apkPath, options = {}) {
       );
     }
   } else {
-    const metaOk =
-      declaredSafetyReader !== null
-      && typeof declaredSafetyReader === 'object'
-      && !Array.isArray(declaredSafetyReader)
-      && declaredSafetyReader.assetPath === SAFETY_READER_ASSET
-      && declaredSafetyReader.sizeBytes === SAFETY_READER_SIZE
-      && declaredSafetyReader.sha256 === SAFETY_READER_SHA256;
+    const metaProblems = safetyReaderManifestProblems(declaredSafetyReader);
+    const metaOk = metaProblems.length === 0;
     check(
       'manifest.safetyReader metadata matches ratified pin',
       metaOk,
       metaOk
         ? `${declaredSafetyReader.assetPath} (${declaredSafetyReader.sizeBytes} B)`
-        : JSON.stringify(declaredSafetyReader ?? null).slice(0, 100),
+        : metaProblems.join('; ').slice(0, 160),
     );
     if (!metaOk) {
       throw new QaRejectionError('manifest.safetyReader missing or disagrees with ratified pin');

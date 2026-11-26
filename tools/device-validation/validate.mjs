@@ -152,6 +152,16 @@ Dry run supplies no physical-device or release-gate evidence.`);
     stage = 'cold-resume'; startWatch();
     await ask('Cold relaunch: reopen/resume the unfinished workout. Compare athlete, exercise, sets and elapsed rest with before-cold-start. Record each and any FAIL.');
     capture('after-cold-start');
+    {
+      const read = (name) => (existsSync(join(out, name)) ? readFileSync(join(out, name), 'utf8') : undefined);
+      const harnessSession = read('session.json');
+      report.errors.push(...verifyColdRestartPidContinuity({
+        beforePidText: read('before-cold-start-pid.txt'),
+        afterPidText: read('after-cold-start-pid.txt'),
+        samples: harnessSession ? JSON.parse(harnessSession).samples : undefined,
+      }));
+      save('observations.json', report);
+    }
     await ask('Finish the FULL prescribed session, logging every remaining set and effort. Save session feel and a synthetic note. Record completion and exact visible text. During sampling, exercise a normal body-state report so the QA lifecycle path runs; never induce symptoms or override a halt.');
     capture('session-finished');
     await stopWatch();
@@ -196,7 +206,49 @@ export function harnessPacketErrors(packet) {
   const clean = packet.summary.lifecycle?.disposalIntegrity?.clean;
   if (clean === false) return ['Disposal failure observed.'];
   if (clean !== true) return ['Disposal integrity not confirmed in the harness summary; evidence incomplete.'];
-  return [];
+  // Clean alone is not enough: counters must balance, sessions must be serial,
+  // and BOTH production models must have a correlated request. Missing is failure.
+  const lifecycle = packet.summary.lifecycle;
+  const integrity = lifecycle.disposalIntegrity;
+  const counts = lifecycle.componentRequestCounts;
+  const errors = [];
+  if (integrity.countersBalanced !== true) errors.push('Disposal counters not confirmed balanced in the harness summary; evidence incomplete.');
+  if (integrity.sessionOverlapCount !== 0) errors.push('Disposal integrity does not confirm zero session overlap; evidence incomplete.');
+  if (lifecycle.sessionOverlapCount !== 0) errors.push('Lifecycle summary does not confirm zero session overlap; evidence incomplete.');
+  if (!(counts?.embedder >= 1)) errors.push('No correlated embedder request in the harness summary; evidence incomplete.');
+  if (!(counts?.['safety-reader'] >= 1)) errors.push('No correlated safety-reader request in the harness summary; evidence incomplete.');
+  return errors;
+}
+// Cold restart (force-stop + relaunch) must produce a NEW process: two valid,
+// distinct PIDs from pidof, and the raw samples must show the before PID
+// immediately followed by the after PID, with no PID ever recurring.
+const parsePid = (text) => {
+  const trimmed = typeof text === 'string' ? text.trim() : '';
+  if (!/^\d+$/.test(trimmed)) return null;
+  const pid = Number(trimmed);
+  return Number.isSafeInteger(pid) && pid > 0 ? pid : null;
+};
+export function verifyColdRestartPidContinuity({ beforePidText, afterPidText, samples }) {
+  const errors = [];
+  const beforePid = parsePid(beforePidText);
+  const afterPid = parsePid(afterPidText);
+  if (beforePid === null) errors.push('Cold restart: before-cold-start PID is not a single positive integer.');
+  if (afterPid === null) errors.push('Cold restart: after-cold-start PID is not a single positive integer.');
+  if (beforePid !== null && beforePid === afterPid) errors.push('Cold restart: before and after PIDs are equal; the process did not restart.');
+  if (!Array.isArray(samples)) {
+    errors.push('Cold restart: no harness samples to check PID continuity.');
+    return errors;
+  }
+  const runs = [];
+  for (const s of samples) if (runs.at(-1) !== s?.processId) runs.push(s?.processId);
+  if (new Set(runs).size !== runs.length) errors.push('Cold restart: a sampled PID reappeared after a PID transition.');
+  if (beforePid !== null && afterPid !== null && beforePid !== afterPid) {
+    const i = runs.indexOf(beforePid);
+    if (i === -1 || runs[i + 1] !== afterPid) {
+      errors.push('Cold restart: samples do not show the before PID immediately followed by the after PID.');
+    }
+  }
+  return errors;
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   try { await main(parseArgs(process.argv.slice(2))); }

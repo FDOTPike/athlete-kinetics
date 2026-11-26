@@ -280,7 +280,7 @@ export function verifyEvidencePacket({
       problems.push(e.message);
       markers = [];
     }
-    const { qualified, disposalIntegrity } = correlateRequests({ markers, segments });
+    const { qualified, componentRequestCounts, disposalIntegrity } = correlateRequests({ markers, segments });
     const mem = summarizeMemory({
       samples: samples.map((s) => ({
         atUtcMs: Number.isFinite(s.captureStartMs) ? s.captureStartMs : Date.parse(s.atUtc),
@@ -302,6 +302,12 @@ export function verifyEvidencePacket({
       disposalFailureCount: disposalIntegrity.disposalFailureCount,
       finalCreated: disposalIntegrity.finalCreated,
       finalDisposed: disposalIntegrity.finalDisposed,
+      componentRequestCounts,
+      sessionOverlapCount: disposalIntegrity.sessionOverlapCount,
+      countersBalanced: disposalIntegrity.countersBalanced,
+      disposalClean: disposalIntegrity.clean,
+      // bindTargetSamples (above) enforces cold-restart PID continuity on these.
+      sampledProcessIds: [...new Set(processSamples.map((s) => s.processId))],
       maxSampledPrivateDirtyBytes: mem.maxSampledPrivateDirtyBytes,
       peakClaimable: mem.peakClaimable,
     };
@@ -316,6 +322,11 @@ export function verifyEvidencePacket({
       ['disposalIntegrity.disposalFailureCount', L.disposalIntegrity?.disposalFailureCount, rederived.disposalFailureCount],
       ['disposalIntegrity.finalCreated', L.disposalIntegrity?.finalCreated, rederived.finalCreated],
       ['disposalIntegrity.finalDisposed', L.disposalIntegrity?.finalDisposed, rederived.finalDisposed],
+      ['componentRequestCounts.embedder', L.componentRequestCounts?.embedder, rederived.componentRequestCounts.embedder],
+      ['componentRequestCounts.safety-reader', L.componentRequestCounts?.['safety-reader'],
+        rederived.componentRequestCounts['safety-reader']],
+      ['sessionOverlapCount', L.sessionOverlapCount, rederived.sessionOverlapCount],
+      ['disposalIntegrity.sessionOverlapCount', L.disposalIntegrity?.sessionOverlapCount, rederived.sessionOverlapCount],
       ['memory.maxSampledPrivateDirtyBytes', M.maxSampledPrivateDirtyBytes, rederived.maxSampledPrivateDirtyBytes],
     ];
     for (const [name, claimedVal, derivedVal] of cmp) {
@@ -327,6 +338,47 @@ export function verifyEvidencePacket({
     if (M.peakClaimable !== rederived.peakClaimable) {
       problems.push(`memory.peakClaimable: packet claims ${M.peakClaimable}, re-derivation yields `
         + `${rederived.peakClaimable}`);
+    }
+    for (const [name, claimedVal, derivedVal] of [
+      ['disposalIntegrity.countersBalanced', L.disposalIntegrity?.countersBalanced, rederived.countersBalanced],
+      ['disposalIntegrity.clean', L.disposalIntegrity?.clean, rederived.disposalClean],
+    ]) {
+      if (claimedVal !== derivedVal) {
+        problems.push(`${name}: packet claims ${claimedVal}, re-derivation yields ${derivedVal}`);
+      }
+      if (derivedVal !== true) {
+        problems.push(`${name}: re-derivation from the raw bytes yields ${derivedVal}; true is required`);
+      }
+    }
+    // Both production models must be proven by the raw bytes themselves.
+    for (const component of ['embedder', 'safety-reader']) {
+      const n = rederived.componentRequestCounts[component];
+      if (!(n >= 1)) {
+        problems.push(`componentRequestCounts.${component}: re-derivation from the raw bytes yields ${n}; `
+          + 'at least 1 is required');
+      }
+    }
+    if (rederived.sessionOverlapCount !== 0) {
+      problems.push(`sessionOverlapCount: re-derivation from the raw bytes yields ${rederived.sessionOverlapCount}; `
+        + '0 is required (sessions in one process must be serial)');
+    }
+    // Process identity: the claimed sampled PIDs must be what the raw dumps
+    // name, and every correlated PID the packet or the re-derivation names
+    // must be one of them.
+    const sampled = rederived.sampledProcessIds;
+    if (JSON.stringify(L.sampledProcessIds) !== JSON.stringify(sampled)) {
+      problems.push(`sampledProcessIds: packet claims ${JSON.stringify(L.sampledProcessIds)}, re-derivation `
+        + `from the raw dumps yields ${JSON.stringify(sampled)}`);
+    }
+    const correlatedPids = [
+      ...qualified.map((q) => q.pid),
+      ...(Array.isArray(L.correlatedRequests) ? L.correlatedRequests.map((q) => q?.pid) : []),
+      ...(Array.isArray(L.processIds) ? L.processIds : []),
+    ];
+    const unsampled = [...new Set(correlatedPids.filter((pid) => !sampled.includes(pid)))];
+    if (unsampled.length > 0) {
+      problems.push(`correlated PID(s) ${unsampled.join(', ')} are not in sampledProcessIds `
+        + `${JSON.stringify(sampled)}`);
     }
   }
 

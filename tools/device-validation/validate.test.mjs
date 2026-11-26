@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { captureEvidence, harnessPacketErrors, memoryBand, parseArgs, selectDevice } from './validate.mjs';
+import { captureEvidence, harnessPacketErrors, memoryBand, parseArgs, selectDevice, verifyColdRestartPidContinuity } from './validate.mjs';
 
 test('ceiling boundaries and missing measurements fail closed', () => {
   assert.equal(memoryBand(null), 'NOT MEASURED');
@@ -51,11 +51,71 @@ test('capture accepts large screenshots and a stopped app, but preserves adb fai
 });
 
 test('a summary is accepted only when the harness confirms clean disposal', () => {
+  // A sound packet must also carry the dual-model, serial-session fields
+  // (WO-02 Item 3), so the positive control states them explicitly.
   const withIntegrity = (disposalIntegrity) => ({ summary: { lifecycle: { disposalIntegrity } } });
-  assert.deepEqual(harnessPacketErrors(withIntegrity({ clean: true })), []);
+  const sound = () => ({ summary: { lifecycle: {
+    componentRequestCounts: { embedder: 1, 'safety-reader': 1 },
+    sessionOverlapCount: 0,
+    disposalIntegrity: { clean: true, countersBalanced: true, sessionOverlapCount: 0 },
+  } } });
+  assert.deepEqual(harnessPacketErrors(sound()), []);
   assert.equal(harnessPacketErrors({}).length, 1);
   assert.equal(harnessPacketErrors(withIntegrity({ clean: false })).length, 1);
   for (const packet of [{ summary: {} }, { summary: { lifecycle: {} } }, withIntegrity({}), withIntegrity({ clean: 'true' }), withIntegrity({ clean: null })]) {
     assert.equal(harnessPacketErrors(packet).length, 1, JSON.stringify(packet));
   }
+});
+
+test('harness packet fails closed on unbalanced counters, overlap, or a missing model', () => {
+  const sound = () => ({ summary: { lifecycle: {
+    componentRequestCounts: { embedder: 1, 'safety-reader': 1 },
+    sessionOverlapCount: 0,
+    disposalIntegrity: { clean: true, countersBalanced: true, sessionOverlapCount: 0 },
+  } } });
+  const cases = [
+    ['countersBalanced false', (L) => { L.disposalIntegrity.countersBalanced = false; }, /counters/i],
+    ['countersBalanced missing', (L) => { delete L.disposalIntegrity.countersBalanced; }, /counters/i],
+    ['disposalIntegrity overlap', (L) => { L.disposalIntegrity.sessionOverlapCount = 1; }, /overlap/i],
+    ['disposalIntegrity overlap missing', (L) => { delete L.disposalIntegrity.sessionOverlapCount; }, /overlap/i],
+    ['lifecycle overlap', (L) => { L.sessionOverlapCount = 2; }, /overlap/i],
+    ['lifecycle overlap missing', (L) => { delete L.sessionOverlapCount; }, /overlap/i],
+    ['embedder missing', (L) => { L.componentRequestCounts.embedder = 0; }, /embedder/],
+    ['safety-reader missing', (L) => { L.componentRequestCounts['safety-reader'] = 0; }, /safety-reader/],
+    ['counts absent', (L) => { delete L.componentRequestCounts; }, /embedder/],
+  ];
+  for (const [label, mutate, pattern] of cases) {
+    const packet = sound();
+    mutate(packet.summary.lifecycle);
+    const errors = harnessPacketErrors(packet);
+    assert.ok(errors.length >= 1 && errors.some((e) => pattern.test(e)), `${label}: ${JSON.stringify(errors)}`);
+  }
+  const noCounts = sound();
+  delete noCounts.summary.lifecycle.componentRequestCounts;
+  const noCountErrors = harnessPacketErrors(noCounts);
+  assert.ok(noCountErrors.some((e) => /safety-reader/.test(e)), 'missing counts fail for BOTH models');
+});
+
+test('cold restart requires two distinct valid PIDs, in order, with no recurrence', () => {
+  const run = (pids) => pids.map((processId) => ({ processId }));
+  const ok = { beforePidText: '900\n', afterPidText: '901\r\n', samples: run([900, 900, 900, 901, 901]) };
+  assert.deepEqual(verifyColdRestartPidContinuity(ok), []);
+  // Equal PIDs: the process was never actually restarted.
+  assert.ok(verifyColdRestartPidContinuity({ ...ok, afterPidText: '900\n', samples: run([900, 900]) }).length >= 1);
+  // Non-integer / non-positive / multiple / stopped-app PIDs.
+  for (const bad of ['abc', '12.5', '900 901', 'not running (exit 1)\n', '0', '-5', '']) {
+    assert.ok(verifyColdRestartPidContinuity({ ...ok, beforePidText: bad }).length >= 1, `before ${JSON.stringify(bad)}`);
+    assert.ok(verifyColdRestartPidContinuity({ ...ok, afterPidText: bad }).length >= 1, `after ${JSON.stringify(bad)}`);
+  }
+  // Recurrence 900 -> 901 -> 900.
+  assert.ok(verifyColdRestartPidContinuity({ ...ok, samples: run([900, 901, 900]) }).length >= 1);
+  // Wrong order and a foreign PID in between.
+  assert.ok(verifyColdRestartPidContinuity({ ...ok, samples: run([901, 900]) }).length >= 1);
+  assert.ok(verifyColdRestartPidContinuity({ ...ok, samples: run([900, 950, 901]) }).length >= 1);
+  // Missing inputs.
+  assert.ok(verifyColdRestartPidContinuity({ ...ok, beforePidText: undefined }).length >= 1);
+  assert.ok(verifyColdRestartPidContinuity({ ...ok, afterPidText: undefined }).length >= 1);
+  assert.ok(verifyColdRestartPidContinuity({ ...ok, samples: undefined }).length >= 1);
+  assert.ok(verifyColdRestartPidContinuity({ ...ok, samples: run([900, 900]) }).length >= 1);
+  assert.ok(verifyColdRestartPidContinuity({ ...ok, samples: run([901]) }).length >= 1);
 });

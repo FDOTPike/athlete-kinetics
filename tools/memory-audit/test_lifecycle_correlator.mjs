@@ -636,8 +636,12 @@ const pidLine = (tsMs, pid, msg) =>
 }
 
 {
-  // SOL FINDING 1: disposal THROWS on req 1 (disposedTotal still increments),
-  // then req 2 succeeds cleanly. The failure must remain visible.
+  // SOL FINDING 1 (Owner-ratified OPTION_A, 2026-11-27): disposal THROWS on
+  // req 1 (disposedTotal still increments), leaving that native session leaked
+  // in PID 500. Under strict native leak physics, req 2 in the SAME PID (500)
+  // overlaps the un-disposed session and is REJECTED, whereas a clean request
+  // after a cold restart into a NEW PID (501) QUALIFIES while PID 500's failed
+  // disposal stays surfaced in disposalIntegrity.
   const t = BASE;
   const lines = [
     pidLine(t + 1000, 500, phaseMsg('session', 'start', 1, 1, 0, 0)),
@@ -655,9 +659,12 @@ const pidLine = (tsMs, pid, msg) =>
     pidLine(t + 3300, 500, phaseMsg('disposal', 'settled', 2, 1, 2, 2)),
     pidLine(t + 3300, 500, completionMsg(2, 1, 300)),
   ];
-  const { qualified, disposalIntegrity } = correlate(lines, sampleTimes(t, 20, 300));
-  check('SOL: the clean later request still qualifies',
-    qualified.length === 1 && qualified[0].requestId === 2, String(qualified.length));
+  const { qualified, lifecycleRejected, disposalIntegrity } = correlate(lines, sampleTimes(t, 20, 300));
+  check('SOL: a later request in the SAME PID after a failed disposal is REJECTED for overlapping the leaked session',
+    qualified.length === 0
+      && disposalIntegrity.sessionOverlapCount === 1
+      && lifecycleRejected.some((r) => r.requestId === 2 && r.reasons.some((x) => x.includes('overlap'))),
+    `qualified=${qualified.length} overlaps=${disposalIntegrity.sessionOverlapCount}`);
   check('SOL: the FAILED disposal is surfaced despite that request being rejected',
     disposalIntegrity.disposalFailureCount === 1,
     `failures=${disposalIntegrity.disposalFailureCount}`);
@@ -668,6 +675,26 @@ const pidLine = (tsMs, pid, msg) =>
     'created==disposed yet a disposal threw — exactly why counters cannot be the test');
   check('SOL: the failing request id is named',
     disposalIntegrity.failures[0].requestId === 1 && disposalIntegrity.failures[0].pid === 500);
+
+  const restartLines = [
+    ...lines.slice(0, 7),
+    pidLine(t + 3000, 501, phaseMsg('session', 'start', 1, 1, 0, 0)),
+    pidLine(t + 3100, 501, phaseMsg('session', 'settled', 1, 1, 1, 0)),
+    pidLine(t + 3100, 501, phaseMsg('inference', 'start', 1, 1, 1, 0)),
+    pidLine(t + 3200, 501, phaseMsg('inference', 'settled', 1, 1, 1, 0)),
+    pidLine(t + 3200, 501, phaseMsg('disposal', 'start', 1, 1, 1, 0)),
+    pidLine(t + 3300, 501, phaseMsg('disposal', 'settled', 1, 1, 1, 1)),
+    pidLine(t + 3300, 501, completionMsg(1, 1, 300)),
+  ];
+  const restartRes = correlate(restartLines, sampleTimes(t, 20, 300));
+  check('SOL: a clean request after a cold restart into a NEW PID still qualifies while preserving the earlier PID disposal failure',
+    restartRes.qualified.length === 1
+      && restartRes.qualified[0].pid === 501
+      && restartRes.qualified[0].requestId === 1
+      && restartRes.disposalIntegrity.sessionOverlapCount === 0
+      && restartRes.disposalIntegrity.disposalFailureCount === 1
+      && restartRes.disposalIntegrity.clean === false,
+    `qualified=${restartRes.qualified.length} pid=${restartRes.qualified[0]?.pid} overlaps=${restartRes.disposalIntegrity.sessionOverlapCount} failures=${restartRes.disposalIntegrity.disposalFailureCount}`);
 }
 {
   const t = BASE;
@@ -1039,6 +1066,208 @@ console.log('\n[15] Stream 2 PR 3 — co-scheduled [embedder-lifecycle] + [safet
       && unbalancedRes.disposalIntegrity.clean === false,
     `created=${unbalancedRes.disposalIntegrity.finalCreated}, disposed=${unbalancedRes.disposalIntegrity.finalDisposed}`,
   );
+}
+
+console.log('\n[16] WO-02 Item 3 — serial non-overlap, cold-restart PID continuity, attribution identity');
+{
+  const rPhase = (p, s, req, ok, created, disposed) =>
+    `[safety-reader-lifecycle] ${p}:${s} req=${req} ok=${ok} created=${created} disposed=${disposed}`;
+  const rDone = (req, ok, totalMs) => `[safety-reader-lifecycle] request=${req} ok=${ok} totalMs=${totalMs}`;
+  /** Seven markers for one request of `component` at explicit offsets. */
+  const life = (component, pid, req, created, at) => {
+    const ph = component === 'embedder' ? phaseMsg : rPhase;
+    const done = component === 'embedder' ? completionMsg : rDone;
+    const [s0, s1, i0, i1, d0, d1] = at;
+    return [
+      pidLine(s0, pid, ph('session', 'start', req, 1, created, created)),
+      pidLine(s1, pid, ph('session', 'settled', req, 1, created + 1, created)),
+      pidLine(i0, pid, ph('inference', 'start', req, 1, created + 1, created)),
+      pidLine(i1, pid, ph('inference', 'settled', req, 1, created + 1, created)),
+      pidLine(d0, pid, ph('disposal', 'start', req, 1, created + 1, created)),
+      pidLine(d1, pid, ph('disposal', 'settled', req, 1, created + 1, created + 1)),
+      pidLine(d1, pid, done(req, 1, d1 - s0)),
+    ];
+  };
+  const wrappers = (pid, t) => [
+    pidLine(t, pid, phaseMsg('wrapper', 'settled', 0, 1, 0, 0)),
+    pidLine(t + 10, pid, rPhase('wrapper', 'settled', 0, 1, 0, 0)),
+  ];
+  const t = BASE;
+
+  // Positive control: strictly sequential dual-model run.
+  const seq = correlate([
+    ...wrappers(777, t + 100),
+    ...life('embedder', 777, 1, 0, [t + 1000, t + 1050, t + 1050, t + 1120, t + 1120, t + 1160]),
+    ...life('safety-reader', 777, 1, 0, [t + 1170, t + 1210, t + 1210, t + 1270, t + 1270, t + 1310]),
+  ], DENSE, { anchor: false });
+  check('OVL-0: sequential embedder then safety-reader in one PID: sessionOverlapCount === 0 and clean',
+    seq.disposalIntegrity.sessionOverlapCount === 0 && seq.disposalIntegrity.clean === true
+      && seq.qualified.length === 2,
+    `overlaps=${seq.disposalIntegrity.sessionOverlapCount} qualified=${seq.qualified.length}`);
+  check('OVL-0: componentRequestCounts reports one request per model',
+    seq.componentRequestCounts?.embedder === 1 && seq.componentRequestCounts?.['safety-reader'] === 1,
+    JSON.stringify(seq.componentRequestCounts));
+
+  // Concurrent: safety-reader session starts BEFORE the embedder session settles its disposal.
+  const conc = correlate([
+    ...wrappers(777, t + 100),
+    ...life('embedder', 777, 1, 0, [t + 1000, t + 1050, t + 1050, t + 1120, t + 1120, t + 1160]),
+    ...life('safety-reader', 777, 1, 0, [t + 1100, t + 1210, t + 1210, t + 1270, t + 1270, t + 1310]),
+  ], DENSE, { anchor: false });
+  check('OVL-1: overlapping embedder + safety-reader sessions in one PID yield sessionOverlapCount > 0',
+    conc.disposalIntegrity.sessionOverlapCount > 0, String(conc.disposalIntegrity.sessionOverlapCount));
+  check('OVL-1: an overlap makes disposalIntegrity NOT clean even with balanced counters and no failures',
+    conc.disposalIntegrity.clean === false && conc.disposalIntegrity.countersBalanced === true
+      && conc.disposalIntegrity.disposalFailureCount === 0);
+  check('OVL-1: sessionOverlaps names BOTH conflicting session identities and timestamps',
+    conc.disposalIntegrity.sessionOverlaps?.length === 1
+      && JSON.stringify(conc.disposalIntegrity.sessionOverlaps[0]).includes('"embedder"')
+      && JSON.stringify(conc.disposalIntegrity.sessionOverlaps[0]).includes('"safety-reader"')
+      && JSON.stringify(conc.disposalIntegrity.sessionOverlaps[0]).includes(String(t + 1100))
+      && JSON.stringify(conc.disposalIntegrity.sessionOverlaps[0]).includes(String(t + 1160)),
+    JSON.stringify(conc.disposalIntegrity.sessionOverlaps ?? null).slice(0, 160));
+  check('OVL-1: correlateRequests rejects BOTH overlapping requests',
+    conc.qualified.length === 0
+      && conc.componentRequestCounts?.embedder === 0 && conc.componentRequestCounts?.['safety-reader'] === 0
+      && conc.lifecycleRejected.filter((r) => r.reasons.some((x) => x.includes('overlap'))).length === 2,
+    conc.lifecycleRejected.map((r) => `${r.component}:${r.reasons.join('|')}`).join(' ; ').slice(0, 160));
+
+  // Same-millisecond sequential handoff: disposal:settled on an EARLIER line, session:start on a LATER line, equal tsMs.
+  const handoff = correlate([
+    ...wrappers(777, t + 100),
+    ...life('embedder', 777, 1, 0, [t + 1000, t + 1050, t + 1050, t + 1120, t + 1120, t + 1160]),
+    ...life('safety-reader', 777, 1, 0, [t + 1160, t + 1210, t + 1210, t + 1270, t + 1270, t + 1310]),
+  ], DENSE, { anchor: false });
+  check('OVL-2: same-millisecond sequential handoff (disposal line before session:start line) is NOT an overlap',
+    handoff.disposalIntegrity.sessionOverlapCount === 0 && handoff.qualified.length === 2
+      && handoff.disposalIntegrity.clean === true,
+    `overlaps=${handoff.disposalIntegrity.sessionOverlapCount} qualified=${handoff.qualified.length}`);
+
+  // Same millisecond, but session:start is logged on an EARLIER line than the disposal:settled.
+  const embedderLines = life('embedder', 777, 1, 0, [t + 1000, t + 1050, t + 1050, t + 1120, t + 1120, t + 1160]);
+  const readerLines = life('safety-reader', 777, 1, 0, [t + 1160, t + 1210, t + 1210, t + 1270, t + 1270, t + 1310]);
+  const sameMsReversed = correlate([
+    ...wrappers(777, t + 100),
+    ...embedderLines.slice(0, 5), readerLines[0], ...embedderLines.slice(5), ...readerLines.slice(1),
+  ], DENSE, { anchor: false });
+  check('OVL-3: equal-timestamp start logged BEFORE the earlier disposal settles IS an overlap',
+    sameMsReversed.disposalIntegrity.sessionOverlapCount === 1 && sameMsReversed.qualified.length === 0,
+    `overlaps=${sameMsReversed.disposalIntegrity.sessionOverlapCount}`);
+
+  // A contains B and C; B and C do not overlap each other. Predecessor-only comparison would miss A-C.
+  const nested = correlate([
+    ...wrappers(777, t + 100),
+    ...life('embedder', 777, 1, 0, [t + 1000, t + 1050, t + 1050, t + 1900, t + 1900, t + 2000]),
+    ...life('safety-reader', 777, 1, 0, [t + 1100, t + 1150, t + 1150, t + 1200, t + 1200, t + 1250]),
+    ...life('safety-reader', 777, 2, 1, [t + 1300, t + 1350, t + 1350, t + 1400, t + 1400, t + 1450]),
+  ], DENSE, { anchor: false });
+  check('OVL-4: one long session containing two shorter ones records BOTH overlaps',
+    nested.disposalIntegrity.sessionOverlapCount === 2, String(nested.disposalIntegrity.sessionOverlapCount));
+  check('OVL-4: the third session (overlapping only the first, not its immediate predecessor) is rejected',
+    nested.qualified.length === 0
+      && nested.lifecycleRejected.some((r) => r.component === 'safety-reader' && r.requestId === 2
+        && r.reasons.some((x) => x.includes('overlap'))),
+    nested.qualified.map((q) => `${q.component}:${q.requestId}`).join(','));
+
+  // Different PIDs never overlap each other.
+  const twoPids = correlate([
+    ...wrappers(777, t + 100), ...wrappers(778, t + 100),
+    ...life('embedder', 777, 1, 0, [t + 1000, t + 1050, t + 1050, t + 1120, t + 1120, t + 1160]),
+    ...life('safety-reader', 778, 1, 0, [t + 1100, t + 1210, t + 1210, t + 1270, t + 1270, t + 1310]),
+  ], DENSE, { anchor: false });
+  check('OVL-5: concurrent sessions in DIFFERENT PIDs are not an overlap',
+    twoPids.disposalIntegrity.sessionOverlapCount === 0, String(twoPids.disposalIntegrity.sessionOverlapCount));
+
+  // Single-model packet: the counts expose the missing model.
+  const embOnly = correlate([...wrappers(777, t + 100),
+    ...life('embedder', 777, 1, 0, [t + 1000, t + 1050, t + 1050, t + 1120, t + 1120, t + 1160])], DENSE, { anchor: false });
+  check('OVL-6: single-model (embedder-only) run reports safety-reader count 0',
+    embOnly.componentRequestCounts?.embedder === 1 && embOnly.componentRequestCounts?.['safety-reader'] === 0,
+    JSON.stringify(embOnly.componentRequestCounts));
+
+  // --- cold-restart PID continuity in bindTargetSamples ----------------------
+  const mkSamples = (pids) => pids.map((pid, i) => ({ captureStartMs: BASE + i * 100, appName: 'target.app', processId: pid }));
+  const bind = (samples, lines) => {
+    const { markers } = parseLifecycleMarkers(lines.join('\n'));
+    const segments = computeSamplingSegments(samples.map((s) => s.captureStartMs), { continuityGapMs: 2000 });
+    return bindTargetSamples({ samples, markers, segments, packageName: 'target.app' });
+  };
+  const recurrence = mkSamples([...Array(10).fill(900), ...Array(10).fill(901), ...Array(10).fill(900)]);
+  let recurErr = null;
+  try { bind(recurrence, [pidLine(BASE + 50, 900, phaseMsg('wrapper', 'settled', 0, 1, 0, 0))]); } catch (e) { recurErr = e; }
+  check('PID-1: PID recurrence 900 -> 901 -> 900 is rejected by bindTargetSamples',
+    recurErr?.message === 'Cold-restart PID continuity violation: process ID reappeared after a PID transition',
+    recurErr?.message ?? 'no error');
+
+  const coldRestart = mkSamples([...Array(10).fill(900), ...Array(10).fill(901)]); // 900 until BASE+900, 901 from BASE+1000
+  let lateErr = null;
+  try {
+    bind(coldRestart, [
+      pidLine(BASE + 50, 900, phaseMsg('wrapper', 'settled', 0, 1, 0, 0)),
+      pidLine(BASE + 1050, 901, phaseMsg('wrapper', 'settled', 0, 1, 0, 0)),
+      pidLine(BASE + 1500, 900, phaseMsg('session', 'start', 1, 1, 0, 0)), // after 901 started sampling
+    ]);
+  } catch (e) { lateErr = e; }
+  check('PID-2: a target-PID marker AFTER the next process sampling window began is rejected, not filtered',
+    lateErr?.message === 'Cold-restart PID continuity violation: target PID lifecycle marker falls outside its process sampling window',
+    lateErr?.message ?? 'no error');
+  let earlyErr = null;
+  try {
+    bind(coldRestart, [
+      pidLine(BASE + 50, 900, phaseMsg('wrapper', 'settled', 0, 1, 0, 0)),
+      pidLine(BASE + 500, 901, phaseMsg('wrapper', 'settled', 0, 1, 0, 0)), // before 900's last sample
+    ]);
+  } catch (e) { earlyErr = e; }
+  check('PID-3: a target-PID marker BEFORE the previous process last sample is rejected',
+    earlyErr?.message === 'Cold-restart PID continuity violation: target PID lifecycle marker falls outside its process sampling window',
+    earlyErr?.message ?? 'no error');
+  let okErr = null;
+  let okBound = null;
+  try {
+    okBound = bind(coldRestart, [
+      pidLine(BASE + 50, 900, phaseMsg('wrapper', 'settled', 0, 1, 0, 0)),
+      pidLine(BASE + 950, 901, phaseMsg('wrapper', 'settled', 0, 1, 0, 0)), // between 900's last and 901's first
+      pidLine(BASE + 960, 999, phaseMsg('wrapper', 'settled', 0, 1, 0, 0)), // foreign pid: filtered
+    ]);
+  } catch (e) { okErr = e; }
+  check('PID-4: an in-window cold restart with a foreign PID binds without error and drops the foreign PID',
+    okErr === null && okBound.markers.length === 2 && okBound.markers.every((m) => m.pid !== 999),
+    okErr?.message ?? `${okBound?.markers.length} markers`);
+
+  // wrapperEpoch is recomputed on the bound set: a poisoned input epoch cannot survive binding.
+  {
+    const { markers } = parseLifecycleMarkers([
+      pidLine(BASE + 50, 900, phaseMsg('wrapper', 'settled', 0, 1, 0, 0)),
+      pidLine(BASE + 300, 900, phaseMsg('session', 'start', 1, 1, 0, 0)),
+    ].join('\n'));
+    const poisoned = markers.map((m) => ({ ...m, wrapperEpoch: 7 }));
+    const samples = mkSamples(Array(10).fill(900));
+    const segments = computeSamplingSegments(samples.map((s) => s.captureStartMs), { continuityGapMs: 2000 });
+    const b = bindTargetSamples({ samples, markers: poisoned, segments, packageName: 'target.app' });
+    check('PID-5: wrapperEpoch is recomputed on the bound target markers (poisoned epoch 7 -> 1)',
+      b.markers.length === 2 && b.markers.every((m) => m.wrapperEpoch === 1),
+      b.markers.map((m) => m.wrapperEpoch).join(','));
+  }
+
+  // --- memory attribution identity ------------------------------------------
+  {
+    const cadence = computeCadence(DENSE, { requestedIntervalMs: 200 });
+    const segments = computeSamplingSegments(DENSE, { continuityGapMs: 2000 }).map((s) => ({ ...s, pid: 777 }));
+    const sum = summarizeMemory({
+      samples: DENSE.map((x) => ({ atUtcMs: x, privateDirtyBytes: 100 })),
+      segments, qualified: seq.qualified, cadence,
+    });
+    const reader = sum.perRequest.find((r) => r.component === 'safety-reader');
+    check('ATTR-1: perRequest carries component, pid and wrapperEpoch',
+      reader?.pid === 777 && reader?.wrapperEpoch === 1
+        && sum.perRequest.some((r) => r.component === 'embedder'),
+      JSON.stringify(sum.perRequest.map((r) => [r.component, r.pid, r.wrapperEpoch])));
+    check('ATTR-2: perRun carries pid', sum.perRun.every((r) => r.pid === 777), JSON.stringify(sum.perRun.map((r) => r.pid)));
+    check('ATTR-3: peakClaimBlockers name component and pid',
+      sum.peakClaimBlockers.some((b) => b.startsWith('safety-reader request 1 (pid 777)'))
+        && sum.peakClaimBlockers.some((b) => b.startsWith('embedder request 1 (pid 777)')),
+      sum.peakClaimBlockers.join('; ').slice(0, 160));
+  }
 }
 
 console.log(`\n${fail === 0 ? 'ALL LIFECYCLE CORRELATOR FIXTURES PASSED' : `${fail} LIFECYCLE CORRELATOR FIXTURE(S) FAILED`}`);

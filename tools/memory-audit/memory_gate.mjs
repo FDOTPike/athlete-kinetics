@@ -391,6 +391,30 @@ export function checkMeasuredEvidence(session, ceiling = RATIFIED_CEILING_BYTES)
       + 'native session leaked (counters still balance; that is why they are not the test)',
     );
   }
+  // Counters that do NOT balance are a leak even with zero explicit failures
+  // (a session created and never disposed), and `clean` is the conjunction
+  // the harness certifies. Neither may be absent or anything but true.
+  if (integrity) {
+    if (integrity.countersBalanced !== true) {
+      problems.push('session-wide disposal counters do not balance (countersBalanced is not true)');
+    }
+    if (integrity.clean !== true) {
+      problems.push('session-wide disposal integrity is not clean (clean is not true)');
+    }
+  }
+  // Serial non-overlap: two live native sessions in one process at once make
+  // per-request memory attribution meaningless. Absence is not zero.
+  if (integrity?.sessionOverlapCount !== 0 || s?.lifecycle?.sessionOverlapCount !== 0) {
+    problems.push(`packet does not prove serial sessions: disposalIntegrity.sessionOverlapCount=`
+      + `${integrity?.sessionOverlapCount}, lifecycle.sessionOverlapCount=${s?.lifecycle?.sessionOverlapCount} `
+      + '(both must be 0; overlapping sessions are not attributable)');
+  }
+  // Both production models must be proven by this packet.
+  const counts = s?.lifecycle?.componentRequestCounts;
+  if (!(counts?.embedder >= 1) || !(counts?.['safety-reader'] >= 1)) {
+    problems.push(`packet does not prove both models: componentRequestCounts embedder=${counts?.embedder}, `
+      + `safety-reader=${counts?.['safety-reader']} (each must be >= 1)`);
+  }
   const median = s?.sampling?.achievedMedianIntervalMs;
   if (!Number.isFinite(median)) problems.push('packet reports no achieved sampling cadence');
   const max = s?.memory?.maxSampledPrivateDirtyBytes;
