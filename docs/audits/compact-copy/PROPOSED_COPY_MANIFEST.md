@@ -1,6 +1,6 @@
 # Proposed copy manifest
 
-PROVISIONAL — FOR ANTIGRAVITY & OWNER REVIEW
+OWNER-RATIFIED (2026-11-27) — AUTHORIZED FOR RELEASE INTEGRATION
 
 Baseline `fb539d06`. Existing copy retained verbatim when it moves into a disclosure. Terms use the glossary. Entries below give the original source location and exact proposed replacement.
 
