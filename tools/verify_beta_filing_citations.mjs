@@ -538,6 +538,10 @@ function matchOpenContainers(expandedLine, containers) {
   return { rest, matchedCount, matchedAll: matchedCount === containers.length };
 }
 
+function isThematicBreak(trimmed) {
+  return /^(?:-[ \t]*){3,}$|^(?:_[ \t]*){3,}$|^(?:\*[ \t]*){3,}$/.test(trimmed);
+}
+
 function openNewContainers(startRest, containers, inParagraphInitial) {
   let rest = startRest;
   let inParagraph = inParagraphInitial;
@@ -551,8 +555,8 @@ function openNewContainers(startRest, containers, inParagraphInitial) {
       inParagraph = false;
       continue;
     }
-    // CommonMark §4.1 thematic break takes precedence over `-` / `*` list markers
-    if (/^(?:[-_*][ ]*){3,}$/.test(trimmed)) break;
+    // CommonMark §4.1 thematic break (3+ matching `-`, `_`, or `*`) takes precedence over list markers
+    if (isThematicBreak(trimmed)) break;
     const listMatch = /^([-+*]|\d{1,9}[.)])([ ]+|$)/.exec(trimmed);
     if (listMatch) {
       const marker = listMatch[1];
@@ -617,7 +621,7 @@ function canInterruptParagraph(rest) {
   if (trimmed.length === 0) return true;
   if (trimmed[0] === '>') return true;
   if (/^#{1,6}(?:[ ]|$)/.test(trimmed)) return true;
-  if (/^(?:[-_*][ ]*){3,}$/.test(trimmed)) return true;
+  if (isThematicBreak(trimmed)) return true;
   const openFence = /^(`{3,}|~{3,})([^\r\n]*)$/.exec(trimmed);
   if (openFence && (openFence[1][0] !== '`' || !openFence[2].includes('`'))) return true;
   if (matchHtmlBlockOpen(trimmed, true) !== null) return true;
@@ -698,21 +702,19 @@ function scanLinkTitle(str, startIdx) {
   return -1;
 }
 
-function peelOneLinkRefDef(text) {
-  let idx = 0;
-  let spaces = 0;
-  while (idx < text.length && text[idx] === ' ' && spaces < 4) {
-    idx += 1;
-    spaces += 1;
-  }
-  if (spaces > 3 || text[idx] !== '[') return null;
-  idx += 1;
+function normalizeLinkLabel(rawLabel) {
+  return rawLabel.trim().replace(/[ \t\r\n]+/g, ' ').toLowerCase().replace(/\u00df/g, 'ss');
+}
+
+function scanLinkLabel(str, startIdx) {
+  if (startIdx < 0 || startIdx >= str.length || str[startIdx] !== '[') return null;
+  let idx = startIdx + 1;
   const labelStart = idx;
   let labelChars = 0;
   let foundClose = false;
-  while (idx < text.length && labelChars <= 999) {
-    const ch = text[idx];
-    if (ch === '\\' && idx + 1 < text.length) {
+  while (idx < str.length && labelChars <= 999) {
+    const ch = str[idx];
+    if (ch === '\\' && idx + 1 < str.length) {
       idx += 2;
       labelChars += 2;
       continue;
@@ -725,10 +727,27 @@ function peelOneLinkRefDef(text) {
     idx += 1;
     labelChars += 1;
   }
-  if (!foundClose || labelChars === 0 || labelChars > 999) return null;
-  const rawLabel = text.slice(labelStart, idx);
-  if (!/\S/.test(rawLabel) || text[idx + 1] !== ':') return null;
-  idx += 2;
+  if (!foundClose || labelChars > 999) return null;
+  return {
+    rawLabel: str.slice(labelStart, idx),
+    endIdx: idx + 1,
+  };
+}
+
+function peelOneLinkRefDef(text) {
+  let idx = 0;
+  let spaces = 0;
+  while (idx < text.length && text[idx] === ' ' && spaces < 4) {
+    idx += 1;
+    spaces += 1;
+  }
+  if (spaces > 3 || text[idx] !== '[') return null;
+  const parsedLabel = scanLinkLabel(text, idx);
+  if (parsedLabel === null || parsedLabel.rawLabel.length === 0) return null;
+  const { rawLabel, endIdx } = parsedLabel;
+  if (!/\S/.test(rawLabel) || text[endIdx] !== ':') return null;
+  const normalizedLabel = normalizeLinkLabel(rawLabel);
+  idx = endIdx + 1;
 
   while (idx < text.length && (text[idx] === ' ' || text[idx] === '\t')) idx += 1;
   if (idx < text.length && text[idx] === '\n') {
@@ -760,27 +779,28 @@ function peelOneLinkRefDef(text) {
     if (afterTitle !== -1) {
       const titleLineEnd = /^[ \t]*(?:\n|$)/.exec(text.slice(afterTitle));
       if (titleLineEnd) {
-        return text.slice(afterTitle + titleLineEnd[0].length);
+        return { rest: text.slice(afterTitle + titleLineEnd[0].length), normalizedLabel };
       }
     }
     if (sawNewlineBeforeTitle && destEndMatch) {
-      return text.slice(afterDest + destEndMatch[0].length);
+      return { rest: text.slice(afterDest + destEndMatch[0].length), normalizedLabel };
     }
     return null;
   }
 
   if (destEndMatch) {
-    return text.slice(afterDest + destEndMatch[0].length);
+    return { rest: text.slice(afterDest + destEndMatch[0].length), normalizedLabel };
   }
   return null;
 }
 
-function peelLeadingLinkRefDefs(paragraphText) {
+function peelLeadingLinkRefDefs(paragraphText, definedLabels) {
   let rest = paragraphText;
   while (rest.length > 0) {
     const next = peelOneLinkRefDef(rest);
     if (next === null) break;
-    rest = next;
+    if (definedLabels) definedLabels.add(next.normalizedLabel);
+    rest = next.rest;
   }
   return rest;
 }
@@ -846,8 +866,62 @@ function tryConsumeInlineLinkTail(block, openParenIdx) {
 
 const HTML_RAW_TOKEN_RE = /^(?:<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<![A-Z][\s\S]*?>|<!\[CDATA\[[\s\S]*?\]\]>|<\/[A-Za-z][A-Za-z0-9-]*\s*>|<[A-Za-z][A-Za-z0-9-]*(?:\s+[A-Za-z_:][A-Za-z0-9_.:-]*(?:\s*=\s*(?:[^\s"'=<>`]+|'[^']*'|"[^"]*"))?)*\s*\/?>|<[A-Za-z][A-Za-z0-9+.-]{1,31}:[^\s<>]*>|<[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*>)/;
 
-function extractInlineCitationsFromBlock(doc, block, citations, errors) {
+function scanInlineLinkLabel(block, startIdx) {
+  if (startIdx < 0 || startIdx >= block.length || block[startIdx] !== '[') return null;
+  let pos = startIdx + 1;
+  while (pos < block.length && pos - (startIdx + 1) <= 999) {
+    const ch = block[pos];
+    if (ch === ']') {
+      return {
+        rawLabel: block.slice(startIdx + 1, pos),
+        endIdx: pos + 1,
+      };
+    }
+    if (ch === '[') return null;
+    if (ch === '\\' && pos + 1 < block.length && ASCII_PUNCT_RE.test(block[pos + 1])) {
+      pos += 2;
+      continue;
+    }
+    if (ch === '<') {
+      const htmlMatch = HTML_RAW_TOKEN_RE.exec(block.slice(pos));
+      if (htmlMatch) {
+        pos += htmlMatch[0].length;
+        continue;
+      }
+    }
+    if (ch === '`') {
+      let runLen = 0;
+      while (pos + runLen < block.length && block[pos + runLen] === '`') runLen += 1;
+      let j = pos + runLen;
+      let closePos = -1;
+      while (j < block.length) {
+        if (block[j] !== '`') {
+          j += 1;
+          continue;
+        }
+        let closeLen = 0;
+        while (j + closeLen < block.length && block[j + closeLen] === '`') closeLen += 1;
+        if (closeLen === runLen) {
+          closePos = j;
+          break;
+        }
+        j += closeLen;
+      }
+      pos = closePos === -1 ? pos + runLen : closePos + runLen;
+      continue;
+    }
+    pos += 1;
+  }
+  return null;
+}
+
+function extractInlineCitationsFromBlock(doc, block, definedLabels, citations, errors) {
   const openBrackets = [];
+  const deactivatePriorLinkOpeners = () => {
+    for (let k = 0; k < openBrackets.length; k += 1) {
+      if (!openBrackets[k].isImage) openBrackets[k].active = false;
+    }
+  };
   let i = 0;
   while (i < block.length) {
     if (block[i] === '\\' && i + 1 < block.length && ASCII_PUNCT_RE.test(block[i + 1])) {
@@ -855,12 +929,12 @@ function extractInlineCitationsFromBlock(doc, block, citations, errors) {
       continue;
     }
     if (block[i] === '!' && block[i + 1] === '[') {
-      openBrackets.push({ isImage: true });
+      openBrackets.push({ isImage: true, active: true, contentStart: i + 2 });
       i += 2;
       continue;
     }
     if (block[i] === '[') {
-      openBrackets.push({ isImage: false });
+      openBrackets.push({ isImage: false, active: true, contentStart: i + 1 });
       i += 1;
       continue;
     }
@@ -870,17 +944,50 @@ function extractInlineCitationsFromBlock(doc, block, citations, errors) {
         continue;
       }
       const opener = openBrackets.pop();
+      if (!opener.active) {
+        i += 1;
+        continue;
+      }
       if (block[i + 1] === '(') {
         const afterLink = tryConsumeInlineLinkTail(block, i + 1);
         if (afterLink !== -1) {
-          if (!opener.isImage) {
-            for (let k = openBrackets.length - 1; k >= 0; k -= 1) {
-              if (!openBrackets[k].isImage) openBrackets.splice(k, 1);
-            }
-          }
+          if (!opener.isImage) deactivatePriorLinkOpeners();
           i = afterLink;
           continue;
         }
+      }
+      const nextLabel = block[i + 1] === '[' ? scanInlineLinkLabel(block, i + 1) : null;
+      if (nextLabel !== null) {
+        if (nextLabel.rawLabel.length === 0) {
+          const firstSlice = scanInlineLinkLabel(block, opener.contentStart - 1);
+          if (
+            firstSlice !== null
+            && firstSlice.endIdx === i + 1
+            && /\S/.test(firstSlice.rawLabel)
+            && definedLabels.has(normalizeLinkLabel(firstSlice.rawLabel))
+          ) {
+            if (!opener.isImage) deactivatePriorLinkOpeners();
+            i = nextLabel.endIdx;
+            continue;
+          }
+        } else if (/\S/.test(nextLabel.rawLabel) && definedLabels.has(normalizeLinkLabel(nextLabel.rawLabel))) {
+          if (!opener.isImage) deactivatePriorLinkOpeners();
+          i = nextLabel.endIdx;
+          continue;
+        }
+        if (nextLabel.rawLabel.length === 0 || /\S/.test(nextLabel.rawLabel)) {
+          i += 1;
+          continue;
+        }
+      }
+      const selfLabel = scanInlineLinkLabel(block, opener.contentStart - 1);
+      if (
+        selfLabel !== null
+        && selfLabel.endIdx === i + 1
+        && /\S/.test(selfLabel.rawLabel)
+        && definedLabels.has(normalizeLinkLabel(selfLabel.rawLabel))
+      ) {
+        if (!opener.isImage) deactivatePriorLinkOpeners();
       }
       i += 1;
       continue;
@@ -947,6 +1054,7 @@ function extractInlineCitationsFromBlock(doc, block, citations, errors) {
 function extractLiveCitations(doc, text, errors) {
   const lines = text.split(/\r?\n/);
   const inlineBlocks = [];
+  const definedLabels = new Set();
   const containers = [];
   let currentParagraph = [];
   let inFence = false;
@@ -956,7 +1064,7 @@ function extractLiveCitations(doc, text, errors) {
 
   const flushParagraph = () => {
     if (currentParagraph.length === 0) return;
-    const body = peelLeadingLinkRefDefs(currentParagraph.join('\n'));
+    const body = peelLeadingLinkRefDefs(currentParagraph.join('\n'), definedLabels);
     if (body.trim().length > 0) {
       inlineBlocks.push(body);
     }
@@ -1023,7 +1131,7 @@ function extractLiveCitations(doc, text, errors) {
     const preOpenIndent = leadingSpaceCount(stripped);
     const preOpenTrimmed = stripped.slice(preOpenIndent);
     if (currentParagraph.length > 0 && matched.matchedAll && preOpenIndent <= 3 && /^(?:=+|-+)[ ]*$/.test(preOpenTrimmed)) {
-      const remainingHeadingText = peelLeadingLinkRefDefs(currentParagraph.join('\n'));
+      const remainingHeadingText = peelLeadingLinkRefDefs(currentParagraph.join('\n'), definedLabels);
       currentParagraph = [];
       if (remainingHeadingText.trim().length > 0) {
         inlineBlocks.push(remainingHeadingText);
@@ -1077,8 +1185,8 @@ function extractLiveCitations(doc, text, errors) {
         continue;
       }
 
-      // CommonMark §4.1 thematic break
-      if (/^(?:[-_*][ ]*){3,}$/.test(trimmedAfterIndent)) {
+      // CommonMark §4.1 thematic break (3+ matching `-`, `_`, or `*`)
+      if (isThematicBreak(trimmedAfterIndent)) {
         flushParagraph();
         continue;
       }
@@ -1101,7 +1209,7 @@ function extractLiveCitations(doc, text, errors) {
 
   const citations = [];
   for (const block of inlineBlocks) {
-    extractInlineCitationsFromBlock(doc, block, citations, errors);
+    extractInlineCitationsFromBlock(doc, block, definedLabels, citations, errors);
   }
   return citations;
 }
@@ -1463,12 +1571,18 @@ function inspectSqliteTables(repoRoot, relPath, rawText, readFile) {
   }
 }
 
+const ANDROID_XML_NS = 'http://schemas.android.com/apk/res/android';
+const ANDROID_TOOLS_XML_NS = 'http://schemas.android.com/tools';
+
 function verifyXmlElementSemantics(xmlInfo, spec, c) {
   if (xmlInfo.parseErrors.length > 0) {
     return `malformed XML: ${xmlInfo.parseErrors[0]}`;
   }
   if (!xmlInfo.doc || !xmlInfo.doc.documentElement) return null;
   const root = xmlInfo.doc.documentElement;
+  if (Boolean(root.namespaceURI) || (root.localName ?? root.tagName) !== 'manifest') {
+    return 'AndroidManifest root element must be unprefixed <manifest> in default namespace';
+  }
   const allAnchors = [spec.startAnchor, ...(spec.rangeAnchors ?? []), ...(spec.endAnchor ? [spec.endAnchor] : [])].join('\n');
   const permMatch = /android:name="([^"]+)"/.exec(allAnchors);
   if (permMatch) {
@@ -1478,9 +1592,9 @@ function verifyXmlElementSemantics(xmlInfo, spec, c) {
     let found = false;
     for (let i = 0; i < nodes.length; i += 1) {
       const el = nodes.item(i);
-      if (!el || el.parentNode !== root) continue;
-      if (el.getAttribute('android:name') !== targetPerm) continue;
-      if (requiresRemove && el.getAttribute('tools:node') !== 'remove') continue;
+      if (!el || el.parentNode !== root || Boolean(el.namespaceURI)) continue;
+      if (el.getAttributeNS(ANDROID_XML_NS, 'name') !== targetPerm) continue;
+      if (requiresRemove && el.getAttributeNS(ANDROID_TOOLS_XML_NS, 'node') !== 'remove') continue;
       if (typeof el.lineNumber === 'number' && (el.lineNumber < c.start || el.lineNumber > c.end)) continue;
       found = true;
       break;
@@ -1494,7 +1608,12 @@ function verifyXmlElementSemantics(xmlInfo, spec, c) {
     let found = false;
     for (let i = 0; i < apps.length; i += 1) {
       const el = apps.item(i);
-      if (el && el.parentNode === root && el.getAttribute('android:allowBackup') === 'false') {
+      if (
+        el
+        && el.parentNode === root
+        && !el.namespaceURI
+        && el.getAttributeNS(ANDROID_XML_NS, 'allowBackup') === 'false'
+      ) {
         found = true;
         break;
       }
@@ -1560,6 +1679,7 @@ function buildSourceBundle(repoRoot, relPath, rawText, readFile) {
       lines,
       activeLines: splitPhysicalLines(activeText),
       strictCodeLines: splitPhysicalLines(strictCodeText),
+      isJsTs: true,
       parseErrors,
       xmlInfo: null,
       sqlInfo: null,
@@ -1569,14 +1689,30 @@ function buildSourceBundle(repoRoot, relPath, rawText, readFile) {
     lines,
     activeLines: lines,
     strictCodeLines: lines,
+    isJsTs: false,
     parseErrors: [],
     xmlInfo: null,
     sqlInfo: null,
   };
 }
 
-function anchorHasQuoteChars(anchor) {
-  return anchor.includes("'") || anchor.includes('"') || anchor.includes('`');
+function maskJsStringInteriorsInSnippet(snippet) {
+  let out = '';
+  let i = 0;
+  while (i < snippet.length) {
+    const ch = snippet[i];
+    if (ch === "'" || ch === '"' || ch === '`') {
+      const closeIdx = findClosingSingleLineQuote(snippet, i, ch);
+      if (closeIdx !== -1) {
+        out += ch + ' '.repeat(closeIdx - i - 1) + ch;
+        i = closeIdx + 1;
+        continue;
+      }
+    }
+    out += ch;
+    i += 1;
+  }
+  return out;
 }
 
 export function verifyBetaFilingCitations({
@@ -1649,15 +1785,27 @@ export function verifyBetaFilingCitations({
         return;
       }
 
-      const pickPoolForAnchor = (anchor, isComment, allowStringLiteral) => {
-        if (isComment) return lines;
-        if (allowStringLiteral || anchorHasQuoteChars(anchor)) return activeLines;
-        return strictCodeLines;
+      const lineMatchesAnchor = (lineIdx, anchor, isComment, allowStringLiteral) => {
+        if (isComment) return lines[lineIdx].includes(anchor);
+        if (allowStringLiteral || !bundle.isJsTs) return activeLines[lineIdx].includes(anchor);
+        return (
+          activeLines[lineIdx].includes(anchor)
+          && strictCodeLines[lineIdx].includes(maskJsStringInteriorsInSnippet(anchor))
+        );
       };
 
-      const startPool = pickPoolForAnchor(spec.startAnchor, spec.startAnchorIsComment, spec.anchorInStringLiteral);
-      const startLine = startPool[c.start - 1];
-      if (!startLine.includes(spec.startAnchor)) {
+      const rangeMatchesAnchor = (startIdx, endExclusiveIdx, anchor, isComment, allowStringLiteral) => {
+        if (isComment) return lines.slice(startIdx, endExclusiveIdx).join('\n').includes(anchor);
+        const inActive = activeLines.slice(startIdx, endExclusiveIdx).join('\n').includes(anchor);
+        if (!inActive) return false;
+        if (allowStringLiteral || !bundle.isJsTs) return true;
+        return strictCodeLines
+          .slice(startIdx, endExclusiveIdx)
+          .join('\n')
+          .includes(maskJsStringInteriorsInSnippet(anchor));
+      };
+
+      if (!lineMatchesAnchor(c.start - 1, spec.startAnchor, spec.startAnchorIsComment, spec.anchorInStringLiteral)) {
         const movedTo = lines
           .map((line, i) => (line.includes(spec.startAnchor) ? i + 1 : -1))
           .filter((n) => n > 0);
@@ -1669,9 +1817,9 @@ export function verifyBetaFilingCitations({
       }
 
       if (spec.prevAnchor) {
-        const prevPool = pickPoolForAnchor(spec.prevAnchor, false, false);
-        const prevLine = c.start >= 2 ? prevPool[c.start - 2] : '';
-        if (!prevLine.includes(spec.prevAnchor)) {
+        const prevMatched = c.start >= 2
+          && lineMatchesAnchor(c.start - 2, spec.prevAnchor, false, Boolean(spec.prevAnchorInStringLiteral));
+        if (!prevMatched) {
           errors.push(
             `${doc} (${c.raw}): preceding line ${c.start - 1} does not contain disambiguating context "${spec.prevAnchor}"`,
           );
@@ -1684,9 +1832,7 @@ export function verifyBetaFilingCitations({
       const endAllowString = spec.endAnchor !== undefined
         ? Boolean(spec.endAnchorInStringLiteral || spec.anchorInStringLiteral)
         : Boolean(spec.anchorInStringLiteral);
-      const endPool = pickPoolForAnchor(expectedEndAnchor, endIsComment, endAllowString);
-      const endLine = endPool[c.end - 1];
-      if (!endLine.includes(expectedEndAnchor)) {
+      if (!lineMatchesAnchor(c.end - 1, expectedEndAnchor, endIsComment, endAllowString)) {
         errors.push(
           `${doc} (${c.raw}): end line ${c.end} does not contain expected end anchor "${expectedEndAnchor}"; got "${lines[c.end - 1].trim().slice(0, 80)}"`,
         );
@@ -1695,9 +1841,7 @@ export function verifyBetaFilingCitations({
 
       if (Array.isArray(spec.rangeAnchors) && spec.rangeAnchors.length > 0) {
         for (const req of spec.rangeAnchors) {
-          const reqPool = pickPoolForAnchor(req, spec.rangeAnchorsAreComments, spec.anchorInStringLiteral);
-          const sliceJoined = reqPool.slice(c.start - 1, c.end).join('\n');
-          if (!sliceJoined.includes(req)) {
+          if (!rangeMatchesAnchor(c.start - 1, c.end, req, spec.rangeAnchorsAreComments, spec.anchorInStringLiteral)) {
             errors.push(`${doc} (${c.raw}): range ${c.start}-${c.end} is missing required active evidence "${req}"`);
           }
         }

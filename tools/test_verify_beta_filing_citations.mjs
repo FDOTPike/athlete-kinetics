@@ -582,6 +582,119 @@ console.log('\n[2] Negative invariants & poisoning falsifiers');
       sqlBracketFakesCommentControlRes.ok,
     ].join(','),
   );
+
+  // WO04-ASTRA-R7a: CommonMark reference-style link labels (`[see][C]` + `[C]: /guide`),
+  // undefined/collapsed/deactivated-outer controls, and matching-vs-mixed thematic breaks (`*-_` vs `***`)
+  const profileCitationToken = '`apps/mobile/src/screens/ProfileScreen.tsx:517-518`';
+  const mutateDisclaimerProfileCitation = (replacement) => verifyBetaFilingCitations({
+    repoRoot,
+    readFile: (rel) => {
+      const real = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+      if (rel !== 'docs/release/beta/DISCLAIMER.md') return real;
+      return real.replace(profileCitationToken, () => replacement);
+    },
+  });
+  const refLabelHiddenRes = mutateDisclaimerProfileCitation(
+    `[see][${profileCitationToken}]\n\n[${profileCitationToken}]: /guide`,
+  );
+  const undefinedRefControlRes = mutateDisclaimerProfileCitation(
+    `[see][${profileCitationToken}]`,
+  );
+  const collapsedRefControlRes = mutateDisclaimerProfileCitation(
+    `[${profileCitationToken}][]\n\n[${profileCitationToken}]: /guide`,
+  );
+  const deactivatedOuterRefControlRes = mutateDisclaimerProfileCitation(
+    `[outer [\`inner\`]][${profileCitationToken}]\n\n[\`inner\`]: /inner\n[${profileCitationToken}]: /guide`,
+  );
+  const mixedThematicBreakRes = mutateDisclaimerProfileCitation(
+    `word\n*-_\n    ${profileCitationToken}`,
+  );
+  const matchingThematicBreakRes = mutateDisclaimerProfileCitation(
+    `word\n***\n    ${profileCitationToken}`,
+  );
+  const unclosedBacktickInRefLabelRes = mutateDisclaimerProfileCitation(
+    `[see][a \`b]\n${profileCitationToken}\n\n[a \`b]: /url`,
+  );
+  check(
+    'WO04-ASTRA-R7a: resolved reference-link labels hide citations while undefined/collapsed/deactivated refs, unclosed-backtick labels, and mixed `*-_` lines match CommonMark',
+    !refLabelHiddenRes.ok
+      && refLabelHiddenRes.totalCitations === 56
+      && undefinedRefControlRes.ok
+      && undefinedRefControlRes.totalCitations === 57
+      && collapsedRefControlRes.ok
+      && collapsedRefControlRes.totalCitations === 57
+      && deactivatedOuterRefControlRes.ok
+      && deactivatedOuterRefControlRes.totalCitations === 57
+      && mixedThematicBreakRes.ok
+      && mixedThematicBreakRes.totalCitations === 57
+      && !matchingThematicBreakRes.ok
+      && matchingThematicBreakRes.totalCitations === 56
+      && !unclosedBacktickInRefLabelRes.ok
+      && unclosedBacktickInRefLabelRes.totalCitations === 56,
+    [
+      refLabelHiddenRes.ok,
+      undefinedRefControlRes.ok,
+      collapsedRefControlRes.ok,
+      deactivatedOuterRefControlRes.ok,
+      mixedThematicBreakRes.ok,
+      matchingThematicBreakRes.ok,
+      unclosedBacktickInRefLabelRes.ok,
+    ].join(','),
+  );
+
+  // WO04-ASTRA-R7b: assigned template string spoofing of quoted code statements (`writeFile(..., 'utf8')`),
+  // mutated string argument (`'hex!'`), and XML `xmlns:tools` / `xmlns:android` namespace URI rebinding
+  const writeInAssignedTemplateRes = verifyBetaFilingCitations({
+    repoRoot,
+    readFile: (rel) => {
+      const real = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+      if (rel !== 'apps/mobile/src/state/backupStore.ts') return real;
+      return real.replace(
+        "await fs().writeFile(encryptedPath, created.text, 'utf8');",
+        "const message = `await fs().writeFile(encryptedPath, created.text, 'utf8');`;",
+      );
+    },
+  });
+  const mutatedWriteEncodingArgRes = verifyBetaFilingCitations({
+    repoRoot,
+    readFile: (rel) => {
+      const real = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+      if (rel !== 'apps/mobile/src/state/backupStore.ts') return real;
+      return real.replace(
+        "await fs().writeFile(encryptedPath, created.text, 'utf8');",
+        "await fs().writeFile(encryptedPath, created.text, 'hex!');",
+      );
+    },
+  });
+  const reboundToolsNsRes = verifyBetaFilingCitations({
+    repoRoot,
+    readFile: (rel) => {
+      const real = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+      if (rel !== 'apps/mobile/android/app/src/main/AndroidManifest.xml') return real;
+      return real.replace('xmlns:tools="http://schemas.android.com/tools"', 'xmlns:tools="urn:unrelated"');
+    },
+  });
+  const reboundAndroidNsRes = verifyBetaFilingCitations({
+    repoRoot,
+    readFile: (rel) => {
+      const real = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+      if (rel !== 'apps/mobile/android/app/src/main/AndroidManifest.xml') return real;
+      return real.replace('xmlns:android="http://schemas.android.com/apk/res/android"', 'xmlns:android="urn:unrelated"');
+    },
+  });
+  check(
+    'WO04-ASTRA-R7b: assigned template-string write spoofing, mutated string arguments, and rebound Android/tools XML namespaces all fail closed',
+    !writeInAssignedTemplateRes.ok
+      && !mutatedWriteEncodingArgRes.ok
+      && !reboundToolsNsRes.ok
+      && !reboundAndroidNsRes.ok,
+    [
+      writeInAssignedTemplateRes.ok,
+      mutatedWriteEncodingArgRes.ok,
+      reboundToolsNsRes.ok,
+      reboundAndroidNsRes.ok,
+    ].join(','),
+  );
 }
 
 console.log(`\n${failed === 0 ? 'ALL BETA FILING CITATION TESTS PASSED' : `${failed} TEST(S) FAILED`}`);
