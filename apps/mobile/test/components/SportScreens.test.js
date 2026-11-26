@@ -215,7 +215,7 @@ describe('the sport screen in the interview', () => {
     press('sport-family-striking');
     press('sport-muay_thai');
     press('sport-outcome-striking_and_clinch');
-    expect(screen.getByTestId('sport-emphasis-summary').props.children).toMatch(/^No extra emphasis\. The app has no reviewed evidence/);
+    expect(screen.getByTestId('sport-emphasis-summary').props.children).toMatch(/^The app has no reviewed evidence/);
     expect(textsOf('sport-emphasis-limit').join(' ')).toMatch(/hip-flexor raises are not added by default/);
     expect(screen.queryByTestId('sport-emphasis-basis')).toBeNull();
   });
@@ -303,7 +303,7 @@ describe('the sport screen in the interview', () => {
     press('sport-outcome-general_support');
     press('sport-experience-new');
     expect(screen.getByTestId('sport-emphasis-summary').props.children)
-      .toBe('No extra emphasis. The plan is general strength alongside your Netball.');
+      .toBe('The plan is general strength alongside your Netball.');
     next();
     walkToReview();
     expect(screen.getByText('Netball — general strength for my sport')).toBeTruthy();
@@ -514,4 +514,34 @@ test('onboarding sport and target chips: names start with the visible words, sel
   expect(targetName()).toBe('I also have a specific target. One more screen will ask for it.');
   expect(sportName()).not.toMatch(/selected/);
   expect(targetName()).not.toMatch(/selected/);
+});
+
+test('no sport outcome summary or focus bundle description begins with "No extra emphasis." (S1-023)', () => {
+  const {
+    FOCUS_BUNDLES,
+    FOCUS_BUNDLE_INFO,
+    SPORT_OUTCOMES_BY_SPORT,
+    sportEmphasisFor,
+  } = require('@ak/inference');
+
+  const offending = [];
+  for (const [sportId, outcomeIds] of Object.entries(SPORT_OUTCOMES_BY_SPORT)) {
+    for (const outcomeId of outcomeIds) {
+      const emphasis = sportEmphasisFor({
+        sportId,
+        outcomeId,
+        otherSportName: sportId === 'other' ? 'Netball' : null,
+      });
+      if (/^No extra emphasis\./.test(emphasis.summary)) {
+        offending.push(`sport:${sportId}:${outcomeId} -> ${emphasis.summary}`);
+      }
+    }
+  }
+  for (const bundleId of FOCUS_BUNDLES) {
+    const desc = FOCUS_BUNDLE_INFO[bundleId].description;
+    if (/^No extra emphasis\./.test(desc)) {
+      offending.push(`focus:${bundleId} -> ${desc}`);
+    }
+  }
+  expect(offending).toEqual([]);
 });

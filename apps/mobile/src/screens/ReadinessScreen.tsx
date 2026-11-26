@@ -177,6 +177,7 @@ function AvailableReadinessScreen({
   const refreshVector = useStore((s) => s.refreshVector);
   const loadDemoAthlete = useStore((s) => s.loadDemoAthlete);
   const resetTrainingData = useStore((s) => s.resetTrainingData);
+  const onboarded = useStore((s) => s.onboarded) === true;
   const returnCheckin = useStore((s) => s.returnCheckin);
   const confirmReturnCheckin = useStore((s) => s.confirmReturnCheckin);
   const dismissReturnCheckin = useStore((s) => s.dismissReturnCheckin);
@@ -253,21 +254,43 @@ function AvailableReadinessScreen({
           <Text style={styles.body}>
             Log a session and sync any available telemetry to build today's recommendation.
           </Text>
-          {!IS_BETA_BUILD && (
+          {onboarded ? (
             <>
-              <PrimaryButton
-                label="Load demo athlete"
-                onPress={attemptDemoLoad}
-                accessibilityLabel="Load the 180 day demo athlete"
-              />
-              {demoBlocked && (
-                <Text style={styles.caption} accessibilityLiveRegion="polite">
-                  Demo not loaded because training history already exists. Use “Reset and load demo” if you want to replace it.
-                </Text>
+              <PrimaryButton label="Refresh" onPress={refreshVector} />
+              {!IS_BETA_BUILD && (
+                <>
+                  <SecondaryButton
+                    label="Load demo athlete"
+                    onPress={attemptDemoLoad}
+                    accessibilityLabel="Load the 180 day demo athlete"
+                  />
+                  {demoBlocked && (
+                    <Text style={styles.caption} accessibilityLiveRegion="polite">
+                      Demo not loaded because training history already exists. Use “Reset and load demo” if you want to replace it.
+                    </Text>
+                  )}
+                </>
               )}
             </>
+          ) : (
+            <>
+              {!IS_BETA_BUILD && (
+                <>
+                  <PrimaryButton
+                    label="Load demo athlete"
+                    onPress={attemptDemoLoad}
+                    accessibilityLabel="Load the 180 day demo athlete"
+                  />
+                  {demoBlocked && (
+                    <Text style={styles.caption} accessibilityLiveRegion="polite">
+                      Demo not loaded because training history already exists. Use “Reset and load demo” if you want to replace it.
+                    </Text>
+                  )}
+                </>
+              )}
+              <SecondaryButton label="Refresh" onPress={refreshVector} />
+            </>
           )}
-          <SecondaryButton label="Refresh" onPress={refreshVector} />
           {!IS_BETA_BUILD && (
             <View style={{ marginTop: theme.space[3] }}>
               <Disclosure label="Reset and load demo">

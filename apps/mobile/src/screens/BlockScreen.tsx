@@ -8,6 +8,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import TrainingSupportNotice from '../components/TrainingSupportNotice';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
+  NO_EMPHASIS_EXPLANATION,
   SELECTABLE_SCHEMA_TYPES,
   addDaysIso,
   applyLoadModifier,
@@ -985,6 +986,49 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
     ) : null
   );
 
+  const renderExistingActivitiesDisclosure = (): React.JSX.Element | null => (
+    activityLedger.series.some((row) => row.effectiveEndDate === null) ? (
+      <Disclosure
+        label="YOUR OTHER WEEKLY ACTIVITIES"
+        hint="Recorded commitments shown beside this plan"
+        testID="plan-existing-activities"
+      >
+        {activityLedger.series.filter((row) => row.effectiveEndDate === null).map((row) => (
+          <View key={row.seriesId}>
+            <Text style={styles.cardTitle}>{row.displayName}</Text>
+            <Text style={styles.bodyText}>
+              {ACTIVITY_WEEKDAYS[row.localWeekday]} · {activityTime(row.localStartMinute)} · {row.timing}
+              {row.expectedDurationMin === null ? ' · duration unknown' : ` · ${row.expectedDurationMin} expected minutes`}
+            </Text>
+          </View>
+        ))}
+        <Text style={styles.bodyText}>
+          These are your reported facts. This version shows them alongside the plan but does not silently
+          move, add, remove, or intensify coach sessions.
+        </Text>
+      </Disclosure>
+    ) : null
+  );
+
+  const renderEmphasisDisclosure = (): React.JSX.Element | null => (
+    block !== null ? (
+      <Disclosure
+        label="WHY THIS PLAN LOOKS THE WAY IT DOES"
+        hint="What your focus, goals and sport changed"
+        testID="plan-emphasis-disclosure"
+      >
+        <EmphasisReportCard
+          report={blockEmphasis?.report ?? null}
+          emptyText={NO_EMPHASIS_EXPLANATION}
+          testID="plan-emphasis"
+        />
+        <Text style={styles.bodyText}>
+          This was recorded when the block was created and does not change if you edit your focus, goals or sport later. Those edits are used for your next block.
+        </Text>
+      </Disclosure>
+    ) : null
+  );
+
   if (vector === null) {
     return (
       // The no-vector gate is an early return INSIDE the real screen, so the
@@ -1057,6 +1101,8 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           </View>
         )}
         {block != null && renderTrajectorySection()}
+        {renderExistingActivitiesDisclosure()}
+        {renderEmphasisDisclosure()}
         <View style={styles.card}>
           <Text style={styles.eyebrow}>COACH</Text>
           <Text style={styles.cardTitle}>Readiness is needed first</Text>
@@ -1077,6 +1123,13 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           {/* #225: a save made from here returns here, so confirm it here. */}
           {routineActionMessage !== null && (
             <Text style={styles.captionText}>{routineActionMessage}</Text>
+          )}
+          {block !== null && (
+            <SecondaryButton
+              label={program == null ? 'Manage block' : 'Manage program'}
+              onPress={program == null ? () => setShowChooser(true) : () => setEditingProgram(true)}
+              accessibilityLabel={program == null ? 'Manage current block' : 'Manage future program preferences'}
+            />
           )}
         </View>
         {renderPauseCard()}
@@ -1168,40 +1221,9 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
         <Text style={styles.wordmark}>pikeMethods</Text>
       </View>
 
-      {activityLedger.series.some((row) => row.effectiveEndDate === null) && (
-        <Disclosure
-          label="YOUR OTHER WEEKLY ACTIVITIES"
-          hint="Recorded commitments shown beside this plan"
-          testID="plan-existing-activities"
-        >
-          {activityLedger.series.filter((row) => row.effectiveEndDate === null).map((row) => (
-            <View key={row.seriesId}>
-              <Text style={styles.cardTitle}>{row.displayName}</Text>
-              <Text style={styles.bodyText}>
-                {ACTIVITY_WEEKDAYS[row.localWeekday]} · {activityTime(row.localStartMinute)} · {row.timing}
-                {row.expectedDurationMin === null ? ' · duration unknown' : ` · ${row.expectedDurationMin} expected minutes`}
-              </Text>
-            </View>
-          ))}
-          <Text style={styles.bodyText}>
-            These are your reported facts. This version shows them alongside the plan but does not silently
-            move, add, remove, or intensify coach sessions.
-          </Text>
-        </Disclosure>
-      )}
+      {renderExistingActivitiesDisclosure()}
 
-      {block !== null && blockEmphasis !== null && (
-        <Disclosure
-          label="WHY THIS PLAN LOOKS THE WAY IT DOES"
-          hint="What your focus, goals and sport changed"
-          testID="plan-emphasis-disclosure"
-        >
-          <EmphasisReportCard report={blockEmphasis.report} testID="plan-emphasis" />
-          <Text style={styles.bodyText}>
-            This was recorded when the block was created and does not change if you edit your focus, goals or sport later. Those edits are used for your next block.
-          </Text>
-        </Disclosure>
-      )}
+      {renderEmphasisDisclosure()}
 
       {block === null && hasArchivedBlock && (
         <View style={styles.card}>

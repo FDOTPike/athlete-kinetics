@@ -189,3 +189,63 @@ describe('recent session rows (#201)', () => {
     expect(screen.getByText('Session recorded')).toBeOnTheScreen();
   });
 });
+
+test('renders TRAINING FOCUS weekly muscle completion and GOALS on the primary Progress tab (S1-022)', () => {
+  mockState = state({
+    today: '2026-11-04',
+    focus: { bundleId: 'beach_muscles', muscles: ['upper_chest', 'biceps'], customised: true, movementControl: false },
+    blockSessions: [{
+      plannedSessionId: 1,
+      weekIndex: 1,
+      dayIndex: 1,
+      focus: 'upper',
+      phase: 'accumulation',
+      sessionDate: '2026-11-04',
+      slotCount: 1,
+      completionStatus: 'complete',
+    }],
+    loadSessionSlots: jest.fn(() => [{
+      slotIndex: 0,
+      plannedSlotId: 1,
+      movementId: 10,
+      movementName: 'Incline Dumbbell Press',
+      sets: 3,
+      reps: 8,
+      target: { kind: 'reps', reps: 8 },
+      targetRpe: 8,
+      overrideLoadKg: null,
+      overrideReason: null,
+    }]),
+    movements: [{ movement_id: 10, name: 'Incline Dumbbell Press', targetMuscles: ['upper_chest'] }],
+    goals: [{
+      goalId: 'g1',
+      status: 'active',
+      revision: 1,
+      goal: {
+        specificOutcome: 'Goblet squat 40 kg for 10',
+        metricId: 'load_kg',
+        unit: 'kg',
+        measurementMethod: 'Goblet squat, 10 reps',
+        baselineKnown: true,
+        baselineValue: 24,
+        targetValue: 40,
+        reason: 'Stronger legs',
+        requestedDeadline: '2026-12-01',
+      },
+      observations: [{ observationId: 'o1', observedOn: '2026-11-01', value: 32, unit: 'kg', metricId: 'load_kg' }],
+    }],
+  });
+
+  render(<ProgressScreen />);
+
+  expect(screen.getByTestId('progress-focus-summary')).toHaveTextContent('Beach muscles (edited): upper chest, biceps');
+  expect(screen.getByTestId('progress-focus-muscle-upper_chest')).toHaveTextContent(
+    'Upper chest · 3 of 3 planned sets completed this week',
+  );
+  expect(screen.getByTestId('progress-focus-muscle-biceps')).toHaveTextContent(
+    'Biceps · 0 of 0 planned sets completed this week',
+  );
+  expect(screen.getByTestId('progress-goal-g1')).toBeOnTheScreen();
+  expect(screen.getByText(/Goblet squat 40 kg for 10/)).toBeOnTheScreen();
+  expect(screen.getByText(/About 50% of the way/)).toBeOnTheScreen();
+});

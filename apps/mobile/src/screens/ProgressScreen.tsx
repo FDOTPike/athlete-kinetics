@@ -19,6 +19,13 @@
  */
 import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import {
+  MUSCLE_GROUP_INFO,
+  describeFocus,
+  goalProgress,
+  resolveMuscleGroupAlias,
+  type MuscleGroupId,
+} from '@ak/inference';
 import { useStore, type RecentSessionOutcome } from '../state/useStore';
 import { theme } from '../theme/theme';
 import { formatAthleteDate } from '../state/athleteDate';
@@ -105,6 +112,12 @@ export default function ProgressScreen(): React.JSX.Element {
   const loadMeasuredHistory = useStore((s) => s.loadMeasuredHistory);
   const loadSessionSummaryFacts = useStore((s) => s.loadSessionSummaryFacts);
   const session = useStore((s) => s.session);
+  const focus = useStore((s) => s.focus) ?? null;
+  const goals = useStore((s) => s.goals) ?? [];
+  const blockSessions = useStore((s) => s.blockSessions) ?? [];
+  const today = useStore((s) => s.today) ?? '';
+  const movements = useStore((s) => s.movements) ?? [];
+  const loadSessionSlots = useStore((s) => s.loadSessionSlots);
 
   const [recentOutcomes, setRecentOutcomes] = useState<RecentSessionOutcome[]>([]);
   // Walk 2 (W2-9): a recent session opens in place to its own summary.
@@ -117,6 +130,35 @@ export default function ProgressScreen(): React.JSX.Element {
     // Re-read when a session ends: the ended session's outcome becomes a fact.
   }, [session, loadRecentOutcomes, loadMeasuredHistory]);
 
+  const activeWeekIndex = blockSessions.find((s) => s.sessionDate >= today)?.weekIndex
+    ?? blockSessions[blockSessions.length - 1]?.weekIndex
+    ?? 1;
+  const focusMuscles: readonly MuscleGroupId[] = focus?.muscles ?? [];
+  const weeklyMuscleCounts = new Map<MuscleGroupId, { plannedSets: number; completedSets: number }>();
+  for (const muscle of focusMuscles) {
+    weeklyMuscleCounts.set(muscle, { plannedSets: 0, completedSets: 0 });
+  }
+  if (focusMuscles.length > 0 && typeof loadSessionSlots === 'function') {
+    for (const bs of blockSessions) {
+      if (bs.weekIndex !== activeWeekIndex) continue;
+      const slots = loadSessionSlots(bs.plannedSessionId) ?? [];
+      const isComplete = bs.completionStatus === 'complete';
+      for (const sl of slots) {
+        const rawMuscles = movements.find((m) => m.movement_id === sl.movementId)?.targetMuscles ?? [];
+        const matched = new Set<MuscleGroupId>();
+        for (const raw of rawMuscles) {
+          const resolved = resolveMuscleGroupAlias(raw);
+          if (resolved !== null && weeklyMuscleCounts.has(resolved)) matched.add(resolved);
+        }
+        for (const muscle of matched) {
+          const entry = weeklyMuscleCounts.get(muscle)!;
+          entry.plannedSets += sl.sets;
+          if (isComplete) entry.completedSets += sl.sets;
+        }
+      }
+    }
+  }
+
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content} testID="progress-screen">
       <CompactDescription label="Progress" heading={<Text style={styles.heading}>PROGRESS</Text>}>
@@ -124,6 +166,44 @@ export default function ProgressScreen(): React.JSX.Element {
           From your training log.
         </Text>
       </CompactDescription>
+
+      <View style={styles.section} testID="progress-focus-section">
+        <Text style={styles.sectionTitle}>TRAINING FOCUS</Text>
+        <Text style={styles.caption} testID="progress-focus-summary">
+          {focus === null ? 'Not answered yet. Balanced whole body is used until you choose.' : describeFocus(focus)}
+        </Text>
+        {focusMuscles.map((muscle) => {
+          const counts = weeklyMuscleCounts.get(muscle) ?? { plannedSets: 0, completedSets: 0 };
+          return (
+            <Text key={muscle} style={styles.caption} testID={`progress-focus-muscle-${muscle}`}>
+              {`${MUSCLE_GROUP_INFO[muscle].label} · ${counts.completedSets} of ${counts.plannedSets} planned sets completed this week`}
+            </Text>
+          );
+        })}
+      </View>
+
+      <View style={styles.section} testID="progress-goals-section">
+        <Text style={styles.sectionTitle}>GOALS</Text>
+        {goals.length === 0 ? (
+          <Text style={styles.caption} testID="progress-goals-none">
+            No goals set. That is fine — you can train with the focus alone.
+          </Text>
+        ) : (
+          goals.map((stored) => {
+            const progress = goalProgress(stored.goal, stored.observations);
+            const deadline = stored.goal.requestedDeadline === null ? 'no deadline' : `by ${stored.goal.requestedDeadline}`;
+            const detail = `Target ${stored.goal.targetValue} ${stored.goal.unit}, ${deadline}${stored.status === 'active' ? '' : ` · ${stored.status}`} · ${progress.summary}`;
+            return (
+              <ListRow
+                key={stored.goalId}
+                label={stored.goal.specificOutcome}
+                detail={detail}
+                testID={`progress-goal-${stored.goalId}`}
+              />
+            );
+          })
+        )}
+      </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>RECENT SESSIONS</Text>

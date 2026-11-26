@@ -14,10 +14,10 @@ test('a Chip stays on one line by default', () => {
 });
 
 test('a Chip asked to wrap shows its whole label, centred', () => {
-  render(<Chip testID="c" wrap label="BALANCED WHOLE BODY — No extra emphasis. Train everything evenly." selected={false} onPress={() => {}} />);
+  render(<Chip testID="c" wrap label="BALANCED WHOLE BODY — Train everything evenly." selected={false} onPress={() => {}} />);
   const label = labelOf('c');
   expect(label.props.numberOfLines).toBeUndefined();
-  expect(label.props.children).toBe('BALANCED WHOLE BODY — No extra emphasis. Train everything evenly.');
+  expect(label.props.children).toBe('BALANCED WHOLE BODY — Train everything evenly.');
   expect(StyleSheet.flatten(label.props.style).textAlign).toBe('center');
 });
 

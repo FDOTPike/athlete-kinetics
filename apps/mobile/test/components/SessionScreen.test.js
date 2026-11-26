@@ -3585,3 +3585,25 @@ test('a reused sessionId with a new startedAtMs drops any stale unlogged load dr
   rerender(<SessionScreen />);
   expect(screen.getByLabelText(/Load in kilograms/i).props.value).toBe('60.0');
 });
+
+test('a Coach-prescribed planned session in self-directed mode renders PLANNED SESSION instead of SELF-DIRECTED SESSION (S1-021)', () => {
+  mockState = state({
+    sessionMode: 'self_directed',
+    sessionPlan: [slot(1, 1, 5, { provenanceKind: 'planned' }), slot(2, 2, 8, { provenanceKind: 'planned' })],
+  });
+  render(<SessionScreen />);
+  expect(screen.getByText('PLANNED SESSION')).toBeOnTheScreen();
+  expect(screen.queryByText('SELF-DIRECTED SESSION')).toBeNull();
+});
+
+test('an unplanned free-form session in self-directed mode still renders SELF-DIRECTED SESSION (S1-021)', () => {
+  mockState = state({
+    sessionMode: 'self_directed',
+    sessionPlan: [
+      slot(1, 1, 5, { provenanceKind: 'free_form', sourcePlannedSlotId: null }),
+      slot(2, 2, 8, { provenanceKind: 'free_form', sourcePlannedSlotId: null }),
+    ],
+  });
+  render(<SessionScreen />);
+  expect(screen.getByText('SELF-DIRECTED SESSION')).toBeOnTheScreen();
+});

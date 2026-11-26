@@ -881,3 +881,65 @@ describe('#228 the off-plan start opens a planned session and says which', () =>
     expect(mockState.startSession).toHaveBeenCalledWith();
   });
 });
+
+test('planned card renders compact program identity bar with block sequence, week index, focus and sport on Day 1 (S1-020)', () => {
+  mockState = baseState({
+    vector: null,
+    program: { currentSequenceIndex: 1, plannedBlockCount: 3, status: 'active' },
+    focus: { bundleId: 'beach_muscles', muscles: ['upper_chest', 'biceps', 'triceps'], customised: false, movementControl: false },
+    sport: {
+      sportId: 'grappling_bjj',
+      otherSportName: null,
+      outcomeId: 'stay_available',
+      experienceId: '2_to_5_years',
+      practiceSessionsPerWeek: 2,
+      matchesPerWeek: 0,
+      typicalSessionMinutes: 90,
+      competitionDate: null,
+      revision: 1,
+    },
+  });
+  render(<TodayScreen />);
+  expect(screen.getByTestId('today-program-identity')).toHaveTextContent(
+    'Block 1 of 3 · Week 1 of 4 · Beach muscles: upper chest, biceps, triceps · Brazilian jiu-jitsu',
+  );
+});
+
+test('planned card tags movements selected for a goal, focus, or sport outcome (S1-020)', () => {
+  mockState = baseState({
+    todayPlan: {
+      plannedSessionId: 1,
+      focus: 'lower',
+      phase: 'accumulation',
+      slots: [
+        slot({ plannedSlotId: 10, movementId: 11, movementName: 'Goblet Squat' }),
+        slot({ plannedSlotId: 11, slotIndex: 1, movementId: 12, movementName: 'Incline Dumbbell Press' }),
+        slot({ plannedSlotId: 12, slotIndex: 2, movementId: 13, movementName: 'Nordic Hamstring Curl' }),
+        slot({ plannedSlotId: 13, slotIndex: 3, movementId: 14, movementName: 'Seated Row' }),
+      ],
+    },
+    blockEmphasis: {
+      blockId: 1,
+      inputs: {
+        focus: { muscles: ['upper_chest'], movementControl: false, description: 'Beach muscles: upper chest' },
+        sport: { name: 'Football (soccer)', muscles: ['hamstrings'] },
+        workload: null,
+        goalMovements: [{ movementId: 11, goalLabel: 'Goblet squat 40 kg for 10' }],
+      },
+      report: {
+        version: 1,
+        applied: [
+          'Incline Dumbbell Press is planned instead of Dumbbell Bench Press: it trains upper chest directly (your focus).',
+          'Nordic Hamstring Curl is planned instead of Leg Curl: it trains hamstrings directly (your Football (soccer) outcome).',
+        ],
+        omitted: [],
+      },
+    },
+  });
+
+  render(<TodayScreen />);
+  expect(screen.getByTestId('today-slot-provenance-10')).toHaveTextContent('Goal: Goblet squat 40 kg for 10');
+  expect(screen.getByTestId('today-slot-provenance-11')).toHaveTextContent('Your focus');
+  expect(screen.getByTestId('today-slot-provenance-12')).toHaveTextContent('Your Football (soccer) outcome');
+  expect(screen.queryByTestId('today-slot-provenance-13')).toBeNull();
+});

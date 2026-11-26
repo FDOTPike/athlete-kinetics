@@ -442,14 +442,14 @@ export const SPORT_EMPHASIS_OVERRIDES: Partial<Record<SportId, Partial<Record<Sp
     strength_for_contact: {
       muscles: [],
       competitionLifts: false,
-      summary: "No extra emphasis. Strength in contact is whole-body strength, which the plan already trains.",
+      summary: "Strength in contact is whole-body strength, which the plan already trains.",
       basis: [{ kind: "published", citation: "Suchomel TJ, Nimphius S, Stone MH. The importance of muscular strength in athletic performance. Sports Med 2016;46(10):1419-1449.", finding: "A review: greater muscular strength is associated with better jumping, sprinting and change-of-direction performance." }, { kind: "published", citation: "Andreato LV, et al. Physical and Physiological Profiles of Brazilian Jiu-Jitsu Athletes: a Systematic Review. Sports Med Open 2017;3(1):9. PMID 28194734.", finding: "BJJ is intermittent, 4-6 matches/day; VO2max 42-52; maximal, isometric and endurance strength can be associated with success." }, { kind: "published", citation: "James LP, et al. Towards a Determination of the Physiological Characteristics Distinguishing Successful Mixed Martial Arts Athletes. Sports Med 2016;46(10):1525-1551. PMID 26993133.", finding: "Grappling and striking sports differ in force-velocity profile between competition levels; the review reports observed differences, not measured training effects." }],
       limits: ["The app has no contact, tackling or wrestling drills.", "Grip, gi and forearm isometric work, neck work and mat conditioning are not in the library. The strengths linked to success in Brazilian jiu-jitsu are not a gym dose."],
     },
     stay_available: {
       muscles: [],
       competitionLifts: false,
-      summary: "No extra emphasis. The hamstring-injury research behind the default availability emphasis comes from running and kicking sports, so it is not applied to jiu-jitsu; the plan stays general strength.",
+      summary: "The hamstring-injury research behind the default availability emphasis comes from running and kicking sports, so it is not applied to jiu-jitsu; the plan stays general strength.",
       basis: [{ kind: "published", citation: "Scoggin JF 3rd, et al. Assessment of Injuries During Brazilian Jiu-Jitsu Competition. Orthop J Sports Med 2014;2(2):2325967114522184. PMID 26535299.", finding: "9.2 injuries per 1000 exposures; elbow most common; arm bar mechanism; lower risk than judo/wrestling/MMA." }],
       limits: ["Elbow and arm-bar exposure is not trained by the library.", "The app cannot promise fewer injuries or better results."],
     },
@@ -458,21 +458,21 @@ export const SPORT_EMPHASIS_OVERRIDES: Partial<Record<SportId, Partial<Record<Sp
     strength_for_contact: {
       muscles: [],
       competitionLifts: false,
-      summary: "No extra emphasis. Strength in contact is whole-body strength, which the plan already trains.",
+      summary: "Strength in contact is whole-body strength, which the plan already trains.",
       basis: [{ kind: "published", citation: "Suchomel TJ, Nimphius S, Stone MH. The importance of muscular strength in athletic performance. Sports Med 2016;46(10):1419-1449.", finding: "A review: greater muscular strength is associated with better jumping, sprinting and change-of-direction performance." }, { kind: "published", citation: "Chaabene H, et al. Physical and Physiological Attributes of Wrestlers: An Update. J Strength Cond Res 2017;31(5):1411-1442. PMID 28030533.", finding: "Anaerobic power/capacity discriminate success; maximal dynamic, isometric, explosive strength and strength endurance relate to performance; flexibility is not key." }, { kind: "published", citation: "James LP, et al. Towards a Determination of the Physiological Characteristics Distinguishing Successful Mixed Martial Arts Athletes. Sports Med 2016;46(10):1525-1551. PMID 26993133.", finding: "Grappling and striking sports differ in force-velocity profile between competition levels; the review reports observed differences, not measured training effects." }],
       limits: ["The app has no contact, tackling or wrestling drills.", "Neck and upper-back isometric work, sprawl and penetration-step drills and live wrestling are not in the library."],
     },
     faster_running: {
       muscles: [],
       competitionLifts: false,
-      summary: "No extra emphasis. No reviewed source tested gym sprint work in wrestlers, so the default running emphasis is not applied.",
+      summary: "No reviewed source tested gym sprint work in wrestlers, so the default running emphasis is not applied.",
       basis: [],
       limits: ["The app has no sprint or agility drills, and none is planned for this sport."],
     },
     stay_available: {
       muscles: [],
       competitionLifts: false,
-      summary: "No extra emphasis. The default hamstring emphasis comes from running and kicking sports; no wrestling-specific prevention trial was reviewed, so the plan stays general strength.",
+      summary: "The default hamstring emphasis comes from running and kicking sports; no wrestling-specific prevention trial was reviewed, so the plan stays general strength.",
       basis: [{ kind: "published", citation: "Thomas RE, Zamanpour K. Injuries in wrestling: systematic review. Phys Sportsmed 2018;46(2):168-196. PMID 29484899.", finding: "Weighted average competition injury rate 16.3 per 1000 athletic encounters (8/11 studies) and 69.5 per 1000 in database studies (5/27)." }],
       limits: ["Wrestling injury epidemiology was reviewed, but no wrestling-specific injury-prevention trial was reviewed, and the library has no neck, sprawl or penetration-step work.", "The app cannot promise fewer injuries or better results."],
     },
@@ -481,14 +481,14 @@ export const SPORT_EMPHASIS_OVERRIDES: Partial<Record<SportId, Partial<Record<Sp
     strength_for_contact: {
       muscles: [],
       competitionLifts: false,
-      summary: "No extra emphasis. Strength in contact is whole-body strength, which the plan already trains.",
+      summary: "Strength in contact is whole-body strength, which the plan already trains.",
       basis: [{ kind: "published", citation: "Suchomel TJ, Nimphius S, Stone MH. The importance of muscular strength in athletic performance. Sports Med 2016;46(10):1419-1449.", finding: "A review: greater muscular strength is associated with better jumping, sprinting and change-of-direction performance." }, { kind: "published", citation: "Pocecco E, et al. Injuries in judo: a systematic literature review including suggestions for prevention. Br J Sports Med 2013;47(18):1139-1143. PMID 24255909.", finding: "11-12% injury risk at the 2008/2012 Olympics; knee, shoulder, fingers; being thrown the main mechanism." }],
       limits: ["The app has no contact, tackling or wrestling drills.", "Grip, gi and break-fall work are not in the library."],
     },
     stay_available: {
       muscles: [],
       competitionLifts: false,
-      summary: "No extra emphasis. Judo injuries concentrate in the knee, shoulder and fingers, mostly from being thrown; the default hamstring emphasis is not judo-specific and is not applied.",
+      summary: "Judo injuries concentrate in the knee, shoulder and fingers, mostly from being thrown; the default hamstring emphasis is not judo-specific and is not applied.",
       basis: [{ kind: "published", citation: "Pocecco E, et al. Injuries in judo: a systematic literature review including suggestions for prevention. Br J Sports Med 2013;47(18):1139-1143. PMID 24255909.", finding: "11-12% injury risk at the 2008/2012 Olympics; knee, shoulder, fingers; being thrown the main mechanism." }],
       limits: ["Judo injuries concentrate in the knee, shoulder and fingers, mostly from being thrown; break-fall and grip work are not trained by the library.", "The app cannot promise fewer injuries or better results."],
     },
@@ -497,7 +497,7 @@ export const SPORT_EMPHASIS_OVERRIDES: Partial<Record<SportId, Partial<Record<Sp
     stay_available: {
       muscles: [],
       competitionLifts: false,
-      summary: "No extra emphasis. No boxing-specific injury study was reviewed, so the default running-sport hamstring emphasis is not applied.",
+      summary: "No boxing-specific injury study was reviewed, so the default running-sport hamstring emphasis is not applied.",
       basis: [],
       limits: ["The app cannot promise fewer injuries or better results."],
     },
@@ -506,14 +506,14 @@ export const SPORT_EMPHASIS_OVERRIDES: Partial<Record<SportId, Partial<Record<Sp
     strength_for_contact: {
       muscles: [],
       competitionLifts: false,
-      summary: "No extra emphasis. Strength in contact is whole-body strength, which the plan already trains.",
+      summary: "Strength in contact is whole-body strength, which the plan already trains.",
       basis: [{ kind: "published", citation: "Suchomel TJ, Nimphius S, Stone MH. The importance of muscular strength in athletic performance. Sports Med 2016;46(10):1419-1449.", finding: "A review: greater muscular strength is associated with better jumping, sprinting and change-of-direction performance." }, { kind: "published", citation: "James LP, et al. Towards a Determination of the Physiological Characteristics Distinguishing Successful Mixed Martial Arts Athletes. Sports Med 2016;46(10):1525-1551. PMID 26993133.", finding: "Grappling and striking sports differ in force-velocity profile between competition levels; the review reports observed differences, not measured training effects." }],
       limits: ["The app has no contact, tackling or wrestling drills.", "Cage wrestling, clinch and ground work are not in the library."],
     },
     stay_available: {
       muscles: [],
       competitionLifts: false,
-      summary: "No extra emphasis. No MMA-specific injury study was reviewed, so the default running-sport hamstring emphasis is not applied.",
+      summary: "No MMA-specific injury study was reviewed, so the default running-sport hamstring emphasis is not applied.",
       basis: [],
       limits: ["The app cannot promise fewer injuries or better results."],
     },
@@ -522,7 +522,7 @@ export const SPORT_EMPHASIS_OVERRIDES: Partial<Record<SportId, Partial<Record<Sp
     stay_available: {
       muscles: [],
       competitionLifts: false,
-      summary: "No extra emphasis. The running-sport hamstring emphasis is not applied: tennis injury research does not show that extra hamstring work prevents tennis injuries, so the plan stays general strength.",
+      summary: "The running-sport hamstring emphasis is not applied: tennis injury research does not show that extra hamstring work prevents tennis injuries, so the plan stays general strength.",
       basis: [{ kind: "published", citation: "Amor-Salamanca A, et al. Risk Factors and Prevention of Musculoskeletal Injuries in Adolescent and Adult High-Performance Tennis Players: A Systematic Review. Sports (Basel) 2025;13(10):336. PMID 41150471.", finding: "High-performance tennis exposes players to repetitive high-load strokes and abrupt directional changes; the review synthesises epidemiology, risk factors and physiotherapy-led prevention." }],
       limits: ["Tennis asks for repeated overhead serving and smashing plus one-sided groundstrokes; the library has shoulder external-rotation and wrist-curl work, but no serve, smash or groundstroke pattern and no on-court drill.", "The app cannot promise fewer injuries or better results."],
     },
@@ -531,7 +531,7 @@ export const SPORT_EMPHASIS_OVERRIDES: Partial<Record<SportId, Partial<Record<Sp
     stay_available: {
       muscles: [],
       competitionLifts: false,
-      summary: "No extra emphasis. Squash is built on repeated deep lunges and push-back recovery rather than running volume, so the running-sport hamstring emphasis is not applied and the plan stays general strength.",
+      summary: "Squash is built on repeated deep lunges and push-back recovery rather than running volume, so the running-sport hamstring emphasis is not applied and the plan stays general strength.",
       basis: [{ kind: "published", citation: "McCartney RV, Fallon T, Heron N. Squash Under Strain: A Systematic Review and Meta-Analysis of Injuries and Illnesses in Squash Players. Sports (Basel) 2026;14(2):79. PMID 41745681.", finding: "Pooled injury rate 0.74 per 365 athlete-days (95% CI 0.26-2.07) and 2.01 per 1000 athlete-days (95% CI 0.72-5.67), with very high heterogeneity; lower-limb soft-tissue injuries were most common." }],
       limits: ["Squash injuries in the reviewed literature are mostly lower-limb soft-tissue injuries; the library has lunge and leg-strength work, but no squash lunge-and-recovery drill and no on-court conditioning.", "No squash-specific injury-prevention trial was reviewed.", "The app cannot promise fewer injuries or better results."],
     },
@@ -540,7 +540,7 @@ export const SPORT_EMPHASIS_OVERRIDES: Partial<Record<SportId, Partial<Record<Sp
     stay_available: {
       muscles: [],
       competitionLifts: false,
-      summary: "No extra emphasis. Pickleball is played on a short court with a non-volley zone, so the running-sport hamstring emphasis is not applied and the plan stays general strength.",
+      summary: "Pickleball is played on a short court with a non-volley zone, so the running-sport hamstring emphasis is not applied and the plan stays general strength.",
       basis: [{ kind: "published", citation: "Bellm EJV, Lindish J, Mourad W, Owoeye OBA. Understanding Upper Extremity Injury Prevalence and Risk in Pickleball Players: A Nationwide Survey. JOSPT Open 2026;4(2):174-180. PMID 42686154.", finding: "689 of 1758 players (39.0%) reported at least one upper-extremity injury in 12 months; 16.2% reported time-loss injuries and chronic overuse was the most cited type (41%)." }],
       limits: ["A nationwide survey of pickleball players reported upper-extremity complaints in 39% of respondents; the library has shoulder-rotation and wrist-curl work, but no paddle-sport overhead or dinking pattern.", "No pickleball-specific injury-prevention trial was reviewed.", "The app cannot promise fewer injuries or better results."],
     },
@@ -558,7 +558,7 @@ export const SPORT_EMPHASIS_OVERRIDES: Partial<Record<SportId, Partial<Record<Sp
     last_the_whole_game: {
       muscles: [],
       competitionLifts: false,
-      summary: "No extra emphasis. Your Distance running sessions are your sport fitness; the gym plan is kept from crowding them out.",
+      summary: "Your Distance running sessions are your sport fitness; the gym plan is kept from crowding them out.",
       basis: [{ kind: "published", citation: "Wilson JM, Marin PJ, Rhea MR, Wilson SMC, Loenneke JP, Anderson JC. Concurrent training: a meta-analysis examining interference of aerobic and resistance exercises. J Strength Cond Res 2012;26(8):2293-2307.", finding: "A meta-analysis of 21 studies: the more frequent and the longer the endurance training done alongside lifting, the smaller the strength, size and power gains." }, { kind: "published", citation: "Denadai BS, et al. Explosive Training and Heavy Weight Training are Effective for Improving Running Economy in Endurance Athletes: A Systematic Review and Meta-Analysis. Sports Med 2017;47(3):545-554. PMID 27497600.", finding: "Explosive (-4.83%) and heavy weight (-3.65%) training produced similar improvements in running economy; isometric training did not reach significance." }],
       limits: ["The app does not plan running or sport-specific conditioning for you.", "The running-economy findings come from added heavy or explosive strength work in trained runners; the library catalogues no plyometric drill."],
     },
@@ -567,7 +567,7 @@ export const SPORT_EMPHASIS_OVERRIDES: Partial<Record<SportId, Partial<Record<Sp
     stay_available: {
       muscles: [],
       competitionLifts: false,
-      summary: "No extra emphasis. Swimming injuries concentrate at the shoulder, and Nordic hamstring work does not train a swimmer's shoulder, so the running-sport emphasis is not applied.",
+      summary: "Swimming injuries concentrate at the shoulder, and Nordic hamstring work does not train a swimmer's shoulder, so the running-sport emphasis is not applied.",
       basis: [{ kind: "published", citation: "Li D, Liu Y. A 45-year global systematic evaluation of musculoskeletal injuries in swimmers: a systematic review and meta-analysis. J Sports Med Phys Fitness 2026;66(1):82-91. PMID 41342747.", finding: "Across 94 studies and 10,973 swimmers, shoulder injuries were reported in 70.2% of studies, knee in 36.1% and arm/forearm in 21.2%." }],
       limits: ["The library has shoulder and upper-back strength work, but no swim-stroke, streamline or pull-pattern exercise.", "No swimming-specific injury-prevention trial was reviewed.", "The app cannot promise fewer injuries or better results."],
     },
@@ -638,7 +638,7 @@ export function sportEmphasisFor(profile: Pick<SportProfile, 'sportId' | 'outcom
       return {
         muscles: [],
         competitionLifts: false,
-        summary: 'No extra emphasis. Strength in contact is whole-body strength, which the plan already trains.',
+        summary: 'Strength in contact is whole-body strength, which the plan already trains.',
         basis: [SPORT_SOURCES.suchomel2016],
         limits: ['The app has no contact, tackling or wrestling drills.'],
       };
@@ -646,7 +646,7 @@ export function sportEmphasisFor(profile: Pick<SportProfile, 'sportId' | 'outcom
       return {
         muscles: [],
         competitionLifts: false,
-        summary: `No extra emphasis. Your ${sport} sessions are your sport fitness; the gym plan is kept from crowding them out.`,
+        summary: `Your ${sport} sessions are your sport fitness; the gym plan is kept from crowding them out.`,
         basis: [SPORT_SOURCES.wilson2012],
         limits: ['The app does not plan running or sport-specific conditioning for you.'],
       };
@@ -654,7 +654,7 @@ export function sportEmphasisFor(profile: Pick<SportProfile, 'sportId' | 'outcom
       return {
         muscles: [],
         competitionLifts: false,
-        summary: 'No extra emphasis. The app has no reviewed evidence that a particular gym exercise improves striking or clinch strength, so it plans general strength.',
+        summary: 'The app has no reviewed evidence that a particular gym exercise improves striking or clinch strength, so it plans general strength.',
         basis: [],
         limits: ['High-repetition drills such as hip-flexor raises are not added by default; no reviewed source supports a dose for them.'],
       };
@@ -663,7 +663,7 @@ export function sportEmphasisFor(profile: Pick<SportProfile, 'sportId' | 'outcom
       return {
         muscles: [],
         competitionLifts: false,
-        summary: `No extra emphasis. The plan is general strength alongside your ${sport}.`,
+        summary: `The plan is general strength alongside your ${sport}.`,
         basis: [],
         limits: [],
       };

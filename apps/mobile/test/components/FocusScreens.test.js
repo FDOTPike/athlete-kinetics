@@ -1089,3 +1089,87 @@ describe('#170: the neutral default of 50 is named as a default', () => {
     expect(screen.getByText('+0.4 SD from your baseline')).toBeOnTheScreen();
   });
 });
+
+test('PLAN pre-readiness (vector === null) renders existing weekly activities, emphasis disclosure, and manage program preferences (#380)', () => {
+  const activeProgram = {
+    programId: 7,
+    objective: 'strength',
+    startDate: '2026-07-01',
+    horizonKind: 'weeks',
+    requestedReviewDate: null,
+    plannedEndDate: '2026-10-21',
+    plannedBlockCount: 4,
+    startingMacroBlockIndex: 1,
+    schemaType: 'LINEAR',
+    status: 'active',
+    currentSequenceIndex: 1,
+    days: [{ dayIndex: 1, focus: 'full' }],
+    movementPreferences: [],
+  };
+  const editorPreview = {
+    objective: 'strength',
+    startDate: TODAY,
+    requestedReviewDate: null,
+    plannedEndDate: '2026-10-21',
+    plannedBlockCount: 4,
+    schemaType: 'LINEAR',
+    days: activeProgram.days,
+    plan: {
+      objective: 'strength', start_date: TODAY, weeks: 4, schemaType: 'LINEAR',
+      macroBlockIndex: 2, macroPhase: 'gpp', peakShifted: false,
+      sessions: [], warnings: [], recovery: false, autopilotAdjusted: [],
+    },
+  };
+  mockState = baseState({
+    vector: null,
+    suspension: null,
+    program: activeProgram,
+    previewTrainingProgram: jest.fn(() => editorPreview),
+    updateProgramPreferences: jest.fn(() => true),
+    previewNextProgramBlock: jest.fn(() => null),
+    continueTrainingProgram: jest.fn(),
+    archiveTrainingProgram: jest.fn(),
+    activityLedger: {
+      definitions: [], occurrences: [], completedLast28Days: 0, knownMinutesLast28Days: 0,
+      completedWithUnknownDuration: 0, scheduledKnownMinutesPerWeek: 60,
+      scheduledWithUnknownDuration: 0,
+      series: [{
+        seriesId: 'series-basketball', activityId: 'activity-basketball', displayName: 'Basketball',
+        revision: 1, localWeekday: 5, localStartMinute: 1020, timezoneId: 'Australia/Sydney',
+        timing: 'fixed', expectedDurationMin: 60, expectedEffort: null,
+        effectiveStartDate: '2026-07-01', effectiveEndDate: null,
+      }],
+    },
+    blockEmphasis: {
+      blockId: 1,
+      inputs: {},
+      report: { version: 1, applied: ['Focus — Beach muscles: upper chest, biceps, triceps.'], omitted: [] },
+    },
+  });
+
+  render(<BlockScreen />);
+
+  expect(screen.getByTestId('plan-existing-activities')).toBeOnTheScreen();
+  expect(screen.getByTestId('plan-emphasis-disclosure')).toBeOnTheScreen();
+  expect(screen.getByLabelText('Manage future program preferences')).toBeOnTheScreen();
+
+  fireEvent.press(screen.getByLabelText('Manage future program preferences'));
+  expect(screen.getByText('MANAGE PROGRAM')).toBeOnTheScreen();
+});
+
+test('PLAN renders plan-emphasis-disclosure with NO_EMPHASIS_EXPLANATION emptyText when block exists and blockEmphasis is null (S1-002)', () => {
+  const { NO_EMPHASIS_EXPLANATION } = jest.requireActual('@ak/inference');
+  mockState = baseState({ vector: null, blockEmphasis: null });
+  const preReadiness = render(<BlockScreen />);
+
+  expect(screen.getByTestId('plan-emphasis-disclosure')).toBeOnTheScreen();
+  fireEvent.press(screen.getByRole('button', { name: 'WHY THIS PLAN LOOKS THE WAY IT DOES' }));
+  expect(screen.getByTestId('plan-emphasis-empty')).toHaveTextContent(NO_EMPHASIS_EXPLANATION);
+  preReadiness.unmount();
+
+  mockState = baseState({ blockEmphasis: null });
+  render(<BlockScreen />);
+  expect(screen.getByTestId('plan-emphasis-disclosure')).toBeOnTheScreen();
+  fireEvent.press(screen.getByRole('button', { name: 'WHY THIS PLAN LOOKS THE WAY IT DOES' }));
+  expect(screen.getByTestId('plan-emphasis-empty')).toHaveTextContent(NO_EMPHASIS_EXPLANATION);
+});
