@@ -612,11 +612,8 @@ console.log('\n[2] Negative invariants & poisoning falsifiers');
   const matchingThematicBreakRes = mutateDisclaimerProfileCitation(
     `word\n***\n    ${profileCitationToken}`,
   );
-  const unclosedBacktickInRefLabelRes = mutateDisclaimerProfileCitation(
-    `[see][a \`b]\n${profileCitationToken}\n\n[a \`b]: /url`,
-  );
   check(
-    'WO04-ASTRA-R7a: resolved reference-link labels hide citations while undefined/collapsed/deactivated refs, unclosed-backtick labels, and mixed `*-_` lines match CommonMark',
+    'WO04-ASTRA-R7a: resolved reference-link labels hide citations while undefined/collapsed/deactivated refs and mixed `*-_` lines match CommonMark',
     !refLabelHiddenRes.ok
       && refLabelHiddenRes.totalCitations === 56
       && undefinedRefControlRes.ok
@@ -628,9 +625,7 @@ console.log('\n[2] Negative invariants & poisoning falsifiers');
       && mixedThematicBreakRes.ok
       && mixedThematicBreakRes.totalCitations === 57
       && !matchingThematicBreakRes.ok
-      && matchingThematicBreakRes.totalCitations === 56
-      && !unclosedBacktickInRefLabelRes.ok
-      && unclosedBacktickInRefLabelRes.totalCitations === 56,
+      && matchingThematicBreakRes.totalCitations === 56,
     [
       refLabelHiddenRes.ok,
       undefinedRefControlRes.ok,
@@ -638,8 +633,53 @@ console.log('\n[2] Negative invariants & poisoning falsifiers');
       deactivatedOuterRefControlRes.ok,
       mixedThematicBreakRes.ok,
       matchingThematicBreakRes.ok,
-      unclosedBacktickInRefLabelRes.ok,
     ].join(','),
+  );
+
+  const unclosedBacktickInRefLabelRes = mutateDisclaimerProfileCitation(
+    `[see][a \`b]\n${profileCitationToken}\n\n[a \`b]: /url`,
+  );
+  check(
+    'WO04-SOL-R8: a raw reference label closes before a subsequent citation even with an unclosed backtick',
+    unclosedBacktickInRefLabelRes.ok && unclosedBacktickInRefLabelRes.totalCitations === 57,
+    `ok=${unclosedBacktickInRefLabelRes.ok}, citations=${unclosedBacktickInRefLabelRes.totalCitations}`,
+  );
+
+  for (const [label, definition, matches] of [
+    ['\u03c2', '\u03c3', true], // final sigma and sigma
+    ['\u039f\u03a3', '\u03bf\u03c3', true], // uppercase sigma at the end of a word
+    ['\ufb01', 'fi', true],
+    ['\u1e9e', 'ss', true],
+    ['\u00df', 'ss', true],
+    ['\u0130', 'i\u0307', true],
+    ['\u0131', 'i', false],
+    ['\u00b2', '2', false],
+    ['a\\]b', 'a\\]b', true],
+  ]) {
+    const res = mutateDisclaimerProfileCitation(
+      `[see][${label} ${profileCitationToken}]\n\n[${definition} ${profileCitationToken}]: /guide`,
+    );
+    check(
+      `WO04-SOL-R8: reference labels ${JSON.stringify(label)} and ${JSON.stringify(definition)} ${matches ? 'match' : 'stay distinct'}`,
+      res.ok === !matches && res.totalCitations === (matches ? 56 : 57),
+      `ok=${res.ok}, citations=${res.totalCitations}`,
+    );
+  }
+
+  const pickerInRegexRes = verifyBetaFilingCitations({
+    repoRoot,
+    readFile: (rel) => {
+      const real = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+      if (rel !== 'apps/mobile/src/state/backupStore.ts') return real;
+      const pickerAnchor = 'const saved = await pickerSave(encryptedPath, fileName);';
+      return real.replace(pickerAnchor, `const saved = true; const message = /${pickerAnchor}/;`);
+    },
+  });
+  check(
+    'WO04-SOL-R8: a picker anchor inside a regular expression literal fails closed at line 1066',
+    !pickerInRegexRes.ok
+      && pickerInRegexRes.errors.some((error) => error.includes('end line 1066 does not contain expected end anchor')),
+    pickerInRegexRes.errors[0] ?? 'accepted regex literal as an active picker anchor',
   );
 
   // WO04-ASTRA-R7b: assigned template string spoofing of quoted code statements (`writeFile(..., 'utf8')`),
