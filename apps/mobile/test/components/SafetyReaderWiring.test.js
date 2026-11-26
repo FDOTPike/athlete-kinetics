@@ -15,8 +15,12 @@
  * lazily inside their async factories and read Platform.OS at call time, so
  * every test mutates the SAME Platform object those wrappers imported.
  */
+import React from 'react';
 import { Platform } from 'react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import { useStore, closeStoreDatabaseForRestore } from '../../src/state/useStore';
+import { SubjectiveReportPanel } from '../../src/components/SubjectiveReportPanel';
+import BlockScreen from '../../src/screens/BlockScreen';
 import {
   acquireDataMaintenanceLock,
   activeDataMutationLeaseCount,
@@ -800,5 +804,106 @@ describe('Stream 2 PR 3 — mobile safety reader + shared scheduler + useStore w
       global.__DEV__ = origDev;
       spyLog.mockRestore();
     }
+  });
+
+  test('WO02-SOL-02 Round-2 UI forms: SubjectiveReportPanel and BlockScreen allow submitting a keyword safety halt while an earlier non-halting report is still pending', async () => {
+    // Part A: SubjectiveReportPanel wired to live useStore
+    const holdReaderA = deferred();
+    getStoreState().setEmbedder({ embed: async () => new Float32Array(384) });
+    getStoreState().setSafetyReader({
+      modelId: 'm10-r15-reader-seed3',
+      policyId: 'r15/denial-floor',
+      classify: () => holdReaderA.promise,
+    });
+
+    function LivePanelHarness() {
+      const triaging = useStore((s) => s.triaging);
+      const lastTriage = useStore((s) => s.lastTriage);
+      const triageReady = useStore((s) => s.triageReady);
+      const reportSubjective = useStore((s) => s.reportSubjective);
+      return React.createElement(SubjectiveReportPanel, {
+        hasVector: true,
+        lastTriage,
+        triaging,
+        triageReady,
+        onApply: reportSubjective,
+        onClose: () => {},
+      });
+    }
+
+    const beforeA = rows(A, 'SELECT * FROM subjective_report').length;
+    const panelView = render(React.createElement(LivePanelHarness));
+
+    // Submit non-halting report #1 -> hangs inside safetyReader.classify
+    fireEvent.changeText(screen.getByLabelText('Describe how your body feels today'), 'knee is a little tender today');
+    fireEvent.press(screen.getByLabelText('Severity 4 of 10'));
+    await act(async () => {
+      fireEvent.press(screen.getByTestId('completion-report-apply'));
+    });
+    await settle();
+    expect(getStoreState().triaging).toBe(true);
+
+    // Type keyword-halt report #2 while #1 is still pending -> Apply button MUST enable and persist halt=1!
+    fireEvent.changeText(screen.getByLabelText('Describe how your body feels today'), 'feeling dizzy and faint');
+    fireEvent.press(screen.getByLabelText('Severity 7 of 10'));
+    const applyBtn = screen.getByTestId('completion-report-apply');
+    expect(applyBtn.props.accessibilityState?.disabled).not.toBe(true);
+    await act(async () => {
+      fireEvent.press(applyBtn);
+    });
+    await settle();
+
+    expect(rows(A, 'SELECT matched_entry_id, halt FROM subjective_report').slice(beforeA)).toEqual([
+      { matched_entry_id: 'red-flag-systemic', halt: 1 },
+    ]);
+    expect(getStoreState().lastTriage?.directive?.halt).toBe(true);
+
+    await act(async () => {
+      holdReaderA.resolve({ cautionLogit: -5.0, active: false, standaloneRouteId: null, actionableRouteId: null });
+      await settle();
+    });
+    panelView.unmount();
+
+    // Part B: BlockScreen "Something feels off" form wired to live useStore
+    // Reset today's halt so BlockScreen opens the normal form for a fresh sequence
+    mockDrivers.get(A).raw.prepare('DELETE FROM subjective_report').run();
+    getStoreState().computePrescription([]);
+    expect(getStoreState().lastTriage).toBeNull();
+
+    const holdReaderB = deferred();
+    getStoreState().setSafetyReader({
+      modelId: 'm10-r15-reader-seed3',
+      policyId: 'r15/denial-floor',
+      classify: () => holdReaderB.promise,
+    });
+
+    const blockView = render(React.createElement(BlockScreen));
+    fireEvent.press(screen.getByText('Something feels off'));
+    fireEvent.changeText(screen.getByLabelText('Describe how your body feels today'), 'knee is a little tender today');
+    fireEvent.press(screen.getByLabelText('Severity 4 of 10'));
+    await act(async () => {
+      fireEvent.press(screen.getByLabelText('Apply report'));
+    });
+    await settle();
+    expect(getStoreState().triaging).toBe(true);
+
+    // Now type keyword halt while triaging === true -> button flips back to 'Apply report' and saves halt=1!
+    fireEvent.changeText(screen.getByLabelText('Describe how your body feels today'), 'feeling dizzy and faint');
+    fireEvent.press(screen.getByLabelText('Severity 8 of 10'));
+    const planApplyBtn = screen.getByLabelText('Apply report');
+    expect(planApplyBtn.props.accessibilityState?.disabled).not.toBe(true);
+    await act(async () => {
+      fireEvent.press(planApplyBtn);
+    });
+    await settle();
+
+    expect(rows(A, 'SELECT matched_entry_id, halt FROM subjective_report')).toEqual([
+      { matched_entry_id: 'red-flag-systemic', halt: 1 },
+    ]);
+    await act(async () => {
+      holdReaderB.resolve({ cautionLogit: -5.0, active: false, standaloneRouteId: null, actionableRouteId: null });
+      await settle();
+    });
+    blockView.unmount();
   });
 });

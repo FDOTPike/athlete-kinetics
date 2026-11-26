@@ -13,6 +13,8 @@
  *
  * Run: node tools/memory-audit/test_memory_gate.mjs
  */
+import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -1010,20 +1012,38 @@ for (const [label, tamper, needle] of [
 // =============================================================================
 console.log('\n[15] WO02-SOL-03 — sealed packets bind candidate_manifest.json & ratified safety-reader SHA-256');
 
-const VALID_CANDIDATE_MANIFEST = Object.freeze({
-  schema: 'ak.candidate-manifest/1',
-  label: 'NON_PRODUCTION_QA_DEBUG_SIGNED',
-  safetyReader: {
-    id: 'm10-r15-reader-seed3',
-    policyId: 'r15/denial-floor',
-    releaseTag: 'ml-reader-m10-r15-s3',
-    releaseCommit: 'b6ceee70c7b7a9afd793968e8ca15ba17704b572',
-    assetId: 775095775,
-    assetPath: 'assets/safety_reader.onnx',
-    sha256: 'a0fa76e40e10246a9caf9d1be463b72b34f03174c68b017d6673fe9f165cb5cf',
-    sizeBytes: 22881187,
-  },
-});
+const REPO_ROOT = join(import.meta.dirname, '..', '..');
+function buildLiveCandidateManifest(overrides = {}) {
+  const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: REPO_ROOT, encoding: 'utf8' }).trim();
+  const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: REPO_ROOT, encoding: 'utf8' }).trim();
+  const diffBuf = execFileSync('git', ['diff', '--full-index', '--binary', 'HEAD'], {
+    cwd: REPO_ROOT, maxBuffer: 256 * 1024 * 1024,
+  });
+  const fp = createHash('sha256').update(diffBuf).digest('hex');
+  return {
+    schema: 'ak.candidate-manifest/1',
+    label: 'NON_PRODUCTION_QA_DEBUG_SIGNED',
+    head,
+    branch,
+    trackedDiffFingerprint: {
+      method: 'sha256(git diff --full-index --binary HEAD)',
+      value: fp,
+    },
+    newFiles: [],
+    safetyReader: {
+      id: 'm10-r15-reader-seed3',
+      policyId: 'r15/denial-floor',
+      releaseTag: 'ml-reader-m10-r15-s3',
+      releaseCommit: 'b6ceee70c7b7a9afd793968e8ca15ba17704b572',
+      assetId: 775095775,
+      assetPath: 'assets/safety_reader.onnx',
+      sha256: 'a0fa76e40e10246a9caf9d1be463b72b34f03174c68b017d6673fe9f165cb5cf',
+      sizeBytes: 22881187,
+    },
+    ...overrides,
+  };
+}
+const VALID_CANDIDATE_MANIFEST = buildLiveCandidateManifest();
 
 function sealFullManifestDir(pkt, candidateManifestObj = undefined) {
   if (candidateManifestObj !== undefined) {
@@ -1123,6 +1143,22 @@ for (const [label, badManifest] of [
   check('SOL-03: mutating candidate_manifest.json after sealing breaks [G] binding and manifest membership',
     v.ok === false
       && v.problems.some((p) => p.includes('bindingDigest') || p.includes('candidate_manifest.json')),
+    v.problems.join('; ').slice(0, 160));
+  rmSync(pkt.dir, { recursive: true, force: true });
+}
+
+{
+  // Round-2 counterexample (SOL-03-R2): an authentic sealed packet from an OLDER
+  // git HEAD (41bc6915...) carrying the valid safetyReader hash MUST be rejected
+  // against the current worktree so old device evidence cannot satisfy a newer APK!
+  const pkt = makePacket();
+  const staleManifest = buildLiveCandidateManifest({
+    head: '41bc69154dca84327d3b22e14a12333349d280c5',
+  });
+  const { sessionPath } = sealFullManifestDir(pkt, staleManifest);
+  const v = verifyEvidencePacket({ sessionPath });
+  check('SOL-03-R2: sealed packet naming stale APK HEAD 41bc6915 is REJECTED against current worktree',
+    v.ok === false && v.problems.some((p) => p.includes('HEAD mismatch')),
     v.problems.join('; ').slice(0, 160));
   rmSync(pkt.dir, { recursive: true, force: true });
 }

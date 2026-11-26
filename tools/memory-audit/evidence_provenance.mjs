@@ -42,6 +42,7 @@ import { basename, dirname, join, relative, sep } from 'node:path';
 
 import { parseMeminfoDump, privateDirtyBytes } from './meminfo_parser.mjs';
 import { checkCandidateManifestSafetyReader } from './memory_gate.mjs';
+import { verifyProvenance } from '../verify_qa_artifact.mjs';
 import {
   bindTargetSamples,
   computeCadence,
@@ -171,6 +172,8 @@ export function verifyEvidencePacket({
   sessionPath,
   manifestPath = undefined,
   requireManifest = true,
+  repoRoot = join(import.meta.dirname, '..', '..'),
+  verifyCandidateProvenance = requireManifest,
 } = {}) {
   const problems = [];
   const fail = (status) => ({
@@ -405,6 +408,12 @@ export function verifyEvidencePacket({
       if (summary.candidateManifest !== undefined
           && JSON.stringify(summary.candidateManifest) !== JSON.stringify(parsedCandidate)) {
         problems.push('summary.candidateManifest does not match sealed candidate_manifest.json');
+      }
+      if (verifyCandidateProvenance) {
+        const candProv = verifyProvenance(parsedCandidate, { repoRoot });
+        if (!candProv.ok) {
+          problems.push(...candProv.problems);
+        }
       }
     } catch (e) {
       problems.push(`${CANDIDATE_MANIFEST_FILENAME} is not parseable JSON: ${e.message}`);

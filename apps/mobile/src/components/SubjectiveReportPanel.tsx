@@ -17,6 +17,7 @@
  */
 import React, { useRef, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { scanRedFlags } from '@ak/inference';
 import type { TriageOutcome } from '../state/useStore';
 import { theme } from '../theme/theme';
 import { IS_BETA_BUILD } from '../config/features';
@@ -58,29 +59,52 @@ export function SubjectiveReportPanel({
   const [notSent, setNotSent] = useState(false);
   const halted = lastTriage !== null && lastTriage.kind === 'matched' && lastTriage.directive.halt;
 
-  // One Apply at a time: a second press before the first answer arrives sends
-  // nothing (the store would refuse it, and its "not sent" would sit beside the
-  // first report's result). The ref is synchronous; `pending` disables the button.
-  const inFlight = useRef(false);
+  // One Apply at a time for ordinary reports: a second press before the first
+  // answer arrives sends nothing unless the new draft carries deterministic
+  // systemic red-flag language, which must never wait behind a hung check.
+  const inFlightCount = useRef(0);
+  const lastInFlightKey = useRef<string | null>(null);
+  const submitEpoch = useRef(0);
   const [pending, setPending] = useState(false);
 
+  const trimmedText = reportText.trim();
+  const keywordHaltReady = trimmedText.length > 0 && scanRedFlags(trimmedText).systemic;
+  const submitKey = reportSeverity !== null ? `${trimmedText}\n${reportSeverity}` : null;
+  const blockedWhileBusy =
+    (triaging || pending) && (!keywordHaltReady || submitKey === lastInFlightKey.current);
+
   const apply = (): void => {
-    if (reportSeverity === null || inFlight.current) return;
-    inFlight.current = true;
+    if (trimmedText.length === 0 || reportSeverity === null) return;
+    const busyNow = triaging || pending || inFlightCount.current > 0;
+    if (busyNow && (!keywordHaltReady || submitKey === lastInFlightKey.current)) return;
+    const myEpoch = ++submitEpoch.current;
+    inFlightCount.current += 1;
+    lastInFlightKey.current = submitKey;
     setPending(true);
     setNotSent(false);
     // A new report starts without the previous report's result on screen.
     setApplied(false);
-    const settled = (): void => { inFlight.current = false; setPending(false); };
+    const settled = (): void => {
+      inFlightCount.current = Math.max(0, inFlightCount.current - 1);
+      if (inFlightCount.current === 0) {
+        lastInFlightKey.current = null;
+        setPending(false);
+      }
+    };
     // The text is cleared only once the store has stored the report. Anything else
     // keeps it on screen and says so, so nothing typed is lost.
     onApply(reportText, reportSeverity).then((stored) => {
       settled();
+      if (submitEpoch.current !== myEpoch) return;
       if (!stored) { setNotSent(true); return; }
       setReportText('');
       setReportSeverity(null);
       setApplied(true);
-    }, () => { settled(); setNotSent(true); });
+    }, () => {
+      settled();
+      if (submitEpoch.current !== myEpoch) return;
+      setNotSent(true);
+    });
   };
 
   const haltCard = halted && lastTriage !== null && lastTriage.kind === 'matched' ? (
@@ -148,10 +172,10 @@ export function SubjectiveReportPanel({
         ))}
       </View>
       <PrimaryButton
-        label={triaging ? 'Checking report' : 'Apply report'}
-        disabled={reportText.trim().length === 0 || reportSeverity === null || triaging || pending}
+        label={blockedWhileBusy ? 'Checking report' : 'Apply report'}
+        disabled={trimmedText.length === 0 || reportSeverity === null || blockedWhileBusy}
         onPress={apply}
-        accessibilityLabel={triaging ? 'Checking report' : 'Apply report'}
+        accessibilityLabel={blockedWhileBusy ? 'Checking report' : 'Apply report'}
         testID="completion-report-apply"
       />
       {notSent && (

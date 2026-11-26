@@ -13,6 +13,7 @@ import {
   applyLoadModifier,
   applyPrescriptionToSlot,
   isPrescriptionReduced,
+  scanRedFlags,
   sportDisplayName,
   sportPeakingFallbackCopy,
   sportPeakingMovementsFor,
@@ -362,6 +363,9 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
   const [reportText, setReportText] = useState('');
   const [reportSeverity, setReportSeverity] = useState<number | null>(null);
   const [reportNotSent, setReportNotSent] = useState(false);
+  const reportSubmitEpoch = useRef(0);
+  const reportInFlightCount = useRef(0);
+  const reportLastInFlightKey = useRef<string | null>(null);
   const [schema, setSchema] = useState<SchemaType>('LINEAR');
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [attributionSlotId, setAttributionSlotId] = useState<number | null>(null);
@@ -1817,27 +1821,51 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                   );
                 })}
               </View>
-              <PrimaryButton
-                label={triaging ? 'Checking report' : 'Apply report'}
-                disabled={reportText.trim().length === 0 || reportSeverity === null || triaging}
-                onPress={() => {
-                  if (reportSeverity === null) return;
-                  setReportNotSent(false);
-                  // The text and severity clear only once the store has stored the report.
-                  // Anything else keeps them on screen and says so, so nothing typed is lost.
-                  void reportSubjective(reportText, reportSeverity).then((stored) => {
-                    if (!stored) { setReportNotSent(true); return; }
-                    setReportText('');
-                    setReportSeverity(null);
-                    // Bring the reply (above the form) into view (#207).
-                    scrollRef.current?.scrollTo({
-                      y: Math.max(0, disclosuresSectionY.current + reportDisclosureOffsetY.current - theme.space[4]),
-                      animated: true,
-                    });
-                  }, () => { setReportNotSent(true); });
-                }}
-                accessibilityLabel={triaging ? 'Checking report' : 'Apply report'}
-              />
+              {(() => {
+                const trimmedReport = reportText.trim();
+                const keywordHaltReady = trimmedReport.length > 0 && scanRedFlags(trimmedReport).systemic;
+                const submitKey = reportSeverity !== null ? `${trimmedReport}\n${reportSeverity}` : null;
+                const reportBusy =
+                  triaging && (!keywordHaltReady || submitKey === reportLastInFlightKey.current);
+                return (
+                  <PrimaryButton
+                    label={reportBusy ? 'Checking report' : 'Apply report'}
+                    disabled={trimmedReport.length === 0 || reportSeverity === null || reportBusy}
+                    onPress={() => {
+                      if (trimmedReport.length === 0 || reportSeverity === null) return;
+                      const busyNow = triaging || reportInFlightCount.current > 0;
+                      if (busyNow && (!keywordHaltReady || submitKey === reportLastInFlightKey.current)) return;
+                      const myEpoch = ++reportSubmitEpoch.current;
+                      reportInFlightCount.current += 1;
+                      reportLastInFlightKey.current = submitKey;
+                      const settled = (): void => {
+                        reportInFlightCount.current = Math.max(0, reportInFlightCount.current - 1);
+                        if (reportInFlightCount.current === 0) reportLastInFlightKey.current = null;
+                      };
+                      setReportNotSent(false);
+                      // The text and severity clear only once the store has stored the report.
+                      // Anything else keeps them on screen and says so, so nothing typed is lost.
+                      void reportSubjective(reportText, reportSeverity).then((stored) => {
+                        settled();
+                        if (reportSubmitEpoch.current !== myEpoch) return;
+                        if (!stored) { setReportNotSent(true); return; }
+                        setReportText('');
+                        setReportSeverity(null);
+                        // Bring the reply (above the form) into view (#207).
+                        scrollRef.current?.scrollTo({
+                          y: Math.max(0, disclosuresSectionY.current + reportDisclosureOffsetY.current - theme.space[4]),
+                          animated: true,
+                        });
+                      }, () => {
+                        settled();
+                        if (reportSubmitEpoch.current !== myEpoch) return;
+                        setReportNotSent(true);
+                      });
+                    }}
+                    accessibilityLabel={reportBusy ? 'Checking report' : 'Apply report'}
+                  />
+                );
+              })()}
               {reportNotSent && (
                 <Text style={styles.captionText} accessibilityRole="alert" testID="plan-report-not-sent">
                   {REPORT_NOT_SENT_TEXT}
