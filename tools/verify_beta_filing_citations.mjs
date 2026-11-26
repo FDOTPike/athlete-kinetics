@@ -17,8 +17,21 @@
  *      disambiguating duplicate lines), and all `rangeAnchors` inside `start..end`.
  */
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+const requireFromHere = createRequire(import.meta.url);
+let cachedTs = undefined;
+function loadTypeScriptCompiler() {
+  if (cachedTs !== undefined) return cachedTs;
+  try {
+    cachedTs = requireFromHere('typescript');
+  } catch {
+    cachedTs = null;
+  }
+  return cachedTs;
+}
 
 export const REQUIRED_FILING_DOCS = Object.freeze([
   'docs/release/beta/DISCLAIMER.md',
@@ -434,73 +447,198 @@ function isRepoContainedRelativePath(repoRoot, relPath) {
 
 const ASCII_PUNCT_RE = /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/;
 
-function leadingIndentColumns(str) {
-  let cols = 0;
-  let idx = 0;
-  while (idx < str.length) {
-    if (str[idx] === ' ') {
-      cols += 1;
-      idx += 1;
-    } else if (str[idx] === '\t') {
-      cols += 4 - (cols % 4);
-      idx += 1;
+const HTML_TYPE1_OPEN_RE = /^<(pre|script|style|textarea)(?:[ \t>]|$)/i;
+const HTML_TYPE1_CLOSE_RE = /<\/(?:pre|script|style|textarea)\s*>/i;
+const HTML_TYPE2_OPEN_RE = /^<!--/;
+const HTML_TYPE2_CLOSE_RE = /-->/;
+const HTML_TYPE3_OPEN_RE = /^<\?/;
+const HTML_TYPE3_CLOSE_RE = /\?>/;
+const HTML_TYPE4_OPEN_RE = /^<![A-Za-z]/;
+const HTML_TYPE4_CLOSE_RE = />/;
+const HTML_TYPE5_OPEN_RE = /^<!\[CDATA\[/;
+const HTML_TYPE5_CLOSE_RE = /\]\]>/;
+const HTML_TYPE6_OPEN_RE = /^<\/?(?:address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h[1-6]|head|header|hr|html|iframe|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param|search|section|summary|table|tbody|td|tfoot|th|thead|title|tr|track|ul)(?:[ \t/>]|$)/i;
+const HTML_TYPE7_OPEN_RE = /^(?:<(?!(?:pre|script|style|textarea)(?:[ \t/>]|$))[A-Za-z][A-Za-z0-9-]*(?:[ \t]+[A-Za-z_:][A-Za-z0-9_.:-]*(?:[ \t]*=[ \t]*(?:[^\s"'=<>`]+|'[^'\r\n]*'|"[^"\r\n]*"))?)*[ \t]*\/?>|<\/(?!(?:pre|script|style|textarea)(?:[ \t>]|$))[A-Za-z][A-Za-z0-9-]*[ \t]*>)[ \t]*$/i;
+
+function expandTabsToSpaces(rawLine) {
+  let out = '';
+  let col = 0;
+  for (let i = 0; i < rawLine.length; i += 1) {
+    const ch = rawLine[i];
+    if (ch === '\t') {
+      const width = 4 - (col % 4);
+      out += ' '.repeat(width);
+      col += width;
     } else {
-      break;
+      out += ch;
+      col += 1;
     }
   }
-  return { cols, indexAfterWhitespace: idx };
+  return out;
 }
 
-function stripBlockquoteContainers(rawLine) {
-  let rest = rawLine;
-  while (true) {
-    const { cols, indexAfterWhitespace } = leadingIndentColumns(rest);
-    if (cols <= 3 && rest[indexAfterWhitespace] === '>') {
-      let nextIdx = indexAfterWhitespace + 1;
-      if (rest[nextIdx] === ' ') nextIdx += 1;
-      else if (rest[nextIdx] === '\t') nextIdx += 1;
-      rest = rest.slice(nextIdx);
-    } else {
-      break;
+function leadingSpaceCount(str) {
+  let idx = 0;
+  while (idx < str.length && str[idx] === ' ') idx += 1;
+  return idx;
+}
+
+function matchOpenContainers(expandedLine, containers) {
+  let rest = expandedLine;
+  let matchedCount = 0;
+  while (matchedCount < containers.length) {
+    const c = containers[matchedCount];
+    const spaces = leadingSpaceCount(rest);
+    const trimmed = rest.slice(spaces);
+    if (c.type === 'blockquote') {
+      if (spaces <= 3 && trimmed[0] === '>') {
+        rest = trimmed[1] === ' ' ? trimmed.slice(2) : trimmed.slice(1);
+        matchedCount += 1;
+      } else {
+        break;
+      }
+    } else if (c.type === 'list') {
+      if (trimmed.length === 0) {
+        rest = '';
+        matchedCount += 1;
+      } else if (spaces >= c.indent) {
+        rest = rest.slice(c.indent);
+        matchedCount += 1;
+      } else {
+        break;
+      }
     }
   }
-  return rest;
+  return { rest, matchedCount, matchedAll: matchedCount === containers.length };
+}
+
+function openNewContainers(startRest, containers, inParagraphInitial) {
+  let rest = startRest;
+  let inParagraph = inParagraphInitial;
+  while (true) {
+    const spaces = leadingSpaceCount(rest);
+    if (spaces > 3) break;
+    const trimmed = rest.slice(spaces);
+    if (trimmed[0] === '>') {
+      containers.push({ type: 'blockquote' });
+      rest = trimmed[1] === ' ' ? trimmed.slice(2) : trimmed.slice(1);
+      inParagraph = false;
+      continue;
+    }
+    // CommonMark §4.1 thematic break takes precedence over `-` / `*` list markers
+    if (/^(?:[-_*][ ]*){3,}$/.test(trimmed)) break;
+    const listMatch = /^([-+*]|\d{1,9}[.)])([ ]+|$)/.exec(trimmed);
+    if (listMatch) {
+      const marker = listMatch[1];
+      const afterMarker = trimmed.slice(marker.length);
+      const spacesAfter = leadingSpaceCount(afterMarker);
+      const contentAfter = afterMarker.slice(spacesAfter);
+      // CommonMark §5.2: interrupting a paragraph requires non-empty item and (if ordered) `1.` / `1)`
+      if (inParagraph) {
+        if (contentAfter.length === 0) break;
+        if (/^\d/.test(marker) && Number.parseInt(marker, 10) !== 1) break;
+      }
+      let paddingCols;
+      if (contentAfter.length === 0) {
+        paddingCols = 1;
+        rest = '';
+      } else if (spacesAfter >= 5) {
+        // CommonMark §5.2 rule 3: 5+ spaces after list marker means indented code on first line (N = 1)
+        paddingCols = 1;
+        rest = afterMarker.slice(1);
+      } else {
+        paddingCols = spacesAfter;
+        rest = afterMarker.slice(spacesAfter);
+      }
+      containers.push({ type: 'list', indent: spaces + marker.length + paddingCols });
+      inParagraph = false;
+      continue;
+    }
+    break;
+  }
+  return { rest, inParagraph };
+}
+
+function matchHtmlBlockOpen(trimmedAfterIndent, inParagraph) {
+  if (HTML_TYPE1_OPEN_RE.test(trimmedAfterIndent)) {
+    return { mode: 'closeRe', closeRe: HTML_TYPE1_CLOSE_RE, closesImmediately: HTML_TYPE1_CLOSE_RE.test(trimmedAfterIndent) };
+  }
+  if (HTML_TYPE2_OPEN_RE.test(trimmedAfterIndent)) {
+    return { mode: 'closeRe', closeRe: HTML_TYPE2_CLOSE_RE, closesImmediately: HTML_TYPE2_CLOSE_RE.test(trimmedAfterIndent) };
+  }
+  if (HTML_TYPE3_OPEN_RE.test(trimmedAfterIndent)) {
+    return { mode: 'closeRe', closeRe: HTML_TYPE3_CLOSE_RE, closesImmediately: HTML_TYPE3_CLOSE_RE.test(trimmedAfterIndent) };
+  }
+  if (HTML_TYPE4_OPEN_RE.test(trimmedAfterIndent)) {
+    return { mode: 'closeRe', closeRe: HTML_TYPE4_CLOSE_RE, closesImmediately: HTML_TYPE4_CLOSE_RE.test(trimmedAfterIndent) };
+  }
+  if (HTML_TYPE5_OPEN_RE.test(trimmedAfterIndent)) {
+    return { mode: 'closeRe', closeRe: HTML_TYPE5_CLOSE_RE, closesImmediately: HTML_TYPE5_CLOSE_RE.test(trimmedAfterIndent) };
+  }
+  if (HTML_TYPE6_OPEN_RE.test(trimmedAfterIndent)) {
+    return { mode: 'blankLine', closeRe: null, closesImmediately: false };
+  }
+  if (!inParagraph && HTML_TYPE7_OPEN_RE.test(trimmedAfterIndent)) {
+    return { mode: 'blankLine', closeRe: null, closesImmediately: false };
+  }
+  return null;
 }
 
 /**
- * Strip CommonMark block containers (blockquotes, fenced/indented code blocks,
- * raw HTML blocks, link reference definitions), inline HTML tags/comments/autolinks,
- * link destination/title tails, and backslash-escaped backticks, then extract
- * single-backtick inline code spans using CommonMark backtick-run matching.
+ * Strip CommonMark block containers (blockquotes, list items, fenced/indented code blocks,
+ * HTML blocks Types 1-7, Setext & ATX headings, link reference definitions), inline HTML
+ * tags/comments/autolinks, link destination/title tails, and backslash-escaped backticks,
+ * then extract single-backtick inline code spans using CommonMark backtick-run matching.
  */
 function extractLiveCitations(doc, text, errors) {
   const lines = text.split(/\r?\n/);
   const unfencedLines = [];
+  const containers = [];
   let inFence = false;
   let fenceChar = '';
   let fenceLen = 0;
-  let inRawHtmlBlock = false;
-  let rawHtmlCloseRe = null;
+  let htmlBlock = null; // { mode: 'closeRe' | 'blankLine', closeRe: RegExp | null }
   let inParagraph = false;
 
   for (let i = 0; i < lines.length; i += 1) {
-    const stripped = stripBlockquoteContainers(lines[i]);
-    const { cols: indentCols, indexAfterWhitespace } = leadingIndentColumns(stripped);
-    const trimmedAfterIndent = stripped.slice(indexAfterWhitespace);
-    const isBlank = trimmedAfterIndent.length === 0;
+    const expanded = expandTabsToSpaces(lines[i]);
+    const matched = matchOpenContainers(expanded, containers);
+    let stripped = matched.rest;
 
-    if (inRawHtmlBlock) {
-      if (rawHtmlCloseRe.test(stripped)) {
-        inRawHtmlBlock = false;
-        rawHtmlCloseRe = null;
+    if (!matched.matchedAll) {
+      if (inFence) {
+        inFence = false;
+        fenceChar = '';
+        fenceLen = 0;
+      }
+      if (htmlBlock !== null) {
+        htmlBlock = null;
+      }
+      if (!inParagraph) {
+        containers.length = matched.matchedCount;
+      }
+    }
+
+    if (htmlBlock !== null) {
+      const indentCols = leadingSpaceCount(stripped);
+      const isBlank = indentCols === stripped.length;
+      if (htmlBlock.mode === 'blankLine') {
+        if (isBlank) {
+          htmlBlock = null;
+          unfencedLines.push('');
+        }
+      } else if (htmlBlock.closeRe.test(stripped)) {
+        htmlBlock = null;
       }
       inParagraph = false;
       continue;
     }
 
     if (inFence) {
+      const indentCols = leadingSpaceCount(stripped);
+      const trimmedAfterIndent = stripped.slice(indentCols);
       if (indentCols <= 3) {
-        const closeMatch = /^(`{3,}|~{3,})[ \t]*$/.exec(trimmedAfterIndent);
+        const closeMatch = /^(`{3,}|~{3,})[ ]*$/.exec(trimmedAfterIndent);
         if (closeMatch && closeMatch[1][0] === fenceChar && closeMatch[1].length >= fenceLen) {
           inFence = false;
           fenceChar = '';
@@ -511,6 +649,29 @@ function extractLiveCitations(doc, text, errors) {
       continue;
     }
 
+    // CommonMark §4.3: Setext heading underline (`===` or `---`) when continuing a non-lazy paragraph
+    const preOpenIndent = leadingSpaceCount(stripped);
+    const preOpenTrimmed = stripped.slice(preOpenIndent);
+    if (inParagraph && matched.matchedAll && preOpenIndent <= 3 && /^(?:=+|-+)[ ]*$/.test(preOpenTrimmed)) {
+      inParagraph = false;
+      continue;
+    }
+
+    if (!matched.matchedAll) {
+      // Check whether unmatched line starts a container/block interruption rather than lazy paragraph continuation
+      containers.length = matched.matchedCount;
+    }
+
+    const opened = openNewContainers(stripped, containers, inParagraph && matched.matchedAll);
+    stripped = opened.rest;
+    if (!opened.inParagraph) {
+      inParagraph = false;
+    }
+
+    const indentCols = leadingSpaceCount(stripped);
+    const trimmedAfterIndent = stripped.slice(indentCols);
+    const isBlank = trimmedAfterIndent.length === 0;
+
     if (isBlank) {
       inParagraph = false;
       unfencedLines.push('');
@@ -519,16 +680,6 @@ function extractLiveCitations(doc, text, errors) {
 
     // CommonMark §4.4: 4+ virtual columns of indentation when NOT interrupting a paragraph
     if (!inParagraph && indentCols >= 4) {
-      while (i + 1 < lines.length) {
-        const nextStripped = stripBlockquoteContainers(lines[i + 1]);
-        const nextIndent = leadingIndentColumns(nextStripped);
-        const nextBlank = nextStripped.slice(nextIndent.indexAfterWhitespace).length === 0;
-        if (nextIndent.cols >= 4 || nextBlank) {
-          i += 1;
-        } else {
-          break;
-        }
-      }
       inParagraph = false;
       continue;
     }
@@ -548,26 +699,58 @@ function extractLiveCitations(doc, text, errors) {
         }
       }
 
-      // CommonMark §4.6 Type 1 raw HTML blocks (<pre>, <script>, <style>, <textarea>)
-      const rawBlockOpen = /^<(pre|script|style|textarea)(?=[\s>]|$)/i.exec(trimmedAfterIndent);
-      if (rawBlockOpen) {
-        const closeRe = new RegExp(`</${rawBlockOpen[1]}\\s*>`, 'i');
-        if (!closeRe.test(stripped)) {
-          inRawHtmlBlock = true;
-          rawHtmlCloseRe = closeRe;
+      // CommonMark §4.6: HTML blocks Types 1-7
+      const htmlOpen = matchHtmlBlockOpen(trimmedAfterIndent, inParagraph);
+      if (htmlOpen !== null) {
+        if (!htmlOpen.closesImmediately) {
+          htmlBlock = { mode: htmlOpen.mode, closeRe: htmlOpen.closeRe };
         }
         inParagraph = false;
         continue;
       }
 
-      // CommonMark §4.7 single-line link reference definitions `[id]: dest "title"`
-      if (!inParagraph && /^\[[^\]\r\n]+\]:[ \t]*\S+(?:[ \t]+(?:"[^"\r\n]*"|'[^'\r\n]*'|\([^)\r\n]*\)))?[ \t]*$/.test(trimmedAfterIndent)) {
-        inParagraph = false;
-        continue;
+      // CommonMark §4.7 single-line & multi-line link reference definitions `[id]: dest "title"`
+      if (!inParagraph) {
+        const linkRefHead = /^\[[^\]\r\n]+\]:[ ]*(.*)$/.exec(trimmedAfterIndent);
+        if (linkRefHead) {
+          const destAndTitleRe = /^(?:<[^<>\r\n]*>|\S+)(?:([ ]+)(?:"(?:\\"|[^"\r\n])*"|'(?:\\'|[^'\r\n])*'|\((?:\\\)|[^)\r\n])*\)))?[ ]*$/;
+          const titleOnlyRe = /^[ ]*(?:"(?:\\"|[^"\r\n])*"|'(?:\\'|[^'\r\n])*'|\((?:\\\)|[^)\r\n])*\))[ ]*$/;
+          const tail = linkRefHead[1];
+          if (tail.length > 0) {
+            const dtMatch = destAndTitleRe.exec(tail);
+            if (dtMatch) {
+              // Optional title on next line when current line had destination only
+              if (!dtMatch[1] && i + 1 < lines.length) {
+                const nextMatch = matchOpenContainers(expandTabsToSpaces(lines[i + 1]), containers);
+                if (nextMatch.matchedAll && titleOnlyRe.test(nextMatch.rest)) {
+                  i += 1;
+                }
+              }
+              inParagraph = false;
+              continue;
+            }
+          } else if (i + 1 < lines.length) {
+            // Destination (and optional title) on next line
+            const nextMatch = matchOpenContainers(expandTabsToSpaces(lines[i + 1]), containers);
+            const nextTrimmed = nextMatch.rest.trimStart();
+            const dtMatch = nextMatch.matchedAll ? destAndTitleRe.exec(nextTrimmed) : null;
+            if (dtMatch) {
+              i += 1;
+              if (!dtMatch[1] && i + 1 < lines.length) {
+                const titleLineMatch = matchOpenContainers(expandTabsToSpaces(lines[i + 1]), containers);
+                if (titleLineMatch.matchedAll && titleOnlyRe.test(titleLineMatch.rest)) {
+                  i += 1;
+                }
+              }
+              inParagraph = false;
+              continue;
+            }
+          }
+        }
       }
 
       // CommonMark §4.1 & §4.2: ATX headings and thematic breaks terminate/do not start paragraphs
-      if (/^#{1,6}(?:[ \t]|$)/.test(trimmedAfterIndent) || /^(?:[-_*][ \t]*){3,}$/.test(trimmedAfterIndent)) {
+      if (/^#{1,6}(?:[ ]|$)/.test(trimmedAfterIndent) || /^(?:[-_*][ ]*){3,}$/.test(trimmedAfterIndent)) {
         inParagraph = false;
         unfencedLines.push(stripped);
         continue;
@@ -582,7 +765,7 @@ function extractLiveCitations(doc, text, errors) {
   const citations = [];
   let i = 0;
   const HTML_RAW_TOKEN_RE = /^(?:<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<![A-Z][\s\S]*?>|<!\[CDATA\[[\s\S]*?\]\]>|<\/[A-Za-z][A-Za-z0-9-]*\s*>|<[A-Za-z][A-Za-z0-9-]*(?:\s+[A-Za-z_:][A-Za-z0-9_.:-]*(?:\s*=\s*(?:[^\s"'=<>`]+|'[^']*'|"[^"]*"))?)*\s*\/?>|<[A-Za-z][A-Za-z0-9+.-]{1,31}:[^\s<>]*>)/;
-  const LINK_TAIL_RE = /^\]\(\s*(?:<[^<>\r\n]*>|[^\s()]+)(?:\s+(?:"(?:\\"|[^"])*"|'(?:\\'|[^'])*'|\((?:\\\)|[^)])*\)))?\s*\)/;
+  const LINK_TAIL_RE = /^\]\(\s*(?:<[^<>\r\n]*>|(?:[^\s()\\]|\\.|\((?:[^\s()\\]|\\.)*\))+)(?:\s+(?:"(?:\\"|[^"])*"|'(?:\\'|[^'])*'|\((?:\\\)|[^)])*\)))?\s*\)/;
 
   while (i < unfenced.length) {
     // CommonMark §2.4: backslash before ASCII punctuation escapes it outside code spans
@@ -676,14 +859,16 @@ function findClosingSingleLineQuote(rawText, openIdx, quote) {
 
 const REGEX_PRECEDING_CHAR_RE = /[=(,[!:&|?{;~^%*+\-<>]/;
 
-function canStartRegexLiteral(rawText, slashIdx) {
+function canStartRegexLiteral(maskedPrefix, rawText, slashIdx) {
   if (slashIdx > 0 && rawText[slashIdx - 1] === '<') return false; // JSX `</Tag>`
-  let k = slashIdx - 1;
-  while (k >= 0 && (rawText[k] === ' ' || rawText[k] === '\t')) k -= 1;
-  if (k < 0 || rawText[k] === '\n' || rawText[k] === '\r') return true;
-  if (REGEX_PRECEDING_CHAR_RE.test(rawText[k])) return true;
+  let k = maskedPrefix.length - 1;
+  while (k >= 0 && /\s/.test(maskedPrefix[k])) k -= 1;
+  if (k < 0) return true;
+  if (maskedPrefix[k] === '+' && k > 0 && maskedPrefix[k - 1] === '+') return false; // postfix `x++ / y`
+  if (maskedPrefix[k] === '-' && k > 0 && maskedPrefix[k - 1] === '-') return false; // postfix `x-- / y`
+  if (REGEX_PRECEDING_CHAR_RE.test(maskedPrefix[k])) return true;
   const identMatch = /(?:^|[^A-Za-z0-9_$])(return|case|throw|typeof|void|delete|in|of|instanceof|new|yield|await)$/.exec(
-    rawText.slice(Math.max(0, k - 14), k + 1),
+    maskedPrefix.slice(Math.max(0, k - 14), k + 1),
   );
   return Boolean(identMatch);
 }
@@ -721,7 +906,43 @@ function findClosingRegexLiteral(rawText, openIdx) {
   return -1;
 }
 
-function stripJsTsCommentsPreservingLines(rawText, maskKeepNewlines) {
+function stripJsTsCommentsWithTypeScript(ts, relPath, rawText) {
+  const scriptKind = relPath.endsWith('.tsx')
+    ? ts.ScriptKind.TSX
+    : relPath.endsWith('.jsx')
+      ? ts.ScriptKind.JSX
+      : relPath.endsWith('.ts')
+        ? ts.ScriptKind.TS
+        : ts.ScriptKind.JS;
+  const sf = ts.createSourceFile(relPath, rawText, ts.ScriptTarget.Latest, true, scriptKind);
+  const chars = Array.from(rawText);
+  const maskRange = (pos, end) => {
+    for (let p = pos; p < end; p += 1) {
+      if (chars[p] !== '\r' && chars[p] !== '\n') chars[p] = ' ';
+    }
+  };
+  const visit = (node) => {
+    const children = node.getChildren(sf);
+    if (children.length === 0) {
+      if (node.kind !== ts.SyntaxKind.JsxText) {
+        const leading = ts.getLeadingCommentRanges(rawText, node.pos) ?? [];
+        for (const r of leading) maskRange(r.pos, r.end);
+        const trailing = ts.getTrailingCommentRanges(rawText, node.end) ?? [];
+        for (const r of trailing) maskRange(r.pos, r.end);
+      }
+      return;
+    }
+    for (const child of children) visit(child);
+  };
+  visit(sf);
+  return chars.join('');
+}
+
+function stripJsTsCommentsPreservingLines(relPath, rawText, maskKeepNewlines) {
+  const ts = loadTypeScriptCompiler();
+  if (ts !== null) {
+    return stripJsTsCommentsWithTypeScript(ts, relPath, rawText);
+  }
   let out = '';
   let idx = 0;
   // Stack entries: -1 = inside template literal text; >= 0 = brace depth inside `${...}`
@@ -791,7 +1012,7 @@ function stripJsTsCommentsPreservingLines(rawText, maskKeepNewlines) {
         continue;
       }
     }
-    if (rawText[idx] === '/' && canStartRegexLiteral(rawText, idx)) {
+    if (rawText[idx] === '/' && canStartRegexLiteral(out, rawText, idx)) {
       const closeRegexIdx = findClosingRegexLiteral(rawText, idx);
       if (closeRegexIdx !== -1) {
         out += rawText.slice(idx, closeRegexIdx + 1);
@@ -870,7 +1091,7 @@ function stripCommentsPreservingLines(relPath, rawText) {
     return out;
   }
   if (relPath.endsWith('.ts') || relPath.endsWith('.tsx') || relPath.endsWith('.mjs') || relPath.endsWith('.js')) {
-    return stripJsTsCommentsPreservingLines(rawText, maskKeepNewlines);
+    return stripJsTsCommentsPreservingLines(relPath, rawText, maskKeepNewlines);
   }
   return rawText;
 }

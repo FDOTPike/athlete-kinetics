@@ -398,6 +398,61 @@ console.log('\n[2] Negative invariants & poisoning falsifiers');
     !colonLineCommentRes.ok,
     colonLineCommentRes.errors[0] ?? 'accepted colon-prefixed // comment',
   );
+
+  // WO04-SOL-03-R5: HTML Type 6 `<div>` block, HTML Type 7 standalone tag block, list-nested fenced block,
+  // list-nested indented code block, and Setext `===`/`---` heading followed by indented code block all fail closed
+  const htmlDivBlockRes = replaceProfileRefInDisclaimer((m) => `<div>\n${m}\n</div>`);
+  const htmlType7BlockRes = replaceProfileRefInDisclaimer((m) => `\n\n<custom-widget data-x="1">\n${m}\n</custom-widget>\n`);
+  const listFenceRes = replaceProfileRefInDisclaimer((m) => `\n- \`\`\`\n  ${m}\n  \`\`\`\n`);
+  const listIndentedCodeRes = replaceProfileRefInDisclaimer((m) => `\n-     ${m}\n`);
+  const setextEqHeadingIndentRes = replaceProfileRefInDisclaimer((m) => `\nExtra Heading\n=============\n    ${m}\n`);
+  const setextDashHeadingIndentRes = replaceProfileRefInDisclaimer((m) => `\nExtra Heading\n-------------\n    ${m}\n`);
+  const multilineLinkRefRes = replaceProfileRefInDisclaimer((m) => `\n\n[ref]: https://example.com\n  "${m}"\n`);
+  const nestedParenLinkTitleRes = replaceProfileRefInDisclaimer((m) => `[notice](https://example.com/a(1) "${m}")`);
+  check(
+    'WO04-SOL-03-R5: HTML <div>/custom blocks, list-nested fenced/indented blocks, Setext `===`/`---` post-heading indented blocks, and multiline/paren link titles all fail closed',
+    !htmlDivBlockRes.ok
+      && !htmlType7BlockRes.ok
+      && !listFenceRes.ok
+      && !listIndentedCodeRes.ok
+      && !setextEqHeadingIndentRes.ok
+      && !setextDashHeadingIndentRes.ok
+      && !multilineLinkRefRes.ok
+      && !nestedParenLinkTitleRes.ok,
+    [
+      htmlDivBlockRes.ok,
+      htmlType7BlockRes.ok,
+      listFenceRes.ok,
+      listIndentedCodeRes.ok,
+      setextEqHeadingIndentRes.ok,
+      setextDashHeadingIndentRes.ok,
+      multilineLinkRefRes.ok,
+      nestedParenLinkTitleRes.ok,
+    ].join(','),
+  );
+
+  // WO04-SOL-02-R5: multiline division expression continued onto the picker line (`/ 1; // const saved = await pickerSave(...)`)
+  // must NOT be misread as a regex literal and must mask the trailing `//` comment so the anchor check fails closed
+  const multilineDivisionCommentRes = verifyBetaFilingCitations({
+    repoRoot,
+    readFile: (rel) => {
+      const real = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+      if (rel !== 'apps/mobile/src/state/backupStore.ts') return real;
+      const writeAnchor = "await fs().writeFile(encryptedPath, created.text, 'utf8');";
+      const pickerAnchor = 'const saved = await pickerSave(encryptedPath, fileName);';
+      const re = new RegExp(
+        writeAnchor.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        + '(\\r?\\n[ \\t]+)'
+        + pickerAnchor.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+      );
+      return real.replace(re, (_m, eolAndIndent) => `${writeAnchor} const saved = 1${eolAndIndent}/ 1; // ${pickerAnchor}`);
+    },
+  });
+  check(
+    'WO04-SOL-02-R5: multiline continued division (`/ 1; // const saved = await pickerSave(...)`) masks the trailing comment and fails closed',
+    !multilineDivisionCommentRes.ok,
+    multilineDivisionCommentRes.errors[0] ?? 'accepted multiline division followed by // comment',
+  );
 }
 
 console.log(`\n${failed === 0 ? 'ALL BETA FILING CITATION TESTS PASSED' : `${failed} TEST(S) FAILED`}`);
