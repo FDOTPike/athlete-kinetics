@@ -374,7 +374,6 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
   const [trajectoryOverflows, setTrajectoryOverflows] = useState(false);
   const [manageOpen, setManageOpen] = useState(block === null);
   const scrollRef = useRef<ScrollView>(null);
-  const trajectorySectionY = useRef(0);
   const manageSectionOffsetY = useRef(0);
   const [reportOpen, setReportOpen] = useState(false);
   // #185: "Review safety report" shows the saved reports, read-only.
@@ -656,10 +655,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
       && sport.sportId !== 'powerlifting'
       && (blockMeetMeta !== null || sport.competitionDate !== null);
     return (
-    <View
-      style={styles.section}
-      onLayout={(event) => { trajectorySectionY.current = event.nativeEvent.layout.y; }}
-    >
+    <View style={styles.section}>
       <View style={styles.trajectoryHeaderRow}>
         <Text style={styles.sectionTitle}>Four-week trajectory</Text>
         {block != null && blockEndDate != null && (
@@ -1030,7 +1026,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
 
   const openManageBlock = (): void => {
     setManageOpen(true);
-    const sectionY = vector === null ? 0 : trajectorySectionY.current;
+    const sectionY = vector !== null ? optionalDetailsY.current : 0;
     scrollRef.current?.scrollTo({
       y: Math.max(0, sectionY + manageSectionOffsetY.current - theme.space[4]),
       animated: true,

@@ -8,7 +8,7 @@
  *    its year, so an old session cannot masquerade as recent.
  */
 import React from 'react';
-import { fireEvent, render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen, within } from '@testing-library/react-native';
 import ProgressScreen from '../../src/screens/ProgressScreen';
 import { makeNodeSqliteDriver } from '../helpers/nodeSqliteOpDriver';
 
@@ -342,15 +342,17 @@ test('WO03-SOL-01: finalized planned session whose focus exercise was skipped re
   );
 });
 
-test('WO03-SOL-R2a: a finalized workout from an archived block on the replacement block start date never credits the replacement block', () => {
+test.each(['in-memory', 'SQLite'])('Progress excludes an older workout when a replacement block reuses its plan ID (%s)', (backend) => {
   const sameDayMs = new SpyDate('2026-11-04T09:00:00').getTime();
+  const createdAtMs = sameDayMs - 3600000;
+  const archivedFinalizedAtMs = createdAtMs - 60000;
   mockState = state({
     today: '2026-11-04',
     block: {
-      blockId: 2,
+      blockId: 3,
       startDate: '2026-11-04',
       objective: 'hypertrophy',
-      createdAtMs: sameDayMs - 3600000,
+      createdAtMs,
     },
     focus: { bundleId: 'beach_muscles', muscles: ['upper_chest'], customised: false, movementControl: false },
     blockSessions: [{
@@ -374,9 +376,9 @@ test('WO03-SOL-R2a: a finalized workout from an archived block on the replacemen
       loggedSetCount: 1,
     }, {
       sessionId: 19,
-      sourcePlannedSessionId: 99,
+      sourcePlannedSessionId: 101,
       outcomeKind: 'followed_plan',
-      finalizedAtMs: sameDayMs,
+      finalizedAtMs: archivedFinalizedAtMs,
       focus: 'upper',
       originKind: 'planned',
       exerciseCount: 1,
@@ -409,12 +411,61 @@ test('WO03-SOL-R2a: a finalized workout from an archived block on the replacemen
     goals: [],
   });
 
-  render(<ProgressScreen />);
-  expect(screen.getByTestId('progress-focus-muscle-upper_chest')).toHaveTextContent(
-    'Upper chest · 1 of 3 planned sets completed this week',
-  );
-  expect(mockState.loadSessionSummaryFacts).toHaveBeenCalledWith(20);
-  expect(mockState.loadSessionSummaryFacts).not.toHaveBeenCalledWith(19);
+  const { authorizeAthleteDataBoot, resetDataMaintenanceLockForTests } = require('../../src/state/dataMaintenanceLock');
+  const db = backend === 'SQLite' ? makeNodeSqliteDriver() : null;
+  try {
+    if (db !== null) {
+      db.raw.exec(`
+        CREATE TABLE planned_session (planned_session_id INTEGER PRIMARY KEY, block_id INTEGER);
+        CREATE TABLE session (session_id INTEGER PRIMARY KEY, started_at_ms INTEGER);
+        CREATE TABLE session_outcome (session_id INTEGER PRIMARY KEY, finalized_at_ms INTEGER, origin_kind TEXT);
+        CREATE TABLE session_origin (session_id INTEGER PRIMARY KEY, origin_kind TEXT, source_planned_session_id INTEGER);
+        INSERT INTO planned_session VALUES (100, 1), (101, 2);
+        INSERT INTO session_origin VALUES (19, 'planned', 101);
+        DELETE FROM planned_session WHERE block_id = 2;
+        INSERT INTO planned_session (block_id) VALUES (3);
+        INSERT INTO session_origin VALUES (20, 'planned', 101), (21, 'planned', 101);
+      `);
+      expect(db.raw.prepare('SELECT planned_session_id FROM planned_session WHERE block_id = 3').get()).toEqual({
+        planned_session_id: 101,
+      });
+      const insertSession = db.raw.prepare('INSERT INTO session VALUES (?, ?)');
+      const insertOutcome = db.raw.prepare("INSERT INTO session_outcome VALUES (?, ?, 'planned')");
+      // Session 21 started before the wipe and was finalized afterward.
+      for (const [id, startedAtMs, finalizedAtMs] of [
+        [19, archivedFinalizedAtMs - 60000, archivedFinalizedAtMs],
+        [20, createdAtMs, sameDayMs + 3600000],
+        [21, archivedFinalizedAtMs, sameDayMs],
+      ]) {
+        insertSession.run(id, startedAtMs);
+        insertOutcome.run(id, finalizedAtMs);
+      }
+      mockState.status = 'ready';
+      mockState.activeAthleteId = 'athlete';
+      mockState.athletes = [{ id: 'athlete', dbName: 'reused-plan.sqlite' }];
+      jest.spyOn(require('@op-engineering/op-sqlite'), 'open').mockReturnValue(db);
+      authorizeAthleteDataBoot();
+    }
+
+    render(<ProgressScreen />);
+    expect(screen.getByTestId('progress-session-19')).toBeOnTheScreen();
+    expect(screen.getByTestId('progress-focus-muscle-upper_chest')).toHaveTextContent(
+      'Upper chest · 1 of 3 planned sets completed this week',
+    );
+    expect(mockState.loadSessionSummaryFacts).toHaveBeenCalledWith(20);
+    expect(mockState.loadSessionSummaryFacts).not.toHaveBeenCalledWith(19);
+    expect(mockState.loadSessionSummaryFacts).not.toHaveBeenCalledWith(21);
+    if (db !== null) {
+      expect(db.raw.prepare('SELECT source_planned_session_id FROM session_origin WHERE session_id = 19').get()).toEqual({
+        source_planned_session_id: 101,
+      });
+    }
+  } finally {
+    if (db !== null) {
+      resetDataMaintenanceLockForTests();
+      db.raw.close();
+    }
+  }
 });
 
 test('WO03-SOL-R2b: twenty-five newer extra sessions do not hide a finalized planned workout from the active week counter', () => {
@@ -441,15 +492,19 @@ test('WO03-SOL-R2b: twenty-five newer extra sessions do not hide a finalized pla
     },
   ];
   const db = makeNodeSqliteDriver();
+  db.raw.exec('CREATE TABLE session (session_id INTEGER PRIMARY KEY, started_at_ms INTEGER)');
   db.raw.exec('CREATE TABLE session_outcome (session_id INTEGER PRIMARY KEY, finalized_at_ms INTEGER, origin_kind TEXT)');
   db.raw.exec('CREATE TABLE session_origin (session_id INTEGER PRIMARY KEY, origin_kind TEXT, source_planned_session_id INTEGER)');
+  const insertSession = db.raw.prepare('INSERT INTO session VALUES (?, ?)');
   const insertOutcome = db.raw.prepare('INSERT INTO session_outcome VALUES (?, ?, ?)');
   const insertOrigin = db.raw.prepare('INSERT INTO session_origin VALUES (?, ?, ?)');
   for (const row of allRows) {
+    insertSession.run(row.sessionId, row.finalizedAtMs - 60000);
     insertOutcome.run(row.sessionId, row.finalizedAtMs, row.originKind);
     insertOrigin.run(row.sessionId, row.originKind, row.sessionId === 50 ? 1 : null);
   }
   // A plan link without a finalized outcome must not be read for set credit.
+  insertSession.run(49, baseMs - 60000);
   insertOrigin.run(49, 'planned', 1);
   const open = jest.spyOn(require('@op-engineering/op-sqlite'), 'open').mockReturnValue(db);
   const { authorizeAthleteDataBoot, resetDataMaintenanceLockForTests } = require('../../src/state/dataMaintenanceLock');
@@ -589,6 +644,42 @@ test('Progress hides weekly totals after a slot read fails and keeps Recent Sess
   expect(loadSessionSummaryFacts).not.toHaveBeenCalled();
   fireEvent.press(screen.getByTestId('progress-session-50'));
   expect(screen.getByTestId('progress-session-50-summary')).toBeOnTheScreen();
+});
+
+test('Progress hides partial weekly totals after a workout summary read fails and keeps Recent Sessions usable', () => {
+  const loadSessionSummaryFacts = jest.fn((id) => {
+    if (id === 50) throw new Error('unreadable session facts');
+    return {
+      durationMin: 30,
+      exercises: [{ movementId: 10, movementName: 'Incline Dumbbell Press', plannedSets: 3, sets: [{ reps: 8 }] }],
+      previousSets: [],
+      skippedExercises: [],
+    };
+  });
+  mockState = state({
+    today: '2026-11-04',
+    block: { blockId: 1, startDate: '2026-11-02', objective: 'strength', createdAtMs: 1 },
+    blockSessions: [
+      { plannedSessionId: 101, weekIndex: 1, sessionDate: '2026-11-02', completionStatus: 'complete' },
+      { plannedSessionId: 102, weekIndex: 1, sessionDate: '2026-11-04', completionStatus: 'complete' },
+    ],
+    focus: { bundleId: null, muscles: ['chest'], customised: true, movementControl: false },
+    movements: [{ movement_id: 10, targetMuscles: ['chest'] }],
+    loadSessionSlots: jest.fn(() => [{ movementId: 10, sets: 3 }]),
+    loadRecentOutcomes: jest.fn(() => [
+      { sessionId: 51, sourcePlannedSessionId: 102, outcomeKind: 'followed_plan', originKind: 'planned', finalizedAtMs: new SpyDate('2026-11-04T09:00:00').getTime() },
+      { sessionId: 50, sourcePlannedSessionId: 101, outcomeKind: 'followed_plan', originKind: 'planned', finalizedAtMs: new SpyDate('2026-11-02T09:00:00').getTime() },
+    ]),
+    loadSessionSummaryFacts,
+  });
+
+  render(<ProgressScreen />);
+  expect(loadSessionSummaryFacts).toHaveBeenCalledWith(51);
+  expect(loadSessionSummaryFacts).toHaveBeenCalledWith(50);
+  expect(screen.queryByTestId('progress-focus-muscle-chest')).toBeNull();
+  fireEvent.press(screen.getByTestId('progress-session-51'));
+  const summary = within(screen.getByTestId('progress-session-51-summary'));
+  expect(summary.getByText(/^Incline Dumbbell Press .*1 set logged/)).toBeOnTheScreen();
 });
 
 test('WO03-SOL-R3: catching up on a missed Week 1 workout during Week 2 does not credit Week 2 counter or read Week 1 summary facts', () => {

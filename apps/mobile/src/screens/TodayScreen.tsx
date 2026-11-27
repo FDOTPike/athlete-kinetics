@@ -466,7 +466,10 @@ function AvailableTodayScreen({
             return 'Your focus';
           }
           const matchedSport = hasFrozenEmphasis
-            ? appliedLines.some((line) => line.startsWith(`${slot.movementName} `) && /outcome\)\.$/.test(line))
+            ? appliedLines.some((line) =>
+                line.startsWith(`${slot.movementName} `)
+                && (line.includes(`(your ${sportSummary ?? 'sport'} outcome)`) || line.includes('(your second sport outcome)')),
+              )
             : resolvedMuscles.some((m) => sportMuscles.has(m));
           if (matchedSport) {
             return `Your ${sportSummary ?? 'sport'} outcome`;

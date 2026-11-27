@@ -105,20 +105,27 @@ const getObjectIdentityTag = (value: unknown): string => {
 };
 
 /** A catch-up workout belongs to its stored plan, even when finalized in a later week. */
-const readPersistedActiveWeekOutcomes = (dbName: string, planIds: readonly number[]): WeekOutcomeRead => {
+const readPersistedActiveWeekOutcomes = (
+  dbName: string,
+  planIds: readonly number[],
+  blockCreatedAtMs: number,
+): WeekOutcomeRead => {
   let readerDb: DB | null = null;
   try {
     const { open } = require('@op-engineering/op-sqlite') as typeof import('@op-engineering/op-sqlite');
     readerDb = open({ name: dbName });
     const placeholders = planIds.map(() => '?').join(', ');
+    // A block wipe can free a plan ID while preserving workouts that reference it.
     const rows = rowsOf<{ session_id: number; finalized_at_ms: number }>(
       readerDb.executeSync(
         `SELECT outcome.session_id, outcome.finalized_at_ms
            FROM session_origin origin
            JOIN session_outcome outcome ON outcome.session_id = origin.session_id
+           JOIN session s ON s.session_id = origin.session_id
           WHERE origin.origin_kind = 'planned' AND outcome.origin_kind = 'planned'
-            AND origin.source_planned_session_id IN (${placeholders})`,
-        [...planIds],
+            AND origin.source_planned_session_id IN (${placeholders})
+            AND (? <= 0 OR (outcome.finalized_at_ms >= ? AND s.started_at_ms >= ?))`,
+        [...planIds, blockCreatedAtMs, blockCreatedAtMs, blockCreatedAtMs],
       ),
     );
     return {
@@ -151,7 +158,11 @@ function replayRecentPlannedOutcomes(
 ): WeekOutcome[] {
   const finalizedPlanById = new Map(finalizedBlockSessions.map((bs) => [bs.plannedSessionId, bs]));
   const candidates = outcomes
-    .filter((row) => row.sessionId != null && (row.originKind == null || row.originKind === 'planned'))
+    .filter((row) =>
+      row.sessionId != null
+      && (row.originKind == null || row.originKind === 'planned')
+      && (!(blockCreatedAtMs > 0) || row.finalizedAtMs >= blockCreatedAtMs),
+    )
     .sort((a, b) => b.sessionId - a.sessionId || b.finalizedAtMs - a.finalizedAtMs);
   const claimedPlanIds = new Set<number>();
   const activeWeekOutcomes: WeekOutcome[] = [];
@@ -162,7 +173,7 @@ function replayRecentPlannedOutcomes(
       if (matchedPlan === undefined) continue;
       claimedPlanIds.add(row.sourcePlannedSessionId);
       if (matchedPlan.weekIndex === activeWeekIndex) activeWeekOutcomes.push(row);
-    } else if (!(blockCreatedAtMs > 0) || row.finalizedAtMs >= blockCreatedAtMs) {
+    } else {
       unresolved.push(row);
     }
   }
@@ -314,13 +325,14 @@ export default function ProgressScreen(): React.JSX.Element {
       && recentOutcomes !== null
       && typeof loadSessionSummaryFacts === 'function'
     ) {
+      const blockCreatedAtMs = block?.createdAtMs ?? 0;
       let activeWeekOutcomes: readonly WeekOutcome[] = [];
       if (activeDbName === null) {
         const finalizedBlockSessions = blockSessions.filter(isFinalizedPlanSession).sort((a, b) =>
           a.sessionDate.localeCompare(b.sessionDate) || a.plannedSessionId - b.plannedSessionId,
         );
         activeWeekOutcomes = replayRecentPlannedOutcomes(
-          recentOutcomes, finalizedBlockSessions, activeWeekIndex, block?.createdAtMs ?? 0,
+          recentOutcomes, finalizedBlockSessions, activeWeekIndex, blockCreatedAtMs,
         );
       } else if (athleteDataBootAllowed()) {
         const planIds = finalizedInActiveWeek.map((bs) => bs.plannedSessionId);
@@ -328,13 +340,13 @@ export default function ProgressScreen(): React.JSX.Element {
           .map((row) => [row.sessionId, row.outcomeKind, row.finalizedAtMs, row.loggedSetCount].join(':'))
           .join(',');
         const sliceIds = [rawMovements, rawBlock, rawBlockSessions].map(getObjectIdentityTag).join('|');
-        const key = JSON.stringify([activeAthleteId, activeDbName, sliceIds, planIds, outcomeSig]);
+        const key = JSON.stringify([activeAthleteId, activeDbName, sliceIds, planIds, blockCreatedAtMs, outcomeSig]);
         const scope = rawMovements?.length ? rawMovements : rawBlock ?? blockSessions;
         const cached = bootScopedWeekOutcomeCache.get(scope);
         if (cached?.key === key) {
           activeWeekOutcomes = cached.outcomes;
         } else {
-          const read = readPersistedActiveWeekOutcomes(activeDbName, planIds);
+          const read = readPersistedActiveWeekOutcomes(activeDbName, planIds, blockCreatedAtMs);
           weeklyTotalsAvailable = read.ok;
           activeWeekOutcomes = read.outcomes;
           if (read.ok) bootScopedWeekOutcomeCache.set(scope, { key, outcomes: activeWeekOutcomes });
@@ -372,7 +384,8 @@ export default function ProgressScreen(): React.JSX.Element {
             }
           }
         } catch {
-          // Unreadable session facts fail closed (0 completed sets credited).
+          weeklyTotalsAvailable = false;
+          break;
         }
       }
     }

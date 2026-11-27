@@ -1197,10 +1197,13 @@ test.each([false, true])('Manage block scroll uses the right layout origin (read
   render(<BlockScreen />);
 
   fireEvent(screen.getByText('Four-week trajectory'), 'layout', { nativeEvent: { layout: { y: 250 } } });
+  if (ready) {
+    fireEvent(screen.getByText('Optional details'), 'layout', { nativeEvent: { layout: { y: 600 } } });
+  }
   fireEvent(screen.getByTestId('manage-block-section'), 'layout', { nativeEvent: { layout: { y: 400 } } });
   fireEvent.press(screen.getByLabelText('Manage current block'));
 
-  expect(scrollTo).toHaveBeenCalledWith({ y: (ready ? 650 : 400) - theme.space[4], animated: true });
+  expect(scrollTo).toHaveBeenCalledWith({ y: (ready ? 1000 : 400) - theme.space[4], animated: true });
 });
 
 test('WO03-SOL-03 & WO03-SOL-04: PLAN pre-readiness Manage block (program === null) opens current block controls rather than NewBlockChooser, and partial activityLedger {} never throws', () => {

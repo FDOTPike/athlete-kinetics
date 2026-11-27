@@ -20,6 +20,7 @@ import { formatAthleteDate } from '../../src/state/athleteDate';
 import React from 'react';
 import { Alert } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { describeEmphasisSlot, describeEmphasisSwap } from '../../../../packages/inference/src/programEmphasis';
 import TodayScreen from '../../src/screens/TodayScreen';
 import {
   deriveTodayState,
@@ -905,7 +906,16 @@ test('planned card renders compact program identity bar with block sequence, wee
   );
 });
 
-test('planned card tags movements selected for a goal, focus, or sport outcome (S1-020)', () => {
+test.each(['swap', 'slot'])('planned card tags goal, focus, and frozen sport provenance (%s report line)', (format) => {
+  const sport = { name: 'Football (soccer)', muscles: ['hamstrings'] };
+  const sportLine = format === 'swap'
+    ? describeEmphasisSwap({
+        chosen: 'Nordic Hamstring Curl', instead: 'Leg Curl', muscle: 'hamstrings', origin: 'sport', emphasis: { sport },
+      })
+    : describeEmphasisSlot({
+        chosen: 'Nordic Hamstring Curl', displaced: null, day: 'lower',
+        why: { muscle: 'hamstrings', origin: 'sport' }, emphasis: { sport },
+      });
   mockState = baseState({
     todayPlan: {
       plannedSessionId: 1,
@@ -922,7 +932,7 @@ test('planned card tags movements selected for a goal, focus, or sport outcome (
       blockId: 1,
       inputs: {
         focus: { muscles: ['upper_chest'], movementControl: false, description: 'Beach muscles: upper chest' },
-        sport: { name: 'Football (soccer)', muscles: ['hamstrings'] },
+        sport,
         workload: null,
         goalMovements: [{ movementId: 11, goalLabel: 'Goblet squat 40 kg for 10' }],
       },
@@ -930,7 +940,7 @@ test('planned card tags movements selected for a goal, focus, or sport outcome (
         version: 1,
         applied: [
           'Incline Dumbbell Press is planned instead of Dumbbell Bench Press: it trains upper chest directly (your focus).',
-          'Nordic Hamstring Curl is planned instead of Leg Curl: it trains hamstrings directly (your Football (soccer) outcome).',
+          sportLine,
         ],
         omitted: [],
       },
