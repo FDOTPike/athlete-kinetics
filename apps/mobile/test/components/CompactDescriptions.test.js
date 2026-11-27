@@ -40,7 +40,10 @@ test('compact mode hides citations while the plan and evidence limits stay visib
 test('the independent chevron gives citations a 56 dp toggle without changing the selection', () => {
   const change = jest.fn();
   render(editor(change));
-  expect(StyleSheet.flatten(descriptionButton().props.style)).toEqual(expect.objectContaining({
+  const target = StyleSheet.flatten(descriptionButton().props.style);
+  expect(target.minWidth).toBeGreaterThanOrEqual(56);
+  expect(target.minHeight).toBeGreaterThanOrEqual(56);
+  expect(target).toEqual(expect.objectContaining({
     minWidth: theme.touch.min,
     minHeight: theme.touch.min,
   }));

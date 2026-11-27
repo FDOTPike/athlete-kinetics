@@ -20,10 +20,34 @@
  *    cold-start root.
  */
 import React from 'react';
+import { execFileSync } from 'node:child_process';
+import { join } from 'node:path';
 import { Dimensions, Keyboard, KeyboardAvoidingView, Platform, StyleSheet } from 'react-native';
 import { render, screen, fireEvent, act, within } from '@testing-library/react-native';
 import { NavigationProvider, useNavigation } from '../../src/navigation/navigation';
 import AppShellTestHarness from '../../src/AppShellTestHarness';
+
+function measureShellLayout(root, { width, height }) {
+  function layoutNodes(instance) {
+    if (typeof instance === 'string') return [];
+    if (typeof instance.type !== 'string') return instance.children.flatMap(layoutNodes);
+    const { testID, style } = instance.props;
+    // The body is the shell's flex slot. Its scroll contents and native text
+    // measurement are outside this shell layout fixture.
+    const children = testID === 'shell-body' || instance.type === 'Text'
+      ? []
+      : instance.children.flatMap(layoutNodes);
+    return [{ testID, style: StyleSheet.flatten(style), children }];
+  }
+
+  // Jest's React Native renderer stops at host props. Run the Yoga layout
+  // pass in Node so the ESM/WASM bindings stay outside Jest's Babel runtime.
+  const output = execFileSync(process.execPath, [join(__dirname, '../measureShellLayout.mjs')], {
+    input: JSON.stringify({ width, height, root: layoutNodes(root)[0] }),
+    encoding: 'utf8',
+  });
+  return JSON.parse(output);
+}
 
 function Probe({ onRef }) {
   const nav = useNavigation();
@@ -388,9 +412,20 @@ describe('Readiness, Session, Library and Profile remain reachable', () => {
   test('an edge-to-edge Android shell clears the bottom gesture bar', () => {
     jest.replaceProperty(Platform, 'OS', 'android');
     jest.spyOn(Platform, 'Version', 'get').mockReturnValue(37);
-    jest.spyOn(Dimensions, 'get').mockReturnValue({ width: 360, height: 800, scale: 3, fontScale: 1 });
+    const viewport = { width: 360, height: 800, scale: 3, fontScale: 1 };
+    jest.spyOn(Dimensions, 'get').mockReturnValue(viewport);
     render(<AppShellTestHarness />);
-    expect(StyleSheet.flatten(screen.getByTestId('shell-root').props.style).paddingBottom).toBeGreaterThan(0);
+
+    // Reserve the 32 dp gesture strip independently of the shell's theme.
+    const gestureTop = viewport.height - 32;
+    const bounds = measureShellLayout(screen.getByTestId('shell-root'), viewport);
+    const tabBar = screen.getByTestId('shell-primary-tabs');
+    const controls = [tabBar, ...within(tabBar).getAllByRole('tab')];
+    for (const control of controls) {
+      const { top, height } = bounds[control.props.testID];
+      expect(height).toBeGreaterThan(0);
+      expect(top + height).toBeLessThanOrEqual(gestureTop);
+    }
   });
 
   test('Session is reachable during an active workout, marked as in progress', () => {

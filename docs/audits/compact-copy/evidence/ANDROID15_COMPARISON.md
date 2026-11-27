@@ -1,0 +1,22 @@
+# Android 15 comparison for the compact-copy work order
+
+Capture filenames are relative to the original `emulator-comparison-2026-11-25` evidence packet.
+
+25 November 2026 · Disposable Android 15 emulator (API 35) · 960 × 2142 px · 427 dpi · 1.3× text · gesture navigation.
+
+The before bundle came from `fb539d06c7608b703f0b18479c8f4d23c1d04e61`. The after bundle came from `9e6bd59c828168a7f95b9710679247fb3f7f7602`, whose application code is `e30fafb2`. Both used the native x86_64 debug APK built from the base with JDK 17 and an isolated Gradle home. The Android native source was identical at the two commits. The emulator used a new scratch athlete. Its pre-set snapshot let both versions run the same Box Squat with the same plan and inputs. Baseline commit (`baseline-head.txt`) · After commit (`after-head.txt`) · Build log (`android-x86-build-cached.log`) · Geometry (`geometry.txt`)
+
+| Surface | Status | Observations and captures |
+| --- | --- | --- |
+| Onboarding, BJJ and Program Setup before | EVIDENCE CAPTURED | The base showed the welcome screen, the expanded BJJ explanation inside its choice and the generic Sport prompt, and the program recommendation. Screenshots (`visual-baseline-onboarding.png`) · Program Setup screenshot (`baseline-program-setup.png`) · Welcome layout (`baseline-onboarding.json`) · Sport layout (`baseline-sport-bjj.json`) · Program Setup layout (`baseline-program-setup.json`) |
+| Onboarding Review before | EVIDENCE CAPTURED | The sticky footer contained Back. Start Training became visible only after scrolling the review content. Before scroll layout (`baseline-review.json`) · After scroll layout (`baseline-review-action.json`) |
+| Box Squat workout before and after | EVIDENCE CAPTURED | Before, both action labels split inside words and the live dot sat above WORKOUT. After, each label fits on one line in its own stacked button. The live dot is 1 px off the label’s center line. Stop guidance is visible in both captures. Visual comparison (`visual-box-squat-comparison.png`) · Before layout (`baseline-workout-box-squat.json`) · After layout (`after-workout-box-squat.json`) |
+| Android 15 gesture clearance | EVIDENCE CAPTURED | All three tab hit areas end at y=2057 in the updated build, with 85 px to the bottom of the display. The baseline hit areas extended to y=2142. The updated screenshot shows the gesture bar below the tabs. Visual comparison (`visual-box-squat-comparison.png`) |
+| Box Squat rest, summary and Session Feel | EVIDENCE CAPTURED | Both builds accepted one synthetic 10-rep, 20 kg set, showed the rest timer, saved a stopped-session summary and opened “How did this session go?”. Before screenshots (`visual-baseline-session.png`) · After screenshots (`visual-after-session.png`) · Before rest layout (`baseline-rest-timer.json`) · After rest layout (`after-rest-timer.json`) · Before summary layout (`baseline-session-summary.json`) · After summary layout (`after-session-summary.json`) · Before Session Feel layout (`baseline-session-feel.json`) · After Session Feel layout (`after-session-feel.json`) |
+| Today and Plan | EVIDENCE CAPTURED | Today changed from `2026-11-25` to `Wed, Nov 25, 2026`. The updated Plan shows the swipe instruction and the full sixth and seventh cells at the right edge. Before screenshots (`visual-baseline-plan.png`) · After screenshots (`visual-after-plan.png`) · Before Today layout (`baseline-today.json`) · After Today layout (`after-today.json`) · Before Plan layout (`baseline-plan.json`) · Right edge layout (`after-plan-right.json`) |
+| Original physical before-state Rest Timer, summary and Session Feel | NOT VERIFIED — the Pixel locked during the original baseline run. | The Android 15 rows above use the original source commit and an emulator scratch athlete. |
+| Android 16 | NOT VERIFIED — the comparison used Android 15 and the prior physical run used Android 17. | |
+
+The screenshots in this index were visually inspected. Layout assertions (`comparison-layout-checks.txt`) · Capture hashes (`capture-sha256.txt`)
+
+The physical Pixel supplied the app APK for the initial installation attempt. Its ARM build reached a native loading error on the emulator and was replaced by the x86_64 build. The physical app and athlete data were left in place. The worktree returned to its branch, the comparison emulator stopped and port 8081 was released. ARM launch log (`arm-apk-launch.log`) · Local service handback (`handback.txt`)
