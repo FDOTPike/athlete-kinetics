@@ -916,6 +916,10 @@ test.each(['swap', 'slot'])('planned card tags goal, focus, and frozen sport pro
         chosen: 'Nordic Hamstring Curl', displaced: null, day: 'lower',
         why: { muscle: 'hamstrings', origin: 'sport' }, emphasis: { sport },
       });
+  const secondSportLine = describeEmphasisSlot({
+    chosen: 'Seated Row', displaced: null, day: 'upper',
+    why: { muscle: 'lats', origin: 'secondary_sport' }, emphasis: { sport },
+  });
   mockState = baseState({
     todayPlan: {
       plannedSessionId: 1,
@@ -941,6 +945,7 @@ test.each(['swap', 'slot'])('planned card tags goal, focus, and frozen sport pro
         applied: [
           'Incline Dumbbell Press is planned instead of Dumbbell Bench Press: it trains upper chest directly (your focus).',
           sportLine,
+          secondSportLine,
         ],
         omitted: [],
       },
@@ -951,6 +956,7 @@ test.each(['swap', 'slot'])('planned card tags goal, focus, and frozen sport pro
   expect(screen.getByTestId('today-slot-provenance-10')).toHaveTextContent('Goal: Goblet squat 40 kg for 10');
   expect(screen.getByTestId('today-slot-provenance-11')).toHaveTextContent('Your focus');
   expect(screen.getByTestId('today-slot-provenance-12')).toHaveTextContent('Your Football (soccer) outcome');
+  expect(screen.getByText(/^Seated Row /)).toBeOnTheScreen();
   expect(screen.queryByTestId('today-slot-provenance-13')).toBeNull();
 });
 

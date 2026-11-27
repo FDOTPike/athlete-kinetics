@@ -468,7 +468,7 @@ function AvailableTodayScreen({
           const matchedSport = hasFrozenEmphasis
             ? appliedLines.some((line) =>
                 line.startsWith(`${slot.movementName} `)
-                && (line.includes(`(your ${sportSummary ?? 'sport'} outcome)`) || line.includes('(your second sport outcome)')),
+                && line.includes(`(your ${sportSummary ?? 'sport'} outcome)`),
               )
             : resolvedMuscles.some((m) => sportMuscles.has(m));
           if (matchedSport) {

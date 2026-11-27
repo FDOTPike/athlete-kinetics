@@ -1220,7 +1220,10 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           {block !== null && (
             <SecondaryButton
               label={program == null ? 'Manage block' : 'Manage program'}
-              onPress={program == null ? openManageBlock : () => setEditingProgram(true)}
+              onPress={program == null ? openManageBlock : () => {
+                if (program?.status !== 'active') setShowChooser(true);
+                else setEditingProgram(true);
+              }}
               accessibilityLabel={program == null ? 'Manage current block' : 'Manage future program preferences'}
             />
           )}

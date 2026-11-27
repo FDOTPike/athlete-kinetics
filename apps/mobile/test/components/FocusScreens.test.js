@@ -800,10 +800,11 @@ describe('BlockScreen - Chooser Entry (Work Order E)', () => {
     expect(screen.queryByText('Coming soon')).toBeNull();
   });
 
-  test('with a program whose review is due and a standalone block, the button keeps "Plan a new block" and opens the chooser (#172)', () => {
+  test.each([true, false])('with a program whose review is due and a standalone block, the planning action opens the chooser (#172, readiness available: %s)', (ready) => {
     // The program editor only saves for an active program, so a finished
     // program must not route this button to it.
     mockState = baseState({
+      vector: ready ? vector : null,
       block: { blockId: 1, startDate: '2026-07-01', objective: 'strength', createdAtMs: 1 },
       program: {
         programId: 1,
@@ -819,7 +820,10 @@ describe('BlockScreen - Chooser Entry (Work Order E)', () => {
     render(<BlockScreen />);
 
     expect(screen.queryByText('Change future blocks')).toBeNull();
-    fireEvent.press(screen.getByText('Plan a new block'));
+    const planningAction = ready
+      ? screen.getByText('Plan a new block')
+      : screen.getByLabelText('Manage future program preferences');
+    fireEvent.press(planningAction);
     expect(screen.getByText('Start a new block')).toBeOnTheScreen();
     expect(screen.getByText('Custom')).toBeOnTheScreen();
     expect(screen.queryByText('MANAGE PROGRAM')).toBeNull();
