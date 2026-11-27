@@ -553,9 +553,8 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
   if (editingProgram) {
     return (
       <ProgramSetupScreen
-        // Create mode when there is no program yet ("Build your first block"):
-        // edit mode would submit to updateProgramPreferences, which refuses.
-        editing={program !== null}
+        // updateProgramPreferences only accepts an active program.
+        editing={program?.status === 'active'}
         onComplete={() => setEditingProgram(false)}
         onCancel={() => setEditingProgram(false)}
       />
@@ -1005,24 +1004,32 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
     ) : null
   );
 
-  const renderEmphasisDisclosure = (): React.JSX.Element | null => (
-    block !== null && blockEmphasis !== null ? (
+  const renderEmphasisDisclosure = (): React.JSX.Element | null => {
+    if (block === null || blockEmphasis === null) return null;
+    const { inputs, report } = blockEmphasis;
+    const hasRecordedSelection = (inputs?.focus?.muscles?.length ?? 0) > 0
+      || inputs?.focus?.movementControl === true
+      || inputs?.sport != null
+      || inputs?.workload != null
+      || (inputs?.goalMovements?.length ?? 0) > 0;
+
+    return (
       <Disclosure
         label="WHY THIS PLAN LOOKS THE WAY IT DOES"
         hint="What your focus, goals and sport changed"
         testID="plan-emphasis-disclosure"
       >
         <EmphasisReportCard
-          report={blockEmphasis.report}
-          emptyText={NO_EMPHASIS_EXPLANATION}
+          report={report}
+          emptyText={hasRecordedSelection ? undefined : NO_EMPHASIS_EXPLANATION}
           testID="plan-emphasis"
         />
         <Text style={styles.bodyText}>
           This was recorded when the block was created and does not change if you edit your focus, goals or sport later. Those edits are used for your next block.
         </Text>
       </Disclosure>
-    ) : null
-  );
+    );
+  };
 
   const openManageBlock = (): void => {
     setManageOpen(true);
@@ -1032,6 +1039,10 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
       animated: true,
     });
   };
+
+  const openProgramPlanning = program?.status !== 'active'
+    ? () => setShowChooser(true)
+    : () => setEditingProgram(true);
 
   const renderManageBlockSection = (): React.JSX.Element => (
     <View
@@ -1220,10 +1231,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           {block !== null && (
             <SecondaryButton
               label={program == null ? 'Manage block' : 'Manage program'}
-              onPress={program == null ? openManageBlock : () => {
-                if (program?.status !== 'active') setShowChooser(true);
-                else setEditingProgram(true);
-              }}
+              onPress={program == null ? openManageBlock : openProgramPlanning}
               accessibilityLabel={program == null ? 'Manage current block' : 'Manage future program preferences'}
             />
           )}
@@ -1425,7 +1433,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           ) : block === null ? (
             <PrimaryButton
               label="Set up a four-week block"
-              onPress={program == null ? openManageBlock : () => setEditingProgram(true)}
+              onPress={program == null ? openManageBlock : openProgramPlanning}
               accessibilityLabel="Set up a four-week block"
             />
           ) : (
@@ -1439,7 +1447,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
             <>
               <SecondaryButton
                 label={program == null ? 'Manage block' : 'Manage program'}
-                onPress={program == null ? openManageBlock : () => setEditingProgram(true)}
+                onPress={program == null ? openManageBlock : openProgramPlanning}
                 accessibilityLabel={program == null ? 'Manage current block' : 'Manage future program preferences'}
               />
               {/* #172: with an active program this changes future blocks only;
@@ -1448,7 +1456,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                   editor only saves for an active program. */}
               <SecondaryButton
                 label={program?.status !== 'active' ? 'Plan a new block' : 'Change future blocks'}
-                onPress={program?.status !== 'active' ? () => setShowChooser(true) : () => setEditingProgram(true)}
+                onPress={openProgramPlanning}
                 accessibilityLabel={program?.status !== 'active' ? 'Plan a new block' : 'Change future blocks'}
               />
             </>

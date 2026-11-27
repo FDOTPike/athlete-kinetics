@@ -459,15 +459,19 @@ function AvailableTodayScreen({
           const resolvedMuscles = rawTargetMuscles
             .map((m) => resolveMuscleGroupAlias(m))
             .filter((m): m is MuscleGroupId => m !== null);
+          const matchesMovement = (line: string): boolean =>
+            line.startsWith(`${slot.movementName} is planned instead of `)
+            || line.startsWith(`${slot.movementName} is added to a `)
+            || line.startsWith(`${slot.movementName} takes the place of `);
           const matchedFocus = hasFrozenEmphasis
-            ? appliedLines.some((line) => line.startsWith(`${slot.movementName} `) && line.includes('(your focus)'))
+            ? appliedLines.some((line) => matchesMovement(line) && line.includes('(your focus)'))
             : resolvedMuscles.some((m) => focusMuscles.has(m));
           if (matchedFocus) {
             return 'Your focus';
           }
           const matchedSport = hasFrozenEmphasis
             ? appliedLines.some((line) =>
-                line.startsWith(`${slot.movementName} `)
+                matchesMovement(line)
                 && line.includes(`(your ${sportSummary ?? 'sport'} outcome)`),
               )
             : resolvedMuscles.some((m) => sportMuscles.has(m));

@@ -960,6 +960,44 @@ test.each(['swap', 'slot'])('planned card tags goal, focus, and frozen sport pro
   expect(screen.queryByTestId('today-slot-provenance-13')).toBeNull();
 });
 
+describe.each(['swap', 'added slot', 'displaced slot'])('R10: frozen provenance (%s)', (format) => {
+  test.each([
+    ['focus', 'Your focus'],
+    ['sport', 'Your Football (soccer) outcome'],
+  ])('tags only the exact movement for %s', (origin, label) => {
+    const chosen = 'Pallof Press With Rotation';
+    const sport = { name: 'Football (soccer)', muscles: ['core'] };
+    const emphasis = { sport };
+    const line = format === 'swap'
+      ? describeEmphasisSwap({ chosen, instead: 'Pallof Press', muscle: 'core', origin, emphasis })
+      : describeEmphasisSlot({
+          chosen, displaced: format === 'displaced slot' ? 'Pallof Press' : null, day: 'upper',
+          why: { muscle: 'core', origin }, emphasis,
+        });
+    mockState = baseState({
+      todayPlan: {
+        plannedSessionId: 1,
+        focus: 'upper',
+        phase: 'accumulation',
+        slots: [
+          slot({ movementName: 'Pallof Press' }),
+          slot({ plannedSlotId: 11, slotIndex: 1, movementId: 12, movementName: chosen }),
+        ],
+      },
+      blockEmphasis: {
+        blockId: 1,
+        inputs: { ...emphasis, focus: null, workload: null, goalMovements: [] },
+        report: { version: 1, applied: [line], omitted: [] },
+      },
+    });
+
+    render(<TodayScreen />);
+    expect(screen.getByText(/^Pallof Press ·/)).toBeOnTheScreen();
+    expect(screen.getByTestId('today-slot-provenance-11')).toHaveTextContent(label);
+    expect(screen.queryByTestId('today-slot-provenance-10')).toBeNull();
+  });
+});
+
 test.each([true, false])('planned movement overlap qualifies for provenance only without frozen emphasis (frozen: %s)', (frozen) => {
   mockState = baseState({
     todayPlan: {
