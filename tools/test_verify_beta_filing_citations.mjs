@@ -3,6 +3,7 @@
  * for `tools/verify_beta_filing_citations.mjs`.
  */
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import os from 'node:os';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
@@ -887,10 +888,100 @@ console.log('\n[3] Round 9 regressions');
   }
 
   const { scripts } = JSON.parse(readRepoFile('package.json'));
-  check('WO04-R9: release gate runs the citation verifier and its regression suite',
+  check('WO04-R9: CI and release run the citation verifier and its regression suite',
     scripts['verify:beta-citations'] === 'node tools/verify_beta_filing_citations.mjs && node tools/test_verify_beta_filing_citations.mjs'
-      && scripts['verify:release'].endsWith(' && npm run verify:beta-citations'),
-    scripts['verify:release']);
+      && scripts['verify:release'].endsWith(' && npm run verify:beta-citations')
+      && scripts['verify:ci'].endsWith(' && npm run verify:beta-citations'),
+    scripts['verify:ci'].split(' && ').at(-1));
+
+  const emptyPrior = mutateRepoFile(priorPath, () => ' \t\r\n');
+  checkCitationError('whitespace-only prior migrations fail closed', emptyPrior, subjectiveCitation,
+    `SQLite schema execution failed: Error: prior migration is empty: ${priorPath}`);
+
+  const internet = citationAt(dataSafety, 0);
+  const permissionError = 'missing active XML <uses-permission android:name="android.permission.INTERNET" tools:node="remove"> element';
+  const nameAttr = 'android:name="android.permission.INTERNET"';
+  const removeAttr = 'tools:node="remove"';
+  for (const requiredAttr of [nameAttr, removeAttr]) {
+    const displaced = mutateRepoFile(internet.target, (real) => {
+      const lines = real.split(/\r\n?|\n/);
+      // Leave a textual decoy where the citation expects the real namespaced attribute.
+      lines[internet.start] = `        ${requiredAttr === nameAttr ? `data-name='${nameAttr}'` : nameAttr}`;
+      lines[internet.end - 1] = `        data-node='${removeAttr} />'${requiredAttr === nameAttr ? ` ${removeAttr}` : ''}`;
+      lines[internet.end] = `        ${requiredAttr} />${lines[internet.end]}`;
+      return lines.join('\n');
+    });
+    checkCitationError(`${requiredAttr} must be inside the cited multiline permission`, displaced, internet, permissionError);
+  }
+
+  const withExtraAttribute = (space) => mutateRepoFile(internet.target,
+    (real) => real.replace(nameAttr, `data-extra="x"${space}${nameAttr}`));
+  checkCitationError('xmldom warnings for unspaced attributes fail closed', withExtraAttribute(''), internet,
+    'malformed XML: [xmldom warning]');
+  const spacedAttributes = withExtraAttribute(' ');
+  check('WO04-R9: correctly spaced attributes in a multiline permission remain valid', spacedAttributes.ok,
+    spacedAttributes.errors[0] ?? '');
+
+  for (const [label, eol] of [['LF', '\n'], ['CRLF', '\r\n'], ['bare CR', '\r']]) {
+    const unicodeManifest = mutateRepoFile(internet.target, (real) => real
+      .replace('Read-only by design:', 'Read-only by design:\u2028')
+      .replace(/\r\n?|\n/g, eol));
+    check(`WO04-R9: U+2028 does not shift XML attribute and element locators with ${label}`, unicodeManifest.ok,
+      unicodeManifest.errors[0] ?? '');
+  }
+
+  for (const explain of ['EXPLAIN ', 'EXPLAIN QUERY PLAN ']) {
+    const explainedTable = mutateRepoFile(subjectiveCitation.target, (real) => {
+      const ddl = real.match(subjectiveTable)[0];
+      return real.replace(ddl, `${explain}${ddl}\n${ddl}`);
+    });
+    checkCitationError(`${explain.trim()} is not CREATE TABLE evidence when the table is created elsewhere`,
+      explainedTable, subjectiveCitation, 'no CREATE TABLE statement for "subjective_report" starts in cited lines');
+  }
+  const splitExplain = mutateRepoFile(subjectiveCitation.target, (real) => {
+    const lines = real.split(/\r\n?|\n/);
+    lines[subjectiveCitation.start - 2] = 'EXPLAIN';
+    const ddl = real.match(subjectiveTable)[0];
+    return lines.join('\n').replace(ddl, `${ddl}\n${ddl}`);
+  });
+  checkCitationError('EXPLAIN on the preceding line disqualifies the cited CREATE TABLE', splitExplain, subjectiveCitation,
+    'no CREATE TABLE statement for "subjective_report" starts in cited lines');
+
+  // Parse the mutated backupStore.ts as TSX so the probe reaches anchor matching, not syntax rejection.
+  const ts = createRequire(import.meta.url)('typescript');
+  const pickerAnchor = exportCitation.spec.endAnchor;
+  const jsxTextSpoof = verifyBetaFilingCitations({
+    repoRoot,
+    readFile: (rel) => rel === exportCitation.target
+      ? readRepoFile(rel).replace('const rows = <T>', 'const rows = <T,>')
+        .replace(pickerAnchor, `<div>${pickerAnchor}</div>;`)
+      : readRepoFile(rel),
+    tsCompiler: {
+      ...ts,
+      createSourceFile: (file, source, target, parents, kind) =>
+        ts.createSourceFile(file, source, target, parents, file === exportCitation.target ? ts.ScriptKind.TSX : kind),
+    },
+  });
+  checkCitationError('pickerSave inside a JSX text node is not statement evidence', jsxTextSpoof, exportCitation,
+    `end line ${exportCitation.end} does not contain expected end anchor "${pickerAnchor}"`);
+
+  const haltCitation = citationAt(disclaimer, 0);
+  const haltText = 'Stop training for today.';
+  const realHalt = mutateRepoFile(haltCitation.target, (real) => real.replace(
+    haltCitation.spec.startAnchor, `<View>${haltCitation.spec.startAnchor}</View>`,
+  ));
+  check('WO04-R9: the SessionScreen JSX element retains its exact text', realHalt.ok, realHalt.errors[0] ?? '');
+  const alteredHalt = mutateRepoFile(haltCitation.target, (real) => real.replace(haltText, 'Stop training for now.'));
+  checkCitationError('the JSX element still requires its exact text', alteredHalt, haltCitation,
+    `does not contain expected anchor "${haltCitation.spec.startAnchor}"`);
+
+  for (const [label, eol] of [['LF', '\n'], ['CRLF', '\r\n'], ['bare CR', '\r']]) {
+    const brokenDestination = hideProfile(`[see](<url\\\ncontinued> "title ${profileCitationToken}")`, eol);
+    check(`WO04-R9: a backslash cannot escape ${label} in an angle-bracket destination`, brokenDestination.ok,
+      brokenDestination.errors.join(' | '));
+  }
+  hiddenProfileCitation('an escaped closing angle bracket keeps the link title hidden',
+    hideProfile(`[see](<url\\>more> "title ${profileCitationToken}")`));
 }
 
 console.log(`\n${failed === 0 ? 'ALL BETA FILING CITATION TESTS PASSED' : `${failed} TEST(S) FAILED`}`);

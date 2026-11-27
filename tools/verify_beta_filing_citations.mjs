@@ -111,6 +111,7 @@ export const EXPECTED_ANCHORS = Object.freeze({
     isRange: false,
     anchorInStringLiteral: true,
     prevAnchor: 'pikeMethods provides training guidance, not medical advice. It is not a medical device.',
+    prevAnchorInJsxText: true,
     startAnchor: 'Stop if something feels unsafe and seek qualified professional advice when needed.',
   },
 
@@ -650,7 +651,7 @@ function scanBalancedDestination(str, startIdx) {
     while (idx < str.length) {
       const ch = str[idx];
       if (ch === '\r' || ch === '\n' || ch === '<') return -1;
-      if (ch === '\\' && idx + 1 < str.length) {
+      if (ch === '\\' && idx + 1 < str.length && ASCII_PUNCT_RE.test(str[idx + 1])) {
         idx += 2;
         continue;
       }
@@ -1210,6 +1211,7 @@ function buildJsTsActiveViewsWithTypeScript(ts, relPath, rawText) {
   // Use exact UTF-16 code units (`split('')`, NOT `Array.from`) so astral code points (e.g. emoji) match TS AST offsets 1:1
   const activeChars = rawText.split('');
   const strictCodeChars = rawText.split('');
+  const jsxTextNodes = [];
   const maskIn = (arr, pos, end) => {
     const clampedEnd = Math.min(arr.length, end);
     for (let p = Math.max(0, pos); p < clampedEnd; p += 1) {
@@ -1244,6 +1246,8 @@ function buildJsTsActiveViewsWithTypeScript(ts, relPath, rawText) {
           maskIn(activeChars, r.pos, r.end);
           maskIn(strictCodeChars, r.pos, r.end);
         }
+      } else {
+        jsxTextNodes.push(node);
       }
       if (
         node.kind === ts.SyntaxKind.StringLiteral
@@ -1278,16 +1282,19 @@ function buildJsTsActiveViewsWithTypeScript(ts, relPath, rawText) {
     for (const child of children) visit(child);
   };
   visit(sf);
+  const strictCodeTextWithJsxText = strictCodeChars.join('');
+  for (const node of jsxTextNodes) maskIn(strictCodeChars, node.pos, node.end);
   return {
     activeText: activeChars.join(''),
-    strictCodeText: strictCodeChars.join(''),
+    strictCodeText: jsxTextNodes.length ? strictCodeChars.join('') : strictCodeTextWithJsxText,
+    strictCodeTextWithJsxText,
     parseErrors,
   };
 }
 
 function stripJsTsCommentsPreservingLines(tsCompiler, relPath, rawText) {
   if (tsCompiler === null) {
-    return { activeText: '', strictCodeText: '', parseErrors: ['TypeScript compiler is unavailable'] };
+    return { activeText: '', strictCodeText: '', strictCodeTextWithJsxText: '', parseErrors: ['TypeScript compiler is unavailable'] };
   }
   return buildJsTsActiveViewsWithTypeScript(tsCompiler, relPath, rawText);
 }
@@ -1358,14 +1365,17 @@ function inspectXmlDom(rawText, DOMParser) {
   const parseErrors = [];
   let doc = null;
   try {
+    // Keep locator lines aligned to splitPhysicalLines, including literal Unicode separators.
+    const source = rawText.replace(/\r\n?/g, '\n').replace(/\u2028/g, '&#x2028;').replace(/\u2029/g, '&#x2029;');
     doc = new DOMParser({
       locator: {},
+      normalizeLineEndings: (text) => text,
       errorHandler: {
-        warning: () => {},
+        warning: (msg) => parseErrors.push(String(msg)),
         error: (msg) => parseErrors.push(String(msg)),
         fatalError: (msg) => parseErrors.push(String(msg)),
       },
-    }).parseFromString(rawText, 'text/xml');
+    }).parseFromString(source, 'text/xml');
   } catch (err) {
     parseErrors.push(String(err));
   }
@@ -1393,7 +1403,10 @@ function inspectSqliteTables(repoRoot, relPath, rawText, readFile) {
         .filter((f) => /^0\d\d_.*\.sql$/.test(f) && !f.startsWith('004_') && f < targetBase)
         .sort();
       for (const prior of priorFiles) {
-        db.exec(readFile(`${schemaDir}/${prior}`));
+        const priorPath = `${schemaDir}/${prior}`;
+        const sql = readFile(priorPath);
+        if (!sql.trim()) throw new Error(`prior migration is empty: ${priorPath}`);
+        db.exec(sql);
       }
     }
     const tableQuery = db.prepare("SELECT lower(name) AS name FROM sqlite_master WHERE type = 'table'");
@@ -1435,14 +1448,19 @@ function verifyXmlElementSemantics(xmlInfo, spec, c, lines) {
   if (permMatch) {
     const targetPerm = permMatch[1];
     const requiresRemove = allAnchors.includes('tools:node="remove"');
+    const inSpan = (node) => Number.isInteger(node?.lineNumber) && c.start <= node.lineNumber && node.lineNumber <= c.end;
     const nodes = root.getElementsByTagName('uses-permission');
     let found = false;
     for (let i = 0; i < nodes.length; i += 1) {
       const el = nodes.item(i);
       if (!el || el.parentNode !== root || Boolean(el.namespaceURI)) continue;
-      if (el.getAttributeNS(ANDROID_XML_NS, 'name') !== targetPerm) continue;
-      if (requiresRemove && el.getAttributeNS(ANDROID_TOOLS_XML_NS, 'node') !== 'remove') continue;
-      if (!Number.isInteger(el.lineNumber) || el.lineNumber < c.start || el.lineNumber > c.end) continue;
+      if (!inSpan(el)) continue;
+      const name = el.getAttributeNodeNS(ANDROID_XML_NS, 'name');
+      if (name?.value !== targetPerm || !inSpan(name)) continue;
+      if (requiresRemove) {
+        const node = el.getAttributeNodeNS(ANDROID_TOOLS_XML_NS, 'node');
+        if (node?.value !== 'remove' || !inSpan(node)) continue;
+      }
       found = true;
       break;
     }
@@ -1469,14 +1487,25 @@ function verifyXmlElementSemantics(xmlInfo, spec, c, lines) {
   return null;
 }
 
-function verifySqlTableSemantics(sqlInfo, spec) {
+function verifySqlTableSemantics(sqlInfo, spec, c, activeLines) {
   if (sqlInfo.sqlError !== null) {
     return `SQLite schema execution failed: ${sqlInfo.sqlError}`;
   }
-  const anchors = [spec.startAnchor, ...(spec.rangeAnchors ?? []), spec.endAnchor ?? ''];
-  for (const anchor of anchors) {
-    const m = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([A-Za-z_][A-Za-z0-9_]*)\b/i.exec(anchor);
+  const anchors = [
+    [spec.startAnchor, c.start, c.start],
+    ...(spec.rangeAnchors ?? []).map((anchor) => [anchor, c.start, c.end]),
+    [spec.endAnchor ?? '', c.end, c.end],
+  ];
+  for (const [anchor, start, end] of anchors) {
+    const m = /^CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([A-Za-z_][A-Za-z0-9_]*)\b/i.exec(anchor);
     if (!m) continue;
+    // Check the SQL before the citation for a statement that continues into it.
+    const preceding = activeLines.slice(0, start - 1).join('\n');
+    const statements = activeLines.slice(start - 1, end).join('\n').split(';');
+    if (preceding.slice(preceding.lastIndexOf(';') + 1).trim()) statements.shift();
+    if (!statements.some((statement) => statement.trimStart().startsWith(anchor))) {
+      return `no CREATE TABLE statement for "${m[1]}" starts in cited lines ${start}-${end}`;
+    }
     const name = m[1].toLowerCase();
     if (sqlInfo.tablesBefore.has(name)) return `SQLite table "${m[1]}" already exists before the cited migration`;
     if (!sqlInfo.tablesAfter.has(name)) return `SQLite execution did not create expected table "${m[1]}"`;
@@ -1520,11 +1549,16 @@ function buildSourceBundle(repoRoot, relPath, rawText, readFile, { tsCompiler, x
     };
   }
   if (relPath.endsWith('.ts') || relPath.endsWith('.tsx') || relPath.endsWith('.mjs') || relPath.endsWith('.js')) {
-    const { activeText, strictCodeText, parseErrors } = stripJsTsCommentsPreservingLines(tsCompiler, relPath, rawText);
+    const { activeText, strictCodeText, strictCodeTextWithJsxText, parseErrors } =
+      stripJsTsCommentsPreservingLines(tsCompiler, relPath, rawText);
+    const strictCodeLines = splitPhysicalLines(strictCodeText);
     return {
       lines,
       activeLines: splitPhysicalLines(activeText),
-      strictCodeLines: splitPhysicalLines(strictCodeText),
+      strictCodeLines,
+      strictCodeLinesWithJsxText: strictCodeText === strictCodeTextWithJsxText
+        ? strictCodeLines
+        : splitPhysicalLines(strictCodeTextWithJsxText),
       isJsTs: true,
       parseErrors,
       xmlInfo: null,
@@ -1659,17 +1693,20 @@ export function verifyBetaFilingCitations({
         return;
       }
 
-      const lineMatchesAnchor = (lineIdx, anchor, isComment, allowStringLiteral) => {
+      const strictLinesForAnchor = (anchor, allowJsxText) =>
+        allowJsxText || anchor.startsWith('<') ? bundle.strictCodeLinesWithJsxText : strictCodeLines;
+
+      const lineMatchesAnchor = (lineIdx, anchor, isComment, allowStringLiteral, allowJsxText) => {
         if (isComment) return lines[lineIdx].includes(anchor);
         if (allowStringLiteral || !bundle.isJsTs) return activeLines[lineIdx].includes(anchor);
-        return hasAlignedCodeAnchor(activeLines[lineIdx], strictCodeLines[lineIdx], anchor);
+        return hasAlignedCodeAnchor(activeLines[lineIdx], strictLinesForAnchor(anchor, allowJsxText)[lineIdx], anchor);
       };
 
       const rangeMatchesAnchor = (startIdx, endExclusiveIdx, anchor, isComment, allowStringLiteral) => {
         if (isComment) return lines.slice(startIdx, endExclusiveIdx).join('\n').includes(anchor);
         const active = activeLines.slice(startIdx, endExclusiveIdx).join('\n');
         if (allowStringLiteral || !bundle.isJsTs) return active.includes(anchor);
-        const strict = strictCodeLines.slice(startIdx, endExclusiveIdx).join('\n');
+        const strict = strictLinesForAnchor(anchor, false).slice(startIdx, endExclusiveIdx).join('\n');
         return hasAlignedCodeAnchor(active, strict, anchor);
       };
 
@@ -1685,8 +1722,9 @@ export function verifyBetaFilingCitations({
       }
 
       if (spec.prevAnchor) {
-        const prevMatched = c.start >= 2
-          && lineMatchesAnchor(c.start - 2, spec.prevAnchor, false, Boolean(spec.prevAnchorInStringLiteral));
+        const prevMatched = c.start >= 2 && lineMatchesAnchor(
+          c.start - 2, spec.prevAnchor, false, spec.prevAnchorInStringLiteral, spec.prevAnchorInJsxText,
+        );
         if (!prevMatched) {
           errors.push(
             `${doc} (${c.raw}): preceding line ${c.start - 1} does not contain disambiguating context "${spec.prevAnchor}"`,
@@ -1723,7 +1761,7 @@ export function verifyBetaFilingCitations({
       }
 
       if (sqlInfo !== null) {
-        const sqlErr = verifySqlTableSemantics(sqlInfo, spec);
+        const sqlErr = verifySqlTableSemantics(sqlInfo, spec, c, activeLines);
         if (sqlErr !== null) {
           errors.push(`${doc} (${c.raw}): ${sqlErr}`);
         }
