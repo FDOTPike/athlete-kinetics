@@ -1820,7 +1820,10 @@ console.log('[N12] Stream 2 safety reader staging, shared scheduler & native smo
     }
     return roots;
   };
+  const producerVerifierCall = /^([ \t]*)(verifyOnnxRuntimeArchive\(artifact, artifactSpec\[1\], pinnedModelAssets\(artifactSpec\[2\]\)\))[ \t]*$/m;
   const gradleEnforcesProducerModels = (gradleSrc) => {
+    const code = gradleSrc.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
+    const producerDoLast = code.match(/^([ \t]*)task\.doLast\s*\{([\s\S]*?)^\1\}/m)?.[2] ?? '';
     const roots = gradleProducerModelRoots(gradleSrc);
     const verifier = gradleSrc.match(/def verifyOnnxRuntimeArchive = \{([\s\S]*?)\n\}/)?.[1] ?? '';
     const pinnedAssets = gradleSrc.match(/def pinnedModelAssets = \{([\s\S]*?)\n\}/)?.[1] ?? '';
@@ -1829,7 +1832,7 @@ console.log('[N12] Stream 2 safety reader staging, shared scheduler & native smo
       && roots.get('signReleaseBundle') === 'base/assets/'
       && roots.has('packageDebug') && roots.get('packageDebug') === null
       && roots.has('signDebugBundle') && roots.get('signDebugBundle') === null
-      && /verifyOnnxRuntimeArchive\(artifact, artifactSpec\[1\], pinnedModelAssets\(artifactSpec\[2\]\)\)/.test(gradleSrc)
+      && producerVerifierCall.test(producerDoLast)
       && /'minilm\.onnx'[\s\S]*pins\.minilmBytes[\s\S]*pins\.minilmSha256/.test(pinnedAssets)
       && /'safety_reader\.onnx'[\s\S]*pins\.readerBytes[\s\S]*pins\.readerSha256/.test(pinnedAssets)
       && verifier.includes("MessageDigest.getInstance('SHA-256')")
@@ -1845,6 +1848,10 @@ console.log('[N12] Stream 2 safety reader staging, shared scheduler & native smo
       && !gradleEnforcesProducerModels(appGradle.replace(/(packageDebug:\s*\["[^"]+",\s*"lib\/",\s*)null/, '$1"assets/"'))
       && !gradleEnforcesProducerModels(appGradle.replaceAll("MessageDigest.getInstance('SHA-256')", "MessageDigest.getInstance('MD5')")));
 
+  check('falsifier: commenting out the Gradle doLast model verifier fails the producer check',
+    producerVerifierCall.test(appGradle)
+      && !gradleEnforcesProducerModels(appGradle.replace(producerVerifierCall, '$1// $2')));
+
   if (existsSync(inspectIosReaderPath)) {
     const { mkdtempSync, rmSync, writeFileSync } = await import('node:fs');
     const { tmpdir } = await import('node:os');
@@ -1854,6 +1861,11 @@ console.log('[N12] Stream 2 safety reader staging, shared scheduler & native smo
       const emptyApp = join(sb, 'Empty.app');
       const { mkdirSync } = await import('node:fs');
       mkdirSync(emptyApp, { recursive: true });
+      for (const invalidPath of ['', '  ']) {
+        const result = inspectIosSafetyReader(invalidPath);
+        check('inspectIosSafetyReader rejects a blank app bundle path',
+          result.ok === false && result.checks.some((c) => c.detail.includes('app bundle path')));
+      }
       const missingRes = inspectIosSafetyReader(emptyApp);
       check('inspectIosSafetyReader rejects an .app bundle missing safety_reader.onnx',
         missingRes.ok === false && missingRes.checks.some((c) => !c.ok && c.name.includes('present')));
@@ -1908,12 +1920,16 @@ console.log('[N12] Stream 2 safety reader staging, shared scheduler & native smo
           fileLinkErr === null ? JSON.stringify(linkRes?.checks?.[0] ?? null).slice(0, 120) : `symlink creation unavailable: ${fileLinkErr}`);
         const linkedAppPath = join(sb, 'Linked.app');
         const dirLinkErr = tryLink(goodApp, linkedAppPath, process.platform === 'win32' ? 'junction' : 'dir');
-        const linkedAppRes = dirLinkErr === null ? inspectIosSafetyReader(linkedAppPath) : null;
-        check('inspectIosSafetyReader rejects a symlinked .app bundle',
-          linkedAppRes !== null
-            && linkedAppRes.ok === false
-            && linkedAppRes.checks.some((c) => !c.ok && c.detail.includes('symlink rejected')),
-          dirLinkErr === null ? JSON.stringify(linkedAppRes?.checks?.[0] ?? null).slice(0, 120) : `symlink creation unavailable: ${dirLinkErr}`);
+        for (const suffix of ['', '/', '\\']) {
+          const linkedAppRes = dirLinkErr === null ? inspectIosSafetyReader(linkedAppPath + suffix) : null;
+          check('inspectIosSafetyReader rejects a symlinked .app bundle with suffix ' + JSON.stringify(suffix),
+            linkedAppRes !== null
+              && linkedAppRes.ok === false
+              && linkedAppRes.checks.some((c) => !c.ok && c.detail.includes('symlink rejected')),
+            dirLinkErr === null ? JSON.stringify(linkedAppRes?.checks?.[0] ?? null).slice(0, 120) : `symlink creation unavailable: ${dirLinkErr}`);
+          check('inspectIosSafetyReader accepts a real .app bundle with suffix ' + JSON.stringify(suffix),
+            inspectIosSafetyReader(goodApp + suffix).ok === true);
+        }
       }
     } finally {
       rmSync(sb, { recursive: true, force: true });

@@ -1101,12 +1101,36 @@ console.log('\n[16] WO-02 Item 3 — serial non-overlap, cold-restart PID contin
     ...life('safety-reader', 777, 1, 0, [t + 1170, t + 1210, t + 1210, t + 1270, t + 1270, t + 1310]),
   ], DENSE, { anchor: false });
   check('OVL-0: sequential embedder then safety-reader in one PID: sessionOverlapCount === 0 and clean',
-    seq.disposalIntegrity.sessionOverlapCount === 0 && seq.disposalIntegrity.clean === true
+    seq.disposalIntegrity.sessionOverlapCount === 0 && seq.disposalIntegrity.unresolvedSessionCount === 0
+      && seq.disposalIntegrity.clean === true
       && seq.qualified.length === 2,
     `overlaps=${seq.disposalIntegrity.sessionOverlapCount} qualified=${seq.qualified.length}`);
   check('OVL-0: componentRequestCounts reports one request per model',
     seq.componentRequestCounts?.embedder === 1 && seq.componentRequestCounts?.['safety-reader'] === 1,
     JSON.stringify(seq.componentRequestCounts));
+
+  for (const [label, settleTime, removeSettlement] of [
+    ['missing settlement', null, true],
+    ['settlement timestamp precedes start', t + 499, false],
+    ['settlement line precedes start at the same timestamp', t + 500, false],
+  ]) {
+    const request = life('embedder', 777, 1, 0, [t + 500, t + 550, t + 550, t + 600, t + 600, t + 650]);
+    request.splice(5, 1);
+    if (!removeSettlement) {
+      request.unshift(pidLine(settleTime, 777, phaseMsg('disposal', 'settled', 1, 1, 1, 1)));
+    }
+    // A wrapper-level counter can already be balanced. It cannot close the request.
+    const result = correlate([
+      ...wrappers(777, t + 100),
+      pidLine(t + 101, 777, phaseMsg('disposal', 'settled', 0, 1, 1, 1)),
+      ...request,
+    ], DENSE, { anchor: false });
+    const integrity = result.disposalIntegrity;
+    check('OVL: a lone session is unresolved with ' + label,
+      integrity.countersBalanced === true && integrity.sessionOverlapCount === 0
+        && integrity.unresolvedSessionCount === 1 && integrity.clean === false,
+      JSON.stringify(integrity));
+  }
 
   // Concurrent: safety-reader session starts BEFORE the embedder session settles its disposal.
   const conc = correlate([
@@ -1262,14 +1286,15 @@ console.log('\n[16] WO-02 Item 3 — serial non-overlap, cold-restart PID contin
       reader?.pid === 777 && reader?.wrapperEpoch === 1
         && sum.perRequest.some((r) => r.component === 'embedder'),
       JSON.stringify(sum.perRequest.map((r) => [r.component, r.pid, r.wrapperEpoch])));
-    check('ATTR-2: perRun carries pid', sum.perRun.every((r) => r.pid === 777), JSON.stringify(sum.perRun.map((r) => r.pid)));
+    const runPids = sum.perRun.map((r) => r.pid);
+    check('ATTR-2: perRun carries the single expected PID', runPids.length === 1 && runPids[0] === 777, JSON.stringify(runPids));
     check('ATTR-3: peakClaimBlockers name component and pid',
       sum.peakClaimBlockers.some((b) => b.startsWith('safety-reader request 1 (pid 777)'))
         && sum.peakClaimBlockers.some((b) => b.startsWith('embedder request 1 (pid 777)')),
       sum.peakClaimBlockers.join('; ').slice(0, 160));
   }
 
-  console.log('\n[17] GPT 6.2 Sol adversarial provenance falsifiers (WO02-SOL-01, 05, 07)');
+  console.log('\n[17] Adversarial provenance falsifiers (WO02-SOL-01, 05, 07)');
   {
     // WO02-SOL-01: reader disposes at +160 ms; embedder req 1 started at +140 ms
     // and settled at +170 ms, but its session:start line was lost from logcat,

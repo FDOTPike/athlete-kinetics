@@ -61,8 +61,9 @@ mutable `main`:
 - `tokenizer_config.json` sha256 `9261e7d79b44c8195c1cada2b453e55b00aeb81e907a6664974b4d7776172ab3`
 - distilled `tokenizer.min.json` sha256 `ed2e443c24f234f62dd05a039ca0c489d8d1a7039f1f42fc876aaae9cb32cff6`
 
-`fetch:embedder` is the only network-enabled model materializer. Run it before
-`verify:ci`: it stages all four remote artifacts, verifies their pinned byte
+`fetch:embedder` and `fetch:safety-reader` are the network-enabled model
+materializers. Run both before `verify:ci`. `fetch:embedder` stages all four
+remote artifacts, verifies their pinned byte
 hashes, and populates the exact revision-scoped Transformers cache plus the
 device output directory. All verification and codebase-embedding consumers use
 that cache with the immutable revision and `local_files_only=true`; a missing
@@ -158,9 +159,9 @@ mandatory and self-locating.
 remediation command — when the checkout is not prepared: missing
 `node_modules`, a broken native `sharp` binding, absent or hash-mismatched
 pinned revision-cache artifacts, missing device outputs, or a distilled
-tokenizer off its pin. It never downloads; `fetch:embedder` remains the only
-network-capable materializer. An unprepared checkout is an operator error, not
-a candidate failure.
+tokenizer off its pin. Preflight and the native model staging scripts verify
+local assets offline. Run `fetch:embedder` and `fetch:safety-reader` to
+materialize missing assets before staging or preflight.
 
 The copied ONNX file and all Android build output are ignored and must not be
 staged.

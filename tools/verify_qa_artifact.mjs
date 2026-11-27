@@ -911,15 +911,16 @@ export async function verifyQaArtifact(apkPath, options = {}) {
   } else {
     const metaProblems = safetyReaderManifestProblems(declaredSafetyReader);
     const metaOk = metaProblems.length === 0;
+    const metaDetail = metaProblems.join('; ').slice(0, 160);
     check(
       'manifest.safetyReader metadata matches ratified pin',
       metaOk,
       metaOk
         ? `${declaredSafetyReader.assetPath} (${declaredSafetyReader.sizeBytes} B)`
-        : metaProblems.join('; ').slice(0, 160),
+        : metaDetail,
     );
     if (!metaOk) {
-      throw new QaRejectionError('manifest.safetyReader missing or disagrees with ratified pin');
+      throw new QaRejectionError(`manifest.safetyReader missing or disagrees with ratified pin: ${metaDetail}`);
     }
     if (!safetyReaderEntry) {
       check(`${SAFETY_READER_ASSET} packaged`, false, `${SAFETY_READER_ASSET} missing`);

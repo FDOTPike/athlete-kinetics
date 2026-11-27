@@ -6,7 +6,7 @@
  */
 import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   KNOWN_BYTES,
@@ -21,7 +21,9 @@ export const IOS_SAFETY_READER_BUNDLE_FILE = 'safety_reader.onnx';
 export function inspectIosSafetyReader(appPath, outPath = null) {
   const expectedBytes = KNOWN_BYTES[SAFETY_READER_ARTIFACT];
   const expectedSha = KNOWN_SHA256[SAFETY_READER_ARTIFACT];
-  const target = join(appPath, IOS_SAFETY_READER_BUNDLE_FILE);
+  const bundle = typeof appPath === 'string' && appPath.trim() !== ''
+    ? resolve(appPath.replace(/[\\/]+$/, '/'))
+    : null;
   const checks = [];
   const record = (name, ok, detail = '') => {
     checks.push({ name, ok: Boolean(ok), detail: String(detail) });
@@ -35,10 +37,19 @@ export function inspectIosSafetyReader(appPath, outPath = null) {
   // lstat (never stat): a symlinked .app bundle or a symlinked
   // safety_reader.onnx fails closed instead of following the link.
   let appSt = null;
-  try { appSt = lstatSync(appPath); } catch { appSt = null; }
-  if (appSt !== null && appSt.isSymbolicLink()) {
+  if (bundle !== null) {
+    try { appSt = lstatSync(bundle); } catch { appSt = null; }
+  }
+  const target = appSt?.isDirectory() && !appSt.isSymbolicLink()
+    ? join(bundle, IOS_SAFETY_READER_BUNDLE_FILE)
+    : null;
+  if (bundle === null) {
+    absentDetail = 'missing app bundle path';
+  } else if (appSt?.isSymbolicLink()) {
     absentDetail = 'symlink rejected (app bundle)';
-  } else if (existsSync(target)) {
+  } else if (appSt !== null && !appSt.isDirectory()) {
+    absentDetail = 'app bundle is not a directory';
+  } else if (target !== null && existsSync(target)) {
     const st = lstatSync(target);
     if (st.isSymbolicLink()) {
       absentDetail = 'symlink rejected';

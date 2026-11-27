@@ -97,6 +97,7 @@ const soundSession = (over = {}) => ({
       // [safety-reader-lifecycle]), serially, in one process.
       componentRequestCounts: { embedder: 6, 'safety-reader': 5 },
       sessionOverlapCount: 0,
+      unresolvedSessionCount: 0,
       disposalProof: [
         { component: 'embedder', requestId: 1, createdSessionWasDisposed: true },
         { component: 'safety-reader', requestId: 1, createdSessionWasDisposed: true },
@@ -104,7 +105,7 @@ const soundSession = (over = {}) => ({
       // Session-wide, independent of which requests qualified (Sol finding 1).
       disposalIntegrity: {
         disposalFailureCount: 0, failures: [], finalCreated: 11, finalDisposed: 11,
-        countersBalanced: true, sessionOverlapCount: 0, sessionOverlaps: [], clean: true,
+        countersBalanced: true, sessionOverlapCount: 0, unresolvedSessionCount: 0, sessionOverlaps: [], clean: true,
       },
     },
     sampling: { achievedMedianIntervalMs: 871 },
@@ -622,6 +623,7 @@ function sealPacket({ dir, session, binding }) {
       correlatedRequestCount: cadence.correlated,
       componentRequestCounts: { embedder: 1, 'safety-reader': 1 },
       sessionOverlapCount: 0,
+      unresolvedSessionCount: 0,
       sampledProcessIds: [...new Set(session.samples.map((s) => Number(/pid (\d+)/.exec(readFileSync(s.rawFile, 'utf-8'))[1])))],
       correlatedRequests: [
         { component: 'embedder', requestId: 1, pid: 4242, wrapperEpoch: 1, totalMs: 300 },
@@ -634,7 +636,7 @@ function sealPacket({ dir, session, binding }) {
       ],
       disposalIntegrity: {
         disposalFailureCount: 0, finalCreated: 2, finalDisposed: 2,
-        countersBalanced: true, sessionOverlapCount: 0, clean: true,
+        countersBalanced: true, sessionOverlapCount: 0, unresolvedSessionCount: 0, clean: true,
       },
     },
     memory: {
@@ -905,6 +907,10 @@ for (const [label, mutate, needle] of [
     (s) => { s.summary.lifecycle.disposalIntegrity.sessionOverlapCount = 1; }, 'overlap'],
   ['an overlap recorded in lifecycle.sessionOverlapCount',
     (s) => { s.summary.lifecycle.sessionOverlapCount = 1; }, 'overlap'],
+  ['an unresolved session recorded in disposalIntegrity.unresolvedSessionCount',
+    (s) => { s.summary.lifecycle.disposalIntegrity.unresolvedSessionCount = 1; }, 'unresolvedSessionCount'],
+  ['a missing lifecycle.unresolvedSessionCount',
+    (s) => { delete s.summary.lifecycle.unresolvedSessionCount; }, 'unresolvedSessionCount'],
   ['a missing lifecycle.sessionOverlapCount',
     (s) => { delete s.summary.lifecycle.sessionOverlapCount; }, 'overlap'],
   ['unbalanced disposal counters with zero disposal failures (DUAL-3 shape)',
@@ -953,7 +959,10 @@ for (const [label, opts, honest, needle] of [
     Object.assign(L.disposalIntegrity, { finalCreated: 1, finalDisposed: 1 });
   }, 'embedder'],
   ['unbalanced disposal (a created session never disposed, no disposal failure)', { danglingEmbedder: true }, (L) => {
-    Object.assign(L.disposalIntegrity, { finalCreated: 3, finalDisposed: 2, countersBalanced: false, clean: false });
+    L.unresolvedSessionCount = 1;
+    Object.assign(L.disposalIntegrity, {
+      finalCreated: 3, finalDisposed: 2, countersBalanced: false, unresolvedSessionCount: 1, clean: false,
+    });
   }, 'countersBalanced'],
 ]) {
   const pkt = makePacket(opts);
@@ -971,6 +980,8 @@ for (const [label, tamper, needle] of [
   ['an inflated embedder count', (L) => { L.componentRequestCounts.embedder += 1; }, 'componentRequestCounts.embedder'],
   ['an inflated safety-reader count', (L) => { L.componentRequestCounts['safety-reader'] += 1; }, 'componentRequestCounts.safety-reader'],
   ['a missing componentRequestCounts', (L) => { delete L.componentRequestCounts; }, 'componentRequestCounts'],
+  ['a lifecycle.unresolvedSessionCount the log contradicts', (L) => { L.unresolvedSessionCount = 1; }, 'unresolvedSessionCount'],
+  ['a disposalIntegrity.unresolvedSessionCount the log contradicts', (L) => { L.disposalIntegrity.unresolvedSessionCount = 1; }, 'unresolvedSessionCount'],
   ['a lifecycle.sessionOverlapCount the log contradicts', (L) => { L.sessionOverlapCount = 1; }, 'sessionOverlapCount'],
   ['a disposalIntegrity.sessionOverlapCount the log contradicts', (L) => { L.disposalIntegrity.sessionOverlapCount = 1; }, 'sessionOverlapCount'],
   ['a countersBalanced the log contradicts', (L) => { L.disposalIntegrity.countersBalanced = false; }, 'countersBalanced'],
@@ -1012,9 +1023,8 @@ for (const [label, tamper, needle] of [
 // =============================================================================
 console.log('\n[15] WO02-SOL-03 — sealed packets bind candidate_manifest.json & ratified safety-reader SHA-256');
 
-const REPO_ROOT = join(import.meta.dirname, '..', '..');
 const EMPTY_DIFF_SHA256 = createHash('sha256').update(Buffer.alloc(0)).digest('hex');
-function buildLiveCandidateManifest(overrides = {}, repoRoot = REPO_ROOT) {
+function buildCandidateManifest(repoRoot, overrides = {}) {
   const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoRoot, encoding: 'utf8' }).trim();
   const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: repoRoot, encoding: 'utf8' }).trim();
   const diffBuf = execFileSync('git', ['diff', '--full-index', '--binary', 'HEAD'], {
@@ -1057,7 +1067,6 @@ function buildLiveCandidateManifest(overrides = {}, repoRoot = REPO_ROOT) {
     ...overrides,
   };
 }
-const VALID_CANDIDATE_MANIFEST = buildLiveCandidateManifest();
 
 function sealFullManifestDir(pkt, candidateManifestObj = undefined) {
   if (candidateManifestObj !== undefined) {
@@ -1085,190 +1094,195 @@ function sealFullManifestDir(pkt, candidateManifestObj = undefined) {
   return { sessionPath, manifestPath };
 }
 
-{
-  // Positive control: sealed packet with valid candidate_manifest.json passes [D] and [G].
-  const pkt = makePacket();
-  const { sessionPath } = sealFullManifestDir(pkt, VALID_CANDIDATE_MANIFEST);
-  const v = verifyEvidencePacket({ sessionPath });
-  const sessionDoc = JSON.parse(readFileSync(sessionPath, 'utf-8'));
-  sessionDoc.summary.candidateManifest = VALID_CANDIDATE_MANIFEST;
-  const g = evaluateMemoryGate({
-    budget: REVIEWED_BUDGET, vectors: VECTORS, session: sessionDoc, evidenceProvenance: v,
-  });
-  check('SOL-03: sealed packet with valid candidate_manifest.json + ratified safetyReader hash is BOUND and GREEN',
-    v.ok === true && v.manifestChecked === true && g.ok === true,
-    v.problems.join('; ').slice(0, 160));
-  rmSync(pkt.dir, { recursive: true, force: true });
-}
+const tempRepo = mkdtempSync(join(tmpdir(), 'ak-cand-prov-'));
+try {
+  const gitTmp = (args) => execFileSync('git', args, { cwd: tempRepo, encoding: 'utf8' });
+  gitTmp(['init', '-q']);
+  mkdirSync(join(tempRepo, 'src'), { recursive: true });
+  writeFileSync(join(tempRepo, 'src', 'tracked.mjs'), 'export const x = 1;\n');
+  gitTmp(['add', 'src/tracked.mjs']);
+  gitTmp([
+    '-c', 'user.name=Fixture',
+    '-c', 'user.email=fixture@example.invalid',
+    '-c', 'commit.gpgsign=false',
+    'commit', '-qm', 'init',
+  ]);
 
-{
-  // Counterexample 1: sealed packet omitting candidate_manifest.json altogether is REJECTED by [G].
-  const pkt = makePacket();
-  const { sessionPath } = sealFullManifestDir(pkt, undefined);
-  const v = verifyEvidencePacket({ sessionPath });
-  check('SOL-03: sealed packet without candidate_manifest.json is REJECTED by [G]',
-    v.ok === false && v.problems.some((p) => p.includes('candidate_manifest.json')),
-    v.problems.join('; ').slice(0, 160));
-  rmSync(pkt.dir, { recursive: true, force: true });
-}
+  const VALID_CANDIDATE_MANIFEST = buildCandidateManifest(tempRepo);
 
-for (const [label, badManifest] of [
-  ['safetyReaderPresent:true with missing safetyReaderModelSha256', {
-    schema: 'ak.candidate-manifest/1',
-    safetyReaderPresent: true,
-  }],
-  ['safetyReaderPresent:true with wrong safetyReaderModelSha256', {
-    schema: 'ak.candidate-manifest/1',
-    safetyReaderPresent: true,
-    safetyReaderModelSha256: '0'.repeat(64),
-  }],
-  ['APK safetyReader object with wrong sha256', {
-    ...VALID_CANDIDATE_MANIFEST,
-    safetyReader: { ...VALID_CANDIDATE_MANIFEST.safetyReader, sha256: 'b'.repeat(64) },
-  }],
-  ['candidate_manifest.json omitting safetyReader completely', {
-    schema: 'ak.candidate-manifest/1',
-    label: 'NON_PRODUCTION_QA_DEBUG_SIGNED',
-  }],
-]) {
-  const pkt = makePacket();
-  const { sessionPath } = sealFullManifestDir(pkt, badManifest);
-  const v = verifyEvidencePacket({ sessionPath });
-  const s = soundSession({ candidateManifest: badManifest });
-  const d = checkMeasuredEvidence(s);
-  check(`SOL-03 [G]: REJECTS ${label}`,
-    v.ok === false && v.problems.some((p) => /safetyReader|safety-reader/i.test(p)),
-    v.problems.join('; ').slice(0, 160));
-  check(`SOL-03 [D]: REJECTS ${label}`,
-    d.ok === false && /safetyReader|safety-reader/i.test(String(d.reason)),
-    String(d.reason ?? '').slice(0, 160));
-  rmSync(pkt.dir, { recursive: true, force: true });
-}
-
-{
-  // Counterexample 2: post-seal tampering with candidate_manifest.json breaks [G] binding & manifest check.
-  const pkt = makePacket();
-  const { sessionPath } = sealFullManifestDir(pkt, VALID_CANDIDATE_MANIFEST);
-  writeFileSync(
-    join(pkt.dir, 'candidate_manifest.json'),
-    JSON.stringify({ ...VALID_CANDIDATE_MANIFEST, tampered: true }, null, 2),
-  );
-  const v = verifyEvidencePacket({ sessionPath });
-  check('SOL-03: mutating candidate_manifest.json after sealing breaks [G] binding and manifest membership',
-    v.ok === false
-      && v.problems.some((p) => p.includes('bindingDigest') || p.includes('candidate_manifest.json')),
-    v.problems.join('; ').slice(0, 160));
-  rmSync(pkt.dir, { recursive: true, force: true });
-}
-
-{
-  // Round-2 counterexample (SOL-03-R2): an authentic sealed packet from an OLDER
-  // git HEAD (41bc6915...) carrying the valid safetyReader hash MUST be rejected
-  // against the current worktree so old device evidence cannot satisfy a newer APK!
-  const pkt = makePacket();
-  const staleManifest = buildLiveCandidateManifest({
-    head: '41bc69154dca84327d3b22e14a12333349d280c5',
-  });
-  const { sessionPath } = sealFullManifestDir(pkt, staleManifest);
-  const v = verifyEvidencePacket({ sessionPath });
-  check('SOL-03-R2: sealed packet naming stale APK HEAD 41bc6915 is REJECTED against current worktree',
-    v.ok === false && v.problems.some((p) => p.includes('HEAD mismatch')),
-    v.problems.join('; ').slice(0, 160));
-  rmSync(pkt.dir, { recursive: true, force: true });
-}
-
-{
-  // Round-4 counterexamples (SOL-03-R4): candidate_manifest.json completeness:
-  //   1. Wrong trackedDiffFingerprint.method (even when value matches live diff)
-  //   2. Wrong schema or label
-  //   3. Wrong sourceDirty boolean
-  //   4. Surplus tracked path listed in newFiles
-  //   5. Omitted current untracked source file in repoRoot
-  //   6. Omitted current staged-new source file in repoRoot
-  //   7. Positive control in temp git repo when both staged-new + untracked files are accurately pinned
-  for (const [label, mutOverrides, needle] of [
-    ['wrong trackedDiffFingerprint.method', {
-      trackedDiffFingerprint: {
-        method: 'sha256(git diff HEAD)',
-        value: VALID_CANDIDATE_MANIFEST.trackedDiffFingerprint.value,
-      },
-    }, /method/i],
-    ['wrong candidate_manifest schema', { schema: 'ak.candidate-manifest/999' }, /schema/i],
-    ['wrong candidate_manifest label', { label: 'PRODUCTION_RELEASE' }, /label/i],
-    ['contradictory sourceDirty flag', { sourceDirty: !VALID_CANDIDATE_MANIFEST.sourceDirty }, /sourceDirty/i],
-    ['surplus tracked path in newFiles', {
-      newFiles: [
-        ...VALID_CANDIDATE_MANIFEST.newFiles,
-        { path: 'package.json', sha256: sha256OfFile(join(REPO_ROOT, 'package.json')) },
-      ],
-    }, /surplus|newFiles/i],
-  ]) {
+  {
+    // Positive control: sealed packet with valid candidate_manifest.json passes [D] and [G].
     const pkt = makePacket();
-    const { sessionPath } = sealFullManifestDir(pkt, buildLiveCandidateManifest(mutOverrides));
-    const v = verifyEvidencePacket({ sessionPath });
-    check(`SOL-03-R4: REJECTS ${label}`,
-      v.ok === false && v.problems.some((p) => needle.test(p)),
+    const { sessionPath } = sealFullManifestDir(pkt, VALID_CANDIDATE_MANIFEST);
+    const v = verifyEvidencePacket({ sessionPath, repoRoot: tempRepo });
+    const sessionDoc = JSON.parse(readFileSync(sessionPath, 'utf-8'));
+    sessionDoc.summary.candidateManifest = VALID_CANDIDATE_MANIFEST;
+    const g = evaluateMemoryGate({
+      budget: REVIEWED_BUDGET, vectors: VECTORS, session: sessionDoc, evidenceProvenance: v,
+    });
+    check('SOL-03: sealed packet with valid candidate_manifest.json + ratified safetyReader hash is BOUND and GREEN',
+      v.ok === true && v.manifestChecked === true && g.ok === true,
       v.problems.join('; ').slice(0, 160));
     rmSync(pkt.dir, { recursive: true, force: true });
   }
 
-  // Isolated scratch git repository for untracked & staged-new file omission / parity checks
-  const tempRepo = mkdtempSync(join(tmpdir(), 'ak-cand-prov-'));
-  try {
-    const gitTmp = (args) => execFileSync('git', args, { cwd: tempRepo, encoding: 'utf8' });
-    gitTmp(['init', '-q']);
-    mkdirSync(join(tempRepo, 'src'), { recursive: true });
-    writeFileSync(join(tempRepo, 'src', 'tracked.mjs'), 'export const x = 1;\n');
-    gitTmp(['add', 'src/tracked.mjs']);
-    gitTmp([
-      '-c', 'user.name=Fixture',
-      '-c', 'user.email=fixture@example.invalid',
-      '-c', 'commit.gpgsign=false',
-      'commit', '-qm', 'init',
-    ]);
-
-    // Case A: current untracked source file in repoRoot omitted from candidate_manifest.json newFiles
-    writeFileSync(join(tempRepo, 'src', 'untracked_helper.mjs'), 'export const y = 2;\n');
-    {
-      const pkt = makePacket();
-      const { sessionPath } = sealFullManifestDir(pkt, buildLiveCandidateManifest({ newFiles: [] }, tempRepo));
-      const v = verifyEvidencePacket({ sessionPath, repoRoot: tempRepo });
-      check('SOL-03-R4: REJECTS packet omitting a current untracked source file in repoRoot',
-        v.ok === false && v.problems.some((p) => p.includes('src/untracked_helper.mjs')),
-        v.problems.join('; ').slice(0, 160));
-      rmSync(pkt.dir, { recursive: true, force: true });
-    }
-
-    // Case B: current staged-new source file in repoRoot omitted from candidate_manifest.json newFiles
-    writeFileSync(join(tempRepo, 'src', 'staged_new.mjs'), 'export const z = 3;\n');
-    gitTmp(['add', 'src/staged_new.mjs']);
-    {
-      const pkt = makePacket();
-      const onlyUntracked = [{
-        path: 'src/untracked_helper.mjs',
-        sha256: sha256OfFile(join(tempRepo, 'src', 'untracked_helper.mjs')),
-      }];
-      const { sessionPath } = sealFullManifestDir(pkt, buildLiveCandidateManifest({ newFiles: onlyUntracked }, tempRepo));
-      const v = verifyEvidencePacket({ sessionPath, repoRoot: tempRepo });
-      check('SOL-03-R4: REJECTS packet omitting a staged-new source file in repoRoot',
-        v.ok === false && v.problems.some((p) => p.includes('src/staged_new.mjs')),
-        v.problems.join('; ').slice(0, 160));
-      rmSync(pkt.dir, { recursive: true, force: true });
-    }
-
-    // Case C: Positive control — when BOTH staged-new and untracked files are accurately pinned in newFiles
-    {
-      const pkt = makePacket();
-      const { sessionPath } = sealFullManifestDir(pkt, buildLiveCandidateManifest({}, tempRepo));
-      const v = verifyEvidencePacket({ sessionPath, repoRoot: tempRepo });
-      check('SOL-03-R4: ACCEPTS packet when staged-new and untracked source files match worktree exactly',
-        v.ok === true && v.status === 'BOUND' && v.problems.length === 0,
-        v.problems.join('; ').slice(0, 160));
-      rmSync(pkt.dir, { recursive: true, force: true });
-    }
-  } finally {
-    rmSync(tempRepo, { recursive: true, force: true });
+  {
+    // Counterexample 1: sealed packet omitting candidate_manifest.json altogether is REJECTED by [G].
+    const pkt = makePacket();
+    const { sessionPath } = sealFullManifestDir(pkt, undefined);
+    const v = verifyEvidencePacket({ sessionPath, repoRoot: tempRepo });
+    check('SOL-03: sealed packet without candidate_manifest.json is REJECTED by [G]',
+      v.ok === false && v.problems.some((p) => p.includes('candidate_manifest.json')),
+      v.problems.join('; ').slice(0, 160));
+    rmSync(pkt.dir, { recursive: true, force: true });
   }
+
+  for (const [label, badManifest] of [
+    ['safetyReaderPresent:true with missing safetyReaderModelSha256', {
+      schema: 'ak.candidate-manifest/1',
+      safetyReaderPresent: true,
+    }],
+    ['safetyReaderPresent:true with wrong safetyReaderModelSha256', {
+      schema: 'ak.candidate-manifest/1',
+      safetyReaderPresent: true,
+      safetyReaderModelSha256: '0'.repeat(64),
+    }],
+    ['APK safetyReader object with wrong flattened size', {
+      ...VALID_CANDIDATE_MANIFEST,
+      safetyReaderModelSizeBytes: VALID_CANDIDATE_MANIFEST.safetyReader.sizeBytes - 1,
+    }],
+    ['APK safetyReader object with wrong sha256', {
+      ...VALID_CANDIDATE_MANIFEST,
+      safetyReader: { ...VALID_CANDIDATE_MANIFEST.safetyReader, sha256: 'b'.repeat(64) },
+    }],
+    ['candidate_manifest.json omitting safetyReader completely', {
+      schema: 'ak.candidate-manifest/1',
+      label: 'NON_PRODUCTION_QA_DEBUG_SIGNED',
+    }],
+  ]) {
+    const pkt = makePacket();
+    const { sessionPath } = sealFullManifestDir(pkt, badManifest);
+    const v = verifyEvidencePacket({ sessionPath, repoRoot: tempRepo });
+    const s = soundSession({ candidateManifest: badManifest });
+    const d = checkMeasuredEvidence(s);
+    check(`SOL-03 [G]: REJECTS ${label}`,
+      v.ok === false && v.problems.some((p) => /safetyReader|safety-reader/i.test(p)),
+      v.problems.join('; ').slice(0, 160));
+    check(`SOL-03 [D]: REJECTS ${label}`,
+      d.ok === false && /safetyReader|safety-reader/i.test(String(d.reason)),
+      String(d.reason ?? '').slice(0, 160));
+    rmSync(pkt.dir, { recursive: true, force: true });
+  }
+
+  {
+    // Counterexample 2: post-seal tampering with candidate_manifest.json breaks [G] binding & manifest check.
+    const pkt = makePacket();
+    const { sessionPath } = sealFullManifestDir(pkt, VALID_CANDIDATE_MANIFEST);
+    writeFileSync(
+      join(pkt.dir, 'candidate_manifest.json'),
+      JSON.stringify({ ...VALID_CANDIDATE_MANIFEST, tampered: true }, null, 2),
+    );
+    const v = verifyEvidencePacket({ sessionPath, repoRoot: tempRepo });
+    check('SOL-03: mutating candidate_manifest.json after sealing breaks [G] binding and manifest membership',
+      v.ok === false
+        && v.problems.some((p) => p.includes('bindingDigest') || p.includes('candidate_manifest.json')),
+      v.problems.join('; ').slice(0, 160));
+    rmSync(pkt.dir, { recursive: true, force: true });
+  }
+
+  {
+    // Round-2 counterexample (SOL-03-R2): an authentic sealed packet from an OLDER
+    // git HEAD (41bc6915...) carrying the valid safetyReader hash MUST be rejected
+    // against the fixture repo so old device evidence cannot satisfy a newer APK.
+    const pkt = makePacket();
+    const staleManifest = buildCandidateManifest(tempRepo, {
+      head: '41bc69154dca84327d3b22e14a12333349d280c5',
+    });
+    const { sessionPath } = sealFullManifestDir(pkt, staleManifest);
+    const v = verifyEvidencePacket({ sessionPath, repoRoot: tempRepo });
+    check('SOL-03-R2: sealed packet naming stale APK HEAD 41bc6915 is REJECTED against the fixture repo',
+      v.ok === false && v.problems.some((p) => p.includes('HEAD mismatch')),
+      v.problems.join('; ').slice(0, 160));
+    rmSync(pkt.dir, { recursive: true, force: true });
+  }
+
+  {
+    // Round-4 counterexamples (SOL-03-R4): candidate_manifest.json completeness:
+    //   1. Wrong trackedDiffFingerprint.method (even when value matches fixture diff)
+    //   2. Wrong schema or label
+    //   3. Wrong sourceDirty boolean
+    //   4. Surplus tracked path listed in newFiles
+    //   5. Omitted current untracked source file in repoRoot
+    //   6. Omitted current staged-new source file in repoRoot
+    //   7. Positive control in temp git repo when both staged-new + untracked files are accurately pinned
+    for (const [label, mutOverrides, needle] of [
+      ['wrong trackedDiffFingerprint.method', {
+        trackedDiffFingerprint: {
+          method: 'sha256(git diff HEAD)',
+          value: VALID_CANDIDATE_MANIFEST.trackedDiffFingerprint.value,
+        },
+      }, /method/i],
+      ['wrong candidate_manifest schema', { schema: 'ak.candidate-manifest/999' }, /schema/i],
+      ['wrong candidate_manifest label', { label: 'PRODUCTION_RELEASE' }, /label/i],
+      ['contradictory sourceDirty flag', { sourceDirty: !VALID_CANDIDATE_MANIFEST.sourceDirty }, /sourceDirty/i],
+      ['surplus tracked path in newFiles', {
+        newFiles: [
+          ...VALID_CANDIDATE_MANIFEST.newFiles,
+          { path: 'src/tracked.mjs', sha256: sha256OfFile(join(tempRepo, 'src/tracked.mjs')) },
+        ],
+      }, /surplus|newFiles/i],
+    ]) {
+      const pkt = makePacket();
+      const { sessionPath } = sealFullManifestDir(pkt, { ...VALID_CANDIDATE_MANIFEST, ...mutOverrides });
+      const v = verifyEvidencePacket({ sessionPath, repoRoot: tempRepo });
+      check(`SOL-03-R4: REJECTS ${label}`,
+        v.ok === false && v.problems.some((p) => needle.test(p)),
+        v.problems.join('; ').slice(0, 160));
+      rmSync(pkt.dir, { recursive: true, force: true });
+    }
+  }
+
+  // Case A: current untracked source file in repoRoot omitted from candidate_manifest.json newFiles
+  writeFileSync(join(tempRepo, 'src', 'untracked_helper.mjs'), 'export const y = 2;\n');
+  {
+    const pkt = makePacket();
+    const { sessionPath } = sealFullManifestDir(pkt, buildCandidateManifest(tempRepo, { newFiles: [] }));
+    const v = verifyEvidencePacket({ sessionPath, repoRoot: tempRepo });
+    check('SOL-03-R4: REJECTS packet omitting a current untracked source file in repoRoot',
+      v.ok === false && v.problems.some((p) => p.includes('src/untracked_helper.mjs')),
+      v.problems.join('; ').slice(0, 160));
+    rmSync(pkt.dir, { recursive: true, force: true });
+  }
+
+  // Case B: current staged-new source file in repoRoot omitted from candidate_manifest.json newFiles
+  writeFileSync(join(tempRepo, 'src', 'staged_new.mjs'), 'export const z = 3;\n');
+  gitTmp(['add', 'src/staged_new.mjs']);
+  {
+    const pkt = makePacket();
+    const onlyUntracked = [{
+      path: 'src/untracked_helper.mjs',
+      sha256: sha256OfFile(join(tempRepo, 'src', 'untracked_helper.mjs')),
+    }];
+    const { sessionPath } = sealFullManifestDir(pkt, buildCandidateManifest(tempRepo, { newFiles: onlyUntracked }));
+    const v = verifyEvidencePacket({ sessionPath, repoRoot: tempRepo });
+    check('SOL-03-R4: REJECTS packet omitting a staged-new source file in repoRoot',
+      v.ok === false && v.problems.some((p) => p.includes('src/staged_new.mjs')),
+      v.problems.join('; ').slice(0, 160));
+    rmSync(pkt.dir, { recursive: true, force: true });
+  }
+
+  // Case C: Positive control — when BOTH staged-new and untracked files are accurately pinned in newFiles
+  {
+    const pkt = makePacket();
+    const { sessionPath } = sealFullManifestDir(pkt, buildCandidateManifest(tempRepo));
+    const v = verifyEvidencePacket({ sessionPath, repoRoot: tempRepo });
+    check('SOL-03-R4: ACCEPTS packet when staged-new and untracked source files match worktree exactly',
+      v.ok === true && v.status === 'BOUND' && v.problems.length === 0,
+      v.problems.join('; ').slice(0, 160));
+    rmSync(pkt.dir, { recursive: true, force: true });
+  }
+} finally {
+  rmSync(tempRepo, { recursive: true, force: true });
 }
 
 console.log(`\n${fail === 0 ? 'ALL MEMORY GATE FIXTURES PASSED' : `${fail} MEMORY GATE FIXTURE(S) FAILED`}`);

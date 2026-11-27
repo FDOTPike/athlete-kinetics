@@ -227,10 +227,9 @@ export function parseLifecycleMarkers(logText, opts = {}) {
  *
  * `disposedTotal` increments even when disposal THROWS (see
  * createLazySingleFlightEmbedder's catch block), so counter equality alone can
- * never prove nothing leaked. The only honest signal is an explicit
- * `disposal:settled ... ok=0`. A failed disposal is a leaked native session and
- * must be visible even when the failing request is itself rejected and a later
- * request succeeds cleanly.
+ * never prove every session was disposed. A failed disposal must remain
+ * visible even when that request is rejected and a later request succeeds.
+ * A session with no successful settlement also prevents clean evidence.
  */
 export function summarizeDisposalIntegrity(markers) {
   const failures = markers
@@ -269,7 +268,7 @@ export function summarizeDisposalIntegrity(markers) {
     if (g.maxCreated !== g.maxDisposed) everyGroupBalanced = false;
   }
   const countersBalanced = everyGroupBalanced && finalCreated === finalDisposed;
-  const { sessionOverlaps } = detectSessionOverlaps(markers);
+  const { sessionOverlaps, unresolvedSessionCount } = detectSessionOverlaps(markers);
   const sessionOverlapCount = sessionOverlaps.length;
   return {
     disposalFailureCount: failures.length,
@@ -278,19 +277,20 @@ export function summarizeDisposalIntegrity(markers) {
     finalDisposed,
     countersBalanced,
     sessionOverlapCount,
+    unresolvedSessionCount,
     sessionOverlaps,
-    clean: failures.length === 0 && countersBalanced && sessionOverlapCount === 0,
-    note: 'disposedTotal increments even on a THROWN disposal, so countersBalanced '
-      + 'alone does not prove absence of a leak; disposalFailureCount is decisive.',
+    clean: failures.length === 0 && countersBalanced && sessionOverlapCount === 0 && unresolvedSessionCount === 0,
+    note: 'disposedTotal increments even on a THROWN disposal; clean evidence requires '
+      + 'successful disposal settlements for all sessions and no overlaps.',
   };
 }
 
 /**
  * Cross-component serial non-overlap. Within one process, every live native
  * session (embedder OR safety-reader) must be disposed before the next one
- * starts. A session's live interval runs from session:start (or
- * session:settled when the start line is absent) to a disposal:settled with
- * ok=1; without a successful disposal the interval never closes.
+ * starts. A session's live interval runs from session:start (or -Infinity
+ * when the start line is absent) to a successful disposal:settled after it.
+ * Without that settlement the interval never closes.
  *
  * Ordering is by (tsMs, lineNo): a disposal settling on an earlier log line at
  * timestamp T followed by a session starting on a later line at the same T is
@@ -298,7 +298,7 @@ export function summarizeDisposalIntegrity(markers) {
  * ALL earlier intervals in the same pid, so one long session containing two
  * shorter, mutually sequential ones yields two overlaps.
  *
- * @returns {{ sessionOverlaps: object[], overlappingKeys: Set<string> }}
+ * @returns {{ sessionOverlaps: object[], overlappingKeys: Set<string>, unresolvedSessionCount: number }}
  */
 export function detectSessionOverlaps(markers) {
   const groups = new Map();
@@ -312,6 +312,7 @@ export function detectSessionOverlaps(markers) {
     groups.get(key).markers.push(m);
   }
   const intervalsByPid = new Map();
+  let unresolvedSessionCount = 0;
   for (const g of groups.values()) {
     const find = (phase, stage) => g.markers.find((m) => m.phase === phase && m.stage === stage);
     const sessionStart = find('session', 'start');
@@ -320,7 +321,10 @@ export function detectSessionOverlaps(markers) {
     // so fail closed (-Infinity) rather than shrinking the interval to a later
     // phase marker and masking a real overlap (WO02-SOL-01).
     const hasOpener = sessionStart !== undefined;
-    const closed = disposalSettled !== undefined && disposalSettled.ok === true;
+    const closed = disposalSettled?.ok === true && (!hasOpener
+      || disposalSettled.tsMs > sessionStart.tsMs
+      || (disposalSettled.tsMs === sessionStart.tsMs && disposalSettled.lineNo > sessionStart.lineNo));
+    if (!closed) unresolvedSessionCount += 1;
     const interval = {
       key: g.key,
       component: g.component,
@@ -357,7 +361,7 @@ export function detectSessionOverlaps(markers) {
       }
     }
   }
-  return { sessionOverlaps, overlappingKeys };
+  return { sessionOverlaps, overlappingKeys, unresolvedSessionCount };
 }
 
 // --- sampling cadence and continuity ---------------------------------------

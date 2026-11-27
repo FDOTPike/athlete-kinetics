@@ -345,6 +345,9 @@ function cmdFinish() {
   if (disposalIntegrity.sessionOverlapCount !== 0) {
     contractViolations.push(`sessionOverlapCount=${disposalIntegrity.sessionOverlapCount} (must be 0)`);
   }
+  if (disposalIntegrity.unresolvedSessionCount !== 0) {
+    contractViolations.push(`unresolvedSessionCount=${disposalIntegrity.unresolvedSessionCount} (must be 0)`);
+  }
   if (disposalIntegrity.clean !== true || disposalIntegrity.disposalFailureCount !== 0
       || disposalIntegrity.countersBalanced !== true) {
     contractViolations.push(`disposalFailureCount=${disposalIntegrity.disposalFailureCount}, `
@@ -409,6 +412,7 @@ function cmdFinish() {
       componentRequestCounts,
       // Serial non-overlap across components inside one process.
       sessionOverlapCount: disposalIntegrity.sessionOverlapCount,
+      unresolvedSessionCount: disposalIntegrity.unresolvedSessionCount,
       // Every PID the raw dumps identified, in sampling order (cold restarts included).
       sampledProcessIds: [...new Set(processSamples.map((s) => s.processId))],
       // Process identity is part of the proof: request ids restart per wrapper.

@@ -397,6 +397,7 @@ export function verifyEvidencePacket({
       finalDisposed: disposalIntegrity.finalDisposed,
       componentRequestCounts,
       sessionOverlapCount: disposalIntegrity.sessionOverlapCount,
+      unresolvedSessionCount: disposalIntegrity.unresolvedSessionCount,
       countersBalanced: disposalIntegrity.countersBalanced,
       disposalClean: disposalIntegrity.clean,
       // bindTargetSamples (above) enforces cold-restart PID continuity on these.
@@ -418,6 +419,8 @@ export function verifyEvidencePacket({
       ['componentRequestCounts.embedder', L.componentRequestCounts?.embedder, rederived.componentRequestCounts.embedder],
       ['componentRequestCounts.safety-reader', L.componentRequestCounts?.['safety-reader'],
         rederived.componentRequestCounts['safety-reader']],
+      ['unresolvedSessionCount', L.unresolvedSessionCount, rederived.unresolvedSessionCount],
+      ['disposalIntegrity.unresolvedSessionCount', L.disposalIntegrity?.unresolvedSessionCount, rederived.unresolvedSessionCount],
       ['sessionOverlapCount', L.sessionOverlapCount, rederived.sessionOverlapCount],
       ['disposalIntegrity.sessionOverlapCount', L.disposalIntegrity?.sessionOverlapCount, rederived.sessionOverlapCount],
       ['memory.maxSampledPrivateDirtyBytes', M.maxSampledPrivateDirtyBytes, rederived.maxSampledPrivateDirtyBytes],
@@ -450,6 +453,10 @@ export function verifyEvidencePacket({
         problems.push(`componentRequestCounts.${component}: re-derivation from the raw bytes yields ${n}; `
           + 'at least 1 is required');
       }
+    }
+    if (rederived.unresolvedSessionCount !== 0) {
+      problems.push(`unresolvedSessionCount: re-derivation from the raw bytes yields ${rederived.unresolvedSessionCount}; `
+        + '0 is required (every session must record successful disposal)');
     }
     if (rederived.sessionOverlapCount !== 0) {
       problems.push(`sessionOverlapCount: re-derivation from the raw bytes yields ${rederived.sessionOverlapCount}; `

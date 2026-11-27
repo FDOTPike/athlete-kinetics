@@ -1,4 +1,9 @@
 import assert from 'node:assert/strict';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { buildZip } from '../test_verify_qa_artifact.mjs';
+import * as validation from './validate.mjs';
 import { test } from 'node:test';
 import { captureEvidence, harnessPacketErrors, memoryBand, parseArgs, selectDevice, verifyColdRestartPidContinuity } from './validate.mjs';
 
@@ -57,7 +62,8 @@ test('a summary is accepted only when the harness confirms clean disposal', () =
   const sound = () => ({ summary: { lifecycle: {
     componentRequestCounts: { embedder: 1, 'safety-reader': 1 },
     sessionOverlapCount: 0,
-    disposalIntegrity: { clean: true, countersBalanced: true, sessionOverlapCount: 0 },
+    unresolvedSessionCount: 0,
+    disposalIntegrity: { clean: true, countersBalanced: true, sessionOverlapCount: 0, unresolvedSessionCount: 0 },
   } } });
   assert.deepEqual(harnessPacketErrors(sound()), []);
   assert.equal(harnessPacketErrors({}).length, 1);
@@ -71,7 +77,8 @@ test('harness packet fails closed on unbalanced counters, overlap, or a missing 
   const sound = () => ({ summary: { lifecycle: {
     componentRequestCounts: { embedder: 1, 'safety-reader': 1 },
     sessionOverlapCount: 0,
-    disposalIntegrity: { clean: true, countersBalanced: true, sessionOverlapCount: 0 },
+    unresolvedSessionCount: 0,
+    disposalIntegrity: { clean: true, countersBalanced: true, sessionOverlapCount: 0, unresolvedSessionCount: 0 },
   } } });
   const cases = [
     ['countersBalanced false', (L) => { L.disposalIntegrity.countersBalanced = false; }, /counters/i],
@@ -80,6 +87,8 @@ test('harness packet fails closed on unbalanced counters, overlap, or a missing 
     ['disposalIntegrity overlap missing', (L) => { delete L.disposalIntegrity.sessionOverlapCount; }, /overlap/i],
     ['lifecycle overlap', (L) => { L.sessionOverlapCount = 2; }, /overlap/i],
     ['lifecycle overlap missing', (L) => { delete L.sessionOverlapCount; }, /overlap/i],
+    ['lifecycle unresolved', (L) => { L.unresolvedSessionCount = 1; }, /unresolved/i],
+    ['disposalIntegrity unresolved missing', (L) => { delete L.disposalIntegrity.unresolvedSessionCount; }, /unresolved/i],
     ['embedder missing', (L) => { L.componentRequestCounts.embedder = 0; }, /embedder/],
     ['safety-reader missing', (L) => { L.componentRequestCounts['safety-reader'] = 0; }, /safety-reader/],
     ['counts absent', (L) => { delete L.componentRequestCounts; }, /embedder/],
@@ -120,11 +129,58 @@ test('cold restart requires two distinct valid PIDs, in order, with no recurrenc
   assert.ok(verifyColdRestartPidContinuity({ ...ok, samples: run([901]) }).length >= 1);
 });
 
+test('APK safety reader verification checks extracted bytes against the model pin', (t) => {
+  assert.equal(typeof validation.verifyApkSafetyReader, 'function');
+  const dir = mkdtempSync(join(tmpdir(), 'ak-device-validation-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const apk = join(dir, 'candidate.apk');
+  const model = readFileSync(new URL('../../packages/inference/assets/safety-reader/reader_quantized.onnx', import.meta.url));
+  const writeApk = (data) => writeFileSync(apk, buildZip(
+    data === null ? [{ name: 'assets/unrelated', data: Buffer.from('fixture') }]
+      : [{ name: 'assets/safety_reader.onnx', data }],
+  ));
+
+  writeApk(null);
+  assert.throws(() => validation.verifyApkSafetyReader(apk), /missing assets\/safety_reader\.onnx/);
+  writeApk(model.subarray(0, -1));
+  assert.throws(() => validation.verifyApkSafetyReader(apk), /SIZE MISMATCH/);
+  writeApk(model);
+  assert.doesNotThrow(() => validation.verifyApkSafetyReader(apk));
+  model[0] ^= 0xff;
+  writeApk(model);
+  assert.throws(() => validation.verifyApkSafetyReader(apk), /CHECKSUM MISMATCH/);
+});
+
+test('cold restart validates and saves the persisted samples only after the watch drains', async () => {
+  assert.equal(typeof validation.recordColdRestartPidContinuity, 'function');
+  const files = new Map([
+    ['before-cold-start-pid.txt', '900\n'],
+    ['after-cold-start-pid.txt', '901\n'],
+    ['session.json', JSON.stringify({ samples: [{ processId: 900 }] })],
+  ]);
+  const read = (name) => files.get(name);
+  const report = { errors: [] };
+  let finishWatch;
+  const draining = new Promise((resolve) => { finishWatch = resolve; });
+  const stopWatch = async () => {
+    await draining;
+    files.set('session.json', JSON.stringify({ samples: [{ processId: 900 }, { processId: 901 }] }));
+  };
+  const save = (name, data) => files.set(name, JSON.stringify(data));
+
+  const recording = validation.recordColdRestartPidContinuity({ stopWatch, read, report, save });
+  assert.equal(files.has('observations.json'), false);
+  finishWatch();
+  await recording;
+  assert.deepEqual(JSON.parse(files.get('observations.json')), { errors: [] });
+});
+
 test('harnessPacketErrors validates candidate_manifest.json safetyReader pin when supplied', () => {
   const sound = () => ({ summary: { lifecycle: {
     componentRequestCounts: { embedder: 1, 'safety-reader': 1 },
     sessionOverlapCount: 0,
-    disposalIntegrity: { clean: true, countersBalanced: true, sessionOverlapCount: 0 },
+    unresolvedSessionCount: 0,
+    disposalIntegrity: { clean: true, countersBalanced: true, sessionOverlapCount: 0, unresolvedSessionCount: 0 },
   } } });
   const validCandidate = {
     safetyReader: {

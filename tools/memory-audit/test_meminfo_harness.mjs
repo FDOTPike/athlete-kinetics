@@ -191,9 +191,12 @@ mock.module('node:child_process', { namedExports: { execFileSync: (_cmd, args) =
   assert.deepEqual(dualSummary.lifecycle.sampledProcessIds, [4242]);
   assert.deepEqual(dualSummary.lifecycle.correlatedRequests.map((q) => [q.component, q.requestId, q.pid, q.wrapperEpoch]),
     [['embedder', 1, 4242, 1], ['safety-reader', 1, 4242, 1]]);
-  assert.ok(dualSummary.lifecycle.disposalProof.every((d) => d.pid === 4242 && d.wrapperEpoch === 1
-    && typeof d.component === 'string' && d.createdSessionWasDisposed === true));
-  assert.ok(dualSummary.sampling.continuousSegments.every((s) => s.pid === 4242));
+  assert.equal(dualSummary.lifecycle.unresolvedSessionCount, 0);
+  const proofs = dualSummary.lifecycle.disposalProof;
+  assert.equal(proofs.length, 2);
+  assert.deepEqual(proofs.map((d) => [d.component, d.pid, d.wrapperEpoch, d.createdSessionWasDisposed]),
+    [['embedder', 4242, 1, true], ['safety-reader', 4242, 1, true]]);
+  assert.deepEqual(dualSummary.sampling.continuousSegments.map((s) => s.pid), [4242]);
   console.log(`  [${++checks}] PASS finish accepts a serial dual-model run and records component/PID identity`);
 
   const single = finishCase('embedder-only', [...wrappersAt(100), ...lifecycle('embedder', 1, 0, 500)]);

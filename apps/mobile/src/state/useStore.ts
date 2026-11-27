@@ -205,7 +205,6 @@ import {
   serializeRunner,
   startRunner,
   runnerTierForTrainingAge,
-  applyGuardrail,
   type RunnerHaltReason,
   type RunnerState,
   type RunnerTarget,
@@ -1371,7 +1370,7 @@ interface KineticsStore {
   reportNiggle: (region: string, severity: number) => boolean;
   /** Reload today's niggles from 011 into state (boot + day rollover). */
   refreshNiggles: () => void;
-  refreshVector: () => void;
+  refreshVector: (today?: string) => void;
   freeFormStartIsEmpty: () => boolean;
   /**
    * Start today's session. `plannedSessionId` (#228) starts another
@@ -1408,7 +1407,7 @@ interface KineticsStore {
   /** Remove an earlier open workout that has no logged sets and no safety stop,
    *  with its rows. Refused otherwise. */
   discardEarlierSession: (sessionId: number) => boolean;
-  computePrescription: (patterns: readonly MovementPattern[]) => void;
+  computePrescription: (patterns: readonly MovementPattern[], today?: string) => void;
   /** Today's saved "Something feels off" reports, oldest first, for the
    *  read-only report view (#185). Reads only: nothing here can withdraw,
    *  correct or re-derive a report. Empty when no database is open. */
@@ -1620,11 +1619,9 @@ const localDateOf = (ms: number): string => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
-/** A neutral placeholder state_vector row for a calendar day with no
- *  materialized row (a pure rest day). The autopilot reads ONLY the window
- *  length from these, never their fields — they exist so detectFlaws sees a
- *  fixed 21-CALENDAR-day grid (preserving the per-calendar-day EMA recency),
- *  not a gap-collapsed list of only training/telemetry days. */
+/** In-memory stand-in for a date without readiness inputs. It keeps the
+ *  autopilot window on a fixed calendar grid and lets a safety halt be
+ *  derived without recording readiness or generating a prescription. */
 const blankVector = (date: string): StateVectorRow => ({
   date, readiness_score: 50, hrv_component: 50, load_component: 50,
   sleep_component: 50, spo2_component: 50, acwr: null, acute_load_kg: null,
@@ -4251,6 +4248,21 @@ export const useStore = create<KineticsStore>()((set, get) => {
     });
     return true;
   };
+  const syncDay = (today: string): void => {
+    // Yesterday's reports and niggles expire, and the trailing-week vector can
+    // be missing a day. Keep these reads separate from prescription generation.
+    const d = getDb();
+    for (const date of demoDates(today, 7)) {
+      d.executeSync(MATERIALIZE_STATE_VECTOR_SQL, [date]);
+    }
+    get().refreshVector(today);
+    get().refreshActivityLedger();
+    get().refreshNiggles();
+    get().refreshBlock();
+    get().refreshProgram();
+    get().refreshReturnCheckin();
+    get().refreshEarlierOpenSessions();
+  };
   return {
   status: 'booting',
   error: null,
@@ -4971,6 +4983,10 @@ export const useStore = create<KineticsStore>()((set, get) => {
     // guardrails the live session was prescribed under.
     if (get().session !== null) {
       set({ error: 'End the active session before switching profiles.' });
+      return;
+    }
+    if (db === null) {
+      set({ error: DATA_LOCKED_MESSAGE });
       return;
     }
     const d = getDb();
@@ -6090,21 +6106,10 @@ export const useStore = create<KineticsStore>()((set, get) => {
 
   rolloverDay: () => {
     if (get().status !== 'ready') return;
-    if (localToday() === get().today) return;
-    // New calendar day: yesterday's reports no longer govern, today's plan
-    // cell moves, the trailing-week materialization may be missing a day.
-    const d = getDb();
-    for (const date of demoDates(localToday(), 7)) {
-      d.executeSync(MATERIALIZE_STATE_VECTOR_SQL, [date]);
-    }
-    get().refreshVector();   // also advances store.today
-    get().refreshActivityLedger(); // advances the factual 28-day activity window
-    get().refreshNiggles();  // yesterday's niggles drop out of the active set
-    get().refreshBlock();
-    get().refreshProgram();
-    get().refreshReturnCheckin();
-    get().refreshEarlierOpenSessions();
-    get().computePrescription([]);
+    const today = localToday();
+    if (today === get().today) return;
+    syncDay(today);
+    get().computePrescription([], today);
   },
 
   generateNewBlock: (schemaType = 'LINEAR') => {
@@ -8268,9 +8273,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
     };
   },
 
-  refreshVector: () => {
+  refreshVector: (today = localToday()) => {
     if (get().status !== 'ready') return;
-    const today = localToday();
     const d = getDb();
     const vector =
       rowsOf<StateVectorRow>(
@@ -10206,35 +10210,16 @@ export const useStore = create<KineticsStore>()((set, get) => {
     get().refreshEarlierOpenSessions();
     return true;
   },
-  computePrescription: (_patterns) => {
-    if (!get().requireTrainingSupport('daily-prescription', undefined, `session-date:${localToday()}`)) return;
+  computePrescription: (_patterns, today = localToday()) => {
+    if (!get().requireTrainingSupport('daily-prescription', undefined, `session-date:${today}`)) return;
     const { vector, profile, session } = get();
     const d = getDb();
-    // ALWAYS the real current date — a store snapshot can be yesterday's
-    // (app open past midnight) and would re-read yesterday's reports.
-    const today = localToday();
     // #179: a Stop-level in-session report leaves a halt row with no matched
     // entry (sessionReportStop.ts). It is read as a recorded halt.
     const sessionStopHalts = rowsOf<{ report_id: number }>(d.executeSync(
       'SELECT report_id FROM subjective_report WHERE date = ? AND matched_entry_id IS NULL AND halt = 1 ORDER BY report_id',
       [today],
     ));
-    // No readiness vector -> no adjustment; NEVER leave yesterday's on screen.
-    if (vector === null) { set({ prescription: null });
-      // A halt does not depend on the plan or on readiness: an in-session
-      // Stop with no readiness yet still halts the day. Only the halt is set
-      // here; with no halt, lastTriage is left as before.
-      if (sessionStopHalts.length > 0) {
-        const halt = applyGuardrail(
-          { load_modifier: 0, set_modifier: -3, rpe_cap: 0, coaching_cue: '' },
-          SESSION_REPORT_STOP_ENTRY,
-          1,
-        );
-        set({ lastTriage: { kind: 'matched', directive: halt }, today });
-      }
-      return;
-    }
-
     // The whole three-layer derivation is the pure, machine-verified
     // derivePrescription (verify:policy [6]); this is only its SQL adapter.
     // Deriving from the database means a halt survives an app kill and a
@@ -10255,13 +10240,27 @@ export const useStore = create<KineticsStore>()((set, get) => {
       .filter((r): r is { entry: PhraseEntry; severity: number | null; wasHalt: boolean } => r !== null);
     // One is enough: every such row carries the same recorded halt.
     if (sessionStopHalts.length > 0) reports.push({ entry: SESSION_REPORT_STOP_ENTRY, severity: null, wasHalt: true });
+    // A recorded halt still governs on a day with no readiness inputs.
+    const operativeReports = vector === null ? reports.filter((report) => report.wasHalt) : reports;
+    if (vector === null && operativeReports.length === 0) {
+      set({ prescription: null });
+      return;
+    }
     const ctx = profileCtx(d, today, session !== null ? session.sessionId : -1);
     const derived = derivePrescription({
-      vector,
+      vector: vector ?? blankVector(today),
       profile,
       ctx,
-      reports,
+      reports: operativeReports,
     });
+    if (vector === null) {
+      const halt = derived.directive;
+      set({
+        prescription: null,
+        ...(halt?.halt === true ? { lastTriage: { kind: 'matched', directive: halt }, today } : {}),
+      });
+      return;
+    }
     // Display only (#186): what the operative report itself changed, read as
     // today's prescription with the reports against the same derivation
     // without them. Nothing below feeds back into the prescription.
@@ -10472,6 +10471,10 @@ export const useStore = create<KineticsStore>()((set, get) => {
         set({ error: 'Your report was not saved because the athlete changed while it was being checked. Please report it again.' });
         return false;
       }
+      const commitDay = localToday();
+      const needsDaySync = commitDay !== today || vector.date !== commitDay;
+      if (needsDaySync) syncDay(commitDay);
+      const commitVector = needsDaySync ? get().vector : vector;
       const resolved =
         baselineHalts || readerPrediction === null
           ? baseline
@@ -10483,10 +10486,10 @@ export const useStore = create<KineticsStore>()((set, get) => {
         d.executeSync(
           `INSERT INTO subjective_report (date, reported_at_ms, raw_text, matched_entry_id, similarity, halt, load_modifier, set_modifier, rpe_cap)
            VALUES (?, ?, ?, NULL, ?, 0, NULL, NULL, NULL)`,
-          [today, Date.now(), raw, resolved.similarity],
+          [commitDay, Date.now(), raw, resolved.similarity],
         );
         try {
-          get().computePrescription([]);
+          get().computePrescription([], commitDay);
           const triageAfter = get().lastTriage;
           if (
             subjectiveReportEpoch === myReportEpoch
@@ -10505,12 +10508,14 @@ export const useStore = create<KineticsStore>()((set, get) => {
       // already carry another guardrail (compounding) or yesterday's date.
       const activeSession = get().session;
       const audit = derivePrescription({
-        vector,
+        vector: commitVector ?? blankVector(commitDay),
         profile: get().profile,
-        ctx: profileCtx(d, today, activeSession !== null ? activeSession.sessionId : -1),
+        ctx: profileCtx(d, commitDay, activeSession !== null ? activeSession.sessionId : -1),
         reports: [{ entry: resolved.entry, severity: safeSeverity }],
       });
-      const auditHalt = audit.directive !== null && audit.directive.halt;
+      const haltDirective = audit.directive?.halt === true ? audit.directive : null;
+      const auditHalt = haltDirective !== null;
+      const auditAdjustment = commitVector !== null || auditHalt ? audit.vector : null;
       // A safety halt is a store boundary, not merely a red screen. Commit the
       // report and exact runner checkpoint together so a relaunch cannot reopen
       // logging between a report and its safety state.
@@ -10525,9 +10530,9 @@ export const useStore = create<KineticsStore>()((set, get) => {
           `INSERT INTO subjective_report (date, reported_at_ms, raw_text, matched_entry_id, similarity, halt, load_modifier, set_modifier, rpe_cap)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
-            today, Date.now(), raw, resolved.entry.id, resolved.similarity,
-            auditHalt ? 1 : 0, audit.vector.load_modifier,
-            audit.vector.set_modifier, audit.vector.rpe_cap,
+            commitDay, Date.now(), raw, resolved.entry.id, resolved.similarity,
+            auditHalt ? 1 : 0, auditAdjustment?.load_modifier ?? null,
+            auditAdjustment?.set_modifier ?? null, auditAdjustment?.rpe_cap ?? null,
           ],
         );
         // Persist the severity (012 side-car) so the pure re-derivation survives a
@@ -10555,8 +10560,11 @@ export const useStore = create<KineticsStore>()((set, get) => {
         set({ error: error instanceof Error ? error.message : String(error) });
         return false;
       }
-      if (haltedRunner !== null && haltedRunner !== activeRunner) {
-        set(runnerSelection(haltedRunner));
+      if (haltDirective !== null) {
+        set({
+          ...(haltedRunner !== null && haltedRunner !== activeRunner ? runnerSelection(haltedRunner) : {}),
+          lastTriage: { kind: 'matched', directive: haltDirective },
+        });
       }
       try {
         if (auditHalt && activeSession !== null && get().session?.sessionId === activeSession.sessionId) {
@@ -10564,16 +10572,16 @@ export const useStore = create<KineticsStore>()((set, get) => {
         }
         // Re-derive the operative prescription from persistence (single source
         // of truth; also sets lastTriage to the now-operative directive).
-        get().computePrescription([]);
+        get().computePrescription([], commitDay);
         // Acknowledge a confident match that did NOT become operative — either
         // positive sentiment OR a complaint the severity gate de-escalated to
         // benign (DOMS) — unless a restrictive report from earlier today still
         // governs, in which case computePrescription kept that honest directive.
-        if (subjectiveReportEpoch === myReportEpoch && get().lastTriage === null) {
+        if (!auditHalt && subjectiveReportEpoch === myReportEpoch && get().lastTriage === null) {
           set({ lastTriage: { kind: 'positive', cue: resolved.entry.cue, entryId: resolved.entry.id } });
         }
       } catch (error) {
-        refreshFailedAfterStore(error, auditHalt ? audit.directive : null);
+        refreshFailedAfterStore(error, haltDirective);
       }
       return true;
     } finally {

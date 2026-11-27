@@ -109,6 +109,10 @@ export function checkCandidateManifestSafetyReader(candidateManifest) {
     return ['candidate_manifest.json is missing or not an object'];
   }
   const problems = [];
+  if (Object.hasOwn(candidateManifest, 'safetyReaderModelSizeBytes')
+      && candidateManifest.safetyReaderModelSizeBytes !== SAFETY_READER_SIZE) {
+    problems.push('candidate_manifest.json safetyReaderModelSizeBytes does not match ratified safetyReader size');
+  }
   if (Object.hasOwn(candidateManifest, 'safetyReader')) {
     const sr = candidateManifest.safetyReader;
     if (sr === null || typeof sr !== 'object' || Array.isArray(sr)) {
@@ -141,10 +145,6 @@ export function checkCandidateManifestSafetyReader(candidateManifest) {
   if (candidateManifest.safetyReaderPresent === true) {
     if (candidateManifest.safetyReaderModelSha256 !== SAFETY_READER_SHA256) {
       problems.push('candidate_manifest.json declares safetyReaderPresent:true without ratified safetyReaderModelSha256');
-    }
-    if (Object.hasOwn(candidateManifest, 'safetyReaderModelSizeBytes')
-        && candidateManifest.safetyReaderModelSizeBytes !== SAFETY_READER_SIZE) {
-      problems.push('candidate_manifest.json safetyReaderModelSizeBytes does not match ratified safetyReader size');
     }
     return problems;
   }
@@ -469,6 +469,10 @@ export function checkMeasuredEvidence(session, ceiling = RATIFIED_CEILING_BYTES)
     if (integrity.clean !== true) {
       problems.push('session-wide disposal integrity is not clean (clean is not true)');
     }
+  }
+  if (integrity?.unresolvedSessionCount !== 0 || s?.lifecycle?.unresolvedSessionCount !== 0) {
+    problems.push(`packet does not prove all sessions were disposed: disposalIntegrity.unresolvedSessionCount=`
+      + `${integrity?.unresolvedSessionCount}, lifecycle.unresolvedSessionCount=${s?.lifecycle?.unresolvedSessionCount} (both must be 0)`);
   }
   // Serial non-overlap: two live native sessions in one process at once make
   // per-request memory attribution meaningless. Absence is not zero.

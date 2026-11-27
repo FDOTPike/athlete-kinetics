@@ -18,7 +18,9 @@
 import { closeSync, copyFileSync, ftruncateSync, mkdirSync, mkdtempSync, openSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { execFileSync } from 'node:child_process';
+import childProcess, { execFileSync } from 'node:child_process';
+import { syncBuiltinESMExports } from 'node:module';
+import { mock } from 'node:test';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -289,12 +291,16 @@ async function withScratch(fn) {
   try { return await fn(scratch); } finally { rmSync(scratch, { recursive: true, force: true }); }
 }
 
-async function expectRejected(label, buffer, opts = FIXTURE_OPTS) {
+async function expectRejected(label, buffer, opts = FIXTURE_OPTS, diagnostic = null) {
   await withScratch(async (scratch) => {
     const p = join(scratch, 'fixture.apk');
     writeFileSync(p, buffer);
-    const { outcome } = await runVerify(p, opts);
-    check(label, outcome === 'threw' || outcome === 'failed', outcome);
+    const { outcome, error } = await runVerify(p, opts);
+    const matches = diagnostic === null
+      ? outcome === 'threw' || outcome === 'failed'
+      : outcome === 'threw' && error.message.startsWith('manifest.safetyReader missing or disagrees with ratified pin: ')
+        && error.message.includes(diagnostic);
+    check(label, matches, error?.message ?? outcome);
   });
 }
 
@@ -462,6 +468,7 @@ async function main() {
             { includeSafetyReader: true },
           ),
           { ...FIXTURE_OPTS, requireSafetyReader: true },
+          `${field}=${JSON.stringify(bad)}`,
         );
       }
       for (const field of Object.keys(VALID_READER_MANIFEST)) {
@@ -470,6 +477,7 @@ async function main() {
           `manifest.safetyReader missing ${field} rejected`,
           fixtureApk({ safetyReader: missing }, { includeSafetyReader: true }),
           { ...FIXTURE_OPTS, requireSafetyReader: true },
+          `missing key ${field}`,
         );
       }
       await expectRejected(
@@ -479,6 +487,7 @@ async function main() {
           { includeSafetyReader: true },
         ),
         { ...FIXTURE_OPTS, requireSafetyReader: true },
+        'unexpected key tag',
       );
       await expectRejected(
         'manifest.safetyReader with stringified assetId rejected (type-exact)',
@@ -487,6 +496,7 @@ async function main() {
           { includeSafetyReader: true },
         ),
         { ...FIXTURE_OPTS, requireSafetyReader: true },
+        'assetId="775095775"',
       );
       // 1. Undeclared safety_reader.onnx in APK without manifest.safetyReader -> REJECTED (AGENT_WORKFLOW §1.2)
       await expectRejected(
@@ -626,21 +636,40 @@ async function main() {
         readerOk.result?.failures?.join('; ') ?? readerOk.outcome,
       );
 
-      // 8. Stream 2 PR 3: real-candidate mode (fixtureMode: false) requires safety_reader.onnx by default
-      //    without introducing any skipAapt bypass knob into verifyQaArtifact.
-      {
-        const qaMod = await import('./verify_qa_artifact.mjs');
-        const verifierSrc = readFileSync(VERIFIER, 'utf8');
-        check(
-          'real-candidate mode defaults requireSafetyReader to true via defaultRequireSafetyReader(fixtureMode)',
-          typeof qaMod.defaultRequireSafetyReader === 'function'
-            && qaMod.defaultRequireSafetyReader() === true
-            && qaMod.defaultRequireSafetyReader(false) === true
-            && qaMod.defaultRequireSafetyReader(true) === false
-            && verifierSrc.includes('requireSafetyReader = defaultRequireSafetyReader(fixtureMode)'),
-          typeof qaMod.defaultRequireSafetyReader,
-        );
+      // Omitting the reader option exercises the real and fixture defaults.
+      const apkWithoutReaderPath = join(scratch, 'real-mode-without-reader.apk');
+      const entriesWithoutReader = fixtureEntries({}, { includeModel: false });
+      entriesWithoutReader.push({
+        name: 'assets/minilm.onnx',
+        data: readFileSync(new URL('../packages/inference/assets/minilm/model_quantized.onnx', import.meta.url)),
+      });
+      writeFileSync(apkWithoutReaderPath, buildZip(entriesWithoutReader));
+      // Supply binary badging for the synthetic APK. Never bypass the real-mode reader default.
+      const badging = mock.method(childProcess, 'execFileSync', (path, args) => {
+        if (path === process.execPath && args.join('|') === `dump|badging|${apkWithoutReaderPath}`) {
+          return "package: name='com.pikemethods.training.qa'\n";
+        }
+        throw new Error(`unexpected Android SDK invocation: ${args.join(' ')}`);
+      });
+      syncBuiltinESMExports();
+      try {
+        const rejected = await runVerify(apkWithoutReaderPath, {
+          fixtureMode: false,
+          requireProvenance: false,
+          env: { AAPT_PATH: process.execPath, APKSIGNER_PATH: process.execPath, ZIPALIGN_PATH: process.execPath },
+        });
+        check('real-candidate defaults reject missing manifest.safetyReader',
+          badging.mock.callCount() === 1 && rejected.outcome === 'threw'
+            && rejected.error.message.startsWith('manifest.safetyReader missing or disagrees with ratified pin: ')
+            && rejected.error.message.includes('manifest.safetyReader is not an object'),
+          rejected.error?.message ?? rejected.outcome);
+      } finally {
+        badging.mock.restore();
+        syncBuiltinESMExports();
       }
+      const noReaderFixture = await runVerify(apkWithoutReaderPath);
+      check('fixture defaults accept an APK with neither reader declaration nor asset',
+        noReaderFixture.outcome === 'ok', noReaderFixture.outcome);
     }
     check('ELF parser: 4 KB fixture reports min alignment 0x1000',
       minElfLoadAlignment(ELF_BAD) === 0x1000);
@@ -1069,4 +1098,6 @@ async function main() {
   process.exit(fail ? 1 : 0);
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((e) => { console.error(e); process.exit(1); });
+}

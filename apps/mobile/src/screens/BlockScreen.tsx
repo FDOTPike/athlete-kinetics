@@ -364,7 +364,8 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
   const [reportSeverity, setReportSeverity] = useState<number | null>(null);
   const [reportNotSent, setReportNotSent] = useState(false);
   const [reportActiveKeys, setReportActiveKeys] = useState<string[]>([]);
-  const reportSubmitEpoch = useRef(0);
+  const submitEpochRef = useRef(0);
+  const draftRevisionRef = useRef(0);
   const reportInFlightCount = useRef(0);
   const reportInFlightKeyCounts = useRef<Map<string, number>>(new Map());
   const [schema, setSchema] = useState<SchemaType>('LINEAR');
@@ -1794,7 +1795,10 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                 disableFullscreenUI
                 style={styles.reportInput}
                 value={reportText}
-                onChangeText={setReportText}
+                onChangeText={(value) => {
+                  if (value !== reportText) draftRevisionRef.current += 1;
+                  setReportText(value);
+                }}
                 placeholder="For example: my knee feels sore when I squat"
                 placeholderTextColor={theme.color.textLow}
                 maxLength={500}
@@ -1808,7 +1812,10 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                   return (
                     <Pressable
                       key={severity}
-                      onPress={() => setReportSeverity(severity)}
+                      onPress={() => {
+                        if (severity !== reportSeverity) draftRevisionRef.current += 1;
+                        setReportSeverity(severity);
+                      }}
                       accessibilityRole="button"
                       accessibilityState={{ selected }}
                       accessibilityLabel={`Severity ${severity} of 10`}
@@ -1841,7 +1848,8 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                       const busyNow = triaging || reportActiveKeys.length > 0 || reportInFlightCount.current > 0;
                       const thisKeyBusy = (reportInFlightKeyCounts.current.get(submitKey) ?? 0) > 0;
                       if (busyNow && (!keywordHaltReady || thisKeyBusy)) return;
-                      const myEpoch = ++reportSubmitEpoch.current;
+                      const myEpoch = ++submitEpochRef.current;
+                      const submittedDraftRevision = draftRevisionRef.current;
                       reportInFlightCount.current += 1;
                       reportInFlightKeyCounts.current.set(
                         submitKey,
@@ -1864,10 +1872,12 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                       try {
                         void reportSubjective(reportText, reportSeverity).then((stored) => {
                           settled();
-                          if (reportSubmitEpoch.current !== myEpoch) return;
-                          if (!stored) { setReportNotSent(true); return; }
-                          setReportText('');
-                          setReportSeverity(null);
+                          if (submitEpochRef.current !== myEpoch) return;
+                          if (stored !== true) { setReportNotSent(true); return; }
+                          if (draftRevisionRef.current === submittedDraftRevision) {
+                            setReportText('');
+                            setReportSeverity(null);
+                          }
                           // Bring the reply (above the form) into view (#207).
                           scrollRef.current?.scrollTo({
                             y: Math.max(0, disclosuresSectionY.current + reportDisclosureOffsetY.current - theme.space[4]),
@@ -1875,12 +1885,12 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                           });
                         }, () => {
                           settled();
-                          if (reportSubmitEpoch.current !== myEpoch) return;
+                          if (submitEpochRef.current !== myEpoch) return;
                           setReportNotSent(true);
                         });
                       } catch {
                         settled();
-                        if (reportSubmitEpoch.current === myEpoch) setReportNotSent(true);
+                        if (submitEpochRef.current === myEpoch) setReportNotSent(true);
                       }
                     }}
                     accessibilityLabel={reportBusy ? 'Checking report' : 'Apply report'}

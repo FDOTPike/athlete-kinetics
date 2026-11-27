@@ -319,6 +319,93 @@ describe('Stream 2 PR 3 — mobile safety reader + shared scheduler + useStore w
     expect(getStoreState().runner?.haltReason).toBe('safety');
   });
 
+  test.each([
+    ['with readiness inputs', true],
+    ['without readiness inputs', false],
+  ])('a reader halt settling after midnight %s governs the new day and stops the open session', async (_case, hasInputs) => {
+    expect(getStoreState().createTrainingProgram({
+      horizon: { kind: 'weeks', blockCount: 1 },
+      schemaType: 'LINEAR',
+      dayIndices: [1, 3, 5],
+    })).toBe(true);
+    const nextPlanned = getStoreState().blockSessions.find((s) => !s.completed);
+    getStoreState().startSession(false, nextPlanned.plannedSessionId);
+    const sessionId = getStoreState().session.sessionId;
+    expect(getStoreState().runner.phase).toBe('working');
+
+    const initialDay = getStoreState().today;
+    const beforeMidnight = new Date(`${initialDay}T23:59:59`);
+    const afterMidnight = new Date(beforeMidnight.getTime() + 1000);
+    const commitDay = [afterMidnight.getFullYear(), afterMidnight.getMonth() + 1, afterMidnight.getDate()]
+      .map((part) => String(part).padStart(2, '0')).join('-');
+    if (hasInputs) {
+      mockDrivers.get(A).raw.prepare('INSERT INTO sleep_daily (date, in_bed_min, asleep_min) VALUES (?, ?, ?)')
+        .run(commitDay, 480, 420);
+    }
+    const pendingReader = deferred();
+    const classify = jest.fn(() => pendingReader.promise);
+    getStoreState().setSafetyReader({ modelId: 'm10-r15-reader-seed3', policyId: 'r15/denial-floor', classify });
+
+    jest.useFakeTimers({ now: beforeMidnight });
+    try {
+      const raw = 'vision went dim for a second after standing';
+      const pendingReport = getStoreState().reportSubjective(raw, 8);
+      expect(classify).toHaveBeenCalledWith(raw);
+      jest.setSystemTime(afterMidnight);
+      pendingReader.resolve({ cautionLogit: 5.4, active: true, standaloneRouteId: 'dizzy', actionableRouteId: 'dizzy' });
+      expect(await pendingReport).toBe(true);
+
+      expect(rows(A, 'SELECT date, matched_entry_id, halt FROM subjective_report')).toEqual([
+        { date: commitDay, matched_entry_id: 'dizzy', halt: 1 },
+      ]);
+      expect(getStoreState().today).toBe(commitDay);
+      if (hasInputs) {
+        expect(getStoreState().vector?.date).toBe(commitDay);
+        expect(getStoreState().prescription?.forDate).toBe(commitDay);
+      } else {
+        expect(getStoreState().vector).toBeNull();
+        expect(getStoreState().prescription).toBeNull();
+        expect(mockDrivers.get(A).raw.prepare('SELECT date FROM state_vector WHERE date = ?').get(commitDay))
+          .toBeUndefined();
+      }
+      expect(getStoreState().lastTriage?.directive?.halt).toBe(true);
+      expect(getStoreState().session?.sessionId).toBe(sessionId);
+      expect(getStoreState().runner).toMatchObject({ phase: 'halted', haltReason: 'safety' });
+      expect(rows(A, 'SELECT session_id, phase FROM session_runner_checkpoint')).toEqual([
+        { session_id: sessionId, phase: 'halted' },
+      ]);
+      // Re-read persisted reports without relying on the immediately published UI state.
+      useStore.setState({ lastTriage: null });
+      getStoreState().computePrescription([]);
+      expect(getStoreState().lastTriage).toMatchObject({ kind: 'matched', directive: { halt: true } });
+    } finally {
+      jest.useRealTimers();
+    }
+  });
+
+  test('a committed halt is visible when training support refuses prescription generation', async () => {
+    const state = getStoreState();
+    const requireTrainingSupport = jest.fn(() => false);
+    useStore.setState({ requireTrainingSupport });
+    try {
+      expect(await getStoreState().reportSubjective('feeling dizzy', 8)).toBe(true);
+      expect(rows(A, 'SELECT matched_entry_id, halt FROM subjective_report')).toEqual([
+        { matched_entry_id: 'red-flag-systemic', halt: 1 },
+      ]);
+      expect(requireTrainingSupport).toHaveBeenCalledWith('daily-prescription', undefined, `session-date:${state.today}`);
+      expect(getStoreState().prescription).toBe(state.prescription);
+      expect(getStoreState().lastTriage).toMatchObject({ kind: 'matched', directive: { halt: true } });
+    } finally {
+      useStore.setState({ requireTrainingSupport: state.requireTrainingSupport });
+    }
+  });
+
+  test('switchProfile refuses a closed database through store error state', () => {
+    closeStoreDatabaseForRestore();
+    expect(() => getStoreState().switchProfile(1)).not.toThrow();
+    expect(getStoreState().error).toBe('Athlete data is temporarily locked for backup or restore.');
+  });
+
   test('reportSubjective suppresses harmless denial misfires from MiniLM without modifying prescription', async () => {
     // Force MiniLM to return exact canonical vector for pain-mild
     const vectorsAsset = require('../../../../packages/inference/assets/phrase-codebase.vectors.json');
@@ -533,16 +620,18 @@ describe('Stream 2 PR 3 — mobile safety reader + shared scheduler + useStore w
   });
 
   test('safetyReader.classify throwing with no embedder degrades to the keyword baseline', async () => {
+    const classify = jest.fn(async () => {
+      throw new Error('simulated native reader failure');
+    });
     getStoreState().setSafetyReader({
       modelId: 'm10-r15-reader-seed3',
       policyId: 'r15/denial-floor',
-      classify: async () => {
-        throw new Error('simulated native reader failure');
-      },
+      classify,
     });
 
     const before = rows(A, 'SELECT * FROM subjective_report').length;
     const saved = await getStoreState().reportSubjective('knee is a little tender today', 4);
+    expect(classify).toHaveBeenCalledTimes(1);
     expect(saved).toBe(true);
     expect(
       rows(A, 'SELECT raw_text, matched_entry_id, halt FROM subjective_report').slice(before),

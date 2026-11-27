@@ -64,7 +64,8 @@ export function SubjectiveReportPanel({
   // systemic red-flag language, which must never wait behind a hung check.
   const inFlightCount = useRef(0);
   const inFlightKeyCounts = useRef<Map<string, number>>(new Map());
-  const submitEpoch = useRef(0);
+  const submitEpochRef = useRef(0);
+  const draftRevisionRef = useRef(0);
   const [pending, setPending] = useState(false);
   const [activeKeys, setActiveKeys] = useState<string[]>([]);
 
@@ -81,7 +82,8 @@ export function SubjectiveReportPanel({
     const busyNow = triaging || pending || inFlightCount.current > 0;
     const thisKeyBusy = (inFlightKeyCounts.current.get(submitKey) ?? 0) > 0;
     if (busyNow && (!keywordHaltReady || thisKeyBusy)) return;
-    const myEpoch = ++submitEpoch.current;
+    const myEpoch = ++submitEpochRef.current;
+    const submittedDraftRevision = draftRevisionRef.current;
     inFlightCount.current += 1;
     inFlightKeyCounts.current.set(submitKey, (inFlightKeyCounts.current.get(submitKey) ?? 0) + 1);
     setActiveKeys([...inFlightKeyCounts.current.keys()]);
@@ -105,19 +107,21 @@ export function SubjectiveReportPanel({
     try {
       onApply(reportText, reportSeverity).then((stored) => {
         settled();
-        if (submitEpoch.current !== myEpoch) return;
-        if (!stored) { setNotSent(true); return; }
-        setReportText('');
-        setReportSeverity(null);
+        if (submitEpochRef.current !== myEpoch) return;
+        if (stored !== true) { setNotSent(true); return; }
+        if (draftRevisionRef.current === submittedDraftRevision) {
+          setReportText('');
+          setReportSeverity(null);
+        }
         setApplied(true);
       }, () => {
         settled();
-        if (submitEpoch.current !== myEpoch) return;
+        if (submitEpochRef.current !== myEpoch) return;
         setNotSent(true);
       });
     } catch {
       settled();
-      if (submitEpoch.current === myEpoch) setNotSent(true);
+      if (submitEpochRef.current === myEpoch) setNotSent(true);
     }
   };
 
@@ -164,7 +168,10 @@ export function SubjectiveReportPanel({
         disableFullscreenUI
         style={styles.input}
         value={reportText}
-        onChangeText={setReportText}
+        onChangeText={(value) => {
+          if (value !== reportText) draftRevisionRef.current += 1;
+          setReportText(value);
+        }}
         placeholder="For example: my knee feels sore when I squat"
         placeholderTextColor={theme.color.textLow}
         maxLength={500}
@@ -179,7 +186,10 @@ export function SubjectiveReportPanel({
             key={severity}
             label={String(severity)}
             selected={reportSeverity === severity}
-            onPress={() => setReportSeverity(severity)}
+            onPress={() => {
+              if (severity !== reportSeverity) draftRevisionRef.current += 1;
+              setReportSeverity(severity);
+            }}
             accessibilityLabel={`Severity ${severity} of 10`}
             testID={`completion-report-severity-${severity}`}
           />

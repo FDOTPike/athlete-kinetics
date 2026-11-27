@@ -11,7 +11,12 @@ import {
   PREFERRED_TARGET_BYTES,
   checkCandidateManifestSafetyReader,
 } from '../memory-audit/memory_gate.mjs';
-import { extractEntryToBuffer, readZipEntries } from '../verify_qa_artifact.mjs';
+import { extractEntryToBuffer, readZipEntries, SAFETY_READER_ASSET } from '../verify_qa_artifact.mjs';
+import {
+  expectedSafetyReaderBytes,
+  SAFETY_READER_ARTIFACT,
+  verifySafetyReaderIntegrity,
+} from '../../scripts/safety-reader-integrity.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const harness = join(root, 'tools/memory-audit/meminfo_harness.mjs');
@@ -54,6 +59,27 @@ export function captureEvidence(label, save, adb, env, execute = execFileSync) {
   }
   save(`${label}-pid.txt`, pid);
 }
+export function verifyApkSafetyReader(apk, entries = readZipEntries(apk).entries) {
+  const entry = entries.get(SAFETY_READER_ASSET);
+  if (!entry) throw new Error(`Refusing APK: missing ${SAFETY_READER_ASSET}.`);
+  const expectedBytes = expectedSafetyReaderBytes(SAFETY_READER_ARTIFACT);
+  if (entry.uncompSize !== expectedBytes) {
+    throw new Error(`Refusing APK: SIZE MISMATCH for ${SAFETY_READER_ASSET}: got ${entry.uncompSize} B, pinned ${expectedBytes} B.`);
+  }
+  verifySafetyReaderIntegrity(SAFETY_READER_ARTIFACT, extractEntryToBuffer(apk, entry), SAFETY_READER_ASSET);
+}
+
+export async function recordColdRestartPidContinuity({ stopWatch, read, report, save }) {
+  await stopWatch();
+  const harnessSession = read('session.json');
+  report.errors.push(...verifyColdRestartPidContinuity({
+    beforePidText: read('before-cold-start-pid.txt'),
+    afterPidText: read('after-cold-start-pid.txt'),
+    samples: harnessSession ? JSON.parse(harnessSession).samples : undefined,
+  }));
+  save('observations.json', report);
+}
+
 async function main(options) {
   if (options.dryRun) {
     console.log(`DRY RUN - no adb, APK access, install, prompts, or device measurements.
@@ -95,10 +121,12 @@ Dry run supplies no physical-device or release-gate evidence.`);
   if (candidateManifestProblems.length > 0) {
     throw new Error(`Refusing APK: ${candidateManifestProblems.join('; ')}`);
   }
+  verifyApkSafetyReader(apk, apkEntries);
   const out = join(outRoot, `device-validation-${new Date().toISOString().replace(/[:.]/g, '-')}`);
   mkdirSync(out, { recursive: true });
   console.log(`Results: ${out}`);
   const save = (name, data) => writeFileSync(join(out, name), typeof data === 'string' || Buffer.isBuffer(data) ? data : JSON.stringify(data, null, 2));
+  const read = (name) => (existsSync(join(out, name)) ? readFileSync(join(out, name), 'utf8') : undefined);
   const report = { startedAt: new Date().toISOString(), serial, apkSha256: createHash('sha256').update(readFileSync(apk)).digest('hex'), observations: [], errors: [] };
   save('candidate_manifest.json', candidateManifestRaw);
   save('apk-badging.txt', badging);
@@ -167,19 +195,9 @@ Dry run supplies no physical-device or release-gate evidence.`);
     stage = 'cold-resume'; startWatch();
     await ask('Cold relaunch: reopen/resume the unfinished workout. Compare athlete, exercise, sets and elapsed rest with before-cold-start. Record each and any FAIL.');
     capture('after-cold-start');
-    {
-      const read = (name) => (existsSync(join(out, name)) ? readFileSync(join(out, name), 'utf8') : undefined);
-      const harnessSession = read('session.json');
-      report.errors.push(...verifyColdRestartPidContinuity({
-        beforePidText: read('before-cold-start-pid.txt'),
-        afterPidText: read('after-cold-start-pid.txt'),
-        samples: harnessSession ? JSON.parse(harnessSession).samples : undefined,
-      }));
-      save('observations.json', report);
-    }
     await ask('Finish the FULL prescribed session, logging every remaining set and effort. Save session feel and a synthetic note. Record completion and exact visible text. During sampling, exercise a normal body-state report so the QA lifecycle path runs; never induce symptoms or override a halt.');
     capture('session-finished');
-    await stopWatch();
+    await recordColdRestartPidContinuity({ stopWatch, read, report, save });
     stage = 'health-denial';
     adb(['shell', 'am', 'start', '-a', 'android.settings.APPLICATION_DETAILS_SETTINGS', '-d', `package:${pkg}`]);
     await ask('On the phone, open Health Connect app permissions through Settings (navigation varies). Revoke ALL read permissions for the QA app; capture/describe the denied state. Do not clear app data. If Health Connect is unavailable, type FAIL: unavailable; this does not verify denial.');
@@ -230,6 +248,9 @@ export function harnessPacketErrors(packet, candidateManifest = undefined) {
   if (integrity.countersBalanced !== true) errors.push('Disposal counters not confirmed balanced in the harness summary; evidence incomplete.');
   if (integrity.sessionOverlapCount !== 0) errors.push('Disposal integrity does not confirm zero session overlap; evidence incomplete.');
   if (lifecycle.sessionOverlapCount !== 0) errors.push('Lifecycle summary does not confirm zero session overlap; evidence incomplete.');
+  if (integrity.unresolvedSessionCount !== 0 || lifecycle.unresolvedSessionCount !== 0) {
+    errors.push('Harness summary does not confirm zero unresolved sessions; evidence incomplete.');
+  }
   if (!(counts?.embedder >= 1)) errors.push('No correlated embedder request in the harness summary; evidence incomplete.');
   if (!(counts?.['safety-reader'] >= 1)) errors.push('No correlated safety-reader request in the harness summary; evidence incomplete.');
   if (arguments.length >= 2 || Object.hasOwn(packet.summary, 'candidateManifest')) {
