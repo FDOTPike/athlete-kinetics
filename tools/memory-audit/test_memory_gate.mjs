@@ -1098,6 +1098,9 @@ const tempRepo = mkdtempSync(join(tmpdir(), 'ak-cand-prov-'));
 try {
   const gitTmp = (args) => execFileSync('git', args, { cwd: tempRepo, encoding: 'utf8' });
   gitTmp(['init', '-q']);
+  const excludesFile = join(tempRepo, '.git', 'fixture-excludes');
+  writeFileSync(excludesFile, '');
+  gitTmp(['config', '--local', 'core.excludesFile', excludesFile]);
   mkdirSync(join(tempRepo, 'src'), { recursive: true });
   writeFileSync(join(tempRepo, 'src', 'tracked.mjs'), 'export const x = 1;\n');
   gitTmp(['add', 'src/tracked.mjs']);
@@ -1174,20 +1177,46 @@ try {
     rmSync(pkt.dir, { recursive: true, force: true });
   }
 
-  {
-    // Counterexample 2: post-seal tampering with candidate_manifest.json breaks [G] binding & manifest check.
+  for (const tamper of ['evidence binding', 'manifest hash']) {
     const pkt = makePacket();
-    const { sessionPath } = sealFullManifestDir(pkt, VALID_CANDIDATE_MANIFEST);
-    writeFileSync(
-      join(pkt.dir, 'candidate_manifest.json'),
-      JSON.stringify({ ...VALID_CANDIDATE_MANIFEST, tampered: true }, null, 2),
-    );
-    const v = verifyEvidencePacket({ sessionPath, repoRoot: tempRepo });
-    check('SOL-03: mutating candidate_manifest.json after sealing breaks [G] binding and manifest membership',
-      v.ok === false
-        && v.problems.some((p) => p.includes('bindingDigest') || p.includes('candidate_manifest.json')),
-      v.problems.join('; ').slice(0, 160));
-    rmSync(pkt.dir, { recursive: true, force: true });
+    const { sessionPath, manifestPath } = sealFullManifestDir(pkt, VALID_CANDIDATE_MANIFEST);
+    try {
+      const verify = () => verifyEvidencePacket({ sessionPath, repoRoot: tempRepo });
+      const baseline = verify();
+      check(`SOL-03: untampered ${tamper} fixture verifies`,
+        baseline.ok === true && baseline.manifestChecked === true && baseline.problems.length === 0,
+        baseline.problems.join('; '));
+
+      const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+      const member = manifest.files.find((file) => file.path === 'candidate_manifest.json');
+      if (tamper === 'evidence binding') {
+        // Re-seal membership for the changed candidate bytes, leaving the packet's binding stale.
+        const candidatePath = join(pkt.dir, member.path);
+        writeFileSync(candidatePath, JSON.stringify({ ...VALID_CANDIDATE_MANIFEST, tampered: true }, null, 2));
+        member.sha256 = sha256OfFile(candidatePath);
+      } else {
+        // Change the recorded member hash without changing any evidence files.
+        member.sha256 = '0'.repeat(64);
+      }
+      writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+      writeFileSync(`${manifestPath}.sha256`, `${sha256OfFile(manifestPath)}  EVIDENCE_MANIFEST.json\n`);
+
+      const v = verify();
+      if (tamper === 'evidence binding') {
+        check('SOL-03: stale candidate evidence binding is rejected with valid manifest hashes',
+          v.ok === false && v.manifestChecked === true && v.problems.length === 2
+            && v.problems.includes('1 raw input(s) do not match the binding: candidate_manifest.json (bytes differ)')
+            && v.problems.some((p) => p.startsWith('bindingDigest mismatch:')),
+          v.problems.join('; '));
+      } else {
+        check('SOL-03: wrong candidate manifest hash is rejected with a valid evidence binding',
+          v.ok === false && v.manifestChecked === true && v.problems.length === 1
+            && v.problems.includes('raw input candidate_manifest.json differs from its sealed manifest entry'),
+          v.problems.join('; '));
+      }
+    } finally {
+      rmSync(pkt.dir, { recursive: true, force: true });
+    }
   }
 
   {

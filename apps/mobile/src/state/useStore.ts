@@ -10241,26 +10241,23 @@ export const useStore = create<KineticsStore>()((set, get) => {
     // One is enough: every such row carries the same recorded halt.
     if (sessionStopHalts.length > 0) reports.push({ entry: SESSION_REPORT_STOP_ENTRY, severity: null, wasHalt: true });
     // A recorded halt still governs on a day with no readiness inputs.
-    const operativeReports = vector === null ? reports.filter((report) => report.wasHalt) : reports;
-    if (vector === null && operativeReports.length === 0) {
-      set({ prescription: null });
+    if (vector === null) { set({ prescription: null });
+      const haltReports = reports.filter((report) => report.wasHalt);
+      if (haltReports.length > 0) {
+        const derivedHalt = derivePrescription({
+          vector: blankVector(today),
+          profile,
+          ctx: profileCtx(d, today, session !== null ? session.sessionId : -1),
+          reports: haltReports,
+        });
+        if (derivedHalt.directive?.halt === true) {
+          set({ lastTriage: { kind: 'matched', directive: derivedHalt.directive }, today });
+        }
+      }
       return;
     }
     const ctx = profileCtx(d, today, session !== null ? session.sessionId : -1);
-    const derived = derivePrescription({
-      vector: vector ?? blankVector(today),
-      profile,
-      ctx,
-      reports: operativeReports,
-    });
-    if (vector === null) {
-      const halt = derived.directive;
-      set({
-        prescription: null,
-        ...(halt?.halt === true ? { lastTriage: { kind: 'matched', directive: halt }, today } : {}),
-      });
-      return;
-    }
+    const derived = derivePrescription({ vector, profile, ctx, reports });
     // Display only (#186): what the operative report itself changed, read as
     // today's prescription with the reports against the same derivation
     // without them. Nothing below feeds back into the prescription.
@@ -10474,7 +10471,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       const commitDay = localToday();
       const needsDaySync = commitDay !== today || vector.date !== commitDay;
       if (needsDaySync) syncDay(commitDay);
-      const commitVector = needsDaySync ? get().vector : vector;
+      const commitVector = get().vector;
       const resolved =
         baselineHalts || readerPrediction === null
           ? baseline

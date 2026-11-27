@@ -479,6 +479,38 @@ describe('Stream 2 PR 3 — mobile safety reader + shared scheduler + useStore w
     expect(getStoreState().error).toBeNull();
   });
 
+  test('saved report adjustments follow a same-day vector refresh during safety classification', async () => {
+    const { today } = getStoreState();
+    const updateReadiness = mockDrivers.get(A).raw.prepare(
+      'UPDATE state_vector SET readiness_score = ?, hrv_z = NULL WHERE date = ?',
+    );
+    updateReadiness.run(90, today);
+    getStoreState().refreshVector(today);
+    expect(getStoreState().vector).toMatchObject({ date: today, readiness_score: 90 });
+
+    const pendingReader = deferred();
+    const classify = jest.fn(() => pendingReader.promise);
+    getStoreState().setSafetyReader({ modelId: 'm10-r15-reader-seed3', policyId: 'r15/denial-floor', classify });
+
+    const raw = 'knee is a little tender today';
+    const pendingReport = getStoreState().reportSubjective(raw, 6);
+    expect(classify).toHaveBeenCalledWith(raw);
+    updateReadiness.run(30, today);
+    getStoreState().refreshVector(today);
+    expect(getStoreState().vector).toMatchObject({ date: today, readiness_score: 30 });
+    pendingReader.resolve({
+      cautionLogit: 0.9, active: true, standaloneRouteId: 'pain-mild', actionableRouteId: 'pain-mild',
+    });
+    expect(await pendingReport).toBe(true);
+
+    const { prescription } = getStoreState();
+    expect(prescription).toMatchObject({ forDate: today, source: 'guardrail' });
+    const { load_modifier, set_modifier, rpe_cap } = prescription.vector;
+    expect(rows(A,
+      'SELECT date, matched_entry_id, halt, load_modifier, set_modifier, rpe_cap FROM subjective_report',
+    )).toEqual([{ date: today, matched_entry_id: 'pain-mild', halt: 0, load_modifier, set_modifier, rpe_cap }]);
+  });
+
   test('async athlete-ownership lease stays held while safetyReader.classify is pending', async () => {
     const holdReader = deferred();
     getStoreState().setEmbedder({ embed: async () => new Float32Array(384) });
