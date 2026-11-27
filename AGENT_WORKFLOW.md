@@ -80,13 +80,13 @@ run it because no runner has an authorized device packet. `verify:all` is an ali
 for `verify:release`.
 ```
 npm run typecheck        # first, always
-npm run verify:ci        # 24 gates + preflight + typecheck; semantic+embedder need bootstrap
+npm run verify:ci        # 25 gates + preflight + typecheck; semantic+embedder need bootstrap
 npm run verify:release   # verify:ci + memory contract [A]/[D] + REAL candidate APK (owner-run)
 ```
 verify:ci gates: db, demo, migrations, policy, blocks, autopilot,
 autopilot-counterexamples, biometrics, semantic, embedder, qa-artifact, native-config, store,
 coach, backup, memory-fixtures, progression, pipeline, runner, outcomes,
-preparation, library, coaching-content-generator, components (+ typecheck).
+preparation, library, coaching-content-generator, components, beta-citations (+ typecheck).
 verify:release adds: memory-contract ([A] ratified envelope, [D] measured device
 evidence, [G] evidence provenance — the packet must be re-derivable from its own
 sealed raw logcat/meminfo bytes, closing the fabricated-packet hole Hermes

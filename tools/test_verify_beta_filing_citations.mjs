@@ -890,8 +890,8 @@ console.log('\n[3] Round 9 regressions');
   const { scripts } = JSON.parse(readRepoFile('package.json'));
   check('WO04-R9: CI and release run the citation verifier and its regression suite',
     scripts['verify:beta-citations'] === 'node tools/verify_beta_filing_citations.mjs && node tools/test_verify_beta_filing_citations.mjs'
-      && scripts['verify:release'].endsWith(' && npm run verify:beta-citations')
-      && scripts['verify:ci'].endsWith(' && npm run verify:beta-citations'),
+      && scripts['verify:ci'].endsWith(' && npm run verify:beta-citations')
+      && scripts['verify:release'].startsWith('npm run verify:ci && '),
     scripts['verify:ci'].split(' && ').at(-1));
 
   const emptyPrior = mutateRepoFile(priorPath, () => ' \t\r\n');
