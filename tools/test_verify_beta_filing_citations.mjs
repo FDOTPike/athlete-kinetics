@@ -3,15 +3,40 @@
  * for `tools/verify_beta_filing_citations.mjs`.
  */
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { fileURLToPath } from 'node:url';
 import {
+  EXPECTED_ANCHORS,
   EXPECTED_CITATION_COUNT,
   REQUIRED_FILING_DOCS,
   verifyBetaFilingCitations,
 } from './verify_beta_filing_citations.mjs';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const readRepoFile = (rel) => fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+const mutateRepoFile = (target, transform) => verifyBetaFilingCitations({
+  repoRoot,
+  readFile: (rel) => rel === target ? transform(readRepoFile(rel)) : readRepoFile(rel),
+});
+const dataSafety = 'docs/release/beta/GOOGLE_DATA_SAFETY_ANSWERS.md';
+const privacy = 'docs/release/beta/PRIVACY_POLICY_DRAFT.md';
+const healthConnect = 'docs/release/beta/HEALTH_CONNECT_PERMISSIONS.md';
+const disclaimer = 'docs/release/beta/DISCLAIMER.md';
+const citationAt = (doc, slot) => {
+  const spec = EXPECTED_ANCHORS[`${doc}|${slot}`];
+  const citations = [...readRepoFile(doc).matchAll(/`((?:apps|packages|tools)\/[\w./-]+):(\d+)(?:-(\d+))?`/g)];
+  const [token, target, start, end = start] = citations[slot] ?? [];
+  if (target !== spec.path) throw new Error(`${doc} slot ${slot} does not cite ${spec.path}`);
+  return { token, target, start: Number(start), end: Number(end), spec };
+};
+const profileCitation = citationAt(disclaimer, 1);
+const { token: profileCitationToken } = profileCitation;
+const exportCitation = citationAt(dataSafety, 1);
+const subjectiveCitation = citationAt(dataSafety, 7);
+const subjectiveTable = /CREATE TABLE IF NOT EXISTS subjective_report \([\s\S]*?^\) STRICT;/m;
+
 let failed = 0;
 function check(label, ok, detail = '') {
   console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? `  [${detail}]` : ''}`);
@@ -107,7 +132,7 @@ console.log('\n[2] Negative invariants & poisoning falsifiers');
     !driftRes.ok
       && driftRes.errors.length === 1
       && matchesExactProfileCitation(driftRes.errors[0], mutatedProfileCoord)
-      && !matchesExactProfileCitation(driftRes.errors[0], 'apps/mobile/src/screens/ProfileScreen.tsx:506-507'),
+      && !matchesExactProfileCitation(driftRes.errors[0], profileCitationToken.slice(1, -1)),
     driftRes.errors[0] ?? '',
   );
 
@@ -317,32 +342,41 @@ console.log('\n[2] Negative invariants & poisoning falsifiers');
       );
     },
   });
-  const sqlCommentedTableRes = verifyBetaFilingCitations({
-    repoRoot,
-    readFile: (rel) => {
-      const real = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
-      if (rel !== 'packages/core-db/src/schema/066_focus_and_goals.sql') return real;
-      return real.replace('CREATE TABLE IF NOT EXISTS athlete_goal (', '-- CREATE TABLE IF NOT EXISTS athlete_goal (');
-    },
-  });
+  const commentedSubjectiveSql = readRepoFile(subjectiveCitation.target)
+    .replace(subjectiveTable, (statement) => `/* ${statement} */`)
+    .replace(/^CREATE INDEX IF NOT EXISTS idx_subjective_date .*;$/m, '-- $&');
+  const fixtureDb = new DatabaseSync(':memory:');
+  let fixtureSqlError;
+  try {
+    fixtureDb.exec(commentedSubjectiveSql);
+  } catch (err) {
+    fixtureSqlError = String(err);
+  } finally {
+    fixtureDb.close();
+  }
+  const sqlCommentedTableRes = mutateRepoFile(subjectiveCitation.target, () => commentedSubjectiveSql);
+  const missingSubjectiveAnchor = `${dataSafety} (${subjectiveCitation.token}): line ${subjectiveCitation.start} does not contain expected anchor "${subjectiveCitation.spec.startAnchor}"`;
   check(
     'WO04-SOL-02-R3: commenting out cited XML permission removal, TS backup sealing, or SQL table definition fails closed',
-    !xmlCommentedManifestRes.ok && !tsCommentedSealRes.ok && !sqlCommentedTableRes.ok,
-    [xmlCommentedManifestRes.ok, tsCommentedSealRes.ok, sqlCommentedTableRes.ok].join(','),
+    !fixtureSqlError && !xmlCommentedManifestRes.ok && !tsCommentedSealRes.ok && !sqlCommentedTableRes.ok
+      && sqlCommentedTableRes.errors.some((error) => error.startsWith(missingSubjectiveAnchor))
+      && !sqlCommentedTableRes.errors.some((error) => error.includes('SQLite schema execution failed')),
+    fixtureSqlError ?? sqlCommentedTableRes.errors.join(' | '),
   );
 
   // WO04-SOL-04..06-R3: filing spans cover export invocation, restore authentication + preview, sleep_daily storage, and readiness exclusion
-  const dataSafetyDoc = fs.readFileSync(path.join(repoRoot, 'docs/release/beta/GOOGLE_DATA_SAFETY_ANSWERS.md'), 'utf8');
-  const privacyDoc = fs.readFileSync(path.join(repoRoot, 'docs/release/beta/PRIVACY_POLICY_DRAFT.md'), 'utf8');
-  const hcDoc = fs.readFileSync(path.join(repoRoot, 'docs/release/beta/HEALTH_CONNECT_PERMISSIONS.md'), 'utf8');
+  const coversSpan = ({ target, start, end, spec }) => {
+    const lines = readRepoFile(target).split(/\r\n?|\n/);
+    const span = lines.slice(start - 1, end).join('\n');
+    return start < end
+      && lines[start - 1]?.includes(spec.startAnchor)
+      && lines[end - 1]?.includes(spec.endAnchor)
+      && spec.rangeAnchors.every((anchor) => span.includes(anchor));
+  };
   check(
     'WO04-SOL-04..06-R3: Data Safety, Privacy Policy, and Health Connect spans cover full export, restore auth/preview, sleep_daily, and RHR readiness exclusion',
-    dataSafetyDoc.includes('`apps/mobile/src/state/backupStore.ts:605-1066`')
-      && dataSafetyDoc.includes('`apps/mobile/src/state/useStore.ts:7670-7696`')
-      && privacyDoc.includes('`apps/mobile/src/state/backupStore.ts:1087-1207`')
-      && privacyDoc.includes('`apps/mobile/src/state/useStore.ts:7670-7696`')
-      && privacyDoc.includes('`apps/mobile/src/state/biometricsCopy.ts:13-15`')
-      && hcDoc.includes('`apps/mobile/src/state/biometricsCopy.ts:13-15`'),
+    [exportCitation, citationAt(dataSafety, 6), citationAt(privacy, 15), citationAt(privacy, 10),
+      citationAt(privacy, 11), citationAt(healthConnect, 8)].every(coversSpan),
     'missing widened evidence span',
   );
 
@@ -585,7 +619,6 @@ console.log('\n[2] Negative invariants & poisoning falsifiers');
 
   // WO04-ASTRA-R7a: CommonMark reference-style link labels (`[see][C]` + `[C]: /guide`),
   // undefined/collapsed/deactivated-outer controls, and matching-vs-mixed thematic breaks (`*-_` vs `***`)
-  const profileCitationToken = '`apps/mobile/src/screens/ProfileScreen.tsx:517-518`';
   const mutateDisclaimerProfileCitation = (replacement) => verifyBetaFilingCitations({
     repoRoot,
     readFile: (rel) => {
@@ -666,19 +699,19 @@ console.log('\n[2] Negative invariants & poisoning falsifiers');
     );
   }
 
-  const pickerInRegexRes = verifyBetaFilingCitations({
-    repoRoot,
-    readFile: (rel) => {
-      const real = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
-      if (rel !== 'apps/mobile/src/state/backupStore.ts') return real;
-      const pickerAnchor = 'const saved = await pickerSave(encryptedPath, fileName);';
-      return real.replace(pickerAnchor, `const saved = true; const message = /${pickerAnchor}/;`);
-    },
+  const pickerAnchor = 'const saved = await pickerSave(encryptedPath, fileName);';
+  const pickerInRegexRes = mutateRepoFile(exportCitation.target, (real) => {
+    const lines = real.split('\n');
+    lines[exportCitation.end - 1] = lines[exportCitation.end - 1].replace(
+      pickerAnchor, `const saved = true; const message = /${pickerAnchor}/;`,
+    );
+    return lines.join('\n');
   });
+  const pickerAnchorError = `${dataSafety} (${exportCitation.token}): end line ${exportCitation.end} does not contain expected end anchor "${pickerAnchor}"`;
   check(
-    'WO04-SOL-R8: a picker anchor inside a regular expression literal fails closed at line 1066',
+    'WO04-SOL-R8: a picker anchor inside a regular expression literal fails at the cited end line',
     !pickerInRegexRes.ok
-      && pickerInRegexRes.errors.some((error) => error.includes('end line 1066 does not contain expected end anchor')),
+      && pickerInRegexRes.errors.some((error) => error.startsWith(pickerAnchorError)),
     pickerInRegexRes.errors[0] ?? 'accepted regex literal as an active picker anchor',
   );
 
@@ -735,6 +768,129 @@ console.log('\n[2] Negative invariants & poisoning falsifiers');
       reboundAndroidNsRes.ok,
     ].join(','),
   );
+}
+
+console.log('\n[3] Round 9 regressions');
+{
+  const backupFlag = citationAt(privacy, 20);
+  const sleepPermission = citationAt(healthConnect, 0);
+  const checkCitationError = (label, result, citation, reason) => {
+    const errors = result.errors.filter((error) => error.includes(`(${citation.token}):`));
+    check(`WO04-R9: ${label}`, !result.ok && errors.some((error) => error.includes(reason)),
+      errors.join(' | ') || 'no error at cited location');
+  };
+
+  checkCitationError('missing TypeScript compiler fails closed',
+    verifyBetaFilingCitations({ repoRoot, tsCompiler: null }), exportCitation, 'TypeScript compiler is unavailable');
+  checkCitationError('missing XML parser fails closed',
+    verifyBetaFilingCitations({ repoRoot, xmlDomParser: null }), backupFlag, 'XML parser is unavailable');
+  checkCitationError('XML parser without a document root fails closed',
+    verifyBetaFilingCitations({ repoRoot, xmlDomParser: class {
+      parseFromString() { return { documentElement: null }; }
+    } }), sleepPermission, 'XML document has no root element');
+
+  const hiddenProfileCitation = (label, result) => check(
+    `WO04-R9: ${label}`, !result.ok && result.totalCitations === EXPECTED_CITATION_COUNT - 1
+      && result.errors.length === 1 && result.errors[0].includes(`found ${EXPECTED_CITATION_COUNT - 1}`),
+    result.errors.join(' | ') || 'citation was counted',
+  );
+  const hideProfile = (replacement, eol = '\n') => mutateRepoFile(disclaimer,
+    (real) => real.replace(profileCitationToken, () => replacement).replace(/\r\n?|\n/g, eol));
+  hiddenProfileCitation('bare CR fenced block hides its citation',
+    hideProfile(`~~~\n${profileCitationToken}\n~~~`, '\r'));
+  const bareCrSourceRes = mutateRepoFile(profileCitation.target, (real) => real.replace(/\r\n?|\n/g, '\r'));
+  check('WO04-R9: bare CR source preserves physical citation lines', bareCrSourceRes.ok,
+    bareCrSourceRes.errors[0] ?? '');
+  for (const quote of ['"', "'"]) {
+    hiddenProfileCitation(`quote-initial ${quote} destination takes a title`,
+      hideProfile(`[see](${quote}dest${quote} "title ${profileCitationToken}")`));
+    hiddenProfileCitation(`quote-initial ${quote} title-only link backtracks`,
+      hideProfile(`[see](${quote}title ${profileCitationToken}${quote})`));
+  }
+
+  const displacedBackupFlag = mutateRepoFile(backupFlag.target, (real) => real
+    .replace(backupFlag.spec.startAnchor, `data-decoy='${backupFlag.spec.startAnchor}'`)
+    .replace('<application', `<application ${backupFlag.spec.startAnchor}`));
+  checkCitationError('allowBackup attribute must be on the cited line', displacedBackupFlag, backupFlag,
+    'missing active XML <application android:allowBackup="false"> attribute');
+  const displacedPermission = mutateRepoFile(sleepPermission.target, (real) => {
+    const lines = real.split(/\r\n?|\n/);
+    const { start, spec: { startAnchor } } = sleepPermission;
+    if (lines[start].trim() !== '') throw new Error('Permission fixture needs a blank line after the citation');
+    lines[start] = lines[start - 1];
+    lines[start - 1] = lines[start - 1].replace(startAnchor, `<wrapper xmlns="urn:decoy">${startAnchor}</wrapper>`);
+    return lines.join('\n');
+  });
+  checkCitationError('uses-permission element must start within the cited span', displacedPermission, sleepPermission,
+    `missing active XML <uses-permission android:name="android.permission.health.READ_SLEEP"> element in lines ${sleepPermission.start}-${sleepPermission.end}`);
+
+  const priorPath = EXPECTED_ANCHORS['docs/release/beta/HEALTH_APPS_DECLARATION.md|0'].path;
+  const priorHasTable = mutateRepoFile(priorPath, (real) => `${real}\n${readRepoFile(subjectiveCitation.target).match(subjectiveTable)[0]}\n`);
+  checkCitationError('a table created by a prior migration is not evidence', priorHasTable, subjectiveCitation,
+    'SQLite table "subjective_report" already exists before the cited migration');
+
+  const scopeCitation = citationAt(privacy, 13);
+  const appendedMatch = (anchor, alteredCode) => `decoy: \`${anchor}\`, ${alteredCode}`;
+  const misalignedLine = mutateRepoFile(scopeCitation.target, (real) => real.replace(
+    scopeCitation.spec.startAnchor, appendedMatch(scopeCitation.spec.startAnchor, "scope: 'other-target',"),
+  ));
+  checkCitationError('strict evidence at a different offset cannot satisfy a line anchor', misalignedLine, scopeCitation,
+    `line ${scopeCitation.start} does not contain expected anchor "${scopeCitation.spec.startAnchor}"`);
+  const alignedSecondOccurrence = mutateRepoFile(scopeCitation.target, (real) => real.replace(
+    scopeCitation.spec.startAnchor, appendedMatch(scopeCitation.spec.startAnchor, scopeCitation.spec.startAnchor),
+  ));
+  check('WO04-R9: a later occurrence can satisfy both views at one offset', alignedSecondOccurrence.ok,
+    alignedSecondOccurrence.errors[0] ?? '');
+  const writeAnchor = "await fs().writeFile(encryptedPath, created.text, 'utf8');";
+  const misalignedRange = mutateRepoFile(exportCitation.target, (real) => real.replace(
+    writeAnchor, `const decoy = \`${writeAnchor}\`; ${writeAnchor.replace('utf8', 'hex!')}`,
+  ));
+  checkCitationError('strict evidence at a different offset cannot satisfy a range anchor', misalignedRange, exportCitation,
+    `range ${exportCitation.start}-${exportCitation.end} is missing required active evidence "${writeAnchor}"`);
+
+  const tempRoot = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), 'beta-citations-')));
+  try {
+    const stageFile = (root, rel) => {
+      const dest = path.join(root, rel);
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.writeFileSync(dest, readRepoFile(rel));
+    };
+    const linkDirectory = (root, rel, dest) => {
+      const link = path.join(root, rel);
+      fs.mkdirSync(path.dirname(link), { recursive: true });
+      fs.symlinkSync(dest, link, 'junction');
+    };
+    const external = path.join(tempRoot, 'external');
+    const docRoot = path.join(tempRoot, 'doc');
+    const sourceRoot = path.join(tempRoot, 'source');
+    const migrationRoot = path.join(tempRoot, 'migration');
+    for (const rel of [disclaimer, citationAt(disclaimer, 0).target, profileCitation.target]) stageFile(external, rel);
+    linkDirectory(docRoot, path.dirname(disclaimer), path.join(external, path.dirname(disclaimer)));
+    stageFile(sourceRoot, disclaimer);
+    linkDirectory(sourceRoot, path.dirname(profileCitation.target), path.join(external, path.dirname(profileCitation.target)));
+    stageFile(migrationRoot, dataSafety);
+    stageFile(migrationRoot, subjectiveCitation.target);
+    linkDirectory(migrationRoot, priorPath, external);
+
+    const escapeReason = 'path escapes repository containment';
+    const escapedDoc = verifyBetaFilingCitations({ repoRoot: docRoot });
+    check('WO04-R9: required filing document cannot follow a junction outside the checkout',
+      !escapedDoc.ok && escapedDoc.errors.some((error) => error.startsWith(`${disclaimer}:`) && error.includes(escapeReason)),
+      escapedDoc.errors.filter((error) => error.startsWith(`${disclaimer}:`)).join(' | ') || 'no containment error');
+    checkCitationError('cited source cannot follow a junction outside the checkout',
+      verifyBetaFilingCitations({ repoRoot: sourceRoot }), profileCitation, escapeReason);
+    checkCitationError('prior migration cannot follow a junction outside the checkout',
+      verifyBetaFilingCitations({ repoRoot: migrationRoot }), subjectiveCitation, `${escapeReason}: ${priorPath}`);
+  } finally {
+    if (path.dirname(tempRoot) !== fs.realpathSync(os.tmpdir())) throw new Error('Unexpected fixture root');
+    fs.rmSync(tempRoot, { recursive: true });
+  }
+
+  const { scripts } = JSON.parse(readRepoFile('package.json'));
+  check('WO04-R9: release gate runs the citation verifier and its regression suite',
+    scripts['verify:beta-citations'] === 'node tools/verify_beta_filing_citations.mjs && node tools/test_verify_beta_filing_citations.mjs'
+      && scripts['verify:release'].endsWith(' && npm run verify:beta-citations'),
+    scripts['verify:release']);
 }
 
 console.log(`\n${failed === 0 ? 'ALL BETA FILING CITATION TESTS PASSED' : `${failed} TEST(S) FAILED`}`);

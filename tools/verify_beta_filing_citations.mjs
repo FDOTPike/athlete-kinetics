@@ -471,6 +471,16 @@ function isRepoContainedRelativePath(repoRoot, relPath) {
   return Boolean(rel) && !rel.startsWith('..') && !path.isAbsolute(rel);
 }
 
+function resolveContainedRealPath(repoRoot, relPath) {
+  const realRoot = fs.realpathSync(repoRoot);
+  const realTarget = fs.realpathSync(path.resolve(repoRoot, relPath));
+  const rel = path.relative(realRoot, realTarget);
+  if (!rel || rel === '..' || rel.startsWith(`..${path.sep}`) || path.isAbsolute(rel)) {
+    throw new Error(`path escapes repository containment: ${relPath}`);
+  }
+  return realTarget;
+}
+
 const ASCII_PUNCT_RE = /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/;
 
 const HTML_TYPE1_OPEN_RE = /^<(pre|script|style|textarea)(?:[ \t>]|$)/i;
@@ -844,36 +854,26 @@ function tryConsumeInlineLinkTail(block, openParenIdx) {
   if (block[openParenIdx] !== '(') return -1;
   const ws1 = skipOptionalInlineWsNoBlankLine(block, openParenIdx + 1);
   if (ws1 === null) return -1;
-  let idx = ws1.idx;
-  if (idx >= block.length) return -1;
+  const idx = ws1.idx;
   if (block[idx] === ')') return idx + 1;
 
-  let hasDest = false;
-  if (block[idx] !== '"' && block[idx] !== "'") {
-    const afterDest = scanBalancedDestination(block, idx);
-    if (afterDest !== -1) {
-      idx = afterDest;
-      hasDest = true;
-    }
-  }
-
-  const ws2 = skipOptionalInlineWsNoBlankLine(block, idx);
-  if (ws2 === null) return -1;
-  idx = ws2.idx;
-  if (idx >= block.length) return -1;
-  if (block[idx] === ')') return idx + 1;
-
-  if (hasDest && !ws2.sawAny) return -1;
-  if (block[idx] === '"' || block[idx] === "'" || block[idx] === '(') {
-    const afterTitle = scanLinkTitle(block, idx);
+  const closeAfterTitle = (titleIdx) => {
+    const afterTitle = scanLinkTitle(block, titleIdx);
     if (afterTitle === -1) return -1;
-    const ws3 = skipOptionalInlineWsNoBlankLine(block, afterTitle);
-    if (ws3 === null) return -1;
-    if (ws3.idx < block.length && block[ws3.idx] === ')') {
-      return ws3.idx + 1;
+    const ws = skipOptionalInlineWsNoBlankLine(block, afterTitle);
+    return ws && block[ws.idx] === ')' ? ws.idx + 1 : -1;
+  };
+
+  const afterDest = scanBalancedDestination(block, idx);
+  if (afterDest !== -1) {
+    const ws = skipOptionalInlineWsNoBlankLine(block, afterDest);
+    if (ws && block[ws.idx] === ')') return ws.idx + 1;
+    if (ws?.sawAny) {
+      const end = closeAfterTitle(ws.idx);
+      if (end !== -1) return end;
     }
   }
-  return -1;
+  return closeAfterTitle(idx);
 }
 
 const HTML_RAW_TOKEN_RE = /^(?:<!--[\s\S]*?-->|<\?[\s\S]*?\?>|<![A-Z][\s\S]*?>|<!\[CDATA\[[\s\S]*?\]\]>|<\/[A-Za-z][A-Za-z0-9-]*\s*>|<[A-Za-z][A-Za-z0-9-]*(?:\s+[A-Za-z_:][A-Za-z0-9_.:-]*(?:\s*=\s*(?:[^\s"'=<>`]+|'[^']*'|"[^"]*"))?)*\s*\/?>|<[A-Za-z][A-Za-z0-9+.-]{1,31}:[^\s<>]*>|<[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)*>)/;
@@ -1016,7 +1016,7 @@ function extractInlineCitationsFromBlock(doc, block, definedLabels, citations, e
  * each paragraph/heading inline block independently for live single-backtick citations.
  */
 function extractLiveCitations(doc, text, errors) {
-  const lines = text.split(/\r?\n/);
+  const lines = text.replace(/\r\n?/g, '\n').split('\n');
   const inlineBlocks = [];
   const definedLabels = new Set();
   const containers = [];
@@ -1179,8 +1179,7 @@ function extractLiveCitations(doc, text, errors) {
 }
 
 function splitPhysicalLines(rawText) {
-  const withoutTrailingEol = rawText.replace(/\r?\n$/, '');
-  return withoutTrailingEol.split(/\r?\n/);
+  return rawText.replace(/\r\n?/g, '\n').replace(/\n$/, '').split('\n');
 }
 
 function findClosingSingleLineQuote(rawText, openIdx, quote) {
@@ -1193,55 +1192,6 @@ function findClosingSingleLineQuote(rawText, openIdx, quote) {
       continue;
     }
     if (ch === quote) return i;
-    i += 1;
-  }
-  return -1;
-}
-
-const REGEX_PRECEDING_CHAR_RE = /[=(,[!:&|?{;~^%*+\-<>]/;
-
-function canStartRegexLiteral(maskedPrefix, rawText, slashIdx) {
-  if (slashIdx > 0 && rawText[slashIdx - 1] === '<') return false; // JSX `</Tag>`
-  let k = maskedPrefix.length - 1;
-  while (k >= 0 && /\s/.test(maskedPrefix[k])) k -= 1;
-  if (k < 0) return true;
-  if (maskedPrefix[k] === '+' && k > 0 && maskedPrefix[k - 1] === '+') return false; // postfix `x++ / y`
-  if (maskedPrefix[k] === '-' && k > 0 && maskedPrefix[k - 1] === '-') return false; // postfix `x-- / y`
-  if (REGEX_PRECEDING_CHAR_RE.test(maskedPrefix[k])) return true;
-  const identMatch = /(?:^|[^A-Za-z0-9_$])(return|case|throw|typeof|void|delete|in|of|instanceof|new|yield|await)$/.exec(
-    maskedPrefix.slice(Math.max(0, k - 14), k + 1),
-  );
-  return Boolean(identMatch);
-}
-
-function findClosingRegexLiteral(rawText, openIdx) {
-  let i = openIdx + 1;
-  if (i >= rawText.length || rawText[i] === '/' || rawText[i] === '*' || rawText[i] === '\r' || rawText[i] === '\n') {
-    return -1;
-  }
-  let inCharClass = false;
-  while (i < rawText.length) {
-    const ch = rawText[i];
-    if (ch === '\r' || ch === '\n') return -1;
-    if (ch === '\\') {
-      i += 2;
-      continue;
-    }
-    if (ch === '[') {
-      inCharClass = true;
-      i += 1;
-      continue;
-    }
-    if (ch === ']' && inCharClass) {
-      inCharClass = false;
-      i += 1;
-      continue;
-    }
-    if (ch === '/' && !inCharClass) {
-      let end = i + 1;
-      while (end < rawText.length && /[dgimsuvy]/.test(rawText[end])) end += 1;
-      return end - 1;
-    }
     i += 1;
   }
   return -1;
@@ -1335,104 +1285,11 @@ function buildJsTsActiveViewsWithTypeScript(ts, relPath, rawText) {
   };
 }
 
-function stripJsTsCommentsPreservingLines(relPath, rawText, maskKeepNewlines) {
-  const ts = loadTypeScriptCompiler();
-  if (ts !== null) {
-    return buildJsTsActiveViewsWithTypeScript(ts, relPath, rawText);
+function stripJsTsCommentsPreservingLines(tsCompiler, relPath, rawText) {
+  if (tsCompiler === null) {
+    return { activeText: '', strictCodeText: '', parseErrors: ['TypeScript compiler is unavailable'] };
   }
-  let out = '';
-  let idx = 0;
-  const templateStack = [];
-
-  while (idx < rawText.length) {
-    const inTemplateText = templateStack.length > 0 && templateStack[templateStack.length - 1] === -1;
-    if (inTemplateText) {
-      if (rawText[idx] === '\\' && idx + 1 < rawText.length) {
-        out += rawText[idx] + rawText[idx + 1];
-        idx += 2;
-        continue;
-      }
-      if (rawText[idx] === '`') {
-        templateStack.pop();
-        out += '`';
-        idx += 1;
-        continue;
-      }
-      if (rawText[idx] === '$' && rawText[idx + 1] === '{') {
-        templateStack[templateStack.length - 1] = 0;
-        out += '${';
-        idx += 2;
-        continue;
-      }
-      out += rawText[idx];
-      idx += 1;
-      continue;
-    }
-
-    if (rawText.startsWith('/*', idx)) {
-      const end = rawText.indexOf('*/', idx + 2);
-      const slice = end === -1 ? rawText.slice(idx) : rawText.slice(idx, end + 2);
-      out += maskKeepNewlines(slice);
-      idx = end === -1 ? rawText.length : end + 2;
-      continue;
-    }
-    if (rawText.startsWith('//', idx)) {
-      const nl = rawText.indexOf('\n', idx + 2);
-      const slice = nl === -1 ? rawText.slice(idx) : rawText.slice(idx, nl);
-      out += maskKeepNewlines(slice);
-      idx = nl === -1 ? rawText.length : nl;
-      continue;
-    }
-    if (rawText[idx] === '`') {
-      templateStack.push(-1);
-      out += '`';
-      idx += 1;
-      continue;
-    }
-    if (templateStack.length > 0) {
-      if (rawText[idx] === '{') {
-        templateStack[templateStack.length - 1] += 1;
-        out += '{';
-        idx += 1;
-        continue;
-      }
-      if (rawText[idx] === '}') {
-        if (templateStack[templateStack.length - 1] === 0) {
-          templateStack[templateStack.length - 1] = -1;
-        } else {
-          templateStack[templateStack.length - 1] -= 1;
-        }
-        out += '}';
-        idx += 1;
-        continue;
-      }
-    }
-    if (rawText[idx] === '/' && canStartRegexLiteral(out, rawText, idx)) {
-      const closeRegexIdx = findClosingRegexLiteral(rawText, idx);
-      if (closeRegexIdx !== -1) {
-        const rawSlice = rawText.slice(idx, closeRegexIdx + 1);
-        const closeSlashInSlice = rawSlice.lastIndexOf('/');
-        out += closeSlashInSlice > 0
-          ? '/' + maskKeepNewlines(rawSlice.slice(1, closeSlashInSlice)) + rawSlice.slice(closeSlashInSlice)
-          : rawSlice;
-        idx = closeRegexIdx + 1;
-        continue;
-      }
-    }
-    if (rawText[idx] === "'" || rawText[idx] === '"') {
-      const quote = rawText[idx];
-      const isJsxProseApostrophe = quote === "'" && idx > 0 && /[A-Za-z0-9]/.test(rawText[idx - 1]);
-      const closeIdx = isJsxProseApostrophe ? -1 : findClosingSingleLineQuote(rawText, idx, quote);
-      if (closeIdx !== -1) {
-        out += rawText.slice(idx, closeIdx + 1);
-        idx = closeIdx + 1;
-        continue;
-      }
-    }
-    out += rawText[idx];
-    idx += 1;
-  }
-  return { activeText: out, strictCodeText: out, parseErrors: [] };
+  return buildJsTsActiveViewsWithTypeScript(tsCompiler, relPath, rawText);
 }
 
 function stripSqlCommentsAndLiteralsPreservingLines(rawText, maskKeepNewlines) {
@@ -1496,13 +1353,13 @@ function stripSqlCommentsAndLiteralsPreservingLines(rawText, maskKeepNewlines) {
   return out;
 }
 
-function inspectXmlDom(rawText) {
-  const DOMParser = loadXmlDomParser();
-  if (DOMParser === null) return { parseErrors: [], doc: null };
+function inspectXmlDom(rawText, DOMParser) {
+  if (DOMParser === null) return { parseErrors: ['XML parser is unavailable'], doc: null };
   const parseErrors = [];
   let doc = null;
   try {
     doc = new DOMParser({
+      locator: {},
       errorHandler: {
         warning: () => {},
         error: (msg) => parseErrors.push(String(msg)),
@@ -1512,6 +1369,7 @@ function inspectXmlDom(rawText) {
   } catch (err) {
     parseErrors.push(String(err));
   }
+  if (!doc?.documentElement) parseErrors.push('XML document has no root element');
   return { parseErrors, doc };
 }
 
@@ -1527,21 +1385,24 @@ function inspectSqliteTables(repoRoot, relPath, rawText, readFile) {
     }
     const schemaDir = 'packages/core-db/src/schema';
     const absSchemaDir = path.join(repoRoot, schemaDir);
+    // Checkout migration SQL is trusted repository code with the same privileges as this verifier and its tests.
     if (relPath.startsWith(`${schemaDir}/`) && fs.existsSync(absSchemaDir)) {
       const targetBase = path.posix.basename(relPath);
       const priorFiles = fs
-        .readdirSync(absSchemaDir)
+        .readdirSync(resolveContainedRealPath(repoRoot, schemaDir))
         .filter((f) => /^0\d\d_.*\.sql$/.test(f) && !f.startsWith('004_') && f < targetBase)
         .sort();
       for (const prior of priorFiles) {
         db.exec(readFile(`${schemaDir}/${prior}`));
       }
     }
+    const tableQuery = db.prepare("SELECT lower(name) AS name FROM sqlite_master WHERE type = 'table'");
+    const tablesBefore = new Set(tableQuery.all().map((row) => row.name));
     db.exec(rawText);
-    const rows = db.prepare("SELECT name FROM sqlite_master WHERE type = 'table'").all();
-    return { sqlError: null, tables: new Set(rows.map((r) => String(r.name))) };
+    const tablesAfter = new Set(tableQuery.all().map((row) => row.name));
+    return { sqlError: null, tablesBefore, tablesAfter };
   } catch (err) {
-    return { sqlError: String(err), tables: new Set() };
+    return { sqlError: String(err) };
   } finally {
     db.close();
   }
@@ -1550,12 +1411,22 @@ function inspectSqliteTables(repoRoot, relPath, rawText, readFile) {
 const ANDROID_XML_NS = 'http://schemas.android.com/apk/res/android';
 const ANDROID_TOOLS_XML_NS = 'http://schemas.android.com/tools';
 
-function verifyXmlElementSemantics(xmlInfo, spec, c) {
-  if (xmlInfo.parseErrors.length > 0) {
-    return `malformed XML: ${xmlInfo.parseErrors[0]}`;
-  }
-  if (!xmlInfo.doc || !xmlInfo.doc.documentElement) return null;
-  const root = xmlInfo.doc.documentElement;
+function xmlAttributeIsInSpan(el, attr, c, lines) {
+  if (Number.isInteger(attr.lineNumber)) return c.start <= attr.lineNumber && attr.lineNumber <= c.end;
+  if (!Number.isInteger(el.lineNumber) || el.lineNumber < 1 || el.lineNumber > lines.length) return false;
+
+  // The element locator starts at its opening tag, whose attributes can span multiple lines.
+  const [firstLine, ...followingLines] = lines.slice(el.lineNumber - 1);
+  const source = [firstLine.slice((el.columnNumber ?? 1) - 1), ...followingLines].join('\n');
+  const openingTag = /^[ \t]*<(?:[^<>"']|"[^"]*"|'[^']*')*>/.exec(source)?.[0];
+  if (!openingTag) return false;
+  const lastLine = el.lineNumber + openingTag.split('\n').length - 1;
+  return c.start <= lastLine && el.lineNumber <= c.end;
+}
+
+function verifyXmlElementSemantics(xmlInfo, spec, c, lines) {
+  const root = xmlInfo.doc?.documentElement;
+  if (!root) return 'malformed XML: XML document has no root element';
   if (Boolean(root.namespaceURI) || (root.localName ?? root.tagName) !== 'manifest') {
     return 'AndroidManifest root element must be unprefixed <manifest> in default namespace';
   }
@@ -1571,7 +1442,7 @@ function verifyXmlElementSemantics(xmlInfo, spec, c) {
       if (!el || el.parentNode !== root || Boolean(el.namespaceURI)) continue;
       if (el.getAttributeNS(ANDROID_XML_NS, 'name') !== targetPerm) continue;
       if (requiresRemove && el.getAttributeNS(ANDROID_TOOLS_XML_NS, 'node') !== 'remove') continue;
-      if (typeof el.lineNumber === 'number' && (el.lineNumber < c.start || el.lineNumber > c.end)) continue;
+      if (!Number.isInteger(el.lineNumber) || el.lineNumber < c.start || el.lineNumber > c.end) continue;
       found = true;
       break;
     }
@@ -1584,18 +1455,15 @@ function verifyXmlElementSemantics(xmlInfo, spec, c) {
     let found = false;
     for (let i = 0; i < apps.length; i += 1) {
       const el = apps.item(i);
-      if (
-        el
-        && el.parentNode === root
-        && !el.namespaceURI
-        && el.getAttributeNS(ANDROID_XML_NS, 'allowBackup') === 'false'
-      ) {
+      if (!el || el.parentNode !== root || el.namespaceURI) continue;
+      const attr = el.getAttributeNodeNS(ANDROID_XML_NS, 'allowBackup');
+      if (attr?.value === 'false' && xmlAttributeIsInSpan(el, attr, c, lines)) {
         found = true;
         break;
       }
     }
     if (!found) {
-      return 'missing active XML <application android:allowBackup="false"> attribute';
+      return `missing active XML <application android:allowBackup="false"> attribute in lines ${c.start}-${c.end}`;
     }
   }
   return null;
@@ -1605,12 +1473,13 @@ function verifySqlTableSemantics(sqlInfo, spec) {
   if (sqlInfo.sqlError !== null) {
     return `SQLite schema execution failed: ${sqlInfo.sqlError}`;
   }
-  const anchors = [spec.startAnchor, ...(spec.rangeAnchors ?? [])];
+  const anchors = [spec.startAnchor, ...(spec.rangeAnchors ?? []), spec.endAnchor ?? ''];
   for (const anchor of anchors) {
     const m = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([A-Za-z_][A-Za-z0-9_]*)\b/i.exec(anchor);
-    if (m && !sqlInfo.tables.has(m[1])) {
-      return `SQLite execution did not create expected table "${m[1]}"`;
-    }
+    if (!m) continue;
+    const name = m[1].toLowerCase();
+    if (sqlInfo.tablesBefore.has(name)) return `SQLite table "${m[1]}" already exists before the cited migration`;
+    if (!sqlInfo.tablesAfter.has(name)) return `SQLite execution did not create expected table "${m[1]}"`;
   }
   return null;
 }
@@ -1619,7 +1488,7 @@ function verifySqlTableSemantics(sqlInfo, spec) {
  * Build line-aligned source views so commented-out or inert string/CDATA/PI text
  * in XML, TS/TSX, or SQL cannot masquerade as active implementation.
  */
-function buildSourceBundle(repoRoot, relPath, rawText, readFile) {
+function buildSourceBundle(repoRoot, relPath, rawText, readFile, { tsCompiler, xmlDomParser }) {
   const maskKeepNewlines = (chunk) => chunk.replace(/[^\r\n]/g, ' ');
   const lines = splitPhysicalLines(rawText);
   if (relPath.endsWith('.xml')) {
@@ -1628,12 +1497,13 @@ function buildSourceBundle(repoRoot, relPath, rawText, readFile) {
       .replace(/<!\[CDATA\[[\s\S]*?(?:\]\]>|$)/g, maskKeepNewlines)
       .replace(/<\?[\s\S]*?(?:\?>|$)/g, maskKeepNewlines);
     const activeLines = splitPhysicalLines(stripped);
+    const xmlInfo = inspectXmlDom(rawText, xmlDomParser);
     return {
       lines,
       activeLines,
       strictCodeLines: activeLines,
-      parseErrors: [],
-      xmlInfo: inspectXmlDom(rawText),
+      parseErrors: xmlInfo.parseErrors,
+      xmlInfo,
       sqlInfo: null,
     };
   }
@@ -1650,7 +1520,7 @@ function buildSourceBundle(repoRoot, relPath, rawText, readFile) {
     };
   }
   if (relPath.endsWith('.ts') || relPath.endsWith('.tsx') || relPath.endsWith('.mjs') || relPath.endsWith('.js')) {
-    const { activeText, strictCodeText, parseErrors } = stripJsTsCommentsPreservingLines(relPath, rawText, maskKeepNewlines);
+    const { activeText, strictCodeText, parseErrors } = stripJsTsCommentsPreservingLines(tsCompiler, relPath, rawText);
     return {
       lines,
       activeLines: splitPhysicalLines(activeText),
@@ -1691,17 +1561,32 @@ function maskJsStringInteriorsInSnippet(snippet) {
   return out;
 }
 
+function hasAlignedCodeAnchor(activeText, strictCodeText, anchor) {
+  const maskedAnchor = maskJsStringInteriorsInSnippet(anchor);
+  for (let offset = activeText.indexOf(anchor); offset !== -1; offset = activeText.indexOf(anchor, offset + 1)) {
+    if (strictCodeText.startsWith(maskedAnchor, offset)) return true;
+  }
+  return false;
+}
+
 export function verifyBetaFilingCitations({
   repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..'),
-  readFile = (relPath) => fs.readFileSync(path.join(repoRoot, relPath), 'utf8'),
+  readFile,
   exists = (relPath) => fs.existsSync(path.join(repoRoot, relPath)),
+  tsCompiler = loadTypeScriptCompiler(),
+  xmlDomParser = loadXmlDomParser(),
 } = {}) {
   const errors = [];
   const bundleCache = new Map();
+  const readRepoFile = (relPath) => {
+    const candidate = path.resolve(repoRoot, relPath);
+    const resolved = !readFile || fs.existsSync(candidate) ? resolveContainedRealPath(repoRoot, relPath) : candidate;
+    return readFile ? readFile(relPath) : fs.readFileSync(resolved, 'utf8');
+  };
   const getSourceBundle = (relPath) => {
     if (!bundleCache.has(relPath)) {
-      const raw = readFile(relPath);
-      bundleCache.set(relPath, buildSourceBundle(repoRoot, relPath, raw, readFile));
+      const raw = readRepoFile(relPath);
+      bundleCache.set(relPath, buildSourceBundle(repoRoot, relPath, raw, readRepoFile, { tsCompiler, xmlDomParser }));
     }
     return bundleCache.get(relPath);
   };
@@ -1713,7 +1598,13 @@ export function verifyBetaFilingCitations({
       errors.push(`${doc}: required filing document is missing`);
       continue;
     }
-    const text = readFile(doc);
+    let text;
+    try {
+      text = readRepoFile(doc);
+    } catch (err) {
+      errors.push(`${doc}: ${err.message}`);
+      continue;
+    }
     if (!text.trim()) {
       errors.push(`${doc}: filing document is empty`);
       continue;
@@ -1744,10 +1635,17 @@ export function verifyBetaFilingCitations({
         errors.push(`${doc} (${c.raw}): target file does not exist: ${c.targetPath}`);
         return;
       }
-      const bundle = getSourceBundle(c.targetPath);
+      let bundle;
+      try {
+        bundle = getSourceBundle(c.targetPath);
+      } catch (err) {
+        errors.push(`${doc} (${c.raw}): ${err.message}`);
+        return;
+      }
       const { lines, activeLines, strictCodeLines, parseErrors, xmlInfo, sqlInfo } = bundle;
       if (parseErrors.length > 0) {
-        errors.push(`${doc} (${c.raw}): syntax error in ${c.targetPath}: ${parseErrors[0]}`);
+        const context = xmlInfo ? 'malformed XML' : `syntax error in ${c.targetPath}`;
+        errors.push(`${doc} (${c.raw}): ${context}: ${parseErrors[0]}`);
         return;
       }
       if (c.start < 1 || c.end < c.start || c.end > lines.length) {
@@ -1764,21 +1662,15 @@ export function verifyBetaFilingCitations({
       const lineMatchesAnchor = (lineIdx, anchor, isComment, allowStringLiteral) => {
         if (isComment) return lines[lineIdx].includes(anchor);
         if (allowStringLiteral || !bundle.isJsTs) return activeLines[lineIdx].includes(anchor);
-        return (
-          activeLines[lineIdx].includes(anchor)
-          && strictCodeLines[lineIdx].includes(maskJsStringInteriorsInSnippet(anchor))
-        );
+        return hasAlignedCodeAnchor(activeLines[lineIdx], strictCodeLines[lineIdx], anchor);
       };
 
       const rangeMatchesAnchor = (startIdx, endExclusiveIdx, anchor, isComment, allowStringLiteral) => {
         if (isComment) return lines.slice(startIdx, endExclusiveIdx).join('\n').includes(anchor);
-        const inActive = activeLines.slice(startIdx, endExclusiveIdx).join('\n').includes(anchor);
-        if (!inActive) return false;
-        if (allowStringLiteral || !bundle.isJsTs) return true;
-        return strictCodeLines
-          .slice(startIdx, endExclusiveIdx)
-          .join('\n')
-          .includes(maskJsStringInteriorsInSnippet(anchor));
+        const active = activeLines.slice(startIdx, endExclusiveIdx).join('\n');
+        if (allowStringLiteral || !bundle.isJsTs) return active.includes(anchor);
+        const strict = strictCodeLines.slice(startIdx, endExclusiveIdx).join('\n');
+        return hasAlignedCodeAnchor(active, strict, anchor);
       };
 
       if (!lineMatchesAnchor(c.start - 1, spec.startAnchor, spec.startAnchorIsComment, spec.anchorInStringLiteral)) {
@@ -1823,8 +1715,8 @@ export function verifyBetaFilingCitations({
         }
       }
 
-      if (xmlInfo !== null && !spec.startAnchorIsComment) {
-        const xmlErr = verifyXmlElementSemantics(xmlInfo, spec, c);
+      if (xmlInfo !== null) {
+        const xmlErr = verifyXmlElementSemantics(xmlInfo, spec, c, lines);
         if (xmlErr !== null) {
           errors.push(`${doc} (${c.raw}): ${xmlErr}`);
         }
