@@ -350,7 +350,7 @@ test('WO03-SOL-R2a: a finalized workout from an archived block on the replacemen
       blockId: 2,
       startDate: '2026-11-04',
       objective: 'hypertrophy',
-      createdAtMs: sameDayMs + 3600000,
+      createdAtMs: sameDayMs - 3600000,
     },
     focus: { bundleId: 'beach_muscles', muscles: ['upper_chest'], customised: false, movementControl: false },
     blockSessions: [{
@@ -361,10 +361,20 @@ test('WO03-SOL-R2a: a finalized workout from an archived block on the replacemen
       phase: 'accumulation',
       sessionDate: '2026-11-04',
       slotCount: 1,
-      completionStatus: null,
+      completionStatus: 'halted',
     }],
     loadRecentOutcomes: jest.fn(() => [{
+      sessionId: 20,
+      sourcePlannedSessionId: 101,
+      outcomeKind: 'stopped_safely',
+      finalizedAtMs: sameDayMs + 3600000,
+      focus: 'upper',
+      originKind: 'planned',
+      exerciseCount: 1,
+      loggedSetCount: 1,
+    }, {
       sessionId: 19,
+      sourcePlannedSessionId: 99,
       outcomeKind: 'followed_plan',
       finalizedAtMs: sameDayMs,
       focus: 'upper',
@@ -372,17 +382,13 @@ test('WO03-SOL-R2a: a finalized workout from an archived block on the replacemen
       exerciseCount: 1,
       loggedSetCount: 3,
     }]),
-    loadSessionSummaryFacts: jest.fn(() => ({
+    loadSessionSummaryFacts: jest.fn((sessionId) => ({
       durationMin: 30,
       exercises: [{
         movementId: 10,
         movementName: 'Incline Dumbbell Press',
         plannedSets: 3,
-        sets: [
-          { reps: 8, loadKg: 20, timeS: null },
-          { reps: 8, loadKg: 20, timeS: null },
-          { reps: 8, loadKg: 20, timeS: null },
-        ],
+        sets: Array.from({ length: sessionId === 20 ? 1 : 3 }, () => ({ reps: 8, loadKg: 20, timeS: null })),
       }],
       previousSets: [],
       skippedExercises: [],
@@ -405,8 +411,10 @@ test('WO03-SOL-R2a: a finalized workout from an archived block on the replacemen
 
   render(<ProgressScreen />);
   expect(screen.getByTestId('progress-focus-muscle-upper_chest')).toHaveTextContent(
-    'Upper chest · 0 of 3 planned sets completed this week',
+    'Upper chest · 1 of 3 planned sets completed this week',
   );
+  expect(mockState.loadSessionSummaryFacts).toHaveBeenCalledWith(20);
+  expect(mockState.loadSessionSummaryFacts).not.toHaveBeenCalledWith(19);
 });
 
 test('WO03-SOL-R2b: twenty-five newer extra sessions do not hide a finalized planned workout from the active week counter', () => {
@@ -432,7 +440,24 @@ test('WO03-SOL-R2b: twenty-five newer extra sessions do not hide a finalized pla
       loggedSetCount: 3,
     },
   ];
+  const db = makeNodeSqliteDriver();
+  db.raw.exec('CREATE TABLE session_outcome (session_id INTEGER PRIMARY KEY, finalized_at_ms INTEGER, origin_kind TEXT)');
+  db.raw.exec('CREATE TABLE session_origin (session_id INTEGER PRIMARY KEY, origin_kind TEXT, source_planned_session_id INTEGER)');
+  const insertOutcome = db.raw.prepare('INSERT INTO session_outcome VALUES (?, ?, ?)');
+  const insertOrigin = db.raw.prepare('INSERT INTO session_origin VALUES (?, ?, ?)');
+  for (const row of allRows) {
+    insertOutcome.run(row.sessionId, row.finalizedAtMs, row.originKind);
+    insertOrigin.run(row.sessionId, row.originKind, row.sessionId === 50 ? 1 : null);
+  }
+  // A plan link without a finalized outcome must not be read for set credit.
+  insertOrigin.run(49, 'planned', 1);
+  const open = jest.spyOn(require('@op-engineering/op-sqlite'), 'open').mockReturnValue(db);
+  const { authorizeAthleteDataBoot, resetDataMaintenanceLockForTests } = require('../../src/state/dataMaintenanceLock');
+  authorizeAthleteDataBoot();
   mockState = state({
+    status: 'ready',
+    activeAthleteId: 'athlete',
+    athletes: [{ id: 'athlete', dbName: 'active-week.sqlite' }],
     today: '2026-11-04',
     block: {
       blockId: 1,
@@ -487,12 +512,83 @@ test('WO03-SOL-R2b: twenty-five newer extra sessions do not hide a finalized pla
     goals: [],
   });
 
-  render(<ProgressScreen />);
-  expect(screen.getByTestId('progress-focus-muscle-upper_chest')).toHaveTextContent(
-    'Upper chest · 3 of 3 planned sets completed this week',
+  try {
+    render(<ProgressScreen />);
+    expect(mockState.loadRecentOutcomes).toHaveBeenCalledTimes(1);
+    expect(mockState.loadRecentOutcomes).toHaveBeenCalledWith(20);
+    expect(open).toHaveBeenCalledWith({ name: 'active-week.sqlite' });
+    expect(screen.getByTestId('progress-focus-muscle-upper_chest')).toHaveTextContent(
+      'Upper chest · 3 of 3 planned sets completed this week',
+    );
+    expect(mockState.loadSessionSummaryFacts).toHaveBeenCalledWith(50);
+    expect(mockState.loadSessionSummaryFacts).not.toHaveBeenCalledWith(49);
+    expect(screen.getByTestId('progress-session-181')).toBeOnTheScreen();
+    expect(screen.queryByTestId('progress-session-180')).toBeNull();
+    expect(screen.queryByTestId('progress-session-50')).toBeNull();
+  } finally {
+    resetDataMaintenanceLockForTests();
+    db.raw.close();
+  }
+});
+
+test('Progress keeps the Plan calendar week on its last recovery day', () => {
+  mockState = state({
+    today: '2026-11-08',
+    block: { blockId: 1, startDate: '2026-11-02', objective: 'strength', createdAtMs: 1 },
+    blockSessions: [
+      { plannedSessionId: 101, weekIndex: 1, sessionDate: '2026-11-06', completionStatus: 'complete' },
+      { plannedSessionId: 102, weekIndex: 2, sessionDate: '2026-11-09', completionStatus: null },
+    ],
+    focus: { bundleId: null, muscles: ['chest'], customised: true, movementControl: false },
+    movements: [{ movement_id: 10, targetMuscles: ['chest'] }],
+    loadSessionSlots: jest.fn((planId) => [{ movementId: 10, sets: planId === 101 ? 3 : 6 }]),
+    loadRecentOutcomes: jest.fn(() => [{
+      sessionId: 50, sourcePlannedSessionId: 101, outcomeKind: 'stopped_safely', originKind: 'planned',
+      finalizedAtMs: new SpyDate('2026-11-06T09:00:00').getTime(),
+    }]),
+    loadSessionSummaryFacts: jest.fn(() => ({ exercises: [{ movementId: 10, plannedSets: 3, sets: [{}] }] })),
+  });
+
+  const view = render(<ProgressScreen />);
+  expect(screen.getByTestId('progress-focus-muscle-chest')).toHaveTextContent(
+    'Chest · 1 of 3 planned sets completed this week',
   );
-  // Recent sessions display remains bounded to the 20 most recent rows
-  expect(screen.queryByTestId('progress-session-50')).toBeNull();
+  mockState.today = '2026-11-09';
+  view.rerender(<ProgressScreen />);
+  expect(screen.getByTestId('progress-focus-muscle-chest')).toHaveTextContent(
+    'Chest · 0 of 6 planned sets completed this week',
+  );
+});
+
+test('Progress hides weekly totals after a slot read fails and keeps Recent Sessions usable', () => {
+  const loadSessionSlots = jest.fn((planId) => {
+    if (planId === 102) throw new Error('unreadable planned slots');
+    return [{ movementId: 10, sets: 3 }];
+  });
+  const loadSessionSummaryFacts = jest.fn(() => ({ durationMin: null, exercises: [], previousSets: [], skippedExercises: [] }));
+  mockState = state({
+    today: '2026-11-04',
+    block: { blockId: 1, startDate: '2026-11-02', objective: 'strength', createdAtMs: 1 },
+    blockSessions: [
+      { plannedSessionId: 101, weekIndex: 1, sessionDate: '2026-11-02', completionStatus: 'complete' },
+      { plannedSessionId: 102, weekIndex: 1, sessionDate: '2026-11-04', completionStatus: null },
+    ],
+    focus: { bundleId: null, muscles: ['chest'], customised: true, movementControl: false },
+    movements: [{ movement_id: 10, targetMuscles: ['chest'] }],
+    loadSessionSlots,
+    loadRecentOutcomes: jest.fn(() => [{
+      sessionId: 50, sourcePlannedSessionId: 101, outcomeKind: 'stopped_safely', originKind: 'planned',
+      finalizedAtMs: new SpyDate('2026-11-02T09:00:00').getTime(),
+    }]),
+    loadSessionSummaryFacts,
+  });
+
+  render(<ProgressScreen />);
+  expect(loadSessionSlots).toHaveBeenCalledWith(102);
+  expect(screen.queryByTestId('progress-focus-muscle-chest')).toBeNull();
+  expect(loadSessionSummaryFacts).not.toHaveBeenCalled();
+  fireEvent.press(screen.getByTestId('progress-session-50'));
+  expect(screen.getByTestId('progress-session-50-summary')).toBeOnTheScreen();
 });
 
 test('WO03-SOL-R3: catching up on a missed Week 1 workout during Week 2 does not credit Week 2 counter or read Week 1 summary facts', () => {
@@ -914,9 +1010,7 @@ test('WO03-ASTRA-R7a: transient session_origin query failure is not cached and r
     try {
       expect(openCalls).toBe(1);
       expect(readerClose).toHaveBeenCalledTimes(1);
-      expect(screen.getByTestId('progress-focus-muscle-chest')).toHaveTextContent(
-        'Chest · 3 of 6 planned sets completed this week',
-      );
+      expect(screen.queryByTestId('progress-focus-muscle-chest')).toBeNull();
       // Rerender with identical store slices: transient failure must NOT be cached!
       view.rerender(<ProgressScreen />);
       expect(realState().movements).toBe(movementsBefore);

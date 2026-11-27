@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import ReadinessScreen from '../../src/screens/ReadinessScreen';
 import BlockScreen from '../../src/screens/BlockScreen';
@@ -1157,21 +1157,50 @@ test('PLAN pre-readiness (vector === null) renders existing weekly activities, e
   expect(screen.getByText('MANAGE PROGRAM')).toBeOnTheScreen();
 });
 
-test('PLAN renders plan-emphasis-disclosure with NO_EMPHASIS_EXPLANATION emptyText when block exists and blockEmphasis is null (S1-002)', () => {
+test.each([false, true])('PLAN hides unknown legacy emphasis and explains recorded empty emphasis (readiness available: %s)', (ready) => {
   const { NO_EMPHASIS_EXPLANATION } = jest.requireActual('@ak/inference');
-  mockState = baseState({ vector: null, blockEmphasis: null });
-  const preReadiness = render(<BlockScreen />);
+  mockState = baseState({
+    vector: ready ? vector : null,
+    blockEmphasis: null,
+    focus: { bundleId: null, muscles: ['chest'], customised: true, movementControl: false },
+  });
+  const view = render(<BlockScreen />);
 
-  expect(screen.getByTestId('plan-emphasis-disclosure')).toBeOnTheScreen();
+  expect(screen.queryByTestId('plan-emphasis-disclosure')).toBeNull();
+
+  mockState.blockEmphasis = {
+    blockId: 1,
+    inputs: { version: 1, focus: null, sport: null, workload: null, goalMovements: [] },
+    report: { version: 1, applied: [], omitted: [] },
+  };
+  view.rerender(<BlockScreen />);
   fireEvent.press(screen.getByRole('button', { name: 'WHY THIS PLAN LOOKS THE WAY IT DOES' }));
   expect(screen.getByTestId('plan-emphasis-empty')).toHaveTextContent(NO_EMPHASIS_EXPLANATION);
-  preReadiness.unmount();
 
-  mockState = baseState({ blockEmphasis: null });
+  const omitted = 'No extra chest work: this plan has no strength day that trains that part of the body.';
+  mockState.blockEmphasis = {
+    ...mockState.blockEmphasis,
+    inputs: {
+      ...mockState.blockEmphasis.inputs,
+      focus: { muscles: ['chest'], movementControl: false },
+    },
+    report: { version: 1, applied: [], omitted: [omitted] },
+  };
+  view.rerender(<BlockScreen />);
+  expect(screen.queryByTestId('plan-emphasis-empty')).toBeNull();
+  expect(screen.getByTestId('plan-emphasis-omitted')).toHaveTextContent(omitted);
+});
+
+test.each([false, true])('Manage block scroll uses the right layout origin (readiness available: %s)', (ready) => {
+  const scrollTo = jest.spyOn(ScrollView.prototype, 'scrollTo').mockImplementation(() => {});
+  mockState = baseState({ vector: ready ? vector : null, program: null });
   render(<BlockScreen />);
-  expect(screen.getByTestId('plan-emphasis-disclosure')).toBeOnTheScreen();
-  fireEvent.press(screen.getByRole('button', { name: 'WHY THIS PLAN LOOKS THE WAY IT DOES' }));
-  expect(screen.getByTestId('plan-emphasis-empty')).toHaveTextContent(NO_EMPHASIS_EXPLANATION);
+
+  fireEvent(screen.getByText('Four-week trajectory'), 'layout', { nativeEvent: { layout: { y: 250 } } });
+  fireEvent(screen.getByTestId('manage-block-section'), 'layout', { nativeEvent: { layout: { y: 400 } } });
+  fireEvent.press(screen.getByLabelText('Manage current block'));
+
+  expect(scrollTo).toHaveBeenCalledWith({ y: (ready ? 650 : 400) - theme.space[4], animated: true });
 });
 
 test('WO03-SOL-03 & WO03-SOL-04: PLAN pre-readiness Manage block (program === null) opens current block controls rather than NewBlockChooser, and partial activityLedger {} never throws', () => {

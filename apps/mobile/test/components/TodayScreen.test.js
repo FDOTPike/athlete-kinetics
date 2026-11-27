@@ -944,6 +944,45 @@ test('planned card tags movements selected for a goal, focus, or sport outcome (
   expect(screen.queryByTestId('today-slot-provenance-13')).toBeNull();
 });
 
+test.each([true, false])('planned movement overlap qualifies for provenance only without frozen emphasis (frozen: %s)', (frozen) => {
+  mockState = baseState({
+    todayPlan: {
+      plannedSessionId: 1,
+      focus: 'lower',
+      phase: 'accumulation',
+      slots: [
+        slot({ plannedSlotId: 10, movementId: 11, movementName: 'Incline Dumbbell Press' }),
+        slot({ plannedSlotId: 11, slotIndex: 1, movementId: 12, movementName: 'Leg Curl' }),
+      ],
+    },
+    movements: [
+      { movement_id: 11, name: 'Incline Dumbbell Press', targetMuscles: ['upper_chest'] },
+      { movement_id: 12, name: 'Leg Curl', targetMuscles: ['hamstrings'] },
+    ],
+    focus: { bundleId: null, muscles: ['upper_chest'], customised: true, movementControl: false },
+    sport: { sportId: 'football_association', otherSportName: null, outcomeId: 'stay_available' },
+    blockEmphasis: frozen ? {
+      blockId: 1,
+      inputs: {
+        focus: { muscles: ['upper_chest'], movementControl: false, description: 'Upper chest' },
+        sport: { name: 'Football (soccer)', muscles: ['hamstrings'] },
+        workload: null,
+        goalMovements: [],
+      },
+      report: { version: 1, applied: [], omitted: [] },
+    } : null,
+  });
+
+  render(<TodayScreen />);
+  if (frozen) {
+    expect(screen.queryByTestId('today-slot-provenance-10')).toBeNull();
+    expect(screen.queryByTestId('today-slot-provenance-11')).toBeNull();
+  } else {
+    expect(screen.getByTestId('today-slot-provenance-10')).toHaveTextContent('Your focus');
+    expect(screen.getByTestId('today-slot-provenance-11')).toHaveTextContent('Your Football (soccer) outcome');
+  }
+});
+
 test('WO03-SOL-02 & WO03-SOL-05: frozen blockEmphasis never leaks later live goal/focus edits onto an active block, and undefined blockSessions does not throw', () => {
   mockState = baseState({
     blockSessions: undefined,

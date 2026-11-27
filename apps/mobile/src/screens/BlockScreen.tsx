@@ -312,8 +312,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
   const today = useStore((s) => s.today);
   const profile = useStore((s) => s.profile);
   const activityLedger = useStore((s) => s.activityLedger ?? EMPTY_ACTIVITY_LEDGER);
-  // Work order 3: the explanation frozen with the active block (null when the
-  // block was created with no focus, sport or goal exercise, or before 067).
+  // Work order 3: the explanation frozen with the active block, when recorded.
   const blockEmphasis = useStore((s) => s.blockEmphasis) ?? null;
   const prescription = useStore((s) => s.prescription);
   const profileNotes = useStore((s) => s.profileNotes);
@@ -1011,14 +1010,14 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
   );
 
   const renderEmphasisDisclosure = (): React.JSX.Element | null => (
-    block !== null ? (
+    block !== null && blockEmphasis !== null ? (
       <Disclosure
         label="WHY THIS PLAN LOOKS THE WAY IT DOES"
         hint="What your focus, goals and sport changed"
         testID="plan-emphasis-disclosure"
       >
         <EmphasisReportCard
-          report={blockEmphasis?.report ?? null}
+          report={blockEmphasis.report}
           emptyText={NO_EMPHASIS_EXPLANATION}
           testID="plan-emphasis"
         />
@@ -1031,8 +1030,9 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
 
   const openManageBlock = (): void => {
     setManageOpen(true);
+    const sectionY = vector === null ? 0 : trajectorySectionY.current;
     scrollRef.current?.scrollTo({
-      y: Math.max(0, trajectorySectionY.current + manageSectionOffsetY.current - theme.space[4]),
+      y: Math.max(0, sectionY + manageSectionOffsetY.current - theme.space[4]),
       animated: true,
     });
   };
