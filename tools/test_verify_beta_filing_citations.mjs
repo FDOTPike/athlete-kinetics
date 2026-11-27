@@ -700,6 +700,24 @@ console.log('\n[2] Negative invariants & poisoning falsifiers');
     );
   }
 
+  const validEmojiPrefix = `${'\u{1F600}'.repeat(500)} `;
+  const overlongEmojiPrefix = `${'\u{1F600}'.repeat(950)} `;
+  for (const [label, referencePrefix, definitionPrefix, expectedCitations] of [
+    ['500 emoji form a valid reference label with the citation', validEmojiPrefix, validEmojiPrefix, 56],
+    ['overlong emoji reference label leaves the citation visible', overlongEmojiPrefix, overlongEmojiPrefix, 57],
+    ['NBSP on one side leaves the citation visible', '\u00A0', '', 57],
+    ['matching NBSP prefixes hide the citation', '\u00A0', '\u00A0', 56],
+  ]) {
+    const res = mutateDisclaimerProfileCitation(
+      `[see][${referencePrefix}${profileCitationToken}]\n\n[${definitionPrefix}${profileCitationToken.toUpperCase()}]: /guide`,
+    );
+    check(
+      `WO04-ASTRA-R10: ${label}`,
+      res.ok === (expectedCitations === EXPECTED_CITATION_COUNT) && res.totalCitations === expectedCitations,
+      `ok=${res.ok}, citations=${res.totalCitations}, expected=${expectedCitations}`,
+    );
+  }
+
   const pickerAnchor = 'const saved = await pickerSave(encryptedPath, fileName);';
   const pickerInRegexRes = mutateRepoFile(exportCitation.target, (real) => {
     const lines = real.split('\n');

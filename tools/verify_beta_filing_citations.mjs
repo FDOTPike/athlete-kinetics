@@ -725,21 +725,23 @@ function unicodeCaseFold(str) {
   return out;
 }
 
+const LINK_LABEL_NONBLANK_RE = /[^ \t\r\n]/;
+
 function normalizeLinkLabel(rawLabel) {
-  return unicodeCaseFold(rawLabel.trim().replace(/[ \t\r\n]+/g, ' '));
+  return unicodeCaseFold(rawLabel.replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, '').replace(/[ \t\r\n]+/g, ' '));
 }
 
 function scanLinkLabel(str, startIdx) {
   if (startIdx < 0 || startIdx >= str.length || str[startIdx] !== '[') return null;
   let idx = startIdx + 1;
   const labelStart = idx;
-  let labelChars = 0;
+  let labelCodePoints = 0;
   let foundClose = false;
-  while (idx < str.length && labelChars <= 999) {
+  while (idx < str.length && labelCodePoints <= 999) {
     const ch = str[idx];
-    if (ch === '\\' && idx + 1 < str.length) {
+    if (ch === '\\' && idx + 1 < str.length && ASCII_PUNCT_RE.test(str[idx + 1])) {
       idx += 2;
-      labelChars += 2;
+      labelCodePoints += 2;
       continue;
     }
     if (ch === '[') return null;
@@ -747,10 +749,10 @@ function scanLinkLabel(str, startIdx) {
       foundClose = true;
       break;
     }
-    idx += 1;
-    labelChars += 1;
+    idx += str.codePointAt(idx) > 0xffff ? 2 : 1;
+    labelCodePoints += 1;
   }
-  if (!foundClose || labelChars > 999) return null;
+  if (!foundClose || labelCodePoints > 999) return null;
   return {
     rawLabel: str.slice(labelStart, idx),
     endIdx: idx + 1,
@@ -768,7 +770,7 @@ function peelOneLinkRefDef(text) {
   const parsedLabel = scanLinkLabel(text, idx);
   if (parsedLabel === null || parsedLabel.rawLabel.length === 0) return null;
   const { rawLabel, endIdx } = parsedLabel;
-  if (!/\S/.test(rawLabel) || text[endIdx] !== ':') return null;
+  if (!LINK_LABEL_NONBLANK_RE.test(rawLabel) || text[endIdx] !== ':') return null;
   const normalizedLabel = normalizeLinkLabel(rawLabel);
   idx = endIdx + 1;
 
@@ -928,19 +930,19 @@ function extractInlineCitationsFromBlock(doc, block, definedLabels, citations, e
           if (
             firstSlice !== null
             && firstSlice.endIdx === i + 1
-            && /\S/.test(firstSlice.rawLabel)
+            && LINK_LABEL_NONBLANK_RE.test(firstSlice.rawLabel)
             && definedLabels.has(normalizeLinkLabel(firstSlice.rawLabel))
           ) {
             if (!opener.isImage) deactivatePriorLinkOpeners();
             i = nextLabel.endIdx;
             continue;
           }
-        } else if (/\S/.test(nextLabel.rawLabel) && definedLabels.has(normalizeLinkLabel(nextLabel.rawLabel))) {
+        } else if (LINK_LABEL_NONBLANK_RE.test(nextLabel.rawLabel) && definedLabels.has(normalizeLinkLabel(nextLabel.rawLabel))) {
           if (!opener.isImage) deactivatePriorLinkOpeners();
           i = nextLabel.endIdx;
           continue;
         }
-        if (nextLabel.rawLabel.length === 0 || /\S/.test(nextLabel.rawLabel)) {
+        if (nextLabel.rawLabel.length === 0 || LINK_LABEL_NONBLANK_RE.test(nextLabel.rawLabel)) {
           i += 1;
           continue;
         }
@@ -949,7 +951,7 @@ function extractInlineCitationsFromBlock(doc, block, definedLabels, citations, e
       if (
         selfLabel !== null
         && selfLabel.endIdx === i + 1
-        && /\S/.test(selfLabel.rawLabel)
+        && LINK_LABEL_NONBLANK_RE.test(selfLabel.rawLabel)
         && definedLabels.has(normalizeLinkLabel(selfLabel.rawLabel))
       ) {
         if (!opener.isImage) deactivatePriorLinkOpeners();
