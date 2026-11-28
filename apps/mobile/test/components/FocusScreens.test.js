@@ -803,62 +803,65 @@ describe('BlockScreen - Chooser Entry (Work Order E)', () => {
     expect(screen.queryByText('Coming soon')).toBeNull();
   });
 
-  test.each([true, false])('with a program whose review is due and a standalone block, the planning action opens the chooser (#172, readiness available: %s)', (ready) => {
-    // The program editor only saves for an active program, so a finished
-    // program must not route this button to it.
-    mockState = baseState({
-      vector: ready ? vector : null,
-      block: { blockId: 1, startDate: '2026-07-01', objective: 'strength', createdAtMs: 1 },
-      program: {
-        programId: 1,
-        status: 'review_due',
-        currentSequenceIndex: 2,
-        plannedBlockCount: 2,
-        plannedEndDate: '2026-08-26',
-        days: [{ dayIndex: 1, focus: 'lower' }, { dayIndex: 2, focus: 'upper' }],
-        movementPreferences: [],
-      },
-    });
+  const planningProgram = {
+    programId: 1,
+    currentSequenceIndex: 2,
+    plannedBlockCount: 2,
+    plannedEndDate: '2026-08-26',
+    days: [{ dayIndex: 1, focus: 'lower' }, { dayIndex: 2, focus: 'upper' }],
+    movementPreferences: [],
+  };
+
+  test('with a review-due program, Plan a new block opens the chooser and Auto creates (#172)', () => {
+    mockState = baseState({ program: { ...planningProgram, status: 'review_due' } });
 
     render(<BlockScreen />);
 
     expect(screen.queryByText('Change future blocks')).toBeNull();
-    const planningAction = ready
-      ? screen.getByText('Plan a new block')
-      : screen.getByLabelText('Manage future program preferences');
-    fireEvent.press(planningAction);
+    fireEvent.press(screen.getByText('Plan a new block'));
     expect(screen.getByText('Start a new block')).toBeOnTheScreen();
     expect(screen.getByText('Custom')).toBeOnTheScreen();
     expect(screen.queryByText('MANAGE PROGRAM')).toBeNull();
+
+    fireEvent.press(screen.getByText('Auto'));
+    expect(screen.getByText('BUILD YOUR PROGRAM')).toBeOnTheScreen();
+    expect(screen.getByText('Create program')).toBeOnTheScreen();
+    expect(screen.queryByText('MANAGE PROGRAM')).toBeNull();
+    expect(screen.queryByText('Save future preferences')).toBeNull();
   });
 
-  test.each([
+  describe.each([
     ['full view with a block', 'Manage program', {}],
     ['gated view with a block', 'Manage program', { vector: null }],
     ['full view without a block', 'Set up a four-week block', { block: null, todayPlan: null, blockSessions: [] }],
-  ])('R10: review-due program opens the chooser and Auto creates in %s', (_view, action, overrides) => {
-    mockState = baseState({
-      program: {
-        programId: 1,
-        status: 'review_due',
-        currentSequenceIndex: 2,
-        plannedBlockCount: 2,
-        plannedEndDate: '2026-08-26',
-        days: [{ dayIndex: 1, focus: 'lower' }, { dayIndex: 2, focus: 'upper' }],
-        movementPreferences: [],
-      },
-      ...overrides,
+  ])('R10: program planning in %s', (_view, action, overrides) => {
+    test.each(['review_due', 'archived'])('%s program opens creation mode', (status) => {
+      mockState = baseState({ program: { ...planningProgram, status }, ...overrides });
+
+      render(<BlockScreen />);
+      fireEvent.press(screen.getByText(action));
+      if (status === 'archived') {
+        expect(screen.getByText('Start a new block')).toBeOnTheScreen();
+        fireEvent.press(screen.getByText('Auto'));
+      }
+
+      expect(screen.queryByText('BUILD YOUR PROGRAM')).toBeOnTheScreen();
+      expect(screen.getByText('Create program')).toBeOnTheScreen();
+      expect(screen.queryByText('MANAGE PROGRAM')).toBeNull();
+      expect(screen.queryByText('Save future preferences')).toBeNull();
+      expect(screen.queryByText('Start a new block')).toBeNull();
     });
 
-    render(<BlockScreen />);
-    fireEvent.press(screen.getByText(action));
-    expect(screen.queryByText('Start a new block')).not.toBeNull();
+    test('active program opens edit mode directly', () => {
+      mockState = baseState({ program: { ...planningProgram, status: 'active' }, ...overrides });
 
-    fireEvent.press(screen.getByText('Auto'));
-    expect(screen.queryByText('MANAGE PROGRAM')).toBeNull();
-    expect(screen.queryByText('Save future preferences')).toBeNull();
-    expect(screen.getByText('BUILD YOUR PROGRAM')).toBeOnTheScreen();
-    expect(screen.getByText('Create program')).toBeOnTheScreen();
+      render(<BlockScreen />);
+      fireEvent.press(screen.getByText(action));
+
+      expect(screen.getByText('MANAGE PROGRAM')).toBeOnTheScreen();
+      expect(screen.getByText('Save future preferences')).toBeOnTheScreen();
+      expect(screen.queryByText('Start a new block')).toBeNull();
+    });
   });
 
   test('inter-block state with block === null and program !== null still opens chooser and routes to handlers', () => {

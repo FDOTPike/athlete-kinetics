@@ -1040,9 +1040,9 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
     });
   };
 
-  const openProgramPlanning = program?.status !== 'active'
-    ? () => setShowChooser(true)
-    : () => setEditingProgram(true);
+  const openProgramPlanning = program?.status === 'active' || program?.status === 'review_due'
+    ? () => setEditingProgram(true)
+    : () => setShowChooser(true);
 
   const renderManageBlockSection = (): React.JSX.Element => (
     <View
@@ -1456,7 +1456,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                   editor only saves for an active program. */}
               <SecondaryButton
                 label={program?.status !== 'active' ? 'Plan a new block' : 'Change future blocks'}
-                onPress={openProgramPlanning}
+                onPress={program?.status !== 'active' ? () => setShowChooser(true) : openProgramPlanning}
                 accessibilityLabel={program?.status !== 'active' ? 'Plan a new block' : 'Change future blocks'}
               />
             </>
