@@ -655,6 +655,8 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
       && !checkIosBetaBuildSplit(quotedIfUiTestCi).uiTestBetaEnabled
       && !checkIosBetaBuildSplit(quotedContinueUiTestCi).uiTestBetaEnabled,
   );
+  const preInstallVerifyOrt = /^[ \t]+verify_ort_cache[ \t]*\r?\n(?=[ \t]+fi[ \t]*\r?\n[ \t]+if git ls-files --error-unmatch Podfile\.lock\b)/m;
+  const postInstallVerifyOrt = /^(?<installEnd>(?<indent>[ \t]+)[ \t]+bundle exec pod install[ \t]*\r?\n\k<indent>fi[ \t]*\r?\n(?:[ \t]*\r?\n)*)\k<indent>verify_ort_cache[ \t]*(?=\r?$)/m;
   const checkIosOrtPodCacheFallback = (ciYaml) => {
     const clean = stripYamlComments(ciYaml);
     const iosJob = splitJobs(clean).get('ios-simulator') ?? '';
@@ -664,13 +666,15 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
     const lastPodInstallIdx = installStep.lastIndexOf('bundle exec pod install');
     if (podInstallIdx === -1 || lastPodInstallIdx === -1) return false;
     const beforePodInstall = installStep.slice(0, podInstallIdx);
-    const afterPodInstall = installStep.slice(lastPodInstallIdx);
-    const hasInsecureCurl = /(?:^|\s)curl\s+[^\n]*(?:\s-(?:[A-Za-z]*k[A-Za-z]*)\b|\s--insecure\b)/m.test(installStep);
+    const afterPodInstall = installStep.slice(installStep.lastIndexOf('\n', lastPodInstallIdx) + 1);
+    const hasInsecureCurl = /(?:^|[ \t])curl(?=[ \t])[^\r\n]*?[ \t]+(?:-[A-Za-z]*k[A-Za-z]*|--insecure)(?=[ \t\r\n;&|)]|$)/m
+      .test(installStep.replace(/\\\r?\n/g, ''));
     if (hasInsecureCurl) return false;
     const hasFnDef = /verify_ort_cache\(\)\s*\{[\s\S]*?! -d "\$ORT_DIR"[\s\S]*?! -f "\$ORT_SPEC"[\s\S]*?e8ede7ac7f5c1ab9e5bf1e46216454cb16892e69d7c58094bfe8a30e3e1f353d[\s\S]*?916aec96269b03515955b8becd987fcc79be5242d91418f61280b3be6c1388c1[\s\S]*?exit 1[\s\S]*?\}/.test(beforePodInstall);
     const bodyAfterFn = beforePodInstall.replace(/verify_ort_cache\(\)\s*\{[\s\S]*?\n\s*\}/, '');
     const hasPreInstallCall = /\bverify_ort_cache\b/.test(bodyAfterFn);
-    const hasUnconditionalPostInstallCall = /^\s*verify_ort_cache\s*$/m.test(afterPodInstall);
+    // Require the standalone guard as the final command after the install block's fi.
+    const hasUnconditionalPostInstallCall = afterPodInstall.trimEnd() === afterPodInstall.match(postInstallVerifyOrt)?.[0].trimEnd();
     return hasFnDef
       && hasPreInstallCall
       && hasUnconditionalPostInstallCall
@@ -684,7 +688,9 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
     'CI Install pods step seeds onnxruntime-c 1.30.0-36ca0 from the commit- and 3-layer-SHA256-pinned archive with strict TLS and verifies cache integrity both before and unconditionally after pod install',
     checkIosOrtPodCacheFallback(ci),
   );
-  const insecureCurlOrtCi = ci.replace('curl -fsSI', 'curl -fsSI -k');
+  const insecureCurlOrtCis = ['-k -fsSI', '--insecure -fsSI', '-fsSIk', '-kfsSI', '-fsSI -k']
+    .map((options) => ci.replace('curl -fsSI', 'curl ' + options));
+  insecureCurlOrtCis.push(ci.replace('curl -fsSL', 'curl -fsSL --insecure'));
   const badTarShaOrtCi = ci.replace(
     '56ebacedaccb3c8809279de032454beb2a80c9faa9fe5d5d8bac56ca0ba333f5',
     '0000000000000000000000000000000000000000000000000000000000000000',
@@ -693,17 +699,31 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
     '916aec96269b03515955b8becd987fcc79be5242d91418f61280b3be6c1388c1',
     '0000000000000000000000000000000000000000000000000000000000000000',
   );
-  const noPostInstallVerifyOrtCi = ci.replace(/\n\s*verify_ort_cache\s*$/m, '\n');
+  const countVerifyOrt = (yaml) => (yaml.match(/\bverify_ort_cache\b/g) ?? []).length;
+  const noPreInstallVerifyOrtCi = ci.replace(preInstallVerifyOrt, '');
+  const noPostInstallVerifyOrtCi = ci.replace(postInstallVerifyOrt, '$<installEnd>');
+  const conditionalPostInstallVerifyOrtCi = ci.replace(
+    postInstallVerifyOrt,
+    '$<installEnd>$<indent>if false; then\n$<indent>  verify_ort_cache\n$<indent>fi',
+  );
   check(
     'falsifier: curl -k/--insecure, altered archive/tree SHA-256 pins, or dropping post-pod-install verify_ort_cache in CI Install pods fail closed',
-    insecureCurlOrtCi !== ci
+    insecureCurlOrtCis.every((insecureCi) => insecureCi !== ci && !checkIosOrtPodCacheFallback(insecureCi))
       && badTarShaOrtCi !== ci
       && badTreeShaOrtCi !== ci
-      && noPostInstallVerifyOrtCi !== ci
-      && !checkIosOrtPodCacheFallback(insecureCurlOrtCi)
+      && preInstallVerifyOrt.test(noPostInstallVerifyOrtCi)
+      && countVerifyOrt(noPostInstallVerifyOrtCi) === countVerifyOrt(ci) - 1
       && !checkIosOrtPodCacheFallback(badTarShaOrtCi)
       && !checkIosOrtPodCacheFallback(badTreeShaOrtCi)
       && !checkIosOrtPodCacheFallback(noPostInstallVerifyOrtCi),
+  );
+  check(
+    'falsifier: dropping pre-pod-install verify_ort_cache or making the post-pod-install call conditional fails closed',
+    postInstallVerifyOrt.test(noPreInstallVerifyOrtCi)
+      && countVerifyOrt(noPreInstallVerifyOrtCi) === countVerifyOrt(ci) - 1
+      && !checkIosOrtPodCacheFallback(noPreInstallVerifyOrtCi)
+      && conditionalPostInstallVerifyOrtCi !== ci
+      && !checkIosOrtPodCacheFallback(conditionalPostInstallVerifyOrtCi),
   );
   const typesSrc = read('packages/inference/src/types.ts');
   const onboardingSrc = read('apps/mobile/src/screens/OnboardingScreen.tsx');
