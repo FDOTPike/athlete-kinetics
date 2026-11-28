@@ -253,6 +253,32 @@ console.log('[N2] pinned embedder model staged into the iOS bundle');
   const stage = read('scripts/stage-native-embedder.mjs');
   check('the staging script verifies against KNOWN_SHA256 and never downloads',
     stage.includes("KNOWN_SHA256['onnx/model_quantized.onnx']") && !/fetch\(|https?:\/\//.test(stage));
+  const hasAlwaysOutOfDateBundleRnPhase = (pbxSrc) => {
+    const rnPhase = pbxSrc.match(/\/\* Bundle React Native code and images \*\/ = \{([\s\S]*?)\n\t\t\};/)?.[1] ?? '';
+    return /\bisa = PBXShellScriptBuildPhase;/.test(rnPhase)
+      && /\balwaysOutOfDate = 1;/.test(rnPhase)
+      && rnPhase.includes('name = "Bundle React Native code and images";')
+      && rnPhase.includes('scripts/react-native-xcode.sh');
+  };
+  check(
+    'Bundle React Native code and images build phase sets alwaysOutOfDate = 1 (silences Xcode 26/27 missing-outputs warning)',
+    hasAlwaysOutOfDateBundleRnPhase(pbx),
+  );
+  const noAlwaysOutOfDateRnPbx = pbx.replace(
+    /(\/\* Bundle React Native code and images \*\/ = \{[\s\S]*?)\n\t\t\talwaysOutOfDate = 1;/,
+    '$1',
+  );
+  const zeroAlwaysOutOfDateRnPbx = pbx.replace(
+    /(\/\* Bundle React Native code and images \*\/ = \{[\s\S]*?\n\t\t\t)alwaysOutOfDate = 1;/,
+    '$1alwaysOutOfDate = 0;',
+  );
+  check(
+    'falsifier: omitting alwaysOutOfDate = 1 or setting alwaysOutOfDate = 0 on Bundle React Native code and images fails closed',
+    noAlwaysOutOfDateRnPbx !== pbx
+      && zeroAlwaysOutOfDateRnPbx !== pbx
+      && !hasAlwaysOutOfDateBundleRnPhase(noAlwaysOutOfDateRnPbx)
+      && !hasAlwaysOutOfDateBundleRnPhase(zeroAlwaysOutOfDateRnPbx),
+  );
 }
 
 const plistXml = read('apps/mobile/ios/AthleteKinetics/Info.plist');
@@ -628,6 +654,76 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
       && !checkIosBetaBuildSplit(iosJobBetaCi).nonBetaClean
       && !checkIosBetaBuildSplit(quotedIfUiTestCi).uiTestBetaEnabled
       && !checkIosBetaBuildSplit(quotedContinueUiTestCi).uiTestBetaEnabled,
+  );
+  const preInstallVerifyOrt = /^[ \t]+verify_ort_cache[ \t]*\r?\n(?=[ \t]+fi[ \t]*\r?\n[ \t]+if git ls-files --error-unmatch Podfile\.lock\b)/m;
+  const postInstallVerifyOrt = /^(?<installEnd>(?<indent>[ \t]+)[ \t]+bundle exec pod install[ \t]*\r?\n\k<indent>fi[ \t]*\r?\n(?:[ \t]*\r?\n)*)\k<indent>verify_ort_cache[ \t]*(?=\r?$)/m;
+  const checkIosOrtPodCacheFallback = (ciYaml) => {
+    const clean = stripYamlComments(ciYaml);
+    const iosJob = splitJobs(clean).get('ios-simulator') ?? '';
+    const installStep = splitSteps(iosJob).find((s) => s.includes('- name: Install pods')) ?? '';
+    if (!installStep) return false;
+    const podInstallIdx = installStep.indexOf('bundle exec pod install --deployment');
+    const lastPodInstallIdx = installStep.lastIndexOf('bundle exec pod install');
+    if (podInstallIdx === -1 || lastPodInstallIdx === -1) return false;
+    const beforePodInstall = installStep.slice(0, podInstallIdx);
+    const afterPodInstall = installStep.slice(installStep.lastIndexOf('\n', lastPodInstallIdx) + 1);
+    const hasInsecureCurl = /(?:^|[ \t])curl(?=[ \t])[^\r\n]*?[ \t]+(?:-[A-Za-z]*k[A-Za-z]*|--insecure)(?=[ \t\r\n;&|)]|$)/m
+      .test(installStep.replace(/\\\r?\n/g, ''));
+    if (hasInsecureCurl) return false;
+    const hasFnDef = /verify_ort_cache\(\)\s*\{[\s\S]*?! -d "\$ORT_DIR"[\s\S]*?! -f "\$ORT_SPEC"[\s\S]*?e8ede7ac7f5c1ab9e5bf1e46216454cb16892e69d7c58094bfe8a30e3e1f353d[\s\S]*?916aec96269b03515955b8becd987fcc79be5242d91418f61280b3be6c1388c1[\s\S]*?exit 1[\s\S]*?\}/.test(beforePodInstall);
+    const bodyAfterFn = beforePodInstall.replace(/verify_ort_cache\(\)\s*\{[\s\S]*?\n\s*\}/, '');
+    const hasPreInstallCall = /\bverify_ort_cache\b/.test(bodyAfterFn);
+    // Require the standalone guard as the final command after the install block's fi.
+    const hasUnconditionalPostInstallCall = afterPodInstall.trimEnd() === afterPodInstall.match(postInstallVerifyOrt)?.[0].trimEnd();
+    return hasFnDef
+      && hasPreInstallCall
+      && hasUnconditionalPostInstallCall
+      && beforePodInstall.includes('https://download.onnxruntime.ai/pod-archive-onnxruntime-c-1.30.0.zip')
+      && beforePodInstall.includes('https://raw.githubusercontent.com/FDOTPike/athlete-kinetics/9a2533b9654eb5b71fda68a9e2f3f0ed67e0d87f/onnxruntime-c-1.30.0-36ca0.tar.xz')
+      && beforePodInstall.includes('56ebacedaccb3c8809279de032454beb2a80c9faa9fe5d5d8bac56ca0ba333f5')
+      && /shasum -a 256/.test(beforePodInstall)
+      && /exit 1/.test(beforePodInstall);
+  };
+  check(
+    'CI Install pods step seeds onnxruntime-c 1.30.0-36ca0 from the commit- and 3-layer-SHA256-pinned archive with strict TLS and verifies cache integrity both before and unconditionally after pod install',
+    checkIosOrtPodCacheFallback(ci),
+  );
+  const insecureCurlOrtCis = ['-k -fsSI', '--insecure -fsSI', '-fsSIk', '-kfsSI', '-fsSI -k']
+    .map((options) => ci.replace('curl -fsSI', 'curl ' + options));
+  insecureCurlOrtCis.push(ci.replace('curl -fsSL', 'curl -fsSL --insecure'));
+  const badTarShaOrtCi = ci.replace(
+    '56ebacedaccb3c8809279de032454beb2a80c9faa9fe5d5d8bac56ca0ba333f5',
+    '0000000000000000000000000000000000000000000000000000000000000000',
+  );
+  const badTreeShaOrtCi = ci.replace(
+    '916aec96269b03515955b8becd987fcc79be5242d91418f61280b3be6c1388c1',
+    '0000000000000000000000000000000000000000000000000000000000000000',
+  );
+  const countVerifyOrt = (yaml) => (yaml.match(/\bverify_ort_cache\b/g) ?? []).length;
+  const noPreInstallVerifyOrtCi = ci.replace(preInstallVerifyOrt, '');
+  const noPostInstallVerifyOrtCi = ci.replace(postInstallVerifyOrt, '$<installEnd>');
+  const conditionalPostInstallVerifyOrtCi = ci.replace(
+    postInstallVerifyOrt,
+    '$<installEnd>$<indent>if false; then\n$<indent>  verify_ort_cache\n$<indent>fi',
+  );
+  check(
+    'falsifier: curl -k/--insecure, altered archive/tree SHA-256 pins, or dropping post-pod-install verify_ort_cache in CI Install pods fail closed',
+    insecureCurlOrtCis.every((insecureCi) => insecureCi !== ci && !checkIosOrtPodCacheFallback(insecureCi))
+      && badTarShaOrtCi !== ci
+      && badTreeShaOrtCi !== ci
+      && preInstallVerifyOrt.test(noPostInstallVerifyOrtCi)
+      && countVerifyOrt(noPostInstallVerifyOrtCi) === countVerifyOrt(ci) - 1
+      && !checkIosOrtPodCacheFallback(badTarShaOrtCi)
+      && !checkIosOrtPodCacheFallback(badTreeShaOrtCi)
+      && !checkIosOrtPodCacheFallback(noPostInstallVerifyOrtCi),
+  );
+  check(
+    'falsifier: dropping pre-pod-install verify_ort_cache or making the post-pod-install call conditional fails closed',
+    postInstallVerifyOrt.test(noPreInstallVerifyOrtCi)
+      && countVerifyOrt(noPreInstallVerifyOrtCi) === countVerifyOrt(ci) - 1
+      && !checkIosOrtPodCacheFallback(noPreInstallVerifyOrtCi)
+      && conditionalPostInstallVerifyOrtCi !== ci
+      && !checkIosOrtPodCacheFallback(conditionalPostInstallVerifyOrtCi),
   );
   const typesSrc = read('packages/inference/src/types.ts');
   const onboardingSrc = read('apps/mobile/src/screens/OnboardingScreen.tsx');
@@ -1049,6 +1145,67 @@ console.log('[N10] CI user-interaction tests (XCUITest)');
   check(
     'falsifier: adding TARGETED_DEVICE_FAMILY = "1,2" to an app config fails the phone-only app check',
     universalAppConfig !== appConfigs[0] && !isPhoneOnlyAppConfig(universalAppConfig),
+  );
+  const inspectXcodeTargetSettings = (pbxSrc) => {
+    const blocks = [...pbxSrc.matchAll(/isa = XCBuildConfiguration;[\s\S]*?\n\t\t\};/g)].map((m) => m[0]);
+    const appCfgBlocks = blocks.filter(
+      (b) => b.includes('PRODUCT_BUNDLE_IDENTIFIER = com.pikemethods.training;') && !b.includes('TEST_TARGET_NAME'),
+    );
+    const uiTestCfgBlocks = blocks.filter(
+      (b) => b.includes('TEST_TARGET_NAME = AthleteKinetics;')
+        && b.includes('PRODUCT_BUNDLE_IDENTIFIER = com.pikemethods.training.uitests;'),
+    );
+    const extractTargets = (list) => list.map((b) => {
+      const m = [...b.matchAll(/\bIPHONEOS_DEPLOYMENT_TARGET\s*=\s*([^;]+);/g)].map((x) => x[1].trim());
+      return m.length === 1 ? m[0] : m.join(',');
+    });
+    const parseLdFlags = (block) => {
+      const body = block.match(/\bOTHER_LDFLAGS\s*=\s*\(([\s\S]*?)\);/)?.[1];
+      if (!body) return [];
+      return [...body.matchAll(/"([^"]+)"|([^\s,()]+)/g)].map((m) => (m[1] ?? m[2]).trim()).filter(Boolean);
+    };
+    const appTargets = extractTargets(appCfgBlocks);
+    const uiTestTargets = extractTargets(uiTestCfgBlocks);
+    const appLdFlags = appCfgBlocks.map(parseLdFlags);
+    const appDeploymentOk = appCfgBlocks.length === 2 && appTargets.every((v) => v === '15.1');
+    const uiTestDeploymentOk = uiTestCfgBlocks.length === 2 && uiTestTargets.every((v) => v === '17.0');
+    const appLdFlagsOk = appCfgBlocks.length === 2 && appLdFlags.every(
+      (flags) => flags.length === 2 && flags[0] === '$(inherited)' && flags[1] === '-ObjC' && !flags.includes('-lc++'),
+    );
+    return {
+      ok: appDeploymentOk && uiTestDeploymentOk && appLdFlagsOk,
+      appDeploymentOk,
+      uiTestDeploymentOk,
+      appLdFlagsOk,
+      detail: `app=[${appTargets.join(',')}] uiTests=[${uiTestTargets.join(',')}] ldflags=${JSON.stringify(appLdFlags)}`,
+    };
+  };
+  const xcodeSettingsState = inspectXcodeTargetSettings(pbx);
+  check(
+    'AthleteKinetics keeps IPHONEOS_DEPLOYMENT_TARGET = 15.1 and OTHER_LDFLAGS without duplicate -lc++, while AthleteKineticsUITests sets IPHONEOS_DEPLOYMENT_TARGET = 17.0',
+    xcodeSettingsState.ok,
+    xcodeSettingsState.detail,
+  );
+  const raisedAppTargetPbx = pbx.replace(
+    /(INFOPLIST_FILE = AthleteKinetics\/Info\.plist;\n\t\t\t\t)IPHONEOS_DEPLOYMENT_TARGET = 15\.1;/,
+    '$1IPHONEOS_DEPLOYMENT_TARGET = 17.0;',
+  );
+  const staleUiTestTargetPbx = pbx.replace(
+    /(GENERATE_INFOPLIST_FILE = YES;\n\t\t\t\t)IPHONEOS_DEPLOYMENT_TARGET = 17\.0;/,
+    '$1IPHONEOS_DEPLOYMENT_TARGET = 15.1;',
+  );
+  const duplicateLibcxxPbx = pbx.replace(
+    /OTHER_LDFLAGS = \(\n\t\t\t\t\t"\$\(inherited\)",\n\t\t\t\t\t"-ObjC",\n\t\t\t\t\);/,
+    'OTHER_LDFLAGS = (\n\t\t\t\t\t"$(inherited)",\n\t\t\t\t\t"-ObjC",\n\t\t\t\t\t"-lc++",\n\t\t\t\t);',
+  );
+  check(
+    'falsifier: raising AthleteKinetics deployment target from 15.1, lowering AthleteKineticsUITests below 17.0, or re-adding duplicate -lc++ to OTHER_LDFLAGS fails closed',
+    raisedAppTargetPbx !== pbx
+      && staleUiTestTargetPbx !== pbx
+      && duplicateLibcxxPbx !== pbx
+      && !inspectXcodeTargetSettings(raisedAppTargetPbx).appDeploymentOk
+      && !inspectXcodeTargetSettings(staleUiTestTargetPbx).uiTestDeploymentOk
+      && !inspectXcodeTargetSettings(duplicateLibcxxPbx).appLdFlagsOk,
   );
   const hasCompatibilityViewportRevealReach = (src) => {
     const code = stripSwiftComments(src);

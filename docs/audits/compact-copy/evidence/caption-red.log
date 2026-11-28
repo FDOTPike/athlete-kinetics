@@ -1,0 +1,122 @@
+FAIL apps/mobile/test/components/TodayScreen.test.js
+  ○ skipped Today shows the same athlete-facing calendar format as other dates
+  deriveTodayState separates the four states the old rest-day boolean conflated
+    ○ skipped a scheduled rest day inside an active block is scheduled_rest, and names the next session
+    ○ skipped no active block at all is unscheduled/no_program — NOT a rest day
+    ○ skipped an athlete whose previous block was archived reads as between_blocks, not no_program
+    ○ skipped an unfinished earlier session outranks rest and reports the EARLIEST plus a count
+    ○ skipped a stopped session counts as attempted, never as missed
+    ○ skipped a block whose last session is in the past is block_ended, with no fabricated next
+    ○ skipped a block that has not started yet is not_started_yet
+  deriveTodayState priority order
+    ○ skipped a safety halt outranks every training state, including an open session
+    ○ skipped an open session outranks today's plan
+    ○ skipped today's own work outranks overdue work, which is reported but not acted on
+    ○ skipped a finalized session today is completed_today, so no start is offered
+    ○ skipped F3: a session today that was STOPPED safely closes the planned attempt (stopped_today)
+    ○ skipped F3: the three finalization states of today stay distinct
+    ○ skipped F3: a safety halt and an open session still outrank a stopped day
+    ○ skipped nextSessionAfter is strict: a session dated today is never "next"
+  duration is measured or declared, never invented
+    ○ skipped with no recorded sessions it falls back to the athlete's OWN configured cap
+    ○ skipped with recorded sessions it reports a median and says how many it came from
+    ○ skipped median rounds to five minutes and never claims under five
+  adjustments read as English and never overstate
+    ○ skipped a set reduction and an eased effort target both read plainly
+    ○ skipped an increase is described as an increase
+    ○ skipped a row with no movement in either delta says so instead of inventing a verb
+  Today starts the workout directly — no Coach detour
+    ○ skipped a planned day offers ONE primary action that calls the production start path
+    ○ skipped an active session offers Resume, and resuming never starts a second session
+    ○ skipped the planned card shows a compact preview and truncates honestly
+    ○ skipped the duration line reports the cap when the athlete has no recorded sessions
+    ○ skipped the duration line reports measured history when it exists
+  Today distinguishes the states rather than calling them all rest
+    ○ skipped a scheduled rest day says rest and offers only a quiet off-plan action
+    ○ skipped an athlete with no program is NOT told to rest
+    ○ skipped a missed session is named with its date, and the plan is explicitly not changed
+    ○ skipped a completed day offers no primary start, only a quiet extra session
+    ○ skipped a safety halt takes the screen and offers no way to start
+  Today never manufactures a coaching message
+    ○ skipped with no pending adjustments, the section is ABSENT — not a "nothing changed" line
+    ○ skipped F2(a): a block-wide adjustment for ANOTHER day never appears under "what changed today"
+    ○ skipped F2(b): an adjusted slot in TODAY’s plan is shown in plain language, never as a raw token
+    ○ skipped F2(c): an unrecognised stored reason renders the change but NO caption
+    ○ skipped missing readiness is stated as missing, never filled in with a number
+    ○ skipped #170: a morning with no row yet says there is no estimate for today yet
+  F3: a stopped day never re-offers the planned workout
+    ○ skipped the stopped card has no planned start, and its only start says it is unplanned
+  an earlier workout the app never closed has a way out (issue 191)
+    ○ skipped an earlier workout with logged sets is finished and kept, and cannot be discarded
+    ○ skipped an earlier workout with no logged sets offers Discard, and no finish
+    ○ skipped a safety stop with no sets is never offered for discard
+    ○ skipped with no earlier workout open, no such card is shown
+  F5: Today opens the workout only after a session actually exists
+    ○ skipped a refused start (store sets error, no session) stays on Today and shows why
+    ○ skipped the stopped-day extra action is guarded the same way
+  an extra session asks first
+    ○ skipped on completed_today, "Start an extra session?" with Start and Not now; nothing starts before Start
+    ○ skipped on stopped_today, "Start an extra session?" with Start and Not now; nothing starts before Start
+  session-5: empty unplanned starts show the plan-first card instead of starting
+    ○ skipped on unscheduled when freeFormStartIsEmpty() is true, pressing start shows the inline card, Go to Plan navigates, Cancel closes, and startSession is not called
+    ○ skipped on scheduled_rest when freeFormStartIsEmpty() is true, pressing start shows the inline card, Go to Plan navigates, Cancel closes, and startSession is not called
+    ○ skipped on completed_today when freeFormStartIsEmpty() is true, pressing start shows the inline card, Go to Plan navigates, Cancel closes, and startSession is not called
+    ○ skipped on stopped_today when freeFormStartIsEmpty() is true, pressing start shows the inline card, Go to Plan navigates, Cancel closes, and startSession is not called
+    ○ skipped a planned start is unchanged even when freeFormStartIsEmpty() is true
+  #177: Today names the active athlete only in Coach mode
+    ○ skipped with two athletes, Today names the active one
+    ○ skipped with one athlete, Today names no one
+    ○ skipped with two athletes, the held Today screen also names the active one
+    ○ skipped with two athletes, the held Today screen with a safety halt names the active one
+    ○ skipped with one athlete, the held Today screen names no one
+  #228 the off-plan start opens a planned session and says which
+    × on a rest day it starts the next planned session (557 ms)
+    × with a missed session it starts the earliest unfinished one (13 ms)
+    √ on stopped_today the extra session stays unplanned and does not take a planned session (29 ms)
+    √ on completed_today the extra session stays unplanned and does not take a planned session (12 ms)
+    √ with nothing left in the plan it keeps the free-form start and says nothing extra (13 ms)
+
+  ● #228 the off-plan start opens a planned session and says which › on a rest day it starts the next planned session
+
+    expect(element).toHaveTextContent()
+
+    Expected element to have text content:
+      This starts Friday's upper-body session (Fri, 17 July 2026), your next planned session.
+    Received:
+      This starts Friday's upper-body session (2026-07-17), your next planned session.
+
+      823 |     render(<TodayScreen />);
+      824 |     const caption = `This starts Friday's upper-body session (${formatAthleteDate('2026-07-17')}), your next planned session.`;
+    > 825 |     expect(screen.getByTestId('today-adhoc-session-caption')).toHaveTextContent(caption);
+          |                                                               ^
+      826 |     expect(screen.getByTestId('today-adhoc-session')).toHaveAccessibleName(caption);
+      827 |     fireEvent.press(screen.getByTestId('today-adhoc-session'));
+      828 |     expect(mockState.startSession).toHaveBeenCalledWith(false, 2);
+
+      at Object.toHaveTextContent (test/components/TodayScreen.test.js:825:63)
+
+  ● #228 the off-plan start opens a planned session and says which › with a missed session it starts the earliest unfinished one
+
+    expect(element).toHaveTextContent()
+
+    Expected element to have text content:
+      This starts Tuesday's lower-body session (Tue, 14 July 2026), the earliest one you have not finished.
+    Received:
+      This starts Tuesday's lower-body session (2026-07-14), the earliest one you have not finished.
+
+      841 |     render(<TodayScreen />);
+      842 |     const caption = `This starts Tuesday's lower-body session (${formatAthleteDate('2026-07-14')}), the earliest one you have not finished.`;
+    > 843 |     expect(screen.getByTestId('today-adhoc-session-caption')).toHaveTextContent(caption);
+          |                                                               ^
+      844 |     expect(screen.getByTestId('today-adhoc-session')).toHaveAccessibleName(caption);
+      845 |     fireEvent.press(screen.getByTestId('today-adhoc-session'));
+      846 |     expect(mockState.startSession).toHaveBeenCalledWith(false, 2);
+
+      at Object.toHaveTextContent (test/components/TodayScreen.test.js:843:63)
+
+Test Suites: 1 failed, 1 total
+Tests:       2 failed, 57 skipped, 3 passed, 62 total
+Snapshots:   0 total
+Time:        4.07 s
+Ran all test suites within paths "apps/mobile/test/components/TodayScreen.test.js".
+EXIT=1
