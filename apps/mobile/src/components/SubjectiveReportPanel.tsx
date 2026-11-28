@@ -18,6 +18,7 @@
 import React, { useRef, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { scanRedFlags } from '@ak/inference';
+import { notedReportShowsCue, reportEntryName } from '../state/reportCopy';
 import type { TriageOutcome } from '../state/useStore';
 import { theme } from '../theme/theme';
 import { IS_BETA_BUILD } from '../config/features';
@@ -211,7 +212,17 @@ export function SubjectiveReportPanel({
       {applied && lastTriage !== null && lastTriage.kind === 'positive' && (
         <View style={styles.result}>
           <Text style={styles.badge}>Noted</Text>
-          <Text style={styles.bodyText}>{lastTriage.cue}</Text>
+          {lastTriage.entryId === undefined ? (
+            <Text style={styles.bodyText}>{lastTriage.cue}</Text>
+          ) : (
+            <>
+              <Text style={styles.caption}>{`Matched: ${reportEntryName(lastTriage.entryId)}`}</Text>
+              <Text style={styles.bodyText}>Today's plan is unchanged.</Text>
+              {notedReportShowsCue(lastTriage.entryId) && (
+                <Text style={styles.caption}>{lastTriage.cue}</Text>
+              )}
+            </>
+          )}
         </View>
       )}
       {applied && lastTriage !== null && lastTriage.kind === 'rejected' && (

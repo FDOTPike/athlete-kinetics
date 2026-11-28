@@ -48,7 +48,7 @@ import { EMPTY_ACTIVITY_LEDGER } from '../state/activityStore';
 import { sessionFocusName } from '../state/sessionSummary';
 import { HALT_NEXT_TEXT, HALT_PAUSE_CARD_TEXT, HALT_TODAY_TEXT } from '../state/haltCopy';
 import { operativeReportLine } from '../state/operativeReportLine';
-import { reportEffectText, reportEntryName } from '../state/reportCopy';
+import { notedReportShowsCue, reportEffectText, reportEntryName } from '../state/reportCopy';
 import { SafetyReportView } from '../components/SafetyReportView';
 import { isSessionReportStop, SESSION_REPORT_STOP_SENTENCE } from '../state/sessionReportStop';
 import {
@@ -1744,7 +1744,8 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
               {/* The reply to a report sits ABOVE the form, so it is in view
                   after Apply (#207). It says, in this order: what the report
                   matched, what changed today with the applied figures (after the
-                  severity gate and the experience scaling), then the entry's cue. */}
+                  severity gate and the experience scaling), then the cue. Noted
+                  replies omit cues from restrictive entries that were gated off. */}
               {lastTriage !== null && lastTriage.kind === 'positive' && (
                 <View style={styles.reportResult} testID="report-result-noted">
                   <View style={styles.statusBadge}>
@@ -1754,7 +1755,9 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                     <Text style={styles.captionText}>{`Matched: ${reportEntryName(lastTriage.entryId)}`}</Text>
                   )}
                   <Text style={styles.bodyText}>Today's plan is unchanged.</Text>
-                  <Text style={styles.captionText}>{lastTriage.cue}</Text>
+                  {notedReportShowsCue(lastTriage.entryId) && (
+                    <Text style={styles.captionText}>{lastTriage.cue}</Text>
+                  )}
                 </View>
               )}
               {lastTriage !== null && lastTriage.kind === 'rejected' && (

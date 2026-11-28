@@ -1,8 +1,10 @@
 /**
  * Plain words for a "Something feels off" report: which entry it matched and
- * what it changed today. Display only: nothing here reads or changes a
- * guardrail, a severity gate or a halt.
+ * what it changed today. Display only: the matched entry's guardrail controls
+ * cue visibility without changing the plan or the report outcome.
  */
+import { isNoOpGuardrail } from '@ak/inference';
+import phraseCodebase from '../../../../packages/inference/assets/phrase-codebase.json';
 
 /** The phrase-codebase entry ids (and the two red-flag overrides) in plain words. */
 export const REPORT_ENTRY_NAME: Readonly<Record<string, string>> = {
@@ -25,6 +27,13 @@ export const REPORT_ENTRY_NAME: Readonly<Record<string, string>> = {
 /** Plain name for a matched entry id; null means the report matched nothing. */
 export const reportEntryName = (entryId: string | null): string =>
   entryId === null ? 'Not matched to any entry' : REPORT_ENTRY_NAME[entryId] ?? 'A matched entry';
+
+/** A noted reply can show a cue only for a non-restrictive entry or a synthetic result. */
+export function notedReportShowsCue(entryId?: string): boolean {
+  if (entryId === undefined) return true;
+  const entry = phraseCodebase.entries.find((candidate) => candidate.id === entryId);
+  return entry !== undefined && isNoOpGuardrail(entry.guardrail);
+}
 
 /** What a report changed, as differences from the plan without it. */
 export interface ReportEffect {
