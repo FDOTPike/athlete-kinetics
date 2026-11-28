@@ -32,6 +32,7 @@ import {
 } from '@ak/inference';
 import { FocusGoalsPanel } from '../components/FocusGoalsPanel';
 import { SportPanel } from '../components/SportPanel';
+import { WarmupPresetsPanel } from '../components/WarmupPresetsPanel';
 import appJson from '../../app.json';
 import { theme } from '../theme/theme';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
@@ -67,7 +68,6 @@ const formatFinalizedDate = (ms: number): string => {
   if (ms <= 0) return '—';
   return formatAthleteDate(ms);
 };
-
 // ---------------------------------------------------------------------------
 // Primitives consuming frozen components from components/ui
 // ---------------------------------------------------------------------------
@@ -555,6 +555,7 @@ export default function ProfileScreen(): React.JSX.Element {
       {/* Work order 3: the sport answer and the weekly sport workload the next
           block will be planned with. */}
       <SportPanel />
+      <WarmupPresetsPanel />
       <ChipRow
         label="2 · TRAINING AGE"
         options={TRAINING_AGES}

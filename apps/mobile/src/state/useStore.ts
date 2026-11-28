@@ -270,14 +270,21 @@ export const storableLoadShown = (shown: SetLoadShown | null | undefined): SetLo
 import {
   PREPARATION_FLOOR_MIN,
   PREPARATION_HELD_MOVEMENT_IDS,
+  buildPersonalisedPreparationProtocol,
   buildPreparationProtocol,
   estimateSessionTime,
   isTerminalPreparationStatus,
+  isWarmupSessionType,
   preparationItemJoints,
   preparationPlanningMinutes,
+  resolveActiveWarmupPreset,
   resolvePreparationOutcome,
   type PreparationOmissionReason,
   type PreparationProtocol,
+  type WarmupPreset,
+  type WarmupPresetDraft,
+  type WarmupSessionOverride,
+  type WarmupSessionType,
 } from '@ak/inference';
 import {
   beginSessionPreparation,
@@ -295,6 +302,25 @@ import {
   type PreparationSummary,
 } from './preparationStore';
 export type { ActivePreparation, PreparationItemRecord, PreparationItemWrite, PreparationSummary } from './preparationStore';
+import {
+  deleteWarmupPreset as deleteWarmupPresetInDb,
+  readPlannedSessionWarmupOverrides,
+  readWarmupPresets,
+  readWarmupSessionTypeAssignments,
+  saveWarmupPreset as saveWarmupPresetInDb,
+  setPlannedSessionWarmupOverride as setPlannedSessionWarmupOverrideInDb,
+  setWarmupSessionTypeAssignment as setWarmupSessionTypeAssignmentInDb,
+} from './warmupPresetStore';
+export type {
+  WarmupPreset,
+  WarmupPresetDraft,
+  WarmupPresetItem,
+  WarmupPresetItemDraft,
+  WarmupPurpose,
+  WarmupSessionOverride,
+  WarmupSessionType,
+  WarmupWeaknessTarget,
+} from '@ak/inference';
 import {
   MAX_ACTIVE_GOALS,
   normalizeFocusSelection,
@@ -1326,6 +1352,16 @@ interface KineticsStore {
   finishPreparation: (outcome: 'finished' | 'already_warm' | 'skipped', expectedRevision: number) => void;
   /** What was recorded for a session's preparation; null = not recorded. */
   loadSessionPreparation: (sessionId: number) => PreparationSummary | null;
+  warmupPresets: WarmupPreset[];
+  warmupSessionTypeAssignments: Partial<Record<WarmupSessionType, number>>;
+  plannedSessionWarmupOverrides: Record<number, WarmupSessionOverride>;
+  freeFormWarmupOverride: WarmupSessionOverride | null;
+  refreshWarmupPresets: () => void;
+  saveWarmupPreset: (draft: WarmupPresetDraft, presetId?: number | null) => boolean;
+  deleteWarmupPreset: (presetId: number) => boolean;
+  setWarmupSessionTypeAssignment: (sessionType: WarmupSessionType, presetId: number | null) => boolean;
+  setPlannedSessionWarmupOverride: (plannedSessionId: number, override: WarmupSessionOverride | null) => boolean;
+  setFreeFormWarmupOverride: (override: WarmupSessionOverride | null) => void;
   addPlanSlot: (movementId: number) => void;
   swapMovement: (oldMovementId: number, newMovementId: number, replacementSets?: number) => void;
   /** Thumbs sentiment for a movement. NEUTRAL (0) DELETEs the row (the 010
@@ -2176,6 +2212,8 @@ const buildSessionPreparationProtocol = (input: {
   readonly capabilityAvailable: ReadonlySet<number>;
   readonly niggles: readonly NiggleInput[];
   readonly readinessReduced: boolean;
+  readonly sessionType: WarmupSessionType;
+  readonly sessionOverride: WarmupSessionOverride | null;
 }): PreparationProtocol => {
   const { sessionPlan, movements, profile, accessContext, capabilityAvailable, niggles } = input;
   const byId = new Map(movements.map((movement) => [movement.movement_id, movement]));
@@ -2212,7 +2250,21 @@ const buildSessionPreparationProtocol = (input: {
   const timeConflictNote = sessionPlan.length > 0 && mainWorkMin + PREPARATION_FLOOR_MIN > capMin
     ? `This session is estimated at about ${Math.ceil(mainWorkMin + PREPARATION_FLOOR_MIN)} minutes including ${PREPARATION_FLOOR_MIN} minutes of preparation, which is over your ${capMin}-minute session limit. The plan was set earlier and has not been changed, and preparation has not been shortened below ${PREPARATION_FLOOR_MIN} minutes.`
     : null;
-  return buildPreparationProtocol({
+  const presets = readWarmupPresets(input.d);
+  const sessionTypeAssignments = readWarmupSessionTypeAssignments(input.d);
+  const activePreset = resolveActiveWarmupPreset({
+    presets,
+    sessionTypeAssignments,
+    sessionType: input.sessionType,
+    sessionOverride: input.sessionOverride,
+  });
+  const movementCatalog = new Map(
+    movements.map((movement) => [
+      movement.movement_id,
+      { name: movement.name, pattern: movement.pattern as MovementPattern },
+    ]),
+  );
+  return buildPersonalisedPreparationProtocol({
     tier: profile.training_age,
     accessContext,
     slots: sessionPlan.flatMap((slot) => {
@@ -2233,6 +2285,10 @@ const buildSessionPreparationProtocol = (input: {
     readinessReduced: input.readinessReduced,
     budgetMin,
     timeConflictNote,
+    preset: activePreset,
+    movementCatalog,
+    mainWorkMin,
+    capMin,
   });
 };
 
@@ -3804,6 +3860,7 @@ const PER_ATHLETE_RESET: Partial<KineticsStore> = {
   activityLedger: EMPTY_ACTIVITY_LEDGER,
   profileNotes: [], profile: DEFAULT_PROFILE, triaging: false, lastTriage: null,
   sessionPlan: [], activeSessionPlanSlotId: null, activeMovementId: null, runner: null, sessionMode: null, preparation: null, substitution: null, niggles: [],
+  warmupPresets: [], warmupSessionTypeAssignments: {}, plannedSessionWarmupOverrides: {}, freeFormWarmupOverride: null,
   activePriorExperienceMovementIds: [], movementAvailabilityRevision: 0, activeSessionAccessContext: null,
   block: null, blockMeta: null, blockMeetMeta: null, blockSessions: [], todayPlan: null, program: null, routineTemplates: [], pendingAutopilotAdjustments: [],
   // Suspension is per-athlete DURABLE state living in that athlete's own DB
@@ -4294,6 +4351,10 @@ export const useStore = create<KineticsStore>()((set, get) => {
   runner: null,
   sessionMode: null,
   preparation: null,
+  warmupPresets: [],
+  warmupSessionTypeAssignments: {},
+  plannedSessionWarmupOverrides: {},
+  freeFormWarmupOverride: null,
   substitution: null,
   niggles: [],
   activePriorExperienceMovementIds: [],
@@ -4437,6 +4498,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
         lastLoggedLoads,
         status: 'ready',
         error: null,
+        freeFormWarmupOverride: null,
         onboarded: onboardStamp !== undefined && onboardStamp.updated_at_ms > 0,
         movements,
         activePriorExperienceMovementIds: capabilityFacts.priorExperienceMovementIds,
@@ -4470,6 +4532,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       get().refreshReturnCheckin();
       get().refreshFocusAndGoals();
       get().refreshSport();
+      get().refreshWarmupPresets();
       get().refreshEarlierOpenSessions();
       // Audit B6: an app killed mid-session RESUMES it on restart instead of
       // permitting a duplicate shell. Unfinished = today's row with no
@@ -8531,12 +8594,22 @@ export const useStore = create<KineticsStore>()((set, get) => {
 
     // Preparation for THIS frozen plan, built before the transaction so the
     // protocol and the session row are inserted together or not at all.
+    const preparationSessionType: WarmupSessionType = planToConsume !== null && isWarmupSessionType(planToConsume.focus)
+      ? planToConsume.focus
+      : planToConsume !== null
+        ? 'default'
+        : 'free_form';
+    const preparationSessionOverride: WarmupSessionOverride | null = planToConsume !== null
+      ? (readPlannedSessionWarmupOverrides(d)[planToConsume.plannedSessionId] ?? null)
+      : get().freeFormWarmupOverride;
     const preparationProtocol = buildSessionPreparationProtocol({
       d, sessionPlan, movements, profile,
       accessContext: executionContext,
       capabilityAvailable,
       niggles: get().niggles,
       readinessReduced: isPrescriptionReduced(todaysVector, profile),
+      sessionType: preparationSessionType,
+      sessionOverride: preparationSessionOverride,
     });
     // Preparation drills answer to the same support decision as the main plan.
     const supportIds = [...sessionPlan.map((slot) => slot.movementId),
@@ -8639,6 +8712,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
         sessionMode,
         preparation,
         activeSessionAccessContext: executionContext,
+        ...(planToConsume === null ? { freeFormWarmupOverride: null } : {}),
         ...runnerSelection(runner),
       });
     } catch (e) {
@@ -8951,6 +9025,101 @@ export const useStore = create<KineticsStore>()((set, get) => {
   },
 
   loadSessionPreparation: (sessionId) => readPreparationSummary(getDb(), sessionId),
+
+  refreshWarmupPresets: () => {
+    const d = getDb();
+    set({
+      warmupPresets: readWarmupPresets(d),
+      warmupSessionTypeAssignments: readWarmupSessionTypeAssignments(d),
+      plannedSessionWarmupOverrides: readPlannedSessionWarmupOverrides(d),
+    });
+  },
+
+  saveWarmupPreset: (draft, presetId = null) => {
+    if (get().status !== 'ready') return false;
+    const d = getDb();
+    const nowMs = Date.now();
+    d.executeSync('BEGIN');
+    try {
+      const result = saveWarmupPresetInDb(d, { presetId, draft, nowMs });
+      if (!result.ok) {
+        d.executeSync('ROLLBACK');
+        set({ error: result.error });
+        return false;
+      }
+      d.executeSync('COMMIT');
+    } catch (e) {
+      try { d.executeSync('ROLLBACK'); } catch { /* ignore */ }
+      set({ error: e instanceof Error ? e.message : String(e) });
+      return false;
+    }
+    set({ warmupPresets: readWarmupPresets(d), error: null });
+    return true;
+  },
+
+  deleteWarmupPreset: (presetId) => {
+    if (get().status !== 'ready') return false;
+    const d = getDb();
+    d.executeSync('BEGIN');
+    try {
+      deleteWarmupPresetInDb(d, presetId);
+      d.executeSync('COMMIT');
+    } catch (e) {
+      try { d.executeSync('ROLLBACK'); } catch { /* ignore */ }
+      set({ error: e instanceof Error ? e.message : String(e) });
+      return false;
+    }
+    const currentFreeForm = get().freeFormWarmupOverride;
+    const nextFreeForm = currentFreeForm?.mode === 'preset' && currentFreeForm.presetId === presetId
+      ? null
+      : currentFreeForm;
+    set({
+      warmupPresets: readWarmupPresets(d),
+      warmupSessionTypeAssignments: readWarmupSessionTypeAssignments(d),
+      plannedSessionWarmupOverrides: readPlannedSessionWarmupOverrides(d),
+      freeFormWarmupOverride: nextFreeForm,
+      error: null,
+    });
+    return true;
+  },
+
+  setWarmupSessionTypeAssignment: (sessionType, presetId) => {
+    if (get().status !== 'ready') return false;
+    const d = getDb();
+    const nowMs = Date.now();
+    d.executeSync('BEGIN');
+    try {
+      setWarmupSessionTypeAssignmentInDb(d, sessionType, presetId, nowMs);
+      d.executeSync('COMMIT');
+    } catch (e) {
+      try { d.executeSync('ROLLBACK'); } catch { /* ignore */ }
+      set({ error: e instanceof Error ? e.message : String(e) });
+      return false;
+    }
+    set({ warmupSessionTypeAssignments: readWarmupSessionTypeAssignments(d), error: null });
+    return true;
+  },
+
+  setPlannedSessionWarmupOverride: (plannedSessionId, override) => {
+    if (get().status !== 'ready') return false;
+    const d = getDb();
+    const nowMs = Date.now();
+    d.executeSync('BEGIN');
+    try {
+      setPlannedSessionWarmupOverrideInDb(d, plannedSessionId, override, nowMs);
+      d.executeSync('COMMIT');
+    } catch (e) {
+      try { d.executeSync('ROLLBACK'); } catch { /* ignore */ }
+      set({ error: e instanceof Error ? e.message : String(e) });
+      return false;
+    }
+    set({ plannedSessionWarmupOverrides: readPlannedSessionWarmupOverrides(d), error: null });
+    return true;
+  },
+
+  setFreeFormWarmupOverride: (override) => {
+    set({ freeFormWarmupOverride: override });
+  },
 
   addPlanSlot: (movementId) => {
     const state = get();
@@ -10808,6 +10977,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       lastLoggedLoads: {},
       session: null, sessionPlan: [], activeSessionPlanSlotId: null, activeMovementId: null, runner: null, sessionMode: null,
       preparation: null,
+      freeFormWarmupOverride: null,
       activeSessionAccessContext: null, activePriorExperienceMovementIds: [],
       movementAvailabilityRevision: get().movementAvailabilityRevision + 1,
       prescription: null, substitution: null, lastTriage: null, niggles: [],
@@ -10826,6 +10996,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
     get().refreshReturnCheckin();
     get().refreshFocusAndGoals();
     get().refreshSport();
+    get().refreshWarmupPresets();
     // Re-read from the wiped file rather than trusting the set() above: this is
     // the same read every other surface here gets, and it is what makes the
     // in-memory value and the database agree after the wipe.

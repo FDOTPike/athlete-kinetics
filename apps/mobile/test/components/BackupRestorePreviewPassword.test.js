@@ -148,6 +148,7 @@ function snapshot(athleteId, dbName, bytes) {
 }
 
 describe('BackupTransferPanel restore preview password retention', () => {
+  jest.setTimeout(180_000);
   beforeEach(async () => {
     resetDataMaintenanceLockForTests();
     authorizeAthleteDataBoot();

@@ -41,13 +41,18 @@ import React, { useMemo } from 'react';
 import { Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
   BALANCED_FOCUS,
+  WARMUP_COPY,
   addDaysIso,
   applyPrescriptionToSlot,
   describeFocus,
+  isWarmupSessionType,
+  resolveActiveWarmupPreset,
   resolveMuscleGroupAlias,
   sportDisplayName,
   sportEmphasisFor,
   type MuscleGroupId,
+  type WarmupSessionOverride,
+  type WarmupSessionType,
 } from '@ak/inference';
 import { useStore, freeFormStartIsEmpty, type EarlierOpenSession } from '../state/useStore';
 import { useNavigation } from '../navigation/navigation';
@@ -65,7 +70,7 @@ import { classifyReadiness, HALT_META, HeldScreenWithHalt } from './ReadinessScr
 import { autopilotReasonCopy } from '../state/autopilotCopy';
 import { formatAthleteDate } from '../state/athleteDate';
 import { coachModeAthleteName } from '../state/coachModeAthlete';
-import { CompactDescription, PrimaryButton, QuietAction, Disclosure, ListRow } from '../components/ui';
+import { Chip, CompactDescription, PrimaryButton, QuietAction, Disclosure, ListRow } from '../components/ui';
 import { sessionFocusName } from '../state/sessionSummary';
 import { HALT_NEXT_TEXT } from '../state/haltCopy';
 import { operativeReportLine } from '../state/operativeReportLine';
@@ -152,10 +157,17 @@ function AvailableTodayScreen({
   const athletes = useStore((s) => s.athletes);
   const activeAthleteId = useStore((s) => s.activeAthleteId);
   const activeAthleteName = coachModeAthleteName(athletes, activeAthleteId);
+  const warmupPresets = useStore((s) => s.warmupPresets) ?? [];
+  const warmupSessionTypeAssignments = useStore((s) => s.warmupSessionTypeAssignments) ?? {};
+  const plannedSessionWarmupOverrides = useStore((s) => s.plannedSessionWarmupOverrides) ?? {};
+  const freeFormWarmupOverride = useStore((s) => s.freeFormWarmupOverride) ?? null;
+  const setPlannedSessionWarmupOverride = useStore((s) => s.setPlannedSessionWarmupOverride);
+  const setFreeFormWarmupOverride = useStore((s) => s.setFreeFormWarmupOverride);
   const nav = typeof useNavigation === 'function' ? useNavigation() : undefined;
 
   const [emptyStartPromptOpen, setEmptyStartPromptOpen] = React.useState(false);
   const [updateConfirmOpen, setUpdateConfirmOpen] = React.useState(false);
+  const [warmupPickerOpen, setWarmupPickerOpen] = React.useState(false);
   // The same access check Start runs, so this notice and Start's refusal agree.
   // Read on every render; a profile (equipment / safety / experience) change re-renders this screen.
   const conflictReason: 'equipment' | 'non_equipment' | null =
@@ -259,6 +271,60 @@ function AvailableTodayScreen({
       { text: 'Start', onPress: startAndOpen },
     ]);
   }, [checkFreeFormStartIsEmpty, startAndOpen]);
+  const renderWarmupSwitcher = (input: {
+    sessionType: WarmupSessionType;
+    override: WarmupSessionOverride | null;
+    onSelect: (next: WarmupSessionOverride) => void;
+  }): React.JSX.Element | null => {
+    if (warmupPresets.length === 0) return null;
+    const activePreset = resolveActiveWarmupPreset({
+      presets: warmupPresets,
+      sessionTypeAssignments: warmupSessionTypeAssignments,
+      sessionType: input.sessionType,
+      sessionOverride: input.override,
+    });
+    return (
+      <View style={styles.preview}>
+        <Text style={styles.caption} testID="today-warmup-summary">
+          {WARMUP_COPY['WP-21'](activePreset?.name ?? null)}
+        </Text>
+        <QuietAction
+          label={WARMUP_COPY['WP-22']}
+          onPress={() => setWarmupPickerOpen((prev) => !prev)}
+          accessibilityLabel={WARMUP_COPY['WP-22']}
+          testID="today-warmup-change"
+        />
+        {warmupPickerOpen && (
+          <View style={styles.warmupPicker} testID="today-warmup-picker">
+            <Chip
+              wrap
+              label={WARMUP_COPY['WP-19']}
+              selected={activePreset === null}
+              onPress={() => {
+                input.onSelect({ mode: 'standard_auto', presetId: null });
+                setWarmupPickerOpen(false);
+              }}
+              testID="today-warmup-option-auto"
+            />
+            {warmupPresets.map((preset) => (
+              <Chip
+                key={preset.presetId}
+                wrap
+                label={preset.name}
+                selected={activePreset?.presetId === preset.presetId}
+                onPress={() => {
+                  input.onSelect({ mode: 'preset', presetId: preset.presetId });
+                  setWarmupPickerOpen(false);
+                }}
+                testID={`today-warmup-option-${preset.presetId}`}
+              />
+            ))}
+          </View>
+        )}
+      </View>
+    );
+  };
+
   const renderUnplannedStartControl = (control: {
     label: string;
     accessibilityLabel: string;
@@ -296,6 +362,19 @@ function AvailableTodayScreen({
     }
     return (
       <>
+        {renderWarmupSwitcher(
+          target === null
+            ? {
+                sessionType: 'free_form',
+                override: freeFormWarmupOverride,
+                onSelect: (next) => { setFreeFormWarmupOverride?.(next); },
+              }
+            : {
+                sessionType: isWarmupSessionType(target.session.focus) ? target.session.focus : 'default',
+                override: plannedSessionWarmupOverrides[target.session.plannedSessionId] ?? null,
+                onSelect: (next) => { setPlannedSessionWarmupOverride?.(target.session.plannedSessionId, next); },
+              },
+        )}
         <QuietAction
           label={control.label}
           onPress={control.confirmExtra === true ? confirmExtraSessionAndOpen : () => startUnplannedAndOpen(target)}
@@ -562,6 +641,11 @@ function AvailableTodayScreen({
                 )}
               </View>
             )}
+            {todayPlan !== null && renderWarmupSwitcher({
+              sessionType: isWarmupSessionType(state.focus) ? state.focus : 'default',
+              override: plannedSessionWarmupOverrides[todayPlan.plannedSessionId] ?? null,
+              onSelect: (next) => { setPlannedSessionWarmupOverride?.(todayPlan.plannedSessionId, next); },
+            })}
             <PrimaryButton
               label="Start workout"
               onPress={startAndOpen}
@@ -877,6 +961,7 @@ const styles = StyleSheet.create({
   body: { ...theme.font.body, color: theme.color.textHi },
   caption: { ...theme.font.label, color: theme.color.textMid },
   preview: { gap: theme.space[1] },
+  warmupPicker: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.space[2] },
   previewRow: { ...theme.font.body, color: theme.color.textMid },
   section: { marginTop: theme.space[5], gap: theme.space[3] },
   sectionTitle: { ...theme.font.eyebrow, color: theme.color.textLow },
