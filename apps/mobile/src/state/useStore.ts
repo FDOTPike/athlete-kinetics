@@ -134,6 +134,7 @@ import {
   RED_FLAG_PAIN,
   RED_FLAG_SYSTEMIC,
   resolveReport,
+  resolveReportWithSafetyReader,
   resolveMovementAvailability,
   triage,
   type CapabilityEdge,
@@ -155,6 +156,8 @@ import {
   type RoutineStressPurpose,
   type DifficultyRating,
   type Embedder,
+  type SafetyReader,
+  type SafetyReaderPrediction,
   type ReturnAction,
   type BlockPlan,
   type BlockFocus,
@@ -202,7 +205,6 @@ import {
   serializeRunner,
   startRunner,
   runnerTierForTrainingAge,
-  applyGuardrail,
   type RunnerHaltReason,
   type RunnerState,
   type RunnerTarget,
@@ -1142,6 +1144,7 @@ interface KineticsStore {
   /** Synchronous read of a planned session's slots (grid detail view). */
   loadSessionSlots: (plannedSessionId: number) => TodaySlot[];
   setEmbedder: (e: Embedder | null) => void;
+  setSafetyReader: (r: SafetyReader | null) => void;
   askQuestion: (text: string) => Promise<QuestionResult | null>;
   saveProfile: (patch: Partial<UserProfile>) => void;
   /** Re-read UI preferences for the active profile slot. */
@@ -1368,7 +1371,7 @@ interface KineticsStore {
   reportNiggle: (region: string, severity: number) => boolean;
   /** Reload today's niggles from 011 into state (boot + day rollover). */
   refreshNiggles: () => void;
-  refreshVector: () => void;
+  refreshVector: (today?: string) => void;
   freeFormStartIsEmpty: () => boolean;
   /**
    * Start today's session. `plannedSessionId` (#228) starts another
@@ -1405,7 +1408,7 @@ interface KineticsStore {
   /** Remove an earlier open workout that has no logged sets and no safety stop,
    *  with its rows. Refused otherwise. */
   discardEarlierSession: (sessionId: number) => boolean;
-  computePrescription: (patterns: readonly MovementPattern[]) => void;
+  computePrescription: (patterns: readonly MovementPattern[], today?: string) => void;
   /** Today's saved "Something feels off" reports, oldest first, for the
    *  read-only report view (#185). Reads only: nothing here can withdraw,
    *  correct or re-derive a report. Empty when no database is open. */
@@ -1474,6 +1477,8 @@ let bootInFlight = false;
  * of, an athlete context it did not start in.
  */
 let athleteContextRevision = 0;
+let activeTriagingCount = 0;
+let subjectiveReportEpoch = 0;
 /** Shown when a normal athlete-data action cannot take its mutation lease. */
 const DATA_LOCKED_MESSAGE = 'Athlete data is temporarily locked for backup or restore.';
 /** Exclusive (registry-changing) actions are also refused while ordinary
@@ -1615,11 +1620,9 @@ const localDateOf = (ms: number): string => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
-/** A neutral placeholder state_vector row for a calendar day with no
- *  materialized row (a pure rest day). The autopilot reads ONLY the window
- *  length from these, never their fields — they exist so detectFlaws sees a
- *  fixed 21-CALENDAR-day grid (preserving the per-calendar-day EMA recency),
- *  not a gap-collapsed list of only training/telemetry days. */
+/** In-memory stand-in for a date without readiness inputs. It keeps the
+ *  autopilot window on a fixed calendar grid and lets a safety halt be
+ *  derived without recording readiness or generating a prescription. */
 const blankVector = (date: string): StateVectorRow => ({
   date, readiness_score: 50, hrv_component: 50, load_component: 50,
   sleep_component: 50, spo2_component: 50, acwr: null, acute_load_kg: null,
@@ -1660,6 +1663,7 @@ const clamp = (x: number, lo: number, hi: number): number => Math.min(hi, Math.m
 // Semantic triage singletons (native-adjacent, non-serializable: module level)
 // ---------------------------------------------------------------------------
 let embedder: Embedder | null = null;
+let safetyReader: SafetyReader | null = null;
 let questionIndex: QuestionIndex | null = null;
 /** Health Connect bridge; null = device cannot serve biometrics (by design,
  *  nothing else in the app changes — subjective-triage-only routing). */
@@ -4247,6 +4251,21 @@ export const useStore = create<KineticsStore>()((set, get) => {
     });
     return true;
   };
+  const syncDay = (today: string): void => {
+    // Yesterday's reports and niggles expire, and the trailing-week vector can
+    // be missing a day. Keep these reads separate from prescription generation.
+    const d = getDb();
+    for (const date of demoDates(today, 7)) {
+      d.executeSync(MATERIALIZE_STATE_VECTOR_SQL, [date]);
+    }
+    get().refreshVector(today);
+    get().refreshActivityLedger();
+    get().refreshNiggles();
+    get().refreshBlock();
+    get().refreshProgram();
+    get().refreshReturnCheckin();
+    get().refreshEarlierOpenSessions();
+  };
   return {
   status: 'booting',
   error: null,
@@ -4990,48 +5009,62 @@ export const useStore = create<KineticsStore>()((set, get) => {
       set({ error: 'End the active session before switching profiles.' });
       return;
     }
+    if (db === null) {
+      set({ error: DATA_LOCKED_MESSAGE });
+      return;
+    }
     const d = getDb();
     const target = rowsOf<{ profile_json: string }>(
       d.executeSync('SELECT profile_json FROM profile_slot WHERE slot_id = ?', [slotId]),
     )[0];
     if (target === undefined) return;
-    // Validated + clamped here, so the athlete_profile UPDATE below can never
-    // throw on a malformed slot (the whole switch stays atomic).
-    const loaded = profileFromJsonString(target.profile_json);
-    // ONE transaction: snapshot the live profile back into the active slot, move
-    // the active flag to the target, LOAD the target into athlete_profile, and
-    // wipe block state. Either all of it commits or none does — is_active and
-    // athlete_profile can never disagree.
-    d.executeSync('BEGIN');
-    try {
-      d.executeSync(
-        'UPDATE profile_slot SET profile_json = ?, updated_at_ms = ? WHERE is_active = 1',
-        [profileToJsonString(get().profile), Date.now()],
-      );
-      d.executeSync('UPDATE profile_slot SET is_active = CASE WHEN slot_id = ? THEN 1 ELSE 0 END', [slotId]);
-      persistProfileFields(d, loaded);
-      runBlockWipe(d, localToday());
-      d.executeSync("UPDATE training_program SET status = 'archived', updated_at_ms = ? WHERE status IN ('active','review_due')", [Date.now()]);
-      d.executeSync('COMMIT');
-    } catch (e) {
-      d.executeSync('ROLLBACK');
-      set({ error: e instanceof Error ? e.message : String(e) });
+    const releaseLease = tryAcquireDataMutationLease(true);
+    if (releaseLease === null) {
+      set({ error: mutationRefusalMessage() });
       return;
     }
-    set({
-      profile: loaded,
-      block: null, blockMeta: null, blockMeetMeta: null, blockSessions: [], todayPlan: null, program: null,
-      niggles: [], lastTriage: null,
-    });
-    get().refreshProfileSlots();
-    get().refreshUiPreferences();
-    get().refreshLoadPreference();
-    get().refreshBandLadder();
-    get().refreshNiggles();
-    get().refreshBlock();
-    get().refreshProgram();
-    get().refreshVector();
-    get().computePrescription([]);
+    athleteContextRevision += 1;
+    try {
+      // Validated + clamped here, so the athlete_profile UPDATE below can never
+      // throw on a malformed slot (the whole switch stays atomic).
+      const loaded = profileFromJsonString(target.profile_json);
+      // ONE transaction: snapshot the live profile back into the active slot, move
+      // the active flag to the target, LOAD the target into athlete_profile, and
+      // wipe block state. Either all of it commits or none does — is_active and
+      // athlete_profile can never disagree.
+      d.executeSync('BEGIN');
+      try {
+        d.executeSync(
+          'UPDATE profile_slot SET profile_json = ?, updated_at_ms = ? WHERE is_active = 1',
+          [profileToJsonString(get().profile), Date.now()],
+        );
+        d.executeSync('UPDATE profile_slot SET is_active = CASE WHEN slot_id = ? THEN 1 ELSE 0 END', [slotId]);
+        persistProfileFields(d, loaded);
+        runBlockWipe(d, localToday());
+        d.executeSync("UPDATE training_program SET status = 'archived', updated_at_ms = ? WHERE status IN ('active','review_due')", [Date.now()]);
+        d.executeSync('COMMIT');
+      } catch (e) {
+        d.executeSync('ROLLBACK');
+        set({ error: e instanceof Error ? e.message : String(e) });
+        return;
+      }
+      set({
+        profile: loaded,
+        block: null, blockMeta: null, blockMeetMeta: null, blockSessions: [], todayPlan: null, program: null,
+        niggles: [], lastTriage: null,
+      });
+      get().refreshProfileSlots();
+      get().refreshUiPreferences();
+      get().refreshLoadPreference();
+      get().refreshBandLadder();
+      get().refreshNiggles();
+      get().refreshBlock();
+      get().refreshProgram();
+      get().refreshVector();
+      get().computePrescription([]);
+    } finally {
+      releaseLease();
+    }
   },
 
   wipeActiveBlockState: () => {
@@ -6097,21 +6130,10 @@ export const useStore = create<KineticsStore>()((set, get) => {
 
   rolloverDay: () => {
     if (get().status !== 'ready') return;
-    if (localToday() === get().today) return;
-    // New calendar day: yesterday's reports no longer govern, today's plan
-    // cell moves, the trailing-week materialization may be missing a day.
-    const d = getDb();
-    for (const date of demoDates(localToday(), 7)) {
-      d.executeSync(MATERIALIZE_STATE_VECTOR_SQL, [date]);
-    }
-    get().refreshVector();   // also advances store.today
-    get().refreshActivityLedger(); // advances the factual 28-day activity window
-    get().refreshNiggles();  // yesterday's niggles drop out of the active set
-    get().refreshBlock();
-    get().refreshProgram();
-    get().refreshReturnCheckin();
-    get().refreshEarlierOpenSessions();
-    get().computePrescription([]);
+    const today = localToday();
+    if (today === get().today) return;
+    syncDay(today);
+    get().computePrescription([], today);
   },
 
   generateNewBlock: (schemaType = 'LINEAR') => {
@@ -8275,9 +8297,8 @@ export const useStore = create<KineticsStore>()((set, get) => {
     };
   },
 
-  refreshVector: () => {
+  refreshVector: (today = localToday()) => {
     if (get().status !== 'ready') return;
-    const today = localToday();
     const d = getDb();
     const vector =
       rowsOf<StateVectorRow>(
@@ -10213,35 +10234,16 @@ export const useStore = create<KineticsStore>()((set, get) => {
     get().refreshEarlierOpenSessions();
     return true;
   },
-  computePrescription: (_patterns) => {
-    if (!get().requireTrainingSupport('daily-prescription', undefined, `session-date:${localToday()}`)) return;
+  computePrescription: (_patterns, today = localToday()) => {
+    if (!get().requireTrainingSupport('daily-prescription', undefined, `session-date:${today}`)) return;
     const { vector, profile, session } = get();
     const d = getDb();
-    // ALWAYS the real current date — a store snapshot can be yesterday's
-    // (app open past midnight) and would re-read yesterday's reports.
-    const today = localToday();
     // #179: a Stop-level in-session report leaves a halt row with no matched
     // entry (sessionReportStop.ts). It is read as a recorded halt.
     const sessionStopHalts = rowsOf<{ report_id: number }>(d.executeSync(
       'SELECT report_id FROM subjective_report WHERE date = ? AND matched_entry_id IS NULL AND halt = 1 ORDER BY report_id',
       [today],
     ));
-    // No readiness vector -> no adjustment; NEVER leave yesterday's on screen.
-    if (vector === null) { set({ prescription: null });
-      // A halt does not depend on the plan or on readiness: an in-session
-      // Stop with no readiness yet still halts the day. Only the halt is set
-      // here; with no halt, lastTriage is left as before.
-      if (sessionStopHalts.length > 0) {
-        const halt = applyGuardrail(
-          { load_modifier: 0, set_modifier: -3, rpe_cap: 0, coaching_cue: '' },
-          SESSION_REPORT_STOP_ENTRY,
-          1,
-        );
-        set({ lastTriage: { kind: 'matched', directive: halt }, today });
-      }
-      return;
-    }
-
     // The whole three-layer derivation is the pure, machine-verified
     // derivePrescription (verify:policy [6]); this is only its SQL adapter.
     // Deriving from the database means a halt survives an app kill and a
@@ -10262,13 +10264,24 @@ export const useStore = create<KineticsStore>()((set, get) => {
       .filter((r): r is { entry: PhraseEntry; severity: number | null; wasHalt: boolean } => r !== null);
     // One is enough: every such row carries the same recorded halt.
     if (sessionStopHalts.length > 0) reports.push({ entry: SESSION_REPORT_STOP_ENTRY, severity: null, wasHalt: true });
+    // A recorded halt still governs on a day with no readiness inputs.
+    if (vector === null) { set({ prescription: null });
+      const haltReports = reports.filter((report) => report.wasHalt);
+      if (haltReports.length > 0) {
+        const derivedHalt = derivePrescription({
+          vector: blankVector(today),
+          profile,
+          ctx: profileCtx(d, today, session !== null ? session.sessionId : -1),
+          reports: haltReports,
+        });
+        if (derivedHalt.directive?.halt === true) {
+          set({ lastTriage: { kind: 'matched', directive: derivedHalt.directive }, today });
+        }
+      }
+      return;
+    }
     const ctx = profileCtx(d, today, session !== null ? session.sessionId : -1);
-    const derived = derivePrescription({
-      vector,
-      profile,
-      ctx,
-      reports,
-    });
+    const derived = derivePrescription({ vector, profile, ctx, reports });
     // Display only (#186): what the operative report itself changed, read as
     // today's prescription with the reports against the same derivation
     // without them. Nothing below feeds back into the prescription.
@@ -10356,6 +10369,10 @@ export const useStore = create<KineticsStore>()((set, get) => {
     set({ triageReady: e !== null });
   },
 
+  setSafetyReader: (r) => {
+    safetyReader = r;
+  },
+
   askQuestion: async (text) => {
     if (get().status !== 'ready' || text.trim().length === 0 || text.length > 300) return null;
     const releaseLease = tryAcquireDataMutationLease();
@@ -10391,11 +10408,19 @@ export const useStore = create<KineticsStore>()((set, get) => {
     // A report typed after midnight must land on the NEW day — persisting it
     // under a stale date would make the resulting halt vanish on restart.
     get().rolloverDay();
-    const { vector, triaging } = get();
+    const { vector, triaging: wasTriaging } = get();
     const today = localToday();
     const raw = text.trim();
-    if (get().status !== 'ready' || vector === null || triaging) return false;
     if (raw.length === 0 || raw.length > 500) return false;
+    // Evaluate deterministic keyword red flags BEFORE consulting `triaging`: a
+    // hung non-halting report already in flight (`wasTriaging`) must never
+    // block or delay a subsequent keyword safety halt on the shared ORT queue.
+    const keywordBaseline = resolveReport(raw, null);
+    const keywordHalts =
+      keywordBaseline.confident
+      && keywordBaseline.entry !== null
+      && keywordBaseline.entry.guardrail.halt;
+    if (get().status !== 'ready' || vector === null || (wasTriaging && !keywordHalts)) return false;
     // The report belongs to the athlete whose database is open NOW. The lease
     // keeps that database bound through the inference await (switch, create
     // and restore are refused until it settles), so a delayed safety report
@@ -10407,6 +10432,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
     }
     const athleteId = get().activeAthleteId;
     const contextRevision = athleteContextRevision;
+    const myReportEpoch = ++subjectiveReportEpoch;
     // The UI forces a 1-10 severity before processing; clamp at the boundary.
     const safeSeverity = Math.round(clamp(severity, 1, 10));
     // Once the report is written it is stored. A refresh that fails after that
@@ -10421,12 +10447,15 @@ export const useStore = create<KineticsStore>()((set, get) => {
         lastTriage: ownHalt !== null ? { kind: 'matched', directive: ownHalt } : earlierHalt,
       });
     };
+    activeTriagingCount += 1;
     set({ triaging: true });
     try {
       // Semantic routing is OPTIONAL; the keyword safety layer inside
-      // resolveReport works with `null` (embedder absent or failed).
+      // resolveReport works with `null` (embedder absent or failed). When an
+      // earlier report is already in flight (`wasTriaging`) and this report is
+      // a deterministic keyword halt, bypass the shared ORT queue entirely.
       let semantic: TriageResult | null = null;
-      if (embedder !== null) {
+      if (!(wasTriaging && keywordHalts) && embedder !== null) {
         try {
           semantic = triage(await embedder.embed(raw), getCodebase());
           set({ triageReady: true });
@@ -10437,6 +10466,24 @@ export const useStore = create<KineticsStore>()((set, get) => {
           set({ triageReady: false });
         }
       }
+      // A keyword or semantic halt is already final: the safety reader can only
+      // add caution, so it is never consulted (and can never delay the halt or
+      // hold the lease) when the shipped resolution halts.
+      const baseline = wasTriaging && keywordHalts ? keywordBaseline : resolveReport(raw, semantic);
+      const baselineHalts =
+        baseline.confident && baseline.entry !== null && baseline.entry.guardrail.halt;
+      let readerPrediction: SafetyReaderPrediction | null = null;
+      let codebaseEntries: readonly PhraseEntry[] = [];
+      if (!baselineHalts && safetyReader !== null) {
+        try {
+          codebaseEntries = getCodebase().entries;
+          readerPrediction = await safetyReader.classify(raw);
+        } catch {
+          // Safety reader (or the codebase it combines with) unavailable or
+          // failed: preserve exact shipped semantic + keyword behavior.
+          readerPrediction = null;
+        }
+      }
       // Defence in depth behind the lease: never resolve "the current
       // database" for a report started in another athlete context. Nothing is
       // written, and the athlete is told so rather than the report vanishing.
@@ -10445,7 +10492,14 @@ export const useStore = create<KineticsStore>()((set, get) => {
         set({ error: 'Your report was not saved because the athlete changed while it was being checked. Please report it again.' });
         return false;
       }
-      const resolved = resolveReport(raw, semantic);
+      const commitDay = localToday();
+      const needsDaySync = commitDay !== today || vector.date !== commitDay;
+      if (needsDaySync) syncDay(commitDay);
+      const commitVector = get().vector;
+      const resolved =
+        baselineHalts || readerPrediction === null
+          ? baseline
+          : resolveReportWithSafetyReader(raw, semantic, readerPrediction, codebaseEntries);
       const d = getDb();
       if (!resolved.confident || resolved.entry === null) {
         // No curated match, no red-flag language: log for codebase curation,
@@ -10453,12 +10507,15 @@ export const useStore = create<KineticsStore>()((set, get) => {
         d.executeSync(
           `INSERT INTO subjective_report (date, reported_at_ms, raw_text, matched_entry_id, similarity, halt, load_modifier, set_modifier, rpe_cap)
            VALUES (?, ?, ?, NULL, ?, 0, NULL, NULL, NULL)`,
-          [today, Date.now(), raw, resolved.similarity],
+          [commitDay, Date.now(), raw, resolved.similarity],
         );
         try {
-          get().computePrescription([]);
+          get().computePrescription([], commitDay);
           const triageAfter = get().lastTriage;
-          if (triageAfter === null || triageAfter.kind !== 'matched' || !triageAfter.directive.halt) {
+          if (
+            subjectiveReportEpoch === myReportEpoch
+            && (triageAfter === null || triageAfter.kind !== 'matched' || !triageAfter.directive.halt)
+          ) {
             set({ lastTriage: { kind: 'rejected' } });
           }
         } catch (error) {
@@ -10472,12 +10529,14 @@ export const useStore = create<KineticsStore>()((set, get) => {
       // already carry another guardrail (compounding) or yesterday's date.
       const activeSession = get().session;
       const audit = derivePrescription({
-        vector,
+        vector: commitVector ?? blankVector(commitDay),
         profile: get().profile,
-        ctx: profileCtx(d, today, activeSession !== null ? activeSession.sessionId : -1),
+        ctx: profileCtx(d, commitDay, activeSession !== null ? activeSession.sessionId : -1),
         reports: [{ entry: resolved.entry, severity: safeSeverity }],
       });
-      const auditHalt = audit.directive !== null && audit.directive.halt;
+      const haltDirective = audit.directive?.halt === true ? audit.directive : null;
+      const auditHalt = haltDirective !== null;
+      const auditAdjustment = commitVector !== null || auditHalt ? audit.vector : null;
       // A safety halt is a store boundary, not merely a red screen. Commit the
       // report and exact runner checkpoint together so a relaunch cannot reopen
       // logging between a report and its safety state.
@@ -10492,9 +10551,9 @@ export const useStore = create<KineticsStore>()((set, get) => {
           `INSERT INTO subjective_report (date, reported_at_ms, raw_text, matched_entry_id, similarity, halt, load_modifier, set_modifier, rpe_cap)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
-            today, Date.now(), raw, resolved.entry.id, resolved.similarity,
-            auditHalt ? 1 : 0, audit.vector.load_modifier,
-            audit.vector.set_modifier, audit.vector.rpe_cap,
+            commitDay, Date.now(), raw, resolved.entry.id, resolved.similarity,
+            auditHalt ? 1 : 0, auditAdjustment?.load_modifier ?? null,
+            auditAdjustment?.set_modifier ?? null, auditAdjustment?.rpe_cap ?? null,
           ],
         );
         // Persist the severity (012 side-car) so the pure re-derivation survives a
@@ -10522,8 +10581,11 @@ export const useStore = create<KineticsStore>()((set, get) => {
         set({ error: error instanceof Error ? error.message : String(error) });
         return false;
       }
-      if (haltedRunner !== null && haltedRunner !== activeRunner) {
-        set(runnerSelection(haltedRunner));
+      if (haltDirective !== null) {
+        set({
+          ...(haltedRunner !== null && haltedRunner !== activeRunner ? runnerSelection(haltedRunner) : {}),
+          lastTriage: { kind: 'matched', directive: haltDirective },
+        });
       }
       try {
         if (auditHalt && activeSession !== null && get().session?.sessionId === activeSession.sessionId) {
@@ -10531,20 +10593,21 @@ export const useStore = create<KineticsStore>()((set, get) => {
         }
         // Re-derive the operative prescription from persistence (single source
         // of truth; also sets lastTriage to the now-operative directive).
-        get().computePrescription([]);
+        get().computePrescription([], commitDay);
         // Acknowledge a confident match that did NOT become operative — either
         // positive sentiment OR a complaint the severity gate de-escalated to
         // benign (DOMS) — unless a restrictive report from earlier today still
         // governs, in which case computePrescription kept that honest directive.
-        if (get().lastTriage === null) {
+        if (!auditHalt && subjectiveReportEpoch === myReportEpoch && get().lastTriage === null) {
           set({ lastTriage: { kind: 'positive', cue: resolved.entry.cue, entryId: resolved.entry.id } });
         }
       } catch (error) {
-        refreshFailedAfterStore(error, auditHalt ? audit.directive : null);
+        refreshFailedAfterStore(error, haltDirective);
       }
       return true;
     } finally {
-      set({ triaging: false });
+      activeTriagingCount = Math.max(0, activeTriagingCount - 1);
+      set({ triaging: activeTriagingCount > 0 });
       releaseLease();
     }
   },

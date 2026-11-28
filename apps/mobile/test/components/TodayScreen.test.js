@@ -20,6 +20,7 @@ import { formatAthleteDate } from '../../src/state/athleteDate';
 import React from 'react';
 import { Alert } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { describeEmphasisSlot, describeEmphasisSwap } from '../../../../packages/inference/src/programEmphasis';
 import TodayScreen from '../../src/screens/TodayScreen';
 import {
   deriveTodayState,
@@ -905,7 +906,20 @@ test('planned card renders compact program identity bar with block sequence, wee
   );
 });
 
-test('planned card tags movements selected for a goal, focus, or sport outcome (S1-020)', () => {
+test.each(['swap', 'slot'])('planned card tags goal, focus, and frozen sport provenance (%s report line)', (format) => {
+  const sport = { name: 'Football (soccer)', muscles: ['hamstrings'] };
+  const sportLine = format === 'swap'
+    ? describeEmphasisSwap({
+        chosen: 'Nordic Hamstring Curl', instead: 'Leg Curl', muscle: 'hamstrings', origin: 'sport', emphasis: { sport },
+      })
+    : describeEmphasisSlot({
+        chosen: 'Nordic Hamstring Curl', displaced: null, day: 'lower',
+        why: { muscle: 'hamstrings', origin: 'sport' }, emphasis: { sport },
+      });
+  const secondSportLine = describeEmphasisSlot({
+    chosen: 'Seated Row', displaced: null, day: 'upper',
+    why: { muscle: 'lats', origin: 'secondary_sport' }, emphasis: { sport },
+  });
   mockState = baseState({
     todayPlan: {
       plannedSessionId: 1,
@@ -922,7 +936,7 @@ test('planned card tags movements selected for a goal, focus, or sport outcome (
       blockId: 1,
       inputs: {
         focus: { muscles: ['upper_chest'], movementControl: false, description: 'Beach muscles: upper chest' },
-        sport: { name: 'Football (soccer)', muscles: ['hamstrings'] },
+        sport,
         workload: null,
         goalMovements: [{ movementId: 11, goalLabel: 'Goblet squat 40 kg for 10' }],
       },
@@ -930,7 +944,8 @@ test('planned card tags movements selected for a goal, focus, or sport outcome (
         version: 1,
         applied: [
           'Incline Dumbbell Press is planned instead of Dumbbell Bench Press: it trains upper chest directly (your focus).',
-          'Nordic Hamstring Curl is planned instead of Leg Curl: it trains hamstrings directly (your Football (soccer) outcome).',
+          sportLine,
+          secondSportLine,
         ],
         omitted: [],
       },
@@ -941,7 +956,85 @@ test('planned card tags movements selected for a goal, focus, or sport outcome (
   expect(screen.getByTestId('today-slot-provenance-10')).toHaveTextContent('Goal: Goblet squat 40 kg for 10');
   expect(screen.getByTestId('today-slot-provenance-11')).toHaveTextContent('Your focus');
   expect(screen.getByTestId('today-slot-provenance-12')).toHaveTextContent('Your Football (soccer) outcome');
+  expect(screen.getByText(/^Seated Row /)).toBeOnTheScreen();
   expect(screen.queryByTestId('today-slot-provenance-13')).toBeNull();
+});
+
+describe.each(['swap', 'added slot', 'displaced slot'])('R10: frozen provenance (%s)', (format) => {
+  test.each([
+    ['focus', 'Your focus'],
+    ['sport', 'Your Football (soccer) outcome'],
+  ])('tags only the exact movement for %s', (origin, label) => {
+    const chosen = 'Pallof Press With Rotation';
+    const sport = { name: 'Football (soccer)', muscles: ['core'] };
+    const emphasis = { sport };
+    const line = format === 'swap'
+      ? describeEmphasisSwap({ chosen, instead: 'Pallof Press', muscle: 'core', origin, emphasis })
+      : describeEmphasisSlot({
+          chosen, displaced: format === 'displaced slot' ? 'Pallof Press' : null, day: 'upper',
+          why: { muscle: 'core', origin }, emphasis,
+        });
+    mockState = baseState({
+      todayPlan: {
+        plannedSessionId: 1,
+        focus: 'upper',
+        phase: 'accumulation',
+        slots: [
+          slot({ movementName: 'Pallof Press' }),
+          slot({ plannedSlotId: 11, slotIndex: 1, movementId: 12, movementName: chosen }),
+        ],
+      },
+      blockEmphasis: {
+        blockId: 1,
+        inputs: { ...emphasis, focus: null, workload: null, goalMovements: [] },
+        report: { version: 1, applied: [line], omitted: [] },
+      },
+    });
+
+    render(<TodayScreen />);
+    expect(screen.getByText(/^Pallof Press ·/)).toBeOnTheScreen();
+    expect(screen.getByTestId('today-slot-provenance-11')).toHaveTextContent(label);
+    expect(screen.queryByTestId('today-slot-provenance-10')).toBeNull();
+  });
+});
+
+test.each([true, false])('planned movement overlap qualifies for provenance only without frozen emphasis (frozen: %s)', (frozen) => {
+  mockState = baseState({
+    todayPlan: {
+      plannedSessionId: 1,
+      focus: 'lower',
+      phase: 'accumulation',
+      slots: [
+        slot({ plannedSlotId: 10, movementId: 11, movementName: 'Incline Dumbbell Press' }),
+        slot({ plannedSlotId: 11, slotIndex: 1, movementId: 12, movementName: 'Leg Curl' }),
+      ],
+    },
+    movements: [
+      { movement_id: 11, name: 'Incline Dumbbell Press', targetMuscles: ['upper_chest'] },
+      { movement_id: 12, name: 'Leg Curl', targetMuscles: ['hamstrings'] },
+    ],
+    focus: { bundleId: null, muscles: ['upper_chest'], customised: true, movementControl: false },
+    sport: { sportId: 'football_association', otherSportName: null, outcomeId: 'stay_available' },
+    blockEmphasis: frozen ? {
+      blockId: 1,
+      inputs: {
+        focus: { muscles: ['upper_chest'], movementControl: false, description: 'Upper chest' },
+        sport: { name: 'Football (soccer)', muscles: ['hamstrings'] },
+        workload: null,
+        goalMovements: [],
+      },
+      report: { version: 1, applied: [], omitted: [] },
+    } : null,
+  });
+
+  render(<TodayScreen />);
+  if (frozen) {
+    expect(screen.queryByTestId('today-slot-provenance-10')).toBeNull();
+    expect(screen.queryByTestId('today-slot-provenance-11')).toBeNull();
+  } else {
+    expect(screen.getByTestId('today-slot-provenance-10')).toHaveTextContent('Your focus');
+    expect(screen.getByTestId('today-slot-provenance-11')).toHaveTextContent('Your Football (soccer) outcome');
+  }
 });
 
 test('WO03-SOL-02 & WO03-SOL-05: frozen blockEmphasis never leaks later live goal/focus edits onto an active block, and undefined blockSessions does not throw', () => {

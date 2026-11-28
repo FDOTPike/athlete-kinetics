@@ -20,6 +20,7 @@ import {
 import { tryCreateBiometricsBridge } from '@ak/biometrics';
 import { palette, useStore } from './state/useStore';
 import { tryCreateDeviceEmbedder } from './inference/deviceEmbedder';
+import { tryCreateDeviceSafetyReader } from './inference/deviceSafetyReader';
 import { NavigationProvider, useNavigation, useSubViewBack, type Tab } from './navigation/navigation';
 import TodayScreen from './screens/TodayScreen';
 import ReadinessScreen from './screens/ReadinessScreen';
@@ -204,6 +205,9 @@ export function AppShell(): React.JSX.Element {
     // model is reachable; the app is fully functional without it.
     void tryCreateDeviceEmbedder().then((e) => {
       useStore.getState().setEmbedder(e);
+    });
+    void tryCreateDeviceSafetyReader().then((r) => {
+      useStore.getState().setSafetyReader?.(r);
     });
     // Health data is optional by contract: Health Connect on Android, Apple
     // Health on iOS. A null bridge (service missing, permission machinery

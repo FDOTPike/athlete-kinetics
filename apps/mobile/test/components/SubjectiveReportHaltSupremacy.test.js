@@ -1,5 +1,6 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { SubjectiveReportPanel } from '../../src/components/SubjectiveReportPanel';
 import { useStore } from '../../src/state/useStore';
 import { authorizeAthleteDataBoot, resetDataMaintenanceLockForTests } from '../../src/state/dataMaintenanceLock';
 import ReadinessScreen from '../../src/screens/ReadinessScreen';
@@ -40,6 +41,26 @@ beforeEach(async () => {
   await settle();
   expect(useStore.getState().status).toBe('ready');
   expect(useStore.getState().loadDemoAthlete()).toBe('loaded');
+});
+
+test.each([
+  ['text', 'feeling dizzy', 3],
+  ['severity', 'knee sore', 8],
+])('a successful pending report preserves a later %s edit', async (edit, text, severity) => {
+  let resolveReport;
+  const pending = new Promise((resolve) => { resolveReport = resolve; });
+  const onApply = jest.fn(() => pending);
+  render(<SubjectiveReportPanel hasVector triageReady triaging={false} lastTriage={null} onApply={onApply} onClose={jest.fn()} />);
+  fireEvent.changeText(screen.getByLabelText('Describe how your body feels today'), 'knee sore');
+  fireEvent.press(screen.getByLabelText('Severity 3 of 10'));
+  fireEvent.press(screen.getByLabelText('Apply report'));
+  expect(onApply).toHaveBeenCalledWith('knee sore', 3);
+  const input = () => screen.getByLabelText('Describe how your body feels today');
+  if (edit === 'text') fireEvent.changeText(input(), text);
+  else fireEvent.press(screen.getByLabelText(`Severity ${severity} of 10`));
+  await act(async () => { resolveReport(true); });
+  expect(input().props.value).toBe(text);
+  expect(screen.getByLabelText(`Severity ${severity} of 10`)).toBeSelected();
 });
 
 test('an unmatched follow-up reply in "Something feels off" logs the reply without clearing an active safety halt across Today, Ready, Plan, and startSession', async () => {

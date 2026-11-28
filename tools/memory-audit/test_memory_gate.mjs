@@ -13,12 +13,15 @@
  *
  * Run: node tools/memory-audit/test_memory_gate.mjs
  */
-import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import {
   computeEvidenceBinding,
   resolveManifestPath,
+  sha256OfFile,
   verifyEvidencePacket,
 } from './evidence_provenance.mjs';
 import {
@@ -90,11 +93,19 @@ const soundSession = (over = {}) => ({
     evidenceBinding: FIXTURE_BINDING,
     lifecycle: {
       correlatedRequestCount: 11,
-      disposalProof: [{ requestId: 1, createdSessionWasDisposed: true }],
+      // Both production models must be proven ([embedder-lifecycle] +
+      // [safety-reader-lifecycle]), serially, in one process.
+      componentRequestCounts: { embedder: 6, 'safety-reader': 5 },
+      sessionOverlapCount: 0,
+      unresolvedSessionCount: 0,
+      disposalProof: [
+        { component: 'embedder', requestId: 1, createdSessionWasDisposed: true },
+        { component: 'safety-reader', requestId: 1, createdSessionWasDisposed: true },
+      ],
       // Session-wide, independent of which requests qualified (Sol finding 1).
       disposalIntegrity: {
         disposalFailureCount: 0, failures: [], finalCreated: 11, finalDisposed: 11,
-        countersBalanced: true, clean: true,
+        countersBalanced: true, sessionOverlapCount: 0, unresolvedSessionCount: 0, sessionOverlaps: [], clean: true,
       },
     },
     sampling: { achievedMedianIntervalMs: 871 },
@@ -508,7 +519,7 @@ console.log('\n[10] HERMES B-1 — a summary is a CLAIM about evidence, not evid
  * computed from those exact bytes. Everything [G] verifies is present, so the
  * fixtures below can tamper with one thing at a time.
  */
-function makePacket() {
+function makePacket({ embedder = true, reader = 'sequential', danglingEmbedder = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'ak-g-fixture-'));
   const t0 = Date.UTC(2026, 7, 24, 3, 0, 0, 0);
   const PID = 4242;
@@ -531,16 +542,43 @@ function makePacket() {
 
   const stamp = (ms) => `${Math.floor(ms / 1000)}.${String(ms % 1000).padStart(3, '0')}`;
   const l = (ms, body) => `${stamp(ms)}  ${PID} ${PID + 1} I ReactNativeJS: [embedder-lifecycle] ${body}`;
-  const logcat = [
-    l(t0 + 500, 'wrapper:settled req=0 ok=1 created=0 disposed=0'),
-    l(t0 + 1000, 'session:start req=1 ok=1 created=0 disposed=0'),
-    l(t0 + 1100, 'session:settled req=1 ok=1 created=1 disposed=0'),
-    l(t0 + 1100, 'inference:start req=1 ok=1 created=1 disposed=0'),
-    l(t0 + 1200, 'inference:settled req=1 ok=1 created=1 disposed=0'),
-    l(t0 + 1200, 'disposal:start req=1 ok=1 created=1 disposed=0'),
-    l(t0 + 1300, 'disposal:settled req=1 ok=1 created=1 disposed=1'),
-    l(t0 + 1300, 'request=1 ok=1 totalMs=300'),
-  ].join('\n');
+  const r = (ms, body) => `${stamp(ms)}  ${PID} ${PID + 1} I ReactNativeJS: [safety-reader-lifecycle] ${body}`;
+  const lines = [l(t0 + 500, 'wrapper:settled req=0 ok=1 created=0 disposed=0')];
+  if (reader !== 'none') lines.push(r(t0 + 510, 'wrapper:settled req=0 ok=1 created=0 disposed=0'));
+  if (embedder) {
+    lines.push(
+      l(t0 + 1000, 'session:start req=1 ok=1 created=0 disposed=0'),
+      l(t0 + 1100, 'session:settled req=1 ok=1 created=1 disposed=0'),
+      l(t0 + 1100, 'inference:start req=1 ok=1 created=1 disposed=0'),
+      l(t0 + 1200, 'inference:settled req=1 ok=1 created=1 disposed=0'),
+      l(t0 + 1200, 'disposal:start req=1 ok=1 created=1 disposed=0'),
+      l(t0 + 1300, 'disposal:settled req=1 ok=1 created=1 disposed=1'),
+      l(t0 + 1300, 'request=1 ok=1 totalMs=300'),
+    );
+  }
+  if (reader !== 'none') {
+    // 'sequential' starts after the embedder disposal settled; 'overlap' starts
+    // while the embedder session is still live in the same process.
+    const s0 = t0 + (reader === 'overlap' ? 1250 : 1400);
+    lines.push(
+      r(s0, 'session:start req=1 ok=1 created=0 disposed=0'),
+      r(s0 + 100, 'session:settled req=1 ok=1 created=1 disposed=0'),
+      r(s0 + 100, 'inference:start req=1 ok=1 created=1 disposed=0'),
+      r(s0 + 200, 'inference:settled req=1 ok=1 created=1 disposed=0'),
+      r(s0 + 200, 'disposal:start req=1 ok=1 created=1 disposed=0'),
+      r(s0 + 300, 'disposal:settled req=1 ok=1 created=1 disposed=1'),
+      r(s0 + 300, 'request=1 ok=1 totalMs=300'),
+    );
+  }
+  if (danglingEmbedder) {
+    // A second embedder session that is created and never disposed: counters
+    // cannot balance, yet it overlaps nothing (no later session in the PID).
+    lines.push(
+      l(t0 + 1900, 'session:start req=2 ok=1 created=1 disposed=1'),
+      l(t0 + 1950, 'session:settled req=2 ok=1 created=2 disposed=1'),
+    );
+  }
+  const logcat = lines.join('\n');
   writeFileSync(join(dir, 'logcat-epoch.txt'), logcat);
 
   // Dense, evenly spaced samples that fully bracket the lifecycle.
@@ -583,9 +621,22 @@ function sealPacket({ dir, session, binding }) {
     },
     lifecycle: {
       correlatedRequestCount: cadence.correlated,
-      disposalProof: [{ requestId: 1, createdSessionWasDisposed: true }],
+      componentRequestCounts: { embedder: 1, 'safety-reader': 1 },
+      sessionOverlapCount: 0,
+      unresolvedSessionCount: 0,
+      sampledProcessIds: [...new Set(session.samples.map((s) => Number(/pid (\d+)/.exec(readFileSync(s.rawFile, 'utf-8'))[1])))],
+      correlatedRequests: [
+        { component: 'embedder', requestId: 1, pid: 4242, wrapperEpoch: 1, totalMs: 300 },
+        { component: 'safety-reader', requestId: 1, pid: 4242, wrapperEpoch: 1, totalMs: 300 },
+      ],
+      processIds: [4242],
+      disposalProof: [
+        { component: 'embedder', pid: 4242, wrapperEpoch: 1, requestId: 1, createdSessionWasDisposed: true },
+        { component: 'safety-reader', pid: 4242, wrapperEpoch: 1, requestId: 1, createdSessionWasDisposed: true },
+      ],
       disposalIntegrity: {
-        disposalFailureCount: 0, finalCreated: 1, finalDisposed: 1, clean: true,
+        disposalFailureCount: 0, finalCreated: 2, finalDisposed: 2,
+        countersBalanced: true, sessionOverlapCount: 0, unresolvedSessionCount: 0, clean: true,
       },
     },
     memory: {
@@ -604,7 +655,7 @@ function computeCadenceLocal(sampleStarts) {
   // Deliberately uses verifyEvidencePacket's own machinery indirectly: build a
   // throwaway packet, read back what the verifier re-derives, and use that as
   // the truth the sealed summary must state.
-  return { median: 200, gap: 2000, correlated: 1, peakClaimable: false };
+  return { median: 200, gap: 2000, correlated: 2, peakClaimable: false };
 }
 
 {
@@ -831,11 +882,436 @@ console.log('\n[13] HERMES r4 R4-3 — a deleted tier is a deleted check');
   pkt.binding = computeEvidenceBinding({ evidenceDir: pkt.dir, session: pkt.session });
   const path = sealPacket(pkt);
   const packet = JSON.parse(readFileSync(path, 'utf8'));
-  packet.summary.lifecycle.correlatedRequestCount = 2;
+  packet.summary.lifecycle.correlatedRequestCount = 4;
+  packet.summary.lifecycle.componentRequestCounts = { embedder: 2, 'safety-reader': 2 };
   writeFileSync(path, JSON.stringify(packet));
   const v = verifyEvidencePacket({ sessionPath: path, requireManifest: false });
   check('SEC11: provenance accepts a genuine cold-start PID change', v.ok, v.problems.join('; '));
   rmSync(pkt.dir, { recursive: true, force: true });
+}
+
+// =============================================================================
+console.log('\n[14] WO-02 Item 3 — dual-model, serial non-overlap, balanced disposal, PID continuity');
+
+const gateWith = (session) => evaluateMemoryGate({
+  budget: REVIEWED_BUDGET, vectors: VECTORS, session, evidenceProvenance: BOUND_STUB,
+});
+{
+  const g = gateWith(soundSession());
+  check('ITEM3: positive control — dual-model sound packet keeps [D] and the reviewed gate GREEN',
+    g.ok === true && g.checks.find((c) => c.id === 'D').ok === true,
+    g.checks.filter((c) => !c.ok).map((c) => `${c.id}:${c.reason}`).join(' | ').slice(0, 160));
+}
+for (const [label, mutate, needle] of [
+  ['an overlap recorded in disposalIntegrity.sessionOverlapCount',
+    (s) => { s.summary.lifecycle.disposalIntegrity.sessionOverlapCount = 1; }, 'overlap'],
+  ['an overlap recorded in lifecycle.sessionOverlapCount',
+    (s) => { s.summary.lifecycle.sessionOverlapCount = 1; }, 'overlap'],
+  ['an unresolved session recorded in disposalIntegrity.unresolvedSessionCount',
+    (s) => { s.summary.lifecycle.disposalIntegrity.unresolvedSessionCount = 1; }, 'unresolvedSessionCount'],
+  ['a missing lifecycle.unresolvedSessionCount',
+    (s) => { delete s.summary.lifecycle.unresolvedSessionCount; }, 'unresolvedSessionCount'],
+  ['a missing lifecycle.sessionOverlapCount',
+    (s) => { delete s.summary.lifecycle.sessionOverlapCount; }, 'overlap'],
+  ['unbalanced disposal counters with zero disposal failures (DUAL-3 shape)',
+    (s) => { Object.assign(s.summary.lifecycle.disposalIntegrity, { countersBalanced: false, clean: false, finalDisposed: 10 }); },
+    'countersBalanced'],
+  ['disposalIntegrity.clean !== true with everything else sound',
+    (s) => { s.summary.lifecycle.disposalIntegrity.clean = false; }, 'clean'],
+  ['a single-model packet missing safety-reader',
+    (s) => { s.summary.lifecycle.componentRequestCounts = { embedder: 11, 'safety-reader': 0 }; }, 'safety-reader'],
+  ['a single-model packet missing embedder',
+    (s) => { s.summary.lifecycle.componentRequestCounts = { embedder: 0, 'safety-reader': 11 }; }, 'embedder'],
+  ['a packet with no componentRequestCounts at all',
+    (s) => { delete s.summary.lifecycle.componentRequestCounts; }, 'componentRequestCounts'],
+]) {
+  const s = soundSession();
+  mutate(s);
+  const d = checkMeasuredEvidence(s);
+  check(`ITEM3 [D]: REJECTS ${label}`, d.ok === false && String(d.reason).includes(needle), d.reason ?? '');
+  check(`ITEM3 gate: ${label} turns the reviewed gate RED`, gateWith(s).ok === false);
+}
+
+// [G]: the same properties must be RE-DERIVED from the raw bytes, not believed.
+const provenanceOf = (path) => verifyEvidencePacket({ sessionPath: path, requireManifest: false });
+const gOf = (v) => checkEvidenceProvenance({ ...v, manifestChecked: true });
+{
+  const pkt = makePacket();
+  const v = provenanceOf(sealPacket(pkt));
+  check('ITEM3 [G]: positive control — sequential dual-model packet is BOUND',
+    v.ok === true && gOf(v).ok === true, v.problems.join('; ').slice(0, 160));
+  rmSync(pkt.dir, { recursive: true, force: true });
+}
+for (const [label, opts, honest, needle] of [
+  ['concurrent embedder + safety-reader sessions in one PID', { reader: 'overlap' }, (L) => {
+    Object.assign(L, { correlatedRequestCount: 0, componentRequestCounts: { embedder: 0, 'safety-reader': 0 },
+      sessionOverlapCount: 1, correlatedRequests: [], processIds: [] });
+    Object.assign(L.disposalIntegrity, { sessionOverlapCount: 1, clean: false });
+  }, 'sessionOverlapCount'],
+  ['a single-model packet (no safety-reader lifecycle)', { reader: 'none' }, (L) => {
+    Object.assign(L, { correlatedRequestCount: 1, componentRequestCounts: { embedder: 1, 'safety-reader': 0 },
+      correlatedRequests: L.correlatedRequests.slice(0, 1) });
+    Object.assign(L.disposalIntegrity, { finalCreated: 1, finalDisposed: 1 });
+  }, 'safety-reader'],
+  ['a single-model packet (no embedder lifecycle)', { embedder: false }, (L) => {
+    Object.assign(L, { correlatedRequestCount: 1, componentRequestCounts: { embedder: 0, 'safety-reader': 1 },
+      correlatedRequests: L.correlatedRequests.slice(1) });
+    Object.assign(L.disposalIntegrity, { finalCreated: 1, finalDisposed: 1 });
+  }, 'embedder'],
+  ['unbalanced disposal (a created session never disposed, no disposal failure)', { danglingEmbedder: true }, (L) => {
+    L.unresolvedSessionCount = 1;
+    Object.assign(L.disposalIntegrity, {
+      finalCreated: 3, finalDisposed: 2, countersBalanced: false, unresolvedSessionCount: 1, clean: false,
+    });
+  }, 'countersBalanced'],
+]) {
+  const pkt = makePacket(opts);
+  const path = sealPacket(pkt);
+  const doc = JSON.parse(readFileSync(path, 'utf-8'));
+  honest(doc.summary.lifecycle);
+  writeFileSync(path, JSON.stringify(doc, null, 2));
+  const v = provenanceOf(path);
+  check(`ITEM3 [G]: REJECTS ${label} even when the packet states it honestly`,
+    v.ok === false && v.problems.some((p) => p.includes(needle)) && gOf(v).ok === false,
+    v.problems.join('; ').slice(0, 160));
+  rmSync(pkt.dir, { recursive: true, force: true });
+}
+for (const [label, tamper, needle] of [
+  ['an inflated embedder count', (L) => { L.componentRequestCounts.embedder += 1; }, 'componentRequestCounts.embedder'],
+  ['an inflated safety-reader count', (L) => { L.componentRequestCounts['safety-reader'] += 1; }, 'componentRequestCounts.safety-reader'],
+  ['a missing componentRequestCounts', (L) => { delete L.componentRequestCounts; }, 'componentRequestCounts'],
+  ['a lifecycle.unresolvedSessionCount the log contradicts', (L) => { L.unresolvedSessionCount = 1; }, 'unresolvedSessionCount'],
+  ['a disposalIntegrity.unresolvedSessionCount the log contradicts', (L) => { L.disposalIntegrity.unresolvedSessionCount = 1; }, 'unresolvedSessionCount'],
+  ['a lifecycle.sessionOverlapCount the log contradicts', (L) => { L.sessionOverlapCount = 1; }, 'sessionOverlapCount'],
+  ['a disposalIntegrity.sessionOverlapCount the log contradicts', (L) => { L.disposalIntegrity.sessionOverlapCount = 1; }, 'sessionOverlapCount'],
+  ['a countersBalanced the log contradicts', (L) => { L.disposalIntegrity.countersBalanced = false; }, 'countersBalanced'],
+  ['a clean flag the log contradicts', (L) => { L.disposalIntegrity.clean = false; }, 'disposalIntegrity.clean'],
+  ['a sampledProcessIds list the raw dumps contradict', (L) => { L.sampledProcessIds = [4242, 1]; }, 'sampledProcessIds'],
+  ['a correlated request attributed to an unsampled PID', (L) => { L.correlatedRequests[0].pid = 1; }, 'sampledProcessIds'],
+]) {
+  const pkt = makePacket();
+  const path = sealPacket(pkt);
+  const doc = JSON.parse(readFileSync(path, 'utf-8'));
+  tamper(doc.summary.lifecycle);
+  writeFileSync(path, JSON.stringify(doc, null, 2));
+  const v = provenanceOf(path);
+  check(`ITEM3 [G]: re-derivation catches ${label}`,
+    v.ok === false && v.problems.some((p) => p.includes(needle)), v.problems.join('; ').slice(0, 160));
+  rmSync(pkt.dir, { recursive: true, force: true });
+}
+{
+  // Cold-restart PID recurrence (4242 -> 5555 -> 4242) is refused by provenance.
+  const pkt = makePacket();
+  const original = [...pkt.session.samples];
+  for (const [offset, pid] of [[3000, 5555], [6000, 4242]]) {
+    for (const sample of original) {
+      const seq = pkt.session.samples.length + 1;
+      const rawFile = join(pkt.dir, `sample-${seq}-recur.txt`);
+      writeFileSync(rawFile, readFileSync(sample.rawFile, 'utf8').replace('pid 4242', `pid ${pid}`));
+      pkt.session.samples.push({ ...sample, seq, rawFile, captureStartMs: sample.captureStartMs + offset,
+        atUtc: new Date(sample.captureStartMs + offset).toISOString() });
+    }
+  }
+  pkt.binding = computeEvidenceBinding({ evidenceDir: pkt.dir, session: pkt.session });
+  const v = provenanceOf(sealPacket(pkt));
+  check('ITEM3 [G]: cold-restart PID recurrence 4242 -> 5555 -> 4242 is REJECTED',
+    v.ok === false && v.problems.some((p) => p.includes('Cold-restart PID continuity violation')),
+    v.problems.join('; ').slice(0, 160));
+  rmSync(pkt.dir, { recursive: true, force: true });
+}
+
+// =============================================================================
+console.log('\n[15] WO02-SOL-03 — sealed packets bind candidate_manifest.json & ratified safety-reader SHA-256');
+
+const EMPTY_DIFF_SHA256 = createHash('sha256').update(Buffer.alloc(0)).digest('hex');
+function buildCandidateManifest(repoRoot, overrides = {}) {
+  const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoRoot, encoding: 'utf8' }).trim();
+  const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: repoRoot, encoding: 'utf8' }).trim();
+  const diffBuf = execFileSync('git', ['diff', '--full-index', '--binary', 'HEAD'], {
+    cwd: repoRoot, maxBuffer: 256 * 1024 * 1024,
+  });
+  const fp = createHash('sha256').update(diffBuf).digest('hex');
+  const ownerArtifacts = new Set(['TASK.md', 'audit_task_b.mjs']);
+  const stagedNew = execFileSync('git', ['diff', '--cached', '--name-only', '--diff-filter=A', '-z'], {
+    cwd: repoRoot, encoding: 'utf8',
+  }).split('\0').filter((p) => p.length > 0 && !ownerArtifacts.has(p));
+  const untracked = execFileSync('git', ['ls-files', '--others', '--exclude-standard', '-z'], {
+    cwd: repoRoot, encoding: 'utf8',
+  }).split('\0').filter((p) => p.length > 0 && !ownerArtifacts.has(p) && !stagedNew.includes(p)).sort();
+  const newFiles = [...stagedNew, ...untracked].map((rel) => ({
+    path: rel.replace(/\\/g, '/'),
+    sha256: sha256OfFile(join(repoRoot, rel)),
+  }));
+  return {
+    schema: 'ak.candidate-manifest/1',
+    label: 'NON_PRODUCTION_QA_DEBUG_SIGNED',
+    head,
+    branch,
+    sourceDirty: fp !== EMPTY_DIFF_SHA256,
+    trackedDiffFingerprint: {
+      method: 'sha256(git diff --full-index --binary HEAD)',
+      value: fp,
+    },
+    newFiles,
+    qaLifecycleTelemetry: true,
+    safetyReader: {
+      id: 'm10-r15-reader-seed3',
+      policyId: 'r15/denial-floor',
+      releaseTag: 'ml-reader-m10-r15-s3',
+      releaseCommit: 'b6ceee70c7b7a9afd793968e8ca15ba17704b572',
+      assetId: 775095775,
+      assetPath: 'assets/safety_reader.onnx',
+      sha256: 'a0fa76e40e10246a9caf9d1be463b72b34f03174c68b017d6673fe9f165cb5cf',
+      sizeBytes: 22881187,
+    },
+    ...overrides,
+  };
+}
+
+function sealFullManifestDir(pkt, candidateManifestObj = undefined) {
+  if (candidateManifestObj !== undefined) {
+    writeFileSync(join(pkt.dir, 'candidate_manifest.json'), JSON.stringify(candidateManifestObj, null, 2));
+  }
+  pkt.binding = computeEvidenceBinding({ evidenceDir: pkt.dir, session: pkt.session });
+  const sessionPath = sealPacket(pkt);
+  const manifestEntries = [
+    { path: 'session.json', sha256: sha256OfFile(sessionPath) },
+    { path: 'logcat-epoch.txt', sha256: sha256OfFile(join(pkt.dir, 'logcat-epoch.txt')) },
+    ...pkt.session.samples.map((s) => {
+      const name = s.rawFile.split(/[\\/]/).pop();
+      return { path: name, sha256: sha256OfFile(s.rawFile) };
+    }),
+  ];
+  if (candidateManifestObj !== undefined) {
+    manifestEntries.push({
+      path: 'candidate_manifest.json',
+      sha256: sha256OfFile(join(pkt.dir, 'candidate_manifest.json')),
+    });
+  }
+  const manifestPath = join(pkt.dir, 'EVIDENCE_MANIFEST.json');
+  writeFileSync(manifestPath, JSON.stringify({ files: manifestEntries }, null, 2));
+  writeFileSync(`${manifestPath}.sha256`, `${sha256OfFile(manifestPath)}  EVIDENCE_MANIFEST.json\n`);
+  return { sessionPath, manifestPath };
+}
+
+const tempRepo = mkdtempSync(join(tmpdir(), 'ak-cand-prov-'));
+try {
+  const gitTmp = (args) => execFileSync('git', args, { cwd: tempRepo, encoding: 'utf8' });
+  gitTmp(['init', '-q']);
+  const excludesFile = join(tempRepo, '.git', 'fixture-excludes');
+  writeFileSync(excludesFile, '');
+  gitTmp(['config', '--local', 'core.excludesFile', excludesFile]);
+  mkdirSync(join(tempRepo, 'src'), { recursive: true });
+  writeFileSync(join(tempRepo, 'src', 'tracked.mjs'), 'export const x = 1;\n');
+  gitTmp(['add', 'src/tracked.mjs']);
+  gitTmp([
+    '-c', 'user.name=Fixture',
+    '-c', 'user.email=fixture@example.invalid',
+    '-c', 'commit.gpgsign=false',
+    'commit', '-qm', 'init',
+  ]);
+
+  const VALID_CANDIDATE_MANIFEST = buildCandidateManifest(tempRepo);
+
+  {
+    // Positive control: sealed packet with valid candidate_manifest.json passes [D] and [G].
+    const pkt = makePacket();
+    const { sessionPath } = sealFullManifestDir(pkt, VALID_CANDIDATE_MANIFEST);
+    const v = verifyEvidencePacket({ sessionPath, repoRoot: tempRepo });
+    const sessionDoc = JSON.parse(readFileSync(sessionPath, 'utf-8'));
+    sessionDoc.summary.candidateManifest = VALID_CANDIDATE_MANIFEST;
+    const g = evaluateMemoryGate({
+      budget: REVIEWED_BUDGET, vectors: VECTORS, session: sessionDoc, evidenceProvenance: v,
+    });
+    check('SOL-03: sealed packet with valid candidate_manifest.json + ratified safetyReader hash is BOUND and GREEN',
+      v.ok === true && v.manifestChecked === true && g.ok === true,
+      v.problems.join('; ').slice(0, 160));
+    rmSync(pkt.dir, { recursive: true, force: true });
+  }
+
+  {
+    // Counterexample 1: sealed packet omitting candidate_manifest.json altogether is REJECTED by [G].
+    const pkt = makePacket();
+    const { sessionPath } = sealFullManifestDir(pkt, undefined);
+    const v = verifyEvidencePacket({ sessionPath, repoRoot: tempRepo });
+    check('SOL-03: sealed packet without candidate_manifest.json is REJECTED by [G]',
+      v.ok === false && v.problems.some((p) => p.includes('candidate_manifest.json')),
+      v.problems.join('; ').slice(0, 160));
+    rmSync(pkt.dir, { recursive: true, force: true });
+  }
+
+  for (const [label, badManifest] of [
+    ['safetyReaderPresent:true with missing safetyReaderModelSha256', {
+      schema: 'ak.candidate-manifest/1',
+      safetyReaderPresent: true,
+    }],
+    ['safetyReaderPresent:true with wrong safetyReaderModelSha256', {
+      schema: 'ak.candidate-manifest/1',
+      safetyReaderPresent: true,
+      safetyReaderModelSha256: '0'.repeat(64),
+    }],
+    ['APK safetyReader object with wrong flattened size', {
+      ...VALID_CANDIDATE_MANIFEST,
+      safetyReaderModelSizeBytes: VALID_CANDIDATE_MANIFEST.safetyReader.sizeBytes - 1,
+    }],
+    ['APK safetyReader object with wrong sha256', {
+      ...VALID_CANDIDATE_MANIFEST,
+      safetyReader: { ...VALID_CANDIDATE_MANIFEST.safetyReader, sha256: 'b'.repeat(64) },
+    }],
+    ['candidate_manifest.json omitting safetyReader completely', {
+      schema: 'ak.candidate-manifest/1',
+      label: 'NON_PRODUCTION_QA_DEBUG_SIGNED',
+    }],
+  ]) {
+    const pkt = makePacket();
+    const { sessionPath } = sealFullManifestDir(pkt, badManifest);
+    const v = verifyEvidencePacket({ sessionPath, repoRoot: tempRepo });
+    const s = soundSession({ candidateManifest: badManifest });
+    const d = checkMeasuredEvidence(s);
+    check(`SOL-03 [G]: REJECTS ${label}`,
+      v.ok === false && v.problems.some((p) => /safetyReader|safety-reader/i.test(p)),
+      v.problems.join('; ').slice(0, 160));
+    check(`SOL-03 [D]: REJECTS ${label}`,
+      d.ok === false && /safetyReader|safety-reader/i.test(String(d.reason)),
+      String(d.reason ?? '').slice(0, 160));
+    rmSync(pkt.dir, { recursive: true, force: true });
+  }
+
+  for (const tamper of ['evidence binding', 'manifest hash']) {
+    const pkt = makePacket();
+    const { sessionPath, manifestPath } = sealFullManifestDir(pkt, VALID_CANDIDATE_MANIFEST);
+    try {
+      const verify = () => verifyEvidencePacket({ sessionPath, repoRoot: tempRepo });
+      const baseline = verify();
+      check(`SOL-03: untampered ${tamper} fixture verifies`,
+        baseline.ok === true && baseline.manifestChecked === true && baseline.problems.length === 0,
+        baseline.problems.join('; '));
+
+      const manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+      const member = manifest.files.find((file) => file.path === 'candidate_manifest.json');
+      if (tamper === 'evidence binding') {
+        // Re-seal membership for the changed candidate bytes, leaving the packet's binding stale.
+        const candidatePath = join(pkt.dir, member.path);
+        writeFileSync(candidatePath, JSON.stringify({ ...VALID_CANDIDATE_MANIFEST, tampered: true }, null, 2));
+        member.sha256 = sha256OfFile(candidatePath);
+      } else {
+        // Change the recorded member hash without changing any evidence files.
+        member.sha256 = '0'.repeat(64);
+      }
+      writeFileSync(manifestPath, JSON.stringify(manifest, null, 2));
+      writeFileSync(`${manifestPath}.sha256`, `${sha256OfFile(manifestPath)}  EVIDENCE_MANIFEST.json\n`);
+
+      const v = verify();
+      if (tamper === 'evidence binding') {
+        check('SOL-03: stale candidate evidence binding is rejected with valid manifest hashes',
+          v.ok === false && v.manifestChecked === true && v.problems.length === 2
+            && v.problems.includes('1 raw input(s) do not match the binding: candidate_manifest.json (bytes differ)')
+            && v.problems.some((p) => p.startsWith('bindingDigest mismatch:')),
+          v.problems.join('; '));
+      } else {
+        check('SOL-03: wrong candidate manifest hash is rejected with a valid evidence binding',
+          v.ok === false && v.manifestChecked === true && v.problems.length === 1
+            && v.problems.includes('raw input candidate_manifest.json differs from its sealed manifest entry'),
+          v.problems.join('; '));
+      }
+    } finally {
+      rmSync(pkt.dir, { recursive: true, force: true });
+    }
+  }
+
+  {
+    // Round-2 counterexample (SOL-03-R2): an authentic sealed packet from an OLDER
+    // git HEAD (41bc6915...) carrying the valid safetyReader hash MUST be rejected
+    // against the fixture repo so old device evidence cannot satisfy a newer APK.
+    const pkt = makePacket();
+    const staleManifest = buildCandidateManifest(tempRepo, {
+      head: '41bc69154dca84327d3b22e14a12333349d280c5',
+    });
+    const { sessionPath } = sealFullManifestDir(pkt, staleManifest);
+    const v = verifyEvidencePacket({ sessionPath, repoRoot: tempRepo });
+    check('SOL-03-R2: sealed packet naming stale APK HEAD 41bc6915 is REJECTED against the fixture repo',
+      v.ok === false && v.problems.some((p) => p.includes('HEAD mismatch')),
+      v.problems.join('; ').slice(0, 160));
+    rmSync(pkt.dir, { recursive: true, force: true });
+  }
+
+  {
+    // Round-4 counterexamples (SOL-03-R4): candidate_manifest.json completeness:
+    //   1. Wrong trackedDiffFingerprint.method (even when value matches fixture diff)
+    //   2. Wrong schema or label
+    //   3. Wrong sourceDirty boolean
+    //   4. Surplus tracked path listed in newFiles
+    //   5. Omitted current untracked source file in repoRoot
+    //   6. Omitted current staged-new source file in repoRoot
+    //   7. Positive control in temp git repo when both staged-new + untracked files are accurately pinned
+    for (const [label, mutOverrides, needle] of [
+      ['wrong trackedDiffFingerprint.method', {
+        trackedDiffFingerprint: {
+          method: 'sha256(git diff HEAD)',
+          value: VALID_CANDIDATE_MANIFEST.trackedDiffFingerprint.value,
+        },
+      }, /method/i],
+      ['wrong candidate_manifest schema', { schema: 'ak.candidate-manifest/999' }, /schema/i],
+      ['wrong candidate_manifest label', { label: 'PRODUCTION_RELEASE' }, /label/i],
+      ['contradictory sourceDirty flag', { sourceDirty: !VALID_CANDIDATE_MANIFEST.sourceDirty }, /sourceDirty/i],
+      ['surplus tracked path in newFiles', {
+        newFiles: [
+          ...VALID_CANDIDATE_MANIFEST.newFiles,
+          { path: 'src/tracked.mjs', sha256: sha256OfFile(join(tempRepo, 'src/tracked.mjs')) },
+        ],
+      }, /surplus|newFiles/i],
+    ]) {
+      const pkt = makePacket();
+      const { sessionPath } = sealFullManifestDir(pkt, { ...VALID_CANDIDATE_MANIFEST, ...mutOverrides });
+      const v = verifyEvidencePacket({ sessionPath, repoRoot: tempRepo });
+      check(`SOL-03-R4: REJECTS ${label}`,
+        v.ok === false && v.problems.some((p) => needle.test(p)),
+        v.problems.join('; ').slice(0, 160));
+      rmSync(pkt.dir, { recursive: true, force: true });
+    }
+  }
+
+  // Case A: current untracked source file in repoRoot omitted from candidate_manifest.json newFiles
+  writeFileSync(join(tempRepo, 'src', 'untracked_helper.mjs'), 'export const y = 2;\n');
+  {
+    const pkt = makePacket();
+    const { sessionPath } = sealFullManifestDir(pkt, buildCandidateManifest(tempRepo, { newFiles: [] }));
+    const v = verifyEvidencePacket({ sessionPath, repoRoot: tempRepo });
+    check('SOL-03-R4: REJECTS packet omitting a current untracked source file in repoRoot',
+      v.ok === false && v.problems.some((p) => p.includes('src/untracked_helper.mjs')),
+      v.problems.join('; ').slice(0, 160));
+    rmSync(pkt.dir, { recursive: true, force: true });
+  }
+
+  // Case B: current staged-new source file in repoRoot omitted from candidate_manifest.json newFiles
+  writeFileSync(join(tempRepo, 'src', 'staged_new.mjs'), 'export const z = 3;\n');
+  gitTmp(['add', 'src/staged_new.mjs']);
+  {
+    const pkt = makePacket();
+    const onlyUntracked = [{
+      path: 'src/untracked_helper.mjs',
+      sha256: sha256OfFile(join(tempRepo, 'src', 'untracked_helper.mjs')),
+    }];
+    const { sessionPath } = sealFullManifestDir(pkt, buildCandidateManifest(tempRepo, { newFiles: onlyUntracked }));
+    const v = verifyEvidencePacket({ sessionPath, repoRoot: tempRepo });
+    check('SOL-03-R4: REJECTS packet omitting a staged-new source file in repoRoot',
+      v.ok === false && v.problems.some((p) => p.includes('src/staged_new.mjs')),
+      v.problems.join('; ').slice(0, 160));
+    rmSync(pkt.dir, { recursive: true, force: true });
+  }
+
+  // Case C: Positive control — when BOTH staged-new and untracked files are accurately pinned in newFiles
+  {
+    const pkt = makePacket();
+    const { sessionPath } = sealFullManifestDir(pkt, buildCandidateManifest(tempRepo));
+    const v = verifyEvidencePacket({ sessionPath, repoRoot: tempRepo });
+    check('SOL-03-R4: ACCEPTS packet when staged-new and untracked source files match worktree exactly',
+      v.ok === true && v.status === 'BOUND' && v.problems.length === 0,
+      v.problems.join('; ').slice(0, 160));
+    rmSync(pkt.dir, { recursive: true, force: true });
+  }
+} finally {
+  rmSync(tempRepo, { recursive: true, force: true });
 }
 
 console.log(`\n${fail === 0 ? 'ALL MEMORY GATE FIXTURES PASSED' : `${fail} MEMORY GATE FIXTURE(S) FAILED`}`);

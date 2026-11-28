@@ -1158,5 +1158,117 @@ async function exerciseCrossModelConcurrency(useSharedScheduler) {
   );
 }
 
+console.log('\n=== [6] resolveReportWithSafetyReader End-to-End Mobile Store Resolution ===');
+{
+  const redFlagMod = require('./.build/semantic/redFlag.js');
+  check(
+    '6a. resolveReportWithSafetyReader is exported from safetyReader and barrel index',
+    typeof readerMod.resolveReportWithSafetyReader === 'function',
+  );
+  if (typeof readerMod.resolveReportWithSafetyReader === 'function') {
+    const entries = codebase.entries;
+    const positiveEntry = entries.find((e) => e.id === 'positive-strong');
+    const domsEntry = entries.find((e) => e.id === 'soreness-doms');
+    const mildEntry = entries.find((e) => e.id === 'pain-mild');
+
+    // 6b. readerPrediction === null preserves shipped behavior verbatim (actionable, positive, rejected)
+    const semPositive = { confident: true, entry: positiveEntry, similarity: 0.91, runnerUp: 0.2, margin: 0.71 };
+    const nullFallbackPos = readerMod.resolveReportWithSafetyReader(
+      'feeling strong and fresh today, weights are moving fast',
+      semPositive,
+      null,
+      entries,
+    );
+    const shippedPos = redFlagMod.resolveReport(
+      'feeling strong and fresh today, weights are moving fast',
+      semPositive,
+    );
+    check(
+      '6b. readerPrediction === null preserves shipped positive-strong result verbatim',
+      JSON.stringify(nullFallbackPos) === JSON.stringify(shippedPos)
+        && nullFallbackPos.entry?.id === 'positive-strong'
+        && nullFallbackPos.confident === true,
+    );
+
+    // 6c. Subtle neurological symptom missed by MiniLM & keywords -> caught by reader (halt)
+    const semMiss = { confident: false, entry: null, similarity: 0.31, runnerUp: 0.28, margin: 0.03 };
+    const subtleCatch = readerMod.resolveReportWithSafetyReader(
+      'vision went dim for a moment after standing up',
+      semMiss,
+      { cautionLogit: 5.2, active: true, standaloneRouteId: 'dizzy', actionableRouteId: 'dizzy' },
+      entries,
+    );
+    check(
+      '6c. Subtle symptom missed by MiniLM & keywords escalates to reader dizzy halt',
+      subtleCatch.confident === true
+        && subtleCatch.overrideApplied === true
+        && subtleCatch.entry?.id === 'dizzy'
+        && subtleCatch.entry?.guardrail.halt === true
+        && subtleCatch.similarity === 0.31,
+    );
+
+    // 6d. Level-2 reader halt escalates over level-1 shipped soreness-doms
+    const semDoms = { confident: true, entry: domsEntry, similarity: 0.72, runnerUp: 0.4, margin: 0.32 };
+    const escalated = readerMod.resolveReportWithSafetyReader(
+      'quads sore and sudden stabbing sensation in hip',
+      semDoms,
+      { cautionLogit: 4.8, active: true, standaloneRouteId: 'pain-sharp', actionableRouteId: 'pain-sharp' },
+      entries,
+    );
+    check(
+      '6d. Reader level-2 halt escalates over shipped level-1 soreness-doms',
+      escalated.confident === true
+        && escalated.overrideApplied === true
+        && escalated.entry?.id === 'pain-sharp'
+        && escalated.entry?.guardrail.halt === true,
+    );
+
+    // 6e. Harmless denial where MiniLM misfired onto pain-mild -> suppressed to rejected (entry: null)
+    const semMisfire = { confident: true, entry: mildEntry, similarity: 0.66, runnerUp: 0.45, margin: 0.21 };
+    const denialSuppressed = readerMod.resolveReportWithSafetyReader(
+      'no pain today',
+      semMisfire,
+      { cautionLogit: 1.1, active: true, standaloneRouteId: 'pain-mild', actionableRouteId: 'pain-mild' },
+      entries,
+    );
+    check(
+      '6e. Harmless denial suppresses MiniLM pain-mild misfire to entry=null, confident=false',
+      denialSuppressed.entry === null
+        && denialSuppressed.confident === false
+        && denialSuppressed.overrideApplied === true
+        && denialSuppressed.similarity === 0.66,
+    );
+
+    // 6f. Uncontested positive-strong preserved when reader sees no caution
+    const uncontestedPos = readerMod.resolveReportWithSafetyReader(
+      'feeling strong and fresh today, weights are moving fast',
+      semPositive,
+      { cautionLogit: -4.5, active: false, standaloneRouteId: null, actionableRouteId: null },
+      entries,
+    );
+    check(
+      '6f. Uncontested positive-strong preserved when reader is inactive',
+      uncontestedPos.confident === true
+        && uncontestedPos.overrideApplied === false
+        && uncontestedPos.entry?.id === 'positive-strong',
+    );
+
+    // 6g. Contested positive-strong overridden when reader detects dizzy halt
+    const contestedPos = readerMod.resolveReportWithSafetyReader(
+      'feeling great except my vision dimmed after the set',
+      semPositive,
+      { cautionLogit: 4.9, active: true, standaloneRouteId: 'dizzy', actionableRouteId: 'dizzy' },
+      entries,
+    );
+    check(
+      '6g. Contested positive-strong overridden by reader dizzy halt',
+      contestedPos.confident === true
+        && contestedPos.overrideApplied === true
+        && contestedPos.entry?.id === 'dizzy'
+        && contestedPos.entry?.guardrail.halt === true,
+    );
+  }
+}
+
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);
 process.exit(fail ? 1 : 0);

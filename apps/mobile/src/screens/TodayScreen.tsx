@@ -46,6 +46,7 @@ import {
   describeFocus,
   resolveMuscleGroupAlias,
   sportDisplayName,
+  sportEmphasisFor,
   type MuscleGroupId,
 } from '@ak/inference';
 import { useStore, freeFormStartIsEmpty, type EarlierOpenSession } from '../state/useStore';
@@ -442,12 +443,11 @@ function AvailableTodayScreen({
         const identityLine = block !== null || program !== null
           ? `${program !== null ? `Block ${program.currentSequenceIndex} of ${program.plannedBlockCount} · ` : ''}Week ${todayWeekIndex} of 4 · ${focusSummary}${sportSummary !== null ? ` · ${sportSummary}` : ''}`
           : null;
-        const focusMuscles = new Set<MuscleGroupId>(
-          hasFrozenEmphasis ? (blockEmphasis!.inputs.focus?.muscles ?? []) : (focus?.muscles ?? []),
-        );
+        const focusMuscles = new Set<MuscleGroupId>(hasFrozenEmphasis ? [] : focus?.muscles ?? []);
         const sportMuscles = new Set<MuscleGroupId>(
-          hasFrozenEmphasis ? (blockEmphasis!.inputs.sport?.muscles ?? []) : [],
+          !hasFrozenEmphasis && sport !== null ? sportEmphasisFor(sport).muscles : [],
         );
+        const appliedLines = blockEmphasis?.report?.applied ?? [];
         const slotProvenanceLabel = (slot: { movementId: number; movementName: string }): string | null => {
           const goalLabel = hasFrozenEmphasis
             ? (blockEmphasis!.inputs.goalMovements?.find((g) => g.movementId === slot.movementId)?.goalLabel ?? null)
@@ -459,19 +459,24 @@ function AvailableTodayScreen({
           const resolvedMuscles = rawTargetMuscles
             .map((m) => resolveMuscleGroupAlias(m))
             .filter((m): m is MuscleGroupId => m !== null);
-          const appliedLines = blockEmphasis?.report?.applied ?? [];
-          const matchedFocus = appliedLines.some((line) => line.startsWith(`${slot.movementName} `) && line.includes('(your focus)'))
-            || resolvedMuscles.some((m) => focusMuscles.has(m));
+          const matchesMovement = (line: string): boolean =>
+            line.startsWith(`${slot.movementName} is planned instead of `)
+            || line.startsWith(`${slot.movementName} is added to a `)
+            || line.startsWith(`${slot.movementName} takes the place of `);
+          const matchedFocus = hasFrozenEmphasis
+            ? appliedLines.some((line) => matchesMovement(line) && line.includes('(your focus)'))
+            : resolvedMuscles.some((m) => focusMuscles.has(m));
           if (matchedFocus) {
             return 'Your focus';
           }
-          const matchedSport = appliedLines.some((line) => line.startsWith(`${slot.movementName} `) && /outcome\)\.$/.test(line))
-            || resolvedMuscles.some((m) => sportMuscles.has(m));
+          const matchedSport = hasFrozenEmphasis
+            ? appliedLines.some((line) =>
+                matchesMovement(line)
+                && line.includes(`(your ${sportSummary ?? 'sport'} outcome)`),
+              )
+            : resolvedMuscles.some((m) => sportMuscles.has(m));
           if (matchedSport) {
-            const sportName = hasFrozenEmphasis
-              ? (blockEmphasis!.inputs.sport?.name ?? 'sport')
-              : (sport !== null ? sportDisplayName(sport) : 'sport');
-            return `Your ${sportName} outcome`;
+            return `Your ${sportSummary ?? 'sport'} outcome`;
           }
           return null;
         };

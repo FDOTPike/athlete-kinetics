@@ -327,6 +327,7 @@ export {
   SAFETY_READER_SHA256,
   combineDenialFloor,
   createLazySingleFlightSafetyReader,
+  resolveReportWithSafetyReader,
   runSafetyReaderInference,
   type DenialFloorInput,
   type LazySafetyReaderOptions,

@@ -17,6 +17,8 @@
  */
 import React, { useRef, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { scanRedFlags } from '@ak/inference';
+import { notedReportShowsCue, reportEntryName } from '../state/reportCopy';
 import type { TriageOutcome } from '../state/useStore';
 import { theme } from '../theme/theme';
 import { IS_BETA_BUILD } from '../config/features';
@@ -58,29 +60,70 @@ export function SubjectiveReportPanel({
   const [notSent, setNotSent] = useState(false);
   const halted = lastTriage !== null && lastTriage.kind === 'matched' && lastTriage.directive.halt;
 
-  // One Apply at a time: a second press before the first answer arrives sends
-  // nothing (the store would refuse it, and its "not sent" would sit beside the
-  // first report's result). The ref is synchronous; `pending` disables the button.
-  const inFlight = useRef(false);
+  // One Apply at a time for ordinary reports: a second press before the first
+  // answer arrives sends nothing unless the new draft carries deterministic
+  // systemic red-flag language, which must never wait behind a hung check.
+  const inFlightCount = useRef(0);
+  const inFlightKeyCounts = useRef<Map<string, number>>(new Map());
+  const submitEpochRef = useRef(0);
+  const draftRevisionRef = useRef(0);
   const [pending, setPending] = useState(false);
+  const [activeKeys, setActiveKeys] = useState<string[]>([]);
+
+  const trimmedText = reportText.trim();
+  const keywordHaltReady = trimmedText.length > 0 && scanRedFlags(trimmedText).systemic;
+  const submitKey = reportSeverity !== null ? `${trimmedText}\n${reportSeverity}` : null;
+  const keyInFlight =
+    submitKey !== null
+    && (activeKeys.includes(submitKey) || (inFlightKeyCounts.current.get(submitKey) ?? 0) > 0);
+  const blockedWhileBusy = (triaging || pending) && (!keywordHaltReady || keyInFlight);
 
   const apply = (): void => {
-    if (reportSeverity === null || inFlight.current) return;
-    inFlight.current = true;
+    if (trimmedText.length === 0 || reportSeverity === null || submitKey === null) return;
+    const busyNow = triaging || pending || inFlightCount.current > 0;
+    const thisKeyBusy = (inFlightKeyCounts.current.get(submitKey) ?? 0) > 0;
+    if (busyNow && (!keywordHaltReady || thisKeyBusy)) return;
+    const myEpoch = ++submitEpochRef.current;
+    const submittedDraftRevision = draftRevisionRef.current;
+    inFlightCount.current += 1;
+    inFlightKeyCounts.current.set(submitKey, (inFlightKeyCounts.current.get(submitKey) ?? 0) + 1);
+    setActiveKeys([...inFlightKeyCounts.current.keys()]);
     setPending(true);
     setNotSent(false);
     // A new report starts without the previous report's result on screen.
     setApplied(false);
-    const settled = (): void => { inFlight.current = false; setPending(false); };
+    let didSettle = false;
+    const settled = (): void => {
+      if (didSettle) return;
+      didSettle = true;
+      inFlightCount.current = Math.max(0, inFlightCount.current - 1);
+      const nextForKey = (inFlightKeyCounts.current.get(submitKey) ?? 1) - 1;
+      if (nextForKey <= 0) inFlightKeyCounts.current.delete(submitKey);
+      else inFlightKeyCounts.current.set(submitKey, nextForKey);
+      setActiveKeys([...inFlightKeyCounts.current.keys()]);
+      if (inFlightCount.current === 0) setPending(false);
+    };
     // The text is cleared only once the store has stored the report. Anything else
     // keeps it on screen and says so, so nothing typed is lost.
-    onApply(reportText, reportSeverity).then((stored) => {
+    try {
+      onApply(reportText, reportSeverity).then((stored) => {
+        settled();
+        if (submitEpochRef.current !== myEpoch) return;
+        if (stored !== true) { setNotSent(true); return; }
+        if (draftRevisionRef.current === submittedDraftRevision) {
+          setReportText('');
+          setReportSeverity(null);
+        }
+        setApplied(true);
+      }, () => {
+        settled();
+        if (submitEpochRef.current !== myEpoch) return;
+        setNotSent(true);
+      });
+    } catch {
       settled();
-      if (!stored) { setNotSent(true); return; }
-      setReportText('');
-      setReportSeverity(null);
-      setApplied(true);
-    }, () => { settled(); setNotSent(true); });
+      if (submitEpochRef.current === myEpoch) setNotSent(true);
+    }
   };
 
   const haltCard = halted && lastTriage !== null && lastTriage.kind === 'matched' ? (
@@ -127,7 +170,10 @@ export function SubjectiveReportPanel({
         disableFullscreenUI
         style={styles.input}
         value={reportText}
-        onChangeText={setReportText}
+        onChangeText={(value) => {
+          if (value !== reportText) draftRevisionRef.current += 1;
+          setReportText(value);
+        }}
         placeholder="For example: my knee feels sore when I squat"
         placeholderTextColor={theme.color.textLow}
         maxLength={500}
@@ -142,17 +188,20 @@ export function SubjectiveReportPanel({
             key={severity}
             label={String(severity)}
             selected={reportSeverity === severity}
-            onPress={() => setReportSeverity(severity)}
+            onPress={() => {
+              if (severity !== reportSeverity) draftRevisionRef.current += 1;
+              setReportSeverity(severity);
+            }}
             accessibilityLabel={`Severity ${severity} of 10`}
             testID={`completion-report-severity-${severity}`}
           />
         ))}
       </View>
       <PrimaryButton
-        label={triaging ? 'Checking report' : 'Apply report'}
-        disabled={reportText.trim().length === 0 || reportSeverity === null || triaging || pending}
+        label={blockedWhileBusy ? 'Checking report' : 'Apply report'}
+        disabled={trimmedText.length === 0 || reportSeverity === null || blockedWhileBusy}
         onPress={apply}
-        accessibilityLabel={triaging ? 'Checking report' : 'Apply report'}
+        accessibilityLabel={blockedWhileBusy ? 'Checking report' : 'Apply report'}
         testID="completion-report-apply"
       />
       {notSent && (
@@ -164,7 +213,17 @@ export function SubjectiveReportPanel({
       {applied && lastTriage !== null && lastTriage.kind === 'positive' && (
         <View style={styles.result}>
           <Text style={styles.badge}>Noted</Text>
-          <Text style={styles.bodyText}>{lastTriage.cue}</Text>
+          {lastTriage.entryId === undefined ? (
+            <Text style={styles.bodyText}>{lastTriage.cue}</Text>
+          ) : (
+            <>
+              <Text style={styles.caption}>{`Matched: ${reportEntryName(lastTriage.entryId)}`}</Text>
+              <Text style={styles.bodyText}>Today's plan is unchanged.</Text>
+              {notedReportShowsCue(lastTriage.entryId) && (
+                <Text style={styles.caption}>{lastTriage.cue}</Text>
+              )}
+            </>
+          )}
         </View>
       )}
       {applied && lastTriage !== null && lastTriage.kind === 'rejected' && (

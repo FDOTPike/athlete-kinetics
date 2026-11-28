@@ -41,8 +41,11 @@ migration.
    It must run fully offline (rule 1) and inside the memory ceiling (rule 3).
    It never writes a prescription, a block or a cue; those stay pure TS. No
    model is added to, or swapped in, the runtime without the owner's sign-off
-   on measured evidence. Today the only model shipped is the sentence
-   embedder.
+   on measured evidence. The approved runtime models are the sentence embedder (`minilm.onnx`)
+   and the safety reader (`safety_reader.onnx`, `m10-r15-reader-seed3`,
+   r15/denial-floor). Both use the shared `SerializedOrtScheduler`.
+   The reader identity and release evidence requirements are recorded in
+   the 2026-11-28 entry in `DEVIATION_LOG.md`.
    Decision record: [initial ruling](https://github.com/FDOTPike/athlete-kinetics/commit/ed051e0bea97bfb8611a3d93e37d90da00f0dd16)
    and [owner confirmation of the conditions, 2026-10-09](https://github.com/FDOTPike/athlete-kinetics/commit/265cbd3cfb150e477bf88c212d549c1ad8e40927),
    incorporated by [PR 60](https://github.com/FDOTPike/athlete-kinetics/pull/60).

@@ -146,6 +146,7 @@
 				13B07F8C1A680F5B00A75B9A /* Frameworks */,
 				13B07F8E1A680F5B00A75B9A /* Resources */,
 				7A1E5B0D2C6F4A3B9E8D1C01 /* Stage embedder model */,
+				7A1E5B0D2C6F4A3B9E8D1C02 /* Stage safety reader model */,
 				00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */,
 				00EEFC60759A1932668264C0 /* [CP] Embed Pods Frameworks */,
 				E235C05ADACE081382539298 /* [CP] Copy Pods Resources */,
@@ -237,6 +238,7 @@
 /* Begin PBXShellScriptBuildPhase section */
 		00DD1BFF1BD5951E006B06BC /* Bundle React Native code and images */ = {
 			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
 			files = (
 			);
@@ -284,6 +286,24 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "set -e\n# Pinned, byte-verified MiniLM model -> <App>.app/minilm.onnx (deviceEmbedder reads it in place).\n# Release REQUIRES it; Debug without it builds policy-only (triage inactive).\n. \"$SRCROOT/.xcode.env\"\nif [ -f \"$SRCROOT/.xcode.env.local\" ]; then . \"$SRCROOT/.xcode.env.local\"; fi\nREQUIRED=\"\"\nif [ \"$CONFIGURATION\" = \"Release\" ]; then REQUIRED=\"--required\"; fi\n\"$NODE_BINARY\" \"$SRCROOT/../../../scripts/stage-native-embedder.mjs\" \"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/minilm.onnx\" $REQUIRED\n";
+			showEnvVarsInLog = 0;
+		};
+		7A1E5B0D2C6F4A3B9E8D1C02 /* Stage safety reader model */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/.xcode.env",
+			);
+			name = "Stage safety reader model";
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/safety_reader.onnx",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -e\n# Pinned, byte-verified Stream 2 safety reader -> <App>.app/safety_reader.onnx (deviceSafetyReader reads it in place).\n# Release REQUIRES it; Debug without it preserves shipped semantic + keyword fallback.\n. \"$SRCROOT/.xcode.env\"\nif [ -f \"$SRCROOT/.xcode.env.local\" ]; then . \"$SRCROOT/.xcode.env.local\"; fi\nREQUIRED=\"\"\nif [ \"$CONFIGURATION\" = \"Release\" ]; then REQUIRED=\"--required\"; fi\n\"$NODE_BINARY\" \"$SRCROOT/../../../scripts/stage-native-safety-reader.mjs\" \"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/safety_reader.onnx\" $REQUIRED\n";
 			showEnvVarsInLog = 0;
 		};
 		C38B50BA6285516D6DCD4F65 /* [CP] Check Pods Manifest.lock */ = {
@@ -362,7 +382,7 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_STYLE = Automatic;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.pikemethods.training.uitests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -378,7 +398,7 @@
 				CLANG_ENABLE_OBJC_WEAK = NO;
 				CODE_SIGN_STYLE = Automatic;
 				GENERATE_INFOPLIST_FILE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.pikemethods.training.uitests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = iphoneos;
@@ -409,7 +429,6 @@
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
-					"-lc++",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.pikemethods.training;
 				PRODUCT_NAME = AthleteKinetics;
@@ -438,7 +457,6 @@
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
-					"-lc++",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.pikemethods.training;
 				PRODUCT_NAME = AthleteKinetics;

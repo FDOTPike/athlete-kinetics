@@ -17,17 +17,18 @@
  * Profile/settings (the editable athlete surface) stays reachable from the
  * shell header and renders the full ProfileScreen unchanged.
  */
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { DB } from '@op-engineering/op-sqlite';
 import {
   MUSCLE_GROUP_INFO,
+  addDaysIso,
   describeFocus,
   goalProgress,
   resolveMuscleGroupAlias,
   type MuscleGroupId,
 } from '@ak/inference';
-import { useStore, type RecentSessionOutcome } from '../state/useStore';
+import { useStore, type BlockSessionSummary, type RecentSessionOutcome } from '../state/useStore';
 import { athleteDataBootAllowed } from '../state/dataMaintenanceLock';
 import { theme } from '../theme/theme';
 import { formatAthleteDate } from '../state/athleteDate';
@@ -67,16 +68,6 @@ const sessionDescriptor = (row: {
 // Two sessions on one day were identical rows; the time tells them apart.
 const formatFinalizedTime = (ms: number): string => (ms <= 0 ? '' : ` · ${new Date(ms).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`);
 
-const addDaysIso = (iso: string, delta: number): string => {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
-  if (m === null) return iso;
-  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + delta));
-  const y = d.getUTCFullYear();
-  const mo = String(d.getUTCMonth() + 1).padStart(2, '0');
-  const da = String(d.getUTCDate()).padStart(2, '0');
-  return `${y}-${mo}-${da}`;
-};
-
 const localIsoDate = (ms: number): string | null => {
   if (!Number.isFinite(ms) || ms <= 0) return null;
   const d = new Date(ms);
@@ -94,18 +85,11 @@ function rowsOf<T>(res: unknown): T[] {
   return Array.isArray(arr) ? (arr as T[]) : [];
 }
 
-type OriginCacheEntry = {
-  readonly key: string;
-  readonly origins: ReadonlyMap<number, number>;
-};
+type WeekOutcome = Pick<RecentSessionOutcome, 'sessionId' | 'finalizedAtMs'>;
+type WeekOutcomeCacheEntry = { readonly key: string; readonly outcomes: readonly WeekOutcome[] };
+type WeekOutcomeRead = { readonly ok: boolean; readonly outcomes: readonly WeekOutcome[] };
 
-type OriginReadResult = {
-  readonly ok: boolean;
-  readonly origins: ReadonlyMap<number, number>;
-};
-
-const EMPTY_ORIGINS: ReadonlyMap<number, number> = new Map<number, number>();
-const bootScopedOriginCache = new WeakMap<object, OriginCacheEntry>();
+const bootScopedWeekOutcomeCache = new WeakMap<object, WeekOutcomeCacheEntry>();
 let nextObjectIdentityId = 1;
 const objectIdentityIds = new WeakMap<object, number>();
 
@@ -120,35 +104,36 @@ const getObjectIdentityTag = (value: unknown): string => {
   return `obj:${id}`;
 };
 
-/** Read persisted `session_origin` links (`session_id -> source_planned_session_id`)
- *  when booted against SQLite so earlier catch-up workouts finalized on a later day
- *  attribute to their true planned session rather than their finalization date. */
-const readPersistedPlannedSessionOrigins = (dbName: string | null): OriginReadResult => {
-  if (dbName === null || !athleteDataBootAllowed()) {
-    return { ok: false, origins: EMPTY_ORIGINS };
-  }
-  const map = new Map<number, number>();
+/** A catch-up workout belongs to its stored plan, even when finalized in a later week. */
+const readPersistedActiveWeekOutcomes = (
+  dbName: string,
+  planIds: readonly number[],
+  blockCreatedAtMs: number,
+): WeekOutcomeRead => {
   let readerDb: DB | null = null;
-  let ok = false;
   try {
     const { open } = require('@op-engineering/op-sqlite') as typeof import('@op-engineering/op-sqlite');
     readerDb = open({ name: dbName });
-    const rows = rowsOf<{ session_id: number; source_planned_session_id: number }>(
+    const placeholders = planIds.map(() => '?').join(', ');
+    // A block wipe can free a plan ID while preserving workouts that reference it.
+    const rows = rowsOf<{ session_id: number; finalized_at_ms: number }>(
       readerDb.executeSync(
-        "SELECT session_id, source_planned_session_id FROM session_origin WHERE origin_kind = 'planned' AND source_planned_session_id IS NOT NULL",
+        `SELECT outcome.session_id, outcome.finalized_at_ms
+           FROM session_origin origin
+           JOIN session_outcome outcome ON outcome.session_id = origin.session_id
+           JOIN session s ON s.session_id = origin.session_id
+          WHERE origin.origin_kind = 'planned' AND outcome.origin_kind = 'planned'
+            AND origin.source_planned_session_id IN (${placeholders})
+            AND (? <= 0 OR (outcome.finalized_at_ms >= ? AND s.started_at_ms >= ?))`,
+        [...planIds, blockCreatedAtMs, blockCreatedAtMs, blockCreatedAtMs],
       ),
     );
-    for (let idx = 0; idx < rows.length; idx += 1) {
-      const row = rows[idx];
-      const sessionId = Number(row.session_id);
-      const planId = Number(row.source_planned_session_id);
-      if (Number.isFinite(sessionId) && Number.isFinite(planId)) {
-        map.set(sessionId, planId);
-      }
-    }
-    ok = true;
+    return {
+      ok: true,
+      outcomes: rows.map((row) => ({ sessionId: row.session_id, finalizedAtMs: row.finalized_at_ms })),
+    };
   } catch {
-    // Transient reader errors or mocked unit-test stores fall back to outcome replay without caching failure.
+    return { ok: false, outcomes: [] };
   } finally {
     if (
       readerDb !== null
@@ -162,8 +147,53 @@ const readPersistedPlannedSessionOrigins = (dbName: string | null): OriginReadRe
       }
     }
   }
-  return { ok, origins: ok ? map : EMPTY_ORIGINS };
 };
+
+/** Mock stores without SQLite replay the bounded outcome list in plan order. */
+function replayRecentPlannedOutcomes(
+  outcomes: readonly (RecentSessionOutcome & { sourcePlannedSessionId?: number | null })[],
+  finalizedBlockSessions: readonly BlockSessionSummary[],
+  activeWeekIndex: number,
+  blockCreatedAtMs: number,
+): WeekOutcome[] {
+  const finalizedPlanById = new Map(finalizedBlockSessions.map((bs) => [bs.plannedSessionId, bs]));
+  const candidates = outcomes
+    .filter((row) =>
+      row.sessionId != null
+      && (row.originKind == null || row.originKind === 'planned')
+      && (!(blockCreatedAtMs > 0) || row.finalizedAtMs >= blockCreatedAtMs),
+    )
+    .sort((a, b) => b.sessionId - a.sessionId || b.finalizedAtMs - a.finalizedAtMs);
+  const claimedPlanIds = new Set<number>();
+  const activeWeekOutcomes: WeekOutcome[] = [];
+  const unresolved: RecentSessionOutcome[] = [];
+  for (const row of candidates) {
+    if (row.sourcePlannedSessionId != null) {
+      const matchedPlan = finalizedPlanById.get(row.sourcePlannedSessionId);
+      if (matchedPlan === undefined) continue;
+      claimedPlanIds.add(row.sourcePlannedSessionId);
+      if (matchedPlan.weekIndex === activeWeekIndex) activeWeekOutcomes.push(row);
+    } else {
+      unresolved.push(row);
+    }
+  }
+
+  const unclaimed = finalizedBlockSessions.filter((bs) => !claimedPlanIds.has(bs.plannedSessionId));
+  for (const row of unresolved.slice(0, unclaimed.length).reverse()) {
+    const rowDate = localIsoDate(row.finalizedAtMs);
+    const focusPool = row.focus == null ? unclaimed : unclaimed.filter((bs) => bs.focus === row.focus);
+    const plans = focusPool.length > 0 ? focusPool : unclaimed;
+    const matchedPlan = rowDate === null
+      ? plans[0]
+      : plans.find((bs) => bs.sessionDate === rowDate)
+        ?? plans.find((bs) => bs.sessionDate < rowDate)
+        ?? plans.find((bs) => bs.sessionDate > rowDate);
+    if (matchedPlan === undefined) continue;
+    unclaimed.splice(unclaimed.indexOf(matchedPlan), 1);
+    if (matchedPlan.weekIndex === activeWeekIndex) activeWeekOutcomes.push(row);
+  }
+  return activeWeekOutcomes;
+}
 
 /** The logged facts of one past session: no plan context, no completion
  *  actions, only what was recorded. */
@@ -229,16 +259,13 @@ export default function ProgressScreen(): React.JSX.Element {
   const activeDbName = storeStatus === 'ready' && activeAthleteId !== null
     ? athletes.find((entry) => entry.id === activeAthleteId)?.dbName ?? null
     : null;
-  const localOriginCacheRef = useRef<OriginCacheEntry | null>(null);
-
-  const [allOutcomes, setAllOutcomes] = useState<RecentSessionOutcome[]>([]);
-  const recentOutcomes = allOutcomes.slice(0, 20);
+  const [recentOutcomes, setRecentOutcomes] = useState<RecentSessionOutcome[] | null>(null);
   // Walk 2 (W2-9): a recent session opens in place to its own summary.
   const [openSessionId, setOpenSessionId] = useState<number | null>(null);
   const [recentMeasures, setRecentMeasures] = useState<ReturnType<typeof loadMeasuredHistory>>([]);
 
   useEffect(() => {
-    setAllOutcomes(loadRecentOutcomes(Number.MAX_SAFE_INTEGER) ?? []);
+    setRecentOutcomes(loadRecentOutcomes(20)?.slice(0, 20) ?? []);
     setRecentMeasures(loadMeasuredHistory(14));
     // Re-read when a session ends, an earlier open workout resolves, or athlete/block state reloads.
   }, [
@@ -247,15 +274,21 @@ export default function ProgressScreen(): React.JSX.Element {
     rawBlock,
     rawBlockSessions,
     activeAthleteId,
+    activeDbName,
     storeStatus,
     rawMovements,
     loadRecentOutcomes,
     loadMeasuredHistory,
   ]);
 
-  const activeWeekIndex = blockSessions.find((s) => s.sessionDate >= today)?.weekIndex
-    ?? blockSessions[blockSessions.length - 1]?.weekIndex
-    ?? 1;
+  // Plan's calendar marks today in the seven-day row anchored to the block start,
+  // including when the next workout is in a later week.
+  const activeWeekIndex = block === null
+    ? blockSessions.find((s) => s.sessionDate >= today)?.weekIndex
+      ?? blockSessions[blockSessions.length - 1]?.weekIndex
+      ?? 1
+    : [1, 2, 3].find((week) => today < addDaysIso(block.startDate, week * 7)) ?? 4;
+  let weeklyTotalsAvailable = recentOutcomes !== null;
   const focusMuscles: readonly MuscleGroupId[] = focus?.muscles ?? [];
   const weeklyMuscleCounts = new Map<MuscleGroupId, { plannedSets: number; completedSets: number }>();
   for (const muscle of focusMuscles) {
@@ -264,9 +297,15 @@ export default function ProgressScreen(): React.JSX.Element {
   const isFinalizedPlanSession = (bs: (typeof blockSessions)[number]): boolean =>
     bs.completionStatus === 'complete' || bs.completionStatus === 'halted';
   const activeWeekSessions = blockSessions.filter((s) => s.weekIndex === activeWeekIndex);
-  if (focusMuscles.length > 0 && typeof loadSessionSlots === 'function') {
+  if (weeklyTotalsAvailable && focusMuscles.length > 0 && typeof loadSessionSlots === 'function') {
     for (const bs of activeWeekSessions) {
-      const slots = loadSessionSlots(bs.plannedSessionId) ?? [];
+      let slots: ReturnType<typeof loadSessionSlots>;
+      try {
+        slots = loadSessionSlots(bs.plannedSessionId) ?? [];
+      } catch {
+        weeklyTotalsAvailable = false;
+        break;
+      }
       for (const sl of slots) {
         const rawMuscles = movements.find((m) => m.movement_id === sl.movementId)?.targetMuscles ?? [];
         const matched = new Set<MuscleGroupId>();
@@ -279,125 +318,53 @@ export default function ProgressScreen(): React.JSX.Element {
         }
       }
     }
-    let weekStart: string | null = null;
-    let weekEnd: string | null = null;
-    if (block !== null) {
-      weekStart = addDaysIso(block.startDate, (activeWeekIndex - 1) * 7);
-      weekEnd = addDaysIso(block.startDate, activeWeekIndex * 7 - 1);
-    } else if (activeWeekSessions.length > 0) {
-      const sortedDates = activeWeekSessions.map((s) => s.sessionDate).sort();
-      weekStart = sortedDates[0];
-      const plusSix = addDaysIso(sortedDates[0], 6);
-      weekEnd = sortedDates[sortedDates.length - 1] > plusSix ? sortedDates[sortedDates.length - 1] : plusSix;
-    }
     const finalizedInActiveWeek = activeWeekSessions.filter(isFinalizedPlanSession);
     if (
-      finalizedInActiveWeek.length > 0
-      && weekStart !== null
-      && weekEnd !== null
+      weeklyTotalsAvailable
+      && finalizedInActiveWeek.length > 0
+      && recentOutcomes !== null
       && typeof loadSessionSummaryFacts === 'function'
     ) {
-      const finalizedBlockSessions = [...blockSessions.filter(isFinalizedPlanSession)].sort((a, b) =>
-        a.sessionDate === b.sessionDate
-          ? a.plannedSessionId - b.plannedSessionId
-          : a.sessionDate < b.sessionDate
-            ? -1
-            : 1,
-      );
-      const allBlockPlanIds = new Set(blockSessions.map((bs) => bs.plannedSessionId));
-      const finalizedPlanById = new Map(finalizedBlockSessions.map((bs) => [bs.plannedSessionId, bs]));
-      const plannedCandidatesNewestFirst = allOutcomes
-        .filter((row) => row.sessionId != null && (row.originKind == null || row.originKind === 'planned'))
-        .sort((a, b) => (b.sessionId ?? 0) - (a.sessionId ?? 0) || b.finalizedAtMs - a.finalizedAtMs);
-      const needsPersistedOrigins = activeDbName !== null && plannedCandidatesNewestFirst.some(
-        (row) => (row as { sourcePlannedSessionId?: number | null }).sourcePlannedSessionId == null,
-      );
-      let persistedOrigins: ReadonlyMap<number, number> = EMPTY_ORIGINS;
-      if (needsPersistedOrigins && athleteDataBootAllowed()) {
-        const outcomeSig = plannedCandidatesNewestFirst
-          .map((row) => `${row.sessionId}:${row.outcomeKind}:${row.finalizedAtMs}:${row.loggedSetCount ?? ''}`)
+      const blockCreatedAtMs = block?.createdAtMs ?? 0;
+      let activeWeekOutcomes: readonly WeekOutcome[] = [];
+      if (activeDbName === null) {
+        const finalizedBlockSessions = blockSessions.filter(isFinalizedPlanSession).sort((a, b) =>
+          a.sessionDate.localeCompare(b.sessionDate) || a.plannedSessionId - b.plannedSessionId,
+        );
+        activeWeekOutcomes = replayRecentPlannedOutcomes(
+          recentOutcomes, finalizedBlockSessions, activeWeekIndex, blockCreatedAtMs,
+        );
+      } else if (athleteDataBootAllowed()) {
+        const planIds = finalizedInActiveWeek.map((bs) => bs.plannedSessionId);
+        const outcomeSig = recentOutcomes
+          .map((row) => [row.sessionId, row.outcomeKind, row.finalizedAtMs, row.loggedSetCount].join(':'))
           .join(',');
-        const sliceIdentitySig = `${getObjectIdentityTag(rawMovements)}|${getObjectIdentityTag(rawBlock)}|${getObjectIdentityTag(rawBlockSessions)}`;
-        const cacheKey = `${activeAthleteId ?? ''}|${activeDbName}|${sliceIdentitySig}|${outcomeSig}`;
-        const scopeObj: object | null =
-          (Array.isArray(rawMovements) && rawMovements.length > 0 ? rawMovements : null)
-          ?? rawBlock
-          ?? (Array.isArray(rawBlockSessions) && rawBlockSessions.length > 0 ? rawBlockSessions : null);
-        const cached = scopeObj !== null ? bootScopedOriginCache.get(scopeObj) : localOriginCacheRef.current;
-        if (cached !== undefined && cached !== null && cached.key === cacheKey) {
-          persistedOrigins = cached.origins;
+        const sliceIds = [rawMovements, rawBlock, rawBlockSessions].map(getObjectIdentityTag).join('|');
+        const key = JSON.stringify([activeAthleteId, activeDbName, sliceIds, planIds, blockCreatedAtMs, outcomeSig]);
+        const scope = rawMovements?.length ? rawMovements : rawBlock ?? blockSessions;
+        const cached = bootScopedWeekOutcomeCache.get(scope);
+        if (cached?.key === key) {
+          activeWeekOutcomes = cached.outcomes;
         } else {
-          const readResult = readPersistedPlannedSessionOrigins(activeDbName);
-          persistedOrigins = readResult.origins;
-          if (readResult.ok) {
-            const nextEntry: OriginCacheEntry = { key: cacheKey, origins: persistedOrigins };
-            if (scopeObj !== null) {
-              bootScopedOriginCache.set(scopeObj, nextEntry);
-            }
-            localOriginCacheRef.current = nextEntry;
-          }
+          const read = readPersistedActiveWeekOutcomes(activeDbName, planIds, blockCreatedAtMs);
+          weeklyTotalsAvailable = read.ok;
+          activeWeekOutcomes = read.outcomes;
+          if (read.ok) bootScopedWeekOutcomeCache.set(scope, { key, outcomes: activeWeekOutcomes });
         }
+      } else {
+        weeklyTotalsAvailable = false;
       }
 
-      const claimedPlanIds = new Set<number>();
-      const activeWeekOutcomes: RecentSessionOutcome[] = [];
-      const unresolvedBlockCandidatesNewestFirst: RecentSessionOutcome[] = [];
-      for (const row of plannedCandidatesNewestFirst) {
-        const explicitPlanId = (row as { sourcePlannedSessionId?: number | null }).sourcePlannedSessionId
-          ?? persistedOrigins.get(row.sessionId)
-          ?? null;
-        if (explicitPlanId !== null) {
-          // Session explicitly linked to an archived/other block's planned_session: skip.
-          if (!allBlockPlanIds.has(explicitPlanId)) continue;
-          claimedPlanIds.add(explicitPlanId);
-          const matchedPlan = finalizedPlanById.get(explicitPlanId);
-          if (matchedPlan !== undefined && matchedPlan.weekIndex === activeWeekIndex) {
-            if (block === null) {
-              const rowDate = localIsoDate(row.finalizedAtMs);
-              if (rowDate === null || rowDate < weekStart || rowDate > weekEnd) continue;
-            }
-            activeWeekOutcomes.push(row);
-          }
-          continue;
-        }
-        if (block === null || !(block.createdAtMs > 0) || row.finalizedAtMs >= block.createdAtMs) {
-          unresolvedBlockCandidatesNewestFirst.push(row);
-        }
-      }
-
-      // Fallback (#228) for mocked unit-test stores without persisted `session_origin` rows:
-      // attribute remaining finalized planned outcomes chronologically to unclaimed sessions.
-      const unclaimed = finalizedBlockSessions.filter((bs) => !claimedPlanIds.has(bs.plannedSessionId));
-      const unresolvedChronological = unresolvedBlockCandidatesNewestFirst
-        .slice(0, unclaimed.length)
-        .reverse();
-      for (const row of unresolvedChronological) {
-        let matchedPlan: (typeof finalizedBlockSessions)[number] | undefined;
-        if (unclaimed.length > 0) {
+      if (block === null) {
+        const dates = activeWeekSessions.map((s) => s.sessionDate).sort();
+        const weekStart = dates[0];
+        const lastPlannedDate = dates[dates.length - 1];
+        const plusSix = addDaysIso(weekStart, 6);
+        const weekEnd = lastPlannedDate > plusSix ? lastPlannedDate : plusSix;
+        activeWeekOutcomes = activeWeekOutcomes.filter((row) => {
           const rowDate = localIsoDate(row.finalizedAtMs);
-          const focusPool = row.focus == null
-            ? unclaimed
-            : unclaimed.filter((bs) => bs.focus === row.focus);
-          const candidates = focusPool.length > 0 ? focusPool : unclaimed;
-          if (rowDate !== null) {
-            matchedPlan = candidates.find((bs) => bs.sessionDate === rowDate)
-              ?? candidates.find((bs) => bs.sessionDate < rowDate)
-              ?? candidates.find((bs) => bs.sessionDate > rowDate);
-          } else {
-            matchedPlan = candidates[0];
-          }
-          if (matchedPlan !== undefined) {
-            const removeIdx = unclaimed.indexOf(matchedPlan);
-            if (removeIdx !== -1) unclaimed.splice(removeIdx, 1);
-          }
-        }
-        if (matchedPlan !== undefined && matchedPlan.weekIndex === activeWeekIndex) {
-          if (block === null) {
-            const rowDate = localIsoDate(row.finalizedAtMs);
-            if (rowDate === null || rowDate < weekStart || rowDate > weekEnd) continue;
-          }
-          activeWeekOutcomes.push(row);
-        }
+          return rowDate !== null && rowDate >= weekStart && rowDate <= weekEnd;
+        });
       }
       for (const row of activeWeekOutcomes) {
         try {
@@ -417,7 +384,8 @@ export default function ProgressScreen(): React.JSX.Element {
             }
           }
         } catch {
-          // Unreadable session facts fail closed (0 completed sets credited).
+          weeklyTotalsAvailable = false;
+          break;
         }
       }
     }
@@ -436,7 +404,7 @@ export default function ProgressScreen(): React.JSX.Element {
         <Text style={styles.caption} testID="progress-focus-summary">
           {focus === null ? 'Not answered yet. Balanced whole body is used until you choose.' : describeFocus(focus)}
         </Text>
-        {focusMuscles.map((muscle) => {
+        {weeklyTotalsAvailable && focusMuscles.map((muscle) => {
           const counts = weeklyMuscleCounts.get(muscle) ?? { plannedSets: 0, completedSets: 0 };
           return (
             <Text key={muscle} style={styles.caption} testID={`progress-focus-muscle-${muscle}`}>
@@ -471,7 +439,7 @@ export default function ProgressScreen(): React.JSX.Element {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>RECENT SESSIONS</Text>
-        {recentOutcomes.length === 0 ? (
+        {recentOutcomes === null || recentOutcomes.length === 0 ? (
           <Text style={styles.caption} testID="progress-outcomes-none">
             No finalized session outcomes recorded yet.
           </Text>
