@@ -308,6 +308,83 @@ def requirePin = { String label, String value, java.util.regex.Pattern pattern -
     return value
 }
 
+// --- Model supply-chain pins (shared) ----------------------------------------
+// Single parse of both on-device model pins, from the sources of truth
+// scripts/embedder-integrity.mjs and scripts/safety-reader-integrity.mjs.
+// Consumed by generateQaCandidateManifest and by the producer-task archive
+// verifier (packageQa / packageRelease / signReleaseBundle). Fails closed with
+// GradleException when any pin is missing or malformed.
+// scripts/embedder-integrity.mjs declares no byte-size pin for
+// onnx/model_quantized.onnx, so the ratified MiniLM size (formerly the literal
+// candidate-manifest model.sizeBytes value) is defined exactly once, here.
+def MINILM_PINNED_SIZE_BYTES = 22972370L
+def MINILM_REVISION_PIN_RE = ~/PINNED_REVISION\s*=\s*'([0-9a-f]{40})'/
+def MINILM_SHA_PIN_RE = ~/'onnx\/model_quantized\.onnx':\s*\n\s*'([0-9a-f]{64})'/
+def READER_ID_PIN_RE = ~/SAFETY_READER_MODEL_ID\s*=\s*'([^']+)'/
+def READER_POLICY_PIN_RE = ~/SAFETY_READER_POLICY_ID\s*=\s*'([^']+)'/
+def READER_TAG_PIN_RE = ~/PINNED_RELEASE_TAG\s*=\s*'([^']+)'/
+def READER_COMMIT_PIN_RE = ~/PINNED_RELEASE_COMMIT\s*=\s*'([0-9a-f]{40})'/
+def READER_ASSET_ID_PIN_RE = ~/PINNED_ASSET_ID\s*=\s*(\d+)/
+def READER_ARTIFACT_PIN_RE = ~/SAFETY_READER_ARTIFACT\s*=\s*'reader_quantized\.onnx'/
+// KNOWN_BYTES / KNOWN_SHA256 use the computed key [SAFETY_READER_ARTIFACT].
+def READER_BYTES_PIN_RE = ~/\[SAFETY_READER_ARTIFACT\]:\s*(\d+)/
+def READER_SHA_PIN_RE = ~/\[SAFETY_READER_ARTIFACT\]:\s*\n\s*'([0-9a-f]{64})'/
+
+def loadModelPins = { ->
+    def readPinSource = { String rel ->
+        def f = new File(repoRoot, rel)
+        if (!f.isFile()) {
+            throw new GradleException("Model pins: ${rel} missing")
+        }
+        return f.getText('UTF-8')
+    }
+    def capturePin = { String src, java.util.regex.Pattern re, String label, String rel ->
+        def m = re.matcher(src)
+        if (!m.find()) {
+            throw new GradleException("Model pins: cannot parse ${label} from ${rel}")
+        }
+        return m.group(1)
+    }
+    def parsePositiveLong = { String value, String label ->
+        long parsed
+        try {
+            parsed = Long.parseLong(value)
+        } catch (NumberFormatException ignored) {
+            throw new GradleException("Model pins: malformed ${label}: '${value}'")
+        }
+        if (parsed <= 0L) {
+            throw new GradleException("Model pins: ${label} must be a positive integer: '${value}'")
+        }
+        return parsed
+    }
+
+    def embedderRel = 'scripts/embedder-integrity.mjs'
+    def embedderSrc = readPinSource(embedderRel)
+    def readerRel = 'scripts/safety-reader-integrity.mjs'
+    def readerSrc = readPinSource(readerRel)
+    if (!READER_ARTIFACT_PIN_RE.matcher(readerSrc).find()) {
+        throw new GradleException("Model pins: SAFETY_READER_ARTIFACT is not 'reader_quantized.onnx' in ${readerRel}")
+    }
+    if (!(MINILM_PINNED_SIZE_BYTES instanceof Long) || MINILM_PINNED_SIZE_BYTES <= 0L) {
+        throw new GradleException("Model pins: MINILM_PINNED_SIZE_BYTES must be a positive integer")
+    }
+    return [
+        minilmRevision     : capturePin(embedderSrc, MINILM_REVISION_PIN_RE, 'PINNED_REVISION', embedderRel),
+        minilmSha256       : capturePin(embedderSrc, MINILM_SHA_PIN_RE, "'onnx/model_quantized.onnx' SHA-256", embedderRel),
+        minilmBytes        : MINILM_PINNED_SIZE_BYTES,
+        readerModelId      : capturePin(readerSrc, READER_ID_PIN_RE, 'SAFETY_READER_MODEL_ID', readerRel),
+        readerPolicyId     : capturePin(readerSrc, READER_POLICY_PIN_RE, 'SAFETY_READER_POLICY_ID', readerRel),
+        readerReleaseTag   : capturePin(readerSrc, READER_TAG_PIN_RE, 'PINNED_RELEASE_TAG', readerRel),
+        readerReleaseCommit: capturePin(readerSrc, READER_COMMIT_PIN_RE, 'PINNED_RELEASE_COMMIT', readerRel),
+        readerAssetId      : parsePositiveLong(
+            capturePin(readerSrc, READER_ASSET_ID_PIN_RE, 'PINNED_ASSET_ID', readerRel), 'PINNED_ASSET_ID'),
+        readerBytes        : parsePositiveLong(
+            capturePin(readerSrc, READER_BYTES_PIN_RE, 'KNOWN_BYTES[SAFETY_READER_ARTIFACT]', readerRel),
+            'KNOWN_BYTES[SAFETY_READER_ARTIFACT]'),
+        readerSha256       : capturePin(readerSrc, READER_SHA_PIN_RE, 'KNOWN_SHA256[SAFETY_READER_ARTIFACT]', readerRel),
+    ]
+}
+
 def qaCandidateManifestTask = tasks.register("generateQaCandidateManifest") {
     group = "verification"
     description = "Generates the non-secret QA candidate identity manifest."
@@ -351,20 +428,12 @@ def qaCandidateManifestTask = tasks.register("generateQaCandidateManifest") {
                 newFiles.add([path: rel.trim().replace('\\', '/'), sha256: sha256OfFile(f)])
             }
 
-        // Embedder supply-chain pin — single source of truth remains
-        // scripts/embedder-integrity.mjs; parsed here, never duplicated.
-        def integrityFile = new File(repoRoot, 'scripts/embedder-integrity.mjs')
-        def integritySrc = integrityFile.text
-        def pinMatcher = integritySrc =~ /PINNED_REVISION\s*=\s*'([0-9a-f]{40})'/
-        if (!pinMatcher.find()) {
-            throw new GradleException("QA candidate manifest: cannot parse PINNED_REVISION from embedder-integrity.mjs")
-        }
-        def modelRevision = pinMatcher.group(1)
-        def modelMatcher = integritySrc =~ /'onnx\/model_quantized\.onnx':\s*\n\s*'([0-9a-f]{64})'/
-        if (!modelMatcher.find()) {
-            throw new GradleException("QA candidate manifest: cannot parse pinned model SHA-256 from embedder-integrity.mjs")
-        }
-        def modelSha = modelMatcher.group(1)
+        // Embedder + safety-reader supply-chain pins — parsed once by the
+        // shared loadModelPins helper from scripts/embedder-integrity.mjs and
+        // scripts/safety-reader-integrity.mjs; never duplicated here.
+        def pins = loadModelPins()
+        def modelRevision = pins.minilmRevision
+        def modelSha = pins.minilmSha256
 
         def stagedModel = new File(repoRoot, 'packages/inference/assets/minilm/model_quantized.onnx')
         if (!stagedModel.isFile()) {
@@ -375,6 +444,33 @@ def qaCandidateManifestTask = tasks.register("generateQaCandidateManifest") {
         if (stagedModelSha != modelSha) {
             throw new GradleException(
                 "QA candidate manifest: staged model sha256 ${stagedModelSha} != ratified pin ${modelSha}; refusing to build")
+        }
+
+        def readerModelId = pins.readerModelId
+        def readerPolicyId = pins.readerPolicyId
+        def readerReleaseTag = pins.readerReleaseTag
+        def readerReleaseCommit = pins.readerReleaseCommit
+        def readerAssetId = pins.readerAssetId
+        def readerBytes = pins.readerBytes
+        def readerSha = pins.readerSha256
+
+        def materializedReader = new File(repoRoot, 'packages/inference/assets/safety-reader/reader_quantized.onnx')
+        if (!materializedReader.isFile()) {
+            throw new GradleException(
+                "QA candidate manifest: ${materializedReader} missing - run 'npm run fetch:safety-reader' before building the QA artifact")
+        }
+        if (materializedReader.length() != readerBytes || sha256OfFile(materializedReader) != readerSha) {
+            throw new GradleException(
+                "QA candidate manifest: materialized safety reader failed size/sha256 check against ${readerSha}; refusing to build")
+        }
+        def stagedAndroidReader = file('src/main/assets/safety_reader.onnx')
+        if (!stagedAndroidReader.isFile()) {
+            throw new GradleException(
+                "QA candidate manifest: ${stagedAndroidReader} missing - stage via 'node scripts/stage-native-safety-reader.mjs apps/mobile/android/app/src/main/assets/safety_reader.onnx --required'")
+        }
+        if (stagedAndroidReader.length() != readerBytes || sha256OfFile(stagedAndroidReader) != readerSha) {
+            throw new GradleException(
+                "QA candidate manifest: staged Android safety_reader.onnx failed size/sha256 check against ${readerSha}; refusing to build")
         }
 
         def rnPkg = new groovy.json.JsonSlurper()
@@ -399,7 +495,17 @@ def qaCandidateManifestTask = tasks.register("generateQaCandidateManifest") {
                 revision     : modelRevision,
                 assetPath    : 'assets/minilm.onnx',
                 sha256       : modelSha,
-                sizeBytes    : 22972370,
+                sizeBytes    : pins.minilmBytes,
+            ],
+            safetyReader        : [
+                id           : readerModelId,
+                policyId     : readerPolicyId,
+                releaseTag   : readerReleaseTag,
+                releaseCommit: readerReleaseCommit,
+                assetId      : readerAssetId,
+                assetPath    : 'assets/safety_reader.onnx',
+                sha256       : readerSha,
+                sizeBytes    : readerBytes,
             ],
             packageId           : 'com.pikemethods.training.qa',
             versionCode         : android.defaultConfig.versionCode,
@@ -455,7 +561,11 @@ dependencies {
     }
 }
 
-def verifyOnnxRuntimeArchive = { File artifact, String libraryRoot ->
+// modelAssets: list of [entry: <zip entry name>, bytes: <long>, sha256: <hex>]
+// that must each be packaged at exactly that size and SHA-256. Empty for debug
+// producers (ONNX .so pairing only). Expected pins are parameters so the
+// packaging contract can exercise the check with small synthetic fixtures.
+def verifyOnnxRuntimeArchive = { File artifact, String libraryRoot, List modelAssets = [] ->
     if (!artifact.isFile()) {
         throw new GradleException("Expected Android artifact was not produced: ${artifact}")
     }
@@ -483,6 +593,34 @@ def verifyOnnxRuntimeArchive = { File artifact, String libraryRoot ->
                 failure = "is missing ONNX Runtime native libraries: ${missingBaseEntries.join(', ')}"
             }
         }
+        if (failure == null) {
+            for (def asset : modelAssets) {
+                def modelEntry = archive.getEntry(asset.entry as String)
+                if (modelEntry == null || modelEntry.isDirectory()) {
+                    failure = "is missing pinned model asset ${asset.entry}"
+                    break
+                }
+                def digest = java.security.MessageDigest.getInstance('SHA-256')
+                long count = 0L
+                archive.getInputStream(modelEntry).withCloseable { input ->
+                    byte[] buffer = new byte[65536]
+                    int read
+                    while ((read = input.read(buffer)) != -1) {
+                        digest.update(buffer, 0, read)
+                        count += read
+                    }
+                }
+                if (count != (asset.bytes as long)) {
+                    failure = "model asset ${asset.entry} size mismatch: ${count} B, pinned ${asset.bytes} B"
+                    break
+                }
+                def actualSha = digest.digest().collect { String.format('%02x', it) }.join()
+                if (actualSha != (asset.sha256 as String)) {
+                    failure = "model asset ${asset.entry} SHA-256 mismatch: ${actualSha}, pinned ${asset.sha256}"
+                    break
+                }
+            }
+        }
     } catch (Exception error) {
         failure = "could not be inspected as a ZIP archive (${error.class.simpleName})"
     } finally {
@@ -502,13 +640,34 @@ def verifyOnnxRuntimeArchive = { File artifact, String libraryRoot ->
     logger.lifecycle("[onnx-packaging] verified ${artifact.name}")
 }
 
-def writeOnnxRuntimeFixture = { File artifact, List<String> entries ->
+// Producer-task model pins: both on-device models under the given archive
+// asset root ("assets/" for APKs, "base/assets/" for AABs), with exact size
+// and SHA-256 sourced from loadModelPins. A null root (debug producers)
+// requires no model assets.
+def pinnedModelAssets = { String modelRoot ->
+    if (modelRoot == null) {
+        return []
+    }
+    def pins = loadModelPins()
+    return [
+        [entry: modelRoot + 'minilm.onnx', bytes: pins.minilmBytes, sha256: pins.minilmSha256],
+        [entry: modelRoot + 'safety_reader.onnx', bytes: pins.readerBytes, sha256: pins.readerSha256],
+    ]
+}
+
+// Each entry is either a name (written as one zero byte) or [name, byte[]].
+def writeOnnxRuntimeFixture = { File artifact, List entries ->
     artifact.parentFile.mkdirs()
     def output = new java.util.zip.ZipOutputStream(new FileOutputStream(artifact))
     try {
-        entries.each { entryName ->
+        entries.each { spec ->
+            def entryName = spec instanceof List ? spec[0] as String : spec as String
             output.putNextEntry(new java.util.zip.ZipEntry(entryName))
-            output.write(0)
+            if (spec instanceof List) {
+                output.write(spec[1] as byte[])
+            } else {
+                output.write(0)
+            }
             output.closeEntry()
         }
     } finally {
@@ -518,7 +677,7 @@ def writeOnnxRuntimeFixture = { File artifact, List<String> entries ->
 
 def onnxPackagingContract = tasks.register("verifyOnnxRuntimePackagingContract") {
     group = "verification"
-    description = "Exercises APK/AAB ONNX native-library pairing and rejection behavior."
+    description = "Exercises APK/AAB ONNX native-library pairing, pinned model-asset size/SHA-256, and rejection behavior."
     outputs.upToDateWhen { false }
     doLast {
         def fixtureDir = layout.buildDirectory.dir("tmp/onnx-packaging-contract").get().asFile
@@ -569,6 +728,82 @@ def onnxPackagingContract = tasks.register("verifyOnnxRuntimePackagingContract")
         if (!corruptRejected || corruptArtifact.exists()) {
             throw new GradleException("ONNX packaging contract failed to reject and remove corrupt.aab")
         }
+
+        // Pinned model-asset enforcement. Small synthetic fixtures with
+        // injected expected size/SHA-256 stand in for the real models.
+        byte[] minilmFixture = "minilm-fixture".getBytes('UTF-8')
+        byte[] readerFixture = "safety-reader-fixture".getBytes('UTF-8')
+        def fixtureModelAssets = { String root ->
+            [
+                [entry: root + 'minilm.onnx', bytes: (long) minilmFixture.length, sha256: sha256Hex(minilmFixture)],
+                [entry: root + 'safety_reader.onnx', bytes: (long) readerFixture.length, sha256: sha256Hex(readerFixture)],
+            ]
+        }
+        byte[] minilmCorrupt = minilmFixture.clone()
+        minilmCorrupt[0] = (byte) (minilmCorrupt[0] ^ 0xff)
+        byte[] readerCorrupt = readerFixture.clone()
+        readerCorrupt[readerCorrupt.length - 1] = (byte) (readerCorrupt[readerCorrupt.length - 1] ^ 0xff)
+        byte[] readerTruncated = java.util.Arrays.copyOf(readerFixture, readerFixture.length - 1)
+        def apkLibs = ["lib/arm64-v8a/libonnxruntimejsi.so", "lib/arm64-v8a/libonnxruntime.so"]
+        def aabLibs = ["base/lib/arm64-v8a/libonnxruntimejsi.so", "base/lib/arm64-v8a/libonnxruntime.so"]
+
+        def modelApk = new File(fixtureDir, "models.apk")
+        writeOnnxRuntimeFixture(modelApk, apkLibs
+            + [["assets/minilm.onnx", minilmFixture], ["assets/safety_reader.onnx", readerFixture]])
+        verifyOnnxRuntimeArchive(modelApk, "lib/", fixtureModelAssets("assets/"))
+        def modelBundle = new File(fixtureDir, "models.aab")
+        writeOnnxRuntimeFixture(modelBundle, aabLibs
+            + [["base/assets/minilm.onnx", minilmFixture], ["base/assets/safety_reader.onnx", readerFixture]])
+        verifyOnnxRuntimeArchive(modelBundle, "base/lib/", fixtureModelAssets("base/assets/"))
+        if (!modelApk.isFile() || !modelBundle.isFile()) {
+            throw new GradleException("ONNX packaging contract removed a valid pinned-model fixture")
+        }
+
+        [
+            [new File(fixtureDir, "missing-minilm.apk"), apkLibs
+                + [["assets/safety_reader.onnx", readerFixture]],
+                "lib/", "assets/", "missing pinned model asset assets/minilm.onnx"],
+            [new File(fixtureDir, "missing-reader.aab"), aabLibs
+                + [["base/assets/minilm.onnx", minilmFixture]],
+                "base/lib/", "base/assets/", "missing pinned model asset base/assets/safety_reader.onnx"],
+            [new File(fixtureDir, "misrooted-models.aab"), aabLibs
+                + [["assets/minilm.onnx", minilmFixture], ["assets/safety_reader.onnx", readerFixture]],
+                "base/lib/", "base/assets/", "missing pinned model asset base/assets/minilm.onnx"],
+            [new File(fixtureDir, "corrupt-minilm.apk"), apkLibs
+                + [["assets/minilm.onnx", minilmCorrupt], ["assets/safety_reader.onnx", readerFixture]],
+                "lib/", "assets/", "model asset assets/minilm.onnx SHA-256 mismatch"],
+            [new File(fixtureDir, "corrupt-reader.aab"), aabLibs
+                + [["base/assets/minilm.onnx", minilmFixture], ["base/assets/safety_reader.onnx", readerCorrupt]],
+                "base/lib/", "base/assets/", "model asset base/assets/safety_reader.onnx SHA-256 mismatch"],
+            [new File(fixtureDir, "truncated-reader.apk"), apkLibs
+                + [["assets/minilm.onnx", minilmFixture], ["assets/safety_reader.onnx", readerTruncated]],
+                "lib/", "assets/", "model asset assets/safety_reader.onnx size mismatch"],
+        ].each { fixture ->
+            def rejectedArtifact = fixture[0] as File
+            writeOnnxRuntimeFixture(rejectedArtifact, fixture[1] as List)
+            def rejectionMessage = null
+            try {
+                verifyOnnxRuntimeArchive(rejectedArtifact, fixture[2] as String, fixtureModelAssets(fixture[3] as String))
+            } catch (GradleException expected) {
+                rejectionMessage = expected.message
+            }
+            if (rejectionMessage == null || !rejectionMessage.contains(fixture[4] as String)
+                    || rejectedArtifact.exists()) {
+                throw new GradleException(
+                    "ONNX packaging contract failed to reject and remove ${rejectedArtifact.name} for '${fixture[4]}' (got: ${rejectionMessage})"
+                )
+            }
+        }
+
+        // Debug producers stay .so-pairing only; release/QA producers resolve
+        // both pins from the integrity sources.
+        if (!pinnedModelAssets(null).isEmpty()) {
+            throw new GradleException("ONNX packaging contract: debug producers must not require model assets")
+        }
+        def releaseAssets = pinnedModelAssets("base/assets/")
+        if (releaseAssets*.entry != ["base/assets/minilm.onnx", "base/assets/safety_reader.onnx"]) {
+            throw new GradleException("ONNX packaging contract: unexpected pinned model entries ${releaseAssets*.entry}")
+        }
     }
 }
 
@@ -577,12 +812,15 @@ def onnxPackagingContract = tasks.register("verifyOnnxRuntimePackagingContract")
 // package, installDebug/run-android, and direct producer-task invocations.
 // Force the small packaging step to execute so an old unverified artifact can
 // never be reused solely because Gradle considered the task up to date.
+// Third element: archive asset root whose minilm.onnx and safety_reader.onnx
+// must match the pinned size and SHA-256 (signed release and QA producers);
+// null keeps debug producers on .so pairing only.
 def onnxArtifactTasks = [
-    packageDebug: ["outputs/apk/debug/app-debug.apk", "lib/"],
-    packageQa: ["outputs/apk/qa/app-qa.apk", "lib/"],
-    packageRelease: ["outputs/apk/release/app-release.apk", "lib/"],
-    signDebugBundle: ["outputs/bundle/debug/app-debug.aab", "base/lib/"],
-    signReleaseBundle: ["outputs/bundle/release/app-release.aab", "base/lib/"],
+    packageDebug: ["outputs/apk/debug/app-debug.apk", "lib/", null],
+    packageQa: ["outputs/apk/qa/app-qa.apk", "lib/", "assets/"],
+    packageRelease: ["outputs/apk/release/app-release.apk", "lib/", "assets/"],
+    signDebugBundle: ["outputs/bundle/debug/app-debug.aab", "base/lib/", null],
+    signReleaseBundle: ["outputs/bundle/release/app-release.aab", "base/lib/", "base/assets/"],
 ]
 
 tasks.configureEach { task ->
@@ -592,7 +830,7 @@ tasks.configureEach { task ->
         task.outputs.upToDateWhen { false }
         task.doLast {
             def artifact = layout.buildDirectory.file(artifactSpec[0]).get().asFile
-            verifyOnnxRuntimeArchive(artifact, artifactSpec[1])
+            verifyOnnxRuntimeArchive(artifact, artifactSpec[1], pinnedModelAssets(artifactSpec[2]))
         }
     }
 }

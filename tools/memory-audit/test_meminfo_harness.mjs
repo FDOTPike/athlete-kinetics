@@ -142,6 +142,82 @@ mock.module('node:child_process', { namedExports: { execFileSync: (_cmd, args) =
   assert.notEqual(badLabel.status, 0);
   assert.match(badLabel.stderr, /Sample label must be a filename-safe name/);
   console.log(`  [${++checks}] PASS path separators in sample labels are refused`);
+
+  // --- finish fails closed unless BOTH models correlate, serially and cleanly ---
+  const finishCase = (name, logBodies) => {
+    const dir = join(root, `finish-${name}`);
+    mkdirSync(dir, { mode: 0o700 });
+    const t0 = Date.UTC(2026, 7, 24, 3, 0, 0, 0);
+    const samples = [];
+    for (let i = 0; i < 12; i += 1) {
+      const rawFile = join(dir, `sample-${String(i + 1).padStart(3, '0')}-window.txt`);
+      writeFileSync(rawFile, '** MEMINFO in pid 4242 [com.pikemethods.training.qa] **\n'
+        + '                   Pss  Private  Private  SwapPss      Rss\n'
+        + '                 Total    Dirty    Clean    Dirty    Total\n'
+        + `        TOTAL   100000    ${90000 + i}        0        0    100000\n`);
+      const at = t0 + i * 200;
+      samples.push({ appName: 'com.pikemethods.training.qa', processId: 4242, seq: i + 1, label: 'window',
+        captureStartMs: at, captureEndMs: at + 10, captureDurationMs: 10, atUtc: new Date(at).toISOString(),
+        rawFile, privateDirtyBytes: (90000 + i) * 1024 });
+    }
+    writeFileSync(join(dir, 'session.json'), JSON.stringify({ startedAtUtc: new Date(t0).toISOString(),
+      package: 'com.pikemethods.training.qa', deviceUtcOffsetMinutes: 0, requestedIntervalMs: 200, samples }));
+    const stamp = (ms) => `${Math.floor(ms / 1000)}.${String(ms % 1000).padStart(3, '0')}`;
+    const logFile = join(root, `finish-${name}-logcat.txt`);
+    writeFileSync(logFile, logBodies.map(([dt, tag, body]) =>
+      `${stamp(t0 + dt)}  4242 4243 I ReactNativeJS: [${tag}-lifecycle] ${body}`).join('\n'));
+    const result = run(['finish'], dir, { AK_LOGCAT_FILE: logFile });
+    return { result, dir };
+  };
+  const lifecycle = (tag, req, created, s0) => [
+    [s0, tag, `session:start req=${req} ok=1 created=${created} disposed=${created}`],
+    [s0 + 50, tag, `session:settled req=${req} ok=1 created=${created + 1} disposed=${created}`],
+    [s0 + 50, tag, `inference:start req=${req} ok=1 created=${created + 1} disposed=${created}`],
+    [s0 + 100, tag, `inference:settled req=${req} ok=1 created=${created + 1} disposed=${created}`],
+    [s0 + 100, tag, `disposal:start req=${req} ok=1 created=${created + 1} disposed=${created}`],
+    [s0 + 150, tag, `disposal:settled req=${req} ok=1 created=${created + 1} disposed=${created + 1}`],
+    [s0 + 150, tag, `request=${req} ok=1 totalMs=150`],
+  ];
+  const wrappersAt = (dt) => [
+    [dt, 'embedder', 'wrapper:settled req=0 ok=1 created=0 disposed=0'],
+    [dt + 10, 'safety-reader', 'wrapper:settled req=0 ok=1 created=0 disposed=0'],
+  ];
+
+  const dual = finishCase('dual', [...wrappersAt(100), ...lifecycle('embedder', 1, 0, 500), ...lifecycle('safety-reader', 1, 0, 1000)]);
+  assert.equal(dual.result.status, 0, dual.result.stderr);
+  const dualSummary = JSON.parse(readFileSync(join(dual.dir, 'session.json'), 'utf8')).summary;
+  assert.deepEqual(dualSummary.lifecycle.componentRequestCounts, { embedder: 1, 'safety-reader': 1 });
+  assert.equal(dualSummary.lifecycle.sessionOverlapCount, 0);
+  assert.deepEqual(dualSummary.lifecycle.sampledProcessIds, [4242]);
+  assert.deepEqual(dualSummary.lifecycle.correlatedRequests.map((q) => [q.component, q.requestId, q.pid, q.wrapperEpoch]),
+    [['embedder', 1, 4242, 1], ['safety-reader', 1, 4242, 1]]);
+  assert.equal(dualSummary.lifecycle.unresolvedSessionCount, 0);
+  const proofs = dualSummary.lifecycle.disposalProof;
+  assert.equal(proofs.length, 2);
+  assert.deepEqual(proofs.map((d) => [d.component, d.pid, d.wrapperEpoch, d.createdSessionWasDisposed]),
+    [['embedder', 4242, 1, true], ['safety-reader', 4242, 1, true]]);
+  assert.deepEqual(dualSummary.sampling.continuousSegments.map((s) => s.pid), [4242]);
+  console.log(`  [${++checks}] PASS finish accepts a serial dual-model run and records component/PID identity`);
+
+  const single = finishCase('embedder-only', [...wrappersAt(100), ...lifecycle('embedder', 1, 0, 500)]);
+  assert.notEqual(single.result.status, 0, 'single-model run must fail finish');
+  assert.match(single.result.stderr, /safety-reader=0/);
+  const readerOnly = finishCase('reader-only', [...wrappersAt(100), ...lifecycle('safety-reader', 1, 0, 500)]);
+  assert.notEqual(readerOnly.result.status, 0, 'single-model run must fail finish');
+  assert.match(readerOnly.result.stderr, /embedder=0/);
+  console.log(`  [${++checks}] PASS finish fails closed on a single-model (embedder-only or safety-reader-only) run`);
+
+  const overlap = finishCase('overlap', [...wrappersAt(100), ...lifecycle('embedder', 1, 0, 500),
+    ...lifecycle('safety-reader', 1, 0, 600), ...lifecycle('embedder', 2, 1, 1200), ...lifecycle('safety-reader', 2, 1, 1500)]);
+  assert.notEqual(overlap.result.status, 0, 'overlapping sessions must fail finish');
+  assert.match(overlap.result.stderr, /sessionOverlapCount=1/);
+  console.log(`  [${++checks}] PASS finish fails closed when two sessions overlap in one process`);
+
+  const dangling = finishCase('unbalanced', [...wrappersAt(100), ...lifecycle('embedder', 1, 0, 500),
+    ...lifecycle('safety-reader', 1, 0, 1000), ...lifecycle('embedder', 2, 1, 1500).slice(0, 2)]);
+  assert.notEqual(dangling.result.status, 0, 'unbalanced counters must fail finish');
+  assert.match(dangling.result.stderr, /countersBalanced=false/);
+  console.log(`  [${++checks}] PASS finish fails closed when created/disposed counters do not balance`);
 } finally {
   rmSync(root, { recursive: true, force: true });
 }

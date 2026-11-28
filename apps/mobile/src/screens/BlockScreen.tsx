@@ -13,6 +13,7 @@ import {
   applyLoadModifier,
   applyPrescriptionToSlot,
   isPrescriptionReduced,
+  scanRedFlags,
   sportDisplayName,
   sportPeakingFallbackCopy,
   sportPeakingMovementsFor,
@@ -47,7 +48,7 @@ import { EMPTY_ACTIVITY_LEDGER } from '../state/activityStore';
 import { sessionFocusName } from '../state/sessionSummary';
 import { HALT_NEXT_TEXT, HALT_PAUSE_CARD_TEXT, HALT_TODAY_TEXT } from '../state/haltCopy';
 import { operativeReportLine } from '../state/operativeReportLine';
-import { reportEffectText, reportEntryName } from '../state/reportCopy';
+import { notedReportShowsCue, reportEffectText, reportEntryName } from '../state/reportCopy';
 import { SafetyReportView } from '../components/SafetyReportView';
 import { isSessionReportStop, SESSION_REPORT_STOP_SENTENCE } from '../state/sessionReportStop';
 import {
@@ -362,6 +363,11 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
   const [reportText, setReportText] = useState('');
   const [reportSeverity, setReportSeverity] = useState<number | null>(null);
   const [reportNotSent, setReportNotSent] = useState(false);
+  const [reportActiveKeys, setReportActiveKeys] = useState<string[]>([]);
+  const submitEpochRef = useRef(0);
+  const draftRevisionRef = useRef(0);
+  const reportInFlightCount = useRef(0);
+  const reportInFlightKeyCounts = useRef<Map<string, number>>(new Map());
   const [schema, setSchema] = useState<SchemaType>('LINEAR');
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [attributionSlotId, setAttributionSlotId] = useState<number | null>(null);
@@ -1738,7 +1744,8 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
               {/* The reply to a report sits ABOVE the form, so it is in view
                   after Apply (#207). It says, in this order: what the report
                   matched, what changed today with the applied figures (after the
-                  severity gate and the experience scaling), then the entry's cue. */}
+                  severity gate and the experience scaling), then the cue. Noted
+                  replies omit cues from restrictive entries that were gated off. */}
               {lastTriage !== null && lastTriage.kind === 'positive' && (
                 <View style={styles.reportResult} testID="report-result-noted">
                   <View style={styles.statusBadge}>
@@ -1748,7 +1755,9 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                     <Text style={styles.captionText}>{`Matched: ${reportEntryName(lastTriage.entryId)}`}</Text>
                   )}
                   <Text style={styles.bodyText}>Today's plan is unchanged.</Text>
-                  <Text style={styles.captionText}>{lastTriage.cue}</Text>
+                  {notedReportShowsCue(lastTriage.entryId) && (
+                    <Text style={styles.captionText}>{lastTriage.cue}</Text>
+                  )}
                 </View>
               )}
               {lastTriage !== null && lastTriage.kind === 'rejected' && (
@@ -1789,7 +1798,10 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                 disableFullscreenUI
                 style={styles.reportInput}
                 value={reportText}
-                onChangeText={setReportText}
+                onChangeText={(value) => {
+                  if (value !== reportText) draftRevisionRef.current += 1;
+                  setReportText(value);
+                }}
                 placeholder="For example: my knee feels sore when I squat"
                 placeholderTextColor={theme.color.textLow}
                 maxLength={500}
@@ -1803,7 +1815,10 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                   return (
                     <Pressable
                       key={severity}
-                      onPress={() => setReportSeverity(severity)}
+                      onPress={() => {
+                        if (severity !== reportSeverity) draftRevisionRef.current += 1;
+                        setReportSeverity(severity);
+                      }}
                       accessibilityRole="button"
                       accessibilityState={{ selected }}
                       accessibilityLabel={`Severity ${severity} of 10`}
@@ -1817,27 +1832,74 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                   );
                 })}
               </View>
-              <PrimaryButton
-                label={triaging ? 'Checking report' : 'Apply report'}
-                disabled={reportText.trim().length === 0 || reportSeverity === null || triaging}
-                onPress={() => {
-                  if (reportSeverity === null) return;
-                  setReportNotSent(false);
-                  // The text and severity clear only once the store has stored the report.
-                  // Anything else keeps them on screen and says so, so nothing typed is lost.
-                  void reportSubjective(reportText, reportSeverity).then((stored) => {
-                    if (!stored) { setReportNotSent(true); return; }
-                    setReportText('');
-                    setReportSeverity(null);
-                    // Bring the reply (above the form) into view (#207).
-                    scrollRef.current?.scrollTo({
-                      y: Math.max(0, disclosuresSectionY.current + reportDisclosureOffsetY.current - theme.space[4]),
-                      animated: true,
-                    });
-                  }, () => { setReportNotSent(true); });
-                }}
-                accessibilityLabel={triaging ? 'Checking report' : 'Apply report'}
-              />
+              {(() => {
+                const trimmedReport = reportText.trim();
+                const keywordHaltReady = trimmedReport.length > 0 && scanRedFlags(trimmedReport).systemic;
+                const submitKey = reportSeverity !== null ? `${trimmedReport}\n${reportSeverity}` : null;
+                const keyInFlight =
+                  submitKey !== null
+                  && (reportActiveKeys.includes(submitKey)
+                    || (reportInFlightKeyCounts.current.get(submitKey) ?? 0) > 0);
+                const reportBusy =
+                  (triaging || reportActiveKeys.length > 0) && (!keywordHaltReady || keyInFlight);
+                return (
+                  <PrimaryButton
+                    label={reportBusy ? 'Checking report' : 'Apply report'}
+                    disabled={trimmedReport.length === 0 || reportSeverity === null || reportBusy}
+                    onPress={() => {
+                      if (trimmedReport.length === 0 || reportSeverity === null || submitKey === null) return;
+                      const busyNow = triaging || reportActiveKeys.length > 0 || reportInFlightCount.current > 0;
+                      const thisKeyBusy = (reportInFlightKeyCounts.current.get(submitKey) ?? 0) > 0;
+                      if (busyNow && (!keywordHaltReady || thisKeyBusy)) return;
+                      const myEpoch = ++submitEpochRef.current;
+                      const submittedDraftRevision = draftRevisionRef.current;
+                      reportInFlightCount.current += 1;
+                      reportInFlightKeyCounts.current.set(
+                        submitKey,
+                        (reportInFlightKeyCounts.current.get(submitKey) ?? 0) + 1,
+                      );
+                      setReportActiveKeys([...reportInFlightKeyCounts.current.keys()]);
+                      let didSettle = false;
+                      const settled = (): void => {
+                        if (didSettle) return;
+                        didSettle = true;
+                        reportInFlightCount.current = Math.max(0, reportInFlightCount.current - 1);
+                        const nextForKey = (reportInFlightKeyCounts.current.get(submitKey) ?? 1) - 1;
+                        if (nextForKey <= 0) reportInFlightKeyCounts.current.delete(submitKey);
+                        else reportInFlightKeyCounts.current.set(submitKey, nextForKey);
+                        setReportActiveKeys([...reportInFlightKeyCounts.current.keys()]);
+                      };
+                      setReportNotSent(false);
+                      // The text and severity clear only once the store has stored the report.
+                      // Anything else keeps them on screen and says so, so nothing typed is lost.
+                      try {
+                        void reportSubjective(reportText, reportSeverity).then((stored) => {
+                          settled();
+                          if (submitEpochRef.current !== myEpoch) return;
+                          if (stored !== true) { setReportNotSent(true); return; }
+                          if (draftRevisionRef.current === submittedDraftRevision) {
+                            setReportText('');
+                            setReportSeverity(null);
+                          }
+                          // Bring the reply (above the form) into view (#207).
+                          scrollRef.current?.scrollTo({
+                            y: Math.max(0, disclosuresSectionY.current + reportDisclosureOffsetY.current - theme.space[4]),
+                            animated: true,
+                          });
+                        }, () => {
+                          settled();
+                          if (submitEpochRef.current !== myEpoch) return;
+                          setReportNotSent(true);
+                        });
+                      } catch {
+                        settled();
+                        if (submitEpochRef.current === myEpoch) setReportNotSent(true);
+                      }
+                    }}
+                    accessibilityLabel={reportBusy ? 'Checking report' : 'Apply report'}
+                  />
+                );
+              })()}
               {reportNotSent && (
                 <Text style={styles.captionText} accessibilityRole="alert" testID="plan-report-not-sent">
                   {REPORT_NOT_SENT_TEXT}

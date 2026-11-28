@@ -146,6 +146,18 @@ jobs:
           npm run fetch:embedder
           node scripts/stage-native-embedder.mjs \
             apps/mobile/android/app/src/main/assets/minilm.onnx --required
+      - name: Cache safety reader model
+        uses: actions/cache@v5
+        with:
+          path: node_modules/.cache/ak-safety-reader
+          key: safety-reader-${{ hashFiles('scripts/safety-reader-integrity.mjs') }}
+      - name: Stage safety reader model into Android assets
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          npm run fetch:safety-reader
+          node scripts/stage-native-safety-reader.mjs \
+            apps/mobile/android/app/src/main/assets/safety_reader.onnx --required
       # This artifact is deliberately DEBUG-signed for local device QA. Play
       # release artifacts require the external upload key documented in
       # docs/PRE_RELEASE_ANDROID.md and are never signed with this key.
@@ -245,6 +257,15 @@ jobs:
       - name: Pin npm 11.16.0 (install-script policy)
         run: npm install -g npm@11.16.0 && npm --version
       - run: npm ci
+      - name: Cache safety reader model
+        uses: actions/cache@v5
+        with:
+          path: node_modules/.cache/ak-safety-reader
+          key: safety-reader-${{ hashFiles('scripts/safety-reader-integrity.mjs') }}
+      - name: Fetch safety reader assets
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: npm run fetch:safety-reader
       # Same pin-bound cache and byte-verified fetch as the Android job.
       - name: Cache embedding model
         uses: actions/cache@v5
@@ -344,6 +365,9 @@ jobs:
           node tools/inspect_ios_app.mjs \
             apps/mobile/ios/build/Build/Products/Release-iphonesimulator/AthleteKinetics.app \
             ios-evidence/xcodebuild.log ios-evidence/app-inspection.json
+          node tools/inspect_ios_safety_reader.mjs \
+            apps/mobile/ios/build/Build/Products/Release-iphonesimulator/AthleteKinetics.app \
+            ios-evidence/safety-reader-inspection.json
       - name: Simulator native smoke (fails closed)
         run: |
           tools/ios_simulator_smoke.sh \

@@ -167,6 +167,25 @@ describe('Plan screen "Something feels off": a report the store does not take is
   });
 });
 
+test.each([
+  ['text', 'feeling dizzy', 3],
+  ['severity', 'knee sore', 8],
+])('a successful pending report preserves a later %s edit', async (edit, text, severity) => {
+  let resolveReport;
+  const pending = new Promise((resolve) => { resolveReport = resolve; });
+  const reportSubjective = jest.fn(() => pending);
+  mockState = baseState({ reportSubjective });
+  render(<BlockScreen />);
+  await applyReport('knee sore', 3);
+  expect(reportSubjective).toHaveBeenCalledWith('knee sore', 3);
+  const input = () => screen.getByLabelText('Describe how your body feels today');
+  if (edit === 'text') fireEvent.changeText(input(), text);
+  else fireEvent.press(screen.getByLabelText(`Severity ${severity} of 10`));
+  await act(async () => { resolveReport(true); });
+  expect(input().props.value).toBe(text);
+  expect(screen.getByLabelText(`Severity ${severity} of 10`)).toBeSelected();
+});
+
 describe('Plan screen "Something feels off": a report the store takes clears as before', () => {
   test('when reportSubjective resolves true, the text and severity clear and no not-sent line shows', async () => {
     mockState = baseState({ reportSubjective: jest.fn(() => Promise.resolve(true)) });

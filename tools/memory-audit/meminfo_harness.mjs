@@ -45,8 +45,12 @@ import {
   parseLifecycleMarkers,
   summarizeMemory,
 } from './lifecycle_correlator.mjs';
-import { computeEvidenceBinding, LOGCAT_FILENAME } from './evidence_provenance.mjs';
-import { PREFERRED_TARGET_BYTES, RATIFIED_CEILING_BYTES } from './memory_gate.mjs';
+import { CANDIDATE_MANIFEST_FILENAME, computeEvidenceBinding, LOGCAT_FILENAME } from './evidence_provenance.mjs';
+import {
+  checkCandidateManifestSafetyReader,
+  PREFERRED_TARGET_BYTES,
+  RATIFIED_CEILING_BYTES,
+} from './memory_gate.mjs';
 
 // The QA variant's real application id (android/app/build.gradle:
 // applicationId com.pikemethods.training + applicationIdSuffix ".qa").
@@ -317,7 +321,7 @@ function cmdFinish() {
   ({ markers, segments } = bindTargetSamples({ samples: processSamples, markers, segments, packageName: session.package }));
 
   // --- correlation ------------------------------------------------------------
-  const { qualified, rejected, disposalIntegrity } = correlateRequests({ markers, segments });
+  const { qualified, rejected, componentRequestCounts, disposalIntegrity } = correlateRequests({ markers, segments });
   if (qualified.length === 0) {
     writeEvidence(join(evidenceRoot(), 'correlation-rejections.json'),
       JSON.stringify({ rejected, undatedCount: undated.length, malformed }, null, 2));
@@ -329,6 +333,31 @@ function cmdFinish() {
       + 'counters proving the created session was disposed, inside one continuous segment. '
       + 'See correlation-rejections.json.',
     );
+  }
+  // Both production models must be proven, serially, with clean disposal.
+  // Any one of these failing means the packet cannot attribute memory to a
+  // single live native session, so finish refuses to write a summary.
+  const contractViolations = [];
+  if (!(componentRequestCounts.embedder >= 1) || !(componentRequestCounts['safety-reader'] >= 1)) {
+    contractViolations.push(`componentRequestCounts embedder=${componentRequestCounts.embedder}, `
+      + `safety-reader=${componentRequestCounts['safety-reader']} (each must be >= 1)`);
+  }
+  if (disposalIntegrity.sessionOverlapCount !== 0) {
+    contractViolations.push(`sessionOverlapCount=${disposalIntegrity.sessionOverlapCount} (must be 0)`);
+  }
+  if (disposalIntegrity.unresolvedSessionCount !== 0) {
+    contractViolations.push(`unresolvedSessionCount=${disposalIntegrity.unresolvedSessionCount} (must be 0)`);
+  }
+  if (disposalIntegrity.clean !== true || disposalIntegrity.disposalFailureCount !== 0
+      || disposalIntegrity.countersBalanced !== true) {
+    contractViolations.push(`disposalFailureCount=${disposalIntegrity.disposalFailureCount}, `
+      + `countersBalanced=${disposalIntegrity.countersBalanced} (disposal integrity must be clean)`);
+  }
+  if (contractViolations.length > 0) {
+    writeEvidence(join(evidenceRoot(), 'correlation-rejections.json'),
+      JSON.stringify({ rejected, undatedCount: undated.length, malformed, disposalIntegrity, componentRequestCounts }, null, 2));
+    throw new Error(`Lifecycle evidence fails the dual-model serial-disposal contract: ${contractViolations.join('; ')}. `
+      + 'See correlation-rejections.json.');
   }
 
   // --- memory attribution -----------------------------------------------------
@@ -365,6 +394,7 @@ function cmdFinish() {
       continuityGapMs,
       continuousSegments: segments.map((s) => ({
         index: s.index,
+        pid: s.pid ?? null,
         startUtc: new Date(s.startMs).toISOString(),
         endUtc: new Date(s.endMs).toISOString(),
         spanMs: s.spanMs,
@@ -378,9 +408,16 @@ function cmdFinish() {
       malformedMarkerCount: malformed.length,
       correlatedRequestIds: qualified.map((q) => q.requestId),
       correlatedRequestCount: qualified.length,
+      // Both production models must be proven: one count per component.
+      componentRequestCounts,
+      // Serial non-overlap across components inside one process.
+      sessionOverlapCount: disposalIntegrity.sessionOverlapCount,
+      unresolvedSessionCount: disposalIntegrity.unresolvedSessionCount,
+      // Every PID the raw dumps identified, in sampling order (cold restarts included).
+      sampledProcessIds: [...new Set(processSamples.map((s) => s.processId))],
       // Process identity is part of the proof: request ids restart per wrapper.
       correlatedRequests: qualified.map((q) => ({
-        requestId: q.requestId, pid: q.pid, wrapperEpoch: q.wrapperEpoch, totalMs: q.totalMs,
+        component: q.component, requestId: q.requestId, pid: q.pid, wrapperEpoch: q.wrapperEpoch, totalMs: q.totalMs,
       })),
       processIds: [...new Set(qualified.map((q) => q.pid))],
       // Session-wide, independent of which requests qualified. A disposal that
@@ -388,6 +425,9 @@ function cmdFinish() {
       disposalIntegrity,
       rejectedRequests: rejected,
       disposalProof: qualified.map((q) => ({
+        component: q.component,
+        pid: q.pid,
+        wrapperEpoch: q.wrapperEpoch,
         requestId: q.requestId,
         createdIndex: q.createdIndex,
         disposedIndex: q.disposedIndex,
@@ -438,6 +478,15 @@ function cmdFinish() {
   // this, a hand-written summary satisfied gate [D] — and because the ratified
   // review band makes [A] depend on [D], one fabricated file turned the whole
   // memory gate green with no device data at all.
+  const candidateManifestPath = join(evidenceRoot(), CANDIDATE_MANIFEST_FILENAME);
+  if (existsSync(candidateManifestPath)) {
+    const parsedCandidate = JSON.parse(readFileSync(candidateManifestPath, 'utf-8'));
+    const candidateProblems = checkCandidateManifestSafetyReader(parsedCandidate);
+    if (candidateProblems.length > 0) {
+      throw new Error(`Invalid ${CANDIDATE_MANIFEST_FILENAME}: ${candidateProblems.join('; ')}`);
+    }
+    summary.candidateManifest = parsedCandidate;
+  }
   summary.evidenceBinding = computeEvidenceBinding({ evidenceDir: evidenceRoot(), session });
   console.log(`[harness] evidence binding: ${summary.evidenceBinding.fileCount} raw input(s), `
     + `digest ${summary.evidenceBinding.bindingDigest}`);

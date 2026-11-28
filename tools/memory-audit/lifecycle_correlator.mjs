@@ -38,6 +38,7 @@
  */
 
 export const LIFECYCLE_TAG = '[embedder-lifecycle]';
+export const SAFETY_READER_LIFECYCLE_TAG = '[safety-reader-lifecycle]';
 
 /** requestId reserved by the wrapper's own creation event. Never a real
  *  inference — see createLazySingleFlightEmbedder's `emit('wrapper',...,0,...)`. */
@@ -141,11 +142,11 @@ export function parseLogcatProcess(line) {
 // --- marker parsing ---------------------------------------------------------
 
 const PHASE_RE = new RegExp(
-  String.raw`\[embedder-lifecycle\]\s+(wrapper|request|session|inference|disposal):(start|settled)`
+  String.raw`\[(embedder|safety-reader)-lifecycle\]\s+(wrapper|request|session|inference|disposal):(start|settled)`
   + String.raw`\s+req=(\d+)\s+ok=(\d+)\s+created=(\d+)\s+disposed=(\d+)`,
 );
 const COMPLETION_RE = new RegExp(
-  String.raw`\[embedder-lifecycle\]\s+request=(\d+)\s+ok=(\d+)\s+totalMs=(-?\d+(?:\.\d+)?)`,
+  String.raw`\[(embedder|safety-reader)-lifecycle\]\s+request=(\d+)\s+ok=(\d+)\s+totalMs=(-?\d+(?:\.\d+)?)`,
 );
 
 /**
@@ -164,7 +165,7 @@ export function parseLifecycleMarkers(logText, opts = {}) {
   const lines = String(logText ?? '').split(/\r?\n/);
 
   lines.forEach((raw, i) => {
-    if (!raw.includes(LIFECYCLE_TAG)) return;
+    if (!raw.includes(LIFECYCLE_TAG) && !raw.includes(SAFETY_READER_LIFECYCLE_TAG)) return;
     const lineNo = i + 1;
     const ts = parseLogcatTimestamp(raw, opts);
 
@@ -174,25 +175,27 @@ export function parseLifecycleMarkers(logText, opts = {}) {
 
     if (phase) {
       marker = {
+        component: phase[1],
         kind: 'phase',
-        phase: phase[1],
-        stage: phase[2],
-        requestId: Number(phase[3]),
-        ok: Number(phase[4]) === 1,
-        created: Number(phase[5]),
-        disposed: Number(phase[6]),
+        phase: phase[2],
+        stage: phase[3],
+        requestId: Number(phase[4]),
+        ok: Number(phase[5]) === 1,
+        created: Number(phase[6]),
+        disposed: Number(phase[7]),
         totalMs: null,
       };
     } else if (completion) {
       marker = {
+        component: completion[1],
         kind: 'completion',
         phase: 'request',
         stage: 'completion',
-        requestId: Number(completion[1]),
-        ok: Number(completion[2]) === 1,
+        requestId: Number(completion[2]),
+        ok: Number(completion[3]) === 1,
         created: null,
         disposed: null,
-        totalMs: Number(completion[3]),
+        totalMs: Number(completion[4]),
       };
     } else {
       malformed.push({ lineNo, raw, reason: 'lifecycle tag present but marker grammar unrecognised' });
@@ -205,12 +208,13 @@ export function parseLifecycleMarkers(logText, opts = {}) {
     else undated.push({ ...record, reason: ts.reason });
   });
 
-  // Stamp a wrapper epoch per process. Every `wrapper:settled` marker announces
-  // a FRESH wrapper whose request counter restarts at 1, so markers before and
-  // after it must never be pooled even within one process.
+  // Stamp a wrapper epoch per (process, component). Every `wrapper:settled`
+  // marker announces a FRESH wrapper for that component whose request counter
+  // restarts at 1, without colliding across co-scheduled embedder + safety-reader
+  // wrappers inside the same process.
   const epochByPid = new Map();
   for (const m of markers) {
-    const key = String(m.pid);
+    const key = `${m.pid}|${m.component ?? 'embedder'}`;
     if (m.phase === 'wrapper') epochByPid.set(key, (epochByPid.get(key) ?? 0) + 1);
     m.wrapperEpoch = epochByPid.get(key) ?? 0;
   }
@@ -223,32 +227,141 @@ export function parseLifecycleMarkers(logText, opts = {}) {
  *
  * `disposedTotal` increments even when disposal THROWS (see
  * createLazySingleFlightEmbedder's catch block), so counter equality alone can
- * never prove nothing leaked. The only honest signal is an explicit
- * `disposal:settled ... ok=0`. A failed disposal is a leaked native session and
- * must be visible even when the failing request is itself rejected and a later
- * request succeeds cleanly.
+ * never prove every session was disposed. A failed disposal must remain
+ * visible even when that request is rejected and a later request succeeds.
+ * A session with no successful settlement also prevents clean evidence.
  */
 export function summarizeDisposalIntegrity(markers) {
   const failures = markers
     .filter((m) => m.phase === 'disposal' && m.stage === 'settled' && m.ok === false)
     .map((m) => ({
+      component: m.component ?? 'embedder',
       pid: m.pid, wrapperEpoch: m.wrapperEpoch, requestId: m.requestId,
       tsMs: m.tsMs, created: m.created, disposed: m.disposed, raw: m.raw,
     }));
-  const settled = markers.filter((m) => m.phase === 'disposal' && m.stage === 'settled');
-  const sessions = markers.filter((m) => m.phase === 'session' && m.stage === 'settled');
-  const finalCreated = sessions.length ? Math.max(...sessions.map((m) => m.created)) : 0;
-  const finalDisposed = settled.length ? Math.max(...settled.map((m) => m.disposed)) : 0;
+  const groups = new Map();
+  const byComponent = new Map();
+  for (const m of markers) {
+    const comp = m.component ?? 'embedder';
+    const k = `${comp}|${m.pid}|${m.wrapperEpoch ?? 0}`;
+    if (!groups.has(k)) groups.set(k, { maxCreated: 0, maxDisposed: 0 });
+    if (!byComponent.has(comp)) byComponent.set(comp, { maxCreated: 0, maxDisposed: 0 });
+    const g = groups.get(k);
+    const c = byComponent.get(comp);
+    if (m.phase === 'session' && m.stage === 'settled' && Number.isFinite(m.created)) {
+      g.maxCreated = Math.max(g.maxCreated, m.created);
+      c.maxCreated = Math.max(c.maxCreated, m.created);
+    }
+    if (m.phase === 'disposal' && m.stage === 'settled' && Number.isFinite(m.disposed)) {
+      g.maxDisposed = Math.max(g.maxDisposed, m.disposed);
+      c.maxDisposed = Math.max(c.maxDisposed, m.disposed);
+    }
+  }
+  let finalCreated = 0;
+  let finalDisposed = 0;
+  for (const c of byComponent.values()) {
+    finalCreated += c.maxCreated;
+    finalDisposed += c.maxDisposed;
+  }
+  let everyGroupBalanced = true;
+  for (const g of groups.values()) {
+    if (g.maxCreated !== g.maxDisposed) everyGroupBalanced = false;
+  }
+  const countersBalanced = everyGroupBalanced && finalCreated === finalDisposed;
+  const { sessionOverlaps, unresolvedSessionCount } = detectSessionOverlaps(markers);
+  const sessionOverlapCount = sessionOverlaps.length;
   return {
     disposalFailureCount: failures.length,
     failures,
     finalCreated,
     finalDisposed,
-    countersBalanced: finalCreated === finalDisposed,
-    clean: failures.length === 0 && finalCreated === finalDisposed,
-    note: 'disposedTotal increments even on a THROWN disposal, so countersBalanced '
-      + 'alone does not prove absence of a leak; disposalFailureCount is decisive.',
+    countersBalanced,
+    sessionOverlapCount,
+    unresolvedSessionCount,
+    sessionOverlaps,
+    clean: failures.length === 0 && countersBalanced && sessionOverlapCount === 0 && unresolvedSessionCount === 0,
+    note: 'disposedTotal increments even on a THROWN disposal; clean evidence requires '
+      + 'successful disposal settlements for all sessions and no overlaps.',
   };
+}
+
+/**
+ * Cross-component serial non-overlap. Within one process, every live native
+ * session (embedder OR safety-reader) must be disposed before the next one
+ * starts. A session's live interval runs from session:start (or -Infinity
+ * when the start line is absent) to a successful disposal:settled after it.
+ * Without that settlement the interval never closes.
+ *
+ * Ordering is by (tsMs, lineNo): a disposal settling on an earlier log line at
+ * timestamp T followed by a session starting on a later line at the same T is
+ * a sequential handoff, not an overlap. Every interval is compared against
+ * ALL earlier intervals in the same pid, so one long session containing two
+ * shorter, mutually sequential ones yields two overlaps.
+ *
+ * @returns {{ sessionOverlaps: object[], overlappingKeys: Set<string>, unresolvedSessionCount: number }}
+ */
+export function detectSessionOverlaps(markers) {
+  const groups = new Map();
+  for (const m of markers) {
+    if (m.kind !== 'phase' || !Number.isFinite(m.pid) || m.requestId === WRAPPER_REQUEST_ID) continue;
+    const component = m.component ?? 'embedder';
+    const key = `${component}|${m.pid}|${m.wrapperEpoch ?? 0}|${m.requestId}`;
+    if (!groups.has(key)) {
+      groups.set(key, { key, component, pid: m.pid, wrapperEpoch: m.wrapperEpoch ?? 0, requestId: m.requestId, markers: [] });
+    }
+    groups.get(key).markers.push(m);
+  }
+  const intervalsByPid = new Map();
+  let unresolvedSessionCount = 0;
+  for (const g of groups.values()) {
+    const find = (phase, stage) => g.markers.find((m) => m.phase === phase && m.stage === stage);
+    const sessionStart = find('session', 'start');
+    const disposalSettled = find('disposal', 'settled');
+    // Without session:start we do not know how early the native session opened,
+    // so fail closed (-Infinity) rather than shrinking the interval to a later
+    // phase marker and masking a real overlap (WO02-SOL-01).
+    const hasOpener = sessionStart !== undefined;
+    const closed = disposalSettled?.ok === true && (!hasOpener
+      || disposalSettled.tsMs > sessionStart.tsMs
+      || (disposalSettled.tsMs === sessionStart.tsMs && disposalSettled.lineNo > sessionStart.lineNo));
+    if (!closed) unresolvedSessionCount += 1;
+    const interval = {
+      key: g.key,
+      component: g.component,
+      pid: g.pid,
+      wrapperEpoch: g.wrapperEpoch,
+      requestId: g.requestId,
+      startTsMs: hasOpener ? sessionStart.tsMs : -Infinity,
+      startLineNo: hasOpener ? sessionStart.lineNo : -Infinity,
+      endTsMs: closed ? disposalSettled.tsMs : Infinity,
+      endLineNo: closed ? disposalSettled.lineNo : Infinity,
+    };
+    if (!intervalsByPid.has(g.pid)) intervalsByPid.set(g.pid, []);
+    intervalsByPid.get(g.pid).push(interval);
+  }
+  const sessionOverlaps = [];
+  const overlappingKeys = new Set();
+  const identity = (iv) => ({
+    component: iv.component, pid: iv.pid, wrapperEpoch: iv.wrapperEpoch, requestId: iv.requestId,
+    startTsMs: Number.isFinite(iv.startTsMs) ? iv.startTsMs : null,
+    endTsMs: Number.isFinite(iv.endTsMs) ? iv.endTsMs : null,
+  });
+  for (const intervals of intervalsByPid.values()) {
+    intervals.sort((a, b) => a.startTsMs - b.startTsMs || a.startLineNo - b.startLineNo);
+    for (let j = 1; j < intervals.length; j += 1) {
+      const b = intervals[j];
+      for (let i = 0; i < j; i += 1) {
+        const a = intervals[i];
+        const overlaps = b.startTsMs < a.endTsMs
+          || (b.startTsMs === a.endTsMs && b.startLineNo < a.endLineNo);
+        if (!overlaps) continue;
+        sessionOverlaps.push({ earlier: identity(a), later: identity(b) });
+        overlappingKeys.add(a.key);
+        overlappingKeys.add(b.key);
+      }
+    }
+  }
+  return { sessionOverlaps, overlappingKeys, unresolvedSessionCount };
 }
 
 // --- sampling cadence and continuity ---------------------------------------
@@ -366,6 +479,7 @@ const keyOf = (phase, stage) => `${phase}:${stage}`;
  */
 export function bindTargetSamples({ samples, markers, segments, packageName }) {
   const runs = [];
+  const seenPids = new Set();
   for (const sample of samples) {
     if (!packageName || sample.appName !== packageName || !Number.isInteger(sample.processId)
         || sample.processId <= 0) throw new Error('Raw memory sample does not identify the target package and PID');
@@ -375,6 +489,12 @@ export function bindTargetSamples({ samples, markers, segments, packageName }) {
     }
     let run = runs.at(-1);
     if (!run || run.pid !== sample.processId) {
+      // A cold restart moves to a NEW pid. A pid that comes back after a
+      // transition cannot be told apart from a stale or interleaved capture.
+      if (seenPids.has(sample.processId)) {
+        throw new Error('Cold-restart PID continuity violation: process ID reappeared after a PID transition');
+      }
+      seenPids.add(sample.processId);
       run = { pid: sample.processId, starts: [] };
       runs.push(run);
     }
@@ -391,23 +511,51 @@ export function bindTargetSamples({ samples, markers, segments, packageName }) {
     }
   }
   // Keep wrapper anchors before the first probe, including after a cold restart.
-  const targetMarkers = markers.filter((m) => runs.some((run, i) => m.pid === run.pid
-    && m.tsMs >= (runs[i - 1]?.starts.at(-1) ?? -Infinity)
-    && m.tsMs <= (runs[i + 1]?.starts[0] ?? Infinity)));
+  // A target-PID marker outside its own process window is evidence of a broken
+  // timeline, so it fails closed instead of being silently filtered out.
+  const targetMarkers = [];
+  const seenMarkerPids = new Set();
+  let lastMarkerPid = null;
+  let lastRunIdx = -1;
+  for (const m of markers) {
+    const i = runs.findIndex((run) => run.pid === m.pid);
+    if (i === -1) continue;
+    if (m.tsMs <= (runs[i - 1]?.starts.at(-1) ?? -Infinity) || m.tsMs >= (runs[i + 1]?.starts[0] ?? Infinity)) {
+      throw new Error('Cold-restart PID continuity violation: target PID lifecycle marker falls outside its process sampling window');
+    }
+    if (m.pid !== lastMarkerPid) {
+      if (seenMarkerPids.has(m.pid) || i < lastRunIdx) {
+        throw new Error('Cold-restart PID continuity violation: process ID reappeared after a PID transition');
+      }
+      seenMarkerPids.add(m.pid);
+      lastMarkerPid = m.pid;
+      lastRunIdx = i;
+    }
+    targetMarkers.push({ ...m });
+  }
+  // Re-stamp wrapper epochs on the bound set only, so filtered foreign-PID
+  // markers (or any epoch carried in by the caller) can never shift epoch state.
+  const epochByKey = new Map();
+  for (const m of targetMarkers) {
+    const key = `${m.pid}|${m.component ?? 'embedder'}`;
+    if (m.phase === 'wrapper') epochByKey.set(key, (epochByKey.get(key) ?? 0) + 1);
+    m.wrapperEpoch = epochByKey.get(key) ?? 0;
+  }
   return { markers: targetMarkers, segments: boundSegments };
 }
 
 export function correlateRequests({ markers, segments }) {
-  // Identity is (process, wrapper instance, request id) — NOT request id alone.
+  // Identity is (component, process, wrapper instance, request id) — NOT request id alone.
   const byRequest = new Map();
   for (const m of markers) {
-    const key = `${m.pid}|${m.wrapperEpoch ?? 0}|${m.requestId}`;
+    const key = `${m.component ?? 'embedder'}|${m.pid}|${m.wrapperEpoch ?? 0}|${m.requestId}`;
     if (!byRequest.has(key)) byRequest.set(key, []);
     byRequest.get(key).push(m);
   }
 
   const qualified = [];
   const rejected = [];
+  const { overlappingKeys } = detectSessionOverlaps(markers);
 
   // --- per-(pid, epoch) session ledger -------------------------------------
   // Hermes R4-2: a stitch whose two halves carry IDENTICAL created snapshots is
@@ -423,22 +571,28 @@ export function correlateRequests({ markers, segments }) {
   const epochLedger = new Map();
   for (const m of markers) {
     if (!Number.isFinite(m.pid)) continue;
-    const k = `${m.pid}|${m.wrapperEpoch ?? 0}`;
-    if (!epochLedger.has(k)) epochLedger.set(k, { sessionSettled: 0, maxCreated: 0 });
+    const k = `${m.component ?? 'embedder'}|${m.pid}|${m.wrapperEpoch ?? 0}`;
+    if (!epochLedger.has(k)) epochLedger.set(k, { sessionSettled: 0, maxCreated: 0, wrapperTsMs: null, wrapperLineNo: null });
     const e = epochLedger.get(k);
+    if (m.phase === 'wrapper' && e.wrapperTsMs === null) {
+      e.wrapperTsMs = m.tsMs;
+      e.wrapperLineNo = m.lineNo;
+    }
     if (m.phase === 'session' && m.stage === 'settled') e.sessionSettled += 1;
     if (Number.isFinite(m.created)) e.maxCreated = Math.max(e.maxCreated, m.created);
   }
 
   const keys = [...byRequest.keys()].sort((a, b) => {
-    const [ap, ae, ar] = a.split('|').map(Number);
-    const [bp, be, br] = b.split('|').map(Number);
-    return ap - bp || ae - be || ar - br;
+    const [ac, apStr, aeStr, arStr] = a.split('|');
+    const [bc, bpStr, beStr, brStr] = b.split('|');
+    const [ap, ae, ar] = [Number(apStr), Number(aeStr), Number(arStr)];
+    const [bp, be, br] = [Number(bpStr), Number(beStr), Number(brStr)];
+    return ap - bp || ac.localeCompare(bc) || ae - be || ar - br;
   });
 
   for (const key of keys) {
     const group = byRequest.get(key);
-    const [pidStr, epochStr] = key.split('|');
+    const [component, pidStr, epochStr] = key.split('|');
     const pid = Number(pidStr);
     const wrapperEpoch = Number(epochStr);
     const processSegments = segments.filter((s) => s.pid === undefined || s.pid === pid);
@@ -586,7 +740,7 @@ export function correlateRequests({ markers, segments }) {
     // Epoch-level ledger (Hermes R4-2). Catches the stitch whose halves agree
     // on their snapshots, because the capture never witnessed enough session
     // creations to justify the counter value those markers carry.
-    const ledger = epochLedger.get(`${pid}|${wrapperEpoch}`);
+    const ledger = epochLedger.get(`${component}|${pid}|${wrapperEpoch}`);
     if (ledger && ledger.maxCreated > ledger.sessionSettled) {
       reasons.push(
         `the created counter reaches ${ledger.maxCreated} in this wrapper instance but only `
@@ -596,16 +750,32 @@ export function correlateRequests({ markers, segments }) {
       );
     }
 
+    if (ledger && Number.isFinite(ledger.wrapperTsMs)) {
+      const preWrapper = group.find(
+        (m) => m.tsMs < ledger.wrapperTsMs
+          || (m.tsMs === ledger.wrapperTsMs && m.lineNo < ledger.wrapperLineNo),
+      );
+      if (preWrapper) {
+        reasons.push(
+          `marker ${preWrapper.phase ?? 'request'}:${preWrapper.stage ?? 'settled'} `
+          + 'precedes its wrapper:settled anchor in time',
+        );
+      }
+    }
+
     const ordered = [
       ...REQUIRED_PHASE_MARKERS.map(([p, s]) => index.get(keyOf(p, s))),
       completion,
     ];
     if (ordered.every(Boolean)) {
       for (let i = 1; i < ordered.length; i += 1) {
-        if (ordered[i].tsMs < ordered[i - 1].tsMs) {
+        if (
+          ordered[i].tsMs < ordered[i - 1].tsMs
+          || (ordered[i].tsMs === ordered[i - 1].tsMs && ordered[i].lineNo < ordered[i - 1].lineNo)
+        ) {
           reasons.push(
-            `markers out of order: ${ordered[i - 1].phase}:${ordered[i - 1].stage} `
-            + `after ${ordered[i].phase}:${ordered[i].stage}`,
+            `markers out of order: ${ordered[i - 1].phase ?? 'request'}:${ordered[i - 1].stage ?? 'settled'} `
+            + `after ${ordered[i].phase ?? 'request'}:${ordered[i].stage ?? 'settled'}`,
           );
           break;
         }
@@ -621,16 +791,24 @@ export function correlateRequests({ markers, segments }) {
 
     // Defensive: every marker in a group must share the process identity the
     // key was built from.
-    if (group.some((m) => m.pid !== pid || (m.wrapperEpoch ?? 0) !== wrapperEpoch)) {
+    if (group.some((m) => (m.component ?? 'embedder') !== component || m.pid !== pid || (m.wrapperEpoch ?? 0) !== wrapperEpoch)) {
       reasons.push('markers in this group disagree about process/wrapper identity');
     }
 
+    // Serial non-overlap: two live native sessions in one process at once
+    // (any component) means neither request's memory can be attributed to it.
+    if (overlappingKeys.has(key)) {
+      reasons.push('session interval overlaps another live session in the same process '
+        + '(see disposalIntegrity.sessionOverlaps)');
+    }
+
     if (reasons.length > 0) {
-      rejected.push({ requestId, pid, wrapperEpoch, reasons, markerCount: group.length });
+      rejected.push({ component, requestId, pid, wrapperEpoch, reasons, markerCount: group.length });
       continue;
     }
 
     qualified.push({
+      component,
       requestId,
       pid,
       wrapperEpoch,
@@ -647,7 +825,15 @@ export function correlateRequests({ markers, segments }) {
     });
   }
 
-  return { qualified, rejected, disposalIntegrity: summarizeDisposalIntegrity(markers) };
+  return {
+    qualified,
+    rejected,
+    componentRequestCounts: {
+      embedder: qualified.filter((q) => q.component === 'embedder').length,
+      'safety-reader': qualified.filter((q) => q.component === 'safety-reader').length,
+    },
+    disposalIntegrity: summarizeDisposalIntegrity(markers),
+  };
 }
 
 // --- memory summarisation ---------------------------------------------------
@@ -693,6 +879,9 @@ export function summarizeMemory({ samples, segments, qualified, cadence, peakCla
     }
     return {
       windowMaxGapMs,
+      component: q.component,
+      pid: q.pid,
+      wrapperEpoch: q.wrapperEpoch,
       requestId: q.requestId,
       segmentIndex: q.segmentIndex,
       startMs: q.startMs,
@@ -715,6 +904,7 @@ export function summarizeMemory({ samples, segments, qualified, cadence, peakCla
     const max = inSeg.length ? Math.max(...inSeg.map((s) => s.privateDirtyBytes)) : null;
     return {
       segmentIndex: seg.index,
+      pid: seg.pid ?? null,
       startMs: seg.startMs,
       endMs: seg.endMs,
       spanMs: seg.spanMs,
@@ -745,10 +935,11 @@ export function summarizeMemory({ samples, segments, qualified, cadence, peakCla
   if (Number.isFinite(p95Interval) && p95Interval > peakClaimIntervalMs) peakClaimBlockers.push(`p95 interval ${p95Interval} ms > ${peakClaimIntervalMs} ms`);
   if (perRequest.length === 0) peakClaimBlockers.push('no correlated request to observe');
   for (const r of perRequest) {
+    const label = `${r.component ?? 'embedder'} request ${r.requestId} (pid ${r.pid ?? 'unknown'})`;
     if (r.samplesInsideRequest < MIN_SAMPLES_IN_REQUEST_WINDOW) {
-      peakClaimBlockers.push(`request ${r.requestId} had ${r.samplesInsideRequest} sample(s) inside its window`);
+      peakClaimBlockers.push(`${label} had ${r.samplesInsideRequest} sample(s) inside its window`);
     } else if (r.windowMaxGapMs > peakClaimIntervalMs) {
-      peakClaimBlockers.push(`request ${r.requestId} has a ${r.windowMaxGapMs} ms observation hole`);
+      peakClaimBlockers.push(`${label} has a ${r.windowMaxGapMs} ms observation hole`);
     }
   }
 

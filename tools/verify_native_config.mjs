@@ -32,6 +32,11 @@ import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { KNOWN_SHA256 } from '../scripts/embedder-integrity.mjs';
+import {
+  KNOWN_BYTES as READER_KNOWN_BYTES,
+  KNOWN_SHA256 as READER_KNOWN_SHA256,
+  SAFETY_READER_ARTIFACT,
+} from '../scripts/safety-reader-integrity.mjs';
 import { splitJobs, splitSteps, stripYamlComments } from './verify_ci_structure.mjs';
 
 const ROOT = join(import.meta.dirname, '..');
@@ -1825,6 +1830,268 @@ console.log('[N11] beta orientation lock (#168)');
   check('iPad keeps portrait and both landscape orientations',
     ['UIInterfaceOrientationPortrait', 'UIInterfaceOrientationLandscapeLeft', 'UIInterfaceOrientationLandscapeRight']
       .every((o) => ipad.includes(o)), ipad.join(','));
+}
+
+console.log('[N12] Stream 2 safety reader staging, shared scheduler & native smoke');
+{
+  const phases = pbx.match(/buildPhases = \(([\s\S]*?)\);/)?.[1] ?? '';
+  const order = [...phases.matchAll(/\/\* ([^*]+) \*\//g)].map((m) => m[1].trim());
+  const iRes = order.indexOf('Resources');
+  const embedder = read('apps/mobile/src/inference/deviceEmbedder.ts');
+  const smoke = read('apps/mobile/src/diagnostics/nativeSmoke.ts');
+  const smokeScriptSrc = read('tools/ios_simulator_smoke.sh');
+  const stripJsComments = (s) => s.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
+  const smokeRequiredChecks = (scriptSrc) => {
+    const m = scriptSrc.match(/\bconst\s+required\s*=\s*\[([\s\S]*?)\];/);
+    if (m === null) return [];
+    return [...stripJsComments(m[1]).matchAll(/["']([^"']+)["']/g)].map((x) => x[1]);
+  };
+  // Stream 2 PR 3: safety_reader.onnx iOS bundle staging, shared ORT scheduler,
+  // native simulator smoke, and CI asset-staging provenance.
+  const iStageReader = order.indexOf('Stage safety reader model');
+  check('the target runs "Stage safety reader model" after Resources', iStageReader > iRes && iRes !== -1, order.join(' > '));
+  const readerPhase = pbx.match(/\/\* Stage safety reader model \*\/ = \{([\s\S]*?)\n\t\t\};/)?.[1] ?? '';
+  check('the safety-reader phase runs scripts/stage-native-safety-reader.mjs into the app bundle as safety_reader.onnx',
+    readerPhase.includes('scripts/stage-native-safety-reader.mjs')
+      && readerPhase.includes('$UNLOCALIZED_RESOURCES_FOLDER_PATH/safety_reader.onnx'));
+  check('Release builds require safety_reader.onnx (--required)',
+    /CONFIGURATION\\?"? = \\?"Release\\?"[\s\S]*--required/.test(readerPhase));
+
+  const deviceReaderPath = join(ROOT, 'apps/mobile/src/inference/deviceSafetyReader.ts');
+  const deviceSchedPath = join(ROOT, 'apps/mobile/src/inference/deviceOrtScheduler.ts');
+  const inspectIosReaderPath = join(ROOT, 'tools/inspect_ios_safety_reader.mjs');
+  const deviceReader = existsSync(deviceReaderPath) ? readFileSync(deviceReaderPath, 'utf8') : '';
+  const deviceSched = existsSync(deviceSchedPath) ? readFileSync(deviceSchedPath, 'utf8') : '';
+  const extractReaderPrefix = (src) => stripJsComments(src).match(/READER_PIN_PREFIX\s*=\s*'([0-9a-f]+)'/)?.[1];
+  const readerPrefix = extractReaderPrefix(deviceReader);
+  const validReaderPrefix = (p) =>
+    p !== undefined
+    && p.length >= 16
+    && READER_KNOWN_SHA256[SAFETY_READER_ARTIFACT].startsWith(p);
+  check('deviceSafetyReader pin prefix matches the ratified safety-reader SHA-256',
+    validReaderPrefix(readerPrefix),
+    readerPrefix ?? 'missing');
+  check('falsifier: a commented-out old READER_PIN_PREFIX cannot mask a wrong active pin prefix (WO02-SOL-08)',
+    !validReaderPrefix(extractReaderPrefix(
+      `// const READER_PIN_PREFIX = '${readerPrefix ?? 'a0fa76e40e10246a'}';\n`
+      + deviceReader.replace(/READER_PIN_PREFIX = '[0-9a-f]+'/, "READER_PIN_PREFIX = '0000000000000000'"),
+    )));
+  check('iOS opens the bundled safety_reader.onnx in place (no Documents copy)',
+    /Platform\.OS === 'ios'[\s\S]{0,220}MainBundleDir/.test(deviceReader));
+  const hasSharedOrtScheduler = (embSrc, rdrSrc, schedSrc) => {
+    const e = stripJsComments(embSrc);
+    const r = stripJsComments(rdrSrc);
+    const s = stripJsComments(schedSrc);
+    return s.includes('createSerializedOrtScheduler()')
+      && e.includes("from './deviceOrtScheduler'")
+      && r.includes("from './deviceOrtScheduler'")
+      && /scheduler\s*:\s*getDeviceOrtScheduler\(\)/.test(e)
+      && /scheduler\s*:\s*getDeviceOrtScheduler\(\)/.test(r);
+  };
+  check('deviceEmbedder and deviceSafetyReader share one process-wide SerializedOrtScheduler',
+    hasSharedOrtScheduler(embedder, deviceReader, deviceSched));
+  check('falsifier: omitting getDeviceOrtScheduler() on either wrapper fails the shared-scheduler check',
+    !hasSharedOrtScheduler(embedder.replace('getDeviceOrtScheduler()', 'undefined'), deviceReader, deviceSched)
+      && !hasSharedOrtScheduler(embedder, deviceReader.replace('getDeviceOrtScheduler()', 'undefined'), deviceSched));
+
+  const hasSafetyReaderSmoke = (smokeSrc, smokeScript) => {
+    const code = stripJsComments(smokeSrc);
+    const stepStart = code.indexOf("step(checks, 'safety reader inference + denial floor'");
+    if (stepStart === -1) return false;
+    const stepTail = code.slice(stepStart);
+    const nextStep = stepTail.indexOf('\n  await step(');
+    const stepBody = nextStep === -1 ? stepTail : stepTail.slice(0, nextStep);
+    return stepBody.includes('tryCreateDeviceSafetyReader()')
+      && stepBody.includes('resolveReportWithSafetyReader(')
+      && /actionableRouteId\s*!==\s*['"]dizzy['"]/.test(stepBody)
+      && smokeRequiredChecks(smokeScript).includes('safety reader inference + denial floor');
+  };
+  check('the native smoke verifies safety_reader.onnx + denial-floor routing and CI requires it',
+    hasSafetyReaderSmoke(smoke, smokeScriptSrc));
+  check('falsifier: dropping "safety reader inference + denial floor" from nativeSmoke or ios_simulator_smoke.sh fails closed',
+    deviceReader.length > 0
+      && !hasSafetyReaderSmoke(smoke.replace("'safety reader inference + denial floor'", "'dropped'"), smokeScriptSrc)
+      && !hasSafetyReaderSmoke(smoke, smokeScriptSrc.replace('"safety reader inference + denial floor"', '')));
+
+  const ciForReader = read('.github/workflows/ci.yml');
+  const checkCiReaderPackaging = (ciYaml) => {
+    const jobs = splitJobs(stripYamlComments(ciYaml));
+    const androidJob = jobs.get('android-apk') ?? '';
+    const iosJob = jobs.get('ios-simulator') ?? '';
+    const androidHasCache = androidJob.includes("hashFiles('scripts/safety-reader-integrity.mjs')");
+    const androidStages = androidJob.indexOf('npm run fetch:safety-reader') !== -1
+      && androidJob.indexOf('scripts/stage-native-safety-reader.mjs') !== -1
+      && androidJob.indexOf('apps/mobile/android/app/src/main/assets/safety_reader.onnx --required') !== -1
+      && androidJob.indexOf('scripts/stage-native-safety-reader.mjs') < androidJob.indexOf('assembleQa');
+    const iosHasCache = iosJob.includes("hashFiles('scripts/safety-reader-integrity.mjs')");
+    const iosFetches = iosJob.indexOf('npm run fetch:safety-reader') !== -1
+      && iosJob.indexOf('npm run fetch:safety-reader') < iosJob.indexOf('Build unsigned Release for the simulator');
+    const iosInspects = iosJob.includes('node tools/inspect_ios_safety_reader.mjs');
+    const noRestoreKeys = !stripYamlComments(ciYaml).includes('restore-keys:');
+    return androidHasCache && androidStages && iosHasCache && iosFetches && iosInspects && noRestoreKeys;
+  };
+  check('CI android-apk and ios-simulator cache, materialize, stage, and inspect safety_reader.onnx fail-closed',
+     existsSync(inspectIosReaderPath)
+      && checkCiReaderPackaging(ciForReader)
+      && READER_KNOWN_BYTES[SAFETY_READER_ARTIFACT] === 22881187);
+  check('falsifier: dropping inspect_ios_safety_reader.mjs or Android safety_reader.onnx staging from ci.yml fails closed',
+    !checkCiReaderPackaging(ciForReader.replace('node tools/inspect_ios_safety_reader.mjs', 'echo skip'))
+      && !checkCiReaderPackaging(ciForReader.replace('apps/mobile/android/app/src/main/assets/safety_reader.onnx --required', '')));
+
+  // Android producer-task model enforcement (build.gradle). The Gradle pin
+  // helper must parse the computed-key `[SAFETY_READER_ARTIFACT]` declarations
+  // that scripts/safety-reader-integrity.mjs actually uses (the literal
+  // 'reader_quantized.onnx' key form matches nothing in that file), and the
+  // packageQa / packageRelease / signReleaseBundle producers must verify both
+  // packaged models by exact size and SHA-256; debug producers must not.
+  const appGradle = read('apps/mobile/android/app/build.gradle');
+  const readerIntegritySrc = read('scripts/safety-reader-integrity.mjs');
+  const gradleSlashyRegex = (gradleSrc, varName) => {
+    const m = gradleSrc.match(new RegExp(`def ${varName}\\s*=\\s*~/((?:\\\\/|[^/\\n])+)/`));
+    return m === null ? null : m[1];
+  };
+  const gradleReaderPinsMatchSource = (gradleSrc) => {
+    const bytesRe = gradleSlashyRegex(gradleSrc, 'READER_BYTES_PIN_RE');
+    const shaRe = gradleSlashyRegex(gradleSrc, 'READER_SHA_PIN_RE');
+    const artifactRe = gradleSlashyRegex(gradleSrc, 'READER_ARTIFACT_PIN_RE');
+    if (bytesRe === null || shaRe === null || artifactRe === null) return false;
+    if (!bytesRe.includes('\\[SAFETY_READER_ARTIFACT\\]') || !shaRe.includes('\\[SAFETY_READER_ARTIFACT\\]')) return false;
+    const bytes = readerIntegritySrc.match(new RegExp(bytesRe))?.[1];
+    const sha = readerIntegritySrc.match(new RegExp(shaRe))?.[1];
+    const artifactOk = new RegExp(artifactRe).test(readerIntegritySrc);
+    return artifactOk
+      && Number(bytes) === READER_KNOWN_BYTES[SAFETY_READER_ARTIFACT]
+      && sha === READER_KNOWN_SHA256[SAFETY_READER_ARTIFACT];
+  };
+  check('build.gradle parses [SAFETY_READER_ARTIFACT] size + SHA-256 pins that match scripts/safety-reader-integrity.mjs',
+    gradleReaderPinsMatchSource(appGradle));
+  check('falsifier: the literal \'reader_quantized.onnx\': key regex matches nothing in safety-reader-integrity.mjs',
+    !/'reader_quantized\.onnx':\s*(\d+)/.test(readerIntegritySrc)
+      && !/'reader_quantized\.onnx':\s*\n\s*'([0-9a-f]{64})'/.test(readerIntegritySrc)
+      && !gradleReaderPinsMatchSource(appGradle.replace(/\\\[SAFETY_READER_ARTIFACT\\\]/g, "'reader_quantized\\.onnx'")));
+  const gradleProducerModelRoots = (gradleSrc) => {
+    const block = gradleSrc.match(/def onnxArtifactTasks = \[([\s\S]*?)\n\]/)?.[1] ?? '';
+    const roots = new Map();
+    for (const m of block.matchAll(/(\w+):\s*\["[^"]+",\s*"[^"]+",\s*(null|"([^"]*)")\s*\]/g)) {
+      roots.set(m[1], m[2] === 'null' ? null : m[3]);
+    }
+    return roots;
+  };
+  const producerVerifierCall = /^([ \t]*)(verifyOnnxRuntimeArchive\(artifact, artifactSpec\[1\], pinnedModelAssets\(artifactSpec\[2\]\)\))[ \t]*$/m;
+  const gradleEnforcesProducerModels = (gradleSrc) => {
+    const code = gradleSrc.replace(/\/\*[\s\S]*?\*\/|\/\/.*$/gm, '');
+    const producerDoLast = code.match(/^([ \t]*)task\.doLast\s*\{([\s\S]*?)^\1\}/m)?.[2] ?? '';
+    const roots = gradleProducerModelRoots(gradleSrc);
+    const verifier = gradleSrc.match(/def verifyOnnxRuntimeArchive = \{([\s\S]*?)\n\}/)?.[1] ?? '';
+    const pinnedAssets = gradleSrc.match(/def pinnedModelAssets = \{([\s\S]*?)\n\}/)?.[1] ?? '';
+    return roots.get('packageQa') === 'assets/'
+      && roots.get('packageRelease') === 'assets/'
+      && roots.get('signReleaseBundle') === 'base/assets/'
+      && roots.has('packageDebug') && roots.get('packageDebug') === null
+      && roots.has('signDebugBundle') && roots.get('signDebugBundle') === null
+      && producerVerifierCall.test(producerDoLast)
+      && /'minilm\.onnx'[\s\S]*pins\.minilmBytes[\s\S]*pins\.minilmSha256/.test(pinnedAssets)
+      && /'safety_reader\.onnx'[\s\S]*pins\.readerBytes[\s\S]*pins\.readerSha256/.test(pinnedAssets)
+      && verifier.includes("MessageDigest.getInstance('SHA-256')")
+      && /size mismatch/.test(verifier)
+      && /SHA-256 mismatch/.test(verifier)
+      && /artifact\.delete\(\)/.test(verifier);
+  };
+  check('build.gradle enforces model size + SHA-256 on packageQa, packageRelease, signReleaseBundle (not debug producers)',
+    gradleEnforcesProducerModels(appGradle),
+    JSON.stringify([...gradleProducerModelRoots(appGradle)]));
+  check('falsifier: dropping the signReleaseBundle model root or requiring models on packageDebug fails the producer check',
+    !gradleEnforcesProducerModels(appGradle.replace(/(signReleaseBundle:\s*\["[^"]+",\s*"base\/lib\/",\s*)"base\/assets\/"/, '$1null'))
+      && !gradleEnforcesProducerModels(appGradle.replace(/(packageDebug:\s*\["[^"]+",\s*"lib\/",\s*)null/, '$1"assets/"'))
+      && !gradleEnforcesProducerModels(appGradle.replaceAll("MessageDigest.getInstance('SHA-256')", "MessageDigest.getInstance('MD5')")));
+
+  check('falsifier: commenting out the Gradle doLast model verifier fails the producer check',
+    producerVerifierCall.test(appGradle)
+      && !gradleEnforcesProducerModels(appGradle.replace(producerVerifierCall, '$1// $2')));
+
+  if (existsSync(inspectIosReaderPath)) {
+    const { mkdtempSync, rmSync, writeFileSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { inspectIosSafetyReader } = await import('./inspect_ios_safety_reader.mjs');
+    const sb = mkdtempSync(join(tmpdir(), 'ak-ios-reader-inspect-'));
+    try {
+      const emptyApp = join(sb, 'Empty.app');
+      const { mkdirSync } = await import('node:fs');
+      mkdirSync(emptyApp, { recursive: true });
+      for (const invalidPath of ['', '  ']) {
+        const result = inspectIosSafetyReader(invalidPath);
+        check('inspectIosSafetyReader rejects a blank app bundle path',
+          result.ok === false && result.checks.some((c) => c.detail.includes('app bundle path')));
+      }
+      const missingRes = inspectIosSafetyReader(emptyApp);
+      check('inspectIosSafetyReader rejects an .app bundle missing safety_reader.onnx',
+        missingRes.ok === false && missingRes.checks.some((c) => !c.ok && c.name.includes('present')));
+
+      const shortApp = join(sb, 'Short.app');
+      mkdirSync(shortApp, { recursive: true });
+      writeFileSync(join(shortApp, 'safety_reader.onnx'), Buffer.from('short'));
+      const shortRes = inspectIosSafetyReader(shortApp);
+      check('inspectIosSafetyReader rejects truncated safety_reader.onnx',
+        shortRes.ok === false && shortRes.checks.some((c) => !c.ok && c.name.includes('byte length')));
+
+      const realReaderPath = join(ROOT, 'packages/inference/assets/safety-reader/reader_quantized.onnx');
+      // Never skip silently: the positive/corrupt/symlink inspector controls
+      // below need the materialized reader (npm run fetch:safety-reader).
+      check('materialized reader_quantized.onnx present for inspectIosSafetyReader verification',
+        existsSync(realReaderPath), realReaderPath);
+      if (existsSync(realReaderPath)) {
+        const goodApp = join(sb, 'Good.app');
+        mkdirSync(goodApp, { recursive: true });
+        const realBytes = readFileSync(realReaderPath);
+        writeFileSync(join(goodApp, 'safety_reader.onnx'), realBytes);
+        const outJson = join(sb, 'report.json');
+        const goodRes = inspectIosSafetyReader(goodApp, outJson);
+        check('inspectIosSafetyReader accepts exact ratified safety_reader.onnx and writes JSON report',
+          goodRes.ok === true && existsSync(outJson));
+
+        const corruptBytes = Buffer.from(realBytes);
+        corruptBytes[128] ^= 0xff;
+        const badApp = join(sb, 'Corrupt.app');
+        mkdirSync(badApp, { recursive: true });
+        writeFileSync(join(badApp, 'safety_reader.onnx'), corruptBytes);
+        const badRes = inspectIosSafetyReader(badApp);
+        check('inspectIosSafetyReader rejects 1-byte corrupted safety_reader.onnx',
+          badRes.ok === false && badRes.checks.some((c) => !c.ok && c.name.includes('sha256')));
+
+        // Symlink rejection: a symlinked safety_reader.onnx (pointing at the
+        // exact ratified bytes, so only the symlink is decisive) and a
+        // symlinked .app bundle must both fail closed. If the platform cannot
+        // create the link, the guard is unverifiable here and this FAILS.
+        const { symlinkSync } = await import('node:fs');
+        const tryLink = (target, linkPath, type) => {
+          try { symlinkSync(target, linkPath, type); return null; } catch (e) { return e?.code ?? String(e); }
+        };
+        const linkApp = join(sb, 'LinkedFile.app');
+        mkdirSync(linkApp, { recursive: true });
+        const fileLinkErr = tryLink(join(goodApp, 'safety_reader.onnx'), join(linkApp, 'safety_reader.onnx'), 'file');
+        const linkRes = fileLinkErr === null ? inspectIosSafetyReader(linkApp) : null;
+        check('inspectIosSafetyReader rejects a symlinked safety_reader.onnx (symlink rejected)',
+          linkRes !== null
+            && linkRes.ok === false
+            && linkRes.checks.some((c) => !c.ok && c.name.includes('present') && c.detail.includes('symlink rejected')),
+          fileLinkErr === null ? JSON.stringify(linkRes?.checks?.[0] ?? null).slice(0, 120) : `symlink creation unavailable: ${fileLinkErr}`);
+        const linkedAppPath = join(sb, 'Linked.app');
+        const dirLinkErr = tryLink(goodApp, linkedAppPath, process.platform === 'win32' ? 'junction' : 'dir');
+        for (const suffix of ['', '/', '\\']) {
+          const linkedAppRes = dirLinkErr === null ? inspectIosSafetyReader(linkedAppPath + suffix) : null;
+          check('inspectIosSafetyReader rejects a symlinked .app bundle with suffix ' + JSON.stringify(suffix),
+            linkedAppRes !== null
+              && linkedAppRes.ok === false
+              && linkedAppRes.checks.some((c) => !c.ok && c.detail.includes('symlink rejected')),
+            dirLinkErr === null ? JSON.stringify(linkedAppRes?.checks?.[0] ?? null).slice(0, 120) : `symlink creation unavailable: ${dirLinkErr}`);
+          check('inspectIosSafetyReader accepts a real .app bundle with suffix ' + JSON.stringify(suffix),
+            inspectIosSafetyReader(goodApp + suffix).ok === true);
+        }
+      }
+    } finally {
+      rmSync(sb, { recursive: true, force: true });
+    }
+  }
 }
 
 console.log(`\n${fail === 0 ? 'NATIVE CONFIG VERIFIED (static contract; native build evidence comes from the macOS CI job)' : `${fail} NATIVE CONFIG CHECK(S) FAILED`}`);

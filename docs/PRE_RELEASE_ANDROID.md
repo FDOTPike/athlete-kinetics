@@ -32,17 +32,22 @@ $env:AK_VERSION_NAME='1.0.0-beta.1'
 
 Release Gradle tasks fail closed when any required signing value is absent.
 
-## 2. Verify and stage the embedded model
+## 2. Verify and stage the embedded models
 
 From the repository root:
 
 ```powershell
 npm.cmd ci
 npm.cmd run fetch:embedder
+npm.cmd run fetch:safety-reader
 npm.cmd run verify:ci
-New-Item -ItemType Directory -Force apps\mobile\android\app\src\main\assets | Out-Null
-Copy-Item packages\inference\assets\minilm\model_quantized.onnx apps\mobile\android\app\src\main\assets\minilm.onnx
+node scripts/stage-native-embedder.mjs apps/mobile/android/app/src/main/assets/minilm.onnx --required
+node scripts/stage-native-safety-reader.mjs apps/mobile/android/app/src/main/assets/safety_reader.onnx --required
 ```
+
+Both staging scripts never download. Each re-verifies the materialized source
+against its pin before copying, re-verifies the staged destination, and with
+`--required` fails when the source has not been materialized.
 
 The embedder supply chain is pinned to an immutable Hugging Face revision — no
 mutable `main`:
@@ -56,8 +61,9 @@ mutable `main`:
 - `tokenizer_config.json` sha256 `9261e7d79b44c8195c1cada2b453e55b00aeb81e907a6664974b4d7776172ab3`
 - distilled `tokenizer.min.json` sha256 `ed2e443c24f234f62dd05a039ca0c489d8d1a7039f1f42fc876aaae9cb32cff6`
 
-`fetch:embedder` is the only network-enabled model materializer. Run it before
-`verify:ci`: it stages all four remote artifacts, verifies their pinned byte
+`fetch:embedder` and `fetch:safety-reader` are the network-enabled model
+materializers. Run both before `verify:ci`. `fetch:embedder` stages all four
+remote artifacts, verifies their pinned byte
 hashes, and populates the exact revision-scoped Transformers cache plus the
 device output directory. All verification and codebase-embedding consumers use
 that cache with the immutable revision and `local_files_only=true`; a missing
@@ -68,12 +74,39 @@ previous trusted file. The single source of truth is
 `scripts/embedder-integrity.mjs`; `npm run verify:embedder` includes the
 deterministic offline integrity gate.
 
+The Stream 2 safety reader (`m10-r15-reader-seed3`, policy `r15/denial-floor`)
+is pinned to an immutable GitHub Release asset:
+
+- Repository and release tag: `FDOTPike/athlete-kinetics@ml-reader-m10-r15-s3`
+- Release target commit: `b6ceee70c7b7a9afd793968e8ca15ba17704b572`
+- Asset ID: `775095775` (`reader_quantized.onnx`)
+- Exact size: `22,881,187` B
+- SHA-256: `a0fa76e40e10246a9caf9d1be463b72b34f03174c68b017d6673fe9f165cb5cf`
+
+`fetch:safety-reader` materializes `packages/inference/assets/safety-reader/reader_quantized.onnx`
+and accepts cached, existing, or downloaded bytes only at that exact size and
+SHA-256. The single source of truth is `scripts/safety-reader-integrity.mjs`.
+
+The Gradle producer tasks `packageQa`, `packageRelease`, and
+`signReleaseBundle` verify that the produced APK/AAB contains both
+`minilm.onnx` (`22,972,370` B, SHA-256 `afdb6f1a…bdb1`) and
+`safety_reader.onnx` (`22,881,187` B, SHA-256 `a0fa76e4…5cf`) under
+`assets/` (APK) or `base/assets/` (AAB), with the expected size and SHA-256
+parsed from the two integrity scripts. A missing entry, size mismatch, or
+SHA-256 mismatch deletes the produced artifact and fails the build.
+`packageDebug` and `signDebugBundle` check ONNX Runtime native-library pairing
+only.
+
 ## 3. Verification and build sequence (one unambiguous clean checkout path)
 
 ```powershell
 npm.cmd ci                      # npm >= 11.16; enforces the install-script policy
 npm.cmd run fetch:embedder
+npm.cmd run fetch:safety-reader
 npm.cmd run verify:ci           # MERGE gate: must exit 0
+node scripts/stage-native-embedder.mjs apps/mobile/android/app/src/main/assets/minilm.onnx --required
+node scripts/stage-native-safety-reader.mjs apps/mobile/android/app/src/main/assets/safety_reader.onnx --required
+Push-Location apps\mobile\android; .\gradlew.bat assembleQa --no-daemon; Pop-Location
 npm.cmd run verify:release      # RELEASE gate: adds [A], [D] and the real QA APK
 ```
 
@@ -126,9 +159,9 @@ mandatory and self-locating.
 remediation command — when the checkout is not prepared: missing
 `node_modules`, a broken native `sharp` binding, absent or hash-mismatched
 pinned revision-cache artifacts, missing device outputs, or a distilled
-tokenizer off its pin. It never downloads; `fetch:embedder` remains the only
-network-capable materializer. An unprepared checkout is an operator error, not
-a candidate failure.
+tokenizer off its pin. Preflight and the native model staging scripts verify
+local assets offline. Run `fetch:embedder` and `fetch:safety-reader` to
+materialize missing assets before staging or preflight.
 
 The copied ONNX file and all Android build output are ignored and must not be
 staged.

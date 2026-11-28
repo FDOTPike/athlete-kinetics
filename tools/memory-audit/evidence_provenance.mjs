@@ -36,11 +36,14 @@
  *     corpus. Manifest binding (below) is the answer to that: the packet must
  *     be a member of an evidence manifest whose detached seal verifies.
  */
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { basename, dirname, join, relative, sep } from 'node:path';
 
 import { parseMeminfoDump, privateDirtyBytes } from './meminfo_parser.mjs';
+import { checkCandidateManifestSafetyReader } from './memory_gate.mjs';
+import { validateFingerprint, verifyProvenance } from '../verify_qa_artifact.mjs';
 import {
   bindTargetSamples,
   computeCadence,
@@ -55,6 +58,86 @@ export const EVIDENCE_BINDING_SCHEMA = 'ak.evidence-binding/1';
 
 /** The raw logcat capture a packet is derived from. */
 export const LOGCAT_FILENAME = 'logcat-epoch.txt';
+
+/** The candidate APK manifest bound to a sealed device-evidence packet. */
+export const CANDIDATE_MANIFEST_FILENAME = 'candidate_manifest.json';
+
+const CANDIDATE_MANIFEST_SCHEMA = 'ak.candidate-manifest/1';
+const CANDIDATE_MANIFEST_LABEL = 'NON_PRODUCTION_QA_DEBUG_SIGNED';
+const EMPTY_DIFF_SHA256 = createHash('sha256').update(Buffer.alloc(0)).digest('hex');
+const OWNER_CANDIDATE_EXCLUSIONS = new Set(['TASK.md', 'audit_task_b.mjs']);
+
+function verifyCandidateManifestComplete(parsedCandidate, { repoRoot, gitBin = 'git' } = {}) {
+  const problems = [];
+  if (parsedCandidate?.schema !== CANDIDATE_MANIFEST_SCHEMA) {
+    problems.push(`candidate_manifest.json schema mismatch: expected "${CANDIDATE_MANIFEST_SCHEMA}", `
+      + `got ${JSON.stringify(parsedCandidate?.schema)}`);
+  }
+  if (parsedCandidate?.label !== CANDIDATE_MANIFEST_LABEL) {
+    problems.push(`candidate_manifest.json label mismatch: expected "${CANDIDATE_MANIFEST_LABEL}", `
+      + `got ${JSON.stringify(parsedCandidate?.label)}`);
+  }
+  if (typeof parsedCandidate?.branch !== 'string' || parsedCandidate.branch.length === 0
+      || !/^[0-9a-f]{40}$/.test(parsedCandidate?.head ?? '')) {
+    problems.push('candidate_manifest.json head/branch identity incomplete or malformed');
+  }
+  if (parsedCandidate?.qaLifecycleTelemetry !== true) {
+    problems.push('candidate_manifest.json qaLifecycleTelemetry must be true');
+  }
+  const fpCheck = validateFingerprint(parsedCandidate?.trackedDiffFingerprint);
+  if (!fpCheck.ok) {
+    for (const p of fpCheck.problems) {
+      problems.push(`candidate_manifest.json trackedDiffFingerprint: ${p}`);
+    }
+  }
+  const candProv = verifyProvenance(parsedCandidate, { repoRoot, gitBin });
+  if (!candProv.ok) {
+    problems.push(...candProv.problems);
+  }
+  if (typeof parsedCandidate?.sourceDirty !== 'boolean') {
+    problems.push('candidate_manifest.json sourceDirty must be a boolean');
+  } else if (candProv.observed?.fingerprint) {
+    const expectedDirty = candProv.observed.fingerprint !== EMPTY_DIFF_SHA256;
+    if (parsedCandidate.sourceDirty !== expectedDirty) {
+      problems.push(`candidate_manifest.json sourceDirty=${parsedCandidate.sourceDirty} disagrees with `
+        + `live worktree tracked diff (expected ${expectedDirty})`);
+    }
+  }
+  // Exact newFiles set parity against apps/mobile/android/app/build.gradle:406-429:
+  // neither surplus tracked paths nor omitted current untracked/staged-new files may slip by.
+  try {
+    const stagedOut = execFileSync(gitBin, ['diff', '--cached', '--name-only', '--diff-filter=A', '-z'], {
+      cwd: repoRoot, encoding: 'utf8', timeout: 300000, maxBuffer: 64 * 1024 * 1024,
+    });
+    const untrackedOut = execFileSync(gitBin, ['ls-files', '--others', '--exclude-standard', '-z'], {
+      cwd: repoRoot, encoding: 'utf8', timeout: 300000, maxBuffer: 64 * 1024 * 1024,
+    });
+    const normalizeRel = (p) => p.replace(/\\/g, '/');
+    const expectedPaths = new Set(
+      [...stagedOut.split('\0'), ...untrackedOut.split('\0')]
+        .map((p) => normalizeRel(p))
+        .filter((p) => p.length > 0 && !OWNER_CANDIDATE_EXCLUSIONS.has(p)),
+    );
+    const declaredPaths = new Set(
+      (Array.isArray(parsedCandidate?.newFiles) ? parsedCandidate.newFiles : [])
+        .map((f) => (typeof f?.path === 'string' ? f.path : null))
+        .filter((p) => p !== null),
+    );
+    const surplus = [...declaredPaths].filter((p) => !expectedPaths.has(p));
+    if (surplus.length > 0) {
+      problems.push('surplus path(s) in candidate_manifest.json newFiles (not untracked or staged-new '
+        + `in worktree): ${surplus.slice(0, 5).join(', ')}`);
+    }
+    const omitted = [...expectedPaths].filter((p) => !declaredPaths.has(p));
+    if (omitted.length > 0) {
+      problems.push('untracked or staged-new worktree file(s) omitted from candidate_manifest.json '
+        + `newFiles: ${omitted.slice(0, 5).join(', ')}`);
+    }
+  } catch (e) {
+    problems.push(`could not enumerate worktree new/untracked files: ${String(e.message).slice(0, 120)}`);
+  }
+  return problems;
+}
 
 export const sha256OfFile = (p) => createHash('sha256').update(readFileSync(p)).digest('hex');
 export const sha256OfString = (s) => createHash('sha256').update(s, 'utf-8').digest('hex');
@@ -71,6 +154,14 @@ export function evidenceInputs({ evidenceDir, session }) {
   const inputs = [];
   const logcat = join(evidenceDir, LOGCAT_FILENAME);
   if (existsSync(logcat)) inputs.push({ name: LOGCAT_FILENAME, kind: 'logcat', path: logcat });
+  const candidateManifest = join(evidenceDir, CANDIDATE_MANIFEST_FILENAME);
+  const claimsCandidate = Boolean(
+    (session && Object.hasOwn(session, 'candidateManifest'))
+    || (session?.summary && Object.hasOwn(session.summary, 'candidateManifest')),
+  );
+  if (existsSync(candidateManifest) || claimsCandidate) {
+    inputs.push({ name: CANDIDATE_MANIFEST_FILENAME, kind: 'candidate-manifest', path: candidateManifest });
+  }
   for (const s of session?.samples ?? []) {
     const name = basename(String(s?.rawFile ?? ''));
     if (!name) continue;
@@ -159,6 +250,8 @@ export function verifyEvidencePacket({
   sessionPath,
   manifestPath = undefined,
   requireManifest = true,
+  repoRoot = join(import.meta.dirname, '..', '..'),
+  verifyCandidateProvenance = requireManifest,
 } = {}) {
   const problems = [];
   const fail = (status) => ({
@@ -280,7 +373,7 @@ export function verifyEvidencePacket({
       problems.push(e.message);
       markers = [];
     }
-    const { qualified, disposalIntegrity } = correlateRequests({ markers, segments });
+    const { qualified, componentRequestCounts, disposalIntegrity } = correlateRequests({ markers, segments });
     const mem = summarizeMemory({
       samples: samples.map((s) => ({
         atUtcMs: Number.isFinite(s.captureStartMs) ? s.captureStartMs : Date.parse(s.atUtc),
@@ -302,6 +395,13 @@ export function verifyEvidencePacket({
       disposalFailureCount: disposalIntegrity.disposalFailureCount,
       finalCreated: disposalIntegrity.finalCreated,
       finalDisposed: disposalIntegrity.finalDisposed,
+      componentRequestCounts,
+      sessionOverlapCount: disposalIntegrity.sessionOverlapCount,
+      unresolvedSessionCount: disposalIntegrity.unresolvedSessionCount,
+      countersBalanced: disposalIntegrity.countersBalanced,
+      disposalClean: disposalIntegrity.clean,
+      // bindTargetSamples (above) enforces cold-restart PID continuity on these.
+      sampledProcessIds: [...new Set(processSamples.map((s) => s.processId))],
       maxSampledPrivateDirtyBytes: mem.maxSampledPrivateDirtyBytes,
       peakClaimable: mem.peakClaimable,
     };
@@ -316,6 +416,13 @@ export function verifyEvidencePacket({
       ['disposalIntegrity.disposalFailureCount', L.disposalIntegrity?.disposalFailureCount, rederived.disposalFailureCount],
       ['disposalIntegrity.finalCreated', L.disposalIntegrity?.finalCreated, rederived.finalCreated],
       ['disposalIntegrity.finalDisposed', L.disposalIntegrity?.finalDisposed, rederived.finalDisposed],
+      ['componentRequestCounts.embedder', L.componentRequestCounts?.embedder, rederived.componentRequestCounts.embedder],
+      ['componentRequestCounts.safety-reader', L.componentRequestCounts?.['safety-reader'],
+        rederived.componentRequestCounts['safety-reader']],
+      ['unresolvedSessionCount', L.unresolvedSessionCount, rederived.unresolvedSessionCount],
+      ['disposalIntegrity.unresolvedSessionCount', L.disposalIntegrity?.unresolvedSessionCount, rederived.unresolvedSessionCount],
+      ['sessionOverlapCount', L.sessionOverlapCount, rederived.sessionOverlapCount],
+      ['disposalIntegrity.sessionOverlapCount', L.disposalIntegrity?.sessionOverlapCount, rederived.sessionOverlapCount],
       ['memory.maxSampledPrivateDirtyBytes', M.maxSampledPrivateDirtyBytes, rederived.maxSampledPrivateDirtyBytes],
     ];
     for (const [name, claimedVal, derivedVal] of cmp) {
@@ -328,13 +435,76 @@ export function verifyEvidencePacket({
       problems.push(`memory.peakClaimable: packet claims ${M.peakClaimable}, re-derivation yields `
         + `${rederived.peakClaimable}`);
     }
+    for (const [name, claimedVal, derivedVal] of [
+      ['disposalIntegrity.countersBalanced', L.disposalIntegrity?.countersBalanced, rederived.countersBalanced],
+      ['disposalIntegrity.clean', L.disposalIntegrity?.clean, rederived.disposalClean],
+    ]) {
+      if (claimedVal !== derivedVal) {
+        problems.push(`${name}: packet claims ${claimedVal}, re-derivation yields ${derivedVal}`);
+      }
+      if (derivedVal !== true) {
+        problems.push(`${name}: re-derivation from the raw bytes yields ${derivedVal}; true is required`);
+      }
+    }
+    // Both production models must be proven by the raw bytes themselves.
+    for (const component of ['embedder', 'safety-reader']) {
+      const n = rederived.componentRequestCounts[component];
+      if (!(n >= 1)) {
+        problems.push(`componentRequestCounts.${component}: re-derivation from the raw bytes yields ${n}; `
+          + 'at least 1 is required');
+      }
+    }
+    if (rederived.unresolvedSessionCount !== 0) {
+      problems.push(`unresolvedSessionCount: re-derivation from the raw bytes yields ${rederived.unresolvedSessionCount}; `
+        + '0 is required (every session must record successful disposal)');
+    }
+    if (rederived.sessionOverlapCount !== 0) {
+      problems.push(`sessionOverlapCount: re-derivation from the raw bytes yields ${rederived.sessionOverlapCount}; `
+        + '0 is required (sessions in one process must be serial)');
+    }
+    // Process identity: the claimed sampled PIDs must be what the raw dumps
+    // name, and every correlated PID the packet or the re-derivation names
+    // must be one of them.
+    const sampled = rederived.sampledProcessIds;
+    if (JSON.stringify(L.sampledProcessIds) !== JSON.stringify(sampled)) {
+      problems.push(`sampledProcessIds: packet claims ${JSON.stringify(L.sampledProcessIds)}, re-derivation `
+        + `from the raw dumps yields ${JSON.stringify(sampled)}`);
+    }
+    const correlatedPids = [
+      ...qualified.map((q) => q.pid),
+      ...(Array.isArray(L.correlatedRequests) ? L.correlatedRequests.map((q) => q?.pid) : []),
+      ...(Array.isArray(L.processIds) ? L.processIds : []),
+    ];
+    const unsampled = [...new Set(correlatedPids.filter((pid) => !sampled.includes(pid)))];
+    if (unsampled.length > 0) {
+      problems.push(`correlated PID(s) ${unsampled.join(', ')} are not in sampledProcessIds `
+        + `${JSON.stringify(sampled)}`);
+    }
   }
 
-  // --- 5. MANDATORY: membership of a SEALED evidence manifest -------------
-  // Steps 1-4 prove a packet is INTERNALLY CONSISTENT. They cannot prove it was
-  // ever produced by a device, because a consistent corpus can simply be
-  // authored. Only the seal — which an auditor verifies out of band via the
-  // detached hash — distinguishes the two. This step is therefore required.
+  // --- 5. MANDATORY: candidate_manifest.json + SEALED evidence manifest ----
+  // Steps 1-4 prove a packet is INTERNALLY CONSISTENT. They cannot prove which
+  // candidate APK produced it or that it was not authored after the fact.
+  const candidateManifestPath = join(evidenceDir, CANDIDATE_MANIFEST_FILENAME);
+  if (existsSync(candidateManifestPath)) {
+    try {
+      const parsedCandidate = JSON.parse(readFileSync(candidateManifestPath, 'utf-8'));
+      problems.push(...checkCandidateManifestSafetyReader(parsedCandidate));
+      if (summary.candidateManifest !== undefined
+          && JSON.stringify(summary.candidateManifest) !== JSON.stringify(parsedCandidate)) {
+        problems.push('summary.candidateManifest does not match sealed candidate_manifest.json');
+      }
+      if (verifyCandidateProvenance) {
+        problems.push(...verifyCandidateManifestComplete(parsedCandidate, { repoRoot }));
+      }
+    } catch (e) {
+      problems.push(`${CANDIDATE_MANIFEST_FILENAME} is not parseable JSON: ${e.message}`);
+    }
+  } else if (requireManifest) {
+    problems.push(`no ${CANDIDATE_MANIFEST_FILENAME} in the packet directory — sealed device evidence `
+      + 'must bind the exercised QA candidate manifest and its ratified safetyReader hash');
+  }
+
   const resolved = resolveManifestPath({ evidenceDir, explicit: manifestPath });
   let manifestChecked = false;
   if (resolved.path) {
