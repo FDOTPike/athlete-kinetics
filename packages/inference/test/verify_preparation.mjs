@@ -42,8 +42,8 @@ const sum = (protocol) => protocol.items.reduce((seconds, item) => seconds + ite
 console.log('[1] provenance and dose bounds');
 {
   const sourceIds = new Set(prep.PREPARATION_SOURCES.map((source) => source.id));
-  check('six sources are recorded, each with a citation and what it supports',
-    prep.PREPARATION_SOURCES.length === 6
+  check('nine sources are recorded, each with a citation and what it supports',
+    prep.PREPARATION_SOURCES.length === 9
       && prep.PREPARATION_SOURCES.every((source) => source.citation.length > 40 && source.supports.length > 20));
   const protocols = [
     build(), build({ budgetMin: 5 }), build({ slots: [] }),

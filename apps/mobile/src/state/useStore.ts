@@ -10717,6 +10717,7 @@ export const useStore = create<KineticsStore>()((set, get) => {
       d.executeSync('DELETE FROM report_severity');
       d.executeSync('DELETE FROM slot_override');
       d.executeSync('DELETE FROM planned_slot');
+      d.executeSync('DELETE FROM planned_session_warmup_override');
       d.executeSync('DELETE FROM planned_session');
       d.executeSync('DELETE FROM block_meta');
       // The OPEN episode, and only it, before its program/block parents.

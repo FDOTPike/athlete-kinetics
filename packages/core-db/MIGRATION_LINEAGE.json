@@ -411,6 +411,11 @@
         "ordinal": 81,
         "file": "082_profile_ui_description_mode.sql",
         "sha256": "e0a7453af5b23d22eb6dbb74f7d9f1739c0e5de2a9bed325aa540a0187967a5e"
+      },
+      {
+        "ordinal": 82,
+        "file": "083_warmup_presets.sql",
+        "sha256": "021d52bf6e8a9e8a2b03a2bb3d81d892bb52297a615367bdb2c464ab626dd68c"
       }
     ]
   },
