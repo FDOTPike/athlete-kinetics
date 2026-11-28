@@ -253,18 +253,59 @@ jobs:
           key: minilm-${{ hashFiles('scripts/embedder-integrity.mjs') }}
       - name: Fetch embedder assets
         run: npm run fetch:embedder
+      - name: Cache CocoaPods download cache
+        uses: actions/cache@v5
+        with:
+          path: ~/Library/Caches/CocoaPods/Pods
+          key: cocoapods-pods-${{ runner.os }}-${{ hashFiles('apps/mobile/ios/Podfile.lock', 'apps/mobile/Gemfile.lock') }}
       # Lock-based when Podfile.lock is committed (--deployment refuses any
       # drift). Until the first lock is committed, the job resolves one and
       # uploads it for review rather than pretending to be reproducible.
       - name: Install pods
         working-directory: apps/mobile/ios
         run: |
+          CP_PODS_CACHE="$HOME/Library/Caches/CocoaPods/Pods"
+          ORT_DIR="$CP_PODS_CACHE/Release/onnxruntime-c/1.30.0-36ca0"
+          ORT_SPEC="$CP_PODS_CACHE/Specs/Release/onnxruntime-c/1.30.0-36ca0.podspec.json"
+          verify_ort_cache() {
+            if [ ! -d "$ORT_DIR" ] || [ ! -f "$ORT_SPEC" ]; then
+              echo "::error title=onnxruntime-c pod cache::missing onnxruntime-c 1.30.0-36ca0 cache dir or podspec"
+              exit 1
+            fi
+            SPEC_SHA=$(shasum -a 256 "$ORT_SPEC" | awk '{print $1}')
+            TREE_SHA=$(cd "$ORT_DIR" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 shasum -a 256 | shasum -a 256 | awk '{print $1}')
+            if [ "$SPEC_SHA" != "e8ede7ac7f5c1ab9e5bf1e46216454cb16892e69d7c58094bfe8a30e3e1f353d" ] || [ "$TREE_SHA" != "916aec96269b03515955b8becd987fcc79be5242d91418f61280b3be6c1388c1" ]; then
+              echo "::error title=onnxruntime-c pod cache::cached onnxruntime-c 1.30.0-36ca0 failed integrity check (spec=$SPEC_SHA tree=$TREE_SHA)"
+              exit 1
+            fi
+          }
+          if [ ! -f "$ORT_DIR/onnxruntime.xcframework/Info.plist" ] || [ ! -f "$ORT_SPEC" ]; then
+            if ! curl -fsSI --max-time 10 https://download.onnxruntime.ai/pod-archive-onnxruntime-c-1.30.0.zip >/dev/null 2>&1; then
+              echo "::notice title=onnxruntime-c pod cache::download.onnxruntime.ai unavailable; seeding SHA256-verified onnxruntime-c 1.30.0-36ca0 cache"
+              ORT_TAR="${RUNNER_TEMP:-/tmp}/onnxruntime-c-1.30.0-36ca0.tar.xz"
+              curl -fsSL -o "$ORT_TAR" https://raw.githubusercontent.com/FDOTPike/athlete-kinetics/9a2533b9654eb5b71fda68a9e2f3f0ed67e0d87f/onnxruntime-c-1.30.0-36ca0.tar.xz
+              TAR_SHA=$(shasum -a 256 "$ORT_TAR" | awk '{print $1}')
+              if [ "$TAR_SHA" != "56ebacedaccb3c8809279de032454beb2a80c9faa9fe5d5d8bac56ca0ba333f5" ]; then
+                echo "::error title=onnxruntime-c pod cache::archive SHA-256 mismatch: $TAR_SHA"
+                rm -f "$ORT_TAR"
+                exit 1
+              fi
+              mkdir -p "$CP_PODS_CACHE"
+              tar -xJf "$ORT_TAR" -C "$CP_PODS_CACHE"
+              rm -f "$ORT_TAR"
+              bundle exec pod --version | tr -d '[:space:]' > "$CP_PODS_CACHE/VERSION"
+            fi
+          fi
+          if [ -d "$ORT_DIR" ] || [ -f "$ORT_SPEC" ]; then
+            verify_ort_cache
+          fi
           if git ls-files --error-unmatch Podfile.lock >/dev/null 2>&1; then
             bundle exec pod install --deployment
           else
             echo "::warning::Podfile.lock is not committed; resolving a new lock (uploaded as an artifact for review)."
             bundle exec pod install
           fi
+          verify_ort_cache
       # Reproducibility: with the committed Podfile.lock and the committed
       # results of React Native's post-install (aggregated privacy manifest,
       # RCTNewArchEnabled, project settings), pod install must leave every
