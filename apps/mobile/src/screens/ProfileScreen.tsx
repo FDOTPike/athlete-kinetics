@@ -54,6 +54,7 @@ import ActivitiesScreen from './ActivitiesScreen';
 import { OBJECTIVE_LABEL } from './OnboardingScreen';
 import HealthTrainingSupportForm from '../components/HealthTrainingSupportForm';
 import BackupTransferPanel from '../components/BackupTransferPanel';
+import { IS_BETA_BUILD } from '../config/features';
 
 const OUTCOME_LABELS: Record<string, string> = {
   followed_plan: 'Plan followed',
@@ -481,7 +482,7 @@ export default function ProfileScreen(): React.JSX.Element {
     return <ActivitiesScreen onClose={() => setActivitiesOpen(false)} />;
   }
 
-  if (labOpen && advancedToolsUnlocked) {
+  if (!IS_BETA_BUILD && labOpen && advancedToolsUnlocked) {
     return <CoachVerificationLabScreen onClose={() => setLabOpen(false)} />;
   }
 
@@ -1526,13 +1527,17 @@ export default function ProfileScreen(): React.JSX.Element {
       {advancedToolsUnlocked && (
         <View style={styles.mgmtSection} testID="advanced-tools-section">
           <Text style={styles.mgmtHeading}>ADVANCED TOOLS</Text>
-          <Text style={styles.fieldHint}>Coach verification is sandbox-only. Athlete training remains in the focused app screens.</Text>
-          <QuietAction
-            label="OPEN COACH VERIFICATION LAB"
-            onPress={() => setLabOpen(true)}
-            disabled={!databaseReady}
-            accessibilityLabel="Open Coach Verification Lab"
-          />
+          {!IS_BETA_BUILD && (
+            <>
+              <Text style={styles.fieldHint}>Coach verification is sandbox-only. Athlete training remains in the focused app screens.</Text>
+              <QuietAction
+                label="OPEN COACH VERIFICATION LAB"
+                onPress={() => setLabOpen(true)}
+                disabled={!databaseReady}
+                accessibilityLabel="Open Coach Verification Lab"
+              />
+            </>
+          )}
           <QuietAction
             label="RELOCK ADVANCED TOOLS"
             onPress={() => {

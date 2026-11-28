@@ -234,7 +234,8 @@ console.log('\n[6] the REAL workflow in this repository');
   const androidBuild = readFileSync(join(ROOT, 'apps', 'mobile', 'android', 'build.gradle'), 'utf-8');
   // 23 since verify:preparation joined verify:ci (session-time contract + preparation policy);
   // 24 since verify:native-config (static iOS/native contract, 2026-10-04 integration).
-  const r = checkWorkflowStructure(real, { gateCount: 24 });
+  // 25 since verify:beta-citations (closed-beta filing citation contract).
+  const r = checkWorkflowStructure(real, { gateCount: 25 });
   check('the shipped ci.yml passes every structural assertion',
     r.ok === true, r.problems.join('; ').slice(0, 160));
   check('  ...and its prerequisite job is the verify suite',

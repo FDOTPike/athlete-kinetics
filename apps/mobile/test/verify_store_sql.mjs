@@ -2075,7 +2075,8 @@ if (resetTables.length >= 15) {
 
   // 23 since verify:preparation joined the suite (session-time contract + preparation policy);
   // 24 since verify:native-config (static iOS/native contract, 2026-10-04 integration).
-  a('verify:ci script invokes exactly 24 verify:* targets', verifyInvocations === 24, `got ${verifyInvocations}`);
+  // 25 since verify:beta-citations (closed-beta filing citation contract).
+  a('verify:ci script invokes exactly 25 verify:* targets', verifyInvocations === 25, `got ${verifyInvocations}`);
   a('verify:components bypasses stale transformed migration caches',
     /(?:^|\s)--no-cache(?:\s|$)/.test(verifyComponentsScript), verifyComponentsScript);
   a('AGENT_WORKFLOW.md documents exact verify:ci gate count', workflowGateCount === verifyInvocations, `documented ${workflowGateCount}, actual ${verifyInvocations}`);
