@@ -153,18 +153,18 @@ console.log('\n[2] Negative invariants & poisoning falsifiers');
     wrongPathRes.errors[0] ?? 'accepted wrong path',
   );
 
-  // WO04-SOL-01b: substituting ProfileScreen visible text (517) with accessibilityLabel line (511) fails closed via prevAnchor
+  // WO04-SOL-01b: substituting ProfileScreen visible text (518) with accessibilityLabel line (512) fails closed via prevAnchor
   const wrongDuplicateLineRes = verifyBetaFilingCitations({
     repoRoot,
     readFile: (rel) => {
       const real = fs.readFileSync(path.join(repoRoot, rel), 'utf8');
       return rel === 'docs/release/beta/HEALTH_APPS_DECLARATION.md'
-        ? real.replace('ProfileScreen.tsx:517', 'ProfileScreen.tsx:511')
+        ? real.replace('ProfileScreen.tsx:518', 'ProfileScreen.tsx:512')
         : real;
     },
   });
   check(
-    'WO04-SOL-01b: substituting ProfileScreen visible notice (517) with accessibilityLabel line (511) fails closed via prevAnchor',
+    'WO04-SOL-01b: substituting ProfileScreen visible notice (518) with accessibilityLabel line (512) fails closed via prevAnchor',
     !wrongDuplicateLineRes.ok && wrongDuplicateLineRes.errors.some((e) => e.includes('disambiguating context')),
     wrongDuplicateLineRes.errors[0] ?? 'accepted duplicate substring on wrong line',
   );

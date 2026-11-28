@@ -8,6 +8,48 @@ import { NavigationProvider } from '../../src/navigation/navigation';
 import { PrimaryButton } from '../../src/components/ui';
 
 let mockState;
+jest.mock('../../src/config/features', () => ({
+  get IS_BETA_BUILD() { return mockBuildFeatures.IS_BETA_BUILD; },
+  get QUESTION_BOX_ENABLED() { return mockBuildFeatures.QUESTION_BOX_ENABLED; },
+}));
+
+function loadBuildFeatures(value) {
+  // Jest leaves the environment read intact. Isolate the real module so each
+  // test gets the build setting it requested even if the shell has it set.
+  const saved = process.env.AK_BETA_BUILD;
+  if (value === undefined) delete process.env.AK_BETA_BUILD;
+  else process.env.AK_BETA_BUILD = value;
+  try {
+    let features;
+    jest.isolateModules(() => { features = jest.requireActual('../../src/config/features'); });
+    return features;
+  } finally {
+    if (saved === undefined) delete process.env.AK_BETA_BUILD;
+    else process.env.AK_BETA_BUILD = saved;
+  }
+}
+
+const defaultBuildFeatures = loadBuildFeatures();
+let mockBuildFeatures = defaultBuildFeatures;
+beforeEach(() => { mockBuildFeatures = defaultBuildFeatures; });
+const labHint = 'Coach verification is sandbox-only. Athlete training remains in the focused app screens.';
+
+function unlockAdvancedTools(view) {
+  expect(screen.queryByTestId('advanced-athlete-manager')).toBeNull();
+  expect(screen.queryByTestId('advanced-tools-section')).toBeNull();
+  const build = screen.getByLabelText('Build 1.0.0-beta.1');
+  for (let i = 0; i < 6; i += 1) fireEvent.press(build);
+  expect(mockState.setAdvancedToolsUnlocked).not.toHaveBeenCalled();
+  fireEvent.press(build);
+  expect(mockState.setAdvancedToolsUnlocked).toHaveBeenCalledTimes(1);
+  expect(mockState.setAdvancedToolsUnlocked).toHaveBeenCalledWith(true);
+  view.rerender(<ProfileScreen />);
+  expect(screen.getByTestId('advanced-athlete-manager')).toBeOnTheScreen();
+  expect(screen.getByTestId('advanced-tools-section')).toBeOnTheScreen();
+  expect(screen.getByText('MANAGE ATHLETES')).toBeOnTheScreen();
+  expect(screen.getByText('ADVANCED TOOLS')).toBeOnTheScreen();
+  expect(screen.getByText('RELOCK ADVANCED TOOLS')).toBeOnTheScreen();
+}
 const mockBackupState = {
   status: 'idle', startupSafe: true, recoveryAvailable: false, message: null, lastSuccessfulBackupAt: null, preview: null,
   initialize: jest.fn(), createBackup: jest.fn(), chooseRestore: jest.fn(),
@@ -102,6 +144,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
 
   beforeEach(() => {
     mockBackupState.status = 'idle';
+    mockBackupState.preview = null;
     deleteAthleteMock = jest.fn();
     wipeBlockStateMock = jest.fn();
     switchProfileMock = jest.fn();
@@ -170,7 +213,7 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
       renameAthleteEntry: jest.fn(),
       deleteAthlete: deleteAthleteMock,
       advancedToolsUnlocked: false,
-      setAdvancedToolsUnlocked: jest.fn(),
+      setAdvancedToolsUnlocked: jest.fn((unlocked) => { mockState.advancedToolsUnlocked = unlocked; }),
       completeOnboarding: jest.fn(),
       beginOnboardingDraft: () => ({ athleteId: 'default', contextRevision: 0 }),
       loadDemoAthlete: jest.fn(),
@@ -530,16 +573,6 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     expect(deleteAthleteMock).toHaveBeenCalledWith('ath-2');
   });
 
-  test('advanced athlete management and Lab are hidden until the seven-tap gesture', () => {
-    render(<ProfileScreen />);
-
-    expect(screen.queryByTestId('advanced-athlete-manager')).toBeNull();
-    expect(screen.queryByTestId('advanced-tools-section')).toBeNull();
-    for (let i = 0; i < 7; i += 1) fireEvent.press(screen.getByLabelText('Build 1.0.0-beta.1'));
-    expect(mockState.setAdvancedToolsUnlocked).toHaveBeenCalledTimes(1);
-    expect(mockState.setAdvancedToolsUnlocked).toHaveBeenCalledWith(true);
-  });
-
   test('#358 footer build version matches apps/mobile/app.json without hardcoded 0.1.0', () => {
     const appJson = require('../../app.json');
     expect(appJson.version).toBe('1.0.0-beta.1');
@@ -549,12 +582,13 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     expect(screen.queryByText(/0\.1\.0/)).toBeNull();
   });
 
-  test('unlocked tools expose the sandbox Lab and explicit relock', () => {
-    mockState.advancedToolsUnlocked = true;
-    render(<ProfileScreen />);
+  test('default build unlocks the sandbox Lab and returns to Profile on close', () => {
+    expect(mockBuildFeatures.IS_BETA_BUILD).toBe(false);
+    unlockAdvancedTools(render(<ProfileScreen />));
 
-    expect(screen.getByTestId('advanced-athlete-manager')).toBeOnTheScreen();
-    fireEvent.press(screen.getByLabelText('Open Coach Verification Lab'));
+    expect(screen.getByText(labHint)).toBeOnTheScreen();
+    expect(screen.getByLabelText('Open Coach Verification Lab')).toBeOnTheScreen();
+    fireEvent.press(screen.getByText('OPEN COACH VERIFICATION LAB'));
     expect(screen.getByTestId('coach-verification-lab')).toBeOnTheScreen();
     expect(screen.getByTestId('lab-no-write-notice')).toBeOnTheScreen();
     fireEvent.press(screen.getByLabelText('Run all verification scenarios'));
@@ -563,8 +597,73 @@ describe('ProfileScreens & Onboarding (WO-UI-5b Remediation)', () => {
     expect(mockState.saveProfile).not.toHaveBeenCalled();
     expect(mockState.saveBodyweight).not.toHaveBeenCalled();
     fireEvent.press(screen.getByLabelText('Close Coach Verification Lab'));
+    expect(screen.queryByTestId('coach-verification-lab')).toBeNull();
+    expect(screen.getByText('ATHLETE PROFILE')).toBeOnTheScreen();
     fireEvent.press(screen.getByLabelText('Relock advanced tools'));
     expect(mockState.setAdvancedToolsUnlocked).toHaveBeenCalledWith(false);
+  });
+
+  test('beta build keeps Coach Mode and backup/restore operable without exposing the Lab', () => {
+    mockBuildFeatures = loadBuildFeatures('on');
+    expect(mockBuildFeatures.IS_BETA_BUILD).toBe(true);
+    const view = render(<ProfileScreen />);
+    unlockAdvancedTools(view);
+
+    const manager = within(screen.getByTestId('advanced-athlete-manager'));
+    fireEvent.press(manager.getByLabelText('Coach mode, 2 athletes, collapsed'));
+    expect(manager.getByLabelText('Coach mode, 2 athletes, expanded')).toBeOnTheScreen();
+    expect(manager.getByLabelText('Athlete Default Athlete, active')).toBeOnTheScreen();
+    fireEvent.press(manager.getByLabelText('Athlete Test Athlete, tap to switch'));
+    expect(mockState.switchAthlete).toHaveBeenCalledWith('ath-2');
+
+    const backup = within(screen.getByTestId('backup-transfer-section'));
+    const password = 'twelve-chars+';
+    fireEvent.changeText(backup.getByLabelText('Backup password, at least 12 characters'), password);
+    fireEvent.changeText(backup.getByLabelText('Confirm backup password'), password);
+    fireEvent.press(backup.getByText('CREATE ENCRYPTED BACKUP'));
+    expect(mockBackupState.createBackup).toHaveBeenCalledWith(password);
+
+    mockBackupState.chooseRestore.mockImplementationOnce(() => {
+      mockBackupState.preview = {
+        backupId: 'one', createdAt: '2026-09-13T05:00:00.000Z', athleteNames: ['Default Athlete', 'Test Athlete'],
+        databaseCount: 2, totalBytes: 2_097_152, replaceOnly: true,
+      };
+    });
+    fireEvent.press(backup.getByText('RESTORE ENCRYPTED BACKUP'));
+    expect(mockBackupState.chooseRestore).toHaveBeenCalledWith(password);
+    view.rerender(<ProfileScreen />);
+    expect(backup.getByText('RESTORE PREVIEW')).toBeOnTheScreen();
+    expect(backup.getByText('Athletes: Default Athlete, Test Athlete')).toBeOnTheScreen();
+    expect(mockBackupState.confirmRestore).not.toHaveBeenCalled();
+    fireEvent.press(backup.getByTestId('confirm-restore-button'));
+    expect(mockBackupState.confirmRestore).toHaveBeenCalledTimes(1);
+
+    expect({
+      labButtonAbsent: screen.queryByText('OPEN COACH VERIFICATION LAB') === null,
+      labLabelAbsent: screen.queryByLabelText('Open Coach Verification Lab') === null,
+      labHintAbsent: screen.queryByText(labHint) === null,
+    }).toEqual({ labButtonAbsent: true, labLabelAbsent: true, labHintAbsent: true });
+
+    fireEvent.press(screen.getByText('RELOCK ADVANCED TOOLS'));
+    expect(mockState.setAdvancedToolsUnlocked).toHaveBeenCalledWith(false);
+    view.rerender(<ProfileScreen />);
+    expect(screen.queryByTestId('advanced-athlete-manager')).toBeNull();
+    expect(screen.queryByTestId('advanced-tools-section')).toBeNull();
+  });
+
+  test('beta render guard suppresses the Lab even when its open state is set', () => {
+    mockState.advancedToolsUnlocked = true;
+    const view = render(<ProfileScreen />);
+    fireEvent.press(screen.getByLabelText('Open Coach Verification Lab'));
+    expect(screen.getByTestId('coach-verification-lab')).toBeOnTheScreen();
+
+    // Change the test setting without remounting so labOpen stays true.
+    mockBuildFeatures = loadBuildFeatures('on');
+    expect(mockBuildFeatures.IS_BETA_BUILD).toBe(true);
+    view.rerender(<ProfileScreen />);
+    const labAbsent = screen.queryByTestId('coach-verification-lab') === null;
+    expect(labAbsent).toBe(true);
+    expect(screen.getByText('ATHLETE PROFILE')).toBeOnTheScreen();
   });
 
   test('b) Block wipe requires two presses before store action fires', () => {

@@ -12,6 +12,6 @@
 
 > pikeMethods provides training guidance, not medical advice. It is not a medical device. Stop if something feels unsafe and seek qualified professional advice when needed.
 
-`apps/mobile/src/screens/ProfileScreen.tsx:517-518`
+`apps/mobile/src/screens/ProfileScreen.tsx:518-519`
 
 The proposed wording preserves a halt for the day and does not imply a restriction is medical clearance. It is draft copy; it has not been inserted in onboarding or the listing.
