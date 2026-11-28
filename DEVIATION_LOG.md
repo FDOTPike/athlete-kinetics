@@ -791,3 +791,30 @@ they can change their goals at any time in Athlete Profile (PR 99).
    - Owner ratified running `npm run fetch:safety-reader` with `GITHUB_TOKEN` in scope in `.github/workflows/ci.yml` to materialize the hash-pinned release asset `775095775` (`reader_quantized.onnx`, `22,881,187` B, SHA-256 `a0fa76e40e10246a9caf9d1be463b72b34f03174c68b017d6673fe9f165cb5cf`) from `FDOTPike/athlete-kinetics@ml-reader-m10-r15-s3` (target commit `b6ceee70c7b7a9afd793968e8ca15ba17704b572`).
    - Scope as present in `.github/workflows/ci.yml`: the `verify` job ("Fetch safety reader assets"), the `android-apk` job ("Stage safety reader model into Android assets", which then runs `node scripts/stage-native-safety-reader.mjs apps/mobile/android/app/src/main/assets/safety_reader.onnx --required`), and the `ios-simulator` job ("Fetch safety reader assets"). Each of these steps sets `GITHUB_TOKEN: ${{ github.token }}` in its own step `env` only, after a model cache step keyed on `hashFiles('scripts/safety-reader-integrity.mjs')`.
    - `scripts/fetch-safety-reader.mjs` uses the token only as the `Authorization` header for the asset download; acceptance of cached, existing, and downloaded bytes is decided by the exact size and SHA-256 in `scripts/safety-reader-integrity.mjs` (`verifySafetyReaderFile` / `installVerifiedSafetyReader`), not by the token or release metadata.
+
+## 2026-11-28 - On-device safety reader alongside the sentence embedder
+
+The product owner authorizes `safety_reader.onnx` (`m10-r15-reader-seed3`,
+r15/denial-floor, 22,881,187 bytes, SHA-256
+`a0fa76e40e10246a9caf9d1be463b72b34f03174c68b017d6673fe9f165cb5cf`)
+alongside `minilm.onnx` for offline interpretation of athlete reports.
+Both models use the shared `SerializedOrtScheduler`. Deterministic
+TypeScript retains authority over prescriptions, blocks, progression,
+substitution and cues.
+
+The dual-model budget envelope remains 471,936,000 bytes. The preferred
+operating target remains 450,000,000 bytes and the hard ceiling remains
+536,870,912 bytes. Release promotion requires a fresh dual-model
+`meminfo_harness` run on a physical Pixel 9 Pro using `app-qa.apk` from
+the final candidate HEAD, a sealed evidence manifest and `verify:release`
+exit 0. Record explicit review of any peak above the preferred target.
+
+Wireless ADB is authorized for the physical Pixel 9 Pro memory run. USB
+validation remains NOT VERIFIED. Authenticated run-04 evidence from
+`53c3f881` may satisfy the memory-evidence condition for merging #389
+into `claude/release-integration` when its provenance establishes the
+same model pair and relevant runtime configuration. If that evidence is
+unusable, hold #389 until fresh qualifying evidence is available.
+Release promotion requires the final candidate's own sealed evidence
+and a successful `verify:release` against its live candidate manifest.
+Physical 3 GB and 4 GB device validation and USB validation remain NOT VERIFIED.
