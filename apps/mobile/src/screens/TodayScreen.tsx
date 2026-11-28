@@ -39,7 +39,16 @@
  */
 import React, { useMemo } from 'react';
 import { Alert, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { addDaysIso, applyPrescriptionToSlot } from '@ak/inference';
+import {
+  BALANCED_FOCUS,
+  addDaysIso,
+  applyPrescriptionToSlot,
+  describeFocus,
+  resolveMuscleGroupAlias,
+  sportDisplayName,
+  sportEmphasisFor,
+  type MuscleGroupId,
+} from '@ak/inference';
 import { useStore, freeFormStartIsEmpty, type EarlierOpenSession } from '../state/useStore';
 import { useNavigation } from '../navigation/navigation';
 import TrainingSupportNotice from '../components/TrainingSupportNotice';
@@ -114,15 +123,21 @@ function AvailableTodayScreen({
   const today = useStore((s) => s.today);
   const session = useStore((s) => s.session);
   const todayPlan = useStore((s) => s.todayPlan);
-  const blockSessions = useStore((s) => s.blockSessions);
-  const block = useStore((s) => s.block);
+  const blockSessions = useStore((s) => s.blockSessions) ?? [];
+  const block = useStore((s) => s.block) ?? null;
   const suspension = useStore((s) => s.suspension);
   const hasArchivedBlock = useStore((s) => s.hasArchivedBlock);
   const lastTriage = useStore((s) => s.lastTriage);
   const prescription = useStore((s) => s.prescription);
   const vector = useStore((s) => s.vector);
   const profile = useStore((s) => s.profile);
-  const program = useStore((s) => s.program);
+  const program = useStore((s) => s.program) ?? null;
+  const focus = useStore((s) => s.focus) ?? null;
+  const sport = useStore((s) => s.sport) ?? null;
+  const goals = useStore((s) => s.goals) ?? [];
+  const goalMovements = useStore((s) => s.goalMovements) ?? {};
+  const blockEmphasis = useStore((s) => s.blockEmphasis) ?? null;
+  const movements = useStore((s) => s.movements) ?? [];
   const startSession = useStore((s) => s.startSession);
   const storeFreeFormStartIsEmpty = useStore((s) => s.freeFormStartIsEmpty);
   const storeEquipmentConflict = useStore((s) => s.todayPlanEquipmentConflict);
@@ -415,22 +430,83 @@ function AvailableTodayScreen({
           recordedDurationsForFocus(state.focus),
           profile.session_duration_cap_min,
         );
+        const todayWeekIndex = blockSessions.find((s) => s.plannedSessionId === todayPlan?.plannedSessionId)?.weekIndex
+          ?? blockSessions.find((s) => s.sessionDate >= today)?.weekIndex
+          ?? 1;
+        const hasFrozenEmphasis = blockEmphasis?.inputs != null;
+        const focusSummary = hasFrozenEmphasis
+          ? (blockEmphasis!.inputs.focus?.description ?? describeFocus(BALANCED_FOCUS))
+          : (focus !== null ? describeFocus(focus) : describeFocus(BALANCED_FOCUS));
+        const sportSummary = hasFrozenEmphasis
+          ? (blockEmphasis!.inputs.sport?.name ?? null)
+          : (sport !== null ? sportDisplayName(sport) : null);
+        const identityLine = block !== null || program !== null
+          ? `${program !== null ? `Block ${program.currentSequenceIndex} of ${program.plannedBlockCount} · ` : ''}Week ${todayWeekIndex} of 4 · ${focusSummary}${sportSummary !== null ? ` · ${sportSummary}` : ''}`
+          : null;
+        const focusMuscles = new Set<MuscleGroupId>(hasFrozenEmphasis ? [] : focus?.muscles ?? []);
+        const sportMuscles = new Set<MuscleGroupId>(
+          !hasFrozenEmphasis && sport !== null ? sportEmphasisFor(sport).muscles : [],
+        );
+        const appliedLines = blockEmphasis?.report?.applied ?? [];
+        const slotProvenanceLabel = (slot: { movementId: number; movementName: string }): string | null => {
+          const goalLabel = hasFrozenEmphasis
+            ? (blockEmphasis!.inputs.goalMovements?.find((g) => g.movementId === slot.movementId)?.goalLabel ?? null)
+            : (goals.find((g) => goalMovements[g.goalId] === slot.movementId)?.goal.specificOutcome ?? null);
+          if (goalLabel !== null && goalLabel !== undefined) {
+            return `Goal: ${goalLabel}`;
+          }
+          const rawTargetMuscles = movements.find((m) => m.movement_id === slot.movementId)?.targetMuscles ?? [];
+          const resolvedMuscles = rawTargetMuscles
+            .map((m) => resolveMuscleGroupAlias(m))
+            .filter((m): m is MuscleGroupId => m !== null);
+          const matchesMovement = (line: string): boolean =>
+            line.startsWith(`${slot.movementName} is planned instead of `)
+            || line.startsWith(`${slot.movementName} is added to a `)
+            || line.startsWith(`${slot.movementName} takes the place of `);
+          const matchedFocus = hasFrozenEmphasis
+            ? appliedLines.some((line) => matchesMovement(line) && line.includes('(your focus)'))
+            : resolvedMuscles.some((m) => focusMuscles.has(m));
+          if (matchedFocus) {
+            return 'Your focus';
+          }
+          const matchedSport = hasFrozenEmphasis
+            ? appliedLines.some((line) =>
+                matchesMovement(line)
+                && line.includes(`(your ${sportSummary ?? 'sport'} outcome)`),
+              )
+            : resolvedMuscles.some((m) => sportMuscles.has(m));
+          if (matchedSport) {
+            return `Your ${sportSummary ?? 'sport'} outcome`;
+          }
+          return null;
+        };
         const preview = (todayPlan?.slots ?? []).slice(0, 4);
         const remaining = (todayPlan?.slots.length ?? 0) - preview.length;
         return (
           <View style={[styles.card, styles.cardActive]} testID="today-card-planned">
             <Text style={styles.eyebrow}>TODAY</Text>
             <Text style={styles.title}>{focusName(state.focus)}</Text>
+            {identityLine !== null && (
+              <Text style={styles.caption} testID="today-program-identity">{identityLine}</Text>
+            )}
             <Text style={styles.caption} testID="today-duration">{durationCopy(estimate)}</Text>
             <View style={styles.preview}>
               {preview.map((slot) => {
                 const effective = applyPrescriptionToSlot(slot, todaysVector);
+                const provenance = slotProvenanceLabel(slot);
                 return (
-                  <Text key={slot.plannedSlotId} style={styles.previewRow}>
-                    {slot.movementName} · {effective.backOff !== undefined && effective.backOff.sets > 0 && slot.target.kind === 'reps'
-                      ? `1×${slot.target.reps} + ${effective.backOff.sets}×${effective.backOff.reps}`
-                      : `${effective.sets}×${slot.target.kind === 'time' ? `${slot.target.seconds}s` : slot.target.reps}`}
-                  </Text>
+                  <View key={slot.plannedSlotId}>
+                    <Text style={styles.previewRow}>
+                      {slot.movementName} · {effective.backOff !== undefined && effective.backOff.sets > 0 && slot.target.kind === 'reps'
+                        ? `1×${slot.target.reps} + ${effective.backOff.sets}×${effective.backOff.reps}`
+                        : `${effective.sets}×${slot.target.kind === 'time' ? `${slot.target.seconds}s` : slot.target.reps}`}
+                    </Text>
+                    {provenance !== null && (
+                      <Text style={styles.caption} testID={`today-slot-provenance-${slot.plannedSlotId}`}>
+                        {provenance}
+                      </Text>
+                    )}
+                  </View>
                 );
               })}
               {remaining > 0 && (

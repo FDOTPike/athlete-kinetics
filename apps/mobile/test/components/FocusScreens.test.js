@@ -1,8 +1,9 @@
 import React from 'react';
-import { StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import ReadinessScreen from '../../src/screens/ReadinessScreen';
 import BlockScreen from '../../src/screens/BlockScreen';
+import { readBlockEmphasis } from '../../src/state/sportStore';
 import { theme } from '../../src/theme/theme';
 
 let mockState;
@@ -313,7 +314,7 @@ describe('Plan session starts navigate only after the store creates a session', 
   });
 });
 
-test('COACH opens the Manage program editor and saves future preferences', () => {
+test('R10: COACH opens the active Manage program editor directly and saves future preferences', () => {
   const updateProgramPreferences = jest.fn(() => true);
   const activeProgram = {
     programId: 7,
@@ -361,7 +362,9 @@ test('COACH opens the Manage program editor and saves future preferences', () =>
   });
 
   render(<BlockScreen />);
+  expect(screen.getByText('Manage program')).toBeOnTheScreen();
   fireEvent.press(screen.getByLabelText('Manage future program preferences'));
+  expect(screen.queryByText('Auto')).toBeNull();
   expect(screen.getByText('MANAGE PROGRAM')).toBeOnTheScreen();
   fireEvent.press(screen.getByText('Save future preferences'));
   expect(updateProgramPreferences).toHaveBeenCalledTimes(1);
@@ -800,21 +803,17 @@ describe('BlockScreen - Chooser Entry (Work Order E)', () => {
     expect(screen.queryByText('Coming soon')).toBeNull();
   });
 
-  test('with a program whose review is due and a standalone block, the button keeps "Plan a new block" and opens the chooser (#172)', () => {
-    // The program editor only saves for an active program, so a finished
-    // program must not route this button to it.
-    mockState = baseState({
-      block: { blockId: 1, startDate: '2026-07-01', objective: 'strength', createdAtMs: 1 },
-      program: {
-        programId: 1,
-        status: 'review_due',
-        currentSequenceIndex: 2,
-        plannedBlockCount: 2,
-        plannedEndDate: '2026-08-26',
-        days: [{ dayIndex: 1, focus: 'lower' }, { dayIndex: 2, focus: 'upper' }],
-        movementPreferences: [],
-      },
-    });
+  const planningProgram = {
+    programId: 1,
+    currentSequenceIndex: 2,
+    plannedBlockCount: 2,
+    plannedEndDate: '2026-08-26',
+    days: [{ dayIndex: 1, focus: 'lower' }, { dayIndex: 2, focus: 'upper' }],
+    movementPreferences: [],
+  };
+
+  test('with a review-due program, Plan a new block opens the chooser and Auto creates (#172)', () => {
+    mockState = baseState({ program: { ...planningProgram, status: 'review_due' } });
 
     render(<BlockScreen />);
 
@@ -823,6 +822,46 @@ describe('BlockScreen - Chooser Entry (Work Order E)', () => {
     expect(screen.getByText('Start a new block')).toBeOnTheScreen();
     expect(screen.getByText('Custom')).toBeOnTheScreen();
     expect(screen.queryByText('MANAGE PROGRAM')).toBeNull();
+
+    fireEvent.press(screen.getByText('Auto'));
+    expect(screen.getByText('BUILD YOUR PROGRAM')).toBeOnTheScreen();
+    expect(screen.getByText('Create program')).toBeOnTheScreen();
+    expect(screen.queryByText('MANAGE PROGRAM')).toBeNull();
+    expect(screen.queryByText('Save future preferences')).toBeNull();
+  });
+
+  describe.each([
+    ['full view with a block', 'Manage program', {}],
+    ['gated view with a block', 'Manage program', { vector: null }],
+    ['full view without a block', 'Set up a four-week block', { block: null, todayPlan: null, blockSessions: [] }],
+  ])('R10: program planning in %s', (_view, action, overrides) => {
+    test.each(['review_due', 'archived'])('%s program opens creation mode', (status) => {
+      mockState = baseState({ program: { ...planningProgram, status }, ...overrides });
+
+      render(<BlockScreen />);
+      fireEvent.press(screen.getByText(action));
+      if (status === 'archived') {
+        expect(screen.getByText('Start a new block')).toBeOnTheScreen();
+        fireEvent.press(screen.getByText('Auto'));
+      }
+
+      expect(screen.queryByText('BUILD YOUR PROGRAM')).toBeOnTheScreen();
+      expect(screen.getByText('Create program')).toBeOnTheScreen();
+      expect(screen.queryByText('MANAGE PROGRAM')).toBeNull();
+      expect(screen.queryByText('Save future preferences')).toBeNull();
+      expect(screen.queryByText('Start a new block')).toBeNull();
+    });
+
+    test('active program opens edit mode directly', () => {
+      mockState = baseState({ program: { ...planningProgram, status: 'active' }, ...overrides });
+
+      render(<BlockScreen />);
+      fireEvent.press(screen.getByText(action));
+
+      expect(screen.getByText('MANAGE PROGRAM')).toBeOnTheScreen();
+      expect(screen.getByText('Save future preferences')).toBeOnTheScreen();
+      expect(screen.queryByText('Start a new block')).toBeNull();
+    });
   });
 
   test('inter-block state with block === null and program !== null still opens chooser and routes to handlers', () => {
@@ -1088,4 +1127,160 @@ describe('#170: the neutral default of 50 is named as a default', () => {
     fireEvent.press(screen.getByLabelText('Full readiness metrics'));
     expect(screen.getByText('+0.4 SD from your baseline')).toBeOnTheScreen();
   });
+});
+
+test('PLAN pre-readiness (vector === null) renders existing weekly activities, emphasis disclosure, and manage program preferences (#380)', () => {
+  const activeProgram = {
+    programId: 7,
+    objective: 'strength',
+    startDate: '2026-07-01',
+    horizonKind: 'weeks',
+    requestedReviewDate: null,
+    plannedEndDate: '2026-10-21',
+    plannedBlockCount: 4,
+    startingMacroBlockIndex: 1,
+    schemaType: 'LINEAR',
+    status: 'active',
+    currentSequenceIndex: 1,
+    days: [{ dayIndex: 1, focus: 'full' }],
+    movementPreferences: [],
+  };
+  const editorPreview = {
+    objective: 'strength',
+    startDate: TODAY,
+    requestedReviewDate: null,
+    plannedEndDate: '2026-10-21',
+    plannedBlockCount: 4,
+    schemaType: 'LINEAR',
+    days: activeProgram.days,
+    plan: {
+      objective: 'strength', start_date: TODAY, weeks: 4, schemaType: 'LINEAR',
+      macroBlockIndex: 2, macroPhase: 'gpp', peakShifted: false,
+      sessions: [], warnings: [], recovery: false, autopilotAdjusted: [],
+    },
+  };
+  mockState = baseState({
+    vector: null,
+    suspension: null,
+    program: activeProgram,
+    previewTrainingProgram: jest.fn(() => editorPreview),
+    updateProgramPreferences: jest.fn(() => true),
+    previewNextProgramBlock: jest.fn(() => null),
+    continueTrainingProgram: jest.fn(),
+    archiveTrainingProgram: jest.fn(),
+    activityLedger: {
+      definitions: [], occurrences: [], completedLast28Days: 0, knownMinutesLast28Days: 0,
+      completedWithUnknownDuration: 0, scheduledKnownMinutesPerWeek: 60,
+      scheduledWithUnknownDuration: 0,
+      series: [{
+        seriesId: 'series-basketball', activityId: 'activity-basketball', displayName: 'Basketball',
+        revision: 1, localWeekday: 5, localStartMinute: 1020, timezoneId: 'Australia/Sydney',
+        timing: 'fixed', expectedDurationMin: 60, expectedEffort: null,
+        effectiveStartDate: '2026-07-01', effectiveEndDate: null,
+      }],
+    },
+    blockEmphasis: {
+      blockId: 1,
+      inputs: {},
+      report: { version: 1, applied: ['Focus — Beach muscles: upper chest, biceps, triceps.'], omitted: [] },
+    },
+  });
+
+  render(<BlockScreen />);
+
+  expect(screen.getByTestId('plan-existing-activities')).toBeOnTheScreen();
+  expect(screen.getByTestId('plan-emphasis-disclosure')).toBeOnTheScreen();
+  expect(screen.getByLabelText('Manage future program preferences')).toBeOnTheScreen();
+
+  fireEvent.press(screen.getByLabelText('Manage future program preferences'));
+  expect(screen.getByText('MANAGE PROGRAM')).toBeOnTheScreen();
+});
+
+test.each([false, true])('PLAN hides unknown legacy emphasis and explains recorded empty emphasis (readiness available: %s)', (ready) => {
+  const { NO_EMPHASIS_EXPLANATION } = jest.requireActual('@ak/inference');
+  mockState = baseState({
+    vector: ready ? vector : null,
+    blockEmphasis: null,
+    focus: { bundleId: null, muscles: ['chest'], customised: true, movementControl: false },
+  });
+  const view = render(<BlockScreen />);
+
+  expect(screen.queryByTestId('plan-emphasis-disclosure')).toBeNull();
+
+  mockState.blockEmphasis = {
+    blockId: 1,
+    inputs: { version: 1, focus: null, sport: null, workload: null, goalMovements: [] },
+    report: { version: 1, applied: [], omitted: [] },
+  };
+  view.rerender(<BlockScreen />);
+  fireEvent.press(screen.getByRole('button', { name: 'WHY THIS PLAN LOOKS THE WAY IT DOES' }));
+  expect(screen.getByTestId('plan-emphasis-empty')).toHaveTextContent(NO_EMPHASIS_EXPLANATION);
+
+  const omitted = 'No extra chest work: this plan has no strength day that trains that part of the body.';
+  mockState.blockEmphasis = {
+    ...mockState.blockEmphasis,
+    inputs: {
+      ...mockState.blockEmphasis.inputs,
+      focus: { muscles: ['chest'], movementControl: false },
+    },
+    report: { version: 1, applied: [], omitted: [omitted] },
+  };
+  view.rerender(<BlockScreen />);
+  expect(screen.queryByTestId('plan-emphasis-empty')).toBeNull();
+  expect(screen.getByTestId('plan-emphasis-omitted')).toHaveTextContent(omitted);
+});
+
+test.each([false, true])('R10: PLAN explains an empty report with saved focus (readiness available: %s)', (ready) => {
+  const { NO_EMPHASIS_EXPLANATION, describeFocus } = jest.requireActual('@ak/inference');
+  const focus = { bundleId: null, muscles: ['chest'], customised: true, movementControl: false };
+  const blockEmphasis = readBlockEmphasis({
+    executeSync: () => ({ rows: [{
+      inputs_json: JSON.stringify({
+        version: 1,
+        focus: { muscles: focus.muscles, movementControl: focus.movementControl, description: describeFocus(focus) },
+        sport: null,
+        workload: null,
+        goalMovements: [],
+      }),
+      report_json: JSON.stringify({ version: 1, applied: [], omitted: [] }),
+    }] }),
+  }, 1);
+  mockState = baseState({ vector: ready ? vector : null, blockEmphasis });
+
+  render(<BlockScreen />);
+  fireEvent.press(screen.getByRole('button', { name: 'WHY THIS PLAN LOOKS THE WAY IT DOES' }));
+
+  expect(screen.queryByText(NO_EMPHASIS_EXPLANATION)).toBeNull();
+  expect(screen.getByText('Nothing in this plan was changed by them.')).toBeOnTheScreen();
+});
+
+test.each([false, true])('Manage block scroll uses the right layout origin (readiness available: %s)', (ready) => {
+  const scrollTo = jest.spyOn(ScrollView.prototype, 'scrollTo').mockImplementation(() => {});
+  mockState = baseState({ vector: ready ? vector : null, program: null });
+  render(<BlockScreen />);
+
+  fireEvent(screen.getByText('Four-week trajectory'), 'layout', { nativeEvent: { layout: { y: 250 } } });
+  if (ready) {
+    fireEvent(screen.getByText('Optional details'), 'layout', { nativeEvent: { layout: { y: 600 } } });
+  }
+  fireEvent(screen.getByTestId('manage-block-section'), 'layout', { nativeEvent: { layout: { y: 400 } } });
+  fireEvent.press(screen.getByLabelText('Manage current block'));
+
+  expect(scrollTo).toHaveBeenCalledWith({ y: (ready ? 1000 : 400) - theme.space[4], animated: true });
+});
+
+test('WO03-SOL-03 & WO03-SOL-04: PLAN pre-readiness Manage block (program === null) opens current block controls rather than NewBlockChooser, and partial activityLedger {} never throws', () => {
+  mockState = baseState({
+    vector: null,
+    program: null,
+    activityLedger: {},
+  });
+  render(<BlockScreen />);
+
+  expect(screen.getByLabelText('Manage current block')).toBeOnTheScreen();
+  fireEvent.press(screen.getByLabelText('Manage current block'));
+
+  expect(screen.getByTestId('manage-block-section')).toBeOnTheScreen();
+  expect(screen.getByText('Choose a loading structure')).toBeOnTheScreen();
+  expect(screen.getByLabelText('Generate next block')).toBeOnTheScreen();
 });

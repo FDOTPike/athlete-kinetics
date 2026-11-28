@@ -6,7 +6,7 @@
  * - In beta builds, copy that says "load the demo athlete" must not appear.
  */
 import React from 'react';
-import { render, screen } from '@testing-library/react-native';
+import { fireEvent, render, screen } from '@testing-library/react-native';
 
 let mockIsBetaBuild = false;
 jest.mock('../../src/config/features', () => ({
@@ -146,5 +146,30 @@ describe('Demo athlete entry points and copy gated by IS_BETA_BUILD (#133)', () 
       ),
     ).toBeOnTheScreen();
     blockView.unmount();
+  });
+
+  test('once real onboarding completes (onboarded === true), Refresh is the primary action and Load demo athlete is demoted below it (S1-003)', () => {
+    mockIsBetaBuild = false;
+    mockState.onboarded = true;
+
+    const readyView = render(<ReadinessScreen />);
+    const { PrimaryButton, SecondaryButton } = require('../../src/components/ui');
+    expect(screen.getByText('Refresh')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Load the 180 day demo athlete')).toBeOnTheScreen();
+    expect(readyView.UNSAFE_getAllByType(PrimaryButton).map((b) => b.props.label)).toContain('Refresh');
+    expect(readyView.UNSAFE_getAllByType(PrimaryButton).map((b) => b.props.label)).not.toContain('Load demo athlete');
+    expect(readyView.UNSAFE_getAllByType(SecondaryButton).map((b) => b.props.label)).toContain('Load demo athlete');
+
+    const treeJson = JSON.stringify(readyView.toJSON());
+    const refreshIdx = treeJson.indexOf('"Refresh"');
+    const demoIdx = treeJson.indexOf('"Load demo athlete"');
+    expect(refreshIdx).toBeGreaterThan(-1);
+    expect(demoIdx).toBeGreaterThan(refreshIdx);
+
+    fireEvent.press(screen.getByText('Refresh'));
+    expect(mockState.refreshVector).toHaveBeenCalledTimes(1);
+    fireEvent.press(screen.getByLabelText('Load the 180 day demo athlete'));
+    expect(mockState.loadDemoAthlete).toHaveBeenCalledTimes(1);
+    readyView.unmount();
   });
 });

@@ -17,13 +17,13 @@ import { theme } from '../theme/theme';
 
 export interface EmphasisReportCardProps {
   report: EmphasisReport | null | undefined;
-  /** Shown instead of the two lists when the plan has no emphasis at all. */
+  /** Shown for an absent report or one with no applied or omitted emphasis. */
   emptyText?: string;
   testID?: string;
 }
 
 export function EmphasisReportCard({ report, emptyText, testID = 'emphasis-report' }: EmphasisReportCardProps): React.JSX.Element | null {
-  if (report === null || report === undefined) {
+  if (report == null || (emptyText !== undefined && report.applied.length === 0 && report.omitted.length === 0)) {
     return emptyText === undefined ? null : (
       <View style={styles.card} testID={testID}>
         <Text style={styles.title} accessibilityRole="header">Your focus, goals and sport</Text>

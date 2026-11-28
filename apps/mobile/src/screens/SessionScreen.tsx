@@ -560,6 +560,18 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
 
   const defaultMode: SessionMode = uiPreferences.sessionModeOverride ?? (profile.training_age === 'beginner' ? 'guided' : 'self_directed');
   const mode: SessionMode = sessionMode ?? defaultMode;
+  const hasPlannedProvenance = sessionPlan.some(
+    (slot) =>
+      slot.provenanceKind === 'planned'
+      || slot.provenanceKind === 'substituted'
+      || slot.provenanceKind === 'day_swapped'
+      || (slot.sourcePlannedSlotId !== null && slot.sourcePlannedSlotId !== undefined),
+  );
+  const sessionKicker = mode === 'guided'
+    ? 'GUIDED SESSION'
+    : hasPlannedProvenance
+      ? 'PLANNED SESSION'
+      : 'SELF-DIRECTED SESSION';
   const runnerPhase = runner?.phase ?? 'working';
 
   const getMovementAvailabilityVerdicts = state.getMovementAvailabilityVerdicts;
@@ -1672,7 +1684,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
         <KeyboardAwareScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} accessibilityLabel="Session preparation">
           <View style={styles.header}>
             <Text style={styles.wordmark}>pikeMethods</Text>
-            <Text style={styles.kicker}>{mode === 'guided' ? 'GUIDED SESSION' : 'SELF-DIRECTED SESSION'}</Text>
+            <Text style={styles.kicker}>{sessionKicker}</Text>
             <Text style={styles.headerTitle}>Before your first set</Text>
             <Text style={styles.headerMeta}>
               {sessionPlan.length === 0
@@ -1704,7 +1716,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
         {/* Wordmark top-left */}
         <View style={styles.header}>
           <Text style={styles.wordmark}>pikeMethods</Text>
-          <Text style={styles.kicker}>{mode === 'guided' ? 'GUIDED SESSION' : 'SELF-DIRECTED SESSION'}</Text>
+          <Text style={styles.kicker}>{sessionKicker}</Text>
           <Text style={styles.headerTitle}>{halted ? (runner?.haltReason === 'manual' ? 'Session paused' : 'Session stopped') : complete ? 'Session complete' : 'Your next step'}</Text>
           {!halted && (!complete || Boolean(runner?.skippedSessionPlanSlotIds.length)) && (
             <Text style={styles.headerMeta}>

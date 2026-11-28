@@ -8,6 +8,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import TrainingSupportNotice from '../components/TrainingSupportNotice';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import {
+  NO_EMPHASIS_EXPLANATION,
   SELECTABLE_SCHEMA_TYPES,
   addDaysIso,
   applyLoadModifier,
@@ -312,8 +313,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
   const today = useStore((s) => s.today);
   const profile = useStore((s) => s.profile);
   const activityLedger = useStore((s) => s.activityLedger ?? EMPTY_ACTIVITY_LEDGER);
-  // Work order 3: the explanation frozen with the active block (null when the
-  // block was created with no focus, sport or goal exercise, or before 067).
+  // Work order 3: the explanation frozen with the active block, when recorded.
   const blockEmphasis = useStore((s) => s.blockEmphasis) ?? null;
   const prescription = useStore((s) => s.prescription);
   const profileNotes = useStore((s) => s.profileNotes);
@@ -380,7 +380,6 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
   const [trajectoryOverflows, setTrajectoryOverflows] = useState(false);
   const [manageOpen, setManageOpen] = useState(block === null);
   const scrollRef = useRef<ScrollView>(null);
-  const trajectorySectionY = useRef(0);
   const manageSectionOffsetY = useRef(0);
   const [reportOpen, setReportOpen] = useState(false);
   // #185: "Review safety report" shows the saved reports, read-only.
@@ -560,9 +559,8 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
   if (editingProgram) {
     return (
       <ProgramSetupScreen
-        // Create mode when there is no program yet ("Build your first block"):
-        // edit mode would submit to updateProgramPreferences, which refuses.
-        editing={program !== null}
+        // updateProgramPreferences only accepts an active program.
+        editing={program?.status === 'active'}
         onComplete={() => setEditingProgram(false)}
         onCancel={() => setEditingProgram(false)}
       />
@@ -662,10 +660,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
       && sport.sportId !== 'powerlifting'
       && (blockMeetMeta !== null || sport.competitionDate !== null);
     return (
-    <View
-      style={styles.section}
-      onLayout={(event) => { trajectorySectionY.current = event.nativeEvent.layout.y; }}
-    >
+    <View style={styles.section}>
       <View style={styles.trajectoryHeaderRow}>
         <Text style={styles.sectionTitle}>Four-week trajectory</Text>
         {block != null && blockEndDate != null && (
@@ -991,12 +986,165 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
     ) : null
   );
 
+  const renderExistingActivitiesDisclosure = (): React.JSX.Element | null => (
+    Array.isArray(activityLedger?.series) && activityLedger.series.some((row) => row.effectiveEndDate === null) ? (
+      <Disclosure
+        label="YOUR OTHER WEEKLY ACTIVITIES"
+        hint="Recorded commitments shown beside this plan"
+        testID="plan-existing-activities"
+      >
+        {activityLedger.series.filter((row) => row.effectiveEndDate === null).map((row) => (
+          <View key={row.seriesId}>
+            <Text style={styles.cardTitle}>{row.displayName}</Text>
+            <Text style={styles.bodyText}>
+              {ACTIVITY_WEEKDAYS[row.localWeekday]} · {activityTime(row.localStartMinute)} · {row.timing}
+              {row.expectedDurationMin === null ? ' · duration unknown' : ` · ${row.expectedDurationMin} expected minutes`}
+            </Text>
+          </View>
+        ))}
+        <Text style={styles.bodyText}>
+          These are your reported facts. This version shows them alongside the plan but does not silently
+          move, add, remove, or intensify coach sessions.
+        </Text>
+      </Disclosure>
+    ) : null
+  );
+
+  const renderEmphasisDisclosure = (): React.JSX.Element | null => {
+    if (block === null || blockEmphasis === null) return null;
+    const { inputs, report } = blockEmphasis;
+    const hasRecordedSelection = (inputs?.focus?.muscles?.length ?? 0) > 0
+      || inputs?.focus?.movementControl === true
+      || inputs?.sport != null
+      || inputs?.workload != null
+      || (inputs?.goalMovements?.length ?? 0) > 0;
+
+    return (
+      <Disclosure
+        label="WHY THIS PLAN LOOKS THE WAY IT DOES"
+        hint="What your focus, goals and sport changed"
+        testID="plan-emphasis-disclosure"
+      >
+        <EmphasisReportCard
+          report={report}
+          emptyText={hasRecordedSelection ? undefined : NO_EMPHASIS_EXPLANATION}
+          testID="plan-emphasis"
+        />
+        <Text style={styles.bodyText}>
+          This was recorded when the block was created and does not change if you edit your focus, goals or sport later. Those edits are used for your next block.
+        </Text>
+      </Disclosure>
+    );
+  };
+
+  const openManageBlock = (): void => {
+    setManageOpen(true);
+    const sectionY = vector !== null ? optionalDetailsY.current : 0;
+    scrollRef.current?.scrollTo({
+      y: Math.max(0, sectionY + manageSectionOffsetY.current - theme.space[4]),
+      animated: true,
+    });
+  };
+
+  const openProgramPlanning = program?.status === 'active' || program?.status === 'review_due'
+    ? () => setEditingProgram(true)
+    : () => setShowChooser(true);
+
+  const renderManageBlockSection = (): React.JSX.Element => (
+    <View
+      testID="manage-block-section"
+      onLayout={(event) => { manageSectionOffsetY.current = event.nativeEvent.layout.y; }}
+    >
+      <Disclosure
+        label="Manage block"
+        hint={block === null ? 'Start your first block' : 'Block settings and regeneration'}
+        open={manageOpen}
+        onOpenChange={setManageOpen}
+      >
+        <View style={styles.disclosureContent}>
+          {block !== null ? (
+            <Text style={styles.captionText}>
+              {block.objective.replace(/_/g, ' ')} block, started {block.startDate}
+              {blockMeta !== null
+                ? ` - ${blockMeta.schemaType}`
+                : ''}
+            </Text>
+          ) : (
+            <Text style={styles.captionText}>
+              Coach will build from your objective, equipment, and weekly frequency.
+            </Text>
+          )}
+          {blockMeta?.peakShifted === true && (
+            <Text style={styles.peakShiftText}>
+              Coach inserted a deload week before the peak because fatigue was high.
+            </Text>
+          )}
+          {/* #171: with no block, "Start a new block" opens the chooser and
+              never reads a loading structure, so the chips are not shown. */}
+          {block !== null && (
+            <>
+              <Text style={styles.schemaLabel}>Choose a loading structure</Text>
+              <View style={styles.schemaRow}>
+                {SELECTABLE_SCHEMA_TYPES.map((type) => {
+                  const selected = type === schema;
+                  return (
+                    <Pressable
+                      key={type}
+                      onPress={() => setSchema(type)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected }}
+                      accessibilityLabel={`${SCHEMA_LABEL[type]} loading structure`}
+                      style={[styles.schemaChip, selected && styles.schemaChipSelected]}
+                    >
+                      <Text style={[styles.schemaChipText, selected && styles.schemaChipTextSelected]}>
+                        {SCHEMA_LABEL[type]}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </>
+          )}
+
+          {!confirmRegenerate ? (
+            <PrimaryButton
+              label={block === null ? 'Start a new block' : 'Generate next block'}
+              onPress={() => {
+                if (block === null) {
+                  setShowChooser(true);
+                } else {
+                  setConfirmRegenerate(true);
+                }
+              }}
+              accessibilityLabel={block === null ? 'Start a new block' : 'Generate next block'}
+            />
+          ) : (
+            <View style={styles.confirmation}>
+              <Text style={styles.bodyText}>This archives the current block and starts the next one today.</Text>
+              <PrimaryButton
+                label="Generate next block now"
+                onPress={() => {
+                  setDetail(null);
+                  generateNewBlock(schema);
+                  setConfirmRegenerate(false);
+                  setManageOpen(false);
+                }}
+                accessibilityLabel="Generate next block now"
+              />
+              <SecondaryButton label="Keep current block" onPress={() => setConfirmRegenerate(false)} accessibilityLabel="Keep current block" />
+            </View>
+          )}
+        </View>
+      </Disclosure>
+    </View>
+  );
+
   if (vector === null) {
     return (
       // The no-vector gate is an early return INSIDE the real screen, so the
       // route identity (coach-screen) is still asserted by tests even when
       // readiness data has not arrived yet.
-      <ScrollView style={styles.screen} contentContainerStyle={styles.gateContent} testID="coach-screen">
+      <ScrollView ref={scrollRef} style={styles.screen} contentContainerStyle={styles.gateContent} testID="coach-screen">
         {halted && lastTriage !== null && lastTriage.kind === 'matched' && (
           <View style={[styles.card, styles.haltCard]}>
             <Text style={styles.eyebrow}>SAFETY</Text>
@@ -1063,6 +1211,8 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           </View>
         )}
         {block != null && renderTrajectorySection()}
+        {renderExistingActivitiesDisclosure()}
+        {renderEmphasisDisclosure()}
         <View style={styles.card}>
           <Text style={styles.eyebrow}>COACH</Text>
           <Text style={styles.cardTitle}>Readiness is needed first</Text>
@@ -1084,19 +1234,19 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           {routineActionMessage !== null && (
             <Text style={styles.captionText}>{routineActionMessage}</Text>
           )}
+          {block !== null && (
+            <SecondaryButton
+              label={program == null ? 'Manage block' : 'Manage program'}
+              onPress={program == null ? openManageBlock : openProgramPlanning}
+              accessibilityLabel={program == null ? 'Manage current block' : 'Manage future program preferences'}
+            />
+          )}
         </View>
+        {block !== null && program === null && renderManageBlockSection()}
         {renderPauseCard()}
       </ScrollView>
     );
   }
-
-  const openManageBlock = (): void => {
-    setManageOpen(true);
-    scrollRef.current?.scrollTo({
-      y: Math.max(0, trajectorySectionY.current + manageSectionOffsetY.current - theme.space[4]),
-      animated: true,
-    });
-  };
 
   /** Open "Something feels off" and bring it into view (#188, injury pause). */
   const openReportForm = (): void => {
@@ -1174,40 +1324,9 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
         <Text style={styles.wordmark}>pikeMethods</Text>
       </View>
 
-      {activityLedger.series.some((row) => row.effectiveEndDate === null) && (
-        <Disclosure
-          label="YOUR OTHER WEEKLY ACTIVITIES"
-          hint="Recorded commitments shown beside this plan"
-          testID="plan-existing-activities"
-        >
-          {activityLedger.series.filter((row) => row.effectiveEndDate === null).map((row) => (
-            <View key={row.seriesId}>
-              <Text style={styles.cardTitle}>{row.displayName}</Text>
-              <Text style={styles.bodyText}>
-                {ACTIVITY_WEEKDAYS[row.localWeekday]} · {activityTime(row.localStartMinute)} · {row.timing}
-                {row.expectedDurationMin === null ? ' · duration unknown' : ` · ${row.expectedDurationMin} expected minutes`}
-              </Text>
-            </View>
-          ))}
-          <Text style={styles.bodyText}>
-            These are your reported facts. This version shows them alongside the plan but does not silently
-            move, add, remove, or intensify coach sessions.
-          </Text>
-        </Disclosure>
-      )}
+      {renderExistingActivitiesDisclosure()}
 
-      {block !== null && blockEmphasis !== null && (
-        <Disclosure
-          label="WHY THIS PLAN LOOKS THE WAY IT DOES"
-          hint="What your focus, goals and sport changed"
-          testID="plan-emphasis-disclosure"
-        >
-          <EmphasisReportCard report={blockEmphasis.report} testID="plan-emphasis" />
-          <Text style={styles.bodyText}>
-            This was recorded when the block was created and does not change if you edit your focus, goals or sport later. Those edits are used for your next block.
-          </Text>
-        </Disclosure>
-      )}
+      {renderEmphasisDisclosure()}
 
       {block === null && hasArchivedBlock && (
         <View style={styles.card}>
@@ -1320,7 +1439,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
           ) : block === null ? (
             <PrimaryButton
               label="Set up a four-week block"
-              onPress={program == null ? openManageBlock : () => setEditingProgram(true)}
+              onPress={program == null ? openManageBlock : openProgramPlanning}
               accessibilityLabel="Set up a four-week block"
             />
           ) : (
@@ -1334,7 +1453,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
             <>
               <SecondaryButton
                 label={program == null ? 'Manage block' : 'Manage program'}
-                onPress={program == null ? openManageBlock : () => setEditingProgram(true)}
+                onPress={program == null ? openManageBlock : openProgramPlanning}
                 accessibilityLabel={program == null ? 'Manage current block' : 'Manage future program preferences'}
               />
               {/* #172: with an active program this changes future blocks only;
@@ -1343,7 +1462,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                   editor only saves for an active program. */}
               <SecondaryButton
                 label={program?.status !== 'active' ? 'Plan a new block' : 'Change future blocks'}
-                onPress={program?.status !== 'active' ? () => setShowChooser(true) : () => setEditingProgram(true)}
+                onPress={program?.status !== 'active' ? () => setShowChooser(true) : openProgramPlanning}
                 accessibilityLabel={program?.status !== 'active' ? 'Plan a new block' : 'Change future blocks'}
               />
             </>
@@ -1592,92 +1711,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
         </Disclosure>
 
         {program == null && (
-        <View
-          testID="manage-block-section"
-          onLayout={(event) => { manageSectionOffsetY.current = event.nativeEvent.layout.y; }}
-        >
-        <Disclosure
-          label="Manage block"
-          hint={block === null ? 'Start your first block' : 'Block settings and regeneration'}
-          open={manageOpen}
-          onOpenChange={setManageOpen}
-        >
-          <View style={styles.disclosureContent}>
-            {block !== null ? (
-              <Text style={styles.captionText}>
-                {block.objective.replace(/_/g, ' ')} block, started {block.startDate}
-                {blockMeta !== null
-                  ? ` - ${blockMeta.schemaType}`
-                  : ''}
-              </Text>
-            ) : (
-              <Text style={styles.captionText}>
-                Coach will build from your objective, equipment, and weekly frequency.
-              </Text>
-            )}
-            {blockMeta?.peakShifted === true && (
-              <Text style={styles.peakShiftText}>
-                Coach inserted a deload week before the peak because fatigue was high.
-              </Text>
-            )}
-            {/* #171: with no block, "Start a new block" opens the chooser and
-                never reads a loading structure, so the chips are not shown. */}
-            {block !== null && (
-            <>
-            <Text style={styles.schemaLabel}>Choose a loading structure</Text>
-            <View style={styles.schemaRow}>
-              {SELECTABLE_SCHEMA_TYPES.map((type) => {
-                const selected = type === schema;
-                return (
-                  <Pressable
-                    key={type}
-                    onPress={() => setSchema(type)}
-                    accessibilityRole="button"
-                    accessibilityState={{ selected }}
-                    accessibilityLabel={`${SCHEMA_LABEL[type]} loading structure`}
-                    style={[styles.schemaChip, selected && styles.schemaChipSelected]}
-                  >
-                    <Text style={[styles.schemaChipText, selected && styles.schemaChipTextSelected]}>
-                      {SCHEMA_LABEL[type]}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-            </>
-            )}
-
-            {!confirmRegenerate ? (
-              <PrimaryButton
-                label={block === null ? 'Start a new block' : 'Generate next block'}
-                onPress={() => {
-                  if (block === null) {
-                    setShowChooser(true);
-                  } else {
-                    setConfirmRegenerate(true);
-                  }
-                }}
-                accessibilityLabel={block === null ? 'Start a new block' : 'Generate next block'}
-              />
-            ) : (
-              <View style={styles.confirmation}>
-                <Text style={styles.bodyText}>This archives the current block and starts the next one today.</Text>
-                <PrimaryButton
-                  label="Generate next block now"
-                  onPress={() => {
-                    setDetail(null);
-                    generateNewBlock(schema);
-                    setConfirmRegenerate(false);
-                    setManageOpen(false);
-                  }}
-                  accessibilityLabel="Generate next block now"
-                />
-                <SecondaryButton label="Keep current block" onPress={() => setConfirmRegenerate(false)} accessibilityLabel="Keep current block" />
-              </View>
-            )}
-          </View>
-        </Disclosure>
-        </View>
+          renderManageBlockSection()
         )}
 
         {/* Deliberately OUTSIDE the `program == null` gate above. "Manage block"

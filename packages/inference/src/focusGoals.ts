@@ -141,7 +141,7 @@ export const FOCUS_BUNDLE_INFO: Record<FocusBundleId, FocusBundle> = {
   },
   balanced: {
     label: 'Balanced whole body',
-    description: 'No extra emphasis. Train everything evenly.',
+    description: 'Train everything evenly.',
     muscles: [],
     movementControl: false,
   },

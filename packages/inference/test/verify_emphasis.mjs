@@ -519,7 +519,7 @@ console.log('[8] sport changes selection');
   const striking = plan(profile(), { sport: thai, workload: workloadOf(thai) });
   check('an outcome with no reviewed basis leaves the plan exactly as it was',
     JSON.stringify(striking.sessions) === JSON.stringify(baseline.sessions)
-      && striking.emphasis.applied.some((line) => /^Muay Thai — be stronger in striking and the clinch: No extra emphasis\./.test(line)));
+      && striking.emphasis.applied.some((line) => /^Muay Thai — be stronger in striking and the clinch: The app has no reviewed evidence/.test(line)));
   const both = plan(profile(), { focus: fg.focusFromBundle('beach_muscles'), sport: football, workload: workloadOf(football) });
   check('the athlete\'s focus is served before the sport emphasis when both want the same slot',
     names(day(both, 2))[2] === 'Barbell Curl' && both.emphasis.applied[0] === 'Focus — Beach muscles: upper chest, biceps, triceps.');
