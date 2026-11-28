@@ -71,7 +71,7 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '069_resting_heart_rate.sql',
   '070_session_feel.sql', '071_beta_recording.sql', '072_question_log.sql', '073_session_slot_replaced_by.sql',
   '074_session_feel_reasons.sql', '075_session_plan_slot_planned_count.sql', '076_sport_taxonomy_expansion.sql', '077_multisport_and_flexibility.sql',
-  '078_kinestrike_telemetry.sql', '079_session_slot_swap_cause.sql', '080_sport_peaking_and_lifting_taxonomy.sql', '081_advanced_program_control.sql', '082_profile_ui_description_mode.sql'];
+  '078_kinestrike_telemetry.sql', '079_session_slot_swap_cause.sql', '080_sport_peaking_and_lifting_taxonomy.sql', '081_advanced_program_control.sql', '082_profile_ui_description_mode.sql', '083_warmup_presets.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
@@ -1768,11 +1768,11 @@ console.log('[2u] 057 block_meta phase/index repair + enforcement');
     const db = freshDb();
     runMigrations(db, MIGRATIONS);
     // Slot 004 is the parameterized materialize script, never a migration:
-    // 81 files (slots 001-082, no 004) -> user_version 81. This count is
+    // 82 files (slots 001-083, no 004) -> user_version 82. This count is
     // pinned deliberately so adding a migration is a conscious act, not a
-    // silent one. Re-pinned for 082 (description mode).
-    check('fresh install reaches user_version 81 (81 files, no slot 004)',
-      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 81,
+    // silent one. Re-pinned for 083 (warmup presets).
+    check('fresh install reaches user_version 82 (82 files, no slot 004)',
+      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 82,
       String(uv(db)));
     const trig = db.raw.prepare(
       `SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'trigger'
@@ -4913,13 +4913,107 @@ console.log('[081] advanced program control (focus ext, schedule mode, slot over
         return /CHECK constraint failed/.test(error.message);
       }
     })());
-    d.raw.exec(MIGRATIONS.at(-1));
+    d.raw.exec(MIGRATIONS[80]);
     check('082 replay preserves the selected description mode',
       d.raw.prepare('SELECT description_mode FROM profile_ui_description_preference').get().description_mode === 'expanded');
     d.raw.exec('DROP TABLE profile_ui_description_preference');
     check('082 missing side-car triggers self-heal', sentinelsMissing(d).includes(table));
     runMigrations(d, MIGRATIONS);
     check('082 self-heal restores the table', d.raw.prepare("SELECT 1 FROM sqlite_master WHERE name = ?").get(table) !== undefined);
+  }
+}
+
+// =============================================================================
+// [083] warm-up presets, items, session-type assignments, and session overrides
+// =============================================================================
+console.log('[083] warm-up presets, items, session-type assignments, and planned-session overrides');
+{
+  const index = FILES.indexOf('083_warmup_presets.sql');
+  check('083 is the last migration in the chain', index === MIGRATIONS.length - 1 && index === 81);
+  const d = freshDb();
+  runMigrations(d, MIGRATIONS);
+  const has = (name) => d.raw.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name=?").get(name).c === 1;
+  const ddlOf = (name) => d.raw.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name=?").get(name)?.sql ?? '';
+  const tables083 = [
+    'warmup_preset',
+    'warmup_preset_item',
+    'warmup_session_type_assignment',
+    'planned_session_warmup_override',
+  ];
+  check('083 creates all 4 STRICT tables',
+    tables083.every((t) => has(t) && /STRICT/.test(ddlOf(t))));
+  check('083 marks warmup_preset_item and warmup_session_type_assignment WITHOUT ROWID',
+    /WITHOUT ROWID$/.test(ddlOf('warmup_preset_item')) && /WITHOUT ROWID$/.test(ddlOf('warmup_session_type_assignment')));
+
+  const rejects = (sql) => { try { d.raw.exec(sql); return false; } catch { return true; } };
+
+  d.raw.exec(`
+    INSERT INTO warmup_preset (preset_id, name, purpose, weakness_target, include_ramp_sets, created_at_ms, updated_at_ms)
+      VALUES (1, 'Lower Prehab', 'prehab', 'knee_patellar', 1, 1000, 1000);
+    INSERT INTO warmup_preset_item (preset_id, item_order, source_kind, catalog_drill_id, prehab_target_id, movement_id, title, sets, dose_kind, dose_amount, per_side, cue_note)
+      VALUES (1, 0, 'catalog_drill', 'mobilise.leg_swings', NULL, NULL, 'Leg swings', 2, 'time', 30, 1, 'Tall trunk');
+    INSERT INTO warmup_preset_item (preset_id, item_order, source_kind, catalog_drill_id, prehab_target_id, movement_id, title, sets, dose_kind, dose_amount, per_side, cue_note)
+      VALUES (1, 1, 'prehab_target', NULL, 'hip_groin', NULL, 'Hip adductor squeeze', 3, 'time', 45, 0, NULL);
+    INSERT INTO warmup_preset_item (preset_id, item_order, source_kind, catalog_drill_id, prehab_target_id, movement_id, title, sets, dose_kind, dose_amount, per_side, cue_note)
+      VALUES (1, 2, 'library_movement', NULL, NULL, 1, 'Competition Squat', 1, 'reps', 10, 0, NULL);
+    INSERT INTO warmup_preset_item (preset_id, item_order, source_kind, catalog_drill_id, prehab_target_id, movement_id, title, sets, dose_kind, dose_amount, per_side, cue_note)
+      VALUES (1, 3, 'custom_physio', NULL, NULL, NULL, 'Wall slide', 5, 'reps', 100, 0, NULL);
+    INSERT INTO warmup_session_type_assignment (session_type, preset_id, updated_at_ms)
+      VALUES ('lower', 1, 1000);
+    INSERT INTO training_block (block_id, start_date, objective, created_at_ms)
+      VALUES (1, '2026-11-28', 'strength', 1000);
+    INSERT INTO planned_session (planned_session_id, block_id, week_index, day_index, focus, phase, session_date)
+      VALUES (1, 1, 1, 1, 'lower', 'accumulation', '2026-11-28');
+    INSERT INTO planned_session_warmup_override (planned_session_id, mode, preset_id, updated_at_ms)
+      VALUES (1, 'preset', 1, 1000);
+  `);
+
+  check('083 rejects invalid warmup_preset rows',
+    rejects("INSERT INTO warmup_preset (preset_id, name, purpose, weakness_target, include_ramp_sets, created_at_ms, updated_at_ms) VALUES (2, '   ', 'gpp', NULL, 1, 1000, 1000)")
+    && rejects(`INSERT INTO warmup_preset (preset_id, name, purpose, weakness_target, include_ramp_sets, created_at_ms, updated_at_ms) VALUES (2, '${'a'.repeat(61)}', 'gpp', NULL, 1, 1000, 1000)`)
+    && rejects("INSERT INTO warmup_preset (preset_id, name, purpose, weakness_target, include_ramp_sets, created_at_ms, updated_at_ms) VALUES (2, 'Bad purpose', 'cardio', NULL, 1, 1000, 1000)")
+    && rejects("INSERT INTO warmup_preset (preset_id, name, purpose, weakness_target, include_ramp_sets, created_at_ms, updated_at_ms) VALUES (2, 'Bad target', 'prehab', 'neck', 1, 1000, 1000)")
+    && rejects("INSERT INTO warmup_preset (preset_id, name, purpose, weakness_target, include_ramp_sets, created_at_ms, updated_at_ms) VALUES (2, 'Bad time', 'gpp', NULL, 1, 1000, 999)"));
+
+  check('083 rejects invalid warmup_preset_item rows (bounds, doses, cross-fields)',
+    rejects("INSERT INTO warmup_preset_item (preset_id, item_order, source_kind, catalog_drill_id, title, sets, dose_kind, dose_amount) VALUES (1, 12, 'catalog_drill', 'raise.easy_movement', 'Raise', 1, 'time', 60)")
+    && rejects("INSERT INTO warmup_preset_item (preset_id, item_order, source_kind, catalog_drill_id, title, sets, dose_kind, dose_amount) VALUES (1, 4, 'catalog_drill', 'raise.easy_movement', 'Raise', 6, 'time', 60)")
+    && rejects("INSERT INTO warmup_preset_item (preset_id, item_order, source_kind, catalog_drill_id, title, sets, dose_kind, dose_amount) VALUES (1, 4, 'catalog_drill', 'raise.easy_movement', 'Raise', 1, 'reps', 101)")
+    && rejects("INSERT INTO warmup_preset_item (preset_id, item_order, source_kind, catalog_drill_id, title, sets, dose_kind, dose_amount) VALUES (1, 4, 'catalog_drill', 'raise.easy_movement', 'Raise', 1, 'time', 4)")
+    && rejects("INSERT INTO warmup_preset_item (preset_id, item_order, source_kind, catalog_drill_id, title, sets, dose_kind, dose_amount) VALUES (1, 4, 'catalog_drill', 'raise.easy_movement', 'Raise', 1, 'time', 1801)")
+    && rejects(`INSERT INTO warmup_preset_item (preset_id, item_order, source_kind, title, sets, dose_kind, dose_amount, cue_note) VALUES (1, 4, 'custom_physio', 'Custom', 1, 'reps', 10, '${'c'.repeat(241)}')`)
+    && rejects("INSERT INTO warmup_preset_item (preset_id, item_order, source_kind, catalog_drill_id, movement_id, title, sets, dose_kind, dose_amount) VALUES (1, 4, 'catalog_drill', 'raise.easy_movement', 1, 'Bad', 1, 'time', 60)")
+    && rejects("INSERT INTO warmup_preset_item (preset_id, item_order, source_kind, catalog_drill_id, prehab_target_id, title, sets, dose_kind, dose_amount) VALUES (1, 4, 'prehab_target', 'raise.easy_movement', 'hip_groin', 'Bad', 1, 'time', 60)")
+    && rejects("INSERT INTO warmup_preset_item (preset_id, item_order, source_kind, movement_id, title, sets, dose_kind, dose_amount) VALUES (1, 4, 'library_movement', NULL, 'Bad', 1, 'reps', 10)")
+    && rejects("INSERT INTO warmup_preset_item (preset_id, item_order, source_kind, movement_id, title, sets, dose_kind, dose_amount) VALUES (1, 4, 'custom_physio', 1, 'Bad', 1, 'reps', 10)"));
+
+  check('083 rejects invalid session_type and invalid override mode/preset_id pairs',
+    rejects("INSERT INTO warmup_session_type_assignment (session_type, preset_id, updated_at_ms) VALUES ('cardio', 1, 1000)")
+    && rejects("INSERT INTO planned_session_warmup_override (planned_session_id, mode, preset_id, updated_at_ms) VALUES (1, 'invalid', NULL, 1000)")
+    && rejects("UPDATE planned_session_warmup_override SET preset_id = NULL WHERE planned_session_id = 1")
+    && rejects("UPDATE planned_session_warmup_override SET mode = 'standard_auto', preset_id = 1 WHERE planned_session_id = 1"));
+
+  // Replay idempotence preserves data
+  d.raw.exec(MIGRATIONS.at(-1));
+  check('083 replay preserves existing preset, items, assignment, and override rows',
+    d.raw.prepare('SELECT COUNT(*) c FROM warmup_preset').get().c === 1
+      && d.raw.prepare('SELECT COUNT(*) c FROM warmup_preset_item').get().c === 4
+      && d.raw.prepare('SELECT COUNT(*) c FROM warmup_session_type_assignment').get().c === 1
+      && d.raw.prepare('SELECT COUNT(*) c FROM planned_session_warmup_override').get().c === 1);
+
+  // Cascade delete from warmup_preset
+  d.raw.exec('DELETE FROM warmup_preset WHERE preset_id = 1');
+  check('083 cascades warmup_preset deletion to items, assignments, and overrides',
+    d.raw.prepare('SELECT COUNT(*) c FROM warmup_preset_item').get().c === 0
+      && d.raw.prepare('SELECT COUNT(*) c FROM warmup_session_type_assignment').get().c === 0
+      && d.raw.prepare('SELECT COUNT(*) c FROM planned_session_warmup_override').get().c === 0);
+
+  // Sentinel self-heal for ALL 4 tables
+  for (const table of [...tables083].reverse()) {
+    d.raw.exec(`DROP TABLE ${table}`);
+    check(`083 dropped ${table} triggers self-heal`, sentinelsMissing(d).includes(table));
+    runMigrations(d, MIGRATIONS);
+    check(`083 self-heal restores ${table}`, has(table));
   }
 }
 

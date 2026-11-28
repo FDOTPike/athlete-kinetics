@@ -683,6 +683,54 @@ test('encrypted backup restores each athlete’s saved description mode', async 
   } finally { restored.close(); }
 });
 
+test('encrypted backup round-trips warmup_preset, warmup_preset_item, and warmup_session_type_assignment', async () => {
+  const livePath = join(mockLibraryDir, 'athlete_kinetics.db');
+  const db = open(livePath);
+  try {
+    db.exec(`
+      INSERT INTO warmup_preset (preset_id, name, purpose, weakness_target, include_ramp_sets, created_at_ms, updated_at_ms)
+        VALUES (11, 'Shoulder Prehab', 'prehab', 'shoulder_cuff', 1, 5000, 5000);
+      INSERT INTO warmup_preset_item (preset_id, item_order, source_kind, catalog_drill_id, prehab_target_id, movement_id, title, sets, dose_kind, dose_amount, per_side, cue_note)
+        VALUES (11, 0, 'prehab_target', NULL, 'shoulder_cuff', 32, 'Band External Rotation', 3, 'reps', 12, 1, 'Stay <= 3/10'),
+               (11, 1, 'custom_physio', NULL, NULL, NULL, 'Banded wall slide', 2, 'time', 30, 0, 'Slow lowering');
+      INSERT INTO warmup_session_type_assignment (session_type, preset_id, updated_at_ms)
+        VALUES ('upper', 11, 5000);
+    `);
+  } finally { db.close(); }
+
+  await useBackupStore.getState().createBackup(PASSWORD);
+  expect(useBackupStore.getState().status).toBe('success');
+
+  const wiped = open(livePath);
+  try {
+    wiped.exec('PRAGMA foreign_keys = ON; DELETE FROM warmup_preset;');
+    expect(wiped.prepare('SELECT COUNT(*) AS c FROM warmup_preset').get().c).toBe(0);
+    expect(wiped.prepare('SELECT COUNT(*) AS c FROM warmup_preset_item').get().c).toBe(0);
+    expect(wiped.prepare('SELECT COUNT(*) AS c FROM warmup_session_type_assignment').get().c).toBe(0);
+  } finally { wiped.close(); }
+
+  copyFileSync(mockSavedBackupPath, mockSelectedBackupPath);
+  mockSelectedSize = statSync(mockSelectedBackupPath).size;
+  useBackupStore.setState({ status: 'idle', message: null, preview: null });
+  await useBackupStore.getState().chooseRestore(PASSWORD);
+  expect(useBackupStore.getState().status).toBe('preview');
+  await useBackupStore.getState().confirmRestore(PASSWORD);
+  expect(useBackupStore.getState().status).toBe('success');
+
+  const restored = open(livePath);
+  try {
+    expect(restored.prepare('SELECT preset_id, name, purpose, weakness_target, include_ramp_sets FROM warmup_preset').all())
+      .toEqual([{ preset_id: 11, name: 'Shoulder Prehab', purpose: 'prehab', weakness_target: 'shoulder_cuff', include_ramp_sets: 1 }]);
+    expect(restored.prepare('SELECT item_order, source_kind, prehab_target_id, movement_id, title, sets, dose_kind, dose_amount, per_side, cue_note FROM warmup_preset_item ORDER BY item_order').all())
+      .toEqual([
+        { item_order: 0, source_kind: 'prehab_target', prehab_target_id: 'shoulder_cuff', movement_id: 32, title: 'Band External Rotation', sets: 3, dose_kind: 'reps', dose_amount: 12, per_side: 1, cue_note: 'Stay <= 3/10' },
+        { item_order: 1, source_kind: 'custom_physio', prehab_target_id: null, movement_id: null, title: 'Banded wall slide', sets: 2, dose_kind: 'time', dose_amount: 30, per_side: 0, cue_note: 'Slow lowering' },
+      ]);
+    expect(restored.prepare('SELECT session_type, preset_id FROM warmup_session_type_assignment').all())
+      .toEqual([{ session_type: 'upper', preset_id: 11 }]);
+  } finally { restored.close(); }
+});
+
 test('round trip at the current schema: a live session, its preparation protocol and item records survive backup and restore', async () => {
   const livePath = join(mockLibraryDir, 'athlete_kinetics.db');
   const db = open(livePath);
@@ -788,9 +836,15 @@ describe('every registered pre-upgrade schema restores, not only the first', () 
     expect(v80.fingerprint).not.toBe(v79.fingerprint);
     expect([v80.migrationSlot, v80.tableCount]).toEqual([81, v79.tableCount + 6]);
     const v81 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 81);
-    expect(v81).toBe(CURRENT);
+    expect(v81).not.toBe(CURRENT);
+    expect(v81.fingerprint).not.toBe(v80.fingerprint);
     expect([v81.migrationSlot, v81.tableCount, v81.objectCount])
       .toEqual([82, v80.tableCount + 1, v80.objectCount + 1]);
+    // 083 adds four STRICT tables for athlete-owned warm-up presets & overrides.
+    const v82 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 82);
+    expect(v82).toBe(CURRENT);
+    expect([v82.migrationSlot, v82.tableCount, v82.objectCount])
+      .toEqual([83, v81.tableCount + 4, v81.objectCount + 4]);
     expect(v70.fingerprint).not.toBe(v69.fingerprint);
     expect([v70.migrationSlot, v70.tableCount]).toEqual([71, v69.tableCount + 2]);
     expect(PRE_UPGRADE.length).toBeGreaterThanOrEqual(7);

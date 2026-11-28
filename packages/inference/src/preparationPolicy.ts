@@ -88,6 +88,21 @@ export const PREPARATION_SOURCES: readonly PreparationSource[] = [
     citation: 'Soligard T, Myklebust G, Steffen K, et al. Comprehensive warm-up programme to prevent injuries in young female footballers: cluster randomised controlled trial. BMJ. 2008;337:a2469; and the FIFA 11+ manual (F-MARC).',
     supports: 'Single-leg balance held for 30 seconds per leg and a static front support ("the bench") of 20-30 seconds as warm-up items.',
   },
+  {
+    id: 'athlete_preset',
+    citation: 'Athlete-authored warm-up preset saved locally in SQLite (083_warmup_presets.sql) and frozen per session.',
+    supports: 'Saved general preparedness, prehab, and movement-rehearsal selections authored by the athlete.',
+  },
+  {
+    id: 'prehab_catalog',
+    citation: 'Internal curated tendon and joint prehab target catalogue (prehabCatalog.ts, WO-03A) with verbatim 3/10 pain stop rule.',
+    supports: 'Prehab target area selections paired with library anchors and conservative pain-monitoring stop rules.',
+  },
+  {
+    id: 'clinician_physio',
+    citation: 'Athlete-entered clinician or physiotherapist warm-up drill saved locally with conservative 3/10 pain stop guidance.',
+    supports: 'Custom physio or rehabilitation drills prescribed outside the standard exercise catalogue.',
+  },
 ];
 
 const SOURCE_IDS: ReadonlySet<string> = new Set(PREPARATION_SOURCES.map((source) => source.id));
@@ -183,7 +198,7 @@ export interface PreparationInput {
   readonly timeConflictNote?: string | null;
 }
 
-interface DrillDefinition {
+export interface PreparationCatalogDrill {
   readonly itemId: string;
   readonly itemRevision: number;
   readonly stage: PreparationStage;
@@ -199,8 +214,8 @@ interface DrillDefinition {
   readonly joints: readonly Joint[];
 }
 
-const STOP_GENERAL = 'Stop if you feel chest pain, dizziness or unusual breathlessness, and do not start the session.';
-const STOP_JOINT = 'Stop the drill if it causes sharp or increasing pain, and skip it.';
+export const STOP_GENERAL = 'Stop if you feel chest pain, dizziness or unusual breathlessness, and do not start the session.';
+export const STOP_JOINT = 'Stop the drill if it causes sharp or increasing pain, and skip it.';
 
 const LOWER_LIMB_JOINTS: readonly Joint[] = ['knee', 'hip', 'ankle'];
 
@@ -317,10 +332,13 @@ const DRILLS = {
     sourceRefs: ['fifa11plus'],
     joints: ['shoulder', 'elbow', 'lower_back'],
   },
-} as const satisfies Record<string, DrillDefinition>;
+} as const satisfies Record<string, PreparationCatalogDrill>;
+
+/** Read-only catalogue of the 8 built-in preparation drills. */
+export const PREPARATION_CATALOG_DRILLS: readonly PreparationCatalogDrill[] = Object.values(DRILLS);
 
 const DRILL_JOINTS: ReadonlyMap<string, readonly Joint[]> = new Map(
-  Object.values(DRILLS).map((drill): [string, readonly Joint[]] => [drill.itemId, drill.joints]),
+  PREPARATION_CATALOG_DRILLS.map((drill): [string, readonly Joint[]] => [drill.itemId, drill.joints]),
 );
 
 /**
@@ -341,7 +359,7 @@ const RAMP_PERCENTS: readonly number[] = [40, 80];
 const REHEARSE_REPS = 6;
 const REHEARSE_HOLD_SECONDS = 10;
 
-const doseSeconds = (dose: PreparationDose): number => {
+export const preparationDoseSeconds = (dose: PreparationDose): number => {
   switch (dose.kind) {
     case 'time': return dose.seconds * (dose.perSide ? 2 : 1);
     case 'reps': return dose.reps * SET_SECONDS_PER_REP * (dose.perSide ? 2 : 1);
@@ -349,7 +367,7 @@ const doseSeconds = (dose: PreparationDose): number => {
   }
 };
 
-const drillItem = (drill: DrillDefinition, doseOverride?: PreparationDose): PreparationItem => {
+const drillItem = (drill: PreparationCatalogDrill, doseOverride?: PreparationDose): PreparationItem => {
   const dose = doseOverride ?? drill.dose;
   return {
     itemId: drill.itemId,
@@ -364,11 +382,11 @@ const drillItem = (drill: DrillDefinition, doseOverride?: PreparationDose): Prep
     movementId: null,
     effort: drill.effort,
     sourceRefs: [...drill.sourceRefs],
-    estimateSeconds: doseSeconds(dose) + ITEM_CHANGEOVER_SECONDS,
+    estimateSeconds: preparationDoseSeconds(dose) + ITEM_CHANGEOVER_SECONDS,
   };
 };
 
-const MOBILISE_BY_PATTERN: Record<MovementPattern, readonly DrillDefinition[]> = {
+const MOBILISE_BY_PATTERN: Record<MovementPattern, readonly PreparationCatalogDrill[]> = {
   squat: [DRILLS.legSwings, DRILLS.ankleRocks],
   hinge: [DRILLS.hipHinge, DRILLS.legSwings],
   lunge: [DRILLS.legSwings, DRILLS.ankleRocks],
@@ -394,74 +412,20 @@ const PATTERN_LABEL: Record<MovementPattern, string> = {
 const roundToHalfMinute = (seconds: number): number => Math.round(seconds / 30) * 30;
 
 /**
- * Build the preparation protocol for one session. The result is complete and
- * self-describing: every item that is NOT there but could have been is listed
- * in `omitted` with its reason, so nothing is dropped silently.
+ * Build unloaded rehearsal and 40%/80% ramp items for the first usable session
+ * movement, applying the same holds and exclusions as the main plan.
  */
-export function buildPreparationProtocol(input: PreparationInput): PreparationProtocol {
-  const budgetMin = Math.max(PREPARATION_MINIMUM_MIN, Number.isFinite(input.budgetMin) ? input.budgetMin : PREPARATION_MINIMUM_MIN);
-  const variant: PreparationVariant = budgetMin >= PREPARATION_STANDARD_FROM_MIN ? 'standard' : 'condensed';
-  const restricted = new Set<Joint>(input.restrictedJoints);
+export function buildFirstMovementRehearsalAndRamp(input: {
+  readonly slots: readonly PreparationMainSlot[];
+  readonly excludedMovements: PreparationInput['excludedMovements'];
+  readonly includeFirstChoiceWhenEmpty?: boolean;
+}): {
+  readonly anchor: PreparationMainSlot | null;
+  readonly rehearse: PreparationItem | null;
+  readonly ramp: readonly PreparationItem[];
+  readonly omitted: readonly PreparationOmission[];
+} {
   const omitted: PreparationOmission[] = [];
-  const notes: string[] = [];
-  const basis: string[] = [];
-
-  const withheldByJoint = (drill: DrillDefinition): boolean => drill.joints.some((joint) => restricted.has(joint));
-
-  // --- raise: always present. A lower-limb niggle switches it to an option
-  // that does not load the sore area instead of removing it. ---------------
-  const lowerLimbRestricted = LOWER_LIMB_JOINTS.some((joint) => restricted.has(joint));
-  const raiseSeconds = variant === 'standard' ? 240 : 180;
-  const raise: PreparationItem = {
-    ...drillItem(DRILLS.raise, { kind: 'time', seconds: raiseSeconds, perSide: false }),
-    ...(lowerLimbRestricted ? {
-      instruction: 'Use an option that keeps weight off the sore area, such as easy seated arm cycling or seated marching with the comfortable leg. Keep a pace where you could hold a conversation.',
-      regression: 'Slow, relaxed breathing while seated, with gentle arm swings.',
-    } : {}),
-  };
-
-  // --- mobilise: dynamic drills for the patterns of the first two movements.
-  const patternsInOrder: MovementPattern[] = [];
-  for (const slot of input.slots) {
-    if (!patternsInOrder.includes(slot.pattern)) patternsInOrder.push(slot.pattern);
-  }
-  const mobiliseCandidates: DrillDefinition[] = [];
-  const pushCandidate = (drill: DrillDefinition | undefined): void => {
-    if (drill !== undefined && !mobiliseCandidates.includes(drill)) mobiliseCandidates.push(drill);
-  };
-  if (input.slots.length === 0) {
-    pushCandidate(DRILLS.legSwings);
-    pushCandidate(DRILLS.armCircles);
-  } else {
-    // First choice of each pattern in session order, then second choices.
-    for (const pattern of patternsInOrder) pushCandidate(MOBILISE_BY_PATTERN[pattern][0]);
-    for (const pattern of patternsInOrder) pushCandidate(MOBILISE_BY_PATTERN[pattern][1]);
-  }
-  const mobilise: PreparationItem[] = [];
-  for (const drill of mobiliseCandidates) {
-    if (withheldByJoint(drill)) {
-      omitted.push({ itemId: drill.itemId, movementId: null, reasonCode: 'safety', detail: `${drill.title} is withheld because it loads an area with an active niggle.` });
-      continue;
-    }
-    if (mobilise.length >= 2) continue;
-    mobilise.push(drillItem(drill));
-  }
-
-  // --- activate: balance or bracing only where the session uses it. ---------
-  const sportContext = input.accessContext === 'sport_conditioning';
-  const wantsBalance = sportContext || input.slots.some((slot) => BALANCE_PATTERNS.has(slot.pattern));
-  const wantsBracing = input.slots.some((slot) => BRACING_PATTERNS.has(slot.pattern));
-  const activateDrill: DrillDefinition | null = wantsBalance ? DRILLS.singleLegBalance : wantsBracing ? DRILLS.frontPlank : null;
-  let activate: PreparationItem | null = null;
-  if (activateDrill !== null) {
-    if (withheldByJoint(activateDrill)) {
-      omitted.push({ itemId: activateDrill.itemId, movementId: null, reasonCode: 'safety', detail: `${activateDrill.title} is withheld because it loads an area with an active niggle.` });
-    } else {
-      activate = drillItem(activateDrill);
-    }
-  }
-
-  // --- rehearse + ramp: the first session movement that may be used. --------
   const usable = (slot: PreparationMainSlot): boolean => {
     const held = PREPARATION_HELD_MOVEMENT_IDS.get(slot.movementId);
     if (held !== undefined) {
@@ -481,7 +445,7 @@ export function buildPreparationProtocol(input: PreparationInput): PreparationPr
   let rehearse: PreparationItem | null = null;
   const ramp: PreparationItem[] = [];
   if (anchor === null) {
-    if (input.slots.length === 0) {
+    if (input.includeFirstChoiceWhenEmpty === true && input.slots.length === 0) {
       rehearse = {
         itemId: 'rehearse.first_choice',
         itemRevision: 1,
@@ -544,7 +508,7 @@ export function buildPreparationProtocol(input: PreparationInput): PreparationPr
           movementId: anchor.movementId,
           effort: percent < 60 ? 'easy' : 'moderate',
           sourceRefs: ['ribeiro2020'],
-          estimateSeconds: doseSeconds(dose),
+          estimateSeconds: preparationDoseSeconds(dose),
         });
       }
     } else if (!anchor.externallyLoaded) {
@@ -553,6 +517,84 @@ export function buildPreparationProtocol(input: PreparationInput): PreparationPr
       omitted.push({ itemId: 'ramp.sets', movementId: anchor.movementId, reasonCode: 'not_applicable', detail: `${anchor.movementName} is time-based, so there are no loaded preparation sets.` });
     }
   }
+  return { anchor, rehearse, ramp, omitted };
+}
+
+/**
+ * Build the preparation protocol for one session. The result is complete and
+ * self-describing: every item that is NOT there but could have been is listed
+ * in `omitted` with its reason, so nothing is dropped silently.
+ */
+export function buildPreparationProtocol(input: PreparationInput): PreparationProtocol {
+  const budgetMin = Math.max(PREPARATION_MINIMUM_MIN, Number.isFinite(input.budgetMin) ? input.budgetMin : PREPARATION_MINIMUM_MIN);
+  const variant: PreparationVariant = budgetMin >= PREPARATION_STANDARD_FROM_MIN ? 'standard' : 'condensed';
+  const restricted = new Set<Joint>(input.restrictedJoints);
+  const omitted: PreparationOmission[] = [];
+  const notes: string[] = [];
+  const basis: string[] = [];
+
+  const withheldByJoint = (drill: PreparationCatalogDrill): boolean => drill.joints.some((joint) => restricted.has(joint));
+
+  // --- raise: always present. A lower-limb niggle switches it to an option
+  // that does not load the sore area instead of removing it. ---------------
+  const lowerLimbRestricted = LOWER_LIMB_JOINTS.some((joint) => restricted.has(joint));
+  const raiseSeconds = variant === 'standard' ? 240 : 180;
+  const raise: PreparationItem = {
+    ...drillItem(DRILLS.raise, { kind: 'time', seconds: raiseSeconds, perSide: false }),
+    ...(lowerLimbRestricted ? {
+      instruction: 'Use an option that keeps weight off the sore area, such as easy seated arm cycling or seated marching with the comfortable leg. Keep a pace where you could hold a conversation.',
+      regression: 'Slow, relaxed breathing while seated, with gentle arm swings.',
+    } : {}),
+  };
+
+  // --- mobilise: dynamic drills for the patterns of the first two movements.
+  const patternsInOrder: MovementPattern[] = [];
+  for (const slot of input.slots) {
+    if (!patternsInOrder.includes(slot.pattern)) patternsInOrder.push(slot.pattern);
+  }
+  const mobiliseCandidates: PreparationCatalogDrill[] = [];
+  const pushCandidate = (drill: PreparationCatalogDrill | undefined): void => {
+    if (drill !== undefined && !mobiliseCandidates.includes(drill)) mobiliseCandidates.push(drill);
+  };
+  if (input.slots.length === 0) {
+    pushCandidate(DRILLS.legSwings);
+    pushCandidate(DRILLS.armCircles);
+  } else {
+    // First choice of each pattern in session order, then second choices.
+    for (const pattern of patternsInOrder) pushCandidate(MOBILISE_BY_PATTERN[pattern][0]);
+    for (const pattern of patternsInOrder) pushCandidate(MOBILISE_BY_PATTERN[pattern][1]);
+  }
+  const mobilise: PreparationItem[] = [];
+  for (const drill of mobiliseCandidates) {
+    if (withheldByJoint(drill)) {
+      omitted.push({ itemId: drill.itemId, movementId: null, reasonCode: 'safety', detail: `${drill.title} is withheld because it loads an area with an active niggle.` });
+      continue;
+    }
+    if (mobilise.length >= 2) continue;
+    mobilise.push(drillItem(drill));
+  }
+
+  // --- activate: balance or bracing only where the session uses it. ---------
+  const sportContext = input.accessContext === 'sport_conditioning';
+  const wantsBalance = sportContext || input.slots.some((slot) => BALANCE_PATTERNS.has(slot.pattern));
+  const wantsBracing = input.slots.some((slot) => BRACING_PATTERNS.has(slot.pattern));
+  const activateDrill: PreparationCatalogDrill | null = wantsBalance ? DRILLS.singleLegBalance : wantsBracing ? DRILLS.frontPlank : null;
+  let activate: PreparationItem | null = null;
+  if (activateDrill !== null) {
+    if (withheldByJoint(activateDrill)) {
+      omitted.push({ itemId: activateDrill.itemId, movementId: null, reasonCode: 'safety', detail: `${activateDrill.title} is withheld because it loads an area with an active niggle.` });
+    } else {
+      activate = drillItem(activateDrill);
+    }
+  }
+
+  // --- rehearse + ramp: the first session movement that may be used. --------
+  const { anchor, rehearse, ramp, omitted: anchorOmitted } = buildFirstMovementRehearsalAndRamp({
+    slots: input.slots,
+    excludedMovements: input.excludedMovements,
+    includeFirstChoiceWhenEmpty: true,
+  });
+  omitted.push(...anchorOmitted);
 
   // --- fit to the preparation time. Essential items stay: raise, and the
   // rehearsal or ramp of the first movement. In the condensed protocol a

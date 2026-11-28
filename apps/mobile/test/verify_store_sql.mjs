@@ -91,7 +91,7 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   // 075 adds session_plan_slot_planned_count, which the store writes when a swap
   // after logged sets overwrites planned_sets, and empties on reset and discard.
   '075_session_plan_slot_planned_count.sql', '076_sport_taxonomy_expansion.sql', '077_multisport_and_flexibility.sql',
-  '078_kinestrike_telemetry.sql', '079_session_slot_swap_cause.sql', '080_sport_peaking_and_lifting_taxonomy.sql', '081_advanced_program_control.sql', '082_profile_ui_description_mode.sql'];
+  '078_kinestrike_telemetry.sql', '079_session_slot_swap_cause.sql', '080_sport_peaking_and_lifting_taxonomy.sql', '081_advanced_program_control.sql', '082_profile_ui_description_mode.sql', '083_warmup_presets.sql'];
 
 
 const db = new DatabaseSync(':memory:');
@@ -891,8 +891,11 @@ const resetTables = [...resetBody.matchAll(/DELETE FROM (\w+)'/g)].map((m) => m[
 a('resetTrainingData body found with its unconditional DELETEs', resetTables.length >= 15, `${resetTables.length} tables`);
 a('reset NEVER clears athlete_profile / movement / profile_slot (settings survive)',
   !['athlete_profile', 'movement', 'movement_detail', 'movement_preference', 'profile_slot'].some((t) => resetTables.includes(t)));
-a('reset NEVER clears the load preference (035) or UI preferences (023) — profile settings survive',
-  !['profile_load_preference', 'profile_ui_preference', 'profile_ui_description_preference'].some((t) => resetTables.includes(t)));
+a('reset NEVER clears the load preference (035), UI preferences (023/082), or warm-up presets (083) — profile settings survive',
+  !['profile_load_preference', 'profile_ui_preference', 'profile_ui_description_preference', 'warmup_preset', 'warmup_preset_item', 'warmup_session_type_assignment'].some((t) => resetTables.includes(t)));
+a('reset explicitly clears planned_session_warmup_override before planned_session',
+  resetTables.includes('planned_session_warmup_override')
+    && resetTables.indexOf('planned_session_warmup_override') < resetTables.indexOf('planned_session'));
 a('reset explicitly clears both immutable Phase 18 side-cars',
   ['set_dose_target', 'session_outcome'].every((table) => resetTables.includes(table)));
 a('reset explicitly clears the autopilot attribution side-car',
@@ -979,6 +982,10 @@ if (resetTables.length >= 15) {
   db.exec("INSERT INTO one_rep_max (movement_id,load_kg,updated_at_ms) VALUES (1,100,0)");
   db.exec("INSERT INTO training_block (block_id,start_date,objective,created_at_ms) VALUES (701,'2026-06-01','strength',0)");
   db.exec("INSERT INTO planned_session (planned_session_id,block_id,week_index,day_index,focus,phase,session_date) VALUES (701,701,1,1,'upper','accumulation','2026-06-10')");
+  db.exec("INSERT INTO warmup_preset (preset_id,name,purpose,weakness_target,include_ramp_sets,created_at_ms,updated_at_ms) VALUES (701,'Reset Warmup','prehab','shoulder_cuff',1,1000,1000)");
+  db.exec("INSERT INTO warmup_preset_item (preset_id,item_order,source_kind,catalog_drill_id,title,sets,dose_kind,dose_amount,per_side) VALUES (701,0,'catalog_drill','mobilise.arm_circles','Arm circles',1,'time',30,0)");
+  db.exec("INSERT INTO warmup_session_type_assignment (session_type,preset_id,updated_at_ms) VALUES ('upper',701,1000)");
+  db.exec("INSERT INTO planned_session_warmup_override (planned_session_id,mode,preset_id,updated_at_ms) VALUES (701,'preset',701,1000)");
   db.exec("INSERT INTO planned_session_focus_ext (planned_session_id,focus) VALUES (701,'push')");
   db.exec("INSERT INTO planned_session_method (planned_session_id,schema_type,routine_template_id,template_name,frozen_at_ms) VALUES (701,'APRE',NULL,'Reset probe',0)");
   db.exec("INSERT INTO planned_slot (planned_slot_id,planned_session_id,slot_index,movement_id,sets,reps,target_rpe) VALUES (701,701,1,1,4,5,8.0)");
@@ -988,14 +995,18 @@ if (resetTables.length >= 15) {
   db.exec("INSERT INTO planned_slot_legacy_role_allowance (planned_slot_id,role) VALUES (701,'supplementary')");
   db.prepare(MAT).run('2026-06-10'); // materializes a state_vector row (mech_daily already filled by trigger)
   const cnt = (t) => Number(db.prepare(`SELECT count(*) c FROM ${t}`).get().c);
-  const seeded = ['session', 'set_record', 'session_plan_slot', 'session_skipped_slot', 'set_load_shown', 'set_dose_target', 'session_outcome', 'set_prefix', 'niggle', 'one_rep_max', 'training_block', 'planned_session', 'planned_session_focus_ext', 'planned_session_method', 'planned_slot', 'planned_slot_autopilot', 'planned_slot_athlete_override', 'planned_slot_routine_decision', 'planned_slot_legacy_role_allowance', 'mech_daily', 'state_vector'];
+  const seeded = ['session', 'set_record', 'session_plan_slot', 'session_skipped_slot', 'set_load_shown', 'set_dose_target', 'session_outcome', 'set_prefix', 'niggle', 'one_rep_max', 'training_block', 'planned_session', 'planned_session_warmup_override', 'planned_session_focus_ext', 'planned_session_method', 'planned_slot', 'planned_slot_autopilot', 'planned_slot_athlete_override', 'planned_slot_routine_decision', 'planned_slot_legacy_role_allowance', 'mech_daily', 'state_vector'];
   a('seed populated the history tables', seeded.every((t) => cnt(t) > 0));
   const profBefore = cnt('athlete_profile'); const movBefore = cnt('movement');
+  const presetBefore = cnt('warmup_preset'); const presetItemBefore = cnt('warmup_preset_item'); const assignBefore = cnt('warmup_session_type_assignment');
   for (const t of resetTables) db.prepare(`DELETE FROM ${t}`).run(); // the store's exact sequence
   a('reset cleared EVERY history table (demo can re-load)', resetTables.every((t) => cnt(t) === 0), seeded.map((t) => `${t}=${cnt(t)}`).filter((s) => !s.endsWith('=0')).join(',') || 'all empty');
-  a('athlete_profile + movement library SURVIVE the reset',
-    cnt('athlete_profile') === profBefore && profBefore === 1 && cnt('movement') === movBefore && movBefore === 300,
-    `profile ${cnt('athlete_profile')}/${profBefore}, movement ${cnt('movement')}/${movBefore}`);
+  a('athlete_profile + movement library + warm-up presets SURVIVE the reset',
+    cnt('athlete_profile') === profBefore && profBefore === 1 && cnt('movement') === movBefore && movBefore === 300
+      && cnt('warmup_preset') === presetBefore && presetBefore === 1
+      && cnt('warmup_preset_item') === presetItemBefore && presetItemBefore === 1
+      && cnt('warmup_session_type_assignment') === assignBefore && assignBefore === 1,
+    `profile ${cnt('athlete_profile')}/${profBefore}, movement ${cnt('movement')}/${movBefore}, preset ${cnt('warmup_preset')}/${presetBefore}`);
   db.exec('ROLLBACK');
 }
 

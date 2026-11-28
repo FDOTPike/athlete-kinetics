@@ -262,3 +262,7 @@ Final live durable tables: 140 (the 134 above, plus `training_program_day_focus_
 ### Migration 082 description preference
 
 Final live durable tables: 141. The per-profile `profile_ui_description_preference` table is carried by the encrypted whole-database snapshot. Migration slot `082` is entry 81 and the v81 backup schema fingerprints 230 objects.
+
+### Update 2026-11-28 — migration 083 (warm-up presets)
+
+Final live durable tables: 145 (the 141 above, plus `warmup_preset`, `warmup_preset_item`, `warmup_session_type_assignment`, and `planned_session_warmup_override`). The migration array has 82 entries through slot `083`, so `PRAGMA user_version = 82`. The current backup contract fingerprints 234 durable table/index/trigger objects; all earlier schema contracts remain registered unchanged. `warmup_preset`, `warmup_preset_item`, and `warmup_session_type_assignment` are preserved across `resetTrainingData` alongside preferences, while `planned_session_warmup_override` is cleared before `planned_session`.
