@@ -71,7 +71,7 @@ const FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_state_vecto
   '069_resting_heart_rate.sql',
   '070_session_feel.sql', '071_beta_recording.sql', '072_question_log.sql', '073_session_slot_replaced_by.sql',
   '074_session_feel_reasons.sql', '075_session_plan_slot_planned_count.sql', '076_sport_taxonomy_expansion.sql', '077_multisport_and_flexibility.sql',
-  '078_kinestrike_telemetry.sql', '079_session_slot_swap_cause.sql', '080_sport_peaking_and_lifting_taxonomy.sql', '081_advanced_program_control.sql'];
+  '078_kinestrike_telemetry.sql', '079_session_slot_swap_cause.sql', '080_sport_peaking_and_lifting_taxonomy.sql', '081_advanced_program_control.sql', '082_profile_ui_description_mode.sql'];
 const MIGRATIONS = FILES.map((f) => readFileSync(join(SCHEMA_DIR, f), 'utf-8'));
 
 const MATERIALIZE_SQL = readFileSync(join(SCHEMA_DIR, '004_state_vector_materialize.sql'), 'utf-8');
@@ -1768,11 +1768,11 @@ console.log('[2u] 057 block_meta phase/index repair + enforcement');
     const db = freshDb();
     runMigrations(db, MIGRATIONS);
     // Slot 004 is the parameterized materialize script, never a migration:
-    // 80 files (slots 001-081, no 004) -> user_version 80. This count is
+    // 81 files (slots 001-082, no 004) -> user_version 81. This count is
     // pinned deliberately so adding a migration is a conscious act, not a
-    // silent one. Re-pinned for 081 (advanced_program_control).
-    check('fresh install reaches user_version 80 (80 files, no slot 004)',
-      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 80,
+    // silent one. Re-pinned for 082 (description mode).
+    check('fresh install reaches user_version 81 (81 files, no slot 004)',
+      uv(db) === MIGRATIONS.length && MIGRATIONS.length === 81,
       String(uv(db)));
     const trig = db.raw.prepare(
       `SELECT COUNT(*) AS c FROM sqlite_master WHERE type = 'trigger'
@@ -4823,7 +4823,7 @@ console.log('[080] sport peaking catalog, lifting taxonomy, and meet countdown s
 console.log('[081] advanced program control (focus ext, schedule mode, slot overrides, day routines, planned slot overrides)');
 {
   const index = FILES.indexOf('081_advanced_program_control.sql');
-  check('081 is the last migration in the chain', index === MIGRATIONS.length - 1);
+  check('081 precedes 082', index === 79 && FILES[index + 1] === '082_profile_ui_description_mode.sql');
   const d = freshDb();
   runMigrations(d, MIGRATIONS);
   const has = (name) => d.raw.prepare("SELECT COUNT(*) c FROM sqlite_master WHERE type='table' AND name=?").get(name).c === 1;
@@ -4894,6 +4894,33 @@ console.log('[081] advanced program control (focus ext, schedule mode, slot over
     sentinelsMissing(d).includes('training_program_slot_override'));
   runMigrations(d, MIGRATIONS);
   check('081 self-heal restores dropped side-car table', has('training_program_slot_override'));
+}
+
+// [082] The slot preference must be strict, idempotent, and repaired by replay.
+{
+  const d = freshDb();
+  runMigrations(d, MIGRATIONS);
+  const table = 'profile_ui_description_preference';
+  const ddl = d.raw.prepare("SELECT sql FROM sqlite_master WHERE name = ?").get(table)?.sql;
+  check('082 creates a STRICT description preference table', /STRICT$/.test(ddl ?? ''));
+  if (ddl !== undefined) {
+    d.raw.exec("INSERT INTO profile_ui_description_preference (profile_slot_id, description_mode) VALUES (1, 'expanded')");
+    check('082 rejects unknown description mode', (() => {
+      try {
+        d.raw.exec("UPDATE profile_ui_description_preference SET description_mode = 'unknown'");
+        return false;
+      } catch (error) {
+        return /CHECK constraint failed/.test(error.message);
+      }
+    })());
+    d.raw.exec(MIGRATIONS.at(-1));
+    check('082 replay preserves the selected description mode',
+      d.raw.prepare('SELECT description_mode FROM profile_ui_description_preference').get().description_mode === 'expanded');
+    d.raw.exec('DROP TABLE profile_ui_description_preference');
+    check('082 missing side-car triggers self-heal', sentinelsMissing(d).includes(table));
+    runMigrations(d, MIGRATIONS);
+    check('082 self-heal restores the table', d.raw.prepare("SELECT 1 FROM sqlite_master WHERE name = ?").get(table) !== undefined);
+  }
 }
 
 console.log(`\n${fail === 0 ? 'ALL CHECKS PASSED' : `${fail} CHECK(S) FAILED`}`);

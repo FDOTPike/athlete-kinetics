@@ -22,7 +22,7 @@ import { notedReportShowsCue, reportEntryName } from '../state/reportCopy';
 import type { TriageOutcome } from '../state/useStore';
 import { theme } from '../theme/theme';
 import { IS_BETA_BUILD } from '../config/features';
-import { Chip, PrimaryButton, SecondaryButton } from './ui';
+import { CompactDescription, Chip, PrimaryButton, SecondaryButton } from './ui';
 import KeyboardAwareScrollView from './KeyboardAwareScrollView';
 
 /** Shown on both report forms (completion screen and Plan screen) when the store did not take the report. */
@@ -158,8 +158,9 @@ export function SubjectiveReportPanel({
   return (
     <KeyboardAwareScrollView style={styles.screen} contentContainerStyle={styles.content} testID="completion-report-panel">
       {haltCard}
-      <Text style={styles.title} accessibilityRole="header">Something feels off</Text>
-      <Text style={styles.caption}>Add a subjective report only when you need Coach to adapt</Text>
+      <CompactDescription label="Something feels off" heading={<Text style={styles.title} accessibilityRole="header">Something feels off</Text>}>
+        <Text style={styles.caption}>Add a subjective report only when you need Coach to adapt</Text>
+      </CompactDescription>
       {!triageReady && (
         <Text style={styles.caption}>
           Semantic matching is unavailable in this build. Injury-language safety checks still apply.

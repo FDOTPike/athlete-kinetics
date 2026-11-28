@@ -40,7 +40,7 @@ import {
   type TrainingAge,
 } from '@ak/inference';
 import { theme } from '../theme/theme';
-import { Chip, QuietAction } from './ui';
+import { CompactDescription, Chip, QuietAction } from './ui';
 
 /** Today in the device's local calendar, YYYY-MM-DD. Kept here (not imported
  * from the store) so the editors stay usable wherever the store is not. */
@@ -334,9 +334,11 @@ export function GoalExerciseField({ movements, movementId, onChange }: GoalExerc
           )}
         </>
       )}
-      <Text style={styles.dim}>
-        When a goal names an exercise, a new plan includes it whenever your equipment and experience level allow, and tells you when they do not.
-      </Text>
+      <CompactDescription label="Linked exercise">
+        <Text style={styles.dim}>
+          When a goal names an exercise, a new plan includes it whenever your equipment and experience level allow, and tells you when they do not.
+        </Text>
+      </CompactDescription>
     </View>
   );
 }

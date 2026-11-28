@@ -66,18 +66,18 @@ const check = (name, cond, detail = '') => {
 
 const schemaFile = path.resolve('packages/core-db/src/schema/080_sport_peaking_and_lifting_taxonomy.sql');
 check('080_sport_peaking_and_lifting_taxonomy.sql exists', fs.existsSync(schemaFile), schemaFile);
-check('MIGRATIONS.length === 80 (slots 080 and 081 registered)',
-  MIGRATIONS.length === 80 && importMap.get('m080') === schemaFile && importMap.has('m081'), `length=${MIGRATIONS.length}`);
-check('BACKUP_SCHEMA_USER_VERSION === 80 and MIGRATION_SLOT === 81',
-  BACKUP_SCHEMA_USER_VERSION === 80 && BACKUP_SCHEMA_MIGRATION_SLOT === 81
+check('the 81-entry migration chain still registers slots 080 and 081',
+  MIGRATIONS.length === 81 && importMap.get('m080') === schemaFile && importMap.has('m081'), `length=${MIGRATIONS.length}`);
+check('historical 080 and 081 backup contracts coexist with current slot 082',
+  BACKUP_SCHEMA_USER_VERSION === 81 && BACKUP_SCHEMA_MIGRATION_SLOT === 82
     && backupSchemaContractFor(79, 80) !== null && backupSchemaContractFor(80, 81) !== null,
   `uv=${BACKUP_SCHEMA_USER_VERSION} slot=${BACKUP_SCHEMA_MIGRATION_SLOT}`);
 
 const db = freshDb();
 runMigrations(db, MIGRATIONS);
 
-check('user_version reaches 80 with zero missing sentinels',
-  db.executeSync('PRAGMA user_version').rows[0].user_version === 80 && sentinelsMissing(db).length === 0,
+check('user_version reaches 81 with zero missing sentinels',
+  db.executeSync('PRAGMA user_version').rows[0].user_version === 81 && sentinelsMissing(db).length === 0,
   `uv=${db.executeSync('PRAGMA user_version').rows[0].user_version} missing=${sentinelsMissing(db).join(',')}`);
 
 // Widened 24-sport CHECK & matches_per_week 0..52 on both sport tables

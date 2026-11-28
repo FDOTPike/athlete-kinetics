@@ -17,7 +17,7 @@ import {
   type TimingCommitment,
 } from '@ak/inference';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
-import { Chip, Disclosure, PrimaryButton, QuietAction, SecondaryButton } from '../components/ui';
+import { CompactDescription, Chip, Disclosure, PrimaryButton, QuietAction, SecondaryButton } from '../components/ui';
 import {
   deviceTimezone,
   type ActivityDefinitionFact,
@@ -497,7 +497,9 @@ export default function ActivitiesScreen({ onClose }: ActivitiesScreenProps): Re
           <TextInput disableFullscreenUI style={styles.input} value={effortText} onChangeText={editField(setEffortText)}
             keyboardType="decimal-pad" accessibilityLabel="Whole activity effort from 1 to 10"
             placeholder="1 very easy · 10 hardest effort" placeholderTextColor={theme.color.textLow} />
-          <Text style={styles.hint}>Effort is for the whole activity. Blank stays unknown; it is never converted to RIR.</Text>
+          <CompactDescription label="Whole activity effort">
+            <Text style={styles.hint}>Effort is for the whole activity. Blank stays unknown; it is never converted to RIR.</Text>
+          </CompactDescription>
 
           {entryMode === 'one_off' && (
             <Disclosure label="ACTIVITY CONTEXT (OPTIONAL)" hint="Modality and purpose stay factual">

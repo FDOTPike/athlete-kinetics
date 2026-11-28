@@ -11,6 +11,8 @@
  * Pure: it reads the block's session summaries only. The session itself is
  * started by the store, through the same checks as any planned start.
  */
+import { formatAthleteDate } from './athleteDate';
+
 export interface OffPlanSessionSummary {
   readonly plannedSessionId: number;
   readonly focus: string;
@@ -58,7 +60,9 @@ export const offPlanSessionName = (session: OffPlanSessionSummary): string => {
 };
 
 /** What the control says it will start. */
-export const offPlanStartCaption = (target: OffPlanStartTarget): string =>
-  target.kind === 'earliest_unfinished'
-    ? `This starts ${offPlanSessionName(target.session)} (${target.session.sessionDate}), the earliest one you have not finished.`
-    : `This starts ${offPlanSessionName(target.session)} (${target.session.sessionDate}), your next planned session.`;
+export const offPlanStartCaption = (target: OffPlanStartTarget): string => {
+  const start = `This starts ${offPlanSessionName(target.session)} (${formatAthleteDate(target.session.sessionDate)})`;
+  return target.kind === 'earliest_unfinished'
+    ? `${start}, the earliest one you have not finished.`
+    : `${start}, your next planned session.`;
+};

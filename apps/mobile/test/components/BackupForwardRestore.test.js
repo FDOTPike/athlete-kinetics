@@ -656,6 +656,33 @@ test('backing up an athlete file that is still at v63 produces a current-schema 
   expect(artifacts()).toEqual([]);
 });
 
+test('encrypted backup restores each athlete’s saved description mode', async () => {
+  const livePath = join(mockLibraryDir, 'athlete_kinetics.db');
+  const db = open(livePath);
+  try {
+    db.exec("INSERT INTO profile_ui_description_preference (profile_slot_id, description_mode) VALUES (1, 'expanded')");
+  } finally { db.close(); }
+
+  await useBackupStore.getState().createBackup(PASSWORD);
+  expect(useBackupStore.getState().status).toBe('success');
+  const changed = open(livePath);
+  try {
+    changed.exec("UPDATE profile_ui_description_preference SET description_mode = 'compact'");
+  } finally { changed.close(); }
+  copyFileSync(mockSavedBackupPath, mockSelectedBackupPath);
+  mockSelectedSize = statSync(mockSelectedBackupPath).size;
+  useBackupStore.setState({ status: 'idle', message: null, preview: null });
+  await useBackupStore.getState().chooseRestore(PASSWORD);
+  expect(useBackupStore.getState().status).toBe('preview');
+  await useBackupStore.getState().confirmRestore(PASSWORD);
+  expect(useBackupStore.getState().status).toBe('success');
+
+  const restored = open(livePath);
+  try {
+    expect(restored.prepare("SELECT description_mode FROM profile_ui_description_preference WHERE profile_slot_id = 1").get().description_mode).toBe('expanded');
+  } finally { restored.close(); }
+});
+
 test('round trip at the current schema: a live session, its preparation protocol and item records survive backup and restore', async () => {
   const livePath = join(mockLibraryDir, 'athlete_kinetics.db');
   const db = open(livePath);
@@ -757,9 +784,13 @@ describe('every registered pre-upgrade schema restores, not only the first', () 
     expect([v79.migrationSlot, v79.tableCount]).toEqual([80, v78.tableCount + 5]);
     // 081 (#228) adds six additive program-control side-car tables.
     const v80 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 80);
-    expect(v80).toBe(CURRENT);
+    expect(v80).not.toBe(CURRENT);
     expect(v80.fingerprint).not.toBe(v79.fingerprint);
     expect([v80.migrationSlot, v80.tableCount]).toEqual([81, v79.tableCount + 6]);
+    const v81 = SUPPORTED_BACKUP_SCHEMA_CONTRACTS.find((contract) => contract.userVersion === 81);
+    expect(v81).toBe(CURRENT);
+    expect([v81.migrationSlot, v81.tableCount, v81.objectCount])
+      .toEqual([82, v80.tableCount + 1, v80.objectCount + 1]);
     expect(v70.fingerprint).not.toBe(v69.fingerprint);
     expect([v70.migrationSlot, v70.tableCount]).toEqual([71, v69.tableCount + 2]);
     expect(PRE_UPGRADE.length).toBeGreaterThanOrEqual(7);
@@ -968,4 +999,16 @@ test('round trip at the current schema: focus, goals, every revision and measure
     expect(() => restored.exec("UPDATE block_emphasis SET report_json = '{}'")).toThrow(/immutable/);
   } finally { restored.close(); }
   expect(artifacts()).toEqual([]);
+});
+
+// A Windows checkout or bundle can carry CRLF bytes. The jest .sql loader must
+// hand the migration runner the same LF text a Git LF checkout does, and only
+// the shipped 058 two-lineage table may carry a backup lineage equivalence.
+test('the .sql loader normalizes CRLF and the backup lineage registry holds only 058', () => {
+  const transformer = require('../sqlRawTransformer');
+  const loaded = { exports: undefined };
+  new Function('module', transformer.process('CREATE TABLE t (\r\n  a INTEGER\r\n) STRICT;\r\n').code)(loaded);
+  expect(loaded.exports).toBe('CREATE TABLE t (\n  a INTEGER\n) STRICT;\n');
+  const { KNOWN_LINEAGE_SQL_EQUIVALENTS } = require('../../../../packages/core-db/src/backup/schemaContract');
+  expect(KNOWN_LINEAGE_SQL_EQUIVALENTS.map((entry) => entry.name)).toEqual(['suspension_episode']);
 });

@@ -186,6 +186,14 @@ export const SUPPORTED_BACKUP_SCHEMA_CONTRACTS: readonly BackupSchemaContract[] 
     objectCount: 229,
     fingerprint: '18e8e595edc07baf10fd1c4ae85de155830f99859b2936d990dbaf78bdeae892',
   },
+  // Through 082: per-profile description display preference.
+  {
+    userVersion: 81,
+    migrationSlot: 82,
+    tableCount: 141,
+    objectCount: 230,
+    fingerprint: 'feae0da792ded0c3b07b073d502023487d3b8ac25890c9006917f87de9ac3bba',
+  },
 ];
 
 export const CURRENT_BACKUP_SCHEMA_CONTRACT: BackupSchemaContract =
@@ -236,13 +244,13 @@ export function backupSchemaContractFor(userVersion: number, migrationSlot: numb
  * for `suspension_episode`, and its exact fingerprint differs from a fresh
  * install's even though columns, CHECKs, indexes and triggers are identical.
  *
- * This table maps that ONE exact stored text to the canonical (feature) text
- * before fingerprinting. It is an exact string match — not comment stripping,
+ * The registry maps each exact stored text to its canonical text before
+ * fingerprinting. It is an exact string match — not comment stripping,
  * not whitespace folding, not a relaxed comparison — so any other text,
  * including a one-byte change to either variant, still fails the contract.
  * Columns are compared unchanged. Adding an entry here requires the same
- * review as adding a migration: verify:backup pins both texts against the
- * real chains (fixtures under packages/core-db/test/fixtures/lineage/).
+ * review as adding a migration. The migration-lineage and backup gates
+ * exercise both texts against SQLite.
  */
 export const MASTER_058_SUSPENSION_EPISODE_SQL = 'CREATE TABLE suspension_episode (\n'
   + '  episode_id         INTEGER PRIMARY KEY,\n'

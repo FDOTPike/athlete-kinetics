@@ -48,13 +48,14 @@ jest.mock('@ak/inference', () => {
 const resolveLoadSelectionSpy = jest.fn((input) => actualResolveLoadSelection(input));
 // Issue 158: a test can set the font scale. Undefined keeps the real hook's value.
 let mockFontScale;
+let mockWindowWidth;
 jest.mock('react-native/Libraries/Utilities/useWindowDimensions', () => {
   const actual = jest.requireActual('react-native/Libraries/Utilities/useWindowDimensions').default;
   return {
     __esModule: true,
     default: () => {
       const dims = actual();
-      return mockFontScale === undefined ? dims : { ...dims, fontScale: mockFontScale };
+      return { ...dims, fontScale: mockFontScale ?? dims.fontScale, width: mockWindowWidth ?? dims.width };
     },
   };
 });
@@ -113,7 +114,7 @@ const state = (overrides = {}) => {
     openSubstitution: jest.fn(), openNeutralSwap: jest.fn(), closeSubstitution: jest.fn(), applyNeutralSwap: jest.fn(), applyRegression: jest.fn(), applyDaySwap: jest.fn(),
     reportNiggle: jest.fn(() => true), logSet: jest.fn(), editSet: jest.fn(), endSession: jest.fn(),
     runner: runner(), sessionMode: 'guided',
-    uiPreferences: { sessionModeOverride: null, readinessDetail: 'summary', restTimerEnabled: true, textScale: 'system' },
+    uiPreferences: { sessionModeOverride: null, readinessDetail: 'summary', restTimerEnabled: true, textScale: 'system', descriptionMode: 'expanded' },
     bandLadder: [], advanceRunnerRest: jest.fn(), skipRunnerRest: jest.fn(), setRunnerRestOverride: jest.fn(), runnerThumbsDown: jest.fn(), runnerHalt: jest.fn(),
     loadSessionOutcome: jest.fn(() => null),
     dismissOutcome: jest.fn(function() {
@@ -3366,9 +3367,67 @@ test('without an edit, coming back shows the seeded load', () => {
   expect(screen.getByTestId('session-load-input').props.value).toBe(seeded);
 });
 
+test('Compact folds the rest explanation while the rest controls stay visible', () => {
+  mockState = state({
+    runner: runner({
+      phase: 'resting',
+      setIndex: 1,
+      restSecondsTarget: 90,
+      restStartedAtMs: Date.now(),
+      restRpe: 8,
+      restSecondsOverride: 90,
+      slotSetCounts: [1, 0],
+      loggedSets: 1,
+    }),
+  });
+  mockState.uiPreferences.descriptionMode = 'compact';
+  render(<SessionScreen />);
+  const explanation = 'Rest uses your effort rating, or the planned effort if you leave it blank. Harder sets get longer rests; a bodyweight set gets 60 to 90 seconds. Your changes apply for this session.';
+  expect(screen.queryByText(explanation)).toBeNull();
+  expect(screen.getByTestId('session-rest-between')).toHaveTextContent('Rest between sets: 1:30');
+  expect(screen.getByLabelText('Change rest (min:sec) 1:30')).toBeOnTheScreen();
+  expect(screen.getByLabelText('Increase Change rest (min:sec)')).toBeOnTheScreen();
+  expect(screen.getByLabelText('Decrease Change rest (min:sec)')).toBeOnTheScreen();
+  const toggle = screen.getByLabelText('Show details for Rest between sets');
+  expect(StyleSheet.flatten(toggle.props.style)).toEqual(expect.objectContaining({
+    minWidth: theme.touch.min,
+    minHeight: theme.touch.min,
+  }));
+  fireEvent.press(toggle);
+  expect(screen.getByText(explanation)).toBeOnTheScreen();
+});
+
+test('Compact hides effort help without hiding stop guidance', () => {
+  mockState = state();
+  mockState.uiPreferences.descriptionMode = 'compact';
+  render(<SessionScreen />);
+  expect(screen.queryByTestId('rpe-cue')).toBeNull();
+  expect(screen.getByTestId('effort-stop-guidance')).toHaveTextContent(
+    'Pain, dizziness, or losing control of the movement: stop the set. Pain is not effort — never trade form for the number.',
+  );
+  fireEvent.press(screen.getByLabelText('Show details for Effort guide'));
+  expect(screen.getByTestId('rpe-cue')).toHaveTextContent('Effort is optional evidence — leave it untouched to skip.');
+});
+
 describe('large text at font scale 2.0 (issue 158)', () => {
   afterEach(() => {
     mockFontScale = undefined;
+    mockWindowWidth = undefined;
+  });
+
+  test.each([360, 412])('at %i dp the two workout actions have separate full-width rows', (width) => {
+    mockFontScale = 1;
+    mockWindowWidth = width;
+    mockState = state();
+    render(<SessionScreen />);
+    expect(StyleSheet.flatten(screen.getByTestId('workout-quick-row').props.style).flexDirection).toBe('column');
+    for (const label of [/^Swap exercise: .+$/, 'Report discomfort']) {
+      const action = screen.getByLabelText(label);
+      expect(StyleSheet.flatten(action.props.style)).toMatchObject({
+        alignSelf: 'stretch',
+        minHeight: theme.touch.min,
+      });
+    }
   });
 
   test('at font scale 2.0 the two workout buttons stack, and each fills the row', () => {
@@ -3380,8 +3439,9 @@ describe('large text at font scale 2.0 (issue 158)', () => {
     expect(StyleSheet.flatten(screen.getByLabelText(/^Swap exercise: .+$/).props.style)).toMatchObject({ alignSelf: 'stretch' });
   });
 
-  test('at the default font scale the two workout buttons stay side by side', () => {
+  test('at the default font scale the two workout buttons stay side by side on a wide display', () => {
     mockFontScale = 1;
+    mockWindowWidth = 600;
     mockState = state();
     render(<SessionScreen />);
     expect(StyleSheet.flatten(screen.getByTestId('workout-quick-row').props.style)).toMatchObject({ flexDirection: 'row' });

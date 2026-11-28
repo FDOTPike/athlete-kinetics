@@ -18,12 +18,14 @@
 const crypto = require('crypto');
 
 module.exports = {
+  // CRLF is folded to LF so a Windows checkout hands the runner the same
+  // bytes a Git LF checkout does (the runner normalizes again before executing).
   process(sourceText) {
-    return { code: `module.exports = ${JSON.stringify(sourceText)};\n` };
+    return { code: `module.exports = ${JSON.stringify(sourceText.replace(/\r\n/g, '\n'))};\n` };
   },
   getCacheKey(sourceText) {
     return crypto.createHash('sha1')
-      .update('sql-raw-transformer-v1')
+      .update('sql-raw-transformer-v2')
       .update(sourceText)
       .digest('hex');
   },

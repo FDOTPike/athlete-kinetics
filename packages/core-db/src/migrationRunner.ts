@@ -355,6 +355,7 @@ export const SENTINELS: readonly MigrationSentinel[] = [
   { type: 'table', name: 'training_program_slot_override' },                  // 081
   { type: 'table', name: 'training_program_day_routine' },                    // 081
   { type: 'table', name: 'planned_slot_athlete_override' },                   // 081
+  { type: 'table', name: 'profile_ui_description_preference' },             // 082
 ];
 
 /** Durable tables deliberately absent from SENTINELS, each with the reason it
@@ -532,7 +533,19 @@ export function splitSqlStatements(sql: string): string[] {
  * steps only the first statement of a script.)
  */
 function executeScript(db: MigrationDb, sql: string): void {
-  for (const statement of splitSqlStatements(sql)) db.executeSync(statement);
+  for (const statement of splitSqlStatements(normalizeSqlLineEndings(sql))) db.executeSync(statement);
+}
+
+/**
+ * SQLite stores a CREATE statement's text verbatim in sqlite_master, and the
+ * backup schema fingerprint covers that text. A Windows checkout or dev bundle
+ * can hand the runner CRLF bytes, which would store a different text for the
+ * same schema. Every script is therefore executed with CRLF folded to LF, so
+ * the stored definitions are the canonical LF text whatever the source bytes.
+ * Checked-in migrations are LF (.gitattributes), so this is a no-op for them.
+ */
+export function normalizeSqlLineEndings(sql: string): string {
+  return sql.replace(/\r\n/g, '\n');
 }
 
 function applyFrom(db: MigrationDb, migrations: readonly string[], start: number): void {

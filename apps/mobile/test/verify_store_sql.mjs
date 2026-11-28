@@ -91,7 +91,7 @@ const SCHEMA_FILES = ['001_mechanical_input.sql', '002_telemetry.sql', '003_stat
   // 075 adds session_plan_slot_planned_count, which the store writes when a swap
   // after logged sets overwrites planned_sets, and empties on reset and discard.
   '075_session_plan_slot_planned_count.sql', '076_sport_taxonomy_expansion.sql', '077_multisport_and_flexibility.sql',
-  '078_kinestrike_telemetry.sql', '079_session_slot_swap_cause.sql', '080_sport_peaking_and_lifting_taxonomy.sql', '081_advanced_program_control.sql'];
+  '078_kinestrike_telemetry.sql', '079_session_slot_swap_cause.sql', '080_sport_peaking_and_lifting_taxonomy.sql', '081_advanced_program_control.sql', '082_profile_ui_description_mode.sql'];
 
 
 const db = new DatabaseSync(':memory:');
@@ -892,7 +892,7 @@ a('resetTrainingData body found with its unconditional DELETEs', resetTables.len
 a('reset NEVER clears athlete_profile / movement / profile_slot (settings survive)',
   !['athlete_profile', 'movement', 'movement_detail', 'movement_preference', 'profile_slot'].some((t) => resetTables.includes(t)));
 a('reset NEVER clears the load preference (035) or UI preferences (023) — profile settings survive',
-  !['profile_load_preference', 'profile_ui_preference'].some((t) => resetTables.includes(t)));
+  !['profile_load_preference', 'profile_ui_preference', 'profile_ui_description_preference'].some((t) => resetTables.includes(t)));
 a('reset explicitly clears both immutable Phase 18 side-cars',
   ['set_dose_target', 'session_outcome'].every((table) => resetTables.includes(table)));
 a('reset explicitly clears the autopilot attribution side-car',

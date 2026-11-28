@@ -13,6 +13,7 @@ import InfoTip from '../components/InfoTip';
 import { isEasedBelow } from '../state/loadCopyFacts';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import {
+  CompactDescription,
   PrimaryButton,
   SecondaryButton,
   ListRow,
@@ -524,9 +525,10 @@ export const clearUnloggedLoadDraftsForTests = (): void => { unloggedLoadDrafts.
 export const unloggedLoadDraftCountForTests = (): number => unloggedLoadDrafts.size;
 
 export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionScreenProps = {}): React.JSX.Element {
-  // Large text (issue 158): the two workout buttons stack so their words do not break.
-  const { fontScale } = useWindowDimensions();
-  const stackQuickRow = fontScale >= 1.3;
+  const { fontScale, width } = useWindowDimensions();
+  // The timeline rail and card padding leave too little space for two labels
+  // at phone widths, even at the default font scale.
+  const stackQuickRow = width <= 412 || fontScale >= 1.3;
   const state = useStore((s) => s);
   const nav = typeof useNavigation === 'function' ? useNavigation() : undefined;
   const [emptyStartPromptOpen, setEmptyStartPromptOpen] = useState(false);
@@ -1973,9 +1975,29 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                           onComplete={completeRest}
                           style={{ alignSelf: 'stretch' }}
                         />
-                        <Text style={styles.nextUp} testID="session-rest-between">
-                          {`Rest between sets: ${minutesSeconds(rest.seconds)}`}
-                        </Text>
+                        {runnerResting ? (
+                          // The target follows the last set's effort (restSecondsFor);
+                          // say so, or the number reads as a setting that changed by
+                          // itself (Android walk 2026-11-03, ux-8). Compact folds the
+                          // explanation; the rest value and stepper stay visible.
+                          <CompactDescription
+                            label="Rest between sets"
+                            heading={(
+                              <Text style={styles.nextUp} testID="session-rest-between">
+                                {`Rest between sets: ${minutesSeconds(rest.seconds)}`}
+                              </Text>
+                            )}
+                            style={{ alignSelf: 'stretch' }}
+                          >
+                            <Text style={styles.nextUp}>
+                              Rest uses your effort rating, or the planned effort if you leave it blank. Harder sets get longer rests; a bodyweight set gets 60 to 90 seconds. Your changes apply for this session.
+                            </Text>
+                          </CompactDescription>
+                        ) : (
+                          <Text style={styles.nextUp} testID="session-rest-between">
+                            {`Rest between sets: ${minutesSeconds(rest.seconds)}`}
+                          </Text>
+                        )}
                         {runnerResting && (
                           <>
                             <Stepper
@@ -1987,12 +2009,6 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                               repeatOnHold={true}
                               style={styles.sessionStepper}
                             />
-                            {/* The target follows the last set's effort (restSecondsFor);
-                                say so, or the number reads as a setting that changed by
-                                itself (Android walk 2026-11-03, ux-8). */}
-                            <Text style={styles.nextUp}>
-                              Rest uses your effort rating, or the planned effort if you leave it blank. Harder sets get longer rests; a bodyweight set gets 60 to 90 seconds. Your changes apply for this session.
-                            </Text>
                           </>
                         )}
                         <PrimaryButton
@@ -2251,17 +2267,19 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                             )}
                           </View>
 
-                          <Text style={styles.effortCue} testID="rpe-cue">
-                            {safeRpe !== null
-                              ? (effortCue(safeRpe) ?? 'Effort is optional evidence — leave it untouched to skip.')
-                              : 'Effort is optional evidence — leave it untouched to skip.'}
-                          </Text>
+                          <CompactDescription label="Effort guide">
+                            <Text style={styles.effortCue} testID="rpe-cue">
+                              {safeRpe !== null
+                                ? (effortCue(safeRpe) ?? 'Effort is optional evidence — leave it untouched to skip.')
+                                : 'Effort is optional evidence — leave it untouched to skip.'}
+                            </Text>
+                            <Text style={styles.effortCue}>{EFFORT_BREATHING_NOTE}</Text>
+                          </CompactDescription>
                           {ceilingNote !== null && (
                             <Text style={styles.effortCue} testID="effort-above-ceiling-note" accessibilityLiveRegion="polite">
                               {ceilingNote}
                             </Text>
                           )}
-                          <Text style={styles.effortCue}>{EFFORT_BREATHING_NOTE}</Text>
                           <Text style={styles.effortStop} testID="effort-stop-guidance">{EFFORT_STOP_GUIDANCE}</Text>
                           {/* With no rating, the cue above already says effort is
                               optional; a second line said it again (ux-8). */}
@@ -2357,7 +2375,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                             }}
                             accessibilityLabel={`Swap exercise: ${movement?.name ?? 'this movement'}`}
                             fullWidth={stackQuickRow}
-                            style={{ flex: 1, minHeight: theme.touch.min }}
+                            style={stackQuickRow ? undefined : styles.quickAction}
                           />
                           <SecondaryButton
                             label="Report discomfort"
@@ -2367,7 +2385,7 @@ export default function SessionScreen({ onReturnToToday, onOpenPlan }: SessionSc
                             }}
                             accessibilityLabel="Report discomfort"
                             fullWidth={stackQuickRow}
-                            style={{ flex: 1, minHeight: theme.touch.min }}
+                            style={stackQuickRow ? undefined : styles.quickAction}
                           />
                         </View>
 
@@ -3058,6 +3076,7 @@ const styles = StyleSheet.create({
   quickRowStacked: {
     flexDirection: 'column',
   },
+  quickAction: { flex: 1 },
   safety: {
     marginTop: theme.space[3],
     padding: theme.space[3],

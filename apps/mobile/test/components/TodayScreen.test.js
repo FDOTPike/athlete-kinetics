@@ -338,6 +338,12 @@ describe('adjustments read as English and never overstate', () => {
 // Screen behaviour and ACTION IDENTITY
 // ---------------------------------------------------------------------------
 
+test('Today shows the same athlete-facing calendar format as other dates', () => {
+  render(<TodayScreen />);
+  expect(screen.getByText(formatAthleteDate(TODAY))).toBeOnTheScreen();
+  expect(screen.queryByText(TODAY)).toBeNull();
+});
+
 describe('Today starts the workout directly — no Coach detour', () => {
   test('a planned day offers ONE primary action that calls the production start path', () => {
     // Sol R4 F5: the mock now does what the real store does on success —
@@ -815,8 +821,9 @@ describe('#228 the off-plan start opens a planned session and says which', () =>
       freeFormStartIsEmpty: () => true,
     });
     render(<TodayScreen />);
-    expect(screen.getByTestId('today-adhoc-session-caption'))
-      .toHaveTextContent("This starts Friday's upper-body session (2026-07-17), your next planned session.");
+    const caption = `This starts Friday's upper-body session (${formatAthleteDate('2026-07-17')}), your next planned session.`;
+    expect(screen.getByTestId('today-adhoc-session-caption')).toHaveTextContent(caption);
+    expect(screen.getByTestId('today-adhoc-session')).toHaveAccessibleName(caption);
     fireEvent.press(screen.getByTestId('today-adhoc-session'));
     expect(mockState.startSession).toHaveBeenCalledWith(false, 2);
     expect(screen.queryByText('Nothing to start yet')).toBeNull();
@@ -832,8 +839,9 @@ describe('#228 the off-plan start opens a planned session and says which', () =>
       ],
     });
     render(<TodayScreen />);
-    expect(screen.getByTestId('today-adhoc-session-caption'))
-      .toHaveTextContent("This starts Tuesday's lower-body session (2026-07-14), the earliest one you have not finished.");
+    const caption = `This starts Tuesday's lower-body session (${formatAthleteDate('2026-07-14')}), the earliest one you have not finished.`;
+    expect(screen.getByTestId('today-adhoc-session-caption')).toHaveTextContent(caption);
+    expect(screen.getByTestId('today-adhoc-session')).toHaveAccessibleName(caption);
     fireEvent.press(screen.getByTestId('today-adhoc-session'));
     expect(mockState.startSession).toHaveBeenCalledWith(false, 2);
   });

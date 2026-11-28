@@ -13368,3 +13368,17 @@ The appendix held the code around the read, every match for `0286` and "record o
 - **Verification Scope (`EVIDENCE CAPTURED`):**
   - Fail-first (`pr228_fail_first.txt`, `pr228_fail_first_db_and_jest.txt`, `pr228_fail_first_migrations.txt`, `pr228_fail_first_split_word.txt`), guard-break/restore (`pr228_guard_break.txt`, `pr228_guard_restored.txt`), and post-edit `npm run typecheck` + `npm run verify:ci` (`pr228_verify_ci.txt`, `pr228_verify_ci_final.txt`) captured outside git working tree.
   - Note: Entry `0304` leaves `0303` available for sibling concurrent branch `#208` / PR `#366`, and migration slot `078` will be reconciled if PR `#366` merges to base prior to `#228`.
+
+## Entry 0305 — 2026-11-23 · Compact descriptions and Pixel 9 Pro fixes
+
+**Input:** Owner handoff for the four-stage isolated run from `fb539d06`. Checkpoint A decisions are provisional and subject to Antigravity and Owner review. The Pixel reported a locked screen at baseline.
+
+**Output:** See the compact-copy judgment ledger and executor handoff for changes, gate output and hardware evidence status.
+
+## Entry 0306 — 2026-11-26 · Compact descriptions post-audit closeout (Opus 5.5)
+
+**Executor:** Claude Opus 5.5 (`C:\codex-sol-compact`, `feat/sol-compact-ui-and-pixel-fixes`, starting HEAD `1f54c76201764a4c84d6b7fd17a0f7bab39d096c`). Local commits only; push reserved for Antigravity.
+
+**Input:** Antigravity audit `SOL_FINAL_WORKORDER_AUDIT_1F54C762.md` closeout items 1–5: remove the dev-session CRLF `082` backup lineage entry and normalize SQL line endings before execution; format the `PLAN` `FIXED UNTIL` date; suppress the duplicate Library detail subtitle; collapse the rest-stepper helper paragraph behind `CompactDescription`; stop the in-flight `Disclosure` rotation on unmount.
+
+**Output:** See `docs/audits/compact-copy/EXECUTOR_HANDOFF.md` and `JUDGMENT_LEDGER.md` for changes, gate output and evidence paths.

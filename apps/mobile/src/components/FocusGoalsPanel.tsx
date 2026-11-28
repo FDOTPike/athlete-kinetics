@@ -24,7 +24,7 @@ import { useStore } from '../state/useStore';
 import { useSubViewBack } from '../navigation/navigation';
 import type { StoredFocus, StoredGoal } from '../state/focusGoalStore';
 import { theme } from '../theme/theme';
-import { Disclosure, PrimaryButton, SecondaryButton } from './ui';
+import { CompactDescription, Disclosure, PrimaryButton, SecondaryButton } from './ui';
 import {
   BALANCED_FOCUS_DRAFT,
   EMPTY_GOAL_FIELDS,
@@ -155,9 +155,11 @@ export function FocusGoalsPanel(): React.JSX.Element | null {
         <View>
           <FocusPicker value={focusDraft} onChange={setFocusDraft}
             showMuscles={showMuscles} onToggleMuscles={() => setShowMuscles((visible) => !visible)} />
-          <Text style={styles.dim}>
-            Saving does not change your current plan. The focus is used when your next block is created.
-          </Text>
+          <CompactDescription label="Save focus">
+            <Text style={styles.dim}>
+              Saving does not change your current plan. The focus is used when your next block is created.
+            </Text>
+          </CompactDescription>
           <View style={styles.actions}>
             <PrimaryButton label="SAVE FOCUS" onPress={commitFocus}
               accessibilityLabel="Save your training focus" testID="profile-focus-save" />

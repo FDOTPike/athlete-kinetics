@@ -46,12 +46,14 @@ import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { appliedAdjustmentLines, autopilotReasonCopy } from '../state/autopilotCopy';
 import { EMPTY_ACTIVITY_LEDGER } from '../state/activityStore';
 import { sessionFocusName } from '../state/sessionSummary';
+import { formatAthleteDate } from '../state/athleteDate';
 import { HALT_NEXT_TEXT, HALT_PAUSE_CARD_TEXT, HALT_TODAY_TEXT } from '../state/haltCopy';
 import { operativeReportLine } from '../state/operativeReportLine';
 import { notedReportShowsCue, reportEffectText, reportEntryName } from '../state/reportCopy';
 import { SafetyReportView } from '../components/SafetyReportView';
 import { isSessionReportStop, SESSION_REPORT_STOP_SENTENCE } from '../state/sessionReportStop';
 import {
+  CompactDescription,
   PrimaryButton,
   SecondaryButton,
   QuietAction,
@@ -220,6 +222,9 @@ function slotTarget(
   }`;
 }
 
+const TRAJECTORY_DAYS = 7;
+const TRAJECTORY_RAIL_MIN_WIDTH = TRAJECTORY_DAYS * theme.touch.min + (TRAJECTORY_DAYS - 1) * theme.space[1];
+
 const AUTOPILOT_BUDGET_NOTE = 'Held steady — effort only rises early in a cycle.';
 
 function autopilotExplanation(slot: TodaySlot): string | null {
@@ -372,6 +377,7 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
   const [detail, setDetail] = useState<SessionDetail | null>(null);
   const [attributionSlotId, setAttributionSlotId] = useState<number | null>(null);
   const [macroBudgetOpen, setMacroBudgetOpen] = useState(false);
+  const [trajectoryOverflows, setTrajectoryOverflows] = useState(false);
   const [manageOpen, setManageOpen] = useState(block === null);
   const scrollRef = useRef<ScrollView>(null);
   const trajectorySectionY = useRef(0);
@@ -663,11 +669,14 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
       <View style={styles.trajectoryHeaderRow}>
         <Text style={styles.sectionTitle}>Four-week trajectory</Text>
         {block != null && blockEndDate != null && (
-          <View style={styles.fixedBadge} accessibilityRole="text" accessibilityLabel={`Fixed until ${blockEndDate}`}>
-            <Text style={styles.fixedBadgeText}>FIXED UNTIL {blockEndDate}</Text>
+          <View style={styles.fixedBadge} accessibilityRole="text" accessibilityLabel={`Fixed until ${formatAthleteDate(blockEndDate)}`}>
+            <Text style={styles.fixedBadgeText}>FIXED UNTIL {formatAthleteDate(blockEndDate)}</Text>
           </View>
         )}
       </View>
+      {block !== null && trajectoryOverflows && (
+        <Text style={styles.captionText}>Swipe across a week to see all seven days.</Text>
+      )}
       {meetHeader !== null && (
         <Text style={styles.captionText} testID="plan-meet-countdown-header">{meetHeader}</Text>
       )}
@@ -727,6 +736,10 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
                     <ScrollView
                       horizontal
                       showsHorizontalScrollIndicator
+                      persistentScrollbar
+                      onLayout={row.week === 1
+                        ? (event) => setTrajectoryOverflows(event.nativeEvent.layout.width < TRAJECTORY_RAIL_MIN_WIDTH)
+                        : undefined}
                       style={styles.dayScroll}
                       contentOffset={{
                         x: Math.max(0, row.cells.findIndex((_, dayIndex) => addDaysIso(block.startDate, (row.week - 1) * 7 + dayIndex) === today)) * (theme.touch.min + theme.space[1]),
@@ -915,12 +928,20 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
          so the pause buttons are not offered. An open pause still shows. */
       <View style={styles.card}>
         <Text style={styles.eyebrow}>PAUSE</Text>
-        <Text style={styles.cardTitle}>Injured, ill, or life got in the way?</Text>
-        <Text style={styles.bodyText}>
-          {halted
-            ? HALT_PAUSE_CARD_TEXT
-            : 'Pausing holds your place in the program so a gap does not cost you a block. You can still train while paused.'}
-        </Text>
+        {halted ? (
+          <>
+            <Text style={styles.cardTitle}>Injured, ill, or life got in the way?</Text>
+            <Text style={styles.bodyText}>{HALT_PAUSE_CARD_TEXT}</Text>
+          </>
+        ) : (
+          <CompactDescription label="Pause" heading={
+            <Text style={styles.cardTitle}>Injured, ill, or life got in the way?</Text>
+          }>
+            <Text style={styles.bodyText}>
+              Pausing holds your place in the program so a gap does not cost you a block. You can still train while paused.
+            </Text>
+          </CompactDescription>
+        )}
         {/* #188: every pause asks first; the pause itself is unchanged. */}
         {confirmPauseReason === null ? SUSPENSION_REASONS.map((reason) => (
           <PrimaryButton
@@ -1364,10 +1385,11 @@ function AvailableBlockScreen({ onSessionStarted }: BlockScreenProps): React.JSX
       {block !== null && appliedLines.length > 0 && (
         <View style={styles.section}>
           <View style={styles.blockAdjustmentsPanel} testID="block-adjustments-panel">
-            <Text style={styles.blockAdjustmentsHeading}>Changed in this block</Text>
-            <Text style={styles.blockAdjustmentsIntro}>
-              These adjustments were applied when this block was built.
-            </Text>
+            <CompactDescription label="Changed in this block" heading={<Text style={styles.blockAdjustmentsHeading}>Changed in this block</Text>}>
+              <Text style={styles.blockAdjustmentsIntro}>
+                These adjustments were applied when this block was built.
+              </Text>
+            </CompactDescription>
             <View style={styles.adjustmentsList}>
               {appliedLines.map((line) => (
                 <View key={line.key} style={styles.adjustmentRow}>
@@ -2061,6 +2083,7 @@ const styles = StyleSheet.create({
   },
   dayRail: {
     flexGrow: 1,
+    minWidth: TRAJECTORY_RAIL_MIN_WIDTH,
     flexDirection: 'row',
     gap: theme.space[1],
   },

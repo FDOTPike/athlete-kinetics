@@ -492,6 +492,12 @@ test('COACH keeps trajectory labels on one line across recovery and finalized st
   // Issue 163: the week row spans the card, shows its scroll bar, and opens at today's cell.
   expect(screen.getByTestId('trajectory-days-week-1').props.horizontal).toBe(true);
   expect(screen.getByTestId('trajectory-days-week-1').props.showsHorizontalScrollIndicator).toBe(true);
+  const scroll = screen.getByTestId('trajectory-days-week-1');
+  expect(scroll.props.persistentScrollbar).toBe(true);
+  fireEvent(scroll, 'layout', { nativeEvent: { layout: { width: 328 } } });
+  expect(screen.getByText('Swipe across a week to see all seven days.')).toBeOnTheScreen();
+  fireEvent(scroll, 'layout', { nativeEvent: { layout: { width: 480 } } });
+  expect(screen.queryByText('Swipe across a week to see all seven days.')).toBeNull();
   expect(StyleSheet.flatten(screen.getByTestId('trajectory-days-week-1').props.style)).toMatchObject({
     width: '100%',
   });

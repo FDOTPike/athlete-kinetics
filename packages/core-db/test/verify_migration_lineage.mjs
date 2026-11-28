@@ -94,6 +94,9 @@ console.log('[L1] frozen SQL bytes, ordinals and registry parity');
   check('unified chain is append-only after the integration point (058 at ordinal 57, 068 at ordinal 67)',
     UNIFIED_FILES[56] === '058_suspension_episode.sql' && UNIFIED_FILES[66] === '068_movement_content_correction_v2.sql'
       && UNIFIED_FILES.slice(67).every((file) => Number(file.slice(0, 3)) > 68));
+  check('082 appends the description side-car after 081 without renumbering either lineage',
+    UNIFIED_FILES[79] === '081_advanced_program_control.sql'
+      && UNIFIED_FILES[80] === '082_profile_ui_description_mode.sql');
   const gateSource = readFileSync(join(CORE, 'test', 'verify_migrations.mjs'), 'utf8');
   const gateFiles = [...gateSource.match(/const FILES = \[([\s\S]*?)\];/)[1].matchAll(/'([^']+\.sql)'/g)].map((m) => m[1]);
   check('verify_migrations.mjs FILES is exactly the production registry (closes the hand-copied-list gap)',
@@ -404,7 +407,36 @@ console.log('[L7] backup schema contract recognises exactly the known lineage va
   check('the equivalence applies only to the suspension_episode TABLE object',
     !contract.matchesBackupSchemaContract(masterObjects.map((o) => (o[1] === 'suspension_episode'
       ? ['index', o[1], o[2], o[3], o[4]] : o)), current, cryptoProvider));
-  check('equivalence registry holds exactly one reviewed entry', contract.KNOWN_LINEAGE_SQL_EQUIVALENTS.length === 1);
+  // A Windows checkout or dev bundle can hand the runner 082 with CRLF line
+  // endings. The runner normalizes line endings before execution, so both
+  // byte forms must store the canonical LF statement: no lineage entry is
+  // registered for this, and DDL drift is still caught.
+  const lfDescriptionSql = (() => {
+    const installed = openDb();
+    runner.runMigrations(installed, UNIFIED);
+    return installed.raw.prepare("SELECT sql FROM sqlite_master WHERE name = 'profile_ui_description_preference'").get().sql;
+  })();
+  for (const [label, ending] of [['Git LF', '\n'], ['Windows CRLF', '\r\n']]) {
+    const installed = openDb();
+    runner.runMigrations(installed, [...UNIFIED.slice(0, -1), UNIFIED.at(-1).replace(/\r?\n/g, ending)]);
+    const objects = schemaObjects(installed);
+    const storedSql = installed.raw.prepare("SELECT sql FROM sqlite_master WHERE name = 'profile_ui_description_preference'").get().sql;
+    check(`082 ${label} bytes are stored as the canonical LF statement (no carriage return)`,
+      !storedSql.includes('\r') && storedSql === lfDescriptionSql);
+    check(`082 ${label} schema matches the current backup contract`,
+      contract.matchesBackupSchemaContract(objects, current, cryptoProvider));
+    const drifted = objects.map((object) => object[1] === 'profile_ui_description_preference'
+      ? [object[0], object[1], object[2], object[3].replace("'expanded'", "'other'"), object[4]]
+      : object);
+    check(`082 ${label} schema with a changed CHECK is rejected`,
+      !contract.matchesBackupSchemaContract(drifted, current, cryptoProvider));
+  }
+  check('equivalence registry is limited to the one shipped two-lineage table (058 suspension_episode)',
+    JSON.stringify(contract.KNOWN_LINEAGE_SQL_EQUIVALENTS.map((entry) => entry.name))
+      === JSON.stringify(['suspension_episode']));
+  check('a CRLF 082 table text is NOT canonicalized by the backup contract (normalization lives in the runner)',
+    !contract.matchesBackupSchemaContract(schemaObjects(masterUpgraded).map((object) => object[1] === 'profile_ui_description_preference'
+      ? [object[0], object[1], object[2], object[3].replace(/\n/g, '\r\n'), object[4]] : object), current, cryptoProvider));
 }
 
 for (const raw of openConnections) {

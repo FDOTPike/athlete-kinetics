@@ -22,7 +22,7 @@ import {
   type SchemaType,
   type SessionTimeAlternative,
 } from '@ak/inference';
-import { Chip, Disclosure, PrimaryButton, SecondaryButton } from '../components/ui';
+import { CompactDescription, Chip, Disclosure, PrimaryButton, SecondaryButton } from '../components/ui';
 import { theme } from '../theme/theme';
 import KeyboardAwareScrollView from '../components/KeyboardAwareScrollView';
 import { EmphasisReportCard } from '../components/EmphasisReportCard';
@@ -761,16 +761,19 @@ export default function ProgramSetupScreen({
         testID="program-advanced"
       >
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>1. Who chooses movements?</Text>
+        <CompactDescription label="1. Who chooses movements?" heading={
+          <Text style={styles.sectionTitle}>1. Who chooses movements?</Text>
+        }>
+          <Text style={styles.caption}>
+            {canCustomizeAdvanced
+              ? 'Choose exercises, sets, reps and target RPE for each slot, or assign a saved routine to a day.'
+              : 'Customize changes movements only. Sets, reps and RPE stay coach-controlled.'}
+          </Text>
+        </CompactDescription>
         <View style={styles.row}>
           <Chip label="Coach build" selected={buildMode === 'coach'} onPress={() => setBuildMode('coach')} />
           <Chip label="Customize" selected={buildMode === 'custom'} onPress={() => setBuildMode('custom')} />
         </View>
-        <Text style={styles.caption}>
-          {canCustomizeAdvanced
-            ? 'Choose exercises, sets, reps and target RPE for each slot, or assign a saved routine to a day.'
-            : 'Customize changes movements only. Sets, reps and RPE stay coach-controlled.'}
-        </Text>
       </View>
 
       <View style={styles.card}>
@@ -815,10 +818,11 @@ export default function ProgramSetupScreen({
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>3. Training days</Text>
-        <Text style={styles.caption} testID="program-days-caption">
-          Choose the days of the week you train. Your schedule repeats every week.
-        </Text>
+        <CompactDescription label="3. Training days" heading={<Text style={styles.sectionTitle}>3. Training days</Text>}>
+          <Text style={styles.caption} testID="program-days-caption">
+            Choose the days of the week you train. Your schedule repeats every week.
+          </Text>
+        </CompactDescription>
         <View style={styles.wrap}>
           {[1, 2, 3, 4, 5, 6, 7].map((day) => (
             <Chip key={day} label={dayLabel(day)} selected={dayIndices.includes(day)} onPress={() => toggleDay(day)} />

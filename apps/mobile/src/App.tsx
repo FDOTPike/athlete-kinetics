@@ -6,6 +6,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   AppState,
+  Dimensions,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -14,6 +15,7 @@ import {
   StyleSheet,
   Text,
   View,
+  useWindowDimensions,
 } from 'react-native';
 import { tryCreateBiometricsBridge } from '@ak/biometrics';
 import { palette, useStore } from './state/useStore';
@@ -30,6 +32,7 @@ import LibraryScreen from './screens/LibraryScreen';
 import ProfileScreen from './screens/ProfileScreen';
 import OnboardingScreen from './screens/OnboardingScreen';
 import { statusBarPaddingTop } from './layout/statusBarPadding';
+import { theme } from './theme/theme';
 import { useBackupStore } from './state/backupStore';
 import { bootAfterSafeRecovery } from './state/backupStartup';
 import { authorizeAthleteDataBoot } from './state/dataMaintenanceLock';
@@ -113,6 +116,14 @@ export default function App(): React.JSX.Element {
 export function AppShell(): React.JSX.Element {
   const keyboardShown = useKeyboardShown();
   const keyboardAvoidance = shellKeyboardAvoidance(Platform.OS, keyboardShown);
+  const { height: windowHeight } = useWindowDimensions();
+  // Android 15+ may draw under the gesture bar. Credit any space the OS
+  // already withheld from the window below the reported status bar.
+  const androidGestureClearance = Platform.OS === 'android' && Number(Platform.Version) >= 35 && !keyboardShown
+    ? Math.max(0, theme.space[6] - Math.max(
+      0, Dimensions.get('screen').height - windowHeight - (StatusBar.currentHeight ?? 0),
+    ))
+    : undefined;
   const programSetupPending = useStore((s) =>
     s.status === 'ready' && s.onboarded && s.block === null && s.program === null);
   // "No block and no program" is NOT only a first-run state: archiving a
@@ -244,7 +255,7 @@ export function AppShell(): React.JSX.Element {
   // under the home indicator. The `shell-root` testID belongs on it directly —
   // the shell-order test walks HOST ancestors and does not require a plain View.
   return (
-    <SafeAreaView style={styles.root} testID="shell-root">
+    <SafeAreaView style={[styles.root, androidGestureClearance === undefined ? undefined : { paddingBottom: androidGestureClearance }]} testID="shell-root">
       <StatusBar barStyle="light-content" backgroundColor={palette.bg} />
       {/* D7: the secondary control bar is a real TOP HEADER, above the body.
           Visible labels are the beginner-readable short forms; accessibility
@@ -395,6 +406,7 @@ const styles = StyleSheet.create({
   },
   headerBtn: {
     flex: 1,
+    flexDirection: 'row',
     minHeight: 56,
     alignItems: 'center',
     justifyContent: 'center',
@@ -404,6 +416,7 @@ const styles = StyleSheet.create({
   // tracking made "WORKOUT" wrap to "WORKOU / T" (Android walk 2026-11-03).
   // Labels keep full font scaling and may wrap, centred, rather than shrink.
   headerText: {
+    flexShrink: 1,
     color: palette.faint,
     fontSize: 10,
     fontWeight: '700',
